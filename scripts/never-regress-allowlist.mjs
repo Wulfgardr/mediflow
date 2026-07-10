@@ -47,6 +47,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'Home-base client tests submit a synthetic operator fixture to validate native login payload encoding against a mocked local endpoint.',
         },
         {
+            path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/PairedPatientsWorkspaceModelLifecycleTests.swift',
+            pattern: 'username\\s*=\\s*"doctor"',
+            reason: 'PIN-rotation lifecycle tests assign a synthetic operator fixture on the workspace model to drive a mocked login; no live credentials are involved.',
+        },
+        {
             path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/HomeBasePatientsClientTests.swift',
             pattern: 'password:\\s*"1992"',
             reason: 'Home-base client tests use a synthetic password literal only inside a mocked local login exchange and never against a live backend.',

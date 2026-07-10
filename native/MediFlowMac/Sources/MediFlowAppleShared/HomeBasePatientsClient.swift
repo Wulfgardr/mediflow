@@ -32,12 +32,83 @@ public actor HomeBasePatientsClient {
         let sessionCookie = try Self.extractSessionCookie(from: response, url: url)
         // The login body carries the wrapped master key + PBKDF2 salt (same as the
         // web client). We keep them so the PIN can unwrap the field-crypto key.
-        let payload = try? JSONDecoder().decode(AuthLoginResponse.self, from: data)
+        let payload = try? decode(AuthLoginResponse.self, from: data)
         return HomeBaseLoginResult(
             sessionCookie: sessionCookie,
             encryptedMasterKey: payload?.encryptedMasterKey,
-            salt: payload?.salt
+            salt: payload?.salt,
+            id: payload?.id,
+            username: payload?.username,
+            displayName: payload?.displayName,
+            ambulatoryName: payload?.ambulatoryName,
+            role: payload?.role
         )
+    }
+
+    public func changePin(
+        currentPin: String,
+        newPin: String,
+        encryptedMasterKey: String,
+        salt: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        let url = try configuration.serverURL()
+            .appendingPathComponent("api")
+            .appendingPathComponent("auth")
+            .appendingPathComponent("change-pin")
+        let (data, _) = try await send(
+            to: url,
+            method: "POST",
+            headers: accountHeaders(sessionCookie: sessionCookie),
+            body: encode(AuthChangePinRequest(
+                currentPin: currentPin,
+                newPin: newPin,
+                encryptedMasterKey: encryptedMasterKey,
+                salt: salt
+            ))
+        )
+        return try decode(HomeBaseMutationAcknowledgement.self, from: data)
+    }
+
+    public func logout(
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        let url = try configuration.serverURL()
+            .appendingPathComponent("api")
+            .appendingPathComponent("auth")
+            .appendingPathComponent("logout")
+        let (data, _) = try await send(
+            to: url,
+            method: "POST",
+            headers: accountHeaders(sessionCookie: sessionCookie)
+        )
+        return try decode(HomeBaseMutationAcknowledgement.self, from: data)
+    }
+
+    public func updateProfile(
+        userId: String,
+        displayName: String,
+        ambulatoryName: String,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        let url = try configuration.serverURL()
+            .appendingPathComponent("api")
+            .appendingPathComponent("auth")
+            .appendingPathComponent("profile")
+        let (data, _) = try await send(
+            to: url,
+            method: "PUT",
+            headers: accountHeaders(sessionCookie: sessionCookie),
+            body: encode(AuthProfileUpdateRequest(
+                id: userId,
+                displayName: displayName,
+                ambulatoryName: ambulatoryName
+            ))
+        )
+        return try decode(HomeBaseMutationAcknowledgement.self, from: data)
     }
 
     public func fetchPatients(
@@ -102,6 +173,80 @@ public actor HomeBasePatientsClient {
             ]
         )
         return try decode([NetworkAmbulatorySummary].self, from: data)
+    }
+
+    public func createAmbulatory(
+        payload: HomeBaseAmbulatoryCreatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("ambulatories")
+        let (data, _) = try await send(
+            to: url,
+            method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: nil),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseAmbulatoryMutationResponse.self, from: data)
+    }
+
+    public func updateAmbulatory(
+        id: String,
+        payload: HomeBaseAmbulatoryUpdatePayload,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("ambulatories")
+            .appendingPathComponent(id)
+        let (data, _) = try await send(
+            to: url,
+            method: "PUT",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: nil),
+            body: encode(payload)
+        )
+        return try decode(HomeBaseAmbulatoryMutationResponse.self, from: data)
+    }
+
+    public func deleteAmbulatory(
+        id: String,
+        expectedVersion: Int,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("ambulatories")
+            .appendingPathComponent(id)
+        let (data, _) = try await send(
+            to: url,
+            method: "DELETE",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: nil),
+            body: encode(AmbulatoryVersionRequest(version: expectedVersion))
+        )
+        return try decode(HomeBaseAmbulatoryMutationResponse.self, from: data)
+    }
+
+    public func clearAmbulatory(
+        id: String,
+        expectedVersion: Int,
+        credentials: HomeBasePairedCredentials,
+        sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network")
+            .appendingPathComponent("ambulatories")
+            .appendingPathComponent("clear")
+        let (data, _) = try await send(
+            to: url,
+            method: "POST",
+            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: nil),
+            body: encode(AmbulatoryClearRequest(ambulatoryId: id, version: expectedVersion))
+        )
+        return try decode(HomeBaseAmbulatoryMutationResponse.self, from: data)
     }
 
     /* @Codex */
@@ -1008,6 +1153,10 @@ public actor HomeBasePatientsClient {
         ]
     }
 
+    private func accountHeaders(sessionCookie: String) -> [String: String] {
+        ["Cookie": sessionCookie]
+    }
+
     private static func queryDateValue(_ date: Date) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
@@ -1043,6 +1192,11 @@ public actor HomeBasePatientsClient {
                    let conflict = try? JSONDecoder().decode(VersionConflictPayload.self, from: data),
                    conflict.code == "VERSION_CONFLICT" {
                     throw HomeBaseClientError.versionConflict(conflict)
+                }
+                if httpResponse.statusCode == 409,
+                   let payload = try? JSONDecoder().decode(APIErrorPayload.self, from: data),
+                   payload.code == "PIN_CHANGE_CONFLICT" {
+                    throw HomeBaseClientError.pinChangeConflict(payload.message ?? payload.error)
                 }
                 throw HomeBaseClientError.httpStatus(httpResponse.statusCode, Self.errorMessage(from: data))
             }
@@ -1149,23 +1303,70 @@ private struct AuthLoginRequest: Encodable {
 private struct AuthLoginResponse: Decodable {
     let encryptedMasterKey: String?
     let salt: String?
+    let id: String?
+    let username: String?
+    let displayName: String?
+    let ambulatoryName: String?
+    let role: String?
 }
 
 public struct HomeBaseLoginResult: Sendable {
     public let sessionCookie: String
     public let encryptedMasterKey: String?
     public let salt: String?
+    public let id: String?
+    public let username: String?
+    public let displayName: String?
+    public let ambulatoryName: String?
+    public let role: String?
 
-    public init(sessionCookie: String, encryptedMasterKey: String?, salt: String?) {
+    public init(
+        sessionCookie: String,
+        encryptedMasterKey: String?,
+        salt: String?,
+        id: String? = nil,
+        username: String? = nil,
+        displayName: String? = nil,
+        ambulatoryName: String? = nil,
+        role: String? = nil
+    ) {
         self.sessionCookie = sessionCookie
         self.encryptedMasterKey = encryptedMasterKey
         self.salt = salt
+        self.id = id
+        self.username = username
+        self.displayName = displayName
+        self.ambulatoryName = ambulatoryName
+        self.role = role
     }
 }
 
 private struct APIErrorPayload: Decodable {
     let error: String?
     let message: String?
+    let code: String?
+}
+
+private struct AuthChangePinRequest: Encodable {
+    let currentPin: String
+    let newPin: String
+    let encryptedMasterKey: String
+    let salt: String
+}
+
+private struct AuthProfileUpdateRequest: Encodable {
+    let id: String
+    let displayName: String
+    let ambulatoryName: String
+}
+
+private struct AmbulatoryVersionRequest: Encodable {
+    let version: Int
+}
+
+private struct AmbulatoryClearRequest: Encodable {
+    let ambulatoryId: String
+    let version: Int
 }
 
 /* @Codex */

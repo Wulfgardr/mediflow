@@ -22,6 +22,20 @@ public enum HomeBaseClinicalListLimit {
 public protocol HomeBasePatientsDataSource: Sendable {
     func login(username: String?, password: String) async throws -> HomeBaseLoginResult
 
+    func changePin(
+        currentPin: String, newPin: String, encryptedMasterKey: String, salt: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement
+
+    func logout(
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement
+
+    func updateProfile(
+        userId: String, displayName: String, ambulatoryName: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement
+
     func fetchPatients(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?, includeDeleted: Bool
     ) async throws -> [HomeBasePatientSummary]
@@ -34,6 +48,26 @@ public protocol HomeBasePatientsDataSource: Sendable {
     func fetchNetworkAmbulatories(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [NetworkAmbulatorySummary]
+
+    func createAmbulatory(
+        payload: HomeBaseAmbulatoryCreatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse
+
+    func updateAmbulatory(
+        id: String, payload: HomeBaseAmbulatoryUpdatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse
+
+    func deleteAmbulatory(
+        id: String, expectedVersion: Int,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse
+
+    func clearAmbulatory(
+        id: String, expectedVersion: Int,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse
 
     /* @Codex */
     func searchDrugs(

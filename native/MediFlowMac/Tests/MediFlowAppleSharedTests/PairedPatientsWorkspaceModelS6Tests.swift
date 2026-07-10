@@ -150,9 +150,14 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
     private let scopedEntries: [HomeBaseEntrySummary]
     private let capabilities: [NetworkCapability]
     private let shouldFail: Bool
+    private let ambulatories: [NetworkAmbulatorySummary]
+    private let ambulatoryMutationError: HomeBaseClientError?
+    private let profileError: HomeBaseClientError?
     private(set) var lastServiceUpdate: ServiceUpdate?
     private(set) var itemUpdates: [ItemUpdate] = []
     private(set) var fetchPatientCount = 0
+    private(set) var fetchAmbulatoriesCount = 0
+    private(set) var createAmbulatoryCount = 0
 
     init(
         details: [String: HomeBasePatientDetail],
@@ -164,7 +169,10 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
         scopedCheckups: [HomeBaseCheckupSummary] = [],
         scopedEntries: [HomeBaseEntrySummary] = [],
         capabilities: [NetworkCapability] = [],
-        shouldFail: Bool = false
+        shouldFail: Bool = false,
+        ambulatories: [NetworkAmbulatorySummary] = [],
+        ambulatoryMutationError: HomeBaseClientError? = nil,
+        profileError: HomeBaseClientError? = nil
     ) {
         self.details = details
         self.services = services
@@ -176,10 +184,67 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
         self.scopedEntries = scopedEntries
         self.capabilities = capabilities
         self.shouldFail = shouldFail
+        self.ambulatories = ambulatories
+        self.ambulatoryMutationError = ambulatoryMutationError
+        self.profileError = profileError
     }
 
     func login(username: String?, password: String) async throws -> HomeBaseLoginResult {
         HomeBaseLoginResult(sessionCookie: "sid=test", encryptedMasterKey: nil, salt: nil)
+    }
+
+    func changePin(
+        currentPin: String, newPin: String, encryptedMasterKey: String, salt: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        return HomeBaseMutationAcknowledgement(success: true)
+    }
+
+    func logout(
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        HomeBaseMutationAcknowledgement(success: true)
+    }
+
+    func updateProfile(
+        userId: String, displayName: String, ambulatoryName: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        if let profileError { throw profileError }
+        return HomeBaseMutationAcknowledgement(success: true)
+    }
+
+    func createAmbulatory(
+        payload: HomeBaseAmbulatoryCreatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        if let ambulatoryMutationError { throw ambulatoryMutationError }
+        createAmbulatoryCount += 1
+        return HomeBaseAmbulatoryMutationResponse(success: true, id: payload.id ?? "amb", version: 1)
+    }
+
+    func updateAmbulatory(
+        id: String, payload: HomeBaseAmbulatoryUpdatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        if let ambulatoryMutationError { throw ambulatoryMutationError }
+        return HomeBaseAmbulatoryMutationResponse(success: true, version: payload.expectedVersion + 1)
+    }
+
+    func deleteAmbulatory(
+        id: String, expectedVersion: Int,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        if let ambulatoryMutationError { throw ambulatoryMutationError }
+        return HomeBaseAmbulatoryMutationResponse(success: true)
+    }
+
+    func clearAmbulatory(
+        id: String, expectedVersion: Int,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        if let ambulatoryMutationError { throw ambulatoryMutationError }
+        return HomeBaseAmbulatoryMutationResponse(success: true, version: expectedVersion + 1)
     }
 
     func fetchPatients(
@@ -223,7 +288,8 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
         sessionCookie: String,
         ambulatoryId: String?
     ) async throws -> [NetworkAmbulatorySummary] {
-        []
+        fetchAmbulatoriesCount += 1
+        return ambulatories
     }
 
     func searchDrugs(

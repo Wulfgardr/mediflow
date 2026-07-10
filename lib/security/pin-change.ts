@@ -7,6 +7,8 @@ export const PIN_CHANGE_INVALID_CURRENT_PIN_CODE = 'PIN_CHANGE_INVALID_CURRENT_P
 export const PIN_CHANGE_INVALID_NEW_PIN_CODE = 'PIN_CHANGE_INVALID_NEW_PIN';
 /* @Codex */
 export const PIN_CHANGE_REUSE_NOT_ALLOWED_CODE = 'PIN_CHANGE_REUSE_NOT_ALLOWED';
+/* @Codex */
+export const PIN_CHANGE_CONFLICT_CODE = 'PIN_CHANGE_CONFLICT';
 
 /* @Codex */
 export type PinChangeFailurePayload = {
@@ -66,8 +68,11 @@ export function formatPinChangeFailure(payload: PinChangeFailurePayload | null, 
     if (
         payload?.code === PIN_CHANGE_INVALID_NEW_PIN_CODE
         || payload?.code === PIN_CHANGE_REUSE_NOT_ALLOWED_CODE
+        || payload?.code === PIN_CHANGE_CONFLICT_CODE
     ) {
-        return payload.message || 'Il nuovo PIN non è valido.';
+        return payload.message || (payload?.code === PIN_CHANGE_CONFLICT_CODE
+            ? 'Il PIN è stato modificato da un’altra sessione. Ricarica e riprova.'
+            : 'Il nuovo PIN non è valido.');
     }
 
     if (status === 401) {

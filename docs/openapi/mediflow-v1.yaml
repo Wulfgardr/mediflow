@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.18.0
+  version: 1.19.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -489,6 +489,148 @@ paths:
           $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Network
+      operationId: createNetworkAmbulatory
+      summary: Create an ambulatory through the paired home-base data plane
+      description: Requires `network.ambulatories.write`, paired-client credentials, and an operator session. A created ambulatory starts at version 1.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AmbulatoryWriteRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/AmbulatoryMutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/ambulatories/{id}:
+    put:
+      tags:
+        - Network
+      operationId: updateNetworkAmbulatory
+      summary: Update or promote an ambulatory through the paired data plane
+      description: "Requires `network.ambulatories.write`. `version` is mandatory; setting `isDefault: true` promotes the target atomically and returns every changed ambulatory version."
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AmbulatoryId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AmbulatoryWriteRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/AmbulatoryMutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags:
+        - Network
+      operationId: deleteNetworkAmbulatory
+      summary: Delete an unlinked ambulatory through the paired data plane
+      description: Requires `network.ambulatories.write` and the current ambulatory version. Active primary patients, any membership, and deletion of the last ambulatory are rejected.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AmbulatoryId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [version]
+              properties:
+                version:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          $ref: '#/components/responses/AmbulatoryMutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/ambulatories/clear:
+    post:
+      tags:
+        - Network
+      operationId: clearNetworkTestAmbulatory
+      summary: Tombstone test-container members through the paired data plane
+      description: Requires `network.ambulatories.write`, an admin session, and the current version of a `test` ambulatory. Live ambulatory clear is forbidden.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [ambulatoryId, version]
+              properties:
+                ambulatoryId:
+                  type: string
+                version:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          $ref: '#/components/responses/AmbulatoryMutationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/drugs:
@@ -2562,6 +2704,13 @@ components:
       in: cookie
       name: mediflow_session
       description: Operator session cookie required for the remote network data plane.
+  parameters:
+    AmbulatoryId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
   responses:
     BadRequest:
       description: Request payload is invalid or missing required mutation metadata.
@@ -2628,6 +2777,18 @@ components:
             notFound:
               value:
                 error: Not found
+    VersionConflict:
+      description: Ambulatory compare-on-write conflict. Refresh the returned PHI-safe snapshot before retrying.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AmbulatoryVersionConflictResponse'
+    AmbulatoryMutationSuccess:
+      description: Ambulatory mutation succeeded. `affectedAmbulatories` includes every version changed by default promotion or fallback reassignment.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AmbulatoryMutationResponse'
     PairingIntentNotFound:
       description: Requested pairing intent was not found.
       content:
@@ -3614,6 +3775,7 @@ components:
           type: string
           enum:
             - network.pairing.bootstrap
+            - network.ambulatories.write
             - network.replica.readonly-patients
             - network.replica.readonly-clinical-diary
             - network.replica.write-patient-profile
@@ -3855,6 +4017,117 @@ components:
           $ref: '#/components/schemas/NetworkPairedClientSummary'
         authHeaders:
           $ref: '#/components/schemas/NetworkPairedClientAuthHeaders'
+    AmbulatoryWriteRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        address:
+          type:
+            - string
+            - 'null'
+        parentId:
+          type:
+            - string
+            - 'null'
+        type:
+          type: string
+          enum: [live, test]
+        description:
+          type:
+            - string
+            - 'null'
+        isDefault:
+          type: boolean
+        version:
+          type: integer
+          minimum: 1
+    AmbulatoryMutationResponse:
+      type: object
+      additionalProperties: false
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          const: true
+        message:
+          type: string
+        id:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        affectedAmbulatories:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, version]
+            properties:
+              id:
+                type: string
+              version:
+                type: integer
+                minimum: 1
+        clearedPatients:
+          type: integer
+          minimum: 0
+        preservedLivePatients:
+          type: integer
+          minimum: 0
+        removedMembershipRows:
+          type: integer
+          minimum: 0
+    AmbulatoryVersionConflictResponse:
+      type: object
+      additionalProperties: false
+      required: [error, code, entity, recordId, expectedVersion, currentVersion, currentUpdatedAt, currentState, currentSnapshot]
+      properties:
+        error:
+          type: string
+          const: Conflict
+        code:
+          type: string
+          const: VERSION_CONFLICT
+        entity:
+          type: string
+          const: ambulatory
+        recordId:
+          type: string
+        expectedVersion:
+          type: integer
+          minimum: 1
+        currentVersion:
+          type:
+            - integer
+            - 'null'
+        currentUpdatedAt:
+          type: 'null'
+        currentState:
+          type: string
+          enum: [present, missing]
+        currentSnapshot:
+          oneOf:
+            - type: 'null'
+            - type: object
+              additionalProperties: false
+              required: [id, version, isDefault, type]
+              properties:
+                id:
+                  type: string
+                version:
+                  type: integer
+                isDefault:
+                  type:
+                    - boolean
+                    - 'null'
+                type:
+                  type:
+                    - string
+                    - 'null'
     AmbulatorySummary:
       type: object
       additionalProperties: false
@@ -3862,8 +4135,11 @@ components:
         - id
         - name
         - address
+        - parentId
         - type
+        - description
         - isDefault
+        - version
         - createdAt
       properties:
         id:
@@ -3874,7 +4150,15 @@ components:
           type:
             - string
             - 'null'
+        parentId:
+          type:
+            - string
+            - 'null'
         type:
+          type:
+            - string
+            - 'null'
+        description:
           type:
             - string
             - 'null'
@@ -3882,6 +4166,9 @@ components:
           type:
             - boolean
             - 'null'
+        version:
+          type: integer
+          minimum: 1
         createdAt:
           type:
             - string

@@ -1,5 +1,6 @@
-import XCTest
 import CryptoKit
+import Foundation
+import XCTest
 @testable import MediFlowAppleShared
 
 /// ADR 0071 Fase 3: the in-process local-authority adapter serves patient list/detail
@@ -72,6 +73,82 @@ final class LocalPatientsDataSourceTests: XCTestCase {
             XCTFail("expected the HTTP fallback to be used")
         } catch let HomeBaseClientError.transport(issue) {
             XCTAssertEqual(issue, .unreachable)
+        }
+    }
+
+    func testAccountOperationsForwardThroughHTTPFallback() async throws {
+        var requests: [String] = []
+        LocalAccountURLProtocol.requestHandler = { request in
+            let url = try XCTUnwrap(request.url)
+            requests.append("\(request.httpMethod ?? "GET") \(url.path)")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "mediflow_session=test")
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+        defer { LocalAccountURLProtocol.requestHandler = nil }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [LocalAccountURLProtocol.self]
+        let client = HomeBasePatientsClient(
+            configuration: HomeBaseConnectionConfiguration(serverURLString: "https://localhost:3443"),
+            session: URLSession(configuration: configuration)
+        )
+        let source = LocalPatientsDataSource(
+            databasePath: fixturePath(), masterKey: masterKey, fallback: client)
+
+        _ = try await source.changePin(
+            currentPin: "1357", newPin: "2468", encryptedMasterKey: "v2:wrapped",
+            salt: "AAECAwQFBgcICQoLDA0ODw==", credentials: credentials,
+            sessionCookie: "mediflow_session=test")
+        _ = try await source.updateProfile(
+            userId: "user-1", displayName: "Ada", ambulatoryName: "Centro",
+            credentials: credentials, sessionCookie: "mediflow_session=test")
+        _ = try await source.logout(
+            credentials: credentials, sessionCookie: "mediflow_session=test")
+
+        XCTAssertEqual(requests, [
+            "POST /api/auth/change-pin",
+            "PUT /api/auth/profile",
+            "POST /api/auth/logout",
+        ])
+    }
+
+    func testAmbulatoryWritesFailHonestlyInLocalAuthorityMode() async throws {
+        let source = makeSource()
+
+        do {
+            _ = try await source.createAmbulatory(
+                payload: HomeBaseAmbulatoryCreatePayload(name: "Sede"),
+                credentials: credentials, sessionCookie: "sid=test")
+            XCTFail("Expected local-authority rejection")
+        } catch let error as HomeBaseClientError {
+            XCTAssertEqual(error, .localAuthorityUnsupported("Creazione ambulatorio"))
+        }
+
+        do {
+            _ = try await source.updateAmbulatory(
+                id: "amb-1", payload: HomeBaseAmbulatoryUpdatePayload(expectedVersion: 1, name: "Sede"),
+                credentials: credentials, sessionCookie: "sid=test")
+            XCTFail("Expected local-authority rejection")
+        } catch let error as HomeBaseClientError {
+            XCTAssertEqual(error, .localAuthorityUnsupported("Aggiornamento ambulatorio"))
+        }
+
+        do {
+            _ = try await source.deleteAmbulatory(
+                id: "amb-1", expectedVersion: 1,
+                credentials: credentials, sessionCookie: "sid=test")
+            XCTFail("Expected local-authority rejection")
+        } catch let error as HomeBaseClientError {
+            XCTAssertEqual(error, .localAuthorityUnsupported("Eliminazione ambulatorio"))
+        }
+
+        do {
+            _ = try await source.clearAmbulatory(
+                id: "amb-test", expectedVersion: 1,
+                credentials: credentials, sessionCookie: "sid=test")
+            XCTFail("Expected local-authority rejection")
+        } catch let error as HomeBaseClientError {
+            XCTAssertEqual(error, .localAuthorityUnsupported("Pulizia ambulatorio"))
         }
     }
 
@@ -365,6 +442,30 @@ final class LocalPatientsDataSourceTests: XCTestCase {
             patientId: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1", limit: 20)
         XCTAssertEqual(observations.first { $0.id == "fixture-observation-1" }?.value, "7.2")
     }
+}
+
+private final class LocalAccountURLProtocol: URLProtocol {
+    static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard let handler = Self.requestHandler else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+            return
+        }
+        do {
+            let (response, data) = try handler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
 }
 
 private extension Data {

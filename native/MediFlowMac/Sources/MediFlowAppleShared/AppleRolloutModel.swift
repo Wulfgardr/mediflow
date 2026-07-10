@@ -72,7 +72,7 @@ public enum AppleFoundationSection: String, CaseIterable, Identifiable, Sendable
 
 /* @Codex */
 public enum ClinicalWorkspaceSection: String, CaseIterable, Identifiable, Sendable {
-    case patients, agenda, diary, analytics, scales, runtime, overview, milestones
+    case patients, agenda, diary, analytics, scales, settings, runtime, overview, milestones
 
     public var id: String { rawValue }
 
@@ -83,6 +83,7 @@ public enum ClinicalWorkspaceSection: String, CaseIterable, Identifiable, Sendab
         case .diary: "Diario"
         case .analytics: "Analytics"
         case .scales: "Scale"
+        case .settings: "Impostazioni"
         case .runtime: "Runtime"
         case .overview: "Panoramica"
         case .milestones: "Tappe"
@@ -96,6 +97,7 @@ public enum ClinicalWorkspaceSection: String, CaseIterable, Identifiable, Sendab
         case .diary: "book.closed"
         case .analytics: "chart.bar"
         case .scales: "checklist"
+        case .settings: "gearshape"
         case .runtime: "server.rack"
         case .overview: "square.grid.2x2"
         case .milestones: "flag.pattern.checkered"
@@ -103,6 +105,7 @@ public enum ClinicalWorkspaceSection: String, CaseIterable, Identifiable, Sendab
     }
 
     static var clinicalSections: [ClinicalWorkspaceSection] { [.patients, .agenda, .diary, .analytics, .scales] }
+    static var settingsSections: [ClinicalWorkspaceSection] { [.settings] }
     static var projectSections: [ClinicalWorkspaceSection] { [.runtime, .overview, .milestones] }
 
     init(legacy section: AppleFoundationSection) {

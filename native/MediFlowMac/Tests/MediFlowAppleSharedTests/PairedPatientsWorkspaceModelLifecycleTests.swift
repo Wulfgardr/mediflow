@@ -6,6 +6,23 @@ import XCTest
 final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
     private let masterKey = SymmetricKey(data: Data(repeating: 7, count: 32))
 
+    private struct CryptoFixture: Decodable {
+        struct Inputs: Decodable {
+            let pin: String
+            let saltHex: String
+            let rawMasterKeyHex: String
+        }
+
+        struct Vectors: Decodable {
+            let wrappedMasterKeyB64: String
+            let wrappedMasterKeyVersioned: String?
+        }
+
+        let version: Int
+        let inputs: Inputs
+        let vectors: Vectors
+    }
+
     func testPatientArchiveUsesMinimalUpdatePayload() async throws {
         let active = detail(id: "p1", archived: false, version: 4)
         let source = LifecycleMockDataSource(details: ["p1": active])
@@ -129,6 +146,200 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertTrue(patients.filter { $0.deletedAt != nil }.isEmpty)
     }
 
+    func testUnlockVersionedV1GoldenFixtureRotatesToV2WithIdenticalMasterKeyBytes() async throws {
+        try await assertGoldenFixtureUnlockAndRotation(version: 1)
+    }
+
+    func testUnlockVersionedV2GoldenFixtureRotatesWithIdenticalMasterKeyBytes() async throws {
+        try await assertGoldenFixtureUnlockAndRotation(version: 2)
+    }
+
+    func testChangePinFailsClosedWithoutMasterKey() async {
+        let source = LifecycleMockDataSource()
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: nil)
+
+        await model.changePin(currentPin: "1357", newPin: "2468")
+
+        let calls = await source.pinChangeCalls
+        let errorMessage = await model.errorMessage
+        XCTAssertTrue(calls.isEmpty)
+        XCTAssertEqual(
+            errorMessage,
+            "Cifratura non disponibile: riaccedi con il PIN operatore prima di cambiarlo."
+        )
+    }
+
+    func testChangePinSurfacesDedicatedConflictWithoutReplacingMasterKey() async throws {
+        let source = LifecycleMockDataSource(
+            pinChangeError: .pinChangeConflict(
+                "Il PIN e stato modificato da un'altra sessione. Ricarica e riprova."))
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+
+        await model.changePin(currentPin: "1357", newPin: "2468")
+        await model.changePin(currentPin: "1357", newPin: "8642")
+
+        let calls = await source.pinChangeCalls
+        let statusMessage = await model.statusMessage
+        let errorMessage = await model.errorMessage
+        XCTAssertEqual(calls.count, 2, "a conflict must not replace or discard the in-memory master key")
+        XCTAssertEqual(statusMessage, "Il PIN e stato modificato da un'altra sessione. Ricarica e riprova.")
+        XCTAssertNil(errorMessage)
+    }
+
+    func testChangePin401UsesExistingSessionExpiredFlow() async {
+        let source = LifecycleMockDataSource(pinChangeError: .httpStatus(401, "PIN non valido"))
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+
+        await model.changePin(currentPin: "1357", newPin: "2468")
+
+        let state = await model.connectionState
+        let connection = await model.clinicalWorkspaceConnection
+        XCTAssertEqual(state, .sessionExpired)
+        XCTAssertNil(connection)
+    }
+
+    func testLockSessionNowClearsLocalSessionAndMasterKeyWhenLogoutFails() async {
+        let source = LifecycleMockDataSource(logoutError: .transport(.timeout))
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+
+        await model.lockSessionNow()
+        await model.changePin(currentPin: "1357", newPin: "2468")
+
+        let logoutCalls = await source.logoutCalls
+        let pinChangeCalls = await source.pinChangeCalls
+        let state = await model.connectionState
+        let statusMessage = await model.statusMessage
+        let errorMessage = await model.errorMessage
+        XCTAssertEqual(logoutCalls, 1)
+        XCTAssertTrue(pinChangeCalls.isEmpty)
+        XCTAssertEqual(state, .sessionExpired)
+        XCTAssertTrue(statusMessage?.contains("Logout remoto non confermato") == true)
+        XCTAssertEqual(
+            errorMessage,
+            "Cifratura non disponibile: riaccedi con il PIN operatore prima di cambiarlo."
+        )
+    }
+
+    func testChangePinDoesNotPersistToUserDefaultsOrPairedStore() async {
+        let suiteName = "PairedPatientsWorkspaceModelLifecycleTests.persistence.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let keychainWrites = Counter()
+        let pairedStore = HomeBasePairedStore(
+            userDefaults: defaults,
+            keychainReader: { _, _ in .success(nil) },
+            keychainWriter: { _, _, _ in
+                keychainWrites.value += 1
+                return .success(())
+            },
+            keychainDeleter: { _, _ in .success(()) }
+        )
+        let source = LifecycleMockDataSource()
+        let cacheStore = HomeBasePatientCacheStore(
+            cacheDirectory: FileManager.default.temporaryDirectory
+                .appendingPathComponent("PairedPatientsWorkspaceModelLifecycleTests-\(UUID().uuidString)"),
+            keyProvider: { SymmetricKey(data: Data(repeating: 8, count: 32)) }
+        )
+        let model = await MainActor.run {
+            PairedPatientsWorkspaceModel(
+                pairedStore: pairedStore,
+                cacheStore: cacheStore,
+                dataSourceFactory: { _ in source }
+            )
+        }
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+        let defaultsBefore = defaults.persistentDomain(forName: suiteName) ?? [:]
+
+        await model.changePin(currentPin: "1357", newPin: "2468")
+
+        let defaultsAfter = defaults.persistentDomain(forName: suiteName) ?? [:]
+        let persistedCalls = await source.pinChangeCalls
+        XCTAssertEqual(defaultsAfter as NSDictionary, defaultsBefore as NSDictionary)
+        XCTAssertEqual(keychainWrites.value, 0)
+        XCTAssertEqual(persistedCalls.count, 1)
+    }
+
+    private func assertGoldenFixtureUnlockAndRotation(version: Int) async throws {
+        let fixture = try loadCryptoFixture(version: version)
+        let blob = version == 1
+            ? fixture.vectors.wrappedMasterKeyB64
+            : try XCTUnwrap(fixture.vectors.wrappedMasterKeyVersioned)
+        let loginResult = HomeBaseLoginResult(
+            sessionCookie: "sid=test",
+            encryptedMasterKey: blob,
+            salt: data(hex: fixture.inputs.saltHex).base64EncodedString()
+        )
+        let source = LifecycleMockDataSource(loginResult: loginResult)
+        let model = await makeModel(source: source)
+        await MainActor.run {
+            model.username = "doctor"
+            model.password = fixture.inputs.pin
+            model.pairedClientId = "test-client"
+            model.pairedClientToken = "test-token"
+        }
+
+        await model.login()
+        await model.changePin(currentPin: fixture.inputs.pin, newPin: "2468")
+
+        let pinChangeCalls = await source.pinChangeCalls
+        let call = try XCTUnwrap(pinChangeCalls.last)
+        let rotatedSalt = try XCTUnwrap(Data(base64Encoded: call.salt))
+        let rotatedMasterKey = try XCTUnwrap(CryptoService.unwrapMasterKeyVersioned(
+            blob: call.encryptedMasterKey,
+            pin: call.newPin,
+            salt: rotatedSalt
+        ))
+        let rotatedBytes = rotatedMasterKey.withUnsafeBytes { Data($0) }
+        XCTAssertEqual(CryptoService.kdfVersion(of: call.encryptedMasterKey), CryptoService.currentKdfVersion)
+        XCTAssertEqual(rotatedSalt.count, 16)
+        XCTAssertEqual(rotatedBytes, data(hex: fixture.inputs.rawMasterKeyHex))
+
+        if version == 1 {
+            // The first call returned success. A second rotation proves the model
+            // retained the same in-memory master key instead of re-deriving it.
+            await model.changePin(currentPin: "2468", newPin: "8642")
+            let callsAfterSuccess = await source.pinChangeCalls
+            let secondCall = try XCTUnwrap(callsAfterSuccess.last)
+            XCTAssertEqual(callsAfterSuccess.count, 2)
+            let secondSalt = try XCTUnwrap(Data(base64Encoded: secondCall.salt))
+            let secondMasterKey = try XCTUnwrap(CryptoService.unwrapMasterKeyVersioned(
+                blob: secondCall.encryptedMasterKey,
+                pin: secondCall.newPin,
+                salt: secondSalt
+            ))
+            XCTAssertEqual(
+                secondMasterKey.withUnsafeBytes { Data($0) },
+                data(hex: fixture.inputs.rawMasterKeyHex)
+            )
+        }
+    }
+
+    private func loadCryptoFixture(version: Int) throws -> CryptoFixture {
+        let nativeDirectory = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let url = nativeDirectory
+            .appendingPathComponent("contracts")
+            .appendingPathComponent("crypto-golden-vectors.v\(version).json")
+        return try JSONDecoder().decode(CryptoFixture.self, from: Data(contentsOf: url))
+    }
+
+    private func data(hex: String) -> Data {
+        var result = Data(capacity: hex.count / 2)
+        var index = hex.startIndex
+        while index < hex.endIndex {
+            let next = hex.index(index, offsetBy: 2)
+            result.append(UInt8(hex[index..<next], radix: 16)!)
+            index = next
+        }
+        return result
+    }
+
     @MainActor
     private func makeModel(source: LifecycleMockDataSource) -> PairedPatientsWorkspaceModel {
         let suiteName = "PairedPatientsWorkspaceModelLifecycleTests.\(UUID().uuidString)"
@@ -208,7 +419,18 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
     }
 }
 
+private final class Counter {
+    var value = 0
+}
+
 private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
+    struct PinChangeCall {
+        let currentPin: String
+        let newPin: String
+        let encryptedMasterKey: String
+        let salt: String
+    }
+
     struct UpdateCall {
         let patientId: String
         let payload: HomeBasePatientUpdatePayload
@@ -227,15 +449,30 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
 
     private var summaries: [HomeBasePatientSummary]
     private var details: [String: HomeBasePatientDetail]
+    private let loginResult: HomeBaseLoginResult
+    private let pinChangeError: HomeBaseClientError?
+    private let logoutError: HomeBaseClientError?
     private(set) var lastUpdate: UpdateCall?
     private(set) var lastCreate: HomeBasePatientCreatePayload?
     private(set) var lastSoftDelete: DeleteCall?
     private(set) var lastRestore: RestoreCall?
     private(set) var softDeleteCalls = 0
+    private(set) var pinChangeCalls: [PinChangeCall] = []
+    private(set) var logoutCalls = 0
 
-    init(summaries: [HomeBasePatientSummary] = [], details: [String: HomeBasePatientDetail] = [:]) {
+    init(
+        summaries: [HomeBasePatientSummary] = [],
+        details: [String: HomeBasePatientDetail] = [:],
+        loginResult: HomeBaseLoginResult = HomeBaseLoginResult(
+            sessionCookie: "sid=test", encryptedMasterKey: nil, salt: nil),
+        pinChangeError: HomeBaseClientError? = nil,
+        logoutError: HomeBaseClientError? = nil
+    ) {
         self.summaries = summaries
         self.details = details
+        self.loginResult = loginResult
+        self.pinChangeError = pinChangeError
+        self.logoutError = logoutError
         if summaries.isEmpty {
             self.summaries = details.values.map {
                 HomeBasePatientSummary(
@@ -256,7 +493,64 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     }
 
     func login(username: String?, password: String) async throws -> HomeBaseLoginResult {
-        HomeBaseLoginResult(sessionCookie: "sid=test", encryptedMasterKey: nil, salt: nil)
+        loginResult
+    }
+
+    func changePin(
+        currentPin: String, newPin: String, encryptedMasterKey: String, salt: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        pinChangeCalls.append(PinChangeCall(
+            currentPin: currentPin,
+            newPin: newPin,
+            encryptedMasterKey: encryptedMasterKey,
+            salt: salt
+        ))
+        if let pinChangeError { throw pinChangeError }
+        return HomeBaseMutationAcknowledgement(success: true)
+    }
+
+    func logout(
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        logoutCalls += 1
+        if let logoutError { throw logoutError }
+        return HomeBaseMutationAcknowledgement(success: true)
+    }
+
+    func updateProfile(
+        userId: String, displayName: String, ambulatoryName: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseMutationAcknowledgement {
+        HomeBaseMutationAcknowledgement(success: true)
+    }
+
+    func createAmbulatory(
+        payload: HomeBaseAmbulatoryCreatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        HomeBaseAmbulatoryMutationResponse(success: true, id: payload.id ?? "amb", version: 1)
+    }
+
+    func updateAmbulatory(
+        id: String, payload: HomeBaseAmbulatoryUpdatePayload,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        HomeBaseAmbulatoryMutationResponse(success: true, version: payload.expectedVersion + 1)
+    }
+
+    func deleteAmbulatory(
+        id: String, expectedVersion: Int,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        HomeBaseAmbulatoryMutationResponse(success: true)
+    }
+
+    func clearAmbulatory(
+        id: String, expectedVersion: Int,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAmbulatoryMutationResponse {
+        HomeBaseAmbulatoryMutationResponse(success: true, version: expectedVersion + 1)
     }
 
     func fetchPatients(

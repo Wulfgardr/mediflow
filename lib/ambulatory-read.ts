@@ -18,8 +18,11 @@ export async function listAmbulatorySummaries(): Promise<AmbulatorySummary[]> {
         id: amb.id,
         name: amb.name,
         address: amb.address ?? null,
+        parentId: amb.parentId ?? null,
         type: amb.type ?? null,
+        description: amb.description ?? null,
         isDefault: amb.isDefault ?? null,
+        version: amb.version,
         createdAt: toIsoString(amb.createdAt),
     }));
 }

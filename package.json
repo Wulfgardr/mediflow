@@ -142,6 +142,8 @@
     "test:network:home-base-diary-write": "MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT=scripts/network-home-base-diary-write.test.mjs bash scripts/network-home-base-write-smoke.sh",
     "test:network:home-base-patient-lifecycle-write": "MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT=scripts/network-home-base-patient-lifecycle-write.test.mjs bash scripts/network-home-base-write-smoke.sh",
     "test:network:home-base-therapy-write": "MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT=scripts/network-home-base-therapy-write.test.mjs bash scripts/network-home-base-write-smoke.sh",
+    "test:network:home-base-account-pin": "MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT=scripts/network-home-base-account-pin.test.mjs bash scripts/network-home-base-write-smoke.sh",
+    "test:network:home-base-ambulatory-write": "MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT=scripts/network-home-base-ambulatory-write.test.mjs bash scripts/network-home-base-write-smoke.sh",
     "test:network:home-base-checkup-write": "MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT=scripts/network-home-base-checkup-write.test.mjs bash scripts/network-home-base-write-smoke.sh",
     "test:network:home-base-observation-write": "MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT=scripts/network-home-base-observation-write.test.mjs bash scripts/network-home-base-write-smoke.sh",
     "test:network:home-base-prescriptions-write": "MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT=scripts/network-home-base-prescriptions-write.test.mjs bash scripts/network-home-base-write-smoke.sh",

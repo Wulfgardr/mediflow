@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
-import { dbServer } from '@/lib/db-server';
-import { users } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
 /* @Codex */
 import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import { authProfileUpdateSchema } from '@/lib/api-schemas/auth';
 /* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
+/* @Codex */
+import { updateProfile } from '@/lib/security/profile-update-service';
 
 export async function PUT(request: Request) {
     /* @Codex */
@@ -27,15 +26,14 @@ export async function PUT(request: Request) {
             return forbiddenResponse();
         }
 
-        const result = await dbServer.update(users)
-            .set({
-                displayName,
-                ambulatoryName,
-            })
-            .where(eq(users.id, session.userId))
-            .run();
+        const result = await updateProfile({
+            session,
+            request,
+            displayName,
+            ambulatoryName,
+        });
 
-        if (result.changes === 0) {
+        if (result.kind === 'not-found') {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
