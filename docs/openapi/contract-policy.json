@@ -99,6 +99,11 @@
   ],
   "breakingOverrides": [
     {
+      "change": "GET /api/v1/network/ambulatories response 200 changed",
+      "trackingIssue": "WUL-194",
+      "reason": "Wave 4 adds version, parentId, and description to the paired ambulatory summary. These are additive fields required for the newly versioned write boundary; existing read clients can ignore them."
+    },
+    {
       "change": "GET /api/v1/network/capabilities response 200 changed",
       "trackingIssue": "WUL-190",
       "reason": "OpenAPI guard treats capability-key enum extensions as response shape drift; adding paired patient, clinical diary, therapy, checkup, observation, prescription, prosthetic prescription, and Wave 2b patient lifecycle capabilities is additive capability advertisement for paired clients, not a removal or stricter client requirement."

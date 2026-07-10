@@ -90,4 +90,6 @@ Il server:
 - policy enterprise sul formato del PIN oltre al range gia deciso
 - revoca forzata di tutte le sessioni/device
 - ricifratura completa del dataset
-- parity macOS/iOS: il filone native resta congelato fino al rebuild controllato
+- parity macOS/iOS: freeze sciolto da [ADR 0075](./0075-paired-account-operations-and-pin-rotation.md)
+  e dalla Wave 4 del client universale Apple; restano validi i confini e le
+  esclusioni definiti da ADR 0075

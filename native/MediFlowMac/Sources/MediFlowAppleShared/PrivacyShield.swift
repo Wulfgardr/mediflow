@@ -4,25 +4,44 @@
 import SwiftUI
 
 enum PrivacyShield {
+    enum Platform {
+        case iOS
+        case macOS
+    }
+
     /// Whether to cover the UI. On iOS, redact whenever the scene is not active
-    /// (inactive/background -> the app-switcher snapshot). On macOS, only when
-    /// forced (window blur redaction would be intrusive). `forced` is the UI-test
-    /// / explicit override.
-    static func shouldRedact(scenePhase: ScenePhase, forced: Bool) -> Bool {
+    /// (inactive/background -> the app-switcher snapshot). A user preference
+    /// redacts on both platforms while the app is open. `forced` remains the
+    /// DEBUG-only UI-test seam.
+    static func shouldRedact(scenePhase: ScenePhase, forced: Bool, userEnabled: Bool) -> Bool {
         #if os(iOS)
-        return forced || scenePhase != .active
+        return shouldRedact(scenePhase: scenePhase, forced: forced, userEnabled: userEnabled, platform: .iOS)
         #else
-        return forced
+        return shouldRedact(scenePhase: scenePhase, forced: forced, userEnabled: userEnabled, platform: .macOS)
         #endif
+    }
+
+    static func shouldRedact(
+        scenePhase: ScenePhase,
+        forced: Bool,
+        userEnabled: Bool,
+        platform: Platform
+    ) -> Bool {
+        forced || userEnabled || (platform == .iOS && scenePhase != .active)
     }
 }
 
 private struct PrivacyShieldModifier: ViewModifier {
     @Environment(\.scenePhase) private var scenePhase
+    @ObservedObject var appearance: AppleAppearanceStore
 
     func body(content: Content) -> some View {
         content.overlay {
-            if PrivacyShield.shouldRedact(scenePhase: scenePhase, forced: Self.forcedForUITest) {
+            if PrivacyShield.shouldRedact(
+                scenePhase: scenePhase,
+                forced: Self.forcedForUITest,
+                userEnabled: appearance.privacyShieldEnabled
+            ) {
                 privacyOverlay
             }
         }
@@ -56,7 +75,7 @@ private struct PrivacyShieldModifier: ViewModifier {
 
 public extension View {
     /// Redact the content with a privacy overlay when the scene is not active.
-    func privacyShield() -> some View {
-        modifier(PrivacyShieldModifier())
+    func privacyShield(appearance: AppleAppearanceStore) -> some View {
+        modifier(PrivacyShieldModifier(appearance: appearance))
     }
 }
