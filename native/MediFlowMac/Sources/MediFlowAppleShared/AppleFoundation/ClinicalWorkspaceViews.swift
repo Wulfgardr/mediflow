@@ -71,6 +71,8 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
             return "L'host collegato non espone ancora l'archivio documenti (capability network.replica.readonly-documents). Aggiorna MediFlow sull'host."
         case "network.replica.write-documents":
             return "L'host collegato non espone il caricamento documenti. Il pairing potrebbe essere precedente: esegui di nuovo il pairing dopo aver aggiornato MediFlow sull'host."
+        case "network.compute.visit-draft":
+            return "L'host collegato non espone ancora l'elaborazione della bozza visita (capability network.compute.visit-draft). Aggiorna MediFlow sull'host."
         default:
             return "L'host collegato non espone ancora la lettura pazienti richiesta (capability \(key)). Aggiorna MediFlow sull'host."
         }
