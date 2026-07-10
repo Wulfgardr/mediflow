@@ -106,6 +106,37 @@ final class ClinicalWorkspaceViewsTests: XCTestCase {
         XCTAssertTrue(store.hasCapability("network.replica.readonly-documents"))
     }
 
+    func testFailedPairingRefreshDoesNotBlockPreviousConnection() async {
+        let store = ClinicalWorkspaceCapabilitiesStore()
+        let availableCapability = NetworkCapability(
+            key: "network.replica.readonly-documents",
+            status: "available",
+            requiresPairing: true,
+            description: "Documenti"
+        )
+        let workingSource = S6MockDataSource(
+            details: details(detail(id: "p1")),
+            capabilities: [availableCapability]
+        )
+        let failingSource = S6MockDataSource(
+            details: details(detail(id: "p1")),
+            shouldFail: true
+        )
+        let workingConnection = connection(workingSource, clientToken: "working-token")
+        let failingConnection = connection(failingSource, clientToken: "rejected-token")
+
+        await store.loadIfNeeded(using: workingConnection)
+        XCTAssertTrue(store.hasCapability("network.replica.readonly-documents"))
+
+        await store.loadIfNeeded(using: failingConnection)
+        guard case .failed = store.state else { return XCTFail("Expected failed refresh") }
+        XCTAssertFalse(store.hasCapability("network.replica.readonly-documents"))
+
+        await store.loadIfNeeded(using: workingConnection)
+        XCTAssertEqual(store.state, .loaded)
+        XCTAssertTrue(store.hasCapability("network.replica.readonly-documents"))
+    }
+
     private func connection(_ source: S6MockDataSource, clientToken: String = "token") -> ClinicalWorkspaceConnection {
         ClinicalWorkspaceConnection(dataSource: source, credentials: HomeBasePairedCredentials(clientId: "client", clientToken: clientToken), sessionCookie: "sid=test", ambulatoryId: nil, masterKey: key)
     }
