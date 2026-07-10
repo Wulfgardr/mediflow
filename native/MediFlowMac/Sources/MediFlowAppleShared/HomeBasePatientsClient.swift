@@ -585,7 +585,7 @@ public actor HomeBasePatientsClient {
             to: url,
             method: "POST",
             headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
-            body: encode(payload)
+            body: HomeBaseAttachmentWirePrecheck.encodedBody(for: payload)
         )
         return try decode(HomeBaseCreatedResource.self, from: data)
     }

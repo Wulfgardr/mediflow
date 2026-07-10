@@ -128,6 +128,69 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
         XCTAssertEqual(error, "Riferimenti allegato non appartenenti al paziente: a1")
     }
 
+    func testChangingPatientClearsAttachmentCacheAndRejectsPreviousPatientReference() async {
+        let patientA = detail(id: "p1")
+        let patientB = detail(id: "p2")
+        let source = S7MockDataSource(
+            details: ["p1": patientA, "p2": patientB],
+            attachments: [attachmentSummary(id: "a1", name: "referto-a.pdf", type: "application/pdf")]
+        )
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patientA)
+        await model.loadSelectedPatientAttachments()
+
+        await MainActor.run {
+            model.toggleNewEntryAttachmentReference("a1")
+            model.startEditingEntry(
+                entrySummary(id: "e1", content: "<p>Voce A</p>", attachments: "[\"a1\"]", version: 1)
+            )
+        }
+
+        await model.loadPatient(summary(for: patientB))
+
+        let cachedAttachments = await model.attachments
+        let cachedPatientId = await model.attachmentsPatientId
+        let newSelection = await model.newEntryAttachmentIds
+        let editSelection = await model.editEntryAttachmentIds
+        XCTAssertTrue(cachedAttachments.isEmpty)
+        XCTAssertNil(cachedPatientId)
+        XCTAssertTrue(newSelection.isEmpty)
+        XCTAssertTrue(editSelection.isEmpty)
+
+        await MainActor.run {
+            model.newEntryEditorDocument.appendNewBlock(kind: .paragraph)
+            model.newEntryEditorDocument.updateText(
+                id: model.newEntryEditorDocument.blocks[0].id,
+                text: "Voce B"
+            )
+            model.toggleNewEntryAttachmentReference("a1")
+        }
+        await model.createEntryForSelectedPatient()
+
+        let createCount = await source.createEntryCalls
+        let error = await model.errorMessage
+        XCTAssertEqual(createCount, 0)
+        XCTAssertEqual(error, "Carica i documenti del paziente corrente prima di collegarli alla voce.")
+    }
+
+    func testSubmitScaleSealsClinicalRichTextFixedPoint() async throws {
+        let patient = detail(id: "p1")
+        let source = S7MockDataSource(details: ["p1": patient])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+
+        await model.submitScale(ClinicalScales.tinetti, answers: [:])
+
+        let capturedPayload = await source.lastCreateEntryPayload
+        let payload = try XCTUnwrap(capturedPayload)
+        let decrypted = try XCTUnwrap(CryptoService.decryptField(payload.content, masterKey: masterKey))
+        let content = try XCTUnwrap(CryptoService.jsonDecodeString(decrypted))
+        let stabilized = ClinicalRichText.render(document: ClinicalRichText.parse(html: content))
+        XCTAssertEqual(content, stabilized)
+        XCTAssertTrue(content.contains("&lt; 19"))
+        XCTAssertFalse(content.contains("(< 19)"))
+    }
+
     func testUpdateEditingEntryOmitsAttachmentsFieldWhenSelectionUntouched() async throws {
         // Regression: model.attachments can legitimately be empty this session
         // (Documenti section never opened). Re-saving an entry that ALREADY
@@ -328,6 +391,16 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
             statusReason: nil, notes: nil, aiSummary: nil, documentInsights: nil, isAdi: false, isArchived: false,
             version: 1, ambulatoryId: "AMB-1", createdAt: nil, updatedAt: Date(timeIntervalSince1970: 1_750_000_000),
             deletedAt: nil, deletionReason: nil
+        )
+    }
+
+    private func summary(for detail: HomeBasePatientDetail) -> HomeBasePatientSummary {
+        HomeBasePatientSummary(
+            id: detail.id, firstName: detail.firstName, lastName: detail.lastName,
+            birthDate: detail.birthDate, taxCode: detail.taxCode, isAdi: detail.isAdi,
+            isArchived: detail.isArchived, version: detail.version, updatedAt: detail.updatedAt,
+            deletedAt: detail.deletedAt, deletionReason: detail.deletionReason,
+            diagnoses: detail.diagnoses
         )
     }
 
