@@ -42,16 +42,22 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
     @Published private(set) var state: ClinicalWorkspaceLoadState = .idle
     private var availableKeys = Set<String>()
     private var loadedConnectionIdentity: ClinicalWorkspaceConnection.Identity?
+    private var requestedConnectionIdentity: ClinicalWorkspaceConnection.Identity?
 
     func loadIfNeeded(using connection: ClinicalWorkspaceConnection?) async {
         guard let connection else {
             availableKeys.removeAll()
             loadedConnectionIdentity = nil
+            requestedConnectionIdentity = nil
             state = .unavailable("Collega l'home-base per verificare le capability disponibili.")
             return
         }
-        guard loadedConnectionIdentity != connection.identity else { return }
+        let connectionIdentity = connection.identity
+        guard loadedConnectionIdentity != connectionIdentity || state != .loaded else { return }
+        guard requestedConnectionIdentity != connectionIdentity || state != .loading else { return }
+        requestedConnectionIdentity = connectionIdentity
         availableKeys.removeAll()
+        loadedConnectionIdentity = nil
         state = .loading
         do {
             let response = try await connection.dataSource.fetchNetworkCapabilities(
@@ -59,12 +65,14 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
                 sessionCookie: connection.sessionCookie,
                 ambulatoryId: connection.ambulatoryId
             )
+            guard requestedConnectionIdentity == connectionIdentity else { return }
             availableKeys = Set(response.capabilities.compactMap { capability in
                 capability.status == "available" ? capability.key : nil
             })
-            loadedConnectionIdentity = connection.identity
+            loadedConnectionIdentity = connectionIdentity
             state = .loaded
         } catch {
+            guard requestedConnectionIdentity == connectionIdentity else { return }
             state = .failed("Non è stato possibile verificare le capability dell'host: \(error.localizedDescription)")
         }
     }
