@@ -28,41 +28,60 @@ final class MediFlowMobileAppUITests: XCTestCase {
         return inTabBar.exists ? inTabBar : app.buttons[label]
     }
 
-    func testLaunchShowsOverview() {
+    func testProjectMenuOpensEverySurface() {
         launch()
-        XCTAssertTrue(
-            sectionView("apple-foundation-overview-view").waitForExistence(timeout: 20),
-            "Overview section should render on launch"
-        )
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
+        let projectButton = app.navigationBars.buttons["Progetto"].firstMatch
+        XCTAssertTrue(projectButton.waitForExistence(timeout: 10))
+        projectButton.tap()
+
+        let surfaces = [
+            (label: "Runtime", identifier: "apple-foundation-runtime-view"),
+            (label: "Panoramica", identifier: "apple-foundation-overview-view"),
+            (label: "Tappe", identifier: "apple-foundation-milestones-view"),
+        ]
+        for (index, surface) in surfaces.enumerated() {
+            let link = app.buttons[surface.label]
+            XCTAssertTrue(link.waitForExistence(timeout: 10))
+            link.tap()
+            XCTAssertTrue(
+                sectionView(surface.identifier).waitForExistence(timeout: 20),
+                "The project menu should open \(surface.label)"
+            )
+            if index < surfaces.count - 1 {
+                let backButton = app.navigationBars.buttons["Progetto"].firstMatch
+                XCTAssertTrue(backButton.waitForExistence(timeout: 10))
+                backButton.tap()
+            }
+        }
     }
 
     func testTabBarNavigatesBetweenSections() {
         launch()
-        XCTAssertTrue(sectionView("apple-foundation-overview-view").waitForExistence(timeout: 20))
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
+
+        tab("Agenda").tap()
+        XCTAssertTrue(
+            sectionView("clinical-workspace-agenda-view").waitForExistence(timeout: 10),
+            "Tapping Agenda should show the cross-patient agenda"
+        )
+
+        tab("Diario").tap()
+        XCTAssertTrue(
+            sectionView("clinical-workspace-diary-view").waitForExistence(timeout: 10),
+            "Tapping Diario should show the global clinical diary"
+        )
 
         tab("Pazienti").tap()
         XCTAssertTrue(
-            sectionView("apple-foundation-modules-view").waitForExistence(timeout: 10),
-            "Tapping Pazienti should show the clinical workspace"
-        )
-
-        tab("Tappe").tap()
-        XCTAssertTrue(
-            sectionView("apple-foundation-milestones-view").waitForExistence(timeout: 10),
-            "Tapping Tappe should show the milestones"
-        )
-
-        tab("Panoramica").tap()
-        XCTAssertTrue(
-            sectionView("apple-foundation-overview-view").waitForExistence(timeout: 10),
-            "Tapping Panoramica should return to the overview"
+            sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 10),
+            "Tapping Pazienti should return to the patient workspace"
         )
     }
 
     func testPatientsSectionShowsConsultationState() {
         launch()
-        tab("Pazienti").tap()
-        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 10))
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 10))
         XCTAssertTrue(
             sectionView("homebase-connection-state").waitForExistence(timeout: 10),
             "The clinical workspace should show the home-base connection state"
@@ -72,7 +91,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
     func testPatientSearchFiltersTheList() {
         // Seed deterministic patients and open the workspace directly.
         launch(seedPatients: true, section: "modules")
-        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
 
         let search = app.textFields["patient-search-field"]
         XCTAssertTrue(search.waitForExistence(timeout: 10), "Search field should render with patients present")
@@ -97,7 +116,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     func testSelectingPatientShowsEnrichedDetail() {
         launch(seedPatients: true, section: "modules")
-        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
 
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
@@ -116,7 +135,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     func testTherapyStatusFilterNarrowsList() {
         launch(seedPatients: true, section: "modules")
-        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
 
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
@@ -140,7 +159,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     func testCheckupStatusFilterNarrowsList() {
         launch(seedPatients: true, section: "modules")
-        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
 
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
@@ -166,7 +185,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     func testDiaryTypeFilterNarrowsList() {
         launch(seedPatients: true, section: "modules")
-        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
 
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
@@ -201,7 +220,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     func testEditPatientFormSavesAnagrafica() {
         launch(seedPatients: true, section: "modules")
-        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
 
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
@@ -229,7 +248,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     func testEditPatientFormArchivesPatient() {
         launch(seedPatients: true, section: "modules")
-        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
 
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
@@ -256,7 +275,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     func testObservationTrendIndicatorShowsForRepeatReading() {
         launch(seedPatients: true, section: "modules")
-        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
 
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
@@ -291,7 +310,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.launchEnvironment["MEDIFLOW_APPLE_INITIAL_SECTION"] = "modules"
         app.launchEnvironment["MEDIFLOW_APPLE_UITEST_FORCE_CONFLICT"] = "1"
         app.launch()
-        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
         let banner = sectionView("version-conflict-banner")
         XCTAssertTrue(banner.waitForExistence(timeout: 10),
                       "A typed 409 conflict should surface the reconciliation banner")
@@ -323,7 +342,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     func testAmbulatoryScopePickerSwitchesScope() {
         launch(seedPatients: true, section: "modules")
-        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
 
         let picker = app.buttons["ambulatory-scope-picker"]
         XCTAssertTrue(picker.waitForExistence(timeout: 10),
@@ -338,7 +357,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     func testDetailShowsDocumentInsightsAndTherapyExport() {
         launch(seedPatients: true, section: "modules")
-        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
         rossi.tap()
@@ -355,7 +374,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     func testEditPatientFormAddsDiagnosis() {
         launch(seedPatients: true, section: "modules")
-        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
         rossi.tap()
@@ -380,7 +399,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     func testScaleFormSubmitsAndAppearsInDiary() {
         launch(seedPatients: true, section: "modules")
-        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
         rossi.tap()
@@ -407,7 +426,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     func testICDSearchAddsCodedDiagnosis() {
         launch(seedPatients: true, section: "modules")
-        XCTAssertTrue(sectionView("apple-foundation-modules-view").waitForExistence(timeout: 20))
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
         rossi.tap()

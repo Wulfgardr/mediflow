@@ -262,7 +262,12 @@ public struct AppleFoundationMobileRootView: View {
     private var projectSurfaceSheet: some View {
         NavigationStack {
             List(ClinicalWorkspaceSection.projectSections) { item in
-                Button { showsProjectSurfaces = false; section = item } label: { Label(item.title, systemImage: item.symbolName) }
+                NavigationLink {
+                    detailView(for: item)
+                        .navigationTitle(item.title)
+                } label: {
+                    Label(item.title, systemImage: item.symbolName)
+                }
             }
             .navigationTitle("Progetto")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Chiudi") { showsProjectSurfaces = false } } }
