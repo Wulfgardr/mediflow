@@ -4053,6 +4053,8 @@ components:
         success:
           type: boolean
           const: true
+        message:
+          type: string
         id:
           type: string
         version:
