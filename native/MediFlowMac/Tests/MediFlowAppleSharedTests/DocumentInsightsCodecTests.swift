@@ -1,3 +1,4 @@
+import CryptoKit
 import XCTest
 @testable import MediFlowAppleShared
 
@@ -127,9 +128,44 @@ final class DocumentInsightsCodecTests: XCTestCase {
         XCTAssertNotNil(oversized.message)
         XCTAssertFalse(oversized.message?.contains("\u{2014}") ?? true, "message must not use an em dash")
 
-        // The boundary itself: right at maxRecommendedRawBytes must not exceed.
+        // The boundary includes the complete JSON body allowance, not only data.
         let boundary = HomeBaseAttachmentWirePrecheck.maxRecommendedRawBytes()
-        XCTAssertFalse(HomeBaseAttachmentWirePrecheck.check(rawByteCount: boundary).exceedsLimit)
+        let boundaryResult = HomeBaseAttachmentWirePrecheck.check(rawByteCount: boundary)
+        XCTAssertFalse(boundaryResult.exceedsLimit)
+        XCTAssertLessThanOrEqual(
+            boundaryResult.estimatedWireBytes,
+            HomeBaseAttachmentWirePrecheck.defaultWireLimitBytes
+        )
+        XCTAssertGreaterThan(
+            HomeBaseAttachmentWirePrecheck.check(rawByteCount: boundary + 4).estimatedWireBytes,
+            HomeBaseAttachmentWirePrecheck.defaultWireLimitBytes
+        )
+    }
+
+    func testAttachmentWirePrecheckRecommendedMaximumProducesBodyUnderHostLimit() throws {
+        let rawByteCount = HomeBaseAttachmentWirePrecheck.maxRecommendedRawBytes()
+        let rawData = Data(repeating: 0xff, count: rawByteCount)
+        let dataURL = HomeBaseAttachmentDataURL.encode(mimeType: "application/pdf", bytes: rawData)
+        let key = SymmetricKey(data: Data(repeating: 7, count: 32))
+        let payload = try ClinicalFieldCrypto.sealAttachmentCreatePayload(
+            name: "referto.pdf",
+            path: "uploads/referto.pdf",
+            data: dataURL,
+            type: "application/pdf",
+            size: rawByteCount,
+            masterKey: key
+        )
+
+        let result = try HomeBaseAttachmentWirePrecheck.check(
+            payload: payload,
+            rawByteCount: rawByteCount
+        )
+
+        XCTAssertFalse(result.exceedsLimit)
+        XCTAssertLessThanOrEqual(
+            result.estimatedWireBytes,
+            HomeBaseAttachmentWirePrecheck.defaultWireLimitBytes
+        )
     }
 
     func testDocumentOcrQueuePresentationMatchesExistingItalianLabels() {

@@ -90,7 +90,10 @@ public enum ClinicalFieldCrypto {
     }
 
     private static func sealString(_ value: String, masterKey: SymmetricKey) throws -> String {
-        guard let json = CryptoService.jsonEncode(value),
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.withoutEscapingSlashes]
+        guard let encoded = try? encoder.encode(value),
+              let json = String(data: encoded, encoding: .utf8),
               let sealed = CryptoService.encryptField(json, masterKey: masterKey) else {
             throw HomeBaseAttachmentCryptoError.sealingFailed
         }

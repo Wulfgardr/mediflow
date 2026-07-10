@@ -31,7 +31,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var ambulatoryId = ""
     @Published private(set) var availableAmbulatories: [NetworkAmbulatorySummary] = []
     @Published private(set) var patients: [HomeBasePatientSummary] = []
-    @Published private(set) var selectedPatient: HomeBasePatientDetail?
+    @Published private(set) var selectedPatient: HomeBasePatientDetail? {
+        didSet {
+            guard oldValue?.id != selectedPatient?.id else { return }
+            invalidateAttachmentPatientState()
+        }
+    }
     @Published private(set) var entries: [HomeBaseEntrySummary] = []
     @Published private(set) var therapies: [HomeBaseTherapySummary] = []
     @Published private(set) var checkups: [HomeBaseCheckupSummary] = []
@@ -211,6 +216,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     // S6 (Wave 5, ADR 0076 Classe A/D7-bis): documents archive, on-demand
     // preview/share, upload with wire precheck, single-record FSE validation.
     @Published private(set) var attachments: [HomeBaseAttachmentSummary] = []
+    @Published private(set) var attachmentsPatientId: String?
     @Published private(set) var selectedAttachmentDetail: HomeBaseAttachmentDetail?
     @Published private(set) var attachmentShareURL: URL?
     @Published private(set) var fseDocumentValidationResult: HomeBaseFseDocumentValidationResponse?
@@ -732,6 +738,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     func loadPatient(_ patient: HomeBasePatientSummary) async {
+        if selectedPatient?.id != patient.id {
+            invalidateAttachmentPatientState()
+        }
         #if DEBUG
         if let detail = Self.uiTestSeededDetail(for: patient) {
             selectedPatient = detail
@@ -920,8 +929,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         let content = newEntryEditorDocument.renderedHTML
         let attachmentIds = Array(newEntryAttachmentIds)
         let patientAttachmentIds = Set(self.attachments.map(\.id))
+        let attachmentCacheMatchesPatient = attachmentsPatientId == patientId
         await runTask {
             guard let masterKey = self.masterKey else { throw PairedCryptoError.keyUnavailable }
+            guard attachmentIds.isEmpty || attachmentCacheMatchesPatient else {
+                throw PairedCryptoError.attachmentCacheUnavailable
+            }
             let attachmentReferences = try ClinicalFieldCrypto.sealEntryAttachmentReferences(
                 patientAttachmentIds: patientAttachmentIds,
                 referencedAttachmentIds: attachmentIds,
@@ -966,7 +979,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         guard let patientId = selectedPatient?.id else { return }
         let result = definition.result(from: answers)
         let metadataJSON = ClinicalScales.metadataJSON(definition: definition, result: result)
-        let content = ClinicalScales.contentSummary(definition: definition, result: result)
+        let content = ClinicalRichText.render(
+            document: ClinicalRichText.parse(
+                html: ClinicalScales.contentSummary(definition: definition, result: result)
+            )
+        )
 
         #if DEBUG
         if Self.isUITestSeeded {
@@ -1088,7 +1105,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /// id or a fabricated placeholder.
     func referencedAttachments(for entry: HomeBaseEntrySummary) -> [HomeBaseAttachmentSummary] {
         let ids = HomeBaseEntryAttachmentReferencesCodec.decode(entry.attachments)
-        guard !ids.isEmpty else { return [] }
+        guard !ids.isEmpty, attachmentsPatientId == entry.patientId else { return [] }
         let byId = Dictionary(uniqueKeysWithValues: attachments.map { ($0.id, $0) })
         return ids.compactMap { byId[$0] }
     }
@@ -1643,10 +1660,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         let attachmentIdsChanged = editEntryAttachmentIds != (editingEntryOriginalAttachmentIds ?? [])
         let attachmentIds = Array(editEntryAttachmentIds)
         let patientAttachmentIds = Set(self.attachments.map(\.id))
+        let attachmentCacheMatchesPatient = attachmentsPatientId == patientId
         await runTask {
             let attachmentReferences: HomeBaseSealedEntryAttachmentReferences?
             if attachmentIdsChanged {
                 guard let masterKey = self.masterKey else { throw PairedCryptoError.keyUnavailable }
+                guard attachmentIds.isEmpty || attachmentCacheMatchesPatient else {
+                    throw PairedCryptoError.attachmentCacheUnavailable
+                }
                 attachmentReferences = try ClinicalFieldCrypto.sealEntryAttachmentReferences(
                     patientAttachmentIds: patientAttachmentIds,
                     referencedAttachmentIds: attachmentIds,
@@ -2758,12 +2779,15 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         await runTask {
-            self.attachments = try await self.fetchDecryptedAttachments(
+            let fetchedAttachments = try await self.fetchDecryptedAttachments(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
+            guard self.selectedPatient?.id == patientId else { return }
+            self.attachments = fetchedAttachments
+            self.attachmentsPatientId = patientId
             self.selectedAttachmentDetail = nil
             self.attachmentShareURL = nil
             self.statusMessage = self.attachments.isEmpty
@@ -2857,6 +2881,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 size: rawData.count,
                 masterKey: masterKey
             )
+            let bodyPrecheck = try HomeBaseAttachmentWirePrecheck.check(
+                payload: payload,
+                rawByteCount: rawData.count
+            )
+            guard !bodyPrecheck.exceedsLimit else {
+                self.errorMessage = bodyPrecheck.message
+                return
+            }
             _ = try await self.makeClient().createAttachment(
                 patientId: patientId,
                 payload: payload,
@@ -2864,14 +2896,29 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
-            self.attachments = try await self.fetchDecryptedAttachments(
+            let fetchedAttachments = try await self.fetchDecryptedAttachments(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
+            guard self.selectedPatient?.id == patientId else { return }
+            self.attachments = fetchedAttachments
+            self.attachmentsPatientId = patientId
             self.statusMessage = "Documento caricato: in coda per elaborazione sull'home-base."
         }
+    }
+
+    private func invalidateAttachmentPatientState() {
+        attachments = []
+        attachmentsPatientId = nil
+        newEntryAttachmentIds = []
+        editEntryAttachmentIds = []
+        editingEntryOriginalAttachmentIds = nil
+        selectedAttachmentDetail = nil
+        attachmentShareURL = nil
+        fseDocumentValidationResult = nil
+        fseDocumentValidationTargetLabel = nil
     }
 
     private func fetchDecryptedAttachments(
@@ -4050,6 +4097,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 enum PairedCryptoError: LocalizedError {
     case keyUnavailable
     case sealFailed
+    case attachmentCacheUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -4057,6 +4105,8 @@ enum PairedCryptoError: LocalizedError {
             return "Cifratura non disponibile: riaccedi con il PIN operatore prima di salvare."
         case .sealFailed:
             return "Cifratura del campo non riuscita: riprova."
+        case .attachmentCacheUnavailable:
+            return "Carica i documenti del paziente corrente prima di collegarli alla voce."
         }
     }
 }

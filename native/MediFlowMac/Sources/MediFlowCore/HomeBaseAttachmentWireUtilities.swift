@@ -35,7 +35,7 @@ public enum HomeBaseAttachmentDataURL {
 /// Client-side pre-check for the attachment wire size limit (ADR 0076 Classe A,
 /// D2/D12). The host enforces MEDIFLOW_ATTACHMENT_MAX_BYTES (default 25 MB,
 /// lib/attachment-payload.ts resolveMaxAttachmentBytes) on the WIRE size of the
-/// sealed `data` field (Content-Length and the ENC ciphertext byte length), not
+/// complete JSON body (Content-Length) and the ENC ciphertext byte length, not
 /// on the raw file bytes. The wire pipeline expands the raw bytes TWICE with
 /// base64 (raw -> base64 data URL -> AEAD ciphertext -> base64 inside the ENC
 /// envelope), so the effective expansion is about 16/9 (~1.78x) plus small
@@ -52,6 +52,8 @@ public enum HomeBaseAttachmentWirePrecheck {
     private static let aeadOverheadAllowanceBytes = 32
     /// Allowance for the "ENC:<b64 nonce>:" envelope around the ciphertext.
     private static let envelopeAllowanceBytes = 64
+    /// Allowance for sealed name/path, type, size, JSON keys and structure.
+    private static let jsonBodyOverheadAllowanceBytes = 2 * 1024
 
     private static func base64Length(ofByteCount count: Int) -> Int {
         ((count + 2) / 3) * 4
@@ -60,15 +62,23 @@ public enum HomeBaseAttachmentWirePrecheck {
     public static func estimatedWireBytes(rawByteCount: Int) -> Int {
         let dataURLBytes = base64Length(ofByteCount: rawByteCount) + dataURLHeaderAllowanceBytes
         let sealedBytes = dataURLBytes + aeadOverheadAllowanceBytes
-        return base64Length(ofByteCount: sealedBytes) + envelopeAllowanceBytes
+        let sealedDataBytes = base64Length(ofByteCount: sealedBytes) + envelopeAllowanceBytes
+        return sealedDataBytes + jsonBodyOverheadAllowanceBytes
     }
 
     public static func maxRecommendedRawBytes(wireLimitBytes: Int = defaultWireLimitBytes) -> Int {
-        let maxCiphertextBase64 = max(0, wireLimitBytes - envelopeAllowanceBytes)
+        let maxSealedDataBytes = max(0, wireLimitBytes - jsonBodyOverheadAllowanceBytes)
+        let maxCiphertextBase64 = max(0, maxSealedDataBytes - envelopeAllowanceBytes)
         let maxSealedBytes = (maxCiphertextBase64 / 4) * 3
         let maxDataURLBytes = max(0, maxSealedBytes - aeadOverheadAllowanceBytes)
         let maxRawBase64 = max(0, maxDataURLBytes - dataURLHeaderAllowanceBytes)
         return (maxRawBase64 / 4) * 3
+    }
+
+    public static func encodedBody(for payload: HomeBaseAttachmentCreatePayload) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.withoutEscapingSlashes]
+        return try encoder.encode(payload)
     }
 
     public struct Result: Equatable, Sendable {
@@ -87,6 +97,31 @@ public enum HomeBaseAttachmentWirePrecheck {
         let maxRawMB = Int((Double(maxRaw) / (1024 * 1024)).rounded())
         let message = "Il file e troppo grande per il caricamento: la cifratura aumenta la dimensione reale trasmessa, il massimo effettivo e circa \(maxRawMB) MB. Scegli un file piu piccolo."
         return Result(estimatedWireBytes: estimate, maxRecommendedRawBytes: maxRaw, exceedsLimit: true, message: message)
+    }
+
+    public static func check(
+        payload: HomeBaseAttachmentCreatePayload,
+        rawByteCount: Int,
+        wireLimitBytes: Int = defaultWireLimitBytes
+    ) throws -> Result {
+        let bodyByteCount = try encodedBody(for: payload).count
+        let maxRaw = maxRecommendedRawBytes(wireLimitBytes: wireLimitBytes)
+        guard bodyByteCount > wireLimitBytes else {
+            return Result(
+                estimatedWireBytes: bodyByteCount,
+                maxRecommendedRawBytes: maxRaw,
+                exceedsLimit: false,
+                message: nil
+            )
+        }
+        let maxRawMB = Int((Double(maxRaw) / (1024 * 1024)).rounded())
+        let message = "Il file e troppo grande per il caricamento: la cifratura aumenta la dimensione reale trasmessa, il massimo effettivo e circa \(maxRawMB) MB. Scegli un file piu piccolo."
+        return Result(
+            estimatedWireBytes: bodyByteCount,
+            maxRecommendedRawBytes: maxRaw,
+            exceedsLimit: true,
+            message: message
+        )
     }
 }
 
