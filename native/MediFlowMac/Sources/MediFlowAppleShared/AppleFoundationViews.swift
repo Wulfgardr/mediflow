@@ -238,7 +238,7 @@ public struct AppleFoundationMobileRootView: View {
                 }
             }
         }
-        .task(id: workspaceModel.connectionState) {
+        .task(id: workspaceModel.clinicalWorkspaceConnection?.identity) {
             await capabilitiesStore.loadIfNeeded(using: workspaceModel.clinicalWorkspaceConnection)
         }
         .sheet(isPresented: $showsProjectSurfaces) { projectSurfaceSheet }
