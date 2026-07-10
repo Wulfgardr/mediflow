@@ -338,9 +338,13 @@ paths:
       description: |
         Returns the PHI-safe AI runtime posture declared by the current node.
         This summary keeps `AI plane` separate from the shared `data plane` and
-        only describes local-vs-centralized capability plus fallback policy.
+        only describes local-vs-centralized capability, fail-closed kill-switch
+        status, and fallback policy. It accepts either the local bearer token or
+        a paired client while the node is in network-home-base mode.
       security:
         - bearerAuth: []
+        - pairedClientId: []
+          pairedClientToken: []
       responses:
         '200':
           description: Current PHI-safe AI runtime summary.
@@ -350,6 +354,57 @@ paths:
                 $ref: '#/components/schemas/NetworkAiRuntimeSummary'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/NetworkModeDisabled'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/visit-draft:
+    post:
+      tags:
+        - Network
+      operationId: computeNetworkVisitDraft
+      summary: Compute a deterministic visit draft through the paired data plane
+      description: |
+        Computes the same deterministic, review-first draft as the web visit
+        route (ADR 0076, Classe E). The route requires a paired client with
+        `network.compute.visit-draft`, an active operator session, and the
+        effective ambulatory scope. It does not persist data or write an audit
+        mutation. `patientId` is intentionally not accepted because this
+        compute operation does not apply a patient scope.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkVisitDraftRequest'
+            examples:
+              computeVisitDraft:
+                value:
+                  transcript: "Paziente riferisce tosse. P: continuare terapia e rivalutare."
+                  events:
+                    - type: start
+                      atMs: 0
+                    - type: stop
+                      atMs: 180000
+      responses:
+        '200':
+          description: Review-first draft with no persisted audio or writes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkVisitDraftResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/pairing-intents:
@@ -3887,6 +3942,7 @@ components:
         - fallbackPolicy
         - rolloutGate
         - surfaces
+        - killSwitches
         - guardrails
       properties:
         plane:
@@ -3916,10 +3972,146 @@ components:
               - patient-insight
               - smart-import
               - document-synthesis
+              - treatment-reasoning
+        killSwitches:
+          $ref: '#/components/schemas/NetworkAiRuntimeKillSwitches'
         guardrails:
           type: array
           items:
             type: string
+    NetworkAiRuntimeKillSwitches:
+      type: object
+      additionalProperties: false
+      required:
+        - patientInsight
+        - documentSynthesis
+        - smartImport
+        - treatmentReasoning
+      properties:
+        patientInsight:
+          type: string
+          enum: [enabled, disabled]
+        documentSynthesis:
+          type: string
+          enum: [enabled, disabled]
+        smartImport:
+          type: string
+          enum: [enabled, disabled]
+        treatmentReasoning:
+          type: string
+          enum: [enabled, disabled]
+    NetworkVisitDraftRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        transcript:
+          type: string
+          minLength: 1
+          maxLength: 12000
+        segments:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [text]
+            properties:
+              text:
+                type: string
+                minLength: 1
+              speaker:
+                type: string
+              atMs:
+                type: number
+        events:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [type, atMs]
+            properties:
+              type:
+                type: string
+                enum: [start, pause, resume, stop]
+              atMs:
+                type: number
+                minimum: 0
+      description: Provide a non-empty transcript or at least one non-empty segment. The combined transcript and segment text limit is 12000 characters. `patientId` is rejected by presence.
+    NetworkVisitDraftResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - schemaVersion
+        - draftText
+        - sections
+        - medications
+        - session
+        - safety
+      properties:
+        schemaVersion:
+          type: string
+          const: mediflow.visit_transcript_draft.v1
+        draftText:
+          type: string
+        sections:
+          type: object
+          additionalProperties: false
+          required: [subjective, objective, assessment, plan]
+          properties:
+            subjective:
+              type: array
+              items: { type: string }
+            objective:
+              type: array
+              items: { type: string }
+            assessment:
+              type: array
+              items: { type: string }
+            plan:
+              type: array
+              items: { type: string }
+        medications:
+          type: array
+          items:
+            type: object
+        session:
+          type: object
+          additionalProperties: false
+          required: [state, eventCount, pauseCount, resumeCount, recordedMs, pausedMs, warnings]
+          properties:
+            state:
+              type: string
+              enum: [idle, recording, paused, stopped]
+            eventCount:
+              type: integer
+            pauseCount:
+              type: integer
+            resumeCount:
+              type: integer
+            recordedMs:
+              type: number
+            pausedMs:
+              type: number
+            warnings:
+              type: array
+              items: { type: string }
+        safety:
+          type: object
+          additionalProperties: false
+          required: [reviewRequired, forbiddenAutoWriteCount, rawAudioPersisted, writesPerformed]
+          properties:
+            reviewRequired:
+              type: boolean
+              const: true
+            forbiddenAutoWriteCount:
+              type: integer
+              const: 0
+            rawAudioPersisted:
+              type: boolean
+              const: false
+            writesPerformed:
+              type: array
+              maxItems: 0
+              items: {}
     NetworkCapability:
       type: object
       additionalProperties: false
@@ -3955,6 +4147,7 @@ components:
             - network.catalogs.readonly
             - network.replica.readonly-documents
             - network.replica.write-documents
+            - network.compute.visit-draft
             - network.replica.sync
             - network.ai.central-runtime
             - network.catalogs.sync
@@ -4584,8 +4777,10 @@ components:
         - content
       description: |
         Clinical diary creation payload for paired clients. Server-controlled
-        `patientId`, `createdAt`, `updatedAt`, and `version` are rejected, and
-        remote attachment/document-derived writes remain outside this boundary.
+        `patientId`, `createdAt`, `updatedAt`, and `version` are rejected.
+        `attachments` may be omitted or cleared, otherwise it must be a client
+        sealed `ENC:` string because the paired host does not inspect attachment
+        references. AI and document-derived fields remain outside this boundary.
       properties:
         id:
           type: string
@@ -4614,6 +4809,11 @@ components:
             - type: object
             - type: array
             - type: 'null'
+        attachments:
+          type:
+            - string
+            - 'null'
+          description: Omit or clear this field, or send a sealed `ENC:` attachment-reference payload. Plaintext JSON and arrays are rejected.
     EntryMutationRequest:
       type: object
       additionalProperties: false
@@ -4621,8 +4821,9 @@ components:
         - version
       description: |
         Partial clinical diary update payload. At least one field other than
-        `version` must be provided. Attachment/document-derived writes are
-        rejected by the paired boundary.
+        `version` must be provided. `attachments` may be cleared or supplied
+        only as a sealed `ENC:` attachment-reference payload; AI and
+        document-derived writes remain rejected by the paired boundary.
       properties:
         version:
           type: integer
@@ -4652,6 +4853,11 @@ components:
             - type: object
             - type: array
             - type: 'null'
+        attachments:
+          type:
+            - string
+            - 'null'
+          description: Clear the field or send a sealed `ENC:` attachment-reference payload. Plaintext JSON and arrays are rejected.
         deletedAt:
           type:
             - string

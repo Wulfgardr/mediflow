@@ -201,7 +201,12 @@ test('buildNetworkCapabilitiesResponse surfaces centralized AI availability when
     assert.equal(documentWrite.status, 'available');
     assert.equal(documentWrite.requiresPairing, true);
 
-    assert.equal(response.capabilities.length, 28);
+    const visitDraft = response.capabilities.find((item) => item.key === 'network.compute.visit-draft');
+    assert.ok(visitDraft);
+    assert.equal(visitDraft.status, 'available');
+    assert.equal(visitDraft.requiresPairing, true);
+
+    assert.equal(response.capabilities.length, 29);
 });
 
 test('buildNetworkReplicaSummary keeps offline-deferred and conflict-review as explicit preview states', () => {

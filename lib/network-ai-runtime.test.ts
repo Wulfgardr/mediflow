@@ -2,6 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 /* @Codex */
 import { deriveNetworkAiRuntimeSummary } from './network-ai-runtime-model.ts';
+import { resolveNetworkAiRuntimeKillSwitches } from './network-ai-runtime.ts';
+
+test('resolveNetworkAiRuntimeKillSwitches is fail-closed for absent and unknown settings', () => {
+    assert.deepEqual(resolveNetworkAiRuntimeKillSwitches({}), {
+        patientInsight: 'disabled',
+        documentSynthesis: 'disabled',
+        smartImport: 'disabled',
+        treatmentReasoning: 'disabled',
+    });
+    assert.deepEqual(resolveNetworkAiRuntimeKillSwitches({
+        aiPatientInsightKillSwitch: 'enabled',
+        aiDocumentSynthesisKillSwitch: 'unexpected',
+        aiSmartImportKillSwitch: 'enabled',
+        aiTreatmentReasoningKillSwitch: 'garbage',
+    }), {
+        patientInsight: 'enabled',
+        documentSynthesis: 'disabled',
+        smartImport: 'enabled',
+        treatmentReasoning: 'disabled',
+    });
+});
 
 test('deriveNetworkAiRuntimeSummary keeps AI local while the node stays local-only', () => {
     const summary = deriveNetworkAiRuntimeSummary({
@@ -12,6 +33,12 @@ test('deriveNetworkAiRuntimeSummary keeps AI local while the node stays local-on
         clinicalModel: 'qwen3.5:35b-a3b',
         reasoningModel: 'qwen3.5:35b-a3b',
         ocrModel: 'deepseek-ocr',
+        killSwitches: {
+            patientInsight: 'disabled',
+            documentSynthesis: 'disabled',
+            smartImport: 'disabled',
+            treatmentReasoning: 'disabled',
+        },
     });
 
     assert.equal(summary.mode, 'local-ai');
@@ -22,7 +49,14 @@ test('deriveNetworkAiRuntimeSummary keeps AI local while the node stays local-on
         'patient-insight',
         'smart-import',
         'document-synthesis',
+        'treatment-reasoning',
     ]);
+    assert.deepEqual(summary.killSwitches, {
+        patientInsight: 'disabled',
+        documentSynthesis: 'disabled',
+        smartImport: 'disabled',
+        treatmentReasoning: 'disabled',
+    });
 });
 
 test('deriveNetworkAiRuntimeSummary exposes centralized AI when home-base mode and local runtime are ready', () => {
@@ -34,6 +68,12 @@ test('deriveNetworkAiRuntimeSummary exposes centralized AI when home-base mode a
         clinicalModel: 'qwen3.5:35b-a3b',
         reasoningModel: 'qwen3.5:35b-a3b',
         ocrModel: 'deepseek-ocr',
+        killSwitches: {
+            patientInsight: 'enabled',
+            documentSynthesis: 'enabled',
+            smartImport: 'enabled',
+            treatmentReasoning: 'enabled',
+        },
     });
 
     assert.equal(summary.mode, 'centralized-available');
@@ -51,6 +91,12 @@ test('deriveNetworkAiRuntimeSummary marks centralized AI unavailable when the lo
         clinicalModel: null,
         reasoningModel: null,
         ocrModel: null,
+        killSwitches: {
+            patientInsight: 'disabled',
+            documentSynthesis: 'disabled',
+            smartImport: 'disabled',
+            treatmentReasoning: 'disabled',
+        },
     });
 
     assert.equal(summary.mode, 'centralized-unavailable');
