@@ -448,9 +448,11 @@ class ApiTable<T> {
         }
 
         const init: RequestInit = { method: 'DELETE' };
-        if (typeof options?.version === 'number' || typeof options?.deletionReason === 'string') {
-            const deletionReason = typeof options?.deletionReason === 'string'
-                ? await this.encryptDeleteField('deletionReason', options.deletionReason)
+        const encryptsDeletionReason = ENCRYPTED_FIELDS[this.tableName]?.includes('deletionReason') ?? false;
+        const rawDeletionReason = options?.deletionReason ?? (encryptsDeletionReason ? 'web-delete' : undefined);
+        if (typeof options?.version === 'number' || typeof rawDeletionReason === 'string') {
+            const deletionReason = typeof rawDeletionReason === 'string'
+                ? await this.encryptDeleteField('deletionReason', rawDeletionReason)
                 : undefined;
             init.headers = { 'Content-Type': 'application/json' };
             init.body = JSON.stringify({

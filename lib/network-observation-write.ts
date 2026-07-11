@@ -21,7 +21,7 @@ import { observations, patientsToAmbulatories } from './schema';
 /* @Codex */
 import { buildObservationVersionConflictPayload, parseObservationExpectedVersion } from './observation-concurrency';
 /* @Codex */
-import { isSealedValue } from './network-patient-lifecycle';
+import { isSealedValue, validateNetworkDeletionReason } from './network-patient-lifecycle';
 
 /* @Codex */
 export const NETWORK_OBSERVATION_WRITE_CAPABILITY = 'network.replica.write-observations';
@@ -87,6 +87,9 @@ function validateNetworkObservationMutationBoundary(
             },
         };
     }
+
+    const deletionReason = validateNetworkDeletionReason(body.deletionReason);
+    if (!deletionReason.ok) return deletionReason;
 
     return null;
 }

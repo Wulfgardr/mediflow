@@ -193,7 +193,8 @@ describe('db locked-data round trip (WUL-323)', () => {
     });
 
     it('keeps legacy plaintext deletion reasons readable and encrypts new writes', async () => {
-        db.setKey(await generateMasterKey());
+        const key = await generateMasterKey();
+        db.setKey(key);
         const calls = installFetchMock((call) => {
             if (call.method === 'GET') {
                 return { id: 'legacy', version: 1, deletionReason: 'motivo legacy' };
@@ -207,11 +208,21 @@ describe('db locked-data round trip (WUL-323)', () => {
         assert.equal(observation?.deletionReason, 'motivo legacy');
 
         await db.checkups.update('legacy', { version: 1, deletionReason: 'nuovo motivo' });
-        await db.observations.update('legacy', { deletionReason: 'nuovo motivo' });
+        await db.observations.update('legacy', { version: 1, deletionReason: 'nuovo motivo' });
         const putBodies = calls.filter((call) => call.method === 'PUT').map((call) => call.body);
         assert.equal(putBodies.length, 2);
         for (const body of putBodies) {
             assert.match(String(body?.deletionReason), /^ENC:/);
+        }
+
+        await db.checkups.delete('legacy', { version: 1, suppressNotify: true });
+        await db.observations.delete('legacy', { version: 1, suppressNotify: true });
+        const deleteBodies = calls.filter((call) => call.method === 'DELETE').map((call) => call.body);
+        assert.equal(deleteBodies.length, 2);
+        for (const body of deleteBodies) {
+            assert.match(String(body?.deletionReason), /^ENC:/);
+            const [, iv, ciphertext] = String(body?.deletionReason).split(':');
+            assert.equal(await decryptData(ciphertext, iv, key), 'web-delete');
         }
     });
 });
