@@ -35,6 +35,22 @@ test('paired account PIN rotation preserves the master key and sealed patient fi
     const sealedNotes = await sealField('account-pin ciphertext survives rewrap', originalMasterKey);
 
     try {
+        const invalidRewrapPayloads = [
+            { encryptedMasterKey: 'v2:not base64', salt: firstLogin.json.salt },
+            { encryptedMasterKey: `v1:${Buffer.alloc(60, 1).toString('base64')}`, salt: firstLogin.json.salt },
+            { encryptedMasterKey: `v2:${Buffer.alloc(60, 1).toString('base64')}`, salt: Buffer.alloc(15, 2).toString('base64') },
+            { encryptedMasterKey: `v2:${'A'.repeat(600)}`, salt: firstLogin.json.salt },
+        ];
+        for (const payload of invalidRewrapPayloads) {
+            const rejected = await rewrapMasterKey(firstLogin.cookie, payload);
+            assert.equal(rejected.response.status, 400);
+            assert.equal(rejected.json?.code, 'KDF_REWRAP_INVALID');
+        }
+        const loginAfterRejectedRewrap = await login(PIN);
+        assert.equal(loginAfterRejectedRewrap.response.status, 200);
+        assert.equal(loginAfterRejectedRewrap.json.encryptedMasterKey, firstLogin.json.encryptedMasterKey);
+        assert.equal(loginAfterRejectedRewrap.json.salt, firstLogin.json.salt);
+
         const created = await request('POST', '/api/v1/network/patients', {
             headers: { ...pairedHeaders(client), Cookie: firstLogin.cookie },
             body: patientPayload(patientId, sealedNotes),
@@ -105,6 +121,7 @@ async function assertServerReady() { const result = await request('GET', '/api/v
 async function enableHomeBaseMode() { const result = await request('PUT', '/api/settings/network.mode', { headers: localApiHeaders(), body: { value: 'network-home-base' } }); assert.equal(result.response.status, 200); }
 async function login(pin) { const result = await request('POST', '/api/auth/login', { body: { username: USERNAME, password: pin } }); return { ...result, cookie: result.response.status === 200 ? extractSessionCookie(result.response) : null }; }
 async function changePin(cookie, currentPin, newPin, blob, salt) { return request('POST', '/api/auth/change-pin', { headers: { Cookie: cookie }, body: { currentPin, newPin, encryptedMasterKey: blob, salt: salt.toString('base64') } }); }
+async function rewrapMasterKey(cookie, body) { return request('POST', '/api/auth/rewrap-master-key', { headers: { Cookie: cookie }, body }); }
 async function pairClient(requestedCapabilities, deviceName) { const intent = await request('POST', '/api/v1/network/pairing-intents', { body: { deviceName, clientPlatform: 'ipados', appVersion: '0.7.1-smoke', requestedCapabilities } }); assert.equal(intent.response.status, 201); const confirmed = await request('POST', `/api/v1/network/pairing-intents/${intent.json.intentId}/confirm`, { headers: localApiHeaders() }); assert.equal(confirmed.response.status, 201); return { pairedClientId: confirmed.json.pairedClient.clientId, pairedClientToken: confirmed.json.pairedClientToken }; }
 function patientPayload(id, notes) { const suffix = id.replace(/-/g, '').slice(0, 13).toUpperCase(); return { id, firstName: 'Account', lastName: 'Pin', taxCode: `ACP${suffix}`, notes, isAdi: false }; }
 async function cleanupPatient(patientId) { const detail = await request('GET', `/api/v1/patients/${patientId}`, { headers: localApiHeaders() }); if (detail.response.status === 200) { const deleted = await request('DELETE', `/api/v1/patients/${patientId}`, { headers: localApiHeaders(), body: { version: detail.json.version } }); assert.equal(deleted.response.status, 200); } }
