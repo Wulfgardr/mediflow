@@ -12,6 +12,9 @@ export const DEFAULT_BACKUP_RETENTION_KEEP_ARTIFACTS = 14 as const;
 const BACKUP_ARTIFACT_FILE_PREFIX = 'mediflow-backup-v1-';
 const BACKUP_ARTIFACT_FILE_SUFFIX = '.mediflow';
 const BACKUP_ARTIFACT_TEMP_SUFFIX = '.mediflow.tmp';
+const BACKUP_LOCK_FILE_NAME = '.mediflow-backup.lock';
+const BACKUP_LOCK_STALE_MS = 6 * 60 * 60 * 1000;
+const BACKUP_TEMP_MIN_AGE_MS = 15 * 60 * 1000;
 
 export type BackupSchedulerRunStatus = 'success' | 'error';
 export type BackupRetentionMode = 'auto' | 'manual';
@@ -257,16 +260,32 @@ function sortManagedBackupFiles(files: ManagedBackupFile[]): ManagedBackupFile[]
     });
 }
 
+function isRecentTemp(file: ManagedBackupFile, nowMs: number): boolean {
+    return file.kind === 'temp' && nowMs - file.modifiedAtMs < BACKUP_TEMP_MIN_AGE_MS;
+}
+
+function hasActiveBackupLock(destinationDir: string, nowMs: number): boolean {
+    try {
+        return nowMs - fs.statSync(path.join(destinationDir, BACKUP_LOCK_FILE_NAME)).mtimeMs < BACKUP_LOCK_STALE_MS;
+    } catch {
+        return false;
+    }
+}
+
 export function previewBackupRetention(
     config: Pick<BackupSchedulerConfig, 'destinationDir' | 'retentionKeepArtifacts'>,
-    options?: { preservePaths?: string[] },
+    options?: { preservePaths?: string[]; nowMs?: number },
 ): BackupRetentionPreview {
     const preservePaths = new Set((options?.preservePaths ?? []).map((value) => path.resolve(value)));
+    const nowMs = options?.nowMs ?? Date.now();
+    const activeBackupLock = hasActiveBackupLock(config.destinationDir, nowMs);
     const managedFiles = sortManagedBackupFiles(listManagedBackupFiles(config.destinationDir));
     const artifacts = managedFiles.filter((file) => file.kind === 'artifact');
     const orphanTemps = managedFiles
         .filter((file) => file.kind === 'temp')
-        .filter((file) => !preservePaths.has(path.resolve(file.path)));
+        .filter((file) => !preservePaths.has(path.resolve(file.path)))
+        .filter((file) => !isRecentTemp(file, nowMs))
+        .filter(() => !activeBackupLock);
     const staleArtifacts = artifacts
         .slice(clampRetentionKeepArtifacts(config.retentionKeepArtifacts))
         .filter((file) => !preservePaths.has(path.resolve(file.path)));
@@ -301,7 +320,7 @@ export function previewBackupRetention(
 
 export function applyBackupRetention(
     config: Pick<BackupSchedulerConfig, 'destinationDir' | 'retentionKeepArtifacts'>,
-    options?: { preservePaths?: string[] },
+    options?: { preservePaths?: string[]; nowMs?: number },
 ): BackupRetentionApplyResult {
     const preview = previewBackupRetention(config, options);
 
