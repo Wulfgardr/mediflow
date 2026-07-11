@@ -52,11 +52,11 @@
       "evidence": [
         {
           "type": "command",
-          "value": "MEDIFLOW_CODESIGN_IDENTITY=- bash scripts/build-native-app.sh"
+          "value": "MEDIFLOW_CODESIGN_IDENTITY=- bash scripts/build-apple-macos-app.sh"
         },
         {
           "type": "command",
-          "value": "codesign -dv native/MediFlowMac/Build/MediFlowMac.app"
+          "value": "codesign -dv tmp-mac-derived-data/Build/Products/Debug/MediFlow.app"
         },
         {
           "type": "manual",
@@ -594,7 +594,11 @@
       "evidence": [
         {
           "type": "command",
-          "value": "npm run test:native:clickmap:probe"
+          "value": "npm run test:native:clickmap:probe -- --app-path tmp-p6-packaged-derived-data/Build/Products/Debug/MediFlow.app"
+        },
+        {
+          "type": "runbook",
+          "value": "docs/parity-click-map-macos.md"
         },
         {
           "type": "command",

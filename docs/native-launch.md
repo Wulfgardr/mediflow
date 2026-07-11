@@ -49,19 +49,19 @@ temporanee o documentazione privata/non-runtime.
 Firma e notarizzazione restano esplicite:
 
 ```bash
-MEDIFLOW_CODESIGN_IDENTITY="-" bash scripts/build-native-app.sh
+MEDIFLOW_CODESIGN_IDENTITY="-" bash scripts/build-apple-macos-app.sh
 MEDIFLOW_CODESIGN_IDENTITY="Developer ID Application: ..." \
-MEDIFLOW_NOTARY_PROFILE="mediflow-notary" \
-bash scripts/build-native-app.sh
+bash scripts/build-apple-macos-app.sh
 ```
 
 Senza queste variabili lo script produce un bundle locale non firmato. La
-notarizzazione richiede una Developer ID reale, non firma ad-hoc.
+notarizzazione richiede una Developer ID reale e un passaggio di distribuzione
+separato; non viene eseguita automaticamente da questo script.
 
 ## Avvio manuale
 
 ```bash
 ./scripts/native-setup.sh
-./scripts/build-native-app.sh
-open native/MediFlowMac/Build/MediFlowMac.app
+./scripts/build-apple-macos-app.sh
+open tmp-mac-derived-data/Build/Products/Debug/MediFlow.app
 ```
