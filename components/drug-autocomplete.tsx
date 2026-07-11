@@ -1,7 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect, useId } from 'react';
-import { db, AifaDrug } from '@/lib/db';
+import type { AifaDrug } from '@/lib/db';
+import {
+    commitDrugAutocompleteQueryChange,
+    createDrugAutocompleteSearch,
+} from '@/lib/drug-autocomplete-search';
 import { Search, X, Pill, Database, Activity } from 'lucide-react';
 
 interface DrugAutocompleteProps {
@@ -25,6 +29,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
     const listboxId = useId();
     const optionId = (index: number) => `${listboxId}-opt-${index}`;
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const [drugSearch] = useState(() => createDrugAutocompleteSearch()); // @Codex WUL-488
     /* @Codex WUL-UIUX: in modifica il campo parte con defaultValue (nome farmaco):
        non deve far partire una ricerca ne aprire il popover finche il medico non
        digita davvero. */
@@ -32,62 +37,39 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
 
     // Debounce search
     useEffect(() => {
-        if (!hasUserTyped.current) return;
+        drugSearch.abort(); // @Codex WUL-488
+        if (!hasUserTyped.current) return () => drugSearch.abort();
         const timer = setTimeout(async () => {
             const tokens = query.trim().split(/\s+/).filter(t => t.length > 0);
 
             if (tokens.length > 0 && tokens[0].length > 2) {
                 setIsLoading(true);
                 try {
-                    // 1. Efficient DB Fetch using ONLY the first token
-                    const firstToken = tokens[0].toLowerCase();
-
-                    const allDrugs = await db.drugs.toArray();
-                    const candidateByAic = new Map<string, AifaDrug>();
-                    let nameMatchCount = 0;
-                    let principleMatchCount = 0;
-
-                    for (const drug of allDrugs) {
-                        if (nameMatchCount < 50 && drug.name.toLowerCase().startsWith(firstToken)) {
-                            candidateByAic.set(drug.aic, drug);
-                            nameMatchCount += 1;
-                        }
-                        if (
-                            principleMatchCount < 50 &&
-                            drug.activePrinciple?.toLowerCase().startsWith(firstToken)
-                        ) {
-                            candidateByAic.set(drug.aic, drug);
-                            principleMatchCount += 1;
-                        }
-                        if (nameMatchCount >= 50 && principleMatchCount >= 50) break;
-                    }
-
-                    const unique = Array.from(candidateByAic.values());
-
-                    // 3. Smart Filtering: Check if ALL tokens match anywhere in the drug data
-                    // This allows searching for "Depakin 500" where "500" might be in the packaging
-                    const filtered = unique.filter(drug => {
-                        const searchString = `${drug.name} ${drug.activePrinciple} ${drug.packaging || ''}`.toLowerCase();
-                        return tokens.every(token => searchString.includes(token.toLowerCase()));
-                    }).slice(0, 30); // Limit final display
-
-                    setResults(filtered);
+                    const matches = await drugSearch.run(query.trim()); // @Codex WUL-488
+                    if (matches === null) return;
+                    setResults(matches);
                     setActiveIndex(-1);
                     setIsOpen(true);
+                    setIsLoading(false);
                 } catch (e) {
                     console.error("Drug search error", e);
-                } finally {
                     setIsLoading(false);
                 }
             } else if (tokens.length === 0) {
                 setResults([]);
                 setActiveIndex(-1);
                 setIsOpen(false);
+                setIsLoading(false);
+            } else {
+                setIsLoading(false);
             }
         }, 300);
 
-        return () => clearTimeout(timer);
-    }, [query]);
+        return () => {
+            clearTimeout(timer);
+            drugSearch.abort();
+        };
+    }, [drugSearch, query]);
 
     // Handle outside click
     useEffect(() => {
@@ -101,7 +83,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
     }, [wrapperRef]);
 
     const handleSelect = (drug: AifaDrug) => {
-        setQuery(drug.name);
+        commitDrugAutocompleteQueryChange(drugSearch, setQuery, drug.name, () => setIsLoading(false)); // @Codex WUL-488
         setIsOpen(false);
         setActiveIndex(-1);
         onSelect(drug);
@@ -147,7 +129,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                     value={query}
                     onChange={(e) => {
                         hasUserTyped.current = true;
-                        setQuery(e.target.value);
+                        commitDrugAutocompleteQueryChange(drugSearch, setQuery, e.target.value); // @Codex WUL-488
                     }}
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder}
@@ -164,7 +146,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                 {!isLoading && query && (
                     <button
                         type="button"
-                        onClick={() => setQuery('')}
+                        onClick={() => commitDrugAutocompleteQueryChange(drugSearch, setQuery, '')} // @Codex WUL-488
                         className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-[color:var(--mf-muted)] transition-colors hover:bg-[color:rgba(248,250,252,0.86)] hover:text-[color:var(--mf-ink)] dark:hover:bg-white/8"
                         style={{ color: 'var(--mf-muted)' }}
                         title="Cancella ricerca"
