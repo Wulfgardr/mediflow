@@ -1,5 +1,6 @@
 /* @Codex */
 import { detectSuspiciousPersonNames } from './patient-data-guardrails';
+import { stripModelArtifacts } from './model-artifacts';
 
 /* @Codex */
 export const CLAIM_SUPPORT_FALLBACK = 'DATI-INCOMPLETI';
@@ -35,15 +36,6 @@ export interface PatientInsightDiagnostics {
     mainMarkdown: string;
     sourcesMarkdown: string;
     limitsMarkdown: string;
-}
-
-function stripModelArtifacts(content: string): string {
-    return content
-        .replace(/<unused94>[\s\S]*?(<unused95>|$)/g, '')
-        .replace(/<think>[\s\S]*?<\/think>/g, '')
-        .replace(/^Plan:\s*/gim, '')
-        .replace(/\r/g, '')
-        .trim();
 }
 
 export function stripCitationMarkers(value: string): string {
