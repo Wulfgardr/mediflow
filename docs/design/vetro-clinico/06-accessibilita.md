@@ -12,7 +12,7 @@ Software clinico: chi lo usa può avere vista affaticata, luce ambientale pessim
 
 | Requisito | Soglia | Note MediFlow |
 | --- | --- | --- |
-| Contrasto testo | 4.5:1 (normale), 3:1 (grande) | Verificato per ogni coppia dei token; `ink.muted` e i segnali su superfici tinte sono i casi limite da misurare, non da stimare. |
+| Contrasto testo | 4.5:1 (normale), 3:1 (grande) | Da verificare per ogni coppia dei token; `ink.muted` e i segnali su superfici tinte sono i casi limite da misurare, non da stimare. |
 | Contrasto non testuale | 3:1 | Bordi di input, icone-azione, focus ring, glifi di stato. |
 | Target | >= 24x24px puntatore, 44pt touch | Vale anche in densità densa (hit area estesa). |
 | Focus visibile | Anello >= 2px, contrasto 3:1 tra stato focused e non | Unico anello: `--mf-focus-ring`, via `:focus-visible`. |
