@@ -16,8 +16,8 @@ fi
 # @Codex
 RUNNER="${MEDIFLOW_NATIVE_TEST_RUNNER:-swift}" # swift | xcode | both
 DERIVED_DATA_DIR="${MEDIFLOW_DERIVED_DATA_DIR:-$ROOT_DIR/tmp-native-derived-data}"
-# Sole surviving SPM scheme after the executables were retired (Fase 0).
-XCODE_SCHEME="${MEDIFLOW_XCODE_SCHEME:-MediFlowAppleShared}"
+# Package aggregate carries both library test targets after app executables retired.
+XCODE_SCHEME="${MEDIFLOW_XCODE_SCHEME:-MediFlowMac-Package}"
 XCODE_DESTINATION="${MEDIFLOW_XCODE_DESTINATION:-platform=macOS,arch=arm64}"
 
 run_swift_tests() {

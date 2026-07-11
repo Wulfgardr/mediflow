@@ -23,6 +23,21 @@ struct ProbeReport {
     }
 }
 
+func argumentValue(after flag: String) -> String? {
+    guard let index = CommandLine.arguments.firstIndex(of: flag),
+          CommandLine.arguments.indices.contains(index + 1) else {
+        return nil
+    }
+    return CommandLine.arguments[index + 1]
+}
+
+func screenIsLocked() -> Bool {
+    guard let session = CGSessionCopyCurrentDictionary() as? [String: Any] else {
+        return false
+    }
+    return session["CGSSessionScreenIsLocked"] as? Bool ?? false
+}
+
 func attribute(_ element: AXUIElement, _ name: String) -> AnyObject? {
     var value: CFTypeRef?
     let result = AXUIElementCopyAttributeValue(element, name as CFString, &value)
@@ -55,26 +70,33 @@ func title(of element: AXUIElement) -> String {
 }
 
 func findElement(in element: AXUIElement, where predicate: (AXUIElement) -> Bool) -> AXUIElement? {
-    if predicate(element) {
-        return element
-    }
-
-    for child in children(of: element) {
-        if let found = findElement(in: child, where: predicate) {
-            return found
+    var queue = [element]
+    var index = 0
+    var visited = Set<AXUIElement>()
+    while index < queue.count {
+        let candidate = queue[index]
+        index += 1
+        guard visited.insert(candidate).inserted else { continue }
+        if predicate(candidate) {
+            return candidate
         }
+        queue.append(contentsOf: children(of: candidate))
     }
-
     return nil
 }
 
 func collectElements(in element: AXUIElement, where predicate: (AXUIElement) -> Bool, into output: inout [AXUIElement]) {
-    if predicate(element) {
-        output.append(element)
-    }
-
-    for child in children(of: element) {
-        collectElements(in: child, where: predicate, into: &output)
+    var queue = [element]
+    var index = 0
+    var visited = Set<AXUIElement>()
+    while index < queue.count {
+        let candidate = queue[index]
+        index += 1
+        guard visited.insert(candidate).inserted else { continue }
+        if predicate(candidate) {
+            output.append(candidate)
+        }
+        queue.append(contentsOf: children(of: candidate))
     }
 }
 
@@ -84,23 +106,42 @@ func press(_ element: AXUIElement) -> Bool {
 }
 
 func runningApp() throws -> NSRunningApplication {
-    if let app = NSRunningApplication.runningApplications(withBundleIdentifier: "com.mediflow.mac").first {
+    if let appPath = argumentValue(after: "--app-path") {
+        let expectedExecutable = URL(fileURLWithPath: appPath)
+            .appendingPathComponent("Contents/MacOS/MediFlow")
+            .standardizedFileURL
+        let matches = NSWorkspace.shared.runningApplications.filter {
+            $0.executableURL?.standardizedFileURL == expectedExecutable
+        }
+        guard matches.count == 1, let app = matches.first else {
+            throw ProbeFailure(
+                message: "Expected exactly one running MediFlow at \(appPath); found \(matches.count)."
+            )
+        }
         return app
     }
 
-    if let app = NSWorkspace.shared.runningApplications.first(where: { $0.localizedName == "MediFlowMac" }) {
-        return app
+    let matches = NSRunningApplication.runningApplications(withBundleIdentifier: "com.mediflow.mobile")
+    guard matches.count == 1, let app = matches.first else {
+        throw ProbeFailure(
+            message: "Expected exactly one running MediFlow; found \(matches.count). Pass --app-path to select the P6 bundle."
+        )
     }
-
-    throw ProbeFailure(message: "MediFlowMac is not running. Launch the app before running this probe.")
+    return app
 }
 
-func appWindow(for app: NSRunningApplication) throws -> AXUIElement {
-    let appElement = AXUIElementCreateApplication(app.processIdentifier)
-    guard let windows = attribute(appElement, kAXWindowsAttribute) as? [AXUIElement], let window = windows.first else {
-        throw ProbeFailure(message: "Unable to resolve the first MediFlowMac window via AX.")
-    }
-    return window
+func appWindow(for app: NSRunningApplication, timeout: TimeInterval = 5.0) throws -> AXUIElement {
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        if let windows = attribute(appElement, kAXWindowsAttribute) as? [AXUIElement],
+           let window = windows.first {
+            return window
+        }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+    } while Date() < deadline
+
+    throw ProbeFailure(message: "Unable to resolve the first MediFlow window via AX.")
 }
 
 func requireIdentifier(_ identifierName: String, in window: AXUIElement, report: inout ProbeReport) throws {
@@ -135,6 +176,105 @@ func requireIdentifierOrLabel(
 
 func windowContainsHomeBaseShell(_ window: AXUIElement) -> Bool {
     findElement(in: window, where: { identifier(of: $0) == "homebase-runtime-status-card" }) != nil
+}
+
+// @Codex: WUL-401 P6 preparatory coverage for the universal clinical shell.
+func windowContainsClinicalShell(_ window: AXUIElement) -> Bool {
+    findElement(in: window, where: {
+        identifier(of: $0).hasPrefix("clinical-workspace-section-")
+            || identifier(of: $0).hasPrefix("clinical-workspace-") && identifier(of: $0).hasSuffix("-view")
+    }) != nil
+}
+
+func waitForIdentifier(
+    _ identifierName: String,
+    in app: NSRunningApplication,
+    timeout: TimeInterval = 5.0
+) -> AXUIElement? {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        if let window = try? appWindow(for: app),
+           let match = findElement(in: window, where: { identifier(of: $0) == identifierName }) {
+            return match
+        }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+    }
+    return nil
+}
+
+func openClinicalSection(
+    _ section: String,
+    expectedView: String,
+    app: NSRunningApplication,
+    report: inout ProbeReport
+) throws {
+    guard let window = try? appWindow(for: app),
+          let button = findElement(in: window, where: {
+              identifier(of: $0) == "clinical-workspace-section-\(section)-button"
+          }),
+          press(button) else {
+        report.fail("Unable to open clinical section \(section)")
+        throw ProbeFailure(message: "Unable to open clinical section \(section)")
+    }
+
+    guard waitForIdentifier(expectedView, in: app) != nil else {
+        report.fail("Clinical section \(section) did not expose \(expectedView)")
+        throw ProbeFailure(message: "Clinical section \(section) did not expose \(expectedView)")
+    }
+    report.pass("Opened clinical section \(section)")
+}
+
+func runClinicalShellProbe(app: NSRunningApplication, report: inout ProbeReport) throws {
+    let sectionChecks = [
+        ("patients", "clinical-workspace-patients-view"),
+        ("agenda", "clinical-workspace-agenda-view"),
+        ("diary", "clinical-workspace-diary-view"),
+        ("analytics", "clinical-workspace-analytics-view"),
+        ("scales", "clinical-workspace-scales-view"),
+        ("settings", "clinical-workspace-settings-view"),
+        ("runtime", "apple-foundation-runtime-view"),
+        ("overview", "apple-foundation-overview-view"),
+        ("milestones", "apple-foundation-milestones-view"),
+    ]
+
+    for (section, expectedView) in sectionChecks {
+        try openClinicalSection(section, expectedView: expectedView, app: app, report: &report)
+    }
+    try openClinicalSection("patients", expectedView: "clinical-workspace-patients-view", app: app, report: &report)
+
+    guard let window = try? appWindow(for: app) else {
+        throw ProbeFailure(message: "Unable to resolve MediFlow window after shell navigation.")
+    }
+
+    let patientRow = findElement(in: window, where: {
+        identifier(of: $0).hasPrefix("patient-cell-uitest-")
+    })
+    guard let patientRow else {
+        report.fail("No patient-cell-uitest-* identifier found; launch the synthetic P6 fixture first")
+        throw ProbeFailure(message: "Synthetic patient fixture required but no UI-test patient row was found.")
+    }
+
+    guard press(patientRow), waitForIdentifier("patient-detail-name", in: app) != nil else {
+        report.fail("Unable to open the first patient detail")
+        throw ProbeFailure(message: "Unable to open the first patient detail")
+    }
+    report.pass("Opened first patient detail")
+
+    let moduleIdentifiers = [
+        "patient-clinical-signals",
+        "homebase-refresh-entries-button",
+        "homebase-new-entry-content-field",
+        "homebase-refresh-therapies-button",
+        "homebase-refresh-checkups-button",
+        "homebase-refresh-observations-button",
+    ]
+    for identifierName in moduleIdentifiers {
+        guard waitForIdentifier(identifierName, in: app) != nil else {
+            report.fail("Missing patient module identifier \(identifierName)")
+            throw ProbeFailure(message: "Missing patient module identifier \(identifierName)")
+        }
+        report.pass("Patient module identifier \(identifierName)")
+    }
 }
 
 func runHomeBaseShellProbe(app: NSRunningApplication, window: AXUIElement, report: inout ProbeReport) throws {
@@ -264,6 +404,9 @@ func main() throws {
     guard AXIsProcessTrusted() else {
         throw ProbeFailure(message: "Accessibility access is not enabled for the current process.")
     }
+    guard !screenIsLocked() else {
+        throw ProbeFailure(message: "The Mac is locked. Unlock it before running the P6 Accessibility probe.")
+    }
 
     var report = ProbeReport()
     let app = try runningApp()
@@ -272,6 +415,19 @@ func main() throws {
 
     let window = try appWindow(for: app)
     report.pass("Attached to window \(title(of: window))")
+
+    if windowContainsClinicalShell(window) {
+        try runClinicalShellProbe(app: app, report: &report)
+        print("Native click-map probe passed.")
+        for line in report.checks {
+            print(line)
+        }
+        return
+    }
+
+    if argumentValue(after: "--app-path") != nil {
+        throw ProbeFailure(message: "The selected P6 bundle did not expose the universal clinical shell.")
+    }
 
     if windowContainsHomeBaseShell(window) {
         try runHomeBaseShellProbe(app: app, window: window, report: &report)
