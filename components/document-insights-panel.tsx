@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { FileText, ChevronDown, ChevronUp, Calendar, Sparkles, AlertTriangle, Trash2, Loader2 } from 'lucide-react';
 import { ApiConflictError, db, DocumentInsight, Patient } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
 import PrivacyBlur from '@/components/privacy-blur';
-import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
+import { refreshPatientSummaryIfEnabled } from '@/lib/ai-summary-service';
+import { useAiModelLabels } from '@/lib/hooks/use-ai-model-labels';
 import { qualityLabel, documentClassLabel } from '@/lib/ai-labels';
 import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
 import { notifyDbChange } from '@/lib/live-query';
@@ -21,13 +22,9 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [busyAction, setBusyAction] = useState<string | 'all' | null>(null);
     // Modelli reali dalla config invece di nomi hardcoded nel footer.
-    const [modelLabels, setModelLabels] = useState<{ clinical: string; ocr: string } | null>(null);
+    const modelLabels = useAiModelLabels();
     const { showToast } = useToast();
     const confirm = useConfirm();
-
-    useEffect(() => {
-        getAiModelLabels().then(setModelLabels).catch(() => setModelLabels(null));
-    }, []);
 
     // Parse insights from patient
     const insights = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights);

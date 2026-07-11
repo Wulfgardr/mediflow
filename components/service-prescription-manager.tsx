@@ -24,6 +24,7 @@ import {
 } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { DocumentReferenceChip } from '@/components/document-reference-chip';
 
 type Props = {
     patientId: string;
@@ -758,19 +759,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                                 </ul>
                                             </div>
                                         )}
-                                        {refs.length > 0 && (
-                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                {refs.map((ref) => (
-                                                    <span
-                                                        key={ref}
-                                                        className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-600"
-                                                    >
-                                                        <FileText className="h-3 w-3" />
-                                                        {ref}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
+                                        <DocumentReferenceChip references={refs} />
                                         {item.notes && (
                                             <p className="mt-3 text-sm leading-6 text-[color:var(--mf-muted)]">{item.notes}</p>
                                         )}
