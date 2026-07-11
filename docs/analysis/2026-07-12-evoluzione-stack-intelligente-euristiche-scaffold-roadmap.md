@@ -244,8 +244,8 @@ Lo stato reale, senza wishful thinking:
   /api/system/redaction) ma senza layer regex deterministico davanti.
 
 L'architettura decisa (ADR 0074): egress gate unico fail-closed, layer 1
-deterministico in-house obbligatorio (CF, NRE, TEAM, nosologico, contatti,
-nomi noti dall'anagrafica locale), layer 2 neurale vincolato ai gate ADR
+deterministico in-house obbligatorio (CF, NRE, TEAM, nosologico etichettato,
+contatti, nomi noti dall'anagrafica locale), layer 2 neurale vincolato ai gate ADR
 0033, pseudonimizzazione coerente con mappa di reidratazione solo in RAM,
 minimizzazione per envelope, audit locale append-only senza contenuti.
 Finche il layer 2 non e promosso, il gate e chiuso per costruzione: il
@@ -261,10 +261,10 @@ difeso da un confine verificabile.
 | # | Intervento | Stato |
 |---|---|---|
 | O1 | ADR 0074 + questo documento | in questa PR |
-| O2 | Scaffold slice 1: OllamaAdapter estratto, facade invariata, OCR dentro la factory, URL heuristics unificate, test | lane esecutiva |
-| O3 | Governance: guard esteso a `ocr`, kill switch OCR, treatment reasoning registrato in write-policy e readiness | lane esecutiva |
-| O4 | Egress gate scheletro: layer 1 deterministico + stato `closed_pending_redaction_lane` + audit, senza alcun provider cloud | lane esecutiva |
-| O5 | Igiene: ai-engine.ts e ai-prompts.ts orfani rimossi, proxy generico senza caller deciso, num_ctx governato, flag troncatura JSON, parse artifact protetto | lane esecutiva |
+| O2 | Scaffold slice 1: OllamaAdapter estratto, facade invariata, OCR dentro la factory, URL heuristics unificate, test | in questa PR |
+| O3 | Governance: guard esteso a `ocr`, kill switch OCR, treatment reasoning registrato in write-policy e readiness | in questa PR |
+| O4 | Egress gate scheletro: layer 1 deterministico + stato `closed_pending_redaction_lane` + audit, senza alcun provider cloud | in questa PR |
+| O5 | Igiene: ai-engine.ts e ai-prompts.ts orfani rimossi, proxy generico senza caller rimosso, num_ctx governato, flag troncatura JSON, parse artifact protetto | in questa PR |
 | O6 | Benchmark GLiNER2-PII sul corpus redaction esistente | fuori sessione, richiede download modello |
 
 Non in questa PR, gia in volo altrove: split prompt contratti (wul-491),
