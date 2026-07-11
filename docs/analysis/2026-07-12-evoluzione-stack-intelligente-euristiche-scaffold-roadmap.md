@@ -56,6 +56,13 @@ treatment reasoning (docs/adr/0073-treatment-reasoning-athena-boundary.md).
    benchmark locale) e il seme del punto di arrivo a dieci anni, dove
    l'intelligenza si sposta a tempo di build e il runtime resta
    deterministico e verificabile.
+9. **L'intelligenza che manca di piu non e un modello: e la chiusura degli
+   anelli di lavoro**. Una prescrizione di esami non puo oggi ricevere i
+   suoi risultati (nessun collegamento in schema tra
+   service_prescription_items e observations, verificato); una serie di
+   osservazioni interrotta non genera nessun richiamo. Sono proiezioni
+   deterministiche sui dati gia strutturati, gradino 1-2 della scala, zero
+   LLM: la Parte 2.1 le tratta come filone a pieno titolo.
 
 ---
 
@@ -152,6 +159,52 @@ devono lasciare traccia in UI. Il censimento elenca decisioni oggi mute
 normalizzazione non persistiti): ogni decisione silenziosa e debito di
 fiducia verso il medico.
 
+### 2.1 La micro-intelligenza dei flussi: gli anelli da chiudere
+
+L'intelligenza percepita dal medico non coincide con i modelli: spesso e la
+capacita dell'applicazione di conoscere la forma del lavoro clinico e di non
+lasciare anelli aperti. Il principio: **ogni artefatto clinico crea
+un'attesa; l'attesa ha una finestra; il sistema mostra le attese aperte e
+chiede i dati che mancano**. Sono proiezioni deterministiche sui dati gia
+strutturati (gradino 1-2 della scala), review-first e citabili, senza alcun
+modello di mezzo.
+
+Gli anelli concreti, in ordine di leva:
+
+1. **Prescrizione esami, poi risultati collegati**. Il dominio prescrizioni
+   di prestazione esiste con item codificabili (ADR 0062/0064,
+   service_prescription_items in lib/schema.ts:232-235), le osservazioni
+   esistono con range e trend; ma NON esiste alcun collegamento tra i due
+   (verificato: nessun observationId/prescriptionId incrociato in schema).
+   L'anello minimo: dall'item prescritto una CTA "inserisci risultati" che
+   apre il form osservazioni precompilato e collega le misure all'item; il
+   match item-osservazione e deterministico quando l'item e codificato
+   (stesso pattern del catalog matching ADR 0064), sempre con conferma
+   dell'operatore (ADR 0057).
+2. **Serie interrotta, richiamo proattivo**. Se un parametro ha una
+   traiettoria (2+ misure) e la cadenza osservata si interrompe, la Scheda
+   mostra una riga "ultima misura X, attesa da Y" con CTA di inserimento.
+   La cadenza attesa si deriva dai dati (intervallo mediano osservato) o
+   dalla prescrizione che l'ha generata; mai un giudizio clinico inventato,
+   solo un fatto verificabile sul calendario.
+3. **Prescrizione scaduta senza esito**. Item prescritto oltre la finestra
+   senza risultati collegati: riga nella coda di revisione, "prescritto il
+   GG/MM, nessun risultato inserito". E il gemello amministrativo
+   dell'anello 1.
+4. **Follow-up documentati** (gia in campo con S6:
+   lib/patient-followup-projection.ts) e **riconciliazione farmaci
+   documenti-terapie** (in roadmap): stessi principi, stessa superficie.
+
+Architettura proposta, volutamente minima: un **registro delle attese**
+tipizzato (sorgente, tipo, finestra, stato, riferimento all'artefatto che
+l'ha creata), alimentato dai domini esistenti e proiettato in Scheda e
+cockpit con provenance esplicita. Nessuna tabella di conoscenza clinica
+cablata: le attese nascono solo da cio che il medico ha gia inserito
+(prescrizioni, serie, documenti), quindi il sistema chiede, non suggerisce
+terapia. Il registro e anche il punto dove, a tendere, le lane AI potranno
+depositare attese proposte (sempre marcate come tali), senza cambiare la
+superficie.
+
 ## Parte 3: lo scaffold provider
 
 La decisione architetturale completa e in ADR 0074. Qui il perche in tre
@@ -234,6 +287,11 @@ parity guard MLX (wul-478), superfici demo cockpit.
 6. **Streaming e coda job AI**: streaming prima sulla lane che ne beneficia
    di piu (dettatura quando arriva, insight poi); coda in-process per i job
    pesanti co-residenti.
+7. **Anello prescrizione-risultato + registro attese v0** (Parte 2.1):
+   collegamento item prescritto-osservazioni con conferma, riga "risultati
+   da inserire" in Scheda, richiamo sulle serie interrotte. Zero LLM, tutto
+   dominio: e il filone dove l'intelligenza percepita cresce piu in fretta
+   per sforzo speso.
 
 ### Un anno
 
