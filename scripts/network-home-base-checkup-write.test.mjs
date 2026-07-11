@@ -15,6 +15,7 @@ const REPORT_PATH = resolveReportPath();
 const READ_PATIENTS_CAPABILITY = 'network.replica.readonly-patients';
 const READ_CHECKUPS_CAPABILITY = 'network.replica.readonly-checkups';
 const WRITE_CHECKUPS_CAPABILITY = 'network.replica.write-checkups';
+const SEALED_NOTES = 'ENC:bm90ZXNpdg==:bm90ZXNjaXBoZXI=';
 
 const scenarioResults = [];
 
@@ -83,7 +84,7 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         });
         assert.equal(missingSession.response.status, 401);
 
-        const create = await request('POST', `/api/v1/network/patients/${patientId}/checkups`, {
+        const plaintextNotes = await request('POST', `/api/v1/network/patients/${patientId}/checkups`, {
             headers: {
                 ...pairedHeaders(checkupWriter),
                 Cookie: sessionCookie,
@@ -93,6 +94,22 @@ test('paired checkup write requires capability, session, scope, version, and PHI
                 title: 'Controllo rete',
                 status: 'pending',
                 notes: 'smoke-test',
+                source: 'manual',
+            },
+        });
+        assert.equal(plaintextNotes.response.status, 400);
+        assert.equal(plaintextNotes.json?.error, 'Network checkup notes must be sealed with ENC:');
+
+        const create = await request('POST', `/api/v1/network/patients/${patientId}/checkups`, {
+            headers: {
+                ...pairedHeaders(checkupWriter),
+                Cookie: sessionCookie,
+            },
+            body: {
+                date: '2026-05-02T09:00:00.000Z',
+                title: 'Controllo rete',
+                status: 'pending',
+                notes: SEALED_NOTES,
                 source: 'manual',
             },
         });

@@ -20,6 +20,8 @@ import type { NetworkWriteContext } from './network-write-context';
 import { patientsToAmbulatories, therapies } from './schema';
 /* @Codex */
 import { buildTherapyVersionConflictPayload, parseTherapyExpectedVersion } from './therapy-concurrency';
+/* @Codex */
+import { isSealedValue } from './network-patient-lifecycle';
 
 /* @Codex */
 export const NETWORK_THERAPY_WRITE_CAPABILITY = 'network.replica.write-therapies';
@@ -45,6 +47,7 @@ const NETWORK_FORBIDDEN_THERAPY_WRITE_FIELDS = new Set([
 ]);
 const NETWORK_FORBIDDEN_THERAPY_CREATE_FIELDS = new Set(['patientId', 'createdAt', 'updatedAt', 'version', 'deletedAt', 'deletionReason']);
 const NETWORK_FORBIDDEN_THERAPY_UPDATE_FIELDS = new Set(['patientId', 'createdAt', 'updatedAt']);
+const NETWORK_THERAPY_SEALED_FIELDS = ['motivation', 'deletionReason'] as const;
 
 function hasOwn(input: Record<string, unknown>, key: string): boolean {
     return Object.prototype.hasOwnProperty.call(input, key);
@@ -71,6 +74,18 @@ function validateNetworkTherapyMutationBoundary(
                 status: 400,
                 value: {
                     error: `Network therapy write boundary rejects client-controlled ${field}`,
+                },
+            };
+        }
+    }
+
+    for (const field of NETWORK_THERAPY_SEALED_FIELDS) {
+        const value = body[field];
+        if (value !== undefined && value !== null && !isSealedValue(value)) {
+            return {
+                status: 400,
+                value: {
+                    error: `Network therapy ${field} must be sealed with ENC:`,
                 },
             };
         }

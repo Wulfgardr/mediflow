@@ -20,6 +20,8 @@ import type { NetworkWriteContext } from './network-write-context';
 import { observations, patientsToAmbulatories } from './schema';
 /* @Codex */
 import { buildObservationVersionConflictPayload, parseObservationExpectedVersion } from './observation-concurrency';
+/* @Codex */
+import { isSealedValue } from './network-patient-lifecycle';
 
 /* @Codex */
 export const NETWORK_OBSERVATION_WRITE_CAPABILITY = 'network.replica.write-observations';
@@ -74,6 +76,16 @@ function validateNetworkObservationMutationBoundary(
                 },
             };
         }
+    }
+
+    const notes = body.notes;
+    if (notes !== undefined && notes !== null && !isSealedValue(notes)) {
+        return {
+            status: 400,
+            value: {
+                error: 'Network observation notes must be sealed with ENC:',
+            },
+        };
     }
 
     return null;
