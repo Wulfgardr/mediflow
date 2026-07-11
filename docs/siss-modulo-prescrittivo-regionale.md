@@ -201,6 +201,29 @@ e non sposta ancora MediFlow verso:
 - `prefill clinico-amministrativo` non dimostrato
 - `consumo diretto dei WS SISS` senza onboarding/coerenza scenario
 
+## Aggiornamento 2026-07-11: il modulo operativo e PRREG
+
+Il modulo prescrittivo regionale in esercizio e il Prescrittivo Regionale
+(PRREG), con root `/prescrittivoRegionale` e una dashboard di ingresso con le
+azioni Nuova Prescrizione e Ricerca Prescrizioni. Rispetto al modulo
+precedente, PRREG unifica farmaci e specialistica in un percorso di ricerca a
+campo libero: una evoluzione della UX del modulo stock che rende l'handoff
+meno oneroso, senza cambiarne la natura. La root legacy `/prescrizione/`
+resta citata come riferimento in transizione.
+
+Il launcher MediFlow apre oggi la dashboard PRREG, con lo stesso pattern di
+prima: copia locale del CF in clipboard, nessun dato personale in URL, audit
+locale PHI-safe del passaggio. Accanto al launcher, un pannello di contesto
+in sola lettura mostra terapie attive, prescrizioni specialistiche recenti,
+esenzioni e diagnosi del paziente con copia rapida dei singoli valori, per
+ridurre gli andirivieni durante la compilazione manuale nel portale. Il
+client nativo Apple offre la stessa apertura assistita.
+
+Il perimetro di integrazione resta l'handoff: l'atto prescrittivo avviene
+nel portale con l'autenticazione personale del medico, e gli acceptance
+criteria della sezione seguente restano il requisito per qualunque passo
+ulteriore.
+
 ## Acceptance criteria per una futura issue runtime
 
 Una futura implementazione runtime dovra dimostrare almeno questo:
