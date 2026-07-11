@@ -11,6 +11,9 @@ Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale
 
 Ultimo aggiornamento: 2026-07-11
 
+> [!NOTE]
+> La repo OSS omette i documenti interni di orchestrazione, attribution, piano operativo a breve e workspace privati. In pubblico devono restare leggibili soprattutto `README`, `docs/FAQ.md`, `docs/ROADMAP.md`, `ARCHITECTURE.md`, `docs/walkthrough.md` e i documenti canonici di prodotto/architettura che descrivono solo cio che e davvero esposto.
+
 ## 📚 Policy di consultazione (agent)
 
 Per orientarti rapidamente:
@@ -29,6 +32,7 @@ Approfondimenti utili:
 
 - Mappa completa markdown: [docs/markdown-index.md](./markdown-index.md)
 - Governance repository e topologia runtime/publication: [docs/repository-topology.md](./repository-topology.md)
+- Sistema di design Vetro Clinico (canone visivo e di interazione per tutte le piattaforme): [docs/design/vetro-clinico/README.md](./design/vetro-clinico/README.md)
 - Lettura completa dello stato corrente: [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
 - FAQ pubbliche e stato sintetico del prodotto: [docs/FAQ.md](./FAQ.md)
 - Walkthrough operativo end-to-end: [docs/walkthrough.md](./walkthrough.md)
