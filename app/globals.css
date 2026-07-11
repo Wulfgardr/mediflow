@@ -381,9 +381,7 @@ body {
 }
 
 :root[data-ui-style='redesign'] .mediflow-sidebar-shell,
-:root[data-ui-style='redesign'] .mediflow-mobile-header,
-:root[data-ui-style='redesign'] .glass-command-capsule,
-:root[data-ui-style='redesign'] .case-lens-panel {
+:root[data-ui-style='redesign'] .mediflow-mobile-header {
   backdrop-filter: blur(18px) saturate(1.04);
   -webkit-backdrop-filter: blur(18px) saturate(1.04);
 }
@@ -399,8 +397,7 @@ body {
 
 :root[data-ui-style='redesign'] .glass-card:hover,
 :root[data-ui-style='redesign'] .ui-btn-primary:hover,
-:root[data-ui-style='redesign'] .apple-list-row:hover,
-:root[data-ui-style='redesign'] .clinical-stream-row:hover {
+:root[data-ui-style='redesign'] .apple-list-row:hover {
   transform: none;
 }
 
@@ -446,24 +443,7 @@ body {
   padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
 }
 
-:root[data-ui-style='redesign'] .glass-command-capsule {
-  border-radius: 18px;
-  padding: 0.85rem;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
-}
-
-:root[data-ui-style='redesign'] .glass-command-cluster {
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.74);
-}
-
-:root[data-ui-style='redesign'] .glass-command-search {
-  border-radius: 14px;
-}
-
 :root[data-ui-style='redesign'] .patient-inbox-pane,
-:root[data-ui-style='redesign'] .patient-reader-panel,
 :root[data-ui-style='redesign'] .patient-identity-lens-reader {
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
@@ -477,8 +457,7 @@ body {
 :root[data-ui-style='redesign'] .patient-liquid-hero,
 :root[data-ui-style='redesign'] .patient-workbench-shell,
 :root[data-ui-style='redesign'] .patient-workbench-shell > *,
-:root[data-ui-style='redesign'] .patient-inbox-pane,
-:root[data-ui-style='redesign'] .case-lens-panel {
+:root[data-ui-style='redesign'] .patient-inbox-pane {
   min-width: 0;
 }
 
@@ -491,15 +470,6 @@ body {
   box-shadow: var(--mf-tier-specular-shadow);
   backdrop-filter: blur(var(--mf-tier-specular-blur)) saturate(var(--mf-tier-specular-saturate));
   -webkit-backdrop-filter: blur(var(--mf-tier-specular-blur)) saturate(var(--mf-tier-specular-saturate));
-}
-
-:root[data-ui-style='redesign'] .patient-liquid-commandbar > .glass-command-capsule {
-  padding: 0;
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-lens {
@@ -578,70 +548,6 @@ body {
   background: rgba(255, 255, 255, 0.055);
 }
 
-:root[data-ui-style='redesign'] .clinical-stream-row {
-  border-radius: 18px;
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.84);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
-}
-
-:root[data-ui-style='redesign'] .clinical-stream-row-mailbox {
-  border-radius: 16px;
-  padding: 0.8rem 0.85rem;
-  background: transparent;
-  box-shadow: none;
-}
-
-:root[data-ui-style='redesign'] .clinical-stream-row-avatar {
-  border-radius: 16px;
-  box-shadow: none;
-}
-
-:root[data-ui-style='redesign'] .clinical-stream-row-cell {
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.56);
-  box-shadow: none;
-}
-
-:root[data-ui-style='redesign'] .clinical-stream-row-utility,
-:root[data-ui-style='redesign'] .clinical-stream-row-link {
-  border-radius: 14px;
-}
-
-:root[data-ui-style='redesign'] .case-lens-panel {
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.84);
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
-}
-
-:root[data-ui-style='redesign'] .patient-reader-panel {
-  border-radius: 20px;
-}
-
-:root[data-ui-style='redesign'] .case-lens-section {
-  position: relative;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.58);
-  box-shadow: none;
-}
-
-:root[data-ui-style='redesign'] .case-lens-section::before {
-  content: "";
-  position: absolute;
-  left: 0.7rem;
-  top: 0.8rem;
-  bottom: 0.8rem;
-  width: 2px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #111827, rgba(71, 85, 105, 0.22));
-  opacity: 0.65;
-}
-
-:root[data-ui-style='redesign'] .case-lens-footer,
-:root[data-ui-style='redesign'] .case-lens-placeholder {
-  border-radius: 16px;
-}
-
 :root[data-ui-style='redesign'] .patient-identity-lens {
   border-radius: 18px;
 }
@@ -684,9 +590,7 @@ body {
 :root.dark[data-ui-style='redesign'] .patient-detail-section,
 :root.dark[data-ui-style='redesign'] .patient-detail-side-section,
 :root.dark[data-ui-style='redesign'] .patient-ai-insight-panel,
-:root.dark[data-ui-style='redesign'] .patient-reader-panel,
-:root.dark[data-ui-style='redesign'] .patient-inbox-pane,
-:root.dark[data-ui-style='redesign'] .case-lens-panel {
+:root.dark[data-ui-style='redesign'] .patient-inbox-pane {
   background-color: rgba(26, 22, 26, 0.88);
   border-color: rgba(255, 247, 240, 0.08);
   box-shadow: 0 16px 30px rgba(6, 5, 7, 0.42);
@@ -719,8 +623,7 @@ body {
 :root.dark[data-ui-style='redesign'] .identity-lens-pane,
 :root.dark[data-ui-style='redesign'] .patient-actions-summary,
 :root.dark[data-ui-style='redesign'] .clinical-river-card,
-:root.dark[data-ui-style='redesign'] .evidence-stack-tile,
-:root.dark[data-ui-style='redesign'] .case-lens-section {
+:root.dark[data-ui-style='redesign'] .evidence-stack-tile {
   background-color: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 247, 240, 0.08);
   box-shadow: none;
@@ -735,22 +638,6 @@ body {
 :root.dark[data-ui-style='redesign'] .apple-list-row:hover {
   background-color: rgba(255, 255, 255, 0.07);
   border-color: rgba(255, 247, 240, 0.16);
-}
-
-:root.dark[data-ui-style='redesign'] .clinical-stream-row,
-:root.dark[data-ui-style='redesign'] .clinical-stream-row-cell {
-  background-color: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 247, 240, 0.08);
-}
-
-:root.dark[data-ui-style='redesign'] .glass-command-capsule {
-  background-color: rgba(28, 23, 27, 0.86);
-  box-shadow: 0 10px 22px rgba(6, 5, 7, 0.3);
-}
-
-:root.dark[data-ui-style='redesign'] .glass-command-cluster,
-:root.dark[data-ui-style='redesign'] .glass-command-search {
-  background-color: rgba(255, 255, 255, 0.05);
 }
 
 /* Dark inputs in the official shell: make sure dropdown/popover text remains legible */
@@ -1449,8 +1336,7 @@ body {
 
 /* Specular: chrome surfaces */
 :root[data-ui-style='redesign'] .mediflow-sidebar-shell,
-:root[data-ui-style='redesign'] .mediflow-mobile-header,
-:root[data-ui-style='redesign'] .glass-command-capsule {
+:root[data-ui-style='redesign'] .mediflow-mobile-header {
   background-color: var(--mf-tier-specular-bg);
   border-color: var(--mf-tier-specular-border);
   box-shadow: var(--mf-tier-specular-shadow);
@@ -1459,8 +1345,7 @@ body {
 }
 
 :root.dark[data-ui-style='redesign'] .mediflow-sidebar-shell,
-:root.dark[data-ui-style='redesign'] .mediflow-mobile-header,
-:root.dark[data-ui-style='redesign'] .glass-command-capsule {
+:root.dark[data-ui-style='redesign'] .mediflow-mobile-header {
   background-color: var(--mf-tier-specular-bg);
   border-color: var(--mf-tier-specular-border);
   box-shadow: var(--mf-tier-specular-shadow);
@@ -1479,7 +1364,6 @@ body {
 }
 
 /* Vitreous: workspace surfaces */
-:root[data-ui-style='redesign'] .case-lens-panel,
 :root[data-ui-style='redesign'] .mediflow-vitreous-panel,
 :root[data-ui-style='redesign'] .mediflow-vitreous-side-panel,
 :root[data-ui-style='redesign'] .patient-identity-lens,
@@ -1492,7 +1376,6 @@ body {
   box-shadow: var(--mf-tier-vitreous-shadow);
 }
 
-:root.dark[data-ui-style='redesign'] .case-lens-panel,
 :root.dark[data-ui-style='redesign'] .mediflow-vitreous-panel,
 :root.dark[data-ui-style='redesign'] .mediflow-vitreous-side-panel,
 :root.dark[data-ui-style='redesign'] .patient-identity-lens,
@@ -1505,7 +1388,6 @@ body {
   box-shadow: var(--mf-tier-vitreous-shadow);
 }
 
-:root[data-ui-style='redesign'] .case-lens-panel,
 :root[data-ui-style='redesign'] .mediflow-vitreous-panel,
 :root[data-ui-style='redesign'] .mediflow-vitreous-side-panel,
 :root[data-ui-style='redesign'] .patient-inbox-pane,
@@ -1533,9 +1415,7 @@ body {
 :root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-sidebar-shell,
 :root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-mobile-header,
 :root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-mobile-nav,
-:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .glass-command-capsule,
 :root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .patient-liquid-commandbar,
-:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .case-lens-panel,
 :root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-vitreous-panel,
 :root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-vitreous-side-panel,
 :root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .patient-inbox-pane,
@@ -1549,9 +1429,7 @@ body {
   :root[data-ui-style='redesign'] .mediflow-sidebar-shell,
   :root[data-ui-style='redesign'] .mediflow-mobile-header,
   :root[data-ui-style='redesign'] .mediflow-mobile-nav,
-  :root[data-ui-style='redesign'] .glass-command-capsule,
   :root[data-ui-style='redesign'] .patient-liquid-commandbar,
-  :root[data-ui-style='redesign'] .case-lens-panel,
   :root[data-ui-style='redesign'] .mediflow-vitreous-panel,
   :root[data-ui-style='redesign'] .mediflow-vitreous-side-panel,
   :root[data-ui-style='redesign'] .patient-identity-lens,
@@ -2210,7 +2088,6 @@ textarea.input-field {
 
 :root[data-ui-style='redesign'] .patient-liquid-signals,
 :root[data-ui-style='redesign'] .patient-inbox-pane,
-:root[data-ui-style='redesign'] .case-lens-panel,
 :root[data-ui-style='redesign'] .patient-identity-lens,
 :root[data-ui-style='redesign'] .patient-detail-section,
 :root[data-ui-style='redesign'] .patient-detail-side-section,
@@ -2243,17 +2120,6 @@ textarea.input-field {
 
 :root[data-ui-style='redesign'] .patient-liquid-stream {
   padding: 0.15rem;
-}
-
-:root[data-ui-style='redesign'] .clinical-stream-row-mailbox {
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.66), rgba(248, 250, 252, 0.36)),
-    rgba(255, 255, 255, 0.76);
-  box-shadow:
-    0 14px 34px rgba(15, 23, 42, 0.07),
-    inset 0 1px 0 rgba(255, 255, 255, 0.66);
 }
 
 :root[data-ui-style='redesign'] .patient-identity-lens {
@@ -2290,7 +2156,6 @@ textarea.input-field {
 :root.dark[data-ui-style='redesign'] .patient-liquid-lens,
 :root.dark[data-ui-style='redesign'] .patient-liquid-signals,
 :root.dark[data-ui-style='redesign'] .patient-inbox-pane,
-:root.dark[data-ui-style='redesign'] .case-lens-panel,
 :root.dark[data-ui-style='redesign'] .patient-identity-lens,
 :root.dark[data-ui-style='redesign'] .patient-detail-section,
 :root.dark[data-ui-style='redesign'] .patient-detail-side-section,
@@ -2305,7 +2170,6 @@ textarea.input-field {
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-:root.dark[data-ui-style='redesign'] .clinical-stream-row-mailbox,
 :root.dark[data-ui-style='redesign'] .patient-liquid-stream-shell,
 :root.dark[data-ui-style='redesign'] .identity-lens-pane,
 :root.dark[data-ui-style='redesign'] .patient-diagnosis-card,
