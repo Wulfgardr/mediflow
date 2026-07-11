@@ -15,6 +15,8 @@ const REPORT_PATH = resolveReportPath();
 const READ_PATIENTS_CAPABILITY = 'network.replica.readonly-patients';
 const READ_THERAPIES_CAPABILITY = 'network.replica.readonly-therapies';
 const WRITE_THERAPIES_CAPABILITY = 'network.replica.write-therapies';
+const SEALED_MOTIVATION = 'ENC:bW90aXZhdGlvbml2:bW90aXZhdGlvbmNpcGhlcg==';
+const SEALED_DELETION_REASON = 'ENC:ZGVsZXRlaXY=:ZGVsZXRlY2lwaGVy';
 
 const scenarioResults = [];
 
@@ -81,7 +83,7 @@ test('paired therapy write requires capability, session, scope, version, and PHI
         });
         assert.equal(missingSession.response.status, 401);
 
-        const create = await request('POST', `/api/v1/network/patients/${patientId}/therapies`, {
+        const plaintextMotivation = await request('POST', `/api/v1/network/patients/${patientId}/therapies`, {
             headers: {
                 ...pairedHeaders(therapyWriter),
                 Cookie: sessionCookie,
@@ -92,6 +94,22 @@ test('paired therapy write requires capability, session, scope, version, and PHI
                 status: 'active',
                 startDate: '2026-05-02T09:00:00.000Z',
                 motivation: 'smoke-test',
+            },
+        });
+        assert.equal(plaintextMotivation.response.status, 400);
+        assert.equal(plaintextMotivation.json?.error, 'Network therapy motivation must be sealed with ENC:');
+
+        const create = await request('POST', `/api/v1/network/patients/${patientId}/therapies`, {
+            headers: {
+                ...pairedHeaders(therapyWriter),
+                Cookie: sessionCookie,
+            },
+            body: {
+                drugName: 'Metformina',
+                dosage: '500 mg x 2',
+                status: 'active',
+                startDate: '2026-05-02T09:00:00.000Z',
+                motivation: SEALED_MOTIVATION,
             },
         });
         assert.equal(create.response.status, 201);
@@ -164,7 +182,7 @@ test('paired therapy write requires capability, session, scope, version, and PHI
         assert.equal(aiField.response.status, 403);
         assert.equal(aiField.json?.error, 'Network therapy write boundary excludes AI/document-derived fields');
 
-        const softDelete = await request('PUT', `/api/v1/network/patients/${patientId}/therapies/${therapyId}`, {
+        const plaintextDeletionReason = await request('PUT', `/api/v1/network/patients/${patientId}/therapies/${therapyId}`, {
             headers: {
                 ...pairedHeaders(therapyWriter),
                 Cookie: sessionCookie,
@@ -173,6 +191,20 @@ test('paired therapy write requires capability, session, scope, version, and PHI
                 version: 2,
                 deletedAt: '2026-05-02T10:00:00.000Z',
                 deletionReason: 'network-smoke-soft-delete',
+            },
+        });
+        assert.equal(plaintextDeletionReason.response.status, 400);
+        assert.equal(plaintextDeletionReason.json?.error, 'Network therapy deletionReason must be sealed with ENC:');
+
+        const softDelete = await request('PUT', `/api/v1/network/patients/${patientId}/therapies/${therapyId}`, {
+            headers: {
+                ...pairedHeaders(therapyWriter),
+                Cookie: sessionCookie,
+            },
+            body: {
+                version: 2,
+                deletedAt: '2026-05-02T10:00:00.000Z',
+                deletionReason: SEALED_DELETION_REASON,
             },
         });
         assert.equal(softDelete.response.status, 200);

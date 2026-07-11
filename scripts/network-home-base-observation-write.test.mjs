@@ -15,6 +15,7 @@ const REPORT_PATH = resolveReportPath();
 const READ_PATIENTS_CAPABILITY = 'network.replica.readonly-patients';
 const READ_OBSERVATIONS_CAPABILITY = 'network.replica.readonly-observations';
 const WRITE_OBSERVATIONS_CAPABILITY = 'network.replica.write-observations';
+const SEALED_NOTES = 'ENC:bm90ZXNpdg==:bm90ZXNjaXBoZXI=';
 
 const scenarioResults = [];
 
@@ -91,7 +92,7 @@ test('paired observation write requires capability, session, scope, version, and
         });
         assert.equal(missingSession.response.status, 401);
 
-        const create = await request('POST', `/api/v1/network/patients/${patientId}/observations`, {
+        const plaintextNotes = await request('POST', `/api/v1/network/patients/${patientId}/observations`, {
             headers: {
                 ...pairedHeaders(observationWriter),
                 Cookie: sessionCookie,
@@ -105,6 +106,26 @@ test('paired observation write requires capability, session, scope, version, and
                 value: 128,
                 observedAt: '2026-05-02T09:00:00.000Z',
                 notes: 'smoke-test',
+                source: 'manual',
+            },
+        });
+        assert.equal(plaintextNotes.response.status, 400);
+        assert.equal(plaintextNotes.json?.error, 'Network observation notes must be sealed with ENC:');
+
+        const create = await request('POST', `/api/v1/network/patients/${patientId}/observations`, {
+            headers: {
+                ...pairedHeaders(observationWriter),
+                Cookie: sessionCookie,
+            },
+            body: {
+                codeSystem: 'LOINC',
+                code: '8480-6',
+                display: 'Systolic blood pressure',
+                unitSystem: 'UCUM',
+                unitCode: 'mm[Hg]',
+                value: 128,
+                observedAt: '2026-05-02T09:00:00.000Z',
+                notes: SEALED_NOTES,
                 source: 'manual',
             },
         });
