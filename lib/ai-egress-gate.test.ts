@@ -76,6 +76,30 @@ test('stays closed_pending_redaction_lane for every clinical lane until Layer 2 
     }
 });
 
+test('redacts labeled nosologico numbers and leaves bare digit runs alone', () => {
+    const result = evaluateEgress({
+        text: 'Ricovero N. nosologico: 12345678 in reparto; pratica 87654321 non etichettata.',
+        lane: 'clinical',
+    });
+
+    assert.equal(
+        result.redactedText,
+        'Ricovero {{NOSOLOGICO_1}} in reparto; pratica 87654321 non etichettata.',
+    );
+    assert.equal(result.entityCounts.nosologico, 1);
+});
+
+test('handles adversarial email-shaped input in linear time without matching', () => {
+    const adversarial = `a@${'a.'.repeat(150_000)}1`;
+    const start = process.hrtime.bigint();
+    const result = evaluateEgress({ text: adversarial, lane: 'clinical' });
+    const elapsedMs = Number(process.hrtime.bigint() - start) / 1e6;
+
+    assert.ok(elapsedMs < 2000, `evaluateEgress ha impiegato ${Math.round(elapsedMs)}ms su input avversariale`);
+    assert.equal(result.entityCounts.email ?? 0, 0);
+    assert.equal(result.status, 'closed_pending_redaction_lane');
+});
+
 test('rehydrates the exact local payload after deterministic tokenization', () => {
     const text = 'Mario Rossi, nato il 01/02/1980, email mario@example.it.';
     const result = evaluateEgress({

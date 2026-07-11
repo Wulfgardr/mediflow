@@ -118,9 +118,10 @@ payload diretto a un provider `cloud` (e riusabile per qualunque egress
 futuro):
 
 - **Layer 1 obbligatorio, deterministico, in-house** (ADR 0070): regex e
-  lookup locali per CF, NRE, tessera TEAM, codice nosologico, telefoni,
-  email, date di nascita, piu i nomi/cognomi noti dall'anagrafica locale del
-  paziente in contesto.
+  lookup locali per CF, NRE, tessera TEAM, codice nosologico quando
+  etichettato nel testo (il formato non e nazionale: i numeri nudi restano
+  compito del layer 2), telefoni, email, date di nascita, piu i nomi/cognomi
+  noti dall'anagrafica locale del paziente in contesto.
 - **Layer 2 neurale** (NER PII, candidato GLiNER2-PII): obbligatorio per il
   testo narrativo appena una lane redaction supera i gate ADR 0033; finche
   non esiste una lane redaction almeno `shadow-ready`, il gate rifiuta
