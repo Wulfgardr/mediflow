@@ -1035,7 +1035,7 @@ export async function applyPatientSmartImportSelection(
         }
     } catch (error) {
         for (const therapyId of createdTherapyIds) {
-            await db.therapies.delete(therapyId, { suppressNotify: true }).catch(() => null);
+            await db.therapies.delete(therapyId, { suppressNotify: true, version: 1 }).catch(() => null);
         }
         if (createdTherapyIds.length > 0) {
             notifyDbChange();

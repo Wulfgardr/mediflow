@@ -558,6 +558,8 @@ class ApiTable<T> {
             || this.tableName === 'ambulatories'
             || this.tableName === 'entries'
             || this.tableName === 'checkups'
+            || this.tableName === 'therapies'
+            || this.tableName === 'observations'
             || this.tableName === 'service_prescriptions'
             || this.tableName === 'service_prescription_items'
             || this.tableName === 'prosthetic_prescriptions';
@@ -569,6 +571,8 @@ class ApiTable<T> {
         if (this.tableName === 'ambulatories') return 'ambulatory';
         if (this.tableName === 'entries') return 'entry';
         if (this.tableName === 'checkups') return 'checkup';
+        if (this.tableName === 'therapies') return 'therapy';
+        if (this.tableName === 'observations') return 'observation';
         if (this.tableName === 'service_prescriptions') return 'service prescription';
         if (this.tableName === 'service_prescription_items') return 'service prescription item';
         if (this.tableName === 'prosthetic_prescriptions') return 'prosthetic prescription';
@@ -920,6 +924,10 @@ export interface Observation {
     observedAt: Date;
     source?: 'manual' | 'ai_suggestion';
     createdAt: Date;
+    version?: number;
+    updatedAt?: Date;
+    deletedAt?: Date | null;
+    deletionReason?: string | null;
 }
 
 export interface Attachment {
@@ -1095,9 +1103,10 @@ export interface Therapy {
     /* @Codex */
     status: 'active' | 'suspended' | 'completed';
     startDate: Date;
-    endDate?: Date;
+    endDate?: Date | null;
     createdAt: Date;
     updatedAt?: Date;
+    version?: number;
     /* @Codex */
     deletedAt?: Date | null;
     /* @Codex */

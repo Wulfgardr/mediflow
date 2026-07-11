@@ -110,15 +110,17 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        await dbServer.insert(patients).values(normalized.values);
+        dbServer.transaction((tx) => {
+            tx.insert(patients).values(normalized.values).run();
 
-        if (normalized.values.ambulatoryId) {
-            await dbServer.insert(patientsToAmbulatories).values({
-                patientId: normalized.values.id,
-                ambulatoryId: normalized.values.ambulatoryId,
-                assignedAt: new Date()
-            }).onConflictDoNothing();
-        }
+            if (normalized.values.ambulatoryId) {
+                tx.insert(patientsToAmbulatories).values({
+                    patientId: normalized.values.id,
+                    ambulatoryId: normalized.values.ambulatoryId,
+                    assignedAt: new Date(),
+                }).onConflictDoNothing().run();
+            }
+        });
 
         /* @Codex */
         await recordPatientAuditEvent(request, 'patient.created', normalized.values.id, {

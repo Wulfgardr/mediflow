@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useLiveQuery } from '@/lib/live-query';
-import { db, Therapy } from '@/lib/db';
+import { ApiConflictError, db, Therapy } from '@/lib/db';
+import { notifyDbChange } from '@/lib/live-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -111,6 +112,11 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
         setIsSaving(true);
         try {
             if (editingId) {
+                const therapy = visibleTherapies.find((item) => item.id === editingId);
+                if (!therapy || typeof therapy.version !== 'number') {
+                    showToast({ tone: 'error', title: 'Versione terapia non disponibile', description: 'Ricarica la pagina e riprova.' });
+                    return;
+                }
                 // UPDATE EXISTING
                 await db.therapies.update(editingId, {
                     ...data,
@@ -118,7 +124,8 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                     diagnosisCode: selectedDiagnosis?.code as any,
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     diagnosisName: selectedDiagnosis?.title as any,
-                    updatedAt: new Date()
+                    updatedAt: new Date(),
+                    version: therapy.version,
                 });
             } else {
                 // CREATE NEW
@@ -163,6 +170,11 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
             cancelEditing();
         } catch (error) {
             console.error("Failed to save therapy", error);
+            if (error instanceof ApiConflictError) {
+                notifyDbChange('therapies');
+                showToast({ tone: 'error', title: 'Terapia aggiornata altrove', description: 'I dati sono stati ricaricati. Controlla e riprova.' });
+                return;
+            }
             showToast({ tone: 'error', title: 'Salvataggio terapia fallito', description: 'Controlla i dati e riprova.' });
         } finally {
             setIsSaving(false);
@@ -170,6 +182,11 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
     };
 
     const updateStatus = async (id: string, status: Therapy['status']) => {
+        const therapy = visibleTherapies.find((item) => item.id === id);
+        if (!therapy || typeof therapy.version !== 'number') {
+            showToast({ tone: 'error', title: 'Versione terapia non disponibile', description: 'Ricarica la pagina e riprova.' });
+            return;
+        }
         const patch: { status: Therapy['status']; updatedAt: Date; endDate?: Date | null } = { status, updatedAt: new Date() };
         /* @Codex WUL-UIUX: endDate esiste in schema ma non veniva mai valorizzata;
            la conclusione la registra. Alla riattivazione va azzerata con null
@@ -177,18 +194,45 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
            non lo cancellerebbe (la route pulisce endDate solo su null o ''). */
         if (status === 'completed') patch.endDate = new Date();
         if (status === 'active') patch.endDate = null;
-        await db.therapies.update(id, patch as Partial<Therapy>);
+        try {
+            await db.therapies.update(id, { ...patch, version: therapy.version });
+        } catch (error) {
+            console.error('Failed to update therapy status', error);
+            if (error instanceof ApiConflictError) {
+                notifyDbChange('therapies');
+                showToast({ tone: 'error', title: 'Terapia aggiornata altrove', description: 'I dati sono stati ricaricati. Controlla e riprova.' });
+                return;
+            }
+            showToast({ tone: 'error', title: 'Aggiornamento terapia fallito' });
+        }
     };
 
     const handleSoftDelete = async (id: string) => {
-        const { confirmed } = await confirm({
+        const therapy = visibleTherapies.find((item) => item.id === id);
+        if (!therapy || typeof therapy.version !== 'number') {
+            showToast({ tone: 'error', title: 'Versione terapia non disponibile', description: 'Ricarica la pagina e riprova.' });
+            return;
+        }
+        const { confirmed, reason } = await confirm({
             title: 'Eliminare questo farmaco dalla cartella?',
             message: 'Usa Elimina solo per errori di inserimento; per una terapia interrotta scegli Sospendi o Concludi.',
             confirmLabel: 'Elimina',
-            tone: 'danger'
+            tone: 'danger',
+            requireReason: true,
+            reasonLabel: 'Motivazione dell\'eliminazione',
+            reasonPlaceholder: 'Es. inserimento duplicato',
         });
-        if (confirmed) {
-            await db.therapies.delete(id);
+        if (!confirmed || !reason) return;
+        try {
+            await db.therapies.delete(id, { version: therapy.version, deletionReason: reason });
+        } catch (error) {
+            console.error('Failed to delete therapy', error);
+            if (error instanceof ApiConflictError) {
+                notifyDbChange('therapies');
+                showToast({ tone: 'error', title: 'Terapia aggiornata altrove', description: 'I dati sono stati ricaricati. Controlla e riprova.' });
+                return;
+            }
+            showToast({ tone: 'error', title: 'Eliminazione terapia fallita' });
         }
     };
 
