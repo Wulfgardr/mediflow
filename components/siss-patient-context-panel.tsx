@@ -781,6 +781,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                                             <p className="text-[11px] text-[color:var(--mf-muted)]">
                                                 {therapy.dosage}
                                                 {therapy.aic ? ` · AIC ${therapy.aic}` : ''}
+                                                {therapy.atc ? ` · ATC ${therapy.atc}` : ''}
                                             </p>
                                         </div>
                                         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">

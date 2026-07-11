@@ -97,7 +97,7 @@ export function normalizeExemptionCodes(exemptions: unknown): string[] {
     return [...new Set(normalized)];
 }
 
-/** Valori copiabili per una terapia: farmaco e, se presente, AIC. */
+/** Valori copiabili per una terapia: farmaco e, se presenti, AIC e ATC. */
 export function buildTherapyCopyFields(therapy: Therapy): PrescriptiveCopyField[] {
     const fields: PrescriptiveCopyField[] = [];
 
@@ -109,6 +109,11 @@ export function buildTherapyCopyFields(therapy: Therapy): PrescriptiveCopyField[
     const aic = therapy.aic?.trim();
     if (aic) {
         fields.push({ key: `${therapy.id}:aic`, label: 'AIC', value: aic });
+    }
+
+    const atc = therapy.atc?.trim();
+    if (atc) {
+        fields.push({ key: `${therapy.id}:atc`, label: 'ATC', value: atc });
     }
 
     return fields;

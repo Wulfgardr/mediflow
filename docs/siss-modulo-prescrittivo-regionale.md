@@ -201,15 +201,17 @@ e non sposta ancora MediFlow verso:
 - `prefill clinico-amministrativo` non dimostrato
 - `consumo diretto dei WS SISS` senza onboarding/coerenza scenario
 
-## Aggiornamento 2026-07-11: il modulo operativo e PRREG
+## Aggiornamento 2026-07-11: percorso osservato verso PRREG
 
-Il modulo prescrittivo regionale in esercizio e il Prescrittivo Regionale
-(PRREG), con root `/prescrittivoRegionale` e una dashboard di ingresso con le
-azioni Nuova Prescrizione e Ricerca Prescrizioni. Rispetto al modulo
-precedente, PRREG unifica farmaci e specialistica in un percorso di ricerca a
-campo libero: una evoluzione della UX del modulo stock che rende l'handoff
-meno oneroso, senza cambiarne la natura. La root legacy `/prescrizione/`
-resta citata come riferimento in transizione.
+Nella sessione operatore locale osservata il 10 luglio 2026, il modulo
+prescrittivo raggiunto e il Prescrittivo Regionale (PRREG), con root
+`/prescrittivoRegionale` e una dashboard di ingresso con le azioni Nuova
+Prescrizione e Ricerca Prescrizioni. In quella superficie PRREG riunisce
+farmaci e specialistica in un percorso di ricerca a campo libero: una
+evoluzione della UX osservata che rende l'handoff meno oneroso, senza
+cambiarne la natura. La root legacy `/prescrizione/` resta citata come
+riferimento in transizione. Questa evidenza di navigazione non costituisce un
+contratto API ne prova un rollout universale.
 
 Il launcher MediFlow apre oggi la dashboard PRREG, con lo stesso pattern di
 prima: copia locale del CF in clipboard, nessun dato personale in URL, audit

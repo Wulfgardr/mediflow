@@ -114,14 +114,14 @@ test('normalizeExemptionCodes: input non array torna vuoto', () => {
     assert.deepEqual(normalizeExemptionCodes(null), []);
 });
 
-test('buildTherapyCopyFields: include farmaco e AIC solo se presenti', () => {
-    const withAic = buildTherapyCopyFields(therapy('a', { aic: '123456789' }));
-    assert.deepEqual(withAic.map((f) => f.label), ['Farmaco', 'AIC']);
+test('buildTherapyCopyFields: include farmaco, AIC e ATC solo se presenti', () => {
+    const withCodes = buildTherapyCopyFields(therapy('a', { aic: '123456789', atc: 'A10BA02' }));
+    assert.deepEqual(withCodes.map((f) => f.label), ['Farmaco', 'AIC', 'ATC']);
 
-    const withoutAic = buildTherapyCopyFields(therapy('b', { aic: undefined }));
-    assert.deepEqual(withoutAic.map((f) => f.label), ['Farmaco']);
+    const withoutCodes = buildTherapyCopyFields(therapy('b', { aic: undefined, atc: undefined }));
+    assert.deepEqual(withoutCodes.map((f) => f.label), ['Farmaco']);
 
-    const blankName = buildTherapyCopyFields(therapy('c', { drugName: '   ', aic: undefined }));
+    const blankName = buildTherapyCopyFields(therapy('c', { drugName: '   ', aic: undefined, atc: undefined }));
     assert.deepEqual(blankName, []);
 });
 

@@ -12,26 +12,40 @@ import UIKit
 // real pasteboard/browser. A protocol with a real, working default conformer
 // (never a throwing stub) so production code gets correct behavior for free.
 protocol SystemActionsPerforming: Sendable {
-    func openExternalURL(_ url: URL)
-    func copyToSystemClipboard(_ text: String)
+    func openExternalURL(_ url: URL) async -> Bool
+    func copyToSystemClipboard(_ text: String) async -> Bool
 }
 
 struct SystemActions: SystemActionsPerforming {
-    func openExternalURL(_ url: URL) {
+    func openExternalURL(_ url: URL) async -> Bool {
         #if os(macOS)
-        NSWorkspace.shared.open(url)
+        return NSWorkspace.shared.open(url)
         #else
-        UIApplication.shared.open(url)
+        return await withCheckedContinuation { continuation in
+            Task { @MainActor in
+                UIApplication.shared.open(url, options: [:]) { didOpen in
+                    continuation.resume(returning: didOpen)
+                }
+            }
+        }
         #endif
     }
 
-    func copyToSystemClipboard(_ text: String) {
+    func copyToSystemClipboard(_ text: String) async -> Bool {
         #if os(macOS)
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
+        return await MainActor.run {
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            return pasteboard.setString(text, forType: .string)
+        }
         #else
-        UIPasteboard.general.string = text
+        return await MainActor.run {
+            // UIKit exposes a setter but no success callback. Reaching the end
+            // of the setter is the strongest observable production outcome;
+            // injected test doubles still exercise the failure presentation.
+            UIPasteboard.general.string = text
+            return true
+        }
         #endif
     }
 }

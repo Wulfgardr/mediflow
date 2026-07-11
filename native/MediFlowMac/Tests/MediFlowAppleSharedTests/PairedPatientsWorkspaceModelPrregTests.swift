@@ -7,16 +7,29 @@ import XCTest
 // pasteboard/browser reali del runner grazie allo spy iniettato al posto di
 // SystemActions.
 final class PairedPatientsWorkspaceModelPrregTests: XCTestCase {
-    private final class SystemActionsSpy: SystemActionsPerforming, @unchecked Sendable {
+    private actor SystemActionsSpy: SystemActionsPerforming {
         private(set) var openedURLs: [URL] = []
         private(set) var copiedTexts: [String] = []
+        private let openResult: Bool
+        private let copyResult: Bool
 
-        func openExternalURL(_ url: URL) {
-            openedURLs.append(url)
+        init(openResult: Bool = true, copyResult: Bool = true) {
+            self.openResult = openResult
+            self.copyResult = copyResult
         }
 
-        func copyToSystemClipboard(_ text: String) {
+        func openExternalURL(_ url: URL) async -> Bool {
+            openedURLs.append(url)
+            return openResult
+        }
+
+        func copyToSystemClipboard(_ text: String) async -> Bool {
             copiedTexts.append(text)
+            return copyResult
+        }
+
+        func recordedActions() -> (openedURLs: [URL], copiedTexts: [String]) {
+            (openedURLs, copiedTexts)
         }
     }
 
@@ -27,14 +40,17 @@ final class PairedPatientsWorkspaceModelPrregTests: XCTestCase {
 
         await model.openPrregHandoff()
 
-        XCTAssertEqual(spy.copiedTexts, ["RSSMRA80A01H501U"])
-        XCTAssertEqual(spy.openedURLs, [SissPortalURLs.prescrittivoRegionale])
+        let actions = await spy.recordedActions()
+        XCTAssertEqual(actions.copiedTexts, ["RSSMRA80A01H501U"])
+        XCTAssertEqual(actions.openedURLs, [SissPortalURLs.prescrittivoRegionale])
         XCTAssertEqual(
-            spy.openedURLs.first?.absoluteString,
+            actions.openedURLs.first?.absoluteString,
             "https://operatorisiss.servizirl.it/prescrittivoRegionale/pages/dashboard"
         )
         let statusMessage = await model.statusMessage
-        XCTAssertEqual(statusMessage, "CF copiato. Si apre il portale regionale nel browser.")
+        XCTAssertEqual(statusMessage, "CF copiato. Portale regionale aperto nel browser.")
+        let errorMessage = await model.errorMessage
+        XCTAssertNil(errorMessage)
     }
 
     func testOpenPrregHandoffWithoutTaxCodeStillOpensDashboardButDoesNotCopy() async {
@@ -44,13 +60,16 @@ final class PairedPatientsWorkspaceModelPrregTests: XCTestCase {
 
         await model.openPrregHandoff()
 
-        XCTAssertEqual(spy.copiedTexts, [])
-        XCTAssertEqual(spy.openedURLs, [SissPortalURLs.prescrittivoRegionale])
+        let actions = await spy.recordedActions()
+        XCTAssertEqual(actions.copiedTexts, [])
+        XCTAssertEqual(actions.openedURLs, [SissPortalURLs.prescrittivoRegionale])
         let statusMessage = await model.statusMessage
         XCTAssertEqual(
             statusMessage,
-            "CF non disponibile per questo paziente. Si apre comunque il portale regionale nel browser."
+            "CF non disponibile per questo paziente. Portale regionale aperto nel browser."
         )
+        let errorMessage = await model.errorMessage
+        XCTAssertNil(errorMessage)
     }
 
     func testOpenPrregHandoffWithoutSelectedPatientDoesNothing() async {
@@ -59,10 +78,43 @@ final class PairedPatientsWorkspaceModelPrregTests: XCTestCase {
 
         await model.openPrregHandoff()
 
-        XCTAssertTrue(spy.openedURLs.isEmpty)
-        XCTAssertTrue(spy.copiedTexts.isEmpty)
+        let actions = await spy.recordedActions()
+        XCTAssertTrue(actions.openedURLs.isEmpty)
+        XCTAssertTrue(actions.copiedTexts.isEmpty)
         let statusMessage = await model.statusMessage
         XCTAssertNil(statusMessage)
+    }
+
+    func testOpenPrregHandoffReportsClipboardFailureWithoutHidingSuccessfulOpen() async {
+        let spy = SystemActionsSpy(copyResult: false)
+        let model = await makeModel(systemActions: spy)
+        await model.configurePairedOnlineForTests(selectedPatient: detail(taxCode: "RSSMRA80A01H501U"))
+
+        await model.openPrregHandoff()
+
+        let actions = await spy.recordedActions()
+        XCTAssertEqual(actions.copiedTexts, ["RSSMRA80A01H501U"])
+        XCTAssertEqual(actions.openedURLs, [SissPortalURLs.prescrittivoRegionale])
+        let statusMessage = await model.statusMessage
+        XCTAssertNil(statusMessage)
+        let errorMessage = await model.errorMessage
+        XCTAssertEqual(errorMessage, "Portale regionale aperto, ma la copia del CF non è riuscita.")
+    }
+
+    func testOpenPrregHandoffReportsOpenFailureWithoutHidingSuccessfulCopy() async {
+        let spy = SystemActionsSpy(openResult: false)
+        let model = await makeModel(systemActions: spy)
+        await model.configurePairedOnlineForTests(selectedPatient: detail(taxCode: "RSSMRA80A01H501U"))
+
+        await model.openPrregHandoff()
+
+        let actions = await spy.recordedActions()
+        XCTAssertEqual(actions.copiedTexts, ["RSSMRA80A01H501U"])
+        XCTAssertEqual(actions.openedURLs, [SissPortalURLs.prescrittivoRegionale])
+        let statusMessage = await model.statusMessage
+        XCTAssertNil(statusMessage)
+        let errorMessage = await model.errorMessage
+        XCTAssertEqual(errorMessage, "CF copiato, ma l'apertura del portale regionale non è riuscita.")
     }
 
     @MainActor
