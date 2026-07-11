@@ -139,7 +139,7 @@
         "validate:patient-insight": "node scripts/run-strip-types.mjs scripts/benchmark-patient-insight.ts --validate --models qwen3.5:35b-a3b",
         "validate:evidence-absorption": "bash scripts/evidence-absorption-benchmark.sh --validate",
         "test:cloud-comparator": "node scripts/run-strip-types.mjs --test lib/cloud-comparator-case-pack.test.ts scripts/cloud-comparator-shadow-eval.test.ts",
-        "test:ai-rollout-readiness": "node scripts/run-strip-types.mjs --test scripts/benchmark-rollout-readiness.test.ts lib/ai-rollout-readiness-storage.test.ts lib/ai-rollout-model-guard.test.ts lib/ai-patient-insight-kill-switch.test.ts lib/ai-smart-import-kill-switch.test.ts lib/ai-document-synthesis-kill-switch.test.ts",
+        "test:ai-rollout-readiness": "node scripts/run-strip-types.mjs --test scripts/benchmark-rollout-readiness.test.ts lib/ai-rollout-readiness-storage.test.ts lib/ai-rollout-model-guard.test.ts lib/ai-patient-insight-kill-switch.test.ts lib/ai-smart-import-kill-switch.test.ts lib/ai-document-synthesis-kill-switch.test.ts lib/ai-ocr-kill-switch.test.ts",
         "test:mlx:runtime": "node scripts/mlx-run.mjs test",
         "test:terminology-registry": "bash scripts/terminology-registry-test.sh",
         "test:siss-adapter": "bash scripts/siss-adapter-test.sh",

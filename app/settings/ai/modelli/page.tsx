@@ -178,6 +178,11 @@ export default function SettingsAiModelsPage() {
                                     roleLabel: 'Internista (Reasoning)',
                                     model: aiConfig.model_reasoning,
                                 },
+                                {
+                                    roleId: 'ocr',
+                                    roleLabel: 'Segreteria (OCR)',
+                                    model: aiConfig.model_ocr,
+                                },
                             ]}
                         />
                     </div>

@@ -5,7 +5,7 @@ import { AIService } from '@/lib/ai-service';
 import { normalizeOllamaBaseUrl } from '@/lib/ai-providers/base-url';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 /* @Codex */
 import { execFile } from 'node:child_process';
 /* @Codex */
@@ -19,6 +19,10 @@ import { promisify } from 'node:util';
 /* @Codex */
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';
 import { validateLocalTarget } from '@/lib/local-target';
+import {
+    AI_OCR_KILL_SWITCH_KEY,
+    isAiOcrEnabledValue,
+} from '@/lib/ai-ocr-kill-switch';
 
 /* @Codex */
 const execFileAsync = promisify(execFile);
@@ -54,6 +58,22 @@ async function loadOcrRuntimeSettings() {
         configuredModel,
         baseUrl,
     };
+}
+
+/* @Codex */
+async function isOcrEnabled(): Promise<boolean> {
+    try {
+        const row = await dbServer
+            .select({ value: settings.value })
+            .from(settings)
+            .where(eq(settings.key, AI_OCR_KILL_SWITCH_KEY))
+            .get();
+
+        return isAiOcrEnabledValue(row?.value);
+    } catch (error) {
+        console.warn('[MediFlow] OCR kill switch read failed; blocking OCR extraction route.', error);
+        return false;
+    }
 }
 
 /* @Codex */
@@ -132,6 +152,12 @@ export async function POST(request: NextRequest) {
     if (!session) return unauthorizedResponse();
 
     try {
+        if (!(await isOcrEnabled())) {
+            return NextResponse.json({
+                error: 'AI OCR is disabled by the local rollout kill switch.',
+            }, { status: 403 });
+        }
+
         const body = await request.json();
         const { image, mode = 'patient' } = body;
 
