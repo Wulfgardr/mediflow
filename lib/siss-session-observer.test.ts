@@ -12,6 +12,7 @@ test('resolveSissObservedModuleFromUrl maps Atlas-observed operator paths to sta
     assert.equal(resolveSissObservedModuleFromUrl('https://operatorisiss.servizirl.it/menusiss/#/menusiss'), 'menu');
     assert.equal(resolveSissObservedModuleFromUrl('https://operatorisiss.servizirl.it/menusiss/'), 'menu');
     assert.equal(resolveSissObservedModuleFromUrl('https://operatorisiss.servizirl.it/prescrizione/'), 'prescription');
+    assert.equal(resolveSissObservedModuleFromUrl('https://operatorisiss.servizirl.it/prescrittivoRegionale/pages/dashboard'), 'prescription');
     assert.equal(resolveSissObservedModuleFromUrl('https://operatorisiss.servizirl.it/assistantrl/home/'), 'prosthetics');
     assert.equal(resolveSissObservedModuleFromUrl('https://operatorisiss.servizirl.it/opefseie/#/app-fascicolo'), 'fse');
     assert.equal(resolveSissObservedModuleFromUrl('https://operatorisiss.servizirl.it/fse/'), 'fse');
@@ -63,12 +64,14 @@ test('buildSissSessionStatusFromHistory summarizes remote-sign and last module w
 
     const remoteSignature = status.checkpoints.find((checkpoint) => checkpoint.key === 'remote-signature');
     const prosthetics = status.checkpoints.find((checkpoint) => checkpoint.key === 'prosthetics');
+    const prescription = status.checkpoints.find((checkpoint) => checkpoint.key === 'prescription');
     const registry = status.checkpoints.find((checkpoint) => checkpoint.key === 'registry');
 
     assert.equal(remoteSignature?.health, 'recent');
     assert.equal(remoteSignature?.observedAt, '2026-04-15T07:26:00.000Z');
     assert.equal(prosthetics?.health, 'recent');
     assert.equal(prosthetics?.label, 'Protesica-RL');
+    assert.equal(prescription?.label, 'Prescrittivo Regionale (PRREG)');
     assert.equal(registry?.health, 'recent');
     assert.equal(registry?.label, 'Anagrafe Gaia');
 });

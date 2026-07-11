@@ -60,6 +60,7 @@ P6 del bundle macOS è ancora aperta in `WUL-401`.
 | Cataloghi AIFA/esenzioni | `FULL` per lookup | ricerca AIFA ed esenzioni dal boundary paired | import/clear repertori resta host-only |
 | Prestazioni e protesica | `FULL` nel perimetro paired | read/write versionati e UI nativa | nessun invio regionale o generazione NRE |
 | Export FHIR/FSE pre-check | `FULL` nel perimetro locale | bundle on-device e validazione boundary | nessun writeback FSE |
+| SISS / PRREG | `HOST-ONLY` per integrazione, utilità PRREG parziale | web con pannello/diario; Apple copia il CF e apre la dashboard PRREG dal paziente | FSE, stato sessione, diario handoff e canale regionale restano sul Mac o fuori scope |
 | Viste globali | `MIXED` | agenda, diario globale e analytics di popolazione | shell/deep-link e cockpit sintetico restano partial |
 | Documenti | `PARTIAL` e policy-limited | upload manuale cifrato, archivio, insight read-only, follow-up e allegati nel diario | OCR/curation/document-derived write richiedono policy dedicata |
 | Offline mobile | `PARTIAL` | cache cifrata derivata e stato degradato read-only | TTL/freschezza visibili e riconciliazione onesta (`WUL-403`) |

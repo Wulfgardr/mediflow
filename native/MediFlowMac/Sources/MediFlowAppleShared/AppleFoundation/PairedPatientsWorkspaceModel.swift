@@ -274,15 +274,22 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /* @Codex */
     private var lastSeenNetworkFingerprint: String?
     private let dataSourceFactory: (@MainActor (PairedPatientsWorkspaceModel) -> any HomeBasePatientsDataSource)?
+    // S3 (D3, lane PRREG): injectable seam for the "Prescrittivo regionale"
+    // handoff action (clipboard + external URL). Defaults to the real
+    // implementation; tests inject a spy instead of touching the system
+    // pasteboard/browser.
+    private let systemActions: SystemActionsPerforming
 
     init(
         pairedStore: HomeBasePairedStore = .shared,
         cacheStore: HomeBasePatientCacheStore = .shared,
-        dataSourceFactory: (@MainActor (PairedPatientsWorkspaceModel) -> any HomeBasePatientsDataSource)? = nil
+        dataSourceFactory: (@MainActor (PairedPatientsWorkspaceModel) -> any HomeBasePatientsDataSource)? = nil,
+        systemActions: SystemActionsPerforming = SystemActions()
     ) {
         self.pairedStore = pairedStore
         self.cacheStore = cacheStore
         self.dataSourceFactory = dataSourceFactory
+        self.systemActions = systemActions
         let launchOverrides = AppleFoundationLaunchOverrides.load()
         self.automaticActions = launchOverrides.automaticActions
         do {
@@ -2733,6 +2740,43 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             try data.write(to: url, options: [.atomic])
             self.patientFHIRExportURL = url
             self.statusMessage = "Export FHIR pronto per la condivisione."
+        }
+    }
+
+    // D3 (S3, lane PRREG): "Prescrittivo regionale" copia il CF decifrato in
+    // clipboard e apre la dashboard PRREG nel browser di sistema. La scheda
+    // paziente resta aperta (terapie e prescrizioni gia' visibili): nessuna
+    // prescrizione nativa, l'handoff resta assistito nel portale con
+    // l'autenticazione personale del medico. Scelta per il caso senza CF: il
+    // portale si apre comunque (e' una dashboard generica, non un deep-link sul
+    // paziente), ma il messaggio dichiara onestamente che il CF non e' stato
+    // copiato invece di affermare un'azione che non e' avvenuta.
+    func openPrregHandoff() async {
+        guard let patient = selectedPatient else { return }
+        statusMessage = nil
+        errorMessage = nil
+
+        if let taxCode = patient.taxCode.trimmedOrNil {
+            let didCopy = await systemActions.copyToSystemClipboard(taxCode)
+            let didOpen = await systemActions.openExternalURL(SissPortalURLs.prescrittivoRegionale)
+
+            switch (didCopy, didOpen) {
+            case (true, true):
+                statusMessage = "CF copiato. Portale regionale aperto nel browser."
+            case (false, true):
+                errorMessage = "Portale regionale aperto, ma la copia del CF non è riuscita."
+            case (true, false):
+                errorMessage = "CF copiato, ma l'apertura del portale regionale non è riuscita."
+            case (false, false):
+                errorMessage = "Copia del CF e apertura del portale regionale non riuscite."
+            }
+        } else {
+            let didOpen = await systemActions.openExternalURL(SissPortalURLs.prescrittivoRegionale)
+            if didOpen {
+                statusMessage = "CF non disponibile per questo paziente. Portale regionale aperto nel browser."
+            } else {
+                errorMessage = "CF non disponibile per questo paziente. Apertura del portale regionale non riuscita."
+            }
         }
     }
 

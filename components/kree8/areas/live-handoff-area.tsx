@@ -57,7 +57,7 @@ function LiveHandoffArea({
     if (!fiscalCodeReady && action !== 'menu.open') {
       setFeedback({
         kind: 'warning',
-        message: 'Il modulo prescrittivo richiede un codice fiscale valido nel profilo paziente.',
+        message: 'Il Prescrittivo Regionale (PRREG) richiede un codice fiscale valido nel profilo paziente.',
       });
       return;
     }
@@ -180,7 +180,7 @@ function LiveHandoffArea({
                 ? 'CF richiesto'
                 : activeAction === 'prescription.create'
                   ? 'Apertura…'
-                  : 'Apri modulo SISS'}
+                  : 'Apri Prescrittivo Regionale (PRREG)'}
             </button>
           ) : null}
         </div>

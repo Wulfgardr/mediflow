@@ -3,15 +3,32 @@
 /* @Codex */
 import { useEffect, useState } from 'react';
 /* @Codex */
-import { Accessibility, ChevronDown, ExternalLink, FolderOpen, LoaderCircle, RefreshCcw, Search, ShieldAlert, ShieldCheck, SquareMenu } from 'lucide-react';
+import { Accessibility, BadgePercent, ChevronDown, Copy, ExternalLink, FolderOpen, IdCard, ListChecks, LoaderCircle, Pill, RefreshCcw, Search, ShieldAlert, ShieldCheck, SquareMenu, Stethoscope } from 'lucide-react';
 /* @Codex */
 import { completeSissPortalHandoff, prepareSissPortalWindow } from '@/lib/siss';
 /* @Codex */
+import { copyToClipboard } from '@/lib/clipboard';
+/* @Codex */
 import { buildSissPatientContextSummary, type SissPatientContextAction, type SissPatientContextTransportMode } from '@/lib/siss-patient-context-shared';
+/* @Codex */
+import {
+    buildExemptionCopyFields,
+    buildServicePrescriptionCopyFields,
+    buildTherapyCopyFields,
+    normalizeExemptionCodes,
+    projectPrescriptiveTherapies,
+    selectPrincipalDiagnoses,
+    selectRecentServicePrescriptions,
+    type PrescriptiveCopyField,
+} from '@/lib/siss-prescriptive-context-projection';
 /* @Codex */
 import { type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 /* @Codex */
-import { db } from '@/lib/db';
+import { db, type ServicePrescriptionStatus } from '@/lib/db';
+/* @Codex */
+import { useLiveQuery, useLiveQueryState } from '@/lib/live-query';
+/* @Codex */
+import { useToast } from '@/components/ui/toast-provider';
 /* @Codex */
 import {
     SISS_SESSION_OBSERVED_MODULE_LABELS,
@@ -70,8 +87,8 @@ type SessionStatusState = {
 const ACTIONS: ContextActionConfig[] = [
     {
         action: 'prescription.create',
-        label: 'Modulo prescrittivo',
-        caption: 'Apri il portale ufficiale del Modulo Prescrittivo Regionale con il CF pronto da incollare.',
+        label: 'Prescrittivo Regionale (PRREG)',
+        caption: 'Apri il portale ufficiale del Prescrittivo Regionale (PRREG) con il CF pronto da incollare.',
         icon: ExternalLink,
     },
     {
@@ -129,6 +146,28 @@ const TRANSPORT_MODE_LABEL: Record<SissPatientContextTransportMode, string> = {
     'portal-handoff': 'Apertura portali assistita',
     'certified-api': 'Integrazione regionale certificata',
 };
+
+/* @Codex S2: stessa etichetta usata nel form di TherapyManager per lo stato attivo. */
+const THERAPY_STATUS_LABEL = 'Attiva';
+
+/* @Codex S2: stesse etichette di STATUS_OPTIONS in service-prescription-manager.tsx
+   (non esportate da li: piccola mappa statica duplicata qui per il solo display). */
+const SERVICE_PRESCRIPTION_STATUS_LABEL: Record<ServicePrescriptionStatus, string> = {
+    prescribed: 'Prescritta',
+    booked: 'Prenotata',
+    performed: 'Eseguita',
+    report_received: 'Referto ricevuto',
+    cancelled: 'Annullata',
+};
+
+/* @Codex S2: formattazione data compatta coerente con formatObservedAt qui sotto. */
+function formatShortDate(value: Date | string | null | undefined): string {
+    if (!value) return 'Data non disponibile';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Data non disponibile';
+
+    return new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
+}
 
 function isHandoffResponse(value: unknown): value is HandoffResponse {
     return (
@@ -188,6 +227,71 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
 
     const summary = buildSissPatientContextSummary({ patientTaxCode });
     const hasTaxCode = summary.patientFiscalCodeReady;
+
+    const { showToast } = useToast();
+
+    /* @Codex S2: query client-side esplicite (D2-bis): il pannello non riceve
+       piu' solo patientId/patientTaxCode, legge da solo terapie, prescrizioni
+       specialistiche e record paziente (esenzioni, diagnosi) per la sezione
+       "Contesto prescrittivo". Sola lettura: nessuna scrittura da qui. */
+    const therapiesQuery = useLiveQueryState(
+        () => db.therapies.query({ patientId }).toArray(),
+        [patientId],
+        undefined,
+        ['therapies'],
+    );
+    const servicePrescriptionsQuery = useLiveQueryState(
+        () => db.servicePrescriptions.query({ patientId }).toArray(),
+        [patientId],
+        undefined,
+        ['service_prescriptions'],
+    );
+    const contextPatientQuery = useLiveQueryState(
+        () => db.patients.get(patientId),
+        [patientId],
+        undefined,
+        ['patients'],
+    );
+
+    const therapiesProjection = projectPrescriptiveTherapies(therapiesQuery.data);
+    const recentServicePrescriptions = selectRecentServicePrescriptions(servicePrescriptionsQuery.data);
+    const principalDiagnoses = selectPrincipalDiagnoses(contextPatientQuery.data?.diagnoses);
+    const prescriptiveExemptionCodes = normalizeExemptionCodes(contextPatientQuery.data?.exemptions);
+
+    /* @Codex S2: stesso pattern di risoluzione descrizione esenzione della
+       modules page (fetch /api/exemptions, nessuna route nuova); se la
+       risoluzione fallisce restano solo i codici, mai descrizioni inventate. */
+    const exemptionDescriptions = useLiveQuery(
+        async () => {
+            if (!prescriptiveExemptionCodes.length) return new Map<string, string>();
+
+            const response = await fetch(`/api/exemptions?codes=${encodeURIComponent(prescriptiveExemptionCodes.join(','))}`, {
+                cache: 'no-store',
+            });
+            if (!response.ok) return new Map<string, string>();
+
+            const payload = await response.json().catch(() => null) as Array<{ code: string; description: string }> | null;
+            if (!Array.isArray(payload)) return new Map<string, string>();
+
+            return new Map(payload.map((item) => [item.code.trim().toUpperCase(), item.description || '']));
+        },
+        [prescriptiveExemptionCodes.join('|')],
+    );
+
+    const handleCopyField = async (field: PrescriptiveCopyField) => {
+        const copied = await copyToClipboard(field.value);
+        showToast({
+            tone: copied ? 'success' : 'error',
+            title: copied ? 'Copiato negli appunti' : 'Copia non riuscita',
+            description: field.label,
+        });
+    };
+
+    const handleCopyTaxCode = async () => {
+        const normalized = patientTaxCode?.trim().toUpperCase();
+        if (!normalized) return;
+        await handleCopyField({ key: 'patientTaxCode', label: 'Codice fiscale', value: normalized });
+    };
 
     const refreshFseReadiness = async () => {
         setFseReadiness((current) => ({
@@ -620,6 +724,211 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                             </button>
                         );
                     })}
+                </div>
+            </div>
+
+            <div className="mt-4">
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                    Contesto prescrittivo
+                </h3>
+                <p className="mt-1 text-[11.5px] leading-5 text-[color:var(--mf-muted)]">
+                    Dati locali del paziente da ritrascrivere o consultare nel portale PRREG. Vista di sola lettura: nessuna scrittura da qui.
+                </p>
+
+                <div className="mt-3 graphite-row">
+                    <div className="min-w-0">
+                        <p className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wide text-[color:var(--mf-muted)]">
+                            <IdCard className="h-3.5 w-3.5" />
+                            Codice fiscale
+                        </p>
+                        <p className="truncate font-semibold text-[color:var(--mf-ink)]">{patientTaxCode?.trim() || 'Non disponibile'}</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => void handleCopyTaxCode()}
+                        disabled={!hasTaxCode}
+                        className="graphite-mini-btn shrink-0"
+                    >
+                        <Copy className="h-3 w-3" />
+                        Copia CF
+                    </button>
+                </div>
+
+                <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                    <div className="graphite-block">
+                        <div className="flex items-center justify-between gap-2">
+                            <h4 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                                <Pill className="h-3.5 w-3.5" />
+                                Terapie attive
+                            </h4>
+                            {therapiesProjection.inactiveCount > 0 && (
+                                <span className="graphite-chip graphite-chip-tone-muted">+{therapiesProjection.inactiveCount} non attive</span>
+                            )}
+                        </div>
+
+                        {therapiesQuery.loading && !therapiesQuery.data ? (
+                            <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Caricamento terapie…</p>
+                        ) : therapiesQuery.error ? (
+                            <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-critical)]">Terapie non disponibili in locale.</p>
+                        ) : therapiesProjection.active.length === 0 ? (
+                            <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Nessuna terapia attiva.</p>
+                        ) : (
+                            <ul className="mt-2 grid gap-1.5">
+                                {therapiesProjection.active.map((therapy) => (
+                                    <li key={therapy.id} className="graphite-row">
+                                        <div className="min-w-0">
+                                            <p className="truncate font-semibold text-[color:var(--mf-ink)]">{therapy.drugName}</p>
+                                            <p className="text-[11px] text-[color:var(--mf-muted)]">
+                                                {therapy.dosage}
+                                                {therapy.aic ? ` · AIC ${therapy.aic}` : ''}
+                                                {therapy.atc ? ` · ATC ${therapy.atc}` : ''}
+                                            </p>
+                                        </div>
+                                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                                            <span className="graphite-chip graphite-chip-tone-success">{THERAPY_STATUS_LABEL}</span>
+                                            {buildTherapyCopyFields(therapy).map((field) => (
+                                                <button
+                                                    key={field.key}
+                                                    type="button"
+                                                    onClick={() => void handleCopyField(field)}
+                                                    className="graphite-mini-btn"
+                                                    title={`Copia ${field.label.toLowerCase()}`}
+                                                >
+                                                    <Copy className="h-3 w-3" />
+                                                    {field.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+
+                    <div className="graphite-block">
+                        <div className="flex items-center justify-between gap-2">
+                            <h4 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                                <ListChecks className="h-3.5 w-3.5" />
+                                Prescrizioni specialistiche recenti
+                            </h4>
+                        </div>
+
+                        {servicePrescriptionsQuery.loading && !servicePrescriptionsQuery.data ? (
+                            <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Caricamento prescrizioni…</p>
+                        ) : servicePrescriptionsQuery.error ? (
+                            <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-critical)]">Prescrizioni non disponibili in locale.</p>
+                        ) : recentServicePrescriptions.length === 0 ? (
+                            <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Nessuna prescrizione specialistica recente.</p>
+                        ) : (
+                            <ul className="mt-2 grid gap-1.5">
+                                {recentServicePrescriptions.map((prescription) => (
+                                    <li key={prescription.id} className="graphite-row">
+                                        <div className="min-w-0">
+                                            <p className="truncate font-semibold text-[color:var(--mf-ink)]">{prescription.serviceName}</p>
+                                            <p className="truncate text-[11px] text-[color:var(--mf-muted)]">
+                                                {formatShortDate(prescription.prescribedAt)}
+                                                {prescription.requestReference ? ` · Rif. ${prescription.requestReference}` : ''}
+                                            </p>
+                                        </div>
+                                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                                            <span className="graphite-chip">{SERVICE_PRESCRIPTION_STATUS_LABEL[prescription.status]}</span>
+                                            {buildServicePrescriptionCopyFields(prescription).map((field) => (
+                                                <button
+                                                    key={field.key}
+                                                    type="button"
+                                                    onClick={() => void handleCopyField(field)}
+                                                    className="graphite-mini-btn"
+                                                    title={`Copia ${field.label.toLowerCase()}`}
+                                                >
+                                                    <Copy className="h-3 w-3" />
+                                                    {field.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+
+                    <div className="graphite-block">
+                        <div className="flex items-center justify-between gap-2">
+                            <h4 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                                <BadgePercent className="h-3.5 w-3.5" />
+                                Esenzioni
+                            </h4>
+                        </div>
+
+                        {contextPatientQuery.loading && !contextPatientQuery.data ? (
+                            <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Caricamento esenzioni…</p>
+                        ) : contextPatientQuery.error ? (
+                            <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-critical)]">Esenzioni non disponibili in locale.</p>
+                        ) : prescriptiveExemptionCodes.length === 0 ? (
+                            <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Nessuna esenzione registrata.</p>
+                        ) : (
+                            <ul className="mt-2 grid gap-1.5">
+                                {prescriptiveExemptionCodes.map((code) => {
+                                    const description = exemptionDescriptions?.get(code) ?? '';
+                                    return (
+                                        <li key={code} className="graphite-row">
+                                            <div className="min-w-0">
+                                                <p className="font-semibold text-[color:var(--mf-ink)]">{code}</p>
+                                                {description && (
+                                                    <p className="truncate text-[11px] text-[color:var(--mf-muted)]">{description}</p>
+                                                )}
+                                            </div>
+                                            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                                                {buildExemptionCopyFields(code).map((field) => (
+                                                    <button
+                                                        key={field.key}
+                                                        type="button"
+                                                        onClick={() => void handleCopyField(field)}
+                                                        className="graphite-mini-btn"
+                                                        title={`Copia ${field.label.toLowerCase()}`}
+                                                    >
+                                                        <Copy className="h-3 w-3" />
+                                                        {field.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </div>
+
+                    <div className="graphite-block">
+                        <div className="flex items-center justify-between gap-2">
+                            <h4 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                                <Stethoscope className="h-3.5 w-3.5" />
+                                Diagnosi principali
+                            </h4>
+                        </div>
+
+                        {contextPatientQuery.loading && !contextPatientQuery.data ? (
+                            <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Caricamento diagnosi…</p>
+                        ) : contextPatientQuery.error ? (
+                            <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-critical)]">Diagnosi non disponibili in locale.</p>
+                        ) : principalDiagnoses.length === 0 ? (
+                            <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Nessuna diagnosi registrata.</p>
+                        ) : (
+                            <ul className="mt-2 grid gap-1.5">
+                                {principalDiagnoses.map((diagnosis, index) => (
+                                    <li key={`${diagnosis.code}-${index}`} className="graphite-row">
+                                        <div className="min-w-0">
+                                            <p className="truncate font-semibold text-[color:var(--mf-ink)]">{diagnosis.description || diagnosis.code}</p>
+                                            <p className="text-[11px] text-[color:var(--mf-muted)]">
+                                                {diagnosis.code}
+                                                {' · '}
+                                                {formatShortDate(diagnosis.date)}
+                                            </p>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
                 </div>
             </div>
 
