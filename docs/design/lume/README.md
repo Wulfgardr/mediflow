@@ -7,7 +7,7 @@ read_when:
 
 # Lume
 
-**Stato: proposta.** Lume è la corsia stilistica nuova derivata dalla review di design del 2026-07-12: ricerca di mercato su tre lane GPT-5.6 (prodotti premium, frontiera clinica, frontiera estetica: [02-derivazione.md](./02-derivazione.md)) e sintesi progettuale Fable. Diventa canone solo con l'approvazione di Leonardo e un ADR dedicato; fino ad allora il canone operativo resta [Vetro Clinico](../vetro-clinico/README.md).
+**Stato: lingua di destinazione** (decisione di Leonardo, 2026-07-12, formalizzata in [ADR 0078](../../adr/0078-lume-lingua-di-design-di-destinazione.md)). Lume è la corsia stilistica nuova derivata dalla review di design del 2026-07-12: ricerca di mercato su lane GPT-5.6 (prodotti premium, frontiera clinica, frontiera estetica, perlustrazione dei gestionali GP e degli applicativi provider USA: [02-derivazione.md](./02-derivazione.md) e [04-perlustrazione.md](./04-perlustrazione.md)) e sintesi progettuale Fable. Il canone operativo transitorio resta [Vetro Clinico](../vetro-clinico/README.md) finché la migrazione ([03-migrazione.md](./03-migrazione.md)) non avanza.
 
 ## Il manifesto
 
