@@ -96,7 +96,7 @@
     "benchmark:icd-resolver": "node scripts/run-strip-types.mjs scripts/benchmark-icd-resolver.ts",
     "benchmark:aifa-resolver": "node scripts/run-strip-types.mjs scripts/benchmark-aifa-resolver.ts",
     "benchmark:ai-task-contracts": "node scripts/run-strip-types.mjs scripts/benchmark-ai-task-contracts.ts",
-    "benchmark:document-decision": "bash scripts/document-decision-benchmark.sh",
+    "benchmark:document-decision": "node scripts/run-strip-types.mjs scripts/benchmark-document-decision.ts",
     "benchmark:document-router": "node scripts/run-strip-types.mjs scripts/benchmark-document-router.ts",
     "benchmark:patient-insight": "node scripts/run-strip-types.mjs scripts/benchmark-patient-insight.ts",
     "benchmark:evidence-absorption": "bash scripts/evidence-absorption-benchmark.sh",
