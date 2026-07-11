@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { FileText, Loader2, CheckCircle, Image, Sparkles, AlertCircle, Archive } from 'lucide-react';
 import { useLiveQuery } from '@/lib/live-query';
@@ -9,7 +9,8 @@ import { extractPatientDataSmart, ExtractedPatientData, isImageDocumentInput, is
 import { analyzeDocumentContent, synthesizeDocument } from '@/lib/domain/documents/document-synthesis-service';
 import { cn } from '@/lib/utils';
 /* @Codex */
-import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
+import { refreshPatientSummaryIfEnabled } from '@/lib/ai-summary-service';
+import { useAiModelLabels } from '@/lib/hooks/use-ai-model-labels';
 /* @Codex */
 import { enrichExtractedPatientDataForReview } from '@/lib/domain/documents/patient-document-import-service';
 import {
@@ -34,18 +35,9 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
     /* @Codex */
     const [aiStage, setAiStage] = useState<string>("");
     /* @Codex */
-    const [aiModels, setAiModels] = useState<{ ocr: string; clinical: string } | null>(null);
+    const aiModels = useAiModelLabels();
     const documentSynthesisKillSwitch = useLiveQuery(() => db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY), []);
     const documentSynthesisEnabled = isAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
-
-    /* @Codex */
-    useEffect(() => {
-        const loadModels = async () => {
-            const models = await getAiModelLabels();
-            setAiModels(models);
-        };
-        loadModels();
-    }, []);
 
     const onDrop = async (acceptedFiles: File[]) => {
         if (acceptedFiles.length === 0) return;

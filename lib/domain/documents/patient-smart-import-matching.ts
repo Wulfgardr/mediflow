@@ -3,6 +3,7 @@ import {
     type SmartImportTherapyExtraction as ParsedAiTherapy,
 } from '../../ai-task-contracts';
 import { type AifaDrug, type Therapy } from '../../db';
+import { extractClinicalDosageNeedles, normalizeClinicalText as normalizeText } from './clinical-text-normalization';
 
 export type SmartImportReviewState =
     | 'new'
@@ -47,15 +48,6 @@ const NO_NOVELTY_BACKGROUND_MARKERS = /\b(gia noto|gia presente|profilo cronico|
 const NO_NOVELTY_FOLLOW_UP_MARKERS = /\b(controllo|follow up|richiesta di visita|impegnativa|rivalutaz|valutare)\b/;
 const NO_NOVELTY_CONTINUATION_MARKERS = /\b(continuare|proseguire|mantenere|come da piano in corso|senza variazioni|senza novita|nessuna novita|nessun cambiamento)\b/;
 const NO_NOVELTY_CHANGE_MARKERS = /\b(nuov|peggior|riacut|acut|switch|passare a|sostit|sospend|interromp|inizia|introd|increment|aument|ridurr|modifica posolog|titolaz|decrement|dimission)\b/;
-
-function normalizeText(value: string | undefined): string {
-    return (value || '')
-        .normalize('NFKD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, ' ')
-        .trim();
-}
 
 /* @Codex */
 export function hasUsableTherapyDosage(value: string | undefined): boolean {
@@ -313,28 +305,17 @@ export function buildDrugSearchTerms(suggestion: ParsedAiTherapy): string[] {
     return Array.from(terms).sort((left, right) => right.length - left.length);
 }
 
-function normalizeDosageNeedle(value: string): string {
-    return value.toLowerCase().replace(/,/g, '.').replace(/\s+/g, '');
-}
-
-function extractDosageNeedles(value: string | undefined): string[] {
-    if (!value?.trim()) return [];
-
-    const matches = value.match(/\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|g|ml|ui|u)\b/gi) || [];
-    return Array.from(new Set(matches.map((item) => normalizeDosageNeedle(item))));
-}
-
 export function extractSuggestionDosageNeedles(suggestion: ParsedAiTherapy): string[] {
     return Array.from(new Set([
-        ...extractDosageNeedles(suggestion.dosage),
-        ...extractDosageNeedles(suggestion.drugMention),
+        ...extractClinicalDosageNeedles(suggestion.dosage),
+        ...extractClinicalDosageNeedles(suggestion.drugMention),
     ]));
 }
 
 function extractCandidateDosageNeedles(candidate: Pick<AifaDrug, 'name' | 'packaging'>): string[] {
     return Array.from(new Set([
-        ...extractDosageNeedles(candidate.name),
-        ...extractDosageNeedles(candidate.packaging),
+        ...extractClinicalDosageNeedles(candidate.name),
+        ...extractClinicalDosageNeedles(candidate.packaging),
     ]));
 }
 
@@ -513,7 +494,7 @@ export function rankDrugCatalogSearchResult(query: string, candidate: AifaDrug):
     const normalizedCandidateName = normalizeText(candidate.name || '');
     const normalizedCandidatePrinciple = normalizeText(candidate.activePrinciple || '');
     const candidateDosageNeedles = extractCandidateDosageNeedles(candidate);
-    const queryDosageNeedles = extractDosageNeedles(query);
+    const queryDosageNeedles = extractClinicalDosageNeedles(query);
 
     let score = overlapCount(candidateText, queryTokens) * 9;
 

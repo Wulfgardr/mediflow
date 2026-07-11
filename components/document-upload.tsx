@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useDropzone, type FileRejection } from 'react-dropzone';
 import { Upload, FileText, X, Eye, Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { db, Attachment } from '@/lib/db';
@@ -24,7 +24,8 @@ import {
 /* @Codex */
 import { synthesizeDocument } from '@/lib/domain/documents/document-synthesis-service';
 /* @Codex */
-import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
+import { refreshPatientSummaryIfEnabled } from '@/lib/ai-summary-service';
+import { useAiModelLabels } from '@/lib/hooks/use-ai-model-labels';
 /* @Codex */
 import { serializeDocumentParseEvidenceArtifact } from '@/lib/domain/documents/document-parse-evidence-artifact';
 import DocumentViewer from '@/components/document-viewer';
@@ -49,16 +50,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
     /* @Codex */
     const [aiStage, setAiStage] = useState<string>("");
     /* @Codex */
-    const [aiModels, setAiModels] = useState<{ ocr: string; clinical: string } | null>(null);
-
-    /* @Codex */
-    useEffect(() => {
-        const loadModels = async () => {
-            const models = await getAiModelLabels();
-            setAiModels(models);
-        };
-        loadModels();
-    }, []);
+    const aiModels = useAiModelLabels();
 
     const attachments = useLiveQuery(
         async () => {
