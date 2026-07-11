@@ -113,10 +113,11 @@ pubblica/OSS riallineata al prodotto reale.
   OSS raccontano lo stato corrente senza overclaim su SISS/FSE, cloud, AI o
   automazione clinica.
 
-> [!WARNING]
-> Il client macOS storico deve ancora assorbire la compatibilita del ciclo `/api/v1`
-> tracciata in `WUL-333`; la base prodotto da estendere resta il bundle
-> Apple/home-base.
+> [!NOTE]
+> Lo snapshot macOS precedente a `v0.4.0` resta storico. La base prodotto da
+> estendere è il bundle Apple/home-base universale; i gap residui sono tracciati
+> dalla matrice parity e dalle issue WUL-401/WUL-403, non dal vecchio filone
+> congelato.
 
 ---
 

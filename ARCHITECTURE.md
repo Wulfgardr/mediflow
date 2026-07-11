@@ -46,8 +46,9 @@ MediFlow è un **sistema ibrido locale**:
   - sidecar locale OpenMed per redaction shadow/benchmark (localhost, non client-facing)
 - Strategia client Apple:
   - la web app sul Mac resta la superficie primaria di oggi
-  - la shell nativa macOS esistente resta uno snapshot da preservare, non il ramo da stratificare
-  - i futuri client iPadOS/iPhone condividono lo stesso boundary `home-base + /api/v1`, non un accesso diretto al database remoto
+  - il bundle macOS Apple/home-base è la base nativa attiva e include il runtime web packaged
+  - i client iPadOS/iPhone paired condividono `MediFlowAppleShared` e il boundary `home-base + /api/v1`, senza accesso diretto al database del Mac
+  - il core Swift tri-OS è verificato su macOS/Linux/Windows, ma non equivale a tre app desktop complete
 - Le integrazioni regionali (`SISS`, `FSE`) restano dentro un boundary esplicito:
   handoff contestuale e percorsi `webapp-assisted` finché non esiste un canale
   qualificato `SSI/A2A` documentato e sostenibile.
