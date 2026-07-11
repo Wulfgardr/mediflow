@@ -30,9 +30,9 @@ const LAUNCHERS: {
 }[] = [
   {
     id: 'prescrittivo',
-    label: 'Modulo Prescrittivo',
+    label: 'Prescrittivo Regionale (PRREG)',
     caption:
-      'Apri il portale ufficiale del Modulo Prescrittivo Regionale con il CF pronto da incollare.',
+      'Apri il portale ufficiale del Prescrittivo Regionale (PRREG) con il CF pronto da incollare.',
     variant: 'blue',
   },
   {
@@ -65,7 +65,7 @@ const BLOCKED_CAPS: { id: string; label: string; reason: string }[] = [
   {
     id: 'prescr-native',
     label: 'Prescrizione diretta',
-    reason: 'La prescrizione si completa sul Modulo Prescrittivo Regionale ufficiale.',
+    reason: 'La prescrizione si completa sul Prescrittivo Regionale (PRREG) ufficiale.',
   },
   {
     id: 'fse-embedded',
@@ -324,7 +324,7 @@ function HandoffStageBody({
             <ArrowUpRight size={13} />
           </button>
           <button type="button" className={styles.ghostBtn} onClick={onAdvance}>
-            Apri Modulo Prescrittivo Regionale
+            Apri Prescrittivo Regionale (PRREG)
             <ArrowUpRight size={13} />
           </button>
           <button type="button" className={styles.ghostBtn} onClick={onAdvance}>

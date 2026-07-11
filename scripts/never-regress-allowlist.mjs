@@ -169,6 +169,16 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'SISS handoff tests validate explicit user-driven portal URLs with synthetic fixtures and no background runtime egress.',
         },
         {
+            path: 'native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/SystemActions.swift',
+            pattern: 'https://operatorisiss.servizirl.it/',
+            reason: 'The native PRREG handoff opens the regional portal dashboard in the system browser on explicit user action, mirroring lib/siss-urls.ts; no background egress.',
+        },
+        {
+            path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/PairedPatientsWorkspaceModelPrregTests.swift',
+            pattern: 'https://operatorisiss.servizirl.it/',
+            reason: 'PRREG handoff tests assert the portal dashboard URL against a spy; no runtime egress.',
+        },
+        {
             path: 'native/MediFlowMac/Sources/MediFlowAppleShared/HomeBaseBonjourDiscovery.swift',
             pattern: 'https://\\\\\\(hostName\\):\\\\\\(port\\)',
             reason: 'Bonjour discovery assembles a paired local server URL from the discovered host and port at runtime; it is not a hardcoded external endpoint.',

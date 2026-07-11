@@ -306,11 +306,11 @@
       "area": "siss",
       "feature": "Apertura portali regionali SISS/FSE (context panel + handoff diary)",
       "web": "apre portali con CF via clipboard/handoff, stato accesso regionale, pre-check FSE, diario handoff SISS CRUD (components/siss-patient-context-panel.tsx; siss-handoff-diary.tsx)",
-      "native": "missing: nessuna superficie SISS/FSE lato Apple",
-      "boundary": "missing: nessuna route paired SISS; integrazione regionale host-only (claim freeze zero-knowledge) (app/api/siss/*)",
+      "native": "partial utility: dalla scheda paziente l'azione PRREG copia il CF decifrato nella clipboard di sistema e apre la dashboard nel browser; restano assenti handoff FSE, stato sessione e diario handoff nativi",
+      "boundary": "host-only per integrazione regionale e diario: l'azione PRREG e tutta client-side sui dati gia decifrati e non introduce route paired SISS (app/api/siss/*)",
       "gap": "host-only",
       "wave": "HOST-ONLY",
-      "evidence": "web-scheda.siss; api-boundary.SISS; codex-fetch-map./api/siss/context"
+      "evidence": "web-scheda.siss; api-boundary.SISS; WUL-480 commit 89cae6e2e; SystemActions.swift; PairedPatientsWorkspaceModelPrregTests (5 pass)"
     },
     {
       "area": "shell-globale",
@@ -644,7 +644,7 @@
     }
   ],
   "critique_residua": [],
-  "updated": "2026-07-11 WUL-479 closeout: evidence reconciled to public/main after Wave 5; residual gaps assigned to Wave 6 or host-only policy",
+  "updated": "2026-07-11 WUL-480: utility PRREG nativa riconciliata dopo il closeout WUL-479; classificazione e conteggi invariati",
   "version": 1,
   "summary": {
     "total": 64,

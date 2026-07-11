@@ -493,6 +493,8 @@ Disponibile:
 - pannello contestuale paziente SISS;
 - launcher/handoff verso percorsi ufficiali;
 - prescrittivo `webapp-assisted`;
+- utilita PRREG nel client Apple: copia locale del CF e apertura della dashboard
+  nel browser di sistema, senza nuova route paired;
 - corpus locale SISS/FSE con sync/freshness;
 - diario locale protesico document-backed e handoff `Protesica-RL`;
 - dominio locale per prescrizioni di prestazione (visite, esami, imaging,

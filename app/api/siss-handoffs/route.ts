@@ -12,7 +12,7 @@ import { parseApiBody } from '@/lib/api-schemas/parse';
 const OUTCOMES = new Set(['started', 'completed', 'blocked', 'cancelled']);
 const ACTION_LABELS: Record<string, string> = {
     'menu.open': 'Menu SISS',
-    'prescription.create': 'Modulo prescrittivo',
+    'prescription.create': 'Prescrittivo Regionale (PRREG)',
     'prosthetics.open': 'Protesica-RL',
     'fse.lookup': 'FSE',
     'registry.lookup': 'Anagrafe',

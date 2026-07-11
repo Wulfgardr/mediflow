@@ -28,7 +28,7 @@ Lo stato presente è un comportamento di servizio locale che:
 
 - espone un mediatore backend locale per l'handoff contestuale verso i portali `operatorisiss`
 - apre dal paziente i moduli `Menu SISS`, `Ricetta Elettronica`, `Protesica-RL`, `FSE` e `Anagrafe`
-- riallinea i launcher contestuali ai percorsi realmente osservati nella sessione operatore locale (`menusiss/#/menusiss`, `prescrizione/`, `assistantrl/home/`, `opefseie/#/app-fascicolo`, `gaia/`)
+- riallinea i launcher contestuali ai percorsi realmente osservati nella sessione operatore locale (`menusiss/#/menusiss`, `prescrittivoRegionale/` per il Prescrittivo Regionale PRREG, `prescrizione/` come root legacy in transizione, `assistantrl/home/`, `opefseie/#/app-fascicolo`, `gaia/`)
 - mostra nel pannello contestuale un pre-check locale di prontezza FSE per terapie e osservazioni
 - mostra nel pannello contestuale un indicatore locale di stato sessione SISS / firma remota osservato dalla cronologia Atlas della macchina, senza dichiarare uno stato certificato del backend regionale
 - mantiene un diario locale delle prescrizioni protesiche con campi decodificati per codice ISO, descrizione, misure, motivazione clinico-funzionale e collaudo
