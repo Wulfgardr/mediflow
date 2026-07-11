@@ -31,8 +31,18 @@ export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
 
+    let body: unknown;
     try {
-        const payload = validateKdfRewrapPayload(await request.json());
+        body = await request.json();
+    } catch (error) {
+        if (error instanceof SyntaxError) {
+            return failureResponse(400, 'KDF_REWRAP_INVALID', 'Payload di re-wrap non valido.');
+        }
+        throw error;
+    }
+
+    try {
+        const payload = validateKdfRewrapPayload(body);
         if (!payload) {
             return failureResponse(400, 'KDF_REWRAP_INVALID', 'Payload di re-wrap non valido.');
         }
