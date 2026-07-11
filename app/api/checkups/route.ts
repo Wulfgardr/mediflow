@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { checkups } from '@/lib/schema';
+import { checkups, patients } from '@/lib/schema';
 import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
@@ -15,6 +15,7 @@ import { parseListParams } from '@/lib/list-query-params';
 import { checkupCreateSchema } from '@/lib/api-schemas/clinical-writes';
 /* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
+import { activePatients } from '@/lib/patient-lifecycle';
 
 // Only plaintext columns are sortable server-side (notes is ENC:, not sortable).
 const CHECKUP_SORT_COLUMNS = {
@@ -112,7 +113,7 @@ export async function POST(request: Request) {
 
         const newId = body.id || uuidv4();
 
-        await dbServer.insert(checkups).values({
+        const checkupValues = {
             id: newId,
             patientId: body.patientId,
             date: checkupDate,
@@ -127,7 +128,19 @@ export async function POST(request: Request) {
             updatedAt: new Date(),
             deletedAt: null,
             deletionReason: null,
+        };
+        const created = dbServer.transaction((tx) => {
+            const patient = tx.select({ id: patients.id })
+                .from(patients)
+                .where(and(eq(patients.id, body.patientId), activePatients()))
+                .get();
+            if (!patient) return false;
+            tx.insert(checkups).values(checkupValues).run();
+            return true;
         });
+        if (!created) {
+            return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
+        }
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(

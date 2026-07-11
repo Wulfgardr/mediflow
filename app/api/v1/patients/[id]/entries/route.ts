@@ -1,7 +1,7 @@
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { entries } from '@/lib/schema';
+import { entries, patients } from '@/lib/schema';
 import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
@@ -9,6 +9,7 @@ import type { EntrySummary } from '@/lib/api/v1/types';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { normalizeEntryCreateInput } from '@/lib/api-v1-clinical-write-normalization';
+import { activePatients } from '@/lib/patient-lifecycle';
 /* @Codex */
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
 
@@ -105,7 +106,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        await dbServer.insert(entries).values(normalized.values);
+        const created = dbServer.transaction((tx) => {
+            const patient = tx.select({ id: patients.id })
+                .from(patients)
+                .where(and(eq(patients.id, id), activePatients()))
+                .get();
+            if (!patient) return false;
+            tx.insert(entries).values(normalized.values).run();
+            return true;
+        });
+        if (!created) {
+            return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
+        }
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(

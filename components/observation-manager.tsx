@@ -5,7 +5,8 @@ import { useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from '@/lib/live-query';
 import { v4 as uuidv4 } from 'uuid';
 import { Activity, ChevronDown, Minus, Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
-import { db } from '@/lib/db';
+import { ApiConflictError, db } from '@/lib/db';
+import { notifyDbChange } from '@/lib/live-query';
 import { searchStaticTerminology } from '@/lib/terminology';
 import { classifyObservationRange, formatReferenceRange } from '@/lib/observation-range';
 import { useToast } from '@/components/ui/toast-provider';
@@ -242,6 +243,11 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
     };
 
     const deleteObservation = async (id: string) => {
+        const observation = observations?.find((item) => item.id === id);
+        if (!observation || typeof observation.version !== 'number') {
+            showToast({ tone: 'error', title: 'Versione osservazione non disponibile', description: 'Ricarica la pagina e riprova.' });
+            return;
+        }
         const { confirmed } = await confirm({
             title: 'Eliminare questa misura?',
             message: 'La misura verra rimossa dai parametri clinici del paziente.',
@@ -250,9 +256,14 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
         });
         if (!confirmed) return;
         try {
-            await db.observations.delete(id);
+            await db.observations.delete(id, { version: observation.version });
         } catch (error) {
             console.error('Failed to delete observation', error);
+            if (error instanceof ApiConflictError) {
+                notifyDbChange('observations');
+                showToast({ tone: 'error', title: 'Osservazione aggiornata altrove', description: 'I dati sono stati ricaricati. Controlla e riprova.' });
+                return;
+            }
             showToast({ tone: 'error', title: 'Eliminazione misura fallita' });
         }
     };

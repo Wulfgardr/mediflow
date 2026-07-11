@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { therapies } from '@/lib/schema';
+import { patients, therapies } from '@/lib/schema';
 import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
@@ -15,6 +15,7 @@ import { parseListParams } from '@/lib/list-query-params';
 import { therapyCreateSchema } from '@/lib/api-schemas/clinical-writes';
 /* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
+import { activePatients } from '@/lib/patient-lifecycle';
 
 // motivation is ENC:, so it is not sortable. Only plaintext columns here.
 const THERAPY_SORT_COLUMNS = {
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
         }
 
         const newId = body.id || uuidv4(); // Consistent ID handling
-        await dbServer.insert(therapies).values({
+        const therapyValues = {
             id: newId,
             patientId: body.patientId,
             drugName: body.drugName,
@@ -108,7 +109,19 @@ export async function POST(request: Request) {
             updatedAt: new Date(),
             deletedAt: null,
             deletionReason: null,
+        };
+        const created = dbServer.transaction((tx) => {
+            const patient = tx.select({ id: patients.id })
+                .from(patients)
+                .where(and(eq(patients.id, body.patientId), activePatients()))
+                .get();
+            if (!patient) return false;
+            tx.insert(therapies).values(therapyValues).run();
+            return true;
         });
+        if (!created) {
+            return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
+        }
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
