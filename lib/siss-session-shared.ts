@@ -11,7 +11,7 @@ export type SissSessionObservedModule = (typeof SISS_SESSION_OBSERVED_MODULES)[n
 /* @Codex */
 export const SISS_SESSION_OBSERVED_MODULE_LABELS: Record<SissSessionObservedModule, string> = {
     menu: 'Menu SISS',
-    prescription: 'Modulo prescrittivo',
+    prescription: 'Prescrittivo Regionale (PRREG)',
     prosthetics: 'Protesica-RL',
     fse: 'FSE OpeFseIE',
     registry: 'Anagrafe Gaia',
