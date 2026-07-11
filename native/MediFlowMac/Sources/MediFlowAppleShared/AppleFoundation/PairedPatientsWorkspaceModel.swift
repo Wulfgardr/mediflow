@@ -2192,8 +2192,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 payload: HomeBaseCheckupUpdatePayload(
                     version: checkup.version,
                     deletedAt: Date(),
-                    // checkups encrypt only `notes` (lib/db.ts), so deletionReason
-                    // stays plaintext to match what the web decrypts.
+                    // The web now encrypts deletionReason in lib/db.ts. The paired client
+                    // does not seal it yet; this documented drift remains because the server
+                    // does not enforce sealing for this field.
                     deletionReason: "mobile-paired-operator-cancelled"
                 ),
                 credentials: credentials,
@@ -2362,8 +2363,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 payload: HomeBaseObservationUpdatePayload(
                     version: observation.version,
                     deletedAt: Date(),
-                    // observations encrypt only `notes` (lib/db.ts), so deletionReason
-                    // stays plaintext to match what the web decrypts.
+                    // The web now encrypts deletionReason in lib/db.ts. The paired client
+                    // does not seal it yet; this documented drift remains because the server
+                    // does not enforce sealing for this field.
                     deletionReason: "mobile-paired-operator-cancelled"
                 ),
                 credentials: credentials,
