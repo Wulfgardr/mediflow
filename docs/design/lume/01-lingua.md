@@ -65,7 +65,7 @@ La firma grafica di Lume è una linea sottile (1px, `accent.minerale` o tono sem
 | Storia di un valore di laboratorio | Il filo collega le rilevazioni, con la banda di riferimento dietro |
 | Connettore di provenienza | Lega un contenuto alla sua fonte (referto, trascrizione) |
 
-**Il tratto è lo stato epistemico**: tratteggiato = bozza (contenuto proposto o non ancora rivisto), pieno = firmato/verificato dal medico. Una regola sola, applicata ovunque: si vede a colpo d'occhio cosa è consolidato e cosa no, senza badge chiassosi. I contenuti proposti dagli strumenti di supporto seguono la stessa regola: entrano tratteggiati e diventano pieni solo con la revisione esplicita del medico.
+**Il tratto è lo stato epistemico, e il tratto pieno è il commit**: tratteggiato = bozza (contenuto proposto o non ancora rivisto), pieno = firmato dal medico. Niente parte (prescrizione, ordine, invio) finché il tratto non è pieno; un inserimento errato si marca come tale, non si cancella. Una regola sola, applicata ovunque: si vede a colpo d'occhio cosa è consolidato e cosa no, senza badge chiassosi. I contenuti proposti dagli strumenti di supporto seguono la stessa regola: entrano tratteggiati e diventano pieni solo con la revisione esplicita del medico. E ogni inferenza o sintesi apre le sue fonti con un gesto (documento, data, frammento): il filo di provenienza è un contratto, non una decorazione (vedi [04-perlustrazione.md](./04-perlustrazione.md)).
 
 Il filo non si moltiplica: mai più di un filo per contenitore. Non è un divisore (i divisori restano bordi neutri): se una linea è `accent.minerale`, porta significato.
 
@@ -98,8 +98,8 @@ Geometria: si eredita la concentricità di Vetro Clinico ma si raffredda la curv
 
 Il layout di Lume non presenta dati: presenta decisioni.
 
-1. **Testata invariabile**: identità paziente, allergie, alert, terapie critiche, sempre nello stesso posto, mai sotto scroll. È l'unico elemento che non partecipa al modello focale: è sempre leggibile.
-2. **La colonna dell'attenzione**: ciò che richiede una decisione (esiti nuovi, delta rilevanti, referti da rivedere, rinnovi in scadenza), ordinabile e spiegabile. Non è un feed di tutto: ogni voce dichiara perché è lì.
+1. **Testata invariabile**: identità paziente, allergie, alert, terapie critiche, sempre nello stesso posto, mai sotto scroll. È l'unico elemento che non partecipa al modello focale: è sempre leggibile. Ed è anche sicurezza: identità verificabile (data di nascita, identificativo, foto dove appropriato); con contesto paziente incerto le azioni cliniche si bloccano; nessun identificativo completo su superfici esposte.
+2. **La colonna dell'attenzione è una coda decisionale, non un feed**: ciò che richiede una decisione (esiti nuovi, delta rilevanti, referti da rivedere, rinnovi in scadenza), ordinabile e spiegabile. Ogni voce dichiara perché è lì, chi la possiede, se è delegabile, entro quando; le voci già valutate non si ripresentano uguali. La coda ha due binari con registro visivo separato: quello clinico usa i segnali, quello amministrativo il neutro minerale, mai lo stesso colore. Un segnale vero riordina la coda e propone l'azione; gli avvisi interruttivi si riservano ai rischi urgenti e azionabili.
 3. **Baseline prima del benchmark**: i valori si confrontano prima con la storia del paziente (banda personale sul filo) e poi con il range di laboratorio (banda di riferimento con fonte). "Diverso dal solito per questo paziente" pesa più di un semaforo generico.
 4. **L'anatomia della riga di laboratorio** (canonica): nome (Voce), valore (Registro, allineato a destra), unità, banda di range con fonte, delta dal precedente comparabile, data. Il grafico della storia è il filo con punti datati e banda dietro: mai sparkline ornamentali senza assi ancorati.
 5. **Densità a strati**: riga -> pannello laterale di contesto -> documento sorgente, senza perdere il punto. I pannelli laterali sostituiscono le navigazioni distruttive.
