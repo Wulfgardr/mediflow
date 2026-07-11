@@ -17,6 +17,11 @@ const READ_PATIENTS_CAPABILITY = 'network.replica.readonly-patients';
 const READ_DIARY_CAPABILITY = 'network.replica.readonly-clinical-diary';
 const WRITE_DIARY_CAPABILITY = 'network.replica.write-clinical-diary';
 const VISIT_DRAFT_CAPABILITY = 'network.compute.visit-draft';
+const SEALED_TITLE = 'ENC:dGl0bGVpdg==:dGl0bGVjaXBoZXI=';
+const SEALED_CONTENT = 'ENC:Y29udGVudGl2:Y29udGVudGNpcGhlcg==';
+const SEALED_UPDATED_CONTENT = 'ENC:dXBkYXRlaXY=:dXBkYXRlY2lwaGVy';
+const SEALED_METADATA = 'ENC:bWV0YWRhdGFpdg==:bWV0YWRhdGFjaXBoZXI=';
+const SEALED_DELETION_REASON = 'ENC:ZGVsZXRlaXY=:ZGVsZXRlY2lwaGVy';
 
 const scenarioResults = [];
 
@@ -147,14 +152,29 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         });
         assert.equal(missingSession.response.status, 401);
 
+        const plaintextClinicalField = await request('POST', `/api/v1/network/patients/${patientId}/entries`, {
+            headers: {
+                ...pairedHeaders(diaryWriter),
+                Cookie: sessionCookie,
+            },
+            body: {
+                type: 'note',
+                title: 'Diario rete',
+                date: '2026-05-02T09:00:00.000Z',
+                content: SEALED_CONTENT,
+            },
+        });
+        assert.equal(plaintextClinicalField.response.status, 400);
+        assert.equal(plaintextClinicalField.json?.error, 'Network diary title must be sealed with ENC:');
+
         const createBody = {
             id: `network-diary-${crypto.randomUUID()}`,
             type: 'note',
-            title: 'Diario rete',
+            title: SEALED_TITLE,
             date: '2026-05-02T09:00:00.000Z',
-            content: 'prima nota',
+            content: SEALED_CONTENT,
             setting: 'ambulatory',
-            metadata: { lane: 'network-diary-write-smoke' },
+            metadata: SEALED_METADATA,
             attachments: 'ENC:aXY=:c2VhbGVkcmVmcw==',
         };
         const create = await request('POST', `/api/v1/network/patients/${patientId}/entries`, {
@@ -189,7 +209,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
             },
             body: {
                 ...createBody,
-                content: 'payload diverso',
+                content: SEALED_UPDATED_CONTENT,
             },
         });
         assert.equal(conflictingCreate.response.status, 409);
@@ -203,7 +223,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         assert.equal(detail.response.status, 200);
         assert.equal(detail.json?.id, entryId);
         assert.equal(detail.json?.version, 1);
-        assert.equal(detail.json?.title, 'Diario rete');
+        assert.equal(detail.json?.title, SEALED_TITLE);
         assert.equal(detail.json?.setting, 'ambulatory');
         assert.equal(detail.json?.attachments, createBody.attachments);
 
@@ -286,7 +306,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
             },
             body: {
                 version: 2,
-                content: 'nota aggiornata',
+                content: SEALED_UPDATED_CONTENT,
             },
         });
         assert.equal(update.response.status, 200);
@@ -299,7 +319,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
             },
         });
         assert.equal(updatedDetail.response.status, 200);
-        assert.equal(updatedDetail.json?.content, 'nota aggiornata');
+        assert.equal(updatedDetail.json?.content, SEALED_UPDATED_CONTENT);
         assert.equal(updatedDetail.json?.version, 3);
 
         const conflict = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
@@ -309,7 +329,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
             },
             body: {
                 version: 2,
-                content: 'stale update',
+                content: SEALED_CONTENT,
             },
         });
         assert.equal(conflict.response.status, 409);
@@ -339,7 +359,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
             body: {
                 version: 3,
                 deletedAt: '2026-05-02T10:00:00.000Z',
-                deletionReason: 'network-smoke-soft-delete',
+                deletionReason: SEALED_DELETION_REASON,
             },
         });
         assert.equal(softDelete.response.status, 200);

@@ -14,6 +14,8 @@ import { dbServer } from '@/lib/db-server';
 import { users } from '@/lib/schema';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+/* @Codex */
+import { validateKdfRewrapPayload } from '@/lib/security/kdf-rewrap-validation';
 
 // Lazy KDF upgrade: persists a re-wrapped master-key blob (and its salt) without
 // touching the PIN. The client calls this after a successful login when the
@@ -29,14 +31,22 @@ export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
 
+    let body: unknown;
     try {
-        const body = await request.json();
-        const encryptedMasterKey = typeof body?.encryptedMasterKey === 'string' ? body.encryptedMasterKey : '';
-        const salt = typeof body?.salt === 'string' ? body.salt : '';
-
-        if (!encryptedMasterKey || !salt) {
-            return failureResponse(400, 'KDF_REWRAP_INVALID', 'Payload di re-wrap incompleto.');
+        body = await request.json();
+    } catch (error) {
+        if (error instanceof SyntaxError) {
+            return failureResponse(400, 'KDF_REWRAP_INVALID', 'Payload di re-wrap non valido.');
         }
+        throw error;
+    }
+
+    try {
+        const payload = validateKdfRewrapPayload(body);
+        if (!payload) {
+            return failureResponse(400, 'KDF_REWRAP_INVALID', 'Payload di re-wrap non valido.');
+        }
+        const { encryptedMasterKey, salt } = payload;
 
         const user = await dbServer.select().from(users).where(eq(users.id, session.userId)).get();
         if (!user) {
