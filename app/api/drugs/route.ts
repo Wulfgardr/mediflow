@@ -7,6 +7,8 @@ import { asc, sql } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import { sortDrugCatalogSearchResults } from '@/lib/domain/documents/patient-smart-import-matching';
+/* @Codex */
+import { buildDrugSearchPredicate } from '@/lib/drug-search-query';
 
 export async function GET(request: Request) {
     /* @Codex */
@@ -30,13 +32,9 @@ export async function GET(request: Request) {
         }
 
         if (query) {
+            /* @Codex */
             const results = await dbServer.select().from(drugs)
-                .where(sql`
-                    ${drugs.name} LIKE ${`%${query}%`}
-                    OR ${drugs.activePrinciple} LIKE ${`%${query}%`}
-                    OR ${drugs.packaging} LIKE ${`%${query}%`}
-                    OR ${drugs.aic} LIKE ${`%${query}%`}
-                `)
+                .where(buildDrugSearchPredicate(query))
                 .orderBy(asc(drugs.name), asc(drugs.packaging))
                 .limit(250);
             const normalizedResults: AifaDrug[] = results.map((item) => ({
