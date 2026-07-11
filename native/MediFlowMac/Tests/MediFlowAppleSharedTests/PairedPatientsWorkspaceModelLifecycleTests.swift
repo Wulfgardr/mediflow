@@ -129,6 +129,34 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         }
     }
 
+    /* @Codex */
+    func testLockedPatientFieldsStayEmptyAndAreOmittedFromUpdate() async throws {
+        let locked = try XCTUnwrap(CryptoService.encryptField(
+            CryptoService.jsonEncode("dato protetto")!, masterKey: SymmetricKey(size: .bits256)))
+        let remote = detail(id: "p1", archived: false, version: 1, encryptedValue: locked)
+        let source = LifecycleMockDataSource(details: ["p1": remote])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+
+        await model.loadPatient(summary(id: "p1", archived: false, version: 1))
+        await model.startEditingPatient()
+
+        let expected: Set<PairedPatientsWorkspaceModel.EncryptedPatientField> = [
+            .address, .phone, .caregiver, .notes, .diagnoses, .exemptions,
+        ]
+        let lockedFields = await model.lockedPatientFields
+        XCTAssertEqual(lockedFields, expected)
+        let address = await model.editPatientAddress
+        XCTAssertTrue(address.isEmpty)
+
+        await model.savePatient()
+        let capturedUpdate = await source.lastUpdate
+        let payload = try XCTUnwrap(capturedUpdate?.payload)
+        for field in [payload.address, payload.phone, payload.caregiver, payload.notes, payload.diagnoses, payload.exemptions] {
+            guard case .omit = field else { return XCTFail("every locked encrypted field must be omitted") }
+        }
+    }
+
     func testRestoreUsesTombstoneVersionAndReloadsTrash() async throws {
         let deleted = summary(id: "p1", archived: false, version: 5, deleted: true, reason: "web-delete")
         let source = LifecycleMockDataSource(summaries: [deleted])
@@ -385,11 +413,13 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         )
     }
 
+    /* @Codex */
     private func detail(
         id: String,
         archived: Bool,
         version: Int,
-        deleted: Bool = false
+        deleted: Bool = false,
+        encryptedValue: String? = nil
     ) -> HomeBasePatientDetail {
         HomeBasePatientDetail(
             id: id,
@@ -397,14 +427,14 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
             lastName: "Rossi",
             birthDate: nil,
             taxCode: "RSSMRA80A01H501U",
-            address: nil,
-            phone: nil,
-            caregiver: nil,
-            exemptions: nil,
-            diagnoses: nil,
+            address: encryptedValue,
+            phone: encryptedValue,
+            caregiver: encryptedValue,
+            exemptions: encryptedValue,
+            diagnoses: encryptedValue,
             monitoringProfile: nil,
             statusReason: nil,
-            notes: nil,
+            notes: encryptedValue,
             aiSummary: nil,
             documentInsights: nil,
             isAdi: false,

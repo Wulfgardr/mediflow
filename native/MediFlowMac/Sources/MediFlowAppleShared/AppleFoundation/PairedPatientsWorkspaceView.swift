@@ -807,14 +807,25 @@ struct PairedPatientsWorkspaceView: View {
                 .accessibilityIdentifier("edit-patient-lastName")
             TextField("Codice fiscale", text: $model.editPatientTaxCode)
                 .accessibilityIdentifier("edit-patient-taxCode")
+            /* @Codex */
             TextField("Indirizzo", text: $model.editPatientAddress)
                 .accessibilityIdentifier("edit-patient-address")
+                .disabled(model.isPatientFieldLocked(.address))
             TextField("Telefono", text: $model.editPatientPhone)
                 .accessibilityIdentifier("edit-patient-phone")
+                .disabled(model.isPatientFieldLocked(.phone))
             TextField("Caregiver", text: $model.editPatientCaregiver)
                 .accessibilityIdentifier("edit-patient-caregiver")
+                .disabled(model.isPatientFieldLocked(.caregiver))
             TextField("Note", text: $model.editPatientNotes, axis: .vertical)
                 .accessibilityIdentifier("edit-patient-notes")
+                .disabled(model.isPatientFieldLocked(.notes))
+            if !model.lockedPatientFields.isEmpty {
+                Label("Alcuni dati cifrati non sono disponibili e non verranno modificati.", systemImage: "lock.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("edit-patient-locked-fields-message")
+            }
             Toggle("Archiviato", isOn: $model.editPatientIsArchived)
                 .accessibilityIdentifier("edit-patient-archived")
             Toggle("ADI (assistenza domiciliare)", isOn: $model.editPatientIsAdi)
@@ -872,6 +883,8 @@ struct PairedPatientsWorkspaceView: View {
                     .accessibilityIdentifier("add-diagnosis-button")
                 }
             }
+            /* @Codex */
+            .disabled(model.isPatientFieldLocked(.diagnoses))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Esenzioni")
@@ -911,6 +924,8 @@ struct PairedPatientsWorkspaceView: View {
                 }
                 exemptionCatalogResultsList
             }
+            /* @Codex */
+            .disabled(model.isPatientFieldLocked(.exemptions))
 
             HStack(spacing: 10) {
                 Button("Salva") {
