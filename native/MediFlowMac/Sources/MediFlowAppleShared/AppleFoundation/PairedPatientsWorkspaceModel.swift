@@ -292,6 +292,19 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         self.systemActions = systemActions
         let launchOverrides = AppleFoundationLaunchOverrides.load()
         self.automaticActions = launchOverrides.automaticActions
+
+        #if DEBUG
+        /* @Codex */
+        // The synthetic click-map must not inspect a developer's real paired
+        // token or encrypted patient cache. It seeds the clinical list/detail
+        // models in performAutomaticActionsIfNeeded(), so keep this launch path
+        // fully isolated from Keychain and Application Support.
+        if ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENTS"] == "1" {
+            applyLaunchOverrides(launchOverrides)
+            return
+        }
+        #endif
+
         do {
             let snapshot = try pairedStore.loadSnapshot()
             self.serverURL = snapshot.settings.serverURL

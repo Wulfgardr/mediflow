@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { createVisitDraft, type VisitDraftRouteBody } from '@/lib/visit-draft-service';
 import { requireNetworkCapabilityContext } from '@/lib/network-write-context';
 
-export const NETWORK_VISIT_DRAFT_CAPABILITY = 'network.compute.visit-draft';
+const NETWORK_VISIT_DRAFT_CAPABILITY = 'network.compute.visit-draft';
 
 function hasOwn(input: Record<string, unknown>, key: string): boolean {
     return Object.prototype.hasOwnProperty.call(input, key);
