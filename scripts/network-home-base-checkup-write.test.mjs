@@ -185,7 +185,7 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         assert.equal(aiField.response.status, 403);
         assert.equal(aiField.json?.error, 'Network checkup write boundary excludes AI/document-derived fields');
 
-        const softDelete = await request('PUT', `/api/v1/network/patients/${patientId}/checkups/${checkupId}`, {
+        const plaintextDeletionReason = await request('PUT', `/api/v1/network/patients/${patientId}/checkups/${checkupId}`, {
             headers: {
                 ...pairedHeaders(checkupWriter),
                 Cookie: sessionCookie,
@@ -194,6 +194,21 @@ test('paired checkup write requires capability, session, scope, version, and PHI
                 version: 2,
                 deletedAt: '2026-05-02T10:00:00.000Z',
                 deletionReason: 'network-smoke-soft-delete',
+            },
+        });
+        assert.equal(plaintextDeletionReason.response.status, 400);
+        assert.equal(plaintextDeletionReason.json?.error, 'Network delete requires a sealed deletion reason');
+
+        const sealedDeletionReason = 'ENC:aXY=:cmVhc29u';
+        const softDelete = await request('PUT', `/api/v1/network/patients/${patientId}/checkups/${checkupId}`, {
+            headers: {
+                ...pairedHeaders(checkupWriter),
+                Cookie: sessionCookie,
+            },
+            body: {
+                version: 2,
+                deletedAt: '2026-05-02T10:00:00.000Z',
+                deletionReason: sealedDeletionReason,
             },
         });
         assert.equal(softDelete.response.status, 200);
@@ -207,6 +222,7 @@ test('paired checkup write requires capability, session, scope, version, and PHI
         assert.equal(deletedDetail.response.status, 200);
         assert.equal(deletedDetail.json?.version, 3);
         assert.equal(deletedDetail.json?.deletedAt, '2026-05-02T10:00:00.000Z');
+        assert.equal(deletedDetail.json?.deletionReason, sealedDeletionReason);
 
         const remoteHardDelete = await request('DELETE', `/api/v1/network/patients/${patientId}/checkups/${checkupId}`, {
             headers: {
@@ -246,6 +262,7 @@ test('paired checkup write requires capability, session, scope, version, and PHI
             updateStatus: update.response.status,
             conflictStatus: conflict.response.status,
             aiFieldStatus: aiField.response.status,
+            plaintextDeletionReasonStatus: plaintextDeletionReason.response.status,
             softDeleteStatus: softDelete.response.status,
             remoteHardDeleteStatus: remoteHardDelete.response.status,
             pairedClientId: checkupWriter.pairedClientId,

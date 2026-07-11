@@ -21,7 +21,7 @@ import { patientsToAmbulatories, checkups } from './schema';
 /* @Codex */
 import { buildCheckupVersionConflictPayload, parseCheckupExpectedVersion } from './checkup-concurrency';
 /* @Codex */
-import { isSealedValue } from './network-patient-lifecycle';
+import { isSealedValue, validateNetworkDeletionReason } from './network-patient-lifecycle';
 
 /* @Codex */
 export const NETWORK_CHECKUP_WRITE_CAPABILITY = 'network.replica.write-checkups';
@@ -87,6 +87,9 @@ function validateNetworkCheckupMutationBoundary(
             },
         };
     }
+
+    const deletionReason = validateNetworkDeletionReason(body.deletionReason);
+    if (!deletionReason.ok) return deletionReason;
 
     return null;
 }
