@@ -18,7 +18,7 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-07-09 (`v0.7.2` mainline)
+Ultimo aggiornamento: 2026-07-11 (`v0.7.2`, closeout parity `WUL-479`)
 
 ---
 
@@ -141,10 +141,12 @@ Il disegno Apple non e "tre app con tre store dati". E una family architecture:
 - client mobili paired, con cache derivata e riconciliazione esplicita quando
   quella parte verra implementata.
 
-Oggi la slice resta read-only-first nel disegno generale: il read pazienti e
-stabile e i write remoti sono limitati/versionati a profilo/status paziente,
-diario clinico, terapie, checkup e osservazioni. Hard delete remoto, cataloghi, sync
-record-level, replica automatica e multi-master sono fuori scope corrente.
+Oggi la slice resta read-only-first nel disegno generale, ma non è più limitata
+ai primi cinque moduli: lifecycle paziente, diario, terapie, checkup,
+osservazioni, prestazioni e protesica hanno write versionati; i cataloghi sono
+read-only e il dominio documentale ammette create manuale cifrato. Hard delete,
+PUT/DELETE paired degli allegati, artifact document-derived, invocazione AI,
+write offline, sync record-level e multi-master restano fuori scope.
 
 Documenti/ADR principali:
 
@@ -280,8 +282,9 @@ Documenti/ADR principali:
    limitato a profilo/status paziente, richiede
    `network.replica.write-patient-profile` e `version`.
 7. `/api/v1/network/patients/{id}/entries*` pubblica read/create/update/soft-delete
-   del diario con capability diary dedicate e `entries.version`, bloccando hard
-   delete, attachment remoti, sync e campi AI/documentali.
+   del diario con capability diary dedicate e `entries.version`; i riferimenti
+   allegato sono ammessi solo sigillati e validati dal client, mentre hard
+   delete, sync e campi AI/document-derived restano bloccati.
 8. Le sotto-risorse cliniche locali condivise `/api/v1/patients/{id}/entries*`,
    `/api/v1/patients/{id}/therapies*`, `/api/v1/patients/{id}/checkups*` e
    `/api/v1/patients/{id}/observations*` mantengono per web/native la stessa
@@ -517,10 +520,20 @@ Disponibile:
 - client iPhone/iPad paired non-AI con cache cifrata degradabile e primi
   workflow online versionati sui moduli core.
 
+Fotografia parity post-Wave 5:
+
+- 64 capability censite: 30 full, 13 partial, 21 host-only, 0 missing-both;
+- tra le 43 capability per cui la parity è un obiettivo, 30 sono full (70%);
+- click-map P6 e convergenza UI macOS restano in `WUL-401`;
+- offline degradato onesto resta in `WUL-403`;
+- Smart Import e invocazione AI paired restano host-only per ADR 0076.
+
+La fonte canonica è [docs/parity-matrix.md](./parity-matrix.md).
+
 Direzione:
 
 - app Windows/Linux e launcher dedicati oltre il core;
-- parity non-AI tramite API;
+- closeout parity tramite `WUL-401`/`WUL-403` e decisione separata per i quattro residui documentali;
 - cache locale cifrata derivata e riconciliazione esplicita.
 
 Fuori scope corrente:

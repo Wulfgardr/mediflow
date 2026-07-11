@@ -1,0 +1,616 @@
+{
+  "version": 2,
+  "updatedAt": "2026-07-11",
+  "issue": "WUL-479",
+  "networkCapabilityContract": {
+    "activeNetworkKeys": [
+      "network.pairing.bootstrap",
+      "network.ambulatories.write",
+      "network.replica.readonly-patients",
+      "network.replica.readonly-clinical-diary",
+      "network.replica.write-patient-profile",
+      "network.replica.write-patient-lifecycle",
+      "network.replica.write-clinical-diary",
+      "network.replica.readonly-therapies",
+      "network.replica.write-therapies",
+      "network.replica.readonly-checkups",
+      "network.replica.readonly-agenda",
+      "network.replica.readonly-clinical-diary-global",
+      "network.replica.write-checkups",
+      "network.replica.readonly-observations",
+      "network.replica.write-observations",
+      "network.replica.readonly-service-prescriptions",
+      "network.replica.write-service-prescriptions",
+      "network.replica.readonly-prosthetic-prescriptions",
+      "network.replica.write-prosthetic-prescriptions",
+      "network.fse.validate",
+      "network.catalogs.readonly",
+      "network.ai.central-runtime",
+      "network.replica.readonly-documents",
+      "network.replica.write-documents",
+      "network.compute.visit-draft"
+    ],
+    "plannedNetworkKeys": [
+      "network.replica.sync",
+      "network.catalogs.sync"
+    ],
+    "localOnlyKeys": [
+      "local.backup.artifact.v1",
+      "local.backup.scheduler.macos"
+    ],
+    "note": "Runtime, TypeScript, and OpenAPI enumerate these 29 keys. The 24 QA acceptance records are separate from the key enum; add each future active network key to every contract surface and its QA coverage together."
+  },
+  "capabilities": [
+    {
+      "id": "macos-packaged-home-base-runtime",
+      "title": "macOS packaged home-base runtime",
+      "surfaces": [
+        "macOS"
+      ],
+      "status": "covered",
+      "acceptance": "The built macOS bundle opens the Apple/home-base shell, includes the web runtime, manages backend/proxy explicitly, and supports local signing.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "MEDIFLOW_CODESIGN_IDENTITY=- bash scripts/build-native-app.sh"
+        },
+        {
+          "type": "command",
+          "value": "codesign -dv native/MediFlowMac/Build/MediFlowMac.app"
+        },
+        {
+          "type": "manual",
+          "value": "MediFlow v0.7.2 public release: https://github.com/Wulfgardr/mediflow/releases/tag/v0.7.2"
+        }
+      ]
+    },
+    {
+      "id": "shared-apple-core-contracts",
+      "title": "Shared Apple core contracts",
+      "surfaces": [
+        "macOS",
+        "iPhone",
+        "iPad"
+      ],
+      "status": "covered",
+      "acceptance": "Shared Swift code has repeatable tests for pairing store, encrypted patient-list cache, patients client, launch overrides, Bonjour discovery, runtime status and optional service diagnostics.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "swift test --package-path native/MediFlowMac"
+        }
+      ]
+    },
+    {
+      "id": "mobile-paired-bootstrap-read",
+      "title": "Mobile paired bootstrap and read",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "A booted iPhone/iPad simulator can receive temporary paired credentials, authenticate as operator, read network patients, launch MediFlowMobile and capture an artifact.",
+      "evidence": [
+        {
+          "type": "runbook",
+          "value": "docs/mobile-home-base-smoke.md"
+        },
+        {
+          "type": "command",
+          "value": "MEDIFLOW_MOBILE_SMOKE_OPERATOR_PIN=<PIN> bash scripts/mobile-home-base-paired-smoke.sh"
+        }
+      ]
+    },
+    {
+      "id": "paired-ambulatory-write",
+      "title": "Paired ambulatory write boundary",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "The paired client can create, update, promote, delete, and clear a test ambulatory through the versioned network boundary with paired-client audit attribution.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-ambulatory-write"
+        }
+      ]
+    },
+    {
+      "id": "paired-account-pin-rotation",
+      "title": "Paired account PIN rotation",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "The paired client rotates its PIN through the shared auth family using client-of-origin re-wrap, a versioned KDF, rotated salt, and conditional server persistence.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-account-pin"
+        },
+        {
+          "type": "adr",
+          "value": "docs/adr/0075-paired-account-operations-and-pin-rotation.md"
+        }
+      ]
+    },
+    {
+      "id": "paired-profile-write",
+      "title": "Paired patient profile write",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "Network paired write for patient profile/status requires paired credentials, operator session, capability and version conflict handling.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-write"
+        },
+        {
+          "type": "adr",
+          "value": "docs/adr/0052-network-patient-profile-write-boundary.md"
+        }
+      ]
+    },
+    {
+      "id": "paired-diary-write",
+      "title": "Paired diary write",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "Network paired diary create/update/soft-delete requires paired credentials, operator session, capability and entry version handling.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-diary-write"
+        },
+        {
+          "type": "adr",
+          "value": "docs/adr/0053-network-diary-entry-write-boundary.md"
+        }
+      ]
+    },
+    {
+      "id": "paired-therapy-write",
+      "title": "Paired therapy write",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "Network paired therapy create/update/soft-delete requires paired credentials, operator session, capability and therapy version handling.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-therapy-write"
+        },
+        {
+          "type": "adr",
+          "value": "docs/adr/0054-network-therapy-write-boundary.md"
+        }
+      ]
+    },
+    {
+      "id": "paired-checkup-write",
+      "title": "Paired checkup write",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "Network paired checkup create/update/soft-delete requires paired credentials, operator session, capability and checkup version handling.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-checkup-write"
+        },
+        {
+          "type": "adr",
+          "value": "docs/adr/0055-network-checkup-write-boundary.md"
+        }
+      ]
+    },
+    {
+      "id": "paired-observation-write",
+      "title": "Paired observation write",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "Network paired observation create/update/soft-delete requires paired credentials, operator session, capability and observation version handling.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-observation-write"
+        },
+        {
+          "type": "adr",
+          "value": "docs/adr/0056-network-observation-write-boundary.md"
+        }
+      ]
+    },
+    {
+      "id": "paired-catalog-read",
+      "title": "Paired catalog read",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "Network paired read-only catalog lookup exposes drugs, exemptions and terminology through /api/v1/network/* only for paired clients with operator session and network.catalogs.readonly; catalog sync remains planned separately.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-catalog-read"
+        }
+      ]
+    },
+    {
+      "id": "paired-cross-patient-agenda-read",
+      "title": "Paired cross-patient agenda read",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "Network paired agenda reads use a distinct capability, mandatory capped limit, plaintext date and status filters, and ambulatory membership scope that excludes patients outside the active ambulatory.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:unit"
+        },
+        {
+          "type": "adr",
+          "value": "docs/adr/0074-network-cross-patient-read-boundary.md"
+        }
+      ]
+    },
+    {
+      "id": "paired-cross-patient-diary-read",
+      "title": "Paired cross-patient clinical diary read",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "Network paired global diary reads use a distinct capability, mandatory capped limit, plaintext filters, ambulatory membership scope, and preserve sealed fields plus soft-delete tombstones for client-side rendering.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:unit"
+        },
+        {
+          "type": "adr",
+          "value": "docs/adr/0074-network-cross-patient-read-boundary.md"
+        }
+      ]
+    },
+    {
+      "id": "mobile-core-crud-ui",
+      "title": "Mobile core CRUD UI",
+      "surfaces": [
+        "iPhone",
+        "iPad"
+      ],
+      "status": "covered",
+      "acceptance": "iPhone/iPad expose usable native list/detail/create/edit flows for the non-AI core modules.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "swift test --package-path native/MediFlowMac --filter HomeBasePatientsClientTests"
+        },
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-diary-write"
+        },
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-therapy-write"
+        },
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-checkup-write"
+        },
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-observation-write"
+        },
+        {
+          "type": "issue",
+          "value": "WUL-206"
+        },
+        {
+          "type": "issue",
+          "value": "WUL-208"
+        },
+        {
+          "type": "issue",
+          "value": "WUL-209"
+        },
+        {
+          "type": "issue",
+          "value": "WUL-210"
+        }
+      ]
+    },
+    {
+      "id": "mobile-offline-cache-reconciliation",
+      "title": "Mobile offline cache and explicit reconciliation",
+      "surfaces": [
+        "iPhone",
+        "iPad"
+      ],
+      "status": "gap",
+      "acceptance": "Mobile clients keep encrypted derived cache, expose cache age, TTL and stale state, remain read-only while offline, and make the absence of an offline write queue explicit.",
+      "gapIssue": "WUL-403",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "swift test --package-path native/MediFlowMac --filter HomeBasePatientCacheStoreTests"
+        },
+        {
+          "type": "issue",
+          "value": "WUL-403"
+        }
+      ]
+    },
+    {
+      "id": "paired-patient-lifecycle-boundary",
+      "title": "Paired patient lifecycle boundary",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "Network paired patient create, soft-delete, restore and tombstone listing are documented in OpenAPI and guarded by the lifecycle capability, sealed sensitive-field checks and optimistic concurrency.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:unit"
+        },
+        {
+          "type": "command",
+          "value": "npm run check:openapi:drift -- --base-ref origin/main"
+        },
+        {
+          "type": "manual",
+          "value": "Lifecycle smoke V2 remains the next slice and is not implemented by this boundary slice."
+        }
+      ]
+    },
+    {
+      "id": "paired-service-prescriptions-boundary",
+      "title": "Paired service prescriptions boundary",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "Network paired service prescriptions and items can be listed, created and updated through scoped capability checks, parent membership checks and optimistic concurrency; paired DELETE is intentionally absent.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:unit"
+        },
+        {
+          "type": "command",
+          "value": "npm run check:openapi:drift -- --base-ref origin/main"
+        },
+        {
+          "type": "manual",
+          "value": "S1 W2-finale excludes smoke S3 and native changes."
+        }
+      ]
+    },
+    {
+      "id": "paired-prosthetic-prescriptions-boundary",
+      "title": "Paired prosthetic prescriptions boundary",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "Network paired prosthetic prescriptions can be listed, created and updated through scoped capability checks and optimistic concurrency; paired DELETE is intentionally absent.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:unit"
+        },
+        {
+          "type": "command",
+          "value": "npm run check:openapi:drift -- --base-ref origin/main"
+        },
+        {
+          "type": "manual",
+          "value": "S1 W2-finale excludes smoke S3 and native changes."
+        }
+      ]
+    },
+    {
+      "id": "paired-network-discovery-dual-auth",
+      "title": "Paired network discovery dual auth",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "Network capabilities, identity and node discovery accept either the local API token or paired credentials; paired identity additionally requires an operator session and resolves the cookie-selected ambulatory scope.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:unit"
+        },
+        {
+          "type": "command",
+          "value": "npm run check:openapi:drift -- --base-ref origin/main"
+        },
+        {
+          "type": "manual",
+          "value": "S2 W2-finale excludes native and smoke changes."
+        }
+      ]
+    },
+    {
+      "id": "paired-network-revision-boundary",
+      "title": "Paired network revision boundary",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "GET /api/v1/network/revision is paired-authenticated, mode-gated, no-store, and exposes only revision, sourceFingerprint and fingerprint.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:unit"
+        },
+        {
+          "type": "command",
+          "value": "npm run check:openapi:drift -- --base-ref origin/main"
+        },
+        {
+          "type": "manual",
+          "value": "S2 W2-finale excludes native guard consumption."
+        }
+      ]
+    },
+    {
+      "id": "paired-fse-validation-boundary",
+      "title": "Paired FSE validation boundary",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "Network paired FSE validate-patient and validate-document require paired credentials, operator session and network.fse.validate; validate-patient returns 404 for patients outside scope.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:unit"
+        },
+        {
+          "type": "command",
+          "value": "npm run check:openapi:drift -- --base-ref origin/main"
+        },
+        {
+          "type": "manual",
+          "value": "S2 W2-finale excludes smoke S3 and Swift FHIR generation."
+        }
+      ]
+    },
+    {
+      "id": "paired-document-domain-boundary",
+      "title": "Paired document domain boundary",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "Network paired attachment list (metadata only, no data), single-attachment read (with data, 404 cross-patient) and create are guarded by distinct read/write capabilities, an active-and-scoped patient check, sealed name/path/data enforcement, rejection by presence of every document-derived and server-controlled field, and the shared host wire size limit; created attachments enter the OCR queue as pending/paired_upload. Paired update and delete are intentionally absent (ADR 0076, Classe A).",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:unit"
+        },
+        {
+          "type": "command",
+          "value": "npm run check:openapi:drift -- --base-ref origin/main"
+        },
+        {
+          "type": "adr",
+          "value": "docs/adr/0076-paired-document-domain-write-policy.md"
+        },
+        {
+          "type": "manual",
+          "value": "S1 W5 excludes smoke S3 and native changes."
+        }
+      ]
+    },
+    {
+      "id": "paired-visit-draft-and-ai-runtime-status",
+      "title": "Paired visit-draft compute and AI runtime status",
+      "surfaces": [
+        "iPhone",
+        "iPad",
+        "home-base"
+      ],
+      "status": "covered",
+      "acceptance": "The paired client can compute a deterministic review-first visit draft without patient scope, persistence, or mutation audit, and can read fail-closed AI kill-switch status through discovery dual-auth.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:unit"
+        },
+        {
+          "type": "command",
+          "value": "npm run check:openapi:drift -- --base-ref origin/main"
+        },
+        {
+          "type": "adr",
+          "value": "docs/adr/0076-paired-document-domain-write-policy.md"
+        },
+        {
+          "type": "manual",
+          "value": "S2 W5 excludes smoke S3 and native changes."
+        }
+      ]
+    },
+    {
+      "id": "apple-wide-click-map",
+      "title": "Current Apple-wide click-map evidence",
+      "surfaces": [
+        "macOS",
+        "iPhone",
+        "iPad"
+      ],
+      "status": "gap",
+      "acceptance": "Eseguire la click-map manuale P6 sul bundle macOS home-base per Pazienti, Diario base, editor rich text, Terapie, Checkup, Osservazioni, cockpit e shell/deep-link; i probe automatici restano evidenza preparatoria, non certificazione di parity UI piena.",
+      "evidence": [
+        {
+          "type": "command",
+          "value": "npm run test:native:clickmap:probe"
+        },
+        {
+          "type": "command",
+          "value": "MEDIFLOW_MOBILE_SMOKE_OPERATOR_PIN=<PIN> MEDIFLOW_MOBILE_SMOKE_AUTOLOAD_PATIENTS=0 bash scripts/mobile-home-base-paired-smoke.sh"
+        },
+        {
+          "type": "command",
+          "value": "npm run test:network:home-base-write"
+        },
+        {
+          "type": "issue",
+          "value": "WUL-401"
+        }
+      ],
+      "gapIssue": "WUL-401"
+    }
+  ],
+  "originIssue": "WUL-194"
+}
