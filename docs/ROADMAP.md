@@ -1,7 +1,14 @@
+---
+summary: "Canonical MediFlow product roadmap and current delivery horizons."
+read_when:
+  - "Changing product direction, release narrative, or Apple parity priorities."
+  - "Separating shipped capabilities from future or policy-gated work."
+---
+
 # 🧭 Roadmap MediFlow
 
 > **Dove siamo e dove vogliamo andare.**
-> v0.7.2 (release corrente, chiude la parità del boundary paired sopra il ramo Apple/native). Ultimo aggiornamento: 2026-07-09.
+> v0.7.2 (release corrente, chiude le Wave 1-5 del boundary/client Apple senza dichiarare parity UI completa). Ultimo aggiornamento: 2026-07-11.
 > Fonte roadmap prodotto canonica (vedi anche [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) per la lettura completa corrente e [docs/README.md](./README.md) per mappa completa documenti).
 
 > [!NOTE]
@@ -29,8 +36,9 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 * **Compliance locale piu esplicita**: terminology registry locale, baseline GTW/FSE, baseline SISS e pannello prescrizione con handoff controllato.
 * **Stabilizzazione web/core**: `typecheck` canonico, normalizzazione condivisa dei payload paziente e riduzione del carico nei file piu densi.
 
-> Nota: il filone `macOS/parity` non prosegue come delivery incrementale oltre `v0.4.0`.
-> Entra in **riscrittura controllata** della shell nativa, preservando `/api/v1`, TLS locale, cifratura e regole security/local-first.
+> Nota storica: dopo `v0.4.0` il vecchio filone `macOS/parity` è entrato in
+> **riscrittura controllata**. Le Wave 1-5 successive lavorano sul nuovo client
+> universale Apple/home-base, non sullo snapshot legacy.
 
 ---
 
@@ -146,7 +154,7 @@ repository pubblica.
 
 ### Modalita network home-base
 
-* **Nodo centrale locale**: pairing esplicito, capability discovery, data plane read-only e primi write versionati per profilo/status, diario, terapie, checkup e osservazioni sono gia entrati su `main`; restano da estendere UX, replica e altri moduli clinici senza rompere il boundary.
+* **Nodo centrale locale**: pairing esplicito, capability discovery, lifecycle paziente, moduli clinici non-AI, prestazioni/protesica, cataloghi read-only e create documentale manuale sono su `main`; restano da chiudere UX, offline e superfici policy-gated senza rompere il boundary.
 * **Replica e fallback offline**: continuita operativa tra dispositivi con riconciliazione esplicita ancora da promuovere oltre il mirror/snapshot governato.
 * **Runtime AI centralizzabile**: opzione locale di studio per client meno potenti, senza egress cloud e ancora separata dal data plane clinico.
 
@@ -160,6 +168,10 @@ repository pubblica.
 
 * **Apple/native su mainline**: macOS resta il fronte nativo piu avanzato;
   iPhone/iPad proseguono come client paired sopra contratti locali versionati.
+* **Wave 6 / closeout parity**: `WUL-479` governa la matrice canonica; `WUL-401`
+  chiude click-map P6 e convergenza dei moduli core, `WUL-403` rende onesto
+  l'offline degradato, mentre il workflow documentale nativo resta condizionato
+  da ADR 0076 e dagli spike `WUL-417`/`WUL-383`.
 * **Stack voice visit**: `WUL-419`, `WUL-421` e `WUL-422` mantengono transcript e
   bozze sintetiche review-first, separati dall'audio reale e dalla promozione
   runtime.

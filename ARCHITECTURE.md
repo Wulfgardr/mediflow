@@ -55,7 +55,8 @@ MediFlow è un **sistema ibrido locale**:
 Il default resta **local-only sul singolo computer**. Se l'operatore attiva la
 modalita `network-home-base`, lo stesso nodo espone anche `/api/v1/network/*`
 con pairing esplicito, data plane pazienti read-only-first e write limitati a
-profilo/status paziente, diario clinico, terapie, checkup e osservazioni per client trusted su LAN.
+lifecycle/profilo paziente, moduli clinici non-AI, prestazioni, protesica e
+create documentale manuale per client trusted su LAN.
 
 ### Porte locali (default)
 
@@ -99,7 +100,8 @@ MediFlow espone due superfici API:
 - **Network API** (`/api/v1/network/*`):
   - si attiva solo in modalita `network-home-base`
   - resta read-only-first, con write versionati su ciclo di vita paziente (creazione, cestino, ripristino), profilo/status, diario clinico, terapie, checkup, osservazioni, prestazioni e protesica, piu export FHIR generato lato client (nodo keyless), validazione FSE, guardia di revisione e discovery capabilities/identity/node in dual-auth
-  - i cataloghi (farmaci, esenzioni, terminologia, prestazioni) sono esposti in sola lettura; restano esclusi hard delete remoto, attachment remoti, sync, cache offline e campi AI/documentali
+  - i cataloghi (farmaci, esenzioni, terminologia, prestazioni) sono esposti in sola lettura
+  - il dominio documentale consente lettura e create manuale cifrato, riferimenti allegato sigillati e compute deterministici senza persistenza; restano esclusi PUT/DELETE paired degli allegati, artifact document-derived, invocazione AI, hard delete remoto, sync e write offline (ADR 0076)
   - disattivare la modalita non revoca i pairing: i token dei client paired
     diventano inerti e il data plane risponde `403 NETWORK_MODE_DISABLED`
     finche la modalita non viene riattivata
@@ -171,7 +173,7 @@ flowchart TB
   - versionato
   - documentato
   - retrocompatibile all'interno della stessa major
-- `local-only` come default e `network-home-base` come opt-in paired/read-only-first con write paziente, diario, terapie, checkup e osservazioni limitati/versionati.
+- `local-only` come default e `network-home-base` come opt-in paired/read-only-first con write versionati e capability-scoped; le eccezioni documentali seguono ADR 0076.
 - Cancellazione clinica reversibile: il DELETE di pazienti e delle
   sotto-risorse cliniche e un tombstone soft-delete version-guarded; la
   cancellazione fisica passa solo da strumenti amministrativi espliciti e
