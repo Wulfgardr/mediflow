@@ -360,7 +360,7 @@
         "iPad"
       ],
       "status": "gap",
-      "acceptance": "Mobile clients keep encrypted derived cache, show paired-offline-degraded state and reconcile writes explicitly when the home-base returns.",
+      "acceptance": "Mobile clients keep encrypted derived cache, expose cache age, TTL and stale state, remain read-only while offline, and make the absence of an offline write queue explicit.",
       "gapIssue": "WUL-403",
       "evidence": [
         {
@@ -540,7 +540,7 @@
         },
         {
           "type": "command",
-          "value": "npm run check:openapi:drift -- --base-ref public/main"
+          "value": "npm run check:openapi:drift -- --base-ref origin/main"
         },
         {
           "type": "adr",
@@ -569,7 +569,7 @@
         },
         {
           "type": "command",
-          "value": "npm run check:openapi:drift -- --base-ref public/main"
+          "value": "npm run check:openapi:drift -- --base-ref origin/main"
         },
         {
           "type": "adr",
@@ -590,7 +590,7 @@
         "iPad"
       ],
       "status": "gap",
-      "acceptance": "Eseguire la click-map manuale P6 sul bundle macOS home-base per Pazienti, Diario, Terapie, Checkup e Osservazioni; i probe automatici restano evidenza preparatoria, non certificazione di parity UI piena.",
+      "acceptance": "Eseguire la click-map manuale P6 sul bundle macOS home-base per Pazienti, Diario base, editor rich text, Terapie, Checkup, Osservazioni, cockpit e shell/deep-link; i probe automatici restano evidenza preparatoria, non certificazione di parity UI piena.",
       "evidence": [
         {
           "type": "command",
@@ -614,4 +614,3 @@
   ],
   "originIssue": "WUL-194"
 }
-

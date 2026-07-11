@@ -15,12 +15,16 @@ const allowedEvidenceTypes = new Set(['command', 'runbook', 'adr', 'issue', 'pr'
 const allowedParityGaps = new Set(['full-parity', 'partial', 'missing-both', 'host-only']);
 const expectedParitySummary = {
   total: 64,
-  fullParity: 31,
+  fullParity: 30,
   partial: 13,
-  missing: 2,
-  hostOnly: 18,
-  openNonHost: 15,
+  missing: 0,
+  hostOnly: 21,
+  openNonHost: 13,
 };
+const expectedManifestGaps = new Map([
+  ['mobile-offline-cache-reconciliation', 'WUL-403'],
+  ['apple-wide-click-map', 'WUL-401'],
+]);
 const requiredCapabilities = [
   'macos-packaged-home-base-runtime',
   'shared-apple-core-contracts',
@@ -143,6 +147,9 @@ if (!Array.isArray(parityMatrix.critique_residua) || parityMatrix.critique_resid
 if (JSON.stringify(parityMatrix).includes('mediflow_private')) {
   fail('parity matrix must reference only the public operational repository.');
 }
+if (JSON.stringify(manifest).includes('mediflow_private')) {
+  fail('QA manifest must reference only the public operational repository.');
+}
 
 if (!networkCapabilityContract || typeof networkCapabilityContract !== 'object') {
   fail('manifest.networkCapabilityContract is required.');
@@ -217,6 +224,22 @@ for (const capability of capabilities) {
     if ((item.type === 'runbook' || item.type === 'adr') && !pathExists(item.value)) {
       fail(`${capability.id}: evidence path does not exist: ${item.value}.`);
     }
+  }
+}
+
+const actualManifestGaps = capabilities.filter((capability) => capability.status !== 'covered');
+if (actualManifestGaps.length !== expectedManifestGaps.size) {
+  fail(`manifest must contain exactly ${expectedManifestGaps.size} non-covered capabilities.`);
+}
+for (const [capabilityId, gapIssue] of expectedManifestGaps) {
+  const capability = capabilities.find((candidate) => candidate.id === capabilityId);
+  if (!capability || capability.status !== 'gap' || capability.gapIssue !== gapIssue) {
+    fail(`${capabilityId} must be the gap owned by ${gapIssue}.`);
+  }
+}
+for (const capability of actualManifestGaps) {
+  if (!expectedManifestGaps.has(capability.id)) {
+    fail(`${capability.id}: unexpected non-covered capability.`);
   }
 }
 
