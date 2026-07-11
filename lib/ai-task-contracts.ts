@@ -1,14 +1,12 @@
 /* @Codex */
 import { filterServicePrescriptionTherapyCandidates, isServicePrescriptionLikeTherapy } from './prescription-boundary';
 import { stripModelArtifacts } from './model-artifacts';
-import {
-    AI_TASK_EXTRACTION_SCHEMA_VERSION,
-    buildExtractionPrompt,
-} from './ai-task-contract-prompts';
+import { AI_TASK_EXTRACTION_SCHEMA_VERSION } from './ai-task-contract-prompts';
 
 /* @Codex */
 export {
     AI_TASK_EXTRACTION_SCHEMA_VERSION,
+    buildDocumentSynthesisExtractionPrompt,
     buildPatientInsightExtractionPrompt,
     buildSmartImportExtractionPrompt,
 } from './ai-task-contract-prompts';
@@ -836,106 +834,4 @@ export function parseDocumentSynthesisExtractionResponse(
             },
         },
     };
-}
-
-
-export function buildDocumentSynthesisExtractionPrompt(rawText: string): string {
-    return buildExtractionPrompt(
-        'document_synthesis',
-        [
-            'Sei un assistente clinico locale.',
-            'Ricevi testo OCR grezzo di un documento medico italiano e devi estrarre solo dati supportati dal testo.',
-        ].join('\n'),
-        `{
-    "qualityLevel": "green|yellow|red",
-    "qualityReason": "motivo sintetico della valutazione",
-    "medications": [
-      "farmaco o principio attivo esplicitamente presente nel documento, con posologia se esplicita"
-    ],
-    "diagnoses": [
-      {
-        "code": "codice ICD esplicito nel documento",
-        "description": "descrizione clinica associata",
-        "system": "ICD-9|ICD-10|ICD-11",
-        "evidence": "breve citazione/parafrasi locale del passaggio rilevante",
-        "confidence": "high|medium|low"
-      }
-    ],
-    "problemStatements": [
-      {
-        "label": "problema clinico in italiano",
-        "icdQuery": "query breve in inglese per ICD-11",
-        "confidence": "high|medium|low",
-        "evidence": "breve evidenza testuale locale"
-      }
-    ],
-    "therapyCandidates": [
-      {
-        "drugMention": "farmaco o principio attivo menzionato",
-        "drugQuery": "chiave breve per catalogo AIFA",
-        "activePrinciple": "principio attivo se disponibile",
-        "dosage": "posologia se disponibile",
-        "motivation": "indicazione o contesto clinico se disponibile",
-        "therapyState": "active|transition|uncertain|inactive",
-        "reviewNote": "motivo breve se non immediatamente applicabile",
-        "confidence": "high|medium|low",
-        "evidence": "breve evidenza testuale locale"
-      }
-    ],
-    "servicePrescriptions": [
-      {
-        "serviceName": "visita, esame, imaging, riabilitazione, screening o procedura prescritta",
-        "category": "lab|imaging|visit|rehab|screening|procedure|other",
-        "priority": "priorita se esplicita",
-        "codeSystem": "sistema di codifica se esplicito",
-        "serviceCode": "codice prestazione se esplicito",
-        "clinicalQuestion": "quesito o motivazione se esplicita",
-        "provider": "struttura o specialita se esplicita",
-        "prescribedAt": "data prescrizione se esplicita",
-        "requestReference": "riferimento impegnativa se esplicito",
-        "confidence": "high|medium|low",
-        "evidence": "breve evidenza testuale locale",
-        "items": [
-          {
-            "serviceName": "singolo atto richiesto, es. EMOCROMO o AST",
-            "category": "lab|imaging|visit|rehab|screening|procedure|other",
-            "codeSystem": "sistema di codifica se esplicito",
-            "serviceCode": "codice del singolo atto se esplicito",
-            "confidence": "high|medium|low",
-            "evidence": "evidenza atomica del singolo atto"
-          }
-        ]
-      }
-    ]
-  }`,
-        [
-            'qualityLevel usa green se il contenuto OCR e chiaro, yellow se ambiguo o parziale, red se insufficiente o rumoroso',
-            'summary deve essere un riassunto clinico conciso in plain text, senza markdown',
-            'summary massimo 2 frasi brevi e non oltre 220 caratteri circa',
-            'in medications includi solo terapie esplicite e correnti nel testo OCR, senza duplicati e senza presidi, detergenti o indicazioni non farmacologiche',
-            'non inserire in medications o therapyCandidates visite specialistiche, prestazioni, esami, controlli, consulenze, impegnative o referral: sono prescrizioni di prestazione, non farmaci',
-            'se il documento e una ricetta/impegnativa per prestazione specialistica, usa servicePrescriptions e lascia medications e therapyCandidates vuoti salvo farmaci espliciti separati',
-            'in servicePrescriptions includi visite specialistiche, laboratorio, imaging, riabilitazione, screening o procedure prescritte; non copiarle in medications o therapyCandidates',
-            'se una richiesta contiene un pannello o piu prestazioni, mantieni il contenitore in serviceName e spacchetta i singoli atti in items, uno per riga clinicamente distinta',
-            'per esami ematochimici esplicita items separati come EMOCROMO, D-DIMERO, LDH, AST, ALT, VITAMINA D quando presenti nel testo; non inventare atti non citati',
-            'in diagnoses includi solo patologie con codice ICD esplicito nel testo OCR; se il documento non riporta codici espliciti restituisci diagnoses come array vuoto e non inventare placeholder o code vuoti',
-            'in problemStatements includi solo patologie attuali, attive o clinicamente rilevanti per la gestione corrente anche se prive di codice esplicito',
-            'problemStatements deve usare label in italiano clinico sintetico e icdQuery breve in inglese',
-            'escludi negazioni, familiarita, anamnesi remota risolta, counselling generico e fattori di rischio non trattati come problema clinico attivo',
-            'in therapyCandidates includi preferibilmente farmaci attivi con posologia esplicita; se la posologia manca non inventarla',
-            'drugQuery deve essere una chiave breve per il catalogo AIFA, preferendo brand o principio attivo con strength se esplicita',
-            'se il documento contiene sezioni come terapia alla dimissione o terapia domiciliare, privilegia quelle rispetto ai farmaci descritti solo durante il ricovero',
-            'non marcare active antibiotici, profilassi, nutrizione enterale o terapie di degenza se non ricompaiono nella terapia alla dimissione o domiciliare',
-            'se una terapia domiciliare pre-ricovero sembra sostituita da una nuova terapia alla dimissione nello stesso ambito terapeutico, usa transition o uncertain per la terapia precedente',
-            'se una terapia ha durata breve, data di stop, oppure testo come fino al, poi stop, sospendere, usa transition o inactive invece di active',
-            'massimo 6 medications, massimo 4 problemStatements, massimo 6 therapyCandidates e massimo 10 servicePrescriptions; se il documento contiene piu elementi tieni solo quelli piu correnti e clinicamente utili',
-            'se una terapia e solo proposta, in switch o da confermare, usa therapyState transition o uncertain invece di active',
-            'evidence deve restare atomica e riferita al singolo problema o farmaco',
-            'non inventare posologie, farmaci o codici mancanti',
-            'mantieni le stringhe molto compatte per restare entro il budget di output',
-            'massimo 4 diagnosi con codice esplicito, massimo 4 problemStatements e massimo 6 therapyCandidates',
-        ],
-        'DOCUMENTO OCR',
-        rawText,
-    );
 }
