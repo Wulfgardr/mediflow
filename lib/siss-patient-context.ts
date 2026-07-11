@@ -42,8 +42,8 @@ function describeSissAction(action: SissPatientContextAction): {
             };
         case 'prescription.create':
             return {
-                title: 'Modulo Prescrittivo Regionale',
-                message: 'Webapp ufficiale del Modulo Prescrittivo Regionale pronta. Il codice fiscale verra copiato in locale prima dell\'apertura della sessione SISS.',
+                title: 'Prescrittivo Regionale (PRREG)',
+                message: 'Webapp ufficiale del Prescrittivo Regionale (PRREG) pronta. Il codice fiscale verra copiato in locale prima dell\'apertura della sessione SISS.',
             };
         case 'prosthetics.open':
             return {

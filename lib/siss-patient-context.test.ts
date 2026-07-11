@@ -55,6 +55,18 @@ test('createSissPatientContextHandoff returns structured payload for FSE lookup'
     assert.match(result.correlationId, /^siss-/);
 });
 
+test('createSissPatientContextHandoff labels the PRREG prescription handoff', async () => {
+    const result = await createSissPatientContextHandoff({
+        patientId: 'patient-ctx-prreg',
+        patientTaxCode: 'RSSMRA85T10A562S',
+        action: 'prescription.create',
+    });
+
+    assert.equal(result.title, 'Prescrittivo Regionale (PRREG)');
+    assert.equal(result.handoffUrl, SISS_PORTAL_URLS['prescription.create']);
+    assert.equal(result.message, 'Webapp ufficiale del Prescrittivo Regionale (PRREG) pronta. Il codice fiscale verra copiato in locale prima dell\'apertura della sessione SISS.');
+});
+
 test('createSissPatientContextHandoff returns structured payload for registry lookup', async () => {
     const result = await createSissPatientContextHandoff({
         patientId: 'patient-ctx-2',

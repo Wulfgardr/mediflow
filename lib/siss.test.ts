@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 /* @Codex */
 import test from 'node:test';
 /* @Codex */
-import { completeSissPortalHandoff, prepareSissPortalWindow } from './siss';
+import { completeSissPortalHandoff, openSissPrescrizione, prepareSissPortalWindow } from './siss';
 
 type PopupStub = {
     opener: unknown;
@@ -130,19 +130,57 @@ test('completeSissPortalHandoff reuses provided popup without opening a second w
 
     try {
         const result = await completeSissPortalHandoff({
-            handoffUrl: 'https://operatorisiss.servizirl.it/prescrizione/',
+            handoffUrl: 'https://operatorisiss.servizirl.it/prescrittivoRegionale/pages/dashboard',
             clipboardText: 'rssmra85t10a562s',
             popupWindow: popup as unknown as Window,
         });
 
         assert.equal(openCalls, 0);
         assert.equal(copiedText, 'RSSMRA85T10A562S');
-        assert.equal(popup.location.href, 'https://operatorisiss.servizirl.it/prescrizione/');
+        assert.equal(popup.location.href, 'https://operatorisiss.servizirl.it/prescrittivoRegionale/pages/dashboard');
         assert.equal(popup.focusCalls, 1);
         assert.deepEqual(result, {
             success: true,
             opened: true,
             message: 'CF "RSSMRA85T10A562S" copiato! Incollalo nel modulo SISS (Cmd+V).',
+        });
+    } finally {
+        restoreDocument();
+        restoreNavigator();
+        restoreWindow();
+    }
+});
+
+test('openSissPrescrizione opens the PRREG dashboard and copies the fiscal code', async () => {
+    const popup = createPopupStub();
+    let copiedText: string | null = null;
+    const restoreWindow = replaceGlobal('window', {
+        open: () => popup,
+        focus: () => undefined,
+    });
+    const restoreNavigator = replaceGlobal('navigator', {
+        clipboard: {
+            writeText: async (value: string) => {
+                copiedText = value;
+            },
+        },
+    });
+    const restoreDocument = replaceGlobal('document', {
+        body: {
+            appendChild: () => undefined,
+            removeChild: () => undefined,
+        },
+    });
+
+    try {
+        const result = await openSissPrescrizione('rssmra85t10a562s');
+
+        assert.equal(copiedText, 'RSSMRA85T10A562S');
+        assert.equal(popup.location.href, 'https://operatorisiss.servizirl.it/prescrittivoRegionale/pages/dashboard');
+        assert.deepEqual(result, {
+            success: true,
+            opened: true,
+            message: 'CF "RSSMRA85T10A562S" copiato! Incollalo nel Prescrittivo Regionale (PRREG) (Cmd+V).',
         });
     } finally {
         restoreDocument();
@@ -158,7 +196,7 @@ test('completeSissPortalHandoff reports blocked popup when pre-open fails', asyn
 
     try {
         const result = await completeSissPortalHandoff({
-            handoffUrl: 'https://operatorisiss.servizirl.it/prescrizione/',
+            handoffUrl: 'https://operatorisiss.servizirl.it/prescrittivoRegionale/pages/dashboard',
         });
 
         assert.deepEqual(result, {
@@ -246,14 +284,14 @@ test('completeSissPortalHandoff skips clipboard writes when the document is not 
 
     try {
         const result = await completeSissPortalHandoff({
-            handoffUrl: 'https://operatorisiss.servizirl.it/prescrizione/',
+            handoffUrl: 'https://operatorisiss.servizirl.it/prescrittivoRegionale/pages/dashboard',
             clipboardText: 'rssmra85t10a562s',
             popupWindow: popup as unknown as Window,
         });
 
         assert.equal(writeCalls, 0);
         assert.equal(capturedErrors.calls.length, 0);
-        assert.equal(popup.location.href, 'https://operatorisiss.servizirl.it/prescrizione/');
+        assert.equal(popup.location.href, 'https://operatorisiss.servizirl.it/prescrittivoRegionale/pages/dashboard');
         assert.equal(popup.focusCalls, 1);
         assert.deepEqual(result, {
             success: false,

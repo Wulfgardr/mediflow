@@ -24,7 +24,7 @@ type FormState = {
 const MODULE_OPTIONS = [
     { action: 'registry.lookup', label: 'Anagrafe' },
     { action: 'fse.lookup', label: 'FSE' },
-    { action: 'prescription.create', label: 'Modulo prescrittivo' },
+    { action: 'prescription.create', label: 'Prescrittivo Regionale (PRREG)' },
     { action: 'prosthetics.open', label: 'Protesica-RL' },
     { action: 'menu.open', label: 'Menu SISS' },
 ];

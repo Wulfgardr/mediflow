@@ -70,8 +70,8 @@ type SessionStatusState = {
 const ACTIONS: ContextActionConfig[] = [
     {
         action: 'prescription.create',
-        label: 'Modulo prescrittivo',
-        caption: 'Apri il portale ufficiale del Modulo Prescrittivo Regionale con il CF pronto da incollare.',
+        label: 'Prescrittivo Regionale (PRREG)',
+        caption: 'Apri il portale ufficiale del Prescrittivo Regionale (PRREG) con il CF pronto da incollare.',
         icon: ExternalLink,
     },
     {
