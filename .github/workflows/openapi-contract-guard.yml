@@ -1,4 +1,4 @@
-name: OpenAPI Contract Guard
+name: Repository Guards
 
 on:
   pull_request:
@@ -6,8 +6,11 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
-  contract-guard:
+  repository-guards:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -17,5 +20,17 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
-      - run: npm run check:openapi:drift -- --base-ref origin/main
+      - name: Install dependencies
+        id: install
+        run: npm ci
+      - name: Claims guard and self-test
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run check:claims
+          npm run check:claims -- --self-test
+      - name: Never-regress guard
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run check:never-regress
+      - name: OpenAPI contract guard
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run check:openapi:drift -- --base-ref origin/main
