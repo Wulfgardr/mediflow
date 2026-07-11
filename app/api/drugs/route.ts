@@ -7,16 +7,8 @@ import { asc, sql } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import { sortDrugCatalogSearchResults } from '@/lib/domain/documents/patient-smart-import-matching';
-
 /* @Codex */
-function normalizeDrugSearchTokens(value: string): string[] {
-    return [...new Set(value.normalize('NFKC').trim().split(/\s+/).filter(Boolean))];
-}
-
-/* @Codex */
-function escapeLikeToken(value: string): string {
-    return value.replace(/[\\%_]/g, '\\$&');
-}
+import { buildDrugSearchPredicate } from '@/lib/drug-search-query';
 
 export async function GET(request: Request) {
     /* @Codex */
@@ -41,22 +33,8 @@ export async function GET(request: Request) {
 
         if (query) {
             /* @Codex */
-            const tokens = normalizeDrugSearchTokens(query);
-            const escapedTokens = JSON.stringify(tokens.map(escapeLikeToken));
-            const tokenPredicate = sql`
-                NOT EXISTS (
-                    SELECT 1
-                    FROM json_each(${escapedTokens}) AS search_token
-                    WHERE NOT (
-                        coalesce(${drugs.name}, '') LIKE '%' || search_token.value || '%' ESCAPE ${'\\'}
-                        OR coalesce(${drugs.activePrinciple}, '') LIKE '%' || search_token.value || '%' ESCAPE ${'\\'}
-                        OR coalesce(${drugs.packaging}, '') LIKE '%' || search_token.value || '%' ESCAPE ${'\\'}
-                        OR coalesce(${drugs.aic}, '') LIKE '%' || search_token.value || '%' ESCAPE ${'\\'}
-                    )
-                )
-            `;
             const results = await dbServer.select().from(drugs)
-                .where(tokenPredicate)
+                .where(buildDrugSearchPredicate(query))
                 .orderBy(asc(drugs.name), asc(drugs.packaging))
                 .limit(250);
             const normalizedResults: AifaDrug[] = results.map((item) => ({
