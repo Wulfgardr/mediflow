@@ -178,6 +178,8 @@ async function main() {
     const unrelatedFile = path.join(backupDir, 'operator-note.txt');
     fs.writeFileSync(staleArtifact, 'stale artifact');
     fs.writeFileSync(staleTemp, 'stale temp');
+    const staleTempAt = new Date(Date.now() - (16 * 60 * 1000));
+    fs.utimesSync(staleTemp, staleTempAt, staleTempAt);
     fs.writeFileSync(unrelatedFile, 'do not delete');
 
     const schedulerResult = timed('scheduledExportAndRetentionMs', timings, () => JSON.parse(command(

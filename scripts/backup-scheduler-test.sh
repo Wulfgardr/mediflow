@@ -36,6 +36,10 @@ NODE
 
 printf 'old artifact' > "$OUT_DIR/mediflow-backup-v1-2026-03-17T00-00-00.000Z.mediflow"
 printf 'orphan temp' > "$OUT_DIR/mediflow-backup-v1-2026-03-17T00-00-00.000Z.mediflow.tmp"
+touch -t 202001010000 "$OUT_DIR/mediflow-backup-v1-2026-03-17T00-00-00.000Z.mediflow.tmp"
+printf 'recent temp' > "$OUT_DIR/mediflow-backup-v1-current.mediflow.tmp"
+printf 'stale lock' > "$OUT_DIR/.mediflow-backup.lock"
+touch -t 202001010000 "$OUT_DIR/.mediflow-backup.lock"
 printf 'keep me' > "$OUT_DIR/notes.txt"
 
 MEDIFLOW_DATA_DIR="$DATA_DIR" \
@@ -60,6 +64,12 @@ if (fs.existsSync(path.join(path.dirname(result.artifactPath), 'mediflow-backup-
 }
 if (fs.existsSync(path.join(path.dirname(result.artifactPath), 'mediflow-backup-v1-2026-03-17T00-00-00.000Z.mediflow.tmp'))) {
   throw new Error('Retention did not remove the orphan temp file.');
+}
+if (!fs.existsSync(path.join(path.dirname(result.artifactPath), 'mediflow-backup-v1-current.mediflow.tmp'))) {
+  throw new Error('Retention removed a recent temp file.');
+}
+if (fs.existsSync(path.join(path.dirname(result.artifactPath), '.mediflow-backup.lock'))) {
+  throw new Error('Runner did not recover and release a stale backup lock.');
 }
 if (!fs.existsSync(path.join(path.dirname(result.artifactPath), 'notes.txt'))) {
   throw new Error('Retention removed an unrelated file.');
