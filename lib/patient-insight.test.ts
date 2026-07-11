@@ -57,6 +57,19 @@ test('finalizePatientInsight keeps partially supported insight instead of generi
     assert.match(diagnostics.limitsMarkdown, /claim non hanno supporto diretto sufficiente/i);
 });
 
+test('patient insight fallback removes uppercase think artifacts', () => {
+    const output = finalizePatientInsight({
+        content: [
+            '<THINK>Ragionamento interno da non mostrare</THINK>',
+            '**Quadro attuale:** BPCO codificata e stabile [S1]',
+        ].join('\n'),
+        sourceRefs,
+    });
+
+    assert.doesNotMatch(output, /think|ragionamento interno/i);
+    assert.match(output, /BPCO codificata e stabile/);
+});
+
 test('finalizePatientInsight falls back when no claim has direct support', () => {
     const output = finalizePatientInsight({
         content: [

@@ -1,5 +1,6 @@
 /* @Codex */
 import { filterServicePrescriptionTherapyCandidates, isServicePrescriptionLikeTherapy } from './prescription-boundary';
+import { stripModelArtifacts } from './model-artifacts';
 
 /* @Codex */
 export const AI_TASK_EXTRACTION_SCHEMA_VERSION = 'mediflow.ai.extract.v1';
@@ -144,15 +145,6 @@ const MAX_INSIGHT_CLAIM_CHARS = 220;
 const MAX_SMART_IMPORT_TEXT_CHARS = 220;
 const MAX_DOCUMENT_SUMMARY_CHARS = 700;
 const MAX_DOCUMENT_MEDICATION_CHARS = 180;
-
-function stripModelArtifacts(content: string): string {
-    return content
-        .replace(/<unused94>[\s\S]*?(<unused95>|$)/g, '')
-        .replace(/<think>[\s\S]*?<\/think>/gi, '')
-        .replace(/^Plan:\s*/gim, '')
-        .replace(/\r/g, '')
-        .trim();
-}
 
 function normalizeCompactText(value: unknown, maxChars: number): string {
     if (typeof value !== 'string') return '';
