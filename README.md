@@ -148,10 +148,15 @@ Il dettaglio completo è nel [CHANGELOG](./CHANGELOG.md).
 MediFlow non vuole raccontare più di quanto possa dimostrare.
 
 - **Nessun cloud obbligatorio**: il default resta locale.
-- **Nessuna app iPad/iPhone dichiarata come già completa**: la direzione multi-device esiste, ma il perimetro operativo attuale è `home-base + paired client`, con approccio read-only-first, cache cifrata e write online limitati a profilo/status, diario, terapie, checkup e osservazioni.
+- **Nessuna app iPad/iPhone dichiarata come già completa**: il perimetro operativo è `home-base + paired client`; lifecycle paziente, moduli clinici non-AI, cataloghi, prestazioni/protesica e upload documentale manuale hanno workflow online governati, mentre cache offline, click-map UI e superfici document-derived restano parziali o host-only.
 - **Nessuna parity Windows/Linux dichiarata oggi**: la 0.7.2 prova il core tri-OS e il runtime di base, non app complete su ogni piattaforma.
 - **Nessuna integrazione SISS/FSE certificata dichiarata senza prove**: il percorso attuale è contestuale e `webapp-assisted`, usando i canali ufficiali; MediFlow non dichiara sincronizzazione FSE, writeback regionale o invio prescrittivo diretto.
 - **Nessuna delega cieca all'AI**: l'AI locale può aiutare, ma non sostituisce revisione, giudizio clinico e responsabilità professionale.
+
+La fotografia post-Wave 5 è versionata in
+[docs/parity-matrix.md](./docs/parity-matrix.md): 30 delle 43 capability per cui
+la parity è un obiettivo sono complete; 13 restano parziali e 21 ulteriori
+capability sono intenzionalmente host-only.
 
 ## Perché open source
 

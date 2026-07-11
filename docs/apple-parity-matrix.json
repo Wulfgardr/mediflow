@@ -76,7 +76,7 @@
       "area": "terapie",
       "feature": "Gestione terapie farmacologiche (CRUD + stato + collegamento diagnosi)",
       "web": "add/edit/soft-delete/status transition, autocomplete AIFA, principio attivo, posologia, collegamento diagnosi, campi AIC/ATC (components/therapy-manager.tsx)",
-      "native": "partial: CRUD+soft-delete+stato+collegamento diagnosi+export testo+campi AIC/ATC in create/edit/dettaglio. Residuo: catalogo AIFA con autocomplete e validazione prontuario (W2 boundary drugs)",
+      "native": "partial: CRUD+soft-delete+stato+campi AIC/ATC/principio attivo, autocomplete AIFA e fallback manuale onesto. Residuo: equivalenza completa del collegamento diagnosi e validazione manuale P6 della flessibilita del form",
       "boundary": "partial: GET/POST/PUT therapies; manca DELETE (write-therapies esclude hard delete/AI/document-derived)",
       "gap": "partial",
       "wave": "W1-mobile-core",
@@ -166,9 +166,9 @@
       "area": "documenti",
       "feature": "Smart Import (candidati diagnosi/terapie da documenti, applica in scheda)",
       "web": "analisi AI candidati ICD-11/AIFA, select/edit/scarta, preview resolver, applica scrittura, kill switch AI_SMART_IMPORT (components/patient-smart-import-panel.tsx)",
-      "native": "missing: nessuna superficie Smart Import lato Apple",
-      "boundary": "missing: document-derived/AI writes esclusi dalle capability",
-      "gap": "missing-both",
+      "native": "host-only per la policy corrente: nessuna superficie Smart Import lato Apple; WUL-409 resta una lane review-first separata, non un requisito automatico di parity",
+      "boundary": "host-only: ADR 0076 esclude scritture document-derived/AI dal client paired finche una nuova decisione non ne ridefinisce il boundary",
+      "gap": "host-only",
       "wave": "W5-ai-avanzate",
       "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; native-ui.documenti"
     },
@@ -576,9 +576,9 @@
       "area": "AI conversazionale",
       "feature": "POST /api/proxy/ai/chat (proxy invocazione modello AI per chat), distinto da /api/conversations e /api/messages (CRUD storico)",
       "web": "app/api/proxy/ai/chat/route.ts — endpoint proxy che inoltra la richiesta di generazione al runtime AI configurato (Ollama/MLX/cloud); /api/conversations e /api/messages gestiscono solo persistenza CRUD dello storico, non l'invocazione del modello",
-      "native": "missing — nessun riferimento a proxy/ai/chat nel codice nativo; il client Apple non ha superficie per invocare la generazione AI stessa (solo eventuale lettura storico se già coperta altrove)",
-      "boundary": "missing — non esiste sotto /api/v1/network; il proxy AI chat non è raggiungibile dal client paired tramite boundary consentito",
-      "gap": "missing-both",
+      "native": "host-only per la policy corrente: il client Apple non invoca la generazione AI e puo al massimo leggere output gia persistiti nelle superfici consentite",
+      "boundary": "host-only: il proxy AI chat non appartiene a /api/v1/network e ADR 0076 esclude l'invocazione AI paired",
+      "gap": "host-only",
       "wave": "W5-ai-avanzate",
       "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; app/api/proxy/ai/chat/route.ts vs app/api/conversations/route.ts, app/api/messages/route.ts"
     },
@@ -636,10 +636,10 @@
       "area": "Impostazioni AI",
       "feature": "/settings/ai (hub) — in realtà un semplice redirect a /settings/ai/modelli, non una vista distinta",
       "web": "app/settings/ai/page.tsx — 'export default function SettingsAiIndexPage() { redirect(\"/settings/ai/modelli\"); }' (commento: WUL-297, /settings/ai defaults to models surface); le viste reali sono /settings/ai/modelli e /settings/ai/funzioni",
-      "native": "n/a — non è un gap: non esiste una terza superficie UI da coprire, la riga 'ai-runtime' che copre modelli+funzioni è già esaustiva",
-      "boundary": "n/a",
-      "gap": "full-parity",
-      "wave": "W4-settings",
+      "native": "n/a — redirect e configurazione del runtime AI restano superfici del nodo Mac autorevole, non un target di parity del client paired",
+      "boundary": "host-only: nessun boundary paired richiesto per un redirect verso impostazioni AI locali",
+      "gap": "host-only",
+      "wave": "HOST-ONLY",
       "evidence": "app/settings/ai/page.tsx:1-5"
     }
   ],
@@ -648,10 +648,10 @@
   "version": 1,
   "summary": {
     "total": 64,
-    "fullParity": 31,
+    "fullParity": 30,
     "partial": 13,
-    "missing": 2,
-    "hostOnly": 18,
-    "openNonHost": 15
+    "missing": 0,
+    "hostOnly": 21,
+    "openNonHost": 13
   }
 }

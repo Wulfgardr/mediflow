@@ -382,8 +382,9 @@ Boundary attuale:
   `network.replica.write-checkups` e `checkups.version`
 - le osservazioni paired usano capability `network.replica.readonly-observations` /
   `network.replica.write-observations` e `observations.version`
-- hard delete remoto, attachment remoti, cataloghi, sync record-level,
-  campi AI/document-derived e fallback automatico restano fuori scope
+- hard delete remoto, PUT/DELETE paired degli allegati, sync record-level,
+  invocazione AI, campi document-derived e fallback automatico restano fuori;
+  cataloghi read-only e create manuale allegati sono disponibili
 
 ### Backup e restore artifact v1
 
@@ -651,10 +652,10 @@ sequenceDiagram
 
 ## ⚠️ Limitazioni attuali
 
-- `home-base` e ancora read-only-first: esistono solo i primi write versionati
-  per profilo/status paziente, diario clinico, terapie, checkup e osservazioni; hard delete
-  remoto, attachment remoti, cataloghi, sync record-level e
-  fallback automatico promotable restano fuori.
+- `home-base` resta read-only-first come autorita, ma include write versionati
+  su lifecycle paziente, moduli clinici, prestazioni/protesica e create manuale
+  degli allegati. Hard delete, curation document-derived, invocazione AI,
+  write offline e sync record-level restano fuori.
 - `documentInsights` resta un compat layer: il `document evidence ledger` ha
   ora una base runtime con artifact e prime ancore sezionali, ma i decision
   layer completi restano incrementali.
@@ -667,18 +668,19 @@ sequenceDiagram
   smoke web+native `PASS`, gap modulo-specifici chiusi, nessuna dichiarazione
   di UI parity piena della vecchia shell clinica. La prossima click-map
   capability-by-capability appartiene al filone Apple-native/home-base.
-- Il pairing multi-device e la UX iPhone/iPad sono ancora workstream aperti.
+- Il closeout parity e tracciato da `WUL-479`: click-map P6 (`WUL-401`), offline
+  degradato (`WUL-403`) e decisione documentale condizionata da ADR 0076.
 
 ---
 
 ## 🧭 Prossimi passi suggeriti
 
-1) Estendere la UX `home-base`: pairing guidato, replica governata e fallback
-   dichiarato senza rompere il local-first
+1) Eseguire la Wave 6/closeout definita in `docs/parity-matrix.md`, iniziando
+   dalla click-map P6 e dai residui UI realmente azionabili
 2) Portare altri consumer sul `parse/evidence artifact` prima di cambiare i
    contratti persistiti piu ampi
 3) Riavviare il filone native sul nuovo shell, non su quello storico; quando
    serve un riferimento visuale esterno, confrontarlo esplicitamente con
    OncoBackboneMac senza confonderlo con MediFlow
-4) Aprire i target iPhone/iPad coerenti con il boundary paired/read-only-first
-   e con i write paziente/diario/terapie/checkup/osservazioni limitati e versionati
+4) Rendere visibile TTL/freschezza della cache mobile senza introdurre write
+   offline o sync multi-master

@@ -1,117 +1,142 @@
-# Matrice Parity Web <-> macOS (Core)
-
-Stato documento: CANONICAL (parity operativa web/native)  
-Ultimo aggiornamento: 2026-06-16
-
+---
+summary: "Canonical feature-parity status between the localhost web app and the universal Apple client."
+read_when:
+  - "Planning or reviewing macOS, iPhone, or iPad parity work."
+  - "Checking which localhost capabilities are full, partial, host-only, or policy-gated."
 ---
 
-## 🎯 Obiettivo vincolante
+# Matrice parity localhost ↔ client Apple
 
-Nei moduli core, web app e app macOS devono avere:
+Stato documento: `CANONICAL`
+Ultimo aggiornamento: 2026-07-11 (`WUL-479`, post-Wave 5)
 
-1. le stesse funzioni
-2. gli stessi campi clinici rilevanti
-3. la stessa flessibilita operativa
-4. capacita di lavorare in modo indipendente (stesso DB condiviso, nessun storage duplicato)
+## Perimetro
 
-Riferimenti:
-- [docs/adr/0005-web-native-functional-parity.md](./adr/0005-web-native-functional-parity.md)
-- [docs/adr/0008-web-first-with-parity-sweeps.md](./adr/0008-web-first-with-parity-sweeps.md)
-- [docs/adr/0009-native-testing-strategy-xcode-xctest.md](./adr/0009-native-testing-strategy-xcode-xctest.md)
+Questa matrice confronta:
 
-## ⚙️ Cadenza operativa
+- **localhost**: la web app locale sul Mac, superficie clinica di riferimento;
+- **macOS**: il bundle Apple/home-base con shell clinica condivisa;
+- **iPhone/iPad**: client paired sul boundary `/api/v1/network/*`.
 
-- Modalita ordinaria: `web-first` (sviluppo principale sulla web app).
-- Modalita convergenza: `parity sweep` dedicati su macOS.
-- Regola: il gap puo esistere temporaneamente, ma deve essere tracciato qui e chiuso nelle wave di parity.
+La fonte machine-readable è
+[docs/apple-parity-matrix.json](./apple-parity-matrix.json). Il manifest
+[docs/apple-wide-qa-manifest.json](./apple-wide-qa-manifest.json) verifica invece
+24 acceptance record tecnici e i contratti di rete: una capability QA
+`covered` non equivale automaticamente a feature parity completa.
 
-## 📚 Legenda
+Riferimenti architetturali:
 
-| Stato | Significato |
-| --- | --- |
-| `FULL` | allineato |
-| `PARTIAL` | parzialmente allineato |
-| `MISSING` | assente |
+- [ADR 0005](./adr/0005-web-native-functional-parity.md)
+- [ADR 0008](./adr/0008-web-first-with-parity-sweeps.md)
+- [ADR 0048](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md)
+- [ADR 0076](./adr/0076-paired-document-domain-write-policy.md)
 
----
+## Fotografia post-Wave 5
 
-## 🧩 Baseline corrente (frozen native snapshot)
+| Classe | Righe | Significato |
+| --- | ---: | --- |
+| `full-parity` | 30 | Il workflow equivalente è disponibile sulle superfici target previste. |
+| `partial` | 13 | Esiste una superficie utile, ma manca equivalenza di funzione, campo, flessibilità o verifica manuale. |
+| `missing-both` | 0 | Nessuna capability resta priva sia di boundary sia di UI senza una decisione esplicita. |
+| `host-only` | 21 | La funzione resta sul Mac/localhost per autorità, filesystem, runtime AI o policy. |
+| **Totale** | **64** | Capability censite. |
 
-> [!NOTE]
-> Snapshot legacy congelato: nessun modulo core e ancora `FULL` e la click-map
-> manuale `P6` non e stata eseguita. La promessa Apple-wide si verifica nella
-> matrice separata, non in questa tabella.
+Escludendo le 21 righe intenzionalmente host-only, 30 capability su 43 sono
+`full-parity` (**70%**); 13 su 43 restano parziali (**30%**). Sul totale
+grezzo, le righe full sono 30/64 (**47%**).
 
-Il run strict `WUL-21` del 2026-05-02 ha validato la lane automatizzata
-web+native (`web 2/2`, Xcode native `45/45`), ma non cambia gli stati modulo:
-la click-map manuale `P6` non e stata eseguita e nessun modulo core e ancora
-`FULL`. Le esenzioni in create/edit paziente risultano code-satisfied in
-`WUL-22`, la semantica delete del diario e stata riallineata in `WUL-24`, le
-osservazioni native LOINC/UCUM risultano code-satisfied in `WUL-23` e i
-cataloghi farmaci/esenzioni sono ora operabili da Settings macOS in `WUL-25`.
-La parita campi/flex delle terapie native e code-satisfied in `WUL-76`.
-La parita campi/flex dei checkups/appuntamenti nativi e code-satisfied in
-`WUL-77`.
+Questi numeri non autorizzano il claim “parity completa”: la click-map manuale
+P6 del bundle macOS è ancora aperta in `WUL-401`.
 
-Il closeout `WUL-26` del 2026-05-02 ha rieseguito lo strict smoke automatizzato
-post-moduli con esito `PASS` (`web PASS`, `native xcode PASS`) in
-`tmp-parity-smoke/wul-26-20260502-post-module-closeout-rerun/summary.md` (private).
-Questo chiude la track legacy come evidenza documentale/code-satisfied, non come
-dichiarazione di UI parity piena del vecchio bundle macOS. Il primo slice
-`WUL-192` sposta l'entrypoint compilato su Apple Foundation/home-base e aggiunge
-osservabilita runtime, supervisione app-managed di backend/proxy e packaging
-firmabile; non riapre la vecchia shell clinica come UI ufficiale. La verifica
-capability-by-capability Apple-wide parte da
+## Stato per area
 
-| Modulo core | Contratto `/api/v1` | Web UI | macOS UI | Parity campi | Parity flessibilita | Indipendenza macOS | Stato |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Pazienti | FULL (GET/POST/PUT/DELETE) | FULL | PARTIAL (view/add/edit/delete/archive/search/sort + filtri stato + esenzioni create/edit code-satisfied) | PARTIAL (click-map P6 non ancora eseguita) | FULL | FULL | PARTIAL |
-| Diario clinico (entries) | FULL | PARTIAL (add + soft-delete/restore) | FULL (add/edit/soft-delete/restore + filtri eliminati) | PARTIAL | PARTIAL | FULL | PARTIAL |
-| Terapie | FULL | FULL | FULL (CRUD + AIFA/manuale, principio attivo, motivazione, indicazione, date/stato) | PARTIAL (click-map P6 non ancora eseguita) | FULL | FULL | PARTIAL |
-| Appuntamenti (checkups) | FULL | PARTIAL (form paziente con date/title/notes/status/source manuale) | FULL (CRUD + note operative, status, source manuale, metadata contratto) | PARTIAL (click-map P6 non ancora eseguita) | FULL | FULL | PARTIAL |
-| Farmaci (catalogo/search) | FULL | FULL (search + import/clear) | FULL (search + status/import JSON/clear in Settings) | PARTIAL (click-map P6 non ancora eseguita) | FULL | FULL | PARTIAL |
-| Esenzioni (catalogo + patient mapping) | FULL | FULL | FULL (patient mapping create/edit + status/import JSON/clear in Settings) | PARTIAL (click-map P6 non ancora eseguita) | FULL | FULL | PARTIAL |
+| Area | Stato | Cosa è già disponibile | Residuo reale |
+| --- | --- | --- | --- |
+| Pazienti | `PARTIAL` | lista, ricerca, dettaglio, create/update, archivio, cestino e ripristino | operazioni bulk non esposte e click-map P6 |
+| Diario | `PARTIAL` | CRUD versionato, restore, filtri, S/O/A/P, rich text, allegati e bozza visita deterministica | equivalenza completa allegati/editor e verifica P6 |
+| Terapie | `PARTIAL` | CRUD, stato, AIC/ATC/principio attivo, autocomplete AIFA e fallback manuale | collegamento diagnosi e flessibilità del form da verificare |
+| Checkup | `PARTIAL` | CRUD, status/source, conflitti versione | equivalenza campi/flussi e P6 |
+| Osservazioni | `PARTIAL` | CRUD LOINC/UCUM e trend | equivalenza visuale/flessibilità e P6 |
+| Cataloghi AIFA/esenzioni | `FULL` per lookup | ricerca AIFA ed esenzioni dal boundary paired | import/clear repertori resta host-only |
+| Prestazioni e protesica | `FULL` nel perimetro paired | read/write versionati e UI nativa | nessun invio regionale o generazione NRE |
+| Export FHIR/FSE pre-check | `FULL` nel perimetro locale | bundle on-device e validazione boundary | nessun writeback FSE |
+| Viste globali | `MIXED` | agenda, diario globale e analytics di popolazione | shell/deep-link e cockpit sintetico restano partial |
+| Documenti | `PARTIAL` e policy-limited | upload manuale cifrato, archivio, insight read-only, follow-up e allegati nel diario | OCR/curation/document-derived write richiedono policy dedicata |
+| Offline mobile | `PARTIAL` | cache cifrata derivata e stato degradato read-only | TTL/freschezza visibili e riconciliazione onesta (`WUL-403`) |
+| AI generativa | `HOST-ONLY` | stato runtime/kill switch leggibile | nessuna invocazione AI paired per ADR 0076 |
+| Backup, diagnostica, repertori, update | `HOST-ONLY` | gestiti dal nodo Mac autorevole | non sono gap di parity client |
 
-### Runtime home-base Apple
+## Wave completate
 
-`WUL-192` introduce una prima superficie osservabile nel bundle macOS:
+1. **Wave 1 — core mobile**: diario, rich text, scale, terapie, report e cockpit.
+2. **Wave 2 — boundary paired**: lifecycle paziente, cataloghi, prestazioni,
+   protesica, FHIR, terminologie, discovery e revision guard.
+3. **Wave 3 — viste globali**: agenda, diario globale, analytics e shell clinica.
+4. **Wave 4 — settings e chiavi**: ambulatori, profilo, aspetto, privacy,
+   session lock e cambio PIN.
+5. **Wave 5 — documenti e superfici AI-adiacenti**: allegati manuali, archivio,
+   rich text, bozza visita deterministica, insight/follow-up read-only e stato AI.
+   Consegnata con [PR #16](https://github.com/Wulfgardr/mediflow/pull/16) e
+   follow-up [PR #17](https://github.com/Wulfgardr/mediflow/pull/17).
 
-- finestra primaria Apple Foundation/home-base invece del prototipo oncologico;
-- pannello runtime con config nativa, presenza token, PID backend/proxy,
-  modalita rete, fingerprint TLS e start/stop esplicito di backend web
-  production + proxy TLS inclusi nel bundle, con stop bounded/escalation;
-- health diagnostico read-only per Ollama e Docker/ICD se gia attivi, senza
-  installazione, avvio, arresto o supervisione app-managed.
+Wave 5 è una tranche consegnata, non la chiusura della parity complessiva.
 
-Questa non modifica gli stati dei moduli core nella tabella legacy: e la base
-per la track Apple-wide successiva, non una nuova certificazione di parity UI.
+## Wave 6 / closeout proposto
 
-## 🧪 QA Apple-wide (WUL-194)
+### W6-A — convergenza UI macOS e click-map P6
 
-La matrice legacy sopra resta la fonte per il vecchio confronto web/macOS core.
-Dal momento in cui il bundle macOS usa la shell Apple/home-base, la promessa
-Apple-wide si verifica invece con una matrice separata:
+Owner: `WUL-401`.
 
-La matrice Apple-wide distingue esplicitamente capability `covered` con
-comando/runbook ripetibile, gap `WUL-193` per CRUD UI mobile e cache/offline, e
-click-map `WUL-194` coperto sulle superfici oggi disponibili: macOS home-base
-shell, smoke mobile paired e write paired non-AI.
+Copre otto residui: pazienti, diario base, editor rich text, terapie, checkup,
+osservazioni, cockpit e shell/deep-link. L’uscita richiede una click-map manuale
+reale sul bundle home-base; i probe automatici non bastano.
 
-> [!IMPORTANT]
-> Nessuna riga `covered` nella matrice Apple-wide equivale da sola a parity
-> piena del prodotto.
+### W6-B — offline degradato onesto
 
-## ⚠️ Gap principali da chiudere
+Owner: `WUL-403`.
 
-1. Nessun gap modulo-specifico legacy resta aperto nella track `WUL-75`: pazienti, esenzioni, osservazioni, diario, cataloghi, terapie e checkups sono code-satisfied sui rispettivi thin slice.
-2. La parity UI piena non va dichiarata sul bundle macOS corrente finche l'entrypoint compilato non torna a una shell clinica MediFlow. Questo lavoro passa alla track Apple-native/home-base (`WUL-187`/`WUL-194`).
+Rende visibili età/TTL della cache, stato stale, read-only e assenza di write
+queue. Non introduce sync multi-master né scritture offline.
 
-## ✅ Regole di uscita (parity gate)
+### W6-C — decisione sul workflow documentale nativo
 
-Un modulo core e considerato `FULL` solo se:
+Dipendenze: `WUL-417` (OCR Apple on-device), `WUL-383` (degradazione OCR) e
+`WUL-409` (Smart Import review-first).
 
-1. funzioni `view/add/edit/delete/filter` equivalenti nei due client
-2. campi principali equivalenti in create/edit/detail
-3. filtri/stati/ricerca/ordinamento equivalenti
-4. workflow completabile end-to-end su entrambi i client
-5. nessuna deviazione dati (stesso schema SQLite e stesso contratto `/api/v1`)
+Copre quattro residui partial: nuova voce avanzata, OCR/sintesi dell’archivio,
+curation degli insight e wizard nuova scheda da documento. Prima di estendere
+scritture document-derived o invocazione AI paired serve una nuova decisione
+che aggiorni ADR 0076. In sua assenza, queste superfici restano read-only o
+host-assisted.
+
+### Fuori Wave 6
+
+- chat/generazione AI paired;
+- gestione modelli, backup, diagnostica e import repertori dal client;
+- hard delete remoto;
+- writeback SISS/FSE;
+- coda di scrittura offline o sync multi-master;
+- parity applicativa Windows/Linux.
+
+Il catalogo AIFA nativo non è un residuo: autocomplete, AIC/ATC e fallback
+manuale sono già presenti; `WUL-476` è assorbita dallo stato corrente.
+
+## Gate di uscita
+
+Una capability può diventare `full-parity` solo con:
+
+1. funzioni equivalenti nel perimetro dichiarato;
+2. stessi campi clinici significativi;
+3. equivalente ricerca, filtri, stati e gestione conflitti;
+4. workflow completabile end-to-end;
+5. test o runbook ripetibile;
+6. click-map manuale quando la promessa riguarda l’esperienza UI;
+7. nessuna violazione dei boundary local-first, zero-knowledge o review-first.
+
+## Verifica
+
+```bash
+npm run check:apple-wide-qa
+npm run check:claims
+npm run check:never-regress
+```
