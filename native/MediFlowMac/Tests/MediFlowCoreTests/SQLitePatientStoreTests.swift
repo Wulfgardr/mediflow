@@ -52,6 +52,13 @@ final class SQLitePatientStoreTests: XCTestCase {
         XCTAssertEqual(diagnoses.first?.system, "ICD-10")
     }
 
+    /* @Codex */
+    func testLoadRawPatientDetailPreservesCiphertext() throws {
+        let raw = try XCTUnwrap(try SQLitePatientStore(path: fixturePath()).loadRawPatientDetail(id: "fixture-1"))
+        XCTAssertTrue(raw.address?.hasPrefix(CryptoService.encPrefix) == true)
+        XCTAssertEqual(PatientFieldCrypto.decryptStringField(raw.address, masterKey: masterKey), "Via Roma 1, Milano")
+    }
+
     func testLoadPatientDetailMissingIdReturnsNil() throws {
         let store = SQLitePatientStore(path: fixturePath())
         XCTAssertNil(try store.loadPatientDetail(id: "does-not-exist", masterKey: masterKey))

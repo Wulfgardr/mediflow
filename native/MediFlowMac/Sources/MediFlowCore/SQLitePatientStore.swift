@@ -102,12 +102,24 @@ public struct SQLitePatientStore {
         }
     }
 
-    /// One patient's full detail with the ENCRYPTED_FIELDS decrypted by the operator
-    /// master key. nil when the id is absent, soft-deleted, or (when a scope is given)
-    /// the patient is not a member of it - 1:1 with getNetworkScopedPatient's membership
-    /// scope. Reuses PatientFieldCrypto so decryption stays byte-identical with the web.
+    /// Raw patient detail with ENC fields untouched, matching the HomeBase HTTP wire.
+    /* @Codex */
+    public func loadRawPatientDetail(
+        id: String, scopeAmbulatoryId: String? = nil
+    ) throws -> HomeBasePatientDetail? {
+        try loadPatientDetailRow(id: id, scopeAmbulatoryId: scopeAmbulatoryId)
+    }
+
+    /// Decrypted convenience retained for direct core consumers and tests.
     public func loadPatientDetail(
         id: String, scopeAmbulatoryId: String? = nil, masterKey: SymmetricKey
+    ) throws -> HomeBasePatientDetail? {
+        guard let raw = try loadPatientDetailRow(id: id, scopeAmbulatoryId: scopeAmbulatoryId) else { return nil }
+        return PatientFieldCrypto.decryptDetail(raw, masterKey: masterKey)
+    }
+
+    private func loadPatientDetailRow(
+        id: String, scopeAmbulatoryId: String?
     ) throws -> HomeBasePatientDetail? {
         let db = try SQLiteConnection(readOnlyPath: path)
         try db.assertSchema(table: "patients", requiredColumns: Self.patientRequiredColumns)
@@ -135,8 +147,7 @@ public struct SQLitePatientStore {
                 createdAt: row.date(13), updatedAt: row.date(14),
                 deletedAt: row.date(21), deletionReason: row.text(22))
         }
-        guard let raw = rows.first else { return nil }
-        return PatientFieldCrypto.decryptDetail(raw, masterKey: masterKey)
+        return rows.first
     }
 
     // MARK: Write path (reversed flow: the core is the on-device write authority)

@@ -11,8 +11,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app = XCUIApplication()
     }
 
-    private func launch(seedPatients: Bool = false, section: String? = nil) {
+    private func launch(seedPatients: Bool = false, lockedPatientFields: Bool = false, section: String? = nil) {
         if seedPatients { app.launchEnvironment["MEDIFLOW_APPLE_UITEST_PATIENTS"] = "1" }
+        if lockedPatientFields { app.launchEnvironment["MEDIFLOW_APPLE_UITEST_LOCKED_PATIENT_FIELDS"] = "1" }
         if let section { app.launchEnvironment["MEDIFLOW_APPLE_INITIAL_SECTION"] = section }
         app.launch()
     }
@@ -244,6 +245,20 @@ final class MediFlowMobileAppUITests: XCTestCase {
         // The detail re-renders with the new address; the form is dismissed.
         XCTAssertTrue(app.staticTexts["Via Nuova 5"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Via Roma 1, Milano"].waitForNonExistence(timeout: 3))
+    }
+
+    func testEditPatientFormDisablesLockedFieldWithoutShowingCiphertext() {
+        launch(seedPatients: true, lockedPatientFields: true, section: "modules")
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
+        app.buttons["patient-cell-uitest-1"].tap()
+        XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 10))
+
+        app.buttons["edit-patient-button"].tap()
+        let address = app.textFields["edit-patient-address"]
+        XCTAssertTrue(address.waitForExistence(timeout: 5))
+        XCTAssertFalse(address.isEnabled)
+        XCTAssertTrue(sectionView("edit-patient-locked-fields-message").exists)
+        XCTAssertFalse(app.staticTexts["ENC:locked:uitest"].exists)
     }
 
     func testEditPatientFormArchivesPatient() {
