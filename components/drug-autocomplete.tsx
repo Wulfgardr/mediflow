@@ -83,7 +83,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
     }, [wrapperRef]);
 
     const handleSelect = (drug: AifaDrug) => {
-        commitDrugAutocompleteQueryChange(drugSearch, setQuery, drug.name); // @Codex WUL-488
+        commitDrugAutocompleteQueryChange(drugSearch, setQuery, drug.name, () => setIsLoading(false)); // @Codex WUL-488
         setIsOpen(false);
         setActiveIndex(-1);
         onSelect(drug);
