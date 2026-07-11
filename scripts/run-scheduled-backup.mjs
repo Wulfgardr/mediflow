@@ -15,6 +15,10 @@ const DEFAULT_BACKUP_RETENTION_KEEP_ARTIFACTS = 14;
 const BACKUP_ARTIFACT_FILE_PREFIX = 'mediflow-backup-v1-';
 const BACKUP_ARTIFACT_FILE_SUFFIX = '.mediflow';
 const BACKUP_ARTIFACT_TEMP_SUFFIX = '.mediflow.tmp';
+const BACKUP_LOCK_FILE_NAME = '.mediflow-backup.lock';
+const BACKUP_LOCK_STALE_MS = 6 * 60 * 60 * 1000;
+const BACKUP_TEMP_MIN_AGE_MS = 15 * 60 * 1000;
+const PATIENT_AMBULATORY_TABLE = 'patients_to_ambulatories';
 
 /* @Codex */
 const BACKUP_TABLES = {
@@ -35,7 +39,6 @@ const BACKUP_TABLES = {
   checkups: 'checkups',
   therapies: 'therapies',
 };
-const BACKUP_COLLECTIONS = Object.keys(BACKUP_TABLES);
 
 function getDefaultDataDir() {
   return process.env.MEDIFLOW_DATA_DIR
@@ -120,7 +123,7 @@ async function serializeBackupArtifact(payload, createdAt = new Date()) {
   const payloadSnapshot = normalizeJson(payload);
   const checksum = await sha256Hex(stableStringify(payloadSnapshot));
   const recordCounts = Object.fromEntries(
-    BACKUP_COLLECTIONS.map((collection) => [collection, payload[collection]?.length ?? 0]),
+    Object.keys(BACKUP_TABLES).map((collection) => [collection, payload[collection]?.length ?? 0]),
   );
   const artifact = {
     format: BACKUP_ARTIFACT_FORMAT,
@@ -130,7 +133,7 @@ async function serializeBackupArtifact(payload, createdAt = new Date()) {
       createdAt: createdAt.toISOString(),
       checksumAlgorithm: 'sha256',
       checksum,
-      collections: BACKUP_COLLECTIONS,
+      collections: Object.keys(BACKUP_TABLES),
       recordCounts,
     },
     payload,
@@ -173,8 +176,48 @@ function listManagedBackupFiles(destinationDir) {
   });
 }
 
+function isRecentTemp(file, nowMs = Date.now()) {
+  return file.kind === 'temp' && nowMs - file.modifiedAtMs < BACKUP_TEMP_MIN_AGE_MS;
+}
+
+function isBackupLockActive(destinationDir, nowMs = Date.now()) {
+  const lockPath = path.join(destinationDir, BACKUP_LOCK_FILE_NAME);
+  try {
+    return nowMs - fs.statSync(lockPath).mtimeMs < BACKUP_LOCK_STALE_MS;
+  } catch {
+    return false;
+  }
+}
+
+function acquireBackupLock(destinationDir) {
+  const lockPath = path.join(destinationDir, BACKUP_LOCK_FILE_NAME);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const descriptor = fs.openSync(lockPath, 'wx');
+      try {
+        fs.writeFileSync(descriptor, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
+      } finally {
+        fs.closeSync(descriptor);
+      }
+      return lockPath;
+    } catch (error) {
+      if (error?.code !== 'EEXIST' || isBackupLockActive(destinationDir)) {
+        throw new Error('Backup automatico gia in esecuzione.');
+      }
+      fs.rmSync(lockPath, { force: true });
+    }
+  }
+  throw new Error('Impossibile acquisire il lock del backup automatico.');
+}
+
+function releaseBackupLock(lockPath) {
+  if (lockPath) fs.rmSync(lockPath, { force: true });
+}
+
 function applyBackupRetention(config, options = {}) {
   const preservePaths = new Set((options.preservePaths ?? []).map((value) => path.resolve(value)));
+  const nowMs = options.nowMs ?? Date.now();
+  const activeBackupLock = !options.ignoreBackupLock && isBackupLockActive(config.destinationDir, nowMs);
   const managedFiles = listManagedBackupFiles(config.destinationDir).sort((left, right) => {
     if (left.modifiedAtMs !== right.modifiedAtMs) return right.modifiedAtMs - left.modifiedAtMs;
     return right.name.localeCompare(left.name);
@@ -182,7 +225,9 @@ function applyBackupRetention(config, options = {}) {
   const artifacts = managedFiles.filter((file) => file.kind === 'artifact');
   const orphanTemps = managedFiles
     .filter((file) => file.kind === 'temp')
-    .filter((file) => !preservePaths.has(path.resolve(file.path)));
+    .filter((file) => !preservePaths.has(path.resolve(file.path)))
+    .filter((file) => !isRecentTemp(file, nowMs))
+    .filter(() => !activeBackupLock);
   const staleArtifacts = artifacts
     .slice(clampRetentionKeepArtifacts(config.retentionKeepArtifacts))
     .filter((file) => !preservePaths.has(path.resolve(file.path)));
@@ -271,35 +316,58 @@ function filterRowsByReference(rows, foreignKey, validRefs) {
   return rows.filter((row) => typeof row?.[foreignKey] === 'string' && validRefs.has(row[foreignKey]));
 }
 
+function buildAssignedAmbulatoryIds(patient, rows) {
+  const ids = new Set();
+  if (typeof patient.ambulatoryId === 'string' && patient.ambulatoryId.trim().length > 0) {
+    ids.add(patient.ambulatoryId);
+  }
+  for (const row of rows) {
+    if (row.patientId === patient.id && typeof row.ambulatoryId === 'string' && row.ambulatoryId.trim().length > 0) {
+      ids.add(row.ambulatoryId);
+    }
+  }
+  return Array.from(ids).sort((left, right) => left.localeCompare(right));
+}
+
 function buildDataset(db, backupCollections) {
-  const dataset = Object.fromEntries(
-    backupCollections.map((collection) => [
-      collection,
-      hasTable(db, BACKUP_TABLES[collection])
-        ? db.prepare(`SELECT * FROM ${BACKUP_TABLES[collection]}`).all().map((row) => normalizeRowDates(normalizeRowKeys(row)))
-        : [],
-    ]),
-  );
+  return db.transaction(() => {
+    const dataset = Object.fromEntries(
+      backupCollections.map((collection) => [
+        collection,
+        hasTable(db, BACKUP_TABLES[collection])
+          ? db.prepare(`SELECT * FROM ${BACKUP_TABLES[collection]}`).all().map((row) => normalizeRowDates(normalizeRowKeys(row)))
+          : [],
+      ]),
+    );
+    const patientAmbulatoryRows = hasTable(db, PATIENT_AMBULATORY_TABLE)
+      ? db.prepare(`SELECT * FROM ${PATIENT_AMBULATORY_TABLE}`).all().map((row) => normalizeRowKeys(row))
+      : [];
+    dataset.patients = dataset.patients.map((patient) => {
+      const assignedAmbulatoryIds = buildAssignedAmbulatoryIds(patient, patientAmbulatoryRows);
+      return assignedAmbulatoryIds.length > 0 ? { ...patient, assignedAmbulatoryIds } : patient;
+    });
 
-  const patientIds = new Set(dataset.patients.map((row) => row.id).filter((value) => typeof value === 'string' && value.length > 0));
-  const conversationIds = new Set(dataset.conversations.map((row) => row.id).filter((value) => typeof value === 'string' && value.length > 0));
+    const patientIds = new Set(dataset.patients.map((row) => row.id).filter((value) => typeof value === 'string' && value.length > 0));
+    const conversationIds = new Set(dataset.conversations.map((row) => row.id).filter((value) => typeof value === 'string' && value.length > 0));
 
-  dataset.attachments = filterRowsByReference(dataset.attachments, 'patientId', patientIds);
-  dataset.entries = filterRowsByReference(dataset.entries, 'patientId', patientIds);
-  dataset.observations = filterRowsByReference(dataset.observations, 'patientId', patientIds);
-  dataset.checkups = filterRowsByReference(dataset.checkups, 'patientId', patientIds);
-  dataset.therapies = filterRowsByReference(dataset.therapies, 'patientId', patientIds);
-  dataset.prostheticPrescriptions = filterRowsByReference(dataset.prostheticPrescriptions, 'patientId', patientIds);
-  dataset.sissHandoffs = filterRowsByReference(dataset.sissHandoffs, 'patientId', patientIds);
-  dataset.messages = filterRowsByReference(dataset.messages, 'conversationId', conversationIds);
+    dataset.attachments = filterRowsByReference(dataset.attachments, 'patientId', patientIds);
+    dataset.entries = filterRowsByReference(dataset.entries, 'patientId', patientIds);
+    dataset.observations = filterRowsByReference(dataset.observations, 'patientId', patientIds);
+    dataset.checkups = filterRowsByReference(dataset.checkups, 'patientId', patientIds);
+    dataset.therapies = filterRowsByReference(dataset.therapies, 'patientId', patientIds);
+    dataset.prostheticPrescriptions = filterRowsByReference(dataset.prostheticPrescriptions, 'patientId', patientIds);
+    dataset.sissHandoffs = filterRowsByReference(dataset.sissHandoffs, 'patientId', patientIds);
+    dataset.messages = filterRowsByReference(dataset.messages, 'conversationId', conversationIds);
 
-  return dataset;
+    return dataset;
+  })();
 }
 
 async function main() {
   const dataDir = getDefaultDataDir();
   const dbPath = path.join(dataDir, 'medical.db');
   const forced = process.env.MEDIFLOW_BACKUP_FORCE === '1';
+  let backupLockPath = null;
 
   try {
     if (!fs.existsSync(dbPath)) {
@@ -315,9 +383,10 @@ async function main() {
     }
 
     fs.mkdirSync(destinationDir, { recursive: true });
+    backupLockPath = acquireBackupLock(destinationDir);
 
     const createdAt = new Date();
-    const payload = buildDataset(db, BACKUP_COLLECTIONS);
+    const payload = buildDataset(db, Object.keys(BACKUP_TABLES));
     const artifact = await serializeBackupArtifact(payload, createdAt);
     const fileName = `mediflow-backup-v1-${formatTimestamp(createdAt)}.mediflow`;
     const finalPath = path.join(destinationDir, fileName);
@@ -344,7 +413,7 @@ async function main() {
         destinationDir,
         retentionKeepArtifacts: currentState.config.retentionKeepArtifacts,
       },
-      { preservePaths: [finalPath] },
+      { preservePaths: [finalPath], ignoreBackupLock: true },
     );
     const nextState = applyRetentionResultToState(backedUpState, retentionResult, 'auto', createdAt);
     nextState.run.lastRunMessage = retentionResult.deletedCount > 0
@@ -391,6 +460,8 @@ async function main() {
       message,
     }));
     process.exitCode = 1;
+  } finally {
+    releaseBackupLock(backupLockPath);
   }
 }
 

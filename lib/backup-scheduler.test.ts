@@ -80,6 +80,8 @@ test('previews only scheduler-owned backup artifacts beyond keep-last-N plus orp
     await fs.promises.writeFile(newerArtifact, 'newer');
     await fs.promises.writeFile(orphanTemp, 'temp');
     await fs.promises.writeFile(unrelated, 'keep');
+    const staleAt = new Date(Date.now() - (16 * 60 * 1000));
+    await fs.promises.utimes(orphanTemp, staleAt, staleAt);
 
     const preview = previewBackupRetention({
         destinationDir: tempDir,
@@ -111,6 +113,8 @@ test('applies retention and tracks the last cleanup state', async () => {
     await fs.promises.writeFile(preservedArtifact, 'latest');
     await fs.promises.writeFile(orphanTemp, 'temp');
     await fs.promises.writeFile(unrelated, 'keep');
+    const staleAt = new Date(Date.now() - (16 * 60 * 1000));
+    await fs.promises.utimes(orphanTemp, staleAt, staleAt);
 
     const result = applyBackupRetention(
         {
@@ -148,6 +152,31 @@ test('applies retention and tracks the last cleanup state', async () => {
     assert.equal(trackedState.run.lastRetentionDeletedCount, 2);
     assert.equal(trackedState.run.lastRetentionAt, '2026-03-18T12:00:00.000Z');
     assert.equal(trackedState.run.lastArtifactPath, preservedArtifact);
+
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
+});
+
+test('retention preserves recent temp files and all temps while a runner lock is active', async () => {
+    const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'mediflow-backup-lock-'));
+    const recentTemp = path.join(tempDir, 'mediflow-backup-v1-recent.mediflow.tmp');
+    const staleTemp = path.join(tempDir, 'mediflow-backup-v1-stale.mediflow.tmp');
+    const lockPath = path.join(tempDir, '.mediflow-backup.lock');
+
+    await fs.promises.writeFile(recentTemp, 'recent');
+    await fs.promises.writeFile(staleTemp, 'stale');
+    const staleAt = new Date(Date.now() - (16 * 60 * 1000));
+    await fs.promises.utimes(staleTemp, staleAt, staleAt);
+    await fs.promises.writeFile(lockPath, 'active');
+
+    const whileLocked = previewBackupRetention({ destinationDir: tempDir, retentionKeepArtifacts: 1 });
+    assert.equal(whileLocked.items.some((item) => item.path === recentTemp), false);
+    assert.equal(whileLocked.items.some((item) => item.path === staleTemp), false);
+
+    const staleLockAt = new Date(Date.now() - (7 * 60 * 60 * 1000));
+    await fs.promises.utimes(lockPath, staleLockAt, staleLockAt);
+    const afterStaleLock = previewBackupRetention({ destinationDir: tempDir, retentionKeepArtifacts: 1 });
+    assert.equal(afterStaleLock.items.some((item) => item.path === recentTemp), false);
+    assert.equal(afterStaleLock.items.some((item) => item.path === staleTemp), true);
 
     await fs.promises.rm(tempDir, { recursive: true, force: true });
 });

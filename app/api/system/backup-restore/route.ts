@@ -34,6 +34,7 @@ import {
     type BackupDataset,
     serializeBackupArtifact,
 } from '@/lib/backup-artifact';
+import { derivePatientAmbulatoryLinks } from '@/lib/backup-patient-ambulatory-links';
 import { runBackupRestorePreflight } from '@/lib/backup-restore-preflight';
 
 /* @Codex */
@@ -192,44 +193,25 @@ function filterRowsByReference<T extends Record<string, unknown>>(
 }
 
 /* @Codex */
-async function buildBackupDataset(): Promise<BackupDataset> {
-    const [
-        ambulatoriesRows,
-        attachmentsRows,
-        conversationsRows,
-        drugsRows,
-        entriesRows,
-        exemptionsRows,
-        messagesRows,
-        observationsRows,
-        patientsRows,
-        prostheticPrescriptionRows,
-        serviceCatalogRows,
-        servicePrescriptionItemRows,
-        servicePrescriptionRows,
-        sissHandoffRows,
-        checkupsRows,
-        therapiesRows,
-        patientAmbulatoryRows,
-    ] = await Promise.all([
-        dbServer.select().from(ambulatories),
-        dbServer.select().from(attachments),
-        dbServer.select().from(conversations),
-        dbServer.select().from(drugs),
-        dbServer.select().from(entries),
-        dbServer.select().from(exemptions),
-        dbServer.select().from(messages),
-        dbServer.select().from(observations),
-        dbServer.select().from(patients),
-        dbServer.select().from(prostheticPrescriptions),
-        dbServer.select().from(serviceCatalogEntries),
-        dbServer.select().from(servicePrescriptionItems),
-        dbServer.select().from(servicePrescriptions),
-        dbServer.select().from(sissHandoffEvents),
-        dbServer.select().from(checkups),
-        dbServer.select().from(therapies),
-        dbServer.select().from(patientsToAmbulatories),
-    ]);
+function buildBackupDataset(): BackupDataset {
+    return dbServer.transaction((tx): BackupDataset => {
+        const ambulatoriesRows = tx.select().from(ambulatories).all();
+        const attachmentsRows = tx.select().from(attachments).all();
+        const conversationsRows = tx.select().from(conversations).all();
+        const drugsRows = tx.select().from(drugs).all();
+        const entriesRows = tx.select().from(entries).all();
+        const exemptionsRows = tx.select().from(exemptions).all();
+        const messagesRows = tx.select().from(messages).all();
+        const observationsRows = tx.select().from(observations).all();
+        const patientsRows = tx.select().from(patients).all();
+        const prostheticPrescriptionRows = tx.select().from(prostheticPrescriptions).all();
+        const serviceCatalogRows = tx.select().from(serviceCatalogEntries).all();
+        const servicePrescriptionItemRows = tx.select().from(servicePrescriptionItems).all();
+        const servicePrescriptionRows = tx.select().from(servicePrescriptions).all();
+        const sissHandoffRows = tx.select().from(sissHandoffEvents).all();
+        const checkupsRows = tx.select().from(checkups).all();
+        const therapiesRows = tx.select().from(therapies).all();
+        const patientAmbulatoryRows = tx.select().from(patientsToAmbulatories).all();
 
     const normalizedPatientAmbulatoryRows = sortBackupRows(patientAmbulatoryRows);
     const enrichedPatients = patientsRows.map((patient) => {
@@ -249,24 +231,25 @@ async function buildBackupDataset(): Promise<BackupDataset> {
             .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
     );
 
-    return {
-        ambulatories: sortBackupRows(ambulatoriesRows),
-        attachments: sortBackupRows(filterRowsByReference(attachmentsRows, 'patientId', patientIds)),
-        conversations: sortBackupRows(conversationsRows),
-        drugs: sortBackupRows(drugsRows),
-        entries: sortBackupRows(filterRowsByReference(entriesRows, 'patientId', patientIds)),
-        exemptions: sortBackupRows(exemptionsRows),
-        messages: sortBackupRows(filterRowsByReference(messagesRows, 'conversationId', conversationIds)),
-        observations: sortBackupRows(filterRowsByReference(observationsRows, 'patientId', patientIds)),
-        patients: sortBackupRows(enrichedPatients),
-        prostheticPrescriptions: sortBackupRows(filterRowsByReference(prostheticPrescriptionRows, 'patientId', patientIds)),
-        serviceCatalogEntries: sortBackupRows(serviceCatalogRows),
-        servicePrescriptionItems: sortBackupRows(filterRowsByReference(servicePrescriptionItemRows, 'patientId', patientIds)),
-        servicePrescriptions: sortBackupRows(filterRowsByReference(servicePrescriptionRows, 'patientId', patientIds)),
-        sissHandoffs: sortBackupRows(filterRowsByReference(sissHandoffRows, 'patientId', patientIds)),
-        checkups: sortBackupRows(filterRowsByReference(checkupsRows, 'patientId', patientIds)),
-        therapies: sortBackupRows(filterRowsByReference(therapiesRows, 'patientId', patientIds)),
-    };
+        return {
+            ambulatories: sortBackupRows(ambulatoriesRows),
+            attachments: sortBackupRows(filterRowsByReference(attachmentsRows, 'patientId', patientIds)),
+            conversations: sortBackupRows(conversationsRows),
+            drugs: sortBackupRows(drugsRows),
+            entries: sortBackupRows(filterRowsByReference(entriesRows, 'patientId', patientIds)),
+            exemptions: sortBackupRows(exemptionsRows),
+            messages: sortBackupRows(filterRowsByReference(messagesRows, 'conversationId', conversationIds)),
+            observations: sortBackupRows(filterRowsByReference(observationsRows, 'patientId', patientIds)),
+            patients: sortBackupRows(enrichedPatients),
+            prostheticPrescriptions: sortBackupRows(filterRowsByReference(prostheticPrescriptionRows, 'patientId', patientIds)),
+            serviceCatalogEntries: sortBackupRows(serviceCatalogRows),
+            servicePrescriptionItems: sortBackupRows(filterRowsByReference(servicePrescriptionItemRows, 'patientId', patientIds)),
+            servicePrescriptions: sortBackupRows(filterRowsByReference(servicePrescriptionRows, 'patientId', patientIds)),
+            sissHandoffs: sortBackupRows(filterRowsByReference(sissHandoffRows, 'patientId', patientIds)),
+            checkups: sortBackupRows(filterRowsByReference(checkupsRows, 'patientId', patientIds)),
+            therapies: sortBackupRows(filterRowsByReference(therapiesRows, 'patientId', patientIds)),
+        };
+    });
 }
 
 /* @Codex */
@@ -328,48 +311,13 @@ function insertRows<T extends Record<string, unknown>>(runner: InsertRunner, tab
 }
 
 /* @Codex */
-function parseAssignedAmbulatoryIds(value: unknown): string[] {
-    if (!Array.isArray(value)) return [];
-    return Array.from(new Set(
-        value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-    ));
-}
-
-function derivePatientLinks(patientsPayload: BackupArtifact['payload']['patients']): Array<{ patientId: string; ambulatoryId: string; assignedAt: Date }> {
-    return patientsPayload.flatMap((patient) => {
-        if (typeof patient.id !== 'string') {
-            return [];
-        }
-        const patientId = patient.id;
-
-        const assignedAt = typeof patient.updatedAt === 'string'
-            ? new Date(patient.updatedAt)
-            : typeof patient.createdAt === 'string'
-                ? new Date(patient.createdAt)
-                : new Date();
-
-        const normalizedAssignedAt = Number.isNaN(assignedAt.getTime()) ? new Date() : assignedAt;
-        const ambulatoryIds = new Set(parseAssignedAmbulatoryIds(patient.assignedAmbulatoryIds));
-        if (typeof patient.ambulatoryId === 'string' && patient.ambulatoryId.trim().length > 0) {
-            ambulatoryIds.add(patient.ambulatoryId);
-        }
-
-        return Array.from(ambulatoryIds).map((ambulatoryId) => ({
-            patientId,
-            ambulatoryId,
-            assignedAt: normalizedAssignedAt,
-        }));
-    });
-}
-
-/* @Codex */
 export async function GET() {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
-        const payload = await buildBackupDataset();
+        const payload = buildBackupDataset();
         const serialized = await serializeBackupArtifact(payload);
         return new NextResponse(serialized, {
             status: 200,
@@ -487,7 +435,7 @@ export async function POST(request: Request) {
                 }
             }
 
-            const patientLinks = derivePatientLinks(artifact.payload.patients);
+            const patientLinks = derivePatientAmbulatoryLinks(artifact.payload.patients);
             insertRows(tx, TABLES.patientsToAmbulatories, patientLinks);
         });
 
