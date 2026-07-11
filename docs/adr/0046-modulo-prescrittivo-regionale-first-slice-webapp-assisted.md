@@ -106,13 +106,15 @@ Negativo:
    - prefill spinto non documentato
    - uso improprio di WS/API fuori scenario approvato
 
-## Checkpoint 2026-07-11: il modulo operativo e PRREG
+## Checkpoint 2026-07-11: percorso osservato verso PRREG
 
-Il modulo prescrittivo regionale operativo e oggi il Prescrittivo Regionale
-(PRREG), con root `/prescrittivoRegionale` e una dashboard di ingresso con le
-azioni Nuova Prescrizione e Ricerca Prescrizioni. E il modulo descritto dal
-documento ufficiale di specifiche `ARIA-PRREG-SIAA@01` gia censito nel
-Contesto di questo ADR.
+Nella sessione operatore locale osservata il 10 luglio 2026, il modulo
+prescrittivo raggiunto e il Prescrittivo Regionale (PRREG), con root
+`/prescrittivoRegionale` e una dashboard di ingresso con le azioni Nuova
+Prescrizione e Ricerca Prescrizioni. E il modulo descritto dal documento
+ufficiale di specifiche `ARIA-PRREG-SIAA@01` gia censito nel Contesto di questo
+ADR. L'osservazione conferma il percorso di navigazione di quella sessione,
+non un contratto API ne un rollout universale.
 
 Cosa cambia in MediFlow:
 

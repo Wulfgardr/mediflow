@@ -710,7 +710,7 @@ struct PairedPatientsWorkspaceView: View {
                     .accessibilityIdentifier("patient-share-fhir-button")
                 }
                 Button {
-                    model.openPrregHandoff()
+                    Task { await model.openPrregHandoff() }
                 } label: {
                     Label("Prescrittivo regionale", systemImage: "arrow.up.forward.app")
                 }

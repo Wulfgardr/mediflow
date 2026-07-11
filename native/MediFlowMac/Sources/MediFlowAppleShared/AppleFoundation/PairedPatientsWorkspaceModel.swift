@@ -2751,15 +2751,32 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     // portale si apre comunque (e' una dashboard generica, non un deep-link sul
     // paziente), ma il messaggio dichiara onestamente che il CF non e' stato
     // copiato invece di affermare un'azione che non e' avvenuta.
-    func openPrregHandoff() {
+    func openPrregHandoff() async {
         guard let patient = selectedPatient else { return }
+        statusMessage = nil
+        errorMessage = nil
+
         if let taxCode = patient.taxCode.trimmedOrNil {
-            systemActions.copyToSystemClipboard(taxCode)
-            systemActions.openExternalURL(SissPortalURLs.prescrittivoRegionale)
-            statusMessage = "CF copiato. Si apre il portale regionale nel browser."
+            let didCopy = await systemActions.copyToSystemClipboard(taxCode)
+            let didOpen = await systemActions.openExternalURL(SissPortalURLs.prescrittivoRegionale)
+
+            switch (didCopy, didOpen) {
+            case (true, true):
+                statusMessage = "CF copiato. Portale regionale aperto nel browser."
+            case (false, true):
+                errorMessage = "Portale regionale aperto, ma la copia del CF non è riuscita."
+            case (true, false):
+                errorMessage = "CF copiato, ma l'apertura del portale regionale non è riuscita."
+            case (false, false):
+                errorMessage = "Copia del CF e apertura del portale regionale non riuscite."
+            }
         } else {
-            systemActions.openExternalURL(SissPortalURLs.prescrittivoRegionale)
-            statusMessage = "CF non disponibile per questo paziente. Si apre comunque il portale regionale nel browser."
+            let didOpen = await systemActions.openExternalURL(SissPortalURLs.prescrittivoRegionale)
+            if didOpen {
+                statusMessage = "CF non disponibile per questo paziente. Portale regionale aperto nel browser."
+            } else {
+                errorMessage = "CF non disponibile per questo paziente. Apertura del portale regionale non riuscita."
+            }
         }
     }
 
