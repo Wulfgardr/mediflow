@@ -130,12 +130,9 @@ testato anche su Linux/Windows.
 * **Gate tri-OS**: Linux, macOS e Windows costruiscono e testano il core
   condiviso in CI. Questo prova la direzione di portabilita, ma non equivale a
   parity applicativa Windows/Linux.
-* **OSS export piu disciplinato**: l'export pubblico resta applicativo e
-  prodotto-centrico; materiali di coordinamento, analisi interne, workspace
-  privati e artifact temporanei restano esclusi.
-
-> [!WARNING]
-> La 0.7.1 va taggata solo dopo merge del ramo Apple/native, CI verde sul
+* **Convergenza pubblica completata**: questo punto storico sull'export OSS e
+  superato da `WUL-477`; la repository pubblica e ora l'unica fonte operativa,
+  mentre materiali sensibili e artifact temporanei restano fuori da Git.
 
 ---
 
@@ -144,7 +141,8 @@ testato anche su Linux/Windows.
 La lettura operativa piu completa del ciclo post-v0.7.2 e ora
 [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md): questo file resta la
 roadmap prodotto, mentre lo stato del sistema tiene insieme runtime effettivo,
-boundary, document intelligence, home-base, Apple clients e split private/OSS.
+boundary, document intelligence, home-base, Apple clients e governance della
+repository pubblica.
 
 ### Modalita network home-base
 
@@ -160,15 +158,16 @@ boundary, document intelligence, home-base, Apple clients e split private/OSS.
 
 ### Esperienza nativa
 
-* **Merge train Apple/native**: chiudere PR #271, far girare CI sul `main`
-  risultante e poi promuovere la release docs 0.7.1.
-* **Stack voice visit**: riconciliare #272, #273 e #274 in ordine, partendo
-  dall'ADR boundary e poi dalle superfici UI/backend sintetiche.
-* **Windows/Linux oltre il core**: trasformare il vecchio branch #266 in slice
-  piu piccole per launcher, floor hardware e distribuzione tri-OS, senza
-  promettere parity applicativa prima delle prove.
-* **Provider locali Apple**: rivalutare #259 dentro WUL-417/WUL-418, recuperando
-  solo kill-switch, test e decisioni compatibili con il gate benchmark-first.
+* **Apple/native su mainline**: macOS resta il fronte nativo piu avanzato;
+  iPhone/iPad proseguono come client paired sopra contratti locali versionati.
+* **Stack voice visit**: `WUL-419`, `WUL-421` e `WUL-422` mantengono transcript e
+  bozze sintetiche review-first, separati dall'audio reale e dalla promozione
+  runtime.
+* **Windows/Linux oltre il core**: procedere per slice piccole su launcher,
+  floor hardware e distribuzione tri-OS, senza promettere parity applicativa
+  prima delle prove.
+* **Provider locali Apple**: `WUL-417` e `WUL-418` restano benchmark-first, con
+  kill-switch, test e decisioni esplicite prima di qualunque promozione runtime.
 
 ### Shell ufficiale e sperimentazioni controllate
 
