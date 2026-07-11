@@ -32,6 +32,7 @@ import {
     type SmartImportReview,
     type SmartImportReviewState,
 } from './patient-smart-import-matching';
+import { normalizeClinicalText as normalizeText } from './clinical-text-normalization';
 /* @Codex */
 import { isServicePrescriptionLikeTherapy } from '../../prescription-boundary';
 import {
@@ -176,15 +177,6 @@ const DRUG_QUERY_STOPWORDS = new Set([
     'mattino', 'mezza', 'ogni', 'per', 'poi', 'pranzo', 'prima', 'sera', 'volta', 'volte',
     'verificare', 'confermare', 'dose', 'dosi', 'ore', 'uno', 'una', 'due', 'tre', 'quattro',
 ]);
-
-function normalizeText(value: string): string {
-    return value
-        .normalize('NFKD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, ' ')
-        .trim();
-}
 
 function buildDrugCandidateKey(candidate: Pick<AifaDrug, 'aic' | 'name' | 'activePrinciple' | 'packaging'>): string {
     return [
