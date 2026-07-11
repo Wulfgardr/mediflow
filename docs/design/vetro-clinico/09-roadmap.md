@@ -12,7 +12,7 @@ Questo piano non biforca la roadmap in 7 fasi della revisione UI/UX 2026-07-02 (
 
 ### DS-0. Canone (questa review)
 
-- Questo folder come specifica operativa del canone proposto da [ADR 0077](../../adr/0077-vetro-clinico-canonical-cross-platform-design-language.md): glossario, legge dei materiali e sovranità dei token.
+- Questo folder come specifica operativa del canone adottato da [ADR 0077](../../adr/0077-vetro-clinico-canonical-cross-platform-design-language.md): glossario, legge dei materiali e sovranità dei token.
 - Gate: ADR 0077 accettato e review del dossier contro codice e linee guida di piattaforma.
 
 ### DS-1. Consolidamento token web (converge con fase 6 "unificazione semantici")
