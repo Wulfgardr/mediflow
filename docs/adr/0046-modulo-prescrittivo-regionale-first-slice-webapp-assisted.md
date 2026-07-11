@@ -105,3 +105,31 @@ Negativo:
    - re-implementazione integrale della UI prescrittiva
    - prefill spinto non documentato
    - uso improprio di WS/API fuori scenario approvato
+
+## Checkpoint 2026-07-11: il modulo operativo e PRREG
+
+Il modulo prescrittivo regionale operativo e oggi il Prescrittivo Regionale
+(PRREG), con root `/prescrittivoRegionale` e una dashboard di ingresso con le
+azioni Nuova Prescrizione e Ricerca Prescrizioni. E il modulo descritto dal
+documento ufficiale di specifiche `ARIA-PRREG-SIAA@01` gia censito nel
+Contesto di questo ADR.
+
+Cosa cambia in MediFlow:
+
+1. il launcher dell'azione prescrittiva apre la dashboard PRREG al posto
+   della root legacy `/prescrizione/`, che resta raggiungibile dal menu SISS;
+2. la copia del codice fiscale in clipboard e il diario dei passaggi restano
+   identici;
+3. accanto al launcher, un pannello di contesto in sola lettura tiene
+   sottocchio terapie attive, prescrizioni specialistiche, esenzioni e
+   diagnosi del paziente, con copia rapida dei singoli valori, cosi il
+   passaggio manuale verso il portale richiede meno andirivieni;
+4. il client nativo Apple guadagna la stessa azione di apertura assistita
+   (codice fiscale nella clipboard di sistema, dashboard nel browser).
+
+Cosa non cambia: la decisione di questo ADR resta intatta. L'atto
+prescrittivo avviene nel portale regionale, con l'autenticazione personale
+del medico. Nessun endpoint interno del modulo viene richiamato o
+documentato come contratto; il perimetro resta l'handoff webapp-assisted, e
+ogni passo oltre richiede i canali qualificati descritti in
+[ADR 0045](./0045-siss-native-integration-boundary-requires-qualified-ssi.md).
