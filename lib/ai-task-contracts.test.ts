@@ -693,6 +693,7 @@ test('document synthesis extraction repairs truncated envelope when only closing
 
     assert.equal(parsed.validJson, true);
     assert.equal(parsed.validTask, true);
+    assert.equal(parsed.repairedTruncation, true);
     assert.equal(parsed.value.data.medications[0], 'Humalog 4 U ai pasti principali');
     assert.equal(parsed.value.data.problemStatements[0].label, 'Diabete mellito tipo 2');
     assert.equal(parsed.value.data.therapyCandidates[0].drugMention, 'Humalog');

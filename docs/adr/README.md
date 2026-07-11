@@ -4,6 +4,10 @@ Gli ADR (Architecture Decision Records) tengono traccia delle decisioni che infl
 
 Questa cartella contiene le decisioni di MediFlow (web + native).
 
+## ADR piu recente
+
+- [0074-ai-provider-abstraction-and-egress-anonymization-boundary.md](./0074-ai-provider-abstraction-and-egress-anonymization-boundary.md): adapter provider AI, registry per ruolo e confine fail-closed per l'egress opzionale.
+
 ---
 
 ## Quando scrivere un ADR

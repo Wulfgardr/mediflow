@@ -69,6 +69,7 @@ export function buildOllamaChatPayload(
         options: {
             temperature: 0.4,
             num_predict: maxTokens || 4096,
+            ...(options?.numCtx ? { num_ctx: options.numCtx } : {}),
         },
         ...(disableThinking ? { think: false } : {}),
     };

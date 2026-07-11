@@ -33,7 +33,7 @@ test('mappa i messaggi multimodali Ollama separando testo e immagini', () => {
 });
 
 test('costruisce il payload con think:false solo per task testuali', () => {
-    const textualPayload = buildOllamaChatPayload('qwen', [{ role: 'user', content: 'ciao' }], 512, { responseFormat: 'json' }, true);
+    const textualPayload = buildOllamaChatPayload('qwen', [{ role: 'user', content: 'ciao' }], 512, { responseFormat: 'json', numCtx: 8192 }, true);
     const ocrPayload = buildOllamaChatPayload('deepseek-ocr', [{ role: 'user', content: 'leggi' }], undefined, undefined, false);
 
     assert.equal(textualPayload.think, false);
@@ -41,8 +41,10 @@ test('costruisce il payload con think:false solo per task testuali', () => {
     assert.equal(textualPayload.keep_alive, '30m');
     assert.equal(textualPayload.options.temperature, 0.4);
     assert.equal(textualPayload.options.num_predict, 512);
+    assert.equal(textualPayload.options.num_ctx, 8192);
     assert.equal(textualPayload.format, 'json');
     assert.equal('think' in ocrPayload, false);
+    assert.equal('num_ctx' in ocrPayload.options, false);
 });
 
 test('distingue il timeout dall annullamento utente', async (t) => {

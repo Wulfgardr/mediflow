@@ -21,6 +21,7 @@ export interface AITaskParseResult<T> {
     rawJson: string | null;
     validJson: boolean;
     validTask: boolean;
+    repairedTruncation: boolean;
 }
 
 /* @Codex */
@@ -221,6 +222,7 @@ function normalizeTaskData(
 function parseLegacyDocumentSynthesisPayload(response: string): {
     rawJson: string | null;
     validJson: boolean;
+    repairedTruncation: boolean;
     summary: string;
     qualityLevel: DocumentQualityLevel;
     qualityReason: string;
@@ -230,8 +232,9 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
     therapyCandidates: SmartImportTherapyExtraction[];
     servicePrescriptions: SmartImportServicePrescriptionExtraction[];
 } | null {
-    const rawJson = extractJsonObject(response);
-    if (!rawJson) return null;
+    const extraction = extractJsonObject(response);
+    if (!extraction) return null;
+    const { rawJson, repairedTruncation } = extraction;
 
     try {
         const parsed = JSON.parse(rawJson) as Record<string, unknown>;
@@ -269,6 +272,7 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
         return {
             rawJson,
             validJson: true,
+            repairedTruncation,
             summary: normalizeCompactText(parsed.summary_markdown ?? parsed.summary, MAX_DOCUMENT_SUMMARY_CHARS),
             qualityLevel: normalizeQualityLevel(quality.level),
             qualityReason: normalizeCompactText(quality.reason, MAX_SHARED_SUMMARY_CHARS),
@@ -282,6 +286,7 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
         return {
             rawJson,
             validJson: false,
+            repairedTruncation,
             summary: '',
             qualityLevel: 'yellow',
             qualityReason: '',
@@ -301,19 +306,23 @@ function parseEnvelope(
     rawJson: string | null;
     validJson: boolean;
     validTask: boolean;
+    repairedTruncation: boolean;
     summary: string;
     data: Record<string, unknown>;
 } {
-    const rawJson = extractJsonObject(response);
-    if (!rawJson) {
+    const extraction = extractJsonObject(response);
+    if (!extraction) {
         return {
             rawJson: null,
             validJson: false,
             validTask: false,
+            repairedTruncation: false,
             summary: '',
             data: {},
         };
     }
+
+    const { rawJson, repairedTruncation } = extraction;
 
     try {
         const parsed = JSON.parse(rawJson) as Record<string, unknown>;
@@ -325,6 +334,7 @@ function parseEnvelope(
             rawJson,
             validJson: true,
             validTask: schemaVersion && taskMatches,
+            repairedTruncation,
             summary: normalizeCompactText(parsed?.summary, MAX_SHARED_SUMMARY_CHARS),
             data,
         };
@@ -333,6 +343,7 @@ function parseEnvelope(
             rawJson,
             validJson: false,
             validTask: false,
+            repairedTruncation,
             summary: '',
             data: {},
         };
@@ -563,10 +574,17 @@ function normalizeSmartImportTherapy(value: unknown): SmartImportTherapyExtracti
     return isServicePrescriptionLikeTherapy(therapy) ? null : therapy;
 }
 
-export function extractJsonObject(response: string): string | null {
+export interface ExtractedJsonObject {
+    rawJson: string;
+    repairedTruncation: boolean;
+}
+
+export function extractJsonObject(response: string): ExtractedJsonObject | null {
     const clean = stripModelArtifacts(response);
     const fenced = clean.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (fenced?.[1]) return fenced[1].trim();
+    if (fenced?.[1]) {
+        return { rawJson: fenced[1].trim(), repairedTruncation: false };
+    }
 
     const firstBrace = clean.indexOf('{');
     const lastBrace = clean.lastIndexOf('}');
@@ -612,7 +630,7 @@ export function extractJsonObject(response: string): string | null {
     }
 
     if (inString) {
-        return fragment;
+        return { rawJson: fragment, repairedTruncation: false };
     }
 
     let repaired = fragment.replace(/,\s*$/g, '');
@@ -621,7 +639,10 @@ export function extractJsonObject(response: string): string | null {
         repaired += opener === '{' ? '}' : ']';
     }
 
-    return repaired;
+    return {
+        rawJson: repaired,
+        repairedTruncation: repaired !== fragment,
+    };
 }
 
 export function parsePatientInsightExtractionResponse(response: string): AITaskParseResult<PatientInsightExtraction> {
@@ -635,6 +656,7 @@ export function parsePatientInsightExtractionResponse(response: string): AITaskP
         rawJson: envelope.rawJson,
         validJson: envelope.validJson,
         validTask: envelope.validTask,
+        repairedTruncation: envelope.repairedTruncation,
         value: {
             schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
             task: 'patient_insight',
@@ -720,6 +742,7 @@ export function parseSmartImportExtractionResponse(response: string): AITaskPars
         rawJson: envelope.rawJson,
         validJson: envelope.validJson,
         validTask: envelope.validTask,
+        repairedTruncation: envelope.repairedTruncation,
         value: {
             schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
             task: 'smart_import',
@@ -821,6 +844,7 @@ export function parseDocumentSynthesisExtractionResponse(
         rawJson: legacyPayload?.rawJson ?? envelope.rawJson,
         validJson: legacyPayload?.validJson ?? envelope.validJson,
         validTask: legacyPayload ? true : envelope.validTask,
+        repairedTruncation: legacyPayload?.repairedTruncation ?? envelope.repairedTruncation,
         value: {
             schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
             task: 'document_synthesis',

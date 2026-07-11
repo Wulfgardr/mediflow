@@ -38,9 +38,19 @@ export function readAiModelParliamentArtifact() {
     const raw = fs.readFileSync(/* turbopackIgnore: true */ paths.jsonPath, 'utf8');
     const stats = fs.statSync(/* turbopackIgnore: true */ paths.jsonPath);
 
-    return {
-        paths,
-        updatedAt: stats.mtime.toISOString(),
-        report: JSON.parse(raw) as Record<string, unknown>,
-    };
+    try {
+        return {
+            paths,
+            updatedAt: stats.mtime.toISOString(),
+            report: JSON.parse(raw) as Record<string, unknown>,
+            error: null,
+        };
+    } catch (error) {
+        return {
+            paths,
+            updatedAt: stats.mtime.toISOString(),
+            report: null,
+            error: error instanceof Error ? error.message : String(error),
+        };
+    }
 }
