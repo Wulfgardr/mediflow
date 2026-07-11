@@ -1223,10 +1223,18 @@ struct PairedPatientsWorkspaceView: View {
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                                 ForEach(entryAttachments) { attachment in
-                                    Text("\(attachment.name.isEmpty ? "Documento" : attachment.name) (\(attachment.type))")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
+                                    /* @Codex */
+                                    Button {
+                                        attachmentDetailCandidate = attachment
+                                        Task { await model.openAttachmentDetail(attachment) }
+                                    } label: {
+                                        Text("\(attachment.name.isEmpty ? "Documento" : attachment.name) (\(attachment.type))")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityIdentifier("entry-row-attachment-\(entry.id)-\(attachment.id)")
                                 }
                             }
                             .accessibilityIdentifier("entry-row-attachments-\(entry.id)")
