@@ -8,6 +8,28 @@ import Foundation
 import Crypto  // swift-crypto: re-exports CryptoKit on Apple, BoringSSL on Linux/Windows (ADR 0071)
 
 public enum PatientFieldCrypto {
+    /* @Codex */
+    public enum EditableField: Equatable, Sendable {
+        case absent
+        case plaintext(String)
+        case locked(ciphertext: String)
+
+        public var isLocked: Bool {
+            if case .locked = self { return true }
+            return false
+        }
+    }
+
+    /* @Codex */
+    public static func resolveStringField(_ value: String?, masterKey: SymmetricKey?) -> EditableField {
+        resolveField(value, masterKey: masterKey) { CryptoService.jsonDecodeString($0) ?? $0 }
+    }
+
+    /* @Codex */
+    public static func resolveStructuredField(_ value: String?, masterKey: SymmetricKey?) -> EditableField {
+        resolveField(value, masterKey: masterKey) { $0 }
+    }
+
     /// A plain string field: ENC -> decrypt -> JSON-unwrap; plaintext -> as-is;
     /// undecryptable ENC (no/wrong key) -> nil so ciphertext is never shown.
     public static func decryptStringField(_ value: String?, masterKey: SymmetricKey?) -> String? {
@@ -75,5 +97,29 @@ public enum PatientFieldCrypto {
             deletedAt: detail.deletedAt,
             deletionReason: decryptStringField(detail.deletionReason, masterKey: masterKey)
         )
+    }
+
+    /* @Codex */
+    public static func encryptedPatchValue(
+        _ plaintext: String?, original: EditableField, masterKey: SymmetricKey, structured: Bool = false
+    ) -> PatchValue<String> {
+        guard !original.isLocked else { return .omit }
+        guard let plaintext, !plaintext.isEmpty else { return .null }
+        let value = structured ? plaintext : (CryptoService.jsonEncode(plaintext) ?? "")
+        guard !value.isEmpty, let encrypted = CryptoService.encryptField(value, masterKey: masterKey) else {
+            return .omit
+        }
+        return .value(encrypted)
+    }
+
+    private static func resolveField(
+        _ value: String?, masterKey: SymmetricKey?, transform: (String) -> String
+    ) -> EditableField {
+        guard let value else { return .absent }
+        guard value.hasPrefix(CryptoService.encPrefix) else { return .plaintext(value) }
+        guard let masterKey, let decrypted = CryptoService.decryptField(value, masterKey: masterKey) else {
+            return .locked(ciphertext: value)
+        }
+        return .plaintext(transform(decrypted))
     }
 }

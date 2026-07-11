@@ -32,6 +32,31 @@ final class PatientFieldCryptoTests: XCTestCase {
                      "ciphertext must never be shown when the key is unavailable")
     }
 
+    /* @Codex */
+    func testEditableFieldResolvesAbsentPlaintextAndLockedByteExactly() {
+        XCTAssertEqual(PatientFieldCrypto.resolveStringField(nil, masterKey: key), .absent)
+        XCTAssertEqual(
+            PatientFieldCrypto.resolveStringField("Via Roma 1", masterKey: key),
+            .plaintext("Via Roma 1"))
+
+        let wrongKey = SymmetricKey(size: .bits256)
+        let locked = PatientFieldCrypto.resolveStringField(encString, masterKey: wrongKey)
+        XCTAssertEqual(locked, .locked(ciphertext: encString))
+        XCTAssertEqual(
+            PatientFieldCrypto.resolveStringField("ENC:corrupt:value", masterKey: key),
+            .locked(ciphertext: "ENC:corrupt:value"))
+    }
+
+    /* @Codex */
+    func testLockedEditableFieldEncodesAsOmit() {
+        let wrongKey = SymmetricKey(size: .bits256)
+        let locked = PatientFieldCrypto.resolveStringField(encString, masterKey: wrongKey)
+        guard case .omit = PatientFieldCrypto.encryptedPatchValue(
+            "", original: locked, masterKey: wrongKey) else {
+            return XCTFail("locked fields must be omitted")
+        }
+    }
+
     func testStructuredFieldRoundTripsArrayJson() {
         let arrayJSON = "[{\"code\":\"E11.9\",\"description\":\"Diabete\",\"system\":\"ICD-10\",\"date\":\"2026-01-01T00:00:00.000Z\"}]"
         let enc = CryptoService.encryptField(arrayJSON, masterKey: key)!
