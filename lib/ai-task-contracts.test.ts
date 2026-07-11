@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import {
     AI_TASK_EXTRACTION_SCHEMA_VERSION,
     buildPatientInsightExtractionPrompt,
@@ -10,6 +11,7 @@ import {
     renderPatientInsightMarkdown,
     toPatientInsightRenderContract,
 } from './ai-task-contracts';
+import { buildSmartImportExtractionPrompt as buildSmartImportPromptDirect } from './ai-task-contract-prompts';
 
 test('patient insight extraction renders local markdown sections from shared JSON contract', () => {
     const parsed = parsePatientInsightExtractionResponse(JSON.stringify({
@@ -466,6 +468,15 @@ test('smart import prompt prioritizes current pathology coding and active therap
     assert.match(prompt, /se una terapia e solo proposta, in switch o da confermare, usa therapyState transition o uncertain/i);
     assert.match(prompt, /non marcare active una terapia futura, condizionale, da valutare/i);
     assert.match(prompt, /switch terapeutico, marca come transition sia il farmaco in uscita sia quello in ingresso/i);
+});
+
+test('smart import prompt stays byte-identical through the compatible barrel', () => {
+    const payload = { patientId: 'synthetic-patient', sources: [{ id: 'S1', text: 'Fixture clinica sintetica' }] };
+    const prompt = buildSmartImportExtractionPrompt(payload);
+
+    assert.equal(prompt, buildSmartImportPromptDirect(payload));
+    assert.equal(Buffer.byteLength(prompt, 'utf8'), 5382);
+    assert.equal(createHash('sha256').update(prompt).digest('hex'), 'e0a67ae602f10e8d5e68b4dacfca678bdca72993a0597ebfe77b9bb038c6e430');
 });
 
 test('document synthesis extraction keeps service prescriptions out of medication lanes', () => {
