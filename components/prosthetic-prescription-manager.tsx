@@ -2,10 +2,11 @@
 
 /* @Codex */
 import { type FormEvent, useMemo, useState } from 'react';
-import { Accessibility, CheckCircle2, FileText, LoaderCircle, Plus, Trash2 } from 'lucide-react';
+import { Accessibility, CheckCircle2, LoaderCircle, Plus, Trash2 } from 'lucide-react';
 import { db, type ProstheticPrescription, type ProstheticPrescriptionCategory, type ProstheticPrescriptionStatus } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { DocumentReferenceChip } from '@/components/document-reference-chip';
 
 type Props = {
     patientId: string;
@@ -329,16 +330,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                                             {item.collaudoAt && <p><span className="font-semibold text-[color:var(--mf-ink)]">Collaudo:</span> {new Date(item.collaudoAt).toLocaleDateString('it-IT')}</p>}
                                         </div>
                                         {item.collaudoOutcome && <p className="mt-2 text-sm text-[color:var(--mf-muted)]">{item.collaudoOutcome}</p>}
-                                        {refs.length > 0 && (
-                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                {refs.map((ref) => (
-                                                    <span key={ref} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-600">
-                                                        <FileText className="h-3 w-3" />
-                                                        {ref}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
+                                        <DocumentReferenceChip references={refs} />
                                         {item.notes && <p className="mt-3 text-sm leading-6 text-[color:var(--mf-muted)]">{item.notes}</p>}
                                     </div>
                                     <div className="flex shrink-0 gap-2">

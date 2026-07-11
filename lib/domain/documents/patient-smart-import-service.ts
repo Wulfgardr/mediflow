@@ -32,6 +32,7 @@ import {
     type SmartImportReview,
     type SmartImportReviewState,
 } from './patient-smart-import-matching';
+import { normalizeClinicalText as normalizeText } from './clinical-text-normalization';
 /* @Codex */
 import { isServicePrescriptionLikeTherapy } from '../../prescription-boundary';
 import {
@@ -176,15 +177,6 @@ const DRUG_QUERY_STOPWORDS = new Set([
     'mattino', 'mezza', 'ogni', 'per', 'poi', 'pranzo', 'prima', 'sera', 'volta', 'volte',
     'verificare', 'confermare', 'dose', 'dosi', 'ore', 'uno', 'una', 'due', 'tre', 'quattro',
 ]);
-
-function normalizeText(value: string): string {
-    return value
-        .normalize('NFKD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, ' ')
-        .trim();
-}
 
 function buildDrugCandidateKey(candidate: Pick<AifaDrug, 'aic' | 'name' | 'activePrinciple' | 'packaging'>): string {
     return [
@@ -946,16 +938,32 @@ function normalizeTherapyKey(therapy: Pick<Therapy, 'drugName' | 'activePrincipl
     ].join('|');
 }
 
-function therapyExists(existing: Therapy[], suggestion: TherapySmartImportSuggestion): boolean {
-    const probe: Pick<Therapy, 'drugName' | 'activePrinciple' | 'dosage' | 'aic'> = {
-        drugName: suggestion.match?.name || suggestion.drugMention,
-        activePrinciple: suggestion.match?.activePrinciple || suggestion.activePrinciple,
-        dosage: suggestion.dosage || '',
-        aic: suggestion.match?.aic,
-    };
-    const probeKey = normalizeTherapyKey(probe);
+function therapyExists(existing: Therapy[], candidate: Pick<Therapy, 'drugName' | 'activePrinciple' | 'dosage' | 'aic'>): boolean {
+    const probeKey = normalizeTherapyKey(candidate);
 
     return existing.some((therapy) => normalizeTherapyKey(therapy) === probeKey);
+}
+
+function buildAppliedTherapyCandidate(
+    patientId: string,
+    suggestion: TherapySmartImportSuggestion,
+    dosage: string,
+): Therapy {
+    const now = new Date();
+    return {
+        id: crypto.randomUUID(),
+        patientId,
+        drugName: suggestion.reviewedDrugName?.trim() || suggestion.match?.name || suggestion.drugMention,
+        aic: suggestion.match?.aic,
+        atc: suggestion.match?.atc,
+        activePrinciple: suggestion.reviewedActivePrinciple?.trim() || suggestion.match?.activePrinciple || suggestion.activePrinciple,
+        dosage,
+        motivation: suggestion.reviewedMotivation?.trim() || suggestion.motivation || suggestion.evidence.excerpt,
+        status: 'active',
+        startDate: now,
+        createdAt: now,
+        updatedAt: now,
+    };
 }
 
 export async function applyPatientSmartImportSelection(
@@ -1002,22 +1010,10 @@ export async function applyPatientSmartImportSelection(
         if (!suggestion.canApply || suggestion.matchType !== 'catalog' || !suggestion.match) continue;
         const appliedDosage = suggestion.reviewedDosage?.trim() || suggestion.dosage?.trim() || '';
         if (!hasUsableTherapyDosage(appliedDosage)) continue;
-        if (therapyExists([...existingTherapies, ...therapyItems], suggestion)) continue;
+        const candidate = buildAppliedTherapyCandidate(patientId, suggestion, appliedDosage);
+        if (therapyExists([...existingTherapies, ...therapyItems], candidate)) continue;
 
-        therapyItems.push({
-            id: crypto.randomUUID(),
-            patientId,
-            drugName: suggestion.reviewedDrugName?.trim() || suggestion.match?.name || suggestion.drugMention,
-            aic: suggestion.match?.aic,
-            atc: suggestion.match?.atc,
-            activePrinciple: suggestion.reviewedActivePrinciple?.trim() || suggestion.match?.activePrinciple || suggestion.activePrinciple,
-            dosage: appliedDosage,
-            motivation: suggestion.reviewedMotivation?.trim() || suggestion.motivation || suggestion.evidence.excerpt,
-            status: 'active',
-            startDate: new Date(),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        });
+        therapyItems.push(candidate);
         appliedTherapyIds.push(suggestion.id);
     }
 

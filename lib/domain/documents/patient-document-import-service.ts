@@ -27,6 +27,8 @@ import {
 } from '../../ai-task-contracts';
 /* @Codex */
 import { isServicePrescriptionLikeTherapy } from '../../prescription-boundary';
+/* @Codex */
+import { extractClinicalDosageNeedles, normalizeClinicalText as normalizeText } from './clinical-text-normalization';
 
 /* @Codex */
 const DOSAGE_REGEX = /\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|g|ml|ui|u|cp|cps|cpr|caps(?:ule)?|compress(?:a|e)|gtt|fial(?:a|e)|spruzzi?)\b(?:\s*[^\n,;]*)?/i;
@@ -147,16 +149,6 @@ interface TherapyContextAnnotation {
 }
 
 /* @Codex */
-function normalizeText(value: string): string {
-    return value
-        .normalize('NFKD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, ' ')
-        .trim();
-}
-
-/* @Codex */
 function compactText(value: string | undefined, maxChars: number): string {
     const normalized = (value || '').replace(/\s+/g, ' ').trim();
     if (!normalized) return '';
@@ -166,15 +158,8 @@ function compactText(value: string | undefined, maxChars: number): string {
 }
 
 /* @Codex */
-function normalizeDosageNeedle(value: string): string {
-    return value.toLowerCase().replace(/,/g, '.').replace(/\s+/g, '');
-}
-
-/* @Codex */
 function extractDosageNeedles(value: string | undefined): string[] {
-    if (!value?.trim()) return [];
-    const matches = value.match(DOSAGE_NEEDLE_REGEX) || [];
-    return Array.from(new Set(matches.map((item) => normalizeDosageNeedle(item))));
+    return extractClinicalDosageNeedles(value);
 }
 
 /* @Codex */

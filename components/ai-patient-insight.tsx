@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { Sparkles, RefreshCw, AlertTriangle } from 'lucide-react';
 import { db, Patient } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
@@ -8,7 +8,8 @@ import PrivacyBlur from '@/components/privacy-blur';
 import Link from 'next/link';
 import { useLiveQuery } from '@/lib/live-query';
 /* @Codex */
-import { regeneratePatientSummary, getAiModelLabels } from '@/lib/ai-summary-service';
+import { regeneratePatientSummary } from '@/lib/ai-summary-service';
+import { useAiModelLabels } from '@/lib/hooks/use-ai-model-labels';
 /* @Codex */
 import { coerceInsightToReadable } from '@/lib/patient-insight-view-model';
 import {
@@ -29,6 +30,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
     const [error, setError] = useState<string | null>(null);
     /* @Codex */
     const [modelLabel, setModelLabel] = useState<string>("");
+    const aiModelLabels = useAiModelLabels();
     /* @Codex */
     const patientInsightKillSwitch = useLiveQuery(() => db.settings.get(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY), []);
 
@@ -41,15 +43,6 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
     );
     /* @Codex */
     const patientInsightEnabled = isAiPatientInsightEnabledValue(patientInsightKillSwitch?.value);
-
-    /* @Codex */
-    useEffect(() => {
-        const loadModels = async () => {
-            const models = await getAiModelLabels();
-            setModelLabel(models.clinical);
-        };
-        loadModels();
-    }, []);
 
     const generateInsight = async () => {
         if (!patientInsightEnabled) {
@@ -195,8 +188,8 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
                         </div>
                         <div>
                             <h3 className="text-base font-bold text-slate-900 dark:text-white">Supporto al ragionamento clinico</h3>
-                            {modelLabel && (
-                                <p className="text-[10px] font-medium text-slate-400 uppercase tracking-tight">Clinico: {modelLabel}</p>
+                            {(modelLabel || aiModelLabels?.clinical) && (
+                                <p className="text-[10px] font-medium text-slate-400 uppercase tracking-tight">Clinico: {modelLabel || aiModelLabels?.clinical}</p>
                             )}
                             {patient.aiSummaryGeneratedAt && (
                                 <p className="text-[10px] font-medium text-slate-400 tracking-tight">

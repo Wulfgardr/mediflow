@@ -1029,29 +1029,3 @@ export async function buildPatientContext(patientId: string): Promise<string> {
     const context = await buildPatientInsightContext(patientId);
     return context.prompt;
 }
-
-/**
- * Smart Search: Tries to find a patient mentioned in the text.
- * Returns the generated context if a UNIQUE match is found.
- */
-export async function findAndBuildSmartContext(text: string): Promise<PatientContext> {
-    const allPatients = await db.patients.toArray();
-    const cleanText = text.toLowerCase();
-
-    const potentialMatches = allPatients.filter((patient) => {
-        const firstName = patient.firstName.toLowerCase();
-        const lastName = patient.lastName.toLowerCase();
-        return cleanText.includes(lastName) || cleanText.includes(`${firstName} ${lastName}`) || cleanText.includes(`${lastName} ${firstName}`);
-    });
-
-    if (potentialMatches.length === 1) {
-        const context = await buildPatientContext(potentialMatches[0].id!);
-        return {
-            found: true,
-            summary: context,
-            patientName: `${potentialMatches[0].lastName} ${potentialMatches[0].firstName}`,
-        };
-    }
-
-    return { found: false, summary: '' };
-}
