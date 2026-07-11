@@ -42,11 +42,10 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
     public func fetchPatient(
         id: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBasePatientDetail {
-        // loadPatientDetail decrypts the ENCRYPTED_FIELDS in-core; the model's later
-        // decryptDetail is a benign no-op (already-plaintext passes through). Scoped by
-        // the membership when present (1:1 with getNetworkScopedPatient's 404).
+        // Preserve raw ENC parity with the HTTP data source. The workspace model owns
+        // decrypt-or-lock resolution so failed decrypts cannot be collapsed to nil.
         let scope = ambulatoryId?.isEmpty == false ? ambulatoryId : nil
-        guard let detail = try patientStore.loadPatientDetail(id: id, scopeAmbulatoryId: scope, masterKey: masterKey) else {
+        guard let detail = try patientStore.loadRawPatientDetail(id: id, scopeAmbulatoryId: scope) else {
             throw HomeBaseClientError.httpStatus(404, "Not found")  // 1:1 with the HTTP 404
         }
         return detail
