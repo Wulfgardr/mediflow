@@ -180,12 +180,17 @@ function isRecentTemp(file, nowMs = Date.now()) {
   return file.kind === 'temp' && nowMs - file.modifiedAtMs < BACKUP_TEMP_MIN_AGE_MS;
 }
 
-function readBackupLockPid(lockPath) {
+/* @Codex */
+function readBackupLock(lockPath) {
   try {
     const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
-    return Number.isSafeInteger(lock?.pid) && lock.pid > 0 ? lock.pid : null;
+    const startedAtMs = typeof lock?.startedAt === 'string' ? Date.parse(lock.startedAt) : Number.NaN;
+    return {
+      pid: Number.isSafeInteger(lock?.pid) && lock.pid > 0 ? lock.pid : null,
+      startedAtMs: Number.isFinite(startedAtMs) ? startedAtMs : null,
+    };
   } catch {
-    return undefined;
+    return null;
   }
 }
 
@@ -203,11 +208,15 @@ function isProcessAlive(pid) {
 function isBackupLockActive(destinationDir, nowMs = Date.now()) {
   const lockPath = path.join(destinationDir, BACKUP_LOCK_FILE_NAME);
   try {
-    const lockAgeMs = nowMs - fs.statSync(lockPath).mtimeMs;
-    const lockPid = readBackupLockPid(lockPath);
-    if (lockPid === undefined) return false;
-    if (lockPid !== null) return isProcessAlive(lockPid);
-    return lockAgeMs < BACKUP_LOCK_STALE_MS;
+    const lock = readBackupLock(lockPath);
+    if (!lock) return false;
+
+    const modifiedAtMs = fs.statSync(lockPath).mtimeMs;
+    const startedAtMs = lock.startedAtMs !== null && lock.startedAtMs <= nowMs
+      ? lock.startedAtMs
+      : modifiedAtMs;
+    if (nowMs - startedAtMs >= BACKUP_LOCK_STALE_MS) return false;
+    return lock.pid === null || isProcessAlive(lock.pid);
   } catch {
     return false;
   }
