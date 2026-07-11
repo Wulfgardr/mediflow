@@ -253,6 +253,119 @@ test('paired observation write requires capability, session, scope, version, and
     }
 });
 
+test('web clinical lifecycle rejects stale writes, preserves observation tombstones, and refuses creates for deleted patients', async () => {
+    await assertServerReady();
+
+    const ambulatoryId = await resolveDefaultAmbulatoryId();
+    const patientId = await createSeedPatient(ambulatoryId);
+    const login = await request('POST', '/api/auth/login', {
+        body: { username: USERNAME, password: PIN },
+    });
+    assert.equal(login.response.status, 200);
+    const sessionCookie = extractSessionCookie(login.response);
+
+    try {
+        const therapy = await request('POST', '/api/therapies', {
+            headers: { Cookie: sessionCookie },
+            body: {
+                patientId,
+                drugName: 'Lifecycle test therapy',
+                dosage: '1 compressa',
+                startDate: '2026-05-02T09:00:00.000Z',
+            },
+        });
+        assert.equal(therapy.response.status, 201);
+
+        const therapyUpdate = await request('PUT', `/api/therapies/${therapy.json.id}`, {
+            headers: { Cookie: sessionCookie },
+            body: { version: 1, status: 'suspended' },
+        });
+        assert.equal(therapyUpdate.response.status, 200);
+
+        const staleTherapyUpdate = await request('PUT', `/api/therapies/${therapy.json.id}`, {
+            headers: { Cookie: sessionCookie },
+            body: { version: 1, status: 'completed' },
+        });
+        assert.equal(staleTherapyUpdate.response.status, 409);
+        assert.equal(staleTherapyUpdate.json?.code, 'VERSION_CONFLICT');
+        assert.equal(staleTherapyUpdate.json?.entity, 'therapy');
+        assert.equal(staleTherapyUpdate.json?.currentVersion, 2);
+
+        const observation = await request('POST', '/api/observations', {
+            headers: { Cookie: sessionCookie },
+            body: {
+                patientId,
+                codeSystem: 'LOINC',
+                code: '8480-6',
+                display: 'Systolic blood pressure',
+                unitSystem: 'UCUM',
+                unitCode: 'mm[Hg]',
+                value: 128,
+                observedAt: '2026-05-02T09:00:00.000Z',
+                source: 'manual',
+            },
+        });
+        assert.equal(observation.response.status, 201);
+
+        const observationDelete = await request('DELETE', `/api/observations/${observation.json.id}`, {
+            headers: { Cookie: sessionCookie },
+            body: { version: 1 },
+        });
+        assert.equal(observationDelete.response.status, 200);
+
+        const deletedObservations = await request('GET', `/api/observations?patientId=${patientId}&includeDeleted=true`, {
+            headers: { Cookie: sessionCookie },
+        });
+        assert.equal(deletedObservations.response.status, 200);
+        const deletedObservation = deletedObservations.json.find((item) => item.id === observation.json.id);
+        assert.ok(deletedObservation, 'Soft-deleted observation must remain recoverable');
+        assert.ok(deletedObservation.deletedAt, 'Soft-deleted observation must have deletedAt');
+        assert.equal(deletedObservation.version, 2);
+
+        const patient = await request('GET', `/api/v1/patients/${patientId}`, {
+            headers: localApiHeaders(),
+        });
+        assert.equal(patient.response.status, 200);
+        const patientDelete = await request('DELETE', `/api/v1/patients/${patientId}`, {
+            headers: localApiHeaders(),
+            body: { version: patient.json.version },
+        });
+        assert.equal(patientDelete.response.status, 200);
+
+        const webCreates = [
+            ['/api/entries', { patientId, type: 'note', date: '2026-05-02T09:00:00.000Z', content: 'blocked' }],
+            ['/api/therapies', { patientId, drugName: 'Blocked therapy', dosage: '1 compressa', startDate: '2026-05-02T09:00:00.000Z' }],
+            ['/api/checkups', { patientId, title: 'Blocked checkup', date: '2026-05-02T09:00:00.000Z' }],
+            ['/api/observations', { patientId, codeSystem: 'LOINC', code: '8480-6', display: 'Systolic blood pressure', unitSystem: 'UCUM', unitCode: 'mm[Hg]', value: 128, observedAt: '2026-05-02T09:00:00.000Z', source: 'manual' }],
+        ];
+        for (const [pathname, body] of webCreates) {
+            const response = await request('POST', pathname, { headers: { Cookie: sessionCookie }, body });
+            assert.equal(response.response.status, 404, `Expected deleted patient create guard for ${pathname}`);
+        }
+
+        const v1Creates = [
+            [`/api/v1/patients/${patientId}/entries`, { type: 'note', date: '2026-05-02T09:00:00.000Z', content: 'blocked' }],
+            [`/api/v1/patients/${patientId}/therapies`, { drugName: 'Blocked therapy', dosage: '1 compressa', startDate: '2026-05-02T09:00:00.000Z' }],
+            [`/api/v1/patients/${patientId}/checkups`, { title: 'Blocked checkup', date: '2026-05-02T09:00:00.000Z' }],
+            [`/api/v1/patients/${patientId}/observations`, { codeSystem: 'LOINC', code: '8480-6', display: 'Systolic blood pressure', unitSystem: 'UCUM', unitCode: 'mm[Hg]', value: 128, observedAt: '2026-05-02T09:00:00.000Z', source: 'manual' }],
+        ];
+        for (const [pathname, body] of v1Creates) {
+            const response = await request('POST', pathname, { headers: localApiHeaders(), body });
+            assert.equal(response.response.status, 404, `Expected deleted patient create guard for ${pathname}`);
+        }
+
+        scenarioResults.push({
+            name: 'web clinical lifecycle',
+            patientId,
+            staleTherapyStatus: staleTherapyUpdate.response.status,
+            observationDeleteStatus: observationDelete.response.status,
+            deletedPatientCreateStatus: 404,
+        });
+    } finally {
+        await cleanupPatient(patientId);
+    }
+});
+
 async function findAuditEvent(eventType, subjectRef, sessionCookie) {
     const audit = await request('GET', `/api/system/audit?eventType=${eventType}&subjectType=observation&limit=20`, {
         headers: {

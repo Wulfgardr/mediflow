@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { therapies } from '@/lib/schema';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import { parseTherapyStatus } from '@/lib/status-normalization';
@@ -12,6 +12,23 @@ import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/securit
 import { therapyUpdateSchema } from '@/lib/api-schemas/clinical-writes';
 /* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
+import { normalizeTherapyUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
+import { buildTherapyVersionConflictPayload, parseTherapyExpectedVersion } from '@/lib/therapy-concurrency';
+import { parseClinicalDeleteBody } from '@/lib/api-v1-clinical-lifecycle';
+
+async function selectTherapyConflictSnapshot(therapyId: string) {
+    return await dbServer
+        .select({
+            id: therapies.id,
+            patientId: therapies.patientId,
+            version: therapies.version,
+            updatedAt: therapies.updatedAt,
+            deletedAt: therapies.deletedAt,
+        })
+        .from(therapies)
+        .where(eq(therapies.id, therapyId))
+        .get() ?? null;
+}
 
 function parseDate(value: unknown): Date | undefined {
     if (value === null || value === undefined || value === '') return undefined;
@@ -29,6 +46,10 @@ export async function PUT(
     try {
         const { id } = await params;
         const rawBody = await request.json() as Record<string, unknown>;
+        const expectedVersion = parseTherapyExpectedVersion(rawBody.version);
+        if (expectedVersion === null) {
+            return NextResponse.json({ error: 'Version is required' }, { status: 400 });
+        }
         const parsedBody = parseApiBody(therapyUpdateSchema, rawBody);
         if (!parsedBody.ok) return parsedBody.response;
         const body = parsedBody.data;
@@ -126,18 +147,24 @@ export async function PUT(
             return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
         }
 
-        await dbServer.update(therapies)
+        const updateResult = await dbServer.update(therapies)
             .set({
                 ...updateData,
-                version: sql`${therapies.version} + 1`,
+                version: expectedVersion + 1,
                 updatedAt: new Date(),
             })
-            .where(eq(therapies.id, id));
-        const current = await dbServer
-            .select({ version: therapies.version })
-            .from(therapies)
-            .where(eq(therapies.id, id))
-            .get();
+            .where(and(eq(therapies.id, id), eq(therapies.version, expectedVersion)))
+            .run();
+        if (updateResult.changes === 0) {
+            return NextResponse.json(
+                buildTherapyVersionConflictPayload(
+                    expectedVersion,
+                    id,
+                    await selectTherapyConflictSnapshot(id),
+                ),
+                { status: 409 },
+            );
+        }
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
@@ -149,7 +176,7 @@ export async function PUT(
                 subjectRef: id,
                 redactedMetadata: {
                     changedFields: listChangedFields(body),
-                    resourceVersion: current?.version ?? undefined,
+                    resourceVersion: expectedVersion + 1,
                 },
             },
             '[MediFlow] Therapy audit write failed:',
@@ -171,11 +198,42 @@ export async function DELETE(
 
     try {
         const { id } = await params;
-        const existing = await dbServer.select({ id: therapies.id, version: therapies.version }).from(therapies).where(eq(therapies.id, id)).get();
+        const parsedBody = await parseClinicalDeleteBody(request, 'web-delete');
+        if (!parsedBody.ok) {
+            return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+        }
+        const expectedVersion = parseTherapyExpectedVersion(parsedBody.values.version);
+        if (expectedVersion === null) {
+            return NextResponse.json({ error: 'Version is required' }, { status: 400 });
+        }
+        const normalized = normalizeTherapyUpdateInput({
+            deletedAt: parsedBody.values.deletedAt,
+            deletionReason: parsedBody.values.deletionReason,
+        });
+        if (!normalized.ok) {
+            return NextResponse.json({ error: normalized.error }, { status: 400 });
+        }
+        const existing = await dbServer.select({ id: therapies.id }).from(therapies).where(eq(therapies.id, id)).get();
         if (!existing) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
-        await dbServer.delete(therapies).where(eq(therapies.id, id));
+        const updateResult = await dbServer.update(therapies)
+            .set({
+                ...normalized.values,
+                version: expectedVersion + 1,
+            })
+            .where(and(eq(therapies.id, id), eq(therapies.version, expectedVersion)))
+            .run();
+        if (updateResult.changes === 0) {
+            return NextResponse.json(
+                buildTherapyVersionConflictPayload(
+                    expectedVersion,
+                    id,
+                    await selectTherapyConflictSnapshot(id),
+                ),
+                { status: 409 },
+            );
+        }
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
@@ -186,8 +244,8 @@ export async function DELETE(
                 subjectType: 'therapy',
                 subjectRef: id,
                 redactedMetadata: {
-                    changedFields: ['deleted'],
-                    resourceVersion: existing.version,
+                    changedFields: ['deletedAt', 'deletionReason'],
+                    resourceVersion: expectedVersion + 1,
                 },
             },
             '[MediFlow] Therapy audit write failed:',
