@@ -9,6 +9,7 @@ export interface AIStats {
 
 export interface AIChatOptions {
     responseFormat?: 'json';
+    numCtx?: number;
 }
 
 export interface ChatMessage {
