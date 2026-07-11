@@ -10,6 +10,7 @@ import {
 export {
     AI_TASK_EXTRACTION_SCHEMA_VERSION,
     buildPatientInsightExtractionPrompt,
+    buildSmartImportExtractionPrompt,
 } from './ai-task-contract-prompts';
 
 /* @Codex */
@@ -837,93 +838,6 @@ export function parseDocumentSynthesisExtractionResponse(
     };
 }
 
-
-export function buildSmartImportExtractionPrompt(payload: unknown): string {
-    return buildExtractionPrompt(
-        'smart_import',
-        [
-            'Sei un assistente clinico locale per MediFlow.',
-            'Obiettivo: proporre suggerimenti reviewable da importare nel profilo paziente, senza testo discorsivo fuori dal JSON.',
-        ].join('\n'),
-        `{
-    "diagnoses": [
-      {
-        "label": "patologia in italiano",
-        "icdQuery": "query breve per ICD-11",
-        "confidence": "high|medium|low",
-        "evidence": "breve evidenza testuale locale",
-        "sourceId": "id della fonte usata",
-        "explicitCode": "solo se la fonte contiene gia un codice esplicito"
-      }
-    ],
-    "therapies": [
-      {
-        "drugMention": "farmaco o principio attivo menzionato",
-        "drugQuery": "query breve per catalogo farmaci/AIFA",
-        "activePrinciple": "principio attivo se disponibile",
-        "dosage": "posologia se disponibile",
-        "motivation": "indicazione/contesto clinico se disponibile",
-        "therapyState": "active|transition|uncertain|inactive",
-        "reviewNote": "motivo breve se non immediatamente applicabile",
-        "confidence": "high|medium|low",
-        "evidence": "breve evidenza testuale locale",
-        "sourceId": "id della fonte usata"
-      }
-    ],
-    "servicePrescriptions": [
-      {
-        "serviceName": "contenitore prescrittivo non farmacologico",
-        "category": "lab|imaging|visit|rehab|screening|procedure|other",
-        "priority": "priorita se esplicita",
-        "codeSystem": "sistema di codifica se esplicito",
-        "serviceCode": "codice contenitore se esplicito",
-        "clinicalQuestion": "quesito o motivazione se esplicita",
-        "requestReference": "riferimento impegnativa se esplicito",
-        "confidence": "high|medium|low",
-        "evidence": "breve evidenza testuale locale",
-        "sourceId": "id della fonte usata",
-        "items": [
-          {
-            "serviceName": "singola prestazione o analita esplicito",
-            "category": "lab|imaging|visit|rehab|screening|procedure|other",
-            "codeSystem": "sistema di codifica se esplicito",
-            "serviceCode": "codice se esplicito",
-            "confidence": "high|medium|low",
-            "evidence": "evidenza atomica del singolo atto"
-          }
-        ]
-      }
-    ]
-  }`,
-        [
-            'non inventare dati non supportati dalle fonti',
-            'per le diagnosi free-text non inventare codici ICD',
-            'escludi negazioni e familiarita',
-            'in diagnoses includi solo patologie attuali, attive o rilevanti per la gestione corrente; escludi anamnesi remota risolta o problemi solo storici se non cambiano la gestione attuale',
-            'non trasformare da soli fattori di rischio, stili di vita, counselling o sospetti generici in diagnosi strutturate se non sono trattati come problema clinico attivo nelle fonti',
-            'label deve restare in italiano clinico sintetico',
-            'icdQuery deve essere una query breve e specifica in inglese, adatta alla ricerca WHO ICD-11 ufficiale',
-            'sourceId deve coincidere esattamente con un id presente nelle fonti fornite',
-            'massimo 5 diagnosi e 10 terapie',
-            'ogni terapia deve rappresentare un singolo farmaco distinto',
-            'non inserire in therapies prestazioni sanitarie, visite specialistiche, esami, controlli, consulenze, impegnative o referral: non sono farmaci',
-            'se una ricetta/impegnativa prescrive una prestazione specialistica, usa servicePrescriptions e non therapies anche se usa parole come prescritta o richiesta',
-            'se una richiesta non farmacologica contiene piu atti, conserva il contenitore in serviceName e spacchetta i singoli atti in items',
-            'per le terapie usa drugQuery come chiave breve per ricerca catalogo AIFA, preferendo brand o principio attivo con strength se esplicita ma senza frequenza, orari o note accessorie',
-            'drugMention e activePrinciple devono essere il piu possibile aderenti al testo sorgente; se il principio attivo e ovvio usa una forma compatibile con il catalogo locale AIFA',
-            'in therapies includi preferibilmente farmaci attivi con posologia esplicita; se la posologia manca non inventarla',
-            'se il documento distingue terapia alla dimissione, terapia domiciliare e terapia di degenza, considera correnti prima la dimissione, poi la domiciliare; non promuovere automaticamente come active i farmaci citati solo nel decorso di ricovero',
-            'evidence deve essere un excerpt atomico riferito al singolo farmaco o alla singola diagnosi, non un riassunto di piu elementi',
-            'se una terapia e solo proposta, in switch o da confermare, usa therapyState transition o uncertain invece di active',
-            'non marcare active una terapia futura, condizionale, da valutare o dipendente da controllo successivo',
-            'quando una fonte descrive uno switch terapeutico, marca come transition sia il farmaco in uscita sia quello in ingresso finche il passaggio non e confermato',
-            'mantieni evidence, motivation e reviewNote molto brevi e senza ripetere il contesto',
-            'non riassumere la scheda paziente fuori dai campi strettamente necessari',
-        ],
-        'CONTESTO STRUTTURATO',
-        JSON.stringify(payload, null, 2),
-    );
-}
 
 export function buildDocumentSynthesisExtractionPrompt(rawText: string): string {
     return buildExtractionPrompt(
