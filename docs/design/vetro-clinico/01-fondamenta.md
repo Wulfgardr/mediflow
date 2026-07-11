@@ -75,7 +75,7 @@ Registro delle decisioni che questo sistema non può contraddire senza un nuovo 
 | Trattino lungo bandito da docs e stringhe UI; meta-testo bandito dalla UI; stati vuoti onesti | Convenzione ripetuta nei documenti (WUL-271 "meta-text purge"; revisione 2026-07-02) | Vincola anche i testi degli esempi in questo folder. |
 | Claims guard | ADR 0065, `scripts/check-claims-guard.mjs` (scansiona anche `docs/design/`) | I testi UI e questi documenti non fanno claim su autonomia clinica, integrazioni regionali o cloud. |
 
-La decisione è formalizzata da [ADR 0077](../../adr/0077-vetro-clinico-canonical-cross-platform-design-language.md). Finché l'ADR resta `Proposed`, questo folder è una specifica operativa candidata e non autorizza da solo refactor runtime.
+La decisione è formalizzata e accettata da [ADR 0077](../../adr/0077-vetro-clinico-canonical-cross-platform-design-language.md). Questo folder è la specifica operativa del linguaggio di design, ma non autorizza da solo refactor runtime.
 
 ## 4. Anti-pattern (vietati)
 
