@@ -40,7 +40,7 @@ export interface FhirTherapyInput {
     motivation?: string;
     status: 'active' | 'suspended' | 'completed';
     startDate: Date | string;
-    endDate?: Date | string;
+    endDate?: Date | string | null;
 }
 
 export interface FhirCheckupInput {

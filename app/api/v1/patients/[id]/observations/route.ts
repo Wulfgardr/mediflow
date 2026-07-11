@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { dbServer } from '@/lib/db-server';
-import { observations } from '@/lib/schema';
+import { observations, patients } from '@/lib/schema';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { ObservationSummary } from '@/lib/api/v1/types';
@@ -11,6 +11,7 @@ import type { ObservationSummary } from '@/lib/api/v1/types';
 import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
 /* @Codex */
 import { normalizeObservationCreateInput } from '@/lib/api-v1-clinical-write-normalization';
+import { activePatients } from '@/lib/patient-lifecycle';
 
 /* @Codex */
 function toIsoString(value: unknown): string | null {
@@ -111,7 +112,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        await dbServer.insert(observations).values(normalized.values);
+        const created = dbServer.transaction((tx) => {
+            const patient = tx.select({ id: patients.id })
+                .from(patients)
+                .where(and(eq(patients.id, id), activePatients()))
+                .get();
+            if (!patient) return false;
+            tx.insert(observations).values(normalized.values).run();
+            return true;
+        });
+        if (!created) {
+            return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
+        }
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(

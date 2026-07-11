@@ -406,6 +406,11 @@ class ApiTable<T> {
         return data.id;
     }
 
+    /* @Codex */
+    async prepareWritePayload(item: Partial<T>, isPartial = false): Promise<Partial<T>> {
+        return this.encryptItem(item, isPartial);
+    }
+
     // Alias for Dexie compatibility (Upsert-like behavior)
     /* @Codex */
     async put(item: T, options?: { suppressNotify?: boolean }): Promise<string> {
@@ -558,6 +563,8 @@ class ApiTable<T> {
             || this.tableName === 'ambulatories'
             || this.tableName === 'entries'
             || this.tableName === 'checkups'
+            || this.tableName === 'therapies'
+            || this.tableName === 'observations'
             || this.tableName === 'service_prescriptions'
             || this.tableName === 'service_prescription_items'
             || this.tableName === 'prosthetic_prescriptions';
@@ -569,6 +576,8 @@ class ApiTable<T> {
         if (this.tableName === 'ambulatories') return 'ambulatory';
         if (this.tableName === 'entries') return 'entry';
         if (this.tableName === 'checkups') return 'checkup';
+        if (this.tableName === 'therapies') return 'therapy';
+        if (this.tableName === 'observations') return 'observation';
         if (this.tableName === 'service_prescriptions') return 'service prescription';
         if (this.tableName === 'service_prescription_items') return 'service prescription item';
         if (this.tableName === 'prosthetic_prescriptions') return 'prosthetic prescription';
@@ -791,6 +800,43 @@ class MedicalApiClient {
     }
 
     /* @Codex */
+    async applyPatientSmartImport(
+        patientId: string,
+        input: {
+            version: number;
+            diagnoses?: Diagnosis[];
+            therapies: Therapy[];
+        },
+    ): Promise<void> {
+        const patientPayload = input.diagnoses === undefined
+            ? undefined
+            : await this.patients.prepareWritePayload({ diagnoses: input.diagnoses }, true);
+        const therapyPayloads = await Promise.all(
+            input.therapies.map((therapy) => this.therapies.prepareWritePayload(therapy)),
+        );
+
+        const response = await fetch(`/api/patients/${encodeURIComponent(patientId)}/smart-import`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                version: input.version,
+                ...(patientPayload?.diagnoses !== undefined ? { diagnoses: patientPayload.diagnoses } : {}),
+                therapies: therapyPayloads,
+            }),
+        });
+        if (!response.ok) {
+            const payload = await response.json().catch(() => null);
+            if (response.status === 409 && isApiVersionConflictPayload(payload)) {
+                throw new ApiConflictError(payload);
+            }
+            throw new Error('Failed to apply Smart Import selection');
+        }
+
+        if (input.diagnoses !== undefined) notifyDbChange('patients');
+        if (input.therapies.length > 0) notifyDbChange('therapies');
+    }
+
+    /* @Codex */
     setKey(key: CryptoKey | null) {
         this.masterKey = key;
     }
@@ -920,6 +966,10 @@ export interface Observation {
     observedAt: Date;
     source?: 'manual' | 'ai_suggestion';
     createdAt: Date;
+    version?: number;
+    updatedAt?: Date;
+    deletedAt?: Date | null;
+    deletionReason?: string | null;
 }
 
 export interface Attachment {
@@ -1095,9 +1145,10 @@ export interface Therapy {
     /* @Codex */
     status: 'active' | 'suspended' | 'completed';
     startDate: Date;
-    endDate?: Date;
+    endDate?: Date | null;
     createdAt: Date;
     updatedAt?: Date;
+    version?: number;
     /* @Codex */
     deletedAt?: Date | null;
     /* @Codex */

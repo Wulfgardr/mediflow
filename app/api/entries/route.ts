@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { entries } from '@/lib/schema';
+import { entries, patients } from '@/lib/schema';
 import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
@@ -11,6 +11,7 @@ import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/securit
 import { normalizeEntryCreateInput } from '@/lib/api-v1-clinical-write-normalization';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';
+import { activePatients } from '@/lib/patient-lifecycle';
 
 // Only plaintext columns are sortable server-side (ENC: columns are opaque).
 const ENTRY_SORT_COLUMNS = {
@@ -79,7 +80,18 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        await dbServer.insert(entries).values(normalized.values);
+        const created = dbServer.transaction((tx) => {
+            const patient = tx.select({ id: patients.id })
+                .from(patients)
+                .where(and(eq(patients.id, patientId), activePatients()))
+                .get();
+            if (!patient) return false;
+            tx.insert(entries).values(normalized.values).run();
+            return true;
+        });
+        if (!created) {
+            return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
+        }
 
         /* @Codex */
         await safeWriteAuditEventFromRequest(
