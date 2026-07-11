@@ -483,6 +483,7 @@ test('smart import prompt stays byte-identical through the compatible barrel', (
     assert.equal(createHash('sha256').update(prompt).digest('hex'), 'e0a67ae602f10e8d5e68b4dacfca678bdca72993a0597ebfe77b9bb038c6e430');
 });
 
+/* @Codex */
 test('document synthesis prompt stays byte-identical through the compatible barrel', () => {
     const rawText = 'REFERTO SINTETICO\nNessun dato reale';
     const prompt = buildDocumentSynthesisExtractionPrompt(rawText);
