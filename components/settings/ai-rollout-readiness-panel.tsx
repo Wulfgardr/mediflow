@@ -15,7 +15,9 @@ type RolloutLane =
 type RolloutLocalControlLane =
     | 'patient_insight'
     | 'smart_import'
-    | 'document_synthesis';
+    | 'document_synthesis'
+    | 'treatment_reasoning'
+    | 'ocr';
 
 type RolloutArtifactPayload = {
     lanes: Array<{

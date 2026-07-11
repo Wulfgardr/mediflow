@@ -14,6 +14,14 @@ import {
     AI_SMART_IMPORT_KILL_SWITCH_KEY,
     isAiSmartImportEnabledValue,
 } from './ai-smart-import-kill-switch';
+import {
+    AI_TREATMENT_REASONING_KILL_SWITCH_KEY,
+    isAiTreatmentReasoningEnabledValue,
+} from './ai-treatment-reasoning-kill-switch';
+import {
+    AI_OCR_KILL_SWITCH_KEY,
+    isAiOcrEnabledValue,
+} from './ai-ocr-kill-switch';
 
 export type RolloutReadinessArtifactLane =
     | 'patient_insight'
@@ -33,12 +41,16 @@ export const AI_ROLLOUT_READINESS_LANES: RolloutReadinessArtifactLane[] = [
 export type RolloutReadinessLocalControlLane =
     | 'patient_insight'
     | 'smart_import'
-    | 'document_synthesis';
+    | 'document_synthesis'
+    | 'treatment_reasoning'
+    | 'ocr';
 
 export const AI_ROLLOUT_LOCAL_CONTROL_LANES: RolloutReadinessLocalControlLane[] = [
     'patient_insight',
     'smart_import',
     'document_synthesis',
+    'treatment_reasoning',
+    'ocr',
 ];
 
 const AI_ROLLOUT_LOCAL_CONTROL_META: Record<RolloutReadinessLocalControlLane, {
@@ -60,6 +72,16 @@ const AI_ROLLOUT_LOCAL_CONTROL_META: Record<RolloutReadinessLocalControlLane, {
         label: 'Document Synthesis',
         key: AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
         resolveEnabled: isAiDocumentSynthesisEnabledValue,
+    },
+    treatment_reasoning: {
+        label: 'Treatment Reasoning',
+        key: AI_TREATMENT_REASONING_KILL_SWITCH_KEY,
+        resolveEnabled: isAiTreatmentReasoningEnabledValue,
+    },
+    ocr: {
+        label: 'OCR documentale',
+        key: AI_OCR_KILL_SWITCH_KEY,
+        resolveEnabled: isAiOcrEnabledValue,
     },
 };
 
