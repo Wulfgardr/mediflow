@@ -145,11 +145,11 @@ la family architecture. In questa slice il bundle **osserva** il runtime locale:
 * non mostra mai token, certificati, chiavi o dati paziente;
 * non installa, avvia, arresta o supervisiona Ollama o container Docker.
 
-`scripts/build-native-app.sh` produce un bundle locale non firmato per default,
-ma puo firmarlo con `MEDIFLOW_CODESIGN_IDENTITY` (`-` per ad-hoc, Developer ID
-per distribuzione) e puo inviare un archivio a notarizzazione con
-`MEDIFLOW_NOTARY_PROFILE`. I servizi opzionali sono visibili come health
-diagnostico, non come processi app-managed.
+`scripts/build-apple-macos-app.sh` produce il bundle universale macOS con il
+WebRuntime incluso, non firmato per default, e puo firmarlo con
+`MEDIFLOW_CODESIGN_IDENTITY` (`-` per ad-hoc, Developer ID per distribuzione).
+La notarizzazione resta un passaggio di distribuzione separato. I servizi
+opzionali sono visibili come health diagnostico, non come processi app-managed.
 
 ### 1. Lock Screen & Sicurezza
 
