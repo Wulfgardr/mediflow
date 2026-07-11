@@ -1,3 +1,5 @@
+import { parseExpectedVersion as parseCanonicalExpectedVersion } from './version-concurrency';
+
 export type AmbulatoryConflictSnapshot = {
     id: string;
     version: number;
@@ -25,7 +27,7 @@ type AmbulatoryConflictSource = {
 };
 
 export function parseExpectedVersion(value: unknown): number | null {
-    return Number.isInteger(value) && typeof value === 'number' && value > 0 ? value : null;
+    return parseCanonicalExpectedVersion(value);
 }
 
 export function buildAmbulatoryVersionConflictPayload(

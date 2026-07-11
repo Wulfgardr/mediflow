@@ -1,3 +1,5 @@
+import { parseExpectedVersion } from './version-concurrency';
+
 /* @Codex */
 export type CheckupConflictSnapshot = {
     id: string;
@@ -30,7 +32,7 @@ type CheckupConflictSource = {
 
 /* @Codex */
 export function parseCheckupExpectedVersion(value: unknown): number | null {
-    return Number.isInteger(value) && typeof value === 'number' && value > 0 ? value : null;
+    return parseExpectedVersion(value);
 }
 
 /* @Codex */

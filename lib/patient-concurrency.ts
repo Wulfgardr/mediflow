@@ -1,3 +1,5 @@
+import { parseExpectedVersion as parseCanonicalExpectedVersion } from './version-concurrency';
+
 /* @Codex */
 export type PatientConflictSnapshot = {
     id: string;
@@ -28,7 +30,7 @@ type PatientConflictSource = {
 
 /* @Codex */
 export function parseExpectedVersion(value: unknown): number | null {
-    return Number.isInteger(value) && typeof value === 'number' && value > 0 ? value : null;
+    return parseCanonicalExpectedVersion(value);
 }
 
 /* @Codex */
