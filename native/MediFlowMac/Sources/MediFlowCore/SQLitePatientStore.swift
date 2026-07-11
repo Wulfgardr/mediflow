@@ -111,6 +111,7 @@ public struct SQLitePatientStore {
     }
 
     /// Decrypted convenience retained for direct core consumers and tests.
+    /* @Codex */
     public func loadPatientDetail(
         id: String, scopeAmbulatoryId: String? = nil, masterKey: SymmetricKey
     ) throws -> HomeBasePatientDetail? {
@@ -118,6 +119,7 @@ public struct SQLitePatientStore {
         return PatientFieldCrypto.decryptDetail(raw, masterKey: masterKey)
     }
 
+    /* @Codex */
     private func loadPatientDetailRow(
         id: String, scopeAmbulatoryId: String?
     ) throws -> HomeBasePatientDetail? {

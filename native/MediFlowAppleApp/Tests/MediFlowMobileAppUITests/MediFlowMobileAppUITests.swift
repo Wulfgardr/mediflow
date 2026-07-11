@@ -11,6 +11,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app = XCUIApplication()
     }
 
+    /* @Codex */
     private func launch(seedPatients: Bool = false, lockedPatientFields: Bool = false, section: String? = nil) {
         if seedPatients { app.launchEnvironment["MEDIFLOW_APPLE_UITEST_PATIENTS"] = "1" }
         if lockedPatientFields { app.launchEnvironment["MEDIFLOW_APPLE_UITEST_LOCKED_PATIENT_FIELDS"] = "1" }
@@ -247,6 +248,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Via Roma 1, Milano"].waitForNonExistence(timeout: 3))
     }
 
+    /* @Codex */
     func testEditPatientFormDisablesLockedFieldWithoutShowingCiphertext() {
         launch(seedPatients: true, lockedPatientFields: true, section: "modules")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))

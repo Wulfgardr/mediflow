@@ -129,6 +129,7 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         }
     }
 
+    /* @Codex */
     func testLockedPatientFieldsStayEmptyAndAreOmittedFromUpdate() async throws {
         let locked = try XCTUnwrap(CryptoService.encryptField(
             CryptoService.jsonEncode("dato protetto")!, masterKey: SymmetricKey(size: .bits256)))
@@ -412,6 +413,7 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         )
     }
 
+    /* @Codex */
     private func detail(
         id: String,
         archived: Bool,

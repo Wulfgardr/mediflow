@@ -38,10 +38,12 @@ final class LocalPatientsDataSourceTests: XCTestCase {
         XCTAssertTrue(outOfScope.isEmpty)
     }
 
+    /* @Codex */
     func testFetchPatientPreservesRawEncryptedFieldsForModelParity() async throws {
         let detail = try await makeSource().fetchPatient(
             id: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
         XCTAssertEqual(detail.firstName, "Mario")
+        /* @Codex */
         XCTAssertTrue(detail.address?.hasPrefix(CryptoService.encPrefix) == true)
         XCTAssertEqual(PatientFieldCrypto.decryptStringField(detail.address, masterKey: masterKey), "Via Roma 1, Milano")
     }
@@ -244,6 +246,7 @@ final class LocalPatientsDataSourceTests: XCTestCase {
         // Persisted locally + decrypts to the plaintext (no double-encryption).
         let detail = try await source.fetchPatient(
             id: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+        /* @Codex */
         XCTAssertTrue(detail.address?.hasPrefix(CryptoService.encPrefix) == true)
         XCTAssertEqual(PatientFieldCrypto.decryptStringField(detail.address, masterKey: masterKey), "Via Nuova 5")
         XCTAssertEqual(detail.version, 2)
@@ -285,6 +288,7 @@ final class LocalPatientsDataSourceTests: XCTestCase {
         XCTAssertTrue(list.contains { $0.id == created.id && $0.lastName == "Paziente" })
         let detail = try await source.fetchPatient(
             id: created.id, credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+        /* @Codex */
         XCTAssertTrue(detail.address?.hasPrefix(CryptoService.encPrefix) == true)
         XCTAssertEqual(PatientFieldCrypto.decryptStringField(detail.address, masterKey: masterKey), "Via Test 1")
         XCTAssertEqual(detail.taxCode, "NVOPZT80A01H501Z")

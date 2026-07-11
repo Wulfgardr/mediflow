@@ -807,6 +807,7 @@ struct PairedPatientsWorkspaceView: View {
                 .accessibilityIdentifier("edit-patient-lastName")
             TextField("Codice fiscale", text: $model.editPatientTaxCode)
                 .accessibilityIdentifier("edit-patient-taxCode")
+            /* @Codex */
             TextField("Indirizzo", text: $model.editPatientAddress)
                 .accessibilityIdentifier("edit-patient-address")
                 .disabled(model.isPatientFieldLocked(.address))
@@ -882,6 +883,7 @@ struct PairedPatientsWorkspaceView: View {
                     .accessibilityIdentifier("add-diagnosis-button")
                 }
             }
+            /* @Codex */
             .disabled(model.isPatientFieldLocked(.diagnoses))
 
             VStack(alignment: .leading, spacing: 4) {
@@ -922,6 +924,7 @@ struct PairedPatientsWorkspaceView: View {
                 }
                 exemptionCatalogResultsList
             }
+            /* @Codex */
             .disabled(model.isPatientFieldLocked(.exemptions))
 
             HStack(spacing: 10) {
