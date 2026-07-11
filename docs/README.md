@@ -33,6 +33,7 @@ Approfondimenti utili:
 - Mappa completa markdown: [docs/markdown-index.md](./markdown-index.md)
 - Governance repository e topologia runtime/publication: [docs/repository-topology.md](./repository-topology.md)
 - Sistema di design Vetro Clinico (canone visivo e di interazione per tutte le piattaforme): [docs/design/vetro-clinico/README.md](./design/vetro-clinico/README.md)
+- Lume, proposta di lingua di design successiva (stato: in valutazione): [docs/design/lume/README.md](./design/lume/README.md)
 - Lettura completa dello stato corrente: [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
 - FAQ pubbliche e stato sintetico del prodotto: [docs/FAQ.md](./FAQ.md)
 - Walkthrough operativo end-to-end: [docs/walkthrough.md](./walkthrough.md)
