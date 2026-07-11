@@ -198,9 +198,9 @@ const ENCRYPTED_FIELDS: Record<string, string[]> = {
     patients: ['address', 'phone', 'caregiver', 'exemptions', 'diagnoses', 'statusReason', 'notes', 'aiSummary', 'documentInsights', 'archiveReason', 'archiveNote', 'deletionReason'],
     entries: ['title', 'content', 'metadata', 'attachments', 'deletionReason'],
     therapies: ['motivation', 'deletionReason'],
-    checkups: ['notes'],
+    checkups: ['notes', 'deletionReason'],
     /* @Codex */
-    observations: ['notes'],
+    observations: ['notes', 'deletionReason'],
     /* @Codex */
     prosthetic_prescriptions: ['description', 'measures', 'clinicalReason', 'regionalPrescriptionId', 'supplier', 'collaudoOutcome', 'documentRefs', 'notes'],
     /* @Codex */
@@ -650,7 +650,10 @@ class ApiTable<T> {
     private async encryptDeleteField(field: string, value: string): Promise<string> {
         const fields = ENCRYPTED_FIELDS[this.tableName];
         const key = this.getMasterKey();
-        if (!fields?.includes(field) || !key || !value) return value;
+        if (!fields?.includes(field) || !value) return value;
+        if (!key) {
+            throw new Error(`Encryption key unavailable for ${this.tableName}.${field}`);
+        }
 
         const { iv, data } = await encryptData(value, key);
         return `ENC:${iv}:${data}`;
@@ -683,13 +686,15 @@ class ApiTable<T> {
                 }
                 continue;
             }
-            if (!key) continue;
-            if (copy[field]) {
+            if (copy[field] !== undefined && copy[field] !== null) {
+                if (!key) {
+                    throw new Error(`Encryption key unavailable for ${this.tableName}.${field}`);
+                }
                 try {
                     const { iv, data } = await encryptData(copy[field], key);
                     copy[field] = `ENC:${iv}:${data}`;
-                } catch (e) {
-                    console.error(`Failed to encrypt ${this.tableName}.${field}`, e);
+                } catch (error) {
+                    throw new Error(`Encryption failed for ${this.tableName}.${field}`, { cause: error });
                 }
             }
         }

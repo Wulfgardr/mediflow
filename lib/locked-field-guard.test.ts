@@ -153,4 +153,65 @@ describe('db locked-data round trip (WUL-323)', () => {
         assert.equal(postBody.phone, ciphertext);
         assert.equal(LOCKED_CIPHERTEXT_KEY in postBody, false);
     });
+
+    it('refuses plaintext encrypted-field writes when the master key is unavailable', async () => {
+        db.setKey(null);
+        const calls = installFetchMock(() => ({ id: 'p5' }));
+
+        await assert.rejects(
+            db.patients.put({ id: 'p5', notes: 'dato clinico' } as never, { suppressNotify: true }),
+            /Encryption key unavailable for patients\.notes/,
+        );
+        assert.equal(calls.length, 0, 'the plaintext payload must not reach fetch');
+    });
+
+    it('refuses the write when encryption fails', async () => {
+        const incompatibleKey = await globalThis.crypto.subtle.generateKey(
+            { name: 'HMAC', hash: 'SHA-256' },
+            false,
+            ['sign', 'verify'],
+        );
+        db.setKey(incompatibleKey);
+        const calls = installFetchMock(() => ({ id: 'p6' }));
+
+        await assert.rejects(
+            db.patients.put({ id: 'p6', notes: 'dato clinico' } as never, { suppressNotify: true }),
+            /Encryption failed for patients\.notes/,
+        );
+        assert.equal(calls.length, 0, 'a failed encryption must abort before fetch');
+    });
+
+    it('encrypts normally when the master key is available', async () => {
+        db.setKey(await generateMasterKey());
+        const calls = installFetchMock(() => ({ id: 'p7' }));
+
+        await db.patients.put({ id: 'p7', notes: 'dato clinico' } as never, { suppressNotify: true });
+
+        const postBody = calls.find((call) => call.method === 'POST')?.body;
+        assert.ok(postBody);
+        assert.match(String(postBody.notes), /^ENC:/);
+    });
+
+    it('keeps legacy plaintext deletion reasons readable and encrypts new writes', async () => {
+        db.setKey(await generateMasterKey());
+        const calls = installFetchMock((call) => {
+            if (call.method === 'GET') {
+                return { id: 'legacy', version: 1, deletionReason: 'motivo legacy' };
+            }
+            return { id: 'legacy' };
+        });
+
+        const checkup = await db.checkups.get('legacy');
+        const observation = await db.observations.get('legacy');
+        assert.equal(checkup?.deletionReason, 'motivo legacy');
+        assert.equal(observation?.deletionReason, 'motivo legacy');
+
+        await db.checkups.update('legacy', { version: 1, deletionReason: 'nuovo motivo' });
+        await db.observations.update('legacy', { deletionReason: 'nuovo motivo' });
+        const putBodies = calls.filter((call) => call.method === 'PUT').map((call) => call.body);
+        assert.equal(putBodies.length, 2);
+        for (const body of putBodies) {
+            assert.match(String(body?.deletionReason), /^ENC:/);
+        }
+    });
 });
