@@ -1,246 +1,108 @@
 import { db } from '@/lib/db';
 import { DEFAULT_OCR_MODEL, ensureTextModelDefaultsUpgraded, resolveTextModel } from '@/lib/ai-models';
+import {
+    DEFAULT_OLLAMA_BASE_URL,
+    resolveOllamaBaseUrl,
+} from '@/lib/ai-providers/base-url';
+import { OllamaProviderAdapter } from '@/lib/ai-providers/ollama';
+import type {
+    AIChatOptions,
+    AIModel,
+    AIProvider,
+    AIStats,
+    ChatMessage,
+    ChatMessageContent,
+    ProviderAdapter,
+} from '@/lib/ai-providers/provider';
 
-export type AIProvider = 'ollama';
+export type {
+    AIChatOptions,
+    AIModel,
+    AIProvider,
+    AIStats,
+    ChatMessage,
+    ChatMessageContent,
+    ProviderAdapter,
+} from '@/lib/ai-providers/provider';
 
-// Timeout per-task: una connessione Ollama appesa non deve bloccare la superficie
-// chiamante (insight, smart import, sintesi, OCR). Valori generosi perche i task
-// clinici girano con think:false; servono solo a spezzare le richieste infinite.
 const TEXT_CHAT_TIMEOUT_MS = 300_000;
 const OCR_CHAT_TIMEOUT_MS = 180_000;
-// Mantiene il modello caldo dopo l'uso per evitare il ricarico a freddo (default
-// Ollama 5m). Passa nel body /api/chat, inoltrato integro dal proxy loopback.
-const MODEL_KEEP_ALIVE = '30m';
-
-export interface AIStats {
-    latency: number;
-    tokensIn: number;
-    tokensOut: number;
-}
 
 /* @Codex */
-export interface AIChatOptions {
-    responseFormat?: 'json';
-}
-
-export interface ChatMessage {
-    role: string;
-    content: string | ChatMessageContent[];
-}
-
-// Multimodal content support (for vision models like DeepSeek-OCR)
-export interface ChatMessageContent {
-    type: 'text' | 'image_url';
-    text?: string;
-    image_url?: { url: string }; // base64 data URL or http URL
-}
-
-function normalizeOllamaImage(url: string): string {
-    if (url.startsWith('data:')) {
-        const [, data] = url.split(',', 2);
-        return data || url;
-    }
-    return url;
-}
-
-function toOllamaMessages(messages: ChatMessage[]) {
-    return messages.map((message) => {
-        if (typeof message.content === 'string') {
-            return {
-                role: message.role,
-                content: message.content,
-            };
-        }
-
-        const textParts: string[] = [];
-        const images: string[] = [];
-
-        for (const item of message.content) {
-            if (item.type === 'text' && item.text) {
-                textParts.push(item.text);
-            } else if (item.type === 'image_url' && item.image_url?.url) {
-                images.push(normalizeOllamaImage(item.image_url.url));
-            }
-        }
-
-        return {
-            role: message.role,
-            content: textParts.join('\n\n').trim(),
-            ...(images.length > 0 ? { images } : {})
-        };
-    });
-}
-
 export class AIService {
     public provider: AIProvider;
-    private baseUrl: string;
-    private model: string;
-    private disableThinking: boolean;
-    private chatTimeoutMs: number;
+    private readonly adapter: ProviderAdapter;
+    private readonly baseUrl: string;
+    private readonly model: string;
 
     constructor(provider: AIProvider, baseUrl: string, model: string, disableThinking = false, chatTimeoutMs = TEXT_CHAT_TIMEOUT_MS) {
-        // Clean URL: Handle /v1, /v (typo), and trailing slash
-        this.baseUrl = baseUrl.replace(/\/v1?\/?$/, '').replace(/\/$/, '');
         this.provider = provider;
-        this.model = model;
-        this.disableThinking = disableThinking;
-        this.chatTimeoutMs = chatTimeoutMs;
+
+        const adapter = new OllamaProviderAdapter({
+            baseUrl,
+            model,
+            disableThinking,
+            chatTimeoutMs,
+        });
+        this.adapter = adapter;
+        this.baseUrl = adapter.getBaseUrl();
+        this.model = adapter.getModel();
     }
 
-    /* @Codex */
+    static fromOllama(baseUrl: string, model: string, disableThinking = false, chatTimeoutMs = TEXT_CHAT_TIMEOUT_MS): AIService {
+        return new AIService('ollama', baseUrl, model, disableThinking, chatTimeoutMs);
+    }
+
     getModelInfo() {
         return {
             provider: this.provider,
             model: this.model,
-            baseUrl: this.baseUrl
+            baseUrl: this.baseUrl,
         };
     }
 
-    /* @Codex */
-    private isBrowserRuntime(): boolean {
-        return typeof window !== 'undefined';
-    }
-
     static async create(task: 'clinical' | 'reasoning' | 'ocr' = 'clinical'): Promise<AIService> {
-        /* @Codex */
         const provider: AIProvider = 'ollama';
         await ensureTextModelDefaultsUpgraded();
 
-        const defaultUrl = "http://127.0.0.1:11434";
-
-        // Try reading generic 'aiUrl' first, then 'ollamaUrl' as fallback
         const genericUrl = await db.settings.get('aiUrl');
         const legacyUrl = await db.settings.get('ollamaUrl');
+        const baseUrl = resolveOllamaBaseUrl(genericUrl?.value, legacyUrl?.value, DEFAULT_OLLAMA_BASE_URL);
 
-        let url = genericUrl?.value;
-        if (!url && provider === 'ollama') url = legacyUrl?.value;
-        if (!url) {
-            url = defaultUrl;
-        }
-        /* @Codex */
-        if (provider === 'ollama' && url.includes(":8080")) {
-            url = legacyUrl?.value || "http://127.0.0.1:11434";
-        }
-
-        // --- Task-Based Model Selection ---
-        // 1. Try to get specific model for the task
         const modelClinical = await db.settings.get('aiModel_clinical');
         const modelReasoning = await db.settings.get('aiModel_reasoning');
         const modelOcr = await db.settings.get('aiModel_ocr');
-        // 2. Fallback to legacy 'aiModel' (which was serving as global previously)
         const modelLegacy = await db.settings.get('aiModel');
 
-        let model = "";
-
+        let model = '';
         if (task === 'clinical') {
             model = resolveTextModel(modelClinical?.value, modelLegacy?.value);
         } else if (task === 'ocr') {
-            // OCR task: DeepSeek-OCR for document understanding
             model = modelOcr?.value || DEFAULT_OCR_MODEL;
-        } else { // reasoning
+        } else {
             model = resolveTextModel(modelReasoning?.value, modelLegacy?.value);
         }
 
         console.log(`[AIService] Initialized for task '${task}' with model: ${model} (${provider})`);
 
-        // think:false per tutti i task testuali contract-bound (clinical e
-        // reasoning): sono estrazioni JSON, non ragionamento aperto. Evita il crollo
-        // di latenza dei modelli con thinking abilitato. OCR e multimodale, il flag
-        // non si applica.
         const disableThinking = task !== 'ocr';
         const chatTimeoutMs = task === 'ocr' ? OCR_CHAT_TIMEOUT_MS : TEXT_CHAT_TIMEOUT_MS;
-        return new AIService(provider, url, model, disableThinking, chatTimeoutMs);
+        return AIService.fromOllama(baseUrl, model, disableThinking, chatTimeoutMs);
     }
 
-    /**
-     * Unified chat entrypoint backed by the native Ollama chat API.
-     */
     async chat(messages: ChatMessage[], signal?: AbortSignal, maxTokens?: number, options?: AIChatOptions): Promise<{ content: string; stats: AIStats }> {
-        const start = Date.now();
-        const body = {
-            model: this.model,
-            messages: toOllamaMessages(messages),
-            stream: false,
-            ...(options?.responseFormat === 'json' ? { format: 'json' } : {}),
-            keep_alive: MODEL_KEEP_ALIVE,
-            options: {
-                temperature: 0.4,
-                num_predict: maxTokens || 4096,
-            },
-            ...(this.disableThinking ? { think: false } : {}),
-        };
-        const endpoint = this.isBrowserRuntime()
-            ? '/api/proxy/ollama/chat'
-            : `${this.baseUrl}/api/chat`;
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-        };
-        if (this.isBrowserRuntime()) {
-            headers['x-target-url'] = this.baseUrl;
-        }
-
-        // Combina il timeout per-task con l'eventuale signal esterno (annullamento
-        // utente). Se Ollama si appende, la richiesta viene abortita comunque.
-        const timeoutSignal = AbortSignal.timeout(this.chatTimeoutMs);
-        const effectiveSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
-
-        try {
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(body),
-                signal: effectiveSignal // annullamento utente + timeout per-task
-            });
-
-            if (!response.ok) {
-                const errText = await response.text();
-                throw new Error(`AI Provider Error (${response.status}): ${errText}`);
-            }
-
-            const data = await response.json();
-            const content = data.message?.content || data.choices?.[0]?.message?.content || "";
-            const usage = data.usage || {};
-            const tokensIn = data.prompt_eval_count || usage.prompt_tokens || 0;
-            const tokensOut = data.eval_count || usage.completion_tokens || 0;
-
-            return {
-                content,
-                stats: {
-                    latency: Date.now() - start,
-                    tokensIn,
-                    tokensOut,
-                }
-            };
-
-        } catch (e: unknown) {
-            // Timeout per-task: distinguibile dall'annullamento utente (che imposta
-            // il proprio signal.aborted) per dare un messaggio chiaro a valle.
-            if (e instanceof DOMException && e.name === 'TimeoutError' && !signal?.aborted) {
-                console.error(`AI Service Chat Timeout dopo ${this.chatTimeoutMs} ms`);
-                throw new Error(`Timeout del provider AI dopo ${Math.round(this.chatTimeoutMs / 1000)}s. Verifica che il modello sia caricato e riprova.`);
-            }
-            console.error("AI Service Chat Error:", e);
-            throw e;
-        }
+        return this.adapter.chat(messages, signal, maxTokens, options);
     }
 
-    /**
-     * Compatibility wrapper for simple generation
-     */
     async generate(prompt: string, signal?: AbortSignal, maxTokens?: number): Promise<string> {
-        const messages = [{ role: 'user', content: prompt }];
-        const result = await this.chat(messages, signal, maxTokens);
+        const result = await this.chat([{ role: 'user', content: prompt }], signal, maxTokens);
         return result.content;
     }
 
     async getHealth(): Promise<{ status: 'ok' | 'error'; message: string; models: string[] }> {
-        // Simple ping to check connectivity
         try {
-            // Hack/Efficiency: use chat with empty/short prompt to test connectivity
-            // await this.chat([{ role: 'user', content: 'ping' }]);
-            // Better: use the new models endpoint to verify connectivity AND get models
             const models = await this.listModels();
-            return { status: 'ok', message: `${this.provider.toUpperCase()} Ready`, models: models.map(m => m.name) };
+            return { status: 'ok', message: `${this.provider.toUpperCase()} Ready`, models: models.map((model) => model.name) };
         } catch (e: unknown) {
             const message = e instanceof Error ? e.message : 'Unknown error';
             return { status: 'error', message: `Connessione fallita: ${message}`, models: [] };
@@ -252,89 +114,12 @@ export class AIService {
         return health.status === 'ok';
     }
 
-    /**
-     * List installed models via API proxy
-     */
-    async listModels(): Promise<{ name: string; size: number; details: Record<string, unknown> }[]> {
-        if (this.provider !== 'ollama') return [];
-
-        const targetUrl = this.baseUrl; // already cleaned
-        try {
-            const res = await fetch(
-                this.isBrowserRuntime() ? '/api/ai/models' : `${targetUrl}/api/tags`,
-                this.isBrowserRuntime()
-                    ? { headers: { 'x-target-url': targetUrl } }
-                    : undefined,
-            );
-            if (!res.ok) throw new Error("Failed to fetch models");
-            const data = await res.json();
-            return data.models || [];
-        } catch (e) {
-            console.error("List Models Error:", e);
-            throw e;
-        }
+    async listModels(): Promise<AIModel[]> {
+        return this.adapter.listModels();
     }
 
-    /**
-     * Pull a model via API proxy with progress callback
-     */
     async pullModel(modelName: string, onProgress?: (status: string, progress: number) => void): Promise<void> {
-        if (this.provider !== 'ollama') throw new Error("Pulling models only supported for Ollama");
-
-        const targetUrl = this.baseUrl;
-
-        const response = await fetch(this.isBrowserRuntime() ? '/api/ai/pull' : `${targetUrl}/api/pull`, { // Use proxy in browser, direct Ollama on server
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(this.isBrowserRuntime() ? { 'x-target-url': targetUrl } : {})
-            },
-            body: JSON.stringify({ model: modelName })
-        });
-
-        if (!response.ok || !response.body) {
-            throw new Error("Failed to start model pull");
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        try {
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-
-                // Process all complete lines
-                buffer = lines.pop() || '';
-
-                for (const line of lines) {
-                    if (!line.trim()) continue;
-                    try {
-                        const data = JSON.parse(line);
-
-                        // Calculate percentage if available
-                        let percent = 0;
-                        if (data.total && data.completed) {
-                            percent = Math.round((data.completed / data.total) * 100);
-                        }
-
-                        if (onProgress) {
-                            onProgress(data.status, percent);
-                        }
-
-                        if (data.error) throw new Error(data.error);
-                    } catch (e) {
-                        // ignore parse errors for partial chunks
-                        console.warn("Parse error chunk", e);
-                    }
-                }
-            }
-        } finally {
-            reader.releaseLock();
-        }
+        if (!this.adapter.pullModel) throw new Error('Pulling models only supported for Ollama');
+        return this.adapter.pullModel(modelName, onProgress);
     }
 }

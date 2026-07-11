@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractDocumentWithAI, isLowSignalOcrText } from '@/lib/domain/documents/ocr-service';
 import { AIService } from '@/lib/ai-service';
+/* @Codex */
+import { normalizeOllamaBaseUrl } from '@/lib/ai-providers/base-url';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
 import { inArray } from 'drizzle-orm';
@@ -44,9 +46,9 @@ async function loadOcrRuntimeSettings() {
 
     const getValue = (key: string) => rows.find(row => row.key === key)?.value || null;
     const configuredModel = getValue('aiModel_ocr') || 'deepseek-ocr';
-    const baseUrl = (getValue('aiUrl') || getValue('ollamaUrl') || 'http://127.0.0.1:11434')
-        .replace(/\/v1\/?$/, '')
-        .replace(/\/$/, '');
+    const baseUrl = normalizeOllamaBaseUrl(
+        getValue('aiUrl') || getValue('ollamaUrl') || 'http://127.0.0.1:11434',
+    );
 
     return {
         configuredModel,
@@ -157,7 +159,8 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const ai = new AIService('ollama', validation.url.toString(), configuredModel);
+        /* @Codex */
+        const ai = AIService.fromOllama(validation.url.toString(), configuredModel);
         /* @Codex */
         let result = await extractDocumentWithAI(image, mode, ai, { signal: request.signal });
         /* @Codex */
