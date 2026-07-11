@@ -12,6 +12,25 @@ function jsonResponse(body: unknown): Response {
     return new Response(JSON.stringify(body), { status: 200 });
 }
 
+test('production helper notifies auth failures without exposing the query or notifying on 5xx', async (t) => {
+    const notified: number[] = [];
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: {
+        dispatchEvent: (event: CustomEvent<{ status: number }>) => notified.push(event.detail.status),
+    } });
+    t.after(() => originalWindow
+        ? Object.defineProperty(globalThis, 'window', originalWindow)
+        : Reflect.deleteProperty(globalThis, 'window'));
+
+    for (const status of [401, 403, 500]) {
+        await assert.rejects(
+            fetchDrugAutocomplete('query-riservata', new AbortController().signal, async () => new Response(null, { status })),
+            (error: unknown) => error instanceof Error && !error.message.includes('query-riservata'),
+        );
+    }
+    assert.deepEqual(notified, [401, 403]);
+});
+
 test('production helper sends the full query, preserves payloads, and caps results at 30', async () => {
     let requestedUrl = '';
     const candidates = Array.from({ length: 35 }, (_, index): AifaDrug => ({
@@ -53,11 +72,15 @@ test('coordinator aborts the prior request and suppresses its stale response', a
     assert.deepEqual(await second, [{ aic: '2', name: 'Secondo farmaco' }]);
 
     pending[0].resolve(jsonResponse([{ aic: '1', name: 'Primo farmaco' }]));
-    assert.equal(await first, null);
+    let newerLoading = true;
+    if (await first !== null) newerLoading = false;
+    assert.equal(newerLoading, true);
 
-    const unmounted = search.run('Terzo farmaco');
-    search.abort();
+    const selected = search.run('Secondo farmaco');
+    let isLoading = true;
+    commitDrugAutocompleteQueryChange(search, () => {}, 'Secondo farmaco', () => { isLoading = false; });
+    assert.equal(isLoading, false);
     assert.equal(pending[2].signal.aborted, true);
-    pending[2].resolve(jsonResponse([{ aic: '3', name: 'Terzo farmaco' }]));
-    assert.equal(await unmounted, null);
+    pending[2].resolve(jsonResponse([{ aic: '2', name: 'Secondo farmaco' }]));
+    assert.equal(await selected, null);
 });

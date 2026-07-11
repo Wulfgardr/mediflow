@@ -1,4 +1,5 @@
 import type { AifaDrug } from '@/lib/db';
+import { isApiTableAuthUnavailableStatus, notifyApiAuthUnavailable } from '@/lib/api-table-response';
 
 const RESULT_LIMIT = 30;
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -10,7 +11,10 @@ export async function fetchDrugAutocomplete(
     fetchImpl: FetchLike = fetch,
 ): Promise<AifaDrug[]> {
     const response = await fetchImpl(`/api/drugs?q=${encodeURIComponent(query.trim())}`, { signal });
-    if (!response.ok) throw new Error(`Drug search failed with status ${response.status}`);
+    if (!response.ok) {
+        if (isApiTableAuthUnavailableStatus(response.status)) notifyApiAuthUnavailable(response.status);
+        throw new Error(`Drug search failed with status ${response.status}`);
+    }
 
     const payload: unknown = await response.json();
     if (!Array.isArray(payload)) throw new Error('Drug search returned an invalid payload');
@@ -50,7 +54,9 @@ export function commitDrugAutocompleteQueryChange(
     search: Pick<ReturnType<typeof createDrugAutocompleteSearch>, 'abort'>,
     commit: (value: string) => void,
     value: string,
+    afterAbort?: () => void,
 ) {
     search.abort();
+    afterAbort?.();
     commit(value);
 }
