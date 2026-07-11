@@ -180,10 +180,34 @@ function isRecentTemp(file, nowMs = Date.now()) {
   return file.kind === 'temp' && nowMs - file.modifiedAtMs < BACKUP_TEMP_MIN_AGE_MS;
 }
 
+function readBackupLockPid(lockPath) {
+  try {
+    const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+    return Number.isSafeInteger(lock?.pid) && lock.pid > 0 ? lock.pid : null;
+  } catch {
+    return undefined;
+  }
+}
+
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if (error?.code === 'ESRCH') return false;
+    if (error?.code === 'EPERM') return true;
+    return true;
+  }
+}
+
 function isBackupLockActive(destinationDir, nowMs = Date.now()) {
   const lockPath = path.join(destinationDir, BACKUP_LOCK_FILE_NAME);
   try {
-    return nowMs - fs.statSync(lockPath).mtimeMs < BACKUP_LOCK_STALE_MS;
+    const lockAgeMs = nowMs - fs.statSync(lockPath).mtimeMs;
+    const lockPid = readBackupLockPid(lockPath);
+    if (lockPid === undefined) return false;
+    if (lockPid !== null) return isProcessAlive(lockPid);
+    return lockAgeMs < BACKUP_LOCK_STALE_MS;
   } catch {
     return false;
   }
