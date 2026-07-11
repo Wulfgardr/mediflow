@@ -43,7 +43,7 @@ In ordine di gravità, dalla ricognizione 2026-07-11:
 
 1. **`VetroGlassModifier` ignora `accessibilityReduceTransparency`**: aggiungere `@Environment(\.accessibilityReduceTransparency)` e degradare a superficie solida (stessa legge del web).
 2. **`accessibilityLabel` quasi assenti** (2 in tutto, a fronte di centinaia di `accessibilityIdentifier` che servono solo ai test): passata VoiceOver su `PairedPatientsWorkspaceView`, con label per azioni, valori (`accessibilityValue` su parametri e trend) e raggruppamenti (`accessibilityElement(children: .combine)` sulle righe).
-3. **Nessuna guardia `reduceMotion`/`differentiateWithoutColor`**: da introdurre insieme alle prime transizioni esplicite e ai glifi di stato.
+3. **`reduceMotion` esiste, ma la copertura va verificata; `differentiateWithoutColor` manca**: `VetroGlassModifier` degrada il materiale e la shell disabilita le animazioni quando richiesto. Verificare ogni transizione esplicita e introdurre la guardia colore insieme ai glifi di stato.
 4. **Dynamic Type non verificato agli estremi**: le viste vanno esercitate alle taglie accessibility (AX1-AX5), con `ViewThatFits` o layout alternativi dove il master-detail manuale trabocca.
 
 ## 6. Lettori di schermo e semantica

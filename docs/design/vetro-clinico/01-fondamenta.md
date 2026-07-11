@@ -56,7 +56,7 @@ Fotografia al 2026-07-11, dalla ricognizione su codice. Il sistema esiste già a
 
 - **Due sistemi di card paralleli**: `GlassCard` (Vetro Clinico) e `CardStyleModifier` (`AppleFoundationStyle.swift`). Uno deve morire: resta Vetro Clinico.
 - **`PairedPatientsWorkspaceView` (3350 righe al 2026-07-11) reimplementa a mano il master-detail** (HStack con colonna fissa 360pt) invece di `NavigationSplitView`, e la lista pazienti è `ForEach` in `ScrollView` invece di `List`: si perdono comportamenti nativi di selezione, adattamento delle colonne e azioni di lista.
-- **Accessibilità solo strumentale**: centinaia di `accessibilityIdentifier` (per test), 2 soli `accessibilityLabel` reali, zero guardie `reduceTransparency`/`reduceMotion`. Un utente con Reduce Transparency attivo riceve comunque il materiale traslucido.
+- **Accessibilità ancora incompleta**: centinaia di `accessibilityIdentifier` (per test), 2 soli `accessibilityLabel` reali. `reduceMotion` è cablato nel kit e nella shell, ma restano assenti le guardie `reduceTransparency` e `differentiateWithoutColor`; un utente con Reduce Transparency attivo riceve comunque il materiale traslucido.
 - **Artefatti di rollout in produzione**: `AppleFoundationOverviewView` e le tab Overview/Milestones sono viste di stato interno, non prodotto.
 - **`Color.red` hardcoded** in un punto al posto di `VetroTone.critical`.
 - **Copertura SF Symbols bassa** rispetto alla superficie clinica: molte azioni sono solo testuali.
