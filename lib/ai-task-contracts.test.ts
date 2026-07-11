@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
     AI_TASK_EXTRACTION_SCHEMA_VERSION,
+    buildDocumentSynthesisExtractionPrompt,
     buildPatientInsightExtractionPrompt,
     buildSmartImportExtractionPrompt,
     parseDocumentSynthesisExtractionResponse,
@@ -11,7 +12,10 @@ import {
     renderPatientInsightMarkdown,
     toPatientInsightRenderContract,
 } from './ai-task-contracts';
-import { buildSmartImportExtractionPrompt as buildSmartImportPromptDirect } from './ai-task-contract-prompts';
+import {
+    buildDocumentSynthesisExtractionPrompt as buildDocumentSynthesisPromptDirect,
+    buildSmartImportExtractionPrompt as buildSmartImportPromptDirect,
+} from './ai-task-contract-prompts';
 
 test('patient insight extraction renders local markdown sections from shared JSON contract', () => {
     const parsed = parsePatientInsightExtractionResponse(JSON.stringify({
@@ -477,6 +481,15 @@ test('smart import prompt stays byte-identical through the compatible barrel', (
     assert.equal(prompt, buildSmartImportPromptDirect(payload));
     assert.equal(Buffer.byteLength(prompt, 'utf8'), 5382);
     assert.equal(createHash('sha256').update(prompt).digest('hex'), 'e0a67ae602f10e8d5e68b4dacfca678bdca72993a0597ebfe77b9bb038c6e430');
+});
+
+test('document synthesis prompt stays byte-identical through the compatible barrel', () => {
+    const rawText = 'REFERTO SINTETICO\nNessun dato reale';
+    const prompt = buildDocumentSynthesisExtractionPrompt(rawText);
+
+    assert.equal(prompt, buildDocumentSynthesisPromptDirect(rawText));
+    assert.equal(Buffer.byteLength(prompt, 'utf8'), 6519);
+    assert.equal(createHash('sha256').update(prompt).digest('hex'), '6f03db526863f776ac3efecaaab4730963eb3be982189a29c3b30292057a2624');
 });
 
 test('document synthesis extraction keeps service prescriptions out of medication lanes', () => {
