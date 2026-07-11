@@ -2,7 +2,7 @@
 # ADR 0077: Vetro Clinico come linguaggio di design canonico multipiattaforma
 
 Date: 2026-07-11
-Status: Proposed
+Status: Accepted
 
 Related: [ARCHITECTURE.md](../../ARCHITECTURE.md),
 [ADR 0047](./0047-graphite-workbench-single-official-web-shell.md),
