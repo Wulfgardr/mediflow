@@ -24,7 +24,7 @@ prepare_workspace() {
   rm -rf "$WORKSPACE_DIR"
   mkdir -p "$WORKSPACE_DIR"
 
-  for entry in app components lib public; do
+  for entry in app components lib public drizzle; do
     if [[ -e "$ROOT_DIR/$entry" ]]; then
       cp -R "$ROOT_DIR/$entry" "$WORKSPACE_DIR/$entry"
     fi
@@ -80,6 +80,11 @@ NODE
 }
 
 prepare_workspace
+
+(
+  cd "$WORKSPACE_DIR"
+  node "$ROOT_DIR/scripts/prepare-e2e-db.mjs"
+)
 
 DEV_PID=""
 
