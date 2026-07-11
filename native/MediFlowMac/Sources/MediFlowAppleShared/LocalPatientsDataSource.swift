@@ -39,6 +39,7 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             includeDeleted: includeDeleted)
     }
 
+    /* @Codex */
     public func fetchPatient(
         id: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBasePatientDetail {

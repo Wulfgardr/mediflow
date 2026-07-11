@@ -34,6 +34,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published private(set) var selectedPatient: HomeBasePatientDetail? {
         didSet {
             guard oldValue?.id != selectedPatient?.id else { return }
+            /* @Codex */
             editablePatientFields = [:]
             lockedPatientFields = []
             invalidateAttachmentPatientState()
@@ -408,6 +409,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         guard ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENTS"] == "1" else {
             return nil
         }
+        /* @Codex */
         let lockedAddress = ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_LOCKED_PATIENT_FIELDS"] == "1"
             ? "ENC:locked:uitest" : "Via Roma 1, Milano"
         return HomeBasePatientDetail(
@@ -765,7 +767,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         }
         #if DEBUG
         if let detail = Self.uiTestSeededDetail(for: patient) {
-            setSelectedPatient(detail)
+            setSelectedPatient(detail) // @Codex
             entries = Self.uiTestSeededEntries(patientId: patient.id)
             therapies = Self.uiTestSeededTherapies(patientId: patient.id)
             checkups = Self.uiTestSeededCheckups(patientId: patient.id)
@@ -795,7 +797,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
-            self.setSelectedPatient(fetchedDetail)
+            self.setSelectedPatient(fetchedDetail) // @Codex
             self.entries = try await self.fetchDecryptedEntries(
                 patientId: patient.id,
                 credentials: credentials,
@@ -866,7 +868,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             let fetchedDetail = try await self.makeClient().fetchPatient(
                 id: id, credentials: credentials, sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil)
-            self.setSelectedPatient(fetchedDetail)
+            self.setSelectedPatient(fetchedDetail) // @Codex
             self.patientReportURL = nil
             self.patientFHIRExportURL = nil
             self.pendingFHIRWarningValidation = nil
@@ -1390,6 +1392,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             errorMessage = "Cifratura non disponibile: riaccedi con il PIN operatore prima di salvare."
             return
         }
+        /* @Codex */
         let payload = HomeBasePatientUpdatePayload(
             version: current.version,
             firstName: editPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -1425,7 +1428,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
-            self.setSelectedPatient(fetchedDetail)
+            self.setSelectedPatient(fetchedDetail) // @Codex
             self.statusMessage = "Anagrafica aggiornata sull'home-base."
         }
     }
@@ -1500,7 +1503,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
-            self.setSelectedPatient(fetchedDetail)
+            self.setSelectedPatient(fetchedDetail) // @Codex
             self.patients = try await self.makeClient().fetchPatients(
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -1582,6 +1585,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /// JSON-encode (matching JSON.stringify) and encrypt to ENC:. The caller holds
     /// the key, so this never emits plaintext for an encrypted field (.omit on a
     /// crypto failure leaves the stored value untouched rather than clobbering it).
+    /* @Codex */
     private func encryptedPatientPatchValue(
         _ text: String?, field: EncryptedPatientField, masterKey: SymmetricKey, structured: Bool = false
     ) -> PatchValue<String> {
@@ -3728,7 +3732,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 sessionCookie: sessionCookie,
                 ambulatoryId: ambulatoryId.trimmedOrNil
             )
-            setSelectedPatient(fetchedDetail)
+            setSelectedPatient(fetchedDetail) // @Codex
             entries = try await fetchDecryptedEntries(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
             therapies = try await fetchDecryptedTherapies(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
             checkups = try await fetchDecryptedCheckups(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
