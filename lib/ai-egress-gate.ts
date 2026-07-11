@@ -20,7 +20,7 @@ export interface EvaluateEgressInput {
     };
 }
 
-// ADR 0033 and ADR 0074 require a promoted neural redaction lane before any
+// ADR 0033 and ADR 0077 require a promoted neural redaction lane before any
 // narrative clinical payload can leave the device. OpenMed is benchmark-only,
 // so this gate intentionally remains closed even after Layer 1 redaction.
 export function isEgressGateOpen(): false {
@@ -35,7 +35,13 @@ const NRE_REGION_CODES = new Set([
 ]);
 const NRE_REGEX = /\b\d{3}[A-Z0-9]{2}\d{10}\b/gi;
 const ITALIAN_TEAM_REGEX = /\b80380\d{15}\b/g;
-const EMAIL_REGEX = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+// Etichette disgiunte dal separatore e quantificatori limitati stile RFC:
+// il punto dentro la classe del dominio rendeva ambiguo lo split e apriva a
+// backtracking superlineare su input avversariali lunghi.
+const EMAIL_REGEX = /\b[A-Z0-9._%+-]{1,64}@(?:[A-Z0-9-]{1,63}\.){1,8}[A-Z]{2,24}\b/gi;
+// Il nosologico non ha un formato nazionale affidabile: si redige solo quando
+// e' etichettato nel testo; i numeri nudi restano compito del layer 2 neurale.
+const NOSOLOGICO_REGEX = /\b(?:n(?:\.|r\.?|umero)?\s+)?nosologico\s*(?:n(?:\.|r\.?|umero)?)?\s*:?\s*\d{5,12}\b/gi;
 const PHONE_REGEX = /(?<![\w+])(?:(?:\+|00)39[\s.-]?)?(?:0\d{1,4}|3\d{2})[\s.-]?\d{3,4}[\s.-]?\d{3,4}(?!\w)/g;
 const DATE_REGEX = /\b(?:0[1-9]|[12]\d|3[01])[/.\-](?:0[1-9]|1[0-2])[/.\-](?:19|20)\d{2}\b/g;
 
@@ -93,6 +99,7 @@ export function evaluateEgress(input: EvaluateEgressInput): EgressGateResult {
 
     redact('team', ITALIAN_TEAM_REGEX);
     redact('nre', NRE_REGEX, (value) => NRE_REGION_CODES.has(value.slice(0, 3)));
+    redact('nosologico', NOSOLOGICO_REGEX);
     redact('codice_fiscale', ITALIAN_TAX_CODE_REGEX, isValidItalianTaxCodeChecksum);
     // A checksum failure is common in OCR, but it is still an identifier-shaped
     // value. Redact it conservatively rather than letting it cross the boundary.
@@ -141,6 +148,7 @@ function tokenLabel(entity: string): string {
         codice_fiscale_candidate: 'CF_CANDIDATO',
         email: 'EMAIL',
         known_name: 'PERSONA',
+        nosologico: 'NOSOLOGICO',
         nre: 'NRE',
         phone: 'TELEFONO',
         team: 'TEAM',
