@@ -57,6 +57,7 @@ const NETWORK_FORBIDDEN_ENTRY_WRITE_FIELDS = new Set([
 ]);
 const NETWORK_FORBIDDEN_ENTRY_CREATE_FIELDS = new Set(['patientId', 'createdAt', 'updatedAt', 'version']);
 const NETWORK_FORBIDDEN_ENTRY_UPDATE_FIELDS = new Set(['patientId', 'createdAt', 'updatedAt']);
+const NETWORK_ENTRY_SEALED_FIELDS = ['title', 'content', 'metadata', 'attachments', 'deletionReason'] as const;
 
 function hasOwn(input: Record<string, unknown>, key: string): boolean {
     return Object.prototype.hasOwnProperty.call(input, key);
@@ -92,15 +93,21 @@ function validateNetworkEntryMutationBoundary(
         }
     }
 
-    if (hasOwn(body, 'attachments')
-        && !isEmptyAttachmentValue(body.attachments)
-        && !isSealedValue(body.attachments)) {
-        return {
-            status: 400,
-            value: {
-                error: 'Network diary attachment references must be sealed with ENC:',
-            },
-        };
+    for (const field of NETWORK_ENTRY_SEALED_FIELDS) {
+        const value = body[field];
+        const isEmptyValue = field === 'attachments'
+            ? isEmptyAttachmentValue(value)
+            : value === undefined || value === null;
+        if (!isEmptyValue && !isSealedValue(value)) {
+            return {
+                status: 400,
+                value: {
+                    error: field === 'attachments'
+                        ? 'Network diary attachment references must be sealed with ENC:'
+                        : `Network diary ${field} must be sealed with ENC:`,
+                },
+            };
+        }
     }
 
     return null;

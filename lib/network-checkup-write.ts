@@ -20,6 +20,8 @@ import type { NetworkWriteContext } from './network-write-context';
 import { patientsToAmbulatories, checkups } from './schema';
 /* @Codex */
 import { buildCheckupVersionConflictPayload, parseCheckupExpectedVersion } from './checkup-concurrency';
+/* @Codex */
+import { isSealedValue, validateNetworkDeletionReason } from './network-patient-lifecycle';
 
 /* @Codex */
 export const NETWORK_CHECKUP_WRITE_CAPABILITY = 'network.replica.write-checkups';
@@ -75,6 +77,19 @@ function validateNetworkCheckupMutationBoundary(
             };
         }
     }
+
+    const notes = body.notes;
+    if (notes !== undefined && notes !== null && !isSealedValue(notes)) {
+        return {
+            status: 400,
+            value: {
+                error: 'Network checkup notes must be sealed with ENC:',
+            },
+        };
+    }
+
+    const deletionReason = validateNetworkDeletionReason(body.deletionReason);
+    if (!deletionReason.ok) return deletionReason;
 
     return null;
 }

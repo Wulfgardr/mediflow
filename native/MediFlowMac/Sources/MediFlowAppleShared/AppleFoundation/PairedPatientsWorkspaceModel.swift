@@ -2192,9 +2192,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 payload: HomeBaseCheckupUpdatePayload(
                     version: checkup.version,
                     deletedAt: Date(),
-                    // checkups encrypt only `notes` (lib/db.ts), so deletionReason
-                    // stays plaintext to match what the web decrypts.
-                    deletionReason: "mobile-paired-operator-cancelled"
+                    deletionReason: try self.sealField("mobile-paired-operator-cancelled")
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
@@ -2362,9 +2360,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 payload: HomeBaseObservationUpdatePayload(
                     version: observation.version,
                     deletedAt: Date(),
-                    // observations encrypt only `notes` (lib/db.ts), so deletionReason
-                    // stays plaintext to match what the web decrypts.
-                    deletionReason: "mobile-paired-operator-cancelled"
+                    deletionReason: try self.sealField("mobile-paired-operator-cancelled")
                 ),
                 credentials: credentials,
                 sessionCookie: sessionCookie,
