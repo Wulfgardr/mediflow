@@ -1,0 +1,657 @@
+{
+  "generated": "2026-07-08",
+  "source": "WUL-479 reconciliation of the 2026-07-08 capability map against Wulfgardr/mediflow public/main",
+  "rows": [
+    {
+      "area": "pazienti",
+      "feature": "Anagrafica paziente: lista, ricerca, view, create, update",
+      "web": "Lista/ricerca/CRUD completo + assign/unassign/move/duplicate/soft-delete/archivia/ripristina (list/create: app/api/patients/route.ts; azioni bulk: app/api/patients/{assign,unassign,move,duplicate}/route.ts, MA il consumer web e' un hook orfano non cablato a UI e move non ha consumer: escluse da W2-finale finche' la web non le espone, decisione spec W2-finale)",
+      "native": "partial: lista+ricerca+view+update+create ANCHE via wire dietro capability lifecycle (HomeBasePatientsClient.createPatient POST network/patients; stub 405 rimosso); soft-delete/archivia/ripristina ora flussi dedicati (vedi riga archivia); mancano assign/unassign/move/duplicate",
+      "boundary": "partial: GET list (+includeDeleted gated), GET/PUT [id], POST create con guardia ENC sui sensibili, DELETE soft-delete, POST restore (app/api/v1/network/patients/route.ts; [id]/route.ts; [id]/restore/route.ts; lib/network-patient-lifecycle.ts); mancano assign/unassign/move/duplicate",
+      "gap": "partial",
+      "wave": "W1-mobile-core",
+      "evidence": "wave2b commits 984f16474; smoke scripts/network-home-base-patient-lifecycle-write.test.mjs (crypto round-trip byte-identico); residuo: assign/unassign/move/duplicate"
+    },
+    {
+      "area": "pazienti",
+      "feature": "Archivia / soft-delete / ripristina paziente (stato scheda)",
+      "web": "Archivia(MMG/decesso/altro), soft-delete verso cestino con motivazione ripristinabile 30gg, ripristina (components/patient-action-modal.tsx; edit/page.tsx:117-219)",
+      "native": "full: sheet dedicate archivia/riattiva (PUT minimale version+isArchived) ed elimina con motivazione facoltativa sigillata; vista Cestino (PatientListViewMode.trash) su includeDeleted con Ripristina; guardie can* sul model (PairedPatientArchiveSheet.swift; PairedPatientDeleteSheet.swift; PatientsFiltering.swift; PairedPatientsWorkspaceModel lifecycle)",
+      "boundary": "full: DELETE [id] con version+deletionReason sigillata (default paired-delete), POST [id]/restore con version check, GET ?includeDeleted=true gated dalla capability lifecycle (lib/network-patient-lifecycle.ts; OpenAPI 1.15.0)",
+      "gap": "full-parity",
+      "wave": "W2-boundary",
+      "evidence": "wave2b commits 984f16474; smoke lifecycle 1/1 pass; swift test 94 Core + 242 AppleShared 0 failure. Nota: il branch fix/patient-archive-delete-reasons fara' persistere archiveReason/archiveNote sulla web; il client nativo per scelta (spec D7) non li raccoglie finche' quel fix non atterra"
+    },
+    {
+      "area": "diario",
+      "feature": "Diario clinico: view/list, create, update, soft-delete+restore, filtri",
+      "web": "list+add+soft-delete con motivazione+restore da cestino+toggle eliminati+view allegati+metadata scala (components/timeline.tsx; entries/new/page.tsx)",
+      "native": "partial(quasi-piena): list+create+update+soft-delete con motivazione libera+restore+toggle mostra eliminate+filtro tipo (PairedDiaryDeleteSheet.swift; PairedPatientsWorkspaceModel.restoreEntry; EntryFiltering includeDeleted). Residuo: view allegati (W5)",
+      "boundary": "partial: GET/POST/PUT su .../entries; manca DELETE paired (capability write-clinical-diary esclude hard delete/AI/document-derived) (app/api/v1/network/patients/[id]/entries)",
+      "gap": "partial",
+      "wave": "W1-mobile-core",
+      "evidence": "web-scheda.diario; native-ui.diario; api-boundary.entries | wave1 slice1 commit 984f16474; residuo allegati -> W5"
+    },
+    {
+      "area": "diario",
+      "feature": "Nuova voce clinica avanzata (S/O/A/P, allegati OCR, sessione visita, elabora bozza AI)",
+      "web": "editor rich-text S/O/A/P, upload allegati con OCR+sintesi, transcript dettato, POST /api/visit-session/draft per ripulire+estrarre farmaci (entries/new/page.tsx)",
+      "native": "partial: editor WYSIWYG a blocchi bindato al transcoder ClinicalRichText (grassetto/corsivo/sottolineato/barrato, heading, liste, blockquote, template S/O/A/P), content sigillato = render del transcoder (parita byte-esatta col sanitizer web su 40 fixture); allegati referenziati in voce con validazione ownership client-side prima del sigillo; flusso bozza visita (dettatura, compute deterministico, revisione obbligatoria). Residuo: OCR/sintesi inline degli allegati resta host (Classe C); stile misto inline non creabile (fallback a blocchi)",
+      "boundary": "partial: POST /api/v1/network/visit-draft compute-only (capability network.compute.visit-draft, lib condivisa con la route web); entries.attachments accetta valori sigillati ENC (guardia sigillo al posto del 403). OCR/sintesi document-derived restano host (ADR 0076 Classe C)",
+      "gap": "partial",
+      "wave": "W5-ai-avanzate",
+      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; ClinicalRichText round-trip + PairedPatientsWorkspaceModelS7Tests"
+    },
+    {
+      "area": "diario",
+      "feature": "Editor rich-text clinico (formattazione S/O/A/P)",
+      "web": "toolbar contentEditable completa (grassetto/liste/indent/paste sanitize) (components/clinical-rich-text-editor.tsx)",
+      "native": "partial: resa formattata HTML in lettura (ClinicalContentRendering, fallback testo piano) + template S/O/A/P identico allo skeleton web alla creazione. Residuo: editing WYSIWYG (in modifica il contenuto resta testo grezzo, markup mai degradato)",
+      "boundary": "n-a: contenuto è testo già supportato dal boundary entries",
+      "gap": "partial",
+      "wave": "W1-mobile-core",
+      "evidence": "web-scheda.diario(editor); native-ui.diario | wave1 slice2 commit 984f16474"
+    },
+    {
+      "area": "scale",
+      "feature": "Somministrazione scale cliniche (runner + salvataggio come voce diario)",
+      "web": "catalogo scale (/scales), runner domanda-per-domanda con score+interpretazione, salva come entry type 'scale' (components/scale-engine.tsx)",
+      "native": "full-parity: menu 'Valutazione' con ClinicalScales.all, form binario/multi-opzione, score live, crea entry type:'scale' stesso shape (ClinicalScaleFormView.swift)",
+      "boundary": "exposed: passa dal boundary entries (create clinical-diary)",
+      "gap": "full-parity",
+      "wave": "W1-mobile-core",
+      "evidence": "web-global.scales; native-ui.diario(scale); native-core.ClinicalScales"
+    },
+    {
+      "area": "scale",
+      "feature": "Libreria/catalogo scale standalone con storico e scorciatoie",
+      "web": "griglia SCALES per area + scorciatoie rapide in scheda + pagina /scales dedicata (app/patients/[id]/scales/page.tsx; app/scales/page.tsx)",
+      "native": "full-parity: modulo Scale per-paziente con libreria per area, avvio runner riusato e storico somministrazioni da entries type=scale; catalogo globale fuori scheda aggiunto in ClinicalScalesWorkspaceView con selezione paziente e riuso di ClinicalScaleFormView (PairedScalesSection.swift; ScaleHistoryPresentation.swift; ClinicalWorkspaceViews.swift)",
+      "boundary": "exposed: entries boundary sufficiente",
+      "gap": "full-parity",
+      "wave": "W1-mobile-core",
+      "evidence": "web-global.scales; web-scheda.scale; native-ui.scale(standalone) | wave1 slice3 commit 984f16474; W3 S5 f01346656 ClinicalScalesWorkspaceView; test esistenziale ClinicalWorkspaceViewsTests.testAnalyticsLoadsDecryptedDiagnosesAndScaleCatalogLoadsPatients"
+    },
+    {
+      "area": "terapie",
+      "feature": "Gestione terapie farmacologiche (CRUD + stato + collegamento diagnosi)",
+      "web": "add/edit/soft-delete/status transition, autocomplete AIFA, principio attivo, posologia, collegamento diagnosi, campi AIC/ATC (components/therapy-manager.tsx)",
+      "native": "partial: CRUD+soft-delete+stato+collegamento diagnosi+export testo+campi AIC/ATC in create/edit/dettaglio. Residuo: catalogo AIFA con autocomplete e validazione prontuario (W2 boundary drugs)",
+      "boundary": "partial: GET/POST/PUT therapies; manca DELETE (write-therapies esclude hard delete/AI/document-derived)",
+      "gap": "partial",
+      "wave": "W1-mobile-core",
+      "evidence": "web-scheda.terapie; native-ui.terapie; api-boundary.therapies | wave1 slice4 commit 984f16474; boundary aic/atc whitelist verificata (lib/api-v1-clinical-write-normalization.ts:534-617)"
+    },
+    {
+      "area": "terapie",
+      "feature": "Ragionamento terapeutico AI (Treatment Reasoning, review-only)",
+      "web": "pannello AI genera bozza (raccomandazione/evidenze/flag sicurezza/writePolicy), gated kill switch AI_TREATMENT_REASONING (components/treatment-reasoning-panel.tsx)",
+      "native": "missing: nessuna superficie AI reasoning lato Apple",
+      "boundary": "missing: nessuna route paired; /api/system/treatment-reasoning/athena-mlx host-only",
+      "gap": "host-only",
+      "wave": "W5-ai-avanzate",
+      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; docs-plan(AI plane separato)"
+    },
+    {
+      "area": "controlli",
+      "feature": "Controlli/checkup follow-up (CRUD + stato)",
+      "web": "view lista pending, gestione via edit form (date/title/notes/status/source) + suggerimenti follow-up da documenti (modules/page.tsx:727-769; followup-suggestions.tsx)",
+      "native": "partial(più ricca su CRUD): list+create+update+soft-delete+filtro stato+note operative; no suggerimenti da documenti (PairedPatientsWorkspaceView.swift:1349-1429)",
+      "boundary": "partial: GET/POST/PUT checkups; manca DELETE (write-checkups esclude hard delete/AI/document-derived)",
+      "gap": "partial",
+      "wave": "W1-mobile-core",
+      "evidence": "web-scheda.follow-up; native-ui.controlli; api-boundary.checkups; docs-plan.gap-legacy(checkups asimmetria)"
+    },
+    {
+      "area": "controlli",
+      "feature": "Suggerimenti follow-up proiettati da documenti",
+      "web": "view excerpt/citazione fonte + form rapido per crearli come checkup (components/followup-suggestions.tsx)",
+      "native": "full: suggerimenti follow-up proiettati dai fact insight (dedup + filtro sui controlli esistenti, semantica web 1:1) che precompilano il form controlli nativo (source ai_suggestion, provenance excerpt+nome file nelle note sigillate); revisione obbligatoria, nessun salvataggio automatico",
+      "boundary": "full: scrittura via capability write-checkups esistente (form_prefill_only, ADR 0076 Classe E); nessuna nuova estrazione document-derived",
+      "gap": "full-parity",
+      "wave": "W5-ai-avanzate",
+      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; PatientFollowupProjection port + DocumentInsightsCodecTests"
+    },
+    {
+      "area": "parametri",
+      "feature": "Osservazioni/parametri clinici (CRUD LOINC/UCUM + trend/sparkline)",
+      "web": "add LOINC+UCUM+range+note, delete, view per parametro/data, sparkline+trend+badge fuori-range (components/observation-manager.tsx)",
+      "native": "full-parity(non-AI): CRUD+trend freccia+sparkline Chart+LOINC/UCUM manuali; no estrazione automatica/HealthKit (PairedPatientsWorkspaceView.swift:1432-1495)",
+      "boundary": "partial: GET/POST/PUT observations; manca DELETE (write-observations esclude hard delete/AI)",
+      "gap": "partial",
+      "wave": "W1-mobile-core",
+      "evidence": "web-scheda.parametri; native-ui.osservazioni; api-boundary.observations; native-core.ObservationTrend"
+    },
+    {
+      "area": "prestazioni",
+      "feature": "Prestazioni prescritte (Service Prescriptions, CRUD ricco + stato)",
+      "web": "form ricco con voci multiple/classe priorità/erogatore/date/allegati, status transitions, delete, matching repertorio (components/service-prescription-manager.tsx)",
+      "native": "full: modulo prestazioni nativo con parita' di campi (21 campi incl. voci multilinea CODICE NOME, priorita' RAO, quesito clinico, riferimenti documento), transizioni con guardie speculari alla web e propagazione stato+data a ogni item con la propria version; niente edit post-create ne' delete, come la web reale (il delete resta host-only per postura no-hard-delete)",
+      "boundary": "full: GET/POST/PUT service-prescriptions e items con capability readonly/write dedicate, concurrency ottimistica nuova (migrazione 0017), scope membership 404, nessuna DELETE (vincolo 4)",
+      "gap": "full-parity",
+      "wave": "W2-boundary",
+      "evidence": "w2-final commits 984f16474; smoke prescriptions-write e discovery-read verdi; swift 110 Core + 257 AppleShared 0 failure"
+    },
+    {
+      "area": "protesica",
+      "feature": "Diario ausili e prescrizioni protesiche (CRUD + collaudo)",
+      "web": "add + azione Collaudo + delete con stato/categoria/ISO/pratica/fornitore/collaudo (components/prosthetic-prescription-manager.tsx; nessun edit post-create nella UI web reale)",
+      "native": "full: modulo protesica nativo con parita' di campi completa e azione Collaudo (stringhe identiche alla web); niente delete (postura no-hard-delete)",
+      "boundary": "full: GET/POST/PUT prosthetic-prescriptions con capability dedicate e version (0017)",
+      "gap": "full-parity",
+      "wave": "W2-boundary",
+      "evidence": "w2-final commits 984f16474; smoke prescriptions-write e discovery-read verdi; swift 110 Core + 257 AppleShared 0 failure"
+    },
+    {
+      "area": "documenti",
+      "feature": "Upload documenti + OCR + sintesi clinica (Archivio documenti)",
+      "web": "drag&drop multi-file, OCR automatico, sintesi, coda OCR-needed, riprova OCR, preview, delete (components/document-upload.tsx)",
+      "native": "partial: upload nativo (fileImporter + PhotosPicker) con sigillo ENC client-side e precheck dimensione wire onesto, archivio allegati con etichette coda OCR, dettaglio on-demand, preview in-memory PDFKit/immagini, condivisione. Residuo: OCR e sintesi clinica restano host/web (Classe C); gli upload paired entrano in coda pending con reason paired_upload",
+      "boundary": "partial: famiglia documenti network (capability readonly-documents/write-documents), create Classe A con name/path/data sigillati ENC e limite wire condiviso; PUT/DELETE e OCR restano host (ADR 0076 Classi A/C)",
+      "gap": "partial",
+      "wave": "W5-ai-avanzate",
+      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; lib/network-attachment-{read,write} + smoke home-base-documents-write"
+    },
+    {
+      "area": "documenti",
+      "feature": "Archivio Intelligente / Document Insights (view estrazioni + delete)",
+      "web": "view/expand diagnosi/terapie estratte, quality reason, sintesi markdown, delete/svuota (components/document-insights-panel.tsx)",
+      "native": "partial: Archivio Intelligente nativo completo in lettura (lista insight, expand diagnosi/terapie estratte, quality reason, sintesi). Residuo: delete/svuota resta web (ADR 0076 Classe C: curation document-derived host-only)",
+      "boundary": "partial: lettura insight via detail paziente esistente; curation (delete) resta host (Classe C)",
+      "gap": "partial",
+      "wave": "W5-ai-avanzate",
+      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; DocumentInsightsCodec + fix web insights version (PR #15)"
+    },
+    {
+      "area": "documenti",
+      "feature": "Smart Import (candidati diagnosi/terapie da documenti, applica in scheda)",
+      "web": "analisi AI candidati ICD-11/AIFA, select/edit/scarta, preview resolver, applica scrittura, kill switch AI_SMART_IMPORT (components/patient-smart-import-panel.tsx)",
+      "native": "missing: nessuna superficie Smart Import lato Apple",
+      "boundary": "missing: document-derived/AI writes esclusi dalle capability",
+      "gap": "missing-both",
+      "wave": "W5-ai-avanzate",
+      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; native-ui.documenti"
+    },
+    {
+      "area": "documenti",
+      "feature": "Referti recenti (Evidence Stack tile, view sintesi)",
+      "web": "card riassuntiva ultimi 4 document insight (components/evidence-stack-tile.tsx)",
+      "native": "full: Evidence Stack nativo (card ultimi 4 insight) in sola lettura, dai documentInsights decifrati",
+      "boundary": "full: nessun boundary aggiuntivo necessario (lettura da detail paziente esistente)",
+      "gap": "full-parity",
+      "wave": "W5-ai-avanzate",
+      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; smoke documenti+diario reali verdi"
+    },
+    {
+      "area": "insight",
+      "feature": "AI Patient Insight (sintesi/follow-up/alert generati)",
+      "web": "generate/regenerate insight, stop, badge stale, dettagli fonti/limiti, kill switch AI_PATIENT_INSIGHT (components/ai-patient-insight.tsx)",
+      "native": "missing (view-only): aiSummary mostrato read-only, nessuna generazione lato client",
+      "boundary": "missing: conversations/messages/AI writes esclusi; solo output già persistiti eventualmente leggibili",
+      "gap": "host-only",
+      "wave": "W5-ai-avanzate",
+      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; docs-plan(AI plane separato)"
+    },
+    {
+      "area": "cockpit",
+      "feature": "Foglio sinottico / Identity Lens / Review Queue (viste sintetiche cockpit)",
+      "web": "synoptic sheet, identity lens, review queue summary, clinical river timeline (patient-synoptic-sheet.tsx; patient-identity-lens.tsx; clinical-river-timeline.tsx)",
+      "native": "partial: segnali clinici calcolati su liste piene fino al limite boundary (100, costante condivisa) con resa onesta N+ al cap (ClinicalSignalCount). Residuo: review queue e aggregati server-side (W2)",
+      "boundary": "partial: dati grezzi via boundary, ma nessun aggregate server-side dedicato",
+      "gap": "partial",
+      "wave": "W1-mobile-core",
+      "evidence": "web-scheda.cockpit; web-scheda.timeline; native-ui.pazienti(segnali clinici) | wave1 slice6 commit 984f16474"
+    },
+    {
+      "area": "scheda",
+      "feature": "Export FHIR paziente (con pre-check validazione FSE)",
+      "web": "pre-check /api/fse/validate-patient, blocco errori/conferma warning, genera bundle FHIR JSON, download (modules/page.tsx:388-434; edit/page.tsx)",
+      "native": "full: flusso identico alla web (conferma, pre-check FSE via boundary con blocco errori e conferma warning, bundle generato on-device da FHIRBundleGenerator, condivisione file); equivalenza col mapper web garantita dal golden contract fhir-golden-bundle.v1.json (confronto strutturale)",
+      "boundary": "full: GET /api/v1/network/fse/validate-patient sotto capability network.fse.validate; il bundle NON passa dal server (zero-knowledge: host keyless)",
+      "gap": "full-parity",
+      "wave": "W2-boundary",
+      "evidence": "w2-final commits 984f16474; smoke prescriptions-write e discovery-read verdi; swift 110 Core + 257 AppleShared 0 failure"
+    },
+    {
+      "area": "scheda",
+      "feature": "Report PDF paziente",
+      "web": "generatePatientReport (dati/diario/scale/terapie/osservazioni), download client (modules/page.tsx:462-474)",
+      "native": "full-parity: report PDF client-side multipagina (PatientReportDocument builder puro + renderer CoreGraphics/CoreText, ShareLink), sezioni oneste se vuote, esclusione rigorosa ciphertext ENC:",
+      "boundary": "n-a: generazione client-side su dati già disponibili via boundary",
+      "gap": "full-parity",
+      "wave": "W1-mobile-core",
+      "evidence": "web-scheda.scheda(report PDF); native-ui.terapie(export testo) | wave1 slice5 commit 984f16474; PatientReportDocumentTests"
+    },
+    {
+      "area": "esenzioni",
+      "feature": "Esenzioni paziente (selezione/gestione codici cifrati)",
+      "web": "ExemptionSelector multi-code cifrati con lookup/validazione, catalogo /api/exemptions (components/exemption-selector.tsx)",
+      "native": "full-parity: chip add/remove + lookup catalogo esenzioni (ricerca codice/descrizione, selezione aggiunge chip), fallback manuale se capability assente",
+      "boundary": "exposed: GET /api/v1/network/exemptions con capability network.catalogs.readonly",
+      "gap": "full-parity",
+      "wave": "W2-boundary",
+      "evidence": "web-scheda.scheda(edit esenzioni); native-ui.esenzioni; api-boundary.exemptions; native-core.ExemptionCodesCodec | wave2a commit 984f16474"
+    },
+    {
+      "area": "farmaci",
+      "feature": "Catalogo farmaci AIFA (ricerca/validazione prontuario)",
+      "web": "autocomplete AIFA nel therapy manager, /api/drugs ricerca (components/therapy-manager.tsx; /api/drugs)",
+      "native": "full-parity(ricerca): autocomplete AIFA as-you-type nel form terapie (debounce, min 2 char, selezione compila drugName/AIC/ATC/principio attivo), fallback manuale onesto se capability assente. Import/clear repertorio restano host-only per disegno",
+      "boundary": "exposed: GET /api/v1/network/drugs con capability network.catalogs.readonly, stessa forma risposta della route host",
+      "gap": "full-parity",
+      "wave": "W2-boundary",
+      "evidence": "native-ui.farmaci; api-boundary.drugs; api-boundary.boundary(catalogs.sync planned) | wave2a commit 984f16474; smoke test:network:home-base-catalog-read"
+    },
+    {
+      "area": "diagnosi/icd",
+      "feature": "Ricerca ICD in-app per codifica diagnosi",
+      "web": "ICDAutocomplete nel patient-form/edit (systems ICD-9/10/11), /api/v1/terminology + /api/icd/proxy (components/patient-form.tsx)",
+      "native": "full-parity: ricerca ICD in-app (ICDCatalog, A14 in-app table) nel form edit diagnosi (PairedPatientsWorkspaceView.swift:627-753)",
+      "boundary": "n-a: catalogo ICD in-app on-device, non richiede boundary; terminology non esposta ma non necessaria",
+      "gap": "full-parity",
+      "wave": "W1-mobile-core",
+      "evidence": "native-core.ICDCatalog; native-ui.pazienti(update diagnosi); api-boundary.terminology"
+    },
+    {
+      "area": "terminologia",
+      "feature": "Ricerca terminologica generale (ICD/systems oltre in-app)",
+      "web": "/api/v1/terminology/search/resolve/systems + /api/icd/proxy verso ICD-11 API",
+      "native": "full: autocomplete LOINC/UCUM nel form osservazioni via boundary terminology con fallback manuale; copre e supera il consumo web reale (libreria statica in-memory, nessuna chiamata HTTP dalla web UI)",
+      "boundary": "exposed: GET /api/v1/network/terminology/search|resolve|systems con capability network.catalogs.readonly",
+      "gap": "full-parity",
+      "wave": "W2-boundary",
+      "evidence": "w2-final commits 984f16474; smoke prescriptions-write e discovery-read verdi; swift 110 Core + 257 AppleShared 0 failure; web usa lib/terminology statica (nessun consumer HTTP)"
+    },
+    {
+      "area": "ambulatori",
+      "feature": "Selezione scope ambulatorio attivo",
+      "web": "filtri scope + selezione contesto ambulatorio (kree8 incarico-area; ambulatories)",
+      "native": "full-parity(scope): campo+menu 'Ambulatorio attivo' via fetchNetworkAmbulatories, selectAmbulatory ricarica lista (PairedPatientsWorkspaceView.swift:226-240)",
+      "boundary": "exposed: GET /api/v1/network/ambulatories (solo lista)",
+      "gap": "full-parity",
+      "wave": "W1-mobile-core",
+      "evidence": "native-ui.ambulatori; api-boundary.ambulatories"
+    },
+    {
+      "area": "ambulatori",
+      "feature": "Gestione anagrafica ambulatori (create/update/predefinita/svuota/elimina)",
+      "web": "CRUD sedi, albero gerarchico, usa come predefinita, svuota test, elimina (app/settings/ambulatories/page.tsx)",
+      "native": "full-parity: CRUD anagrafica ambulatori, promozione predefinita, svuota test ed elimina nel hub Impostazioni paired (SettingsWorkspaceView.swift)",
+      "boundary": "full: create/update/promozione/elimina/svuota sul boundary network versionato con capability network.ambulatories.write",
+      "gap": "full-parity",
+      "wave": "W4-settings",
+      "evidence": "commit 80e05c427 (boundary+capability) + cd8c05c42 (hub nativo); npm run test:network:home-base-ambulatory-write verde"
+    },
+    {
+      "area": "analytics",
+      "feature": "Cruscotto analytics locale (popolazione, età, diagnosi, ADI)",
+      "web": "slider età, 4 indicatori, distribuzione fasce, top 10 diagnosi (app/analytics/page.tsx:105-238)",
+      "native": "full: vista Analytics nativa con slider eta, metriche popolazione/ADI/diagnosi, distribuzione fasce e top diagnosi decifrate lato client (PopulationAnalyticsWorkspaceView; PopulationAnalytics.swift). Sezione Audit esclusa: web-admin-only, nessun percorso paired.",
+      "boundary": "exposed: GET /api/v1/network/patients?include=diagnoses usa la scope-list paired con capability network.replica.readonly-patients; diagnosi restano ciphertext passthrough e vengono decifrate lato client",
+      "gap": "full-parity",
+      "wave": "W3-macos-clinical-shell",
+      "evidence": "web-global.analytics; W3 S1 828468c02 boundary include=diagnoses/ADR 0074; S3 f01346656 data-plane; S4 f01346656 PopulationAnalytics.swift; S5 f01346656 PopulationAnalyticsWorkspaceView; test esistenziale ClinicalWorkspaceViewsTests.testAnalyticsLoadsDecryptedDiagnosesAndScaleCatalogLoadsPatients"
+    },
+    {
+      "area": "analytics",
+      "feature": "Pannello audit operativo locale",
+      "web": "finestra 7/30/90gg, GET /api/system/audit, card eventi/attori/esiti, gestione 403 admin (app/analytics/page.tsx:193-229)",
+      "native": "missing: nessun pannello audit lato Apple",
+      "boundary": "missing: /api/system/audit host-only, solo network-overview aggregato read-only lato host",
+      "gap": "host-only",
+      "wave": "HOST-ONLY",
+      "evidence": "web-global.analytics(audit); api-boundary.analytics/system; codex-fetch-map./api/system/audit"
+    },
+    {
+      "area": "siss",
+      "feature": "Apertura portali regionali SISS/FSE (context panel + handoff diary)",
+      "web": "apre portali con CF via clipboard/handoff, stato accesso regionale, pre-check FSE, diario handoff SISS CRUD (components/siss-patient-context-panel.tsx; siss-handoff-diary.tsx)",
+      "native": "missing: nessuna superficie SISS/FSE lato Apple",
+      "boundary": "missing: nessuna route paired SISS; integrazione regionale host-only (claim freeze zero-knowledge) (app/api/siss/*)",
+      "gap": "host-only",
+      "wave": "HOST-ONLY",
+      "evidence": "web-scheda.siss; api-boundary.SISS; codex-fetch-map./api/siss/context"
+    },
+    {
+      "area": "shell-globale",
+      "feature": "Cockpit shell / rail navigazione globale + toolbar + deep-link",
+      "web": "Kree8 cockpit shell con 5 aree, toolbar ricerca/filtri, deep-link query string, sub-area tabs (components/kree8/kree8-clinical-cockpit.tsx)",
+      "native": "partial: NavigationSplitView (macOS/iPad) / TabView (iPhone) con sezioni cliniche Pazienti/Agenda/Diario/Analytics/Scale e gruppo Progetto separato, piu master-detail pazienti (AppleFoundationViews.swift:210-292). Residuo ristretto: nessun deep-link/URL scheme nativo equivalente alla query string web ?area=&paziente=. Ricerca globale non conteggiata come residuo di parita: non esiste nemmeno come ricerca globale unica sulla web.",
+      "boundary": "n-a: chrome UI locale",
+      "gap": "partial",
+      "wave": "W3-macos-clinical-shell",
+      "evidence": "web-global.shell query string in components/kree8/kree8-clinical-cockpit.tsx:204-219; native-ui.navigazione; W3 S5 f01346656 AppleFoundationViews.swift"
+    },
+    {
+      "area": "turno",
+      "feature": "Agenda di oggi / turno + bridge candidati agenda clinica",
+      "web": "agenda odierna, stat card, filtri, GET /api/clinical-agenda/candidates read-only (components/kree8/areas/turno-area.tsx)",
+      "native": "full: vista Agenda nativa con statistiche visite oggi/pianificate/pazienti attivi, lista prossime visite e pill di stato, caricata da AgendaWorkspaceView/AgendaWorkspaceModel e logica AgendaPresentation.swift. Bridge candidati esterni da mail escluso: sorgenti host-local, non paired, e AI_QUEUE web mock.",
+      "boundary": "exposed: GET /api/v1/network/checkups con capability network.replica.readonly-agenda, scope ambulatoriale, filtri plaintext e limit cap",
+      "gap": "full-parity",
+      "wave": "W3-macos-clinical-shell",
+      "evidence": "web-global.turno; W3 S1 boundary 828468c02 /api/v1/network/checkups + ADR 0074; S2 smoke f01346656 scripts/network-home-base-aggregate-read.test.mjs; S3 data-plane f01346656 HomeBasePatientsClient.fetchScopedCheckups; S5 UI f01346656 AgendaWorkspaceView; test esistenziale ClinicalWorkspaceViewsTests.testAgendaLoadsScopedRowsAndStatistics. Bridge mail escluso e dati host-local; AI_QUEUE web mock in turno-area.tsx:25-51"
+    },
+    {
+      "area": "diario-globale",
+      "feature": "Diario clinico globale cross-paziente (ultime 50 voci)",
+      "web": "timeline cross-paziente virtualizzata, route /diary dedicata (components/kree8/areas/diario-area.tsx)",
+      "native": "full: vista Diario globale nativa con ultime 50 voci cross-paziente, nome/codice paziente, preview decifrata, stato Eliminata e conteggio allegati (GlobalDiaryWorkspaceView/GlobalDiaryWorkspaceModel; GlobalDiaryPresentation.swift)",
+      "boundary": "exposed: GET /api/v1/network/entries con capability network.replica.readonly-clinical-diary-global, default limit 50, scope ambulatoriale e tombstone soft-delete incluse come la web",
+      "gap": "full-parity",
+      "wave": "W3-macos-clinical-shell",
+      "evidence": "web-global.diario(globale); W3 S1 boundary 828468c02 /api/v1/network/entries + ADR 0074; S2 smoke f01346656 aggregate-read include soft-deleted entries; S3 data-plane f01346656 HomeBasePatientsClient.fetchScopedEntries; S5 UI f01346656 GlobalDiaryWorkspaceView; test esistenziale ClinicalWorkspaceViewsTests.testDiaryDecryptsClinicalFieldsWithTestMasterKey"
+    },
+    {
+      "area": "repertori",
+      "feature": "Cruscotto repertori clinici (AIFA/esenzioni/ICD freschezza)",
+      "web": "card freschezza, conteggi drugs/exemptions, stato ICD locale, link import/diagnostica (components/kree8/areas/repertori-area.tsx)",
+      "native": "missing: nessun cruscotto repertori (solo ICD in-app usato silenziosamente)",
+      "boundary": "missing: drugs/exemptions non esposti al paired; catalogs.sync planned",
+      "gap": "host-only",
+      "wave": "W4-settings",
+      "evidence": "web-global.repertori; api-boundary.drugs/exemptions; web-settings.repertori"
+    },
+    {
+      "area": "pazienti-nuovo",
+      "feature": "Wizard nuova scheda da documento (PdfImporter + review + form)",
+      "web": "3 sezioni: PdfImporter OCR, review import, PatientForm, check duplicato CF (app/patients/new/page.tsx:99-350)",
+      "native": "partial: create paziente solo anagrafica base (local authority), nessun import documento/OCR/review",
+      "boundary": "partial: POST create paziente ora presente sul boundary con guardia ENC (era 405); document import assente (W5)",
+      "gap": "partial",
+      "wave": "W2-boundary",
+      "evidence": "web-global.pazienti-nuovo; wave2b commit 984f16474; residuo import documento -> W5"
+    },
+    {
+      "area": "auth",
+      "feature": "Pairing + login operatore + PIN (deriva master key)",
+      "web": "login/logout/check/setup + change-pin lato web session locale (app/api/auth/*)",
+      "native": "full-parity(paired model): card pairing HTTPS+fingerprint+Bonjour+client ID/token, login operatore, PIN deriva KEK RAM-only, dissocia (PairedPatientsWorkspaceView.swift:201-306)",
+      "boundary": "exposed(modello paired): pairing intent/confirm + token headers + sessionCookie; NON usa /api/auth/* (lib/network-contract; network-paired-client-auth)",
+      "gap": "full-parity",
+      "wave": "W4-settings",
+      "evidence": "native-ui.auth; api-boundary.auth; api-boundary.boundary(pairing)"
+    },
+    {
+      "area": "accesso",
+      "feature": "Cambio PIN / gestione ciclo di vita chiave (rewrap/reset)",
+      "web": "changePin (3 campi), rewrap-master-key, reset (app/settings/accesso/page.tsx; /api/auth/change-pin,/reset,/rewrap-master-key)",
+      "native": "full-parity: cambio PIN paired con re-wrap client-of-origin, KDF v2 e salt ruotato; reset escluso come superficie host/web-admin cripto-distruttiva",
+      "boundary": "exposed: famiglia auth condivisa, session-auth; nessuna route network replicata e vincolo master key client-of-origin rispettato",
+      "gap": "full-parity",
+      "wave": "W4-settings",
+      "evidence": "commit 1f9a9cc64 (UPDATE condizionale anti-race) + bf4f64dfc (client paired) + cd8c05c42 (UI); npm run test:network:home-base-account-pin verde"
+    },
+    {
+      "area": "accesso",
+      "feature": "Blocco sessione immediato / stato sessione",
+      "web": "mostra operatore/ambulatorio, 'Blocca sessione adesso' lock() (app/settings/accesso/page.tsx:148-179)",
+      "native": "full-parity: bottone Blocca sessione adesso, logout e azzeramento locale di cookie e master key",
+      "boundary": "n-a: gestione sessione locale al client",
+      "gap": "full-parity",
+      "wave": "W4-settings",
+      "evidence": "commit bf4f64dfc (logout+lockSessionNow) + cd8c05c42 (UI); Core e AppleShared Swift verdi nella wave"
+    },
+    {
+      "area": "profilo",
+      "feature": "Profilo medico/ambulatorio (nome mostrato su documenti)",
+      "web": "2 campi doctorName/clinicName, PUT /api/auth/profile (app/settings/profilo/page.tsx)",
+      "native": "full-parity: modifica nome medico e ambulatorio nel hub Impostazioni paired",
+      "boundary": "exposed: PUT /api/auth/profile nella famiglia auth condivisa con session-auth, senza route network replicata",
+      "gap": "full-parity",
+      "wave": "W4-settings",
+      "evidence": "commit 1f9a9cc64 (profilo transazionale) + 07ca88ae5 (identita operatore) + cd8c05c42 (UI); Core e AppleShared Swift verdi nella wave"
+    },
+    {
+      "area": "aspetto",
+      "feature": "Preferenze UI: tema light/dark/system, riduci movimento",
+      "web": "ThemeToggle + reduceMotion + privacy pointer (app/settings/aspetto/page.tsx)",
+      "native": "full-parity: tema system/light/dark e riduci movimento nel hub Impostazioni su iOS e macOS; riduci movimento e per-device e non sincronizzato col server, come la preferenza tema web",
+      "boundary": "n-a: preferenza UI puramente locale",
+      "gap": "full-parity",
+      "wave": "W4-settings",
+      "evidence": "commit 61e89f6ce; test AppleAppearanceStore verdi nella wave"
+    },
+    {
+      "area": "privacy",
+      "feature": "Modalità Privacy / redazione dati",
+      "web": "PrivacyModeToggle persistente header, blur/mascheramento dati (kree8-clinical-cockpit; PrivacyProvider)",
+      "native": "full-parity: toggle Privacy mode persistito e simmetrico su iOS e macOS, separato dal seam di test",
+      "boundary": "n-a: comportamento UI locale",
+      "gap": "full-parity",
+      "wave": "W4-settings",
+      "evidence": "commit 61e89f6ce; PrivacyShieldTests verdi nella wave"
+    },
+    {
+      "area": "conversazioni-ai",
+      "feature": "Conversazioni AI e messaggi",
+      "web": "GET/POST/PUT/DELETE /api/conversations e /api/messages",
+      "native": "missing: nessuna superficie conversazioni AI lato Apple",
+      "boundary": "missing: nessuna route paired conversations/messages (AI writes esclusi)",
+      "gap": "host-only",
+      "wave": "W5-ai-avanzate",
+      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; web-global.boundary(no consumer)"
+    },
+    {
+      "area": "ai-runtime",
+      "feature": "Configurazione/invocazione runtime AI (Ollama/modelli/kill switch)",
+      "web": "selezione modelli per ruolo, connessione Ollama, profilo hardware, kill switch funzioni AI, budget contesto (app/settings/ai/*)",
+      "native": "missing (view-only): pannello runtime mostra stato Ollama/Docker come diagnostica, mai avviato/configurato; nessuna inferenza via boundary",
+      "boundary": "partial/host-only: GET /api/v1/network/ai-runtime solo stato; central-runtime 'gated by benchmark/rollout', nessuna route chat/generate paired",
+      "gap": "host-only",
+      "wave": "W5-ai-avanzate",
+      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; native-ui.boundary(runtime status)"
+    },
+    {
+      "area": "cache-offline",
+      "feature": "Cache pazienti cifrata offline (consultazione degradata)",
+      "web": "n-a (web è online contro DB locale)",
+      "native": "partial: snapshot cifrato AES-GCM lista pazienti (Keychain, TTL 24h, scoping server+ambulatorio), restore offline-degraded; SOLO lista, no dettaglio/sotto-risorse, NO write queue (HomeBasePatientCacheStore.swift)",
+      "boundary": "n-a: derivata dal boundary, mai autorevole (vincolo docs-plan: no seconda source of truth)",
+      "gap": "partial",
+      "wave": "W1-mobile-core",
+      "evidence": "native-ui.cache offline; gap corrente WUL-403; nessuna offline write queue"
+    },
+    {
+      "area": "settings-host",
+      "feature": "Backup: schedulazione automatica + ripristino manuale",
+      "web": "BackupSchedulerUI + BackupRestoreUI su filesystem/cron host (app/settings/backup/page.tsx)",
+      "native": "host-only (view): capability local.backup.artifact.v1/scheduler.macos; runtime status osservabile, nessuna gestione da client paired remoto",
+      "boundary": "host-only: opera su filesystem/DB del nodo host, non esposto al client paired",
+      "gap": "host-only",
+      "wave": "HOST-ONLY",
+      "evidence": "web-settings.backup; api-boundary.analytics/system; api-boundary.boundary(local.backup capability)"
+    },
+    {
+      "area": "settings-host",
+      "feature": "Diagnostica: architettura servizi + Diagnostic Hub + service health",
+      "web": "ServiceArchitecturePanel + DiagnosticHub introspezione servizi host (app/settings/diagnostica/page.tsx)",
+      "native": "host-only (view): HomeBaseRuntimeStatusView mostra stato componenti; start/stop backend/proxy solo macOS, iOS solo view (HomeBaseRuntimeStatusView.swift)",
+      "boundary": "host-only: introspezione servizi del nodo host",
+      "gap": "host-only",
+      "wave": "HOST-ONLY",
+      "evidence": "web-settings.diagnostica; native-ui.boundary(runtime home-base)"
+    },
+    {
+      "area": "settings-host",
+      "feature": "Update Awareness (aggiornamenti software)",
+      "web": "UpdateAwarenessPanel, GET /api/system/update-awareness (app/settings/diagnostica/page.tsx)",
+      "native": "missing: nessun pannello update; update del client Apple gestito via App Store/canale nativo separato",
+      "boundary": "host-only: pannello controlla update backend/host",
+      "gap": "host-only",
+      "wave": "HOST-ONLY",
+      "evidence": "web-settings.diagnostica(update); codex-fetch-map./api/system/update-awareness"
+    },
+    {
+      "area": "settings-host",
+      "feature": "Repertori: import CSV AIFA + gestione DB esenzioni",
+      "web": "importAifaCsv con progress, clearDrugDatabase, ExemptionDbManager (app/settings/repertori/page.tsx)",
+      "native": "missing: nessun import repertori lato Apple",
+      "boundary": "host-only: import massivo alimenta il boundary lato host, non ripetuto su ogni client paired",
+      "gap": "host-only",
+      "wave": "HOST-ONLY",
+      "evidence": "web-settings.repertori; api-boundary.drugs/exemptions"
+    },
+    {
+      "area": "settings-host",
+      "feature": "Modelli AI: pull modello Ollama + profilo hardware + governance",
+      "web": "/api/ai/pull, applyHardwareProfile, AiModelParliamentPanel, AiRolloutReadinessPanel (app/settings/ai/modelli,funzioni)",
+      "native": "host-only: hardware/RAM e runtime Ollama sono del nodo host; nessuna gestione client paired",
+      "boundary": "host-only: configurazione runtime AI del nodo host",
+      "gap": "host-only",
+      "wave": "HOST-ONLY",
+      "evidence": "web-settings.ai/modelli(pull,hardware,parliament); codex-fetch-map./api/ai/pull,ai-parliament,ai-rollout-readiness"
+    },
+    {
+      "area": "settings-host",
+      "feature": "Kill switch funzioni AI (stato read-only rilevante al client)",
+      "web": "4 toggle Patient Insight/Document Synthesis/Smart Import/Treatment Reasoning, saveAiConfig (app/settings/ai/funzioni/page.tsx:162-349)",
+      "native": "full: sezione Funzioni AI nei settings, stato dei 4 kill switch (Attivo/Disattivato) e del runtime AI in sola lettura, nota onesta di governance host, fail-closed quando lo stato non e leggibile",
+      "boundary": "full: GET /api/v1/network/ai-runtime in dual-auth espone killSwitches (4 chiavi fail-closed) e la surface treatment-reasoning (ADR 0076 Classe D: stato leggibile, invocazione esclusa)",
+      "gap": "full-parity",
+      "wave": "W5-ai-avanzate",
+      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; lib/network-ai-runtime + SettingsAiFunctionsModel + settings-write-policy registry"
+    },
+    {
+      "area": "settings-host",
+      "feature": "Network Operating Mode (gestione modalità boundary)",
+      "web": "NetworkOperatingModePanel, POST /api/settings/network.mode, /api/system/network-overview (components/settings/network-operating-mode-panel.tsx)",
+      "native": "host-only: riguarda il nodo che espone il boundary, non il client paired",
+      "boundary": "host-only: settings network scritti solo home-base (lib/network-home-base-server.ts)",
+      "gap": "host-only",
+      "wave": "HOST-ONLY",
+      "evidence": "web-settings.settings(network mode); api-boundary.settings; codex-fetch-map./api/settings/network.mode,network-overview"
+    },
+    {
+      "area": "settings-host",
+      "feature": "Zona pericolo: reset onboarding + sviluppo (seeder, apri app nativa, DB repair/purge)",
+      "web": "reset onboarding, DataSeeder, POST /api/system/native, repair-db/purge/migrate (app/settings/zona-pericolo, sviluppo)",
+      "native": "host-only: reset chiavi/onboarding + tool sviluppo agiscono sul nodo host, non replicati sul client paired (che avrebbe semmai 'scollega/pairing reset', già presente via Dissocia)",
+      "boundary": "host-only: nessuna operazione di sistema raggiungibile dal client paired",
+      "gap": "host-only",
+      "wave": "HOST-ONLY",
+      "evidence": "web-settings.zona-pericolo,sviluppo; api-boundary.analytics/system; native-ui.auth(Dissocia)"
+    },
+    {
+      "area": "governance",
+      "feature": "Hub Impostazioni / governance (dashboard navigazione settings)",
+      "web": "hub link a /settings/* con card stato sessione/audit/backup (components/kree8/areas/live-governance-area.tsx)",
+      "native": "full-parity per il target nativo: hub Impostazioni con Accesso, Profilo, Ambulatori, Aspetto e Privacy",
+      "boundary": "host-only per la maggior parte dei target; hub in sé è chrome",
+      "gap": "host-only",
+      "wave": "W4-settings",
+      "evidence": "commit cd8c05c42 (hub nativo) + 61e89f6ce (aspetto/privacy); SettingsWorkspaceTests verdi nella wave; residuo host-only dichiarato"
+    },
+    {
+      "area": "Contesto ambulatorio",
+      "feature": "POST/GET /api/context (imposta/legge ambulatory_id come cookie di sessione)",
+      "web": "app/api/context/route.ts — set/read cookie 'ambulatory_id' lato server, session-gated (requireSession)",
+      "native": "full per equivalenza stateless: il client seleziona l'ambulatorio per richiesta (picker esistente + cookie per-request) e legge lo scope effettivo risolto dal server via identity.scope (ramo paired onora il cookie ambulatory_id, smoke discovery-read lo asserisce); un POST context server-side non ha senso per un client stateless (decisione D7 spec W2-finale)",
+      "boundary": "full per equivalenza: identity dual-auth con scope dal cookie; nessuna route context dedicata per design",
+      "gap": "full-parity",
+      "wave": "W2-boundary",
+      "evidence": "w2-final commits 984f16474; smoke prescriptions-write e discovery-read verdi; swift 110 Core + 257 AppleShared 0 failure; spec D7"
+    },
+    {
+      "area": "FSE / conformità",
+      "feature": "Validazione documento FSE singolo (profilo->payload) via v1",
+      "web": "app/api/v1/fse/validate-document/route.ts — POST {profile, document|payload} -> validateProfileDocument(), auth locale (requireLocalApiToken), DISTINTO da /api/fse/validate-patient (batch validazione retrospettiva paziente, session-auth, cita PROFILE_OBSERVATION_VITALS/PROFILE_THERAPY_MEDICATION su tutte le risorse del paziente)",
+      "native": "full: azione Verifica FSE nell area documenti che invoca validateFseDocument sui record terapia/osservazione e mostra l esito per profilo; client method e boundary gia pronti (W2), UI aggiunta in W5",
+      "boundary": "full: POST /api/v1/network/fse/validate-document sotto capability network.fse.validate (logica condivisa con la route v1 locale)",
+      "gap": "full-parity",
+      "wave": "W2-boundary+W5-ui",
+      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; smoke documenti+diario reali verdi"
+    },
+    {
+      "area": "Repertorio prestazioni",
+      "feature": "GET /api/service-catalog (catalogo prestazioni) + famiglie distinte /api/service-prescriptions e /api/service-prescription-items",
+      "web": "app/api/service-catalog/route.ts (catalogo/ricerca), app/api/service-prescriptions/* (prescrizioni), app/api/service-prescription-items/* (righe/item) — tre famiglie API separate, non un'unica 'matching repertorio'",
+      "native": "full a livello API: fetchServiceCatalog(+count) nel client paired; il matching repertorio in UI non esiste su NESSUNA superficie (la web crea item con matchStatus manual/unmatched senza consultare il catalogo), quindi non e' un gap di parita'",
+      "boundary": "full: GET /api/v1/network/service-catalog sotto readonly-service-prescriptions",
+      "gap": "full-parity",
+      "wave": "W2-boundary",
+      "evidence": "w2-final commits 984f16474; smoke prescriptions-write e discovery-read verdi; swift 110 Core + 257 AppleShared 0 failure; DEDUP: le famiglie prescriptions/items sono coperte dalla riga 'Prestazioni prescritte' (W2-boundary); questa riga resta per il solo catalogo; retag da W1-mobile-core a W2-boundary"
+    },
+    {
+      "area": "AI conversazionale",
+      "feature": "POST /api/proxy/ai/chat (proxy invocazione modello AI per chat), distinto da /api/conversations e /api/messages (CRUD storico)",
+      "web": "app/api/proxy/ai/chat/route.ts — endpoint proxy che inoltra la richiesta di generazione al runtime AI configurato (Ollama/MLX/cloud); /api/conversations e /api/messages gestiscono solo persistenza CRUD dello storico, non l'invocazione del modello",
+      "native": "missing — nessun riferimento a proxy/ai/chat nel codice nativo; il client Apple non ha superficie per invocare la generazione AI stessa (solo eventuale lettura storico se già coperta altrove)",
+      "boundary": "missing — non esiste sotto /api/v1/network; il proxy AI chat non è raggiungibile dal client paired tramite boundary consentito",
+      "gap": "missing-both",
+      "wave": "W5-ai-avanzate",
+      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; app/api/proxy/ai/chat/route.ts vs app/api/conversations/route.ts, app/api/messages/route.ts"
+    },
+    {
+      "area": "AI runtime locale",
+      "feature": "GET /api/system/mlx (stato/gestione generico runtime MLX via PM2, admin-only, solo macOS), distinto da /api/system/treatment-reasoning/athena-mlx (generazione ragionamento terapeutico specifico, kill-switch dedicato)",
+      "web": "app/api/system/mlx/route.ts — stato PM2Manager del runtime MLX generico (501 strutturato su non-macOS), requireSessionOrLocalToken + admin only; athena-mlx è un consumer applicativo separato del runtime, con proprio kill-switch AI_TREATMENT_REASONING_KILL_SWITCH_KEY",
+      "native": "missing — nessuna evidenza di consumo di /api/system/mlx (generico) nel codice nativo, solo eventualmente della funzione applicativa athena-mlx se già mappata altrove",
+      "boundary": "n/a — non è sotto /api/v1/network; è un endpoint di sistema admin, HOST-ONLY per natura (richiede PM2/macOS Apple Silicon)",
+      "gap": "host-only",
+      "wave": "HOST-ONLY",
+      "evidence": "app/api/system/mlx/route.ts:14-16,29-36 vs app/api/system/treatment-reasoning/athena-mlx/route.ts:1-13"
+    },
+    {
+      "area": "Privacy / de-identificazione",
+      "feature": "GET /api/system/redaction (stato/health provider OpenMed per redazione PII)",
+      "web": "app/api/system/redaction/route.ts — verifica endpoint OpenMed configurato e relativo health check, requireSessionOrLocalToken",
+      "native": "host-only: stato e health di OpenMed locale, senza pertinenza per il client paired remoto",
+      "boundary": "host-only: non è sotto /api/v1/network; dipende da OpenMed locale e usa requireSessionOrLocalToken con validateLocalTarget",
+      "gap": "host-only",
+      "wave": "W4-settings",
+      "evidence": "spec W4 D14; app/api/system/redaction/route.ts:1-33"
+    },
+    {
+      "area": "Diagnostica applicazione",
+      "feature": "GET /api/system/revision (fingerprint/branch/revisione build corrente, usato per rilevare mismatch versione)",
+      "web": "app/api/system/revision/route.ts — espone revision/sourceFingerprint/fingerprint sempre, branch/worktreeHash solo se autenticato; consumato da components/app-revision-guard.tsx per forzare reload su drift versione",
+      "native": "full: guard revisione attivo su connect e ritorno in foreground (fetchNetworkRevision, refetch + notice non bloccante su fingerprint cambiato)",
+      "boundary": "full: GET /api/v1/network/revision paired-auth espone SOLO revision/sourceFingerprint/fingerprint (branch/worktreeHash mai, asserito da smoke)",
+      "gap": "full-parity",
+      "wave": "W2-boundary",
+      "evidence": "w2-final commits 984f16474; smoke prescriptions-write e discovery-read verdi; swift 110 Core + 257 AppleShared 0 failure"
+    },
+    {
+      "area": "Zona pericolo / manutenzione DB",
+      "feature": "POST/GET /api/system/fix-orphans (conteggio+riparazione righe cliniche orfane, admin-only) e POST /api/system/migrate-m2m (migrazione relazione paziente-ambulatorio da 1:1 a many-to-many, admin-only) — DISTINTI dal generico /api/system/migrate (setup ambulatorio di default) e da repair-db/purge",
+      "web": "app/api/system/fix-orphans/route.ts — countOrphanedClinicalRows/purgeOrphanedClinicalRows su cascata paziente; app/api/system/migrate-m2m/route.ts — backfill patientsToAmbulatories da patients.ambulatoryId legacy; entrambi isWebAdminSession/role admin, azioni una-tantum di manutenzione dati distinte da 'migrate' semplice e da 'repair-db'",
+      "native": "missing — la riga attuale 'zona pericolo: repair-db/purge/migrate' non nomina questi due endpoint specifici; nessuna evidenza di superficie nativa equivalente",
+      "boundary": "n/a — non sono sotto /api/v1/network; operazioni web-admin dirette sul DB server, per natura HOST-ONLY (rischio di corruzione se esposte a un client remoto paired)",
+      "gap": "host-only",
+      "wave": "HOST-ONLY",
+      "evidence": "app/api/system/fix-orphans/route.ts:1-38; app/api/system/migrate-m2m/route.ts:1-20; cfr. app/api/system/migrate/route.ts:1-16 (endpoint generico distinto)"
+    },
+    {
+      "area": "Network boundary — discovery/pairing",
+      "feature": "GET /api/v1/network/capabilities, /api/v1/network/identity, /api/v1/network/node (negoziazione capability host, identità di rete, sommario nodo) — famiglie boundary distinte da pairing-intents/confirm e session",
+      "web": "app/api/v1/network/capabilities/route.ts (getNetworkCapabilities), app/api/v1/network/identity/route.ts (getNetworkIdentitySummary, session-aware), app/api/v1/network/node/route.ts (getNetworkNodeSummary) — tutte con requireLocalApiToken, GET-only, servono a un client paired per scoprire cosa il nodo host supporta prima/durante il pairing",
+      "native": "full: fetchNetworkCapabilities/Identity/Node nel client paired con test; identity consumata per lo scope, revision guard attivo; nessuna superficie UI diagnostica dedicata su nessuno dei due lati (parita' a livello di consumo API)",
+      "boundary": "full: dual-auth local-token O paired (helper resolveNetworkDiscoveryAuth; ramo local-token invariato, asserito da smoke)",
+      "gap": "full-parity",
+      "wave": "W2-boundary",
+      "evidence": "w2-final commits 984f16474; smoke prescriptions-write e discovery-read verdi; swift 110 Core + 257 AppleShared 0 failure"
+    },
+    {
+      "area": "Impostazioni AI",
+      "feature": "/settings/ai (hub) — in realtà un semplice redirect a /settings/ai/modelli, non una vista distinta",
+      "web": "app/settings/ai/page.tsx — 'export default function SettingsAiIndexPage() { redirect(\"/settings/ai/modelli\"); }' (commento: WUL-297, /settings/ai defaults to models surface); le viste reali sono /settings/ai/modelli e /settings/ai/funzioni",
+      "native": "n/a — non è un gap: non esiste una terza superficie UI da coprire, la riga 'ai-runtime' che copre modelli+funzioni è già esaustiva",
+      "boundary": "n/a",
+      "gap": "full-parity",
+      "wave": "W4-settings",
+      "evidence": "app/settings/ai/page.tsx:1-5"
+    }
+  ],
+  "critique_residua": [],
+  "updated": "2026-07-11 WUL-479 closeout: evidence reconciled to public/main after Wave 5; residual gaps assigned to Wave 6 or host-only policy",
+  "version": 1,
+  "summary": {
+    "total": 64,
+    "fullParity": 31,
+    "partial": 13,
+    "missing": 2,
+    "hostOnly": 18,
+    "openNonHost": 15
+  }
+}
