@@ -65,22 +65,27 @@ test('primary patient list reads exclude soft-deleted patients', () => {
 // WUL-322 (ADR 0066 Slice 3): the test-container clear must select victims via the
 // M2M membership and tombstone them, never via the stale legacy patients.ambulatoryId
 // column (WUL-300 constraint), never as a hard delete.
+/* @Codex */
 test('ambulatories/clear is membership-based, soft-deletes and stays test-only', () => {
-    const source = read('app/api/ambulatories/clear/route.ts');
+    const routeSource = read('app/api/ambulatories/clear/route.ts');
+    const writeSource = read('lib/ambulatory-write.ts');
+    const clearServiceSource = handlerSource(writeSource, 'clearAmbulatory');
 
-    assert.doesNotMatch(source, /\.delete\(patients\)/, 'clear must never hard-delete patients');
-    assert.doesNotMatch(source, /patients\.ambulatoryId/, 'clear must not select patients via the stale legacy column (WUL-300)');
-    assert.match(source, /clearTestContainerByMembership\(/, 'clear must go through the membership-based helper');
-    assert.match(source, /dbServer\.transaction\(/, 'clear must run in one synchronous transaction');
+    assert.match(routeSource, /clearAmbulatory\(\{ request, session \}, ambulatoryId, body\.version\)/, 'clear route must delegate to the ambulatory write service');
+    assert.doesNotMatch(clearServiceSource, /\.delete\(patients\)/, 'clear must never hard-delete patients');
+    assert.doesNotMatch(clearServiceSource, /patients\.ambulatoryId/, 'clear must not select patients via the stale legacy column (WUL-300)');
+    assert.match(clearServiceSource, /clearTestContainerByMembership\(/, 'clear service must go through the membership-based helper');
+    assert.match(clearServiceSource, /dbServer\.transaction\(/, 'clear service must run in one synchronous transaction');
 
     // (e) the non-test safety check stays: clearing a LIVE ambulatory is rejected.
-    assert.match(source, /type !== 'test'/, 'clear must keep the test-only safety check');
-    assert.match(source, /status: 403/, 'clearing a non-test ambulatory must stay rejected');
+    assert.match(clearServiceSource, /type !== 'test'/, 'clear must keep the test-only safety check');
+    assert.match(clearServiceSource, /status: 403/, 'clearing a non-test ambulatory must stay rejected');
 
     // (d) one patient.deleted audit event per cleared patient, PHI-safe metadata only.
-    assert.match(source, /for \(const cleared of result\.clearedPatients\)/, 'clear must audit each cleared patient');
-    assert.match(source, /'patient\.deleted'/, 'clear must emit the patient.deleted audit event');
-    assert.match(source, /reasonCode: TEST_CONTAINER_CLEAR_REASON/, 'audit metadata must carry the dedicated deletion reason');
+    assert.match(clearServiceSource, /clearedPatientVersions: result\.clearedPatients/, 'clear service must retain the membership-clear result for auditing');
+    assert.match(clearServiceSource, /for \(const item of cleared\)/, 'clear must audit each cleared patient');
+    assert.match(clearServiceSource, /'patient\.deleted'/, 'clear must emit the patient.deleted audit event');
+    assert.match(clearServiceSource, /reasonCode: TEST_CONTAINER_CLEAR_REASON/, 'audit metadata must carry the dedicated deletion reason');
 });
 
 test('the membership-clear helper tombstones with the dedicated reason', () => {
