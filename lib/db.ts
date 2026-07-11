@@ -406,6 +406,11 @@ class ApiTable<T> {
         return data.id;
     }
 
+    /* @Codex */
+    async prepareWritePayload(item: Partial<T>, isPartial = false): Promise<Partial<T>> {
+        return this.encryptItem(item, isPartial);
+    }
+
     // Alias for Dexie compatibility (Upsert-like behavior)
     /* @Codex */
     async put(item: T, options?: { suppressNotify?: boolean }): Promise<string> {
@@ -792,6 +797,43 @@ class MedicalApiClient {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.settings = new ApiTable<any>('/api/settings', 'settings', getKey);
         this.patientsToAmbulatories = new ApiTable<PatientAmbulatory>('/api/patients/assign', 'patients_to_ambulatories', getKey);
+    }
+
+    /* @Codex */
+    async applyPatientSmartImport(
+        patientId: string,
+        input: {
+            version: number;
+            diagnoses?: Diagnosis[];
+            therapies: Therapy[];
+        },
+    ): Promise<void> {
+        const patientPayload = input.diagnoses === undefined
+            ? undefined
+            : await this.patients.prepareWritePayload({ diagnoses: input.diagnoses }, true);
+        const therapyPayloads = await Promise.all(
+            input.therapies.map((therapy) => this.therapies.prepareWritePayload(therapy)),
+        );
+
+        const response = await fetch(`/api/patients/${encodeURIComponent(patientId)}/smart-import`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                version: input.version,
+                ...(patientPayload?.diagnoses !== undefined ? { diagnoses: patientPayload.diagnoses } : {}),
+                therapies: therapyPayloads,
+            }),
+        });
+        if (!response.ok) {
+            const payload = await response.json().catch(() => null);
+            if (response.status === 409 && isApiVersionConflictPayload(payload)) {
+                throw new ApiConflictError(payload);
+            }
+            throw new Error('Failed to apply Smart Import selection');
+        }
+
+        if (input.diagnoses !== undefined) notifyDbChange('patients');
+        if (input.therapies.length > 0) notifyDbChange('therapies');
     }
 
     /* @Codex */

@@ -17,7 +17,6 @@ import { dedupeDocumentInsightsForContext } from './document-insight-context';
 /* @Codex */
 import { renderDocumentEvidencePackContext } from './document-evidence-pack';
 import { searchICDHybrid, type ICDSearchResult } from '../../icd-service';
-import { notifyDbChange } from '../../live-query';
 import {
     buildDiagnosisSearchQueries,
     classifyExtractedTherapyState,
@@ -1017,30 +1016,12 @@ export async function applyPatientSmartImportSelection(
         appliedTherapyIds.push(suggestion.id);
     }
 
-    const createdTherapyIds: string[] = [];
-    try {
-        for (const therapyItem of therapyItems) {
-            await db.therapies.add(therapyItem, { suppressNotify: true });
-            createdTherapyIds.push(therapyItem.id);
-        }
-
-        if (appliedDiagnosisIds.length > 0) {
-            await db.patients.update(patientId, {
-                diagnoses: nextDiagnoses,
-                version: patient.version,
-                updatedAt: new Date(),
-            });
-        } else if (createdTherapyIds.length > 0) {
-            notifyDbChange();
-        }
-    } catch (error) {
-        for (const therapyId of createdTherapyIds) {
-            await db.therapies.delete(therapyId, { suppressNotify: true, version: 1 }).catch(() => null);
-        }
-        if (createdTherapyIds.length > 0) {
-            notifyDbChange();
-        }
-        throw error;
+    if (appliedDiagnosisIds.length > 0 || therapyItems.length > 0) {
+        await db.applyPatientSmartImport(patientId, {
+            version: patient.version,
+            diagnoses: appliedDiagnosisIds.length > 0 ? nextDiagnoses : undefined,
+            therapies: therapyItems,
+        });
     }
 
     if (appliedDiagnosisIds.length > 0 || appliedTherapyIds.length > 0) {
