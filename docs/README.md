@@ -2,31 +2,33 @@
 summary: "Canonical MediFlow documentation entrypoint and precedence map."
 read_when:
   - "Starting any MediFlow task and deciding which docs are authoritative."
-  - "Updating documentation structure, canonical indices, or OSS/private doc boundaries."
+  - "Updating documentation structure, canonical indices, or repository governance."
 ---
 
 # Documentazione MediFlow: Indice Canonico
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-07-03
+Ultimo aggiornamento: 2026-07-09
 
 ## 📚 Policy di consultazione (agent)
 
 Per orientarti rapidamente:
 
 1. [README.md](../README.md)
+2. [AGENTS.md](../AGENTS.md)
 3. [docs/README.md](./README.md) (questo file)
 4. [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
 5. [ARCHITECTURE.md](../ARCHITECTURE.md)
 6. [SECURITY.md](../SECURITY.md)
 7. [CONTRIBUTING.md](../CONTRIBUTING.md)
+8. [docs/repository-topology.md](./repository-topology.md)
 9. [docs/adr/](./adr/README.md) (partendo dai più recenti)
 
 Approfondimenti utili:
 
 - Mappa completa markdown: [docs/markdown-index.md](./markdown-index.md)
-- Topologia repository (runtime clinico vs publication/site): [docs/repository-topology.md](./repository-topology.md)
+- Governance repository e topologia runtime/publication: [docs/repository-topology.md](./repository-topology.md)
 - Lettura completa dello stato corrente: [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
 - FAQ pubbliche e stato sintetico del prodotto: [docs/FAQ.md](./FAQ.md)
 - Walkthrough operativo end-to-end: [docs/walkthrough.md](./walkthrough.md)
@@ -38,11 +40,13 @@ Approfondimenti utili:
 ## 🧭 Ordine di lettura consigliato
 
 1. [README.md](../README.md)
+2. [AGENTS.md](../AGENTS.md)
 3. [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
 4. [ARCHITECTURE.md](../ARCHITECTURE.md)
 5. [SECURITY.md](../SECURITY.md)
 6. [CONTRIBUTING.md](../CONTRIBUTING.md)
-7. [docs/adr/](./adr/README.md) (partendo dai più recenti)
+7. [docs/repository-topology.md](./repository-topology.md)
+8. [docs/adr/](./adr/README.md) (partendo dai più recenti)
 9. [docs/walkthrough.md](./walkthrough.md)
 10. [docs/markdown-index.md](./markdown-index.md)
 
@@ -57,7 +61,9 @@ Approfondimenti utili:
 | Tema | File canonico | Stato | Note |
 | --- | --- | --- | --- |
 | Onboarding progetto | [README.md](../README.md) | `CANONICAL` | Punto di ingresso generale. |
-| Stato completo del sistema | [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | `CANONICAL` | Lettura unificata corrente: prodotto, runtime, boundary, AI/document intelligence, Apple clients e split private/OSS. |
+| Regole operative per agent | [AGENTS.md](../AGENTS.md) | `CANONICAL` | Boot sequence, repository canonica, privacy, disciplina di branch/worktree e verifica. |
+| Governance e topologia repository | [docs/repository-topology.md](./repository-topology.md) | `CANONICAL` | Fissa la repository pubblica come unica fonte operativa e separa runtime, publication/site e artefatti locali fuori Git. |
+| Stato completo del sistema | [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | `CANONICAL` | Lettura unificata corrente: prodotto, runtime, boundary, AI/document intelligence, Apple clients e governance della repository pubblica. |
 | Visione architetturale stabile | [ARCHITECTURE.md](../ARCHITECTURE.md) | `CANONICAL` | Confini e principi che cambiano raramente. |
 | Sicurezza e redazione dati | [SECURITY.md](../SECURITY.md) | `CANONICAL` | Policy di sicurezza, threat model, logging rules. |
 | Intended purpose e claims guard clinico | [docs/adr/0065-intended-purpose-and-claims-guard.md](./adr/0065-intended-purpose-and-claims-guard.md) | `CANONICAL` | Fissa `WUL-279`: claim consentiti/esclusi su AI, SISS/FSE, cloud, diagnosi, triage, prescrizione e automazione, con guard `check:claims`. |
