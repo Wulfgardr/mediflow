@@ -24,6 +24,21 @@ after(() => {
     console.log(`[network-home-base-account-pin] Report written to ${REPORT_PATH}`);
 });
 
+test('re-wrap master key rejects malformed JSON bodies', async () => {
+    await assertServerReady();
+    const firstLogin = await login(PIN);
+    assert.equal(firstLogin.response.status, 200);
+
+    const rejected = await rewrapMasterKeyWithRawBody(firstLogin.cookie, '{"encryptedMasterKey":');
+    assert.equal(rejected.response.status, 400);
+    assert.equal(rejected.json?.code, 'KDF_REWRAP_INVALID');
+
+    const loginAfterRejectedRewrap = await login(PIN);
+    assert.equal(loginAfterRejectedRewrap.response.status, 200);
+    assert.equal(loginAfterRejectedRewrap.json.encryptedMasterKey, firstLogin.json.encryptedMasterKey);
+    assert.equal(loginAfterRejectedRewrap.json.salt, firstLogin.json.salt);
+});
+
 test('paired account PIN rotation preserves the master key and sealed patient field', async () => {
     await assertServerReady();
     await enableHomeBaseMode();
@@ -122,6 +137,7 @@ async function enableHomeBaseMode() { const result = await request('PUT', '/api/
 async function login(pin) { const result = await request('POST', '/api/auth/login', { body: { username: USERNAME, password: pin } }); return { ...result, cookie: result.response.status === 200 ? extractSessionCookie(result.response) : null }; }
 async function changePin(cookie, currentPin, newPin, blob, salt) { return request('POST', '/api/auth/change-pin', { headers: { Cookie: cookie }, body: { currentPin, newPin, encryptedMasterKey: blob, salt: salt.toString('base64') } }); }
 async function rewrapMasterKey(cookie, body) { return request('POST', '/api/auth/rewrap-master-key', { headers: { Cookie: cookie }, body }); }
+async function rewrapMasterKeyWithRawBody(cookie, body) { const response = await fetch(new URL('/api/auth/rewrap-master-key', BASE_URL), { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body }); const text = await response.text(); let json = null; try { json = text ? JSON.parse(text) : null; } catch { json = text; } return { response, json, text }; }
 async function pairClient(requestedCapabilities, deviceName) { const intent = await request('POST', '/api/v1/network/pairing-intents', { body: { deviceName, clientPlatform: 'ipados', appVersion: '0.7.1-smoke', requestedCapabilities } }); assert.equal(intent.response.status, 201); const confirmed = await request('POST', `/api/v1/network/pairing-intents/${intent.json.intentId}/confirm`, { headers: localApiHeaders() }); assert.equal(confirmed.response.status, 201); return { pairedClientId: confirmed.json.pairedClient.clientId, pairedClientToken: confirmed.json.pairedClientToken }; }
 function patientPayload(id, notes) { const suffix = id.replace(/-/g, '').slice(0, 13).toUpperCase(); return { id, firstName: 'Account', lastName: 'Pin', taxCode: `ACP${suffix}`, notes, isAdi: false }; }
 async function cleanupPatient(patientId) { const detail = await request('GET', `/api/v1/patients/${patientId}`, { headers: localApiHeaders() }); if (detail.response.status === 200) { const deleted = await request('DELETE', `/api/v1/patients/${patientId}`, { headers: localApiHeaders(), body: { version: detail.json.version } }); assert.equal(deleted.response.status, 200); } }
