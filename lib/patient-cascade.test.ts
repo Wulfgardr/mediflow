@@ -33,6 +33,7 @@ function bootstrapDatabase(): { sqlite: Database.Database; db: BetterSQLite3Data
         if (sql.trim().length === 0) continue;
         sqlite.exec(sql);
     }
+    sqlite.pragma('foreign_keys = ON');
     return { sqlite, db: drizzle(sqlite) };
 }
 
@@ -58,8 +59,8 @@ function insertPatientWithChildren(sqlite: Database.Database, patientId: string)
         "INSERT INTO siss_handoff_events (id, patient_id, action, module_label, started_at) VALUES (?, ?, 'open', 'Test', 1)"
     ).run(`sh-${suffix}`, patientId);
     sqlite.prepare(
-        "INSERT INTO observations (id, patient_id, code_system, code, display, unit_system, unit_code, value, observed_at) VALUES (?, ?, 'loinc', '8867-4', 'Heart rate', 'ucum', '/min', '70', 1)"
-    ).run(`ob-${suffix}`, patientId);
+        "INSERT INTO observations (id, patient_id, code_system, code, display, unit_system, unit_code, value, observed_at, service_prescription_item_id) VALUES (?, ?, 'loinc', '8867-4', 'Heart rate', 'ucum', '/min', '70', 1, ?)"
+    ).run(`ob-${suffix}`, patientId, `spi-${suffix}`);
     sqlite.prepare(
         "INSERT INTO checkups (id, patient_id, date, title) VALUES (?, ?, 1, 'Controllo')"
     ).run(`ck-${suffix}`, patientId);
@@ -98,6 +99,7 @@ test('purgePatientCascade deletes every child table and returns per-table counts
         expectAllOnes(countPatientCascadeRows(db, 'patient-keep'), 'control patient must be untouched');
         const leftover = countPatientCascadeRows(db, 'patient-purge');
         assert.equal(totalPatientCascadeRows(leftover), 0, 'purged patient must have zero child rows');
+        assert.deepEqual(sqlite.pragma('foreign_key_check'), []);
     } finally {
         sqlite.close();
     }

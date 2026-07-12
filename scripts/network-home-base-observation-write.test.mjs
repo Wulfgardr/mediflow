@@ -37,6 +37,7 @@ test('paired observation write requires capability, session, scope, version, and
     const ambulatoryId = await resolveDefaultAmbulatoryId();
     await enableHomeBaseMode();
     const patientId = await createSeedPatient(ambulatoryId);
+    const otherPatientId = await createSeedPatient(ambulatoryId);
 
     try {
         const readOnlyClient = await pairClient(
@@ -56,6 +57,99 @@ test('paired observation write requires capability, session, scope, version, and
         });
         assert.equal(login.response.status, 200);
         const sessionCookie = extractSessionCookie(login.response);
+
+        const otherPrescription = await request('POST', '/api/service-prescriptions', {
+            headers: { Cookie: sessionCookie },
+            body: {
+                patientId: otherPatientId,
+                prescribedAt: '2026-07-12T08:00:00.000Z',
+                status: 'prescribed',
+                category: 'lab',
+                serviceName: 'Emocromo di altro paziente',
+                source: 'manual',
+            },
+        });
+        assert.equal(otherPrescription.response.status, 201);
+
+        const otherItem = await request('POST', '/api/service-prescription-items', {
+            headers: { Cookie: sessionCookie },
+            body: {
+                prescriptionId: otherPrescription.json.id,
+                ordinal: 1,
+                status: 'prescribed',
+                category: 'lab',
+                serviceName: 'Emocromo di altro paziente',
+                matchStatus: 'manual',
+            },
+        });
+        assert.equal(otherItem.response.status, 201);
+        assert.ok(otherItem.json?.id);
+
+        const observationPayload = {
+            codeSystem: 'LOINC',
+            code: '718-7',
+            display: 'Hemoglobin',
+            unitSystem: 'UCUM',
+            unitCode: 'g/dL',
+            value: 14,
+            observedAt: '2026-07-12T09:00:00.000Z',
+            source: 'manual',
+        };
+        const crossPatientCreate = await request('POST', '/api/observations', {
+            headers: { Cookie: sessionCookie },
+            body: {
+                ...observationPayload,
+                patientId,
+                servicePrescriptionItemId: otherItem.json.id,
+            },
+        });
+        assert.equal(crossPatientCreate.response.status, 422);
+        assert.equal(crossPatientCreate.json?.error, 'Service prescription item not found or does not belong to observation patient');
+
+        const missingItemCreate = await request('POST', '/api/observations', {
+            headers: { Cookie: sessionCookie },
+            body: {
+                ...observationPayload,
+                patientId,
+                servicePrescriptionItemId: 'missing-service-prescription-item',
+            },
+        });
+        assert.equal(missingItemCreate.response.status, 422);
+
+        const unlinkedObservation = await request('POST', '/api/observations', {
+            headers: { Cookie: sessionCookie },
+            body: { ...observationPayload, patientId },
+        });
+        assert.equal(unlinkedObservation.response.status, 201);
+
+        const crossPatientUpdate = await request('PUT', `/api/observations/${unlinkedObservation.json.id}`, {
+            headers: { Cookie: sessionCookie },
+            body: { version: 1, servicePrescriptionItemId: otherItem.json.id },
+        });
+        assert.equal(crossPatientUpdate.response.status, 422);
+        assert.equal(crossPatientUpdate.json?.error, 'Service prescription item not found or does not belong to observation patient');
+
+        const samePatientCreate = await request('POST', '/api/observations', {
+            headers: { Cookie: sessionCookie },
+            body: {
+                ...observationPayload,
+                patientId: otherPatientId,
+                servicePrescriptionItemId: otherItem.json.id,
+            },
+        });
+        assert.equal(samePatientCreate.response.status, 201);
+
+        const samePatientUnlinkedObservation = await request('POST', '/api/observations', {
+            headers: { Cookie: sessionCookie },
+            body: { ...observationPayload, patientId: otherPatientId },
+        });
+        assert.equal(samePatientUnlinkedObservation.response.status, 201);
+
+        const samePatientUpdate = await request('PUT', `/api/observations/${samePatientUnlinkedObservation.json.id}`, {
+            headers: { Cookie: sessionCookie },
+            body: { version: 1, servicePrescriptionItemId: otherItem.json.id },
+        });
+        assert.equal(samePatientUpdate.response.status, 200);
 
         const readOnlyCreate = await request('POST', `/api/v1/network/patients/${patientId}/observations`, {
             headers: {
@@ -288,6 +382,7 @@ test('paired observation write requires capability, session, scope, version, and
         });
     } finally {
         await cleanupPatient(patientId);
+        await cleanupPatient(otherPatientId);
     }
 });
 

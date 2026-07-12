@@ -7,9 +7,92 @@ import {
     normalizeOptionalCheckupSource,
     normalizeEntryCreateInput,
     normalizeEntryUpdateInput,
+    normalizeObservationCreateInput,
+    normalizeObservationUpdateInput,
     normalizeTherapyCreateInput,
     normalizeTherapyUpdateInput,
 } from './api-v1-clinical-write-normalization';
+
+test('normalizes the service item link only for the local web observation path', () => {
+    const input = {
+        codeSystem: 'LOINC',
+        code: '2339-0',
+        display: 'Glicemia',
+        unitSystem: 'UCUM',
+        unitCode: 'mg/dL',
+        value: '91',
+        observedAt: '2026-07-12T10:00:00.000Z',
+        servicePrescriptionItemId: 'service-item-1',
+    };
+    const local = normalizeObservationCreateInput(input, {
+        id: 'observation-1',
+        patientId: 'patient-1',
+        allowServicePrescriptionItemLink: true,
+    });
+    assert.equal(local.ok, true);
+    if (!local.ok) return;
+    assert.equal(local.values.servicePrescriptionItemId, 'service-item-1');
+
+    const boundary = normalizeObservationCreateInput(input, {
+        id: 'observation-1',
+        patientId: 'patient-1',
+    });
+    assert.equal(boundary.ok, true);
+    if (!boundary.ok) return;
+    assert.equal(boundary.values.servicePrescriptionItemId, null);
+
+    const update = normalizeObservationUpdateInput(
+        { servicePrescriptionItemId: 'service-item-2' },
+        { allowServicePrescriptionItemLink: true },
+    );
+    assert.equal(update.ok, true);
+    if (!update.ok) return;
+    assert.equal(update.values.servicePrescriptionItemId, 'service-item-2');
+});
+
+test('normalizes blank service prescription item IDs to absence while preserving valid IDs', () => {
+    const createContext = {
+        id: 'observation-1',
+        patientId: 'patient-1',
+        allowServicePrescriptionItemLink: true,
+    };
+    const requiredObservation = {
+        codeSystem: 'LOINC',
+        code: '8480-6',
+        display: 'Pressione sistolica',
+        unitSystem: 'UCUM',
+        unitCode: 'mm[Hg]',
+        value: '120',
+        observedAt: '2026-07-12T10:00:00.000Z',
+        source: 'manual',
+    };
+
+    for (const servicePrescriptionItemId of ['', '   ']) {
+        const result = normalizeObservationCreateInput(
+            { ...requiredObservation, servicePrescriptionItemId },
+            createContext,
+        );
+        assert.equal(result.ok, true);
+        if (!result.ok) return;
+        assert.equal(result.values.servicePrescriptionItemId, null);
+    }
+
+    const preserved = normalizeObservationUpdateInput(
+        { servicePrescriptionItemId: '  service-item-3  ' },
+        { allowServicePrescriptionItemLink: true },
+    );
+    assert.equal(preserved.ok, true);
+    if (!preserved.ok) return;
+    assert.equal(preserved.values.servicePrescriptionItemId, 'service-item-3');
+
+    assert.deepEqual(
+        normalizeObservationUpdateInput(
+            { servicePrescriptionItemId: 42 },
+            { allowServicePrescriptionItemLink: true },
+        ),
+        { ok: false, error: 'Invalid servicePrescriptionItemId' },
+    );
+});
 
 test('normalizeEntryCreateInput rejects invalid required fields before the DB layer', () => {
     assert.deepEqual(

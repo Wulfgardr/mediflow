@@ -8,6 +8,7 @@ import { eq } from 'drizzle-orm';
 import { SESSION_COOKIE_NAME, type ServerSession } from './security/server-session.ts';
 import type { dbServer as DbServer } from './db-server.ts';
 import type {
+    observations,
     patients,
     prostheticPrescriptions,
     servicePrescriptionItems,
@@ -19,6 +20,7 @@ const ROOT_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '
 type LoadedModules = {
     dbServer: typeof DbServer;
     schema: {
+        observations: typeof observations;
         patients: typeof patients;
         prostheticPrescriptions: typeof prostheticPrescriptions;
         servicePrescriptionItems: typeof servicePrescriptionItems;
@@ -129,6 +131,18 @@ test('host service prescription DELETE requires the matching version before casc
         matchStatus: 'unmatched',
         version: 1,
     }).run();
+    modules.dbServer.insert(modules.schema.observations).values({
+        id: 'observation-service-delete-parent',
+        patientId,
+        codeSystem: 'LOINC',
+        code: '58410-2',
+        display: 'Emocromo panel',
+        unitSystem: 'UCUM',
+        unitCode: '1',
+        value: 'synthetic',
+        observedAt: new Date('2026-07-09T08:00:00.000Z'),
+        servicePrescriptionItemId: itemId,
+    }).run();
 
     const stale = await modules.deleteHostServicePrescription(fakeContext(prescriptionId), 2);
     assert.equal(stale.status, 409);
@@ -136,11 +150,20 @@ test('host service prescription DELETE requires the matching version before casc
     assert.equal(stale.value.entity, 'service_prescription');
     assert.ok(modules.dbServer.select().from(modules.schema.servicePrescriptions).where(eq(modules.schema.servicePrescriptions.id, prescriptionId)).get());
     assert.ok(modules.dbServer.select().from(modules.schema.servicePrescriptionItems).where(eq(modules.schema.servicePrescriptionItems.id, itemId)).get());
+    assert.equal(
+        modules.dbServer.select().from(modules.schema.observations).where(eq(modules.schema.observations.id, 'observation-service-delete-parent')).get()?.servicePrescriptionItemId,
+        itemId,
+    );
 
     const ok = await modules.deleteHostServicePrescription(fakeContext(prescriptionId), 3);
     assert.equal(ok.status, 200);
     assert.equal(modules.dbServer.select().from(modules.schema.servicePrescriptionItems).where(eq(modules.schema.servicePrescriptionItems.id, itemId)).get(), undefined);
     assert.equal(modules.dbServer.select().from(modules.schema.servicePrescriptions).where(eq(modules.schema.servicePrescriptions.id, prescriptionId)).get(), undefined);
+    assert.equal(
+        modules.dbServer.select().from(modules.schema.observations).where(eq(modules.schema.observations.id, 'observation-service-delete-parent')).get()?.servicePrescriptionItemId,
+        null,
+    );
+    assert.deepEqual(modules.dbServer.$client.pragma('foreign_key_check'), []);
 });
 
 test('host service prescription item DELETE is version-guarded', async () => {
@@ -168,15 +191,36 @@ test('host service prescription item DELETE is version-guarded', async () => {
         matchStatus: 'unmatched',
         version: 4,
     }).run();
+    modules.dbServer.insert(modules.schema.observations).values({
+        id: 'observation-service-delete-item',
+        patientId,
+        codeSystem: 'LOINC',
+        code: '30746-2',
+        display: 'Radiografia torace',
+        unitSystem: 'UCUM',
+        unitCode: '1',
+        value: 'synthetic',
+        observedAt: new Date('2026-07-09T09:00:00.000Z'),
+        servicePrescriptionItemId: itemId,
+    }).run();
 
     const stale = await modules.deleteHostServicePrescriptionItem(fakeContext(itemId), 3);
     assert.equal(stale.status, 409);
     assert.equal(stale.value.entity, 'service_prescription_item');
     assert.ok(modules.dbServer.select().from(modules.schema.servicePrescriptionItems).where(eq(modules.schema.servicePrescriptionItems.id, itemId)).get());
+    assert.equal(
+        modules.dbServer.select().from(modules.schema.observations).where(eq(modules.schema.observations.id, 'observation-service-delete-item')).get()?.servicePrescriptionItemId,
+        itemId,
+    );
 
     const ok = await modules.deleteHostServicePrescriptionItem(fakeContext(itemId), 4);
     assert.equal(ok.status, 200);
     assert.equal(modules.dbServer.select().from(modules.schema.servicePrescriptionItems).where(eq(modules.schema.servicePrescriptionItems.id, itemId)).get(), undefined);
+    assert.equal(
+        modules.dbServer.select().from(modules.schema.observations).where(eq(modules.schema.observations.id, 'observation-service-delete-item')).get()?.servicePrescriptionItemId,
+        null,
+    );
+    assert.deepEqual(modules.dbServer.$client.pragma('foreign_key_check'), []);
 });
 
 test('host prosthetic prescription DELETE is version-guarded', async () => {
