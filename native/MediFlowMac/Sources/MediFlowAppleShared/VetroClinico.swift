@@ -1,8 +1,12 @@
-// Vetro Clinico: the shared Liquid Glass design kit for the universal app.
-// Adopts Apple Liquid Glass (WWDC25/26) on iOS 26 / macOS 26 and degrades to a
-// system material on the iOS 17 / macOS 14 deployment floor, so one set of
-// primitives renders correctly on every supported OS.
+// Vetro Clinico: the shared design kit for the universal app.
+// Liquid Glass belongs to controls and service chrome; clinical content stays
+// opaque on every supported OS.
 import SwiftUI
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 /// Clinical tone for status surfaces. Maps to a single source-of-truth color.
 public enum VetroTone: Equatable {
@@ -24,6 +28,32 @@ public enum VetroPalette {
         case .attention: return .orange
         case .critical: return .red
         }
+    }
+}
+
+enum PlatformColors {
+    static var groupedBackground: Color {
+        #if os(macOS)
+        return Color(nsColor: .windowBackgroundColor)
+        #else
+        return Color(uiColor: .systemGroupedBackground)
+        #endif
+    }
+
+    static var cardBackground: Color {
+        #if os(macOS)
+        return Color(nsColor: .controlBackgroundColor)
+        #else
+        return Color(uiColor: .secondarySystemBackground)
+        #endif
+    }
+
+    static var separator: Color {
+        #if os(macOS)
+        return Color(nsColor: .separatorColor)
+        #else
+        return Color(uiColor: .separator)
+        #endif
     }
 }
 
@@ -56,7 +86,31 @@ public extension View {
     }
 }
 
-/// A Liquid Glass clinical card container.
+/* @Codex */
+private struct ClinicalCardStyleModifier: ViewModifier {
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        content
+            .padding(16)
+            .background(shape.fill(PlatformColors.cardBackground))
+            .overlay(shape.stroke(PlatformColors.separator, lineWidth: 1))
+    }
+}
+
+public extension View {
+    /// Applies the shared opaque surface for clinical content. Liquid Glass is
+    /// intentionally excluded so legibility does not depend on OS appearance.
+    func clinicalCardStyle(cornerRadius: CGFloat = 14) -> some View {
+        modifier(ClinicalCardStyleModifier(cornerRadius: cornerRadius))
+    }
+}
+
+/// Legacy card name retained while call sites migrate to Lume terminology.
+/// The rendered surface is opaque on every supported OS.
+@available(*, deprecated, message: "Use clinicalCardStyle(cornerRadius:) for clinical content.")
 public struct GlassCard<Content: View>: View {
     private let cornerRadius: CGFloat
     private let content: Content
@@ -68,8 +122,7 @@ public struct GlassCard<Content: View>: View {
 
     public var body: some View {
         content
-            .padding(16)
-            .vetroGlass(in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .clinicalCardStyle(cornerRadius: cornerRadius)
     }
 }
 
