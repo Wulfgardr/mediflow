@@ -40,6 +40,29 @@ export interface DocumentClassRouterResult {
     rationale: string;
 }
 
+/**
+ * Classi con struttura abbastanza certa da usare la sintesi di fallback senza
+ * invocare il modello, ma solo quando il router ha confidence `high`.
+ */
+export const DETERMINISTIC_SYNTHESIS_CLASSES: ReadonlySet<DocumentDecisionClassification> = new Set([
+    // Referti di laboratorio: il layout di valori e intervalli e gia strutturato.
+    'lab_report',
+    // Ricette farmacologiche: nome file esplicito, senza narrativa clinica da interpretare.
+    'medication_prescription',
+    // Prescrizioni protesiche: documento prescrittivo con codici e ausili espliciti.
+    'prosthetic_prescription',
+    // Certificati e moduli amministrativi: non richiedono interpretazione clinica narrativa.
+    'administrative',
+    // Documento identificativo: contenuto amministrativo, non una relazione clinica.
+    'identity_document',
+]);
+
+export function isDeterministicSynthesisRoute(
+    routed: Pick<DocumentClassRouterResult, 'classification' | 'confidence'>,
+): boolean {
+    return routed.confidence === 'high' && DETERMINISTIC_SYNTHESIS_CLASSES.has(routed.classification);
+}
+
 // Vocabolario controllato del campo classe nel nome file -> classificazione.
 // Alcuni token (ricetta, promemoria) sono intrinsecamente ambigui tra farmaco e
 // prestazione: mappati alla classe piu probabile ma con confidence contenuta.

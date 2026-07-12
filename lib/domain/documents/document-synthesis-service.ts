@@ -37,6 +37,13 @@ import {
     buildDocumentSynthesisAutofillPlan,
     parseExistingDocumentSynthesisDiagnoses,
 } from './document-synthesis-autofill';
+/* @Codex */
+import {
+    buildDeterministicDocumentSynthesisAnalysis,
+    decideDocumentRouterControlFlow,
+    DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY,
+    parseDocumentRouterControlFlowMode,
+} from './document-router-control-flow';
 
 /* @Codex */
 const MAX_SYNTHESIS_CHARS = 12000;
@@ -63,6 +70,25 @@ function parseExistingInsights(raw: unknown): DocumentInsight[] {
         return Array.isArray(parsed) ? parsed as DocumentInsight[] : [];
     } catch {
         return [];
+    }
+}
+
+/* @Codex */
+async function recordDocumentRouterShadowDecision(input: {
+    classification: string;
+    confidence: string;
+    wouldSkip: boolean;
+}): Promise<void> {
+    try {
+        const response = await fetch('/api/ai/document-router-audit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...input, mode: 'shadow' }),
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    } catch (error) {
+        // L'audit shadow non deve modificare la pipeline clinica gia esistente.
+        console.warn('[DocumentSynthesis] document router shadow audit unavailable', error);
     }
 }
 
@@ -97,11 +123,26 @@ export async function synthesizeDocument(
     assertAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
 
     const normalized = normalizeDocumentInput(rawMarkdown);
-    const analysis = await analyzeDocumentContent(rawMarkdown);
-
-    // Classificazione deterministica (nome file + metadata PDF + testata):
-    // segnale additivo per la review, non altera il flusso di sintesi.
     const routed = routeDocumentClassForSynthesis(rawMarkdown, fileName, options);
+    const routerControlFlow = await db.settings.get(DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY);
+    const routerMode = parseDocumentRouterControlFlowMode(routerControlFlow?.value);
+    const routerDecision = decideDocumentRouterControlFlow({
+        documentSynthesisKillSwitchValue: documentSynthesisKillSwitch?.value,
+        mode: routerMode,
+        routed,
+    });
+
+    if (routerMode === 'shadow') {
+        await recordDocumentRouterShadowDecision({
+            classification: routed.classification,
+            confidence: routed.confidence,
+            wouldSkip: routerDecision.wouldSkip,
+        });
+    }
+
+    const analysis = routerDecision.useDeterministicSynthesis
+        ? buildDeterministicDocumentSynthesisAnalysis(normalized.normalizedText, routed)
+        : await analyzeDocumentContent(rawMarkdown);
 
     const patient = await db.patients.get(patientId);
     if (!patient) {
@@ -142,7 +183,13 @@ export async function synthesizeDocument(
         autofill: appliedCodes.length > 0
             ? { appliedDiagnoses: appliedCodes }
             : undefined,
-        routedClass: { classification: routed.classification, confidence: routed.confidence },
+        routedClass: {
+            classification: routed.classification,
+            confidence: routed.confidence,
+            ...(routerDecision.useDeterministicSynthesis
+                ? { synthesis: { kind: 'deterministic' as const, rationale: routed.rationale } }
+                : {}),
+        },
         ...(routed.documentDate ? { documentDate: routed.documentDate } : {}),
     };
 
