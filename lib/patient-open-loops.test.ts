@@ -108,6 +108,30 @@ test('does not treat zero or sub-day median intervals as an observation cadence'
     assert.deepEqual(sameDayMeasurements, []);
 });
 
+test('requires three distinct observation dates before deriving a cadence', () => {
+    const duplicateTimestampMixedWithOneLaterDate = deriveOpenLoops({
+        items: [],
+        observations: [
+            observation({ code: 'duplicate-date', observedAt: '2026-01-01T08:00:00.000Z' }),
+            observation({ code: 'duplicate-date', observedAt: '2026-01-01T08:00:00.000Z' }),
+            observation({ code: 'duplicate-date', observedAt: '2026-02-01T08:00:00.000Z' }),
+        ],
+        now,
+    });
+    assert.deepEqual(duplicateTimestampMixedWithOneLaterDate, []);
+
+    const multipleMeasurementsOnOneDayPlusOneLaterDate = deriveOpenLoops({
+        items: [],
+        observations: [
+            observation({ code: 'same-day-mixed', observedAt: '2026-01-01T08:00:00.000Z' }),
+            observation({ code: 'same-day-mixed', observedAt: '2026-01-01T16:00:00.000Z' }),
+            observation({ code: 'same-day-mixed', observedAt: '2026-02-01T08:00:00.000Z' }),
+        ],
+        now,
+    });
+    assert.deepEqual(multipleMeasurementsOnOneDayPlusOneLaterDate, []);
+});
+
 test('ignores series with only two points or a typical interval over the cap', () => {
     const loops = deriveOpenLoops({
         items: [],

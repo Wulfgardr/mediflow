@@ -62,6 +62,11 @@ function median(values: number[]): number {
         : sorted[middle];
 }
 
+/* @Codex Una giornata clinica contribuisce una sola volta alla cadenza. */
+function utcDayIndex(date: Date): number {
+    return Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / DAY_MS);
+}
+
 /**
  * Proietta attese locali dai record gia presenti. Le soglie descrivono solo il
  * calendario dei record, non una priorita o raccomandazione clinica.
@@ -113,15 +118,22 @@ export function deriveOpenLoops(input: {
     }
 
     for (const series of observationsBySeries.values()) {
-        if (series.length < MIN_POINTS) continue;
         const chronological = [...series].sort((left, right) => left.observedDate.getTime() - right.observedDate.getTime());
-        const intervals = chronological
+        const observationsByDay = new Map<number, OpenLoopObservation & { observedDate: Date }>();
+        for (const observation of chronological) {
+            observationsByDay.set(utcDayIndex(observation.observedDate), observation);
+        }
+        const distinctDates = [...observationsByDay.entries()].sort(([left], [right]) => left - right);
+        if (distinctDates.length < MIN_POINTS) continue;
+        const intervals = distinctDates
             .slice(1)
-            .map((observation, index) => (observation.observedDate.getTime() - chronological[index].observedDate.getTime()) / DAY_MS);
+            .map(([day], index) => day - distinctDates[index][0])
+            .filter((interval) => interval > 0);
+        if (intervals.length < MIN_POINTS - 1) continue;
         const typicalIntervalDays = median(intervals);
         if (typicalIntervalDays < MIN_TYPICAL_INTERVAL_DAYS || typicalIntervalDays > MAX_TYPICAL_INTERVAL_DAYS) continue;
 
-        const latest = chronological[chronological.length - 1];
+        const latest = distinctDates[distinctDates.length - 1][1];
         const thresholdDays = typicalIntervalDays * STALL_FACTOR;
         const elapsedDays = (input.now.getTime() - latest.observedDate.getTime()) / DAY_MS;
         if (elapsedDays <= thresholdDays) continue;

@@ -1,7 +1,7 @@
-# ADR 0078: attese locali e collegamento prestazione-risultato
+# ADR 0079: attese locali e collegamento prestazione-risultato
 
 Date: 2026-07-12
-Status: Accepted
+Status: Proposed
 
 Related: [ADR 0057](./0057-local-evidence-absorption-layer.md), [ADR 0062](./0062-service-prescriptions-domain.md), [ADR 0064](./0064-service-prescription-itemization-and-catalog-matching.md), [ADR 0056](./0056-network-observation-write-boundary.md)
 
@@ -36,13 +36,15 @@ non assegna priorita e non produce prescrizioni o azioni automatiche.
 Adottiamo l'opzione 2.
 
 - `observations.service_prescription_item_id` e un riferimento nullable a
-  `service_prescription_items.id`.
+  `service_prescription_items.id`; la cancellazione fisica dell'item conserva
+  il risultato e azzera il collegamento tramite `ON DELETE SET NULL`.
 - Una proiezione pura segnala item `prescribed` o `performed` senza referto,
   senza osservazione collegata e oltre 14 giorni dalla data programmata o di
   creazione.
-- La stessa proiezione segnala una serie solo quando ha almeno tre misure, il
-  suo intervallo mediano non supera 180 giorni e l'ultima misura supera 1,5
-  volte tale intervallo.
+- La stessa proiezione segnala una serie solo quando ha almeno tre date di
+  misura distinte, calcola la mediana sui soli intervalli positivi tra tali
+  date, non supera 180 giorni e l'ultima misura supera 1,5 volte tale
+  intervallo.
 - La Scheda mostra solo righe aperte con provenienza e una CTA che precompila
   il form osservazioni. Il salvataggio resta sempre un gesto esplicito
   dell'operatore.

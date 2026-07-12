@@ -172,7 +172,10 @@ export const observations = sqliteTable('observations', {
     refHigh: text('ref_high'),
     refText: text('ref_text'),
     /* @Codex Link esplicito e locale tra un risultato registrato e la prestazione attesa. */
-    servicePrescriptionItemId: text('service_prescription_item_id').references(() => servicePrescriptionItems.id),
+    servicePrescriptionItemId: text('service_prescription_item_id').references(
+        () => servicePrescriptionItems.id,
+        { onDelete: 'set null' },
+    ),
     /* @Codex */
     version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
@@ -187,6 +190,7 @@ export const observations = sqliteTable('observations', {
     patientIdx: index('observations_patient_idx').on(t.patientId),
     codeIdx: index('observations_code_idx').on(t.codeSystem, t.code),
     patientDeletedIdx: index('observations_patient_deleted_idx').on(t.patientId, t.deletedAt),
+    servicePrescriptionItemIdx: index('observations_service_prescription_item_idx').on(t.servicePrescriptionItemId),
 }));
 
 /* @Codex */
