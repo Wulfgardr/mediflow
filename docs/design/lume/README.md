@@ -29,7 +29,9 @@ Ciò che NON cambia: le leggi cliniche di Vetro Clinico restano fondamenta anche
 1. [01-lingua.md](./01-lingua.md): la specifica completa: modello focale, materia, filo, tipografia, profondità, grammatica dell'attenzione, provenienza, motion, note per piattaforma.
 2. [02-derivazione.md](./02-derivazione.md): la ricerca di mercato (tre lane GPT-5.6 Terra con fonti), cosa è stato scartato e perché ogni scelta di Lume discende dai dati.
 3. [03-migrazione.md](./03-migrazione.md): il percorso da Vetro Clinico: mappa dei token, fasi, rischi, cosa sopravvive.
-4. [mockups/lume.html](./mockups/lume.html): dimostratore interattivo (aprire nel browser, nessuna dipendenza): modello focale, filo, due voci, registri giorno/grafite/guardia.
+4. [04-perlustrazione.md](./04-perlustrazione.md): la perlustrazione EHR/provider e le 12 integrazioni normative alla grammatica.
+5. [05-app-native.md](./05-app-native.md): Lume nelle app: mappa SwiftUI per il client Apple (LumeKit), grammatica compatta iPhone, tri-OS Windows/Linux.
+6. [mockups/lume.html](./mockups/lume.html): dimostratore interattivo (aprire nel browser, nessuna dipendenza): modello focale, filo, due voci, registri giorno/grafite/guardia.
 
 ## Rapporto con il canone
 
