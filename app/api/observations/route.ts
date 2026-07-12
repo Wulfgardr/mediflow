@@ -1,7 +1,7 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { observations, patients } from '@/lib/schema';
+import { observations, patients, servicePrescriptionItems } from '@/lib/schema';
 import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
@@ -74,6 +74,7 @@ export async function POST(request: Request) {
         const normalized = normalizeObservationCreateInput(body, {
             id,
             patientId,
+            allowServicePrescriptionItemLink: true,
         });
         if (!normalized.ok) {
             return NextResponse.json({ error: normalized.error }, { status: 400 });
@@ -84,12 +85,22 @@ export async function POST(request: Request) {
                 .from(patients)
                 .where(and(eq(patients.id, patientId), activePatients()))
                 .get();
-            if (!patient) return false;
+            if (!patient) return 'patient-not-found';
+            if (normalized.values.servicePrescriptionItemId) {
+                const item = tx.select({ patientId: servicePrescriptionItems.patientId })
+                    .from(servicePrescriptionItems)
+                    .where(eq(servicePrescriptionItems.id, normalized.values.servicePrescriptionItemId))
+                    .get();
+                if (!item || item.patientId !== patientId) return 'invalid-service-prescription-item';
+            }
             tx.insert(observations).values(normalized.values).run();
-            return true;
+            return 'created';
         });
-        if (!created) {
+        if (created === 'patient-not-found') {
             return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
+        }
+        if (created === 'invalid-service-prescription-item') {
+            return NextResponse.json({ error: 'Service prescription item not found or does not belong to observation patient' }, { status: 422 });
         }
 
         /* @Codex */

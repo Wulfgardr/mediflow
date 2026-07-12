@@ -6,7 +6,7 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
-- [0077-ai-provider-abstraction-and-egress-anonymization-boundary.md](./0077-ai-provider-abstraction-and-egress-anonymization-boundary.md): adapter provider AI, registry per ruolo e confine fail-closed per l'egress opzionale.
+- [0079-local-open-loops-and-result-link.md](./0079-local-open-loops-and-result-link.md): propone attese locali deterministiche e collegamento manuale tra prestazione e risultato.
 
 ---
 

@@ -148,6 +148,7 @@ type ObservationCreateValues = {
     refLow: string | null;
     refHigh: string | null;
     refText: string | null;
+    servicePrescriptionItemId: string | null;
     observedAt: Date;
     source: CheckupSource;
     version: number;
@@ -169,6 +170,7 @@ type ObservationUpdateValues = {
     refLow?: string | null;
     refHigh?: string | null;
     refText?: string | null;
+    servicePrescriptionItemId?: string | null;
     observedAt?: Date;
     source?: CheckupSource | null;
     updatedAt?: Date;
@@ -260,6 +262,20 @@ function parseOptionalNullableString(value: unknown, field: string): WriteNormal
     }
 
     return { ok: true, values: value };
+}
+
+/* @Codex Service prescription item IDs are identifiers, never meaningful blank text. */
+function parseNullableTrimmedString(value: unknown, field: string): WriteNormalizationResult<string | null> {
+    const parsed = parseNullableString(value, field);
+    if (!parsed.ok) return parsed;
+    return { ok: true, values: parsed.values?.trim() || null };
+}
+
+/* @Codex Preserve omission on update while normalizing an explicit blank link to null. */
+function parseOptionalNullableTrimmedString(value: unknown, field: string): WriteNormalizationResult<string | null | undefined> {
+    const parsed = parseOptionalNullableString(value, field);
+    if (!parsed.ok) return parsed;
+    return { ok: true, values: parsed.values === undefined ? undefined : parsed.values?.trim() || null };
 }
 
 /* @Codex */
@@ -788,7 +804,7 @@ export function normalizeCheckupUpdateInput(
 /* @Codex */
 export function normalizeObservationCreateInput(
     input: Record<string, unknown>,
-    context: { id: string; patientId: string; now?: Date }
+    context: { id: string; patientId: string; now?: Date; allowServicePrescriptionItemLink?: boolean }
 ): WriteNormalizationResult<ObservationCreateValues> {
     const now = context.now ?? new Date();
     const codeSystem = normalizeObservationCodeSystem(input.codeSystem);
@@ -819,6 +835,11 @@ export function normalizeObservationCreateInput(
     const refText = parseNullableString(input.refText, 'refText');
     if (!refText.ok) return refText;
 
+    const servicePrescriptionItemId = context.allowServicePrescriptionItemLink
+        ? parseNullableTrimmedString(input.servicePrescriptionItemId, 'servicePrescriptionItemId')
+        : { ok: true as const, values: null };
+    if (!servicePrescriptionItemId.ok) return servicePrescriptionItemId;
+
     const observedAt = parseRequiredDate(input.observedAt, 'observedAt');
     if (!observedAt.ok) return observedAt;
 
@@ -840,6 +861,7 @@ export function normalizeObservationCreateInput(
             refLow: refLow.values,
             refHigh: refHigh.values,
             refText: refText.values,
+            servicePrescriptionItemId: servicePrescriptionItemId.values,
             observedAt: observedAt.values,
             source: source.values,
             version: 1,
@@ -853,7 +875,8 @@ export function normalizeObservationCreateInput(
 
 /* @Codex */
 export function normalizeObservationUpdateInput(
-    input: Record<string, unknown>
+    input: Record<string, unknown>,
+    options: { allowServicePrescriptionItemLink?: boolean } = {},
 ): WriteNormalizationResult<ObservationUpdateValues> {
     const update: ObservationUpdateValues = {};
 
@@ -902,6 +925,12 @@ export function normalizeObservationUpdateInput(
     const refText = parseOptionalNullableString(input.refText, 'refText');
     if (!refText.ok) return refText;
     if (refText.values !== undefined) update.refText = refText.values;
+
+    if (options.allowServicePrescriptionItemLink) {
+        const servicePrescriptionItemId = parseOptionalNullableTrimmedString(input.servicePrescriptionItemId, 'servicePrescriptionItemId');
+        if (!servicePrescriptionItemId.ok) return servicePrescriptionItemId;
+        if (servicePrescriptionItemId.values !== undefined) update.servicePrescriptionItemId = servicePrescriptionItemId.values;
+    }
 
     const observedAt = parseOptionalDate(input.observedAt, 'observedAt');
     if (!observedAt.ok) return observedAt;

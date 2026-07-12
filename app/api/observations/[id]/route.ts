@@ -1,7 +1,7 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { observations } from '@/lib/schema';
+import { observations, servicePrescriptionItems } from '@/lib/schema';
 import { and, eq } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
@@ -41,7 +41,7 @@ export async function PUT(
         }
 
         const existing = await dbServer
-            .select({ id: observations.id })
+            .select({ id: observations.id, patientId: observations.patientId })
             .from(observations)
             .where(eq(observations.id, id))
             .get();
@@ -49,9 +49,20 @@ export async function PUT(
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
-        const normalized = normalizeObservationUpdateInput(body);
+        const normalized = normalizeObservationUpdateInput(body, { allowServicePrescriptionItemLink: true });
         if (!normalized.ok) {
             return NextResponse.json({ error: normalized.error }, { status: 400 });
+        }
+
+        if (normalized.values.servicePrescriptionItemId) {
+            const item = await dbServer
+                .select({ patientId: servicePrescriptionItems.patientId })
+                .from(servicePrescriptionItems)
+                .where(eq(servicePrescriptionItems.id, normalized.values.servicePrescriptionItemId))
+                .get();
+            if (!item || item.patientId !== existing.patientId) {
+                return NextResponse.json({ error: 'Service prescription item not found or does not belong to observation patient' }, { status: 422 });
+            }
         }
 
         const updateResult = await dbServer.update(observations)

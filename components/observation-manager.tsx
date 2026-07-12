@@ -1,7 +1,7 @@
 'use client';
 
 /* @Codex */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from '@/lib/live-query';
 import { v4 as uuidv4 } from 'uuid';
 import { Activity, ChevronDown, Minus, Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
@@ -9,6 +9,11 @@ import { ApiConflictError, db } from '@/lib/db';
 import { notifyDbChange } from '@/lib/live-query';
 import { searchStaticTerminology } from '@/lib/terminology';
 import { classifyObservationRange, formatReferenceRange } from '@/lib/observation-range';
+import {
+    applyObservationPrefill,
+    type ObservationPrefill,
+    type ServicePrescriptionItemLink,
+} from '@/lib/observation-prefill';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
@@ -66,8 +71,18 @@ function Sparkline({ values }: { values: number[] }) {
     );
 }
 
+export type { ObservationPrefill } from '@/lib/observation-prefill';
+
 /* @Codex */
-export default function ObservationManager({ patientId, embedded = false }: { patientId: string; embedded?: boolean }) {
+export default function ObservationManager({
+    patientId,
+    embedded = false,
+    prefill,
+}: {
+    patientId: string;
+    embedded?: boolean;
+    prefill?: ObservationPrefill;
+}) {
     const { showToast } = useToast();
     const confirm = useConfirm();
     const [code, setCode] = useState('8480-6');
@@ -78,6 +93,8 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
     // S6: range di riferimento del referto (opzionali). Se assenti, nessun flag.
     const [refLow, setRefLow] = useState('');
     const [refHigh, setRefHigh] = useState('');
+    const [servicePrescriptionItemId, setServicePrescriptionItemId] = useState<string | undefined>();
+    const [servicePrescriptionItem, setServicePrescriptionItem] = useState<ServicePrescriptionItemLink | undefined>();
     const [isSaving, setIsSaving] = useState(false);
     const [valueError, setValueError] = useState<string | null>(null);
     const codeSelectRef = useRef<HTMLSelectElement>(null);
@@ -91,6 +108,18 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
        onesta di UI (label "Misure del giorno", non "Referto"): senza panelId nello
        schema non si afferma che sia lo stesso referto. */
     const [viewMode, setViewMode] = useState<'parametro' | 'data'>('parametro');
+    const loincOptions = useMemo(() => searchStaticTerminology('LOINC', '', 500), []);
+    const ucumOptions = useMemo(() => searchStaticTerminology('UCUM', '', 500), []);
+
+    useEffect(() => {
+        if (!prefill) return;
+        const applied = applyObservationPrefill(prefill, loincOptions);
+        setCode(applied.code);
+        setUnitCode(applied.unitCode);
+        setServicePrescriptionItemId(applied.servicePrescriptionItemId);
+        setServicePrescriptionItem(applied.servicePrescriptionItem);
+        requestAnimationFrame(() => valueInputRef.current?.focus());
+    }, [loincOptions, prefill]);
 
     const toggleGroup = (analyteCode: string) =>
         setOpenGroups((prev) => {
@@ -113,8 +142,6 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
         valueInputRef.current?.focus();
     };
 
-    const loincOptions = useMemo(() => searchStaticTerminology('LOINC', '', 500), []);
-    const ucumOptions = useMemo(() => searchStaticTerminology('UCUM', '', 500), []);
     /* @Codex Etichetta italiana per un analita, con fallback al display grezzo
        (regge sia i record storici in inglese sia quelli nuovi). */
     const italianLoincLabel = (analyteCode: string, fallback: string) =>
@@ -224,6 +251,7 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
                 observedAt: observedDate,
                 source: 'manual',
                 createdAt: new Date(),
+                servicePrescriptionItemId,
             });
 
             /* @Codex WUL-UIUX Trascrizione referto multi-analita: conservare la
@@ -233,6 +261,8 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
             setNotes('');
             setRefLow('');
             setRefHigh('');
+            setServicePrescriptionItemId(undefined);
+            setServicePrescriptionItem(undefined);
             codeSelectRef.current?.focus();
         } catch (error) {
             console.error('Failed to save observation', error);
@@ -284,6 +314,23 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
             )}
 
             <form onSubmit={saveObservation} className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {servicePrescriptionItemId && servicePrescriptionItem ? (
+                    <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-[18px] border border-[color:rgba(15,23,42,0.12)] bg-white/70 px-3.5 py-2.5 dark:border-white/10 dark:bg-white/5">
+                        <span className="text-sm text-[color:var(--mf-ink)] dark:text-slate-100">
+                            Collegata a: <strong>{servicePrescriptionItem.serviceName}</strong> (prescrizione del {new Date(servicePrescriptionItem.prescriptionDate).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })})
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setServicePrescriptionItemId(undefined);
+                                setServicePrescriptionItem(undefined);
+                            }}
+                            className="text-xs font-medium text-[color:var(--mf-muted)] hover:text-[color:var(--mf-ink)] hover:underline"
+                        >
+                            Rimuovi collegamento
+                        </button>
+                    </div>
+                ) : null}
                 <label className="space-y-1">
                     <span className="section-kicker">Parametro</span>
                     <select
@@ -299,6 +346,7 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
                         }}
                         className="mf-input"
                     >
+                        <option value="">Seleziona parametro</option>
                         {loincOptions.map((item) => (
                             <option key={item.code} value={item.code}>
                                 {item.displayIt ?? item.display}
@@ -348,6 +396,7 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
                         onChange={(e) => setUnitCode(e.target.value)}
                         className="mf-input"
                     >
+                        <option value="">Seleziona unità</option>
                         {ucumOptions.map((item) => (
                             <option key={item.code} value={item.code}>
                                 {item.displayIt ?? item.display}
@@ -395,7 +444,7 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
                 <div className="md:col-span-2 flex justify-end">
                     <button
                         type="submit"
-                        disabled={isSaving || value.trim().length === 0}
+                        disabled={isSaving || value.trim().length === 0 || !code || !unitCode}
                         className="ui-btn-primary inline-flex h-10 items-center gap-1.5 px-4 text-sm font-semibold disabled:opacity-50"
                     >
                         <Plus className="w-4 h-4" />
