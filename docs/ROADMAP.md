@@ -11,8 +11,6 @@ read_when:
 > v0.7.2 (release corrente, chiude le Wave 1-5 del boundary/client Apple senza dichiarare parity UI completa). Ultimo aggiornamento: 2026-07-11.
 > Fonte roadmap prodotto canonica (vedi anche [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) per la lettura completa corrente e [docs/README.md](./README.md) per mappa completa documenti).
 
-> [!NOTE]
-
 ## ✅ Fatto (v0.3.0)
 
 Le fondamenta sono solide e usabili in produzione locale.
@@ -86,8 +84,6 @@ boundary espliciti.
   (`deletedAt`/`deletionReason`) e version guard (ADR 0066, `WUL-306`), che non
   orfana i figli clinici e lascia il contratto API invariato; lato admin
   `purge-patient` (erasure GDPR con dry-run) e `restore-patient`, entrambi audited.
-  azzerata in quel closeout; dal 2026-06-13/16 la coda post-review e di nuovo
-  attiva tramite `WUL-341`, `WUL-356` e la proposta `WUL-373`.
 
 > [!WARNING]
 > `v0.6.0` non dichiara sync completo, multi-master, attachment remoti, cataloghi remoti, prescribing SISS nativo o AI cloud di default. Questi restano esplicitamente fuori dal claim di release.
@@ -113,10 +109,12 @@ pubblica/OSS riallineata al prodotto reale.
   OSS raccontano lo stato corrente senza overclaim su SISS/FSE, cloud, AI o
   automazione clinica.
 
-> [!WARNING]
-> Il client macOS storico deve ancora assorbire la compatibilita del ciclo `/api/v1`
-> tracciata in `WUL-333`; la base prodotto da estendere resta il bundle
-> Apple/home-base.
+> [!NOTE]
+> Lo snapshot macOS precedente a `v0.4.0` resta storico. La base prodotto da
+> estendere e il bundle Apple/home-base universale; i gap residui sono tracciati
+> dalla matrice parity e dalle issue `WUL-401`/`WUL-403`, non dal vecchio filone
+> congelato. Lume e la lingua di destinazione; Vetro Clinico resta il canone
+> operativo transitorio durante la migrazione verificata L0-L6.
 
 ---
 
