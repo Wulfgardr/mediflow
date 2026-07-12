@@ -30,7 +30,9 @@ fi
 # 1. Web runtime (Next.js standalone)
 if [[ "${MEDIFLOW_SKIP_WEB_BUILD:-0}" != "1" ]]; then
   echo "Building web runtime (next build, standalone)..."
-  ( cd "$ROOT_DIR" && npm run build && npm run check:standalone-runtime-bundle )
+  # @Codex: webpack supports the repository's sibling-worktree node_modules
+  # layout; Turbopack rejects dependencies resolved outside the worktree root.
+  ( cd "$ROOT_DIR" && npm run build -- --webpack && npm run check:standalone-runtime-bundle )
 fi
 if [[ ! -f "$ROOT_DIR/.next/standalone/server.js" ]]; then
   echo "Missing .next/standalone/server.js. Run 'npm run build' first (or unset MEDIFLOW_SKIP_WEB_BUILD)." >&2
