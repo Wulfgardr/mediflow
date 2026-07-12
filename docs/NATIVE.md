@@ -1,11 +1,20 @@
-# Sviluppo Nativo (macOS)
+---
+summary: "Canonical guide to the active MediFlow Apple family, packaged Mac home-base, paired clients, shared Swift core, and native verification boundaries."
+read_when:
+  - "Changing the macOS, iPhone, or iPad clients or their packaged home-base runtime."
+  - "Checking Apple client structure, native build commands, parity limits, or Lume migration boundaries."
+---
 
-> Guida tecnica del client SwiftUI di MediFlow.
+# Sviluppo nativo Apple (macOS, iPhone e iPad)
+
+> Guida tecnica della family SwiftUI di MediFlow e del Mac `home-base`.
 
 > [!IMPORTANT]
-> Dopo `v0.4.0` il filone macOS/parity e **congelato**: la shell nativa entra in **riscrittura controllata** ("demolizione controllata").
-> Questo documento resta canonico per capire lo snapshot esistente, il contratto `/api/v1`, il trasporto TLS locale e i vincoli security da preservare nel rebuild.
-> La direzione Apple, pero, e oggi piu ampia: macOS resta il nodo di partenza, mentre iPadOS/iOS rientrano nello stesso disegno `home-base + paired client` descritto nei documenti canonici.
+> Il congelamento dello snapshot macOS precedente a `v0.4.0` e storico. La base
+> attiva e oggi l'app universale descritta da ADR 0048/0071: bundle macOS
+> `home-base`, target iPhone/iPad paired e package condiviso
+> `MediFlowCore`/`MediFlowAppleShared`. La web app resta la superficie piu
+> completa; "family Apple attiva" non significa parity UI completa.
 
 Riferimenti correlati:
 
@@ -14,41 +23,40 @@ Riferimenti correlati:
 - [docs/walkthrough.md](./walkthrough.md) (flusso end-to-end)
 - [docs/local-api-tls.md](./local-api-tls.md) (trasporto TLS locale)
 - [docs/native-testing.md](./native-testing.md) (strategia test ufficiale)
+- [docs/parity-matrix.md](./parity-matrix.md) (stato verificato delle capability)
+- [docs/design/lume/README.md](./design/lume/README.md) (lingua di design di destinazione)
+- [docs/design/lume/06-macos-apple-contract.md](./design/lume/06-macos-apple-contract.md) (contratto macOS)
 
 ---
 
 ## Stato del progetto
 
-Il client nativo documentato qui non e piu la base per nuova delivery incrementale. Oggi va letto cosi:
+La base corrente va letta cosi:
 
-* **Snapshot operativo esistente**: il vecchio client ha gia superato il read-only e contiene CRUD clinico essenziale, tooling AI locale e lock screen con PIN.
-* **Contratto da preservare**: `/api/v1`, bootstrap secure-first del token locale, TLS proxy e policy di sicurezza restano validi e non vanno persi.
-* **Nuovo mandato**: le prossime feature macOS non si stratificano su questo shell; il lavoro passa a un rebuild controllato da zero.
-* **Direzione multi-device**: l'estensione a iPadOS/iOS non passa da un database remoto condiviso, ma dallo stesso boundary locale/API che oggi regge il filone `home-base`.
-* **Entrypoint compilato corrente**: `MediFlowMacApp` apre la shell
-  Apple/home-base come finestra primaria. Il prototipo oncologico resta
-  apribile come finestra separata e non va confuso con MediFlow prodotto o con
-  OncoBackboneMac, che e un'applicazione distinta usabile solo come riferimento
-  visuale esterno.
-
-Lo snapshot corrente supporta comunque:
-
-* **CRUD clinico essenziale**: creazione pazienti, visite, terapie e controlli.
-  Le terapie native usano lo stesso contratto `/api/v1` della web UI per
-  farmaco AIFA/manuale, AIC/ATC, principio attivo, posologia, motivazione,
-  indicazione ICD/sentinella, date e stato.
-  I controlli/appuntamenti nativi mantengono parita sul contratto condiviso
-  per data, titolo, note operative, stato, source manuale e metadata di
-  versione restituita dal backend.
-* **AI Control Panel**: monitoraggio modelli e chat tecnica locale.
-* **Sicurezza**: lock screen con PIN, cifratura in memoria e certificate pinning.
+* **macOS**: `MediFlowMacApp` e il fronte nativo piu maturo. Il bundle packaged
+  include il WebRuntime Next standalone e puo osservare o gestire esplicitamente
+  backend locale e proxy TLS senza diventare supervisore di Ollama o Docker.
+* **iPhone/iPad**: `MediFlowMobileApp` usa la stessa libreria SwiftUI e il
+  boundary `/api/v1/network/*`. I workflow paired online coprono lifecycle
+  paziente, moduli clinici non-AI, cataloghi, prestazioni/protesica e create
+  documentale manuale secondo ADR 0076.
+* **Core condiviso**: `MediFlowCore` concentra contratti, cifratura, codec,
+  validatori, scale cliniche e SQLite. I gate macOS/Linux/Windows provano la
+  portabilita del core, non app desktop complete su tre sistemi.
+* **Sicurezza**: i client sigillano i campi sensibili prima del wire/storage;
+  pairing device e sessione operatore restano distinti; nessun client mobile
+  accede direttamente al database del Mac.
+* **Parity**: la matrice post-Wave 5 e in [docs/parity-matrix.md](./parity-matrix.md).
+  `WUL-401` copre la click-map macOS P6; `WUL-403` resta la corsia per rendere
+  visibili eta, TTL e staleness della cache e il degrado offline read-only.
 
 ---
 
 ## Requisiti e setup rapido
 
-1. **Xcode 15+** (Swift 5.9).
-2. **Node.js 20+**.
+1. **Xcode corrente compatibile con Swift 5.9**; per i gate locali viene usato
+   Xcode beta quando indicato dai runbook.
+2. **Node.js 24 consigliato**. Il runner TypeScript richiede almeno Node 22.6.
 3. **Mkcert** (per HTTPS locale).
 
 ### Quick start
@@ -110,15 +118,17 @@ Le prime scritture mobile paired esposte nella shell condivisa coprono diario
 clinico, terapie, controlli e osservazioni. Dalla scheda paziente iPhone/iPad si
 possono leggere le ultime voci diario, inviare una nuova voce online
 all'home-base, modificarla e annullarla con soft-delete reviewable. Le terapie
-espongono list/create/update e annullamento online per campi manuali non-AI
-essenziali: farmaco, principio attivo opzionale, posologia, stato, date e
-motivazione. I controlli espongono titolo, data, stato e note manuali; le
+espongono lookup AIFA paired con fallback manuale, list/create/update e
+annullamento online per campi non-AI essenziali: farmaco, AIC/ATC quando
+disponibili, principio attivo opzionale, posologia, stato, date e motivazione.
+I controlli espongono titolo, data, stato e note manuali; le
 osservazioni espongono parametro/codice LOINC, valore, unita UCUM, data di
 rilevazione e note. Ogni create diario usa un identificativo client-side stabile
 per evitare duplicati se la rete cade dopo il commit; update e annullamento
 usano la `version` del record e mostrano il conflitto come richiesta di
-ricarica/confronto. Non esistono prescrizione SISS nativa, catalogo farmaci
-mobile, AI/OCR remoto, scritture offline o coda di merge.
+ricarica/confronto. Il client non gestisce un repertorio farmaci autonomo:
+interroga in sola lettura il catalogo dell'home-base. Non esistono prescrizione
+SISS nativa, AI/OCR paired, scritture offline o coda di merge.
 
 ---
 
@@ -151,31 +161,30 @@ WebRuntime incluso, non firmato per default, e puo firmarlo con
 La notarizzazione resta un passaggio di distribuzione separato. I servizi
 opzionali sono visibili come health diagnostico, non come processi app-managed.
 
-### 1. Lock Screen & Sicurezza
+### 1. Sessione e privacy
 
-L'app parte bloccata:
+Il client mantiene la master key soltanto in memoria durante una sessione
+sbloccata e applica il privacy shield quando l'app perde il primo piano. Il
+token del nodo, la sessione operatore e la chiave clinica hanno cicli di vita
+distinti; il dettaglio normativo resta negli ADR auth/crypto.
 
-* Devi inserire il **PIN** (lo stesso della web app).
-* Il PIN deriva la **Master Key** in RAM.
-* Se l'app va in background (o il Mac si sospende), la chiave viene scaricata.
+### 2. Workspace clinico condiviso
 
-### 2. AI Control Panel & Tools
+La shell SwiftUI espone lista e dettaglio paziente, diario rich text, terapie,
+checkup, osservazioni, prestazioni, protesica, documenti e report entro le
+capability concesse dall'home-base. Le superfici AI, OCR e document-derived
+restano host-only o review-only secondo
+[ADR 0073](./adr/0073-treatment-reasoning-athena-boundary.md) e
+[ADR 0076](./adr/0076-paired-document-domain-write-policy.md).
 
-Nel tab `Strumenti` trovi il pannello AI.
+### 3. Design e accessibilita
 
-* **Stato Modelli**: Vedi se Qwen/DeepSeek sono carichi in memoria.
-* **Chat tecnica**: puoi testare prompt o fare troubleshooting locale.
-* **Gestione Farmaci/ICD**: Strumenti rapidi per cercare codici senza aprire un paziente.
-* **Cataloghi in Settings**: il pannello `Cataloghi` espone stato/count,
-  import JSON e svuotamento controllato per farmaci ed esenzioni usando il
-  backend condiviso, senza storage nativo duplicato.
-
-### 3. Editor Full-Feature
-
-I form di inserimento (Nuovo Paziente, Nuova Visita) sono nativi SwiftUI.
-
-* Usa i componenti di sistema (Date Picker, Menu).
-* Performance e interazione sono più immediate rispetto al browser.
+Vetro Clinico resta il canone operativo transitorio; Lume e la lingua di
+destinazione. Le superfici cliniche restano opache e leggibili, mentre sidebar,
+toolbar, menu, sheet, popover e inspector usano i componenti di sistema. Liquid
+Glass e un enhancement del chrome su OS compatibili, non un materiale da
+applicare alle card cliniche. macOS, iPhone e iPad condividono semantica e
+primitive, non la stessa navigazione o densita.
 
 ---
 
@@ -194,11 +203,18 @@ graph LR
     Next --> DB[(SQLite)]
 ```
 
-### Struttura codice (`native/MediFlowMac`)
+### Struttura codice
 
-* `Services/LocalAPIClient.swift`: comunicazione HTTP/TLS con pinning.
-* `Services/SecuritySession.swift`: ciclo di vita chiavi in memoria.
-* `Views/AIControlPanelView.swift`: controllo runtime AI locale.
+* `native/MediFlowAppleApp/project.yml`: target app macOS e iOS/iPadOS.
+* `native/MediFlowAppleApp/Sources/`: entrypoint delle due shell.
+* `native/MediFlowMac/Package.swift`: package condiviso e separazione dei target
+  Apple dal core tri-OS.
+* `native/MediFlowMac/Sources/MediFlowCore/`: dominio, contratti, crypto e store
+  portabile.
+* `native/MediFlowMac/Sources/MediFlowAppleShared/`: networking home-base,
+  cache, privacy, report e shell SwiftUI condivisa.
+* `native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/`: workspace
+  clinico, settings, runtime status e modelli di presentazione.
 
 ---
 
@@ -206,6 +222,9 @@ graph LR
 
 Se vuoi aggiungere una vista:
 
-1. Controlla `lib/api/v1/types.ts` per vedere i dati.
-2. Crea la View in SwiftUI dentro `Views/`.
-3. Ricordati di usare `SecuritySession.shared.decrypt(...)` quando mostri dati sensibili!
+1. Parti dal contratto OpenAPI e dai tipi paired gia implementati.
+2. Metti logica portabile in `MediFlowCore` e presentazione Apple in
+   `MediFlowAppleShared`; evita un terzo modello parallelo.
+3. Mantieni sigillo e decrittazione nel boundary client esistente: non creare
+   scorciatoie dirette verso SQLite o nuove primitive crypto.
+4. Aggiorna matrice parity, capability manifest e test nello stesso slice.

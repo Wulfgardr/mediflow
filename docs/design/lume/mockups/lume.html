@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lume: dimostratore</title>
+<style>
+/* ============================================================
+   Lume: dimostratore della lingua di destinazione.
+   File autonomo, nessuna dipendenza, nessun font remoto.
+   Dati esclusivamente dimostrativi, nessun dato reale.
+   Il fuoco si sposta cliccando i pannelli e le righe.
+   ============================================================ */
+
+:root {
+  /* Registro Giorno */
+  --canvas: #eef0f2;
+  --field: #f5f5f4;
+  --focal: #fbfaf7;
+  --chrome: #e6e8eb;
+  --ink: #1a1c1e;
+  --ink-muted: #5f6b76;
+  --minerale: #33506b;
+  --warning: #9a6a2f;
+  --critical: #a33a2f;
+  --success: #4b6354;
+  --plum: #555161;
+  --warning-tint: rgba(154, 106, 47, 0.10);
+  --critical-tint: rgba(163, 58, 47, 0.10);
+  --success-tint: rgba(75, 99, 84, 0.10);
+  --border: rgba(26, 28, 30, 0.10);
+  --border-chrome: rgba(26, 28, 30, 0.06);
+  --shadow-focal: 0 2px 8px rgba(26, 28, 30, 0.10);
+  --shadow-overlay: 0 12px 32px rgba(26, 28, 30, 0.18);
+  --band-lab: rgba(51, 80, 107, 0.10);      /* range di laboratorio */
+  --band-personale: rgba(154, 106, 47, 0.14); /* banda personale */
+
+  --r-panel: 20px;
+  --r-card: 14px;
+  --r-control: 10px;
+
+  --voce: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Inter", sans-serif;
+  --registro: ui-monospace, "SF Mono", "IBM Plex Mono", "Cascadia Mono", Menlo, monospace;
+
+  --focus-ring: 0 0 0 2px var(--canvas), 0 0 0 4px var(--minerale);
+}
+
+.grafite {
+  --canvas: #121417;
+  --field: #191c21;
+  --focal: #22252b;
+  --chrome: #0e1013;
+  --ink: #e9ecef;
+  --ink-muted: #8f9aa6;
+  --minerale: #8fb0cc;
+  --warning: #c89c5a;
+  --critical: #d67668;
+  --success: #7e9e8a;
+  --plum: #9691a5;
+  --warning-tint: rgba(200, 156, 90, 0.14);
+  --critical-tint: rgba(214, 118, 104, 0.14);
+  --success-tint: rgba(126, 158, 138, 0.14);
+  --border: rgba(233, 236, 239, 0.10);
+  --border-chrome: rgba(233, 236, 239, 0.05);
+  --shadow-focal: 0 2px 10px rgba(0, 0, 0, 0.5);
+  --shadow-overlay: 0 12px 36px rgba(0, 0, 0, 0.6);
+  --band-lab: rgba(143, 176, 204, 0.12);
+  --band-personale: rgba(200, 156, 90, 0.16);
+}
+
+.guardia {
+  --canvas: #0c0e12;
+  --field: #14171d;
+  --focal: #1a1e26;
+  --chrome: #090b0e;
+  --ink: #e3e8ee;
+  --ink-muted: #8792a3;
+  --minerale: #7fa0bc;
+  --warning: #cfa35f;
+  --critical: #d98a7d;
+  --success: #85a291;
+  --plum: #9691a5;
+  --warning-tint: rgba(207, 163, 95, 0.14);
+  --critical-tint: rgba(217, 138, 125, 0.14);
+  --success-tint: rgba(133, 162, 145, 0.14);
+  --border: rgba(227, 232, 238, 0.09);
+  --border-chrome: rgba(227, 232, 238, 0.04);
+  --shadow-focal: 0 2px 10px rgba(0, 0, 0, 0.6);
+  --shadow-overlay: 0 12px 36px rgba(0, 0, 0, 0.7);
+  --band-lab: rgba(127, 160, 188, 0.12);
+  --band-personale: rgba(207, 163, 95, 0.16);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--voce);
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  transition: background 200ms ease-out, color 200ms ease-out;
+}
+
+/* Grana sub-percettiva: SOLO su canvas e chrome, mai in zona lettura */
+body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
+}
+@media (prefers-contrast: more) { body::before { display: none; } }
+
+/* Il Registro: ogni atomo verificabile */
+.reg { font-family: var(--registro); font-variant-numeric: tabular-nums; font-size: 0.95em; }
+
+/* ---------- Barra del dimostratore (buio operativo) ---------- */
+.demo-bar {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 12px 22px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border-chrome);
+}
+.demo-bar h1 { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+.demo-bar .hint { font-size: 11px; color: var(--ink-muted); }
+.switch { display: flex; gap: 3px; background: var(--canvas); border-radius: 999px; padding: 3px; }
+.switch button {
+  border: 0; background: transparent; color: var(--ink-muted);
+  font: inherit; font-size: 12px; font-weight: 500;
+  padding: 4px 13px; border-radius: 999px; cursor: pointer;
+}
+.switch button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.switch button[aria-pressed="true"] { background: var(--focal); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,0.10); }
+
+/* ---------- Testata paziente invariabile ---------- */
+.testata {
+  position: relative; z-index: 1;
+  max-width: 1220px; margin: 20px auto 0; padding: 12px 18px;
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  background: var(--field); border: 1px solid var(--border); border-radius: var(--r-card);
+}
+.testata .nome { font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
+.testata .dato { font-size: 12px; color: var(--ink-muted); }
+.testata .allergia { font-size: 12px; font-weight: 600; color: var(--critical); }
+
+/* ---------- Palco ---------- */
+.stage { position: relative; z-index: 1; max-width: 1220px; margin: 14px auto 40px; padding: 0 0 0 0; }
+.viewnote { font-size: 12px; color: var(--ink-muted); margin: 0 2px 12px; max-width: 74ch; }
+.cockpit { display: grid; grid-template-columns: 56px 320px 1fr 270px; gap: 14px; align-items: start; }
+@media (max-width: 1080px) { .cockpit { grid-template-columns: 56px 300px 1fr; } .attn { display: none; } }
+@media (max-width: 900px) { .cockpit { grid-template-columns: 1fr; } .rail { display: none; } }
+
+/* ---------- Rail: buio operativo, opaco ---------- */
+.rail {
+  display: flex; flex-direction: column; gap: 8px; align-items: center;
+  padding: 12px 0; min-height: 540px;
+  background: var(--chrome); border: 1px solid var(--border-chrome); border-radius: var(--r-panel);
+}
+.rail button {
+  width: 36px; height: 36px; border-radius: 10px; border: 0; cursor: pointer;
+  background: transparent; color: var(--ink-muted); font-size: 15px;
+  display: grid; place-items: center;
+  transition: transform 100ms ease-out, background 150ms ease-out;
+}
+.rail button:hover { background: var(--canvas); }
+.rail button:active { transform: scale(0.94); }
+.rail button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.rail button[aria-current="true"] { background: var(--field); color: var(--ink); }
+
+/* ---------- Pannelli: il modello focale ---------- */
+.panel {
+  position: relative;
+  background: var(--field); border: 1px solid var(--border);
+  border-radius: var(--r-panel); padding: 16px; min-height: 540px;
+  transition: background 180ms ease-out, box-shadow 180ms ease-out;
+  cursor: default;
+}
+.panel[data-fuoco="true"] {
+  background: var(--focal);
+  box-shadow: var(--shadow-focal);
+}
+/* Il filo focale: si disegna sul bordo sinistro del fuoco */
+.panel::after {
+  content: ""; position: absolute; left: -1px; top: 14%; bottom: 86%;
+  width: 2px; border-radius: 2px; background: var(--minerale);
+  opacity: 0; transition: opacity 150ms ease-out, bottom 220ms ease-out;
+}
+.panel[data-fuoco="true"]::after { opacity: 1; bottom: 14%; }
+@media (prefers-reduced-motion: reduce) {
+  .panel, .panel::after, body { transition: none !important; }
+}
+
+.panel h2 { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; margin-bottom: 1px; }
+.panel .sub { font-size: 11px; color: var(--ink-muted); margin-bottom: 12px; }
+.sez { margin-top: 16px; }
+.sez h3 { font-size: 10.5px; font-weight: 650; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-muted); margin-bottom: 8px; }
+
+/* ---------- Worklist ---------- */
+.row {
+  position: relative;
+  display: flex; align-items: center; gap: 9px;
+  height: 42px; padding: 0 10px; border-radius: var(--r-control); cursor: pointer;
+  transition: background 150ms ease-out;
+}
+.row:hover { background: rgba(95, 107, 118, 0.08); }
+.row:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.row .who { flex: 1; min-width: 0; }
+.row .who b { display: block; font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .who span { font-size: 11px; color: var(--ink-muted); }
+/* Selezione = filo, non campitura */
+.row::before {
+  content: ""; position: absolute; left: -2px; top: 50%; bottom: 50%;
+  width: 2px; border-radius: 2px; background: var(--minerale);
+  opacity: 0; transition: opacity 120ms ease-out, top 180ms ease-out, bottom 180ms ease-out;
+}
+.row[aria-selected="true"] { background: var(--focal); }
+.row[aria-selected="true"]::before { opacity: 1; top: 18%; bottom: 18%; }
+
+.glyph { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10.5px; font-weight: 550; letter-spacing: 0.02em;
+  padding: 2px 9px; border-radius: 999px;
+}
+.chip.critical { color: var(--critical); background: var(--critical-tint); }
+.chip.warning { color: var(--warning); background: var(--warning-tint); }
+.chip.success { color: var(--success); background: var(--success-tint); }
+
+/* ---------- Quadro ---------- */
+.q-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.q-head h2 { font-size: 20px; }
+.q-head .meta { font-size: 12px; color: var(--ink-muted); }
+
+/* Anatomia della riga di laboratorio */
+.lab { display: grid; grid-template-columns: 1fr auto auto; gap: 4px 14px; align-items: center; padding: 9px 2px; border-bottom: 1px solid var(--border); }
+.lab:last-child { border-bottom: 0; }
+.lab .nome-t { font-size: 13.5px; font-weight: 550; }
+.lab .fonte { font-size: 10.5px; color: var(--ink-muted); }
+.lab .valore { text-align: right; font-size: 14px; font-weight: 650; }
+.lab .valore small { font-weight: 400; color: var(--ink-muted); font-size: 11px; }
+.lab .delta { font-size: 11px; color: var(--ink-muted); text-align: right; min-width: 74px; }
+.lab .delta.su { color: var(--warning); }
+/* Banda di range con marcatore */
+.banda { grid-column: 1 / -1; position: relative; height: 6px; border-radius: 3px; background: var(--band-lab); margin: 2px 0 1px; }
+.banda .personale { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: var(--band-personale); }
+.banda .marker { position: absolute; top: -3px; width: 2px; height: 12px; border-radius: 2px; background: var(--ink); }
+.banda .marker.fuori { background: var(--critical); }
+.legenda { font-size: 10.5px; color: var(--ink-muted); margin-top: 6px; }
+.legenda .reg { font-size: 10.5px; }
+
+/* ---------- Il filo: timeline del diario ---------- */
+.filo-tl { position: relative; margin: 4px 0 0 7px; padding-left: 18px; }
+.filo-tl::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 1px; background: var(--minerale); opacity: 0.8; }
+.voce-tl { position: relative; padding: 6px 0 10px; }
+.voce-tl::before {
+  content: ""; position: absolute; left: -21px; top: 12px; width: 7px; height: 7px;
+  border-radius: 50%; background: var(--field); border: 1.5px solid var(--minerale);
+}
+.voce-tl .t-quando { font-size: 10.5px; color: var(--ink-muted); }
+.voce-tl .t-testo { font-size: 13px; }
+.voce-tl .t-stato { font-size: 10.5px; margin-left: 6px; }
+/* Bozza: il tratto del filo diventa tratteggiato */
+.voce-tl.bozza::after {
+  content: ""; position: absolute; left: -18px; top: 30px; bottom: 0; width: 1px;
+  background: repeating-linear-gradient(to bottom, var(--warning) 0 3px, transparent 3px 7px);
+}
+.voce-tl.bozza::before { border-style: dashed; border-color: var(--warning); }
+.voce-tl.bozza .t-stato { color: var(--warning); }
+.voce-tl.firmata .t-stato { color: var(--success); }
+
+/* ---------- Terapie ---------- */
+.tx { display: flex; align-items: center; gap: 9px; height: 38px; padding: 0 6px; border-radius: var(--r-control); }
+.tx:hover { background: rgba(95, 107, 118, 0.07); }
+.tx .t-nome { flex: 1; font-weight: 550; font-size: 13.5px; }
+.tx .t-pos { color: var(--ink-muted); font-size: 12px; }
+
+/* ---------- Colonna dell'attenzione ---------- */
+.attn .att-item { display: flex; flex-direction: column; gap: 1px; padding: 9px 8px; border-radius: var(--r-control); cursor: pointer; }
+.attn .att-item:hover { background: rgba(95, 107, 118, 0.07); }
+.attn .att-item b { font-size: 12.5px; font-weight: 600; }
+.attn .att-item span { font-size: 11px; color: var(--ink-muted); }
+.attn .att-perche { font-size: 10.5px; color: var(--minerale); }
+
+/* Stato vuoto onesto */
+.empty { padding: 14px 6px; font-size: 12px; color: var(--ink-muted); }
+
+/* Bottoni */
+.btn { border: 0; cursor: pointer; font: inherit; font-weight: 600; font-size: 12.5px;
+  color: var(--focal); background: var(--minerale); padding: 8px 16px; border-radius: var(--r-control);
+  transition: transform 100ms ease-out; }
+.btn:active { transform: scale(0.97); }
+.btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.btn-quiet { border: 1px solid var(--border); background: transparent; color: var(--ink);
+  font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; padding: 7px 13px; border-radius: 999px;
+  transition: transform 100ms ease-out, background 150ms ease-out; }
+.btn-quiet:hover { background: var(--canvas); }
+.btn-quiet:active { transform: scale(0.97); }
+.btn-quiet:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+</style>
+</head>
+<body class="giorno">
+
+<div class="demo-bar">
+  <h1>Lume</h1>
+  <div class="switch" role="group" aria-label="Registro di luce">
+    <button data-reg="giorno" aria-pressed="true">Giorno</button>
+    <button data-reg="grafite" aria-pressed="false">Grafite</button>
+    <button data-reg="guardia" aria-pressed="false">Guardia</button>
+  </div>
+  <span class="hint">Il fuoco si sposta: clicca i pannelli e le righe. Dati dimostrativi. Riferimento: docs/design/lume/01-lingua.md</span>
+</div>
+
+<!-- Testata paziente invariabile: fuori dal modello focale, sempre leggibile -->
+<div class="testata" role="banner">
+  <span class="nome">Bianchi Aurora</span>
+  <span class="dato reg">1954</span>
+  <span class="dato">dati dimostrativi</span>
+  <span class="allergia">Allergia: penicillina</span>
+  <span class="dato">Terapie attive: <span class="reg">3</span></span>
+  <span class="dato">Ultimo contatto: <span class="reg">04/07/2026</span></span>
+</div>
+
+<div class="stage">
+  <p class="viewnote">Fuoco, penombra, buio operativo: la gerarchia è la luce, non il vetro. Il filo marca il fuoco e porta lo stato: tratto pieno = firmato, tratteggiato = bozza. Ogni atomo verificabile è nel Registro (mono).</p>
+
+  <div class="cockpit">
+    <nav class="rail" aria-label="Navigazione">
+      <button aria-current="true" title="Pazienti">&#9679;</button>
+      <button title="Diario">&#9633;</button>
+      <button title="Agenda">&#9651;</button>
+      <button title="Revisione">&#8862;</button>
+    </nav>
+
+    <section class="panel" data-fuoco="false" data-panel="lista" aria-label="Lista di lavoro" tabindex="0">
+      <h2>Ambulatorio</h2>
+      <p class="sub">Oggi, <span class="reg">6</span> in lista</p>
+      <div class="row" tabindex="0" aria-selected="true">
+        <span class="glyph" style="background: var(--critical)"></span>
+        <span class="who"><b>Bianchi Aurora (demo)</b><span>Controllo pressorio, <span class="reg">09:00</span></span></span>
+        <span class="chip critical">&#9650; PA</span>
+      </div>
+      <div class="row" tabindex="0" aria-selected="false">
+        <span class="glyph" style="background: var(--warning)"></span>
+        <span class="who"><b>Ferri Giacomo (demo)</b><span>Rinnovo piano, <span class="reg">09:30</span></span></span>
+        <span class="chip warning">Scadenza</span>
+      </div>
+      <div class="row" tabindex="0" aria-selected="false">
+        <span class="glyph" style="background: var(--success)"></span>
+        <span class="who"><b>Conti Elena (demo)</b><span>Esiti rientrati, <span class="reg">10:00</span></span></span>
+        <span class="chip success">Esiti ok</span>
+      </div>
+      <div class="row" tabindex="0" aria-selected="false">
+        <span class="glyph" style="background: var(--plum)"></span>
+        <span class="who"><b>Riva Pietro (demo)</b><span>Prima visita, <span class="reg">10:30</span></span></span>
+      </div>
+      <div class="row" tabindex="0" aria-selected="false">
+        <span class="glyph" style="background: var(--ink-muted)"></span>
+        <span class="who"><b>Sala Martina (demo)</b><span>Follow-up, <span class="reg">11:00</span></span></span>
+      </div>
+      <div class="empty">Fine della lista di oggi. Le visite di domani compaiono alle 18.</div>
+    </section>
+
+    <section class="panel" data-fuoco="true" data-panel="quadro" aria-label="Quadro paziente" tabindex="0">
+      <div class="q-head">
+        <h2>Quadro</h2>
+        <span class="meta">ipertensione in follow-up</span>
+        <span class="chip critical">Pressione fuori range</span>
+      </div>
+
+      <div class="sez">
+        <h3>Laboratorio e parametri</h3>
+        <div class="lab">
+          <div><div class="nome-t">PA sistolica</div><div class="fonte">ambulatorio, <span class="reg">09:05</span></div></div>
+          <div class="valore reg">158 <small>mmHg</small></div>
+          <div class="delta su reg">&#9650; +16</div>
+          <div class="banda">
+            <span class="personale" style="left: 30%; width: 34%;"></span>
+            <span class="marker fuori" style="left: 88%;"></span>
+          </div>
+        </div>
+        <div class="lab">
+          <div><div class="nome-t">Colesterolo LDL</div><div class="fonte">lab. esterno, <span class="reg">02/07</span> &middot; range del referto</div></div>
+          <div class="valore reg">128 <small>mg/dL</small></div>
+          <div class="delta reg">&#9660; -14</div>
+          <div class="banda">
+            <span class="personale" style="left: 42%; width: 30%;"></span>
+            <span class="marker" style="left: 58%;"></span>
+          </div>
+        </div>
+        <p class="legenda">Banda chiara: range del laboratorio (fonte nel referto). Banda ambra: il solito di questo paziente (<span class="reg">12</span> rilevazioni, <span class="reg">24</span> mesi). Il confronto primario è con la baseline personale.</p>
+      </div>
+
+      <div class="sez">
+        <h3>Diario, sul filo</h3>
+        <div class="filo-tl">
+          <div class="voce-tl firmata">
+            <span class="t-quando reg">04/07/2026</span><span class="t-stato">firmata</span>
+            <div class="t-testo">Controllo programmato. Riferisce cefalea mattutina saltuaria. PA domiciliare in salita nell'ultima settimana.</div>
+          </div>
+          <div class="voce-tl bozza">
+            <span class="t-quando reg">11/07/2026</span><span class="t-stato">bozza, da rivedere</span>
+            <div class="t-testo">Proposta di richiamo a 7 giorni con diario pressorio; valutare aggiustamento della terapia serale.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sez">
+        <h3>Terapie attive &middot; <span class="reg">3</span></h3>
+        <div class="tx"><span class="glyph" style="background: var(--success)"></span><span class="t-nome">Ramipril</span><span class="t-pos reg">5 mg &middot; 1 cp, ore 8</span></div>
+        <div class="tx"><span class="glyph" style="background: var(--success)"></span><span class="t-nome">Amlodipina</span><span class="t-pos reg">5 mg &middot; 1 cp, ore 20</span></div>
+        <div class="tx"><span class="glyph" style="background: var(--warning)"></span><span class="t-nome">Atorvastatina</span><span class="t-pos reg">20 mg &middot; 1 cp, ore 22</span></div>
+      </div>
+
+      <div class="sez" style="display: flex; gap: 8px;">
+        <button class="btn">Apri Scheda</button>
+        <button class="btn-quiet">Nuova voce diario</button>
+        <button class="btn-quiet">Registra parametri</button>
+      </div>
+    </section>
+
+    <aside class="panel attn" data-fuoco="false" data-panel="attenzione" aria-label="Richiede attenzione" tabindex="0">
+      <h2>Attenzione</h2>
+      <p class="sub"><span class="reg">3</span> voci, ognuna dice perché</p>
+      <div class="att-item">
+        <b>PA fuori range</b>
+        <span>Bianchi A. &middot; <span class="reg">158/94</span></span>
+        <span class="att-perche">sopra la baseline personale da 2 rilevazioni</span>
+      </div>
+      <div class="att-item">
+        <b>Esiti da rivedere</b>
+        <span>Conti E. &middot; emocromo del <span class="reg">10/07</span></span>
+        <span class="att-perche">referto nuovo, non ancora aperto</span>
+      </div>
+      <div class="att-item">
+        <b>Rinnovo in scadenza</b>
+        <span>Ferri G. &middot; piano terapeutico</span>
+        <span class="att-perche">scade tra <span class="reg">6</span> giorni</span>
+      </div>
+      <div class="empty">Nient'altro richiede una decisione ora.</div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function () {
+  var body = document.body;
+
+  /* Registri di luce */
+  document.querySelectorAll('[data-reg]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      body.className = b.dataset.reg;
+      document.querySelectorAll('[data-reg]').forEach(function (x) {
+        x.setAttribute('aria-pressed', String(x === b));
+      });
+    });
+  });
+
+  /* Il modello focale: il fuoco e' UNO e si sposta con la luce */
+  var panels = document.querySelectorAll('.panel[data-panel]');
+  function setFuoco(target) {
+    panels.forEach(function (p) { p.setAttribute('data-fuoco', String(p === target)); });
+  }
+  panels.forEach(function (p) {
+    p.addEventListener('click', function () { setFuoco(p); });
+    p.addEventListener('focusin', function () { setFuoco(p); });
+  });
+
+  /* Selezione in worklist: il filo si sposta sulla riga */
+  var rows = document.querySelectorAll('.row');
+  rows.forEach(function (r) {
+    r.addEventListener('click', function (e) {
+      e.stopPropagation();
+      rows.forEach(function (x) { x.setAttribute('aria-selected', String(x === r)); });
+      setFuoco(document.querySelector('[data-panel="lista"]'));
+    });
+  });
+})();
+</script>
+</body>
+</html>
