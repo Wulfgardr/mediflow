@@ -29,6 +29,8 @@ Approfondimenti utili:
 
 - Mappa completa markdown: [docs/markdown-index.md](./markdown-index.md)
 - Governance repository e topologia runtime/publication: [docs/repository-topology.md](./repository-topology.md)
+- Vetro Clinico, baseline storica e transitoria di design (canone operativo durante la migrazione): [docs/design/vetro-clinico/README.md](./design/vetro-clinico/README.md)
+- Lume, lingua di design di destinazione con migrazione progressiva: [docs/design/lume/README.md](./design/lume/README.md)
 - Lettura completa dello stato corrente: [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
 - FAQ pubbliche e stato sintetico del prodotto: [docs/FAQ.md](./FAQ.md)
 - Walkthrough operativo end-to-end: [docs/walkthrough.md](./walkthrough.md)
@@ -98,6 +100,7 @@ Approfondimenti utili:
 | Topologia dati e flussi | [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md) | `CANONICAL` | Percorsi dati digitali end-to-end (cifratura, API, storage, trust boundaries), inclusi artifact documentali cifrati e boundary `network-home-base`. |
 | Indice completo Markdown repo | [docs/markdown-index.md](./markdown-index.md) | `CANONICAL` | Elenco navigabile e descrittivo di tutti i `.md` tracciati nel repository. |
 | Testing app macOS | [docs/native-testing.md](./native-testing.md) | `CANONICAL` | Strategia e workflow ufficiale test native (XCTest/Xcode). |
+| Contratto design Lume macOS | [docs/design/lume/06-macos-apple-contract.md](./design/lume/06-macos-apple-contract.md) | `CANONICAL` | Contratto di design di destinazione per la futura app macOS: disposizione nativa, confine Liquid Glass/contenuto clinico, availability Apple, sequenza e gate visuali. La feature parity resta governata dai documenti dedicati. |
 | Verify loop e smoke paired mobile home-base | [docs/mobile-home-base-smoke.md](./mobile-home-base-smoke.md) | `SECONDARY` | Runbook operativo: gate headless sintetici obbligatori sul boundary di rete e smoke iPhone/iPad opzionale contro `home-base` reale. |
 | Deep dive tecnico architettura | [docs/ARCHITETTURA.md](./ARCHITETTURA.md) | `SECONDARY` | Approfondimento tecnico esteso. |
 | Sintesi operativa architettura | [docs/system_architecture.md](./system_architecture.md) | `SECONDARY` | Versione compatta/rapida del sistema reale su `main`, con overview su Clinical Workbench, home-base, document intelligence, SISS/FSE e guardrail locali. |
