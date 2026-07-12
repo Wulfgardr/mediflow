@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vetro Clinico: esplorazioni</title>
+<style>
+/* ============================================================
+   Vetro Clinico: dimostratore statico delle esplorazioni.
+   File autonomo: nessuna dipendenza, nessun font remoto.
+   Dati esclusivamente dimostrativi, nessun dato reale.
+   ============================================================ */
+
+:root {
+  /* Livello 2: token semantici (valori canonici, vedi 02-token.md) */
+  --surface-base: #f6f7f9;
+  --surface-elevated: #ffffff;
+  --surface-strong: #e8edf3;
+  --ink-primary: #151316;
+  --ink-muted: #667085;
+  --action-primary: #2f3a48;
+  --action-accent: #4b5565;
+  --signal-plum: #555161;
+  --signal-warning: #875b26;
+  --signal-critical: #a33a2f;
+  --signal-success: #4b6354;
+  --warning-tint: rgba(154, 106, 47, 0.12);
+  --critical-tint: rgba(163, 58, 47, 0.12);
+  --success-tint: rgba(75, 99, 84, 0.12);
+  --plum-tint: rgba(85, 81, 97, 0.10);
+
+  --glass-bg: rgba(255, 255, 255, 0.74);
+  --glass-border: rgba(15, 23, 42, 0.08);
+  --glass-blur: 14px;
+  --glass-sat: 1.04;
+  --paper-bg: rgba(255, 255, 255, 0.94);
+  --paper-border: rgba(15, 23, 42, 0.08);
+  --paper-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+  --panel-shadow: 0 24px 60px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+
+  --radius-panel: 30px;
+  --radius-card: 24px;
+  --radius-control: 16px;
+  --radius-chip: 999px;
+
+  --row-h: 44px;
+  --body-size: 15px;
+  --dense-size: 13px;
+  --card-pad: 18px;
+
+  --focus-ring: 0 0 0 2px var(--surface-base), 0 0 0 4px var(--action-accent);
+
+  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Tema scuro standard */
+.dark {
+  --surface-base: #111318;
+  --surface-elevated: #1a1f28;
+  --surface-strong: #232a35;
+  --ink-primary: #f4f7fb;
+  --ink-muted: #94a0b4;
+  --action-primary: #c6d0de;
+  --action-accent: #9aa8bc;
+  --glass-bg: rgba(20, 24, 32, 0.66);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --paper-bg: rgba(26, 31, 40, 0.96);
+  --paper-border: rgba(255, 255, 255, 0.08);
+  --paper-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --warning-tint: rgba(200, 156, 90, 0.16);
+  --critical-tint: rgba(214, 118, 104, 0.16);
+  --success-tint: rgba(126, 158, 138, 0.16);
+  --plum-tint: rgba(150, 145, 165, 0.12);
+  --signal-warning: #c89c5a;
+  --signal-critical: #d67668;
+  --signal-success: #7e9e8a;
+  --signal-plum: #9691a5;
+}
+
+/* Esplorazione B: Guardia (notte clinica, raffinamento del dark) */
+.guardia {
+  --surface-base: #0c0e12;
+  --surface-elevated: #151a22;
+  --surface-strong: #1c232e;
+  --ink-primary: #e8ecf2;
+  --ink-muted: #8792a3;
+  --signal-critical: #d98a7d;   /* corallo desaturato: niente rosso saturo su nero */
+  --signal-warning: #cfa35f;    /* ambra */
+  --signal-success: #85a291;    /* salvia spenta */
+  --glass-bg: rgba(14, 17, 23, 0.82);
+  --glass-blur: 14px;           /* di notte il vetro si addensa */
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Esplorazione A: Strumento (densita) */
+.strumento {
+  --row-h: 44px;
+  --body-size: 13px;
+  --card-pad: 12px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--surface-base);
+  color: var(--ink-primary);
+  font-size: var(--body-size);
+  line-height: 1.45;
+  min-height: 100vh;
+  transition: background 300ms ease, color 300ms ease;
+}
+
+/* Orbs di fondo: solo nella vista base, spariscono in Strumento e Guardia */
+.orbs { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.orb { position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.12; }
+.orb-a { width: 480px; height: 480px; background: #4b5565; top: -140px; right: -100px; }
+.orb-b { width: 380px; height: 380px; background: #555161; bottom: -120px; left: -80px; }
+.strumento .orbs, .guardia .orbs, .inchiostro .orbs { display: none; }
+
+/* ---------- Barra del dimostratore ---------- */
+.demo-bar {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 14px 24px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  border-bottom: 1px solid var(--glass-border);
+}
+.demo-bar h1 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.demo-bar .hint { font-size: 11px; color: var(--ink-muted); }
+.switch { display: flex; gap: 4px; background: var(--surface-strong); border-radius: var(--radius-chip); padding: 3px; }
+.switch button {
+  border: 0; background: transparent; color: var(--ink-muted);
+  font: inherit; font-size: 12px; font-weight: 500;
+  padding: 5px 14px; border-radius: var(--radius-chip); cursor: pointer;
+}
+.switch button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.switch button[aria-pressed="true"] { background: var(--surface-elevated); color: var(--ink-primary); box-shadow: 0 1px 3px rgba(15,23,42,0.12); }
+
+/* ---------- Layout cockpit ---------- */
+.stage { position: relative; z-index: 1; max-width: 1240px; margin: 28px auto; padding: 0 24px; }
+.viewnote { font-size: 12px; color: var(--ink-muted); margin-bottom: 14px; max-width: 68ch; }
+
+.cockpit { display: grid; grid-template-columns: 64px 340px 1fr; gap: 16px; align-items: start; }
+.strumento .cockpit { grid-template-columns: 64px 300px 1fr 280px; }
+
+/* Rail: vetro strutturale */
+.rail {
+  display: flex; flex-direction: column; gap: 10px; align-items: center;
+  padding: 14px 0; border-radius: var(--radius-panel);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--panel-shadow);
+  min-height: 520px;
+}
+.rail button {
+  width: 40px; height: 40px; border-radius: 14px; border: 0; cursor: pointer;
+  background: transparent; color: var(--ink-muted); font-size: 16px;
+  display: grid; place-items: center;
+  transition: transform 100ms ease-out, background 150ms ease;
+}
+.rail button:hover { background: var(--surface-strong); }
+.rail button:active { transform: scale(0.94); }
+.rail button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.rail button[aria-current="true"] { background: var(--action-primary); color: var(--surface-elevated); }
+
+/* Pannelli: carta clinica */
+.panel {
+  background: var(--paper-bg); border: 1px solid var(--paper-border);
+  border-radius: var(--radius-card); box-shadow: var(--paper-shadow);
+  padding: var(--card-pad); min-height: 520px;
+}
+.panel h2 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 2px; }
+.panel .sub { font-size: 11px; color: var(--ink-muted); letter-spacing: 0.02em; margin-bottom: 14px; }
+
+/* Worklist */
+.row {
+  display: flex; align-items: center; gap: 10px;
+  height: var(--row-h); padding: 0 10px; border-radius: 14px; cursor: pointer;
+  transition: background 120ms ease;
+}
+.row:hover { background: rgba(102, 112, 133, 0.08); }
+.row:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.row .who { flex: 1; min-width: 0; }
+.row .who b { display: block; font-weight: 600; font-size: var(--body-size); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .who span { font-size: 11px; color: var(--ink-muted); }
+.strumento .row .who span { display: none; }
+.row .key {
+  font-size: 10px; color: var(--ink-muted); border: 1px solid var(--paper-border);
+  border-radius: 6px; padding: 1px 6px; opacity: 0; transition: opacity 120ms ease;
+}
+.row:hover .key { opacity: 1; }
+.row[aria-selected="true"] { background: var(--plum-tint); }
+
+/* Glifi di stato: il colore non lavora mai da solo */
+.glyph { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 500; letter-spacing: 0.02em;
+  padding: 3px 10px; border-radius: var(--radius-chip);
+}
+.chip.warning { color: var(--signal-warning); background: var(--warning-tint); }
+.chip.critical { color: var(--signal-critical); background: var(--critical-tint); }
+.chip.success { color: var(--signal-success); background: var(--success-tint); }
+.chip.plum { color: var(--signal-plum); background: var(--plum-tint); }
+
+/* Quadro */
+.quadro-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.quadro-head h2 { font-size: 22px; letter-spacing: -0.01em; }
+.quadro-head .meta { font-size: 12px; color: var(--ink-muted); }
+.section { margin-top: 16px; }
+.section h3 { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-muted); margin-bottom: 8px; }
+
+table.params { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+table.params th { text-align: left; font-size: 11px; font-weight: 500; color: var(--ink-muted); letter-spacing: 0.02em; padding: 6px 8px; border-bottom: 1px solid var(--paper-border); }
+table.params td { font-size: var(--body-size); padding: 8px; border-bottom: 1px solid var(--paper-border); }
+table.params td.num, table.params th.num { text-align: right; }
+table.params tr:last-child td { border-bottom: 0; }
+.delta { font-size: 11px; color: var(--ink-muted); }
+.delta.up { color: var(--signal-warning); }
+
+.therapy { display: flex; align-items: center; gap: 10px; height: var(--row-h); padding: 0 8px; border-radius: 12px; }
+.therapy:hover { background: rgba(102, 112, 133, 0.07); }
+.therapy .t-name { flex: 1; font-weight: 500; }
+.therapy .t-pos { color: var(--ink-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+/* Stato vuoto onesto */
+.empty { padding: 18px 8px; font-size: 12.5px; color: var(--ink-muted); }
+
+/* Bottoni */
+.btn-primary {
+  border: 0; cursor: pointer; font: inherit; font-weight: 600; font-size: 13px;
+  color: #ffffff; background: linear-gradient(135deg, #151923, #2f3a48 58%, #475569);
+  padding: 9px 18px; border-radius: var(--radius-control);
+  box-shadow: 0 10px 24px rgba(21, 25, 35, 0.25);
+  transition: transform 100ms ease-out;
+}
+.btn-primary:active { transform: scale(0.97); }
+.btn-primary:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.btn-quiet {
+  border: 1px solid var(--paper-border); background: transparent; color: var(--ink-primary);
+  font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer;
+  padding: 7px 14px; border-radius: var(--radius-chip);
+  transition: transform 100ms ease-out, background 150ms ease;
+}
+.btn-quiet:hover { background: var(--surface-strong); }
+.btn-quiet:active { transform: scale(0.97); }
+.btn-quiet:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* Pannello azioni (solo Strumento) */
+.actions-panel { display: none; }
+.strumento .actions-panel { display: block; }
+.actions-panel .queue-item { display: flex; gap: 8px; align-items: center; padding: 8px; border-radius: 12px; font-size: 12px; }
+.actions-panel .queue-item:hover { background: rgba(102,112,133,0.07); }
+
+/* Toast: vetro transitorio */
+.toast {
+  position: fixed; right: 24px; bottom: 24px; z-index: 60;
+  display: flex; align-items: center; gap: 10px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(22px) saturate(1.06);
+  backdrop-filter: blur(22px) saturate(1.06);
+  border: 1px solid var(--glass-border); border-radius: 14px;
+  padding: 12px 16px; font-size: 13px;
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.18);
+}
+.toast .undo { border: 0; background: transparent; color: var(--action-accent); font: inherit; font-weight: 600; cursor: pointer; }
+.toast .undo:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 6px; }
+
+/* ---------- Vista Inchiostro (anteprima stampa) ---------- */
+.print-sheet {
+  max-width: 720px; margin: 0 auto; background: #ffffff; color: #111111;
+  padding: 56px 64px; border: 1px solid #d9dde3; box-shadow: 0 18px 44px rgba(15,23,42,0.12);
+  font-size: 12px; line-height: 1.5;
+}
+.print-sheet header { display: flex; justify-content: space-between; border-bottom: 1.5px solid #111; padding-bottom: 10px; margin-bottom: 18px; }
+.print-sheet header .doc-title { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+.print-sheet header .doc-meta { text-align: right; font-size: 10px; color: #444; }
+.print-sheet h4 { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin: 18px 0 8px; }
+.print-sheet table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.print-sheet th { text-align: left; font-size: 9.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; border-bottom: 0.5pt solid #111; padding: 4px 6px; }
+.print-sheet td { font-size: 10.5px; padding: 6px; border-bottom: 0.5pt solid #c9ccd2; }
+.print-sheet .mark { font-weight: 700; }
+.print-sheet footer { margin-top: 28px; padding-top: 8px; border-top: 0.5pt solid #111; display: flex; justify-content: space-between; font-size: 9px; color: #444; }
+.inchiostro .cockpit, .inchiostro .toast { display: none; }
+.view-inchiostro { display: none; }
+.inchiostro .view-inchiostro { display: block; }
+
+/* Fascia compatta: un pannello alla volta, niente rail (dopo le regole base per vincere in cascata) */
+@media (max-width: 980px) {
+  .cockpit { grid-template-columns: 1fr; }
+  .strumento .cockpit { grid-template-columns: 1fr; }
+  .rail { display: none; }
+  .panel { min-height: 0; }
+}
+
+/* Accessibilita */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .demo-bar, .rail, .toast { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--surface-elevated); }
+}
+</style>
+</head>
+<body class="base">
+
+<div class="orbs" aria-hidden="true"><div class="orb orb-a"></div><div class="orb orb-b"></div></div>
+
+<div class="demo-bar">
+  <h1>Vetro Clinico: esplorazioni</h1>
+  <div class="switch" role="group" aria-label="Esplorazione">
+    <button data-view="base" aria-pressed="true">Base</button>
+    <button data-view="strumento" aria-pressed="false">Strumento</button>
+    <button data-view="guardia" aria-pressed="false">Guardia</button>
+    <button data-view="inchiostro" aria-pressed="false">Inchiostro</button>
+  </div>
+  <div class="switch" role="group" aria-label="Tema">
+    <button data-theme="light" aria-pressed="true">Chiaro</button>
+    <button data-theme="dark" aria-pressed="false">Scuro</button>
+  </div>
+  <span class="hint">Dati dimostrativi. Riferimento: docs/design/vetro-clinico/08-esplorazioni.md</span>
+</div>
+
+<div class="stage">
+  <p class="viewnote" id="viewnote">Base: il linguaggio attuale consolidato. Vetro sul telaio (rail, barra, toast), carta clinica per il contenuto, colore solo come segnale.</p>
+
+  <div class="cockpit">
+    <nav class="rail" aria-label="Navigazione">
+      <button aria-current="true" title="Pazienti">&#9679;</button>
+      <button title="Diario">&#9633;</button>
+      <button title="Agenda">&#9651;</button>
+      <button title="Revisione">&#8862;</button>
+    </nav>
+
+    <section class="panel" aria-label="Lista di lavoro">
+      <h2>Ambulatorio</h2>
+      <p class="sub">Oggi, 6 in lista</p>
+      <div class="row" tabindex="0" aria-selected="true">
+        <span class="glyph" style="background: var(--signal-critical)"></span>
+        <span class="who"><b>Bianchi Aurora (demo)</b><span>Controllo pressorio, 09:00</span></span>
+        <span class="chip critical">&#9650; PA</span>
+        <span class="key">B</span>
+      </div>
+      <div class="row" tabindex="0">
+        <span class="glyph" style="background: var(--signal-warning)"></span>
+        <span class="who"><b>Ferri Giacomo (demo)</b><span>Rinnovo piano, 09:30</span></span>
+        <span class="chip warning">Scadenza</span>
+        <span class="key">F</span>
+      </div>
+      <div class="row" tabindex="0">
+        <span class="glyph" style="background: var(--signal-success)"></span>
+        <span class="who"><b>Conti Elena (demo)</b><span>Esiti rientrati, 10:00</span></span>
+        <span class="chip success">Esiti ok</span>
+        <span class="key">C</span>
+      </div>
+      <div class="row" tabindex="0">
+        <span class="glyph" style="background: var(--signal-plum)"></span>
+        <span class="who"><b>Riva Pietro (demo)</b><span>Prima visita, 10:30</span></span>
+        <span class="chip plum">Nuovo</span>
+        <span class="key">R</span>
+      </div>
+      <div class="row" tabindex="0">
+        <span class="glyph" style="background: var(--ink-muted)"></span>
+        <span class="who"><b>Sala Martina (demo)</b><span>Follow-up, 11:00</span></span>
+        <span class="key">S</span>
+      </div>
+      <div class="empty">Fine della lista di oggi. Le visite di domani compaiono qui alle 18.</div>
+    </section>
+
+    <section class="panel" aria-label="Quadro paziente">
+      <div class="quadro-head">
+        <h2>Bianchi Aurora</h2>
+        <span class="meta">1954, dati dimostrativi &middot; ipertensione in follow-up</span>
+      </div>
+      <span class="chip critical">Pressione fuori range</span>
+
+      <div class="section">
+        <h3>Parametri recenti</h3>
+        <table class="params">
+          <thead><tr><th>Parametro</th><th class="num">Valore</th><th class="num">Precedente</th><th>Andamento</th></tr></thead>
+          <tbody>
+            <tr><td>PA sistolica</td><td class="num"><b>158</b> mmHg</td><td class="num">142</td><td><span class="delta up">&#9650; +16</span></td></tr>
+            <tr><td>PA diastolica</td><td class="num"><b>94</b> mmHg</td><td class="num">88</td><td><span class="delta up">&#9650; +6</span></td></tr>
+            <tr><td>FC</td><td class="num">72 bpm</td><td class="num">75</td><td><span class="delta">&#9660; -3</span></td></tr>
+            <tr><td>Peso</td><td class="num">78,4 kg</td><td class="num">78,9</td><td><span class="delta">&#9660; -0,5</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section">
+        <h3>Terapie attive &middot; 3</h3>
+        <div class="therapy"><span class="glyph" style="background: var(--signal-success)"></span><span class="t-name">Ramipril 5 mg</span><span class="t-pos">1 cp, ore 8</span></div>
+        <div class="therapy"><span class="glyph" style="background: var(--signal-success)"></span><span class="t-name">Amlodipina 5 mg</span><span class="t-pos">1 cp, ore 20</span></div>
+        <div class="therapy"><span class="glyph" style="background: var(--signal-warning)"></span><span class="t-name">Atorvastatina 20 mg</span><span class="t-pos">1 cp, ore 22 &middot; rinnovo tra 6 gg</span></div>
+      </div>
+
+      <div class="section" style="display: flex; gap: 10px;">
+        <button class="btn-primary">Apri Scheda</button>
+        <button class="btn-quiet">Nuova voce diario</button>
+        <button class="btn-quiet">Registra parametri</button>
+      </div>
+    </section>
+
+    <aside class="panel actions-panel" aria-label="Coda di revisione">
+      <h2 style="font-size:15px">Revisione</h2>
+      <p class="sub">2 in coda</p>
+      <div class="queue-item"><span class="glyph" style="background: var(--signal-plum)"></span> Esiti laboratorio, Conti E.</div>
+      <div class="queue-item"><span class="glyph" style="background: var(--signal-plum)"></span> Lettera dimissione, Riva P.</div>
+      <div class="empty">Nient'altro da rivedere.</div>
+    </aside>
+  </div>
+
+  <!-- Vista Inchiostro: anteprima del linguaggio di stampa -->
+  <div class="view-inchiostro">
+    <div class="print-sheet" role="img" aria-label="Anteprima di stampa del piano terapeutico dimostrativo">
+      <header>
+        <div>
+          <div class="doc-title">Piano terapeutico</div>
+          <div style="font-size:11px; margin-top:2px;">Bianchi Aurora &middot; 1954 &middot; dati dimostrativi</div>
+        </div>
+        <div class="doc-meta">Ambulatorio demo<br>11 luglio 2026</div>
+      </header>
+      <h4>Terapia in corso</h4>
+      <table>
+        <thead><tr><th>Farmaco</th><th>Dose</th><th>Posologia</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td>Ramipril</td><td>5 mg</td><td>1 cp al mattino, ore 8</td><td></td></tr>
+          <tr><td>Amlodipina</td><td>5 mg</td><td>1 cp la sera, ore 20</td><td></td></tr>
+          <tr><td>Atorvastatina</td><td>20 mg</td><td>1 cp la sera, ore 22</td><td class="mark">&#9650; rinnovo entro il 17/07</td></tr>
+        </tbody>
+      </table>
+      <h4>Indicazioni</h4>
+      <p>Misurare la pressione due volte al giorno per una settimana e riportare i valori al prossimo controllo. In caso di valori ripetuti oltre 160/100, contattare l'ambulatorio.</p>
+      <footer><span>Generato da MediFlow, 11/07/2026</span><span>Pagina 1 di 1</span></footer>
+    </div>
+  </div>
+</div>
+
+<div class="toast" role="status">
+  <span class="glyph" style="background: var(--signal-success)"></span>
+  Voce di diario salvata.
+  <button class="undo">Annulla</button>
+</div>
+
+<script>
+(function () {
+  var body = document.body;
+  var note = document.getElementById('viewnote');
+  var notes = {
+    base: 'Base: il linguaggio attuale consolidato. Vetro sul telaio (rail, barra, toast), carta clinica per il contenuto, colore solo come segnale.',
+    strumento: 'Strumento: densita per le superfici di volume. Righe 32px, cifre tabellari, terzo pannello con la coda di revisione, orb rimossi. I target restano invariati.',
+    guardia: 'Guardia: la notte clinica. Luminanza abbassata, critico in corallo desaturato, attenzione in ambra, vetro piu denso. Raffinamento del tema scuro, non un tema in piu.',
+    inchiostro: 'Inchiostro: il linguaggio degli artefatti stampati. Solo inchiostro su carta, filetti sottili, segnali resi con peso e glifo. Vale per PDF e stampe, mai per la UI.'
+  };
+  var viewButtons = document.querySelectorAll('[data-view]');
+  var themeButtons = document.querySelectorAll('[data-theme]');
+  var theme = 'light';
+  var view = 'base';
+
+  function apply() {
+    var cls = [view];
+    if (view === 'guardia') { cls.push('dark'); }
+    else if (view === 'inchiostro') { /* la stampa e sempre chiara */ }
+    else if (theme === 'dark') { cls.push('dark'); }
+    body.className = cls.join(' ');
+    note.textContent = notes[view];
+    viewButtons.forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.view === view)); });
+    themeButtons.forEach(function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.theme === theme));
+      b.disabled = (view === 'guardia' || view === 'inchiostro');
+      b.style.opacity = b.disabled ? 0.4 : 1;
+    });
+  }
+  viewButtons.forEach(function (b) { b.addEventListener('click', function () { view = b.dataset.view; apply(); }); });
+  themeButtons.forEach(function (b) { b.addEventListener('click', function () { theme = b.dataset.theme; apply(); }); });
+  apply();
+})();
+</script>
+</body>
+</html>
