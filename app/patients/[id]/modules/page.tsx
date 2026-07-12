@@ -12,7 +12,7 @@ import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
 import DocumentUpload from '@/components/document-upload';
 import { EvidenceStackTile } from '@/components/evidence-stack-tile';
-import ObservationManager from '@/components/observation-manager';
+import ObservationManager, { type ObservationPrefill } from '@/components/observation-manager';
 import PatientActionModal from '@/components/patient-action-modal';
 import { PatientIdentityLens } from '@/components/patient-identity-lens';
 import PatientReviewQueueSummaryPanel from '@/components/patient-review-queue-summary';
@@ -39,6 +39,7 @@ import { classifyInsightReadability } from '@/lib/patient-insight-view-model';
 import { classifyObservationRange, toNumericValue } from '@/lib/observation-range';
 import { resolveStaticTerminology } from '@/lib/terminology';
 import { projectFollowupSuggestions } from '@/lib/patient-followup-projection';
+import { deriveOpenLoops, type OpenLoop } from '@/lib/patient-open-loops';
 import FollowupSuggestions from '@/components/followup-suggestions';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
@@ -46,6 +47,7 @@ export default function PatientDetailPage() {
     const params = useParams();
     const id = params.id as string;
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+    const [observationPrefill, setObservationPrefill] = useState<ObservationPrefill | undefined>();
     /* WUL-262: mirror of the Smart Import review counts reported by the panel. */
     const [smartImportReview, setSmartImportReview] = useState<SmartImportReviewSnapshot | null>(null);
     const confirm = useConfirm();
@@ -115,6 +117,27 @@ export default function PatientDetailPage() {
         [id],
         undefined,
         ['observations'],
+    );
+    const servicePrescriptionItems = useLiveQuery(
+        async () => db.servicePrescriptionItems.query({ patientId: id }).toArray(),
+        [id],
+        undefined,
+        ['service_prescription_items'],
+    );
+    const serviceCatalogItemIds = (servicePrescriptionItems ?? [])
+        .map((item) => item.catalogEntryId)
+        .filter((catalogEntryId): catalogEntryId is string => Boolean(catalogEntryId))
+        .sort()
+        .join('|');
+    const linkedServiceCatalogEntries = useLiveQuery(
+        async () => {
+            const ids = [...new Set(serviceCatalogItemIds.split('|').filter(Boolean))];
+            return (await Promise.all(ids.map((catalogEntryId) => db.serviceCatalogEntries.get(catalogEntryId))))
+                .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+        },
+        [serviceCatalogItemIds],
+        undefined,
+        ['service_catalog_entries'],
     );
     // Ultima osservazione registrata: data e valore per la cella Parametri.
     const latestObservation = useLiveQuery(
@@ -230,6 +253,16 @@ export default function PatientDetailPage() {
             : undefined),
         [patient, entries, therapies, checkups, observations, attachments],
     );
+    const openLoops = useMemo(
+        () => servicePrescriptionItems && observations
+            ? deriveOpenLoops({ items: servicePrescriptionItems, observations, now: new Date() })
+            : [],
+        [observations, servicePrescriptionItems],
+    );
+    const serviceCatalogById = useMemo(
+        () => new Map((linkedServiceCatalogEntries ?? []).map((entry) => [entry.id, entry])),
+        [linkedServiceCatalogEntries],
+    );
 
     if (!patient) {
         return (
@@ -268,6 +301,49 @@ export default function PatientDetailPage() {
     const nextCheckup = (checkups ?? [])[0];
     // Proiezione read-only dei follow-up suggeriti dai documenti (nessun auto-write).
     const followupSuggestions = projectFollowupSuggestions(documentInsights);
+    const openObservationForm = (loop: OpenLoop) => {
+        const requestId = `${loop.kind}:${loop.sourceRef.id ?? loop.sourceRef.code ?? 'unknown'}:${Date.now()}`;
+        let prefill: ObservationPrefill = { requestId };
+
+        if (loop.kind === 'results_pending' && loop.sourceRef.id) {
+            const item = servicePrescriptionItems?.find((candidate) => candidate.id === loop.sourceRef.id);
+            const catalogEntry = item?.catalogEntryId ? serviceCatalogById.get(item.catalogEntryId) : undefined;
+            const codeSystem = item?.codeSystem ?? catalogEntry?.codeSystem;
+            const code = item?.serviceCode ?? catalogEntry?.serviceCode;
+            const terminology = codeSystem?.trim().toUpperCase() === 'LOINC' && code
+                ? resolveStaticTerminology('LOINC', code)
+                : null;
+            prefill = {
+                requestId,
+                codeSystem: terminology ? 'LOINC' : undefined,
+                code: terminology?.code,
+                display: terminology?.displayIt ?? terminology?.display ?? item?.catalogDisplayName ?? catalogEntry?.displayName,
+                unitCode: terminology?.defaultUnit,
+                servicePrescriptionItemId: item?.id,
+            };
+        }
+
+        if (loop.kind === 'series_stalled') {
+            const latest = (observations ?? [])
+                .filter((observation) => !observation.deletedAt
+                    && observation.codeSystem === loop.sourceRef.codeSystem
+                    && observation.code === loop.sourceRef.code)
+                .sort((left, right) => new Date(right.observedAt).getTime() - new Date(left.observedAt).getTime())[0];
+            if (latest) {
+                prefill = {
+                    requestId,
+                    codeSystem: latest.codeSystem === 'LOINC' ? 'LOINC' : undefined,
+                    code: latest.code,
+                    display: latest.display,
+                    unitCode: latest.unitCode,
+                };
+            }
+        }
+
+        setObservationPrefill(prefill);
+        window.location.hash = 'parametri';
+        requestAnimationFrame(() => document.getElementById('parametri')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    };
     const summaryText = leadDiagnosis
         ? `${leadDiagnosis.code} · ${leadDiagnosis.description}${patient.isAdi ? ' con continuita territoriale attiva.' : '.'}`
         : 'Nessuna diagnosi codificata nella scheda.';
@@ -527,6 +603,53 @@ export default function PatientDetailPage() {
                 >
                     <PatientReviewQueueSummaryPanel summary={reviewQueueSummary} embedded />
                 </CollapsibleSection>
+
+                {openLoops.length > 0 ? (
+                    <section className="patient-detail-section border p-5 md:p-6">
+                        <div className="mb-4">
+                            <h2 className="text-xl font-semibold text-[color:var(--mf-ink)]">Attese aperte</h2>
+                        </div>
+                        <div className="space-y-2">
+                            {openLoops.map((loop) => {
+                                const provenance = loop.sourceRef.type === 'service_prescription_item'
+                                    ? (() => {
+                                        const item = servicePrescriptionItems?.find((candidate) => candidate.id === loop.sourceRef.id);
+                                        const date = item?.scheduledAt ?? item?.createdAt;
+                                        const dateLabel = date
+                                            ? new Date(date).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })
+                                            : 'data non disponibile';
+                                        return `Da prescrizione del ${dateLabel}: ${item?.serviceName ?? loop.sourceRef.serviceName ?? 'prestazione'}`;
+                                    })()
+                                    : (() => {
+                                        const latest = (observations ?? [])
+                                            .filter((observation) => observation.codeSystem === loop.sourceRef.codeSystem && observation.code === loop.sourceRef.code)
+                                            .sort((left, right) => new Date(right.observedAt).getTime() - new Date(left.observedAt).getTime())[0];
+                                        return `Serie ${resolveStaticTerminology('LOINC', loop.sourceRef.code ?? '')?.displayIt ?? latest?.display ?? loop.sourceRef.code ?? 'non disponibile'}`;
+                                    })();
+                                return (
+                                    <div
+                                        key={`${loop.kind}:${loop.sourceRef.id ?? `${loop.sourceRef.codeSystem}:${loop.sourceRef.code}`}`}
+                                        className="rounded-[12px] border border-dashed border-[color:rgba(112,106,100,0.2)] px-4 py-3 dark:border-[color:rgba(255,247,240,0.14)]"
+                                    >
+                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-[color:var(--mf-ink)]">{loop.label}</p>
+                                                <p className="mt-1.5 text-[11px] text-[color:var(--mf-muted)]">{provenance}</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => openObservationForm(loop)}
+                                                className="inline-flex shrink-0 items-center justify-center rounded-full border border-[color:rgba(112,106,100,0.2)] px-3 py-1.5 text-xs font-medium text-[color:var(--mf-ink)] transition-colors hover:bg-white/60 dark:border-[color:rgba(255,247,240,0.14)] dark:hover:bg-white/5"
+                                            >
+                                                {loop.suggestedAction === 'insert_results' ? 'Inserisci risultato' : 'Inserisci misura'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+                ) : null}
             </div>
 
             <div className={workspaceStyles.workspaceGrid}>
@@ -609,7 +732,7 @@ export default function PatientDetailPage() {
                         summary={workspace?.observationsCount === 0 ? 'Nessun parametro registrato.' : undefined}
                         keepMounted
                     >
-                        <ObservationManager patientId={id} embedded />
+                        <ObservationManager patientId={id} embedded prefill={observationPrefill} />
                     </CollapsibleSection>
 
                     <CollapsibleSection

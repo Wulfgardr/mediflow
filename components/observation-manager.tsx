@@ -1,7 +1,7 @@
 'use client';
 
 /* @Codex */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from '@/lib/live-query';
 import { v4 as uuidv4 } from 'uuid';
 import { Activity, ChevronDown, Minus, Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
@@ -66,8 +66,25 @@ function Sparkline({ values }: { values: number[] }) {
     );
 }
 
+export type ObservationPrefill = {
+    requestId: string;
+    codeSystem?: 'LOINC';
+    code?: string;
+    display?: string;
+    unitCode?: string;
+    servicePrescriptionItemId?: string;
+};
+
 /* @Codex */
-export default function ObservationManager({ patientId, embedded = false }: { patientId: string; embedded?: boolean }) {
+export default function ObservationManager({
+    patientId,
+    embedded = false,
+    prefill,
+}: {
+    patientId: string;
+    embedded?: boolean;
+    prefill?: ObservationPrefill;
+}) {
     const { showToast } = useToast();
     const confirm = useConfirm();
     const [code, setCode] = useState('8480-6');
@@ -78,6 +95,7 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
     // S6: range di riferimento del referto (opzionali). Se assenti, nessun flag.
     const [refLow, setRefLow] = useState('');
     const [refHigh, setRefHigh] = useState('');
+    const [servicePrescriptionItemId, setServicePrescriptionItemId] = useState<string | undefined>();
     const [isSaving, setIsSaving] = useState(false);
     const [valueError, setValueError] = useState<string | null>(null);
     const codeSelectRef = useRef<HTMLSelectElement>(null);
@@ -91,6 +109,21 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
        onesta di UI (label "Misure del giorno", non "Referto"): senza panelId nello
        schema non si afferma che sia lo stesso referto. */
     const [viewMode, setViewMode] = useState<'parametro' | 'data'>('parametro');
+    const loincOptions = useMemo(() => searchStaticTerminology('LOINC', '', 500), []);
+    const ucumOptions = useMemo(() => searchStaticTerminology('UCUM', '', 500), []);
+
+    useEffect(() => {
+        if (!prefill) return;
+        const option = prefill.codeSystem === 'LOINC' && prefill.code
+            ? loincOptions.find((item) => item.code === prefill.code)
+            : undefined;
+        if (option) {
+            setCode(option.code);
+            if (prefill.unitCode || option.defaultUnit) setUnitCode(prefill.unitCode ?? option.defaultUnit ?? '');
+        }
+        setServicePrescriptionItemId(prefill.servicePrescriptionItemId);
+        requestAnimationFrame(() => valueInputRef.current?.focus());
+    }, [loincOptions, prefill]);
 
     const toggleGroup = (analyteCode: string) =>
         setOpenGroups((prev) => {
@@ -113,8 +146,6 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
         valueInputRef.current?.focus();
     };
 
-    const loincOptions = useMemo(() => searchStaticTerminology('LOINC', '', 500), []);
-    const ucumOptions = useMemo(() => searchStaticTerminology('UCUM', '', 500), []);
     /* @Codex Etichetta italiana per un analita, con fallback al display grezzo
        (regge sia i record storici in inglese sia quelli nuovi). */
     const italianLoincLabel = (analyteCode: string, fallback: string) =>
@@ -224,6 +255,7 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
                 observedAt: observedDate,
                 source: 'manual',
                 createdAt: new Date(),
+                servicePrescriptionItemId,
             });
 
             /* @Codex WUL-UIUX Trascrizione referto multi-analita: conservare la
@@ -233,6 +265,7 @@ export default function ObservationManager({ patientId, embedded = false }: { pa
             setNotes('');
             setRefLow('');
             setRefHigh('');
+            setServicePrescriptionItemId(undefined);
             codeSelectRef.current?.focus();
         } catch (error) {
             console.error('Failed to save observation', error);
