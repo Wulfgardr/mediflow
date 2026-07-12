@@ -12,13 +12,21 @@ const repoRoot = path.resolve(__dirname, '..');
 const checks = [
   {
     id: 'runtime-default-ollama-only',
-    file: 'lib/ai-service.ts',
+    file: 'lib/ai-providers/base-url.ts',
     mustContain: [
-      "type AIProvider = 'ollama'",
-      'url.includes(":8080")',
-      'http://127.0.0.1:11434',
+      "export const DEFAULT_OLLAMA_BASE_URL = 'http://127.0.0.1:11434'",
+      "baseUrl.includes(':8080')",
+      'baseUrl = legacyUrl || defaultUrl',
     ],
     parity: 'Ollama remains the operational app runtime; stale MLX URLs must fall back to loopback Ollama.',
+  },
+  {
+    id: 'runtime-provider-surface-ollama-only',
+    file: 'lib/ai-providers/provider.ts',
+    mustContain: [
+      "export type AIProvider = 'ollama'",
+    ],
+    parity: 'The product provider surface remains fail-closed to the local Ollama adapter.',
   },
   {
     id: 'benchmark-runtime-symmetry',
@@ -43,14 +51,17 @@ const checks = [
   },
   {
     id: 'native-runtime-fallback-explicit',
-    file: 'native/MediFlowMac/Sources/MediFlowMac/Services/AISettingsResolver.swift',
+    // Fase 0 (76fb55ab6) deleted the dead Swift AISettingsResolver; the native
+    // macOS app now ships the bundled WebRuntime, so the explicit fallback and
+    // OCR pinning it guarded live in lib/ai-service.ts.
+    file: 'lib/ai-service.ts',
     mustContain: [
-      'resolveRuntimeSnapshot',
-      'provider == "mlx"',
-      'persistOllamaFallback',
-      'task == .ocr',
+      "const provider: AIProvider = 'ollama'",
+      'resolveOllamaBaseUrl(genericUrl?.value, legacyUrl?.value, DEFAULT_OLLAMA_BASE_URL)',
+      "task === 'ocr'",
+      'DEFAULT_OCR_MODEL',
     ],
-    parity: 'Native diagnostics expose effective runtime and keep OCR pinned to Ollama when MLX is configured.',
+    parity: 'The runtime bundled in the native app keeps the provider pinned to Ollama with an explicit loopback fallback for stale MLX URLs, and OCR stays on the Ollama OCR default.',
   },
   {
     id: 'homebase-optional-mlx-readonly',
