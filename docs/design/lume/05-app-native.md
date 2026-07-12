@@ -1,5 +1,5 @@
 ---
-summary: "Lume for the native apps: SwiftUI mapping for the Apple client (focal model, filo, Registro, LumeKit primitives), compact/mobile grammar, tri-OS mapping for Windows and Linux."
+summary: "Lume for the native apps: SwiftUI mapping for Apple, compact/mobile grammar, and prospective notes for Windows and Linux."
 read_when:
   - "Implementing Lume on the Apple paired client or planning the tri-OS clients."
   - "Deciding how a Lume concept (fuoco, filo, registri, coda) maps to SwiftUI, WinUI, or GTK."
@@ -7,7 +7,7 @@ read_when:
 
 # Lume nelle app native
 
-Lume nasce multipiattaforma per costruzione: essendo opaca e fondata sulla luce, degrada meglio del vetro su ogni OS. Questo documento traduce la lingua per le app: l'app Apple accoppiata (che esiste oggi in `MediFlowAppleShared`), la grammatica della fascia compatta (iPhone), e i client tri-OS futuri (ADR 0068/0071). I lavori di consolidamento nativo di Vetro Clinico (DS-2: `NavigationSplitView`, spacchettamento del workspace, guardie di accessibilità) restano prerequisiti invariati: preparano Lume.
+Lume nasce multipiattaforma per costruzione, ma la delivery corrente e Apple-first e macOS-first. Questo documento traduce la lingua per le app: l'app Apple accoppiata, la grammatica compatta iPhone e, solo come nota prospettica, i client tri-OS futuri. Il contratto operativo macOS e in [06-macos-apple-contract.md](./06-macos-apple-contract.md). Feature parity e delivery Windows/Linux restano fuori da questo filone.
 
 ## 1. Apple: mappa dei concetti
 
@@ -53,9 +53,9 @@ Sulla fascia compatta il modello focale si semplifica, non si spegne:
 - **Registro guardia**: sul telefono è il caso d'uso principe (reperibilità notturna); segue il dark di sistema con i token notte.
 - I target restano 44pt; la densità densa non esiste in compact.
 
-## 4. Tri-OS: Windows e Linux sotto Lume
+## 4. Tri-OS prospettico: Windows e Linux sotto Lume
 
-Le guide di Vetro Clinico ([../vetro-clinico/07-piattaforme/windows.md](../vetro-clinico/07-piattaforme/windows.md), [linux.md](../vetro-clinico/07-piattaforme/linux.md)) restano valide per struttura, idiomi e integrazione di sistema; alla fase L6 della migrazione le loro tabelle dei materiali sono sostituite da questa mappa:
+Questa sezione conserva una direzione e non apre una lane. Le guide di Vetro Clinico ([../vetro-clinico/07-piattaforme/windows.md](../vetro-clinico/07-piattaforme/windows.md), [linux.md](../vetro-clinico/07-piattaforme/linux.md)) restano note prospettiche; le tabelle seguenti non sono un piano di implementazione attivo:
 
 | Concetto Lume | Windows (Fluent/WinUI) | Linux (GNOME/libadwaita) |
 | --- | --- | --- |
@@ -83,4 +83,4 @@ Il punto strategico: **Lume elimina il problema del degrado**. Con Vetro Clinico
 2. L1 nativa: `LumePalette` come asset catalog con i tre registri, contrasti misurati.
 3. L2-L3 nativa: `LumeSurface`/`LumeCard`/`Filo` in LumeKit, adozione su worklist e Quadro del client accoppiato.
 4. L4 nativa: modifier `.registro()` su tutti gli atomi verificabili (dosi, valori, date già presenti nel workspace).
-5. L5-L6: coda dell'attenzione come home compatta, tri-OS quando la lane apre.
+5. L5-L6: coda dell'attenzione come home compatta; tri-OS resta fermo finché una lane separata non viene autorizzata.

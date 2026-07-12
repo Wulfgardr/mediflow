@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-07-11
+Ultimo aggiornamento: 2026-07-12
 
 ## 📚 Come usare questo indice
 
@@ -100,12 +100,13 @@ Ultimo aggiornamento: 2026-07-11
 | [docs/design/vetro-clinico/07-piattaforme/linux.md](./design/vetro-clinico/07-piattaforme/linux.md) | Guida Linux previsionale: adattamento GNOME/libadwaita (niente vetro), condotta KDE/freedesktop, degrado piatto del linguaggio. | Quando si progetta o pianifica il client Linux. |
 | [docs/design/vetro-clinico/08-esplorazioni.md](./design/vetro-clinico/08-esplorazioni.md) | Quattro esplorazioni con ricetta, costo e verdetto: Strumento (densità), Guardia (notte), Vetro Vivo (motion), Inchiostro (stampa); registro del rifiuto della direzione Referto. | Quando si decide la prossima evoluzione del linguaggio visivo o di interazione. |
 | [docs/design/vetro-clinico/09-roadmap.md](./design/vetro-clinico/09-roadmap.md) | Corsie DS di implementazione del sistema di design, convergenti con la roadmap UI/UX 2026-07-02, con gate di verifica. | Quando si pianifica o prioritizza lavoro di design system. |
-| [docs/design/lume/README.md](./design/lume/README.md) | Lume, PROPOSTA di lingua di design successiva a Vetro Clinico: manifesto (la luce sostituisce il vetro), rapporto col canone, stato di adozione. | Quando si valuta o implementa la proposta Lume o si discute la direzione visiva di lungo periodo. |
+| [docs/design/lume/README.md](./design/lume/README.md) | Lume, lingua di design di destinazione successiva a Vetro Clinico: manifesto (la luce sostituisce il vetro), rapporto col canone e stato di adozione. | Quando si implementa Lume o si discute la direzione visiva di lungo periodo. |
 | [docs/design/lume/01-lingua.md](./design/lume/01-lingua.md) | Specifica Lume: modello focale (fuoco/penombra/buio operativo), materia e registri di luce, il filo, due voci tipografiche, profondità semantica, grammatica dell'attenzione, motion. | Quando si prototipa o implementa una superficie Lume. |
 | [docs/design/lume/02-derivazione.md](./design/lume/02-derivazione.md) | La ricerca di mercato dietro Lume (tre lane GPT-5.6 con fonti: premium 2026, frontiera clinica, frontiera estetica), le opzioni scartate e la motivazione di ogni scelta. | Quando si mette in dubbio una scelta di Lume o si rifà la ricerca. |
-| [docs/design/lume/03-migrazione.md](./design/lume/03-migrazione.md) | Percorso di migrazione da Vetro Clinico a Lume: mappa dei token, fasi L0-L6 con gate, rischi, cosa sopravvive. | Quando si pianifica l'adozione di Lume dopo l'approvazione. |
+| [docs/design/lume/03-migrazione.md](./design/lume/03-migrazione.md) | Percorso di migrazione da Vetro Clinico a Lume: mappa dei token, fasi L0-L6 con gate, rischi, cosa sopravvive. | Quando si pianifica o verifica l'adozione progressiva di Lume. |
 | [docs/design/lume/04-perlustrazione.md](./design/lume/04-perlustrazione.md) | Perlustrazione EHR/provider dietro la grammatica dell'attenzione: tre lane GPT-5.6 (applicativi USA, gestionali GP, design system sanitari aperti), 12 integrazioni normative, rifiuti, spazio bianco competitivo. | Quando si raffina worklist, provenienza, sicurezza o si studia il mercato dei gestionali. |
-| [docs/design/lume/05-app-native.md](./design/lume/05-app-native.md) | Lume nelle app native: mappa SwiftUI (LumeKit da VetroClinico.swift, testata, filo, Registro), grammatica compatta iPhone, mappa tri-OS Windows/Linux, verifica e sequenza nativa. | Quando si implementa Lume sul client Apple o si pianificano i client tri-OS. |
+| [docs/design/lume/05-app-native.md](./design/lume/05-app-native.md) | Lume nelle app native: mappa SwiftUI, grammatica compatta iPhone e note tri-OS prospettiche, con macOS come priorita operativa. | Quando si implementa Lume sui client Apple; non apre una lane Windows/Linux. |
+| [docs/design/lume/06-macos-apple-contract.md](./design/lume/06-macos-apple-contract.md) | Contratto Lume per la futura app macOS principale: fonti Apple, availability, disposizione sidebar/workbench/inspector, materiali, audit corrente, sequenza e gate. | Prima di progettare o implementare una superficie Lume su macOS. |
 | [docs/private/linear-backlog/2026-05-20-mediflow-linear-legacy-snapshot.md](./private/linear-backlog/2026-05-20-mediflow-linear-legacy-snapshot.md) | Snapshot privato delle issue Linear legacy candidate ad archiviazione, creato prima della pulizia del backlog. | Quando si libera Linear da issue datate mantenendo una traccia locale riusabile. |
 
 ## 🧱 ADR (decisioni architetturali)

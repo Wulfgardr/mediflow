@@ -1,5 +1,5 @@
 ---
-summary: "Lume: the proposed next design language for MediFlow. Manifesto, relationship to Vetro Clinico, reading order, adoption status."
+summary: "Lume: the destination design language for MediFlow. Manifesto, relationship to Vetro Clinico, reading order, adoption status."
 read_when:
   - "Evaluating or implementing the Lume design language proposal."
   - "Deciding the long-term visual direction of MediFlow beyond Vetro Clinico."
@@ -30,12 +30,13 @@ Ciò che NON cambia: le leggi cliniche di Vetro Clinico restano fondamenta anche
 2. [02-derivazione.md](./02-derivazione.md): la ricerca di mercato (tre lane GPT-5.6 Terra con fonti), cosa è stato scartato e perché ogni scelta di Lume discende dai dati.
 3. [03-migrazione.md](./03-migrazione.md): il percorso da Vetro Clinico: mappa dei token, fasi, rischi, cosa sopravvive.
 4. [04-perlustrazione.md](./04-perlustrazione.md): la perlustrazione EHR/provider e le 12 integrazioni normative alla grammatica.
-5. [05-app-native.md](./05-app-native.md): Lume nelle app: mappa SwiftUI per il client Apple (LumeKit), grammatica compatta iPhone, tri-OS Windows/Linux.
-6. [mockups/lume.html](./mockups/lume.html): dimostratore interattivo (aprire nel browser, nessuna dipendenza): modello focale, filo, due voci, registri giorno/grafite/guardia.
+5. [05-app-native.md](./05-app-native.md): mappa generale delle app native, grammatica compatta iPhone e note tri-OS prospettiche.
+6. [06-macos-apple-contract.md](./06-macos-apple-contract.md): contratto di destinazione macOS, fonti Apple, availability, disposizione, materiali, debito corrente e sequenza verificabile.
+7. [mockups/lume.html](./mockups/lume.html): dimostratore interattivo (aprire nel browser, nessuna dipendenza): modello focale, filo, due voci, registri giorno/grafite/guardia.
 
 ## Rapporto con il canone
 
-- Vetro Clinico ([../vetro-clinico/](../vetro-clinico/README.md)) resta il canone finché Lume non è approvata: i lavori di consolidamento DS-1..DS-3 della sua roadmap servono ANCHE a Lume (stessi token semantici, stessi componenti) e non vanno fermati.
+- Lume e approvata come lingua di destinazione; Vetro Clinico ([../vetro-clinico/](../vetro-clinico/README.md)) resta il canone operativo transitorio finché le fasi di migrazione non sostituiscono i consumatori. I lavori DS-1..DS-3 servono anche a Lume e non vanno fermati.
 - Le esplorazioni Strumento, Guardia e Inchiostro sono compatibili con Lume e vi confluiscono (Guardia diventa il terzo registro di luce; Strumento la densità dello strumento; Inchiostro resta il linguaggio di stampa).
 - Vetro Vivo viene sostituita dal modello di motion di Lume (la luce si sposta, le superfici no), più sobrio e meno costoso.
-- Decisione richiesta: ADR "Lume come lingua di design di destinazione", dopo la valutazione del dimostratore.
+- La decisione di prodotto e registrata in ADR 0074. Restano decisioni di delivery: font non-Apple, ordine delle slice e promozione dei singoli componenti dopo prova reale.

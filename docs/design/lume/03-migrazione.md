@@ -39,13 +39,13 @@ Principio: Lume non butta niente di ciò che vale. Il consolidamento di Vetro Cl
 
 | Fase | Contenuto | Gate |
 | --- | --- | --- |
-| L0 | Decisione: valutazione del dimostratore, ADR "Lume lingua di destinazione" (include la scelta del font della Voce e del Registro) | Verdetto di Leonardo |
+| L0 | Decisione di prodotto e canone: Lume lingua di destinazione, ADR 0074 e contratti di piattaforma | Completata per la direzione; font non-Apple e slice restano decisioni di delivery |
 | L1 | Token: registri giorno/grafite/guardia nel sorgente DTCG, misura dei contrasti, `data-lume` accanto ai token attuali (convivenza temporanea, non selettore utente: flag di sviluppo) | Tutte le coppie AA misurate |
 | L2 | Fuoco e chrome: modello focale nel cockpit (worklist/Quadro), rail e barre a chrome opaco, ritiro del vetro strutturale | Smoke visivo 3 registri + 3 segnali di accessibilità |
 | L3 | Il filo: selezione focale, timeline diario, storia valori con banda personale | Leggibilità misurata; il tratteggio bozza copre i contenuti proposti |
 | L4 | Le due voci: bundling font, regola del Registro su dosi/valori/codici/date (web e nativo) | Nessun fetch remoto; parity visiva print |
 | L5 | Overlay e motion: overlay a ombra+scrim, cross-fade focale, filo che prosegue Quadro/Scheda | 60fps; Reduce Motion |
-| L6 | Piattaforme native: mapping Apple/Windows/Linux dei registri | Le guide di piattaforma aggiornate |
+| L6 | Piattaforme native: Apple viene implementata per prima; Windows/Linux restano documentazione prospettica finché le lane non vengono riaperte | Contratto macOS verificato nel bundle; nessuna claim di client tri-OS |
 
 Le fasi L2-L5 atterrano in fette piccole per superficie (prima il cockpit, poi la Scheda, poi settings), con la disciplina già in uso.
 

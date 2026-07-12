@@ -8,6 +8,8 @@ read_when:
 
 Contratto: outcome = client accoppiato con la stessa grammatica del web, reso con i mezzi nativi. Floor: iOS 17 / macOS 14, con Liquid Glass reale solo su OS 26+ dietro `#available` (già così). UI: SwiftUI, condivisa in `MediFlowAppleShared`, differenziata da size class e `#if os`.
 
+Per macOS, [Lume su macOS: contratto Apple](../../lume/06-macos-apple-contract.md) e la fonte di destinazione. Questa guida descrive il canone transitorio condiviso Apple.
+
 ## 1. Mappa superficie -> API
 
 | Superficie | OS 26+ | Sotto il floor Liquid Glass |

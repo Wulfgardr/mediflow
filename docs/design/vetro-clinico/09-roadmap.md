@@ -10,10 +10,10 @@ Questo piano non biforca la roadmap in 7 fasi della revisione UI/UX 2026-07-02 (
 
 ## Corsie
 
-### DS-0. Canone (questa review)
+### DS-0. Canone (completato per la direzione)
 
-- Questo folder come base canonica; proposta di ADR 0074 "Vetro Clinico linguaggio di design canonico" (glossario, legge dei materiali, sovranità dei token, preferenza densità).
-- Gate: revisione di Leonardo; l'ADR si apre solo dopo approvazione della base.
+- Vetro Clinico e il canone operativo transitorio; Lume e la lingua di destinazione secondo ADR 0074. Questo folder conserva glossario, leggi cliniche, token e debito da consolidare.
+- Gate completato: decisione di Leonardo registrata. I gate successivi riguardano delivery e verifica, non una nuova scelta di direzione.
 
 ### DS-1. Consolidamento token web (converge con fase 6 "unificazione semantici")
 
@@ -24,7 +24,7 @@ Le 8 azioni di [02-token.md](./02-token.md) sezione 7: stile unico (`data-ui-sty
 
 ### DS-2. Consolidamento nativo Apple
 
-Le 6 azioni di [07-piattaforme/apple.md](./07-piattaforme/apple.md): un solo sistema di card, `NavigationSplitView`, spacchettamento del workspace, via gli artefatti di rollout, colori solo da `VetroPalette`, guardie di accessibilità.
+Le azioni di [07-piattaforme/apple.md](./07-piattaforme/apple.md) e del [contratto Lume macOS](../lume/06-macos-apple-contract.md): un solo sistema di card cliniche opache, `NavigationSplitView`, spacchettamento del workspace, via gli artefatti di rollout, palette semantica unica, guardie di accessibilità e disposizione sidebar/workbench/inspector.
 
 - Percorsi: `native/MediFlowMac/Sources/MediFlowAppleShared/` (VetroClinico.swift, AppleFoundationStyle.swift, PairedPatientsWorkspaceView.swift, AppleFoundationViews.swift).
 - Gate: build + esercizio su simulatore iOS e run macOS (Xcode-beta via `DEVELOPER_DIR`), passata VoiceOver sui flussi principali, verifica Reduce Transparency.
@@ -57,9 +57,9 @@ Le tre transizioni: Quadro/Scheda, capsule, overlay. [08-esplorazioni.md](./08-e
 
 - Gate: 60fps sulle transizioni su hardware medio; Reduce Motion integrale; nessuna regressione dei tempi di input.
 
-### DS-8. Lane tri-OS (si apre con ADR 0068/0071, non prima)
+### DS-8. Lane tri-OS (in attesa)
 
-[07-piattaforme/windows.md](./07-piattaforme/windows.md) e [07-piattaforme/linux.md](./07-piattaforme/linux.md) diventano operativi; decisione shell nativa vs canvas web al momento del kickoff, con i confini già scritti nei due documenti.
+[07-piattaforme/windows.md](./07-piattaforme/windows.md) e [07-piattaforme/linux.md](./07-piattaforme/linux.md) restano abbozzi prospettici. Il cuore del prodotto resta localhost e la priorita nativa e macOS. Nessuna implementazione tri-OS parte da questa roadmap senza un kickoff separato.
 
 ## Sequenza e dipendenze
 
@@ -70,7 +70,7 @@ DS-0 ──> DS-1 ──> DS-5 (Guardia)
    ├──> DS-3 (= fase 5, indipendente)
    ├──> DS-6 (Inchiostro, indipendente)
    └──> [fase 6: URL cockpit] ──> DS-7 (Vetro Vivo)
-DS-8 quando la lane tri-OS apre
+DS-8 fermo finché una lane tri-OS separata non viene autorizzata
 ```
 
 ## Regole di ingaggio
