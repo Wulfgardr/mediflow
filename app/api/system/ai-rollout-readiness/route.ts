@@ -11,6 +11,8 @@ import {
 import { AI_PATIENT_INSIGHT_KILL_SWITCH_KEY } from '@/lib/ai-patient-insight-kill-switch';
 import { AI_SMART_IMPORT_KILL_SWITCH_KEY } from '@/lib/ai-smart-import-kill-switch';
 import { AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY } from '@/lib/ai-document-synthesis-kill-switch';
+import { AI_TREATMENT_REASONING_KILL_SWITCH_KEY } from '@/lib/ai-treatment-reasoning-kill-switch';
+import { AI_OCR_KILL_SWITCH_KEY } from '@/lib/ai-ocr-kill-switch';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +28,8 @@ export async function GET() {
                 AI_PATIENT_INSIGHT_KILL_SWITCH_KEY,
                 AI_SMART_IMPORT_KILL_SWITCH_KEY,
                 AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
+                AI_TREATMENT_REASONING_KILL_SWITCH_KEY,
+                AI_OCR_KILL_SWITCH_KEY,
             ]));
 
         const rowMap = new Map(rows.map((row) => [row.key, row.value]));
@@ -33,6 +37,8 @@ export async function GET() {
             patient_insight: rowMap.get(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY),
             smart_import: rowMap.get(AI_SMART_IMPORT_KILL_SWITCH_KEY),
             document_synthesis: rowMap.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY),
+            treatment_reasoning: rowMap.get(AI_TREATMENT_REASONING_KILL_SWITCH_KEY),
+            ocr: rowMap.get(AI_OCR_KILL_SWITCH_KEY),
         });
 
         return NextResponse.json(buildAiRolloutReadinessArtifactsPayload({ localControls }));

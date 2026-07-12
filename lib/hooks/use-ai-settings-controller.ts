@@ -37,6 +37,11 @@ import {
     isAiTreatmentReasoningEnabledValue,
     serializeAiTreatmentReasoningKillSwitchState,
 } from '@/lib/ai-treatment-reasoning-kill-switch';
+import {
+    AI_OCR_KILL_SWITCH_KEY,
+    isAiOcrEnabledValue,
+    serializeAiOcrKillSwitchState,
+} from '@/lib/ai-ocr-kill-switch';
 
 type HardwareProfile = 'low' | 'medium' | 'high' | 'custom';
 
@@ -79,6 +84,7 @@ export function useAiSettingsController() {
     const [documentSynthesisEnabled, setDocumentSynthesisEnabled] = useState(true);
     const [smartImportEnabled, setSmartImportEnabled] = useState(true);
     const [treatmentReasoningEnabled, setTreatmentReasoningEnabled] = useState(false);
+    const [ocrEnabled, setOcrEnabled] = useState(true);
 
     useEffect(() => {
         void loadAiConfig();
@@ -115,6 +121,7 @@ export function useAiSettingsController() {
             const documentSynthesisKillSwitch = await safeGet(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
             const smartImportKillSwitch = await safeGet(AI_SMART_IMPORT_KILL_SWITCH_KEY);
             const treatmentReasoningKillSwitch = await safeGet(AI_TREATMENT_REASONING_KILL_SWITCH_KEY);
+            const ocrKillSwitch = await safeGet(AI_OCR_KILL_SWITCH_KEY);
 
             let currentUrl = genericUrl?.value;
             if (!currentUrl) currentUrl = legacyUrl?.value;
@@ -137,6 +144,7 @@ export function useAiSettingsController() {
             setDocumentSynthesisEnabled(isAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value));
             setSmartImportEnabled(isAiSmartImportEnabledValue(smartImportKillSwitch?.value));
             setTreatmentReasoningEnabled(isAiTreatmentReasoningEnabledValue(treatmentReasoningKillSwitch?.value));
+            setOcrEnabled(isAiOcrEnabledValue(ocrKillSwitch?.value));
         } catch (e) {
             console.error('Failed to load AI config:', e);
         }
@@ -200,6 +208,10 @@ export function useAiSettingsController() {
             await db.settings.put({
                 key: AI_TREATMENT_REASONING_KILL_SWITCH_KEY,
                 value: serializeAiTreatmentReasoningKillSwitchState(treatmentReasoningEnabled),
+            });
+            await db.settings.put({
+                key: AI_OCR_KILL_SWITCH_KEY,
+                value: serializeAiOcrKillSwitchState(ocrEnabled),
             });
             await saveAIInsightStoredSettings(aiInsightSettings);
             setAiTestStatus('idle');
@@ -296,6 +308,8 @@ export function useAiSettingsController() {
         setSmartImportEnabled,
         treatmentReasoningEnabled,
         setTreatmentReasoningEnabled,
+        ocrEnabled,
+        setOcrEnabled,
         selectedInsightMode,
         insightRuntimePreview,
         applyHardwareProfile,

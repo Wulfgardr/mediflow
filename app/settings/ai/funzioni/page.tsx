@@ -34,6 +34,8 @@ export default function SettingsAiFunctionsPage() {
         setSmartImportEnabled,
         treatmentReasoningEnabled,
         setTreatmentReasoningEnabled,
+        ocrEnabled,
+        setOcrEnabled,
         selectedInsightMode,
         insightRuntimePreview,
         updateManualInsightConfig,
@@ -174,6 +176,49 @@ export default function SettingsAiFunctionsPage() {
                     </div>
 
                     <div className="space-y-3">
+                        <div
+                            className="rounded-[18px] border p-4"
+                            style={ocrEnabled
+                                ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(248, 250, 252, 0.85)' }
+                                : { borderColor: 'rgba(192, 57, 43, 0.28)', background: 'rgba(192, 57, 43, 0.08)' }}
+                            data-testid="ocr-kill-switch-card"
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>OCR documentale (modello locale)</p>
+                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>
+                                        Se spento, l&apos;estrazione testo da scansioni si ferma e i documenti restano in coda revisione.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <label
+                                        htmlFor="ocrKillSwitch"
+                                        className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
+                                        style={ocrEnabled
+                                            ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-ink)' }
+                                            : { borderColor: 'rgba(192, 57, 43, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--mf-critical)' }}
+                                    >
+                                        {ocrEnabled ? 'Attivo' : 'Spento'}
+                                    </label>
+                                    <button
+                                        id="ocrKillSwitch"
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={ocrEnabled}
+                                        aria-label="OCR documentale locale"
+                                        onClick={() => setOcrEnabled(!ocrEnabled)}
+                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:rgba(15,23,42,0.24)]"
+                                        style={{ background: ocrEnabled ? 'var(--mf-ink)' : 'rgba(112,106,100,0.2)' }}
+                                    >
+                                        <span
+                                            className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
+                                            style={{ transform: ocrEnabled ? 'translateX(20px)' : 'translateX(0)' }}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         <div
                             className="rounded-[18px] border p-4"
                             style={patientInsightEnabled

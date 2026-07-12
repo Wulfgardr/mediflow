@@ -47,6 +47,7 @@ export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
     aiDocumentSynthesisKillSwitch: { write: ['web-session'], note: 'kill switch (lib/ai-document-synthesis-kill-switch.ts)' },
     aiSmartImportKillSwitch: { write: ['web-session'], note: 'kill switch (lib/ai-smart-import-kill-switch.ts)' },
     aiTreatmentReasoningKillSwitch: { write: ['web-session'], note: 'kill switch (lib/ai-treatment-reasoning-kill-switch.ts)' },
+    aiOcrKillSwitch: { write: ['web-session'], note: 'kill switch (lib/ai-ocr-kill-switch.ts)' },
 
     // --- UI / accessibility preferences (per-operator, web session). ---
     uiReduceMotion: { write: ['web-session'], note: 'accessibility pref (components/ui-accessibility-provider.tsx)' },
