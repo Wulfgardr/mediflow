@@ -36,6 +36,8 @@ export default function SettingsAiFunctionsPage() {
         setTreatmentReasoningEnabled,
         ocrEnabled,
         setOcrEnabled,
+        documentRouterControlFlowMode,
+        setDocumentRouterControlFlowMode,
         selectedInsightMode,
         insightRuntimePreview,
         updateManualInsightConfig,
@@ -217,6 +219,41 @@ export default function SettingsAiFunctionsPage() {
                                     </button>
                                 </div>
                             </div>
+                        </div>
+
+                        <div
+                            className="rounded-[18px] border p-4"
+                            style={{ borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(248, 250, 252, 0.85)' }}
+                            data-testid="document-router-control-flow-card"
+                        >
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="min-w-0">
+                                    <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>Instradamento documentale deterministico</p>
+                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>
+                                        Decide quando le classi a estrazione certa possono usare la sintesi deterministica invece del modello.
+                                    </p>
+                                </div>
+                                <label className="text-xs font-medium" style={{ color: 'var(--mf-muted)' }}>
+                                    Modalita
+                                    <select
+                                        aria-label="Modalita instradamento documentale deterministico"
+                                        value={documentRouterControlFlowMode}
+                                        onChange={(event) => setDocumentRouterControlFlowMode(event.target.value as typeof documentRouterControlFlowMode)}
+                                        className={`mt-1 min-w-40 ${SETTINGS_INPUT_CLASS}`}
+                                    >
+                                        <option value="off">Spento</option>
+                                        <option value="shadow">Osservazione</option>
+                                        <option value="active">Attivo</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <p className="mt-3 rounded-[14px] border px-3 py-2 text-[11px] leading-5" style={{ borderColor: 'rgba(15, 23, 42, 0.12)', background: 'rgba(255,255,255,0.72)', color: 'var(--mf-muted)' }}>
+                                {documentRouterControlFlowMode === 'off'
+                                    ? 'Spento: il modello analizza tutti i documenti.'
+                                    : documentRouterControlFlowMode === 'shadow'
+                                        ? 'Osservazione: il router registra cosa salterebbe senza cambiare la sintesi.'
+                                        : 'Attivo: le classi a estrazione certa saltano il modello e usano la sintesi deterministica.'}
+                            </p>
                         </div>
 
                         <div
