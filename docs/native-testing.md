@@ -15,6 +15,7 @@ Riferimenti:
 - [docs/adr/0008-web-first-with-parity-sweeps.md](./adr/0008-web-first-with-parity-sweeps.md)
 - [docs/adr/0009-native-testing-strategy-xcode-xctest.md](./adr/0009-native-testing-strategy-xcode-xctest.md)
 - [docs/parity-matrix.md](./parity-matrix.md)
+- [docs/parity-click-map-macos.md](./parity-click-map-macos.md)
 
 ---
 
@@ -75,14 +76,14 @@ npm run test:native:xcode
 ```
 
 Variabili utili:
-- `MEDIFLOW_XCODE_SCHEME` (default: `MediFlowMac`)
+- `MEDIFLOW_XCODE_SCHEME` (default: `MediFlowMac-Package`)
 - `MEDIFLOW_XCODE_DESTINATION` (default: `platform=macOS,arch=arm64`)
 - `MEDIFLOW_DERIVED_DATA_DIR` (default: `./tmp-native-derived-data`)
 
 ### Xcode (workflow locale)
 
 1. Apri `native/MediFlowMac/Package.swift` in Xcode.
-2. Seleziona scheme package (`MediFlowMac`).
+2. Seleziona lo scheme package `MediFlowMac-Package`.
 3. Esegui `Product > Test`.
 
 Per debugging test:
@@ -99,8 +100,9 @@ Per debugging test:
    - `npm run test:native`
 3. Native click-map manuale (finche UI test non e completa):
    - apri app con `./scripts/Launch_MediFlowMac.command`
-   - opzionale: esegui il probe AX read-only `npm run test:native:clickmap:probe`
-   - verifica punti chiave parity da `docs/parity-matrix.md`
+   - opzionale: esegui il probe AX read-only con `--app-path` come descritto nel runbook P6
+   - esegui e verbalizza la P6 da `docs/parity-click-map-macos.md`
+   - verifica i punti chiave parity da `docs/parity-matrix.md`
 4. Smoke mobile paired (quando tocchi `home-base` iPhone/iPad):
    - esegui `bash scripts/mobile-home-base-paired-smoke.sh`
    - per modifiche al boundary `/api/v1/network/*`, esegui anche `npm run test:network:home-base-readonly`, `npm run test:network:home-base-write` e, se tocchi il diario paired, `npm run test:network:home-base-diary-write`
