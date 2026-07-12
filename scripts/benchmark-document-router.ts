@@ -70,7 +70,7 @@ export const DOCUMENT_ROUTER_SELF_TEST_FIXTURES: DocumentRouterBenchmarkEntry[] 
         file: '2026-01-12__laboratorio__emocromo_sintetico.pdf',
         expectedClass: 'lab_report',
         labelSource: 'synthetic_filename',
-        text: 'Ematologia. Determinazione Risultato Unita Limiti di riferimento.',
+        text: 'Ematologia. Referto di laboratorio con determinazione risultato, unita e limiti di riferimento per campione sintetico.',
         producer: 'JasperReports Library',
     },
     {
@@ -191,7 +191,7 @@ export function runDocumentRouterBenchmark(entries: DocumentRouterBenchmarkEntry
             labelSource: entry.labelSource,
             confidence: routed.confidence,
             signals: routed.signals,
-            wouldSkip: isDeterministicSynthesisRoute(routed),
+            wouldSkip: isDeterministicSynthesisRoute(routed, entry.text ?? ''),
         };
     });
 

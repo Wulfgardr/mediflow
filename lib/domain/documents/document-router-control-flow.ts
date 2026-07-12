@@ -31,10 +31,11 @@ export interface DocumentRouterControlFlowDecision {
 export function decideDocumentRouterControlFlow(input: {
     documentSynthesisKillSwitchValue: unknown;
     mode: DocumentRouterControlFlowMode;
-    routed: Pick<DocumentClassRouterResult, 'classification' | 'confidence'>;
+    routed: Pick<DocumentClassRouterResult, 'classification' | 'confidence' | 'signals'>;
+    normalizedText: string;
 }): DocumentRouterControlFlowDecision {
     assertAiDocumentSynthesisEnabledValue(input.documentSynthesisKillSwitchValue);
-    const wouldSkip = isDeterministicSynthesisRoute(input.routed);
+    const wouldSkip = isDeterministicSynthesisRoute(input.routed, input.normalizedText);
 
     return {
         mode: input.mode,

@@ -93,6 +93,44 @@ async function recordDocumentRouterShadowDecision(input: {
 }
 
 /* @Codex */
+type DocumentRouterShadowRecorder = typeof recordDocumentRouterShadowDecision;
+
+/* @Codex */
+export function dispatchDocumentRouterShadowDecision(
+    input: Parameters<DocumentRouterShadowRecorder>[0],
+    recorder: DocumentRouterShadowRecorder = recordDocumentRouterShadowDecision,
+): void {
+    // Telemetria best-effort: una richiesta lenta o pendente non entra mai nel
+    // percorso critico della sintesi.
+    void recorder(input).catch((error) => {
+        console.warn('[DocumentSynthesis] document router shadow audit unavailable', error);
+    });
+}
+
+/* @Codex */
+export async function selectDocumentSynthesisAnalysis(input: {
+    rawMarkdown: string;
+    normalizedText: string;
+    routed: ReturnType<typeof routeDocumentClassForSynthesis>;
+    routerMode: ReturnType<typeof parseDocumentRouterControlFlowMode>;
+    routerDecision: ReturnType<typeof decideDocumentRouterControlFlow>;
+    analyze?: typeof analyzeDocumentContent;
+    recordShadow?: DocumentRouterShadowRecorder;
+}): Promise<DocumentStructuredAnalysis> {
+    if (input.routerMode === 'shadow') {
+        dispatchDocumentRouterShadowDecision({
+            classification: input.routed.classification,
+            confidence: input.routed.confidence,
+            wouldSkip: input.routerDecision.wouldSkip,
+        }, input.recordShadow);
+    }
+
+    return input.routerDecision.useDeterministicSynthesis
+        ? buildDeterministicDocumentSynthesisAnalysis(input.normalizedText, input.routed)
+        : (input.analyze ?? analyzeDocumentContent)(input.rawMarkdown);
+}
+
+/* @Codex */
 /**
  * Analyze OCR text without persisting anything.
  */
@@ -130,19 +168,16 @@ export async function synthesizeDocument(
         documentSynthesisKillSwitchValue: documentSynthesisKillSwitch?.value,
         mode: routerMode,
         routed,
+        normalizedText: normalized.normalizedText,
     });
 
-    if (routerMode === 'shadow') {
-        await recordDocumentRouterShadowDecision({
-            classification: routed.classification,
-            confidence: routed.confidence,
-            wouldSkip: routerDecision.wouldSkip,
-        });
-    }
-
-    const analysis = routerDecision.useDeterministicSynthesis
-        ? buildDeterministicDocumentSynthesisAnalysis(normalized.normalizedText, routed)
-        : await analyzeDocumentContent(rawMarkdown);
+    const analysis = await selectDocumentSynthesisAnalysis({
+        rawMarkdown,
+        normalizedText: normalized.normalizedText,
+        routed,
+        routerMode,
+        routerDecision,
+    });
 
     const patient = await db.patients.get(patientId);
     if (!patient) {

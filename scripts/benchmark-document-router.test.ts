@@ -18,9 +18,9 @@ test('document router benchmark self-test fixtures classify cleanly', () => {
     assert.deepEqual(
         report.skipDecisions.map((metric) => [metric.classification, metric.wouldSkip]),
         [
-            ['administrative', 1],
+            ['administrative', 0],
             ['lab_report', 1],
-            ['prosthetic_prescription', 1],
+            ['prosthetic_prescription', 0],
             ['specialist_report', 0],
         ],
     );
