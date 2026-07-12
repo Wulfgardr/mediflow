@@ -105,7 +105,7 @@ Confermato localmente e contro-rivisto da Opus 4.8 max:
 
 | Finding | Stato | Destinazione |
 | --- | --- | --- |
-| Le card cliniche usano `glassEffect` su OS 26+ | Confermato | Ritirare il vetro dalle superfici cliniche prima di Lume visuale. |
+| Le card cliniche usavano `glassEffect` su OS 26+ | Risolto in WUL-55 M1 | `clinicalCardStyle()` rende una superficie opaca condivisa; `cardStyle()` resta alias transitorio e `GlassCard` e deprecata. |
 | Il workspace pazienti interno e un `HStack` con colonna fissa 360pt | Confermato | Migrare a `NavigationSplitView` + `List(selection:)` come DS-2. |
 | Non esiste `.inspector()` nel workspace | Confermato | Introdurlo dopo lo split, per contesto e drill-down. |
 | Identita paziente scorre via e non esiste `safeAreaInset` | Confermato | Creare `TestataPaziente`; allergie richiedono prima verifica del contratto dati. |
@@ -133,6 +133,12 @@ La prima slice eseguibile resta sotto circa 300 LOC e non combina M1 con M2.
 Scelta candidata: primitive additive + Registro sui call-site esistenti, oppure
 la sola correzione delle card cliniche. La scelta finale richiede issue Linear
 dedicata e prova visuale prima del commit.
+
+WUL-55 applica la seconda opzione come proof of application del workflow Apple
+Docs: una sola primitiva opaca per le card custom, senza cambiare navigazione,
+parity o contratti. Il test sintetico renderizza la superficie in light/dark e
+include un controllo negativo traslucido per dimostrare che il gate alpha e
+discriminante.
 
 ## 8. Gate di verifica
 
