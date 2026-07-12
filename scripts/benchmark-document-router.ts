@@ -1,7 +1,11 @@
 /* @Codex */
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { routeDocumentClass, type DocumentClassRouterInput } from '../lib/domain/documents/document-class-router';
+import {
+    isDeterministicSynthesisRoute,
+    routeDocumentClass,
+    type DocumentClassRouterInput,
+} from '../lib/domain/documents/document-class-router';
 import type { DocumentDecisionClassification } from '../lib/domain/documents/document-decision';
 
 /* @Codex */
@@ -23,6 +27,7 @@ export interface DocumentRouterBenchmarkRow {
     labelSource: string;
     confidence: string;
     signals: string[];
+    wouldSkip: boolean;
 }
 
 /* @Codex */
@@ -41,6 +46,13 @@ export interface DocumentRouterConfusion {
 }
 
 /* @Codex */
+export interface DocumentRouterSkipDecisionMetric {
+    classification: DocumentDecisionClassification;
+    total: number;
+    wouldSkip: number;
+}
+
+/* @Codex */
 export interface DocumentRouterBenchmarkReport {
     schemaVersion: 'mediflow.document_router_benchmark.v1';
     total: number;
@@ -48,6 +60,7 @@ export interface DocumentRouterBenchmarkReport {
     accuracy: number;
     byClass: DocumentRouterClassMetric[];
     confusions: DocumentRouterConfusion[];
+    skipDecisions: DocumentRouterSkipDecisionMetric[];
     rows: DocumentRouterBenchmarkRow[];
 }
 
@@ -57,7 +70,7 @@ export const DOCUMENT_ROUTER_SELF_TEST_FIXTURES: DocumentRouterBenchmarkEntry[] 
         file: '2026-01-12__laboratorio__emocromo_sintetico.pdf',
         expectedClass: 'lab_report',
         labelSource: 'synthetic_filename',
-        text: 'Ematologia. Determinazione Risultato Unita Limiti di riferimento.',
+        text: 'Ematologia. Referto di laboratorio con determinazione risultato, unita e limiti di riferimento per campione sintetico.',
         producer: 'JasperReports Library',
     },
     {
@@ -178,16 +191,23 @@ export function runDocumentRouterBenchmark(entries: DocumentRouterBenchmarkEntry
             labelSource: entry.labelSource,
             confidence: routed.confidence,
             signals: routed.signals,
+            wouldSkip: isDeterministicSynthesisRoute(routed, entry.text ?? ''),
         };
     });
 
     const byClassMap = new Map<DocumentDecisionClassification, { total: number; correct: number }>();
     const confusionMap = new Map<string, DocumentRouterConfusion>();
+    const skipDecisionMap = new Map<DocumentDecisionClassification, { total: number; wouldSkip: number }>();
     for (const row of rows) {
         const current = byClassMap.get(row.expectedClass) ?? { total: 0, correct: 0 };
         current.total += 1;
         if (row.correct) current.correct += 1;
         byClassMap.set(row.expectedClass, current);
+
+        const skipMetric = skipDecisionMap.get(row.predictedClass) ?? { total: 0, wouldSkip: 0 };
+        skipMetric.total += 1;
+        if (row.wouldSkip) skipMetric.wouldSkip += 1;
+        skipDecisionMap.set(row.predictedClass, skipMetric);
 
         if (!row.correct) {
             const key = `${row.expectedClass}->${row.predictedClass}`;
@@ -221,6 +241,9 @@ export function runDocumentRouterBenchmark(entries: DocumentRouterBenchmarkEntry
             a.expectedClass.localeCompare(b.expectedClass)
             || a.predictedClass.localeCompare(b.predictedClass)
         )),
+        skipDecisions: Array.from(skipDecisionMap.entries())
+            .map(([classification, metric]) => ({ classification, ...metric }))
+            .sort((a, b) => a.classification.localeCompare(b.classification)),
         rows,
     };
 }
@@ -260,7 +283,15 @@ export function formatDocumentRouterBenchmarkReport(report: DocumentRouterBenchm
                 String(item.count),
             ]),
         );
-    return `${summary}\n\nBy class\n${byClass}\n\nConfusions\n${confusions}`;
+    const skipDecisions = table(
+        ['class', 'documents', 'wouldSkip'],
+        report.skipDecisions.map((metric) => [
+            metric.classification,
+            String(metric.total),
+            String(metric.wouldSkip),
+        ]),
+    );
+    return `${summary}\n\nBy class\n${byClass}\n\nConfusions\n${confusions}\n\nDeterministic skip decisions\n${skipDecisions}`;
 }
 
 async function main(argv: string[]): Promise<void> {

@@ -90,6 +90,7 @@ test('current key/writer pairs still resolve to allowed', () => {
         'aiProvider', 'aiUrl', 'ollamaUrl', 'aiModel', 'aiModel_clinical',
         'aiModel_reasoning', 'aiModel_ocr', 'aiModelDefaultVersion', 'hardwareProfile',
         'aiInsightMode', 'aiInsightManualConfig', 'aiPatientInsightKillSwitch',
+        'documentRouterControlFlow',
         'aiDocumentSynthesisKillSwitch', 'aiSmartImportKillSwitch', 'aiTreatmentReasoningKillSwitch',
         'aiOcrKillSwitch', 'uiReduceMotion',
         'uiReduceTransparency', 'uiStyleMode', 'terminologyRegistry', 'clinicName', 'network.mode',

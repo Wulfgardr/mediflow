@@ -8,6 +8,10 @@ import { routeDocumentClassForSynthesis } from './document-synthesis-routing';
 import { rememberPdfDocumentMetadata } from '../../pdf-document-metadata';
 import { parseStructuredAnalysisResponse } from './document-synthesis-parser';
 import { parseDocumentIntelligenceCasePack } from './document-intelligence-case-pack';
+/* @Codex */
+import { decideDocumentRouterControlFlow } from './document-router-control-flow';
+/* @Codex */
+import { selectDocumentSynthesisAnalysis } from './document-synthesis-service';
 import {
     buildDocumentParseEvidenceArtifact,
     evaluateDocumentParseEvidenceArtifact,
@@ -15,6 +19,118 @@ import {
     projectDocumentEvidencePack,
     serializeDocumentParseEvidenceArtifact,
 } from './document-parse-evidence-artifact';
+
+test('shadow synthesis calls the model without waiting for a pending audit write', async () => {
+    const rawMarkdown = 'Referto di laboratorio con determinazione risultato e intervalli di riferimento. '.repeat(2);
+    const routed = routeDocumentClassForSynthesis(rawMarkdown, '2026-07-12__laboratorio__synthetic.pdf');
+    const routerDecision = decideDocumentRouterControlFlow({
+        documentSynthesisKillSwitchValue: 'enabled',
+        mode: 'shadow',
+        routed,
+        normalizedText: rawMarkdown,
+    });
+    let modelCalls = 0;
+    let auditCalls = 0;
+    const pendingAudit = () => {
+        auditCalls += 1;
+        return new Promise<void>(() => undefined);
+    };
+
+    const analysis = await Promise.race([
+        selectDocumentSynthesisAnalysis({
+            rawMarkdown,
+            normalizedText: rawMarkdown,
+            routed,
+            routerMode: 'shadow',
+            routerDecision,
+            recordShadow: pendingAudit,
+            analyze: async () => {
+                modelCalls += 1;
+                return {
+                    summary: 'Sintesi modello sintetica',
+                    quality: { level: 'green', reason: 'Test sintetico' },
+                    medications: [],
+                    diagnoses: [],
+                    problemStatements: [],
+                    therapyCandidates: [],
+                    servicePrescriptions: [],
+                };
+            },
+        }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('audit blocked synthesis')), 75)),
+    ]);
+
+    assert.equal(modelCalls, 1);
+    assert.equal(auditCalls, 1);
+    assert.equal(analysis.summary, 'Sintesi modello sintetica');
+});
+
+test('off synthesis preserves model output and never dispatches the shadow audit', async () => {
+    const rawMarkdown = 'Referto di laboratorio con determinazione risultato e intervalli di riferimento. '.repeat(2);
+    const routed = routeDocumentClassForSynthesis(rawMarkdown, '2026-07-12__laboratorio__synthetic.pdf');
+    const routerDecision = decideDocumentRouterControlFlow({
+        documentSynthesisKillSwitchValue: 'enabled',
+        mode: 'off',
+        routed,
+        normalizedText: rawMarkdown,
+    });
+    let auditCalls = 0;
+    const expected = {
+        summary: 'Output modello invariato',
+        quality: { level: 'green' as const, reason: 'Test sintetico' },
+        medications: [],
+        diagnoses: [],
+        problemStatements: [],
+        therapyCandidates: [],
+        servicePrescriptions: [],
+    };
+
+    const analysis = await selectDocumentSynthesisAnalysis({
+        rawMarkdown,
+        normalizedText: rawMarkdown,
+        routed,
+        routerMode: 'off',
+        routerDecision,
+        recordShadow: async () => { auditCalls += 1; },
+        analyze: async () => expected,
+    });
+
+    assert.equal(auditCalls, 0);
+    assert.deepEqual(analysis, expected);
+});
+
+test('shadow synthesis absorbs a rejected audit write and preserves model output', async (context) => {
+    const rawMarkdown = 'Referto di laboratorio con determinazione risultato e intervalli di riferimento. '.repeat(2);
+    const routed = routeDocumentClassForSynthesis(rawMarkdown, '2026-07-12__laboratorio__synthetic.pdf');
+    const routerDecision = decideDocumentRouterControlFlow({
+        documentSynthesisKillSwitchValue: 'enabled',
+        mode: 'shadow',
+        routed,
+        normalizedText: rawMarkdown,
+    });
+    const warn = context.mock.method(console, 'warn', () => undefined);
+    const analysis = await selectDocumentSynthesisAnalysis({
+        rawMarkdown,
+        normalizedText: rawMarkdown,
+        routed,
+        routerMode: 'shadow',
+        routerDecision,
+        recordShadow: async () => { throw new Error('synthetic audit failure'); },
+        analyze: async () => ({
+            summary: 'Output modello invariato',
+            quality: { level: 'green', reason: 'Test sintetico' },
+            medications: [],
+            diagnoses: [],
+            problemStatements: [],
+            therapyCandidates: [],
+            servicePrescriptions: [],
+        }),
+    });
+    await Promise.resolve();
+
+    assert.equal(analysis.summary, 'Output modello invariato');
+    assert.equal(warn.mock.callCount(), 1);
+});
 
 test('parses explicit medications from the model JSON payload', () => {
     const analysis = parseStructuredAnalysisResponse(

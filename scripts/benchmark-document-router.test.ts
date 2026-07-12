@@ -15,6 +15,15 @@ test('document router benchmark self-test fixtures classify cleanly', () => {
     assert.equal(report.total, 4);
     assert.equal(report.accuracy, 1);
     assert.deepEqual(report.confusions, []);
+    assert.deepEqual(
+        report.skipDecisions.map((metric) => [metric.classification, metric.wouldSkip]),
+        [
+            ['administrative', 0],
+            ['lab_report', 1],
+            ['prosthetic_prescription', 0],
+            ['specialist_report', 0],
+        ],
+    );
 });
 
 test('document router benchmark reports class-level metrics and confusions', () => {
@@ -43,6 +52,7 @@ test('document router benchmark reports class-level metrics and confusions', () 
     assert.equal(report.confusions[0]?.predictedClass, 'unknown');
     assert.match(formatted, /By class/);
     assert.match(formatted, /Confusions/);
+    assert.match(formatted, /Deterministic skip decisions/);
 });
 
 test('document router manifest parser validates required fields', () => {

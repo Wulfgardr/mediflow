@@ -92,6 +92,10 @@ export interface DocumentInsight {
     routedClass?: {
         classification: string;
         confidence: string;
+        synthesis?: {
+            kind: 'deterministic';
+            rationale: string;
+        };
     };
     documentDate?: string;
 }
