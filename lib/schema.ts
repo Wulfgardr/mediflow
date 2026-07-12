@@ -171,6 +171,8 @@ export const observations = sqliteTable('observations', {
     refLow: text('ref_low'),
     refHigh: text('ref_high'),
     refText: text('ref_text'),
+    /* @Codex Link esplicito e locale tra un risultato registrato e la prestazione attesa. */
+    servicePrescriptionItemId: text('service_prescription_item_id').references(() => servicePrescriptionItems.id),
     /* @Codex */
     version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),

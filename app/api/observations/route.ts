@@ -74,6 +74,7 @@ export async function POST(request: Request) {
         const normalized = normalizeObservationCreateInput(body, {
             id,
             patientId,
+            allowServicePrescriptionItemLink: true,
         });
         if (!normalized.ok) {
             return NextResponse.json({ error: normalized.error }, { status: 400 });

@@ -254,6 +254,7 @@ function applySchemaGuards() {
         ensureColumn('observations', 'ref_low', 'ref_low TEXT');
         ensureColumn('observations', 'ref_high', 'ref_high TEXT');
         ensureColumn('observations', 'ref_text', 'ref_text TEXT');
+        ensureColumn('observations', 'service_prescription_item_id', 'service_prescription_item_id TEXT REFERENCES service_prescription_items(id)');
         sqlite.prepare("CREATE INDEX IF NOT EXISTS observations_patient_idx ON observations(patient_id)").run();
         sqlite.prepare("CREATE INDEX IF NOT EXISTS observations_code_idx ON observations(code_system, code)").run();
     } catch (error) {

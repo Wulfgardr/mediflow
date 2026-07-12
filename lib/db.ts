@@ -974,6 +974,7 @@ export interface Observation {
     refLow?: string | null;
     refHigh?: string | null;
     refText?: string | null;
+    servicePrescriptionItemId?: string | null;
     observedAt: Date;
     source?: 'manual' | 'ai_suggestion';
     createdAt: Date;

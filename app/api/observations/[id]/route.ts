@@ -49,7 +49,7 @@ export async function PUT(
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
-        const normalized = normalizeObservationUpdateInput(body);
+        const normalized = normalizeObservationUpdateInput(body, { allowServicePrescriptionItemLink: true });
         if (!normalized.ok) {
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }

@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-07-11
+Ultimo aggiornamento: 2026-07-12
 
 ## 📚 Come usare questo indice
 
@@ -137,6 +137,7 @@ Ultimo aggiornamento: 2026-07-11
 | [docs/adr/0075-paired-account-operations-and-pin-rotation.md](./adr/0075-paired-account-operations-and-pin-rotation.md) | Fissa le operazioni account paired sulla famiglia auth condivisa, la rotazione PIN client-of-origin con KDF v2 e le esclusioni di reset e re-wrap lazy nativo. |
 | [docs/adr/0076-paired-document-domain-write-policy.md](./adr/0076-paired-document-domain-write-policy.md) | Classifica le scritture del dominio documentale paired in cinque classi: contenuto manuale e compute deterministici consentiti, artefatti document-derived e invocazione AI esclusi, stato kill switch leggibile. |
 | [docs/adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md](./adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md) | Definisce adapter provider, registry per ruolo e egress gate fail-closed per i provider cloud opzionali. |
+| [docs/adr/0078-local-open-loops-and-result-link.md](./adr/0078-local-open-loops-and-result-link.md) | Fissa le attese locali deterministiche: collegamento manuale osservazione-item, soglie temporali dichiarate, provenance nella Scheda e nessuna estensione paired. |
 | [docs/adr/0050-functional-preview-profiles-retired-on-mainline.md](./adr/0050-functional-preview-profiles-retired-on-mainline.md) | Fissa `WUL-199`: i preview profiles funzionali vengono ritirati da `main`, con AI e Smart Import gia live e il contesto paziente SISS promosso a parte stabile della scheda paziente. |
 | [docs/adr/0048-apple-shared-client-architecture-and-home-base-runtime.md](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md) | Formalizza `WUL-188`: family Apple ricostruita con core Swift condiviso, shell distinte per macOS/iPhone/iPad, Mac packaged come `home-base` autorevole e mobile paired senza accesso diretto a SQLite. |
 | [docs/adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md](./adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md) | Formalizza `WUL-176`: corpus documentale locale SISS/FSE con manifest versionato, fetch/sync fuori Git e futuro MCP ammesso solo sopra un corpus approvato. |

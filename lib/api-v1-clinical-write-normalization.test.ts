@@ -7,9 +7,48 @@ import {
     normalizeOptionalCheckupSource,
     normalizeEntryCreateInput,
     normalizeEntryUpdateInput,
+    normalizeObservationCreateInput,
+    normalizeObservationUpdateInput,
     normalizeTherapyCreateInput,
     normalizeTherapyUpdateInput,
 } from './api-v1-clinical-write-normalization';
+
+test('normalizes the service item link only for the local web observation path', () => {
+    const input = {
+        codeSystem: 'LOINC',
+        code: '2339-0',
+        display: 'Glicemia',
+        unitSystem: 'UCUM',
+        unitCode: 'mg/dL',
+        value: '91',
+        observedAt: '2026-07-12T10:00:00.000Z',
+        servicePrescriptionItemId: 'service-item-1',
+    };
+    const local = normalizeObservationCreateInput(input, {
+        id: 'observation-1',
+        patientId: 'patient-1',
+        allowServicePrescriptionItemLink: true,
+    });
+    assert.equal(local.ok, true);
+    if (!local.ok) return;
+    assert.equal(local.values.servicePrescriptionItemId, 'service-item-1');
+
+    const boundary = normalizeObservationCreateInput(input, {
+        id: 'observation-1',
+        patientId: 'patient-1',
+    });
+    assert.equal(boundary.ok, true);
+    if (!boundary.ok) return;
+    assert.equal(boundary.values.servicePrescriptionItemId, null);
+
+    const update = normalizeObservationUpdateInput(
+        { servicePrescriptionItemId: 'service-item-2' },
+        { allowServicePrescriptionItemLink: true },
+    );
+    assert.equal(update.ok, true);
+    if (!update.ok) return;
+    assert.equal(update.values.servicePrescriptionItemId, 'service-item-2');
+});
 
 test('normalizeEntryCreateInput rejects invalid required fields before the DB layer', () => {
     assert.deepEqual(
