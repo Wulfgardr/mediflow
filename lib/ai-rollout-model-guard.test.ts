@@ -69,9 +69,14 @@ test('collectAiRolloutModelGuards aggregates roles and promotes rollback-require
     assert.equal(guards[0]?.blockerMessages.length, 2);
 });
 
-test('collectAiRolloutModelGuards ignores shadow-ready or unrelated selections', () => {
+test('collectAiRolloutModelGuards ignores missing artifacts, shadow-ready artifacts, or unrelated selections', () => {
     const payload: AiRolloutGuardPayload = {
         lanes: [
+            {
+                lane: 'smart_import',
+                available: false,
+                report: null,
+            },
             {
                 lane: 'patient_insight',
                 available: true,
@@ -94,6 +99,35 @@ test('collectAiRolloutModelGuards ignores shadow-ready or unrelated selections',
     ]);
 
     assert.deepEqual(guards, []);
+});
+
+test('OCR selections receive non-blocking rollout and local-control notices', () => {
+    const payload: AiRolloutGuardPayload = {
+        lanes: [{
+            lane: 'generative_challenger',
+            available: true,
+            report: {
+                status: 'hold',
+                selectedModel: 'deepseek-ocr',
+                blockers: [{ message: 'OCR validation still pending.' }],
+            },
+        }],
+        localControls: [
+            { lane: 'ocr', label: 'OCR documentale', state: 'disabled' },
+        ],
+    };
+    const selections = [{ roleId: 'ocr' as const, roleLabel: 'Segreteria (OCR)', model: 'deepseek-ocr' }];
+
+    const guards = collectAiRolloutModelGuards(payload, selections);
+    const localGuards = collectAiRolloutLocalControlGuards(payload, selections);
+
+    assert.deepEqual(guards[0]?.roles, ['Segreteria (OCR)']);
+    assert.deepEqual(localGuards, [{
+        lane: 'ocr',
+        label: 'OCR documentale',
+        roles: ['Segreteria (OCR)'],
+        state: 'disabled',
+    }]);
 });
 
 test('collectAiRolloutLocalControlGuards reports disabled productized lanes for the clinical selector only', () => {

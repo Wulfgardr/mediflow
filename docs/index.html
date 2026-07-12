@@ -189,7 +189,7 @@ graph TB
     ENC --> API_CLIENT
     API_CLIENT -->|"REST API"| NEXT
     NEXT -->|"Drizzle ORM"| SQLITE
-    NEXT -->|"/api/proxy/ai/chat"| OLLAMA
+    NEXT -->|"/api/proxy/ollama/chat"| OLLAMA
     NEXT -.->|"Alternative"| MLX
     NEXT -->|"/api/icd/proxy"| ICD
 
@@ -370,7 +370,7 @@ sequenceDiagram
     actor Medico
     participant UI as React UI
     participant Facade as lib/db.ts
-    participant Proxy as /api/proxy/ai/chat
+    participant Proxy as /api/proxy/ollama/chat
     participant LLM as Ollama/MLX
 
     Medico->>UI: "Analizza quadro clinico"
@@ -449,7 +449,7 @@ services:
 | `/api/checkups` | GET, POST | Controlli e misurazioni |
 | `/api/conversations` | GET, POST | Storico chat AI |
 | `/api/messages` | GET, POST | Messaggi singoli |
-| `/api/proxy/ai/chat` | POST | Proxy verso Ollama/MLX |
+| `/api/proxy/ollama/chat` | POST | Proxy verso Ollama |
 | `/api/icd/proxy` | GET | Proxy verso ICD-11 Docker |
 | `/api/auth/login` | POST | Autenticazione |
 | `/api/auth/setup` | POST | Primo setup profilo |

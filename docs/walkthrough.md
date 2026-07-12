@@ -428,8 +428,7 @@ restano follow-up. Vedi anche [docs/adr/0016-backup-artifact-v1-manifest-preflig
 
 ### Servizi
 
-- `lib/ai-service.ts`: wrapper LLM (Ollama / MLX)
-- `app/api/proxy/ai/chat/route.ts`: proxy locale verso provider
+- `lib/ai-service.ts`: facciata LLM con adapter Ollama; ATHENA/MLX resta una lane separata per treatment reasoning
 - `lib/ocr-service.ts`: OCR multimodale
 - `lib/pdf-service.ts`: estrazione testo PDF (fallback regex)
 - `lib/document-synthesis-service.ts`: sintesi clinica + salvataggio
@@ -633,7 +632,6 @@ sequenceDiagram
 | API web | `app/api/*` |
 | API v1 | `app/api/v1/*` |
 | AI/OCR | `lib/ai-service.ts`, `lib/ocr-service.ts`, `lib/pdf-service.ts` |
-| Proxy AI | `app/api/proxy/ai/chat/route.ts` |
 | ICD | `app/api/icd/proxy/route.ts` |
 | Native app | `native/MediFlowMac/Sources/MediFlowMac/*` |
 | TLS proxy | `scripts/local-api-tls-proxy.mjs` |
