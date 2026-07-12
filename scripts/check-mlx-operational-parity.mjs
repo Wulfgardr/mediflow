@@ -12,13 +12,21 @@ const repoRoot = path.resolve(__dirname, '..');
 const checks = [
   {
     id: 'runtime-default-ollama-only',
-    file: 'lib/ai-service.ts',
+    file: 'lib/ai-providers/base-url.ts',
     mustContain: [
-      "type AIProvider = 'ollama'",
-      'url.includes(":8080")',
-      'http://127.0.0.1:11434',
+      "export const DEFAULT_OLLAMA_BASE_URL = 'http://127.0.0.1:11434'",
+      "baseUrl.includes(':8080')",
+      'baseUrl = legacyUrl || defaultUrl',
     ],
     parity: 'Ollama remains the operational app runtime; stale MLX URLs must fall back to loopback Ollama.',
+  },
+  {
+    id: 'runtime-provider-surface-ollama-only',
+    file: 'lib/ai-providers/provider.ts',
+    mustContain: [
+      "export type AIProvider = 'ollama'",
+    ],
+    parity: 'The product provider surface remains fail-closed to the local Ollama adapter.',
   },
   {
     id: 'benchmark-runtime-symmetry',
@@ -49,7 +57,7 @@ const checks = [
     file: 'lib/ai-service.ts',
     mustContain: [
       "const provider: AIProvider = 'ollama'",
-      'legacyUrl?.value || "http://127.0.0.1:11434"',
+      'resolveOllamaBaseUrl(genericUrl?.value, legacyUrl?.value, DEFAULT_OLLAMA_BASE_URL)',
       "task === 'ocr'",
       'DEFAULT_OCR_MODEL',
     ],
