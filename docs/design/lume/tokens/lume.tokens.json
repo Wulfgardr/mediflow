@@ -1,0 +1,57 @@
+{
+  "$description": "Lume design tokens (WUL-55, L1a candidate). DTCG-style source for the three light registers giorno/grafite/guardia plus register-independent clinical signals. Not yet wired to any runtime consumer; no data-lume flag exists yet. Text/background contrast is measured by scripts/check-lume-tokens.mjs.",
+  "$type": "color",
+  "register": {
+    "giorno": {
+      "surface": {
+        "canvas": { "$value": "#eef0f2" },
+        "field": { "$value": "#f5f5f4" },
+        "focal": { "$value": "#fbfaf7" },
+        "chrome": { "$value": "#e6e8eb" }
+      },
+      "ink": {
+        "primary": { "$value": "#1a1c1e" },
+        "muted": { "$value": "#5c6772" }
+      },
+      "accent": {
+        "minerale": { "$value": "#33506b" }
+      }
+    },
+    "grafite": {
+      "surface": {
+        "canvas": { "$value": "#121417" },
+        "field": { "$value": "#191c21" },
+        "focal": { "$value": "#22252b" },
+        "chrome": { "$value": "#0e1013" }
+      },
+      "ink": {
+        "primary": { "$value": "#e9ecef" },
+        "muted": { "$value": "#8f9aa6" }
+      },
+      "accent": {
+        "minerale": { "$value": "#8fb0cc" }
+      }
+    },
+    "guardia": {
+      "surface": {
+        "canvas": { "$value": "#0c0e12" },
+        "field": { "$value": "#14171d" },
+        "focal": { "$value": "#1a1e26" },
+        "chrome": { "$value": "#090b0e" }
+      },
+      "ink": {
+        "primary": { "$value": "#e3e8ee" },
+        "muted": { "$value": "#8792a3" }
+      },
+      "accent": {
+        "minerale": { "$value": "#7fa0bc" }
+      }
+    }
+  },
+  "signal": {
+    "warning": { "$value": "#9a6a2f" },
+    "critical": { "$value": "#a33a2f" },
+    "success": { "$value": "#4b6354" },
+    "plum": { "$value": "#555161" }
+  }
+}

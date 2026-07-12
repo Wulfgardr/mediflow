@@ -65,7 +65,9 @@ Si adotta l'opzione 2:
    consolidamento DS-1..DS-3 sono prerequisito tecnico della migrazione.
 3. La migrazione segue `docs/design/lume/03-migrazione.md` (fasi L0-L6 con
    gate); il flag di convivenza `data-lume` e strumento di sviluppo, non un
-   selettore utente: ADR 0047 resta pienamente in vigore.
+   selettore utente: ADR 0047 resta pienamente in vigore. La condizione di
+   uscita da quella convivenza e formalizzata qui sotto prima che L1b la
+   introduca.
 4. I segnali clinici e le leggi cliniche (colore = semantica, stati onesti,
    tastiera, AA) sono invarianti tra le due lingue.
 
@@ -82,8 +84,34 @@ Si adotta l'opzione 2:
   (lane GPT-5.6, 2026-07-12) alimenta il raffinamento della grammatica
   dell'attenzione prima della fase L2.
 
+## Condizione di uscita dalla convivenza `data-lume`
+
+Il flag `data-lume` e la convivenza dei due vocabolari di token sono temporanei.
+Questa condizione di uscita e definita prima che L1b introduca il flag, cosi la
+convivenza nasce gia con la sua fine scritta. Non e legata a una data di
+calendario ma al raggiungimento congiunto di questi cancelli:
+
+1. Tutti i consumatori previsti delle fasi L2-L5 (cockpit, Scheda, filo, voci,
+   overlay e motion) sono migrati a Lume: non resta superficie in produzione
+   che dipenda dal vocabolario di token legacy.
+2. Il guard runtime a vocabolario-zero passa, cioe nessun riferimento residuo ai
+   token o alle classi legacy compare nel runtime.
+3. I cancelli visivi e di accessibilita richiesti passano: smoke sui tre
+   registri e le coppie di contrasto misurate restano sopra soglia dopo la
+   migrazione.
+
+Quando i tre cancelli sono verdi insieme, si rimuovono il flag di sviluppo
+`data-lume` e gli alias dei vecchi token: la convivenza finisce e Lume resta
+l'unico vocabolario. Finche anche uno solo e rosso, la convivenza prosegue e il
+flag resta strumento di sviluppo (ADR 0047).
+
 ## First Thin Slice
 
-Fase L1 di `docs/design/lume/03-migrazione.md`: i tre registri di luce nel
-sorgente token DTCG con misura strumentale dei contrasti AA, dietro flag di
-sviluppo, senza toccare alcuna superficie utente.
+Fase L1a di `docs/design/lume/03-migrazione.md`: i tre registri di luce nel
+sorgente token DTCG (`docs/design/lume/tokens/lume.tokens.json`) con misura
+strumentale del contrasto (`scripts/check-lume-tokens.mjs`), senza toccare
+alcuna superficie utente e senza introdurre ancora il flag `data-lume`. Questo
+branch (WUL-55) e un candidato L1a, non adozione runtime: non esiste ancora
+nessun consumatore. L1 si considera consegnata quando il contratto token e
+mergiato e misurato; la convivenza runtime (L1b) arriva in un pacchetto
+successivo, dietro la condizione di uscita qui sopra.
