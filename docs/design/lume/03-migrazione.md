@@ -40,7 +40,8 @@ Principio: Lume non butta niente di ciò che vale. Il consolidamento di Vetro Cl
 | Fase | Contenuto | Gate |
 | --- | --- | --- |
 | L0 | Decisione di prodotto e canone: Lume lingua di destinazione, ADR 0078 e contratti di piattaforma | Completata per la direzione; font non-Apple e slice restano decisioni di delivery |
-| L1 | Token: registri giorno/grafite/guardia nel sorgente DTCG, misura dei contrasti, `data-lume` accanto ai token attuali (convivenza temporanea, non selettore utente: flag di sviluppo) | Tutte le coppie AA misurate |
+| L1a | Contratto token: registri giorno/grafite/guardia nel sorgente DTCG (`tokens/lume.tokens.json`) con misura strumentale dei contrasti (`scripts/check-lume-tokens.mjs`). Solo sorgente e misura: nessun consumatore runtime, nessun flag `data-lume` ancora | Tutte le coppie testo/superficie dichiarate misurate >= 4,5:1 |
+| L1b | Convivenza: `data-lume` accanto ai token attuali (convivenza temporanea, non selettore utente: flag di sviluppo), introdotto in un pacchetto successivo quando arriva il primo consumatore | Flag di sviluppo isolato, ADR 0047 rispettato |
 | L2 | Fuoco e chrome: modello focale nel cockpit (worklist/Quadro), rail e barre a chrome opaco, ritiro del vetro strutturale | Smoke visivo 3 registri + 3 segnali di accessibilità |
 | L3 | Il filo: selezione focale, timeline diario, storia valori con banda personale | Leggibilità misurata; il tratteggio bozza copre i contenuti proposti |
 | L4 | Le due voci: bundling font, regola del Registro su dosi/valori/codici/date (web e nativo) | Nessun fetch remoto; parity visiva print |
@@ -48,6 +49,8 @@ Principio: Lume non butta niente di ciò che vale. Il consolidamento di Vetro Cl
 | L6 | Piattaforme native: Apple viene implementata per prima; Windows/Linux restano documentazione prospettica finché le lane non vengono riaperte | Contratto macOS verificato nel bundle; nessuna claim di client tri-OS |
 
 Le fasi L2-L5 atterrano in fette piccole per superficie (prima il cockpit, poi la Scheda, poi settings), con la disciplina già in uso.
+
+Stato di questo branch (WUL-55): è un candidato **L1a**, non adozione runtime. Consegna il contratto token (sorgente DTCG più misura del contrasto) e nient'altro: non esiste ancora nessun consumatore `data-lume`, nessun CSS, componente o file nativo cambia. L1 si considera consegnata solo quando il contratto token è mergiato e misurato; la convivenza runtime (L1b, flag `data-lume`) inizia in un pacchetto successivo, dietro la condizione di uscita formalizzata in ADR 0078.
 
 ## 4. Rischi
 

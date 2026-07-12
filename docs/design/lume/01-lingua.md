@@ -39,10 +39,12 @@ Tre registri di luce, non tre temi (giorno/grafite seguono il chiaro/scuro di si
 | `surface.focal` (fuoco) | `#fbfaf7` | `#22252b` | `#1a1e26` |
 | `surface.chrome` (buio operativo) | `#e6e8eb` | `#0e1013` | `#090b0e` |
 | `ink.primary` | `#1a1c1e` | `#e9ecef` | `#e3e8ee` |
-| `ink.muted` | `#5f6b76` | `#8f9aa6` | `#8792a3` |
+| `ink.muted` | `#5c6772` | `#8f9aa6` | `#8792a3` |
 | `accent.minerale` (interattivo) | `#33506b` | `#8fb0cc` | `#7fa0bc` |
 
 Il gradiente di temperatura è la novità: il fuoco è appena più caldo (avorio), la periferia appena più fredda (minerale). Sotto la soglia del dichiarabile a parole, sopra la soglia del percepibile: è la lampada, non un tema.
+
+I valori sono formalizzati nel sorgente token DTCG `tokens/lume.tokens.json` e misurati da `scripts/check-lume-tokens.mjs` (WUL-55, candidato L1a: sorgente e misura, nessun consumatore runtime). In `giorno` `ink.muted` è stato scurito da `#5f6b76` a `#5c6772`: il valore originale misurava 4,44:1 su `surface.chrome` (la superficie chiara più scura, quindi la coppia vincolante), sotto la soglia 4,5:1; ora misura 4,70:1. Le altre coppie erano già sopra soglia.
 
 I segnali clinici NON cambiano: `signal.warning #9a6a2f`, `signal.critical #a33a2f`, `signal.success #4b6354`, `signal.plum #555161` (e le loro derivazioni scure/notturne dai token). La semantica clinica è patrimonio, non stile.
 
@@ -122,4 +124,4 @@ Il layout di Lume non presenta dati: presenta decisioni.
 
 ## 9. Contratti invariati
 
-Accessibilità ([../vetro-clinico/06-accessibilita.md](../vetro-clinico/06-accessibilita.md)), interazione e stati onesti ([../vetro-clinico/04-interazione.md](../vetro-clinico/04-interazione.md)), responsività e densità ([../vetro-clinico/05-responsivita.md](../vetro-clinico/05-responsivita.md)) valgono in Lume parola per parola. I contrasti dei registri vanno misurati come da matrice (i valori di palette qui sopra sono progettati per passare 4.5:1 ma la misura fa fede).
+Accessibilità ([../vetro-clinico/06-accessibilita.md](../vetro-clinico/06-accessibilita.md)), interazione e stati onesti ([../vetro-clinico/04-interazione.md](../vetro-clinico/04-interazione.md)), responsività e densità ([../vetro-clinico/05-responsivita.md](../vetro-clinico/05-responsivita.md)) valgono in Lume parola per parola. I contrasti dei registri sono misurati da `scripts/check-lume-tokens.mjs` sul sorgente token: testo primario e attenuato su tutte e quattro le superfici, e l'accento minerale interattivo sulle superfici di lavoro (penombra, fuoco), soglia 4,5:1 perché portano testo di dimensione normale. Le trenta coppie dichiarate passano tutte; la misura fa fede. Questa è la coppia testo/superficie misurata, non una dichiarazione di accessibilità piena: i segnali clinici, gli stati di focus, i componenti e le superfici native restano da verificare nelle fasi successive.
