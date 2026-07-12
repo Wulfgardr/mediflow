@@ -46,7 +46,7 @@ Prima di modificare questo runbook o il boundary `home-base`:
   PHI fuori dal perimetro di sviluppo.
 
 Riferimenti correlati:
-- [docs/apple-wide-parity-qa.md](./apple-wide-parity-qa.md)
+- [docs/apple-wide-qa-manifest.json](./apple-wide-qa-manifest.json)
 - [docs/native-testing.md](./native-testing.md)
 - [docs/native-setup.md](./native-setup.md)
 - [docs/local-api-tls.md](./local-api-tls.md)
