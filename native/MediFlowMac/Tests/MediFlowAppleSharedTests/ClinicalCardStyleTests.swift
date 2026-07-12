@@ -21,12 +21,12 @@ final class ClinicalCardStyleTests: XCTestCase {
         XCTAssertNotEqual(clinicalLight.rgb, clinicalDark.rgb)
     }
 
-    func testOpacityAssertionRejectsTheTranslucentServiceSurface() throws {
-        let serviceSurface = Color.clear
+    func testOpacityAssertionRejectsAKnownTranslucentSurface() throws {
+        let translucentSurface = Color.clear
             .frame(width: 48, height: 24)
-            .vetroGlass(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(Color.red.opacity(0.5))
 
-        let center = try centerPixel(serviceSurface, colorScheme: .light)
+        let center = try centerPixel(translucentSurface, colorScheme: .light)
         XCTAssertLessThan(center.alpha, 255)
     }
 
