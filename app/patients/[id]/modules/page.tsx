@@ -12,7 +12,8 @@ import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
 import DocumentUpload from '@/components/document-upload';
 import { EvidenceStackTile } from '@/components/evidence-stack-tile';
-import ObservationManager, { type ObservationPrefill } from '@/components/observation-manager';
+import ObservationManager from '@/components/observation-manager';
+import type { ObservationPrefill } from '@/lib/observation-prefill';
 import PatientActionModal from '@/components/patient-action-modal';
 import { PatientIdentityLens } from '@/components/patient-identity-lens';
 import PatientReviewQueueSummaryPanel from '@/components/patient-review-queue-summary';
@@ -320,6 +321,11 @@ export default function PatientDetailPage() {
                 display: terminology?.displayIt ?? terminology?.display ?? item?.catalogDisplayName ?? catalogEntry?.displayName,
                 unitCode: terminology?.defaultUnit,
                 servicePrescriptionItemId: item?.id,
+                servicePrescriptionItem: item ? {
+                    id: item.id,
+                    serviceName: item.serviceName,
+                    prescriptionDate: item.createdAt,
+                } : undefined,
             };
         }
 

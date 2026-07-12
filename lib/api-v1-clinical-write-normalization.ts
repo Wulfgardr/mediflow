@@ -264,6 +264,20 @@ function parseOptionalNullableString(value: unknown, field: string): WriteNormal
     return { ok: true, values: value };
 }
 
+/* @Codex Service prescription item IDs are identifiers, never meaningful blank text. */
+function parseNullableTrimmedString(value: unknown, field: string): WriteNormalizationResult<string | null> {
+    const parsed = parseNullableString(value, field);
+    if (!parsed.ok) return parsed;
+    return { ok: true, values: parsed.values?.trim() || null };
+}
+
+/* @Codex Preserve omission on update while normalizing an explicit blank link to null. */
+function parseOptionalNullableTrimmedString(value: unknown, field: string): WriteNormalizationResult<string | null | undefined> {
+    const parsed = parseOptionalNullableString(value, field);
+    if (!parsed.ok) return parsed;
+    return { ok: true, values: parsed.values === undefined ? undefined : parsed.values?.trim() || null };
+}
+
 /* @Codex */
 function parseOptionalDate(value: unknown, field: string): WriteNormalizationResult<Date | undefined> {
     if (value === undefined) {
@@ -822,7 +836,7 @@ export function normalizeObservationCreateInput(
     if (!refText.ok) return refText;
 
     const servicePrescriptionItemId = context.allowServicePrescriptionItemLink
-        ? parseNullableString(input.servicePrescriptionItemId, 'servicePrescriptionItemId')
+        ? parseNullableTrimmedString(input.servicePrescriptionItemId, 'servicePrescriptionItemId')
         : { ok: true as const, values: null };
     if (!servicePrescriptionItemId.ok) return servicePrescriptionItemId;
 
@@ -913,7 +927,7 @@ export function normalizeObservationUpdateInput(
     if (refText.values !== undefined) update.refText = refText.values;
 
     if (options.allowServicePrescriptionItemLink) {
-        const servicePrescriptionItemId = parseOptionalNullableString(input.servicePrescriptionItemId, 'servicePrescriptionItemId');
+        const servicePrescriptionItemId = parseOptionalNullableTrimmedString(input.servicePrescriptionItemId, 'servicePrescriptionItemId');
         if (!servicePrescriptionItemId.ok) return servicePrescriptionItemId;
         if (servicePrescriptionItemId.values !== undefined) update.servicePrescriptionItemId = servicePrescriptionItemId.values;
     }

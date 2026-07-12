@@ -3,6 +3,8 @@
 export const RESULTS_PENDING_AFTER_DAYS = 14;
 export const MIN_POINTS = 3;
 export const STALL_FACTOR = 1.5;
+/* Intervalli sotto un giorno non descrivono una cadenza osservativa. */
+export const MIN_TYPICAL_INTERVAL_DAYS = 1;
 export const MAX_TYPICAL_INTERVAL_DAYS = 180;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -117,7 +119,7 @@ export function deriveOpenLoops(input: {
             .slice(1)
             .map((observation, index) => (observation.observedDate.getTime() - chronological[index].observedDate.getTime()) / DAY_MS);
         const typicalIntervalDays = median(intervals);
-        if (typicalIntervalDays > MAX_TYPICAL_INTERVAL_DAYS) continue;
+        if (typicalIntervalDays < MIN_TYPICAL_INTERVAL_DAYS || typicalIntervalDays > MAX_TYPICAL_INTERVAL_DAYS) continue;
 
         const latest = chronological[chronological.length - 1];
         const thresholdDays = typicalIntervalDays * STALL_FACTOR;

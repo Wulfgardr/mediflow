@@ -9,6 +9,11 @@ import { ApiConflictError, db } from '@/lib/db';
 import { notifyDbChange } from '@/lib/live-query';
 import { searchStaticTerminology } from '@/lib/terminology';
 import { classifyObservationRange, formatReferenceRange } from '@/lib/observation-range';
+import {
+    applyObservationPrefill,
+    type ObservationPrefill,
+    type ServicePrescriptionItemLink,
+} from '@/lib/observation-prefill';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
@@ -66,14 +71,7 @@ function Sparkline({ values }: { values: number[] }) {
     );
 }
 
-export type ObservationPrefill = {
-    requestId: string;
-    codeSystem?: 'LOINC';
-    code?: string;
-    display?: string;
-    unitCode?: string;
-    servicePrescriptionItemId?: string;
-};
+export type { ObservationPrefill } from '@/lib/observation-prefill';
 
 /* @Codex */
 export default function ObservationManager({
@@ -96,6 +94,7 @@ export default function ObservationManager({
     const [refLow, setRefLow] = useState('');
     const [refHigh, setRefHigh] = useState('');
     const [servicePrescriptionItemId, setServicePrescriptionItemId] = useState<string | undefined>();
+    const [servicePrescriptionItem, setServicePrescriptionItem] = useState<ServicePrescriptionItemLink | undefined>();
     const [isSaving, setIsSaving] = useState(false);
     const [valueError, setValueError] = useState<string | null>(null);
     const codeSelectRef = useRef<HTMLSelectElement>(null);
@@ -114,14 +113,11 @@ export default function ObservationManager({
 
     useEffect(() => {
         if (!prefill) return;
-        const option = prefill.codeSystem === 'LOINC' && prefill.code
-            ? loincOptions.find((item) => item.code === prefill.code)
-            : undefined;
-        if (option) {
-            setCode(option.code);
-            if (prefill.unitCode || option.defaultUnit) setUnitCode(prefill.unitCode ?? option.defaultUnit ?? '');
-        }
-        setServicePrescriptionItemId(prefill.servicePrescriptionItemId);
+        const applied = applyObservationPrefill(prefill, loincOptions);
+        setCode(applied.code);
+        setUnitCode(applied.unitCode);
+        setServicePrescriptionItemId(applied.servicePrescriptionItemId);
+        setServicePrescriptionItem(applied.servicePrescriptionItem);
         requestAnimationFrame(() => valueInputRef.current?.focus());
     }, [loincOptions, prefill]);
 
@@ -266,6 +262,7 @@ export default function ObservationManager({
             setRefLow('');
             setRefHigh('');
             setServicePrescriptionItemId(undefined);
+            setServicePrescriptionItem(undefined);
             codeSelectRef.current?.focus();
         } catch (error) {
             console.error('Failed to save observation', error);
@@ -317,6 +314,23 @@ export default function ObservationManager({
             )}
 
             <form onSubmit={saveObservation} className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {servicePrescriptionItemId && servicePrescriptionItem ? (
+                    <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-[18px] border border-[color:rgba(15,23,42,0.12)] bg-white/70 px-3.5 py-2.5 dark:border-white/10 dark:bg-white/5">
+                        <span className="text-sm text-[color:var(--mf-ink)] dark:text-slate-100">
+                            Collegata a: <strong>{servicePrescriptionItem.serviceName}</strong> (prescrizione del {new Date(servicePrescriptionItem.prescriptionDate).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })})
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setServicePrescriptionItemId(undefined);
+                                setServicePrescriptionItem(undefined);
+                            }}
+                            className="text-xs font-medium text-[color:var(--mf-muted)] hover:text-[color:var(--mf-ink)] hover:underline"
+                        >
+                            Rimuovi collegamento
+                        </button>
+                    </div>
+                ) : null}
                 <label className="space-y-1">
                     <span className="section-kicker">Parametro</span>
                     <select
@@ -332,6 +346,7 @@ export default function ObservationManager({
                         }}
                         className="mf-input"
                     >
+                        <option value="">Seleziona parametro</option>
                         {loincOptions.map((item) => (
                             <option key={item.code} value={item.code}>
                                 {item.displayIt ?? item.display}
@@ -381,6 +396,7 @@ export default function ObservationManager({
                         onChange={(e) => setUnitCode(e.target.value)}
                         className="mf-input"
                     >
+                        <option value="">Seleziona unità</option>
                         {ucumOptions.map((item) => (
                             <option key={item.code} value={item.code}>
                                 {item.displayIt ?? item.display}
@@ -428,7 +444,7 @@ export default function ObservationManager({
                 <div className="md:col-span-2 flex justify-end">
                     <button
                         type="submit"
-                        disabled={isSaving || value.trim().length === 0}
+                        disabled={isSaving || value.trim().length === 0 || !code || !unitCode}
                         className="ui-btn-primary inline-flex h-10 items-center gap-1.5 px-4 text-sm font-semibold disabled:opacity-50"
                     >
                         <Plus className="w-4 h-4" />

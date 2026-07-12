@@ -1,7 +1,7 @@
 /* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveOpenLoops } from './patient-open-loops';
+import { deriveOpenLoops, MIN_TYPICAL_INTERVAL_DAYS } from './patient-open-loops';
 
 const now = new Date('2026-07-01T12:00:00.000Z');
 
@@ -80,6 +80,32 @@ test('signals a stalled series from its observed cadence', () => {
     assert.equal(loops.length, 1);
     assert.equal(loops[0].kind, 'series_stalled');
     assert.match(loops[0].label, /ultima misura il 01\/03, intervallo tipico ~30 giorni/);
+});
+
+test('does not treat zero or sub-day median intervals as an observation cadence', () => {
+    assert.equal(MIN_TYPICAL_INTERVAL_DAYS, 1);
+
+    const identicalTimestamps = deriveOpenLoops({
+        items: [],
+        observations: [
+            observation({ code: 'same-time', observedAt: '2026-01-01T08:00:00.000Z' }),
+            observation({ code: 'same-time', observedAt: '2026-01-01T08:00:00.000Z' }),
+            observation({ code: 'same-time', observedAt: '2026-01-01T08:00:00.000Z' }),
+        ],
+        now,
+    });
+    assert.deepEqual(identicalTimestamps, []);
+
+    const sameDayMeasurements = deriveOpenLoops({
+        items: [],
+        observations: [
+            observation({ code: 'same-day', observedAt: '2026-01-01T08:00:00.000Z' }),
+            observation({ code: 'same-day', observedAt: '2026-01-01T12:00:00.000Z' }),
+            observation({ code: 'same-day', observedAt: '2026-01-01T16:00:00.000Z' }),
+        ],
+        now,
+    });
+    assert.deepEqual(sameDayMeasurements, []);
 });
 
 test('ignores series with only two points or a typical interval over the cap', () => {
