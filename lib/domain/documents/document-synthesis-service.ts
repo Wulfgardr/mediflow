@@ -37,6 +37,13 @@ import {
     buildDocumentSynthesisAutofillPlan,
     parseExistingDocumentSynthesisDiagnoses,
 } from './document-synthesis-autofill';
+/* @Codex */
+import {
+    buildDeterministicDocumentSynthesisAnalysis,
+    decideDocumentRouterControlFlow,
+    DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY,
+    parseDocumentRouterControlFlowMode,
+} from './document-router-control-flow';
 
 /* @Codex */
 const MAX_SYNTHESIS_CHARS = 12000;
@@ -64,6 +71,63 @@ function parseExistingInsights(raw: unknown): DocumentInsight[] {
     } catch {
         return [];
     }
+}
+
+/* @Codex */
+async function recordDocumentRouterShadowDecision(input: {
+    classification: string;
+    confidence: string;
+    wouldSkip: boolean;
+}): Promise<void> {
+    try {
+        const response = await fetch('/api/ai/document-router-audit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...input, mode: 'shadow' }),
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    } catch (error) {
+        // L'audit shadow non deve modificare la pipeline clinica gia esistente.
+        console.warn('[DocumentSynthesis] document router shadow audit unavailable', error);
+    }
+}
+
+/* @Codex */
+type DocumentRouterShadowRecorder = typeof recordDocumentRouterShadowDecision;
+
+/* @Codex */
+export function dispatchDocumentRouterShadowDecision(
+    input: Parameters<DocumentRouterShadowRecorder>[0],
+    recorder: DocumentRouterShadowRecorder = recordDocumentRouterShadowDecision,
+): void {
+    // Telemetria best-effort: una richiesta lenta o pendente non entra mai nel
+    // percorso critico della sintesi.
+    void recorder(input).catch((error) => {
+        console.warn('[DocumentSynthesis] document router shadow audit unavailable', error);
+    });
+}
+
+/* @Codex */
+export async function selectDocumentSynthesisAnalysis(input: {
+    rawMarkdown: string;
+    normalizedText: string;
+    routed: ReturnType<typeof routeDocumentClassForSynthesis>;
+    routerMode: ReturnType<typeof parseDocumentRouterControlFlowMode>;
+    routerDecision: ReturnType<typeof decideDocumentRouterControlFlow>;
+    analyze?: typeof analyzeDocumentContent;
+    recordShadow?: DocumentRouterShadowRecorder;
+}): Promise<DocumentStructuredAnalysis> {
+    if (input.routerMode === 'shadow') {
+        dispatchDocumentRouterShadowDecision({
+            classification: input.routed.classification,
+            confidence: input.routed.confidence,
+            wouldSkip: input.routerDecision.wouldSkip,
+        }, input.recordShadow);
+    }
+
+    return input.routerDecision.useDeterministicSynthesis
+        ? buildDeterministicDocumentSynthesisAnalysis(input.normalizedText, input.routed)
+        : (input.analyze ?? analyzeDocumentContent)(input.rawMarkdown);
 }
 
 /* @Codex */
@@ -97,11 +161,23 @@ export async function synthesizeDocument(
     assertAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
 
     const normalized = normalizeDocumentInput(rawMarkdown);
-    const analysis = await analyzeDocumentContent(rawMarkdown);
-
-    // Classificazione deterministica (nome file + metadata PDF + testata):
-    // segnale additivo per la review, non altera il flusso di sintesi.
     const routed = routeDocumentClassForSynthesis(rawMarkdown, fileName, options);
+    const routerControlFlow = await db.settings.get(DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY);
+    const routerMode = parseDocumentRouterControlFlowMode(routerControlFlow?.value);
+    const routerDecision = decideDocumentRouterControlFlow({
+        documentSynthesisKillSwitchValue: documentSynthesisKillSwitch?.value,
+        mode: routerMode,
+        routed,
+        normalizedText: normalized.normalizedText,
+    });
+
+    const analysis = await selectDocumentSynthesisAnalysis({
+        rawMarkdown,
+        normalizedText: normalized.normalizedText,
+        routed,
+        routerMode,
+        routerDecision,
+    });
 
     const patient = await db.patients.get(patientId);
     if (!patient) {
@@ -142,7 +218,13 @@ export async function synthesizeDocument(
         autofill: appliedCodes.length > 0
             ? { appliedDiagnoses: appliedCodes }
             : undefined,
-        routedClass: { classification: routed.classification, confidence: routed.confidence },
+        routedClass: {
+            classification: routed.classification,
+            confidence: routed.confidence,
+            ...(routerDecision.useDeterministicSynthesis
+                ? { synthesis: { kind: 'deterministic' as const, rationale: routed.rationale } }
+                : {}),
+        },
         ...(routed.documentDate ? { documentDate: routed.documentDate } : {}),
     };
 

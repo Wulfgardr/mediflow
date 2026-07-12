@@ -353,7 +353,7 @@ function renderListSection(title: string, items: string[]): string {
     return `**${title}:**\n${items.map((item) => `- ${item}`).join('\n')}`;
 }
 
-function buildDocumentFallbackSummary(rawText: string): string {
+export function buildDocumentFallbackSummary(rawText: string): string {
     const normalized = rawText
         .split(/\n+/)
         .map((line) => line.trim())

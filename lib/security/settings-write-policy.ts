@@ -41,6 +41,7 @@ export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
     hardwareProfile: { write: ['web-session'], note: 'AI hardware profile (use-ai-settings-controller, ai-insight-settings)' },
     aiInsightMode: { write: ['web-session'], note: 'AI insight mode (lib/ai-insight-settings.ts)' },
     aiInsightManualConfig: { write: ['web-session'], note: 'AI insight manual config (lib/ai-insight-settings.ts)' },
+    documentRouterControlFlow: { write: ['web-session'], note: 'document router control-flow mode (use-ai-settings-controller)' },
 
     // --- AI kill switches (safety toggles; web session only). ---
     aiPatientInsightKillSwitch: { write: ['web-session'], note: 'kill switch (lib/ai-patient-insight-kill-switch.ts)' },

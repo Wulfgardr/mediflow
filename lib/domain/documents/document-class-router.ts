@@ -40,6 +40,27 @@ export interface DocumentClassRouterResult {
     rationale: string;
 }
 
+/**
+ * Classi con struttura abbastanza certa da usare la sintesi di fallback senza
+ * invocare il modello, ma solo quando il router ha confidence `high`.
+ */
+export const DETERMINISTIC_SYNTHESIS_CLASSES: ReadonlySet<DocumentDecisionClassification> = new Set([
+    // Referti di laboratorio: ammessi solo con testata riconosciuta e testo utile.
+    'lab_report',
+]);
+
+export function isDeterministicSynthesisRoute(
+    routed: Pick<DocumentClassRouterResult, 'classification' | 'confidence' | 'signals'>,
+    normalizedText: string,
+): boolean {
+    const hasUsableText = normalizedText.trim().length >= 80;
+    const hasContentSignal = routed.signals.some((signal) => signal.startsWith('content:'));
+    return routed.confidence === 'high'
+        && hasUsableText
+        && hasContentSignal
+        && DETERMINISTIC_SYNTHESIS_CLASSES.has(routed.classification);
+}
+
 // Vocabolario controllato del campo classe nel nome file -> classificazione.
 // Alcuni token (ricetta, promemoria) sono intrinsecamente ambigui tra farmaco e
 // prestazione: mappati alla classe piu probabile ma con confidence contenuta.
@@ -157,6 +178,10 @@ export function routeDocumentClass(input: DocumentClassRouterInput): DocumentCla
         signals.push(`filename:${fileHints.classToken}`);
         // Un token forte del filename vince anche sui producer di scansione.
         if (mapped.confident) {
+            const contentMatch = matchContent(input.textSample);
+            if (contentMatch && contentMatch.classification === mapped.classification) {
+                signals.push(`content:${contentMatch.pattern}`);
+            }
             return finalize(mapped.classification, 'high', fileHints, postProcessed, signals,
                 `Token di classe "${fileHints.classToken}" nel nome file.`);
         }
