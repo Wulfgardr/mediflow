@@ -39,4 +39,4 @@ Ciò che NON cambia: le leggi cliniche di Vetro Clinico restano fondamenta anche
 - Lume e approvata come lingua di destinazione; Vetro Clinico ([../vetro-clinico/](../vetro-clinico/README.md)) resta il canone operativo transitorio finché le fasi di migrazione non sostituiscono i consumatori. I lavori DS-1..DS-3 servono anche a Lume e non vanno fermati.
 - Le esplorazioni Strumento, Guardia e Inchiostro sono compatibili con Lume e vi confluiscono (Guardia diventa il terzo registro di luce; Strumento la densità dello strumento; Inchiostro resta il linguaggio di stampa).
 - Vetro Vivo viene sostituita dal modello di motion di Lume (la luce si sposta, le superfici no), più sobrio e meno costoso.
-- La decisione di prodotto e registrata in ADR 0074. Restano decisioni di delivery: font non-Apple, ordine delle slice e promozione dei singoli componenti dopo prova reale.
+- La decisione di prodotto e registrata in ADR 0078. Restano decisioni di delivery: font non-Apple, ordine delle slice e promozione dei singoli componenti dopo prova reale.

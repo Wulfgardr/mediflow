@@ -39,7 +39,7 @@ Principio: Lume non butta niente di ciò che vale. Il consolidamento di Vetro Cl
 
 | Fase | Contenuto | Gate |
 | --- | --- | --- |
-| L0 | Decisione di prodotto e canone: Lume lingua di destinazione, ADR 0074 e contratti di piattaforma | Completata per la direzione; font non-Apple e slice restano decisioni di delivery |
+| L0 | Decisione di prodotto e canone: Lume lingua di destinazione, ADR 0078 e contratti di piattaforma | Completata per la direzione; font non-Apple e slice restano decisioni di delivery |
 | L1 | Token: registri giorno/grafite/guardia nel sorgente DTCG, misura dei contrasti, `data-lume` accanto ai token attuali (convivenza temporanea, non selettore utente: flag di sviluppo) | Tutte le coppie AA misurate |
 | L2 | Fuoco e chrome: modello focale nel cockpit (worklist/Quadro), rail e barre a chrome opaco, ritiro del vetro strutturale | Smoke visivo 3 registri + 3 segnali di accessibilità |
 | L3 | Il filo: selezione focale, timeline diario, storia valori con banda personale | Leggibilità misurata; il tratteggio bozza copre i contenuti proposti |

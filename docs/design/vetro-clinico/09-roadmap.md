@@ -12,7 +12,7 @@ Questo piano non biforca la roadmap in 7 fasi della revisione UI/UX 2026-07-02 (
 
 ### DS-0. Canone (completato per la direzione)
 
-- Vetro Clinico e il canone operativo transitorio; Lume e la lingua di destinazione secondo ADR 0074. Questo folder conserva glossario, leggi cliniche, token e debito da consolidare.
+- Vetro Clinico e il canone operativo transitorio; Lume e la lingua di destinazione secondo ADR 0078. Questo folder conserva glossario, leggi cliniche, token e debito da consolidare.
 - Gate completato: decisione di Leonardo registrata. I gate successivi riguardano delivery e verifica, non una nuova scelta di direzione.
 
 ### DS-1. Consolidamento token web (converge con fase 6 "unificazione semantici")

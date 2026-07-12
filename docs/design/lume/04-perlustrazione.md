@@ -7,7 +7,7 @@ read_when:
 
 # La perlustrazione
 
-Metodo (2026-07-12, dopo ADR 0074): tre lane di ricerca web GPT-5.6 Terra via Codex CLI (S1 e S2 a effort high, S3 medium, sola lettura), su prompt di Fable; sintesi e integrazione nella specifica di Fable. Obiettivo: applicativi avanzati per provider USA, gestionali per general practitioner con UI pubbliche, e fonti aperte (design system sanitari, evidenza di usabilità) da cui derivare interfacce.
+Metodo (2026-07-12, dopo ADR 0078): tre lane di ricerca web GPT-5.6 Terra via Codex CLI (S1 e S2 a effort high, S3 medium, sola lettura), su prompt di Fable; sintesi e integrazione nella specifica di Fable. Obiettivo: applicativi avanzati per provider USA, gestionali per general practitioner con UI pubbliche, e fonti aperte (design system sanitari, evidenza di usabilità) da cui derivare interfacce.
 
 ## 1. Cosa hanno trovato le lane
 

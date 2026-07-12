@@ -70,12 +70,12 @@ Registro delle decisioni che questo sistema non può contraddire senza un nuovo 
 | Nessun selettore di stile UI persistito | ADR 0047 (2026-04-22), ribadito in ADR 0060 | Un solo linguaggio visivo. Le preferenze utente ammesse sono assi ergonomici e di accessibilità (densità, trasparenza, motion, contrasto), non temi alternativi. Ogni nuovo asse di preferenza richiede un ADR. |
 | Cockpit alla root `/` | ADR 0060 (2026-05-15) | Il cockpit è l'ingresso; la grammatica visiva della root è quella di WUL-271. |
 | `Scheda paziente` = `/patients/[id]/modules`, unica destinazione di rotta; `Quadro` = sinossi in-cockpit senza cambio rotta | `docs/design/wul-271-kree8-visual-translation.md` righe 134, 193-196 | Una parola, un concetto. Le transizioni Quadro/Scheda sono il punto di continuità spaziale più importante del prodotto. |
-| Direzione visiva unica su tutte le piattaforme: Vetro Clinico (base Liquid Glass) | Decisione di progetto 2026-06 (memoria di lavoro); formalizzazione proposta in ADR 0074 | Niente lingue visive per-piattaforma; cambia il materiale, non la grammatica. |
+| Direzione visiva unica su tutte le piattaforme: Lume come destinazione, Vetro Clinico come canone transitorio | [ADR 0078](../../adr/0078-lume-lingua-di-design-di-destinazione.md) | Niente lingue visive per-piattaforma; cambiano struttura e resa idiomatica, non la semantica clinica condivisa. |
 | Direzione calda/carta "Referto" per la UI dell'app: valutata e respinta (2026-06) | Decisione di progetto in memoria di lavoro; questo documento ne è la prima registrazione scritta in repo | Non si ripropone come tema dell'app. Il linguaggio di stampa (vedi [08-esplorazioni.md](./08-esplorazioni.md), proposta Inchiostro) riguarda solo gli artefatti esportati, non la UI. |
 | Trattino lungo bandito da docs e stringhe UI; meta-testo bandito dalla UI; stati vuoti onesti | Convenzione ripetuta nei documenti (WUL-271 "meta-text purge"; revisione 2026-07-02) | Vincola anche i testi degli esempi in questo folder. |
 | Claims guard | ADR 0065, `scripts/check-claims-guard.mjs` (scansiona anche `docs/design/`) | I testi UI e questi documenti non fanno claim su autonomia clinica, integrazioni regionali o cloud. |
 
-**Azione proposta**: ADR 0074 "Vetro Clinico come linguaggio di design canonico multipiattaforma", che formalizzi glossario ([README.md](./README.md)), la legge dei materiali ([03-materiali.md](./03-materiali.md)) e la sovranità dei token ([02-token.md](./02-token.md)). Fino ad allora questo folder vale come bozza operativa.
+La direzione e ora formalizzata in [ADR 0078](../../adr/0078-lume-lingua-di-design-di-destinazione.md): questo folder conserva le fondamenta cliniche e il canone operativo transitorio mentre la migrazione a Lume procede per slice verificabili.
 
 ## 4. Anti-pattern (vietati)
 

@@ -8,7 +8,7 @@ read_when:
 # Lume su macOS: contratto Apple
 
 Stato: contratto di destinazione per la futura superficie principale macOS.
-Questo documento applica [ADR 0074](../../adr/0074-lume-lingua-di-design-di-destinazione.md)
+Questo documento applica [ADR 0078](../../adr/0078-lume-lingua-di-design-di-destinazione.md)
 alla app reale `MediFlowMacApp`. Non governa la feature parity, che resta in un
 workstream separato, e non attiva le lane Windows/Linux.
 
