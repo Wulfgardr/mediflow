@@ -253,7 +253,8 @@ function buildCodingHints(
     hints.push('Diagnosi da collegare a codifica clinica');
   }
   if (therapiesWithoutDiagnosis.length > 0) {
-    hints.push(`${therapiesWithoutDiagnosis.length} terapie senza aggancio diagnosi`);
+    const therapyLabel = therapiesWithoutDiagnosis.length === 1 ? 'terapia' : 'terapie';
+    hints.push(`${therapiesWithoutDiagnosis.length} ${therapyLabel} senza aggancio diagnosi`);
   }
   if (attachments.length > 0) {
     hints.push('Documenti recenti da usare per confermare codifiche');

@@ -6,97 +6,64 @@ _by Ordito & Concilio_
 
 **Cartella clinica territoriale local-first.**
 
-Dati vicini al medico, flusso rapido, privacy come impostazione di base.
+Per ritrovare informazioni, seguire terapie e tenere il filo del lavoro clinico,
+senza consegnare i dati a un cloud per poter lavorare.
 
 [![Versione](https://img.shields.io/badge/versione-0.7.3-1f6feb)](./CHANGELOG.md)
 [![Licenza](https://img.shields.io/badge/licenza-MIT-2ea043)](./LICENSE)
 [![Local-first](https://img.shields.io/badge/dati-local--first-8957e5)](#confini-dichiarati)
-[![Core tri-OS](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#la-073-in-breve)
+[![Core Swift](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#stato-073)
 
-[![Claude Code](https://img.shields.io/badge/Claude%20Code-Anthropic-D97757?logo=claude&logoColor=white)](https://claude.com/claude-code)
-[![Codex](https://img.shields.io/badge/Codex-OpenAI-412991?logo=openai&logoColor=white)](https://openai.com/codex)
-
-[Perché](#perché-mediflow) · [Screenshot](#come-si-presenta) · [Architettura](#come-è-fatto) · [0.7.3](#la-073-in-breve) · [Confini](#confini-dichiarati) · [Avvio](#avvio-rapido) · [AI e trasparenza](#come-è-stato-costruito)
+[In breve](#mediflow-in-breve) · [Schermate](#come-si-presenta) · [Architettura](#come-è-fatto) · [Stato](#stato-073) · [Avvio](#avvio-rapido) · [Sviluppo](#sviluppo-assistito)
 
 </div>
 
-## Perché MediFlow
+## MediFlow, in breve
 
-MediFlow nasce dal lavoro reale con i pazienti, non da un esercizio teorico.
+MediFlow nasce dal lavoro reale con i pazienti. Serve a raccogliere dati
+clinici, terapie, note e documenti in una scheda che resti leggibile anche
+quando il percorso si allunga e le fonti si moltiplicano.
 
-Una cartella clinica deve aiutare chi cura a ritrovare informazioni, seguire
-terapie, annotare decisioni, conservare documenti e mantenere continuità, senza
-trasformare ogni gesto in burocrazia digitale.
+Il principio è semplice: il dato resta vicino a chi lo produce e lo usa. Il Mac
+ospita la base autorevole; il cloud non è un requisito per lavorare. L'AI, quando
+c'è, gira in locale e propone materiale da rivedere. Non prende decisioni e non
+scrive dati clinici in autonomia.
 
-Nel contesto territoriale italiano questo bisogno è ancora più evidente: il
-tempo è poco, i dati sono sensibili, i percorsi sono spesso frammentati e gli
-strumenti disponibili non sempre rispettano il modo in cui il lavoro clinico
-viene davvero svolto.
+Nel contesto territoriale italiano questo significa soprattutto togliere
+attrito: aprire la scheda, capire dove si è, ritrovare una fonte, distinguere una
+terapia da una prestazione prescritta e preparare il passaggio successivo senza
+confondere supporto operativo e integrazione istituzionale.
 
-MediFlow prova a rispondere a questo spazio: una base locale, leggibile,
-prudente e modulare per la gestione quotidiana dei pazienti. La priorità non è
-fare scena, ma ridurre attrito: aprire la scheda, capire dove si è, rivedere una
-fonte, distinguere una terapia da una prestazione prescritta, preparare il
-passaggio giusto senza confondere supporto operativo e integrazione
-istituzionale.
+MediFlow non sostituisce SISS, FSE o gli altri canali ufficiali. Sta accanto al
+lavoro clinico quotidiano, con confini dichiarati e verificabili.
 
-Non nasce per sostituire i canali istituzionali, né per promettere integrazioni
-che non sono ancora dimostrate. Nasce per dare ordine, continuità e controllo al
-lavoro clinico di tutti i giorni.
-
-## Repository canonica
-
-Lo sviluppo di MediFlow avviene interamente in questa repository pubblica.
-Branch, pull request, issue, tag e release fanno capo a
-[`Wulfgardr/mediflow`](https://github.com/Wulfgardr/mediflow); la precedente
-repository privata è archiviata e non costituisce più una fonte operativa.
-Gli artefatti sensibili o locali restano fuori da Git secondo
+Lo sviluppo avviene nella repository pubblica
+[`Wulfgardr/mediflow`](https://github.com/Wulfgardr/mediflow). Database, dati
+sanitari, credenziali e altri artefatti locali restano fuori da Git secondo
 [`SECURITY.md`](./SECURITY.md) e
 [`docs/repository-topology.md`](./docs/repository-topology.md).
 
 ## Come si presenta
 
-<img src="./screenshots/01-worklist.png" alt="Cockpit Kree8: lista di lavoro con pazienti dimostrativi sintetici" width="820" loading="lazy" decoding="async"/>
+<img src="./screenshots/01-worklist.png" alt="Cockpit Lume di MediFlow: lista di lavoro con pazienti dimostrativi sintetici" width="820" loading="lazy" decoding="async"/>
 
-_Render reali dell'interfaccia attuale, catturati con dati dimostrativi sintetici: nessun dato paziente reale._
+_Render reali delle superfici web che adottano Lume, la lingua visiva di
+MediFlow. Catturati dalla build di produzione con dati dimostrativi sintetici.
+Nessun dato paziente reale._
 
 <details>
-<summary><b>Altri screenshot</b> (Scheda paziente, quadro clinico, revisione documenti, sicurezza)</summary>
-<p>
-<img src="./screenshots/02-scheda.png" alt="Scheda paziente con moduli clinici" width="820" loading="lazy" decoding="async"/>
-</p>
-<p>
-<img src="./screenshots/03-quadro.png" alt="Quadro paziente nel cockpit" width="820" loading="lazy" decoding="async"/>
-</p>
-<p>
-<img src="./screenshots/04-review.png" alt="Coda di revisione documenti (Smart Import)" width="820" loading="lazy" decoding="async"/>
-</p>
-<p>
-<img src="./screenshots/05-security.png" alt="Impostazioni di sicurezza locale con PIN" width="820" loading="lazy" decoding="async"/>
-</p>
+<summary><b>Altre schermate</b>: scheda paziente, quadro clinico, revisione documenti e sicurezza</summary>
+<p><img src="./screenshots/02-scheda.png" alt="Scheda paziente con moduli clinici" width="820" loading="lazy" decoding="async"/></p>
+<p><img src="./screenshots/03-quadro.png" alt="Quadro paziente nel cockpit" width="820" loading="lazy" decoding="async"/></p>
+<p><img src="./screenshots/04-review.png" alt="Revisione documenti e codifiche" width="820" loading="lazy" decoding="async"/></p>
+<p><img src="./screenshots/05-security.png" alt="Impostazioni di sicurezza locale con PIN" width="820" loading="lazy" decoding="async"/></p>
 </details>
-
-## L'idea
-
-MediFlow è una web app locale per gestire dati clinici, terapie, note e documenti.
-
-Il principio guida è **local-first**: il dato resta vicino a chi lo produce e lo
-usa. Il cloud non è un requisito per lavorare, e l'architettura è pensata per
-ridurre al minimo la dipendenza da servizi esterni.
-
-La direzione è quella di uno strumento:
-
-- sobrio nell'interfaccia;
-- esplicito nei confini;
-- prudente nell'uso dell'AI;
-- rispettoso della privacy;
-- adatto a crescere senza diventare opaco.
 
 ## Come è fatto
 
-Il Mac è il nodo autorevole (`home-base`): ospita il database e la web app.
-Gli altri dispositivi non parlano mai col database: parlano con l'API locale,
-dopo un pairing esplicito.
+Il Mac è il nodo autorevole (`home-base`): ospita database e web app. Gli altri
+dispositivi non parlano direttamente con SQLite, ma con l'API locale, dopo un
+pairing esplicito.
 
 ```mermaid
 flowchart LR
@@ -107,82 +74,73 @@ flowchart LR
         ai["Ollama<br/>AI e OCR locali, opzionali"]
         web --> api --> db
         web -.-> ai
+        native["App nativa macOS<br/>sull'host"]
+        native -- "TLS locale" --> api
     end
-    subgraph paired["Client paired"]
-        native["App macOS home-base"]
-        mobile["iPhone / iPad<br/>(read-first, cache cifrata)"]
+    subgraph paired["Dispositivi paired"]
+        mobile["iPhone / iPad / Mac<br/>(read-first, cache cifrata)"]
     end
-    native -- "TLS locale" --> api
     mobile -- "pairing esplicito, TLS locale" --> api
 ```
 
-Il cloud non compare nel diagramma: nessun egress di default, il percorso resta local-first.
+Il diagramma mostra il percorso locale. Trasporto, pairing e limiti del data
+plane sono documentati in
+[`docs/topologia-dati-flussi.md`](./docs/topologia-dati-flussi.md).
 
-## La 0.7.3 in breve
+## Stato 0.7.3
 
-La `0.7.3` consolida la linea local-first sopra il boundary paired della
-`0.7.2`: adotta progressivamente Lume, rende più modulare lo stack AI locale,
-rafforza affidabilità e packaging e applica un guardrail automatico ai claim
-pubblici. Non chiude la migrazione UI completa né il gate manuale P6.
+La 0.7.3 consolida il percorso local-first avviato dalla 0.7.2. Porta Lume sulle
+prime superfici web e native, rende più modulare lo stack AI locale e rafforza
+backup, cifratura dei campi clinici, packaging e controlli sui claim pubblici.
 
-- **Lume in adozione progressiva**: ADR 0078 è `Accepted`; canone L0, token
-  L1a, convivenza web L1b, cockpit, workspace clinico e lock screen sono su
-  `main`. Sul nativo è atterrata la card clinica opaca; componenti interni,
-  filo, tipografia, Settings scene e QA manuale completa restano aperti.
-- **Stack AI modulare ma locale**: `OllamaAdapter` e `AIService` sono su
-  `main`; il gate egress applica il primo strato deterministico ma resta
-  `closed_pending_redaction_lane`. Registry, provider alternativi e consenso
-  cloud non sono consegnati.
-- **Control-flow e attese review-first**: il router documentale usa `shadow`
-  come default e può evitare il modello solo nei casi eleggibili ad alta
-  confidenza. Le attese locali vivono oggi nel solo web e ogni salvataggio
-  resta esplicito.
-- **Affidabilità e distribuzione**: backup, cifratura, transazioni, ricerca
-  farmaci, campi nativi bloccati, dipendenze di produzione e runtime PM2 sono
-  stati irrobustiti con test e controlli dedicati.
-- **Repository e claim pubblici**: la repository pubblica è l'unica fonte
-  operativa; README, documentazione e white paper sono verificati dal claims
-  guard, che impedisce promesse non dimostrate su AI, FHIR, GDPR, cifratura,
-  cloud e integrazioni regionali.
-- **Boundary regionale realistico**: SISS e FSE restano un handoff contestuale
-  `webapp-assisted`; MediFlow non effettua invii o scritture nei sistemi
-  regionali.
-- **P6 preparata, non certificata**: PR #21 e `WUL-401`, ora completata, hanno
-  consegnato il tooling di base: bundle, fixture, probe AX e runbook. `WUL-481`
-  conserva i prerequisiti operativi ancora bloccati e il verbale manuale sul
-  Mac sbloccato, quindi MediFlow non dichiara parity UI completa.
+Restano aperti la migrazione completa dell'interfaccia, parte della parity dei
+client paired e il collaudo manuale P6 sul bundle macOS. Il gate verso provider
+AI esterni resta chiuso e non è consegnato alcun percorso di consenso o invio.
 
-Il dettaglio completo è nel [CHANGELOG](./CHANGELOG.md).
+Il dettaglio è nel [CHANGELOG](./CHANGELOG.md). La fotografia completa vive in
+[`docs/STATE_OF_THE_SYSTEM.md`](./docs/STATE_OF_THE_SYSTEM.md); la parity
+versionata in [`docs/parity-matrix.md`](./docs/parity-matrix.md).
 
 ## Confini dichiarati
 
-MediFlow non vuole raccontare più di quanto possa dimostrare.
+MediFlow non racconta più di quanto possa dimostrare.
 
-- **Nessun cloud obbligatorio**: il default resta locale.
-- **Nessuna app iPad/iPhone dichiarata come già completa**: il perimetro operativo è `home-base + paired client`; lifecycle paziente, moduli clinici non-AI, cataloghi, prestazioni/protesica e upload documentale manuale hanno workflow online governati, mentre cache offline, click-map UI e superfici document-derived restano parziali o host-only.
-- **Nessuna parity Windows/Linux dichiarata oggi**: la 0.7.3 prova il core tri-OS e il runtime di base, non app complete su ogni piattaforma.
-- **Nessuna integrazione SISS/FSE certificata dichiarata senza prove**: il percorso attuale è contestuale e `webapp-assisted`, usando i canali ufficiali; MediFlow non dichiara sincronizzazione FSE, writeback regionale o invio prescrittivo diretto.
-- **Nessuna delega cieca all'AI**: l'AI locale può aiutare, ma non sostituisce revisione, giudizio clinico e responsabilità professionale.
+- **Il default è locale.** Nessun cloud obbligatorio, nessuna telemetria o
+  uscita dati attiva per impostazione iniziale.
+- **iPhone e iPad non sono app complete.** Il perimetro operativo è
+  `home-base + client paired`; cache offline e alcune superfici derivate dai
+  documenti restano parziali o disponibili solo sull'host.
+- **Windows e Linux non hanno ancora parity applicativa.** La 0.7.3 verifica il
+  core Swift condiviso e il runtime di base, non applicazioni complete su ogni
+  piattaforma.
+- **SISS e FSE restano un handoff assistito.** MediFlow apre il contesto giusto,
+  ma non dichiara sincronizzazione FSE, writeback regionale o invio
+  prescrittivo diretto.
+- **L'AI resta review-first.** Può aiutare a leggere e organizzare, non
+  sostituisce revisione, giudizio clinico o responsabilità professionale.
 
-La fotografia post-Wave 5 è versionata in
-[docs/parity-matrix.md](./docs/parity-matrix.md): 30 delle 43 capability per cui
-la parity è un obiettivo sono complete; 13 restano parziali e 21 ulteriori
-capability sono intenzionalmente host-only. Il tooling P6 di base è ripetibile,
-ma i conteggi non cambiano finché `WUL-481` non chiude blocker operativi e
-verbale manuale verde sul bundle macOS.
+Delle 43 capability per cui la parity è un obiettivo, 30 sono complete e 13
+parziali; altre 21 restano intenzionalmente host-only. La matrice fa fede sui
+conteggi e sul significato di ciascuno stato.
 
-## Perché open source
+## Avvio rapido
 
-MediFlow nasce come progetto personale, ma ha senso solo se può diventare una
-base aperta, verificabile e migliorabile.
+```bash
+git clone https://github.com/Wulfgardr/mediflow
+cd mediflow
+npm install
+```
 
-Open source, in questo caso, significa soprattutto:
+Poi usa il launcher della tua piattaforma:
 
-- codice leggibile;
-- documentazione chiara;
-- confini dichiarati;
-- nessuna promessa vaga;
-- possibilità di controllo da parte di chi usa lo strumento.
+| OS | Comando |
+| :-- | :-- |
+| macOS | `./Start_MediFlow.command` |
+| Windows | `powershell -ExecutionPolicy Bypass -File .\Start-MediFlow.ps1` |
+| Linux | `./scripts/start-mediflow.sh` |
+
+Apri `http://localhost:3000`. Ollama, Docker e ICD-11 sono opzionali; senza,
+MediFlow resta usabile con funzionalità ridotte.
 
 ## Documentazione
 
@@ -193,73 +151,50 @@ Open source, in questo caso, significa soprattutto:
 | [Roadmap](./docs/ROADMAP.md) | Dove sta andando il progetto |
 | [Compliance](./docs/COMPLIANCE.md) | Privacy, GDPR e confini regolatori |
 | [Crediti](./CREDITS.md) | Fonti, modelli, librerie e ispirazioni con licenze |
-| [Document map](./docs/README.md) | La mappa di tutta la documentazione |
-
-## Avvio rapido
-
-```bash
-git clone https://github.com/Wulfgardr/mediflow
-cd mediflow
-npm install
-```
-
-Poi il launcher della tua piattaforma:
-
-| OS | Comando |
-| :-- | :-- |
-| macOS | `./Start_MediFlow.command` |
-| Windows | `powershell -ExecutionPolicy Bypass -File .\Start-MediFlow.ps1` |
-| Linux | `./scripts/start-mediflow.sh` |
-
-Apri `http://localhost:3000`. Ollama, Docker e ICD-11 sono opzionali: senza,
-MediFlow resta usabile con funzionalità ridotte.
+| [Mappa documentale](./docs/README.md) | La guida alla documentazione canonica |
 
 ## Fonti e attribuzioni
 
-MediFlow dichiara in chiaro le sue fonti.
+La prima lingua visiva del cockpit è derivata da
+[Kree8](https://www.kree8.studio/), tradotta in un'implementazione clinica
+originale. Il ragionamento terapeutico review-only usa
+[ATHENA](https://github.com/mims-harvard/ATHENA) di mims-harvard, con licenza
+MIT. Il lavoro sulla visita registrabile prende a riferimento l'ecosistema
+Fluid.
 
-[![Kree8](https://img.shields.io/badge/look-Kree8-8957e5)](https://www.kree8.studio/)
-[![ATHENA](https://img.shields.io/badge/modello-ATHENA-181717?logo=github&logoColor=white)](https://github.com/mims-harvard/ATHENA)
-[![Fluid](https://img.shields.io/badge/visita-Fluid-a42e2b)](https://github.com/altic-dev/FluidVoice)
-[![Crediti](https://img.shields.io/badge/crediti%20completi-CREDITS.md-2ea043)](./CREDITS.md)
-
-Il **look** del cockpit è derivato da [Kree8](https://www.kree8.studio/),
-ispirazione esterna resa in una implementazione clinica originale. Il ragionamento
-terapeutico review-only usa il modello [ATHENA](https://github.com/mims-harvard/ATHENA)
-(mims-harvard, licenza MIT). Il motore della visita registrabile prende a
-riferimento l'ecosistema Fluid.
-
-Modelli, librerie, runtime e ispirazioni con URL e licenze:
+Modelli, runtime, librerie e ispirazioni, con URL, ruolo e licenza, sono in
 **[CREDITS.md](./CREDITS.md)**.
 
-## Come è stato costruito
+## Sviluppo assistito
 
-Scrivo MediFlow da medico, con un aiuto sostanziale e dichiarato di strumenti di sviluppo assistito da AI.
+Scrivo MediFlow da medico, con un aiuto sostanziale e dichiarato di strumenti di
+sviluppo assistito da AI.
 
-Due copiloti, ruoli distinti. **Codex** (OpenAI) è la mia corsia principale di implementazione e verifica; **Claude Code** (Anthropic) è la seconda corsia: review, coordinamento e i controlli che decidono cosa entra nel codice. Chi scrive non è chi approva.
+[Codex](https://openai.com/codex) e
+[Claude Code](https://claude.com/claude-code) hanno contribuito a progettazione,
+implementazione, review e verifica. Le proposte dei modelli restano materiale da
+controllare: test reali e guard automatici decidono se una modifica regge.
 
-Aggiornato al 9 luglio 2026, tengo il conto dai log locali delle sessioni: **circa 20 miliardi di token** per MediFlow, 16,4 con Codex e 4,0 con Claude Code. Sono token di sessione, quindi in gran parte contesto riletto a ogni passaggio: misurano il volume del lavoro assistito, non quanto ho scritto.
+Uno snapshot dei log locali del 13 luglio 2026 conta circa **12,34 miliardi di
+token di sessione**: 7,89 miliardi con Codex e 4,45 con Claude Code. Sono in gran
+parte contesto riletto o recuperato dalla cache; misurano il volume del lavoro
+assistito, non righe di codice o qualità.
 
-<img src="./screenshots/token-models.svg" alt="Modelli usati per MediFlow: Codex CLI con gpt-5.5 a 16,4 miliardi di token, Claude Code (Opus 4.8, Fable 5, Sonnet 5) a 4,0 miliardi" width="720" loading="lazy"/>
+<img src="./screenshots/token-models.svg" alt="Modelli usati per MediFlow: Codex circa 7,89 miliardi di token nelle famiglie GPT-5.2-5.6; Claude Code circa 4,45 miliardi con Opus 4.8, Fable 5, Sonnet 5 e una quota esplorativa storica di Haiku 4.5" width="720" loading="lazy"/>
 
-### Lo stack
+Ogni colore corrisponde a un modello o a una famiglia vicina. Le due barre usano
+la stessa scala: mostrano insieme il peso dei due ambienti e la loro composizione
+interna. Non è una classifica di qualità, ma la fotografia di quali modelli hanno
+assorbito più contesto durante lo sviluppo.
 
-Il metodo conta più del volume.
+Per Codex i log registrano anche l'effort: `xhigh` è la quota maggiore, seguito
+da `medium`, `high` e `low`. `Ultra` è mostrato a parte perché indica fan-out tra
+più agenti, non un livello di ragionamento. Nei log storici di Claude Code
+l'effort non è esposto in modo abbastanza uniforme; questa revisione del README
+è stata eseguita con Opus 4.8 a effort `max`.
 
-- **Review incrociata tra modelli.** Un modello propone, un altro prova a smontarlo. Le due corsie si controllano a vicenda invece di darsi ragione.
-- **Verifica con prove.** Prima di chiudere un lavoro giro davvero i test e i controlli in locale. Niente "fatto" sulla parola del modello.
-- **Diagnosi in parallelo.** Per bug e regressioni, più letture in sola lettura sullo stesso codice da angoli diversi.
-- **Guard automatici in CI.** Bloccano il merge se rientrano regressioni di sicurezza o affermazioni non dimostrate.
-- **Il modello giusto per il compito.** Lavoro meccanico ai modelli economici, giudizio e architettura a quelli capaci.
-
-Gli strumenti, in chiaro:
-
-- **[Codex CLI](https://openai.com/codex)** (OpenAI) e **[Claude Code](https://claude.com/claude-code)** (Anthropic): i due copiloti.
-- **[Repo Prompt CE](https://github.com/repoprompt/repoprompt-ce)** (Eric Provencher): lo spazio di contesto, open source. Serve a costruire il contesto giusto da dare agli agenti, quali file, quali diff, quale struttura del repo, prima che agiscano, e a far dialogare più modelli sullo stesso problema senza sprecare contesto.
-- **[CodexBar](https://github.com/steipete/CodexBar)** (Peter Steinberger): il conteggio d'uso da cui vengono i numeri qui sopra.
-- Parte del flusso di review deriva da **[steipete/agent-scripts](https://github.com/steipete/agent-scripts)** (MIT).
-
-L'AI scrive, ma non decide. La responsabilità di MediFlow resta mia.
+Il conteggio precedente del README usava una metodologia diversa e non è
+direttamente confrontabile. La responsabilità del progetto resta mia.
 
 ## Licenza
 
