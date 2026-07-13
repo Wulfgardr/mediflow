@@ -155,7 +155,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             setActiveMasterKey(null);
             setIsAuthenticated(false);
             setIsLocked(true);
-            setAuthErrorMessage('Sessione scaduta. Inserisci il PIN per continuare.');
+            setAuthErrorMessage('Sessione scaduta.');
         };
 
         window.addEventListener(MEDIFLOW_API_AUTH_UNAVAILABLE_EVENT, handleApiAuthUnavailable);
@@ -427,7 +427,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                         setIsAuthenticated(false);
                         setIsLocked(true);
                         // Messaggio mostrato inline dalla LockScreen tramite authErrorMessage.
-                        setAuthErrorMessage("Setup già completato. Inserisci il PIN esistente.");
+                        setAuthErrorMessage("Accesso già configurato.");
                     }
                     return;
                 }
