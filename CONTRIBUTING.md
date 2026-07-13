@@ -110,9 +110,10 @@ Il guard fallisce se trova:
 
 ### Claims guard
 
-Per bloccare claim di prodotto fuori scope (autonomia clinica AI, auto-apply senza
-review, integrazione regionale SISS/FSE certificata nativa, prescrizione regionale,
-cloud di default), ancorati all'ADR 0065:
+Per bloccare claim di prodotto fuori scope (autonomia clinica AI, auto-apply
+senza review, integrazione regionale SISS/FSE, cloud di default, cifratura
+whole-database, claim FHIR non qualificati, garanzie GDPR, topologia single-device e
+codifica ICD obbligatoria), ancorati all'ADR 0065:
 
 ```bash
 npm run check:claims

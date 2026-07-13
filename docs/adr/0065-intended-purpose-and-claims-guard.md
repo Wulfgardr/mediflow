@@ -37,8 +37,10 @@ perimetro ADR esistente.
 
 Sono consentiti, quando veri nello stato corrente del repo:
 
-- `local-first`, `no cloud di default`, `dati locali`, `SQLite cifrato`,
-  `zero-knowledge a riposo`;
+- `local-first`, `no cloud di default`, storage autorevole sul nodo
+  `home-base`, campi clinici sensibili cifrati lato client con AES-256-GCM;
+- PIN non persistito e master key aperta solo nella memoria del client, senza
+  estendere questo fatto a un claim zero-knowledge sull'intero database;
 - `supporto`, `workbench`, `reviewable`, `draft`, `candidate`, `fonte`,
   `provenance`, `handoff`, `webapp-assisted`;
 - AI locale come supporto a sintesi, recupero fonti, Smart Import reviewable e
@@ -62,7 +64,17 @@ salvo citazione esplicita in un documento di policy o test negativo:
   verifica;
 - cloud AI, cloud sync, telemetry o upload di PHI/PII come default;
 - auto-import clinico, auto-apply strutturato o accettazione silenziosa di
-  output AI/documentali senza review, attore e audit trail.
+  output AI/documentali senza review, attore e audit trail;
+- cifratura integrale del file SQLite, database interamente illeggibile senza
+  PIN o zero-knowledge whole-database finche identificativi, metadati e backup
+  non rientrano nello stesso perimetro verificato;
+- compatibilita, conformita, interoperabilita o portabilita FHIR garantite
+  senza validator, profilo, terminologia e prova di ingestione espliciti;
+- conformita GDPR certificata dal prodotto, ruoli privacy assegnati in modo
+  categorico o diritti dichiarati garantiti dalle sole feature;
+- dati dichiarati confinati a un solo dispositivo senza esplicitare
+  `home-base`, client paired, cache locali ed export/backup;
+- ogni diagnosi dichiarata obbligatoriamente codificata o validata ICD-11.
 
 ## Frasi ambigue
 
@@ -82,6 +94,13 @@ Adottiamo un guard testuale repo-local, senza dipendenze nuove:
   modello remoto;
 - allowlist: esplicita, per file/rule/snippet, con rationale;
 - fallimento: stampa `CLAIM-*`, file, riga, categoria e snippet.
+
+La prima fase `WUL-354` applica le nuove regole alle superfici documentali
+tracciate. La root publication `whitepaper/` resta temporaneamente attivabile
+con `npm run check:claims -- --include-publication` finche la Phase B, posseduta
+dalla lane visuale, non riallinea il copy e abilita lo scan nel percorso di
+default. Il guard stampa questa dipendenza: l'esclusione non deve essere
+silenziosa ne diventare un'allowlist permanente.
 
 Il guard non sostituisce review umana o valutazione regolatoria. Serve come
 freno deterministico contro claim drift evidenti.
