@@ -427,10 +427,10 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
     <span class="eyebrow"><span class="dot"></span> White paper · Maggio 2026</span>
     <h1 class="title">Una cartella clinica<br/>che resta a casa tua.</h1>
     <p class="lede">
-      MediFlow è una cartella clinica per il singolo professionista e per piccoli ambulatori.
-      I dati restano sul computer del medico, cifrati. L'intelligenza artificiale gira sullo stesso
-      dispositivo, senza chiamare servizi remoti. Lo standard clinico è quello internazionale:
-      ICD-11 per le diagnosi, FHIR per l'esportazione.
+      MediFlow è una cartella clinica local-first per il singolo professionista e per piccoli ambulatori.
+      Il Mac home-base conserva lo storage autorevole; client paired, cache, export e backup sono
+      percorsi espliciti. I campi clinici configurati sono cifrati lato client. I servizi AI locali
+      restano opzionali; ICD-11 è un resolver di supporto e FHIR R4 una mappatura export-only v0.
     </p>
     <div class="hero-cta">
       <a class="btn primary" href="#cosa">Inizia la lettura →</a>
@@ -439,15 +439,15 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
 
     <div class="hero-meta">
       <div class="cell"><div class="k">Filosofia</div><div class="v">Locale prima di tutto</div></div>
-      <div class="cell"><div class="k">Privacy</div><div class="v">Zero conoscenza a riposo</div></div>
-      <div class="cell"><div class="k">AI</div><div class="v">Sul tuo computer</div></div>
-      <div class="cell"><div class="k">Standard</div><div class="v">ICD-11 · FHIR R4</div></div>
+      <div class="cell"><div class="k">Privacy</div><div class="v">Cifratura clinica per campo</div></div>
+      <div class="cell"><div class="k">AI</div><div class="v">Locale e opzionale</div></div>
+      <div class="cell"><div class="k">Standard</div><div class="v">ICD opzionale · FHIR export-only</div></div>
     </div>
 
     <div class="strip" aria-hidden="true">
-      <span><b>Local-first</b> · i dati non escono dal tuo Mac</span>
+      <span><b>Local-first</b> · home-base e percorsi paired espliciti</span>
       <span class="sep">◇</span>
-      <span><b>AES-256-GCM</b> a riposo</span>
+      <span><b>AES-256-GCM</b> per i campi configurati</span>
       <span class="sep">◇</span>
       <span><b>Niente telemetria</b></span>
       <span class="sep">◇</span>
@@ -455,7 +455,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
       <span class="sep">◇</span>
       <span><b>Audit append-only</b></span>
       <span class="sep">◇</span>
-      <span><b>FHIR R4</b> per la portabilità</span>
+      <span><b>FHIR R4</b> · mappatura export-only v0</span>
     </div>
   </div>
 </section>
@@ -477,7 +477,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
       <div class="card">
         <div class="icon">📋</div>
         <h3>Una scheda paziente coerente</h3>
-        <p>Anagrafica, diagnosi codificate, terapie, esami, osservazioni, allegati. Tutto in un unico posto, tutto cifrato.</p>
+        <p>Anagrafica, problemi e diagnosi reviewable, terapie, controlli, osservazioni e allegati. I campi clinici configurati sono cifrati lato client.</p>
       </div>
       <div class="card">
         <div class="icon">🧠</div>
@@ -486,8 +486,8 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
       </div>
       <div class="card">
         <div class="icon">🔒</div>
-        <h3>Una serratura sola: il PIN</h3>
-        <p>Senza il tuo PIN il database non è leggibile. Nemmeno per chi ha scritto il software.</p>
+        <h3>Il PIN apre i campi protetti</h3>
+        <p>Il PIN non viene persistito e sblocca la chiave dei campi clinici configurati. Il file SQLite non è cifrato integralmente.</p>
       </div>
       <div class="card">
         <div class="icon">📦</div>
@@ -501,16 +501,16 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
       </div>
       <div class="card">
         <div class="icon">🔁</div>
-        <h3>Esci quando vuoi</h3>
-        <p>Esportazione FHIR R4 della storia clinica. Niente trappola: i tuoi dati restano riusabili anche fuori da MediFlow.</p>
+        <h3>Export documentato</h3>
+        <p>La mappatura FHIR R4 export-only v0 produce un Bundle <code>collection</code>; non attesta conformità completa né ingestione da parte di terzi.</p>
       </div>
     </div>
 
     <div class="divider"></div>
 
     <div class="pull reveal">
-      «MediFlow è uno strumento. Il titolare del trattamento resta il professionista.
-      Il software non sostituisce le sue responsabilità: gli dà solo gli attrezzi giusti per esercitarle.»
+      «MediFlow offre misure tecniche e strumenti operativi. Ruoli, responsabilità,
+      basi giuridiche e adempimenti dipendono dal contesto di deployment.»
       <small>Principio operativo</small>
     </div>
   </div>
@@ -536,19 +536,19 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
         <div class="grid cols-2">
           <div class="card">
             <h3>Cosa vede ogni giorno</h3>
-            <p>La scheda del paziente con la storia coerente: diagnosi codificate, terapie con principio attivo e ATC, controlli passati e in agenda, osservazioni con unità di misura standard, allegati con riassunto.</p>
+            <p>La scheda del paziente riunisce problemi e diagnosi reviewable, terapie, controlli, osservazioni e allegati. Terminologie e codici restano associati alle fonti e alla revisione clinica.</p>
           </div>
           <div class="card">
             <h3>Cosa cambia rispetto al solito</h3>
-            <p>I dati non sono in un servizio remoto: sono nel suo computer. L'AI lo aiuta ma non scrive nulla in scheda senza una sua conferma esplicita, soprattutto su diagnosi e terapie.</p>
+            <p>Lo storage autorevole resta sul Mac home-base; client paired, cache, export e backup seguono percorsi espliciti. L'AI propone contenuti reviewable e non promuove diagnosi o terapie senza conferma.</p>
           </div>
           <div class="card">
             <h3>Cosa non gli viene chiesto</h3>
-            <p>Niente account su servizi terzi, niente abbonamenti per usare l'AI, niente caricamento di referti sul cloud. Il PIN è l'unica credenziale che deve ricordare.</p>
+            <p>Il runtime ordinario non richiede un account AI cloud. Servizi locali, rete paired ed eventuali lane comparative restano opzionali e governati separatamente.</p>
           </div>
           <div class="card">
             <h3>Cosa porta via se cambia idea</h3>
-            <p>Un pacchetto FHIR R4 con anagrafica, diagnosi, visite, terapie e osservazioni. Standard riconosciuto, leggibile da altri sistemi.</p>
+            <p>Un Bundle FHIR R4 <code>collection</code> secondo la mappatura export-only v0. È un artefatto documentato, non una garanzia di conformità o importabilità universale.</p>
           </div>
         </div>
       </div>
@@ -557,19 +557,19 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
         <div class="grid cols-2">
           <div class="card">
             <h3>Dove finiscono i suoi dati</h3>
-            <p>Sul computer del professionista che ha in cura il paziente, cifrati. Non vengono condivisi con servizi remoti né usati per addestrare modelli.</p>
+            <p>Sul Mac home-base vive lo storage autorevole; i campi clinici configurati sono cifrati lato client. Cache paired, export e backup hanno confini separati e dichiarati.</p>
           </div>
           <div class="card">
-            <h3>Quali diritti restano garantiti</h3>
-            <p>Diritto all'oblio (Art. 17 GDPR) con cancellazione governata. Portabilità dei dati (Art. 20) tramite esportazione in formato standard.</p>
+            <h3>Quali strumenti supportano i diritti</h3>
+            <p>Tombstone, purge governato ed export possono supportare richieste GDPR. Ruoli, basi giuridiche, backup e adempimenti vanno valutati nel deployment concreto.</p>
           </div>
           <div class="card">
             <h3>Cosa succede se il computer viene rubato</h3>
-            <p>Il database resta cifrato a riposo. Senza il PIN nessuno può leggerlo, nemmeno con il file in mano. La chiave non è sul disco.</p>
+            <p>I campi clinici configurati restano cifrati lato client. Identificativi, metadati, file SQLite e backup non sono coperti da un claim di cifratura integrale; servono anche le protezioni del sistema operativo e del deployment.</p>
           </div>
           <div class="card">
             <h3>Chi è responsabile</h3>
-            <p>Il professionista resta titolare del trattamento. MediFlow è lo strumento, non l'esecutore.</p>
+            <p>MediFlow è uno strumento tecnico. Titolare, responsabili e obblighi dipendono dagli attori e dal contesto organizzativo in cui viene installato.</p>
           </div>
         </div>
       </div>
@@ -578,7 +578,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
         <div class="grid cols-2">
           <div class="card">
             <h3>Modello di dispiegamento</h3>
-            <p>Single-tenant locale. Un nodo per professionista. Niente server centrale da mantenere, niente perimetro multi-paziente da difendere a livello di rete.</p>
+            <p>Un Mac home-base conserva lo storage autorevole. La rete locale paired è opt-in, capability-scoped e separata da cache, export e backup.</p>
           </div>
           <div class="card">
             <h3>Compatibilità con il SSR</h3>
@@ -590,7 +590,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
           </div>
           <div class="card">
             <h3>Costi nascosti</h3>
-            <p>Nessun canone per AI cloud. Nessun lock-in proprietario di formato dati: l'export FHIR R4 e la cifratura aperta tengono basso il costo di uscita.</p>
+            <p>Il runtime AI locale non richiede per default un canone cloud. Export JSON, backup e mappatura FHIR R4 export-only v0, che non attesta interoperabilità completa, rendono il percorso di uscita ispezionabile.</p>
           </div>
         </div>
       </div>
@@ -613,15 +613,15 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
     <div class="grid cols-2 reveal">
       <div class="card pillar">
         <h3>① Locale prima di tutto <span class="tag">default</span></h3>
-        <p>I dati clinici non escono dal computer per impostazione predefinita. Niente telemetria, niente sincronizzazione automatica, niente chiamate AI verso servizi esterni. Se una funzione richiedesse un canale remoto, viene aggiunta in modo esplicito, documentata e disattivabile.</p>
+        <p>Il Mac home-base mantiene lo storage autorevole. Client paired, cache, export e backup sono percorsi espliciti; niente telemetria e niente AI remota nel runtime clinico di default.</p>
       </div>
       <div class="card pillar">
-        <h3>② Zero conoscenza a riposo <span class="tag">cifratura</span></h3>
-        <p>I campi sensibili sono cifrati lato client con AES-256-GCM prima della scrittura. Il PIN non viene mai salvato. La chiave principale viene derivata dal PIN, custodita in memoria solo durante la sessione e mai sul disco. Nessun ripristino possibile in caso di smarrimento del PIN: è una garanzia, non un bug.</p>
+        <h3>② Cifratura clinica per campo <span class="tag">cifratura</span></h3>
+        <p>I campi clinici configurati sono cifrati lato client con AES-256-GCM prima della scrittura. Il PIN non viene persistito e la chiave aperta resta in memoria durante la sessione. Questo perimetro non equivale alla cifratura integrale di SQLite, identificativi, metadati o backup.</p>
       </div>
       <div class="card pillar">
         <h3>③ Standard aperti <span class="tag">interoperabilità</span></h3>
-        <p>ICD-11 per le diagnosi, ATC e AIC per i farmaci, LOINC e UCUM per le osservazioni, FHIR R4 per l'esportazione. Niente formato proprietario quando esiste un formato condiviso a livello internazionale.</p>
+        <p>Il resolver ICD-11 è opzionale e i problemi free-text restano reviewable. ATC, AIC, LOINC e UCUM sono supporti di codifica; FHIR R4 è oggi una mappatura export-only v0.</p>
       </div>
       <div class="card pillar">
         <h3>④ AI revisionabile <span class="tag">no automatismi</span></h3>
@@ -736,7 +736,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
         <g font-family="-apple-system,Inter,sans-serif" style="fill:var(--ink)">
           <rect x="680" y="340" width="180" height="60" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="770" y="364" text-anchor="middle" font-size="13" font-weight="600">medical.db</text>
-          <text x="770" y="384" text-anchor="middle" font-size="11" style="fill:var(--muted)">SQLite cifrato</text>
+          <text x="770" y="384" text-anchor="middle" font-size="11" style="fill:var(--muted)">SQLite · campi clinici cifrati</text>
 
           <rect x="880" y="340" width="180" height="60" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="970" y="364" text-anchor="middle" font-size="13" font-weight="600">backup notturno</text>
@@ -794,7 +794,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
       </div>
       <div class="card">
         <h3>Servizi locali allowlisted</h3>
-        <p>I proxy verso AI e ICD-11 accettano solo destinazioni localhost. Nessun rischio di SSRF verso indirizzi remoti.</p>
+        <p>I proxy verso AI e ICD-11 applicano una allowlist localhost e porte previste, riducendo la superficie SSRF senza trasformarla in una garanzia assoluta.</p>
       </div>
     </div>
   </div>
@@ -822,7 +822,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
         <div class="step">FLUSSO · 02</div>
         <div class="body">
           <h4>Scrittura clinica dal browser</h4>
-          <p>I campi sensibili (note, allegati, riassunti AI) vengono cifrati nel browser prima di partire verso l'API. Sul disco arrivano solo stringhe nella forma <code>ENC:iv:cipher</code>. Il server non vede mai il testo in chiaro.</p>
+          <p>I campi clinici configurati vengono cifrati nel browser prima della persistenza. Per quei campi il payload usa la forma <code>ENC:iv:cipher</code>; il confine non si estende automaticamente a identificativi, metadati, intero file SQLite o backup.</p>
         </div>
       </div>
 
@@ -838,7 +838,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
         <div class="step">FLUSSO · 04</div>
         <div class="body">
           <h4>Documento → OCR → sintesi → archivio</h4>
-          <p>Il referto caricato passa al servizio OCR locale (Ollama), che lo rende testo. Un secondo passaggio AI estrae sintesi, qualità del segnale e codici ICD esplicitamente presenti. Il risultato viene cifrato e attaccato al paziente come allegato + artefatto di evidenza.</p>
+          <p>Il referto caricato può passare ai servizi OCR e AI locali. Testo, sintesi e codici candidati restano artefatti con fonte e revisione; i campi clinici configurati vengono cifrati prima della persistenza.</p>
         </div>
       </div>
 
@@ -879,7 +879,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
           <li>leggere log applicativi, screenshot o crash report</li>
           <li>annusare il traffico locale verso i client</li>
         </ul>
-        <p style="margin-top:14px">Per ognuno dei tre, la cifratura a riposo, la redazione dei log e il proxy TLS locale forniscono una difesa esplicita.</p>
+        <p style="margin-top:14px">Cifratura dei campi configurati, redazione dei log e TLS locale mitigano questi scenari entro confini distinti; non equivalgono alla cifratura integrale del database o dei backup.</p>
       </div>
       <div class="card">
         <h3>Cosa non copriamo</h3>
@@ -895,7 +895,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
       </div>
       <div class="card">
         <h3>Logging e redazione</h3>
-        <p>I log applicativi non contengono mai campi paziente decifrati, OCR grezzo, prompt AI completi o allegati. L'audit clinico è separato dai log tecnici: è strutturato, versionato e append-only, con catalogo di eventi minimo.</p>
+        <p>La policy vieta campi paziente decifrati, OCR grezzo, prompt AI completi e allegati nei log applicativi. L'audit clinico è separato dai log tecnici: è strutturato, versionato e append-only, con catalogo di eventi minimo.</p>
       </div>
       <div class="card">
         <h3>Boundary verso servizi esterni</h3>
@@ -911,17 +911,17 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
     <div class="section-head reveal">
       <div class="kicker">Interoperabilità</div>
       <h2>Standard veri, non promesse.</h2>
-      <p class="lead">Ogni dato clinico ha un codice riconosciuto a livello internazionale. Niente vincoli proprietari sui formati di esportazione.</p>
+      <p class="lead">Terminologie ed export sono supporti documentati, non garanzie universali. Free-text e revisione clinica restano parte del modello.</p>
     </div>
 
     <div class="grid cols-4 reveal">
       <div class="card">
         <h3>ICD-11</h3>
-        <p>Diagnosi codificate secondo il sistema OMS, via API locale. Niente più testo libero ambiguo.</p>
+        <p>Resolver OMS locale opzionale per candidati ICD-11. Diagnosi e problemi free-text restano ammessi e reviewable.</p>
       </div>
       <div class="card">
         <h3>FHIR R4</h3>
-        <p>Esportazione della cartella in pacchetto JSON HL7 FHIR R4: Patient, Condition, Encounter, MedicationStatement, Observation.</p>
+        <p>Mappatura export-only v0 in un Bundle R4 <code>collection</code>. Non attesta conformità completa né ingestione da parte di altri sistemi.</p>
       </div>
       <div class="card">
         <h3>ATC · AIC</h3>
@@ -950,10 +950,10 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
         <div class="ver"><b>v0.3.0</b> · fondamenta</div>
         <h4>Le radici tecniche</h4>
         <ul>
-          <li>Migrazione a SQLite cifrato (addio storage browser)</li>
-          <li>Cifratura zero-knowledge attiva</li>
-          <li>AI locale: Qwen per testo, DeepSeek per OCR via Ollama</li>
-          <li>Diagnosi standardizzate ICD-11</li>
+          <li>Migrazione da storage browser a SQLite locale</li>
+          <li>Introduzione della cifratura lato client per campi clinici configurati</li>
+          <li>Prime pipeline AI e OCR locali via Ollama</li>
+          <li>Supporto iniziale al resolver ICD-11, con free-text preservato</li>
           <li>Multi-ambulatorio con identificazione visiva</li>
         </ul>
       </div>
@@ -965,7 +965,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
           <li>API locale governata: baseline OpenAPI <code>/api/v1</code> e guardrail anti-deriva</li>
           <li>Pipeline OCR-first con import revisionabile</li>
           <li>Archivio intelligente operabile (pulizia, persistenza farmaci, allineamento insight)</li>
-          <li>Audit append-only, lockout autenticazione, cambio PIN zero-knowledge</li>
+          <li>Audit append-only, lockout autenticazione e gestione documentata delle chiavi</li>
           <li>Backup automatico, scheduler notturno, retention</li>
         </ul>
       </div>
@@ -1072,8 +1072,8 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
         <p>Il software funziona prima di tutto sul dispositivo del professionista. La rete è opzionale e governata. Il contrario è "cloud-first": app che hanno bisogno di un server centrale per funzionare e mandano lì i dati.</p>
       </details>
       <details class="term">
-        <summary>Zero-knowledge a riposo</summary>
-        <p>I dati clinici sul disco sono illeggibili senza il PIN. Nemmeno chi ha scritto il software o gestisce il computer può leggerli senza inserire il PIN. Niente backdoor di recupero: questa è la garanzia, ma anche la responsabilità del professionista.</p>
+        <summary>Cifratura clinica per campo</summary>
+        <p>I campi clinici configurati sono cifrati lato client con una chiave aperta durante la sessione. Il perimetro non include automaticamente identificativi, metadati, intero file SQLite, export o backup.</p>
       </details>
       <details class="term">
         <summary>AES-256-GCM</summary>
@@ -1085,11 +1085,11 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
       </details>
       <details class="term">
         <summary>FHIR R4</summary>
-        <p>Standard internazionale (HL7 FHIR, versione R4) per scambiare dati sanitari tra sistemi. MediFlow lo usa per esportare la storia clinica in un formato che altri sistemi sono in grado di leggere.</p>
+        <p>Standard internazionale per rappresentare dati sanitari. MediFlow implementa oggi una mappatura export-only v0 in un Bundle R4 <code>collection</code>, senza attestare conformità o importabilità universale.</p>
       </details>
       <details class="term">
         <summary>ICD-11</summary>
-        <p>Classificazione internazionale delle malattie, undicesima edizione, curata dall'OMS. Permette di codificare una diagnosi con un identificativo univoco (ad esempio <code>5A10</code>), invece che con un testo libero soggetto a interpretazione.</p>
+        <p>Classificazione internazionale delle malattie curata dall'OMS. MediFlow offre un resolver locale opzionale; diagnosi e problemi free-text restano ammessi e reviewable.</p>
       </details>
       <details class="term">
         <summary>ATC, AIC</summary>
@@ -1101,7 +1101,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
       </details>
       <details class="term">
         <summary>SQLite</summary>
-        <p>Un database che vive in un singolo file sul disco, senza bisogno di un server. Per MediFlow è il file <code>medical.db</code>, sempre cifrato.</p>
+        <p>Un database che vive in un singolo file sul disco, senza bisogno di un server. In MediFlow il file <code>medical.db</code> contiene anche campi clinici cifrati, ma non è cifrato integralmente.</p>
       </details>
       <details class="term">
         <summary>Ollama</summary>
@@ -1148,7 +1148,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
           <span style="color:var(--ink-0); font-weight:600">MediFlow</span>
         </div>
         <p style="max-width:480px">
-          Una cartella clinica locale, cifrata, con AI sul dispositivo. Codice aperto, contratti stabili,
+          Una cartella clinica local-first, con cifratura clinica per campo e AI locale opzionale. Codice aperto, contratti stabili,
           niente promesse che non possiamo mantenere.
         </p>
       </div>
