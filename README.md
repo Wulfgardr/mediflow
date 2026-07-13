@@ -128,10 +128,10 @@ Apple/native sul mainline con macOS come fronte più avanzato e iPhone e iPad co
 client paired sul modello `home-base`.
 
 - **ciclo di vita paziente sul boundary paired**: creazione, cestino con soft-delete e ripristino dal client Apple, con concorrenza ottimistica e senza accesso diretto al database;
-- **prestazioni, protesica ed export FHIR sul client paired**: nuove famiglie cliniche sul boundary con concorrenza ottimistica, e bundle FHIR generato on-device con pre-check di validazione FSE;
+- **prestazioni, protesica ed export FHIR sul client paired**: nuove famiglie cliniche sul boundary con concorrenza ottimistica, e mappatura export-only v0 in un Bundle FHIR R4 `collection` generato on-device con pre-check FSE locale, senza claim di conformità completa a profili o ingestione di terze parti;
 - **web app locale** come superficie primaria di lavoro sul Mac;
 - **Kree8 cockpit** come root web live, con una direzione visuale unica e senza selector persistiti: copy asciutto, palette semantica sobria, dark mode completa e flusso a un clic verso la Scheda paziente;
-- **database SQLite cifrato**, con approccio zero-knowledge;
+- **campi clinici sensibili cifrati lato client** con AES-256-GCM; il PIN non viene persistito, ma il file SQLite, gli identificativi, alcuni metadati e i backup non rientrano tutti in un perimetro whole-database cifrato verificato;
 - **backup, audit e contratto `/api/v1`** resi più chiari ed espliciti;
 - **AI locale** per insight e OCR, senza egress di default;
 - **import documentale reviewable**, con Smart Import prudente, artifact `parse/evidence`, ancore fonte e benchmark di assorbimento evidenza;

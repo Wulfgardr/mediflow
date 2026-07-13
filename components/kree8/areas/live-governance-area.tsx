@@ -94,7 +94,8 @@ function LiveGovernanceArea({
             Stato operativo <em>· controlli della postazione</em>
           </h1>
           <p className={styles.areaSubtitle}>
-            I dati clinici non lasciano il dispositivo.
+            Storage autorevole sul Mac home-base; accessi paired, cache ed export
+            restano percorsi espliciti.
           </p>
         </div>
       </header>

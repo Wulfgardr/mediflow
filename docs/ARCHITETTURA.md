@@ -16,7 +16,8 @@ MediFlow oggi va letto così:
 
 - **web app locale** come superficie primaria: la root `/` apre direttamente il
   cockpit Kree8, senza selector di shell;
-- **SQLite cifrato** come storage autorevole;
+- **SQLite locale** come storage autorevole, con campi clinici sensibili
+  cifrati lato client e senza claim di cifratura integrale del file;
 - **`/api/v1`** come contratto condiviso per i client Apple;
 - **`home-base` read-only-first** con write online limitati/versionati su
   profilo/status paziente, diario clinico, terapie, checkup e osservazioni;
@@ -80,7 +81,8 @@ Sul fronte cancellazione, il dato non viene orfanato: la rimozione di un
 paziente scrive un tombstone reversibile (`deletedAt` / `deletionReason`) con
 version guard, senza staccare i figli clinici. L'erasure GDPR esplicita
 (`purge-patient`) e il `restore-patient` restano azioni admin separate e
-audited. Il dato cifrato non viene mai sovrascritto dal placeholder
+audited; la purge non raggiunge backup gia esportati. Il dato cifrato non viene
+mai sovrascritto dal placeholder
 `[LOCKED DATA]`, che è solo presentazione.
 
 ---
@@ -93,7 +95,7 @@ Le superfici principali sono tre:
 | --- | --- | --- |
 | `/api/*` | sessione web | CRUD web e overview locale |
 | `/api/v1/*` | bearer token locale | contratto condiviso per client Apple |
-| `/api/v1/network/*` | paired client + sessione operatore | perimetro `home-base`, read-only-first con write versionati su ciclo di vita paziente, diario, terapie, checkup, osservazioni, prestazioni e protesica, piu export FHIR lato client, validazione FSE, revisione e discovery; cataloghi in sola lettura |
+| `/api/v1/network/*` | paired client + sessione operatore | perimetro `home-base`, read-only-first con write versionati su ciclo di vita paziente, diario, terapie, checkup, osservazioni, prestazioni e protesica, piu mappatura export-only v0 in un Bundle FHIR R4 `collection` lato client e pre-check FSE locale, senza claim di conformità completa; cataloghi in sola lettura |
 
 Le sotto-risorse cliniche (diario, terapie, checkup, osservazioni) condividono
 un ciclo di vita unificato: version guard con `409` sulle scritture, liste che

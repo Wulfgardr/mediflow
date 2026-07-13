@@ -21,10 +21,12 @@ Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/mark
 
 ## 🧭 Snapshot corrente
 
-1. **Local-first di default**: il dato resta sul computer locale e nessun cloud
-   entra nel runtime operativo per default.
-2. **Zero-knowledge a riposo**: i campi clinici e gli artifact documentali
-   persistono cifrati lato client.
+1. **Local-first di default**: lo storage autorevole resta sul nodo `home-base`;
+   client paired, cache locali ed export/backup espliciti completano il
+   perimetro. Nessun cloud entra nel runtime operativo per default.
+2. **Cifratura clinica per campo a riposo**: i campi configurati e gli artifact
+   documentali sensibili persistono cifrati lato client. Il file SQLite non è
+   cifrato integralmente.
 3. **Home-base opt-in**: esiste una slice `network-home-base` su
    `/api/v1/network/*` con read pazienti, write versionati su
    profilo/status, diario, terapie, checkup e osservazioni, mentre hard delete
@@ -63,8 +65,8 @@ Per la mappa documentale completa usa [docs/README.md](./README.md) e [docs/mark
 
 ## 🔒 Dati e cifratura
 
-Tutto cio che e clinicamente sensibile viene cifrato lato client prima della
-persistenza. Questo include:
+I campi configurati come sensibili vengono cifrati lato client prima della
+persistenza. Il mapping corrente include:
 
 - campi paziente (`address`, `phone`, `notes`, `aiSummary`, `documentInsights`)
 - contenuti del diario clinico
@@ -79,7 +81,9 @@ ENC:<iv_b64>:<cipher_b64>
 ```
 
 Il server non possiede la chiave in chiaro; la master key vive solo nella
-sessione attiva del browser/client. Il soft-delete paziente (ADR 0066) scrive un
+sessione attiva del browser/client. Identificativi e alcuni metadati restano
+fuori dal mapping: il PIN non equivale a zero-knowledge sull'intero database.
+Il soft-delete paziente (ADR 0066) scrive un
 tombstone reversibile (`deletedAt` / `deletionReason`) con version guard e non
 orfana i figli clinici; il dato cifrato non viene mai sovrascritto dal
 placeholder `[LOCKED DATA]`, che resta solo di presentazione.

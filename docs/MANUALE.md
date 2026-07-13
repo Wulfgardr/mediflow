@@ -39,9 +39,9 @@ Al primo avvio ti chiederò di creare un **Profilo Medico** e un **PIN**.
 Il PIN è la chiave che protegge i dati.
 
 > [!WARNING]
-> **Se perdi il PIN, perdi i dati.** Non c'è "recupero password" via email, e non c'è un server centrale che può aiutarti.
+> **Se perdi il PIN, MediFlow non può aprire i campi clinici cifrati con quella chiave.** Non c'è "recupero password" via email, né un servizio centrale di recupero.
 
-Questo è il prezzo di una privacy forte: controllo totale, ma nessuna backdoor.
+Questo è un confine della gestione locale delle chiavi, non un claim di cifratura integrale del database.
 
 ---
 
@@ -97,12 +97,16 @@ MediFlow può leggere documenti clinici e produrre sintesi direttamente in local
 
 Puoi aggiungere farmaci e mantenere una lista terapie aggiornata.
 
-### Diagnosi (ICD-11)
+### Diagnosi e resolver ICD-11
 
-Le diagnosi usano lo standard OMS ICD-11.
+Il resolver OMS ICD-11 è opzionale: può proporre un codice strutturato, che
+resta da rivedere prima del salvataggio. I problemi clinici possono anche
+restare free-text.
 
-* Inserisci una diagnosi e ottieni suggerimenti codificati (es. `5A10`).
-* Risultato: più precisione clinica e migliore interoperabilità.
+* Inserisci una diagnosi e, quando utile, richiedi un suggerimento codificato
+  (es. `5A10`).
+* Un codice strutturato può supportare riuso futuro; non garantisce da solo
+  validità clinica o interoperabilità.
 
 ---
 

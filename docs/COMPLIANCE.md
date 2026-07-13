@@ -13,50 +13,81 @@ Riferimenti correlati:
 
 ## ⚖️ 1. GDPR e privacy
 
-MediFlow segue il principio **Privacy by Design**.
-Nel contesto clinico, il medico resta il **Titolare del Trattamento**: il software è uno strumento, non un sostituto delle responsabilità.
+MediFlow applica misure tecniche coerenti con il principio **Privacy by
+Design**. Queste misure possono supportare la protezione dei dati, ma non
+certificano da sole la conformità GDPR.
+
+Ruoli e obblighi dipendono da finalità, mezzi e contesto effettivi del singolo
+deployment. Il software non assegna automaticamente il ruolo di titolare o
+responsabile del trattamento: la valutazione resta in capo all'organizzazione
+che usa MediFlow.
 
 ### Misure Tecniche di Sicurezza
 
-Per supportare gli obblighi GDPR (Art. 32), MediFlow implementa:
+MediFlow mette a disposizione misure tecniche che possono concorrere alla
+protezione richiesta dal contesto operativo:
 
-1. **Cifratura at-rest (AES-256)**: senza PIN i dati non sono leggibili.
-2. **Zero-knowledge**: il PIN non viene salvato e non esistono backdoor di recupero.
-3. **Minimizzazione**: niente telemetria e nessun egress di default verso terze parti.
-4. **Local-first**: i dati restano sul dispositivo del professionista.
+1. **Cifratura clinica per campo (AES-256-GCM)**: i campi elencati in
+   `ENCRYPTED_FIELDS` vengono cifrati lato client prima della persistenza. Il
+   file SQLite non è cifrato integralmente: identificativi, alcuni metadati e
+   gli artefatti di backup non rientrano tutti nello stesso perimetro
+   whole-database verificato.
+2. **Chiavi e PIN**: il PIN non viene persistito e la master key viene aperta
+   solo nella memoria del client durante la sessione. Questo non equivale a un
+   claim zero-knowledge sull'intero database.
+3. **Minimizzazione**: telemetria, cloud sync ed egress PHI non sono attivi per
+   default.
+4. **Local-first**: lo storage autorevole resta sul nodo `home-base`. Client
+   paired sulla LAN, cache locali ed export/backup avviati dall'operatore sono
+   percorsi espliciti, non eccezioni nascoste.
 
 ### Strumenti per i Diritti dell'Interessato
 
-Il GDPR garantisce diritti specifici ai pazienti. In MediFlow:
+MediFlow offre strumenti che possono aiutare l'operatore a gestire richieste
+degli interessati:
 
-* **Diritto all'oblio (Art. 17)**: la cancellazione del paziente scrive un tombstone reversibile (`deletedAt` / `deletionReason`) con version guard, senza orfanare i figli clinici. L'erasure GDPR esplicita è l'azione admin `purge-patient`, con dry-run e audit `patient.purged`; il ripristino è `restore-patient`, con audit `patient.restored`.
-* **Portabilità dei dati (Art. 20)**: puoi esportare la storia clinica in formato interoperabile (vedi sotto).
+* **Cancellazione ed erasure**: il DELETE operativo scrive un tombstone
+  reversibile (`deletedAt` / `deletionReason`) con version guard. L'azione admin
+  `purge-patient` rimuove il grafo paziente dal database live con dry-run e
+  audit `patient.purged`; non raggiunge backup già esportati, che devono essere
+  gestiti separatamente. `restore-patient` ripristina un tombstone e registra
+  `patient.restored`.
+* **Accesso e portabilità**: gli export possono supportare la risposta a una
+  richiesta. La loro disponibilità non prova da sola l'adempimento degli
+  articoli 17, 20 o 32 né sostituisce la valutazione del caso concreto.
 
 ---
 
-## 🔌 2. Interoperabilità (FHIR R4)
+## 🔌 2. Export FHIR R4 (v0)
 
-MediFlow adotta **HL7 FHIR R4** per evitare lock-in e facilitare integrazione/export.
+Lo storage interno di MediFlow non è FHIR-native. L'export locale genera una
+mappatura **export-only v0** in un `Bundle` FHIR R4 di tipo `collection`.
 
 ### Export FHIR
 
-Con l'export clinico viene generato un pacchetto JSON compatibile FHIR R4.
-
 | Risorsa FHIR | Contenuto |
 |---|---|
-| `Patient` | Anagrafica |
-| `Condition` | Diagnosi (codificate ICD-11/ICD-9) |
-| `Encounter` | Visite effettuate |
-| `MedicationStatement` | Terapie prescritte |
-| `Observation` | Note e parametri rilevati |
+| `Patient` | Campi anagrafici e identificativi selezionati |
+| `Condition` | Diagnosi strutturate presenti nel profilo |
+| `Encounter` | Una risorsa per ogni voce di diario clinico non eliminata |
+| `MedicationStatement` | Terapie, con farmaco rappresentato oggi come testo |
+| `Observation` | Scale con punteggio e osservazioni strutturate |
 
-Obiettivo: mantenere i dati riusabili anche fuori da MediFlow.
+I test correnti verificano il mapping su fixture sintetiche. Non attestano
+conformità completa alla base R4, a profili HL7 Italia/FSE, correttezza
+terminologica o ingestione da parte di sistemi terzi. L'export è una base di
+trasporto limitata ai record mappati, non una garanzia di interoperabilità o
+portabilità completa.
 
 ---
 
 ## 🩺 3. Standard diagnostici (ICD-11)
 
-Le diagnosi non restano solo testo libero: MediFlow integra ICD-11 via API OMS locale.
+Un resolver locale ICD-11 opzionale può supportare ricerca e codifica tramite
+API OMS locale.
 
-* **Precisione clinica**: ogni diagnosi ha codice univoco (es. `5A10`).
-* **Interoperabilità futura**: più dati strutturati, meno ambiguità nei flussi FSE.
+* **Codifica reviewable**: le diagnosi strutturate possono includere un codice;
+  i problemi free-text restano ammessi e non sono garantiti come codificati o
+  validati.
+* **Direzione futura**: più dati strutturati possono ridurre ambiguità nei
+  flussi FSE, dopo profili e verifiche dedicate.

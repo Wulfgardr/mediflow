@@ -9,15 +9,16 @@ Questa roadmap non sostituisce la normativa nazionale/regionale: definisce il pi
 tecnico di MediFlow per supportare i requisiti documentali in modo incrementale.
 
 Chiave di lettura: percorso pragmatico ispirato a pratiche mature open source
-(incluso il lavoro su OpenHospital), adattato ai vincoli MediFlow
-local-first e zero-knowledge.
+(incluso il lavoro su OpenHospital), adattato ai vincoli MediFlow local-first e
+alla cifratura clinica per campo.
 
 ---
 
 ## Vincoli non negoziabili (già decisi)
 
 - Local-first: nessuna dipendenza cloud di default.
-- Zero-knowledge at rest: nessuna decifratura lato server.
+- Cifratura per campo a riposo: i campi clinici configurati arrivano al server
+  come ciphertext; identificativi e alcuni metadati restano fuori dal mapping.
 - Contratto stabile via API versionate (`/api/v1/*`).
 - Diff piccoli e reversibili, con migrazioni esplicite.
 
@@ -31,7 +32,8 @@ Riferimenti interni:
 
 ## Stato attuale (baseline)
 
-- Diagnosi: `ICD-11` (provider WHO via API locale).
+- Diagnosi: provider ICD-11 OMS opzionale via API locale; i record possono
+  includere ICD-9/10/11 o problemi free-text reviewable.
 - Farmaci: `AIC` (catalogo AIFA locale).
 - Farmaci (classificazione): `ATC` presente nel modello dati, da rendere first-class nei flussi.
 - Esenzioni: catalogo locale dedicato già operativo.

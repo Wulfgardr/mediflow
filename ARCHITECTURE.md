@@ -17,7 +17,10 @@ Per il resto:
 
 - **Local-first / offline-first** di default.
 - **Privacy-by-design**: nessuna uscita verso cloud (telemetria, sync, chiamate AI) se non esplicitamente implementata e documentata.
-- **Zero-knowledge a riposo**: il database SQLite deve essere illeggibile senza il PIN utente.
+- **Cifratura clinica per campo a riposo**: i campi sensibili devono essere
+  cifrati lato client con AES-256-GCM. Il file SQLite, gli identificativi,
+  alcuni metadati e i backup non sono tutti coperti da un perimetro
+  whole-database verificato.
 - **Manutenibilità**: diff minimi, codice chiaro, contratti espliciti.
 
 ## ⚠️ Non-obiettivi (per ora)
@@ -78,6 +81,8 @@ create documentale manuale per client trusted su LAN.
 
 - Lo storage autorevole è un **singolo file SQLite** (`medical.db`).
 - I campi sensibili sono cifrati **lato client** (browser / client native) prima della scrittura su disco.
+- Il file SQLite non è cifrato integralmente: il PIN non viene persistito, ma
+  questo non equivale a zero-knowledge sull'intero database.
 - Anche gli artifact documentali (`attachments.summarySnapshot`,
   `attachments.parseEvidenceArtifactSnapshot`) sono trattati come dati clinici e
   persistiti cifrati.
@@ -100,7 +105,7 @@ MediFlow espone due superfici API:
   - protetta da **token locale** (trasporto su HTTPS locale via TLS proxy)
 - **Network API** (`/api/v1/network/*`):
   - si attiva solo in modalita `network-home-base`
-  - resta read-only-first, con write versionati su ciclo di vita paziente (creazione, cestino, ripristino), profilo/status, diario clinico, terapie, checkup, osservazioni, prestazioni e protesica, piu export FHIR generato lato client (nodo keyless), validazione FSE, guardia di revisione e discovery capabilities/identity/node in dual-auth
+  - resta read-only-first, con write versionati su ciclo di vita paziente (creazione, cestino, ripristino), profilo/status, diario clinico, terapie, checkup, osservazioni, prestazioni e protesica, piu mappatura export-only v0 in un Bundle FHIR R4 `collection` generato lato client (nodo keyless), pre-check FSE locale, guardia di revisione e discovery capabilities/identity/node in dual-auth; nessun claim di conformità completa a profili o ingestione di terze parti
   - i cataloghi (farmaci, esenzioni, terminologia, prestazioni) sono esposti in sola lettura
   - il dominio documentale consente lettura e create manuale cifrato, riferimenti allegato sigillati e compute deterministici senza persistenza; restano esclusi PUT/DELETE paired degli allegati, artifact document-derived, invocazione AI, hard delete remoto, sync e write offline (ADR 0076)
   - disattivare la modalita non revoca i pairing: i token dei client paired

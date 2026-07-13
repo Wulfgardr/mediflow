@@ -253,11 +253,15 @@ revisione operatore.
 - la cancellazione paziente e un soft-delete reversibile (ADR 0066): scrive un
   tombstone (`deletedAt` / `deletionReason`) con version guard, non orfana i
   figli clinici e lascia invariato il contratto API. L'erasure GDPR esplicita
-  resta un'azione admin separata (`purge-patient` con dry-run, `restore-patient`)
+  resta un'azione admin separata (`purge-patient` con dry-run, `restore-patient`);
+  la purge agisce sul database live e non raggiunge backup gia esportati
 
 ### Cifratura lato client (web)
 
-Il server non vede i dati in chiaro. La cifratura avviene nel browser prima della scrittura:
+I campi elencati in `lib/db.ts` (`ENCRYPTED_FIELDS`) vengono cifrati nel browser
+prima della scrittura e arrivano al server come ciphertext. Identificativi e
+alcuni metadati restano fuori da quel mapping: il file SQLite non è cifrato
+integralmente e il PIN non abilita un claim zero-knowledge whole-database.
 
 ```
 Dato originale -> AES-256-GCM -> "ENC:<iv_b64>:<cipher_b64>" -> DB

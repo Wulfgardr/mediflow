@@ -105,14 +105,15 @@ npm run check:never-regress
 
 Il guard fallisce se trova:
 - credenziali di default hardcoded nel runtime
-- endpoint runtime non locali o telemetry default-on
+- endpoint runtime non locali o attivazione implicita della telemetria
 - rotture delle invarianti zero-knowledge minime
 
 ### Claims guard
 
-Per bloccare claim di prodotto fuori scope (autonomia clinica AI, auto-apply senza
-review, integrazione regionale SISS/FSE certificata nativa, prescrizione regionale,
-cloud di default), ancorati all'ADR 0065:
+Per bloccare claim di prodotto fuori scope (autonomia clinica AI, auto-apply
+senza review, integrazione regionale SISS/FSE, cloud di default, cifratura
+whole-database, claim FHIR non qualificati, garanzie GDPR, topologia single-device e
+codifica ICD obbligatoria), ancorati all'ADR 0065:
 
 ```bash
 npm run check:claims
