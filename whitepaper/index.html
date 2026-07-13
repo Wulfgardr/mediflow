@@ -4,45 +4,58 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <title>MediFlow · White paper</title>
-<meta name="description" content="MediFlow: cartella clinica locale, cifrata, con AI sul dispositivo. Cosa è, come funziona, dove va." />
-<meta name="theme-color" content="#0a1018" />
+<meta name="description" content="MediFlow: cartella clinica local-first, cifratura clinica per campo e AI locale opzionale. Cosa è, come funziona, dove va." />
+<meta name="theme-color" content="#eef0f2" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#121417" media="(prefers-color-scheme: dark)" />
 <style>
 /* =====================================================================
    MEDIFLOW · WHITE PAPER
-   Liquid glass, asciutto, italiano semplice.
+   Superfici Lume opache, asciutto, italiano semplice.
    ===================================================================== */
 
 :root{
-  --bg-0:#070b11;
-  --bg-1:#0a1018;
-  --bg-2:#0f1722;
-  --ink-0:#f4f7fb;
-  --ink-1:#cdd6e2;
-  --ink-2:#92a0b3;
-  --ink-3:#5d6b80;
-  --line:rgba(255,255,255,.08);
-  --line-strong:rgba(255,255,255,.18);
+  /* === Lume · superfici canoniche (Giorno) ======================== */
+  --canvas:#eef0f2;
+  --field:#f5f5f4;
+  --focal:#fbfaf7;
+  --chrome:#e6e8eb;
+  --ink:#1a1c1e;
+  --muted:#5c6772;
+  --accent:#33506b;
 
-  --teal:#5fe3c7;
-  --teal-deep:#1aa089;
-  --azure:#7cc7ff;
-  --violet:#b59bff;
-  --amber:#ffc674;
-  --rose:#ff8aa8;
-
-  --glass:rgba(255,255,255,.045);
-  --glass-strong:rgba(255,255,255,.085);
-  --glass-edge:rgba(255,255,255,.14);
-
+  /* === Linee 1px e raggi 20/14/10 ================================= */
+  --line:rgba(26,28,30,.10);
+  --line-strong:rgba(26,28,30,.18);
   --r-1:10px;
-  --r-2:18px;
-  --r-3:28px;
+  --r-2:14px;
+  --r-3:20px;
 
-  --shadow-1:0 1px 0 rgba(255,255,255,.05) inset, 0 20px 50px -20px rgba(0,0,0,.55);
-  --shadow-2:0 1px 0 rgba(255,255,255,.07) inset, 0 30px 80px -30px rgba(0,0,0,.7);
+  /* === Nessuna ombra strutturale ================================= */
+  --shadow-1:none;
+  --shadow-2:none;
+
+  /* === Alias di compatibilità, rimossi in F1b/F1c ================= */
+  --ink-0:var(--ink);
+  --ink-1:var(--ink);
+  --ink-2:var(--muted);
+  --ink-3:var(--muted);
 
   --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,system-ui,sans-serif;
   --mono:"SF Mono","JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+
+@media (prefers-color-scheme: dark){
+  :root{
+    --canvas:#121417;
+    --field:#191c21;
+    --focal:#22252b;
+    --chrome:#0e1013;
+    --ink:#e9ecef;
+    --muted:#8f9aa6;
+    --accent:#8fb0cc;
+    --line:rgba(255,255,255,.10);
+    --line-strong:rgba(255,255,255,.16);
+  }
 }
 
 *{box-sizing:border-box}
@@ -51,7 +64,7 @@ html{scroll-behavior:smooth}
 body{
   font-family:var(--font);
   color:var(--ink-1);
-  background:var(--bg-0);
+  background:var(--canvas);
   -webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
   line-height:1.55;
@@ -59,65 +72,15 @@ body{
   overflow-x:hidden;
 }
 
-::selection{background:rgba(95,227,199,.28);color:#fff}
+::selection{ background:var(--accent); color:var(--focal); }
 
-/* === Background scenico ============================================ */
+/* === Focus visibile (accento) ===================================== */
+:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+/* === Background scenico (piatto, opaco) =========================== */
 .scene{
-  position:fixed; inset:0; z-index:-1; overflow:hidden;
-  background:
-    radial-gradient(1200px 800px at 12% -10%, rgba(124,199,255,.18), transparent 60%),
-    radial-gradient(900px 700px at 90% 10%, rgba(181,155,255,.18), transparent 60%),
-    radial-gradient(1100px 900px at 50% 110%, rgba(95,227,199,.16), transparent 65%),
-    linear-gradient(180deg, #060a10 0%, #080d15 50%, #060a10 100%);
-}
-.scene::before{
-  content:""; position:absolute; inset:-20%;
-  background-image:
-    radial-gradient(circle at 20% 30%, rgba(255,255,255,.05) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 80% 70%, rgba(255,255,255,.04) 0 1px, transparent 1.5px);
-  background-size: 3px 3px, 4px 4px;
-  opacity:.5;
-  mix-blend-mode:screen;
-  animation:drift 60s linear infinite;
-}
-.orb{
-  position:absolute; border-radius:50%; filter:blur(60px); opacity:.55;
-  mix-blend-mode:screen; pointer-events:none;
-  animation:float 18s ease-in-out infinite;
-}
-.orb.a{ width:520px; height:520px; left:-120px; top:-120px;
-  background:radial-gradient(circle, rgba(124,199,255,.55), transparent 60%); }
-.orb.b{ width:600px; height:600px; right:-160px; top:160px;
-  background:radial-gradient(circle, rgba(181,155,255,.5), transparent 60%);
-  animation-delay:-6s; }
-.orb.c{ width:680px; height:680px; left:30%; bottom:-260px;
-  background:radial-gradient(circle, rgba(95,227,199,.45), transparent 60%);
-  animation-delay:-12s; }
-
-@keyframes float{
-  0%,100%{ transform:translate3d(0,0,0) scale(1) }
-  50%{ transform:translate3d(20px,-30px,0) scale(1.05) }
-}
-@keyframes drift{
-  0%{ transform:translate3d(0,0,0) }
-  100%{ transform:translate3d(40px,40px,0) }
-}
-
-/* === Glass primitives ============================================== */
-.glass{
-  background:var(--glass);
-  backdrop-filter:blur(28px) saturate(160%);
-  -webkit-backdrop-filter:blur(28px) saturate(160%);
-  border:1px solid var(--glass-edge);
-  border-radius:var(--r-2);
-  box-shadow:var(--shadow-1);
-}
-.glass-strong{
-  background:var(--glass-strong);
-  backdrop-filter:blur(36px) saturate(180%);
-  -webkit-backdrop-filter:blur(36px) saturate(180%);
-  border:1px solid var(--glass-edge);
-  box-shadow:var(--shadow-2);
+  position:fixed; inset:0; z-index:-1;
+  background:var(--canvas);
 }
 
 /* === Layout ======================================================== */
@@ -130,12 +93,9 @@ body{
 }
 .nav{
   display:flex; align-items:center; gap:14px;
-  padding:10px 14px; border-radius:999px;
-  background:rgba(10,15,22,.5);
-  backdrop-filter:blur(24px) saturate(180%);
-  -webkit-backdrop-filter:blur(24px) saturate(180%);
-  border:1px solid var(--glass-edge);
-  box-shadow:var(--shadow-1);
+  padding:10px 14px; border-radius:var(--r-3);
+  background:var(--chrome);
+  border:1px solid var(--line);
 }
 .brand{
   display:flex; align-items:center; gap:10px; color:var(--ink-0);
@@ -143,27 +103,27 @@ body{
 }
 .brand-mark{
   width:28px; height:28px; border-radius:8px; position:relative;
-  background:conic-gradient(from 220deg at 50% 50%, #5fe3c7, #7cc7ff, #b59bff, #5fe3c7);
-  box-shadow:0 0 24px rgba(124,199,255,.4) inset, 0 0 0 1px rgba(255,255,255,.2);
+  background:var(--accent);
+  border:1px solid var(--line);
 }
 .brand-mark::after{
   content:""; position:absolute; inset:6px; border-radius:5px;
-  background:radial-gradient(circle at 30% 30%, rgba(255,255,255,.7), transparent 50%), #0a1018;
+  background:var(--focal);
 }
 .nav .links{
   display:flex; gap:4px; margin-left:auto; flex-wrap:wrap;
 }
 .nav .links a{
   color:var(--ink-2); text-decoration:none;
-  padding:7px 11px; border-radius:999px; font-size:13.5px;
+  padding:7px 11px; border-radius:var(--r-1); font-size:13.5px;
   transition:.25s ease; white-space:nowrap;
 }
-.nav .links a:hover{ color:var(--ink-0); background:rgba(255,255,255,.06); }
+.nav .links a:hover{ color:var(--ink-0); background:var(--field); }
 .nav .badge{
-  font-size:11.5px; color:var(--teal);
-  border:1px solid rgba(95,227,199,.4);
+  font-size:11.5px; color:var(--accent);
+  border:1px solid var(--line);
   padding:3px 9px; border-radius:999px;
-  background:rgba(95,227,199,.08);
+  background:var(--field);
   letter-spacing:.5px;
 }
 
@@ -180,11 +140,11 @@ body{
   display:inline-flex; align-items:center; gap:8px;
   font-size:12.5px; letter-spacing:1.6px; text-transform:uppercase;
   color:var(--ink-2); padding:6px 12px; border-radius:999px;
-  background:rgba(255,255,255,.04); border:1px solid var(--line);
+  background:var(--field); border:1px solid var(--line);
 }
 .eyebrow .dot{
   width:7px; height:7px; border-radius:50%;
-  background:var(--teal); box-shadow:0 0 10px var(--teal);
+  background:var(--accent);
   animation:pulse 2.4s ease-in-out infinite;
 }
 @keyframes pulse{
@@ -196,8 +156,6 @@ h1.title{
   font-size:clamp(38px, 6.4vw, 76px);
   line-height:1.02; letter-spacing:-.02em;
   margin:18px 0 18px; color:var(--ink-0); font-weight:700;
-  background:linear-gradient(180deg, #fff 0%, #c8d2e0 100%);
-  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
 }
 .lede{
   font-size:clamp(17px, 1.8vw, 21px);
@@ -206,18 +164,19 @@ h1.title{
 .hero-cta{ display:flex; gap:12px; margin-top:30px; flex-wrap:wrap; }
 .btn{
   display:inline-flex; align-items:center; gap:9px;
-  padding:12px 18px; border-radius:999px; font-size:14.5px;
+  padding:12px 18px; border-radius:var(--r-1); font-size:14.5px;
   text-decoration:none; transition:.25s ease;
-  border:1px solid var(--glass-edge);
+  border:1px solid var(--line);
   color:var(--ink-0);
 }
 .btn.primary{
-  background:linear-gradient(135deg, rgba(95,227,199,.3), rgba(124,199,255,.25));
-  border-color:rgba(95,227,199,.45);
+  background:var(--accent);
+  border-color:var(--accent);
+  color:var(--focal);
 }
-.btn.primary:hover{ transform:translateY(-1px); box-shadow:0 10px 30px -12px rgba(95,227,199,.4); }
-.btn.ghost{ background:rgba(255,255,255,.04); }
-.btn.ghost:hover{ background:rgba(255,255,255,.09); }
+.btn.primary:hover{ transform:translateY(-1px); }
+.btn.ghost{ background:var(--field); }
+.btn.ghost:hover{ background:var(--focal); }
 
 .hero-meta{
   display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:12px;
@@ -225,8 +184,7 @@ h1.title{
 }
 .hero-meta .cell{
   padding:18px 18px; border-radius:var(--r-2);
-  background:var(--glass); border:1px solid var(--glass-edge);
-  backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+  background:var(--field); border:1px solid var(--line);
 }
 .hero-meta .k{ font-size:12.5px; color:var(--ink-3); text-transform:uppercase; letter-spacing:1.4px; }
 .hero-meta .v{ font-size:18px; color:var(--ink-0); margin-top:4px; font-weight:600; }
@@ -240,7 +198,7 @@ section + section{ border-top:1px solid var(--line); }
 .section-head{ max-width:780px; margin-bottom:36px; }
 .kicker{
   font-size:12px; letter-spacing:1.8px; text-transform:uppercase;
-  color:var(--teal); margin-bottom:8px; font-weight:600;
+  color:var(--accent); margin-bottom:8px; font-weight:600;
 }
 h2{
   font-size:clamp(28px, 3.4vw, 44px); line-height:1.1; margin:0 0 14px;
@@ -265,16 +223,15 @@ p.lead{ font-size:18px; color:var(--ink-1); }
 
 .card{
   padding:22px; border-radius:var(--r-2);
-  background:var(--glass); border:1px solid var(--glass-edge);
-  backdrop-filter:blur(24px) saturate(160%); -webkit-backdrop-filter:blur(24px) saturate(160%);
+  background:var(--field); border:1px solid var(--line);
   transition:.3s ease;
 }
 .card:hover{ transform:translateY(-2px); border-color:var(--line-strong); }
 .card .icon{
   width:42px; height:42px; border-radius:12px;
   display:grid; place-items:center; margin-bottom:14px;
-  background:linear-gradient(135deg, rgba(124,199,255,.18), rgba(181,155,255,.18));
-  border:1px solid rgba(255,255,255,.12);
+  background:var(--chrome);
+  border:1px solid var(--line);
   color:var(--ink-0);
 }
 
@@ -283,26 +240,26 @@ p.lead{ font-size:18px; color:var(--ink-1); }
 .pillar h3{ display:flex; align-items:center; gap:10px; }
 .pillar .tag{
   font-size:11px; padding:3px 8px; border-radius:999px;
-  background:rgba(255,255,255,.06); color:var(--ink-2); letter-spacing:.5px;
+  background:var(--chrome); color:var(--ink-2); letter-spacing:.5px;
   border:1px solid var(--line);
 }
 
 /* === Audience tabs ================================================= */
 .tabs{
   display:flex; gap:6px; padding:6px;
-  background:var(--glass); border:1px solid var(--glass-edge);
-  border-radius:999px; backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+  background:var(--field); border:1px solid var(--line);
+  border-radius:var(--r-2);
   width:max-content; margin-bottom:22px;
 }
 .tabs button{
   appearance:none; border:none; background:transparent;
   padding:9px 16px; color:var(--ink-2); font-family:inherit; font-size:14px;
-  border-radius:999px; cursor:pointer; transition:.25s ease;
+  border-radius:var(--r-1); cursor:pointer; transition:.25s ease;
 }
 .tabs button.active{
   color:var(--ink-0);
-  background:linear-gradient(135deg, rgba(95,227,199,.25), rgba(124,199,255,.2));
-  border:1px solid rgba(255,255,255,.16);
+  background:var(--focal);
+  border:1px solid var(--line);
 }
 .panel{ display:none; animation:fade .35s ease; }
 .panel.active{ display:block; }
@@ -312,8 +269,8 @@ p.lead{ font-size:18px; color:var(--ink-1); }
 .topo{
   position:relative; padding:28px;
   border-radius:var(--r-3);
-  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
-  border:1px solid var(--glass-edge); overflow:hidden;
+  background:var(--focal);
+  border:1px solid var(--line); overflow:hidden;
 }
 .topo svg{ width:100%; height:auto; display:block; }
 .legend{
@@ -326,12 +283,11 @@ p.lead{ font-size:18px; color:var(--ink-1); }
 .flow{
   display:grid; grid-template-columns:120px 1fr; gap:18px; align-items:start;
   padding:18px 20px; border-radius:var(--r-2);
-  background:var(--glass); border:1px solid var(--glass-edge);
-  backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+  background:var(--field); border:1px solid var(--line);
   transition:.3s ease;
 }
-.flow:hover{ background:var(--glass-strong); }
-.flow .step{ font-family:var(--mono); font-size:13px; color:var(--teal); letter-spacing:.5px; }
+.flow:hover{ background:var(--focal); }
+.flow .step{ font-family:var(--mono); font-size:13px; color:var(--accent); letter-spacing:.5px; }
 .flow .body h4{ margin:0 0 6px; color:var(--ink-0); font-size:16.5px; font-weight:600; }
 .flow .body p{ margin:0; color:var(--ink-1); font-size:14.5px; }
 @media (max-width:600px){
@@ -342,21 +298,19 @@ p.lead{ font-size:18px; color:var(--ink-1); }
 .timeline{ position:relative; padding-left:30px; }
 .timeline::before{
   content:""; position:absolute; left:9px; top:0; bottom:0; width:2px;
-  background:linear-gradient(180deg, var(--teal), var(--violet), transparent);
-  opacity:.6;
+  background:var(--line-strong);
 }
 .tl-item{
   position:relative; margin-bottom:22px;
   padding:18px 20px; border-radius:var(--r-2);
-  background:var(--glass); border:1px solid var(--glass-edge);
-  backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+  background:var(--field); border:1px solid var(--line);
 }
 .tl-item::before{
   content:""; position:absolute; left:-26px; top:24px;
   width:14px; height:14px; border-radius:50%;
-  background:var(--teal); box-shadow:0 0 0 4px rgba(95,227,199,.18);
+  background:var(--accent);
 }
-.tl-item.future::before{ background:var(--violet); box-shadow:0 0 0 4px rgba(181,155,255,.2); }
+.tl-item.future::before{ background:var(--canvas); border:1px solid var(--accent); }
 .tl-item .ver{
   display:inline-flex; gap:8px; align-items:center;
   font-family:var(--mono); font-size:12.5px;
@@ -368,20 +322,18 @@ p.lead{ font-size:18px; color:var(--ink-1); }
 .tl-item ul li{ margin-bottom:5px; }
 .tl-item .pill{
   display:inline-block; font-size:11px; padding:3px 8px; border-radius:999px;
-  background:rgba(255,255,255,.06); color:var(--ink-2); letter-spacing:.5px;
+  background:var(--chrome); color:var(--ink-2); letter-spacing:.5px;
   border:1px solid var(--line); margin-left:6px;
 }
-.tl-item.future .pill{ background:rgba(181,155,255,.1); color:var(--violet); border-color:rgba(181,155,255,.3); }
+.tl-item.future .pill{ background:var(--chrome); color:var(--accent); border-color:var(--line-strong); }
 
 /* === Glossary ====================================================== */
 details.term{
   padding:16px 18px; border-radius:14px;
-  background:var(--glass); border:1px solid var(--glass-edge);
-  backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
-  margin-bottom:8px; cursor:pointer;
+  background:var(--field); border:1px solid var(--line);  margin-bottom:8px; cursor:pointer;
   transition:.25s ease;
 }
-details.term[open]{ background:var(--glass-strong); }
+details.term[open]{ background:var(--focal); }
 details.term summary{
   list-style:none; display:flex; align-items:center; gap:10px;
   color:var(--ink-0); font-weight:600;
@@ -389,17 +341,16 @@ details.term summary{
 details.term summary::-webkit-details-marker{ display:none; }
 details.term summary::before{
   content:"+"; width:20px; height:20px; border-radius:6px; display:grid; place-items:center;
-  background:rgba(255,255,255,.07); color:var(--ink-1); font-size:14px; transition:.25s ease;
+  background:var(--chrome); color:var(--ink-1); font-size:14px; transition:.25s ease;
 }
-details.term[open] summary::before{ content:"−"; background:rgba(95,227,199,.18); color:var(--teal); }
+details.term[open] summary::before{ content:"−"; background:var(--accent); color:var(--focal); }
 details.term p{ margin:10px 0 0 30px; color:var(--ink-1); font-size:14.5px; }
 
 /* === Quote / pull ================================================== */
 .pull{
   padding:32px; border-radius:var(--r-3);
-  background:linear-gradient(135deg, rgba(95,227,199,.08), rgba(181,155,255,.06));
-  border:1px solid var(--glass-edge);
-  backdrop-filter:blur(28px); -webkit-backdrop-filter:blur(28px);
+  background:var(--focal);
+  border:1px solid var(--line);
   font-size:clamp(18px, 2.2vw, 24px); line-height:1.4;
   color:var(--ink-0); letter-spacing:-.005em;
 }
@@ -425,19 +376,18 @@ footer a:hover{ color:var(--ink-0); }
 .reveal.in{ opacity:1; transform:none; }
 
 /* === Code blocks =================================================== */
-code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rgba(95,227,199,.08); padding:2px 6px; border-radius:6px; }
+code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:var(--chrome); padding:2px 6px; border-radius:6px; }
 
 /* === Accent text =================================================== */
-.accent{ color:var(--teal); }
-.accent-2{ color:var(--violet); }
+.accent{ color:var(--accent); }
+.accent-2{ color:var(--accent); }
 .muted{ color:var(--ink-2); }
-.divider{ height:1px; background:linear-gradient(90deg, transparent, var(--line), transparent); margin:30px 0; }
+.divider{ height:1px; background:var(--line); margin:30px 0; }
 
 /* === Marquee bar (principles strip) ================================ */
 .strip{
-  display:flex; gap:36px; padding:14px 18px; border-radius:999px;
-  border:1px solid var(--glass-edge); background:var(--glass);
-  backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px);
+  display:flex; gap:36px; padding:14px 18px; border-radius:var(--r-3);
+  border:1px solid var(--line); background:var(--field);
   margin-top:40px; overflow:hidden; white-space:nowrap;
 }
 .strip span{ color:var(--ink-2); font-size:13.5px; letter-spacing:.4px; }
@@ -447,11 +397,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
 </head>
 <body>
 
-<div class="scene" aria-hidden="true">
-  <span class="orb a"></span>
-  <span class="orb b"></span>
-  <span class="orb c"></span>
-</div>
+<div class="scene" aria-hidden="true"></div>
 
 <!-- ===================== TOP NAV ===================== -->
 <header class="topbar">
@@ -481,10 +427,10 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
     <span class="eyebrow"><span class="dot"></span> White paper · Maggio 2026</span>
     <h1 class="title">Una cartella clinica<br/>che resta a casa tua.</h1>
     <p class="lede">
-      MediFlow è una cartella clinica per il singolo professionista e per piccoli ambulatori.
-      I dati restano sul computer del medico, cifrati. L'intelligenza artificiale gira sullo stesso
-      dispositivo, senza chiamare servizi remoti. Lo standard clinico è quello internazionale:
-      ICD-11 per le diagnosi, FHIR per l'esportazione.
+      MediFlow è una cartella clinica local-first per il singolo professionista e per piccoli ambulatori.
+      Il Mac home-base conserva lo storage autorevole; client paired, cache, export e backup sono
+      percorsi espliciti. I campi clinici configurati sono cifrati lato client. I servizi AI locali
+      restano opzionali; ICD-11 è un resolver di supporto e FHIR R4 una mappatura export-only v0.
     </p>
     <div class="hero-cta">
       <a class="btn primary" href="#cosa">Inizia la lettura →</a>
@@ -493,15 +439,15 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
 
     <div class="hero-meta">
       <div class="cell"><div class="k">Filosofia</div><div class="v">Locale prima di tutto</div></div>
-      <div class="cell"><div class="k">Privacy</div><div class="v">Zero conoscenza a riposo</div></div>
-      <div class="cell"><div class="k">AI</div><div class="v">Sul tuo computer</div></div>
-      <div class="cell"><div class="k">Standard</div><div class="v">ICD-11 · FHIR R4</div></div>
+      <div class="cell"><div class="k">Privacy</div><div class="v">Cifratura clinica per campo</div></div>
+      <div class="cell"><div class="k">AI</div><div class="v">Locale e opzionale</div></div>
+      <div class="cell"><div class="k">Standard</div><div class="v">ICD opzionale · FHIR export-only</div></div>
     </div>
 
     <div class="strip" aria-hidden="true">
-      <span><b>Local-first</b> · i dati non escono dal tuo Mac</span>
+      <span><b>Local-first</b> · home-base e percorsi paired espliciti</span>
       <span class="sep">◇</span>
-      <span><b>AES-256-GCM</b> a riposo</span>
+      <span><b>AES-256-GCM</b> per i campi configurati</span>
       <span class="sep">◇</span>
       <span><b>Niente telemetria</b></span>
       <span class="sep">◇</span>
@@ -509,7 +455,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
       <span class="sep">◇</span>
       <span><b>Audit append-only</b></span>
       <span class="sep">◇</span>
-      <span><b>FHIR R4</b> per la portabilità</span>
+      <span><b>FHIR R4</b> · mappatura export-only v0</span>
     </div>
   </div>
 </section>
@@ -531,7 +477,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
       <div class="card">
         <div class="icon">📋</div>
         <h3>Una scheda paziente coerente</h3>
-        <p>Anagrafica, diagnosi codificate, terapie, esami, osservazioni, allegati. Tutto in un unico posto, tutto cifrato.</p>
+        <p>Anagrafica, problemi e diagnosi reviewable, terapie, controlli, osservazioni e allegati. I campi clinici configurati sono cifrati lato client.</p>
       </div>
       <div class="card">
         <div class="icon">🧠</div>
@@ -540,8 +486,8 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
       </div>
       <div class="card">
         <div class="icon">🔒</div>
-        <h3>Una serratura sola: il PIN</h3>
-        <p>Senza il tuo PIN il database non è leggibile. Nemmeno per chi ha scritto il software.</p>
+        <h3>Il PIN apre i campi protetti</h3>
+        <p>Il PIN non viene persistito e sblocca la chiave dei campi clinici configurati. Il file SQLite non è cifrato integralmente.</p>
       </div>
       <div class="card">
         <div class="icon">📦</div>
@@ -555,16 +501,16 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
       </div>
       <div class="card">
         <div class="icon">🔁</div>
-        <h3>Esci quando vuoi</h3>
-        <p>Esportazione FHIR R4 della storia clinica. Niente trappola: i tuoi dati restano riusabili anche fuori da MediFlow.</p>
+        <h3>Export documentato</h3>
+        <p>La mappatura FHIR R4 export-only v0 produce un Bundle <code>collection</code>; non attesta conformità completa né ingestione da parte di terzi.</p>
       </div>
     </div>
 
     <div class="divider"></div>
 
     <div class="pull reveal">
-      «MediFlow è uno strumento. Il titolare del trattamento resta il professionista.
-      Il software non sostituisce le sue responsabilità: gli dà solo gli attrezzi giusti per esercitarle.»
+      «MediFlow offre misure tecniche e strumenti operativi. Ruoli, responsabilità,
+      basi giuridiche e adempimenti dipendono dal contesto di deployment.»
       <small>Principio operativo</small>
     </div>
   </div>
@@ -590,19 +536,19 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
         <div class="grid cols-2">
           <div class="card">
             <h3>Cosa vede ogni giorno</h3>
-            <p>La scheda del paziente con la storia coerente: diagnosi codificate, terapie con principio attivo e ATC, controlli passati e in agenda, osservazioni con unità di misura standard, allegati con riassunto.</p>
+            <p>La scheda del paziente riunisce problemi e diagnosi reviewable, terapie, controlli, osservazioni e allegati. Terminologie e codici restano associati alle fonti e alla revisione clinica.</p>
           </div>
           <div class="card">
             <h3>Cosa cambia rispetto al solito</h3>
-            <p>I dati non sono in un servizio remoto: sono nel suo computer. L'AI lo aiuta ma non scrive nulla in scheda senza una sua conferma esplicita, soprattutto su diagnosi e terapie.</p>
+            <p>Lo storage autorevole resta sul Mac home-base; client paired, cache, export e backup seguono percorsi espliciti. L'AI propone contenuti reviewable e non promuove diagnosi o terapie senza conferma.</p>
           </div>
           <div class="card">
             <h3>Cosa non gli viene chiesto</h3>
-            <p>Niente account su servizi terzi, niente abbonamenti per usare l'AI, niente caricamento di referti sul cloud. Il PIN è l'unica credenziale che deve ricordare.</p>
+            <p>Il runtime ordinario non richiede un account AI cloud. Servizi locali, rete paired ed eventuali lane comparative restano opzionali e governati separatamente.</p>
           </div>
           <div class="card">
             <h3>Cosa porta via se cambia idea</h3>
-            <p>Un pacchetto FHIR R4 con anagrafica, diagnosi, visite, terapie e osservazioni. Standard riconosciuto, leggibile da altri sistemi.</p>
+            <p>Un Bundle FHIR R4 <code>collection</code> secondo la mappatura export-only v0. È un artefatto documentato, non una garanzia di conformità o importabilità universale.</p>
           </div>
         </div>
       </div>
@@ -611,19 +557,19 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
         <div class="grid cols-2">
           <div class="card">
             <h3>Dove finiscono i suoi dati</h3>
-            <p>Sul computer del professionista che ha in cura il paziente, cifrati. Non vengono condivisi con servizi remoti né usati per addestrare modelli.</p>
+            <p>Sul Mac home-base vive lo storage autorevole; i campi clinici configurati sono cifrati lato client. Cache paired, export e backup hanno confini separati e dichiarati.</p>
           </div>
           <div class="card">
-            <h3>Quali diritti restano garantiti</h3>
-            <p>Diritto all'oblio (Art. 17 GDPR) con cancellazione governata. Portabilità dei dati (Art. 20) tramite esportazione in formato standard.</p>
+            <h3>Quali strumenti supportano i diritti</h3>
+            <p>Tombstone, purge governato ed export possono supportare richieste GDPR. Ruoli, basi giuridiche, backup e adempimenti vanno valutati nel deployment concreto.</p>
           </div>
           <div class="card">
             <h3>Cosa succede se il computer viene rubato</h3>
-            <p>Il database resta cifrato a riposo. Senza il PIN nessuno può leggerlo, nemmeno con il file in mano. La chiave non è sul disco.</p>
+            <p>I campi clinici configurati restano cifrati lato client. Identificativi, metadati, file SQLite e backup non sono coperti da un claim di cifratura integrale; servono anche le protezioni del sistema operativo e del deployment.</p>
           </div>
           <div class="card">
             <h3>Chi è responsabile</h3>
-            <p>Il professionista resta titolare del trattamento. MediFlow è lo strumento, non l'esecutore.</p>
+            <p>MediFlow è uno strumento tecnico. Titolare, responsabili e obblighi dipendono dagli attori e dal contesto organizzativo in cui viene installato.</p>
           </div>
         </div>
       </div>
@@ -632,7 +578,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
         <div class="grid cols-2">
           <div class="card">
             <h3>Modello di dispiegamento</h3>
-            <p>Single-tenant locale. Un nodo per professionista. Niente server centrale da mantenere, niente perimetro multi-paziente da difendere a livello di rete.</p>
+            <p>Un Mac home-base conserva lo storage autorevole. La rete locale paired è opt-in, capability-scoped e separata da cache, export e backup.</p>
           </div>
           <div class="card">
             <h3>Compatibilità con il SSR</h3>
@@ -644,7 +590,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
           </div>
           <div class="card">
             <h3>Costi nascosti</h3>
-            <p>Nessun canone per AI cloud. Nessun lock-in proprietario di formato dati: l'export FHIR R4 e la cifratura aperta tengono basso il costo di uscita.</p>
+            <p>Il runtime AI locale non richiede per default un canone cloud. Export JSON, backup e mappatura FHIR R4 export-only v0, che non attesta interoperabilità completa, rendono il percorso di uscita ispezionabile.</p>
           </div>
         </div>
       </div>
@@ -667,15 +613,15 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
     <div class="grid cols-2 reveal">
       <div class="card pillar">
         <h3>① Locale prima di tutto <span class="tag">default</span></h3>
-        <p>I dati clinici non escono dal computer per impostazione predefinita. Niente telemetria, niente sincronizzazione automatica, niente chiamate AI verso servizi esterni. Se una funzione richiedesse un canale remoto, viene aggiunta in modo esplicito, documentata e disattivabile.</p>
+        <p>Il Mac home-base mantiene lo storage autorevole. Client paired, cache, export e backup sono percorsi espliciti; niente telemetria e niente AI remota nel runtime clinico di default.</p>
       </div>
       <div class="card pillar">
-        <h3>② Zero conoscenza a riposo <span class="tag">cifratura</span></h3>
-        <p>I campi sensibili sono cifrati lato client con AES-256-GCM prima della scrittura. Il PIN non viene mai salvato. La chiave principale viene derivata dal PIN, custodita in memoria solo durante la sessione e mai sul disco. Nessun ripristino possibile in caso di smarrimento del PIN: è una garanzia, non un bug.</p>
+        <h3>② Cifratura clinica per campo <span class="tag">cifratura</span></h3>
+        <p>I campi clinici configurati sono cifrati lato client con AES-256-GCM prima della scrittura. Il PIN non viene persistito e la chiave aperta resta in memoria durante la sessione. Questo perimetro non equivale alla cifratura integrale di SQLite, identificativi, metadati o backup.</p>
       </div>
       <div class="card pillar">
         <h3>③ Standard aperti <span class="tag">interoperabilità</span></h3>
-        <p>ICD-11 per le diagnosi, ATC e AIC per i farmaci, LOINC e UCUM per le osservazioni, FHIR R4 per l'esportazione. Niente formato proprietario quando esiste un formato condiviso a livello internazionale.</p>
+        <p>Il resolver ICD-11 è opzionale e i problemi free-text restano reviewable. ATC, AIC, LOINC e UCUM sono supporti di codifica; FHIR R4 è oggi una mappatura export-only v0.</p>
       </div>
       <div class="card pillar">
         <h3>④ AI revisionabile <span class="tag">no automatismi</span></h3>
@@ -700,143 +646,124 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
     <div class="topo reveal">
       <svg viewBox="0 0 1100 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Topologia MediFlow">
         <defs>
-          <linearGradient id="g-client" x1="0" x2="1" y1="0" y2="1">
-            <stop offset="0%" stop-color="#7cc7ff" stop-opacity=".2"/>
-            <stop offset="100%" stop-color="#7cc7ff" stop-opacity=".05"/>
-          </linearGradient>
-          <linearGradient id="g-back" x1="0" x2="1" y1="0" y2="1">
-            <stop offset="0%" stop-color="#5fe3c7" stop-opacity=".2"/>
-            <stop offset="100%" stop-color="#5fe3c7" stop-opacity=".05"/>
-          </linearGradient>
-          <linearGradient id="g-svc" x1="0" x2="1" y1="0" y2="1">
-            <stop offset="0%" stop-color="#b59bff" stop-opacity=".2"/>
-            <stop offset="100%" stop-color="#b59bff" stop-opacity=".05"/>
-          </linearGradient>
-          <linearGradient id="g-fs" x1="0" x2="1" y1="0" y2="1">
-            <stop offset="0%" stop-color="#ffc674" stop-opacity=".2"/>
-            <stop offset="100%" stop-color="#ffc674" stop-opacity=".05"/>
-          </linearGradient>
           <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-            <path d="M0,0 L10,5 L0,10 Z" fill="#cdd6e2"/>
-          </marker>
-          <marker id="arr-soft" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-            <path d="M0,0 L10,5 L0,10 Z" fill="#7cc7ff"/>
+            <path d="M0,0 L10,5 L0,10 Z" style="fill:var(--muted)"/>
           </marker>
         </defs>
 
         <!-- LANES -->
-        <rect x="20" y="20" width="280" height="520" rx="20" fill="url(#g-client)" stroke="rgba(124,199,255,.35)"/>
-        <text x="36" y="50" fill="#7cc7ff" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">CLIENT</text>
+        <rect x="20" y="20" width="280" height="520" rx="20" style="fill:var(--field);stroke:var(--muted)"/>
+        <text x="36" y="50" style="fill:var(--muted)" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">CLIENT</text>
 
-        <rect x="320" y="20" width="320" height="520" rx="20" fill="url(#g-back)" stroke="rgba(95,227,199,.35)"/>
-        <text x="336" y="50" fill="#5fe3c7" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">APPLICAZIONE LOCALE</text>
+        <rect x="320" y="20" width="320" height="520" rx="20" style="fill:var(--field);stroke:var(--muted)"/>
+        <text x="336" y="50" style="fill:var(--muted)" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">APPLICAZIONE LOCALE</text>
 
-        <rect x="660" y="20" width="220" height="260" rx="20" fill="url(#g-svc)" stroke="rgba(181,155,255,.35)"/>
-        <text x="676" y="50" fill="#b59bff" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">SERVIZI LOCALI</text>
+        <rect x="660" y="20" width="220" height="260" rx="20" style="fill:var(--field);stroke:var(--muted)" stroke-dasharray="6 3"/>
+        <text x="676" y="50" style="fill:var(--muted)" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">SERVIZI LOCALI</text>
 
-        <rect x="660" y="295" width="420" height="245" rx="20" fill="url(#g-fs)" stroke="rgba(255,198,116,.35)"/>
-        <text x="676" y="325" fill="#ffc674" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">FILESYSTEM LOCALE</text>
+        <rect x="660" y="295" width="420" height="245" rx="20" style="fill:var(--field);stroke:var(--muted)"/>
+        <text x="676" y="325" style="fill:var(--muted)" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">FILESYSTEM LOCALE</text>
 
-        <rect x="900" y="20" width="180" height="260" rx="20" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.18)" stroke-dasharray="4 4"/>
-        <text x="916" y="50" fill="#92a0b3" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">RETE LOCALE</text>
-        <text x="916" y="68" fill="#5d6b80" font-size="11" font-family="ui-monospace">opt-in</text>
+        <rect x="900" y="20" width="180" height="260" rx="20" style="fill:var(--field);stroke:var(--muted)" stroke-dasharray="4 4"/>
+        <text x="916" y="50" style="fill:var(--muted)" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">RETE LOCALE</text>
+        <text x="916" y="68" style="fill:var(--muted)" font-size="11" font-family="ui-monospace">opt-in</text>
 
         <!-- CLIENT BOXES -->
-        <g font-family="-apple-system,Inter,sans-serif" fill="#f4f7fb">
-          <rect x="40" y="80" width="240" height="64" rx="12" fill="rgba(124,199,255,.18)" stroke="rgba(124,199,255,.45)"/>
+        <g font-family="-apple-system,Inter,sans-serif" style="fill:var(--ink)">
+          <rect x="40" y="80" width="240" height="64" rx="14" style="fill:var(--focal);stroke:var(--muted)"/>
           <text x="160" y="108" text-anchor="middle" font-size="14" font-weight="600">Browser web</text>
-          <text x="160" y="128" text-anchor="middle" font-size="11" fill="#cdd6e2">UI clinica · cifratura lato client</text>
+          <text x="160" y="128" text-anchor="middle" font-size="11" style="fill:var(--muted)">UI clinica · cifratura lato client</text>
 
-          <rect x="40" y="170" width="240" height="64" rx="12" fill="rgba(124,199,255,.13)" stroke="rgba(124,199,255,.4)"/>
+          <rect x="40" y="170" width="240" height="64" rx="14" style="fill:var(--focal);stroke:var(--muted)"/>
           <text x="160" y="198" text-anchor="middle" font-size="14" font-weight="600">Client macOS</text>
-          <text x="160" y="218" text-anchor="middle" font-size="11" fill="#cdd6e2">SwiftUI · sessione sicurezza</text>
+          <text x="160" y="218" text-anchor="middle" font-size="11" style="fill:var(--muted)">SwiftUI · sessione sicurezza</text>
 
-          <rect x="40" y="260" width="240" height="64" rx="12" fill="rgba(124,199,255,.08)" stroke="rgba(124,199,255,.3)" stroke-dasharray="3 3"/>
+          <rect x="40" y="260" width="240" height="64" rx="14" style="fill:var(--focal);stroke:var(--muted)" stroke-dasharray="3 3"/>
           <text x="160" y="288" text-anchor="middle" font-size="14" font-weight="600">iPhone / iPad</text>
-          <text x="160" y="308" text-anchor="middle" font-size="11" fill="#92a0b3">paired · scrittura limitata</text>
+          <text x="160" y="308" text-anchor="middle" font-size="11" style="fill:var(--muted)">paired · scrittura limitata</text>
 
-          <rect x="40" y="380" width="240" height="130" rx="12" fill="rgba(255,255,255,.03)" stroke="rgba(255,255,255,.14)" stroke-dasharray="2 4"/>
-          <text x="160" y="406" text-anchor="middle" font-size="12" fill="#92a0b3" font-family="ui-monospace" letter-spacing="1">CIFRATURA</text>
-          <text x="160" y="430" text-anchor="middle" font-size="13" fill="#cdd6e2">PIN → KEK</text>
-          <text x="160" y="452" text-anchor="middle" font-size="13" fill="#cdd6e2">KEK → master key in RAM</text>
-          <text x="160" y="474" text-anchor="middle" font-size="13" fill="#cdd6e2">AES-256-GCM</text>
-          <text x="160" y="496" text-anchor="middle" font-size="11" fill="#5d6b80">PIN mai persistito</text>
+          <rect x="40" y="380" width="240" height="130" rx="14" style="fill:var(--focal);stroke:var(--muted)" stroke-dasharray="2 4"/>
+          <text x="160" y="406" text-anchor="middle" font-size="12" style="fill:var(--muted)" font-family="ui-monospace" letter-spacing="1">CIFRATURA</text>
+          <text x="160" y="430" text-anchor="middle" font-size="13" style="fill:var(--muted)">PIN → KEK</text>
+          <text x="160" y="452" text-anchor="middle" font-size="13" style="fill:var(--muted)">KEK → master key in RAM</text>
+          <text x="160" y="474" text-anchor="middle" font-size="13" style="fill:var(--muted)">AES-256-GCM</text>
+          <text x="160" y="496" text-anchor="middle" font-size="11" style="fill:var(--muted)">PIN mai persistito</text>
         </g>
 
         <!-- BACKEND BOXES -->
-        <g font-family="-apple-system,Inter,sans-serif" fill="#f4f7fb">
-          <rect x="340" y="80" width="280" height="50" rx="10" fill="rgba(95,227,199,.16)" stroke="rgba(95,227,199,.4)"/>
+        <g font-family="-apple-system,Inter,sans-serif" style="fill:var(--ink)">
+          <rect x="340" y="80" width="280" height="50" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="480" y="100" text-anchor="middle" font-size="13" font-weight="600">Proxy TLS locale</text>
-          <text x="480" y="118" text-anchor="middle" font-size="11" fill="#cdd6e2">https://127.0.0.1:3443</text>
+          <text x="480" y="118" text-anchor="middle" font-size="11" style="fill:var(--muted)">https://127.0.0.1:3443</text>
 
-          <rect x="340" y="150" width="280" height="50" rx="10" fill="rgba(95,227,199,.16)" stroke="rgba(95,227,199,.4)"/>
+          <rect x="340" y="150" width="280" height="50" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="480" y="170" text-anchor="middle" font-size="13" font-weight="600">Web API · /api/*</text>
-          <text x="480" y="188" text-anchor="middle" font-size="11" fill="#cdd6e2">sessione cookie</text>
+          <text x="480" y="188" text-anchor="middle" font-size="11" style="fill:var(--muted)">sessione cookie</text>
 
-          <rect x="340" y="220" width="280" height="50" rx="10" fill="rgba(95,227,199,.16)" stroke="rgba(95,227,199,.4)"/>
+          <rect x="340" y="220" width="280" height="50" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="480" y="240" text-anchor="middle" font-size="13" font-weight="600">Native API · /api/v1/*</text>
-          <text x="480" y="258" text-anchor="middle" font-size="11" fill="#cdd6e2">bearer token versionato</text>
+          <text x="480" y="258" text-anchor="middle" font-size="11" style="fill:var(--muted)">bearer token versionato</text>
 
-          <rect x="340" y="290" width="280" height="50" rx="10" fill="rgba(95,227,199,.10)" stroke="rgba(95,227,199,.3)" stroke-dasharray="3 3"/>
+          <rect x="340" y="290" width="280" height="50" rx="10" style="fill:var(--chrome);stroke:var(--muted)" stroke-dasharray="3 3"/>
           <text x="480" y="310" text-anchor="middle" font-size="13" font-weight="600">Network API · /api/v1/network/*</text>
-          <text x="480" y="328" text-anchor="middle" font-size="11" fill="#92a0b3">paired · read-only-first</text>
+          <text x="480" y="328" text-anchor="middle" font-size="11" style="fill:var(--muted)">paired · read-only-first</text>
 
-          <rect x="340" y="370" width="280" height="60" rx="10" fill="rgba(95,227,199,.18)" stroke="rgba(95,227,199,.45)"/>
+          <rect x="340" y="370" width="280" height="60" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="480" y="394" text-anchor="middle" font-size="13" font-weight="600">Auth · setup / login / lockout</text>
-          <text x="480" y="414" text-anchor="middle" font-size="11" fill="#cdd6e2">5 tentativi · 15 min</text>
+          <text x="480" y="414" text-anchor="middle" font-size="11" style="fill:var(--muted)">5 tentativi · 15 min</text>
 
-          <rect x="340" y="450" width="280" height="60" rx="10" fill="rgba(95,227,199,.12)" stroke="rgba(95,227,199,.35)"/>
+          <rect x="340" y="450" width="280" height="60" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="480" y="474" text-anchor="middle" font-size="13" font-weight="600">Audit append-only</text>
-          <text x="480" y="494" text-anchor="middle" font-size="11" fill="#cdd6e2">catalogo eventi limitato</text>
+          <text x="480" y="494" text-anchor="middle" font-size="11" style="fill:var(--muted)">catalogo eventi limitato</text>
         </g>
 
         <!-- SERVICES -->
-        <g font-family="-apple-system,Inter,sans-serif" fill="#f4f7fb">
-          <rect x="680" y="80" width="180" height="50" rx="10" fill="rgba(181,155,255,.16)" stroke="rgba(181,155,255,.4)"/>
+        <g font-family="-apple-system,Inter,sans-serif" style="fill:var(--ink)">
+          <rect x="680" y="80" width="180" height="50" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="770" y="102" text-anchor="middle" font-size="12.5" font-weight="600">Ollama</text>
-          <text x="770" y="119" text-anchor="middle" font-size="10.5" fill="#cdd6e2">AI · OCR · :11434</text>
+          <text x="770" y="119" text-anchor="middle" font-size="10.5" style="fill:var(--muted)">AI · OCR · :11434</text>
 
-          <rect x="680" y="150" width="180" height="50" rx="10" fill="rgba(181,155,255,.16)" stroke="rgba(181,155,255,.4)"/>
+          <rect x="680" y="150" width="180" height="50" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="770" y="172" text-anchor="middle" font-size="12.5" font-weight="600">ICD-11 OMS</text>
-          <text x="770" y="189" text-anchor="middle" font-size="10.5" fill="#cdd6e2">docker locale · :8888</text>
+          <text x="770" y="189" text-anchor="middle" font-size="10.5" style="fill:var(--muted)">docker locale · :8888</text>
 
-          <rect x="680" y="220" width="180" height="50" rx="10" fill="rgba(181,155,255,.10)" stroke="rgba(181,155,255,.3)" stroke-dasharray="3 3"/>
+          <rect x="680" y="220" width="180" height="50" rx="10" style="fill:var(--chrome);stroke:var(--muted)" stroke-dasharray="3 3"/>
           <text x="770" y="242" text-anchor="middle" font-size="12.5" font-weight="600">OpenMed redaction</text>
-          <text x="770" y="259" text-anchor="middle" font-size="10.5" fill="#92a0b3">shadow · benchmark only</text>
+          <text x="770" y="259" text-anchor="middle" font-size="10.5" style="fill:var(--muted)">shadow · benchmark only</text>
         </g>
 
         <!-- FILESYSTEM -->
-        <g font-family="-apple-system,Inter,sans-serif" fill="#f4f7fb">
-          <rect x="680" y="340" width="180" height="60" rx="10" fill="rgba(255,198,116,.18)" stroke="rgba(255,198,116,.45)"/>
+        <g font-family="-apple-system,Inter,sans-serif" style="fill:var(--ink)">
+          <rect x="680" y="340" width="180" height="60" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="770" y="364" text-anchor="middle" font-size="13" font-weight="600">medical.db</text>
-          <text x="770" y="384" text-anchor="middle" font-size="11" fill="#cdd6e2">SQLite cifrato</text>
+          <text x="770" y="384" text-anchor="middle" font-size="11" style="fill:var(--muted)">SQLite · campi clinici cifrati</text>
 
-          <rect x="880" y="340" width="180" height="60" rx="10" fill="rgba(255,198,116,.14)" stroke="rgba(255,198,116,.4)"/>
+          <rect x="880" y="340" width="180" height="60" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="970" y="364" text-anchor="middle" font-size="13" font-weight="600">backup notturno</text>
-          <text x="970" y="384" text-anchor="middle" font-size="11" fill="#cdd6e2">retention configurabile</text>
+          <text x="970" y="384" text-anchor="middle" font-size="11" style="fill:var(--muted)">retention configurabile</text>
 
-          <rect x="680" y="420" width="180" height="60" rx="10" fill="rgba(255,198,116,.12)" stroke="rgba(255,198,116,.35)"/>
+          <rect x="680" y="420" width="180" height="60" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="770" y="444" text-anchor="middle" font-size="13" font-weight="600">token API locale</text>
-          <text x="770" y="464" text-anchor="middle" font-size="11" fill="#cdd6e2">permessi 0600</text>
+          <text x="770" y="464" text-anchor="middle" font-size="11" style="fill:var(--muted)">permessi 0600</text>
 
-          <rect x="880" y="420" width="180" height="60" rx="10" fill="rgba(255,198,116,.12)" stroke="rgba(255,198,116,.35)"/>
+          <rect x="880" y="420" width="180" height="60" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="970" y="444" text-anchor="middle" font-size="13" font-weight="600">certificati TLS</text>
-          <text x="970" y="464" text-anchor="middle" font-size="11" fill="#cdd6e2">cert.pem + key.pem</text>
+          <text x="970" y="464" text-anchor="middle" font-size="11" style="fill:var(--muted)">cert.pem + key.pem</text>
         </g>
 
         <!-- LAN -->
-        <g font-family="-apple-system,Inter,sans-serif" fill="#cdd6e2">
-          <rect x="920" y="80" width="140" height="50" rx="10" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.2)" stroke-dasharray="3 3"/>
-          <text x="990" y="102" text-anchor="middle" font-size="12.5" font-weight="600" fill="#f4f7fb">Mac home-base</text>
+        <g font-family="-apple-system,Inter,sans-serif" style="fill:var(--muted)">
+          <rect x="920" y="80" width="140" height="50" rx="10" style="fill:var(--chrome);stroke:var(--muted)" stroke-dasharray="3 3"/>
+          <text x="990" y="102" text-anchor="middle" font-size="12.5" font-weight="600" style="fill:var(--ink)">Mac home-base</text>
           <text x="990" y="119" text-anchor="middle" font-size="10.5">nodo autorevole</text>
 
-          <rect x="920" y="150" width="140" height="50" rx="10" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.18)" stroke-dasharray="3 3"/>
-          <text x="990" y="172" text-anchor="middle" font-size="12.5" font-weight="600" fill="#f4f7fb">paired client</text>
+          <rect x="920" y="150" width="140" height="50" rx="10" style="fill:var(--chrome);stroke:var(--muted)" stroke-dasharray="3 3"/>
+          <text x="990" y="172" text-anchor="middle" font-size="12.5" font-weight="600" style="fill:var(--ink)">paired client</text>
           <text x="990" y="189" text-anchor="middle" font-size="10.5">capability + version</text>
         </g>
 
         <!-- ARROWS -->
-        <g stroke="#cdd6e2" stroke-width="1.4" fill="none" opacity=".75" marker-end="url(#arr)">
+        <g style="fill:none;stroke:var(--muted)" stroke-width="1.4" marker-end="url(#arr)">
           <path d="M280 112 C 310 112 310 175 340 175"/>
           <path d="M280 202 C 310 202 310 105 340 105"/>
           <path d="M280 292 C 310 292 310 315 340 315"/>
@@ -848,11 +775,11 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
         </g>
       </svg>
       <div class="legend">
-        <span><i class="swatch" style="background:#7cc7ff"></i>Client</span>
-        <span><i class="swatch" style="background:#5fe3c7"></i>Applicazione locale</span>
-        <span><i class="swatch" style="background:#b59bff"></i>Servizi locali (opzionali)</span>
-        <span><i class="swatch" style="background:#ffc674"></i>Filesystem</span>
-        <span><i class="swatch" style="background:#92a0b3"></i>Rete locale (opt-in)</span>
+        <span><i class="swatch" style="background:var(--muted)"></i>Client</span>
+        <span><i class="swatch" style="background:var(--ink)"></i>Applicazione locale</span>
+        <span><i class="swatch" style="background:transparent;border:1px dashed var(--muted)"></i>Servizi locali (opzionali)</span>
+        <span><i class="swatch" style="background:var(--chrome);border:1px solid var(--muted)"></i>Filesystem</span>
+        <span><i class="swatch" style="background:transparent;border:1px dotted var(--muted)"></i>Rete locale (opt-in)</span>
       </div>
     </div>
 
@@ -867,7 +794,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
       </div>
       <div class="card">
         <h3>Servizi locali allowlisted</h3>
-        <p>I proxy verso AI e ICD-11 accettano solo destinazioni localhost. Nessun rischio di SSRF verso indirizzi remoti.</p>
+        <p>I proxy verso AI e ICD-11 applicano una allowlist localhost e porte previste, riducendo la superficie SSRF senza trasformarla in una garanzia assoluta.</p>
       </div>
     </div>
   </div>
@@ -895,7 +822,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
         <div class="step">FLUSSO · 02</div>
         <div class="body">
           <h4>Scrittura clinica dal browser</h4>
-          <p>I campi sensibili (note, allegati, riassunti AI) vengono cifrati nel browser prima di partire verso l'API. Sul disco arrivano solo stringhe nella forma <code>ENC:iv:cipher</code>. Il server non vede mai il testo in chiaro.</p>
+          <p>I campi clinici configurati vengono cifrati nel browser prima della persistenza. Per quei campi il payload usa la forma <code>ENC:iv:cipher</code>; il confine non si estende automaticamente a identificativi, metadati, intero file SQLite o backup.</p>
         </div>
       </div>
 
@@ -911,7 +838,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
         <div class="step">FLUSSO · 04</div>
         <div class="body">
           <h4>Documento → OCR → sintesi → archivio</h4>
-          <p>Il referto caricato passa al servizio OCR locale (Ollama), che lo rende testo. Un secondo passaggio AI estrae sintesi, qualità del segnale e codici ICD esplicitamente presenti. Il risultato viene cifrato e attaccato al paziente come allegato + artefatto di evidenza.</p>
+          <p>Il referto caricato può passare ai servizi OCR e AI locali. Testo, sintesi e codici candidati restano artefatti con fonte e revisione; i campi clinici configurati vengono cifrati prima della persistenza.</p>
         </div>
       </div>
 
@@ -952,7 +879,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
           <li>leggere log applicativi, screenshot o crash report</li>
           <li>annusare il traffico locale verso i client</li>
         </ul>
-        <p style="margin-top:14px">Per ognuno dei tre, la cifratura a riposo, la redazione dei log e il proxy TLS locale forniscono una difesa esplicita.</p>
+        <p style="margin-top:14px">Cifratura dei campi configurati, redazione dei log e TLS locale mitigano questi scenari entro confini distinti; non equivalgono alla cifratura integrale del database o dei backup.</p>
       </div>
       <div class="card">
         <h3>Cosa non copriamo</h3>
@@ -968,7 +895,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
       </div>
       <div class="card">
         <h3>Logging e redazione</h3>
-        <p>I log applicativi non contengono mai campi paziente decifrati, OCR grezzo, prompt AI completi o allegati. L'audit clinico è separato dai log tecnici: è strutturato, versionato e append-only, con catalogo di eventi minimo.</p>
+        <p>La policy vieta campi paziente decifrati, OCR grezzo, prompt AI completi e allegati nei log applicativi. L'audit clinico è separato dai log tecnici: è strutturato, versionato e append-only, con catalogo di eventi minimo.</p>
       </div>
       <div class="card">
         <h3>Boundary verso servizi esterni</h3>
@@ -984,17 +911,17 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
     <div class="section-head reveal">
       <div class="kicker">Interoperabilità</div>
       <h2>Standard veri, non promesse.</h2>
-      <p class="lead">Ogni dato clinico ha un codice riconosciuto a livello internazionale. Niente vincoli proprietari sui formati di esportazione.</p>
+      <p class="lead">Terminologie ed export sono supporti documentati, non garanzie universali. Free-text e revisione clinica restano parte del modello.</p>
     </div>
 
     <div class="grid cols-4 reveal">
       <div class="card">
         <h3>ICD-11</h3>
-        <p>Diagnosi codificate secondo il sistema OMS, via API locale. Niente più testo libero ambiguo.</p>
+        <p>Resolver OMS locale opzionale per candidati ICD-11. Diagnosi e problemi free-text restano ammessi e reviewable.</p>
       </div>
       <div class="card">
         <h3>FHIR R4</h3>
-        <p>Esportazione della cartella in pacchetto JSON HL7 FHIR R4: Patient, Condition, Encounter, MedicationStatement, Observation.</p>
+        <p>Mappatura export-only v0 in un Bundle R4 <code>collection</code>. Non attesta conformità completa né ingestione da parte di altri sistemi.</p>
       </div>
       <div class="card">
         <h3>ATC · AIC</h3>
@@ -1023,10 +950,10 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
         <div class="ver"><b>v0.3.0</b> · fondamenta</div>
         <h4>Le radici tecniche</h4>
         <ul>
-          <li>Migrazione a SQLite cifrato (addio storage browser)</li>
-          <li>Cifratura zero-knowledge attiva</li>
-          <li>AI locale: Qwen per testo, DeepSeek per OCR via Ollama</li>
-          <li>Diagnosi standardizzate ICD-11</li>
+          <li>Migrazione da storage browser a SQLite locale</li>
+          <li>Introduzione della cifratura lato client per campi clinici configurati</li>
+          <li>Prime pipeline AI e OCR locali via Ollama</li>
+          <li>Supporto iniziale al resolver ICD-11, con free-text preservato</li>
           <li>Multi-ambulatorio con identificazione visiva</li>
         </ul>
       </div>
@@ -1038,7 +965,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
           <li>API locale governata: baseline OpenAPI <code>/api/v1</code> e guardrail anti-deriva</li>
           <li>Pipeline OCR-first con import revisionabile</li>
           <li>Archivio intelligente operabile (pulizia, persistenza farmaci, allineamento insight)</li>
-          <li>Audit append-only, lockout autenticazione, cambio PIN zero-knowledge</li>
+          <li>Audit append-only, lockout autenticazione e gestione documentata delle chiavi</li>
           <li>Backup automatico, scheduler notturno, retention</li>
         </ul>
       </div>
@@ -1145,8 +1072,8 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
         <p>Il software funziona prima di tutto sul dispositivo del professionista. La rete è opzionale e governata. Il contrario è "cloud-first": app che hanno bisogno di un server centrale per funzionare e mandano lì i dati.</p>
       </details>
       <details class="term">
-        <summary>Zero-knowledge a riposo</summary>
-        <p>I dati clinici sul disco sono illeggibili senza il PIN. Nemmeno chi ha scritto il software o gestisce il computer può leggerli senza inserire il PIN. Niente backdoor di recupero: questa è la garanzia, ma anche la responsabilità del professionista.</p>
+        <summary>Cifratura clinica per campo</summary>
+        <p>I campi clinici configurati sono cifrati lato client con una chiave aperta durante la sessione. Il perimetro non include automaticamente identificativi, metadati, intero file SQLite, export o backup.</p>
       </details>
       <details class="term">
         <summary>AES-256-GCM</summary>
@@ -1158,11 +1085,11 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
       </details>
       <details class="term">
         <summary>FHIR R4</summary>
-        <p>Standard internazionale (HL7 FHIR, versione R4) per scambiare dati sanitari tra sistemi. MediFlow lo usa per esportare la storia clinica in un formato che altri sistemi sono in grado di leggere.</p>
+        <p>Standard internazionale per rappresentare dati sanitari. MediFlow implementa oggi una mappatura export-only v0 in un Bundle R4 <code>collection</code>, senza attestare conformità o importabilità universale.</p>
       </details>
       <details class="term">
         <summary>ICD-11</summary>
-        <p>Classificazione internazionale delle malattie, undicesima edizione, curata dall'OMS. Permette di codificare una diagnosi con un identificativo univoco (ad esempio <code>5A10</code>), invece che con un testo libero soggetto a interpretazione.</p>
+        <p>Classificazione internazionale delle malattie curata dall'OMS. MediFlow offre un resolver locale opzionale; diagnosi e problemi free-text restano ammessi e reviewable.</p>
       </details>
       <details class="term">
         <summary>ATC, AIC</summary>
@@ -1174,7 +1101,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
       </details>
       <details class="term">
         <summary>SQLite</summary>
-        <p>Un database che vive in un singolo file sul disco, senza bisogno di un server. Per MediFlow è il file <code>medical.db</code>, sempre cifrato.</p>
+        <p>Un database che vive in un singolo file sul disco, senza bisogno di un server. In MediFlow il file <code>medical.db</code> contiene anche campi clinici cifrati, ma non è cifrato integralmente.</p>
       </details>
       <details class="term">
         <summary>Ollama</summary>
@@ -1221,7 +1148,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
           <span style="color:var(--ink-0); font-weight:600">MediFlow</span>
         </div>
         <p style="max-width:480px">
-          Una cartella clinica locale, cifrata, con AI sul dispositivo. Codice aperto, contratti stabili,
+          Una cartella clinica local-first, con cifratura clinica per campo e AI locale opzionale. Codice aperto, contratti stabili,
           niente promesse che non possiamo mantenere.
         </p>
       </div>
