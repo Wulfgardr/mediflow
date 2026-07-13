@@ -143,6 +143,29 @@ client paired sul modello `home-base`.
 
 Il dettaglio completo è nel [CHANGELOG](./CHANGELOG.md).
 
+### Il ciclo 0.7.3 su `main`
+
+Il `main` successivo alla `0.7.2` conserva il boundary paired già consegnato e
+sta consolidando due avanzamenti distinti: l'adozione progressiva di Lume e uno
+stack intelligente più modulare, ma ancora locale, fail-closed e review-first.
+
+- **Lume in adozione progressiva**: ADR 0078 è `Accepted`; canone L0, token
+  L1a, convivenza web L1b, cockpit, workspace clinico e lock screen sono su
+  `main`. Sul nativo è atterrata la card clinica opaca; componenti interni,
+  filo, tipografia, Settings scene e QA manuale completa restano aperti.
+- **Stack AI modulare ma locale**: `OllamaAdapter` e `AIService` sono su
+  `main`; il gate egress applica il primo strato deterministico ma resta
+  `closed_pending_redaction_lane`. Registry, provider alternativi e consenso
+  cloud non sono consegnati.
+- **Control-flow e attese review-first**: il router documentale usa `shadow`
+  come default e può evitare il modello solo nei casi eleggibili ad alta
+  confidenza. Le attese locali vivono oggi nel solo web e ogni salvataggio
+  resta esplicito.
+- **P6 preparata, non certificata**: PR #21 e `WUL-401`, ora completata, hanno
+  consegnato il tooling di base: bundle, fixture, probe AX e runbook. `WUL-481`
+  conserva i prerequisiti operativi ancora bloccati e il verbale manuale sul
+  Mac sbloccato, quindi MediFlow non dichiara parity UI completa.
+
 ## Confini dichiarati
 
 MediFlow non vuole raccontare più di quanto possa dimostrare.
@@ -156,7 +179,9 @@ MediFlow non vuole raccontare più di quanto possa dimostrare.
 La fotografia post-Wave 5 è versionata in
 [docs/parity-matrix.md](./docs/parity-matrix.md): 30 delle 43 capability per cui
 la parity è un obiettivo sono complete; 13 restano parziali e 21 ulteriori
-capability sono intenzionalmente host-only.
+capability sono intenzionalmente host-only. Il tooling P6 di base è ripetibile,
+ma i conteggi non cambiano finché `WUL-481` non chiude blocker operativi e
+verbale manuale verde sul bundle macOS.
 
 ## Perché open source
 

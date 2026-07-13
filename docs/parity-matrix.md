@@ -8,7 +8,7 @@ read_when:
 # Matrice parity localhost ↔ client Apple
 
 Stato documento: `CANONICAL`
-Ultimo aggiornamento: 2026-07-11 (`WUL-479`, post-Wave 5)
+Ultimo aggiornamento: 2026-07-13 (`WUL-479`, gate residuo `WUL-481`)
 
 ## Perimetro
 
@@ -31,7 +31,7 @@ Riferimenti architetturali:
 - [ADR 0048](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md)
 - [ADR 0076](./adr/0076-paired-document-domain-write-policy.md)
 
-## Fotografia post-Wave 5
+## Fotografia corrente
 
 | Classe | Righe | Significato |
 | --- | ---: | --- |
@@ -45,8 +45,11 @@ Escludendo le 21 righe intenzionalmente host-only, 30 capability su 43 sono
 `full-parity` (**70%**); 13 su 43 restano parziali (**30%**). Sul totale
 grezzo, le righe full sono 30/64 (**47%**).
 
-Questi numeri non autorizzano il claim “parity completa”: la click-map manuale
-P6 del bundle macOS è ancora aperta in `WUL-401`.
+Questi numeri non autorizzano il claim “parity completa”. [PR #21](https://github.com/Wulfgardr/mediflow/pull/21)
+e `WUL-401`, ora completata, hanno consegnato bundle, fixture, probe AX e
+runbook P6 di base. `WUL-481` conserva sia i prerequisiti operativi oggi
+`BLOCKED` sia il verbale manuale verde sul Mac sbloccato. I conteggi non
+cambiano finche quel gate non e soddisfatto.
 
 ## Stato per area
 
@@ -82,15 +85,18 @@ P6 del bundle macOS è ancora aperta in `WUL-401`.
 
 Wave 5 è una tranche consegnata, non la chiusura della parity complessiva.
 
-## Wave 6 / closeout proposto
+## Wave 6 / closeout residuo
 
 ### W6-A — convergenza UI macOS e click-map P6
 
-Owner: `WUL-401`.
+Tooling di base consegnato: `WUL-401` / PR #21. Owner dei prerequisiti e del
+gate manuale residuo: `WUL-481`.
 
 Copre otto residui: pazienti, diario base, editor rich text, terapie, checkup,
-osservazioni, cockpit e shell/deep-link. L’uscita richiede una click-map manuale
-reale sul bundle home-base; i probe automatici non bastano.
+osservazioni, cockpit e shell/deep-link. Prima dell'uscita servono un home-base
+temporaneo interamente sintetico con credenziali effimere e cleanup automatico,
+piu una decisione verificabile sul deep-link o sul perimetro dichiarato; solo
+allora una click-map manuale reale puo produrre il verbale verde.
 
 ### W6-B — offline degradato onesto
 

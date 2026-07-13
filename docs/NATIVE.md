@@ -47,8 +47,10 @@ La base corrente va letta cosi:
   pairing device e sessione operatore restano distinti; nessun client mobile
   accede direttamente al database del Mac.
 * **Parity**: la matrice post-Wave 5 e in [docs/parity-matrix.md](./parity-matrix.md).
-  `WUL-401` copre la click-map macOS P6; `WUL-403` resta la corsia per rendere
-  visibili eta, TTL e staleness della cache e il degrado offline read-only.
+  `WUL-401`/PR #21 hanno consegnato bundle, fixture, probe AX e runbook P6 di
+  base; `WUL-481` governa i prerequisiti operativi ancora bloccati e il verbale
+  manuale sul Mac sbloccato. `WUL-403` resta la corsia per rendere visibili eta,
+  TTL e staleness della cache e il degrado offline read-only.
 
 ---
 
@@ -179,8 +181,9 @@ restano host-only o review-only secondo
 
 ### 3. Design e accessibilita
 
-Vetro Clinico resta il canone operativo transitorio; Lume e la lingua di
-destinazione. Le superfici cliniche restano opache e leggibili, mentre sidebar,
+ADR 0078 e `Accepted`: Vetro Clinico resta il canone operativo transitorio e
+Lume la lingua di destinazione. La card clinica gia migrata resta opaca e
+leggibile; le altre superfici sono ancora in adozione progressiva. Sidebar,
 toolbar, menu, sheet, popover e inspector usano i componenti di sistema. Liquid
 Glass e un enhancement del chrome su OS compatibili, non un materiale da
 applicare alle card cliniche. macOS, iPhone e iPad condividono semantica e

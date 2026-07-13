@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-07-11",
+  "updatedAt": "2026-07-13",
   "issue": "WUL-479",
   "networkCapabilityContract": {
     "activeNetworkKeys": [
@@ -583,14 +583,14 @@
     },
     {
       "id": "apple-wide-click-map",
-      "title": "Current Apple-wide click-map evidence",
+      "title": "Packaged macOS P6 gate evidence",
       "surfaces": [
         "macOS",
         "iPhone",
         "iPad"
       ],
       "status": "gap",
-      "acceptance": "Eseguire la click-map manuale P6 sul bundle macOS home-base per Pazienti, Diario base, editor rich text, Terapie, Checkup, Osservazioni, cockpit e shell/deep-link; i probe automatici restano evidenza preparatoria, non certificazione di parity UI piena.",
+      "acceptance": "PR #21 e WUL-401 hanno consegnato bundle, fixture, probe AX e runbook di base. WUL-481 conserva il gap finche non esistono un home-base temporaneo interamente sintetico con credenziali effimere e cleanup automatico per i percorsi oggi BLOCKED, e una decisione verificabile sul deep-link o sul perimetro dichiarato; solo allora la click-map manuale P6 sul Mac sbloccato puo produrre il verbale verde.",
       "evidence": [
         {
           "type": "command",
@@ -609,11 +609,15 @@
           "value": "npm run test:network:home-base-write"
         },
         {
+          "type": "pr",
+          "value": "https://github.com/Wulfgardr/mediflow/pull/21"
+        },
+        {
           "type": "issue",
-          "value": "WUL-401"
+          "value": "WUL-481"
         }
       ],
-      "gapIssue": "WUL-401"
+      "gapIssue": "WUL-481"
     }
   ],
   "originIssue": "WUL-194"
