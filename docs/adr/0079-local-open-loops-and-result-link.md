@@ -1,16 +1,24 @@
 # ADR 0079: attese locali e collegamento prestazione-risultato
 
 Date: 2026-07-12
-Status: Proposed
+Status: Accepted
 
 Related: [ADR 0057](./0057-local-evidence-absorption-layer.md), [ADR 0062](./0062-service-prescriptions-domain.md), [ADR 0064](./0064-service-prescription-itemization-and-catalog-matching.md), [ADR 0056](./0056-network-observation-write-boundary.md)
+
+## Stato di implementazione
+
+La prima slice web locale e su `main`: colonna e migrazione, proiezione pura,
+righe nella Scheda e precompilazione del form osservazioni. Il salvataggio resta
+esplicito. Parity paired, registro generale delle attese e reminder persistenti
+restano fuori da questa decisione consegnata.
 
 ## Problema
 
 Una prestazione prescritta puo restare senza esito registrato nella Scheda. Le
 serie di osservazioni possono anche interrompersi senza che la UI renda visibile
-il semplice fatto temporale. Mancano un collegamento esplicito tra risultato e
-item di prestazione e una proiezione locale delle attese.
+il semplice fatto temporale. Prima della slice mancavano un collegamento
+esplicito tra risultato e item di prestazione e una proiezione locale delle
+attese.
 
 ## Contesto
 
@@ -60,6 +68,6 @@ separato, con contratto API e decisione dedicati.
 
 ## First Thin Slice
 
-1. Aggiungere colonna, guardia runtime e artefatto Drizzle storico.
-2. Introdurre proiezione pura con test di soglia, mediana e ordinamento.
-3. Mostrare le righe aperte nella Scheda e precompilare il form locale.
+1. **Consegnato**: colonna, guardia runtime e artefatto Drizzle storico.
+2. **Consegnato**: proiezione pura con test di soglia, mediana e ordinamento.
+3. **Consegnato**: righe aperte nella Scheda e precompilazione del form locale.

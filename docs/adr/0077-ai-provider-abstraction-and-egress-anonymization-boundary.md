@@ -2,7 +2,7 @@
 # ADR 0077: Astrazione provider del runtime AI e confine di anonimizzazione per l'egress
 
 Date: 2026-07-12
-Status: Proposed
+Status: Accepted
 
 Related: ADR 0028 (stack-aware AI model evaluation matrix), ADR 0029 (AI model
 parliament and local retention policy), ADR 0033 (AI rollout governance
@@ -11,6 +11,15 @@ comparator shadow evaluation), [ADR 0065](./0065-intended-purpose-and-claims-gua
 [ADR 0070](./0070-in-house-first-for-buildable-logic.md), la governance rollout
 AI locale, il benchmark di redazione OpenMed e
 [lib/ai-service.ts](../../lib/ai-service.ts).
+
+## Stato di implementazione
+
+La decisione e accettata e la prima base e su `main`: adapter Ollama,
+`AIService` come facciata, governance OCR/Treatment Reasoning e scheletro egress
+con layer 1 deterministico, audit hash-only e stato fail-closed. Restano da
+consegnare registry e binding per ruolo, adapter locali alternativi, layer 2 di
+redazione, consenso e qualunque provider cloud. Il problema sotto conserva la
+fotografia precedente all'estrazione e non descrive lo stato runtime corrente.
 
 ## Problema
 
@@ -177,14 +186,14 @@ futuro):
 
 ## First Thin Slice
 
-1. Estrarre `OllamaAdapter` e il registry con binding per ruolo, refactor
-   puro con default invariati; migrazione chiavi legacy; test dedicati.
-2. Dichiarare il registro ruoli (kill switch + lane benchmark + guard) ed
-   estendere il rollout guard al ruolo `ocr`.
-3. Scheletro di `lib/ai-egress-gate.ts` con il solo layer 1 deterministico e
-   lo stato `closed_pending_redaction_lane` esplicito, piu audit locale.
-4. Superficie settings minimale: lettura del registry, kind visibile,
-   nessun provider cloud offerto finche il gate e chiuso.
+1. **Parziale**: `OllamaAdapter` e facciata consegnati; registry, binding e
+   migrazione delle chiavi restano pendenti.
+2. **Consegnato**: kill switch e readiness local-control coprono OCR e
+   Treatment Reasoning; l'associazione modello del rollout guard e estesa solo
+   al ruolo OCR.
+3. **Consegnato**: layer 1, stato `closed_pending_redaction_lane` e audit
+   locale sono presenti senza wiring cloud.
+4. **Pendente**: superficie registry/kind; nessun provider cloud e offerto.
 
 ## Fuori Scope
 
