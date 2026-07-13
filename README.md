@@ -8,15 +8,15 @@ _by Ordito & Concilio_
 
 Dati vicini al medico, flusso rapido, privacy come impostazione di base.
 
-[![Versione](https://img.shields.io/badge/versione-0.7.2-1f6feb)](./CHANGELOG.md)
+[![Versione](https://img.shields.io/badge/versione-0.7.3-1f6feb)](./CHANGELOG.md)
 [![Licenza](https://img.shields.io/badge/licenza-MIT-2ea043)](./LICENSE)
 [![Local-first](https://img.shields.io/badge/dati-local--first-8957e5)](#confini-dichiarati)
-[![Core tri-OS](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#la-071-in-breve)
+[![Core tri-OS](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#la-073-in-breve)
 
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-Anthropic-D97757?logo=claude&logoColor=white)](https://claude.com/claude-code)
 [![Codex](https://img.shields.io/badge/Codex-OpenAI-412991?logo=openai&logoColor=white)](https://openai.com/codex)
 
-[Perché](#perché-mediflow) · [Screenshot](#come-si-presenta) · [Architettura](#come-è-fatto) · [0.7.2](#la-072-in-breve) · [Confini](#confini-dichiarati) · [Avvio](#avvio-rapido) · [AI e trasparenza](#come-è-stato-costruito)
+[Perché](#perché-mediflow) · [Screenshot](#come-si-presenta) · [Architettura](#come-è-fatto) · [0.7.3](#la-073-in-breve) · [Confini](#confini-dichiarati) · [Avvio](#avvio-rapido) · [AI e trasparenza](#come-è-stato-costruito)
 
 </div>
 
@@ -118,36 +118,12 @@ flowchart LR
 
 Il cloud non compare nel diagramma: nessun egress di default, il percorso resta local-first.
 
-## La 0.7.2 in breve
+## La 0.7.3 in breve
 
-La `0.7.2` chiude la parità del boundary paired: il client Apple raggiunge la web
-app sul ciclo di vita del paziente e sulle famiglie cliniche mancanti
-(prestazioni, protesica, export FHIR), sempre entro i confini local-first e senza
-hard delete remoto. Restano le fondamenta della `0.7.1`, che ha portato il ramo
-Apple/native sul mainline con macOS come fronte più avanzato e iPhone e iPad come
-client paired sul modello `home-base`.
-
-- **ciclo di vita paziente sul boundary paired**: creazione, cestino con soft-delete e ripristino dal client Apple, con concorrenza ottimistica e senza accesso diretto al database;
-- **prestazioni, protesica ed export FHIR sul client paired**: nuove famiglie cliniche sul boundary con concorrenza ottimistica, e mappatura export-only v0 in un Bundle FHIR R4 `collection` generato on-device con pre-check FSE locale, senza claim di conformità completa a profili o ingestione di terze parti;
-- **web app locale** come superficie primaria di lavoro sul Mac;
-- **Kree8 cockpit** come root web live, con una direzione visuale unica e senza selector persistiti: copy asciutto, palette semantica sobria, dark mode completa e flusso a un clic verso la Scheda paziente;
-- **campi clinici sensibili cifrati lato client** con AES-256-GCM; il PIN non viene persistito, ma il file SQLite, gli identificativi, alcuni metadati e i backup non rientrano tutti in un perimetro whole-database cifrato verificato;
-- **backup, audit e contratto `/api/v1`** resi più chiari ed espliciti;
-- **AI locale** per insight e OCR, senza egress di default;
-- **import documentale reviewable**, con Smart Import prudente, artifact `parse/evidence`, ancore fonte e benchmark di assorbimento evidenza;
-- **prescrizioni di prestazione** separate dalle terapie farmacologiche, con item codificabili e matching repertorio preparato in modo bounded;
-- **app Apple/native** con macOS come fronte più maturo, shell home-base, core Swift condiviso e target iPhone/iPad paired senza accesso diretto al DB;
-- **core tri-OS** costruito e testato su macOS, Linux e Windows: oggi prova di portabilità del core, non promessa di app desktop complete su ogni piattaforma;
-- **runtime cross-platform**: launcher per macOS, Windows e Linux, scheduler di backup adattivo (launchd, Task Scheduler, systemd/cron) e degradazione esplicita delle funzioni solo-Mac;
-- **boundary SISS/FSE realistico**: handoff contestuale e percorso prescrittivo `webapp-assisted`, non integrazione regionale nativa già risolta.
-
-Il dettaglio completo è nel [CHANGELOG](./CHANGELOG.md).
-
-### Il ciclo 0.7.3 su `main`
-
-Il `main` successivo alla `0.7.2` conserva il boundary paired già consegnato e
-sta consolidando due avanzamenti distinti: l'adozione progressiva di Lume e uno
-stack intelligente più modulare, ma ancora locale, fail-closed e review-first.
+La `0.7.3` consolida la linea local-first sopra il boundary paired della
+`0.7.2`: adotta progressivamente Lume, rende più modulare lo stack AI locale,
+rafforza affidabilità e packaging e applica un guardrail automatico ai claim
+pubblici. Non chiude la migrazione UI completa né il gate manuale P6.
 
 - **Lume in adozione progressiva**: ADR 0078 è `Accepted`; canone L0, token
   L1a, convivenza web L1b, cockpit, workspace clinico e lock screen sono su
@@ -161,10 +137,22 @@ stack intelligente più modulare, ma ancora locale, fail-closed e review-first.
   come default e può evitare il modello solo nei casi eleggibili ad alta
   confidenza. Le attese locali vivono oggi nel solo web e ogni salvataggio
   resta esplicito.
+- **Affidabilità e distribuzione**: backup, cifratura, transazioni, ricerca
+  farmaci, campi nativi bloccati, dipendenze di produzione e runtime PM2 sono
+  stati irrobustiti con test e controlli dedicati.
+- **Repository e claim pubblici**: la repository pubblica è l'unica fonte
+  operativa; README, documentazione e white paper sono verificati dal claims
+  guard, che impedisce promesse non dimostrate su AI, FHIR, GDPR, cifratura,
+  cloud e integrazioni regionali.
+- **Boundary regionale realistico**: SISS e FSE restano un handoff contestuale
+  `webapp-assisted`; MediFlow non effettua invii o scritture nei sistemi
+  regionali.
 - **P6 preparata, non certificata**: PR #21 e `WUL-401`, ora completata, hanno
   consegnato il tooling di base: bundle, fixture, probe AX e runbook. `WUL-481`
   conserva i prerequisiti operativi ancora bloccati e il verbale manuale sul
   Mac sbloccato, quindi MediFlow non dichiara parity UI completa.
+
+Il dettaglio completo è nel [CHANGELOG](./CHANGELOG.md).
 
 ## Confini dichiarati
 
@@ -172,7 +160,7 @@ MediFlow non vuole raccontare più di quanto possa dimostrare.
 
 - **Nessun cloud obbligatorio**: il default resta locale.
 - **Nessuna app iPad/iPhone dichiarata come già completa**: il perimetro operativo è `home-base + paired client`; lifecycle paziente, moduli clinici non-AI, cataloghi, prestazioni/protesica e upload documentale manuale hanno workflow online governati, mentre cache offline, click-map UI e superfici document-derived restano parziali o host-only.
-- **Nessuna parity Windows/Linux dichiarata oggi**: la 0.7.2 prova il core tri-OS e il runtime di base, non app complete su ogni piattaforma.
+- **Nessuna parity Windows/Linux dichiarata oggi**: la 0.7.3 prova il core tri-OS e il runtime di base, non app complete su ogni piattaforma.
 - **Nessuna integrazione SISS/FSE certificata dichiarata senza prove**: il percorso attuale è contestuale e `webapp-assisted`, usando i canali ufficiali; MediFlow non dichiara sincronizzazione FSE, writeback regionale o invio prescrittivo diretto.
 - **Nessuna delega cieca all'AI**: l'AI locale può aiutare, ma non sostituisce revisione, giudizio clinico e responsabilità professionale.
 
