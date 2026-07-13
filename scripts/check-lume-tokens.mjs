@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const DEFAULT_TOKENS_PATH = path.join(ROOT_DIR, 'docs/design/lume/tokens/lume.tokens.json');
+export const DEFAULT_CSS_MIRROR_PATH = path.join(ROOT_DIR, 'app/lume-tokens.css');
 
 export const REGISTERS = ['giorno', 'grafite', 'guardia'];
 export const SURFACES = ['canvas', 'field', 'focal', 'chrome'];
@@ -125,16 +126,123 @@ export function loadTokens(tokensPath = DEFAULT_TOKENS_PATH) {
   return JSON.parse(readFileSync(tokensPath, 'utf8'));
 }
 
+export function loadCssMirror(cssPath = DEFAULT_CSS_MIRROR_PATH) {
+  return readFileSync(cssPath, 'utf8');
+}
+
+// Active aliases resolve at runtime to a register-scoped variable.
+export const ACTIVE_ALIASES = [
+  { alias: '--lume-surface-canvas', suffix: 'surface-canvas' },
+  { alias: '--lume-surface-field', suffix: 'surface-field' },
+  { alias: '--lume-surface-focal', suffix: 'surface-focal' },
+  { alias: '--lume-surface-chrome', suffix: 'surface-chrome' },
+  { alias: '--lume-ink', suffix: 'ink-primary' },
+  { alias: '--lume-ink-muted', suffix: 'ink-muted' },
+  { alias: '--lume-accent', suffix: 'accent-minerale' },
+];
+
+export function expectedMirror(tokens) {
+  const map = new Map();
+  for (const register of REGISTERS) {
+    for (const surface of SURFACES) {
+      map.set(`--lume-${register}-surface-${surface}`, resolveColor(tokens, `register.${register}.surface.${surface}`));
+    }
+    map.set(`--lume-${register}-ink-primary`, resolveColor(tokens, `register.${register}.ink.primary`));
+    map.set(`--lume-${register}-ink-muted`, resolveColor(tokens, `register.${register}.ink.muted`));
+    map.set(`--lume-${register}-accent-minerale`, resolveColor(tokens, `register.${register}.accent.minerale`));
+  }
+  for (const signal of SIGNALS) {
+    map.set(`--lume-signal-${signal}`, resolveColor(tokens, `signal.${signal}`));
+  }
+  return map;
+}
+
+const NAMESPACED_TOKEN = /^--lume-(?:giorno|grafite|guardia)-|^--lume-signal-/;
+
+export function parseCssBlocks(css) {
+  const clean = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const blocks = [];
+  const ruleRe = /([^{}]+)\{([^{}]*)\}/g;
+  let rule;
+  while ((rule = ruleRe.exec(clean)) !== null) {
+    const decls = new Map();
+    const declRe = /(--[\w-]+)\s*:\s*([^;]+?)(?:;|$)/g;
+    let decl;
+    while ((decl = declRe.exec(rule[2])) !== null) {
+      const name = decl[1].trim();
+      if (decls.has(name)) throw new Error(`mirror duplicate declaration: ${name}`);
+      decls.set(name, decl[2].trim());
+    }
+    blocks.push({ selector: rule[1].trim(), decls });
+  }
+  return blocks;
+}
+
+function normalizeHex(value) {
+  const trimmed = value.trim();
+  parseHexColor(trimmed); // fail closed on a malformed mirror value
+  return trimmed.toLowerCase();
+}
+
+export function verifyCssMirror(tokens, css) {
+  const blocks = parseCssBlocks(css);
+  const flat = new Map();
+  for (const block of blocks) {
+    for (const [name, value] of block.decls) {
+      if (NAMESPACED_TOKEN.test(name) && flat.has(name)) throw new Error(`mirror duplicate token: ${name}`);
+      if (!flat.has(name)) flat.set(name, value);
+    }
+  }
+  const expected = expectedMirror(tokens);
+  for (const [name, hex] of expected) {
+    const got = flat.get(name);
+    if (got === undefined) throw new Error(`mirror missing token: ${name}`);
+    if (normalizeHex(got) !== normalizeHex(hex)) throw new Error(`mirror drift: ${name} is ${got}, expected ${hex}`);
+  }
+  for (const name of flat.keys()) {
+    if (NAMESPACED_TOKEN.test(name) && !expected.has(name)) throw new Error(`mirror unknown token: ${name}`);
+  }
+  const roots = blocks.filter((block) => block.selector.split(',').some((s) => s.trim() === ':root'));
+  const darks = blocks.filter((block) => block.selector.split(',').some((s) => s.trim() === '.dark'));
+  if (roots.length !== 1) throw new Error('mirror requires exactly one :root block');
+  if (darks.length !== 1) throw new Error('mirror requires exactly one .dark block');
+  const [root] = roots;
+  const [dark] = darks;
+  const aliasNames = new Set(ACTIVE_ALIASES.map(({ alias }) => alias));
+  for (const block of blocks) {
+    if (block !== root && block !== dark && [...block.decls.keys()].some((name) => aliasNames.has(name))) {
+      throw new Error(`mirror active alias outside theme block: ${block.selector}`);
+    }
+  }
+  for (const { alias, suffix } of ACTIVE_ALIASES) {
+    assertAlias(root.decls, alias, `var(--lume-giorno-${suffix})`, ':root/giorno');
+    assertAlias(dark.decls, alias, `var(--lume-grafite-${suffix})`, '.dark/grafite');
+  }
+  return { tokens: expected.size, aliases: ACTIVE_ALIASES.length };
+}
+
+function assertAlias(decls, alias, expectedValue, where) {
+  const got = decls.get(alias);
+  if (got === undefined) throw new Error(`mirror missing active alias ${alias} in ${where}`);
+  if (got.replace(/\s+/g, '') !== expectedValue.replace(/\s+/g, '')) {
+    throw new Error(`mirror alias ${alias} in ${where} is ${got}, expected ${expectedValue}`);
+  }
+}
+
 function main() {
   let result;
+  let mirror;
   try {
-    result = evaluateContract(loadTokens());
+    const tokens = loadTokens();
+    result = evaluateContract(tokens);
+    mirror = verifyCssMirror(tokens, loadCssMirror());
   } catch (error) {
     console.error(`lume token check failed: ${error.message}`);
     process.exitCode = 1;
     return;
   }
   console.log(formatReport(result));
+  console.log(`CSS mirror app/lume-tokens.css: ${mirror.tokens} namespaced tokens matched, ${mirror.aliases} active aliases per theme OK`);
   process.exitCode = result.pass ? 0 : 1;
 }
 
