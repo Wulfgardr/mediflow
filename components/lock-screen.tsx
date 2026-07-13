@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSecurity } from './security-provider';
-import { AlertCircle, KeyRound, Loader2, ShieldCheck, Unlock } from 'lucide-react';
+import { AlertCircle, Loader2, Unlock } from 'lucide-react';
 import styles from './kree8/kree8-lock-screen.module.css';
 
 export function LockScreen() {
@@ -11,6 +11,18 @@ export function LockScreen() {
     const [confirmPin, setConfirmPin] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    // WUL-55: ref + nonce to restore focus to the PIN operatore input after a failed login.
+    const pinInputRef = useRef<HTMLInputElement>(null);
+    const [failedAttempt, setFailedAttempt] = useState(0);
+
+    // A failed login re-enables and clears the input; deterministically restore focus so the
+    // operator can retry at once. Guards: !loading = input already enabled; optional chaining =
+    // safe across unmount, so a successful login (which unmounts this form) never focuses.
+    useEffect(() => {
+        if (failedAttempt > 0 && !loading) {
+            pinInputRef.current?.focus();
+        }
+    }, [failedAttempt, loading]);
 
     // If not locked and setup is done, don't render anything
     if (!isLocked && !requiresSetup) return null;
@@ -25,10 +37,12 @@ export function LockScreen() {
             if (!success) {
                 setError('');
                 setPin('');
+                setFailedAttempt((n) => n + 1);
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Errore durante il login');
             setPin('');
+            setFailedAttempt((n) => n + 1);
         } finally {
             setLoading(false);
         }
@@ -58,7 +72,7 @@ export function LockScreen() {
     const visibleError = error || authErrorMessage;
 
     return (
-        // @Codex WUL-274: lock chrome mirrors the Kree8 live root without changing auth semantics.
+        // @Codex WUL-55 F2d-A: lock chrome uses the landed Lume identity without changing auth semantics.
         <div className={styles.lockShell} aria-label="MediFlow lock screen">
             <section className={styles.lockCard} aria-labelledby="mediflow-lock-title">
                 <div className={styles.brandRow}>
@@ -66,42 +80,27 @@ export function LockScreen() {
                     <span className={styles.brandWord}>
                         MEDI<b>FLOW</b>
                     </span>
-                    <span className={styles.statusPill}>
-                        {requiresSetup ? 'primo avvio' : 'PIN richiesto'}
-                    </span>
                 </div>
 
                 <div className={styles.headerBlock}>
-                    <div className={styles.kicker}>
-                        {requiresSetup ? (
-                            <>
-                                <ShieldCheck size={13} /> Prima configurazione
-                            </>
-                        ) : (
-                            <>
-                                <KeyRound size={13} /> Sessione protetta
-                            </>
-                        )}
-                    </div>
                     <h1 id="mediflow-lock-title" className={styles.title}>
                         {requiresSetup ? 'Crea il tuo PIN' : 'Sblocca MediFlow'}
                     </h1>
-                    <p className={styles.subtitle}>
-                        {requiresSetup
-                            ? 'Crea un PIN per proteggere la sessione e cifrare i dati.'
-                            : 'Inserisci il PIN per riprendere il lavoro.'}
-                    </p>
                 </div>
 
                 <form onSubmit={requiresSetup ? handleSetup : handleLogin} className={styles.form}>
-                    <label className={styles.fieldLabel} htmlFor="mediflow-lock-pin">
-                        PIN operatore
-                    </label>
+                    {requiresSetup && (
+                        <label className={styles.fieldLabel} htmlFor="mediflow-lock-pin">
+                            PIN operatore
+                        </label>
+                    )}
                     <div className={styles.inputWrap}>
                         <input
                             id="mediflow-lock-pin"
+                            ref={pinInputRef}
                             type="password"
-                            placeholder="Inserisci PIN"
+                            aria-label="PIN operatore"
+                            placeholder={requiresSetup ? 'Inserisci PIN' : undefined}
                             value={pin}
                             onChange={(e) => setPin(e.target.value)}
                             className={styles.pinInput}
@@ -169,12 +168,6 @@ export function LockScreen() {
                         )}
                     </button>
                 </form>
-
-                <footer className={styles.footer}>
-                    <span>Sessione locale</span>
-                    <span>Nessun trasferimento di rete</span>
-                    <span>Zero-knowledge</span>
-                </footer>
             </section>
         </div>
     );

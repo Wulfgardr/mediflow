@@ -64,7 +64,7 @@ export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
   const lockHeading = page.getByRole('heading', { name: 'Sblocca MediFlow' });
   if (!(await isVisible(lockHeading))) return;
 
-  const pinInput = page.locator('input[placeholder="Inserisci PIN"]:not([disabled])').first();
+  const pinInput = page.getByLabel('PIN operatore').first();
   const unlockButton = page.getByRole('button', { name: /Sblocca/ }).first();
 
   await pinInput.fill(pin);
