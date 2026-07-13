@@ -8,6 +8,8 @@
 > Snapshot storico pre-riordino roadmap.
 
 Questa versione è mantenuta solo come riferimento storico.
+Le formulazioni rischiose sono annotate come superate per non propagarle come
+stato corrente; il resto dello snapshot non viene riallineato retroattivamente.
 Per la versione attiva consulta [docs/ROADMAP.md](./ROADMAP.md).
 
 ---
@@ -37,7 +39,8 @@ Cose che mi servono per usarlo davvero ogni giorno:
 ### Sicurezza
 
 - **Log degli accessi**: Chi ha visto cosa e quando. Serve per GDPR.
-- **Cambio PIN**: Ora se perdi il PIN perdi tutto. Devo poterlo cambiare.
+- **Cambio PIN (claim storico superato)**: lo snapshot assumeva la perdita totale
+  senza PIN; la semantica corrente va verificata nelle fonti canoniche attive.
 - **Pulizia automatica**: Cancellare dati vecchi dopo X anni (configurabile).
 
 ### Usabilità

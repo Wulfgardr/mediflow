@@ -105,7 +105,7 @@ npm run check:never-regress
 
 Il guard fallisce se trova:
 - credenziali di default hardcoded nel runtime
-- endpoint runtime non locali o telemetry default-on
+- endpoint runtime non locali o attivazione implicita della telemetria
 - rotture delle invarianti zero-knowledge minime
 
 ### Claims guard
