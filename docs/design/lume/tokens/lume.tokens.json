@@ -1,5 +1,5 @@
 {
-  "$description": "Lume design tokens (WUL-55, L1a candidate). DTCG-style source for the three light registers giorno/grafite/guardia plus register-independent clinical signals. Not yet wired to any runtime consumer; no data-lume flag exists yet. Text/background contrast is measured by scripts/check-lume-tokens.mjs.",
+  "$description": "Lume design tokens (WUL-55, L1a delivered; L1b web runtime mirror delivered). DTCG-style source for the three light registers giorno/grafite/guardia plus register-independent clinical signals. app/lume-tokens.css mirrors this source; app/layout.tsx exposes the fixed data-lume=true migration marker, while active aliases map giorno to :root and grafite to .dark. Guardia is declared but not active. Text/background contrast is measured by scripts/check-lume-tokens.mjs.",
   "$type": "color",
   "register": {
     "giorno": {

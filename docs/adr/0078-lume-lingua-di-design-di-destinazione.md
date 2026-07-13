@@ -1,7 +1,7 @@
 # ADR 0078: Lume come lingua di design di destinazione multipiattaforma
 
-Date: 2026-07-12
-Status: Proposed (decisione di prodotto di Leonardo registrata il 2026-07-12; da marcare Accepted al merge del branch); implementazione gated dalle fasi L0-L6 di migrazione
+Date: 2026-07-12 (ledger aggiornato 2026-07-13)
+Status: Accepted (decisione di prodotto di Leonardo registrata il 2026-07-12; canone mergiato su main con PR #45); implementazione in corso lungo le fasi L0-L6 di migrazione (ledger in fondo)
 
 ---
 
@@ -61,13 +61,16 @@ Si adotta l'opzione 2:
    il filo come firma grafica con tratto = stato epistemico, due voci
    tipografiche (Voce e Registro), grammatica dell'attenzione.
 2. **Vetro Clinico** (`docs/design/vetro-clinico/`) resta il canone operativo
-   transitorio: ogni lavoro UI corrente lo segue, e le sue corsie di
-   consolidamento DS-1..DS-3 sono prerequisito tecnico della migrazione.
+   transitorio delle superfici non migrate. Le corsie DS sono prerequisiti
+   applicati per piattaforma e superficie, non un blocco globale: DS-1 governa
+   i consumatori web coinvolti, DS-2 le slice strutturali native e DS-3 i flussi
+   di feedback toccati. Le prime slice web hanno chiuso la parte necessaria del
+   proprio perimetro; questo non dichiara DS-1..DS-3 complete in tutta l'app.
 3. La migrazione segue `docs/design/lume/03-migrazione.md` (fasi L0-L6 con
-   gate); il flag di convivenza `data-lume` e strumento di sviluppo, non un
-   selettore utente: ADR 0047 resta pienamente in vigore. La condizione di
-   uscita da quella convivenza e formalizzata qui sotto prima che L1b la
-   introduca.
+   gate); il marker fisso `data-lume="true"` segnala la convivenza, ma non
+   governa la cascata e non e un selettore utente: ADR 0047 resta pienamente in
+   vigore. La condizione di uscita da quella convivenza e formalizzata qui
+   sotto.
 4. I segnali clinici e le leggi cliniche (colore = semantica, stati onesti,
    tastiera, AA) sono invarianti tra le due lingue.
 
@@ -86,10 +89,10 @@ Si adotta l'opzione 2:
 
 ## Condizione di uscita dalla convivenza `data-lume`
 
-Il flag `data-lume` e la convivenza dei due vocabolari di token sono temporanei.
-Questa condizione di uscita e definita prima che L1b introduca il flag, cosi la
-convivenza nasce gia con la sua fine scritta. Non e legata a una data di
-calendario ma al raggiungimento congiunto di questi cancelli:
+Il marker `data-lume` e la convivenza dei due vocabolari di token sono temporanei.
+Ora che L1b ha introdotto il marker nel runtime web, questa condizione resta il
+criterio per chiudere la convivenza. Non e legata a una data di calendario ma al
+raggiungimento congiunto di questi cancelli:
 
 1. Tutti i consumatori previsti delle fasi L2-L5 (cockpit, Scheda, filo, voci,
    overlay e motion) sono migrati a Lume: non resta superficie in produzione
@@ -100,18 +103,45 @@ calendario ma al raggiungimento congiunto di questi cancelli:
    registri e le coppie di contrasto misurate restano sopra soglia dopo la
    migrazione.
 
-Quando i tre cancelli sono verdi insieme, si rimuovono il flag di sviluppo
+Quando i tre cancelli sono verdi insieme, si rimuovono il marker di migrazione
 `data-lume` e gli alias dei vecchi token: la convivenza finisce e Lume resta
 l'unico vocabolario. Finche anche uno solo e rosso, la convivenza prosegue e il
-flag resta strumento di sviluppo (ADR 0047).
+marker resta evidenza tecnica della migrazione (ADR 0047).
 
-## First Thin Slice
+## Ledger di implementazione
 
-Fase L1a di `docs/design/lume/03-migrazione.md`: i tre registri di luce nel
-sorgente token DTCG (`docs/design/lume/tokens/lume.tokens.json`) con misura
-strumentale del contrasto (`scripts/check-lume-tokens.mjs`), senza toccare
-alcuna superficie utente e senza introdurre ancora il flag `data-lume`. Questo
-branch (WUL-55) e un candidato L1a, non adozione runtime: non esiste ancora
-nessun consumatore. L1 si considera consegnata quando il contratto token e
-mergiato e misurato; la convivenza runtime (L1b) arriva in un pacchetto
-successivo, dietro la condizione di uscita qui sopra.
+Il canone e Accepted; la migrazione resta in corso. Questo ledger distingue le
+tranche gia atterrate su `main` da quelle ancora aperte. Ogni riga consegnata
+cita l'evidenza; il resto e lavoro dichiarato, non stato raggiunto.
+
+Consegnate:
+
+- **L0, canone e ADR**: questo documento e i contratti di piattaforma, mergiati
+  (PR #45). PR #44 conserva Vetro Clinico come corpus storico e transitorio.
+- **L1a, contratto token**: registri giorno/grafite/guardia nel sorgente DTCG
+  (`docs/design/lume/tokens/lume.tokens.json`), con le trenta coppie
+  testo/superficie misurate da `scripts/check-lume-tokens.mjs` (PR #47).
+- **L1b, convivenza runtime web**: mirror CSS `app/lume-tokens.css` importato da
+  `app/layout.tsx`; l'HTML espone il marker fisso `data-lume="true"`, mentre gli
+  alias attivi mappano giorno su `:root` e grafite su `.dark`, con verifica di
+  allineamento al sorgente e test runtime (PR #48). Il marker non e un gate ne
+  un selettore utente. La guardia resta nel sorgente ma non e un tema attivo.
+- **Prime superfici Lume (web)**: cockpit (PR #49), shell del workspace clinico
+  con fuoco focale via `data-lume-focus` e scrollspy (PR #52) e lock screen
+  (PR #53), con smoke E2E.
+- **Thin slice nativa (macOS)**: la card clinica diventa opaca su ogni OS
+  (`clinicalCardStyle()`, alias `cardStyle()`, `GlassCard` deprecata e resa
+  opaca) con test sintetico light/dark (`ClinicalCardStyleTests`) e build del
+  bundle (PR #46).
+
+Aperte:
+
+- Componenti interni e viste web non ancora migrati: Vetro Clinico resta il
+  canone operativo transitorio delle superfici non toccate.
+- Registro guardia come tema attivo, filo, tipografia bundle (Voce e Registro),
+  motion focale e Settings scene.
+- Nativo oltre la card opaca: `LumePalette`/`LumeSurface`, struttura desktop,
+  parity e un target XCUITest macOS dedicato non esistono ancora.
+- Accessibilita, sicurezza e computer-use verificati manualmente end-to-end: le
+  prove correnti sono sintetiche o di CI (misura contrasti, smoke E2E, test
+  unitari), non una QA manuale completa.

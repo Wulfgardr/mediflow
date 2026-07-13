@@ -44,7 +44,7 @@ Tre registri di luce, non tre temi (giorno/grafite seguono il chiaro/scuro di si
 
 Il gradiente di temperatura è la novità: il fuoco è appena più caldo (avorio), la periferia appena più fredda (minerale). Sotto la soglia del dichiarabile a parole, sopra la soglia del percepibile: è la lampada, non un tema.
 
-I valori sono formalizzati nel sorgente token DTCG `tokens/lume.tokens.json` e misurati da `scripts/check-lume-tokens.mjs` (WUL-55, candidato L1a: sorgente e misura, nessun consumatore runtime). In `giorno` `ink.muted` è stato scurito da `#5f6b76` a `#5c6772`: il valore originale misurava 4,44:1 su `surface.chrome` (la superficie chiara più scura, quindi la coppia vincolante), sotto la soglia 4,5:1; ora misura 4,70:1. Le altre coppie erano già sopra soglia.
+I valori sono formalizzati nel sorgente token DTCG `tokens/lume.tokens.json` e misurati da `scripts/check-lume-tokens.mjs` (L1a). Il mirror CSS `app/lume-tokens.css`, importato dal layout insieme al marker fisso `data-lume="true"`, li porta nel runtime web con giorno su `:root` e grafite su `.dark` (L1b); il marker non governa la cascata e la guardia resta nel sorgente ma non è ancora un tema attivo. In `giorno` `ink.muted` è stato scurito da `#5f6b76` a `#5c6772`: il valore originale misurava 4,44:1 su `surface.chrome` (la superficie chiara più scura, quindi la coppia vincolante), sotto la soglia 4,5:1; ora misura 4,70:1. Le altre coppie erano già sopra soglia.
 
 I segnali clinici NON cambiano: `signal.warning #9a6a2f`, `signal.critical #a33a2f`, `signal.success #4b6354`, `signal.plum #555161` (e le loro derivazioni scure/notturne dai token). La semantica clinica è patrimonio, non stile.
 
@@ -116,7 +116,7 @@ Il layout di Lume non presenta dati: presenta decisioni.
 
 ## 8. Note per piattaforma
 
-- **Web**: piattaforma prevista per la prima implementazione di riferimento. I registri saranno set di custom properties; il modello focale userà un attributo (`data-lume-focus`) per spostare le variabili di zona; il filo sarà un bordo/pseudo-elemento e la sua estensione una transizione su `height`/`width` in compositor (scale). Il font variabile impacchettato dovrà entrare nel bundle locale, senza fetch remoto.
+- **Web**: prima implementazione di riferimento, in corso. I registri sono set di custom properties (mirror `app/lume-tokens.css`, marker `data-lume="true"`, giorno/grafite attivi su `:root`/`.dark`); il modello focale usa l'attributo `data-lume-focus` per spostare le variabili di zona, già adottato nella shell del workspace clinico; il filo resta da implementare come bordo/pseudo-elemento, con l'estensione come transizione su `height`/`width` in compositor (scale). Il font variabile impacchettato dovrà ancora entrare nel bundle locale, senza fetch remoto.
 - **Apple**: SF Pro/SF Mono al posto delle voci impacchettate; il fuoco usa i colori semantici custom sopra i materiali opachi; gli overlay restano gli sheet di sistema (vetro nativo dove l'OS lo dà: è idiomatico, non è una violazione: la legge riguarda le superfici strutturali e cliniche). `matchedGeometryEffect` solo per il filo che prosegue.
 - **Windows**: Mica resta il fondo di finestra (è il "canvas" idiomatico); i tre livelli di luce vivono nei layer fill; Registro = Cascadia Mono se non si impacchetta Plex.
 - **Linux/GNOME**: Lume degrada meglio del vetro per costruzione (è già opaco e piatto): zone di luce come toni Adwaita-compatibili, filo come accent, nessun blur da rimuovere.
