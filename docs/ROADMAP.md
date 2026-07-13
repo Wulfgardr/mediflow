@@ -8,7 +8,7 @@ read_when:
 # 🧭 Roadmap MediFlow
 
 > **Dove siamo e dove vogliamo andare.**
-> v0.7.2 resta la release corrente; il `main` e nel ciclo v0.7.3 senza dichiarare parity UI completa. Ultimo aggiornamento: 2026-07-13.
+> v0.7.3 e la linea corrente, senza dichiarare parity UI completa. Ultimo aggiornamento: 2026-07-13.
 > Fonte roadmap prodotto canonica (vedi anche [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) per la lettura completa corrente e [docs/README.md](./README.md) per mappa completa documenti).
 
 > [!NOTE]
@@ -146,14 +146,18 @@ testato anche su Linux/Windows.
 
 ---
 
-## 🚧 In corso (ciclo v0.7.3 su `main`)
+## ✅ Consegnato nella linea v0.7.3
 
-La `v0.7.2` resta la release pubblicata corrente. La lettura operativa piu
-completa del ciclo v0.7.3 su `main` e ora
+La lettura operativa piu completa della linea v0.7.3 e
 [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md): questo file resta la
 roadmap prodotto, mentre lo stato del sistema tiene insieme runtime effettivo,
 boundary, document intelligence, home-base, Apple clients e governance della
 repository pubblica.
+
+La linea consegna le prime superfici Lume, lo scaffold AI locale modulare, il
+control-flow documentale review-first, hardening di runtime e dati, il claims
+guard pubblico e il tooling P6 sintetico. La migrazione Lume completa e il
+verbale manuale di `WUL-481` restano lavoro successivo, non claim di release.
 
 ### Modalita network home-base
 

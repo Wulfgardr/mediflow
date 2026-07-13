@@ -6,7 +6,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const includePublication = process.argv.includes('--include-publication');
 const roots = [
   'README.md', 'ARCHITECTURE.md', 'SECURITY.md', 'CONTRIBUTING.md',
   'docs/README.md', 'docs/markdown-index.md', 'docs/FAQ.md', 'docs/ROADMAP.md',
@@ -16,9 +15,8 @@ const roots = [
   'docs/topologia-dati-flussi.md', 'docs/design',
   'docs/adr/0006-terminology-plugin-and-fse-profiles.md',
   'docs/adr/0065-intended-purpose-and-claims-guard.md',
-  'app', 'components', 'native', 'oss-assets',
+  'app', 'components', 'native', 'oss-assets', 'whitepaper',
 ];
-const publicationRoots = ['whitepaper'];
 const extensions = new Set(['.md', '.mdx', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.html', '.swift']);
 const skipped = ['.git', '.next', 'node_modules', 'e2e', 'coverage', 'dist', 'out']
   .map((item) => `${path.sep}${item.replaceAll('/', path.sep)}${path.sep}`);
@@ -81,8 +79,7 @@ if (process.argv.includes('--self-test')) runSelfTest();
 else runRepositoryScan();
 
 function runRepositoryScan() {
-  const activeRoots = includePublication ? [...roots, ...publicationRoots] : roots;
-  const files = activeRoots.flatMap(collectFiles).sort();
+  const files = roots.flatMap(collectFiles).sort();
   const findings = [];
 
   for (const file of files) {
@@ -94,9 +91,6 @@ function runRepositoryScan() {
 
   if (findings.length === 0) {
     console.log(`Claims guard passed: scanned ${files.length} file(s), 0 high-risk claim(s).`);
-    if (!includePublication) {
-      console.log('Phase B dependency: whitepaper/ is not enforced yet; rerun with --include-publication after its copy converges.');
-    }
     return;
   }
   console.error(`Claims guard failed: ${findings.length} high-risk claim(s) need review.`);

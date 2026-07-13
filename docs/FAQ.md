@@ -11,45 +11,38 @@ No, di default no.
 
 Il progetto nasce `local-first`: database locale, AI locale, servizi locali. Se esistono lane di confronto o shadow evaluation, restano opt-in, separate e non fanno parte del runtime clinico ordinario.
 
-## 🧭 Che cosa porta `v0.7.2`?
+## 🧭 Che cosa porta `v0.7.3`?
 
-`v0.7.2` chiude la parità del boundary paired sopra la base multi-superficie
-consolidata con la `0.7.1`:
+`v0.7.3` consolida la base multi-superficie senza ampliare i claim oltre le
+prove disponibili:
 
-- ciclo di vita paziente, prestazioni, protesica ed export FHIR dal client Apple paired;
-- storage e sicurezza più solidi;
-- contratto locale `/api/v1` più chiaro;
-- backup, audit e guardrail più espliciti;
-- import documentale e AI più reviewable;
-- Mac `home-base` packaged e app Apple/native molto più concreta su macOS;
-- core Swift condiviso costruito e testato anche su Linux e Windows;
-- document intelligence `artifact-first` con fonti e conflitti più espliciti;
-- prescrizioni di prestazione separate dalle terapie farmacologiche;
-- root web sul cockpit Kree8 live, senza selector di shell su `main`;
-- boundary SISS/FSE raccontati senza scorciatoie narrative.
+- adozione progressiva di Lume su prime superfici web e card clinica nativa;
+- stack AI locale più modulare, con Ollama come unico provider operativo e gate
+  egress ancora chiuso;
+- control-flow documentale `shadow` e attese locali sempre review-first;
+- hardening di backup, cifratura, transazioni, ricerca farmaci, campi nativi
+  bloccati, dipendenze di produzione e runtime PM2;
+- claims guard esteso al white paper e alle altre superfici pubbliche;
+- tooling packaged P6 con fixture sintetiche, probe e runbook;
+- repository pubblica unica come fonte di sviluppo e rilascio.
 
-La differenza principale rispetto alla 0.7.0 e il consolidamento Apple/native:
-macOS e il fronte piu maturo, iPhone/iPad restano client paired, mentre
-Windows/Linux provano oggi portabilita del core e CI, non parity applicativa
-completa.
+Restano le capacità paired della `0.7.2`: ciclo di vita paziente, prestazioni,
+protesica ed export FHIR dal client Apple, entro contratti locali versionati.
 
 Per il quadro dettagliato, inclusi runtime reale, home-base, document
-intelligence, AI locale, SISS/FSE, Apple clients e split pubblico/privato, vedi
+intelligence, AI locale, SISS/FSE e Apple clients, vedi
 [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md).
 
-## ✨ Cosa e gia su `main` nel ciclo 0.7.3?
+## ✨ Cosa resta aperto dopo `v0.7.3`?
 
-La `v0.7.2` resta la release pubblicata corrente. Sul `main` successivo:
-
-- ADR 0078 e `Accepted` e Lume e in adozione progressiva: prime superfici web
-  e card clinica opaca nativa sono consegnate, non l'intera migrazione L0-L6;
-- `OllamaAdapter` e `AIService` introducono lo scaffold provider, ma Ollama
-  resta l'unico provider e il gate egress rimane chiuso;
-- il control-flow documentale usa `shadow` come default e la prima slice web
-  delle attese locali mantiene review e salvataggio espliciti;
-- PR #21 e `WUL-401` hanno consegnato il tooling P6 di base; prerequisiti
-  operativi e verbale manuale sul Mac sbloccato restano un gate di `WUL-481`,
-  quindi non dichiariamo parity UI piena.
+- **Lume**: componenti interni, filo, tipografia, Settings scene e QA manuale
+  completa non sono ancora chiusi.
+- **P6 / `WUL-481`**: il tooling sintetico non sostituisce il verbale manuale
+  sul bundle macOS con macchina sbloccata; nessuna parity UI piena è dichiarata.
+- **AI e cloud**: registry, provider alternativi, redaction lane e consenso
+  cloud non sono consegnati. Nessun provider remoto è attivo di default.
+- **Client paired**: offline, click-map UI e superfici derivate dai documenti
+  restano parziali o host-only.
 
 ## 🍎 Posso usarlo su Mac, iPad o iPhone?
 

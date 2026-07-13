@@ -7,6 +7,53 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-07-13
+
+> Nota release: la `0.7.3` consolida la linea local-first con un'adozione
+> progressiva di Lume, uno stack AI locale più modulare e nuovi gate sui claim
+> pubblici. La migrazione Lume completa e il verbale manuale P6 sul Mac
+> sbloccato restano fuori da questa release.
+
+### Aggiunto
+
+- **Lume, adozione progressiva**: ADR 0078 `Accepted`, token condivisi e prime
+  superfici web su cockpit, workspace clinico e lock screen; sul client nativo
+  è presente la card clinica opaca. Settings, componenti interni e QA manuale
+  completa restano aperti.
+- **Stack AI locale modulare**: `OllamaAdapter`, `AIService`, contratti di task
+  e router documentale `shadow` preparano provider e control-flow separati.
+  Ollama resta l'unico provider operativo e il gate egress resta chiuso in
+  attesa della redaction lane.
+- **Claims guard pubblico**: controllo automatico di README, documentazione,
+  UI, client nativo, asset OSS e white paper contro claim non dimostrati su AI,
+  FHIR, GDPR, cifratura, cloud e integrazioni regionali.
+- **Tooling P6 ripetibile**: bundle, fixture sintetiche, probe di accessibilità
+  e runbook per la verifica packaged. Il verbale manuale sul Mac sbloccato
+  resta governato da `WUL-481` e non è sostituito dai test sintetici.
+
+### Migliorato
+
+- **Affidabilità locale**: hardening di backup, cifratura, rollback delle
+  transazioni, ricerca farmaci, campi nativi bloccati, dipendenze di produzione
+  e runtime PM2, con test di regressione dedicati.
+- **Flussi review-first**: il control-flow documentale può evitare il modello
+  solo per casi eleggibili ad alta confidenza; attese e salvataggi clinici
+  restano espliciti e revisionabili.
+- **White paper**: nuova direzione Lume opaca, copy riallineato allo stato reale
+  e metadata aggiornati alla linea `0.7.3`.
+- **Topologia repository**: `Wulfgardr/mediflow` pubblica è l'unica fonte
+  operativa per sviluppo, issue, branch, tag e release.
+
+### Confini
+
+- Lume è parzialmente implementato: nessun claim di parity UI completa.
+- FHIR resta una mappatura export-only v0; non è dichiarata conformità completa
+  né ingestione garantita da sistemi terzi.
+- Il percorso SISS/FSE resta contestuale e `webapp-assisted`, senza
+  sincronizzazione, writeback o invio prescrittivo diretto certificati.
+- Nessun cloud o provider AI remoto è attivo di default; nessuna scrittura
+  clinica viene applicata senza revisione esplicita.
+
 ## [0.7.2] - 2026-07-09
 
 > Nota release: la `0.7.2` chiude la parità del boundary paired per il client
