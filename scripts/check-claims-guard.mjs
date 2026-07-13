@@ -47,7 +47,7 @@ const rules = [
     /(?:\bFHIR(?: R4)?\b.{0,120}\b(?:compatibil[ei]|conform(?:e|ita|ità)|interoperabil(?:e|ita|ità)|portabilit[aà]|leggibil[ei] da altr[io] sistem\w*|riusabil[ei]|lock-in)|\b(?:compatibil[ei]|conform(?:e|ita|ità)|interoperabil(?:e|ita|ità)|portabilit[aà]|leggibil[ei] da altr[io] sistem\w*|riusabil[ei]|lock-in)\b.{0,120}\bFHIR(?: R4)?\b)/iu],
   ['CLAIM-GDPR-GUARANTEE', 'GDPR / roles / rights',
     'Product features must not certify GDPR compliance, assign roles categorically, or guarantee rights.',
-    /(?:\b(?:MediFlow|software|prodotto|feature|funzionalit[aà])\b.{0,120}\b(?:garantisce|certifica|assicura|(?:e|è|risulta)\s+conforme)\b.{0,120}\b(?:GDPR|conformit[aà]|art(?:icolo|\.)?\s*(?:17|20|32))\b|\b(?:medico|professionista)\b.{0,80}\b(?:resta|e|è)\b.{0,24}\btitolare del trattamento\b|\btitolare del trattamento\b.{0,48}\bresta\b.{0,32}\b(?:medico|professionista)\b|\b(?:diritt[io]|GDPR|art(?:icolo|\.)?\s*(?:17|20|32))\b.{0,96}\b(?:garantit[ioe]|conform[ei]|certificat[oaie]|assicurat[ioe])\b)/iu],
+    /(?:\b(?:MediFlow|software|prodotto|feature|funzionalit[aà])\b.{0,120}(?:\b(?:garantisce|certifica|assicura)\b|(?:\be\b|è|\brisulta\b)\s+conforme).{0,120}\b(?:GDPR|conformit[aà]|art(?:icolo|\.)?\s*(?:17|20|32))\b|\b(?:medico|professionista)\b.{0,80}(?:\b(?:resta|e)\b|è).{0,24}\btitolare del trattamento\b|\btitolare del trattamento\b.{0,48}\bresta\b.{0,32}\b(?:medico|professionista)\b|\b(?:diritt[io]|GDPR|art(?:icolo|\.)?\s*(?:17|20|32))\b.{0,96}\b(?:garantit[ioe]|conform[ei]|certificat[oaie]|assicurat[ioe])\b)/iu],
   ['CLAIM-ONE-DEVICE-ABSOLUTE', 'local-first / topology',
     'Local-first claims must name home-base and explicit paired, cache, export, or backup paths.',
     /\b(?:i\s+|tutti i\s+)?dati(?: clinici| paziente)?\b.{0,56}\b(?:non (?:escono|lasciano)(?: mai)?|restano|rimangono|sono nel|stanno sul)\b.{0,64}\b(?:Mac|computer|dispositivo)\b/iu],
@@ -185,6 +185,9 @@ function runSelfTest() {
     ['home-base alone plus single-device absolute', 'Storage home-base; tutti i dati restano sul computer.', 'CLAIM-ONE-DEVICE-ABSOLUTE'],
     ['optional resolver plus universal ICD guarantee', 'Resolver opzionale; ogni diagnosi ha un codice ICD-11 validato.', 'CLAIM-ICD-GUARANTEE'],
     ['support wording plus GDPR conformity', 'Le misure possono supportare il GDPR; MediFlow e conforme al GDPR.', 'CLAIM-GDPR-GUARANTEE'],
+    ['accented GDPR conformity', 'MediFlow è conforme al GDPR.', 'CLAIM-GDPR-GUARANTEE'],
+    ['PIN qualifier plus comma contrast', 'Il PIN non equivale a zero-knowledge, ma il database SQLite è cifrato integralmente.', 'CLAIM-FULL-DB-ENCRYPTION'],
+    ['negative encryption plus comma contrast', 'Il file SQLite non è cifrato integralmente, ma il database SQLite è cifrato integralmente.', 'CLAIM-FULL-DB-ENCRYPTION'],
   ];
   for (const [name, source, expected] of contradictoryCases) {
     const matched = findRuleMatches(source, 'self-test.md').map((item) => item.rule.id);
@@ -207,7 +210,7 @@ function findRuleMatches(source, file) {
     const flags = rule.pattern.flags.includes('g') ? rule.pattern.flags : `${rule.pattern.flags}g`;
     const clauseBoundedSource = rule.pattern.source.replace(
       /\.\{0,(\d+)\}/gu,
-      String.raw`(?:(?![.!?](?:\s|$)|;|\n).){0,$1}`,
+      String.raw`(?:(?![.!?](?:\s|$)|;|\n|,\s*(?:ma|però|tuttavia|mentre)\b).){0,$1}`,
     );
     const pattern = new RegExp(clauseBoundedSource, flags);
     for (const match of scanText.matchAll(pattern)) {
@@ -247,7 +250,8 @@ function shouldJoinLine(line, next) {
 }
 
 function claimClauseAt(scanText, offset) {
-  const boundaries = [...scanText.matchAll(/[;\n]|[.!?](?=\s|$)/gu)].map((match) => match.index ?? 0);
+  const boundaries = [...scanText.matchAll(/[;\n]|[.!?](?=\s|$)|,(?=\s*(?:ma|però|tuttavia|mentre)\b)/giu)]
+    .map((match) => match.index ?? 0);
   const previous = boundaries.filter((position) => position < offset);
   const following = boundaries.filter((position) => position >= offset);
   const start = (previous.at(-1) ?? -1) + 1;
