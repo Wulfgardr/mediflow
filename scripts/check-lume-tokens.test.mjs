@@ -8,6 +8,11 @@ import {
   evaluateContract,
   formatReport,
   loadTokens,
+  loadCssMirror,
+  parseCssBlocks,
+  expectedMirror,
+  verifyCssMirror,
+  ACTIVE_ALIASES,
 } from './check-lume-tokens.mjs';
 
 // Minimal well-formed tokens covering every path the contract references.
@@ -89,4 +94,42 @@ test('a deliberately low-contrast pair is reported as a violation', () => {
   assert.equal(bad.pass, false);
   assert.ok(bad.ratio < 4.5);
   assert.match(formatReport(result), /CONTRACT VIOLATED/);
+});
+
+// CSS mirror (app/lume-tokens.css)
+test('parseCssBlocks strips comments and reads namespaced + alias declarations', () => {
+  const blocks = parseCssBlocks('/* x */\n:root { --lume-a: #fff; --lume-b: var(--lume-a); }');
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].selector, ':root');
+  assert.equal(blocks[0].decls.get('--lume-a'), '#fff');
+  assert.equal(blocks[0].decls.get('--lume-b'), 'var(--lume-a)');
+});
+
+test('committed CSS mirror matches the committed token source', () => {
+  const summary = verifyCssMirror(loadTokens(), loadCssMirror());
+  // 3 registers x (4 surface + 2 ink + 1 accent) + 4 signals.
+  assert.equal(summary.tokens, expectedMirror(loadTokens()).size);
+  assert.equal(summary.tokens, 25);
+  assert.equal(summary.aliases, ACTIVE_ALIASES.length);
+});
+
+test('a drifted mirror value fails closed', () => {
+  const css = loadCssMirror().replace('--lume-giorno-surface-canvas: #eef0f2;', '--lume-giorno-surface-canvas: #ffffff;');
+  assert.throws(() => verifyCssMirror(loadTokens(), css), /mirror drift: --lume-giorno-surface-canvas/);
+  assert.throws(() => verifyCssMirror(loadTokens(), `${css}\n:root { --lume-giorno-surface-canvas: #eef0f2 }`), /duplicate token/);
+});
+
+test('a mirror missing a namespaced token fails closed', () => {
+  const css = loadCssMirror().replace('--lume-grafite-ink-muted: #8f9aa6;', '');
+  assert.throws(() => verifyCssMirror(loadTokens(), css), /mirror missing token: --lume-grafite-ink-muted/);
+});
+
+test('a mirror missing the :root (giorno) active alias fails closed', () => {
+  const css = loadCssMirror().replace('--lume-surface-canvas: var(--lume-giorno-surface-canvas);', '');
+  assert.throws(() => verifyCssMirror(loadTokens(), css), /missing active alias --lume-surface-canvas in :root\/giorno/);
+});
+
+test('a mirror whose .dark alias points at the wrong register fails closed', () => {
+  const css = loadCssMirror().replace('--lume-ink: var(--lume-grafite-ink-primary);', '--lume-ink: var(--lume-giorno-ink-primary);');
+  assert.throws(() => verifyCssMirror(loadTokens(), css), /alias --lume-ink in \.dark\/grafite/);
 });
