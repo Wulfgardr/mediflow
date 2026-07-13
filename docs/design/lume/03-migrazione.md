@@ -7,7 +7,7 @@ read_when:
 
 # La migrazione
 
-Principio: Lume non butta niente di ciò che vale. Il consolidamento di Vetro Clinico (roadmap DS-1..DS-3) è il prerequisito tecnico di Lume: si migra un sistema a token, non duemila valori sparsi. Per questo la migrazione NON parte finché DS-1 (token web) e DS-2 (nativo) non sono a posto.
+Principio: Lume non butta niente di ciò che vale. Il consolidamento di Vetro Clinico (roadmap DS-1..DS-3) resta il prerequisito tecnico applicabile alla superficie che migra: DS-1 per i consumatori web, DS-2 per le slice strutturali native, DS-3 per i flussi di feedback toccati. Non è un blocco globale tra piattaforme. Le prime slice web L1-L2 hanno chiuso la parte necessaria di DS-1 nel proprio perimetro; DS-2 resta il gate del lavoro nativo oltre la card opaca e nessuna di queste frasi dichiara DS-1..DS-3 complete in tutta l'app.
 
 ## 1. Cosa sopravvive tale e quale
 
@@ -40,9 +40,9 @@ Principio: Lume non butta niente di ciò che vale. Il consolidamento di Vetro Cl
 | Fase | Contenuto | Gate |
 | --- | --- | --- |
 | L0 | Decisione di prodotto e canone: Lume lingua di destinazione, ADR 0078 e contratti di piattaforma | Completata per la direzione; font non-Apple e slice restano decisioni di delivery |
-| L1a | Contratto token: registri giorno/grafite/guardia nel sorgente DTCG (`tokens/lume.tokens.json`) con misura strumentale dei contrasti (`scripts/check-lume-tokens.mjs`). Solo sorgente e misura: nessun consumatore runtime, nessun flag `data-lume` ancora | Tutte le coppie testo/superficie dichiarate misurate >= 4,5:1 |
-| L1b | Convivenza: `data-lume` accanto ai token attuali (convivenza temporanea, non selettore utente: flag di sviluppo), introdotto in un pacchetto successivo quando arriva il primo consumatore | Flag di sviluppo isolato, ADR 0047 rispettato |
-| L2 | Fuoco e chrome: modello focale nel cockpit (worklist/Quadro), rail e barre a chrome opaco, ritiro del vetro strutturale | Smoke visivo 3 registri + 3 segnali di accessibilità |
+| L1a (consegnata, PR #47) | Contratto token: registri giorno/grafite/guardia nel sorgente DTCG (`tokens/lume.tokens.json`) con misura strumentale dei contrasti (`scripts/check-lume-tokens.mjs`) | Tutte le coppie testo/superficie dichiarate misurate >= 4,5:1 |
+| L1b (consegnata, PR #48) | Convivenza: mirror CSS `app/lume-tokens.css`, marker fisso `data-lume="true"` (temporaneo, non gate ne selettore utente), alias giorno su `:root` e grafite su `.dark`, con test di allineamento al sorgente; guardia non ancora tema attivo | Marker di migrazione isolato, ADR 0047 rispettato |
+| L2 (in corso) | Fuoco e chrome: modello focale nel cockpit (worklist/Quadro), rail e barre a chrome opaco, ritiro del vetro strutturale. Prime superfici atterrate: cockpit (PR #49), shell del workspace con fuoco focale e scrollspy (PR #52), lock screen (PR #53); le altre viste e i componenti interni restano da migrare | Smoke visivo 3 registri + 3 segnali di accessibilità |
 | L3 | Il filo: selezione focale, timeline diario, storia valori con banda personale | Leggibilità misurata; il tratteggio bozza copre i contenuti proposti |
 | L4 | Le due voci: bundling font, regola del Registro su dosi/valori/codici/date (web e nativo) | Nessun fetch remoto; parity visiva print |
 | L5 | Overlay e motion: overlay a ombra+scrim, cross-fade focale, filo che prosegue Quadro/Scheda | 60fps; Reduce Motion |
@@ -50,12 +50,12 @@ Principio: Lume non butta niente di ciò che vale. Il consolidamento di Vetro Cl
 
 Le fasi L2-L5 atterrano in fette piccole per superficie (prima il cockpit, poi la Scheda, poi settings), con la disciplina già in uso.
 
-Stato di questo branch (WUL-55): è un candidato **L1a**, non adozione runtime. Consegna il contratto token (sorgente DTCG più misura del contrasto) e nient'altro: non esiste ancora nessun consumatore `data-lume`, nessun CSS, componente o file nativo cambia. L1 si considera consegnata solo quando il contratto token è mergiato e misurato; la convivenza runtime (L1b, flag `data-lume`) inizia in un pacchetto successivo, dietro la condizione di uscita formalizzata in ADR 0078.
+Stato al 2026-07-13: L0, L1a e L1b sono atterrate su main; L2 è in corso con le prime superfici (cockpit, shell del workspace, lock screen). Restano aperte L3-L5 (filo, due voci con tipografia bundle, overlay e motion) e L6 nativa oltre la thin slice della card clinica opaca. Il dettaglio verificabile, con le PR di riferimento e la distinzione tra tranche consegnate e aperte, è nel ledger di [ADR 0078](../../adr/0078-lume-lingua-di-design-di-destinazione.md).
 
 ## 4. Rischi
 
 - **Il gradiente di temperatura è sottile**: su monitor scadenti può sparire. Mitigazione: la gerarchia non dipende MAI dalla sola temperatura (c'è sempre luminanza + ombra + filo); la temperatura è rifinitura.
-- **Fatica da doppio sistema** durante la convivenza L1-L5: il flag `data-lume` è di sviluppo, non un selettore utente (ADR 0047 rispettato); prima di avviare L1, la condizione di uscita dalla convivenza deve essere formalizzata nell'ADR.
+- **Fatica da doppio sistema** durante la convivenza L1-L5: `data-lume` è un marker tecnico fisso, non un gate né un selettore utente (ADR 0047 rispettato); la condizione di uscita già formalizzata in ADR 0078 resta il criterio vincolante e ogni slice deve ridurre, non ampliare, i consumatori legacy.
 - **Il font impacchettato** aggiunge peso al bundle e una scelta di licenza: candidati open (Inter, IBM Plex) con licenza OFL; su Apple si resta su SF (zero costo).
 - **Il filo tratteggiato come stato**: convenzione nuova da insegnare; mitigazione: legenda nella vista di aiuto `?` e coerenza assoluta (mai tratteggio decorativo).
 - **Regressione di identità**: togliendo il vetro, MediFlow deve restare riconoscibile; l'identità passa al filo, alla temperatura e alle due voci. Il dimostratore serve esattamente a giudicare questo prima di scrivere codice.

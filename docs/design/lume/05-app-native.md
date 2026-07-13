@@ -79,6 +79,8 @@ Il punto strategico: **Lume elimina il problema del degrado**. Con Vetro Clinico
 
 ## 6. Sequenza nativa
 
+Stato al 2026-07-13: dell'intera sequenza è atterrata solo la thin slice delle card cliniche opache: `clinicalCardStyle()` come primitiva condivisa (Liquid Glass escluso dalle card che la adottano su ogni OS), `cardStyle()` come alias di compatibilità e `GlassCard` deprecata e resa opaca, con test sintetico light/dark (`ClinicalCardStyleTests`) e build del bundle macOS (PR #46). `LumePalette`, `LumeSurface`/`LumeCard`/`Filo`, la struttura desktop, la parity e un target XCUITest macOS dedicato non esistono ancora: i passi seguenti sono il piano, non stato raggiunto.
+
 1. Con DS-2 (prerequisito): `NavigationSplitView`, spacchettamento workspace, guardie di accessibilità.
 2. L1 nativa: `LumePalette` come asset catalog con i tre registri, contrasti misurati.
 3. L2-L3 nativa: `LumeSurface`/`LumeCard`/`Filo` in LumeKit, adozione su worklist e Quadro del client accoppiato.

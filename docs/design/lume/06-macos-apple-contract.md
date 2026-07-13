@@ -46,7 +46,7 @@ Matrice operativa:
 | Package condiviso | `MediFlowMac/Package.swift` conserva macOS 13 per il codice condiviso. |
 | App prodotto | `MediFlowMacApp` ha deployment target macOS 14. `.inspector()` e quindi ammesso senza fallback nel target app. |
 | Enhancement recente | Liquid Glass e le API geometriche/toolbar 26+ stanno dietro `#available(macOS 26, *)`; la struttura e la gerarchia non dipendono da esse. |
-| Evidenza storica del candidato | Sul vecchio head PR #40, il run WUL-55 del 2026-07-12 con `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer xcodebuild -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj -scheme MediFlowMacApp -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build` restituì `BUILD SUCCEEDED` con SDK macOS 27 e target macOS 14. Non è prova fresca di questo packet docs-only né del runtime su `main`. |
+| Evidenza del ramo card opaca | La correzione delle card cliniche opache e il suo test sono poi atterrati su `main` (PR #46). Un run storico WUL-55 del 2026-07-12 sul vecchio head PR #40 (`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer xcodebuild -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj -scheme MediFlowMacApp -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build`) aveva dato `BUILD SUCCEEDED` con SDK macOS 27 e target macOS 14; questo packet docs-only non riesegue la build. |
 
 ## 3. Disposizione della finestra
 
@@ -78,9 +78,10 @@ La disposizione di destinazione e desktop-native:
 | Overlay sotto macOS 26 | Materiale di sistema o resa opaca coerente; il task resta comprensibile senza traslucenza. |
 | Reduce Transparency / Motion | I componenti standard si adattano automaticamente; ogni resa custom deve avere un equivalente solido e senza morphing. |
 
-Conseguenza: `CardStyleModifier` e `GlassCard` non possono rendere vetro il
-contenuto clinico su OS 26+. Il percorso opaco attualmente usato come fallback
-e piu vicino al contratto Lume del ramo recente.
+Conseguenza: le card cliniche che adottano `clinicalCardStyle()` non sono rese a
+vetro su nessun OS. La primitiva e opaca e condivisa, `cardStyle()` ne e alias e
+`GlassCard` e deprecata e resa opaca (PR #46): per queste card il percorso opaco
+non e piu un fallback ma il contratto.
 
 ## 5. Spaziatura, controlli e tipografia
 
@@ -105,7 +106,7 @@ Confermato localmente e contro-rivisto da Opus 4.8 max:
 
 | Finding | Stato | Destinazione |
 | --- | --- | --- |
-| Le card cliniche usano `glassEffect` su OS 26+ | Candidato separato nel vecchio PR #40, non integrato in questo packet docs-only | Estrarre e verificare `clinicalCardStyle()` su un branch runtime dedicato; `cardStyle()` resterà alias transitorio e `GlassCard` sarà deprecata solo dopo quella promozione. |
+| Le card cliniche usano `glassEffect` su OS 26+ | Risolto (PR #46): `clinicalCardStyle()` rende opaca la card clinica su ogni OS, `cardStyle()` è alias di compatibilità e `GlassCard` è deprecata e resa opaca | Consolidare le primitive Lume (`LumeSurface`/`LumeCard`) resta lavoro separato. |
 | Il workspace pazienti interno e un `HStack` con colonna fissa 360pt | Confermato | Migrare a `NavigationSplitView` + `List(selection:)` come DS-2. |
 | Non esiste `.inspector()` nel workspace | Confermato | Introdurlo dopo lo split, per contesto e drill-down. |
 | Identita paziente scorre via e non esiste `safeAreaInset` | Confermato | Creare `TestataPaziente`; allergie richiedono prima verifica del contratto dati. |
@@ -121,7 +122,8 @@ simulate con dati inventati.
 
 1. **M0, canone**: questo contratto, availability, debito corrente e gate.
 2. **M1, primitive additive**: `LumePalette`, `LumeSurface`, `.registro()` e
-   card clinica opaca; nessuna riorganizzazione funzionale.
+   card clinica opaca; nessuna riorganizzazione funzionale. Consegnata finora
+   solo la card clinica opaca (PR #46); le altre primitive restano aperte.
 3. **M2, struttura desktop**: `NavigationSplitView`, `List(selection:)`,
    workspace spacchettato e pairing fuori dalla worklist.
 4. **M3, sicurezza di contesto**: `TestataPaziente` persistente con i soli dati
@@ -129,16 +131,16 @@ simulate con dati inventati.
 5. **M4, densita a strati**: inspector e provenienza senza perdere la selezione.
 6. **M5, firma Lume**: filo, fuoco e motion sobri, dopo la prova della struttura.
 
-La prima slice eseguibile resta sotto circa 300 LOC e non combina M1 con M2.
-Scelta candidata: primitive additive + Registro sui call-site esistenti, oppure
-la sola correzione delle card cliniche. La scelta finale richiede issue Linear
-dedicata e prova visuale prima del commit.
+La prima slice, atterrata con PR #46, e la correzione delle card cliniche opache
+(`clinicalCardStyle()`, alias `cardStyle()`, `GlassCard` deprecata) con test
+sintetico light/dark (`ClinicalCardStyleTests`) e build del bundle macOS
+(PR #46), senza cambiare navigazione, parity o contratti. Il test e sintetico,
+non una QA manuale completa dei gate qui sotto.
 
-Il vecchio PR #40 contiene un candidato separabile per la sola correzione delle
-card custom, senza cambiare navigazione, parity o contratti. Quel candidato e il
-relativo test sintetico light/dark non fanno parte di questo packet docs-only:
-devono essere estratti su un branch runtime dedicato e rieseguiti su base fresca
-prima di poter dichiarare M1 consegnata.
+La prossima slice eseguibile resta sotto circa 300 LOC e non combina M1 con M2.
+La candidata riguarda il resto di M1 (`LumePalette`, `LumeSurface`,
+`.registro()` sui call-site esistenti); richiede issue Linear dedicata e prova
+visuale prima del commit. I passi M2-M5 restano aperti.
 
 ## 8. Gate di verifica
 
