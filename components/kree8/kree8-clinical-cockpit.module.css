@@ -5,15 +5,20 @@
   /* ── local tokens (scoped; no globals touched) ── */
   --surface: var(--lume-surface-focal);
   --surface-soft: var(--lume-surface-field);
-  --surface-inset: #f3f4f6;
+  --surface-inset: var(--lume-surface-chrome);
   --canvas: var(--lume-surface-canvas);
   --ink: var(--lume-ink);
-  --ink-strong: #1e293b;
+  --ink-strong: var(--lume-ink);
   --ink-muted: var(--lume-ink-muted);
-  --ink-subtle: #52606d;
-  --ink-faint: #64748b;
+  /* Lume: due soli livelli di inchiostro (primario + attenuato);
+     subtle/faint confluiscono nell'attenuato Lume, misurato >= 4,5:1. */
+  --ink-subtle: var(--lume-ink-muted);
+  --ink-faint: var(--lume-ink-muted);
   --line: rgba(15, 23, 42, 0.05);
   --line-strong: rgba(15, 23, 42, 0.08);
+  /* Lume: bordo di controllo interattivo (WCAG 1.4.11), derivato dall'alias
+     ink-muted Lume (>= 4,5:1 su ogni superficie attiva; ri-risolve per registro). */
+  --control-border: var(--lume-ink-muted);
   --rail-green: #2f7d4f;
   /* @Codex WUL-UIUX: ex #1d4ed8, portato su slate per coerenza col focus globale */
   --rail-blue: var(--lume-accent);
@@ -33,27 +38,35 @@
   --pill-violet-fg: #5b21b6;
   --pill-muted-bg: #eef0f2;
   --pill-muted-fg: #475569;
-  --accent-ai: linear-gradient(135deg, #1e293b 0%, #3b3a5d 55%, #5b3a55 100%);
+  /* Lume: la coda AI/amministrativa usa il neutro minerale, non un
+     gradiente ornamentale; le azioni piene usano l'inchiostro Lume. */
+  --accent-ai: var(--lume-accent);
   --accent-ai-fg: #ffffff;
-  --solid-action-bg: #0f172a;
+  --solid-action-bg: var(--lume-ink);
   --solid-action-fg: #ffffff;
-  --brand-dot-bg: #0f172a;
+  --brand-dot-bg: var(--lume-ink);
   --brand-dot-fg: #ffffff;
-  --rail-bg: linear-gradient(180deg, var(--surface-inset) 0%, var(--canvas) 100%);
-  --rail-dot-shadow: rgba(71, 85, 105, 0.18);
-  --surface-highlight: rgba(255, 255, 255, 0.65);
+  /* Lume: il telaio (buio operativo) e chrome opaco, non un gradiente. */
+  --rail-bg: var(--lume-surface-chrome);
+  --rail-dot-shadow: transparent;
+  /* Lume: niente lucido di vetro; le superfici sono opache. */
+  --surface-highlight: transparent;
   --mf-ink: var(--ink);
   --mf-muted: var(--ink-muted);
-  --mf-bg-elevated: var(--surface);
-  --glass-bg: var(--surface-soft);
-  --glass-border: var(--line-strong);
-  --shadow-card: 0 0 0 1px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.04);
-  --shadow-panel: 0 1px 0 rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.04);
-  --row-raised: rgba(255, 255, 255, 0.68);
+  /* Lume: profondita semantica: bordo 1px, nessuna ombra decorativa;
+     l'ombra corta resta solo al fuoco e agli overlay. */
+  --shadow-card: 0 0 0 1px var(--line-strong);
+  --shadow-panel: 0 0 0 1px var(--line-strong);
+  /* Lume: livello sollevato (il fuoco) = ombra corta 0 2px 8px a bassa opacita. */
+  --shadow-focal: 0 2px 8px rgba(15, 23, 42, 0.10);
+  /* Lume: le righe candidate ordinarie restano non-focali (campo); il fuoco
+     e riservato al solo paziente selezionato. */
+  --row-raised: var(--lume-surface-field);
   --toggle-track: #d1d5db;
-  --sweep-tint: rgba(15, 23, 42, 0.04);
-  --halo-green: rgba(22, 163, 74, 0.16);
-  --halo-blue: rgba(15, 23, 42, 0.14);
+  /* Lume: niente sweep decorativo ne aloni di luce. */
+  --sweep-tint: transparent;
+  --halo-green: transparent;
+  --halo-blue: transparent;
   --ring-accept: rgba(21, 128, 61, 0.22);
   --ring-correct: rgba(29, 78, 216, 0.22);
   --ring-ignore: rgba(100, 116, 139, 0.18);
@@ -83,13 +96,13 @@
 :global(html.dark) .shell {
   --surface: var(--lume-surface-focal);
   --surface-soft: var(--lume-surface-field);
-  --surface-inset: #1e293b;
+  --surface-inset: var(--lume-surface-chrome);
   --canvas: var(--lume-surface-canvas);
   --ink: var(--lume-ink);
-  --ink-strong: #e2e8f0;
+  --ink-strong: var(--lume-ink);
   --ink-muted: var(--lume-ink-muted);
-  --ink-subtle: #b6c2d0;
-  --ink-faint: #94a3b8;
+  --ink-subtle: var(--lume-ink-muted);
+  --ink-faint: var(--lume-ink-muted);
   --line: rgba(226, 232, 240, 0.10);
   --line-strong: rgba(226, 232, 240, 0.16);
   --rail-green: #4ade80;
@@ -110,22 +123,23 @@
   --pill-violet-fg: #ddd6fe;
   --pill-muted-bg: rgba(148, 163, 184, 0.14);
   --pill-muted-fg: #cbd5e1;
-  --accent-ai: linear-gradient(135deg, #e2e8f0 0%, #d9d4f1 55%, #ecd5e3 100%);
+  --accent-ai: var(--lume-accent);
   --accent-ai-fg: #020617;
-  --solid-action-bg: #e2e8f0;
+  --solid-action-bg: var(--lume-ink);
   --solid-action-fg: #020617;
-  --brand-dot-bg: #e2e8f0;
+  --brand-dot-bg: var(--lume-ink);
   --brand-dot-fg: #0f172a;
-  --rail-bg: linear-gradient(180deg, #111827 0%, #020617 100%);
-  --rail-dot-shadow: rgba(148, 163, 184, 0.22);
-  --surface-highlight: rgba(255, 255, 255, 0.08);
-  --shadow-card: 0 0 0 1px rgba(226, 232, 240, 0.10), 0 10px 24px rgba(0, 0, 0, 0.28);
-  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.04), 0 0 0 1px rgba(226, 232, 240, 0.10), 0 14px 34px rgba(0, 0, 0, 0.32);
-  --row-raised: rgba(148, 163, 184, 0.10);
+  --rail-bg: var(--lume-surface-chrome);
+  --rail-dot-shadow: transparent;
+  --surface-highlight: transparent;
+  --shadow-card: 0 0 0 1px var(--line-strong);
+  --shadow-panel: 0 0 0 1px var(--line-strong);
+  --shadow-focal: 0 2px 8px rgba(0, 0, 0, 0.28);
+  --row-raised: var(--lume-surface-field);
   --toggle-track: rgba(148, 163, 184, 0.28);
-  --sweep-tint: rgba(226, 232, 240, 0.07);
-  --halo-green: rgba(74, 222, 128, 0.22);
-  --halo-blue: rgba(203, 213, 225, 0.20);
+  --sweep-tint: transparent;
+  --halo-green: transparent;
+  --halo-blue: transparent;
   --ring-accept: rgba(74, 222, 128, 0.38);
   --ring-correct: rgba(96, 165, 250, 0.38);
   --ring-ignore: rgba(148, 163, 184, 0.32);
@@ -213,8 +227,7 @@
   justify-content: center;
   font-size: 11px;
   font-weight: 700;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: none;
 }
 
 .brandWord {
@@ -278,10 +291,10 @@
   background: var(--surface);
   color: var(--ink);
   font-weight: 500;
-  box-shadow:
-    0 1px 0 var(--surface-highlight) inset,
-    0 4px 10px rgba(15, 23, 42, 0.06),
-    0 0 0 1px rgba(15, 23, 42, 0.04);
+  /* Lume: la selezione di navigazione vive nel telaio (buio
+     operativo) e recede: si solleva su chrome piu il peso, senza filo. Il filo
+     minerale resta riservato all'oggetto clinico in fuoco (un solo fuoco). */
+  box-shadow: 0 0 0 1px var(--line-strong);
 }
 
 .navChevron {
@@ -351,9 +364,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  box-shadow:
-    0 12px 30px rgba(15, 23, 42, 0.05),
-    0 0 0 1px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 0 0 1px var(--line-strong);
 }
 
 .canvas::-webkit-scrollbar { width: 10px; }
@@ -368,7 +379,8 @@
   align-items: center;
   gap: 8px;
   padding: 6px;
-  background: var(--surface-soft);
+  /* Lume: la chrome strutturale del cockpit consuma la superficie chrome opaca. */
+  background: var(--surface-inset);
   border-radius: 18px;
   box-shadow: inset 0 1px 0 var(--surface-highlight),
     0 0 0 1px var(--line);
@@ -383,8 +395,7 @@
   padding: 8px 14px;
   flex: 1;
   min-width: 0;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04),
-    0 0 0 1px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 0 0 1px var(--control-border);
   color: var(--ink-subtle);
   font-size: 13px;
   border: 0;
@@ -426,9 +437,7 @@
   color: var(--ink-strong);
   cursor: pointer;
   border: 0;
-  box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.04),
-    0 0 0 1px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 0 0 1px var(--control-border);
   transition: transform 140ms var(--motion-spring),
     box-shadow 160ms var(--motion-ease);
 }
@@ -439,7 +448,8 @@
 .toolChipMuted {
   background: transparent;
   color: var(--ink-muted);
-  box-shadow: none;
+  /* Lume: lo stato muted resta interattivo, quindi conserva un bordo di controllo (WCAG 1.4.11). */
+  box-shadow: 0 0 0 1px var(--control-border);
 }
 
 .aiButton {
@@ -454,9 +464,7 @@
   font-size: 12px;
   border: 0;
   cursor: pointer;
-  box-shadow:
-    0 6px 18px rgba(15, 23, 42, 0.16),
-    inset 0 1px 0 var(--surface-highlight);
+  box-shadow: none;
   transition: transform 140ms var(--motion-spring),
     filter 160ms var(--motion-ease);
 }
@@ -485,9 +493,7 @@
   border-radius: var(--radius-pill);
   font-size: 12px;
   color: var(--ink-strong);
-  box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.04),
-    0 0 0 1px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 0 0 1px var(--line);
 }
 
 .avatarDot {
@@ -729,7 +735,6 @@
 .pillInk {
   background: var(--solid-action-bg);
   color: var(--solid-action-fg);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 /* commit pulse (replays via React key on state change) */
@@ -773,9 +778,9 @@
 .segSelected {
   background: var(--surface);
   color: var(--ink);
-  box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.06),
-    0 0 0 1px rgba(15, 23, 42, 0.04);
+  /* Lume: il segmento attivo si distingue con il salto di superficie
+     e il bordo 1px, senza ombra sollevata (profondita solo al fuoco/overlay). */
+  box-shadow: 0 0 0 1px var(--line-strong);
 }
 
 /* ───────────── lists ───────────── */
@@ -912,9 +917,7 @@
   background: var(--surface);
   padding: 4px;
   border-radius: 12px;
-  box-shadow:
-    0 0 0 1px rgba(15, 23, 42, 0.05),
-    0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 0 0 1px var(--line-strong);
 }
 
 .stepperBtn {
@@ -973,7 +976,6 @@
   height: 16px;
   background: var(--surface);
   border-radius: var(--radius-pill);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
   transition: transform 200ms var(--motion-spring);
 }
 
@@ -1025,8 +1027,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.04),
-    0 4px 14px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 0 0 1px var(--line-strong);
   font-size: 12px;
   color: var(--ink-strong);
   line-height: 1.55;
@@ -1038,7 +1039,7 @@
   display: inline-block;
   padding: 0 4px;
   border-radius: 4px;
-  background: linear-gradient(180deg, transparent 60%, var(--pill-yellow-bg) 60%);
+  background: var(--pill-yellow-bg);
   color: var(--ink);
   font-weight: 500;
 }
@@ -1252,13 +1253,9 @@
   inset: -4px -6px;
   border-radius: 18px;
   pointer-events: none;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--sweep-tint) 50%,
-    transparent 100%
-  );
-  animation: sweep 720ms var(--motion-ease) both;
+  /* Lume: niente sweep ornamentale; il cambio di fase e comunicato
+     dal filo minerale sulla fase attiva, non da un gradiente animato. */
+  background: none;
 }
 
 @keyframes sweep {
@@ -1293,10 +1290,12 @@
 .stageBtn:active { transform: scale(0.985); }
 
 .stageBtnActive {
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-inset) 100%);
+  background: var(--surface);
+  /* Lume: la fase attiva e marcata dal filo minerale, non da un
+     gradiente sollevato. */
   box-shadow:
-    0 0 0 1px var(--line-strong),
-    0 6px 18px rgba(15, 23, 42, 0.08);
+    inset 1px 0 0 var(--lume-accent),
+    0 0 0 1px var(--line-strong);
 }
 
 .stageBtnDone {
@@ -1348,8 +1347,7 @@
   font-weight: 500;
   border: 0;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  box-shadow: none;
   transition: transform 140ms var(--motion-spring),
     filter 160ms var(--motion-ease);
 }
@@ -1470,16 +1468,14 @@
   background: var(--surface);
   color: var(--ink-muted);
   padding: 9px 12px;
-  box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.04),
-    0 0 0 1px var(--line);
+  box-shadow: 0 0 0 1px var(--control-border);
 }
 
 /* @Codex WUL-UIUX: l'input azzera il proprio outline; l'indicatore di focus da
    tastiera vive sul contenitore, coerente con l'anello condiviso. */
 .patientSearchField:focus-within {
   box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 0 0 1px var(--control-border),
     var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.28));
 }
 
@@ -1538,8 +1534,7 @@
 .scopeChipActive {
   background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 0 0 1px var(--line-strong),
-    0 4px 10px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 0 0 1px var(--line-strong);
 }
 
 .patientRowWrap {
@@ -1589,8 +1584,14 @@
 }
 
 .patientRowSelected {
-  background: var(--surface-soft);
-  box-shadow: 0 0 0 1px var(--line-strong) inset;
+  background: var(--surface);
+  /* Lume: il paziente in fuoco e l'unica superficie focale della lista: filo
+     minerale 1px sul bordo, bordo neutro 1px e ombra corta del livello
+     sollevato; le altre righe restano non-focali (campo, senza ombra). */
+  box-shadow:
+    inset 1px 0 0 var(--lume-accent),
+    inset 0 0 0 1px var(--line-strong),
+    var(--shadow-focal);
 }
 
 .patientDot {
@@ -1929,9 +1930,7 @@
 
 .settingsQuickItem:hover {
   background: var(--surface);
-  box-shadow:
-    0 0 0 1px var(--line-strong),
-    0 8px 18px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 0 0 1px var(--line-strong);
   transform: translateY(-1px);
 }
 
@@ -1991,8 +1990,8 @@
   font-weight: 500;
   text-decoration: none;
   border-radius: var(--radius-pill);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  /* Lume: azione flottante = ombra corta (livello sollevato), niente lucido. */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
   transition: transform 140ms var(--motion-spring), filter 160ms var(--motion-ease);
 }
 
