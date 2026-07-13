@@ -188,6 +188,7 @@ function runSelfTest() {
     ['accented GDPR conformity', 'MediFlow è conforme al GDPR.', 'CLAIM-GDPR-GUARANTEE'],
     ['PIN qualifier plus comma contrast', 'Il PIN non equivale a zero-knowledge, ma il database SQLite è cifrato integralmente.', 'CLAIM-FULL-DB-ENCRYPTION'],
     ['negative encryption plus comma contrast', 'Il file SQLite non è cifrato integralmente, ma il database SQLite è cifrato integralmente.', 'CLAIM-FULL-DB-ENCRYPTION'],
+    ['accented comma contrast', 'Il PIN non equivale a zero-knowledge, però il database SQLite è cifrato integralmente.', 'CLAIM-FULL-DB-ENCRYPTION'],
   ];
   for (const [name, source, expected] of contradictoryCases) {
     const matched = findRuleMatches(source, 'self-test.md').map((item) => item.rule.id);
@@ -210,7 +211,7 @@ function findRuleMatches(source, file) {
     const flags = rule.pattern.flags.includes('g') ? rule.pattern.flags : `${rule.pattern.flags}g`;
     const clauseBoundedSource = rule.pattern.source.replace(
       /\.\{0,(\d+)\}/gu,
-      String.raw`(?:(?![.!?](?:\s|$)|;|\n|,\s*(?:ma|però|tuttavia|mentre)\b).){0,$1}`,
+      String.raw`(?:(?![.!?](?:\s|$)|;|\n|,\s*(?:(?:ma|tuttavia|mentre)\b|però(?=\s|$))).){0,$1}`,
     );
     const pattern = new RegExp(clauseBoundedSource, flags);
     for (const match of scanText.matchAll(pattern)) {
@@ -250,7 +251,7 @@ function shouldJoinLine(line, next) {
 }
 
 function claimClauseAt(scanText, offset) {
-  const boundaries = [...scanText.matchAll(/[;\n]|[.!?](?=\s|$)|,(?=\s*(?:ma|però|tuttavia|mentre)\b)/giu)]
+  const boundaries = [...scanText.matchAll(/[;\n]|[.!?](?=\s|$)|,(?=\s*(?:(?:ma|tuttavia|mentre)\b|però(?=\s|$)))/giu)]
     .map((match) => match.index ?? 0);
   const previous = boundaries.filter((position) => position < offset);
   const following = boundaries.filter((position) => position >= offset);
