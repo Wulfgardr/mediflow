@@ -23,7 +23,7 @@ const expectedParitySummary = {
 };
 const expectedManifestGaps = new Map([
   ['mobile-offline-cache-reconciliation', 'WUL-403'],
-  ['apple-wide-click-map', 'WUL-401'],
+  ['apple-wide-click-map', 'WUL-481'],
 ]);
 const requiredCapabilities = [
   'macos-packaged-home-base-runtime',

@@ -8,7 +8,7 @@ read_when:
 # 🧭 Roadmap MediFlow
 
 > **Dove siamo e dove vogliamo andare.**
-> v0.7.2 (release corrente, chiude le Wave 1-5 del boundary/client Apple senza dichiarare parity UI completa). Ultimo aggiornamento: 2026-07-11.
+> v0.7.2 resta la release corrente; il `main` e nel ciclo v0.7.3 senza dichiarare parity UI completa. Ultimo aggiornamento: 2026-07-13.
 > Fonte roadmap prodotto canonica (vedi anche [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) per la lettura completa corrente e [docs/README.md](./README.md) per mappa completa documenti).
 
 > [!NOTE]
@@ -116,9 +116,7 @@ pubblica/OSS riallineata al prodotto reale.
 > [!NOTE]
 > Lo snapshot macOS precedente a `v0.4.0` resta storico. La base prodotto da
 > estendere e il bundle Apple/home-base universale; i gap residui sono tracciati
-> dalla matrice parity e dalle issue `WUL-401`/`WUL-403`, non dal vecchio filone
-> congelato. Lume e la lingua di destinazione; Vetro Clinico resta il canone
-> operativo transitorio durante la migrazione verificata L0-L6.
+> dalla matrice parity e dalle issue dedicate, non dal vecchio filone congelato.
 
 ---
 
@@ -146,9 +144,10 @@ testato anche su Linux/Windows.
 
 ---
 
-## 🚧 In corso (post-v0.7.2)
+## 🚧 In corso (ciclo v0.7.3 su `main`)
 
-La lettura operativa piu completa del ciclo post-v0.7.2 e ora
+La `v0.7.2` resta la release pubblicata corrente. La lettura operativa piu
+completa del ciclo v0.7.3 su `main` e ora
 [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md): questo file resta la
 roadmap prodotto, mentre lo stato del sistema tiene insieme runtime effettivo,
 boundary, document intelligence, home-base, Apple clients e governance della
@@ -165,15 +164,30 @@ repository pubblica.
 * **Artifact `parse/evidence` su allegati**: la prima slice runtime del `document evidence ledger` e gia su `main`, con `patients.documentInsights` mantenuto come projection compatibile.
 * **Decision layer separati**: i prossimi step spingono source governance, recency, exclusions e reviewability senza introdurre import silenziosi o riscritture in blocco.
 * **Safety gate AI**: kill-switch per `patient-insight`, `smart-import` e `document-synthesis` e model governance delle decisioni documentali sono gia su `main` (`WUL-355`, `WUL-358`); l'AI locale resta review-first, senza scrittura clinica automatica.
+* **Control-flow documentale**: il router usa `shadow` come default e puo
+  evitare il modello solo per route eleggibili ad alta confidenza, conservando
+  sempre review e salvataggio espliciti.
+
+### Stack intelligente locale
+
+* **Provider scaffold**: `OllamaAdapter` e `AIService` sono su `main`; il gate
+  egress applica il primo strato deterministico e resta
+  `closed_pending_redaction_lane`.
+* **Boundary ancora chiuso**: registry, provider alternativi, redaction lane e
+  consenso cloud non sono consegnati; Ollama resta l'unico provider operativo.
+* **Attese locali**: la prima slice web collega prestazione attesa e risultato;
+  non estende il workflow ai client paired e non introduce scritture autonome.
 
 ### Esperienza nativa
 
 * **Apple/native su mainline**: macOS resta il fronte nativo piu avanzato;
   iPhone/iPad proseguono come client paired sopra contratti locali versionati.
-* **Wave 6 / closeout parity**: `WUL-479` governa la matrice canonica; `WUL-401`
-  chiude click-map P6 e convergenza dei moduli core, `WUL-403` rende onesto
-  l'offline degradato, mentre il workflow documentale nativo resta condizionato
-  da ADR 0076 e dagli spike `WUL-417`/`WUL-383`.
+* **Wave 6 / closeout parity**: `WUL-479` governa la matrice canonica. PR #21 e
+  `WUL-401`, ora completata, hanno consegnato bundle, fixture, probe AX e
+  runbook P6 di base; `WUL-481` conserva i prerequisiti operativi bloccati e il
+  gate manuale sul Mac sbloccato. `WUL-403` resta la corsia per l'offline
+  degradato, mentre il workflow documentale nativo resta condizionato da ADR
+  0076 e dagli spike `WUL-417`/`WUL-383`.
 * **Stack voice visit**: `WUL-419`, `WUL-421` e `WUL-422` mantengono transcript e
   bozze sintetiche review-first, separati dall'audio reale e dalla promozione
   runtime.
@@ -189,6 +203,10 @@ repository pubblica.
 * **Niente preview profiles su `main`**: AI, Smart Import e contesto paziente SISS/FSE vivono direttamente nella shell ufficiale quando sono maturi.
 * **Sperimentazioni esplicite**: nuove fette AI, import o SISS entrano solo dopo verifica dedicata, non come selector runtime persistito.
 * **Guardrail locali**: revision fingerprint, `/api/system/revision` e reset `.next` source-aware riducono il rischio di testare una shell stale.
+* **Lume progressiva**: ADR 0078 e `Accepted`; canone L0, token L1a,
+  convivenza web L1b, cockpit, workspace e lock screen sono su `main`. Sul
+  nativo e consegnata la card clinica opaca; il resto della migrazione L0-L6 e
+  la QA manuale completa rimangono aperti.
 
 ### SISS/FSE e base documentale regionale
 
