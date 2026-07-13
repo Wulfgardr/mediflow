@@ -5,6 +5,16 @@ import { bootstrapUnlockedSession } from './utils';
 test('web smoke: unlock/setup + patients filters + settings navigation', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
 
+  // @Codex WUL-55: the locked surface stays terse while retaining an accessible field name.
+  await page.goto('/');
+  const lockScreen = page.getByLabel('MediFlow lock screen');
+  await expect(lockScreen).toBeVisible();
+  await expect(lockScreen.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+  await expect(lockScreen.getByText(/sessione protetta/i)).toHaveCount(0);
+  await expect(lockScreen.getByText(/inserisci (il )?pin/i)).toHaveCount(0);
+  await expect(lockScreen.getByText('PIN operatore', { exact: true })).toHaveClass(/sr-only/);
+  await expect(lockScreen.getByLabel('PIN operatore')).toBeVisible();
+
   await bootstrapUnlockedSession(page, pin);
 
   // WUL-274/Kree8: the patients list moved into the cockpit "incarico" area

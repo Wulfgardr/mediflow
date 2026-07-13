@@ -11,7 +11,7 @@ export function LockScreen() {
     const [confirmPin, setConfirmPin] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    // WUL-55: ref + nonce to restore focus to the PIN operatore input after a failed login.
+    // WUL-55: ref + nonce to restore focus to the credential field after a failed login.
     const pinInputRef = useRef<HTMLInputElement>(null);
     const [failedAttempt, setFailedAttempt] = useState(0);
 
@@ -89,18 +89,15 @@ export function LockScreen() {
                 </div>
 
                 <form onSubmit={requiresSetup ? handleSetup : handleLogin} className={styles.form}>
-                    {requiresSetup && (
-                        <label className={styles.fieldLabel} htmlFor="mediflow-lock-pin">
-                            PIN operatore
-                        </label>
-                    )}
+                    {/* @Codex WUL-55: keep the field name for assistive tech without repeating visible copy. */}
+                    <label className="sr-only" htmlFor="mediflow-lock-pin">
+                        {requiresSetup ? 'Nuovo PIN' : 'PIN operatore'}
+                    </label>
                     <div className={styles.inputWrap}>
                         <input
                             id="mediflow-lock-pin"
                             ref={pinInputRef}
                             type="password"
-                            aria-label="PIN operatore"
-                            placeholder={requiresSetup ? 'Inserisci PIN' : undefined}
                             value={pin}
                             onChange={(e) => setPin(e.target.value)}
                             className={styles.pinInput}
@@ -116,9 +113,13 @@ export function LockScreen() {
 
                     {requiresSetup && (
                         <div className={styles.inputWrap}>
+                            <label className="sr-only" htmlFor="mediflow-lock-pin-confirm">
+                                Conferma PIN
+                            </label>
                             <input
+                                id="mediflow-lock-pin-confirm"
                                 type="password"
-                                placeholder="Conferma PIN"
+                                placeholder="Conferma"
                                 value={confirmPin}
                                 onChange={(e) => setConfirmPin(e.target.value)}
                                 className={styles.pinInput}
@@ -160,7 +161,7 @@ export function LockScreen() {
                                 {requiresSetup ? 'Sto configurando...' : 'Sto sbloccando...'}
                             </>
                         ) : requiresSetup ? (
-                            'Imposta PIN'
+                            'Imposta'
                         ) : (
                             <>
                                 <Unlock size={16} /> Sblocca

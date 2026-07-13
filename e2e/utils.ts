@@ -84,9 +84,9 @@ export async function setupPinLegacyIfNeeded(page: Page, pin: string): Promise<v
   const setupHeading = page.getByRole('heading', { name: 'Crea il tuo PIN' });
   if (!(await isVisible(setupHeading))) return;
 
-  const pinInput = page.locator('input[placeholder="Inserisci PIN"]:not([disabled])').first();
-  const confirmPinInput = page.locator('input[placeholder="Conferma PIN"]:not([disabled])').first();
-  const setupButton = page.getByRole('button', { name: /Imposta PIN/ }).first();
+  const pinInput = page.getByLabel('Nuovo PIN').first();
+  const confirmPinInput = page.getByLabel('Conferma PIN').first();
+  const setupButton = page.getByRole('button', { name: 'Imposta' }).first();
 
   await pinInput.fill(pin);
   await confirmPinInput.fill(pin);
