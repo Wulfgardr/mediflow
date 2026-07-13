@@ -18,7 +18,7 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-07-13 (ciclo v0.7.3 su `main`; release pubblicata v0.7.2)
+Ultimo aggiornamento: 2026-07-13 (linea v0.7.3; parity UI completa non dichiarata)
 
 ---
 
