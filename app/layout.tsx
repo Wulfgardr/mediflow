@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
 import './globals.css';
+// WUL-55: Lume runtime token mirror loads after globals so its --lume-* custom
+// properties are the first design-token input available to the live cockpit.
+import './lume-tokens.css';
 import { getAppFingerprint } from '@/lib/app-revision';
 import { RootRuntimeShell } from '@/components/root-runtime-shell';
 import {
@@ -17,6 +20,7 @@ const uiStyleBootstrapScript = `
   const root = document.documentElement;
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   try {
+    root.dataset.lume = 'true';
     root.dataset.uiStyle = 'redesign';
     root.dataset.uiReduceMotion = localStorage.getItem('${UI_REDUCE_MOTION_STORAGE_KEY}') === 'true' ? 'true' : 'false';
     root.dataset.uiReduceTransparency = 'false';
@@ -27,6 +31,7 @@ const uiStyleBootstrapScript = `
     root.classList.add(resolved);
     root.style.colorScheme = resolved;
   } catch (error) {
+    root.dataset.lume = 'true';
     root.dataset.uiStyle = 'redesign';
     root.dataset.uiReduceMotion = 'false';
     root.dataset.uiReduceTransparency = 'false';
@@ -47,7 +52,7 @@ export default function RootLayout({
   const appFingerprint = getAppFingerprint();
 
   return (
-    <html lang="it" data-ui-style="redesign" suppressHydrationWarning>
+    <html lang="it" data-ui-style="redesign" data-lume="true" suppressHydrationWarning>
       {/* @Codex: keep layout fully local/offline by avoiding remote Google Font fetches */}
       <head>
         <meta name="mediflow-app-fingerprint" content={appFingerprint} />

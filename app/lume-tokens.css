@@ -1,0 +1,58 @@
+/* Lume runtime token mirror (WUL-55, F2a). Hand-kept mirror of
+   docs/design/lume/tokens/lume.tokens.json, which stays the single source of
+   truth; scripts/check-lume-tokens.mjs fails closed on any drift. The namespaced
+   --lume-<register>-* properties declare giorno/grafite/guardia plus the
+   register-independent signals; the active aliases resolve to giorno under light
+   and grafite under html.dark. guardia is declared only, never a user control. */
+
+:root {
+  /* register: giorno */
+  --lume-giorno-surface-canvas: #eef0f2;
+  --lume-giorno-surface-field: #f5f5f4;
+  --lume-giorno-surface-focal: #fbfaf7;
+  --lume-giorno-surface-chrome: #e6e8eb;
+  --lume-giorno-ink-primary: #1a1c1e;
+  --lume-giorno-ink-muted: #5c6772;
+  --lume-giorno-accent-minerale: #33506b;
+  /* register: grafite */
+  --lume-grafite-surface-canvas: #121417;
+  --lume-grafite-surface-field: #191c21;
+  --lume-grafite-surface-focal: #22252b;
+  --lume-grafite-surface-chrome: #0e1013;
+  --lume-grafite-ink-primary: #e9ecef;
+  --lume-grafite-ink-muted: #8f9aa6;
+  --lume-grafite-accent-minerale: #8fb0cc;
+  /* register: guardia (declared only; not user-selectable) */
+  --lume-guardia-surface-canvas: #0c0e12;
+  --lume-guardia-surface-field: #14171d;
+  --lume-guardia-surface-focal: #1a1e26;
+  --lume-guardia-surface-chrome: #090b0e;
+  --lume-guardia-ink-primary: #e3e8ee;
+  --lume-guardia-ink-muted: #8792a3;
+  --lume-guardia-accent-minerale: #7fa0bc;
+  /* register-independent clinical signals */
+  --lume-signal-warning: #9a6a2f;
+  --lume-signal-critical: #a33a2f;
+  --lume-signal-success: #4b6354;
+  --lume-signal-plum: #555161;
+  /* active aliases: giorno is the light default */
+  --lume-surface-canvas: var(--lume-giorno-surface-canvas);
+  --lume-surface-field: var(--lume-giorno-surface-field);
+  --lume-surface-focal: var(--lume-giorno-surface-focal);
+  --lume-surface-chrome: var(--lume-giorno-surface-chrome);
+  --lume-ink: var(--lume-giorno-ink-primary);
+  --lume-ink-muted: var(--lume-giorno-ink-muted);
+  --lume-accent: var(--lume-giorno-accent-minerale);
+}
+
+/* active aliases: grafite is the dark default (html.dark is set by the layout
+   bootstrap; it coexists with mediflow-theme and data-ui-style=redesign). */
+.dark {
+  --lume-surface-canvas: var(--lume-grafite-surface-canvas);
+  --lume-surface-field: var(--lume-grafite-surface-field);
+  --lume-surface-focal: var(--lume-grafite-surface-focal);
+  --lume-surface-chrome: var(--lume-grafite-surface-chrome);
+  --lume-ink: var(--lume-grafite-ink-primary);
+  --lume-ink-muted: var(--lume-grafite-ink-muted);
+  --lume-accent: var(--lume-grafite-accent-minerale);
+}

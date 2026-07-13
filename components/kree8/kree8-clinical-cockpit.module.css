@@ -3,20 +3,20 @@
 
 .shell {
   /* ── local tokens (scoped; no globals touched) ── */
-  --surface: #ffffff;
-  --surface-soft: #f5f6f7;
+  --surface: var(--lume-surface-focal);
+  --surface-soft: var(--lume-surface-field);
   --surface-inset: #f3f4f6;
-  --canvas: #eef0f2;
-  --ink: #0f172a;
+  --canvas: var(--lume-surface-canvas);
+  --ink: var(--lume-ink);
   --ink-strong: #1e293b;
-  --ink-muted: #475569;
+  --ink-muted: var(--lume-ink-muted);
   --ink-subtle: #52606d;
   --ink-faint: #64748b;
   --line: rgba(15, 23, 42, 0.05);
   --line-strong: rgba(15, 23, 42, 0.08);
   --rail-green: #2f7d4f;
   /* @Codex WUL-UIUX: ex #1d4ed8, portato su slate per coerenza col focus globale */
-  --rail-blue: #334155;
+  --rail-blue: var(--lume-accent);
   --rail-yellow: #b45309;
   --rail-coral: #dc2626;
   --rail-violet: #6d28d9;
@@ -81,19 +81,19 @@
 }
 
 :global(html.dark) .shell {
-  --surface: #0f172a;
-  --surface-soft: #111827;
+  --surface: var(--lume-surface-focal);
+  --surface-soft: var(--lume-surface-field);
   --surface-inset: #1e293b;
-  --canvas: #020617;
-  --ink: #f8fafc;
+  --canvas: var(--lume-surface-canvas);
+  --ink: var(--lume-ink);
   --ink-strong: #e2e8f0;
-  --ink-muted: #cbd5e1;
+  --ink-muted: var(--lume-ink-muted);
   --ink-subtle: #b6c2d0;
   --ink-faint: #94a3b8;
   --line: rgba(226, 232, 240, 0.10);
   --line-strong: rgba(226, 232, 240, 0.16);
   --rail-green: #4ade80;
-  --rail-blue: #cbd5e1;
+  --rail-blue: var(--lume-accent);
   --rail-yellow: #fbbf24;
   --rail-coral: #f87171;
   --rail-violet: #a78bfa;
