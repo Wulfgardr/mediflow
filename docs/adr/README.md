@@ -6,7 +6,7 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
-- [0079-local-open-loops-and-result-link.md](./0079-local-open-loops-and-result-link.md): propone attese locali deterministiche e collegamento manuale tra prestazione e risultato.
+- [0079-local-open-loops-and-result-link.md](./0079-local-open-loops-and-result-link.md): adotta attese locali deterministiche e collegamento manuale tra prestazione e risultato; la prima slice web locale e consegnata.
 
 ---
 
