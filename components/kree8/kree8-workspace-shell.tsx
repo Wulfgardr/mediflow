@@ -3,7 +3,7 @@
 /* @Codex */
 
 import Link from 'next/link';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, FolderOpen } from 'lucide-react';
 
 // WUL-297: Privacy Mode is always reachable from the workspace header.
@@ -42,45 +42,124 @@ export function Kree8WorkspaceShell({
   /* @Codex WUL-UIUX: scrollspy. Su una Scheda lunga la rail evidenzia la sezione
      in vista (aria-current) cosi non si perde l'orientamento. */
   const [activeHref, setActiveHref] = useState<string | null>(null);
+  /* @Codex WUL-55 F2c: mirror durevole di activeHref; ogni generazione dell'effetto
+     (una per navKey) rilegge currentHref da qui, cosi un cambio navKey azzera un
+     aria-current stantio invece di ereditarlo. */
+  const activeHrefRef = useRef<string | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const navKey = navItems.map((item) => item.href).join('|');
 
+  /* Lume focal locus + scrollspy (WUL-55, F2c). Un solo effetto governa la vita
+     dei bersagli: li scopre nel DOM dentro QUESTO guscio (querySelector sul ref,
+     mai document-global, cosi due cockpit non si contendono lo stesso id), li
+     ri-lega quando compaiono in ritardo (percorso Analytics: la rail monta con
+     ANALYTICS_NAV_ITEMS prima che esistano #popolazione/#indicatori) o quando un
+     nodo con lo stesso id viene sostituito, e sposta [data-lume-focus] sul nodo
+     vivo azzerando ogni stato stantio. La rail tiene aria-current come feedback
+     di navigazione, non una seconda superficie focale (01-lingua ss.1-3). */
   useEffect(() => {
-    const hrefs = navKey ? navKey.split('|') : [];
-    const targets = hrefs
-      .map((href) => {
-        const el = href.startsWith('#') ? document.getElementById(href.slice(1)) : null;
-        return el ? { href, el } : null;
-      })
-      .filter((entry): entry is { href: string; el: HTMLElement } => entry !== null);
-    if (targets.length === 0) return;
+    const root = rootRef.current;
+    if (!root) return;
+    const hashHrefs = (navKey ? navKey.split('|') : []).filter((href) => href.startsWith('#'));
 
-    const visible = new Set<string>();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const href = `#${entry.target.id}`;
-          if (entry.isIntersecting) visible.add(href);
-          else visible.delete(href);
+    let targets: Array<{ href: string; el: HTMLElement }> = [];
+    let observer: IntersectionObserver | null = null;
+    let focusEl: HTMLElement | null = null;
+    /* Seme dal mirror, non da null: la prima risoluzione a vuoto dopo un cambio
+       navKey confronta l'href stantio e lo azzera. */
+    let currentHref = activeHrefRef.current;
+    /* Guardia di generazione: il cleanup la alza e i callback tardivi obsoleti
+       non scrivono piu lo stato. */
+    let cancelled = false;
+    const visible = new Set<HTMLElement>();
+
+    /* Unico punto che muta lo stato posseduto: sposta il filo focale sul nodo
+       vivo (mai un nodo staccato) e allinea la rail. */
+    const commit = (href: string | null, el: HTMLElement | null) => {
+      if (cancelled) return;
+      if (el !== focusEl) {
+        if (focusEl) focusEl.removeAttribute('data-lume-focus');
+        focusEl = el;
+        if (focusEl) focusEl.setAttribute('data-lume-focus', '');
+      }
+      if (href !== currentHref) {
+        currentHref = href;
+        activeHrefRef.current = href;
+        setActiveHref(href);
+      }
+    };
+
+    const resolve = () =>
+      hashHrefs
+        .map((href) => {
+          const el = root.querySelector<HTMLElement>(`#${CSS.escape(href.slice(1))}`);
+          return el ? { href, el } : null;
+        })
+        .filter((entry): entry is { href: string; el: HTMLElement } => entry !== null);
+
+    /* Sezione attiva = quella piu in alto tra le visibili, cosi l'evidenziazione
+       segue l'ordine visivo anche con le due colonne (DOM e rail divergono). */
+    const pickActive = () => {
+      const seen = targets.filter((target) => visible.has(target.el));
+      if (seen.length === 0) return;
+      const topmost = seen.reduce((best, target) =>
+        target.el.getBoundingClientRect().top < best.el.getBoundingClientRect().top ? target : best,
+      );
+      commit(topmost.href, topmost.el);
+    };
+
+    const bind = () => {
+      const next = resolve();
+      const same =
+        next.length === targets.length &&
+        next.every((entry, i) => entry.el === targets[i].el && entry.href === targets[i].href);
+      if (!same) {
+        if (observer) observer.disconnect();
+        visible.clear();
+        targets = next;
+        if (next.length === 0) {
+          observer = null;
+          commit(null, null);
+          return;
         }
-        /* Sezione attiva = quella piu in alto sullo schermo tra le visibili, cosi
-           l'evidenziazione segue l'ordine visivo anche con le due colonne (dove
-           l'ordine del DOM e quello della rail possono divergere). */
-        const visibleTargets = targets.filter((target) => visible.has(target.href));
-        if (visibleTargets.length > 0) {
-          const topmost = visibleTargets.reduce((best, target) =>
-            target.el.getBoundingClientRect().top < best.el.getBoundingClientRect().top ? target : best,
-          );
-          setActiveHref(topmost.href);
-        }
-      },
-      { rootMargin: '-120px 0px -65% 0px', threshold: [0, 0.25, 0.6] },
-    );
-    targets.forEach((target) => observer.observe(target.el));
-    return () => observer.disconnect();
+        observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              const el = entry.target as HTMLElement;
+              if (entry.isIntersecting) visible.add(el);
+              else visible.delete(el);
+            }
+            pickActive();
+          },
+          { rootMargin: '-120px 0px -65% 0px', threshold: [0, 0.25, 0.6] },
+        );
+        next.forEach((entry) => observer!.observe(entry.el));
+      }
+      /* Ri-ancora fuoco e rail sul nodo vivo dell'href attivo (sostituzione con
+         stesso id) o lascia cadere lo stato se la sezione e sparita. */
+      if (currentHref) {
+        const live = next.find((entry) => entry.href === currentHref);
+        commit(live ? live.href : null, live ? live.el : null);
+      }
+    };
+
+    bind();
+    /* DOM-aware, senza polling: il MutationObserver ri-lega quando i bersagli
+       compaiono/spariscono/vengono sostituiti (solo childList, cosi setAttribute
+       del filo non lo ritriggera). */
+    const mo = new MutationObserver(() => bind());
+    mo.observe(root, { childList: true, subtree: true });
+
+    return () => {
+      cancelled = true;
+      mo.disconnect();
+      if (observer) observer.disconnect();
+      if (focusEl) focusEl.removeAttribute('data-lume-focus');
+    };
   }, [navKey]);
 
   return (
-    <div className={styles.shell}>
+    <div className={styles.shell} ref={rootRef}>
       <main className={styles.canvas}>
         <header className={styles.chrome}>
           <div className={styles.chromeTopRow}>
