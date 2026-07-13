@@ -1,7 +1,7 @@
 ---
 summary: "Manual P6 click-map for the packaged MediFlow macOS home-base shell."
 read_when:
-  - "Running WUL-401 or deciding whether a macOS capability can move from partial to full parity."
+  - "Running the residual WUL-481 P6 gate or deciding whether a macOS capability can move from partial to full parity."
   - "Verifying the universal macOS bundle after native UI or navigation changes."
 ---
 
@@ -9,8 +9,9 @@ read_when:
 
 Stato documento: `SECONDARY / VERIFICATION RUNBOOK`
 
-Questo runbook raccoglie l'evidenza manuale richiesta da `WUL-401`. Il probe AX
-riduce l'ambiguita sugli identificatori, ma non certifica da solo usabilita,
+`WUL-401` e PR #21 hanno consegnato il tooling di base; `WUL-481` governa sia i
+prerequisiti operativi ancora bloccati sia il verbale manuale residuo. Il probe
+AX riduce l'ambiguita sugli identificatori, ma non certifica da solo usabilita,
 completezza dei campi o parity UI.
 
 ## Confini
@@ -61,7 +62,9 @@ Restano `BLOCKED` per costruzione, e non vanno promossi a `PASS`:
 
 Aprire un form senza salvarlo prova la superficie, non il CRUD end-to-end. Per
 chiudere quei gate serve un home-base temporaneo con database esclusivamente
-sintetico, credenziali effimere e cleanup automatico.
+sintetico, credenziali effimere e cleanup automatico. Anche il deep-link deve
+ricevere un contratto verificabile o essere escluso esplicitamente dal perimetro
+prima che `WUL-481` possa produrre un verbale interamente verde.
 
 ## Mappa manuale P6
 

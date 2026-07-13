@@ -37,6 +37,20 @@ Per il quadro dettagliato, inclusi runtime reale, home-base, document
 intelligence, AI locale, SISS/FSE, Apple clients e split pubblico/privato, vedi
 [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md).
 
+## ✨ Cosa e gia su `main` nel ciclo 0.7.3?
+
+La `v0.7.2` resta la release pubblicata corrente. Sul `main` successivo:
+
+- ADR 0078 e `Accepted` e Lume e in adozione progressiva: prime superfici web
+  e card clinica opaca nativa sono consegnate, non l'intera migrazione L0-L6;
+- `OllamaAdapter` e `AIService` introducono lo scaffold provider, ma Ollama
+  resta l'unico provider e il gate egress rimane chiuso;
+- il control-flow documentale usa `shadow` come default e la prima slice web
+  delle attese locali mantiene review e salvataggio espliciti;
+- PR #21 e `WUL-401` hanno consegnato il tooling P6 di base; prerequisiti
+  operativi e verbale manuale sul Mac sbloccato restano un gate di `WUL-481`,
+  quindi non dichiariamo parity UI piena.
+
 ## 🍎 Posso usarlo su Mac, iPad o iPhone?
 
 Oggi la superficie primaria resta la web app sul Mac.
@@ -111,4 +125,8 @@ Non vuol dire ancora:
 
 Non nel path di default.
 
-OCR e sintesi usano runtime locali. Se esistono lane separate di benchmark o comparazione, sono esplicitamente distinte dal runtime clinico e non vanno lette come comportamento standard del prodotto.
+OCR e sintesi usano runtime locali. `OllamaAdapter` e `AIService` preparano un
+boundary provider piu modulare, ma oggi Ollama resta l'unico provider operativo:
+il gate egress e `closed_pending_redaction_lane` e non esistono provider cloud o
+impostazioni di consenso consegnati. Le lane separate di benchmark o
+comparazione non sono comportamento standard del prodotto.

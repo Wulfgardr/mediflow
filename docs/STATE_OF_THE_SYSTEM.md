@@ -18,7 +18,7 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-07-11 (`v0.7.2`, closeout parity `WUL-479`)
+Ultimo aggiornamento: 2026-07-13 (ciclo v0.7.3 su `main`; release pubblicata v0.7.2)
 
 ---
 
@@ -34,9 +34,10 @@ versionati e ogni integrazione esterna resta dentro boundary documentati.
 La fotografia corrente e questa:
 
 - **Superficie primaria**: web app Next.js locale, avviata sul Mac.
-- **Shell ufficiale**: il cockpit Kree8 e la root web live su `main`, senza
-  selector o preview profiles persistiti. Kree8 resta ispirazione visuale
-  esterna e grammatica di riferimento, non un prodotto MediFlow a se.
+- **Shell ufficiale**: il cockpit resta la root web live su `main`, senza
+  selector o preview profiles persistiti. ADR 0078 adotta Lume e le prime
+  superfici sono consegnate; Kree8 resta ispirazione esterna e Vetro Clinico
+  il canone transitorio nelle aree non ancora migrate.
 - **Storage autorevole**: un solo file SQLite locale (`medical.db`), con accesso
   server via Drizzle e cifratura client-side dei campi clinici sensibili.
 - **Sicurezza di default**: local-only, campi clinici sensibili cifrati lato
@@ -72,8 +73,11 @@ La fotografia corrente e questa:
 - **Prescrizioni di prestazione**: visite, esami, imaging, riabilitazione e
   screening sono separati dalle terapie farmacologiche; gli item figli e il
   catalog matching restano reviewable e non generano invii regionali.
-- **AI**: runtime locale per default, benchmark e shadow lane separati dal
-  prodotto clinico.
+- **AI**: runtime locale per default, `OllamaAdapter` e `AIService` come scaffold
+  operativo e gate egress ancora chiuso; benchmark e shadow lane restano
+  separati dal prodotto clinico.
+- **Attese locali**: la prima slice web collega prestazioni attese e risultati;
+  il salvataggio resta esplicito e il workflow non e esteso ai client paired.
 - **SISS/FSE**: handoff contestuale e flussi `webapp-assisted`; nessuna
   integrazione regionale nativa certificata dichiarata senza `SSI/A2A` e scenari
   approvati.
@@ -219,9 +223,9 @@ Documenti/ADR principali:
 | `/api/*` | Runtime web | CRUD, auth, proxy locali, sistema | Session cookie |
 | `/api/v1/*` | Contratto locale/shared | Client native e superfici stabili | Bearer token locale, TLS proxy |
 | `/api/v1/network/*` | First slice home-base | Lista/dettaglio pazienti e write limitati/versionati su profilo/status, diario, terapie, checkup e osservazioni da device paired | Credenziale device + sessione operatore |
-| macOS Apple shell | `v0.7.2` | Fronte nativo piu maturo: shell Apple/home-base, workspace paziente condiviso, runtime panel, Vetro Clinico/Liquid Glass e store locale verificabile | Firma/notarizzazione esplicite, Ollama/Docker non app-managed |
-| `MediFlowCore` tri-OS | `v0.7.2` | Core Swift condiviso per logica clinica, cifratura, contratti, filtri, conflict handling, clinical scales e SQLite locale | CI Linux/macOS/Windows; non equivale a app complete Windows/Linux |
-| iPhone/iPad | `v0.7.2` | Client paired non-AI, cache cifrata degradabile e workflow online versionati sui moduli core | No SQLite diretto |
+| macOS Apple shell | Operativa | Fronte nativo piu maturo: shell Apple/home-base, workspace paziente condiviso, runtime panel e store locale verificabile; Lume e consegnata nella card clinica opaca, mentre le altre superfici restano in migrazione | Firma/notarizzazione esplicite, Ollama/Docker non app-managed |
+| `MediFlowCore` tri-OS | Verificato tri-OS | Core Swift condiviso per logica clinica, cifratura, contratti, filtri, conflict handling, clinical scales e SQLite locale | CI Linux/macOS/Windows; non equivale a app complete Windows/Linux |
+| iPhone/iPad | Paired | Client paired non-AI, cache cifrata degradabile e workflow online versionati sui moduli core | No SQLite diretto |
 | Ollama | Opzionale locale | AI/OCR/sintesi dove disponibile | Solo localhost; OCR primario |
 | Apple Vision OCR | macOS-only fallback | Seconda lettura locale quando DeepSeek/Ollama OCR restituisce output blank/low-signal | Solo macOS, nessun equivalente certificato Windows/Linux |
 | ICD-11 Docker | Opzionale locale | Diagnosi/coding | Solo localhost |
@@ -312,6 +316,11 @@ Documenti/ADR principali:
 Il runtime AI operativo resta locale. Il default generativo protetto e trattato
 come baseline finche benchmark e governance non giustificano un cambio.
 
+`OllamaAdapter` e `AIService` separano il provider dal servizio applicativo, ma
+`AIProvider` espone oggi solo Ollama. Il gate egress applica il primo strato
+deterministico e resta `closed_pending_redaction_lane`: non esistono provider
+cloud, registry operativo o consenso egress consegnati.
+
 Le superfici operative includono:
 
 - `AI Patient Insight`;
@@ -323,6 +332,10 @@ Le superfici AI restano review-first e protette da safety gate (WUL-355,
 WUL-358): kill-switch dedicato per `patient-insight`, `smart-import` e
 `document-synthesis`, piu model governance delle decisioni documentali. Nessuna
 scrittura clinica autonoma: l'AI locale propone, il medico rivede.
+
+Il router documentale usa `shadow` come default. La modalita `active` puo
+evitare il modello solo su route esplicitamente eleggibili ad alta confidenza;
+non promuove mai proposte cliniche senza review e salvataggio espliciti.
 
 ### 5.2 Lane benchmark-only
 
@@ -428,6 +441,8 @@ Disponibile:
   `deletionReason` dedicata e audit per paziente;
 - PUT profilo con `ambulatoryId` come set-primary: aggiorna la membership
   primaria senza azzerare le membership multi-ambulatorio.
+- attese locali web con collegamento esplicito tra prestazione prevista e
+  risultato, senza estensione paired o scritture cliniche autonome.
 
 Da preservare:
 
@@ -515,6 +530,9 @@ Disponibile:
 
 - macOS come fronte nativo piu maturo: shell Apple/home-base, workspace
   paziente, runtime panel e store locale verificabile;
+- adozione Lume progressiva: ADR 0078 e `Accepted`, con prime superfici web e
+  card clinica opaca nativa consegnate; componenti interni e QA manuale completa
+  restano aperti;
 - `MediFlowCore` condiviso e testato su macOS, Linux e Windows;
 - contratto `/api/v1`;
 - TLS proxy locale;
@@ -526,7 +544,9 @@ Fotografia parity post-Wave 5:
 
 - 64 capability censite: 30 full, 13 partial, 21 host-only, 0 missing-both;
 - tra le 43 capability per cui la parity è un obiettivo, 30 sono full (70%);
-- click-map P6 e convergenza UI macOS restano in `WUL-401`;
+- PR #21 e `WUL-401`, ora completata, hanno consegnato bundle, fixture, probe AX
+  e runbook P6 di base; prerequisiti operativi e verbale manuale sul Mac
+  sbloccato restano in `WUL-481`;
 - offline degradato onesto resta in `WUL-403`;
 - Smart Import e invocazione AI paired restano host-only per ADR 0076.
 
@@ -535,7 +555,7 @@ La fonte canonica è [docs/parity-matrix.md](./parity-matrix.md).
 Direzione:
 
 - app Windows/Linux e launcher dedicati oltre il core;
-- closeout parity tramite `WUL-401`/`WUL-403` e decisione separata per i quattro residui documentali;
+- closeout parity residuo tramite `WUL-481`/`WUL-403` e decisione separata per i quattro residui documentali;
 - cache locale cifrata derivata e riconciliazione esplicita.
 
 Fuori scope corrente:

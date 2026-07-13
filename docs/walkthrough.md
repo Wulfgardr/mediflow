@@ -666,15 +666,17 @@ sequenceDiagram
   smoke web+native `PASS`, gap modulo-specifici chiusi, nessuna dichiarazione
   di UI parity piena della vecchia shell clinica. La prossima click-map
   capability-by-capability appartiene al filone Apple-native/home-base.
-- Il closeout parity e tracciato da `WUL-479`: click-map P6 (`WUL-401`), offline
-  degradato (`WUL-403`) e decisione documentale condizionata da ADR 0076.
+- Il closeout parity e tracciato da `WUL-479`: `WUL-401`/PR #21 hanno
+  consegnato il tooling P6 di base, mentre `WUL-481` governa prerequisiti
+  operativi e verbale manuale residuo sul Mac sbloccato. Offline degradato
+  (`WUL-403`) e decisione documentale condizionata da ADR 0076 restano separati.
 
 ---
 
 ## 🧭 Prossimi passi suggeriti
 
-1) Eseguire la Wave 6/closeout definita in `docs/parity-matrix.md`, iniziando
-   dalla click-map P6 e dai residui UI realmente azionabili
+1) Chiudere sotto `WUL-481` i prerequisiti operativi e poi il verbale manuale P6
+   definiti in `docs/parity-matrix.md`, partendo dal tooling di `WUL-401`/PR #21
 2) Portare altri consumer sul `parse/evidence artifact` prima di cambiare i
    contratti persistiti piu ampi
 3) Riavviare il filone native sul nuovo shell, non su quello storico; quando
