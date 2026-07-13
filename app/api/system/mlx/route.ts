@@ -35,14 +35,10 @@ export async function GET(request: Request) {
     if (!MLX_SUPPORTED) return mlxUnsupportedResponse();
 
     try {
-        await PM2Manager.connect();
-        const status = await PM2Manager.getStatus();
+        const status = await PM2Manager.withConnection(() => PM2Manager.getStatus());
         return NextResponse.json(status);
     } catch (e: any) {
         return NextResponse.json({ error: e.message }, { status: 500 });
-    } finally {
-        /* @Codex */
-        PM2Manager.disconnect();
     }
 }
 
@@ -59,12 +55,9 @@ export async function POST() {
     if (!MLX_SUPPORTED) return mlxUnsupportedResponse();
 
     try {
-        await PM2Manager.connect();
-        await PM2Manager.start();
-        PM2Manager.disconnect();
-        return NextResponse.json({ success: true, message: "Started" });
+        await PM2Manager.withConnection(() => PM2Manager.start());
+        return NextResponse.json({ success: true, message: "Avvio PM2 richiesto; verifica lo stato locale." });
     } catch (e: any) {
-        PM2Manager.disconnect();
         return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }
@@ -78,12 +71,9 @@ export async function DELETE() {
     if (!MLX_SUPPORTED) return mlxUnsupportedResponse();
 
     try {
-        await PM2Manager.connect();
-        await PM2Manager.stop();
-        PM2Manager.disconnect();
+        await PM2Manager.withConnection(() => PM2Manager.stop());
         return NextResponse.json({ success: true, message: "Stopped" });
     } catch (e: any) {
-        PM2Manager.disconnect();
         return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }
