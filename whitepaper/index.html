@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <title>MediFlow · White paper</title>
 <meta name="description" content="MediFlow: cartella clinica locale, cifrata, con AI sul dispositivo. Cosa è, come funziona, dove va." />
-<meta name="theme-color" content="#0a1018" />
+<meta name="theme-color" content="#eef0f2" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#121417" media="(prefers-color-scheme: dark)" />
 <style>
 /* =====================================================================
    MEDIFLOW · WHITE PAPER
@@ -13,36 +14,53 @@
    ===================================================================== */
 
 :root{
-  --bg-0:#070b11;
-  --bg-1:#0a1018;
-  --bg-2:#0f1722;
-  --ink-0:#f4f7fb;
-  --ink-1:#cdd6e2;
-  --ink-2:#92a0b3;
-  --ink-3:#5d6b80;
-  --line:rgba(255,255,255,.08);
-  --line-strong:rgba(255,255,255,.18);
+  /* === Lume · superfici canoniche (Giorno) ======================== */
+  --canvas:#eef0f2;
+  --field:#f5f5f4;
+  --focal:#fbfaf7;
+  --chrome:#e6e8eb;
+  --ink:#1a1c1e;
+  --muted:#5c6772;
+  --accent:#33506b;
 
-  --teal:#5fe3c7;
-  --teal-deep:#1aa089;
-  --azure:#7cc7ff;
-  --violet:#b59bff;
-  --amber:#ffc674;
-  --rose:#ff8aa8;
-
-  --glass:rgba(255,255,255,.045);
-  --glass-strong:rgba(255,255,255,.085);
-  --glass-edge:rgba(255,255,255,.14);
-
+  /* === Linee 1px e raggi 20/14/10 ================================= */
+  --line:rgba(26,28,30,.10);
+  --line-strong:rgba(26,28,30,.18);
   --r-1:10px;
-  --r-2:18px;
-  --r-3:28px;
+  --r-2:14px;
+  --r-3:20px;
 
-  --shadow-1:0 1px 0 rgba(255,255,255,.05) inset, 0 20px 50px -20px rgba(0,0,0,.55);
-  --shadow-2:0 1px 0 rgba(255,255,255,.07) inset, 0 30px 80px -30px rgba(0,0,0,.7);
+  /* === Nessuna ombra strutturale ================================= */
+  --shadow-1:none;
+  --shadow-2:none;
+
+  /* === Alias di compatibilità, rimossi in F1b/F1c ================= */
+  --ink-0:var(--ink);
+  --ink-1:var(--ink);
+  --ink-2:var(--muted);
+  --ink-3:var(--muted);
+  --teal:var(--accent);
+  --violet:var(--accent);
+  --glass:var(--focal);
+  --glass-strong:var(--chrome);
+  --glass-edge:var(--line);
 
   --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,system-ui,sans-serif;
   --mono:"SF Mono","JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+
+@media (prefers-color-scheme: dark){
+  :root{
+    --canvas:#121417;
+    --field:#191c21;
+    --focal:#22252b;
+    --chrome:#0e1013;
+    --ink:#e9ecef;
+    --muted:#8f9aa6;
+    --accent:#8fb0cc;
+    --line:rgba(255,255,255,.10);
+    --line-strong:rgba(255,255,255,.16);
+  }
 }
 
 *{box-sizing:border-box}
@@ -51,7 +69,7 @@ html{scroll-behavior:smooth}
 body{
   font-family:var(--font);
   color:var(--ink-1);
-  background:var(--bg-0);
+  background:var(--canvas);
   -webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
   line-height:1.55;
@@ -59,48 +77,15 @@ body{
   overflow-x:hidden;
 }
 
-::selection{background:rgba(95,227,199,.28);color:#fff}
+::selection{ background:var(--accent); color:var(--focal); }
 
-/* === Background scenico ============================================ */
+/* === Focus visibile (accento) ===================================== */
+:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+/* === Background scenico (piatto, opaco) =========================== */
 .scene{
-  position:fixed; inset:0; z-index:-1; overflow:hidden;
-  background:
-    radial-gradient(1200px 800px at 12% -10%, rgba(124,199,255,.18), transparent 60%),
-    radial-gradient(900px 700px at 90% 10%, rgba(181,155,255,.18), transparent 60%),
-    radial-gradient(1100px 900px at 50% 110%, rgba(95,227,199,.16), transparent 65%),
-    linear-gradient(180deg, #060a10 0%, #080d15 50%, #060a10 100%);
-}
-.scene::before{
-  content:""; position:absolute; inset:-20%;
-  background-image:
-    radial-gradient(circle at 20% 30%, rgba(255,255,255,.05) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 80% 70%, rgba(255,255,255,.04) 0 1px, transparent 1.5px);
-  background-size: 3px 3px, 4px 4px;
-  opacity:.5;
-  mix-blend-mode:screen;
-  animation:drift 60s linear infinite;
-}
-.orb{
-  position:absolute; border-radius:50%; filter:blur(60px); opacity:.55;
-  mix-blend-mode:screen; pointer-events:none;
-  animation:float 18s ease-in-out infinite;
-}
-.orb.a{ width:520px; height:520px; left:-120px; top:-120px;
-  background:radial-gradient(circle, rgba(124,199,255,.55), transparent 60%); }
-.orb.b{ width:600px; height:600px; right:-160px; top:160px;
-  background:radial-gradient(circle, rgba(181,155,255,.5), transparent 60%);
-  animation-delay:-6s; }
-.orb.c{ width:680px; height:680px; left:30%; bottom:-260px;
-  background:radial-gradient(circle, rgba(95,227,199,.45), transparent 60%);
-  animation-delay:-12s; }
-
-@keyframes float{
-  0%,100%{ transform:translate3d(0,0,0) scale(1) }
-  50%{ transform:translate3d(20px,-30px,0) scale(1.05) }
-}
-@keyframes drift{
-  0%{ transform:translate3d(0,0,0) }
-  100%{ transform:translate3d(40px,40px,0) }
+  position:fixed; inset:0; z-index:-1;
+  background:var(--canvas);
 }
 
 /* === Glass primitives ============================================== */
@@ -447,11 +432,7 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--teal); background:rg
 </head>
 <body>
 
-<div class="scene" aria-hidden="true">
-  <span class="orb a"></span>
-  <span class="orb b"></span>
-  <span class="orb c"></span>
-</div>
+<div class="scene" aria-hidden="true"></div>
 
 <!-- ===================== TOP NAV ===================== -->
 <header class="topbar">
