@@ -177,8 +177,22 @@ function runSelfTest() {
     failures.push('unrelated negation suppressed CLAIM-REGIONAL-PRESCRIPTION');
   }
 
+  const contradictoryCases = [
+    ['field qualifier plus whole database claim', 'I campi sono cifrati lato client; il database SQLite e cifrato integralmente.', 'CLAIM-FULL-DB-ENCRYPTION'],
+    ['local-first plus NRE issuance', 'MediFlow e local-first; MediFlow genera NRE e invia ricette regionali.', 'CLAIM-REGIONAL-PRESCRIPTION'],
+    ['telemetry negation plus cloud default', 'Niente telemetria; la cloud AI e attiva di default.', 'CLAIM-CLOUD-DEFAULT'],
+    ['export-only plus FHIR guarantee', 'Mappatura export-only v0; il bundle FHIR R4 e interoperabile.', 'CLAIM-FHIR-CONFORMANCE'],
+    ['home-base alone plus single-device absolute', 'Storage home-base; tutti i dati restano sul computer.', 'CLAIM-ONE-DEVICE-ABSOLUTE'],
+    ['optional resolver plus universal ICD guarantee', 'Resolver opzionale; ogni diagnosi ha un codice ICD-11 validato.', 'CLAIM-ICD-GUARANTEE'],
+    ['support wording plus GDPR conformity', 'Le misure possono supportare il GDPR; MediFlow e conforme al GDPR.', 'CLAIM-GDPR-GUARANTEE'],
+  ];
+  for (const [name, source, expected] of contradictoryCases) {
+    const matched = findRuleMatches(source, 'self-test.md').map((item) => item.rule.id);
+    if (!matched.includes(expected)) failures.push(`${name}: expected ${expected}, got ${matched.join(', ') || 'none'}`);
+  }
+
   if (failures.length === 0) {
-    console.log(`Claims guard self-test passed: ${required.length} synthetic violation(s) detected and allowed boundary wording accepted.`);
+    console.log(`Claims guard self-test passed: ${required.length} synthetic violation(s) and ${contradictoryCases.length} masking regression(s) detected; allowed boundary wording accepted.`);
     return;
   }
   console.error('Claims guard self-test failed:');
@@ -191,10 +205,14 @@ function findRuleMatches(source, file) {
   const matches = [];
   for (const rule of rules) {
     const flags = rule.pattern.flags.includes('g') ? rule.pattern.flags : `${rule.pattern.flags}g`;
-    const pattern = new RegExp(rule.pattern.source, flags);
+    const clauseBoundedSource = rule.pattern.source.replace(
+      /\.\{0,(\d+)\}/gu,
+      String.raw`(?:(?![.!?](?:\s|$)|;|\n).){0,$1}`,
+    );
+    const pattern = new RegExp(clauseBoundedSource, flags);
     for (const match of scanText.matchAll(pattern)) {
       const offset = match.index ?? 0;
-      const context = logicalBlockAt(scanText, offset);
+      const context = claimClauseAt(scanText, offset);
       if (!isContextAllowed(rule.id, match[0], context)) {
         matches.push({
           rule,
@@ -228,10 +246,12 @@ function shouldJoinLine(line, next) {
   return !/^\s*(?:#{1,6}\s|[-*+]\s|\d+[.)]\s|>|\||<\/?[A-Za-z])/u.test(next);
 }
 
-function logicalBlockAt(scanText, offset) {
-  const start = scanText.lastIndexOf('\n', offset - 1) + 1;
-  const nextBreak = scanText.indexOf('\n', offset);
-  const end = nextBreak === -1 ? scanText.length : nextBreak;
+function claimClauseAt(scanText, offset) {
+  const boundaries = [...scanText.matchAll(/[;\n]|[.!?](?=\s|$)/gu)].map((match) => match.index ?? 0);
+  const previous = boundaries.filter((position) => position < offset);
+  const following = boundaries.filter((position) => position >= offset);
+  const start = (previous.at(-1) ?? -1) + 1;
+  const end = following[0] ?? scanText.length;
   return scanText.slice(start, end);
 }
 
@@ -242,19 +262,29 @@ function lineNumberAt(source, offset) {
 function isContextAllowed(ruleId, line, context) {
   const boundaryText = context.toLocaleLowerCase('it-IT');
   if (ruleId === 'CLAIM-FULL-DB-ENCRYPTION') {
-    return /\b(?:campi\b.{0,48}\bcifrat\w*|cifratura\b.{0,32}\bper campo|field-level|non presentare|non deve descrivere|non equivale|non rientr\w*|non (?:e|è) cifrat[oa] integralmente|non sono tutti coperti|non ["“]?intero database|senza estendere|non abilita|finche\b.{0,96}\bperimetro)\b/u.test(boundaryText);
+    const explicitlyQualified = /\b(?:non\s+presentare|non\s+deve\s+descrivere|non\s+equivale|non\s+rientr\w*|non\s+(?:e|è)\s+cifrat[oa](?:\s+integralmente)?|non\s+sono\s+tutti\s+coperti|non\s+["“]?intero\s+database|senza\s+(?:claim|estendere)|non\s+abilita|finche\b.{0,96}\bperimetro)\b/u.test(boundaryText);
+    const fieldOnly = /\b(?:campi?\b.{0,48}\bcifrat\w*|cifratura\b.{0,32}\bper campo|field-level)\b/u.test(boundaryText)
+      && !/\b(?:integral\w*|intero database|zero[- ]knowledge|zero conoscenza|illeggibil\w*|tutto cifrato)\b/u.test(boundaryText);
+    return explicitlyQualified || fieldOnly;
   }
   if (ruleId === 'CLAIM-FHIR-CONFORMANCE') {
-    return /\b(?:export-only v0|mappatura export-only|senza claim|non (?:attesta|prova|dichiara|garantisce)|nessuna garanzia|quadro (?:compliance|documentale))\b/u.test(boundaryText);
+    const qualifiedExport = /\b(?:export-only v0|mappatura export-only)\b/u.test(boundaryText)
+      && /\b(?:senza claim|non (?:attesta|prova|dichiara|garantisce)|nessuna garanzia)\b/u.test(boundaryText);
+    return qualifiedExport || /\bquadro (?:compliance|documentale)\b/u.test(boundaryText);
   }
   if (ruleId === 'CLAIM-GDPR-GUARANTEE') {
-    return /\b(?:pu[oò] supportare|possono supportare|non (?:certifica|prova|assegna)|dipendono dal deployment|valutazione del caso)\b/u.test(boundaryText);
+    const supportIsQualified = /\b(?:pu[oò]|possono) supportare\b/u.test(boundaryText)
+      && /\b(?:non (?:certifica|prova|assegna)|dipendono dal deployment|valutazione del caso)\b/u.test(boundaryText);
+    return supportIsQualified || /\bnon (?:certifica|prova|assegna)\b/u.test(boundaryText);
   }
   if (ruleId === 'CLAIM-ONE-DEVICE-ABSOLUTE') {
-    return /\b(?:home-base|client paired|cache|export|backup|storage autorevole)\b/u.test(boundaryText);
+    return /\bhome-base\b/u.test(boundaryText)
+      && /\b(?:client paired|cache|export|backup)\b/u.test(boundaryText);
   }
   if (ruleId === 'CLAIM-ICD-GUARANTEE') {
-    return /\b(?:opzional|possono|free-text|reviewable|non (?:ogni|tutte))\w*\b/u.test(boundaryText);
+    if (/\b(?:ogni|tutte le)\s+diagnos[ie]\b/u.test(line.toLocaleLowerCase('it-IT'))) return false;
+    return /\bopzional\w*\b/u.test(boundaryText)
+      && /\b(?:free-text|reviewable|non (?:ogni|tutte))\w*\b/u.test(boundaryText);
   }
   const text = context.toLocaleLowerCase('it-IT');
   if (hasBoundaryNegation(text)) return true;
@@ -273,10 +303,7 @@ function hasBoundaryNegation(text) {
     || /\bno\b.{0,64}\b(?:cloud|egress|sync|telemetry|telemetria|writeback|invio|accesso diretto)\b/u.test(text)
     || /\bsenza\b.{0,64}\b(?:cloud|egress|telemetry|telemetria|sync|writeback|adr|canale qualificato|review|conferma|integrazione|auto-write|scritture)\b/u.test(text)
     || /\b(fuori|fuori scope|vieta|vietato|vietata|vietati|vietate|esclude|escluso|esclusa|not)\b/u.test(text)
-    || text.includes('local-first')
-    || text.includes('solo se scelto')
-    || text.includes('solo opt-in')
-    || text.includes('opt-in');
+    || /\b(?:solo se scelto|solo opt-in|opt-in)\b.{0,48}\b(?:cloud|egress|sync|telemetry|telemetria)\b/u.test(text);
 }
 
 function collectFiles(root) {

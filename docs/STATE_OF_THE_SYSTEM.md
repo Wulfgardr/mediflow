@@ -103,7 +103,7 @@ Questo significa che non sono ammessi, senza ADR e documentazione esplicita:
 
 - sync cloud implicita;
 - telemetry o analytics in background;
-- non usare runtime AI remoto come default;
+- runtime AI remoto come default (vietato);
 - upload automatico di documenti clinici;
 - database remoto multi-tenant;
 - bypass del nodo Mac `home-base` per i client mobili.
