@@ -2,17 +2,25 @@
 /* Scoped Kree8 shell for dense patient workspaces. */
 
 .shell {
-  --k8-surface: #ffffff;
-  --k8-soft: #f5f6f7;
-  --k8-canvas: #eef0f2;
-  --k8-ink: #0f172a;
-  --k8-muted: #475569;
-  --k8-subtle: #52606d;
+  /* Lume material (WUL-55, F2c): surfaces read from the live giorno/grafite aliases. Structural shell + header
+     recede to opaque canvas/chrome; content panels sit on field. Focal + il filo stay reserved for the active
+     clinical locus rendered by inner content (Lume 01-lingua ss.1-3), so the shell declares no focal surface of its own. */
+  --k8-surface: var(--lume-surface-field);
+  --k8-soft: var(--lume-surface-canvas);
+  --k8-canvas: var(--lume-surface-canvas);
+  --k8-ink: var(--lume-ink);
+  --k8-muted: var(--lume-ink-muted);
+  /* Lume: due soli livelli di inchiostro; subtle confluisce nell'attenuato
+     misurato (>= 4,5:1 su ogni superficie). */
+  --k8-subtle: var(--lume-ink-muted);
   --k8-line: rgba(15, 23, 42, 0.05);
   --k8-line-strong: rgba(15, 23, 42, 0.08);
-  --k8-chrome-bg: rgba(255, 255, 255, 0.92);
-  --k8-control-bg: #ffffff;
-  --k8-chip-bg: #eef2f7;
+  /* Lume: bordo dei controlli interattivi (WCAG 1.4.11) dall'alias misurato
+     ink-muted, mai un separatore a bassa opacita. */
+  --k8-control-border: var(--lume-ink-muted);
+  --k8-chrome-bg: var(--lume-surface-chrome);
+  --k8-control-bg: var(--lume-surface-field);
+  --k8-chip-bg: var(--lume-surface-canvas);
   --k8-pill-success-bg: #dcfce7;
   --k8-pill-success-fg: #166534;
   --k8-pill-info-bg: #dbeafe;
@@ -21,21 +29,27 @@
   --k8-pill-warning-fg: #92400e;
   --k8-pill-critical-bg: #ffe2dd;
   --k8-pill-critical-fg: #9a3412;
-  --k8-primary-bg: #0f172a;
+  --k8-primary-bg: var(--lume-ink);
   --k8-primary-fg: #ffffff;
-  /* @Codex WUL-UIUX: accent e focus allineati allo slate del focus ring globale
-     (rgba(15, 23, 42, ...)): un solo colore di focus per pagina. */
-  --k8-accent: #334155;
+  /* Lume: accento minerale interattivo (ed e anche il filo, quando un contenuto
+     interno segna il fuoco clinico, e ora anche l'anello di focus del guscio). */
+  --k8-accent: var(--lume-accent);
   --k8-accent-soft: rgba(15, 23, 42, 0.07);
   --k8-accent-line: rgba(15, 23, 42, 0.18);
-  --k8-focus: rgba(15, 23, 42, 0.34);
-  --k8-shadow: 0 1px 0 rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04);
+  /* Lume a11y (WCAG 1.4.11): focus + --mf-focus-ring leggono l'accento minerale
+     (>= 7.5:1 su field, non piu lo slate ~2.14:1); si ribaltano via --lume-accent. */
+  --k8-focus: var(--lume-accent);
+  --mf-focus-ring: 0 0 0 2px var(--lume-accent);
+  /* Lume: profondita semantica = bordo 1px neutro, nessuna ombra decorativa ne lucido di vetro; l'unica ombra corta
+     sollevata vive sul solo fuoco clinico ([data-lume-focus]), mai sulla struttura. */
+  --k8-focal: var(--lume-surface-focal);
+  --k8-focal-shadow: 0 2px 8px rgba(15, 23, 42, 0.10);
   --mf-ink: var(--k8-ink);
   --mf-muted: var(--k8-muted);
   --mf-bg: var(--k8-canvas);
   --mf-bg-elevated: var(--k8-soft);
   --mf-card: var(--k8-surface);
-  --glass-bg: var(--k8-soft);
+  --glass-bg: var(--k8-surface);
   --glass-border: var(--k8-line);
   position: fixed;
   inset: 0;
@@ -49,17 +63,10 @@
 }
 
 :global(html.dark) .shell {
-  --k8-surface: #0f172a;
-  --k8-soft: #111827;
-  --k8-canvas: #020617;
-  --k8-ink: #f8fafc;
-  --k8-muted: #cbd5e1;
-  --k8-subtle: #b6c2d0;
+  /* Lume grafite: surfaces / ink / accent / primary (e ora il focus, via --lume-accent) flip through the active aliases;
+     only the non-alias tokens (neutral lines, clinical pills, primary foreground) need a dark override. */
   --k8-line: rgba(226, 232, 240, 0.10);
   --k8-line-strong: rgba(226, 232, 240, 0.16);
-  --k8-chrome-bg: rgba(15, 23, 42, 0.82);
-  --k8-control-bg: #0f172a;
-  --k8-chip-bg: rgba(148, 163, 184, 0.14);
   --k8-pill-success-bg: rgba(74, 222, 128, 0.16);
   --k8-pill-success-fg: #bbf7d0;
   --k8-pill-info-bg: rgba(96, 165, 250, 0.18);
@@ -68,13 +75,10 @@
   --k8-pill-warning-fg: #fde68a;
   --k8-pill-critical-bg: rgba(248, 113, 113, 0.16);
   --k8-pill-critical-fg: #fecaca;
-  --k8-primary-bg: #e2e8f0;
   --k8-primary-fg: #020617;
-  --k8-accent: #cbd5e1;
   --k8-accent-soft: rgba(148, 163, 184, 0.16);
   --k8-accent-line: rgba(203, 213, 225, 0.28);
-  --k8-focus: rgba(203, 213, 225, 0.42);
-  --k8-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 0 0 1px rgba(226, 232, 240, 0.10), 0 14px 34px rgba(0, 0, 0, 0.32);
+  --k8-focal-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
 }
 
 .canvas {
@@ -86,14 +90,14 @@
   gap: 14px;
   padding: var(--k8-canvas-pad);
   border-radius: 28px;
-  background: var(--k8-surface);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(15, 23, 42, 0.04);
+  border: 1px solid var(--k8-line-strong);
+  background: var(--k8-canvas);
 }
 
 .canvas::-webkit-scrollbar { width: 10px; }
 .canvas::-webkit-scrollbar-track { background: transparent; }
 .canvas::-webkit-scrollbar-thumb {
-  border: 3px solid var(--k8-surface);
+  border: 3px solid var(--k8-canvas);
   border-radius: 999px;
   background: rgba(100, 116, 139, 0.36);
 }
@@ -111,8 +115,6 @@
   border: 1px solid var(--k8-line);
   border-radius: 18px;
   background: var(--k8-chrome-bg);
-  box-shadow: var(--k8-shadow);
-  backdrop-filter: blur(18px);
 }
 
 /* WUL-297: back button + persistent privacy toggle share the chrome top row. */
@@ -200,7 +202,7 @@
 
 .backButton,
 .sectionLink {
-  border: 1px solid var(--k8-line);
+  border: 1px solid var(--k8-control-border);
   border-radius: 12px;
   background: var(--k8-soft);
   color: var(--k8-muted);
@@ -231,7 +233,7 @@
 
 .backButton:hover,
 .sectionLink:hover {
-  border-color: var(--k8-accent-line);
+  border-color: var(--k8-ink);
   background: var(--k8-control-bg);
   color: var(--k8-ink);
 }
@@ -273,7 +275,7 @@
 /* @Codex WUL-UIUX: sezione attiva (scrollspy). Stile coerente con :hover ma
    piu marcato, cosi su una Scheda lunga si vede dove si e. */
 .sectionLink[aria-current='location'] {
-  border-color: var(--k8-accent-line);
+  border-color: var(--k8-ink);
   background: var(--k8-control-bg);
   color: var(--k8-ink);
   font-weight: 700;
@@ -327,12 +329,18 @@
   border-radius: 22px !important;
   background: var(--k8-surface) !important;
   color: var(--k8-ink) !important;
-  box-shadow: var(--k8-shadow) !important;
+  /* Lume: azzera l'ombra ornamentale globale ereditata da globals (giorno 0 24px 64px + filo inset chiaro;
+     grafite 0 28px 68px): una struttura non-focale non e mai sollevata. La sola ombra corta vive su [data-lume-focus]. */
+  box-shadow: none !important;
+  /* Lume: reset del blur strutturale legacy (globals blur(24px)); il riempimento
+     opaco da solo non basta, servono entrambe le proprieta. */
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .shell :global(.patient-detail-side-section),
 .shell :global(.patient-actions-dock) { border-radius: 18px !important; }
-.shell :global(.glass-panel) { backdrop-filter: none !important; }
+.shell :global(.glass-panel) { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
 
 .shell :global(.patient-identity-lens) {
   min-height: 0 !important;
@@ -364,7 +372,7 @@
 .shell :global(.ui-btn-primary) {
   border-radius: 14px !important;
   background: var(--k8-primary-bg) !important;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18) !important;
+  box-shadow: none !important;
   color: var(--k8-primary-fg) !important;
 }
 
@@ -383,6 +391,22 @@
 .shell :global(.graphite-chip-tone-info) { background: var(--k8-pill-info-bg) !important; color: var(--k8-pill-info-fg) !important; }
 .shell :global(.graphite-chip-tone-warning) { background: var(--k8-pill-warning-bg) !important; color: var(--k8-pill-warning-fg) !important; }
 .shell :global(.graphite-chip-tone-critical) { background: var(--k8-pill-critical-bg) !important; color: var(--k8-pill-critical-fg) !important; }
+
+/* @Codex WUL-55 F2c: alias semantici SOLO per lo status-glyph, rimappati sui token Lume misurati (testo stato Giorno 5.477:1-8.414:1,
+   Grafite 6.205:1-11.542:1; archiviato >= 4.872:1). Non allargarli al guscio: regredirebbero gli sfondi distruttivi e altri consumatori. */
+.shell :global(.status-glyph) {
+  --mf-primary: var(--k8-accent);
+  --mf-plum: var(--k8-pill-info-fg);
+  --mf-success: var(--k8-pill-success-fg);
+  --mf-warning: var(--k8-pill-warning-fg);
+  --mf-critical: var(--k8-pill-critical-fg);
+}
+
+/* Disco icona sulla superficie del guscio; !important perche il selettore globale
+   del redesign (disco bianco) altrimenti vince in Grafite. Tratti icona >= 5.291:1. */
+.shell :global(.status-glyph-icon) {
+  background: var(--k8-surface) !important;
+}
 
 /* @Codex */
 :global(html.dark) .shell :global([class*="text-slate-900"]),
@@ -408,15 +432,17 @@
   background-color: var(--k8-soft) !important;
 }
 
-:global(html.dark) .shell :global([class*="border-white"]),
-:global(html.dark) .shell :global([class*="border-slate-200"]),
-:global(html.dark) .shell :global([class*="border-slate-300"]) {
+/* @Codex WUL-55 F2c a11y: escludi i controlli reali; input/select/textarea devono tenere --k8-control-border misurato
+   (WCAG 1.4.11), non la linea neutra che qui vincerebbe per specificita sulla regola di bordo dei controlli. */
+:global(html.dark) .shell :global([class*="border-white"]:not(input):not(select):not(textarea)),
+:global(html.dark) .shell :global([class*="border-slate-200"]:not(input):not(select):not(textarea)),
+:global(html.dark) .shell :global([class*="border-slate-300"]:not(input):not(select):not(textarea)) {
   border-color: var(--k8-line) !important;
 }
 
 .shell :global(.graphite-mini-btn) {
   border-radius: 12px !important;
-  border-color: var(--k8-line) !important;
+  border-color: var(--k8-control-border) !important;
   background: var(--k8-control-bg) !important;
   color: var(--k8-muted) !important;
 }
@@ -425,7 +451,7 @@
 .shell :global(input:not([type="checkbox"]):not([type="radio"]):not([type="range"])),
 .shell :global(select),
 .shell :global(textarea) {
-  border: 1px solid var(--k8-line) !important;
+  border: 1px solid var(--k8-control-border) !important;
   border-radius: 12px !important;
   background: var(--k8-control-bg) !important;
   color: var(--k8-ink) !important;
@@ -439,16 +465,24 @@
   outline-offset: 1px;
 }
 
+/* @Codex WUL-55 F2c a11y: .ui-btn-primary e .siss-action-btn azzerano il box-shadow nel guscio, cancellando l'anello globale
+   consegnato via box-shadow; l'outline ne ridipinge uno reale da 2px sull'accento (WCAG 1.4.11), immune a quel reset. */
+.shell :global(.ui-btn-primary:focus-visible),
+.shell :global(.siss-action-btn:focus-visible) {
+  outline: 2px solid var(--k8-focus) !important;
+  outline-offset: 2px;
+}
+
 /* @Codex */
 .shell :global(.siss-action-btn) {
-  border-color: var(--k8-line) !important;
+  border-color: var(--k8-control-border) !important;
   background: var(--k8-surface) !important;
   color: var(--k8-ink) !important;
   box-shadow: none !important;
 }
 
 .shell :global(.siss-action-btn:hover:not(:disabled)) {
-  border-color: var(--k8-line-strong) !important;
+  border-color: var(--k8-ink) !important;
   background: var(--k8-soft) !important;
 }
 
@@ -456,8 +490,11 @@
   border: 1px solid var(--k8-line) !important;
   border-radius: 18px !important;
   background: var(--k8-surface) !important;
-  box-shadow: var(--k8-shadow) !important;
+  /* Lume: l'insight AI e nello stesso selettore ornamentale globale delle sezioni;
+     azzera l'ombra sollevata ereditata, non e una superficie focale. */
+  box-shadow: none !important;
   backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .shell :global(.patient-ai-insight-panel .bg-slate-50) {
@@ -469,6 +506,27 @@
 .shell :global(.ui-btn-primary[disabled]) {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* Lume focal locus (WUL-55, F2c): il bersaglio attivo dello scrollspy, segnato
+   [data-lume-focus], e l'unica superficie focale della vista (Lume 01-lingua
+   ss.1-3). Superficie fuoco, perimetro neutro dipinto inset 1px, un solo filo minerale inset
+   a sinistra e l'ombra corta sollevata esterna. Nessun discendente eredita il
+   fuoco: una zona, una sola superficie focale. */
+.shell :global([data-lume-focus]) {
+  background: var(--k8-focal) !important;
+  /* Lume F2c geometria: perimetro e filo sono disegnati come ombre inset, non
+     come bordo reale, cosi la geometria del box non cambia fra riposo e attivo e
+     lo scrollspy non provoca reflow scorrendo su wrapper eterogenei (stack ancore
+     #quadro, griglia #indicatori, div nudo #dati). Il bordo proprio del bersaglio
+     diventa trasparente a larghezza invariata: niente 1px in piu, niente doppio
+     filo. Il raggio esplicito evita la cornice quadrata sui wrapper senza raggio. */
+  border-color: transparent !important;
+  border-radius: 22px !important;
+  box-shadow:
+    inset 1px 0 0 var(--k8-accent),
+    inset 0 0 0 1px var(--k8-line-strong),
+    var(--k8-focal-shadow) !important;
 }
 
 @media (max-width: 1180px) {
