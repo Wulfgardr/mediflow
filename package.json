@@ -185,7 +185,7 @@
     "next": "16.2.6",
     "openai": "^6.16.0",
     "pdfjs-dist": "4.10.38",
-    "pm2": "^6.0.14",
+    "pm2": "^7.0.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-dropzone": "^14.3.8",
@@ -196,6 +196,9 @@
     "zod": "^4.2.1"
   },
   "overrides": {
+    "jspdf": {
+      "dompurify": "3.4.12"
+    },
     "next": {
       "postcss": "8.5.10"
     }
@@ -211,7 +214,7 @@
     "drizzle-kit": "^0.31.8",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
-    "js-yaml": "^4.1.1",
+    "js-yaml": "^4.3.0",
     "tailwindcss": "^4",
     "typescript": "5.9.3"
   }
