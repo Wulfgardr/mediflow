@@ -17,10 +17,12 @@ read_when:
 
 Le fondamenta sono solide e usabili in produzione locale.
 
-* **Database solido**: migrazione completa a SQLite cifrato.
+* **Database solido**: migrazione a SQLite autorevole con cifratura lato client
+  dei campi clinici sensibili; il file non è cifrato integralmente.
 * **Privacy locale**: cifratura locale dei dati clinici sensibili e modello senza cloud di default; i claim zero-knowledge forti restano in riallineamento `WUL-342`/`WUL-354`.
 * **AI Locale**: Integrazione di Qwen text-only (sintesi/insight) e DeepSeek OCR via Ollama.
-* **ICD-11**: Diagnosi standardizzate OMS.
+* **ICD-11**: resolver OMS locale opzionale e diagnosi strutturate codificabili;
+  i problemi free-text restano reviewable.
 * **Multi-ambulatorio**: gestione sedi con identificazione visiva rapida.
 
 ---
@@ -32,7 +34,7 @@ Base tecnica più solida, con flussi documentali e contratti locali molto più e
 * **API locale più governata**: baseline OpenAPI `/api/v1`, guard anti-drift e concorrenza ottimistica sui pazienti.
 * **Import clinico più utile**: pipeline OCR-first strutturata e smart import reviewable verso diagnosi ICD-11 e terapie.
 * **Archivio intelligente più operabile**: pulizia per singolo documento o completa, persistenza farmaci estratti e riallineamento dell'insight AI.
-* **Sicurezza e continuita operative**: audit append-only, lockout auth, cambio PIN zero-knowledge, backup artifact/preflight, scheduler notturno e retention automatica.
+* **Sicurezza e continuita operative**: audit append-only, lockout auth, cambio PIN tramite re-wrap client-side della master key, backup artifact/preflight, scheduler notturno e retention automatica.
 * **Compliance locale piu esplicita**: terminology registry locale, baseline GTW/FSE, baseline SISS e pannello prescrizione con handoff controllato.
 * **Stabilizzazione web/core**: `typecheck` canonico, normalizzazione condivisa dei payload paziente e riduzione del carico nei file piu densi.
 

@@ -8,6 +8,8 @@
 > Snapshot storico pre-riordino roadmap.
 
 Questa versione è mantenuta solo come riferimento storico.
+Le formulazioni rischiose sono annotate come superate per non propagarle come
+stato corrente; il resto dello snapshot non viene riallineato retroattivamente.
 Per la versione attiva consulta [docs/ROADMAP.md](./ROADMAP.md).
 
 ---
@@ -17,11 +19,15 @@ Per la versione attiva consulta [docs/ROADMAP.md](./ROADMAP.md).
 Quello che c'è e funziona oggi:
 
 - **Database serio**: Addio IndexedDB, ora uso SQLite. I dati stanno in un file `.db` che posso backuppare.
-- **AI locale vera**: MedGemma gira su Ollama, niente cloud. I dati paziente non escono mai dal computer.
+- **AI locale (claim storico, oggi qualificato)**: il runtime ordinario usa
+  servizi locali senza cloud di default; client paired, cache ed export restano
+  percorsi espliciti del perimetro corrente.
 - **OCR con DeepSeek**: Carico un PDF o una foto di un referto → viene letto e estratto il testo.
 - **Archivio Intelligente**: Ogni documento caricato viene riassunto dall'AI. Vedo gli ultimi 3 nella scheda paziente.
-- **ICD-11**: Le diagnosi usano lo standard WHO ufficiale, non più il vecchio ICD-9.
-- **Cifratura**: Tutto cifrato con AES-256. Senza PIN non si legge nulla, nemmeno io.
+- **ICD-11 (claim storico, oggi qualificato)**: un resolver OMS locale opzionale
+  supporta la codifica; restano diagnosi ICD-9/10/11 e problemi free-text.
+- **Cifratura (claim storico superato)**: lo stato corrente cifra lato client i
+  campi clinici configurati; il file SQLite non è cifrato integralmente.
 - **Multi-ambulatorio**: Posso gestire più sedi/reparti con colori diversi.
 
 ---
@@ -33,7 +39,8 @@ Cose che mi servono per usarlo davvero ogni giorno:
 ### Sicurezza
 
 - **Log degli accessi**: Chi ha visto cosa e quando. Serve per GDPR.
-- **Cambio PIN**: Ora se perdi il PIN perdi tutto. Devo poterlo cambiare.
+- **Cambio PIN (claim storico superato)**: lo snapshot assumeva la perdita totale
+  senza PIN; la semantica corrente va verificata nelle fonti canoniche attive.
 - **Pulizia automatica**: Cancellare dati vecchi dopo X anni (configurabile).
 
 ### Usabilità

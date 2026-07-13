@@ -6,15 +6,19 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const includePublication = process.argv.includes('--include-publication');
 const roots = [
   'README.md', 'ARCHITECTURE.md', 'SECURITY.md', 'CONTRIBUTING.md',
   'docs/README.md', 'docs/markdown-index.md', 'docs/FAQ.md', 'docs/ROADMAP.md',
   'docs/STATE_OF_THE_SYSTEM.md', 'docs/walkthrough.md', 'docs/system_architecture.md',
   'docs/ARCHITETTURA.md', 'docs/COMPLIANCE.md', 'docs/MANUALE.md', 'docs/NATIVE.md',
+  'docs/FSE2-terminology-roadmap.md', 'docs/product_roadmap.md',
   'docs/topologia-dati-flussi.md', 'docs/design',
+  'docs/adr/0006-terminology-plugin-and-fse-profiles.md',
   'docs/adr/0065-intended-purpose-and-claims-guard.md',
-  'app', 'components', 'oss-assets',
+  'app', 'components', 'native', 'oss-assets',
 ];
+const publicationRoots = ['whitepaper'];
 const extensions = new Set(['.md', '.mdx', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.html', '.swift']);
 const skipped = ['.git', '.next', 'node_modules', 'e2e', 'coverage', 'dist', 'out']
   .map((item) => `${path.sep}${item.replaceAll('/', path.sep)}${path.sep}`);
@@ -35,6 +39,21 @@ const rules = [
   ['CLAIM-CLOUD-DEFAULT', 'cloud / privacy',
     'Cloud processing or sync must not be described as default for clinical data.',
     /\b(?:cloud|telemetry|telemetria|AI remot[ao])\b.{0,96}\b(?:default|automatic[ao]|obbligatori[ao]|sempre attiv[ao]|dati clinici|PHI|PII|prompt clinici)/iu],
+  ['CLAIM-FULL-DB-ENCRYPTION', 'encryption / at rest',
+    'Field-level encryption must not be presented as whole-database encryption or zero knowledge.',
+    /(?:\b(?:(?:inter[oa]\s+)?database|file SQLite|SQLite|dati clinici sul disco|tutto)\b.{0,112}\b(?:cifrat[oaie]|illeggibil[ei]|non (?:e|è) leggibil[ei]|non si (?:legge|leggono)|zero[- ]knowledge|zero conoscenza)\b|\b(?:zero[- ]knowledge|zero conoscenza)\b.{0,80}\b(?:a riposo|database|SQLite|attiv[oa]|non negoziabil\w*)\b|\b(?:se\s+)?perdi il PIN\b.{0,48}\bperdi (?:(?:tutti )?i )?dati\b|\b(?:se\s+)?perdi il PIN\b.{0,48}\bperdi tutto\b)/iu],
+  ['CLAIM-FHIR-CONFORMANCE', 'FHIR / interoperability',
+    'FHIR export must not imply conformance, portability, or third-party ingestion without evidence.',
+    /(?:\bFHIR(?: R4)?\b.{0,120}\b(?:compatibil[ei]|conform(?:e|ita|ità)|interoperabil(?:e|ita|ità)|portabilit[aà]|leggibil[ei] da altr[io] sistem\w*|riusabil[ei]|lock-in)|\b(?:compatibil[ei]|conform(?:e|ita|ità)|interoperabil(?:e|ita|ità)|portabilit[aà]|leggibil[ei] da altr[io] sistem\w*|riusabil[ei]|lock-in)\b.{0,120}\bFHIR(?: R4)?\b)/iu],
+  ['CLAIM-GDPR-GUARANTEE', 'GDPR / roles / rights',
+    'Product features must not certify GDPR compliance, assign roles categorically, or guarantee rights.',
+    /(?:\b(?:MediFlow|software|prodotto|feature|funzionalit[aà])\b.{0,120}(?:\b(?:garantisce|certifica|assicura)\b|(?:\be\b|è|\brisulta\b)\s+conforme).{0,120}\b(?:GDPR|conformit[aà]|art(?:icolo|\.)?\s*(?:17|20|32))\b|\b(?:medico|professionista)\b.{0,80}(?:\b(?:resta|e)\b|è).{0,24}\btitolare del trattamento\b|\btitolare del trattamento\b.{0,48}\bresta\b.{0,32}\b(?:medico|professionista)\b|\b(?:diritt[io]|GDPR|art(?:icolo|\.)?\s*(?:17|20|32))\b.{0,96}\b(?:garantit[ioe]|conform[ei]|certificat[oaie]|assicurat[ioe])\b)/iu],
+  ['CLAIM-ONE-DEVICE-ABSOLUTE', 'local-first / topology',
+    'Local-first claims must name home-base and explicit paired, cache, export, or backup paths.',
+    /\b(?:i\s+|tutti i\s+)?dati(?: clinici| paziente)?\b.{0,56}\b(?:non (?:escono|lasciano)(?: mai)?|restano|rimangono|sono nel|stanno sul)\b.{0,64}\b(?:Mac|computer|dispositivo)\b/iu],
+  ['CLAIM-ICD-GUARANTEE', 'ICD / terminology',
+    'Optional terminology support must not imply that every diagnosis is coded or validated.',
+    /(?:\b(?:ogni|tutte le)\s+diagnos[ie]\b.{0,80}\b(?:codic|ICD-11|validat)\w*\b|\bdiagnos[ie]\b.{0,80}\b(?:usano|usa|sempre|solo)\b.{0,40}\bICD-11\b|\bdiagnos[ie]\b.{0,64}\bnon (?:restano|sono)\b.{0,24}\btesto libero\b)/iu],
 ].map(([id, category, description, pattern]) => ({ id, category, description, pattern }));
 
 const allowlist = [
@@ -43,6 +62,14 @@ const allowlist = [
   ['CLAIM-SISS-FSE-INTEGRATION', 'SISS integrato'],
   ['CLAIM-REGIONAL-PRESCRIPTION', 'NRE'],
   ['CLAIM-CLOUD-DEFAULT', 'cloud AI'],
+  ['CLAIM-FULL-DB-ENCRYPTION', 'cifratura integrale del file SQLite'],
+  ['CLAIM-FULL-DB-ENCRYPTION', 'zero-knowledge whole-database'],
+  ['CLAIM-FULL-DB-ENCRYPTION', "zero-knowledge sull'intero database"],
+  ['CLAIM-FHIR-CONFORMANCE', 'compatibilita, conformita, interoperabilita'],
+  ['CLAIM-GDPR-GUARANTEE', 'conformita GDPR certificata'],
+  ['CLAIM-GDPR-GUARANTEE', 'diritti dichiarati garantiti'],
+  ['CLAIM-ONE-DEVICE-ABSOLUTE', 'confinati a un solo dispositivo'],
+  ['CLAIM-ICD-GUARANTEE', 'ogni diagnosi dichiarata obbligatoriamente'],
 ].map(([ruleId, snippet]) => ({
   file: 'docs/adr/0065-intended-purpose-and-claims-guard.md',
   ruleId,
@@ -54,24 +81,22 @@ if (process.argv.includes('--self-test')) runSelfTest();
 else runRepositoryScan();
 
 function runRepositoryScan() {
-  const files = roots.flatMap(collectFiles).sort();
+  const activeRoots = includePublication ? [...roots, ...publicationRoots] : roots;
+  const files = activeRoots.flatMap(collectFiles).sort();
   const findings = [];
 
   for (const file of files) {
-    const lines = fs.readFileSync(path.join(repoRoot, file), 'utf8').split(/\r?\n/);
-    lines.forEach((line, index) => {
-      const context = lines.slice(Math.max(0, index - 5), index + 2).join(' ');
-      for (const rule of matchingRules(line, context)) {
-        const match = rule.pattern.exec(line)?.[0] ?? line;
-        if (!isAllowlisted(file, rule.id, line, match)) {
-          findings.push({ rule, file, line: index + 1, snippet: compact(match) });
-        }
-      }
-    });
+    const source = fs.readFileSync(path.join(repoRoot, file), 'utf8').replaceAll('\r\n', '\n');
+    for (const item of findRuleMatches(source, file)) {
+      if (!isAllowlisted(file, item.rule.id, item.context, item.match)) findings.push(item);
+    }
   }
 
   if (findings.length === 0) {
     console.log(`Claims guard passed: scanned ${files.length} file(s), 0 high-risk claim(s).`);
+    if (!includePublication) {
+      console.log('Phase B dependency: whitepaper/ is not enforced yet; rerun with --include-publication after its copy converges.');
+    }
     return;
   }
   console.error(`Claims guard failed: ${findings.length} high-risk claim(s) need review.`);
@@ -90,30 +115,88 @@ function runSelfTest() {
     ['regional sync claim', 'Il modulo SISS integrato consente writeback e sync certificato.', 'CLAIM-SISS-FSE-INTEGRATION'],
     ['official prescription claim', 'MediFlow genera NRE e invia ricette regionali direttamente.', 'CLAIM-REGIONAL-PRESCRIPTION'],
     ['cloud default claim', 'La cloud AI e attiva di default per prompt clinici e dati PHI.', 'CLAIM-CLOUD-DEFAULT'],
+    ['whole database encryption claim', 'Il database SQLite e cifrato e illeggibile senza PIN.', 'CLAIM-FULL-DB-ENCRYPTION'],
+    ['zero-knowledge invariant claim', 'Architettura local-first e zero-knowledge non negoziabile.', 'CLAIM-FULL-DB-ENCRYPTION'],
+    ['PIN total loss claim', 'Se perdi il PIN, perdi i dati.', 'CLAIM-FULL-DB-ENCRYPTION'],
+    ['PIN everything loss claim', 'Ora se perdi il PIN perdi tutto.', 'CLAIM-FULL-DB-ENCRYPTION'],
+    ['FHIR conformance claim', 'L export FHIR R4 e compatibile e leggibile da altri sistemi.', 'CLAIM-FHIR-CONFORMANCE'],
+    ['FHIR ingestion claim', 'Il bundle FHIR R4 e leggibile da altri sistemi.', 'CLAIM-FHIR-CONFORMANCE'],
+    ['reverse FHIR compatibility claim', 'Viene generato un pacchetto JSON compatibile FHIR R4.', 'CLAIM-FHIR-CONFORMANCE'],
+    ['reverse FHIR interoperability claim', 'Esporta un formato interoperabile FHIR R4.', 'CLAIM-FHIR-CONFORMANCE'],
+    ['GDPR role claim', 'Il professionista resta il titolare del trattamento.', 'CLAIM-GDPR-GUARANTEE'],
+    ['GDPR reverse role claim', 'Il titolare del trattamento resta il professionista.', 'CLAIM-GDPR-GUARANTEE'],
+    ['GDPR conformity claim', 'MediFlow e conforme al GDPR.', 'CLAIM-GDPR-GUARANTEE'],
+    ['single device claim', 'I dati clinici non lasciano mai il dispositivo.', 'CLAIM-ONE-DEVICE-ABSOLUTE'],
+    ['ICD guarantee claim', 'Ogni diagnosi ha un codice ICD-11 validato.', 'CLAIM-ICD-GUARANTEE'],
   ];
   const failures = [];
   for (const [name, line, expected] of required) {
-    const matched = matchingRules(line).map((rule) => rule.id);
+    const matched = findRuleMatches(line, 'self-test.md').map((item) => item.rule.id);
     if (!matched.includes(expected)) failures.push(`${name}: expected ${expected}, got ${matched.join(', ') || 'none'}`);
   }
 
   const allowed = [
     'MediFlow usa handoff webapp-assisted SISS/FSE e non dichiara integrazione certificata.',
     'MediFlow non genera NRE e non invia ricette regionali direttamente.',
+    'MediFlow cifra lato client i campi clinici sensibili; il file SQLite non e cifrato integralmente.',
+    'Il PIN non viene persistito; questo non equivale a zero-knowledge sull intero database.',
+    'MediFlow genera una mappatura FHIR R4 export-only v0 che non attesta conformita completa.',
+    'Le misure tecniche possono supportare il GDPR; ruoli e obblighi dipendono dal deployment.',
+    'Lo storage autorevole resta sul nodo home-base; client paired, cache ed export sono percorsi espliciti.',
+    'Il resolver ICD-11 e opzionale e i problemi free-text restano reviewable.',
+    'Niente telemetria, cloud o egress dati e attivo per default.',
   ];
   for (const line of allowed) {
-    const matched = matchingRules(line).map((rule) => rule.id);
+    const matched = findRuleMatches(line, 'self-test.md').map((item) => item.rule.id);
     if (matched.length > 0) failures.push(`allowed boundary phrase matched ${matched.join(', ')}`);
   }
 
-  const unrelatedContext = 'Non e solo un database locale.\nMediFlow genera NRE e invia ricette regionali direttamente.';
-  const unrelated = matchingRules('MediFlow genera NRE e invia ricette regionali direttamente.', unrelatedContext);
-  if (!unrelated.some((rule) => rule.id === 'CLAIM-REGIONAL-PRESCRIPTION')) {
+  const unrelatedContext = '- I campi clinici sono cifrati lato client.\n- Il database SQLite e cifrato integralmente.';
+  const unrelated = findRuleMatches(unrelatedContext, 'self-test.md');
+  if (!unrelated.some((item) => item.rule.id === 'CLAIM-FULL-DB-ENCRYPTION')) {
+    failures.push('qualification in a previous list item suppressed CLAIM-FULL-DB-ENCRYPTION');
+  }
+
+  const multiline = findRuleMatches('Il database SQLite e\ncifrato integralmente.', 'self-test.md');
+  if (!multiline.some((item) => item.rule.id === 'CLAIM-FULL-DB-ENCRYPTION')) {
+    failures.push('multiline claim bypassed CLAIM-FULL-DB-ENCRYPTION');
+  }
+
+  const linkedTable = findRuleMatches('| [FHIR R4](./spec.md) | formato interoperabile |', 'self-test.md');
+  if (!linkedTable.some((item) => item.rule.id === 'CLAIM-FHIR-CONFORMANCE')) {
+    failures.push('linked Markdown table bypassed CLAIM-FHIR-CONFORMANCE');
+  }
+
+  const uiClaim = findRuleMatches('export const Claim = () => <p>Il database SQLite e cifrato integralmente.</p>;', 'claim.tsx');
+  if (!uiClaim.some((item) => item.rule.id === 'CLAIM-FULL-DB-ENCRYPTION')) {
+    failures.push('UI source bypassed CLAIM-FULL-DB-ENCRYPTION');
+  }
+
+  const unrelatedNegation = findRuleMatches('Non e solo un database locale.\nMediFlow genera NRE e invia ricette regionali direttamente.', 'self-test.md');
+  if (!unrelatedNegation.some((item) => item.rule.id === 'CLAIM-REGIONAL-PRESCRIPTION')) {
     failures.push('unrelated negation suppressed CLAIM-REGIONAL-PRESCRIPTION');
   }
 
+  const contradictoryCases = [
+    ['field qualifier plus whole database claim', 'I campi sono cifrati lato client; il database SQLite e cifrato integralmente.', 'CLAIM-FULL-DB-ENCRYPTION'],
+    ['local-first plus NRE issuance', 'MediFlow e local-first; MediFlow genera NRE e invia ricette regionali.', 'CLAIM-REGIONAL-PRESCRIPTION'],
+    ['telemetry negation plus cloud default', 'Niente telemetria; la cloud AI e attiva di default.', 'CLAIM-CLOUD-DEFAULT'],
+    ['export-only plus FHIR guarantee', 'Mappatura export-only v0; il bundle FHIR R4 e interoperabile.', 'CLAIM-FHIR-CONFORMANCE'],
+    ['home-base alone plus single-device absolute', 'Storage home-base; tutti i dati restano sul computer.', 'CLAIM-ONE-DEVICE-ABSOLUTE'],
+    ['optional resolver plus universal ICD guarantee', 'Resolver opzionale; ogni diagnosi ha un codice ICD-11 validato.', 'CLAIM-ICD-GUARANTEE'],
+    ['support wording plus GDPR conformity', 'Le misure possono supportare il GDPR; MediFlow e conforme al GDPR.', 'CLAIM-GDPR-GUARANTEE'],
+    ['accented GDPR conformity', 'MediFlow è conforme al GDPR.', 'CLAIM-GDPR-GUARANTEE'],
+    ['PIN qualifier plus comma contrast', 'Il PIN non equivale a zero-knowledge, ma il database SQLite è cifrato integralmente.', 'CLAIM-FULL-DB-ENCRYPTION'],
+    ['negative encryption plus comma contrast', 'Il file SQLite non è cifrato integralmente, ma il database SQLite è cifrato integralmente.', 'CLAIM-FULL-DB-ENCRYPTION'],
+    ['accented comma contrast', 'Il PIN non equivale a zero-knowledge, però il database SQLite è cifrato integralmente.', 'CLAIM-FULL-DB-ENCRYPTION'],
+  ];
+  for (const [name, source, expected] of contradictoryCases) {
+    const matched = findRuleMatches(source, 'self-test.md').map((item) => item.rule.id);
+    if (!matched.includes(expected)) failures.push(`${name}: expected ${expected}, got ${matched.join(', ') || 'none'}`);
+  }
+
   if (failures.length === 0) {
-    console.log(`Claims guard self-test passed: ${required.length} synthetic violation(s) detected and allowed boundary wording accepted.`);
+    console.log(`Claims guard self-test passed: ${required.length} synthetic violation(s) and ${contradictoryCases.length} masking regression(s) detected; allowed boundary wording accepted.`);
     return;
   }
   console.error('Claims guard self-test failed:');
@@ -121,33 +204,111 @@ function runSelfTest() {
   process.exit(1);
 }
 
-function matchingRules(line, context = line) {
-  return rules.filter((rule) => {
-    rule.pattern.lastIndex = 0;
-    return rule.pattern.test(line) && !isContextAllowed(rule.id, line, context);
-  });
+function findRuleMatches(source, file) {
+  const scanText = joinWrappedLines(source);
+  const matches = [];
+  for (const rule of rules) {
+    const flags = rule.pattern.flags.includes('g') ? rule.pattern.flags : `${rule.pattern.flags}g`;
+    const clauseBoundedSource = rule.pattern.source.replace(
+      /\.\{0,(\d+)\}/gu,
+      String.raw`(?:(?![.!?](?:\s|$)|;|\n|,\s*(?:(?:ma|tuttavia|mentre)\b|però(?=\s|$))).){0,$1}`,
+    );
+    const pattern = new RegExp(clauseBoundedSource, flags);
+    for (const match of scanText.matchAll(pattern)) {
+      const offset = match.index ?? 0;
+      const context = claimClauseAt(scanText, offset);
+      if (!isContextAllowed(rule.id, match[0], context)) {
+        matches.push({
+          rule,
+          file,
+          line: lineNumberAt(source, offset),
+          match: match[0],
+          context,
+          snippet: compact(match[0]),
+        });
+      }
+    }
+  }
+  return matches;
+}
+
+function joinWrappedLines(source) {
+  const lines = source.split('\n');
+  let inFence = false;
+  return lines.map((line, index) => {
+    const isFence = /^\s*```/u.test(line);
+    const preserveBreak = inFence || isFence;
+    if (isFence) inFence = !inFence;
+    if (index === lines.length - 1) return line;
+    const next = lines[index + 1];
+    return `${line}${!preserveBreak && shouldJoinLine(line, next) ? ' ' : '\n'}`;
+  }).join('');
+}
+
+function shouldJoinLine(line, next) {
+  if (line.trim() === '' || next.trim() === '') return false;
+  return !/^\s*(?:#{1,6}\s|[-*+]\s|\d+[.)]\s|>|\||<\/?[A-Za-z])/u.test(next);
+}
+
+function claimClauseAt(scanText, offset) {
+  const boundaries = [...scanText.matchAll(/[;\n]|[.!?](?=\s|$)|,(?=\s*(?:(?:ma|tuttavia|mentre)\b|però(?=\s|$)))/giu)]
+    .map((match) => match.index ?? 0);
+  const previous = boundaries.filter((position) => position < offset);
+  const following = boundaries.filter((position) => position >= offset);
+  const start = (previous.at(-1) ?? -1) + 1;
+  const end = following[0] ?? scanText.length;
+  return scanText.slice(start, end);
+}
+
+function lineNumberAt(source, offset) {
+  return source.slice(0, offset).split('\n').length;
 }
 
 function isContextAllowed(ruleId, line, context) {
-  if (ruleId === 'CLAIM-AUTO-APPLY') return false;
+  const boundaryText = context.toLocaleLowerCase('it-IT');
+  if (ruleId === 'CLAIM-FULL-DB-ENCRYPTION') {
+    const explicitlyQualified = /\b(?:non\s+presentare|non\s+deve\s+descrivere|non\s+equivale|non\s+rientr\w*|non\s+(?:e|è)\s+cifrat[oa](?:\s+integralmente)?|non\s+sono\s+tutti\s+coperti|non\s+["“]?intero\s+database|senza\s+(?:claim|estendere)|non\s+abilita|finche\b.{0,96}\bperimetro)\b/u.test(boundaryText);
+    const fieldOnly = /\b(?:campi?\b.{0,48}\bcifrat\w*|cifratura\b.{0,32}\bper campo|field-level)\b/u.test(boundaryText)
+      && !/\b(?:integral\w*|intero database|zero[- ]knowledge|zero conoscenza|illeggibil\w*|tutto cifrato)\b/u.test(boundaryText);
+    return explicitlyQualified || fieldOnly;
+  }
+  if (ruleId === 'CLAIM-FHIR-CONFORMANCE') {
+    const qualifiedExport = /\b(?:export-only v0|mappatura export-only)\b/u.test(boundaryText)
+      && /\b(?:senza claim|non (?:attesta|prova|dichiara|garantisce)|nessuna garanzia)\b/u.test(boundaryText);
+    return qualifiedExport || /\bquadro (?:compliance|documentale)\b/u.test(boundaryText);
+  }
+  if (ruleId === 'CLAIM-GDPR-GUARANTEE') {
+    const supportIsQualified = /\b(?:pu[oò]|possono) supportare\b/u.test(boundaryText)
+      && /\b(?:non (?:certifica|prova|assegna)|dipendono dal deployment|valutazione del caso)\b/u.test(boundaryText);
+    return supportIsQualified || /\bnon (?:certifica|prova|assegna)\b/u.test(boundaryText);
+  }
+  if (ruleId === 'CLAIM-ONE-DEVICE-ABSOLUTE') {
+    return /\bhome-base\b/u.test(boundaryText)
+      && /\b(?:client paired|cache|export|backup)\b/u.test(boundaryText);
+  }
+  if (ruleId === 'CLAIM-ICD-GUARANTEE') {
+    if (/\b(?:ogni|tutte le)\s+diagnos[ie]\b/u.test(line.toLocaleLowerCase('it-IT'))) return false;
+    return /\bopzional\w*\b/u.test(boundaryText)
+      && /\b(?:free-text|reviewable|non (?:ogni|tutte))\w*\b/u.test(boundaryText);
+  }
   const text = context.toLocaleLowerCase('it-IT');
   if (hasBoundaryNegation(text)) return true;
   if (ruleId !== 'CLAIM-SISS-FSE-INTEGRATION') return false;
-  return /\b(corpus|documental[ei]|sorgent[ei]|manifest|mcp|fetch\/sync|source sync|siss-corpus:sync|gia sincronizzato|già sincronizzato)\b/iu.test(line);
+  return /\b(corpus|documental[ei]|sorgent[ei]|manifest|mcp|fetch\/sync|source sync|siss-corpus:sync|gia sincronizzato|già sincronizzato)\b/iu.test(context);
 }
 
 function hasBoundaryNegation(text) {
   return /\bnon (?:sono|e|è) ammessi\b/u.test(text)
+    || /\bnon (?:sono|e|è) attiv[io]\b/u.test(text)
+    || /\bnon esiste\b/u.test(text)
     || /\bfallisce se trova\b/u.test(text)
-    || /\bnon (?:dichiara|introduce|usa|invia|genera|automatizza|prescrive|sostituisce|promuove|applica|accetta)\b/u.test(text)
-    || /\bnessun[ao]?\b.{0,64}\b(?:cloud|egress|sync|telemetry|telemetria|writeback|invio|accesso diretto)\b/u.test(text)
+    || /\bnon (?:dichiara|introduce|usa|usare|invia|genera|automatizza|prescrive|sostituisce|promuove|applica|accetta)\b/u.test(text)
+    || /\bnessun[ao]?\b.{0,64}\b(?:cloud|egress|sync|telemetry|telemetria|writeback|invio|accesso diretto|integrazione)\b/u.test(text)
+    || /\bniente\b.{0,64}\b(?:cloud|egress|sync|telemetry|telemetria|writeback|invio|accesso diretto)\b/u.test(text)
     || /\bno\b.{0,64}\b(?:cloud|egress|sync|telemetry|telemetria|writeback|invio|accesso diretto)\b/u.test(text)
     || /\bsenza\b.{0,64}\b(?:cloud|egress|telemetry|telemetria|sync|writeback|adr|canale qualificato|review|conferma|integrazione|auto-write|scritture)\b/u.test(text)
     || /\b(fuori|fuori scope|vieta|vietato|vietata|vietati|vietate|esclude|escluso|esclusa|not)\b/u.test(text)
-    || text.includes('local-first')
-    || text.includes('solo se scelto')
-    || text.includes('solo opt-in')
-    || text.includes('opt-in');
+    || /\b(?:solo se scelto|solo opt-in|opt-in)\b.{0,48}\b(?:cloud|egress|sync|telemetry|telemetria)\b/u.test(text);
 }
 
 function collectFiles(root) {

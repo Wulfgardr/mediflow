@@ -14,7 +14,8 @@ e senza rompere la parita web/native.
 
 ## Contesto
 
-- Architettura local-first e zero-knowledge non negoziabile.
+- Architettura local-first e cifratura client-side dei campi clinici non
+  negoziabili; nessun claim di cifratura whole-database.
 - Contratto condiviso via `/api/v1/*` (ADR 0005).
 - Nessuna dipendenza cloud di default.
 - Evoluzione incrementale, diff piccoli.
