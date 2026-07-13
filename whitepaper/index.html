@@ -23,11 +23,6 @@
   --muted:#5c6772;
   --accent:#33506b;
 
-  /* === Segnali Lume · indipendenti dal registro =================== */
-  --success:#4b6354;
-  --warning:#9a6a2f;
-  --plum:#555161;
-
   /* === Linee 1px e raggi 20/14/10 ================================= */
   --line:rgba(26,28,30,.10);
   --line-strong:rgba(26,28,30,.18);
@@ -657,16 +652,16 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
         </defs>
 
         <!-- LANES -->
-        <rect x="20" y="20" width="280" height="520" rx="20" style="fill:var(--field);stroke:var(--accent)"/>
+        <rect x="20" y="20" width="280" height="520" rx="20" style="fill:var(--field);stroke:var(--muted)"/>
         <text x="36" y="50" style="fill:var(--muted)" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">CLIENT</text>
 
-        <rect x="320" y="20" width="320" height="520" rx="20" style="fill:var(--field);stroke:var(--success)"/>
+        <rect x="320" y="20" width="320" height="520" rx="20" style="fill:var(--field);stroke:var(--muted)"/>
         <text x="336" y="50" style="fill:var(--muted)" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">APPLICAZIONE LOCALE</text>
 
-        <rect x="660" y="20" width="220" height="260" rx="20" style="fill:var(--field);stroke:var(--plum)"/>
+        <rect x="660" y="20" width="220" height="260" rx="20" style="fill:var(--field);stroke:var(--muted)" stroke-dasharray="6 3"/>
         <text x="676" y="50" style="fill:var(--muted)" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">SERVIZI LOCALI</text>
 
-        <rect x="660" y="295" width="420" height="245" rx="20" style="fill:var(--field);stroke:var(--warning)"/>
+        <rect x="660" y="295" width="420" height="245" rx="20" style="fill:var(--field);stroke:var(--muted)"/>
         <text x="676" y="325" style="fill:var(--muted)" font-size="13" font-family="ui-monospace" letter-spacing="1.4" font-weight="600">FILESYSTEM LOCALE</text>
 
         <rect x="900" y="20" width="180" height="260" rx="20" style="fill:var(--field);stroke:var(--muted)" stroke-dasharray="4 4"/>
@@ -675,15 +670,15 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
 
         <!-- CLIENT BOXES -->
         <g font-family="-apple-system,Inter,sans-serif" style="fill:var(--ink)">
-          <rect x="40" y="80" width="240" height="64" rx="14" style="fill:var(--focal);stroke:var(--accent)"/>
+          <rect x="40" y="80" width="240" height="64" rx="14" style="fill:var(--focal);stroke:var(--muted)"/>
           <text x="160" y="108" text-anchor="middle" font-size="14" font-weight="600">Browser web</text>
           <text x="160" y="128" text-anchor="middle" font-size="11" style="fill:var(--muted)">UI clinica · cifratura lato client</text>
 
-          <rect x="40" y="170" width="240" height="64" rx="14" style="fill:var(--focal);stroke:var(--accent)"/>
+          <rect x="40" y="170" width="240" height="64" rx="14" style="fill:var(--focal);stroke:var(--muted)"/>
           <text x="160" y="198" text-anchor="middle" font-size="14" font-weight="600">Client macOS</text>
           <text x="160" y="218" text-anchor="middle" font-size="11" style="fill:var(--muted)">SwiftUI · sessione sicurezza</text>
 
-          <rect x="40" y="260" width="240" height="64" rx="14" style="fill:var(--focal);stroke:var(--accent)" stroke-dasharray="3 3"/>
+          <rect x="40" y="260" width="240" height="64" rx="14" style="fill:var(--focal);stroke:var(--muted)" stroke-dasharray="3 3"/>
           <text x="160" y="288" text-anchor="middle" font-size="14" font-weight="600">iPhone / iPad</text>
           <text x="160" y="308" text-anchor="middle" font-size="11" style="fill:var(--muted)">paired · scrittura limitata</text>
 
@@ -697,61 +692,61 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
 
         <!-- BACKEND BOXES -->
         <g font-family="-apple-system,Inter,sans-serif" style="fill:var(--ink)">
-          <rect x="340" y="80" width="280" height="50" rx="10" style="fill:var(--chrome);stroke:var(--success)"/>
+          <rect x="340" y="80" width="280" height="50" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="480" y="100" text-anchor="middle" font-size="13" font-weight="600">Proxy TLS locale</text>
           <text x="480" y="118" text-anchor="middle" font-size="11" style="fill:var(--muted)">https://127.0.0.1:3443</text>
 
-          <rect x="340" y="150" width="280" height="50" rx="10" style="fill:var(--chrome);stroke:var(--success)"/>
+          <rect x="340" y="150" width="280" height="50" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="480" y="170" text-anchor="middle" font-size="13" font-weight="600">Web API · /api/*</text>
           <text x="480" y="188" text-anchor="middle" font-size="11" style="fill:var(--muted)">sessione cookie</text>
 
-          <rect x="340" y="220" width="280" height="50" rx="10" style="fill:var(--chrome);stroke:var(--success)"/>
+          <rect x="340" y="220" width="280" height="50" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="480" y="240" text-anchor="middle" font-size="13" font-weight="600">Native API · /api/v1/*</text>
           <text x="480" y="258" text-anchor="middle" font-size="11" style="fill:var(--muted)">bearer token versionato</text>
 
-          <rect x="340" y="290" width="280" height="50" rx="10" style="fill:var(--chrome);stroke:var(--success)" stroke-dasharray="3 3"/>
+          <rect x="340" y="290" width="280" height="50" rx="10" style="fill:var(--chrome);stroke:var(--muted)" stroke-dasharray="3 3"/>
           <text x="480" y="310" text-anchor="middle" font-size="13" font-weight="600">Network API · /api/v1/network/*</text>
           <text x="480" y="328" text-anchor="middle" font-size="11" style="fill:var(--muted)">paired · read-only-first</text>
 
-          <rect x="340" y="370" width="280" height="60" rx="10" style="fill:var(--chrome);stroke:var(--success)"/>
+          <rect x="340" y="370" width="280" height="60" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="480" y="394" text-anchor="middle" font-size="13" font-weight="600">Auth · setup / login / lockout</text>
           <text x="480" y="414" text-anchor="middle" font-size="11" style="fill:var(--muted)">5 tentativi · 15 min</text>
 
-          <rect x="340" y="450" width="280" height="60" rx="10" style="fill:var(--chrome);stroke:var(--success)"/>
+          <rect x="340" y="450" width="280" height="60" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="480" y="474" text-anchor="middle" font-size="13" font-weight="600">Audit append-only</text>
           <text x="480" y="494" text-anchor="middle" font-size="11" style="fill:var(--muted)">catalogo eventi limitato</text>
         </g>
 
         <!-- SERVICES -->
         <g font-family="-apple-system,Inter,sans-serif" style="fill:var(--ink)">
-          <rect x="680" y="80" width="180" height="50" rx="10" style="fill:var(--chrome);stroke:var(--plum)"/>
+          <rect x="680" y="80" width="180" height="50" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="770" y="102" text-anchor="middle" font-size="12.5" font-weight="600">Ollama</text>
           <text x="770" y="119" text-anchor="middle" font-size="10.5" style="fill:var(--muted)">AI · OCR · :11434</text>
 
-          <rect x="680" y="150" width="180" height="50" rx="10" style="fill:var(--chrome);stroke:var(--plum)"/>
+          <rect x="680" y="150" width="180" height="50" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="770" y="172" text-anchor="middle" font-size="12.5" font-weight="600">ICD-11 OMS</text>
           <text x="770" y="189" text-anchor="middle" font-size="10.5" style="fill:var(--muted)">docker locale · :8888</text>
 
-          <rect x="680" y="220" width="180" height="50" rx="10" style="fill:var(--chrome);stroke:var(--plum)" stroke-dasharray="3 3"/>
+          <rect x="680" y="220" width="180" height="50" rx="10" style="fill:var(--chrome);stroke:var(--muted)" stroke-dasharray="3 3"/>
           <text x="770" y="242" text-anchor="middle" font-size="12.5" font-weight="600">OpenMed redaction</text>
           <text x="770" y="259" text-anchor="middle" font-size="10.5" style="fill:var(--muted)">shadow · benchmark only</text>
         </g>
 
         <!-- FILESYSTEM -->
         <g font-family="-apple-system,Inter,sans-serif" style="fill:var(--ink)">
-          <rect x="680" y="340" width="180" height="60" rx="10" style="fill:var(--chrome);stroke:var(--warning)"/>
+          <rect x="680" y="340" width="180" height="60" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="770" y="364" text-anchor="middle" font-size="13" font-weight="600">medical.db</text>
           <text x="770" y="384" text-anchor="middle" font-size="11" style="fill:var(--muted)">SQLite cifrato</text>
 
-          <rect x="880" y="340" width="180" height="60" rx="10" style="fill:var(--chrome);stroke:var(--warning)"/>
+          <rect x="880" y="340" width="180" height="60" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="970" y="364" text-anchor="middle" font-size="13" font-weight="600">backup notturno</text>
           <text x="970" y="384" text-anchor="middle" font-size="11" style="fill:var(--muted)">retention configurabile</text>
 
-          <rect x="680" y="420" width="180" height="60" rx="10" style="fill:var(--chrome);stroke:var(--warning)"/>
+          <rect x="680" y="420" width="180" height="60" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="770" y="444" text-anchor="middle" font-size="13" font-weight="600">token API locale</text>
           <text x="770" y="464" text-anchor="middle" font-size="11" style="fill:var(--muted)">permessi 0600</text>
 
-          <rect x="880" y="420" width="180" height="60" rx="10" style="fill:var(--chrome);stroke:var(--warning)"/>
+          <rect x="880" y="420" width="180" height="60" rx="10" style="fill:var(--chrome);stroke:var(--muted)"/>
           <text x="970" y="444" text-anchor="middle" font-size="13" font-weight="600">certificati TLS</text>
           <text x="970" y="464" text-anchor="middle" font-size="11" style="fill:var(--muted)">cert.pem + key.pem</text>
         </g>
@@ -780,11 +775,11 @@ code{ font-family:var(--mono); font-size:.92em; color:var(--accent); background:
         </g>
       </svg>
       <div class="legend">
-        <span><i class="swatch" style="background:var(--accent)"></i>Client</span>
-        <span><i class="swatch" style="background:var(--success)"></i>Applicazione locale</span>
-        <span><i class="swatch" style="background:var(--plum)"></i>Servizi locali (opzionali)</span>
-        <span><i class="swatch" style="background:var(--warning)"></i>Filesystem</span>
-        <span><i class="swatch" style="background:var(--muted)"></i>Rete locale (opt-in)</span>
+        <span><i class="swatch" style="background:var(--muted)"></i>Client</span>
+        <span><i class="swatch" style="background:var(--ink)"></i>Applicazione locale</span>
+        <span><i class="swatch" style="background:transparent;border:1px dashed var(--muted)"></i>Servizi locali (opzionali)</span>
+        <span><i class="swatch" style="background:var(--chrome);border:1px solid var(--muted)"></i>Filesystem</span>
+        <span><i class="swatch" style="background:transparent;border:1px dotted var(--muted)"></i>Rete locale (opt-in)</span>
       </div>
     </div>
 
