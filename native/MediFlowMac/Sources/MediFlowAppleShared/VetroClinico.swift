@@ -86,6 +86,7 @@ public struct StatusBadge: View {
 public struct InfoRow: View {
     private let label: String
     private let value: String
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     public init(_ label: String, _ value: String) {
         self.label = label
@@ -93,14 +94,34 @@ public struct InfoRow: View {
     }
 
     public var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 12)
-            Text(value)
-                .font(.callout)
-                .multilineTextAlignment(.trailing)
+        /* @Codex */
+        Group {
+            if dynamicTypeSize >= .accessibility1 {
+                VStack(alignment: .leading, spacing: 2) {
+                    labelText
+                    valueText
+                        .multilineTextAlignment(.leading)
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline) {
+                    labelText
+                    Spacer(minLength: 12)
+                    valueText
+                        .multilineTextAlignment(.trailing)
+                }
+            }
         }
+    }
+
+    private var labelText: some View {
+        Text(label)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    private var valueText: some View {
+        Text(value)
+            .font(.callout)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

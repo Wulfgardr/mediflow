@@ -125,6 +125,7 @@ struct PairedHomeBaseCredentialsView: View {
 
 /* @Codex */
 struct PairedPatientsWorklistView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var model: PairedPatientsWorkspaceModel
     @Binding var patientQuery: String
     @Binding var patientViewMode: PatientListViewMode
@@ -132,14 +133,20 @@ struct PairedPatientsWorklistView: View {
 
     @ViewBuilder
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text("Consultazione mobile")
-                .font(.headline)
-            Spacer(minLength: 8)
-            Label(model.connectionState.title, systemImage: model.connectionState.symbolName)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(model.connectionState.tintColor)
-                .accessibilityIdentifier("homebase-connection-state")
+        /* @Codex */
+        if dynamicTypeSize >= .accessibility1 {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Consultazione mobile")
+                    .font(.headline)
+                connectionStateLabel
+            }
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text("Consultazione mobile")
+                    .font(.headline)
+                Spacer(minLength: 8)
+                connectionStateLabel
+            }
         }
         Text(model.reconciliationLine)
             .font(.caption)
@@ -215,48 +222,84 @@ struct PairedPatientsWorklistView: View {
                         Button {
                             Task { await model.loadPatient(patient) }
                         } label: {
-                            HStack(spacing: 8) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack(spacing: 6) {
-                                        Text("\(patient.lastName) \(patient.firstName)")
-                                            .font(.subheadline.weight(.semibold))
-                                        if patient.isAdi == true { PairedPatientFlagChip("ADI", tone: .info) }
-                                        if patient.isArchived == true { PairedPatientFlagChip("Archiviato", tone: .neutral) }
-                                    }
-                                    HStack(spacing: 6) {
-                                        Text(patient.taxCode)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                        if let age = PairedPatientsWorkspaceSupport.age(from: patient.birthDate) {
-                                            Text("· \(age) anni")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                                .accessibilityIdentifier("patient-cell-age-\(patient.id)")
-                                        }
-                                    }
-                                }
-                                Spacer(minLength: 8)
-                                VStack(alignment: .trailing, spacing: 4) {
-                                    if let updated = patient.updatedAt {
-                                        Text(PairedPatientsWorkspaceSupport.relativeUpdated(updated))
-                                            .font(.caption2)
-                                            .foregroundStyle(.tertiary)
-                                            .accessibilityIdentifier("patient-cell-updated-\(patient.id)")
-                                    }
-                                    if model.selectedPatient?.id == patient.id {
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption.weight(.semibold))
-                                            .foregroundStyle(.tint)
-                                    }
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            activePatientLabel(patient)
                         }
                         .buttonStyle(.plain)
                         .modifier(LumeRigaListaModifier(isSelected: model.selectedPatient?.id == patient.id))
                         .accessibilityIdentifier("patient-cell-\(patient.id)")
                     }
                 }
+            }
+        }
+    }
+
+    private var connectionStateLabel: some View {
+        Label(model.connectionState.title, systemImage: model.connectionState.symbolName)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(model.connectionState.tintColor)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("homebase-connection-state")
+    }
+
+    @ViewBuilder
+    private func activePatientLabel(_ patient: HomeBasePatientSummary) -> some View {
+        if dynamicTypeSize >= .accessibility1 {
+            VStack(alignment: .leading, spacing: 6) {
+                patientIdentity(patient)
+                patientMetadata(patient)
+                patientUpdate(patient, alignment: .leading)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    patientIdentity(patient)
+                    patientMetadata(patient)
+                }
+                Spacer(minLength: 8)
+                patientUpdate(patient, alignment: .trailing)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func patientIdentity(_ patient: HomeBasePatientSummary) -> some View {
+        HStack(spacing: 6) {
+            Text("\(patient.lastName) \(patient.firstName)")
+                .font(.subheadline.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+            if patient.isAdi == true { PairedPatientFlagChip("ADI", tone: .info) }
+            if patient.isArchived == true { PairedPatientFlagChip("Archiviato", tone: .neutral) }
+        }
+    }
+
+    private func patientMetadata(_ patient: HomeBasePatientSummary) -> some View {
+        HStack(spacing: 6) {
+            Text(patient.taxCode)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if let age = PairedPatientsWorkspaceSupport.age(from: patient.birthDate) {
+                Text("· \(age) anni")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("patient-cell-age-\(patient.id)")
+            }
+        }
+    }
+
+    private func patientUpdate(_ patient: HomeBasePatientSummary, alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 4) {
+            if let updated = patient.updatedAt {
+                Text(PairedPatientsWorkspaceSupport.relativeUpdated(updated))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("patient-cell-updated-\(patient.id)")
+            }
+            if model.selectedPatient?.id == patient.id {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tint)
             }
         }
     }

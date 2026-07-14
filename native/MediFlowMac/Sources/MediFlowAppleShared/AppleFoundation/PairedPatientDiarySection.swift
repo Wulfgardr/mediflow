@@ -2,6 +2,7 @@ import SwiftUI
 
 /* @Codex */
 struct PairedPatientDiarySection: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var model: PairedPatientsWorkspaceModel
     @ObservedObject var capabilities: ClinicalWorkspaceCapabilitiesStore
     @Binding var entryTypeFilter: EntryTypeFilter
@@ -13,7 +14,11 @@ struct PairedPatientDiarySection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
+            /* @Codex */
+            let headerLayout = dynamicTypeSize >= .accessibility1
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
+            headerLayout {
                 VStack(alignment: .leading, spacing: 2) {
                     Label("Diario clinico", systemImage: "list.bullet.clipboard")
                         .font(.subheadline.weight(.semibold))
@@ -21,7 +26,9 @@ struct PairedPatientDiarySection: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                Spacer(minLength: 8)
+                if dynamicTypeSize < .accessibility1 {
+                    Spacer(minLength: 8)
+                }
                 Button {
                     Task { await model.loadSelectedPatientEntries() }
                 } label: {
@@ -74,19 +81,26 @@ struct PairedPatientDiarySection: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(filteredDiaryEntries) { entry in
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(filteredDiaryEntries) { entry in
                     VStack(alignment: .leading, spacing: 4) {
-                        HStack(alignment: .firstTextBaseline) {
+                        let rowHeaderLayout = dynamicTypeSize >= .accessibility1
+                            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+                            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 6))
+                        rowHeaderLayout {
                             Text(entry.title)
                                 .font(.caption.weight(.semibold))
                                 .strikethrough(entry.deletedAt != nil, color: .secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                             if let type = PairedDiaryEntryType(rawValue: entry.type) {
                                 PairedPatientFlagChip(type.title, tone: .info)
                             }
                             if entry.deletedAt != nil {
                                 PairedPatientFlagChip("Eliminata", tone: .attention)
                             }
-                            Spacer(minLength: 8)
+                            if dynamicTypeSize < .accessibility1 {
+                                Spacer(minLength: 8)
+                            }
                             Text(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: entry.date))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
@@ -94,7 +108,8 @@ struct PairedPatientDiarySection: View {
                         Text(ClinicalContentRendering.attributedString(from: entry.content))
                             .font(.caption)
                             .foregroundStyle(entry.deletedAt == nil ? .primary : .secondary)
-                            .lineLimit(4)
+                            .lineLimit(dynamicTypeSize >= .accessibility1 ? nil : 4)
+                            .fixedSize(horizontal: false, vertical: true)
                         // S7 (D4): resolves the entry's referenced attachment ids
                         // against the loaded patient attachment list (S6), same
                         // pairing as the web timeline-entry-card. An id that does
@@ -102,7 +117,10 @@ struct PairedPatientDiarySection: View {
                         // attachment is gone) is simply omitted, never shown raw.
                         let entryAttachments = model.referencedAttachments(for: entry)
                         if !entryAttachments.isEmpty {
-                            HStack(spacing: 6) {
+                            let attachmentLayout = dynamicTypeSize >= .accessibility1
+                                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                                : AnyLayout(HStackLayout(spacing: 6))
+                            attachmentLayout {
                                 Image(systemName: "paperclip")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
@@ -117,7 +135,8 @@ struct PairedPatientDiarySection: View {
                                         Text("\(attachment.name.isEmpty ? "Documento" : attachment.name) (\(attachment.type))")
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
-                                            .lineLimit(1)
+                                            .lineLimit(dynamicTypeSize >= .accessibility1 ? nil : 1)
+                                            .fixedSize(horizontal: false, vertical: true)
                                     }
                                     .buttonStyle(.plain)
                                     .accessibilityIdentifier("entry-row-attachment-\(entry.id)-\(attachment.id)")
@@ -146,7 +165,10 @@ struct PairedPatientDiarySection: View {
                                 .accessibilityIdentifier("homebase-restore-entry-button-\(entry.id)")
                             }
                         } else if model.canMutateEntry(entry) {
-                            HStack(spacing: 8) {
+                            let actionLayout = dynamicTypeSize >= .accessibility1
+                                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                                : AnyLayout(HStackLayout(spacing: 8))
+                            actionLayout {
                                 Button {
                                     model.startEditingEntry(entry)
                                 } label: {
@@ -166,14 +188,17 @@ struct PairedPatientDiarySection: View {
                         }
                     }
                         .padding(.vertical, 6)
+                        .padding(.leading, 14)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .modifier(LumeRigaListaModifier(isSelected: false))
-                        .overlay(alignment: .leading) {
-                            Filo(axis: .vertical, isConnected: true, tone: .minerale)
-                                .frame(width: 2)
-                                .padding(.vertical, 8)
-                        }
                         .accessibilityIdentifier("entry-row-\(entry.id)")
+                    }
+                }
+                .background(alignment: .leading) {
+                    Filo(axis: .vertical, isConnected: true, tone: .minerale)
+                        .frame(width: 2)
+                        .padding(.vertical, 22)
+                        .accessibilityHidden(true)
                 }
             }
 

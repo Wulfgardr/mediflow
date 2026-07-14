@@ -2,6 +2,7 @@ import SwiftUI
 
 /* @Codex */
 struct PairedPatientDetailSection: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var model: PairedPatientsWorkspaceModel
     let detail: HomeBasePatientDetail
     @Binding var patientLifecycleSheet: PatientLifecycleSheet?
@@ -11,71 +12,22 @@ struct PairedPatientDetailSection: View {
     var body: some View {
         let exemptions = ExemptionCodesCodec.decode(detail.exemptions)
         return VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label("Anagrafica", systemImage: "person.text.rectangle")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 8)
-                Button {
-                    model.startEditingPatient()
-                } label: {
-                    Label("Modifica", systemImage: "pencil")
+            /* @Codex */
+            if dynamicTypeSize >= .accessibility1 {
+                VStack(alignment: .leading, spacing: 8) {
+                    patientHeaderTitle
+                    patientHeaderActions
                 }
-                .font(.caption)
-                .disabled(model.isEditingPatient)
-                .accessibilityIdentifier("edit-patient-button")
-                if detail.isArchived == true {
-                    Button {
-                        patientLifecycleSheet = .unarchive
-                    } label: {
-                        Label("Riattiva", systemImage: "archivebox")
-                    }
-                    .font(.caption)
-                    .disabled(!model.canUnarchivePatient)
-                    .accessibilityIdentifier("unarchive-patient-button")
-                } else {
-                    Button {
-                        patientLifecycleSheet = .archive
-                    } label: {
-                        Label("Archivia", systemImage: "archivebox")
-                    }
-                    .font(.caption)
-                    .disabled(!model.canArchivePatient)
-                    .accessibilityIdentifier("archive-patient-button")
+            } else {
+                HStack {
+                    patientHeaderTitle
+                    Spacer(minLength: 8)
+                    patientHeaderActions
                 }
-                Button(role: .destructive) {
-                    patientLifecycleSheet = .delete
-                } label: {
-                    Label("Elimina", systemImage: "trash")
-                }
-                .font(.caption)
-                .disabled(!model.canSoftDeletePatient)
-                .accessibilityIdentifier("soft-delete-patient-button")
-                Button {
-                    confirmsFHIRExport = true
-                } label: {
-                    Label("Esporta FHIR", systemImage: "doc.badge.arrow.up")
-                }
-                .font(.caption)
-                .disabled(!model.canPrepareFHIRExport)
-                .accessibilityIdentifier("patient-export-fhir-button")
-                if let fhirURL = model.patientFHIRExportURL {
-                    ShareLink(item: fhirURL) {
-                        Label("Condividi FHIR", systemImage: "square.and.arrow.up")
-                            .font(.caption)
-                    }
-                    .accessibilityIdentifier("patient-share-fhir-button")
-                }
-                Button {
-                    Task { await model.openPrregHandoff() }
-                } label: {
-                    Label("Prescrittivo regionale", systemImage: "arrow.up.forward.app")
-                }
-                .font(.caption)
-                .accessibilityIdentifier("patient-prreg-handoff-button")
             }
             Text("\(detail.lastName) \(detail.firstName)")
                 .font(.title3.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("patient-detail-name")
             if detail.isAdi == true || detail.isArchived == true {
                 HStack(spacing: 6) {
@@ -154,6 +106,73 @@ struct PairedPatientDetailSection: View {
                 patientEditForm
             }
         }
+    }
+
+    private var patientHeaderTitle: some View {
+        Label("Anagrafica", systemImage: "person.text.rectangle")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+    }
+
+    @ViewBuilder
+    private var patientHeaderActions: some View {
+        Button {
+            model.startEditingPatient()
+        } label: {
+            Label("Modifica", systemImage: "pencil")
+        }
+        .font(.caption)
+        .disabled(model.isEditingPatient)
+        .accessibilityIdentifier("edit-patient-button")
+        if detail.isArchived == true {
+            Button {
+                patientLifecycleSheet = .unarchive
+            } label: {
+                Label("Riattiva", systemImage: "archivebox")
+            }
+            .font(.caption)
+            .disabled(!model.canUnarchivePatient)
+            .accessibilityIdentifier("unarchive-patient-button")
+        } else {
+            Button {
+                patientLifecycleSheet = .archive
+            } label: {
+                Label("Archivia", systemImage: "archivebox")
+            }
+            .font(.caption)
+            .disabled(!model.canArchivePatient)
+            .accessibilityIdentifier("archive-patient-button")
+        }
+        Button(role: .destructive) {
+            patientLifecycleSheet = .delete
+        } label: {
+            Label("Elimina", systemImage: "trash")
+        }
+        .font(.caption)
+        .disabled(!model.canSoftDeletePatient)
+        .accessibilityIdentifier("soft-delete-patient-button")
+        Button {
+            confirmsFHIRExport = true
+        } label: {
+            Label("Esporta FHIR", systemImage: "doc.badge.arrow.up")
+        }
+        .font(.caption)
+        .disabled(!model.canPrepareFHIRExport)
+        .accessibilityIdentifier("patient-export-fhir-button")
+        if let fhirURL = model.patientFHIRExportURL {
+            ShareLink(item: fhirURL) {
+                Label("Condividi FHIR", systemImage: "square.and.arrow.up")
+                    .font(.caption)
+            }
+            .accessibilityIdentifier("patient-share-fhir-button")
+        }
+        Button {
+            Task { await model.openPrregHandoff() }
+        } label: {
+            Label("Prescrittivo regionale", systemImage: "arrow.up.forward.app")
+        }
+        .font(.caption)
+        .accessibilityIdentifier("patient-prreg-handoff-button")
     }
 
     private var patientEditForm: some View {
@@ -350,8 +369,11 @@ struct PairedPatientDetailSection: View {
 
 
     private func signalTile(_ icon: String, _ signal: ClinicalSignalCount, _ label: String) -> some View {
-        VStack(spacing: 2) {
-            HStack(spacing: 4) {
+        let layout = dynamicTypeSize >= .accessibility1
+            ? AnyLayout(HStackLayout(spacing: 6))
+            : AnyLayout(VStackLayout(spacing: 2))
+        return layout {
+            Group {
                 Image(systemName: icon)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -362,6 +384,10 @@ struct PairedPatientDetailSection: View {
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if dynamicTypeSize >= .accessibility1 {
+                Spacer(minLength: 4)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 6)
@@ -382,7 +408,12 @@ struct PairedPatientDetailSection: View {
             .filter { $0.deletedAt == nil && $0.status == "pending" && $0.date >= Date() }
             .min(by: { $0.date < $1.date })
         VStack(alignment: .leading, spacing: 6) {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 84), spacing: 8)], spacing: 8) {
+            LazyVGrid(
+                columns: dynamicTypeSize >= .accessibility1
+                    ? [GridItem(.flexible())]
+                    : [GridItem(.adaptive(minimum: 84), spacing: 8)],
+                spacing: 8
+            ) {
                 signalTile("cross.case", .exact(problemi), "Problemi")
                 signalTile(
                     "pills",
@@ -408,17 +439,30 @@ struct PairedPatientDetailSection: View {
             }
             .accessibilityIdentifier("patient-clinical-signals")
             if let next = nextCheckup {
-                HStack(spacing: 6) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    Text("Prossimo follow-up: \(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: next.date)) · \(next.title)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        nextFollowUpText(next)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        nextFollowUpText(next)
+                    }
                 }
                 .accessibilityIdentifier("patient-next-followup")
             }
         }
+    }
+
+    private func nextFollowUpText(_ next: HomeBaseCheckupSummary) -> some View {
+        Text("Prossimo follow-up: \(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: next.date)) · \(next.title)")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
 }

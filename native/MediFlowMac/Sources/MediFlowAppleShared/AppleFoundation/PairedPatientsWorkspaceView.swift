@@ -3,6 +3,7 @@ import PhotosUI
 
 struct PairedPatientsWorkspaceView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject private var model: PairedPatientsWorkspaceModel
     // S6 (D7-bis): gates the new document surfaces on the effective capability
     // matrix returned for this pairing. The server downgrades host-supported but
@@ -231,6 +232,7 @@ struct PairedPatientsWorkspaceView: View {
                     #if DEBUG
                     if focusedDetailOnly, let detail = model.selectedPatient {
                         selectedPatientSections(detail)
+                            .compactContainerWidth(inset: 40)
                     } else {
                         credentialsCard
                         patientsCard
@@ -241,6 +243,7 @@ struct PairedPatientsWorkspaceView: View {
                     #endif
                 }
                 .padding(20)
+                .compactContainerWidth()
             }
             .safeAreaInset(edge: .top, spacing: 0) {
                 if let detail = model.selectedPatient {
@@ -281,6 +284,7 @@ struct PairedPatientsWorkspaceView: View {
             if let detail = model.selectedPatient {
                 Divider()
                 selectedPatientSections(detail)
+                    .compactContainerWidth(inset: 72)
             }
         }
         .padding(16)
@@ -308,19 +312,36 @@ struct PairedPatientsWorkspaceView: View {
             isCompactPatientHeaderExpanded.toggle()
         } label: {
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 8) {
-                    Text("\(detail.lastName) \(detail.firstName)")
-                        .font(.subheadline.weight(.semibold))
-                    if let birthDate = detail.birthDate {
-                        Text(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birthDate))
-                            .font(.caption)
-                            .registro()
-                            .foregroundStyle(.secondary)
+                /* @Codex */
+                if dynamicTypeSize >= .accessibility1 {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("\(detail.lastName) \(detail.firstName)")
+                                .font(.subheadline.weight(.semibold))
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 8)
+                            compactHeaderChevron
+                        }
+                        if let birthDate = detail.birthDate {
+                            Text(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birthDate))
+                                .font(.caption)
+                                .registro()
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                    Spacer(minLength: 8)
-                    Image(systemName: isCompactPatientHeaderExpanded ? "chevron.up" : "chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                } else {
+                    HStack(spacing: 8) {
+                        Text("\(detail.lastName) \(detail.firstName)")
+                            .font(.subheadline.weight(.semibold))
+                        if let birthDate = detail.birthDate {
+                            Text(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birthDate))
+                                .font(.caption)
+                                .registro()
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 8)
+                        compactHeaderChevron
+                    }
                 }
                 if isCompactPatientHeaderExpanded {
                     Text("Codice fiscale: \(detail.taxCode)")
@@ -334,6 +355,13 @@ struct PairedPatientsWorkspaceView: View {
             .lumeSurface(zone: .focal, cornerRadius: 0)
         }
         .buttonStyle(.plain)
+        .compactContainerWidth()
+    }
+
+    private var compactHeaderChevron: some View {
+        Image(systemName: isCompactPatientHeaderExpanded ? "chevron.up" : "chevron.down")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
     }
 
     @ViewBuilder
@@ -388,6 +416,24 @@ struct PairedPatientsWorkspaceView: View {
                 expandedInsightId: $expandedInsightId
             )
         }
+    }
+}
+
+/* @Codex */
+private extension View {
+    @ViewBuilder
+    func compactContainerWidth(inset: CGFloat = 0) -> some View {
+        #if os(iOS)
+        if #available(iOS 17.0, *) {
+            containerRelativeFrame(.horizontal, alignment: .topLeading) { length, _ in
+                max(0, length - inset)
+            }
+        } else {
+            frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        #else
+        frame(maxWidth: .infinity, alignment: .topLeading)
+        #endif
     }
 }
 

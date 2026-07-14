@@ -78,6 +78,7 @@ struct PairedPatientFlagChip: View {
 
 /* @Codex */
 struct PairedPatientSectionHeader: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var model: PairedPatientsWorkspaceModel
     let title: String
     let subtitle: String
@@ -86,22 +87,41 @@ struct PairedPatientSectionHeader: View {
     let action: () -> Void
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
-                Label(title, systemImage: systemImage)
-                    .font(.subheadline.weight(.semibold))
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+        /* @Codex */
+        Group {
+            if dynamicTypeSize >= .accessibility1 {
+                VStack(alignment: .leading, spacing: 8) {
+                    heading
+                    refreshButton
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline) {
+                    heading
+                    Spacer(minLength: 8)
+                    refreshButton
+                }
             }
-            Spacer(minLength: 8)
-            Button(action: action) {
-                Label("Aggiorna", systemImage: "arrow.clockwise")
-            }
-            .font(.caption)
-            .disabled(model.isWorking || model.selectedPatient == nil)
-            .accessibilityIdentifier(refreshIdentifier)
         }
+    }
+
+    private var heading: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Label(title, systemImage: systemImage)
+                .font(.subheadline.weight(.semibold))
+            Text(subtitle)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var refreshButton: some View {
+        Button(action: action) {
+            Label("Aggiorna", systemImage: "arrow.clockwise")
+        }
+        .font(.caption)
+        .disabled(model.isWorking || model.selectedPatient == nil)
+        .accessibilityIdentifier(refreshIdentifier)
     }
 }
 
@@ -135,23 +155,45 @@ struct PairedPatientFormButtons: View {
 
 /* @Codex */
 struct PairedPatientCounterStrip: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let values: [(String, Int)]
     let identifier: String
 
     var body: some View {
-        HStack(spacing: 8) {
-            ForEach(values, id: \.0) { label, value in
-                VStack(spacing: 2) {
-                    Text("\(value)")
-                        .font(.caption.weight(.semibold))
-                        .monospacedDigit()
-                    Text(label)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+        Group {
+            if dynamicTypeSize >= .accessibility1 {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(values, id: \.0) { label, value in
+                        HStack(spacing: 6) {
+                            Text("\(value)")
+                                .font(.caption.weight(.semibold))
+                                .monospacedDigit()
+                            Text(label)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(minWidth: 58, alignment: .leading)
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 8)
+                        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                    }
                 }
-                .frame(minWidth: 58)
-                .padding(.vertical, 6)
-                .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            } else {
+                HStack(spacing: 8) {
+                    ForEach(values, id: \.0) { label, value in
+                        VStack(spacing: 2) {
+                            Text("\(value)")
+                                .font(.caption.weight(.semibold))
+                                .monospacedDigit()
+                            Text(label)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(minWidth: 58)
+                        .padding(.vertical, 6)
+                        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                    }
+                }
             }
         }
         .accessibilityIdentifier(identifier)
