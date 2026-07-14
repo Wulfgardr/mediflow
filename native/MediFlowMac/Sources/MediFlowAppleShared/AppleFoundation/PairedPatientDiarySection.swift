@@ -106,6 +106,8 @@ struct PairedPatientDiarySection: View {
                                 Image(systemName: "paperclip")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
+                                Filo(axis: .horizontal, isConnected: true, tone: .inkMuted)
+                                    .frame(width: 18, height: 2)
                                 ForEach(entryAttachments) { attachment in
                                     /* @Codex */
                                     Button {
@@ -163,9 +165,15 @@ struct PairedPatientDiarySection: View {
                             }
                         }
                     }
-                    .padding(.vertical, 6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityIdentifier("entry-row-\(entry.id)")
+                        .padding(.vertical, 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .modifier(LumeRigaListaModifier(isSelected: false))
+                        .overlay(alignment: .leading) {
+                            Filo(axis: .vertical, isConnected: true, tone: .minerale)
+                                .frame(width: 2)
+                                .padding(.vertical, 8)
+                        }
+                        .accessibilityIdentifier("entry-row-\(entry.id)")
                 }
             }
 

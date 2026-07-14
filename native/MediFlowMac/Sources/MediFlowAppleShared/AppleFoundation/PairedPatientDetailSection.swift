@@ -86,8 +86,10 @@ struct PairedPatientDetailSection: View {
             patientSignals(detail, exemptionsCount: exemptions.count)
             VStack(alignment: .leading, spacing: 4) {
                 InfoRow("Codice fiscale", detail.taxCode)
+                    .registro()
                 if let birth = detail.birthDate {
                     InfoRow("Data di nascita", PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birth))
+                        .registro()
                 }
                 if let address = cleanedPatientWorkspaceValue(detail.address) { InfoRow("Indirizzo", address) }
                 if let phone = cleanedPatientWorkspaceValue(detail.phone) { InfoRow("Telefono", phone) }
@@ -97,6 +99,7 @@ struct PairedPatientDetailSection: View {
             }
             if !exemptions.isEmpty {
                 InfoRow("Esenzioni", exemptions.joined(separator: " · "))
+                    .registro()
                     .accessibilityIdentifier("patient-detail-exemptions")
             }
             let diagnoses = DiagnosesCodec.decode(detail.diagnoses)
@@ -218,6 +221,7 @@ struct PairedPatientDetailSection: View {
                             HStack(alignment: .firstTextBaseline) {
                                 Text("\(icd.code)  \(icd.description)")
                                     .font(.caption)
+                                    .registro()
                                     .multilineTextAlignment(.leading)
                                 Spacer(minLength: 4)
                                 Image(systemName: "plus.circle")
@@ -256,6 +260,7 @@ struct PairedPatientDetailSection: View {
                     HStack {
                         Text(code)
                             .font(.callout)
+                            .registro()
                         Spacer(minLength: 8)
                         Button(role: .destructive) {
                             model.removeExemption(code)
@@ -328,6 +333,7 @@ struct PairedPatientDetailSection: View {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Text(exemption.code)
                                 .font(.caption.monospaced().weight(.semibold))
+                                .registro()
                             Text(exemption.description)
                                 .font(.caption)
                                 .lineLimit(2)

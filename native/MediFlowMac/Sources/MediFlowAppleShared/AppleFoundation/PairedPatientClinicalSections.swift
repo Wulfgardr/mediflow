@@ -200,6 +200,7 @@ struct PairedPatientClinicalSections: View {
             }
             Text(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: checkup.date))
                 .font(.caption2)
+                .registro()
                 .foregroundStyle(.secondary)
             if let notes = checkup.notes, !notes.isEmpty {
                 Text(notes)
@@ -234,6 +235,7 @@ struct PairedPatientClinicalSections: View {
         }
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(LumeRigaListaModifier(isSelected: false))
     }
 
     /* @Codex */
@@ -252,10 +254,12 @@ struct PairedPatientClinicalSections: View {
                 }
                 Text("\(observation.value) \(observation.unitCode)")
                     .font(.caption2.weight(.semibold))
+                    .registro()
                     .foregroundStyle(observation.deletedAt == nil ? Color.primary : Color.secondary)
             }
             Text("\(observation.codeSystem) \(observation.code) - \(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: observation.observedAt))")
                 .font(.caption2)
+                .registro()
                 .foregroundStyle(.secondary)
             let series = numericObservationSeries(forCode: observation.code)
             if observation.deletedAt == nil, series.count >= 2 {
@@ -302,6 +306,7 @@ struct PairedPatientClinicalSections: View {
         }
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(LumeRigaListaModifier(isSelected: false))
     }
 
     private struct ObservationPoint: Identifiable {
@@ -485,6 +490,7 @@ struct PairedPatientClinicalSections: View {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Text(item.code)
                                 .font(.caption.monospaced().weight(.semibold))
+                                .registro()
                             Text(item.display)
                                 .font(.caption)
                                 .lineLimit(2)

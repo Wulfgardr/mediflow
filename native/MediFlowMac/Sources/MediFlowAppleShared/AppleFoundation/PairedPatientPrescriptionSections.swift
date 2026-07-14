@@ -98,6 +98,7 @@ struct PairedPatientPrescriptionSections: View {
                         .font(.caption.weight(.semibold))
                     Text(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: prescription.prescribedAt))
                         .font(.caption2)
+                        .registro()
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
@@ -114,6 +115,7 @@ struct PairedPatientPrescriptionSections: View {
                 if let code = prescription.serviceCode?.trimmedOrNil {
                     Text(code)
                         .font(.caption2.monospaced().weight(.semibold))
+                        .registro()
                         .foregroundStyle(.secondary)
                 }
             }
@@ -132,6 +134,7 @@ struct PairedPatientPrescriptionSections: View {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("\(item.ordinal).")
                         .font(.caption2.monospaced())
+                        .registro()
                         .foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.serviceName)
@@ -139,6 +142,7 @@ struct PairedPatientPrescriptionSections: View {
                         if let code = item.serviceCode?.trimmedOrNil {
                             Text(code)
                                 .font(.caption2.monospaced())
+                                .registro()
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -176,6 +180,7 @@ struct PairedPatientPrescriptionSections: View {
         }
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(LumeRigaListaModifier(isSelected: false))
     }
 
     /* @Codex */
@@ -287,6 +292,7 @@ struct PairedPatientPrescriptionSections: View {
                 if let iso = prescription.isoCode?.trimmedOrNil {
                     Text(iso)
                         .font(.caption2.monospaced().weight(.semibold))
+                        .registro()
                         .foregroundStyle(.secondary)
                 }
             }
@@ -308,6 +314,7 @@ struct PairedPatientPrescriptionSections: View {
             if let collaudo = prescription.collaudoAt {
                 Text("Collaudo: \(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: collaudo))")
                     .font(.caption2)
+                    .registro()
                     .foregroundStyle(.secondary)
             }
             if let outcome = prescription.collaudoOutcome?.trimmedOrNil {
@@ -326,6 +333,7 @@ struct PairedPatientPrescriptionSections: View {
         }
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(LumeRigaListaModifier(isSelected: false))
     }
 
     /* @Codex */
@@ -402,6 +410,7 @@ struct PairedPatientPrescriptionSections: View {
         ].compactMap { $0 }
         return Text(values.joined(separator: " · "))
             .font(.caption2)
+            .registro()
             .foregroundStyle(.secondary)
             .opacity(values.isEmpty ? 0 : 1)
     }

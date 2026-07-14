@@ -285,6 +285,7 @@ struct VisitDraftComposerView: View {
                 draftReview(draft)
             }
         }
+        .lumeInchiostro(bozza: model.newEntryVisitDraftResponse != nil && !model.newEntryVisitDraftReviewed)
     }
 
     private func draftReview(_ draft: HomeBaseVisitDraftResponse) -> some View {

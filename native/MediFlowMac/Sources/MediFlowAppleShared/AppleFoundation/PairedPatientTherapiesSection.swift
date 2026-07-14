@@ -173,6 +173,7 @@ struct PairedPatientTherapiesSection: View {
             }
             Text(therapy.dosage)
                 .font(.caption)
+                .registro()
                 .foregroundStyle(therapy.deletedAt == nil ? .primary : .secondary)
                 .lineLimit(2)
             if let activePrinciple = therapy.activePrinciple, !activePrinciple.isEmpty {
@@ -186,11 +187,13 @@ struct PairedPatientTherapiesSection: View {
                     if let aic = therapy.aic?.trimmedOrNil {
                         Text("AIC \(aic)")
                             .font(.caption2.monospaced().weight(.semibold))
+                            .registro()
                             .foregroundStyle(.secondary)
                     }
                     if let atc = therapy.atc?.trimmedOrNil {
                         Text("ATC \(atc)")
                             .font(.caption2.monospaced().weight(.semibold))
+                            .registro()
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -203,6 +206,7 @@ struct PairedPatientTherapiesSection: View {
             }
             Text(PairedPatientsWorkspaceSupport.therapyDateLine(for: therapy))
                 .font(.caption2)
+                .registro()
                 .foregroundStyle(.secondary)
             if therapy.deletedAt != nil {
                 Text("Terapia annullata")
@@ -231,6 +235,7 @@ struct PairedPatientTherapiesSection: View {
         }
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(LumeRigaListaModifier(isSelected: false))
     }
 
     /* @Codex */
@@ -378,6 +383,7 @@ struct PairedPatientTherapiesSection: View {
                                     }
                                 }
                                 .font(.caption2.monospaced())
+                                .registro()
                                 .foregroundStyle(.secondary)
                             }
                             Spacer(minLength: 4)
