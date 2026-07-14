@@ -524,11 +524,11 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                 <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div className="min-w-0">
                         <p className="section-kicker">SISS / FSE</p>
-                        <h2 className="mt-1 flex items-center gap-2 text-base font-semibold text-[color:var(--mf-ink)] md:text-[17px]">
-                            <ShieldCheck className="h-4 w-4 text-[color:var(--mf-primary)]" />
+                        <h2 className="mt-1 flex items-center gap-2 text-base font-semibold text-[color:var(--lume-ink)] md:text-[17px]">
+                            <ShieldCheck className="h-4 w-4 text-[color:var(--lume-accent)]" />
                             SISS e FSE
                         </h2>
-                        <p className="mt-1 max-w-2xl text-xs leading-5 text-[color:var(--mf-muted)]">
+                        <p className="mt-1 max-w-2xl text-xs leading-5 text-[color:var(--lume-ink-muted)]">
                             Apertura assistita dei portali regionali ufficiali. L&apos;atto clinico avviene nel portale: qui prepariamo il codice fiscale e mostriamo lo stato locale.
                         </p>
                     </div>
@@ -538,7 +538,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
             )}
 
             {!hasTaxCode && (
-                <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-warning)]">
+                <p className="mt-2 text-[11.5px] font-medium text-[color:var(--lume-signal-warning)]">
                     Le azioni paziente-specifiche richiedono un codice fiscale valido nel profilo; il Menu SISS resta apribile.
                 </p>
             )}
@@ -546,7 +546,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
             <div className="mt-4 grid gap-3 lg:grid-cols-2">
                 <div className="graphite-block">
                     <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                        <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--lume-ink-muted)]">
                             Accesso regionale
                         </h3>
                         <button
@@ -562,7 +562,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                     </div>
 
                     {sessionStatus.error ? (
-                        <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-critical)]">Stato accesso non leggibile in locale.</p>
+                        <p className="mt-2 text-[11.5px] font-medium text-[color:var(--lume-signal-critical)]">Stato accesso non leggibile in locale.</p>
                     ) : sessionData ? (
                         <>
                             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -604,32 +604,32 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
 
                             <dl className="mt-3 grid gap-1">
                                 <div className="graphite-row">
-                                    <dt className="text-[11px] font-medium uppercase tracking-wide text-[color:var(--mf-muted)]">Ultimo modulo</dt>
+                                    <dt className="text-[11px] font-medium uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Ultimo modulo</dt>
                                     <dd className="flex items-center gap-2 text-right">
-                                        <span className="font-semibold text-[color:var(--mf-ink)]">
+                                        <span className="font-semibold text-[color:var(--lume-ink)]">
                                             {sessionData.lastModule ? SISS_SESSION_OBSERVED_MODULE_LABELS[sessionData.lastModule] : '–'}
                                         </span>
-                                        <span className="text-[11px] text-[color:var(--mf-muted)]">{formatObservedAt(sessionData.lastModuleAt)}</span>
+                                        <span className="text-[11px] text-[color:var(--lume-ink-muted)]">{formatObservedAt(sessionData.lastModuleAt)}</span>
                                     </dd>
                                 </div>
                             </dl>
 
-                            <p className="mt-2 text-[10.5px] uppercase tracking-wide text-[color:var(--mf-muted)]">
+                            <p className="mt-2 text-[10.5px] uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                 Stato letto localmente
                             </p>
 
                             {sessionData.warning && (
-                                <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-warning)]">Stato accesso non aggiornato di recente.</p>
+                                <p className="mt-2 text-[11.5px] font-medium text-[color:var(--lume-signal-warning)]">Stato accesso non aggiornato di recente.</p>
                             )}
                         </>
                     ) : (
-                        <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Controllo locale dell&apos;accesso in corso…</p>
+                        <p className="mt-2 text-[11.5px] text-[color:var(--lume-ink-muted)]">Controllo locale dell&apos;accesso in corso…</p>
                     )}
                 </div>
 
                 <div className="graphite-block">
                     <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                        <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--lume-ink-muted)]">
                             Controllo FSE locale
                         </h3>
                         <button
@@ -644,16 +644,16 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                         </button>
                     </div>
 
-                    <p className="mt-1 text-[11.5px] leading-5 text-[color:var(--mf-muted)]">
+                    <p className="mt-1 text-[11.5px] leading-5 text-[color:var(--lume-ink-muted)]">
                         Verifica locale dei dati che servono prima di operare sul fascicolo regionale.
                     </p>
 
                     {fseReadiness.error ? (
-                        <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-critical)]">Controllo FSE non disponibile al momento.</p>
+                        <p className="mt-2 text-[11.5px] font-medium text-[color:var(--lume-signal-critical)]">Controllo FSE non disponibile al momento.</p>
                     ) : validation ? (
                         <dl className="mt-2 grid gap-1">
                             <div className="graphite-row">
-                                <dt className="flex items-center gap-2 text-[11.5px] text-[color:var(--mf-ink)]">
+                                <dt className="flex items-center gap-2 text-[11.5px] text-[color:var(--lume-ink)]">
                                     <span className={`graphite-status-dot ${
                                         validation.therapyMedication.errorCount > 0
                                             ? 'is-stale'
@@ -663,8 +663,8 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                                     }`} aria-hidden />
                                     Terapie
                                 </dt>
-                                <dd className="text-right text-[11px] text-[color:var(--mf-muted)]">
-                                    <span className="font-semibold text-[color:var(--mf-ink)]">{validation.therapyMedication.total} record</span>
+                                <dd className="text-right text-[11px] text-[color:var(--lume-ink-muted)]">
+                                    <span className="font-semibold text-[color:var(--lume-ink)]">{validation.therapyMedication.total} record</span>
                                     {' · '}
                                     <span>{validation.therapyMedication.errorCount} blocchi</span>
                                     {' · '}
@@ -672,7 +672,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                                 </dd>
                             </div>
                             <div className="graphite-row">
-                                <dt className="flex items-center gap-2 text-[11.5px] text-[color:var(--mf-ink)]">
+                                <dt className="flex items-center gap-2 text-[11.5px] text-[color:var(--lume-ink)]">
                                     <span className={`graphite-status-dot ${
                                         validation.observationVitals.errorCount > 0
                                             ? 'is-stale'
@@ -682,8 +682,8 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                                     }`} aria-hidden />
                                     Parametri
                                 </dt>
-                                <dd className="text-right text-[11px] text-[color:var(--mf-muted)]">
-                                    <span className="font-semibold text-[color:var(--mf-ink)]">{validation.observationVitals.total} record</span>
+                                <dd className="text-right text-[11px] text-[color:var(--lume-ink-muted)]">
+                                    <span className="font-semibold text-[color:var(--lume-ink)]">{validation.observationVitals.total} record</span>
                                     {' · '}
                                     <span>{validation.observationVitals.errorCount} blocchi</span>
                                     {' · '}
@@ -696,7 +696,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
             </div>
 
             <div className="mt-4">
-                <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--lume-ink-muted)]">
                     Apri portale regionale
                 </h3>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -718,7 +718,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                                 <div className="siss-action-btn-head">
                                     {isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
                                     <span className="min-w-0 truncate">{item.label}</span>
-                                    <ExternalLink className="ml-auto h-3 w-3 text-[color:var(--mf-muted)]" />
+                                    <ExternalLink className="ml-auto h-3 w-3 text-[color:var(--lume-ink-muted)]" />
                                 </div>
                                 <p className="siss-action-btn-caption line-clamp-1">{item.caption}</p>
                             </button>
@@ -728,20 +728,20 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
             </div>
 
             <div className="mt-4">
-                <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--lume-ink-muted)]">
                     Contesto prescrittivo
                 </h3>
-                <p className="mt-1 text-[11.5px] leading-5 text-[color:var(--mf-muted)]">
+                <p className="mt-1 text-[11.5px] leading-5 text-[color:var(--lume-ink-muted)]">
                     Dati locali del paziente da ritrascrivere o consultare nel portale PRREG. Vista di sola lettura: nessuna scrittura da qui.
                 </p>
 
                 <div className="mt-3 graphite-row">
                     <div className="min-w-0">
-                        <p className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wide text-[color:var(--mf-muted)]">
+                        <p className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                             <IdCard className="h-3.5 w-3.5" />
                             Codice fiscale
                         </p>
-                        <p className="truncate font-semibold text-[color:var(--mf-ink)]">{patientTaxCode?.trim() || 'Non disponibile'}</p>
+                        <p className="truncate font-semibold text-[color:var(--lume-ink)]">{patientTaxCode?.trim() || 'Non disponibile'}</p>
                     </div>
                     <button
                         type="button"
@@ -757,7 +757,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                 <div className="mt-3 grid gap-3 lg:grid-cols-2">
                     <div className="graphite-block">
                         <div className="flex items-center justify-between gap-2">
-                            <h4 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                            <h4 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--lume-ink-muted)]">
                                 <Pill className="h-3.5 w-3.5" />
                                 Terapie attive
                             </h4>
@@ -767,18 +767,18 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                         </div>
 
                         {therapiesQuery.loading && !therapiesQuery.data ? (
-                            <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Caricamento terapie…</p>
+                            <p className="mt-2 text-[11.5px] text-[color:var(--lume-ink-muted)]">Caricamento terapie…</p>
                         ) : therapiesQuery.error ? (
-                            <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-critical)]">Terapie non disponibili in locale.</p>
+                            <p className="mt-2 text-[11.5px] font-medium text-[color:var(--lume-signal-critical)]">Terapie non disponibili in locale.</p>
                         ) : therapiesProjection.active.length === 0 ? (
-                            <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Nessuna terapia attiva.</p>
+                            <p className="mt-2 text-[11.5px] text-[color:var(--lume-ink-muted)]">Nessuna terapia attiva.</p>
                         ) : (
                             <ul className="mt-2 grid gap-1.5">
                                 {therapiesProjection.active.map((therapy) => (
                                     <li key={therapy.id} className="graphite-row">
                                         <div className="min-w-0">
-                                            <p className="truncate font-semibold text-[color:var(--mf-ink)]">{therapy.drugName}</p>
-                                            <p className="text-[11px] text-[color:var(--mf-muted)]">
+                                            <p className="truncate font-semibold text-[color:var(--lume-ink)]">{therapy.drugName}</p>
+                                            <p className="text-[11px] text-[color:var(--lume-ink-muted)]">
                                                 {therapy.dosage}
                                                 {therapy.aic ? ` · AIC ${therapy.aic}` : ''}
                                                 {therapy.atc ? ` · ATC ${therapy.atc}` : ''}
@@ -807,25 +807,25 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
 
                     <div className="graphite-block">
                         <div className="flex items-center justify-between gap-2">
-                            <h4 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                            <h4 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--lume-ink-muted)]">
                                 <ListChecks className="h-3.5 w-3.5" />
                                 Prescrizioni specialistiche recenti
                             </h4>
                         </div>
 
                         {servicePrescriptionsQuery.loading && !servicePrescriptionsQuery.data ? (
-                            <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Caricamento prescrizioni…</p>
+                            <p className="mt-2 text-[11.5px] text-[color:var(--lume-ink-muted)]">Caricamento prescrizioni…</p>
                         ) : servicePrescriptionsQuery.error ? (
-                            <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-critical)]">Prescrizioni non disponibili in locale.</p>
+                            <p className="mt-2 text-[11.5px] font-medium text-[color:var(--lume-signal-critical)]">Prescrizioni non disponibili in locale.</p>
                         ) : recentServicePrescriptions.length === 0 ? (
-                            <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Nessuna prescrizione specialistica recente.</p>
+                            <p className="mt-2 text-[11.5px] text-[color:var(--lume-ink-muted)]">Nessuna prescrizione specialistica recente.</p>
                         ) : (
                             <ul className="mt-2 grid gap-1.5">
                                 {recentServicePrescriptions.map((prescription) => (
                                     <li key={prescription.id} className="graphite-row">
                                         <div className="min-w-0">
-                                            <p className="truncate font-semibold text-[color:var(--mf-ink)]">{prescription.serviceName}</p>
-                                            <p className="truncate text-[11px] text-[color:var(--mf-muted)]">
+                                            <p className="truncate font-semibold text-[color:var(--lume-ink)]">{prescription.serviceName}</p>
+                                            <p className="truncate text-[11px] text-[color:var(--lume-ink-muted)]">
                                                 {formatShortDate(prescription.prescribedAt)}
                                                 {prescription.requestReference ? ` · Rif. ${prescription.requestReference}` : ''}
                                             </p>
@@ -853,18 +853,18 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
 
                     <div className="graphite-block">
                         <div className="flex items-center justify-between gap-2">
-                            <h4 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                            <h4 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--lume-ink-muted)]">
                                 <BadgePercent className="h-3.5 w-3.5" />
                                 Esenzioni
                             </h4>
                         </div>
 
                         {contextPatientQuery.loading && !contextPatientQuery.data ? (
-                            <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Caricamento esenzioni…</p>
+                            <p className="mt-2 text-[11.5px] text-[color:var(--lume-ink-muted)]">Caricamento esenzioni…</p>
                         ) : contextPatientQuery.error ? (
-                            <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-critical)]">Esenzioni non disponibili in locale.</p>
+                            <p className="mt-2 text-[11.5px] font-medium text-[color:var(--lume-signal-critical)]">Esenzioni non disponibili in locale.</p>
                         ) : prescriptiveExemptionCodes.length === 0 ? (
-                            <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Nessuna esenzione registrata.</p>
+                            <p className="mt-2 text-[11.5px] text-[color:var(--lume-ink-muted)]">Nessuna esenzione registrata.</p>
                         ) : (
                             <ul className="mt-2 grid gap-1.5">
                                 {prescriptiveExemptionCodes.map((code) => {
@@ -872,9 +872,9 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                                     return (
                                         <li key={code} className="graphite-row">
                                             <div className="min-w-0">
-                                                <p className="font-semibold text-[color:var(--mf-ink)]">{code}</p>
+                                                <p className="font-semibold text-[color:var(--lume-ink)]">{code}</p>
                                                 {description && (
-                                                    <p className="truncate text-[11px] text-[color:var(--mf-muted)]">{description}</p>
+                                                    <p className="truncate text-[11px] text-[color:var(--lume-ink-muted)]">{description}</p>
                                                 )}
                                             </div>
                                             <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
@@ -900,25 +900,25 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
 
                     <div className="graphite-block">
                         <div className="flex items-center justify-between gap-2">
-                            <h4 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                            <h4 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--lume-ink-muted)]">
                                 <Stethoscope className="h-3.5 w-3.5" />
                                 Diagnosi principali
                             </h4>
                         </div>
 
                         {contextPatientQuery.loading && !contextPatientQuery.data ? (
-                            <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Caricamento diagnosi…</p>
+                            <p className="mt-2 text-[11.5px] text-[color:var(--lume-ink-muted)]">Caricamento diagnosi…</p>
                         ) : contextPatientQuery.error ? (
-                            <p className="mt-2 text-[11.5px] font-medium text-[color:var(--mf-critical)]">Diagnosi non disponibili in locale.</p>
+                            <p className="mt-2 text-[11.5px] font-medium text-[color:var(--lume-signal-critical)]">Diagnosi non disponibili in locale.</p>
                         ) : principalDiagnoses.length === 0 ? (
-                            <p className="mt-2 text-[11.5px] text-[color:var(--mf-muted)]">Nessuna diagnosi registrata.</p>
+                            <p className="mt-2 text-[11.5px] text-[color:var(--lume-ink-muted)]">Nessuna diagnosi registrata.</p>
                         ) : (
                             <ul className="mt-2 grid gap-1.5">
                                 {principalDiagnoses.map((diagnosis, index) => (
                                     <li key={`${diagnosis.code}-${index}`} className="graphite-row">
                                         <div className="min-w-0">
-                                            <p className="truncate font-semibold text-[color:var(--mf-ink)]">{diagnosis.description || diagnosis.code}</p>
-                                            <p className="text-[11px] text-[color:var(--mf-muted)]">
+                                            <p className="truncate font-semibold text-[color:var(--lume-ink)]">{diagnosis.description || diagnosis.code}</p>
+                                            <p className="text-[11px] text-[color:var(--lume-ink-muted)]">
                                                 {diagnosis.code}
                                                 {' · '}
                                                 {formatShortDate(diagnosis.date)}
@@ -933,13 +933,13 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
             </div>
 
             <details className="group mt-4">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-[10px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.78)] px-3 py-2 text-[12.5px] font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,123,104,0.26)] dark:border-[color:rgba(255,247,240,0.08)] dark:bg-white/4">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-[10px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.78)] px-3 py-2 text-[12.5px] font-semibold text-[color:var(--lume-ink)] transition-colors hover:border-[color:color-mix(in_srgb,var(--lume-accent)_26%,transparent)] dark:border-[color:rgba(255,247,240,0.08)] dark:bg-white/4">
                     <span className="flex items-center gap-2">
-                        <ShieldAlert className="h-4 w-4 text-[color:var(--mf-warning)]" />
+                        <ShieldAlert className="h-4 w-4 text-[color:var(--lume-signal-warning)]" />
                         Funzioni non automatiche
                         <span className="graphite-chip graphite-chip-tone-muted">{BLOCKED_CAPABILITIES.length}</span>
                     </span>
-                    <ChevronDown className="h-4 w-4 text-[color:var(--mf-muted)] transition-transform group-open:rotate-180" />
+                    <ChevronDown className="h-4 w-4 text-[color:var(--lume-ink-muted)] transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="mt-2 siss-blocked-list">
                     {BLOCKED_CAPABILITIES.map((item) => (
@@ -950,7 +950,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                         </div>
                     ))}
                 </div>
-                <p className="mt-2 text-[11.5px] leading-5 text-[color:var(--mf-muted)]">
+                <p className="mt-2 text-[11.5px] leading-5 text-[color:var(--lume-ink-muted)]">
                     Queste operazioni restano da svolgere nel portale ufficiale: il percorso regionale certificato non e ancora disponibile in app.
                 </p>
             </details>

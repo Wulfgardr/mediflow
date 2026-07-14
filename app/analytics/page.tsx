@@ -168,7 +168,7 @@ function percent(part: number, total: number) {
 
 function ProgressLine({ value, total, tone }: { value: number; total: number; tone: ToneKey }) {
     return (
-        <div className="mt-4 h-2 w-full overflow-hidden rounded-full" style={{ background: 'var(--k8-line)' }}>
+        <div className="mt-4 h-2 w-full overflow-hidden rounded-full" style={{ background: 'color-mix(in srgb, var(--lume-ink) 12%, transparent)' }}>
             <div
                 className="h-full rounded-full transition-[width] duration-700"
                 style={{ width: `${percent(value, total)}%`, background: K8_TONES[tone].accent }}
@@ -245,7 +245,7 @@ export default function AnalyticsPage() {
                 statusLabel="Sto leggendo dal Mac..."
                 navItems={ANALYTICS_NAV_ITEMS}
             >
-                <div className="patient-detail-section p-6 text-sm" style={{ color: 'var(--k8-muted)' }}>
+                <div className="mf-section p-6 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
                     Sto preparando il cruscotto locale.
                 </div>
             </Kree8WorkspaceShell>
@@ -264,12 +264,12 @@ export default function AnalyticsPage() {
             statusLabel={`${stats.totalInRange} schede in ${normalizedAgeRange[0]}-${normalizedAgeRange[1]} anni · ${stats.withoutBirthDate} senza data nascita`}
             navItems={ANALYTICS_NAV_ITEMS}
         >
-            <section id="popolazione" className="patient-detail-section space-y-5 p-5 scroll-mt-32">
+            <section id="popolazione" className="mf-section lume-focal space-y-5 p-5 scroll-mt-32">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div className="min-w-0">
                         <p className="section-kicker">Popolazione</p>
-                        <h2 className="mt-1 text-xl font-semibold" style={{ color: 'var(--k8-ink)' }}>Filtro età</h2>
-                        <p className="mt-1 text-sm" style={{ color: 'var(--k8-muted)' }}>
+                        <h2 className="mt-1 text-xl font-semibold" style={{ color: 'var(--lume-ink)' }}>Filtro età</h2>
+                        <p className="mt-1 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
                             Il filtro considera le schede attive con data di nascita compilata.
                         </p>
                     </div>
@@ -291,7 +291,7 @@ export default function AnalyticsPage() {
                         <label className="min-w-0">
                             <span className="mf-eyebrow mb-2 flex items-center justify-between gap-3">
                                 <span>Età minima</span>
-                                <strong>{ageRange[0]} anni</strong>
+                                <strong className="lume-registro">{ageRange[0]} anni</strong>
                             </span>
                             <input
                                 type="range"
@@ -307,7 +307,7 @@ export default function AnalyticsPage() {
                         <label className="min-w-0">
                             <span className="mf-eyebrow mb-2 flex items-center justify-between gap-3">
                                 <span>Età massima</span>
-                                <strong>{ageRange[1]} anni</strong>
+                                <strong className="lume-registro">{ageRange[1]} anni</strong>
                             </span>
                             <input
                                 type="range"
@@ -338,11 +338,11 @@ export default function AnalyticsPage() {
             </section>
 
             <section id="indicatori" className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 scroll-mt-32">
-                <div className="patient-detail-side-section p-5" style={{ borderLeft: `3px solid ${K8_TONES.info.accent}` }}>
+                <div className="mf-section p-5">
                     <div className="flex items-start justify-between gap-3">
                         <div>
                             <p className="mf-eyebrow">Schede nel filtro</p>
-                            <p className="mt-2 text-3xl font-semibold" style={{ color: 'var(--k8-ink)' }}>{stats.totalInRange}</p>
+                            <p className="lume-registro mt-2 text-3xl font-semibold" style={{ color: 'var(--lume-ink)' }}>{stats.totalInRange}</p>
                         </div>
                         <Users className="h-7 w-7" style={{ color: K8_TONES.info.accent }} />
                     </div>
@@ -352,11 +352,11 @@ export default function AnalyticsPage() {
                     </p>
                 </div>
 
-                <div className="patient-detail-side-section p-5" style={{ borderLeft: `3px solid ${K8_TONES.warning.accent}` }}>
+                <div className="mf-section p-5">
                     <div className="flex items-start justify-between gap-3">
                         <div>
                             <p className="mf-eyebrow">ADI attive</p>
-                            <p className="mt-2 text-3xl font-semibold" style={{ color: 'var(--k8-ink)' }}>{stats.adiCount}</p>
+                            <p className="lume-registro mt-2 text-3xl font-semibold" style={{ color: 'var(--lume-ink)' }}>{stats.adiCount}</p>
                         </div>
                         <Stethoscope className="h-7 w-7" style={{ color: K8_TONES.warning.accent }} />
                     </div>
@@ -366,11 +366,11 @@ export default function AnalyticsPage() {
                     </p>
                 </div>
 
-                <div className="patient-detail-side-section p-5" style={{ borderLeft: `3px solid ${K8_TONES.success.accent}` }}>
+                <div className="mf-section p-5">
                     <div className="flex items-start justify-between gap-3">
                         <div>
                             <p className="mf-eyebrow">Con diagnosi</p>
-                            <p className="mt-2 text-3xl font-semibold" style={{ color: 'var(--k8-ink)' }}>{stats.withDiagnoses}</p>
+                            <p className="lume-registro mt-2 text-3xl font-semibold" style={{ color: 'var(--lume-ink)' }}>{stats.withDiagnoses}</p>
                         </div>
                         <ClipboardList className="h-7 w-7" style={{ color: K8_TONES.success.accent }} />
                     </div>
@@ -380,11 +380,11 @@ export default function AnalyticsPage() {
                     </p>
                 </div>
 
-                <div className="patient-detail-side-section p-5" style={{ borderLeft: `3px solid ${K8_TONES.critical.accent}` }}>
+                <div className="mf-section p-5">
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                             <p className="mf-eyebrow">Diagnosi più ricorrente</p>
-                            <p className="mt-2 truncate text-base font-semibold" title={topDiagnosis?.description} style={{ color: 'var(--k8-ink)' }}>
+                            <p className="mt-2 truncate text-base font-semibold" title={topDiagnosis?.description} style={{ color: 'var(--lume-ink)' }}>
                                 {topDiagnosis?.description ?? 'Non disponibile'}
                             </p>
                         </div>
@@ -396,22 +396,22 @@ export default function AnalyticsPage() {
                 </div>
             </section>
 
-            <section id="audit" className="patient-detail-section space-y-5 p-5 scroll-mt-32">
+            <section id="audit" className="mf-section space-y-5 p-5 scroll-mt-32">
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                     <div>
                         <p className="section-kicker">Audit</p>
-                        <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold" style={{ color: 'var(--k8-ink)' }}>
+                        <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold" style={{ color: 'var(--lume-ink)' }}>
                             <ShieldCheck className="h-5 w-5" style={{ color: K8_TONES.success.accent }} />
                             Attività locale
                         </h2>
-                        <p className="mt-1 text-sm" style={{ color: 'var(--k8-muted)' }}>
+                        <p className="mt-1 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
                             Log operativo degli ultimi {auditDays} giorni, senza contenuti clinici.
                         </p>
                     </div>
                 </div>
 
                 {auditLoading ? (
-                    <div className="patient-detail-side-section p-4 text-sm" style={{ color: 'var(--k8-muted)' }}>Sto leggendo il tracciato locale...</div>
+                    <div className="mf-section mf-section-tight p-4 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>Sto leggendo il tracciato locale...</div>
                 ) : auditError ? (
                     <div
                         className="flex gap-2 rounded-[18px] border p-4 text-sm"
@@ -438,13 +438,13 @@ export default function AnalyticsPage() {
                             />
                         </div>
 
-                        <div className="patient-detail-side-section p-4 text-sm" style={{ color: 'var(--k8-muted)' }}>
-                            <p className="font-semibold" style={{ color: 'var(--k8-ink)' }}>Esiti e origine</p>
+                        <div className="mf-section mf-section-tight p-4 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
+                            <p className="font-semibold" style={{ color: 'var(--lume-ink)' }}>Esiti e origine</p>
                             <div className="mt-3 flex flex-wrap gap-4">
-                                <span>Completati: <strong>{auditSummary.outcomes.success}</strong></span>
-                                <span>Errori: <strong>{auditSummary.outcomes.failure}</strong></span>
-                                <span>Negati: <strong>{auditSummary.outcomes.denied}</strong></span>
-                                <span>Web/API/Native: <strong>{auditSummary.sourceSurfaces.web}/{auditSummary.sourceSurfaces.api}/{auditSummary.sourceSurfaces.native}</strong></span>
+                                <span>Completati: <strong className="lume-registro">{auditSummary.outcomes.success}</strong></span>
+                                <span>Errori: <strong className="lume-registro">{auditSummary.outcomes.failure}</strong></span>
+                                <span>Negati: <strong className="lume-registro">{auditSummary.outcomes.denied}</strong></span>
+                                <span>Web/API/Native: <strong className="lume-registro">{auditSummary.sourceSurfaces.web}/{auditSummary.sourceSurfaces.api}/{auditSummary.sourceSurfaces.native}</strong></span>
                             </div>
                             {auditSummary.isTruncated && (
                                 <p className="mt-3 text-xs" style={{ color: K8_TONES.warning.accent }}>
@@ -457,9 +457,9 @@ export default function AnalyticsPage() {
             </section>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <section id="eta" className="patient-detail-section p-5 scroll-mt-32">
-                    <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--k8-ink)' }}>
-                        <Clock className="h-5 w-5" style={{ color: 'var(--k8-subtle)' }} />
+                <section id="eta" className="mf-section p-5 scroll-mt-32">
+                    <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--lume-ink)' }}>
+                        <Clock className="h-5 w-5" style={{ color: 'var(--lume-ink-muted)' }} />
                         Fasce d’età
                     </h2>
 
@@ -467,8 +467,8 @@ export default function AnalyticsPage() {
                         {Object.entries(stats.ageDist).map(([range, count]) => (
                             <div key={range}>
                                 <div className="mb-1 flex justify-between gap-4 text-sm">
-                                    <span className="font-medium" style={{ color: 'var(--k8-muted)' }}>{range} anni</span>
-                                    <span className="font-semibold" style={{ color: 'var(--k8-ink)' }}>{count}</span>
+                                    <span className="font-medium" style={{ color: 'var(--lume-ink-muted)' }}>{range} anni</span>
+                                    <span className="lume-registro font-semibold" style={{ color: 'var(--lume-ink)' }}>{count}</span>
                                 </div>
                                 <ProgressLine value={count} total={stats.totalInRange} tone="info" />
                             </div>
@@ -476,8 +476,8 @@ export default function AnalyticsPage() {
                     </div>
                 </section>
 
-                <section id="diagnosi" className="patient-detail-section p-5 scroll-mt-32">
-                    <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--k8-ink)' }}>
+                <section id="diagnosi" className="mf-section p-5 scroll-mt-32">
+                    <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--lume-ink)' }}>
                         <Activity className="h-5 w-5" style={{ color: K8_TONES.critical.accent }} />
                         Diagnosi registrate
                     </h2>
@@ -488,8 +488,8 @@ export default function AnalyticsPage() {
                                 key={diagnosis.key}
                                 className="flex items-center gap-3 rounded-[14px] border p-3"
                                 style={{
-                                    background: 'var(--k8-soft)',
-                                    borderColor: 'var(--k8-line)',
+                                    background: 'var(--lume-surface-field)',
+                                    borderColor: 'color-mix(in srgb, var(--lume-ink) 12%, transparent)',
                                 }}
                             >
                                 <div
@@ -499,16 +499,16 @@ export default function AnalyticsPage() {
                                     {index + 1}
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-medium" style={{ color: 'var(--k8-ink)' }}>{diagnosis.description}</p>
-                                    <p className="text-xs" style={{ color: 'var(--k8-muted)' }}>{diagnosis.system} {diagnosis.code}</p>
+                                    <p className="truncate text-sm font-medium" style={{ color: 'var(--lume-ink)' }}>{diagnosis.description}</p>
+                                    <p className="lume-registro text-xs" style={{ color: 'var(--lume-ink-muted)' }}>{diagnosis.system} {diagnosis.code}</p>
                                 </div>
-                                <div className="text-sm font-semibold" style={{ color: 'var(--k8-muted)' }}>
+                                <div className="lume-registro text-sm font-semibold" style={{ color: 'var(--lume-ink-muted)' }}>
                                     {diagnosis.count} <span className="text-[10px] font-normal">schede</span>
                                 </div>
                             </div>
                         ))}
                         {stats.topDiagnoses.length === 0 && (
-                            <p className="mt-10 text-center text-sm italic" style={{ color: 'var(--k8-muted)' }}>
+                            <p className="mt-10 text-center text-sm italic" style={{ color: 'var(--lume-ink-muted)' }}>
                                 Nessuna diagnosi codificata nel filtro corrente.
                             </p>
                         )}
@@ -534,16 +534,15 @@ function AuditCard({
 
     return (
         <div
-            className="rounded-[18px] p-4"
+            className="rounded-[var(--lume-radius-card)] p-4"
             style={{
-                background: 'var(--k8-surface)',
-                border: '1px solid var(--k8-line)',
-                borderLeft: `3px solid ${palette.accent}`,
-                boxShadow: 'var(--k8-shadow)',
+                background: 'var(--lume-surface-field)',
+                border: '1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent)',
+                boxShadow: 'none',
             }}
         >
             <p className="mf-eyebrow" style={{ color: palette.accent }}>{label}</p>
-            <p className="mt-2 truncate text-2xl font-semibold" title={String(value)} style={{ color: 'var(--k8-ink)' }}>{value}</p>
+            <p className="lume-registro mt-2 truncate text-2xl font-semibold" title={String(value)} style={{ color: 'var(--lume-ink)' }}>{value}</p>
             {note ? <p className="mt-1 text-xs" style={{ color: palette.accent }}>{note}</p> : null}
         </div>
     );

@@ -24,23 +24,23 @@ export default function DocumentViewer({ file, fileName, onClose }: DocumentView
 
     return (
         // @Codex WUL-229: full-screen document viewer reuses specular chrome + vitreous canvas
-        <div className="mf-modal-backdrop p-4 md:p-8 animate-in fade-in duration-200" style={{ zIndex: 100 }}>
+        <div className="mf-modal-backdrop p-4 md:p-8 animate-in fade-in duration-[var(--lume-dur-riga)]" style={{ zIndex: 100 }}>
             <button
                 type="button"
                 aria-label="Chiudi sfondo"
                 className="absolute inset-0 cursor-default"
                 onClick={onClose}
             />
-            <div className="mf-modal-shell relative w-full h-full max-w-6xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="mf-modal-shell lume-overlay-shadow relative w-full h-full max-w-6xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-[var(--lume-dur-fuoco)]">
                 <div className="flex items-center justify-between p-4 graphite-divider">
                     <div className="flex items-center gap-3">
                         <div
                             className="p-2 rounded-xl flex items-center justify-center"
-                            style={{ background: 'rgba(15, 123, 104, 0.12)', color: 'var(--mf-primary)' }}
+                            style={{ background: 'color-mix(in srgb, var(--lume-accent) 12%, var(--lume-surface-field))', color: 'var(--lume-accent)' }}
                         >
                             <FileText className="w-5 h-5" />
                         </div>
-                        <h3 className="font-semibold text-sm md:text-base truncate" style={{ color: 'var(--mf-ink)' }}>{fileName}</h3>
+                        <h3 className="font-semibold text-sm md:text-base truncate" style={{ color: 'var(--lume-ink)' }}>{fileName}</h3>
                     </div>
                     <button
                         onClick={onClose}
@@ -54,7 +54,7 @@ export default function DocumentViewer({ file, fileName, onClose }: DocumentView
 
                 <div
                     className="flex-1 relative"
-                    style={{ background: 'var(--mf-tier-vitreous-bg, rgba(255,252,247,0.55))' }}
+                    style={{ background: 'var(--lume-surface-field)' }}
                 >
                     {url ? (
                         <iframe
@@ -65,7 +65,7 @@ export default function DocumentViewer({ file, fileName, onClose }: DocumentView
                     ) : (
                         <div
                             className="flex items-center justify-center h-full text-sm"
-                            style={{ color: 'var(--mf-muted)' }}
+                            style={{ color: 'var(--lume-ink-muted)' }}
                         >
                             Caricamento anteprima...
                         </div>

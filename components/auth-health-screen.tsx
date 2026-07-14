@@ -72,17 +72,17 @@ export function AuthHealthScreen({
     ].filter(Boolean) as Array<[string, string]>;
 
     return (
-        <div className="h-screen w-screen fixed inset-0 z-[100] bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center p-6">
-            <div className="w-full max-w-2xl rounded-3xl border border-orange-100 bg-white/80 backdrop-blur-xl shadow-2xl p-8 space-y-6">
+        <div className="fixed inset-0 z-[100] flex h-screen w-screen items-center justify-center bg-[color:var(--lume-surface-canvas)] p-6">
+            <div className="lume-focal w-full max-w-2xl space-y-6 rounded-[var(--lume-radius-panel)] border p-8" style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)', background: 'var(--lume-surface-focal)', boxShadow: '0 12px 30px color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}>
                 <div className="flex items-start gap-4">
                     <div className="p-3 rounded-2xl bg-orange-100 text-orange-600">
                         <AlertTriangle className="w-6 h-6" />
                     </div>
                     <div className="space-y-2">
-                        <h1 className="text-2xl font-bold text-gray-800">Problema Database</h1>
-                        <p className="text-sm text-gray-600">{friendlyMessage}</p>
+                        <h1 className="text-2xl font-bold" style={{ color: 'var(--lume-ink)' }}>Problema Database</h1>
+                        <p className="text-sm" style={{ color: 'var(--lume-ink-muted)' }}>{friendlyMessage}</p>
                         {health.error?.code && (
-                            <p className="text-xs text-orange-700 font-mono">Codice: {health.error.code}</p>
+                            <p className="lume-registro text-xs text-orange-700">Codice: {health.error.code}</p>
                         )}
                     </div>
                 </div>
@@ -98,27 +98,27 @@ export function AuthHealthScreen({
                 {/* @Codex */}
                 {remediationCommand && (
                     <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                        <div className="text-xs font-semibold text-gray-600 mb-2">Comando consigliato (esegui manualmente nel terminale)</div>
-                        <code className="block font-mono text-xs text-gray-900 break-all whitespace-pre-wrap select-all">
+                        <div className="mb-2 text-xs font-semibold" style={{ color: 'var(--lume-ink-muted)' }}>Comando consigliato (esegui manualmente nel terminale)</div>
+                        <code className="lume-registro block break-all whitespace-pre-wrap select-all text-xs" style={{ color: 'var(--lume-ink)' }}>
                             {remediationCommand}
                         </code>
-                        <p className="text-[11px] text-gray-500 mt-2">
+                        <p className="mt-2 text-[11px]" style={{ color: 'var(--lume-ink-muted)' }}>
                             Esegui il comando con lo stesso runtime Node usato per avviare MediFlow. Non eseguito automaticamente per sicurezza.
                         </p>
                     </div>
                 )}
 
                 {details.length > 0 && (
-                    <div className="rounded-2xl border border-orange-100 bg-white p-4">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
+                    <div className="rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-field)] p-4" style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 12%, transparent)' }}>
+                        <div className="mb-3 flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>
                             <Database className="w-4 h-4 text-orange-500" />
                             Dettagli locale
                         </div>
-                        <div className="grid grid-cols-1 gap-2 text-xs text-gray-600">
+                        <div className="grid grid-cols-1 gap-2 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                             {details.map(([label, value]) => (
                                 <div key={label} className="flex items-center justify-between gap-4">
-                                    <span className="text-gray-500">{label}</span>
-                                    <span className="font-mono text-gray-800 break-all">{value}</span>
+                                    <span>{label}</span>
+                                    <span className="lume-registro break-all" style={{ color: 'var(--lume-ink)' }}>{value}</span>
                                 </div>
                             ))}
                         </div>
@@ -128,7 +128,7 @@ export function AuthHealthScreen({
                 <div className="flex flex-wrap gap-3">
                     <button
                         onClick={onRetry}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-600 text-white text-sm font-semibold shadow hover:bg-orange-700"
+                        className="ui-btn-primary lume-press px-4 py-2 text-sm"
                     >
                         <RefreshCw className="w-4 h-4" />
                         Riprova controllo
@@ -138,16 +138,16 @@ export function AuthHealthScreen({
                         <button
                             onClick={onRepair}
                             disabled={isRepairing}
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-900 text-white text-sm font-semibold shadow hover:bg-gray-800 disabled:opacity-60"
+                            className="mf-btn-secondary lume-press px-4 py-2 text-sm disabled:opacity-60"
                         >
                             {isRepairing ? 'Ripristino in corso...' : 'Ripristina DB da legacy'}
                         </button>
                     )}
                 </div>
 
-                <p className="text-xs text-gray-500">
+                <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                     Se hai usato strumenti di pulizia, verifica che la cartella dati e il file{' '}
-                    <code className="font-mono text-[11px] text-gray-700">medical.db</code> non siano
+                    <code className="lume-registro text-[11px]" style={{ color: 'var(--lume-ink)' }}>medical.db</code> non siano
                     stati rimossi o spostati. In caso di dubbi, ripristina un backup locale.
                 </p>
             </div>

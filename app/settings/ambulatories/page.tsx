@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { SettingsSectionIntro } from '@/components/settings/settings-ui';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { LumeFilo } from '@/components/ui/lume-filo';
 
 export default function AmbulatoryManagerPage() {
     const { showToast } = useToast();
@@ -137,23 +138,23 @@ export default function AmbulatoryManagerPage() {
                 role="treeitem"
                 aria-selected={node.isDefault}
                 className={cn(
-                    "bg-[color:var(--mf-bg-elevated)] dark:bg-white/6 border rounded-xl p-6 transition-all flex flex-col gap-5 shadow-sm relative md:flex-row md:items-center md:justify-between",
-                    node.isDefault ? "border-[color:rgba(15,123,104,0.38)] shadow-md ring-1 ring-[color:rgba(15,123,104,0.22)]" : "border-[color:rgba(112,106,100,0.14)]",
-                    level > 0 && "ml-8 border-l-4 border-l-[color:rgba(15,123,104,0.18)]"
+                    "bg-[color:var(--lume-surface-focal)] dark:bg-white/6 border rounded-xl p-6 transition-[border-color,background-color,color] flex flex-col gap-5 shadow-sm relative md:flex-row md:items-center md:justify-between",
+                    node.isDefault ? "lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)]" : "border-[color:rgba(112,106,100,0.14)]",
+                    level > 0 && "ml-8"
                 )}
             >
                 {/* Connection Line for hierarchy */}
                 {level > 0 && (
-                    <div className="absolute -left-8 top-1/2 w-8 h-px bg-[color:rgba(112,106,100,0.2)]"></div>
+                    <LumeFilo variant="connettore" fill={100} className="absolute -left-8 top-[calc(50%_-_7px)] h-[14px] w-8" />
                 )}
 
                 <div className="min-w-0 space-y-2">
-                    <h3 className="flex flex-wrap items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)] dark:text-white">
+                    <h3 className="flex flex-wrap items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)] dark:text-white">
                         <span className="min-w-0 truncate">{node.name}</span>
-                        {node.isDefault && <span className="bg-[color:rgba(15,123,104,0.12)] text-[color:var(--mf-primary)] text-xs px-2 py-0.5 rounded-full border border-[color:rgba(15,123,104,0.22)]">Predefinita</span>}
-                        {node.type === 'test' && <span className="bg-[color:rgba(197,138,47,0.14)] text-[color:var(--mf-warning)] text-xs px-2 py-0.5 rounded-full uppercase border border-[color:rgba(197,138,47,0.28)]">Test</span>}
+                        {node.isDefault && <span className="bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink)] text-xs px-2 py-0.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)]">Predefinita</span>}
+                        {node.type === 'test' && <span className="bg-[color:rgba(197,138,47,0.14)] text-[color:var(--lume-signal-warning)] text-xs px-2 py-0.5 rounded-full uppercase border border-[color:rgba(197,138,47,0.28)]">Test</span>}
                     </h3>
-                    <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[color:var(--mf-muted)]">
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[color:var(--lume-ink-muted)]">
                         <span className="inline-flex items-center gap-1 rounded-full border border-[color:rgba(112,106,100,0.12)] bg-white/68 px-2.5 py-1 dark:bg-white/5">
                             <CornerDownRight className="h-3 w-3" />
                             {relationLabel}
@@ -169,7 +170,7 @@ export default function AmbulatoryManagerPage() {
                 <div className="flex flex-wrap items-center gap-2 md:justify-end">
                     <button
                         onClick={() => handleAddChild(node.id)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[color:rgba(15,123,104,0.1)] hover:bg-[color:rgba(15,123,104,0.16)] text-[color:var(--mf-primary)] rounded-lg text-sm font-medium transition-colors border border-[color:rgba(15,123,104,0.22)]"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] hover:bg-[color:color-mix(in_srgb,var(--lume-accent)_12%,var(--lume-surface-field))] text-[color:var(--lume-accent)] rounded-lg text-sm font-medium transition-colors border border-[color:color-mix(in_srgb,var(--lume-accent)_18%,transparent)]"
                         title={`Aggiungi reparto sotto ${node.name}`}
                         aria-label={`Aggiungi reparto sotto ${node.name}`}
                     >
@@ -179,7 +180,7 @@ export default function AmbulatoryManagerPage() {
                     <button
                         onClick={() => handleActivate(node.id)}
                         disabled={node.isDefault}
-                        className="px-3 py-1.5 bg-white/60 dark:bg-white/6 hover:bg-white/80 dark:hover:bg-white/10 border border-[color:rgba(112,106,100,0.14)] text-[color:var(--mf-ink)] rounded-lg text-sm font-medium transition-colors disabled:cursor-default disabled:opacity-60"
+                        className="px-3 py-1.5 bg-white/60 dark:bg-white/6 hover:bg-white/80 dark:hover:bg-white/10 border border-[color:rgba(112,106,100,0.14)] text-[color:var(--lume-ink)] rounded-lg text-sm font-medium transition-colors disabled:cursor-default disabled:opacity-60"
                     >
                         {node.isDefault ? 'Già predefinita' : 'Usa come predefinita'}
                     </button>
@@ -188,7 +189,7 @@ export default function AmbulatoryManagerPage() {
                             onClick={() => handleClear(node.id)}
                             title="Svuota ambiente di test"
                             aria-label="Svuota ambiente di test"
-                            className="px-3 py-1 border border-[color:rgba(163,58,47,0.28)] text-[color:var(--mf-critical)] hover:bg-[color:rgba(163,58,47,0.08)] rounded-lg text-sm font-medium transition-colors"
+                            className="px-3 py-1 border border-[color:rgba(163,58,47,0.28)] text-[color:var(--lume-signal-critical)] hover:bg-[color:rgba(163,58,47,0.08)] rounded-lg text-sm font-medium transition-colors"
                             disabled={isClearing}
                         >
                             Svuota
@@ -197,7 +198,7 @@ export default function AmbulatoryManagerPage() {
                     <button
                         onClick={() => handleDelete(node.id)}
                         aria-label="Elimina sede"
-                        className="p-2 hover:bg-[color:rgba(163,58,47,0.08)] rounded-lg text-[color:var(--mf-critical)]/80 hover:text-[color:var(--mf-critical)] transition-colors"
+                        className="p-2 hover:bg-[color:rgba(163,58,47,0.08)] rounded-lg text-[color:var(--lume-signal-critical)]/80 hover:text-[color:var(--lume-signal-critical)] transition-colors"
                     >
                         <Trash2 className="w-5 h-5" />
                     </button>
@@ -262,23 +263,23 @@ export default function AmbulatoryManagerPage() {
                 title="Sedi e ambulatori"
                 description="Organizza sedi e reparti e scegli la sede predefinita per il lavoro quotidiano."
             />
-            <p className="text-xs" style={{ color: 'var(--mf-muted)' }}>
+            <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                 {isLoading ? 'Caricamento sedi...' : `${ambulatories.length} sedi configurate.`}
             </p>
             <section id="nuova-sede" className={cn(
-                'patient-detail-section mf-section p-6 md:p-8 transition-all',
-                newParentId ? 'border-[color:rgba(15,123,104,0.38)] ring-1 ring-[color:rgba(15,123,104,0.22)]' : 'border-[color:rgba(112,106,100,0.14)]',
+                'patient-detail-section mf-section p-6 md:p-8 transition-[border-color,background-color,color]',
+                newParentId ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)]' : 'border-[color:rgba(112,106,100,0.14)]',
             )}>
                 <div className="mb-6 flex items-center gap-4 border-b border-[color:rgba(112,106,100,0.14)] pb-4">
-                    <div className="p-3 bg-[color:rgba(15,123,104,0.1)] rounded-xl text-[color:var(--mf-primary)]">
+                    <div className="p-3 bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] rounded-xl text-[color:var(--lume-accent)]">
                         <Building2 className="w-6 h-6" />
                     </div>
                     <div>
-                        <h3 className="text-xl font-bold text-[color:var(--mf-ink)] dark:text-white flex items-center gap-2">
+                        <h3 className="text-xl font-bold text-[color:var(--lume-ink)] dark:text-white flex items-center gap-2">
                             Nuova sede o reparto
-                            {selectedParent && <span className="text-sm font-normal bg-[color:rgba(15,123,104,0.1)] text-[color:var(--mf-primary)] px-2 py-1 rounded-full flex items-center gap-1 border border-[color:rgba(15,123,104,0.22)]"><CornerDownRight className="w-3 h-3" /> Reparto di: {selectedParent.name}</span>}
+                            {selectedParent && <span className="text-sm font-normal bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink)] px-2 py-1 rounded-full flex items-center gap-1 border border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)]"><CornerDownRight className="w-3 h-3" /> Reparto di: {selectedParent.name}</span>}
                         </h3>
-                        <p className="text-sm text-[color:var(--mf-muted)]">Aggiungi una sede clinica o un reparto collegato a un contesto esistente.</p>
+                        <p className="text-sm text-[color:var(--lume-ink-muted)]">Aggiungi una sede clinica o un reparto collegato a un contesto esistente.</p>
                     </div>
                 </div>
 
@@ -324,7 +325,7 @@ export default function AmbulatoryManagerPage() {
                             disabled={!newName || isCreating}
                             className="ui-btn-primary flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 text-sm whitespace-nowrap min-w-[120px] justify-center"
                         >
-                            {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                            {isCreating ? <Loader2 className="w-4 h-4" /> : <Plus className="w-4 h-4 mr-2" />}
                             Aggiungi
                         </button>
                     </div>
@@ -334,17 +335,17 @@ export default function AmbulatoryManagerPage() {
             <section id="sedi" className="patient-detail-section mf-section p-6 md:p-8">
                 <div className="mb-5">
                     <p className="section-kicker">Sedi</p>
-                    <h2 className="mt-1 text-xl font-semibold tracking-tight" style={{ color: 'var(--mf-ink)' }}>Sedi configurate</h2>
-                    <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
+                    <h2 className="mt-1 text-xl font-semibold tracking-tight" style={{ color: 'var(--lume-ink)' }}>Sedi configurate</h2>
+                    <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--lume-ink-muted)' }}>
                         La sede predefinita viene usata per i nuovi dati quando non scegli un contesto diverso.
                     </p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
                 {isLoading ? (
-                    <div className="text-center py-10 text-[color:var(--mf-muted)]">Caricamento...</div>
+                    <div className="text-center py-10 text-[color:var(--lume-ink-muted)]">Caricamento...</div>
                 ) : ambulatories.length === 0 ? (
-                    <div className="text-center py-10 bg-[color:rgba(255,249,240,0.5)] dark:bg-white/4 rounded-lg border border-dashed border-[color:rgba(112,106,100,0.2)] text-[color:var(--mf-muted)]">
+                    <div className="text-center py-10 bg-[color:rgba(255,249,240,0.5)] dark:bg-white/4 rounded-lg border border-dashed border-[color:rgba(112,106,100,0.2)] text-[color:var(--lume-ink-muted)]">
                         Nessun ambulatorio configurato.
                     </div>
                 ) : (

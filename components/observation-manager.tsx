@@ -57,7 +57,7 @@ function Sparkline({ values }: { values: number[] }) {
             height={height}
             viewBox={`0 0 ${width} ${height}`}
             aria-hidden="true"
-            className="text-[color:var(--mf-muted)]"
+            className="text-[color:var(--lume-ink-muted)]"
         >
             <polyline
                 points={points}
@@ -299,15 +299,15 @@ export default function ObservationManager({
     };
 
     return (
-        <div className={embedded ? 'space-y-5' : 'patient-detail-section glass-panel border p-6 space-y-5'}>
+        <div className={embedded ? 'space-y-5' : 'patient-detail-section lume-panel border p-6 space-y-5'}>
             {!embedded && (
                 <div>
                     <p className="section-kicker">Parametri</p>
                     <div className="mt-1 flex items-center gap-2">
-                        <Activity className="w-5 h-5 text-[color:var(--mf-muted)]" />
+                        <Activity className="w-5 h-5 text-[color:var(--lume-ink-muted)]" />
                         <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Parametri clinici</h3>
                     </div>
-                    <p className="mt-1 text-xs leading-5 text-[color:var(--mf-muted)]">
+                    <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
                         Valori misurati per il paziente, raggruppati per parametro. La codifica clinica resta visibile come metadata.
                     </p>
                 </div>
@@ -316,7 +316,7 @@ export default function ObservationManager({
             <form onSubmit={saveObservation} className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {servicePrescriptionItemId && servicePrescriptionItem ? (
                     <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-[18px] border border-[color:rgba(15,23,42,0.12)] bg-white/70 px-3.5 py-2.5 dark:border-white/10 dark:bg-white/5">
-                        <span className="text-sm text-[color:var(--mf-ink)] dark:text-slate-100">
+                        <span className="text-sm text-[color:var(--lume-ink)] dark:text-slate-100">
                             Collegata a: <strong>{servicePrescriptionItem.serviceName}</strong> (prescrizione del {new Date(servicePrescriptionItem.prescriptionDate).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })})
                         </span>
                         <button
@@ -325,7 +325,7 @@ export default function ObservationManager({
                                 setServicePrescriptionItemId(undefined);
                                 setServicePrescriptionItem(undefined);
                             }}
-                            className="text-xs font-medium text-[color:var(--mf-muted)] hover:text-[color:var(--mf-ink)] hover:underline"
+                            className="text-xs font-medium text-[color:var(--lume-ink-muted)] hover:text-[color:var(--lume-ink)] hover:underline"
                         >
                             Rimuovi collegamento
                         </button>
@@ -385,7 +385,7 @@ export default function ObservationManager({
                         className="mf-input"
                     />
                     {valueError ? (
-                        <span className="block text-[11px] text-[color:var(--mf-critical)]">{valueError}</span>
+                        <span className="block text-[11px] text-[color:var(--lume-signal-critical)]">{valueError}</span>
                     ) : null}
                 </label>
 
@@ -461,7 +461,7 @@ export default function ObservationManager({
                                 type="button"
                                 aria-pressed={viewMode === 'parametro'}
                                 onClick={() => setViewMode('parametro')}
-                                className={`rounded-full px-3 py-1 font-medium transition-colors ${viewMode === 'parametro' ? 'bg-[color:var(--mf-ink)] text-white' : 'text-[color:var(--mf-muted)] hover:text-[color:var(--mf-ink)]'}`}
+                                className={`rounded-full px-3 py-1 font-medium transition-colors ${viewMode === 'parametro' ? 'bg-[color:var(--lume-ink)] text-white' : 'text-[color:var(--lume-ink-muted)] hover:text-[color:var(--lume-ink)]'}`}
                             >
                                 Per parametro
                             </button>
@@ -469,7 +469,7 @@ export default function ObservationManager({
                                 type="button"
                                 aria-pressed={viewMode === 'data'}
                                 onClick={() => setViewMode('data')}
-                                className={`rounded-full px-3 py-1 font-medium transition-colors ${viewMode === 'data' ? 'bg-[color:var(--mf-ink)] text-white' : 'text-[color:var(--mf-muted)] hover:text-[color:var(--mf-ink)]'}`}
+                                className={`rounded-full px-3 py-1 font-medium transition-colors ${viewMode === 'data' ? 'bg-[color:var(--lume-ink)] text-white' : 'text-[color:var(--lume-ink-muted)] hover:text-[color:var(--lume-ink)]'}`}
                             >
                                 Per data
                             </button>
@@ -481,12 +481,12 @@ export default function ObservationManager({
                         {[0, 1, 2].map((row) => (
                             <div
                                 key={row}
-                                className="h-16 animate-pulse rounded-[18px] border border-slate-200/70 bg-white/60 dark:border-white/10 dark:bg-white/5"
+                                className="mf-skeleton h-16 border border-slate-200/70 dark:border-white/10"
                             />
                         ))}
                     </div>
                 ) : groups.length === 0 ? (
-                    <p className="text-sm italic text-[color:var(--mf-muted)]">
+                    <p className="text-sm italic text-[color:var(--lume-ink-muted)]">
                         Nessun parametro registrato. Usa il modulo qui sopra per registrare la prima misura.
                     </p>
                 ) : viewMode === 'data' ? (
@@ -499,7 +499,7 @@ export default function ObservationManager({
                                 <span className="text-sm font-semibold text-slate-900 dark:text-white">
                                     Misure del {day.date.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}
                                 </span>
-                                <span className="ml-2 text-[11px] text-[color:var(--mf-muted)]">
+                                <span className="ml-2 text-[11px] text-[color:var(--lume-ink-muted)]">
                                     {day.items.length} {day.items.length === 1 ? 'misura' : 'misure'}
                                 </span>
                             </header>
@@ -513,12 +513,12 @@ export default function ObservationManager({
                                                 {italianLoincLabel(item.code, item.display)}
                                             </span>
                                             <span className="inline-flex items-center gap-2">
-                                                <span className={flag ? 'text-sm font-semibold tabular-nums text-[color:var(--mf-critical)]' : 'text-sm tabular-nums text-slate-800 dark:text-slate-100'}>
+                                                <span className={flag ? 'text-sm font-semibold tabular-nums text-[color:var(--lume-signal-critical)]' : 'text-sm tabular-nums text-slate-800 dark:text-slate-100'}>
                                                     {item.value}{item.unitCode ? ` ${item.unitCode}` : ''}
                                                 </span>
                                                 {range ? <span className="text-[10px] text-slate-400 dark:text-slate-500">rif {range}</span> : null}
                                                 {flag ? (
-                                                    <span className="rounded-md bg-[color:rgba(163,58,47,0.12)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--mf-critical)]">
+                                                    <span className="rounded-md bg-[color:rgba(163,58,47,0.12)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--lume-signal-critical)]">
                                                         {flag === 'alto' ? 'Alto' : 'Basso'}
                                                     </span>
                                                 ) : null}
@@ -565,7 +565,7 @@ export default function ObservationManager({
                                             <span className="text-sm font-semibold text-slate-900 dark:text-white">
                                                 {label}
                                             </span>
-                                            <span className="text-[11px] text-[color:var(--mf-muted)]">
+                                            <span className="text-[11px] text-[color:var(--lume-ink-muted)]">
                                                 {group.unitCode} · {group.items.length}{' '}
                                                 {group.items.length === 1 ? 'misura' : 'misure'}
                                             </span>
@@ -576,20 +576,20 @@ export default function ObservationManager({
                                     </span>
                                     <span className="flex shrink-0 items-center gap-2.5">
                                         <Sparkline values={chartValues} />
-                                        <span className={`text-base font-semibold tabular-nums ${classifyObservationRange(latest.value, latest.refLow, latest.refHigh) ? 'text-[color:var(--mf-critical)]' : 'text-slate-900 dark:text-white'}`}>
+                                        <span className={`text-base font-semibold tabular-nums ${classifyObservationRange(latest.value, latest.refLow, latest.refHigh) ? 'text-[color:var(--lume-signal-critical)]' : 'text-slate-900 dark:text-white'}`}>
                                             {latest.value}
                                         </span>
                                         {hasTrend ? (
                                             delta > 0 ? (
-                                                <TrendingUp className="h-4 w-4 text-[color:var(--mf-muted)]" aria-label="in aumento" />
+                                                <TrendingUp className="h-4 w-4 text-[color:var(--lume-ink-muted)]" aria-label="in aumento" />
                                             ) : delta < 0 ? (
-                                                <TrendingDown className="h-4 w-4 text-[color:var(--mf-muted)]" aria-label="in calo" />
+                                                <TrendingDown className="h-4 w-4 text-[color:var(--lume-ink-muted)]" aria-label="in calo" />
                                             ) : (
-                                                <Minus className="h-4 w-4 text-[color:var(--mf-muted)]" aria-label="stabile" />
+                                                <Minus className="h-4 w-4 text-[color:var(--lume-ink-muted)]" aria-label="stabile" />
                                             )
                                         ) : null}
                                         <ChevronDown
-                                            className={`h-4 w-4 text-[color:var(--mf-muted)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                                            className={`h-4 w-4 text-[color:var(--lume-ink-muted)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
                                             aria-hidden
                                         />
                                     </span>
@@ -608,7 +608,7 @@ export default function ObservationManager({
                                                             className="grid grid-cols-[72px_1fr_auto] items-center gap-2 px-3.5 py-1.5"
                                                         >
                                                             <span
-                                                                className="text-xs tabular-nums text-[color:var(--mf-muted)]"
+                                                                className="text-xs tabular-nums text-[color:var(--lume-ink-muted)]"
                                                                 title={new Date(item.observedAt).toLocaleString('it-IT')}
                                                             >
                                                                 {new Date(item.observedAt).toLocaleDateString('it-IT', {
@@ -622,7 +622,7 @@ export default function ObservationManager({
                                                                     <span
                                                                         className={
                                                                             interpretation
-                                                                                ? 'text-sm font-semibold tabular-nums text-[color:var(--mf-critical)]'
+                                                                                ? 'text-sm font-semibold tabular-nums text-[color:var(--lume-signal-critical)]'
                                                                                 : 'text-sm tabular-nums text-slate-800 dark:text-slate-100'
                                                                         }
                                                                     >
@@ -634,14 +634,14 @@ export default function ObservationManager({
                                                                         </span>
                                                                     ) : null}
                                                                     {interpretation ? (
-                                                                        <span className="rounded-md bg-[color:rgba(163,58,47,0.12)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--mf-critical)]">
+                                                                        <span className="rounded-md bg-[color:rgba(163,58,47,0.12)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--lume-signal-critical)]">
                                                                             {interpretation === 'alto' ? 'Alto' : 'Basso'}
                                                                         </span>
                                                                     ) : null}
                                                                 </span>
                                                                 {item.notes ? (
                                                                     <span
-                                                                        className="block truncate text-[11px] italic text-[color:var(--mf-muted)]"
+                                                                        className="block truncate text-[11px] italic text-[color:var(--lume-ink-muted)]"
                                                                         title={item.notes}
                                                                     >
                                                                         {item.notes}
@@ -664,7 +664,7 @@ export default function ObservationManager({
                                                 <button
                                                     type="button"
                                                     onClick={() => prefillGroup(group.code, group.unitCode)}
-                                                    className="text-xs font-medium text-[color:var(--mf-ink)] hover:underline"
+                                                    className="text-xs font-medium text-[color:var(--lume-ink)] hover:underline"
                                                 >
                                                     Registra nuova misura
                                                 </button>
@@ -672,7 +672,7 @@ export default function ObservationManager({
                                                     <button
                                                         type="button"
                                                         onClick={() => toggleFull(group.code)}
-                                                        className="text-xs font-medium text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-ink)]"
+                                                        className="text-xs font-medium text-[color:var(--lume-ink-muted)] transition-colors hover:text-[color:var(--lume-ink)]"
                                                     >
                                                         {isFull ? 'Mostra meno' : `Mostra tutte le ${group.items.length} misure`}
                                                     </button>

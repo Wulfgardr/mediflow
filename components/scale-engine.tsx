@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface ScaleQuestion {
@@ -27,25 +27,17 @@ interface ScaleEngineProps {
 }
 
 function ProgressBar({ progress }: { progress: number }) {
-    const barRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (barRef.current) {
-            barRef.current.style.width = `${progress}%`;
-        }
-    }, [progress]);
-
     return (
         // @Codex WUL-229: progress meter uses MediFlow palette
         <div
             className="mt-6 h-1.5 rounded-full overflow-hidden"
-            style={{ background: 'rgba(112, 106, 100, 0.18)' }}
+            style={{ background: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)' }}
         >
             <div
-                ref={barRef}
-                className="h-full transition-all duration-500 ease-out"
+                className="h-full transition-[width] duration-[var(--lume-dur-firma)] ease-[var(--lume-ease)]"
                 style={{
-                    background: 'linear-gradient(90deg, var(--mf-primary), #2aa37e)'
+                    background: 'var(--lume-accent)',
+                    width: `${progress}%`,
                 }}
             />
         </div>
@@ -93,17 +85,17 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
         // @Codex WUL-273: scale engine can live inside the Kree8 workspace without the old page chrome.
         <div className="patient-detail-section mx-auto flex min-h-[500px] w-full max-w-3xl flex-col overflow-hidden border !p-0">
             <div className="border-b border-[color:rgba(112,106,100,0.12)] p-6">
-                <h2 className="text-2xl font-semibold tracking-tight text-[color:var(--mf-ink)]">{scale.title}</h2>
-                <p className="mt-1 text-sm text-[color:var(--mf-muted)]">{scale.description}</p>
+                <h2 className="text-2xl font-semibold tracking-tight text-[color:var(--lume-ink)]">{scale.title}</h2>
+                <p className="mt-1 text-sm text-[color:var(--lume-ink-muted)]">{scale.description}</p>
 
                 <ProgressBar progress={progress} />
-                <div className="mt-2 text-right text-xs text-[color:var(--mf-muted)]">
+                <div className="mt-2 text-right text-xs text-[color:var(--lume-ink-muted)]">
                     Domanda {currentStep + 1} di {scale.questions.length}
                 </div>
             </div>
 
             <div className="flex flex-1 flex-col justify-center p-6 md:p-8">
-                <h3 className="mb-8 text-xl font-medium leading-relaxed text-[color:var(--mf-ink)]">
+                <h3 className="mb-8 text-xl font-medium leading-relaxed text-[color:var(--lume-ink)]">
                     {currentQuestion.text}
                 </h3>
 
@@ -128,9 +120,9 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
                                 style={
                                     answers[currentQuestion.id] === 0
                                         ? {
-                                            borderColor: 'var(--mf-critical)',
+                                            borderColor: 'var(--lume-signal-critical)',
                                             background: 'rgba(192, 57, 43, 0.08)',
-                                            color: 'var(--mf-critical)'
+                                            color: 'var(--lume-signal-critical)'
                                         }
                                         : undefined
                                 }

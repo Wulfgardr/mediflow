@@ -210,11 +210,11 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                 <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                         <p className="section-kicker">Protesica</p>
-                        <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--mf-ink)]">
-                            <Accessibility className="h-5 w-5 text-[color:var(--mf-primary)]" />
+                        <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--lume-ink)]">
+                            <Accessibility className="h-5 w-5 text-[color:var(--lume-accent)]" />
                             Diario ausili e prescrizioni
                         </h2>
-                        <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
+                        <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--lume-ink-muted)]">
                             Registra cosa è stato prescritto, con codice ISO, misure, documenti prodotti e collaudo. Le voci da allegati restano da revisione operatore.
                         </p>
                     </div>
@@ -225,66 +225,66 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
             {isFormOpen && (
                 <form onSubmit={handleSubmit} className="mb-5 rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 p-4">
                     <div className="grid gap-3 md:grid-cols-2">
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Data prescrizione
-                            <input className="input-field" type="date" value={form.prescribedAt} onChange={(event) => updateForm('prescribedAt', event.target.value)} />
+                            <input className="input-field lume-registro" type="date" value={form.prescribedAt} onChange={(event) => updateForm('prescribedAt', event.target.value)} />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Stato
                             <select className="input-field" value={form.status} onChange={(event) => updateForm('status', event.target.value as ProstheticPrescriptionStatus)}>
                                 {STATUS_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                             </select>
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Tipo
                             <select className="input-field" value={form.category} onChange={(event) => updateForm('category', event.target.value as ProstheticPrescriptionCategory)}>
                                 {CATEGORY_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                             </select>
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Codice ISO
-                            <input className="input-field" value={form.isoCode} onChange={(event) => updateForm('isoCode', event.target.value)} placeholder="es. 12.22.03.006" />
+                            <input className="input-field lume-registro" value={form.isoCode} onChange={(event) => updateForm('isoCode', event.target.value)} placeholder="es. 12.22.03.006" />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)] md:col-span-2">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)] md:col-span-2">
                             Descrizione ausilio <span aria-hidden className="text-rose-600">*</span>
                             <input className="input-field" value={form.description} onChange={(event) => updateForm('description', event.target.value)} placeholder="Carrozzina ad autospinta..." aria-required="true" />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Misure / configurazione
                             <textarea className="input-field min-h-24" value={form.measures} onChange={(event) => updateForm('measures', event.target.value)} />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Motivazione clinico-funzionale
                             <textarea className="input-field min-h-24" value={form.clinicalReason} onChange={(event) => updateForm('clinicalReason', event.target.value)} />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Numero pratica / prescrizione
-                            <input className="input-field" value={form.regionalPrescriptionId} onChange={(event) => updateForm('regionalPrescriptionId', event.target.value)} />
+                            <input className="input-field lume-registro" value={form.regionalPrescriptionId} onChange={(event) => updateForm('regionalPrescriptionId', event.target.value)} />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Fornitore / struttura
                             <input className="input-field" value={form.supplier} onChange={(event) => updateForm('supplier', event.target.value)} />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Data collaudo
-                            <input className="input-field" type="date" value={form.collaudoAt} onChange={(event) => updateForm('collaudoAt', event.target.value)} />
+                            <input className="input-field lume-registro" type="date" value={form.collaudoAt} onChange={(event) => updateForm('collaudoAt', event.target.value)} />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Esito collaudo
                             <input className="input-field" value={form.collaudoOutcome} onChange={(event) => updateForm('collaudoOutcome', event.target.value)} />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Origine
                             <select className="input-field" value={form.source} onChange={(event) => updateForm('source', event.target.value as FormState['source'])}>
                                 <option value="manual">Manuale</option>
                                 <option value="document_review">Da documento revisionato</option>
                             </select>
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Allegati / riferimenti
                             <input className="input-field" value={form.documentRefs} onChange={(event) => updateForm('documentRefs', event.target.value)} placeholder="ID allegato, nome file o riferimento pratica" />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)] md:col-span-2">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)] md:col-span-2">
                             Note operative
                             <textarea className="input-field min-h-20" value={form.notes} onChange={(event) => updateForm('notes', event.target.value)} />
                         </label>
@@ -302,7 +302,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
 
             {!prescriptions ? null : prescriptions.length === 0 ? (
                 <div className="rounded-[18px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-6 text-center">
-                    <p className="text-sm text-[color:var(--mf-muted)]">
+                    <p className="text-sm text-[color:var(--lume-ink-muted)]">
                         Nessuna prescrizione protesica registrata per questo paziente.
                     </p>
                 </div>
@@ -315,23 +315,23 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                     <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <span className="apple-chip">{new Date(item.prescribedAt).toLocaleDateString('it-IT')}</span>
+                                            <span className="apple-chip lume-registro">{new Date(item.prescribedAt).toLocaleDateString('it-IT')}</span>
                                             <span className="apple-chip">{statusLabel(item.status)}</span>
                                             <span className="apple-chip">{categoryLabel(item.category)}</span>
                                             {item.source === 'document_review' && <span className="apple-chip">document-backed</span>}
                                         </div>
-                                        <h3 className="mt-3 text-base font-semibold text-[color:var(--mf-ink)]">{item.description}</h3>
-                                        <div className="mt-2 grid gap-2 text-sm text-[color:var(--mf-muted)] md:grid-cols-2">
-                                            {item.isoCode && <p><span className="font-semibold text-[color:var(--mf-ink)]">ISO:</span> {item.isoCode}</p>}
-                                            {item.regionalPrescriptionId && <p><span className="font-semibold text-[color:var(--mf-ink)]">Pratica:</span> {item.regionalPrescriptionId}</p>}
-                                            {item.measures && <p><span className="font-semibold text-[color:var(--mf-ink)]">Misure:</span> {item.measures}</p>}
-                                            {item.clinicalReason && <p><span className="font-semibold text-[color:var(--mf-ink)]">Motivo:</span> {item.clinicalReason}</p>}
-                                            {item.supplier && <p><span className="font-semibold text-[color:var(--mf-ink)]">Fornitore:</span> {item.supplier}</p>}
-                                            {item.collaudoAt && <p><span className="font-semibold text-[color:var(--mf-ink)]">Collaudo:</span> {new Date(item.collaudoAt).toLocaleDateString('it-IT')}</p>}
+                                        <h3 className="mt-3 text-base font-semibold text-[color:var(--lume-ink)]">{item.description}</h3>
+                                        <div className="mt-2 grid gap-2 text-sm text-[color:var(--lume-ink-muted)] md:grid-cols-2">
+                                            {item.isoCode && <p><span className="font-semibold text-[color:var(--lume-ink)]">ISO:</span> <span className="lume-registro">{item.isoCode}</span></p>}
+                                            {item.regionalPrescriptionId && <p><span className="font-semibold text-[color:var(--lume-ink)]">Pratica:</span> <span className="lume-registro">{item.regionalPrescriptionId}</span></p>}
+                                            {item.measures && <p><span className="font-semibold text-[color:var(--lume-ink)]">Misure:</span> {item.measures}</p>}
+                                            {item.clinicalReason && <p><span className="font-semibold text-[color:var(--lume-ink)]">Motivo:</span> {item.clinicalReason}</p>}
+                                            {item.supplier && <p><span className="font-semibold text-[color:var(--lume-ink)]">Fornitore:</span> {item.supplier}</p>}
+                                            {item.collaudoAt && <p><span className="font-semibold text-[color:var(--lume-ink)]">Collaudo:</span> <span className="lume-registro">{new Date(item.collaudoAt).toLocaleDateString('it-IT')}</span></p>}
                                         </div>
-                                        {item.collaudoOutcome && <p className="mt-2 text-sm text-[color:var(--mf-muted)]">{item.collaudoOutcome}</p>}
+                                        {item.collaudoOutcome && <p className="mt-2 text-sm text-[color:var(--lume-ink-muted)]">{item.collaudoOutcome}</p>}
                                         <DocumentReferenceChip references={refs} />
-                                        {item.notes && <p className="mt-3 text-sm leading-6 text-[color:var(--mf-muted)]">{item.notes}</p>}
+                                        {item.notes && <p className="mt-3 text-sm leading-6 text-[color:var(--lume-ink-muted)]">{item.notes}</p>}
                                     </div>
                                     <div className="flex shrink-0 gap-2">
                                         {item.status !== 'tested' && (

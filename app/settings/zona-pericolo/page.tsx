@@ -93,7 +93,7 @@ export default function SettingsDangerZonePage() {
                         onClick={resetOnboarding}
                         disabled={!confirmed || isResetting}
                         data-testid="danger-zone-reset-button"
-                        className="inline-flex items-center justify-center gap-2 rounded-full border border-red-300 bg-white px-4 py-2 text-xs font-bold text-red-600 shadow-sm transition-[border-color,background-color,color,box-shadow] hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-red-600 dark:border-red-500/30 dark:bg-red-950/10 dark:text-red-200 dark:hover:bg-red-600 dark:disabled:hover:bg-red-950/10 dark:disabled:hover:text-red-200"
+                        className="inline-flex items-center justify-center gap-2 rounded-full border border-red-300 bg-white px-4 py-2 text-xs font-bold text-red-600 shadow-sm transition-[border-color,background-color,color] hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-red-600 dark:border-red-500/30 dark:bg-red-950/10 dark:text-red-200 dark:hover:bg-red-600 dark:disabled:hover:bg-red-950/10 dark:disabled:hover:text-red-200"
                     >
                         {isResetting ? 'Reset in corso...' : 'Ripeti configurazione iniziale'}
                     </button>

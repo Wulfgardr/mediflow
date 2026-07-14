@@ -110,6 +110,24 @@ NER clinico italiano, candidato di benchmark, non promosso a runtime.
 
 ## Runtime e librerie locali
 
+### Font Lume
+
+**Inter Variable** e la Voce di Lume. Il file locale
+`app/fonts/Inter-Variable-Latin.woff2` proviene da
+[`@fontsource-variable/inter` 5.2.8](https://www.npmjs.com/package/@fontsource-variable/inter/v/5.2.8),
+subset latino del font Inter v20. Upstream:
+[rsms/inter](https://github.com/rsms/inter). Licenza:
+[SIL Open Font License 1.1](https://openfontlicense.org). La licenza distribuita
+con l'asset e in `app/fonts/Inter-OFL.txt`.
+
+**IBM Plex Mono** e il Registro di Lume. I file locali 400, 500 e 600 in
+`app/fonts/IBM-Plex-Mono-*-Latin.woff2` provengono da
+[`@fontsource/ibm-plex-mono` 5.2.7](https://www.npmjs.com/package/@fontsource/ibm-plex-mono/v/5.2.7),
+subset latino del font IBM Plex Mono v20. Upstream:
+[IBM/plex](https://github.com/IBM/plex). Licenza:
+[SIL Open Font License 1.1](https://openfontlicense.org). La licenza distribuita
+con gli asset e in `app/fonts/IBM-Plex-Mono-OFL.txt`.
+
 ### Ollama
 
 [![Ollama](https://img.shields.io/badge/Ollama-runtime%20locale-000000?logo=ollama&logoColor=white)](https://ollama.com)

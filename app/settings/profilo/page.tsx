@@ -75,13 +75,13 @@ export default function SettingsProfilePage() {
             <div className={SETTINGS_CARD_CLASS}>
                 {/* @Codex WUL-229: header icon disc + ink copy mapped to MediFlow tokens */}
                 <div className="mb-5 flex items-start gap-3">
-                    <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' }}>
+                    <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--lume-ink)' }}>
                         <User className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
                         <p className="section-kicker">Profilo</p>
-                        <h2 className="mt-1 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>Nome medico e ambulatorio</h2>
-                        <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>Mostrati in intestazione, ricette e referti generati.</p>
+                        <h2 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Nome medico e ambulatorio</h2>
+                        <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Mostrati in intestazione, ricette e referti generati.</p>
                     </div>
                 </div>
 

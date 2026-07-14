@@ -290,10 +290,10 @@ export default function NewPatientPage() {
                                 )}
                             </div>
                             <div className="space-y-1">
-                                <h3 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--mf-ink)' }}>
+                                <h3 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--lume-ink)' }}>
                                     {importMeta.reviewPending ? 'Documento pronto: scegli cosa portare nella scheda' : 'Dati importati nella scheda'}
                                 </h3>
-                                <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
+                                <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--lume-ink-muted)' }}>
                                     {importMeta.diagnosisCount > 0
                                         ? `Trovate ${importMeta.diagnosisCount} diagnosi candidate${importMeta.medicationCount > 0 ? ` e ${importMeta.medicationCount} terapie da valutare` : ''}: scegli cosa tenere prima di compilare la scheda.`
                                         : importMeta.medicationCount > 0
@@ -301,7 +301,7 @@ export default function NewPatientPage() {
                                             : 'Il documento è stato letto, ma non contiene dati clinici abbastanza strutturati da proporre automaticamente.'}
                                 </p>
                                 {importMeta.quality?.reason && (
-                                    <p className="mt-2 text-[11px] font-bold uppercase" style={{ color: 'var(--mf-muted)' }}>
+                                    <p className="mt-2 text-[11px] font-bold uppercase" style={{ color: 'var(--lume-ink-muted)' }}>
                                         Qualità documento: {importMeta.quality.reason}
                                     </p>
                                 )}

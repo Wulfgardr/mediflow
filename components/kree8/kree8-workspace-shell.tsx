@@ -78,9 +78,15 @@ export function Kree8WorkspaceShell({
     const commit = (href: string | null, el: HTMLElement | null) => {
       if (cancelled) return;
       if (el !== focusEl) {
-        if (focusEl) focusEl.removeAttribute('data-lume-focus');
+        if (focusEl) {
+          focusEl.removeAttribute('data-lume-focus');
+          focusEl.classList.remove('lume-focal');
+        }
         focusEl = el;
-        if (focusEl) focusEl.setAttribute('data-lume-focus', '');
+        if (focusEl) {
+          focusEl.setAttribute('data-lume-focus', '');
+          focusEl.classList.add('lume-focal');
+        }
       }
       if (href !== currentHref) {
         currentHref = href;
@@ -154,7 +160,10 @@ export function Kree8WorkspaceShell({
       cancelled = true;
       mo.disconnect();
       if (observer) observer.disconnect();
-      if (focusEl) focusEl.removeAttribute('data-lume-focus');
+      if (focusEl) {
+        focusEl.removeAttribute('data-lume-focus');
+        focusEl.classList.remove('lume-focal');
+      }
     };
   }, [navKey]);
 

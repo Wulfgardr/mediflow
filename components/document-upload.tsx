@@ -317,10 +317,10 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
             <div
                 {...getRootProps()}
                 className={cn(
-                    "border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all",
+                    "rounded-[var(--lume-radius-card)] border p-6 flex flex-col items-center justify-center cursor-pointer transition-[border-color,background-color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]",
                     isDragActive
-                        ? "border-slate-400 bg-slate-50 dark:bg-white/10"
-                        : "border-gray-300 dark:border-white/10 hover:border-slate-400 hover:bg-gray-50 dark:hover:bg-white/5 bg-white/50 dark:bg-white/5"
+                        ? "lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)]"
+                        : "border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]"
                 )}
             >
                 <input {...getInputProps()} />
@@ -332,7 +332,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
             </div>
 
             {fileRejections.length > 0 && (
-                <ul className="mt-2 space-y-1 rounded-xl border border-[color:rgba(163,58,47,0.28)] bg-[color:rgba(163,58,47,0.08)] px-3 py-2 text-xs text-[color:var(--mf-critical)]">
+                <ul className="mt-2 space-y-1 rounded-xl border border-[color:rgba(163,58,47,0.28)] bg-[color:rgba(163,58,47,0.08)] px-3 py-2 text-xs text-[color:var(--lume-signal-critical)]">
                     {fileRejections.map((message) => (
                         <li key={message}>{message}</li>
                     ))}
@@ -382,7 +382,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
             {/* File List */}
             <div className="flex flex-col gap-3">
                 {attachments?.map((file) => (
-                    <div key={file.id} className="glass-card group flex items-center gap-3 p-3 transition-colors hover:border-slate-300 dark:hover:border-white/20">
+                    <div key={file.id} className="lume-card group flex items-center gap-3 p-3 transition-colors hover:border-slate-300 dark:hover:border-white/20">
                         <div className="p-2 bg-red-50 dark:bg-red-900/10 rounded-lg text-red-500 dark:text-red-400 border border-red-100 dark:border-white/5">
                             <FileText className="w-5 h-5" />
                         </div>
@@ -412,7 +412,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                                 <button
                                     onClick={() => handleOcrReplay(file)}
                                     disabled={replayingId !== null}
-                                    className="rounded-lg p-2 text-[color:var(--mf-warning)] transition-colors hover:bg-[color:rgba(154,106,47,0.1)] disabled:opacity-50 dark:hover:bg-white/10"
+                                    className="rounded-lg p-2 text-[color:var(--lume-signal-warning)] transition-colors hover:bg-[color:rgba(154,106,47,0.1)] disabled:opacity-50 dark:hover:bg-white/10"
                                     title="Riprova OCR"
                                     aria-label={`Riprova OCR su ${file.name}`}
                                 >
@@ -423,7 +423,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                                 <button
                                     onClick={() => handleOcrManualReview(file)}
                                     disabled={replayingId !== null}
-                                    className="rounded-lg p-2 text-[color:var(--mf-warning)] transition-colors hover:bg-[color:rgba(154,106,47,0.1)] disabled:opacity-50 dark:hover:bg-white/10"
+                                    className="rounded-lg p-2 text-[color:var(--lume-signal-warning)] transition-colors hover:bg-[color:rgba(154,106,47,0.1)] disabled:opacity-50 dark:hover:bg-white/10"
                                     title="Segna per revisione manuale"
                                     aria-label={`Segna ${file.name} per revisione manuale`}
                                 >
@@ -432,7 +432,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                             )}
                             <button
                                 onClick={() => setViewingFile(file)}
-                                className="rounded-lg p-2 text-[color:var(--mf-muted)] transition-colors hover:bg-[color:rgba(15,23,42,0.06)] hover:text-[color:var(--mf-ink)] dark:hover:bg-white/10"
+                                className="rounded-lg p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:rgba(15,23,42,0.06)] hover:text-[color:var(--lume-ink)] dark:hover:bg-white/10"
                                 title="Visualizza"
                                 aria-label={`Visualizza ${file.name}`}
                             >
@@ -441,7 +441,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
 
                             <button
                                 onClick={() => handleDelete(file.id)}
-                                className="p-2 text-[color:var(--mf-muted)] hover:text-[color:var(--mf-critical)] hover:bg-[color:rgba(163,58,47,0.1)] rounded-lg transition-colors"
+                                className="p-2 text-[color:var(--lume-ink-muted)] hover:text-[color:var(--lume-signal-critical)] hover:bg-[color:rgba(163,58,47,0.1)] rounded-lg transition-colors"
                                 title="Elimina"
                                 aria-label={`Elimina ${file.name}`}
                             >

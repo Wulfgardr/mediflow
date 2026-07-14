@@ -516,7 +516,7 @@ export default function PatientDetailPage() {
     };
 
     const actionsDock = (
-        <div className="patient-actions-dock rounded-[14px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 p-4 dark:bg-white/4">
+        <div className="patient-actions-dock lume-card p-4">
             <Link
                 href={`/patients/${id}/entries/new`}
                 className="ui-btn-primary flex h-11 w-full items-center justify-center gap-2 px-4 text-sm font-semibold"
@@ -528,7 +528,7 @@ export default function PatientDetailPage() {
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <Link
                     href={`/patients/${id}/edit`}
-                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-[color:rgba(15,23,42,0.12)] bg-white/88 px-3 text-xs font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,23,42,0.24)] hover:bg-white dark:bg-white/6"
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-[color:rgba(15,23,42,0.12)] bg-white/88 px-3 text-xs font-semibold text-[color:var(--lume-ink)] transition-colors hover:border-[color:rgba(15,23,42,0.24)] hover:bg-white dark:bg-white/6"
                 >
                     <Pencil className="h-3.5 w-3.5" />
                     Modifica
@@ -536,7 +536,7 @@ export default function PatientDetailPage() {
                 <button
                     type="button"
                     onClick={() => setIsExportModalOpen(true)}
-                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-[color:rgba(15,23,42,0.12)] bg-white/88 px-3 text-xs font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,23,42,0.24)] hover:bg-white dark:bg-white/6"
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-[color:rgba(15,23,42,0.12)] bg-white/88 px-3 text-xs font-semibold text-[color:var(--lume-ink)] transition-colors hover:border-[color:rgba(15,23,42,0.24)] hover:bg-white dark:bg-white/6"
                 >
                     <Download className="h-3.5 w-3.5" />
                     Export FHIR
@@ -549,7 +549,7 @@ export default function PatientDetailPage() {
                         const reportService = await import('@/lib/report-service');
                         reportService.generatePatientReport(patient, nonScaleEntries, scaleEntries, reportTherapies, reportObservations);
                     }}
-                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-[color:rgba(15,23,42,0.12)] bg-white/88 px-3 text-xs font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,23,42,0.24)] hover:bg-white dark:bg-white/6"
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border border-[color:rgba(15,23,42,0.12)] bg-white/88 px-3 text-xs font-semibold text-[color:var(--lume-ink)] transition-colors hover:border-[color:rgba(15,23,42,0.24)] hover:bg-white dark:bg-white/6"
                 >
                     <FileText className="h-3.5 w-3.5" />
                     Report PDF
@@ -613,7 +613,7 @@ export default function PatientDetailPage() {
                 {openLoops.length > 0 ? (
                     <section className="patient-detail-section border p-5 md:p-6">
                         <div className="mb-4">
-                            <h2 className="text-xl font-semibold text-[color:var(--mf-ink)]">Attese aperte</h2>
+                            <h2 className="text-xl font-semibold text-[color:var(--lume-ink)]">Attese aperte</h2>
                         </div>
                         <div className="space-y-2">
                             {openLoops.map((loop) => {
@@ -639,13 +639,13 @@ export default function PatientDetailPage() {
                                     >
                                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                             <div className="min-w-0">
-                                                <p className="text-sm font-medium text-[color:var(--mf-ink)]">{loop.label}</p>
-                                                <p className="mt-1.5 text-[11px] text-[color:var(--mf-muted)]">{provenance}</p>
+                                                <p className="text-sm font-medium text-[color:var(--lume-ink)]">{loop.label}</p>
+                                                <p className="mt-1.5 text-[11px] text-[color:var(--lume-ink-muted)]">{provenance}</p>
                                             </div>
                                             <button
                                                 type="button"
                                                 onClick={() => openObservationForm(loop)}
-                                                className="inline-flex shrink-0 items-center justify-center rounded-full border border-[color:rgba(112,106,100,0.2)] px-3 py-1.5 text-xs font-medium text-[color:var(--mf-ink)] transition-colors hover:bg-white/60 dark:border-[color:rgba(255,247,240,0.14)] dark:hover:bg-white/5"
+                                                className="inline-flex shrink-0 items-center justify-center rounded-full border border-[color:rgba(112,106,100,0.2)] px-3 py-1.5 text-xs font-medium text-[color:var(--lume-ink)] transition-colors hover:bg-white/60 dark:border-[color:rgba(255,247,240,0.14)] dark:hover:bg-white/5"
                                             >
                                                 {loop.suggestedAction === 'insert_results' ? 'Inserisci risultato' : 'Inserisci misura'}
                                             </button>
@@ -664,10 +664,10 @@ export default function PatientDetailPage() {
                         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
                                 <p className="section-kicker">Timeline</p>
-                                <h2 className="mt-1 text-xl font-semibold text-[color:var(--mf-ink)]">
+                                <h2 className="mt-1 text-xl font-semibold text-[color:var(--lume-ink)]">
                                     Timeline clinica
                                 </h2>
-                                <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
+                                <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--lume-ink-muted)]">
                                     Anteprima cronologica degli ultimi eventi del caso: diario, controlli e referti.
                                 </p>
                             </div>
@@ -686,8 +686,8 @@ export default function PatientDetailPage() {
                         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
                                 <p className="section-kicker">Diario</p>
-                                <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--mf-ink)]">
-                                    <FileText className="h-5 w-5 text-[color:var(--mf-muted)]" />
+                                <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--lume-ink)]">
+                                    <FileText className="h-5 w-5 text-[color:var(--lume-ink-muted)]" />
                                     Diario clinico
                                 </h2>
                             </div>
@@ -780,7 +780,7 @@ export default function PatientDetailPage() {
                     <section id="documenti" className="patient-detail-side-section border p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Evidenze documentali</p>
-                            <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">
+                            <h3 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">
                                 Referti recenti
                             </h3>
                         </div>
@@ -793,7 +793,7 @@ export default function PatientDetailPage() {
                             </div>
                         ) : (
                             <div className="rounded-[12px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-5 text-center dark:border-[color:rgba(255,247,240,0.12)]">
-                                <p className="text-sm text-[color:var(--mf-muted)]">
+                                <p className="text-sm text-[color:var(--lume-ink-muted)]">
                                     Nessuna evidenza documentale in primo piano. I nuovi referti compariranno qui.
                                 </p>
                             </div>
@@ -833,21 +833,21 @@ export default function PatientDetailPage() {
                         <div className="space-y-3">
                             <Link href={`/patients/${id}/scales/tinetti`} className="apple-list-row">
                                 <span>Tinetti</span>
-                                <Plus className="h-4 w-4 text-[color:var(--mf-muted)]" />
+                                <Plus className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
                             </Link>
                             <Link href={`/patients/${id}/scales/mmse`} className="apple-list-row">
                                 <span>MMSE</span>
-                                <Plus className="h-4 w-4 text-[color:var(--mf-muted)]" />
+                                <Plus className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
                             </Link>
                             <Link href={`/patients/${id}/scales/adl`} className="apple-list-row">
                                 <span>ADL (Katz)</span>
-                                <Plus className="h-4 w-4 text-[color:var(--mf-muted)]" />
+                                <Plus className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
                             </Link>
                             <Link href={`/patients/${id}/scales/gds`} className="apple-list-row">
                                 <span>GDS</span>
-                                <Plus className="h-4 w-4 text-[color:var(--mf-muted)]" />
+                                <Plus className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
                             </Link>
-                            <Link href={`/patients/${id}/scales`} className="block pt-1 text-xs font-medium text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-ink)]">
+                            <Link href={`/patients/${id}/scales`} className="block pt-1 text-xs font-medium text-[color:var(--lume-ink-muted)] transition-colors hover:text-[color:var(--lume-ink)]">
                                 Apri libreria scale
                             </Link>
                         </div>
@@ -856,16 +856,16 @@ export default function PatientDetailPage() {
                     <section id="follow-up" className="patient-detail-side-section border p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Pianificazione</p>
-                            <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
-                                <Calendar className="h-5 w-5 text-[color:var(--mf-muted)]" />
+                            <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
+                                <Calendar className="h-5 w-5 text-[color:var(--lume-ink-muted)]" />
                                 Follow-up
                             </h3>
                         </div>
 
                         {!checkups || checkups.length === 0 ? (
                             <div className="rounded-[12px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-5 text-center dark:border-[color:rgba(255,247,240,0.12)]">
-                                <p className="text-sm italic text-[color:var(--mf-muted)]">Nessun follow-up pianificato.</p>
-                                <Link href={`/patients/${id}/edit`} className="mt-3 inline-block text-xs font-medium text-[color:var(--mf-ink)] hover:underline">
+                                <p className="text-sm italic text-[color:var(--lume-ink-muted)]">Nessun follow-up pianificato.</p>
+                                <Link href={`/patients/${id}/edit`} className="mt-3 inline-block text-xs font-medium text-[color:var(--lume-ink)] hover:underline">
                                     Aggiungi follow-up
                                 </Link>
                             </div>
@@ -875,16 +875,16 @@ export default function PatientDetailPage() {
                                     <div key={checkup.id} className="rounded-[12px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 px-4 py-3 dark:border-[color:rgba(255,247,240,0.08)] dark:bg-white/5">
                                         <div className="flex items-start justify-between gap-3">
                                             <div>
-                                                <p className="text-sm font-semibold text-[color:var(--mf-ink)]">{checkup.title}</p>
+                                                <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{checkup.title}</p>
                                                 {checkup.notes ? (
-                                                    <p className="mt-1 text-xs leading-5 text-[color:var(--mf-muted)]">{checkup.notes}</p>
+                                                    <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">{checkup.notes}</p>
                                                 ) : null}
                                             </div>
                                             <span className="apple-chip shrink-0">{new Date(checkup.date).toLocaleDateString('it-IT')}</span>
                                         </div>
                                     </div>
                                 ))}
-                                <Link href={`/patients/${id}/edit`} className="block pt-1 text-xs font-medium text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-ink)]">
+                                <Link href={`/patients/${id}/edit`} className="block pt-1 text-xs font-medium text-[color:var(--lume-ink-muted)] transition-colors hover:text-[color:var(--lume-ink)]">
                                     Gestisci follow-up
                                 </Link>
                             </div>

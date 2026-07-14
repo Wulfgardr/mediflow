@@ -113,8 +113,8 @@ export default function ScaleRunnerPage() {
                 <aside className={workspaceStyles.secondaryStack}>
                     <section id="contesto" className="patient-detail-side-section border p-5">
                         <p className="section-kicker">Contesto</p>
-                        <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
-                            <Activity className="h-5 w-5 text-[color:var(--mf-primary)]" />
+                        <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
+                            <Activity className="h-5 w-5 text-[color:var(--lume-accent)]" />
                             Dove viene somministrata
                         </h3>
 
@@ -123,10 +123,10 @@ export default function ScaleRunnerPage() {
                                 type="button"
                                 onClick={() => setSetting('ambulatory')}
                                 className={cn(
-                                    'flex min-h-[54px] items-center justify-between gap-3 rounded-[16px] border px-4 text-sm font-semibold transition-[border-color,background-color,color,box-shadow]',
+                                    'flex min-h-[54px] items-center justify-between gap-3 rounded-[16px] border px-4 text-sm font-semibold transition-[border-color,background-color,color]',
                                     setting === 'ambulatory'
-                                        ? 'border-[color:rgba(15,123,104,0.22)] bg-[color:rgba(15,123,104,0.08)] text-[color:var(--mf-primary)] shadow-[0_12px_24px_rgba(15,123,104,0.08)]'
-                                        : 'border-[color:rgba(112,106,100,0.14)] bg-white text-[color:var(--mf-muted)] hover:border-[color:rgba(112,106,100,0.2)]'
+                                        ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)]'
+                                        : 'border-[color:rgba(112,106,100,0.14)] bg-white text-[color:var(--lume-ink-muted)] hover:border-[color:rgba(112,106,100,0.2)]'
                                 )}
                             >
                                 <span className="inline-flex items-center gap-2">
@@ -140,10 +140,10 @@ export default function ScaleRunnerPage() {
                                 type="button"
                                 onClick={() => setSetting('home')}
                                 className={cn(
-                                    'flex min-h-[54px] items-center justify-between gap-3 rounded-[16px] border px-4 text-sm font-semibold transition-[border-color,background-color,color,box-shadow]',
+                                    'flex min-h-[54px] items-center justify-between gap-3 rounded-[16px] border px-4 text-sm font-semibold transition-[border-color,background-color,color]',
                                     setting === 'home'
-                                        ? 'border-[color:rgba(182,106,60,0.24)] bg-[color:rgba(182,106,60,0.08)] text-[color:var(--mf-accent)] shadow-[0_12px_24px_rgba(182,106,60,0.08)]'
-                                        : 'border-[color:rgba(112,106,100,0.14)] bg-white text-[color:var(--mf-muted)] hover:border-[color:rgba(112,106,100,0.2)]'
+                                        ? 'border-[color:rgba(182,106,60,0.24)] bg-[color:rgba(182,106,60,0.08)] text-[color:var(--lume-accent)] shadow-[0_12px_24px_rgba(182,106,60,0.08)]'
+                                        : 'border-[color:rgba(112,106,100,0.14)] bg-white text-[color:var(--lume-ink-muted)] hover:border-[color:rgba(112,106,100,0.2)]'
                                 )}
                             >
                                 <span className="inline-flex items-center gap-2">
@@ -157,22 +157,22 @@ export default function ScaleRunnerPage() {
 
                     <section id="salvataggio" className="patient-detail-side-section border p-5">
                         <p className="section-kicker">Salvataggio</p>
-                        <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
-                            <Save className="h-5 w-5 text-[color:var(--mf-primary)]" />
+                        <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
+                            <Save className="h-5 w-5 text-[color:var(--lume-accent)]" />
                             Voce diario automatica
                         </h3>
-                        <p className="mt-3 text-sm leading-6 text-[color:var(--mf-muted)]">
+                        <p className="mt-3 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
                             Al completamento vengono salvati punteggio, interpretazione e risposte. Il risultato rientra nella timeline e nei report del paziente.
                         </p>
                     </section>
 
                     <section className="patient-detail-side-section border p-5">
                         <p className="section-kicker">Scala</p>
-                        <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
-                            <BookOpenCheck className="h-5 w-5 text-[color:var(--mf-primary)]" />
+                        <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
+                            <BookOpenCheck className="h-5 w-5 text-[color:var(--lume-accent)]" />
                             {scaleDef.questions.length} domande
                         </h3>
-                        <p className="mt-3 text-sm leading-6 text-[color:var(--mf-muted)]">
+                        <p className="mt-3 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
                             {scaleDef.description}
                         </p>
                     </section>

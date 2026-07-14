@@ -107,26 +107,26 @@ export default function ExemptionDbManager() {
     const percent = total > 0 ? Math.round((progress / total) * 100) : 0;
 
     return (
-        <div className="mediflow-vitreous-panel glass-panel border p-6 md:p-7 space-y-5">
+        <div className="mf-section lume-focal space-y-5 p-6 md:p-7">
             <div className="flex items-center gap-3">
                 <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
                     <Database className="w-6 h-6" />
                 </div>
                 <div>
                     <p className="section-kicker">Repertorio amministrativo</p>
-                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Codifiche Esenzioni</h2>
-                    <p className="text-xs text-gray-500">Repertorio per la ricerca rapida in anagrafica paziente.</p>
+                    <h2 className="text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>Codifiche Esenzioni</h2>
+                    <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Repertorio per la ricerca rapida in anagrafica paziente.</p>
                 </div>
             </div>
 
-            <div className="rounded-[22px] border border-emerald-200/60 bg-emerald-50/80 p-4 flex items-center justify-between dark:border-emerald-500/20 dark:bg-emerald-900/10">
+            <div className="flex items-center justify-between rounded-[var(--lume-radius-card)] border border-emerald-200/60 bg-emerald-50/80 p-4 dark:border-emerald-500/20 dark:bg-emerald-900/10">
                 <div>
                     <p className="text-xs text-emerald-700 dark:text-emerald-300 font-bold uppercase tracking-wider">Codici Indicizzati</p>
-                    <p className="text-2xl font-bold text-emerald-900 dark:text-emerald-100">
+                    <p className="lume-registro text-2xl font-bold text-emerald-900 dark:text-emerald-100">
                         {stats !== null ? stats.toLocaleString() : '-'}
                     </p>
                 </div>
-                <RefreshCw className={`w-7 h-7 text-emerald-300 dark:text-emerald-700 ${isImporting ? 'animate-spin' : ''}`} />
+                <RefreshCw className="w-7 h-7 text-emerald-300 dark:text-emerald-700" />
             </div>
 
             <div
@@ -139,9 +139,9 @@ export default function ExemptionDbManager() {
                     setIsDragging(false);
                 }}
                 onDrop={onDrop}
-                className={`rounded-[24px] border-2 border-dashed p-5 transition-all ${isDragging
-                    ? 'border-emerald-500 bg-emerald-50/80 dark:bg-emerald-900/20'
-                    : 'border-slate-300 bg-white/72 dark:border-white/15 dark:bg-white/5'
+                className={`rounded-[var(--lume-radius-panel)] border p-5 transition-[border-color,background-color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)] ${isDragging
+                    ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)]'
+                    : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)]'
                     }`}
             >
                 <input
@@ -156,7 +156,7 @@ export default function ExemptionDbManager() {
 
                 {!isImporting ? (
                     <div className="text-center space-y-3">
-                        <div className="mx-auto w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-300">
+                        <div className="mx-auto w-12 h-12 rounded-full bg-[color:var(--lume-surface-field)] flex items-center justify-center text-[color:var(--lume-ink)]">
                             <Upload className="w-6 h-6" />
                         </div>
                         <div>
@@ -165,7 +165,7 @@ export default function ExemptionDbManager() {
                         </div>
                         <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="inline-flex items-center gap-2 rounded-full border border-emerald-200/80 bg-white/85 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-500/20 dark:bg-white/5 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
+                            className="inline-flex items-center gap-2 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-2 text-sm font-medium text-[color:var(--lume-ink)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]"
                         >
                             Seleziona file
                         </button>
@@ -174,23 +174,23 @@ export default function ExemptionDbManager() {
                     <div className="space-y-2">
                         <div className="flex justify-between text-xs text-gray-500">
                             <span>Importazione in corso...</span>
-                            <span>{percent}%</span>
+                            <span className="lume-registro">{percent}%</span>
                         </div>
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                             <div
-                                className="h-2 rounded-full bg-emerald-500 transition-all duration-200"
+                                className="h-2 rounded-full bg-emerald-500 transition-[width] duration-200"
                                 style={{ width: `${percent}%` }}
                             />
                         </div>
                         <p className="text-[11px] text-gray-500 text-center">
-                            Elaborate {progress.toLocaleString()} di {Math.max(total, progress).toLocaleString()} righe...
+                            Elaborate <span className="lume-registro">{progress.toLocaleString()} di {Math.max(total, progress).toLocaleString()}</span> righe...
                         </p>
                     </div>
                 )}
             </div>
 
             {message && (
-                <div className={`p-3 rounded-[18px] text-sm flex items-center gap-2 border ${message.type === 'success'
+                <div className={`flex items-center gap-2 rounded-[var(--lume-radius-card)] border p-3 text-sm ${message.type === 'success'
                     ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-500/20 dark:bg-green-900/20 dark:text-green-300'
                     : 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-900/20 dark:text-red-300'
                     }`}>

@@ -401,11 +401,11 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                 <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                         <p className="section-kicker">Prestazioni</p>
-                        <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--mf-ink)]">
-                            <Stethoscope className="h-5 w-5 text-[color:var(--mf-primary)]" />
+                        <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--lume-ink)]">
+                            <Stethoscope className="h-5 w-5 text-[color:var(--lume-accent)]" />
                             Prestazioni prescritte
                         </h2>
-                        <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
+                        <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--lume-ink-muted)]">
                             Visite, esami, imaging, riabilitazione e screening richiesti. Non sono terapie farmacologiche.
                         </p>
                     </div>
@@ -419,11 +419,11 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                     className="mb-5 rounded-[8px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 p-4"
                 >
                     <div className="grid gap-3 md:grid-cols-2">
-                        <div className="md:col-span-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                        <div className="md:col-span-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                             <Stethoscope className="h-3.5 w-3.5" aria-hidden />
                             Prestazione e voci richieste
                         </div>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)] md:col-span-2">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)] md:col-span-2">
                             Nome prestazione (raggruppa le voci) <span aria-hidden className="text-rose-600">*</span>
                             <input
                                 className="input-field"
@@ -433,7 +433,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                 aria-required="true"
                             />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)] md:col-span-2">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)] md:col-span-2">
                             <span className="flex items-center gap-1.5">
                                 <ListChecks className="h-3.5 w-3.5" aria-hidden />
                                 Voci richieste - una per riga, opzionale CODICE NOME
@@ -444,26 +444,26 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                 onChange={(event) => updateForm('itemsText', event.target.value)}
                                 placeholder={`EMOCROMO\nD-DIMERO\nLDH\nAST\nALT\nVITAMINA D`}
                             />
-                            <p className="text-[11px] font-normal text-[color:var(--mf-muted)]">
+                            <p className="text-[11px] font-normal text-[color:var(--lume-ink-muted)]">
                                 {form.itemsText.trim().length === 0
                                     ? 'Lascia vuoto per una singola voce con il nome della prestazione.'
                                     : `${parsedItemsPreview.length} voci pronte al salvataggio.`}
                             </p>
                         </label>
-                        <div className="md:col-span-2 mt-1 border-t border-[color:rgba(112,106,100,0.1)] pt-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                        <div className="md:col-span-2 mt-1 border-t border-[color:rgba(112,106,100,0.1)] pt-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                             <CalendarClock className="h-3.5 w-3.5" aria-hidden />
                             Inquadramento e pianificazione
                         </div>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Data prescrizione
                             <input
-                                className="input-field"
+                                className="input-field lume-registro"
                                 type="date"
                                 value={form.prescribedAt}
                                 onChange={(event) => updateForm('prescribedAt', event.target.value)}
                             />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Stato
                             <select
                                 className="input-field"
@@ -475,7 +475,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                 ))}
                             </select>
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Categoria
                             <select
                                 className="input-field"
@@ -487,7 +487,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                 ))}
                             </select>
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Classe di priorità
                             <select
                                 className="input-field"
@@ -499,29 +499,29 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                 ))}
                             </select>
                         </label>
-                        <div className="md:col-span-2 mt-1 border-t border-[color:rgba(112,106,100,0.1)] pt-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                        <div className="md:col-span-2 mt-1 border-t border-[color:rgba(112,106,100,0.1)] pt-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                             <FileText className="h-3.5 w-3.5" aria-hidden />
                             Codifica, contesto e note
                         </div>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Sistema codice
                             <input
-                                className="input-field"
+                                className="input-field lume-registro"
                                 value={form.codeSystem}
                                 onChange={(event) => updateForm('codeSystem', event.target.value)}
                                 placeholder="es. nomenclatore regionale, LOINC, SNOMED"
                             />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Codice prestazione
                             <input
-                                className="input-field"
+                                className="input-field lume-registro"
                                 value={form.serviceCode}
                                 onChange={(event) => updateForm('serviceCode', event.target.value)}
                                 placeholder="es. 89.7"
                             />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)] md:col-span-2">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)] md:col-span-2">
                             Quesito clinico
                             <textarea
                                 className="input-field min-h-20"
@@ -530,7 +530,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                 placeholder="Motivazione e quesito alla base della richiesta"
                             />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Struttura / erogatore
                             <input
                                 className="input-field"
@@ -539,43 +539,43 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                 placeholder="es. Ambulatorio Cardiologia ASST"
                             />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Riferimento ricetta / impegnativa
                             <input
-                                className="input-field"
+                                className="input-field lume-registro"
                                 value={form.requestReference}
                                 onChange={(event) => updateForm('requestReference', event.target.value)}
                                 placeholder="es. NRE / numero pratica"
                             />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Data prenotazione
                             <input
-                                className="input-field"
+                                className="input-field lume-registro"
                                 type="date"
                                 value={form.scheduledAt}
                                 onChange={(event) => updateForm('scheduledAt', event.target.value)}
                             />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Data esecuzione
                             <input
-                                className="input-field"
+                                className="input-field lume-registro"
                                 type="date"
                                 value={form.performedAt}
                                 onChange={(event) => updateForm('performedAt', event.target.value)}
                             />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Data referto
                             <input
-                                className="input-field"
+                                className="input-field lume-registro"
                                 type="date"
                                 value={form.reportReceivedAt}
                                 onChange={(event) => updateForm('reportReceivedAt', event.target.value)}
                             />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Origine
                             <select
                                 className="input-field"
@@ -586,7 +586,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                 <option value="document_review">Da documento revisionato</option>
                             </select>
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)] md:col-span-2">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)] md:col-span-2">
                             Esito / sintesi referto
                             <textarea
                                 className="input-field min-h-20"
@@ -595,7 +595,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                 placeholder="Sintesi dell'esito utile per il decorso clinico"
                             />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Allegati / riferimenti
                             <input
                                 className="input-field"
@@ -604,7 +604,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                 placeholder="ID allegato, nome file o riferimento pratica"
                             />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)] md:col-span-2">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)] md:col-span-2">
                             Note operative
                             <textarea
                                 className="input-field min-h-20"
@@ -636,8 +636,8 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
 
             {!prescriptions ? null : prescriptions.length === 0 ? (
                 <div className="rounded-[8px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-6 text-center">
-                    <ClipboardList className="mx-auto mb-2 h-5 w-5 text-[color:var(--mf-muted)]" aria-hidden />
-                    <p className="text-sm text-[color:var(--mf-muted)]">
+                    <ClipboardList className="mx-auto mb-2 h-5 w-5 text-[color:var(--lume-ink-muted)]" aria-hidden />
+                    <p className="text-sm text-[color:var(--lume-ink-muted)]">
                         Nessuna prestazione prescritta registrata. Aggiungi visite, esami o riabilitazione quando vuoi seguirne stato ed esito.
                     </p>
                 </div>
@@ -660,7 +660,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                     <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <span className="apple-chip">{formatDate(item.prescribedAt) ?? '–'}</span>
+                                            <span className="apple-chip lume-registro">{formatDate(item.prescribedAt) ?? '–'}</span>
                                             <span className="apple-chip">{statusLabel(item.status)}</span>
                                             <span className="apple-chip">{categoryLabel(item.category)}</span>
                                             {priority !== 'unknown' && <span className="apple-chip">{priorityLabel(priority)}</span>}
@@ -673,55 +673,55 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                             {item.source === 'document_review' && <span className="apple-chip">document-backed</span>}
                                             {item.source === 'legacy_therapy_cleanup' && <span className="apple-chip">da pulizia diario</span>}
                                         </div>
-                                        <h3 className="mt-3 text-base font-semibold text-[color:var(--mf-ink)]">{item.serviceName}</h3>
-                                        <div className="mt-2 grid gap-2 text-sm text-[color:var(--mf-muted)] md:grid-cols-2">
+                                        <h3 className="mt-3 text-base font-semibold text-[color:var(--lume-ink)]">{item.serviceName}</h3>
+                                        <div className="mt-2 grid gap-2 text-sm text-[color:var(--lume-ink-muted)] md:grid-cols-2">
                                             {item.serviceCode && (
                                                 <p>
-                                                    <span className="font-semibold text-[color:var(--mf-ink)]">Codice:</span>{' '}
+                                                    <span className="font-semibold text-[color:var(--lume-ink)]">Codice:</span>{' '}
                                                     {item.serviceCode}
                                                     {item.codeSystem ? ` (${item.codeSystem})` : ''}
                                                 </p>
                                             )}
                                             {item.provider && (
                                                 <p>
-                                                    <span className="font-semibold text-[color:var(--mf-ink)]">Erogatore:</span> {item.provider}
+                                                    <span className="font-semibold text-[color:var(--lume-ink)]">Erogatore:</span> {item.provider}
                                                 </p>
                                             )}
                                             {item.requestReference && (
                                                 <p>
-                                                    <span className="font-semibold text-[color:var(--mf-ink)]">Ricetta:</span> {item.requestReference}
+                                                    <span className="font-semibold text-[color:var(--lume-ink)]">Ricetta:</span> {item.requestReference}
                                                 </p>
                                             )}
                                             {item.scheduledAt && (
                                                 <p>
-                                                    <span className="font-semibold text-[color:var(--mf-ink)]">Prenotazione:</span>{' '}
-                                                    {formatDate(item.scheduledAt)}
+                                                    <span className="font-semibold text-[color:var(--lume-ink)]">Prenotazione:</span>{' '}
+                                                    <span className="lume-registro">{formatDate(item.scheduledAt)}</span>
                                                 </p>
                                             )}
                                             {item.performedAt && (
                                                 <p>
-                                                    <span className="font-semibold text-[color:var(--mf-ink)]">Esecuzione:</span>{' '}
-                                                    {formatDate(item.performedAt)}
+                                                    <span className="font-semibold text-[color:var(--lume-ink)]">Esecuzione:</span>{' '}
+                                                    <span className="lume-registro">{formatDate(item.performedAt)}</span>
                                                 </p>
                                             )}
                                             {item.reportReceivedAt && (
                                                 <p>
-                                                    <span className="font-semibold text-[color:var(--mf-ink)]">Referto:</span>{' '}
-                                                    {formatDate(item.reportReceivedAt)}
+                                                    <span className="font-semibold text-[color:var(--lume-ink)]">Referto:</span>{' '}
+                                                    <span className="lume-registro">{formatDate(item.reportReceivedAt)}</span>
                                                 </p>
                                             )}
                                             {item.clinicalQuestion && (
                                                 <p className="md:col-span-2">
-                                                    <span className="font-semibold text-[color:var(--mf-ink)]">Quesito:</span> {item.clinicalQuestion}
+                                                    <span className="font-semibold text-[color:var(--lume-ink)]">Quesito:</span> {item.clinicalQuestion}
                                                 </p>
                                             )}
                                         </div>
                                         {item.outcomeNote && (
-                                            <p className="mt-2 text-sm leading-6 text-[color:var(--mf-muted)]">{item.outcomeNote}</p>
+                                            <p className="mt-2 text-sm leading-6 text-[color:var(--lume-ink-muted)]">{item.outcomeNote}</p>
                                         )}
                                         {childItems.length > 0 && (
                                             <div className="mt-3 border-t border-[color:rgba(112,106,100,0.12)] pt-3">
-                                                <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                                                <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                                     <ListChecks className="h-3.5 w-3.5" aria-hidden />
                                                     Voci richieste · {childItems.length}
                                                 </p>
@@ -741,15 +741,15 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                                                 className="flex flex-col gap-1 py-1.5 text-sm md:flex-row md:items-center md:justify-between md:gap-3"
                                                             >
                                                                 <div className="min-w-0 flex-1">
-                                                                    <span className="font-medium text-[color:var(--mf-ink)]">{child.serviceName}</span>
+                                                                    <span className="font-medium text-[color:var(--lume-ink)]">{child.serviceName}</span>
                                                                     {child.serviceCode && (
-                                                                        <span className="ml-2 font-mono text-xs text-[color:var(--mf-muted)]">
+                                                                        <span className="lume-registro ml-2 text-xs text-[color:var(--lume-ink-muted)]">
                                                                             {child.serviceCode}
                                                                             {child.codeSystem ? ` · ${child.codeSystem}` : ''}
                                                                         </span>
                                                                     )}
                                                                     {!child.serviceCode && (
-                                                                        <span className="ml-2 text-xs italic text-[color:var(--mf-muted)]">in attesa di matching repertorio</span>
+                                                                        <span className="ml-2 text-xs italic text-[color:var(--lume-ink-muted)]">in attesa di matching repertorio</span>
                                                                     )}
                                                                 </div>
                                                                 <span className="apple-chip shrink-0 text-[10px]">{matchLabel}</span>
@@ -761,7 +761,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                         )}
                                         <DocumentReferenceChip references={refs} />
                                         {item.notes && (
-                                            <p className="mt-3 text-sm leading-6 text-[color:var(--mf-muted)]">{item.notes}</p>
+                                            <p className="mt-3 text-sm leading-6 text-[color:var(--lume-ink-muted)]">{item.notes}</p>
                                         )}
                                     </div>
                                     <div className="flex shrink-0 flex-wrap gap-2 md:flex-col md:items-stretch">

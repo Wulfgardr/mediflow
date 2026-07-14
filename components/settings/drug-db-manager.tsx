@@ -19,7 +19,7 @@ function ProgressBar({ progress, total }: { progress: number; total: number }) {
         <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
             <div
                 ref={barRef}
-                className="h-full bg-indigo-500 transition-all duration-300 ease-out"
+                className="h-full bg-indigo-500 transition-[width] duration-300 ease-out"
             />
         </div>
     );
@@ -85,7 +85,7 @@ export default function DrugDbManager() {
     };
 
     return (
-        <div className="mediflow-vitreous-panel glass-panel border p-6 space-y-6">
+        <div className="mf-section lume-focal space-y-6 p-6">
             <div className="flex justify-between items-start">
                 <div>
                     <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
@@ -126,7 +126,7 @@ export default function DrugDbManager() {
                                 type="file"
                                 accept=".csv"
                                 onChange={handleFileUpload}
-                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/30 dark:file:text-indigo-300 transition-all cursor-pointer"
+                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/30 dark:file:text-indigo-300 transition-colors cursor-pointer"
                             />
                         </label>
                     </div>
@@ -141,7 +141,7 @@ export default function DrugDbManager() {
                                 </div>
                                 <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                     <div
-                                        className="h-full bg-indigo-500 transition-all duration-300 ease-out progress-bar-fill"
+                                        className="h-full bg-indigo-500 transition-[width] duration-300 ease-out progress-bar-fill"
                                         data-progress={Math.round((progress / total) * 100) || 0}
                                     />
                                 </div>

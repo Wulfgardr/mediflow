@@ -118,7 +118,7 @@ export default function PatientDocumentImportReview({
     const tone = qualityTone(localDraft.quality?.level);
 
     return (
-        <div className={`glass-panel rounded-[32px] border p-6 md:p-8 ${tone.panel}`}>
+        <div className={`lume-panel rounded-[32px] border p-6 md:p-8 ${tone.panel}`}>
             <div className="flex flex-col gap-5 border-b border-black/5 pb-6 dark:border-white/5 md:flex-row md:items-start md:justify-between">
                 <div className="flex items-start gap-4">
                     <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${tone.icon}`}>
@@ -225,7 +225,7 @@ export default function PatientDocumentImportReview({
                                                 fields: current.fields.map((item) => item.key === field.key ? { ...item, value: event.target.value } : item),
                                             }))}
                                             rows={4}
-                                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                                         />
                                     ) : (
                                         <input
@@ -235,7 +235,7 @@ export default function PatientDocumentImportReview({
                                                 ...current,
                                                 fields: current.fields.map((item) => item.key === field.key ? { ...item, value: event.target.value } : item),
                                             }))}
-                                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                                         />
                                     )}
                                 </div>
@@ -297,7 +297,7 @@ export default function PatientDocumentImportReview({
                                                 ...current,
                                                 diagnoses: current.diagnoses.map((item) => item.id === diagnosis.id ? { ...item, code: event.target.value } : item),
                                             }))}
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-mono text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-mono text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                                         />
                                         <input
                                             value={diagnosis.description}
@@ -305,7 +305,7 @@ export default function PatientDocumentImportReview({
                                                 ...current,
                                                 diagnoses: current.diagnoses.map((item) => item.id === diagnosis.id ? { ...item, description: event.target.value } : item),
                                             }))}
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                                         />
                                     </div>
                                 </div>
@@ -370,7 +370,7 @@ export default function PatientDocumentImportReview({
                                                 servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => candidate.id === item.id ? { ...candidate, serviceName: event.target.value } : candidate),
                                             }))}
                                             placeholder="Nome prestazione"
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                                         />
                                         <input
                                             value={item.serviceCode || ''}
@@ -379,7 +379,7 @@ export default function PatientDocumentImportReview({
                                                 servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => candidate.id === item.id ? { ...candidate, serviceCode: event.target.value } : candidate),
                                             }))}
                                             placeholder="Codice prestazione"
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                                         />
                                         <input
                                             value={item.clinicalQuestion || ''}
@@ -388,7 +388,7 @@ export default function PatientDocumentImportReview({
                                                 servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => candidate.id === item.id ? { ...candidate, clinicalQuestion: event.target.value } : candidate),
                                             }))}
                                             placeholder="Quesito clinico"
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                                         />
                                         <input
                                             value={item.provider || ''}
@@ -397,7 +397,7 @@ export default function PatientDocumentImportReview({
                                                 servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => candidate.id === item.id ? { ...candidate, provider: event.target.value } : candidate),
                                             }))}
                                             placeholder="Struttura / specialita"
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                                         />
                                     </div>
                                 </div>
@@ -472,7 +472,7 @@ export default function PatientDocumentImportReview({
                                                 medications: current.medications.map((item) => item.id === medication.id ? { ...item, drugName: event.target.value } : item),
                                             }))}
                                             placeholder="Nome farmaco"
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                                         />
                                         <input
                                             value={medication.dosage || ''}
@@ -481,7 +481,7 @@ export default function PatientDocumentImportReview({
                                                 medications: current.medications.map((item) => item.id === medication.id ? { ...item, dosage: event.target.value } : item),
                                             }))}
                                             placeholder="Posologia"
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                                         />
                                         <input
                                             value={medication.activePrinciple || ''}
@@ -490,7 +490,7 @@ export default function PatientDocumentImportReview({
                                                 medications: current.medications.map((item) => item.id === medication.id ? { ...item, activePrinciple: event.target.value } : item),
                                             }))}
                                             placeholder="Principio attivo"
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                                         />
                                         <input
                                             value={medication.motivation || ''}
@@ -499,7 +499,7 @@ export default function PatientDocumentImportReview({
                                                 medications: current.medications.map((item) => item.id === medication.id ? { ...item, motivation: event.target.value } : item),
                                             }))}
                                             placeholder="Indicazione / contesto"
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                                         />
                                     </div>
 

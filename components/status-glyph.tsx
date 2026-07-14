@@ -37,40 +37,40 @@ const GLYPH_MAP: Record<
 > = {
     active: {
         icon: HeartPulse,
-        label: 'Active',
-        className: 'border-[color:rgba(15,123,104,0.18)] bg-[color:rgba(15,123,104,0.1)] text-[color:var(--mf-primary)]',
+        label: 'Attivo',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-accent)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_10%,transparent)] text-[color:var(--lume-accent)]',
     },
     review: {
         icon: ScanSearch,
-        label: 'In review',
-        className: 'border-[color:rgba(94,53,95,0.18)] bg-[color:rgba(94,53,95,0.1)] text-[color:var(--mf-plum)]',
+        label: 'Da rivedere',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-signal-plum)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-plum)_10%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-plum)_60%,var(--lume-ink))]',
     },
     completed: {
         icon: Check,
-        label: 'Completed',
-        className: 'border-[color:rgba(63,122,76,0.18)] bg-[color:rgba(63,122,76,0.1)] text-[color:var(--mf-success)]',
+        label: 'Completato',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-signal-success)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_10%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]',
     },
     high: {
         icon: AlertTriangle,
         /* @Codex WUL-UIUX: 'high' (critico) deve gridare, non avere la stessa
            ricetta tenue di 'archived'. Bordo e fondo a piena forza + ombra. */
-        label: 'High',
-        className: 'border-[color:rgba(163,58,47,0.55)] bg-[color:rgba(163,58,47,0.16)] text-[color:var(--mf-critical)] shadow-[0_2px_10px_rgba(163,58,47,0.2)]',
+        label: 'Priorità alta',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-signal-critical)_28%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_10%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))] shadow-[var(--lume-shadow-focal)]',
     },
     'follow-up': {
         icon: Clock3,
-        label: 'Follow-up',
-        className: 'border-[color:rgba(197,138,47,0.2)] bg-[color:rgba(197,138,47,0.1)] text-[color:var(--mf-warning)]',
+        label: 'Da ricontattare',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_20%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_10%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]',
     },
     archived: {
         icon: Archive,
-        label: 'Archived',
-        className: 'border-[color:rgba(112,106,100,0.18)] bg-[color:rgba(112,106,100,0.1)] text-[color:var(--mf-muted)]',
+        label: 'Archiviato',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]',
     },
     ambulatory: {
         icon: CircleDashed,
-        label: 'Ambulatory',
-        className: 'border-[color:rgba(15,123,104,0.12)] bg-[color:rgba(15,123,104,0.06)] text-[color:var(--mf-primary)]',
+        label: 'Ambulatorio',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-accent)_12%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_6%,transparent)] text-[color:var(--lume-accent)]',
     },
 };
 

@@ -3,7 +3,7 @@
 /* @Codex WUL-UIUX: progressive disclosure per la Scheda. I gestori operativi
    pesanti si aprono su richiesta, cosi su pazienti complessi la pagina si apre
    corta e prioritizzata invece di una catena di pannelli sempre espansi.
-   Stile invariato (glass, radius, colori): cambia solo la disposizione. */
+   Stile invariato (superficie, radius, colori): cambia solo la disposizione. */
 
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { ChevronDown, type LucideIcon } from 'lucide-react';
@@ -24,7 +24,7 @@ interface CollapsibleSectionProps {
        quando la sezione viene collassata. Per default i figli si smontano da
        chiusi (lazy mount) per tenere la pagina leggera. */
     keepMounted?: boolean;
-    /* Classe della superficie glass, cosi la sezione si allinea alla colonna in
+    /* Classe della superficie Lume, cosi la sezione si allinea alla colonna in
        cui vive (es. patient-detail-side-section nella colonna stretta). */
     surfaceClassName?: string;
     children: ReactNode;

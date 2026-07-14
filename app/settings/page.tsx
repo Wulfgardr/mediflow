@@ -78,17 +78,17 @@ function SettingsCommandRow({ item }: { item: SettingsNavItem }) {
         <Link
             href={item.href}
             data-testid={`settings-overview-link-${item.id}`}
-            className="group grid min-h-[64px] grid-cols-[32px_minmax(0,1fr)_auto_18px] items-center gap-3 rounded-[14px] border px-3.5 py-3 transition-colors hover:border-[color:var(--mf-accent)]"
+            className="group grid min-h-[64px] grid-cols-[32px_minmax(0,1fr)_auto_18px] items-center gap-3 rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-field)] px-3.5 py-3 transition-colors hover:border-[color:var(--lume-accent)]"
             style={{
-                borderColor: isDanger ? 'rgba(192, 57, 43, 0.26)' : 'var(--glass-border)',
-                background: isDanger ? 'rgba(192, 57, 43, 0.06)' : 'var(--mf-bg-elevated)',
+                borderColor: isDanger ? 'rgba(163, 58, 47, 0.26)' : 'color-mix(in srgb, var(--lume-ink) 12%, transparent)',
+                background: isDanger ? 'rgba(163, 58, 47, 0.06)' : 'var(--lume-surface-field)',
             }}
         >
             <span
                 className="flex h-8 w-8 items-center justify-center rounded-[10px]"
                 style={{
-                    background: isDanger ? 'rgba(192, 57, 43, 0.08)' : 'var(--mf-bg)',
-                    color: isDanger ? 'var(--mf-critical)' : 'var(--mf-muted)',
+                    background: isDanger ? 'rgba(163, 58, 47, 0.08)' : 'var(--lume-surface-focal)',
+                    color: isDanger ? 'var(--lume-signal-critical)' : 'var(--lume-ink-muted)',
                 }}
             >
                 <Icon className="h-4 w-4" aria-hidden="true" />
@@ -96,26 +96,26 @@ function SettingsCommandRow({ item }: { item: SettingsNavItem }) {
             <span className="min-w-0">
                 <span
                     className="block truncate text-[13px] font-semibold"
-                    style={{ color: isDanger ? 'var(--mf-critical)' : 'var(--mf-ink)' }}
+                    style={{ color: isDanger ? 'var(--lume-signal-critical)' : 'var(--lume-ink)' }}
                 >
                     {item.label}
                 </span>
-                <span className="mt-0.5 block truncate text-[11px]" style={{ color: 'var(--mf-muted)' }}>
+                <span className="mt-0.5 block truncate text-[11px]" style={{ color: 'var(--lume-ink-muted)' }}>
                     {item.description}
                 </span>
             </span>
             <span
-                className="hidden rounded-full px-2.5 py-1 text-[11px] font-semibold sm:inline-flex"
+                className="lume-registro hidden rounded-full px-2.5 py-1 text-[11px] font-semibold sm:inline-flex"
                 style={{
-                    background: isDanger ? 'rgba(192, 57, 43, 0.08)' : 'var(--mf-bg)',
-                    color: isDanger ? 'var(--mf-critical)' : 'var(--mf-muted)',
+                    background: isDanger ? 'rgba(163, 58, 47, 0.08)' : 'var(--lume-surface-focal)',
+                    color: isDanger ? 'var(--lume-signal-critical)' : 'var(--lume-ink-muted)',
                 }}
             >
                 {SETTINGS_ITEM_BADGES[item.id] ?? 'apri'}
             </span>
             <ArrowUpRight
                 className="h-4 w-4 justify-self-end opacity-45 transition-opacity group-hover:opacity-100"
-                style={{ color: isDanger ? 'var(--mf-critical)' : 'var(--mf-muted)' }}
+                style={{ color: isDanger ? 'var(--lume-signal-critical)' : 'var(--lume-ink-muted)' }}
                 aria-hidden="true"
             />
         </Link>
@@ -135,36 +135,36 @@ export default function SettingsPage() {
 
     return (
         <div className="space-y-6" data-testid="settings-overview-section">
-            <section className="patient-detail-section mf-section p-5 md:p-6">
+            <section className="mf-section lume-focal p-5 md:p-6">
                 <div className="grid gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(360px,1.05fr)] xl:items-start">
                     <div className="space-y-4">
                         <div>
                             <p className="section-kicker">Postazione locale</p>
-                            <h2 className="mt-1 text-xl font-semibold tracking-tight" style={{ color: 'var(--mf-ink)' }}>
+                            <h2 className="mt-1 text-xl font-semibold tracking-tight" style={{ color: 'var(--lume-ink)' }}>
                                 Stato operativo
                             </h2>
-                            <p className="mt-2 max-w-2xl text-sm leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
+                            <p className="mt-2 max-w-2xl text-sm leading-relaxed" style={{ color: 'var(--lume-ink-muted)' }}>
                                 Controlli essenziali del Mac che ospita MediFlow, senza uscita dati di default.
                             </p>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
-                            <div className="apple-subsection min-w-0 p-4">
+                            <div className="mf-section mf-section-tight min-w-0 p-4">
                                 <p className="section-kicker">Operatore</p>
-                                <p className="mt-2 truncate text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>
+                                <p className="mt-2 truncate text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>
                                     {user?.displayName || 'Admin'}
                                 </p>
-                                <p className="mt-1 truncate text-xs" style={{ color: 'var(--mf-muted)' }}>
+                                <p className="mt-1 truncate text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                                     {user?.ambulatoryName || 'Ambulatorio non impostato'}
                                 </p>
                             </div>
-                            <div className="apple-subsection min-w-0 p-4">
+                            <div className="mf-section mf-section-tight min-w-0 p-4">
                                 <p className="section-kicker">Lettura</p>
                                 <div className="mt-2 flex flex-wrap items-center gap-3">
                                     <div className="[&>div]:mx-0">
                                         <ThemeToggle />
                                     </div>
                                 </div>
-                                <p className="mt-2 text-xs leading-5" style={{ color: 'var(--mf-muted)' }}>
+                                <p className="mt-2 text-xs leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
                                     Privacy Mode resta nell&apos;intestazione dell&apos;app.
                                 </p>
                             </div>
@@ -189,7 +189,7 @@ export default function SettingsPage() {
                         <div key={group.id} className="mf-section mf-section-tight p-4 md:p-5">
                             <div className="mb-3 flex items-baseline justify-between gap-3">
                                 <p className="section-kicker">{group.label}</p>
-                                <span className="text-[11px]" style={{ color: 'var(--mf-muted)' }}>
+                                <span className="lume-registro text-[11px]" style={{ color: 'var(--lume-ink-muted)' }}>
                                     {group.items.length} sezioni
                                 </span>
                             </div>

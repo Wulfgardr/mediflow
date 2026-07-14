@@ -13,6 +13,7 @@ import { notifyDbChange } from '@/lib/live-query';
 import { persistDocumentInsightsArchive } from '@/lib/domain/documents/document-insights-archive';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { LumeFilo } from '@/components/ui/lume-filo';
 
 interface DocumentInsightsPanelProps {
     patient: Patient;
@@ -128,7 +129,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
     };
 
     return (
-        <div className="patient-detail-side-section glass-panel border p-6">
+        <div className="patient-detail-side-section lume-panel border p-6">
             <div className="mb-4 flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
                     <div className="rounded-2xl bg-amber-50 p-2 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300">
@@ -168,7 +169,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                 {insights.map((insight, index) => (
                     <div
                         key={insight.id}
-                        className={`rounded-xl border transition-all ${expandedId === insight.id
+                        className={`rounded-xl border transition-[border-color,background-color] ${expandedId === insight.id
                                 ? 'border-amber-200 dark:border-amber-500/30 bg-amber-50/40 dark:bg-amber-900/10'
                                 : 'border-slate-200/80 dark:border-white/10 bg-white/75 dark:bg-white/5 hover:border-slate-300'
                             }`}
@@ -233,7 +234,8 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                         </div>
 
                         {expandedId === insight.id && (
-                            <div className="px-4 pb-4">
+                            <div className="relative px-4 pb-4 pl-9">
+                                <LumeFilo variant="connettore" fill={100} className="absolute left-4 top-0 h-4 w-5" />
                                 {Array.isArray(insight.extractedData?.diagnoses) && insight.extractedData.diagnoses.length > 0 && (
                                     <div className="mb-3 flex flex-wrap gap-2">
                                         {insight.extractedData.diagnoses.map((diagnosis) => (

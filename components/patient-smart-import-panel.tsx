@@ -170,7 +170,7 @@ function formatResolverScore(score: number): string {
     return `${Math.round(score)}`;
 }
 
-const smartImportInputClassName = "h-10 w-full rounded-[16px] border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-slate-400 focus:ring-2 focus:ring-slate-100 dark:border-white/10 dark:bg-slate-950 dark:text-white dark:focus:border-white/30 dark:focus:ring-white/10";
+const smartImportInputClassName = "h-10 w-full rounded-[16px] border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition-colors focus:border-slate-400 focus:ring-2 focus:ring-slate-100 dark:border-white/10 dark:bg-slate-950 dark:text-white dark:focus:border-white/30 dark:focus:ring-white/10";
 
 // @Codex: Smart Import often renders in a narrow patient side rail, so actions must not share a cramped title row.
 function ReviewActionButtons({
@@ -504,7 +504,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
     if (!analysis && !isGenerating && !smartImportEnabled) {
         return (
             <div
-                className="glass-panel overflow-hidden rounded-[28px] border-red-200/70 bg-red-50/20 p-6 backdrop-blur-xl dark:border-red-500/20 dark:bg-red-950/10"
+                className="lume-panel overflow-hidden border-red-200/70 p-6 dark:border-red-500/20"
                 data-testid="smart-import-disabled-card"
             >
                 <div className="flex flex-col items-center text-center space-y-5">
@@ -531,7 +531,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
     }
 
     return (
-        <div className="patient-detail-section glass-panel overflow-hidden rounded-[28px] border p-0">
+        <div className="patient-detail-section lume-panel overflow-hidden rounded-[28px] border p-0">
             <div className="border-b border-slate-200/60 p-5 dark:border-white/5">
                 <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-3">
@@ -601,12 +601,12 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                 {isGenerating && (
                     <div className="space-y-4 py-10 text-center">
                         <div className="relative mx-auto h-12 w-12">
-                            <Brain className="h-12 w-12 animate-pulse text-slate-300 dark:text-white/15" />
+                            <Brain className="h-12 w-12 text-slate-300 dark:text-white/15" />
                             <div className="absolute inset-0 flex items-center justify-center">
                                 <RefreshCw className="h-5 w-5 animate-spin text-slate-700 dark:text-slate-200" />
                             </div>
                         </div>
-                        <p className="text-xs font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Elaborazione fonti cliniche...</p>
+                        <p className="text-xs font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Elaborazione fonti cliniche in corso...</p>
                     </div>
                 )}
 
@@ -651,7 +651,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                         return (
                                             <div
                                                 key={diagnosis.id}
-                                                className={`overflow-hidden rounded-[24px] border p-3.5 transition-[border-color,background-color,box-shadow] ${reviewStateCardClasses(diagnosis.review.state, isSelected)}`}
+                                                className={`overflow-hidden rounded-[var(--lume-radius-card)] border p-3.5 text-[color:var(--lume-ink-muted)] transition-[border-color,background-color,color] duration-[var(--lume-dur-firma)] ${reviewStateCardClasses(diagnosis.review.state, isSelected)}`}
                                             >
                                                 <div className="flex items-start gap-3">
                                                     <div className="pt-0.5">
@@ -684,7 +684,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                                     </span>
                                                                 </div>
                                                                 {diagnosis.match && (
-                                                                    <p className="break-words font-mono text-[10px] font-bold text-slate-700 dark:text-slate-200">
+                                                                    <p className="break-words lume-registro text-[10px] font-bold text-slate-700 dark:text-slate-200">
                                                                         ICD-11 {diagnosis.match.code} · {diagnosis.match.description}
                                                                     </p>
                                                                 )}
@@ -772,7 +772,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                         return (
                                             <div
                                                 key={therapy.id}
-                                                className={`overflow-hidden rounded-[24px] border p-3.5 transition-[border-color,background-color,box-shadow] ${reviewStateCardClasses(therapy.review.state, isSelected)}`}
+                                                className={`overflow-hidden rounded-[var(--lume-radius-card)] border p-3.5 text-[color:var(--lume-ink-muted)] transition-[border-color,background-color,color] duration-[var(--lume-dur-firma)] ${reviewStateCardClasses(therapy.review.state, isSelected)}`}
                                             >
                                                 <div className="flex items-start gap-3">
                                                     <div className="pt-0.5">
@@ -811,7 +811,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                                     {[displayPrinciple, displayDosage].filter(Boolean).join(' · ')}
                                                                 </p>
                                                                 {therapy.match?.aic && (
-                                                                    <p className="break-words font-mono text-[10px] font-bold text-slate-500 dark:text-slate-300">
+                                                                    <p className="break-words lume-registro text-[10px] font-bold text-slate-500 dark:text-slate-300">
                                                                         AIC {therapy.match.aic}{therapy.match.atc ? ` · ATC ${therapy.match.atc}` : ''}
                                                                     </p>
                                                                 )}

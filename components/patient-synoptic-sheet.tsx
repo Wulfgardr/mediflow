@@ -62,9 +62,9 @@ export interface PatientSynopticSheetProps {
 }
 
 const SIGNAL_TONE: Record<NonNullable<SynopticSignal['tone']>, string> = {
-    neutral: 'text-[color:var(--mf-ink)]',
-    warning: 'text-[color:var(--mf-warning)]',
-    critical: 'text-[color:var(--mf-critical)]',
+    neutral: 'text-[color:var(--lume-ink)]',
+    warning: 'text-[color:var(--lume-signal-warning)]',
+    critical: 'text-[color:var(--lume-signal-critical)]',
 };
 
 const THERAPY_CAP = 6;
@@ -81,7 +81,7 @@ function SkeletonLines({ rows }: { rows: number }) {
 
 function MicroLabel({ children }: { children: ReactNode }) {
     return (
-        <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+        <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
             {children}
         </span>
     );
@@ -108,21 +108,21 @@ export function PatientSynopticSheet({
             {/* A. Identita compatta */}
             <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div className="min-w-0">
-                    <h2 id="synoptic-name" className="text-[17px] font-semibold leading-tight text-[color:var(--mf-ink)]">
+                    <h2 id="synoptic-name" className="text-[17px] font-semibold leading-tight text-[color:var(--lume-ink)]">
                         <PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur>
                     </h2>
-                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-[color:var(--mf-muted)]">
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-[color:var(--lume-ink-muted)]">
                         {patient.taxCode ? (
                             <PrivacyBlur intensity="sm"><span className="font-mono uppercase">{patient.taxCode}</span></PrivacyBlur>
                         ) : null}
                         <span>{ageLabel}</span>
-                        {patient.isArchived ? <span className="text-[color:var(--mf-muted)]">· Archiviato</span> : null}
+                        {patient.isArchived ? <span className="text-[color:var(--lume-ink-muted)]">· Archiviato</span> : null}
                     </p>
                 </div>
                 <div className="shrink-0">{actions}</div>
             </header>
 
-            <hr className="my-4 border-0 border-t border-[color:var(--glass-border,rgba(15,23,42,0.08))]" />
+            <hr className="my-4 border-0 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_8%,transparent)]" />
 
             {/* B. Problema guida (prima diagnosi di qualunque sistema) */}
             <div className="flex items-start justify-between gap-3">
@@ -131,15 +131,15 @@ export function PatientSynopticSheet({
                     {leadDiagnosis ? (
                         <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
                             <span className="patient-code-pill patient-code-pill-plum shrink-0">{leadDiagnosis.code}</span>
-                            <span className="text-[15px] font-semibold leading-6 text-[color:var(--mf-ink)]">{leadDiagnosis.description}</span>
-                            <span className="text-[11px] uppercase tracking-wide text-[color:var(--mf-muted)]">{leadDiagnosis.system}</span>
+                            <span className="text-[15px] font-semibold leading-6 text-[color:var(--lume-ink)]">{leadDiagnosis.description}</span>
+                            <span className="text-[11px] uppercase tracking-wide text-[color:var(--lume-ink-muted)]">{leadDiagnosis.system}</span>
                         </div>
                     ) : (
-                        <p className="mt-1 text-sm text-[color:var(--mf-muted)]">Nessuna diagnosi codificata in scheda.</p>
+                        <p className="mt-1 text-sm text-[color:var(--lume-ink-muted)]">Nessuna diagnosi codificata in scheda.</p>
                     )}
                 </div>
                 {otherProblemsCount > 0 ? (
-                    <span className="shrink-0 whitespace-nowrap text-[11px] text-[color:var(--mf-muted)]">+{otherProblemsCount} problemi</span>
+                    <span className="shrink-0 whitespace-nowrap text-[11px] text-[color:var(--lume-ink-muted)]">+{otherProblemsCount} problemi</span>
                 ) : null}
             </div>
 
@@ -149,7 +149,7 @@ export function PatientSynopticSheet({
                     {signals.map((signal) => {
                         const body = (
                             <>
-                                <span className="block text-[11px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">{signal.label}</span>
+                                <span className="block text-[11px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">{signal.label}</span>
                                 <span className={`mt-0.5 block text-[18px] font-semibold leading-none tabular-nums ${SIGNAL_TONE[signal.tone ?? 'neutral']}`}>
                                     {signal.value}
                                 </span>
@@ -170,32 +170,32 @@ export function PatientSynopticSheet({
                 </div>
             ) : null}
 
-            <hr className="my-4 border-0 border-t border-[color:var(--glass-border,rgba(15,23,42,0.08))]" />
+            <hr className="my-4 border-0 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_8%,transparent)]" />
 
             <div className="grid gap-4 md:grid-cols-2">
                 {/* D. Terapie attive */}
                 <div className="min-w-0">
                     <a href="#terapie" className="mf-listrow !px-1 !py-0.5 justify-between">
                         <MicroLabel>Terapie attive</MicroLabel>
-                        <span className="text-[11px] text-[color:var(--mf-muted)]">{therapiesTotal ?? '–'}</span>
+                        <span className="text-[11px] text-[color:var(--lume-ink-muted)]">{therapiesTotal ?? '–'}</span>
                     </a>
                     {therapies === undefined ? (
                         <div className="mt-2"><SkeletonLines rows={3} /></div>
                     ) : therapies.length === 0 ? (
-                        <p className="mt-2 text-sm text-[color:var(--mf-muted)]">Nessuna terapia attiva.</p>
+                        <p className="mt-2 text-sm text-[color:var(--lume-ink-muted)]">Nessuna terapia attiva.</p>
                     ) : (
-                        <ul className="mt-1 divide-y divide-[color:var(--glass-border,rgba(15,23,42,0.06))]">
+                        <ul className="mt-1 divide-y divide-[color:color-mix(in_srgb,var(--lume-ink)_6%,transparent)]">
                             {visibleTherapies.map((therapy) => (
                                 <li key={therapy.id} className="flex items-baseline justify-between gap-3 py-1">
-                                    <span className="min-w-0 truncate text-[13px] font-medium text-[color:var(--mf-ink)]">{therapy.drugName}</span>
+                                    <span className="min-w-0 truncate text-[13px] font-medium text-[color:var(--lume-ink)]">{therapy.drugName}</span>
                                     {therapy.dosage ? (
-                                        <span className="shrink-0 text-[12px] text-[color:var(--mf-muted)]">{therapy.dosage}</span>
+                                        <span className="shrink-0 text-[12px] text-[color:var(--lume-ink-muted)]">{therapy.dosage}</span>
                                     ) : null}
                                 </li>
                             ))}
                             {extraTherapies > 0 ? (
                                 <li className="py-1">
-                                    <a href="#terapie" className="text-[12px] font-medium text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-ink)]">
+                                    <a href="#terapie" className="text-[12px] font-medium text-[color:var(--lume-ink-muted)] transition-colors hover:text-[color:var(--lume-ink)]">
                                         +{extraTherapies} altre terapie
                                     </a>
                                 </li>
@@ -213,15 +213,15 @@ export function PatientSynopticSheet({
                         {latestMeasure === undefined ? (
                             <div className="mt-2"><SkeletonLines rows={1} /></div>
                         ) : latestMeasure === null ? (
-                            <p className="mt-1 text-sm text-[color:var(--mf-muted)]">Nessun parametro registrato.</p>
+                            <p className="mt-1 text-sm text-[color:var(--lume-ink-muted)]">Nessun parametro registrato.</p>
                         ) : (
                             <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
-                                <span className="text-[13px] text-[color:var(--mf-ink)]">{latestMeasure.display}</span>
-                                <span className={`text-[15px] font-semibold tabular-nums ${latestMeasure.outOfRange ? 'text-[color:var(--mf-critical)]' : 'text-[color:var(--mf-ink)]'}`}>
+                                <span className="text-[13px] text-[color:var(--lume-ink)]">{latestMeasure.display}</span>
+                                <span className={`text-[15px] font-semibold tabular-nums ${latestMeasure.outOfRange ? 'text-[color:var(--lume-signal-critical)]' : 'text-[color:var(--lume-ink)]'}`}>
                                     {latestMeasure.valueLabel}
                                 </span>
                                 {latestMeasure.delta ? (
-                                    <span className="inline-flex items-center gap-0.5 text-[12px] text-[color:var(--mf-muted)]">
+                                    <span className="inline-flex items-center gap-0.5 text-[12px] text-[color:var(--lume-ink-muted)]">
                                         {latestMeasure.delta.direction === 'up' ? (
                                             <TrendingUp className="h-3.5 w-3.5" aria-label="in aumento" />
                                         ) : latestMeasure.delta.direction === 'down' ? (
@@ -231,11 +231,11 @@ export function PatientSynopticSheet({
                                         )}
                                         <span className="tabular-nums">{latestMeasure.delta.label}</span>
                                         {latestMeasure.delta.sinceLabel ? (
-                                            <span className="text-[color:var(--mf-muted)]">{latestMeasure.delta.sinceLabel}</span>
+                                            <span className="text-[color:var(--lume-ink-muted)]">{latestMeasure.delta.sinceLabel}</span>
                                         ) : null}
                                     </span>
                                 ) : null}
-                                <span className="text-[11px] text-[color:var(--mf-muted)]">{latestMeasure.dateLabel}</span>
+                                <span className="text-[11px] text-[color:var(--lume-ink-muted)]">{latestMeasure.dateLabel}</span>
                             </div>
                         )}
                     </div>
@@ -246,11 +246,11 @@ export function PatientSynopticSheet({
                         </a>
                         {nextCheckupLabel ? (
                             <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
-                                <span className="text-[13px] font-semibold text-[color:var(--mf-warning)]">{nextCheckupLabel}</span>
-                                {nextCheckupTitle ? <span className="min-w-0 truncate text-[12px] text-[color:var(--mf-muted)]">{nextCheckupTitle}</span> : null}
+                                <span className="text-[13px] font-semibold text-[color:var(--lume-signal-warning)]">{nextCheckupLabel}</span>
+                                {nextCheckupTitle ? <span className="min-w-0 truncate text-[12px] text-[color:var(--lume-ink-muted)]">{nextCheckupTitle}</span> : null}
                             </div>
                         ) : (
-                            <p className="mt-1 text-sm text-[color:var(--mf-muted)]">Nessun follow-up pianificato.</p>
+                            <p className="mt-1 text-sm text-[color:var(--lume-ink-muted)]">Nessun follow-up pianificato.</p>
                         )}
                     </div>
                 </div>

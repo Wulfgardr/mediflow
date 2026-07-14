@@ -30,8 +30,8 @@ export function PrivacyModeToggle({
             className={cn(
                 'inline-flex h-7 items-center justify-center gap-1.5 rounded-full border px-2 text-[11px] font-semibold transition-colors',
                 isPrivacyMode
-                    ? 'border-[color:rgba(15,123,104,0.28)] bg-[color:rgba(15,123,104,0.12)] text-[color:var(--mf-primary)]'
-                    : 'border-[color:rgba(112,106,100,0.2)] bg-transparent text-[color:var(--mf-muted)] hover:text-[color:var(--mf-ink)]',
+                    ? 'border-[color:color-mix(in_srgb,var(--lume-accent)_28%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_12%,transparent)] text-[color:var(--lume-accent)]'
+                    : 'border-[color:color-mix(in_srgb,var(--lume-ink)_20%,transparent)] bg-transparent text-[color:var(--lume-ink-muted)] hover:text-[color:var(--lume-ink)]',
                 className,
             )}
         >

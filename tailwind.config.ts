@@ -14,25 +14,15 @@ const config: Config = {
             colors: {
                 background: "var(--background)",
                 foreground: "var(--foreground)",
-                /* @Codex WUL-UIUX (STREAM E): il vocabolario Liquid Glass vive nei
-                   custom properties --mf-*; qui li promuoviamo a utility Tailwind
-                   (text-ink, bg-glass, border-glass, ...) cosi i call-site smettono
-                   di ripetere valori arbitrari [color:var(--mf-*)]. */
-                ink: "var(--mf-ink)",
-                muted: "var(--mf-muted)",
-                primary: "var(--mf-primary)",
-                accent: "var(--mf-accent)",
-                plum: "var(--mf-plum)",
-                warning: "var(--mf-warning)",
-                critical: "var(--mf-critical)",
-                success: "var(--mf-success)",
-                glass: {
-                    DEFAULT: "var(--glass-bg)",
-                    bg: "var(--mf-bg)",
-                    elevated: "var(--mf-bg-elevated)",
-                    strong: "var(--mf-bg-strong)",
-                    border: "var(--glass-border)",
-                },
+                /* Lume espone superfici opache, inchiostro e segnali clinici. */
+                ink: "var(--lume-ink)",
+                muted: "var(--lume-ink-muted)",
+                primary: "var(--lume-accent)",
+                accent: "var(--lume-accent)",
+                plum: "var(--lume-signal-plum)",
+                warning: "var(--lume-signal-warning)",
+                critical: "var(--lume-signal-critical)",
+                success: "var(--lume-signal-success)",
             },
             fontSize: {
                 /* @Codex WUL-UIUX (STREAM E): scala fissa che copre i px scritti a

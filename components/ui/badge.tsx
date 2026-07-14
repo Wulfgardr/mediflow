@@ -2,7 +2,7 @@
    varianti className scritte a mano (rounded-full border px-.. text-[11px]
    font-semibold + tinte semantiche) in un'unica API a toni. Le ricette dei toni
    derivano da status-glyph.tsx, che era la resa canonica del vocabolario
-   --mf-* (primary / plum / success / critical / warning / muted). */
+   Lume (accento minerale, plum, success, critical, warning e inchiostro). */
 
 import type { ReactNode } from 'react';
 
@@ -12,18 +12,18 @@ export type BadgeTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
 
 const TONE_CLASSES: Record<BadgeTone, string> = {
     neutral:
-        'border-[color:rgba(112,106,100,0.18)] bg-[color:rgba(112,106,100,0.1)] text-[color:var(--mf-muted)]',
-    info: 'border-[color:rgba(94,53,95,0.18)] bg-[color:rgba(94,53,95,0.1)] text-[color:var(--mf-plum)]',
+        'border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]',
+    info: 'border-[color:color-mix(in_srgb,var(--lume-signal-plum)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-plum)_10%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-plum)_60%,var(--lume-ink))]',
     success:
-        'border-[color:rgba(63,122,76,0.18)] bg-[color:rgba(63,122,76,0.1)] text-[color:var(--mf-success)]',
+        'border-[color:color-mix(in_srgb,var(--lume-signal-success)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_10%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]',
     warning:
-        'border-[color:rgba(197,138,47,0.2)] bg-[color:rgba(197,138,47,0.1)] text-[color:var(--mf-warning)]',
+        'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_20%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_10%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]',
     danger:
-        'border-[color:rgba(163,58,47,0.28)] bg-[color:rgba(163,58,47,0.12)] text-[color:var(--mf-critical)]',
+        'border-[color:color-mix(in_srgb,var(--lume-signal-critical)_28%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_10%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]',
 };
 
 /* @Codex WUL-UIUX (STREAM W2-B): dimensione "palette" a famiglie di colore Tailwind.
-   Le pillole di stato fuori dal cockpit non parlano il vocabolario semantico --mf-*
+   Le pillole di stato fuori dal cockpit non parlano il vocabolario semantico Lume
    ma tinte Tailwind con override dark-mode scritti a mano (amber/emerald/blue/red/
    slate). Invece di forzarle sui toni semantici (che sarebbe un ridisegno), qui le
    riproduco fedelmente, classe per classe, cosi i call-site possono migrare senza
@@ -60,7 +60,7 @@ const SIZE_CLASSES: Record<BadgeSize, string> = {
 };
 
 export interface BadgeProps {
-    /** Resa semantica sui token --mf-*. Ignorata quando `palette` e presente. */
+    /** Resa semantica sui token Lume. Ignorata quando `palette` e presente. */
     tone?: BadgeTone;
     /** Resa a famiglia di colore Tailwind (con dark-mode), per le pillole legacy. */
     palette?: BadgePalette;

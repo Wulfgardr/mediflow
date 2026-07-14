@@ -98,13 +98,13 @@ export default function BackupRestoreUI() {
 
     return (
         <div className="grid gap-6 xl:grid-cols-2">
-            <div className="mediflow-vitreous-panel glass-panel border p-6 md:p-7">
+            <div className="mf-section lume-focal p-6 md:p-7">
                 <p className="section-kicker">Export locale</p>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <h3 className="flex items-center gap-2 text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>
                     <Download className="w-5 h-5 text-blue-500" />
                     Backup
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 mb-4">
+                <p className="mb-4 mt-2 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
                     Scarica un artifact <code>.mediflow</code> v1 con manifest e checksum. Il ripristino valida formato, versione e integrità prima di sovrascrivere i dati.
                     <br />
                     <span className="font-bold text-amber-600 dark:text-amber-500">Nota:</span> il restore copre le collezioni esportabili via API locale; i dati non validi vengono rifiutati prima della scrittura.
@@ -112,16 +112,16 @@ export default function BackupRestoreUI() {
                 <button
                     onClick={handleExport}
                     disabled={isLoading}
-                    className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0A84FF,#5AC8FA)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_18px_34px_rgba(10,132,255,0.24)] transition-all hover:-translate-y-0.5 hover:shadow-[0_22px_40px_rgba(10,132,255,0.3)] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="ui-btn-primary lume-press px-5 py-2.5 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                    {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    {isLoading ? <RefreshCw className="w-4 h-4" /> : <Download className="w-4 h-4" />}
                     Scarica Backup
                 </button>
             </div>
 
-            <div className="mediflow-vitreous-panel glass-panel border p-6 md:p-7">
+            <div className="mf-section lume-focal p-6 md:p-7">
                 <p className="section-kicker">Ripristino controllato</p>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <h3 className="flex items-center gap-2 text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>
                     <Upload className="w-5 h-5 text-amber-500" />
                     Restore
                 </h3>
@@ -133,8 +133,8 @@ export default function BackupRestoreUI() {
                     </p>
                 </div>
 
-                <label className="inline-flex w-fit items-center gap-2 rounded-full border border-white/70 bg-white/76 px-4 py-2.5 text-sm font-medium text-gray-700 shadow-[0_10px_22px_rgba(15,23,42,0.04)] backdrop-blur-md transition-colors hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-[#21262d] cursor-pointer">
-                    {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                <label className="mf-btn-secondary lume-press w-fit cursor-pointer">
+                    {isLoading ? <RefreshCw className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
                     Seleziona file .mediflow v1
                     <input
                         type="file"
@@ -183,7 +183,7 @@ export default function BackupRestoreUI() {
                                 data-testid="restore-confirmation-submit"
                                 className="inline-flex items-center gap-2 rounded-full border border-red-300 bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-500/40"
                             >
-                                {isLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                                {isLoading ? <RefreshCw className="w-3.5 h-3.5" /> : <Upload className="w-3.5 h-3.5" />}
                                 Ripristina adesso
                             </button>
                             <button

@@ -433,7 +433,7 @@ export function Kree8ClinicalCockpit({
         </div>
       </aside>
 
-      <section className={styles.canvas}>
+      <section className={styles.canvas} data-lume-context={area}>
         <Toolbar
           activeArea={area}
           filter={filter}

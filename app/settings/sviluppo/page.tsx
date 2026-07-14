@@ -34,33 +34,33 @@ export default function SettingsDevelopmentPage() {
             />
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="apple-subsection flex flex-col justify-between">
+                <div className="mf-section flex flex-col justify-between">
                     <div className="mb-3">
                         <p className="section-kicker">Sviluppo</p>
-                        <h4 className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">Dati dimostrativi</h4>
-                        <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Genera pazienti e documenti sintetici per verificare la postazione.</p>
+                        <h4 className="mt-1 text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Dati dimostrativi</h4>
+                        <p className="mt-1 text-[11px]" style={{ color: 'var(--lume-ink-muted)' }}>Genera pazienti e documenti sintetici per verificare la postazione.</p>
                     </div>
                     <div className="flex items-center justify-end">
                         <DataSeeder />
                     </div>
                 </div>
 
-                <div className="apple-subsection flex flex-col justify-between">
+                <div className="mf-section flex flex-col justify-between">
                     <div className="mb-3">
                         <p className="section-kicker">Desktop</p>
-                        <h4 className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">App nativa macOS</h4>
-                        <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Avvia la shell nativa quando disponibile sul sistema.</p>
+                        <h4 className="mt-1 text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>App nativa macOS</h4>
+                        <p className="mt-1 text-[11px]" style={{ color: 'var(--lume-ink-muted)' }}>Avvia la shell nativa quando disponibile sul sistema.</p>
                     </div>
                     <div className="flex items-center justify-between gap-4">
                         <button
                             onClick={openNativeApp}
                             disabled={nativeLaunchState === 'loading'}
-                            className="inline-flex items-center gap-2 rounded-full border border-slate-200/70 bg-white/76 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 disabled:text-slate-400"
+                            className="mf-btn-secondary lume-press disabled:text-[color:var(--lume-ink-muted)]"
                         >
                             {nativeLaunchState === 'loading' ? 'Avvio in corso...' : 'Apri app nativa'}
                         </button>
                         {nativeLaunchState === 'success' && (
-                            <span className="text-xs text-slate-600 dark:text-slate-300">Aperta</span>
+                            <span className="text-xs" style={{ color: 'var(--lume-signal-success)' }}>Aperta</span>
                         )}
                         {nativeLaunchState === 'error' && (
                             <span className="text-xs text-red-600">Errore</span>

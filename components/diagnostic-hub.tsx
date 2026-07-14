@@ -123,22 +123,22 @@ export default function DiagnosticHub() {
     };
 
     return (
-        <div className="mediflow-vitreous-panel glass-panel border p-6 md:p-7 space-y-6">
+        <div className="mf-section lume-focal space-y-6 p-6 md:p-7">
             <div className="flex items-center justify-between">
                 <div>
                     <p className="section-kicker">Servizi locali</p>
-                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                    <h2 className="flex items-center gap-2 text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>
                         <Activity className="w-5 h-5 text-indigo-500" />
                         Diagnostica di Sistema
                     </h2>
-                    <p className="text-xs text-gray-500">Verifica lo stato dei sottosistemi.</p>
+                    <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Verifica lo stato dei sottosistemi.</p>
                 </div>
                 <button
                     onClick={runAll}
                     disabled={isRunningAll}
-                    className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#4F46E5,#818CF8)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_18px_34px_rgba(79,70,229,0.24)] transition-all hover:-translate-y-0.5 hover:shadow-[0_22px_40px_rgba(79,70,229,0.3)] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="ui-btn-primary lume-press px-5 py-2.5 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                    {isRunningAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                    {isRunningAll ? <Loader2 className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                     Esegui Test Completo
                 </button>
             </div>
@@ -147,7 +147,7 @@ export default function DiagnosticHub() {
                 {checks.map(check => {
                     const res = results[check.id] || { status: 'idle' };
                     return (
-                        <div key={check.id} className="group flex items-center justify-between gap-4 p-4 rounded-[22px] border border-white/70 bg-white/72 shadow-[0_10px_22px_rgba(15,23,42,0.04)] backdrop-blur-md hover:border-white hover:shadow-[0_14px_28px_rgba(15,23,42,0.06)] transition-all dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20">
+                        <div key={check.id} className="group flex items-center justify-between gap-4 rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4 transition-colors hover:border-[color:var(--lume-accent)]">
                             <div className="flex items-center gap-4">
                                 <div className={cn(
                                     "p-2 rounded-lg transition-colors",
@@ -156,20 +156,20 @@ export default function DiagnosticHub() {
                                             res.status === 'running' ? "bg-indigo-50 text-indigo-600" :
                                                 "bg-gray-100 text-gray-500"
                                 )}>
-                                    {res.status === 'running' ? <Loader2 className="w-4 h-4 animate-spin" /> :
+                                    {res.status === 'running' ? <Loader2 className="w-4 h-4" /> :
                                         res.status === 'ok' ? <CheckCircle className="w-4 h-4" /> :
                                             res.status === 'error' ? <XCircle className="w-4 h-4" /> :
                                                 check.icon}
                                 </div>
                                 <div>
-                                    <p className="text-sm font-bold text-gray-700 dark:text-gray-200">{check.name}</p>
-                                    <p className="text-[10px] text-gray-400">{check.description}</p>
+                                    <p className="text-sm font-bold" style={{ color: 'var(--lume-ink)' }}>{check.name}</p>
+                                    <p className="text-[10px]" style={{ color: 'var(--lume-ink-muted)' }}>{check.description}</p>
                                 </div>
                             </div>
 
                             <div className="flex items-center gap-4">
                                 {res.status === 'ok' && (
-                                    <span className="rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-mono text-green-600 dark:border-green-500/20 dark:bg-green-900/10 dark:text-green-300">
+                                    <span className="lume-registro rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs text-green-600 dark:border-green-500/20 dark:bg-green-900/10 dark:text-green-300">
                                         {res.latency}ms
                                     </span>
                                 )}

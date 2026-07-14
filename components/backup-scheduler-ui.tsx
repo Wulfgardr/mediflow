@@ -55,9 +55,9 @@ function formatBytes(value: number): string {
     return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-const INPUT_CLASS = 'mt-1 w-full rounded-2xl border border-white/70 bg-white/76 p-3 text-sm text-slate-800 shadow-[0_10px_22px_rgba(15,23,42,0.05)] outline-none backdrop-blur-md transition-all focus:border-white focus:ring-2 focus:ring-sky-500/20 dark:border-white/10 dark:bg-white/5 dark:text-slate-100';
-const PRIMARY_BUTTON_CLASS = 'inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#4F46E5,#818CF8)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(79,70,229,0.24)] transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_36px_rgba(79,70,229,0.3)] disabled:cursor-not-allowed disabled:opacity-50';
-const SECONDARY_BUTTON_CLASS = 'inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/76 px-4 py-2.5 text-sm font-medium text-slate-700 shadow-[0_10px_22px_rgba(15,23,42,0.04)] backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-white hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-white/20';
+const INPUT_CLASS = 'mf-input mt-1 p-3';
+const PRIMARY_BUTTON_CLASS = 'ui-btn-primary lume-press px-5 py-2.5 disabled:cursor-not-allowed disabled:opacity-50';
+const SECONDARY_BUTTON_CLASS = 'mf-btn-secondary lume-press px-4 py-2.5 disabled:cursor-not-allowed disabled:opacity-50';
 
 export default function BackupSchedulerUI() {
     const [status, setStatus] = useState<BackupSchedulerResponse | null>(null);
@@ -231,15 +231,15 @@ export default function BackupSchedulerUI() {
     const schedulingUnsupported = Boolean(status && !status.supported);
 
     return (
-        <div className="mediflow-vitreous-panel glass-panel border p-6 md:p-7 space-y-5">
+        <div className="mf-section lume-focal space-y-5 p-6 md:p-7">
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <p className="section-kicker">Continuità operativa</p>
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <h3 className="flex items-center gap-2 text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>
                         <Clock3 className="w-5 h-5 text-indigo-500" />
                         Backup automatico notturno
                     </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                    <p className="mt-2 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
                         Schedulazione cross-platform: LaunchAgent su macOS, Task Scheduler su Windows, systemd-timer o cron su Linux. Il runner headless locale e lo stesso ovunque.
                     </p>
                 </div>
@@ -257,7 +257,7 @@ export default function BackupSchedulerUI() {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <label className="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="flex items-center gap-3 text-sm font-medium" style={{ color: 'var(--lume-ink)' }}>
                     <input
                         type="checkbox"
                         checked={enabled}
@@ -268,7 +268,7 @@ export default function BackupSchedulerUI() {
                     Attiva backup notturno
                 </label>
 
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="text-sm font-medium" style={{ color: 'var(--lume-ink)' }}>
                     Orario
                     <input
                         type="time"
@@ -279,7 +279,7 @@ export default function BackupSchedulerUI() {
                     />
                 </label>
 
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="text-sm font-medium" style={{ color: 'var(--lume-ink)' }}>
                     Destinazione
                     <input
                         type="text"
@@ -290,7 +290,7 @@ export default function BackupSchedulerUI() {
                     />
                 </label>
 
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="text-sm font-medium" style={{ color: 'var(--lume-ink)' }}>
                     Mantieni ultimi backup
                     <input
                         type="number"
@@ -303,7 +303,7 @@ export default function BackupSchedulerUI() {
                 </label>
             </div>
 
-            <div className="rounded-[22px] border border-slate-200/70 bg-white/72 px-4 py-3 text-sm text-slate-700 shadow-[0_10px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+            <div className="rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
                 La retention automatica e limitata ai file `mediflow-backup-v1-*.mediflow` e ai `.tmp` orfani nella cartella configurata. Nessun allegato clinico o file arbitrario viene toccato.
             </div>
 
@@ -313,7 +313,7 @@ export default function BackupSchedulerUI() {
                     disabled={isSaving || schedulingUnsupported}
                     className={PRIMARY_BUTTON_CLASS}
                 >
-                    {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    {isSaving ? <RefreshCw className="w-4 h-4" /> : <Save className="w-4 h-4" />}
                     Salva schedulazione
                 </button>
                 <button
@@ -321,7 +321,7 @@ export default function BackupSchedulerUI() {
                     disabled={isRunning}
                     className={SECONDARY_BUTTON_CLASS}
                 >
-                    {isRunning ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FolderArchive className="w-4 h-4" />}
+                    {isRunning ? <RefreshCw className="w-4 h-4" /> : <FolderArchive className="w-4 h-4" />}
                     Esegui adesso
                 </button>
                 <button
@@ -329,7 +329,7 @@ export default function BackupSchedulerUI() {
                     disabled={isPreviewingRetention}
                     className={SECONDARY_BUTTON_CLASS}
                 >
-                    {isPreviewingRetention ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    {isPreviewingRetention ? <RefreshCw className="w-4 h-4" /> : <RefreshCw className="w-4 h-4" />}
                     Anteprima retention
                 </button>
                 <button
@@ -337,13 +337,13 @@ export default function BackupSchedulerUI() {
                     disabled={isApplyingRetention}
                     className={SECONDARY_BUTTON_CLASS}
                 >
-                    {isApplyingRetention ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FolderArchive className="w-4 h-4" />}
+                    {isApplyingRetention ? <RefreshCw className="w-4 h-4" /> : <FolderArchive className="w-4 h-4" />}
                     Applica pulizia
                 </button>
             </div>
 
             {lastRun && (
-                <div className="apple-subsection space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                <div className="mf-section mf-section-tight space-y-1 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
                     <p><strong>Ultimo run:</strong> {lastRun.lastRunAt ?? 'mai eseguito'}</p>
                     <p><strong>Esito:</strong> {lastRun.lastRunStatus ?? 'n/d'}</p>
                     {lastRun.lastRunMessage && <p><strong>Messaggio:</strong> {lastRun.lastRunMessage}</p>}
@@ -359,7 +359,7 @@ export default function BackupSchedulerUI() {
             )}
 
             {retentionPreview && (
-                <div className="apple-subsection space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                <div className="mf-section mf-section-tight space-y-2 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
                     <p><strong>Anteprima retention:</strong> {retentionPreview.deleteCount} file candidati, {formatBytes(retentionPreview.deleteBytes)} totali.</p>
                     <p><strong>Policy:</strong> mantieni ultimi {retentionPreview.keepArtifacts} artifact nella cartella {retentionPreview.destinationDir}</p>
                     <p><strong>Inventario:</strong> {retentionPreview.artifactCount} artifact gestiti, {retentionPreview.orphanTempCount} `.tmp` orfani</p>
