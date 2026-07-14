@@ -27,6 +27,8 @@ struct PairedPatientDocumentsSection: View {
             followupSuggestionsSection
             fseDocumentValidationSection
         }
+        .padding(12)
+        .lumeSurface(zone: .field)
     }
 
     // MARK: - S6 (Wave 5): documenti, archivio intelligente, follow-up, FSE
@@ -212,6 +214,7 @@ struct PairedPatientDocumentsSection: View {
             }
         }
         .buttonStyle(.plain)
+        .modifier(LumeRigaListaModifier(isSelected: attachmentDetailCandidate?.id == attachment.id))
     }
 
     private func attachmentDetailSheet(_ summary: HomeBaseAttachmentSummary) -> some View {
@@ -395,8 +398,7 @@ struct PairedPatientDocumentsSection: View {
             .foregroundStyle(.secondary)
         }
         .padding(10)
-        .background(PlatformColors.groupedBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .lumeSurface(zone: .field, cornerRadius: 12)
     }
 
     /* @Codex */
@@ -440,7 +442,7 @@ struct PairedPatientDocumentsSection: View {
             }
         }
         .padding(10)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.2)))
+        .lumeSurface(zone: .field, cornerRadius: 10)
     }
 
     /* @Codex */

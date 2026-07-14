@@ -98,7 +98,8 @@ struct PairedHomeBaseCredentialsView: View {
                     .accessibilityIdentifier("homebase-error-message")
             }
         }
-        .cardStyle()
+        .padding(16)
+        .lumeSurface(zone: .field)
         .confirmationDialog(
             "Dissociare questo dispositivo?",
             isPresented: $confirmsClearingPairing,
@@ -208,6 +209,7 @@ struct PairedPatientsWorklistView: View {
                         }
                         .padding(.vertical, 6)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .lumeSurface(zone: model.selectedPatient?.id == patient.id ? .focal : .field, cornerRadius: 10)
                         .accessibilityIdentifier("patient-trash-row-\(patient.id)")
                     } else {
                         Button {
@@ -251,6 +253,7 @@ struct PairedPatientsWorklistView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .buttonStyle(.plain)
+                        .modifier(LumeRigaListaModifier(isSelected: model.selectedPatient?.id == patient.id))
                         .accessibilityIdentifier("patient-cell-\(patient.id)")
                     }
                 }
@@ -344,6 +347,7 @@ struct PairedPatientsWorklistView: View {
 
     // Plain tinted capsule (no glass): glass inside the glass card would nest.
 }
+
 
 /* @Codex */
 struct PairedPatientCreateView: View {

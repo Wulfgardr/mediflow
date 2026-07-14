@@ -387,6 +387,15 @@ public struct RigaLista<Content: View>: View {
     }
 }
 
+/* @Codex */
+struct LumeRigaListaModifier: ViewModifier {
+    let isSelected: Bool
+
+    func body(content: Content) -> some View {
+        RigaLista(isSelected: isSelected) { content }
+    }
+}
+
 private struct LumeInchiostroModifier: ViewModifier {
     let bozza: Bool
 

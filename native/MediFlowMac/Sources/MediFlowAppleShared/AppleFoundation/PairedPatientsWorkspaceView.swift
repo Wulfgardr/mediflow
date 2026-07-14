@@ -38,6 +38,7 @@ struct PairedPatientsWorkspaceView: View {
     @State private var selectedFseTherapyId: String?
     @State private var selectedFseObservationId: String?
     @State private var expandedInsightId: String?
+    @State private var isCompactPatientHeaderExpanded = false
 
     init(model: PairedPatientsWorkspaceModel, capabilities: ClinicalWorkspaceCapabilitiesStore) {
         self.model = model
@@ -200,7 +201,8 @@ struct PairedPatientsWorkspaceView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         credentialsCard
                         patientsListContent
-                            .cardStyle()
+                            .padding(16)
+                            .lumeSurface(zone: .field)
                     }
                     .padding(20)
                 }
@@ -212,7 +214,8 @@ struct PairedPatientsWorkspaceView: View {
                     Group {
                         if let detail = model.selectedPatient {
                             selectedPatientSections(detail)
-                                .cardStyle()
+                                .padding(16)
+                                .lumeSurface(zone: .focal)
                         } else {
                             emptyDetailState
                         }
@@ -238,6 +241,11 @@ struct PairedPatientsWorkspaceView: View {
                     #endif
                 }
                 .padding(20)
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if let detail = model.selectedPatient {
+                    compactPatientHeader(detail)
+                }
             }
         }
     }
@@ -275,7 +283,8 @@ struct PairedPatientsWorkspaceView: View {
                 selectedPatientSections(detail)
             }
         }
-        .cardStyle()
+        .padding(16)
+        .lumeSurface(zone: .focal)
     }
 
     private var emptyDetailState: some View {
@@ -292,6 +301,39 @@ struct PairedPatientsWorkspaceView: View {
         }
         .frame(maxWidth: 420)
         .frame(maxWidth: .infinity, minHeight: 320)
+    }
+
+    private func compactPatientHeader(_ detail: HomeBasePatientDetail) -> some View {
+        Button {
+            isCompactPatientHeaderExpanded.toggle()
+        } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Text("\(detail.lastName) \(detail.firstName)")
+                        .font(.subheadline.weight(.semibold))
+                    if let birthDate = detail.birthDate {
+                        Text(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birthDate))
+                            .font(.caption)
+                            .registro()
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: isCompactPatientHeaderExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                if isCompactPatientHeaderExpanded {
+                    Text("Codice fiscale: \(detail.taxCode)")
+                        .font(.caption)
+                        .registro()
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.horizontal, 16)
+            .lumeSurface(zone: .focal, cornerRadius: 0)
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
