@@ -449,7 +449,7 @@ export default function SettingsAiFunctionsPage() {
 
                 {/* Read-only governance */}
                 {/* WUL-297: expanded by default now that governance lives on a dedicated page. */}
-                <details open className="group rounded-[24px] border border-slate-200/70 bg-white/60 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
+                <details open className="group rounded-[var(--lume-radius-panel)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)]">
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
                         <div>
                             <p className="section-kicker">Governance</p>
@@ -457,7 +457,7 @@ export default function SettingsAiFunctionsPage() {
                         </div>
                         <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
                     </summary>
-                    <div className="space-y-4 border-t border-slate-200/70 px-5 py-5 dark:border-white/10">
+                    <div className="space-y-4 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] px-5 py-5">
                         <AiModelParliamentPanel />
                         <AiRolloutReadinessPanel />
                     </div>

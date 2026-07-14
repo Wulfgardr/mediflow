@@ -161,7 +161,7 @@ export default function SettingsAccessPage() {
                     </div>
 
                     <div className="space-y-4">
-                        <div className="apple-subsection">
+                        <div className="mf-section">
                             <p className="section-kicker">Operatore</p>
                             <p className="mt-2 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>{user?.displayName || 'Admin'}</p>
                             <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>{user?.ambulatoryName || 'Ambulatorio non impostato'}</p>

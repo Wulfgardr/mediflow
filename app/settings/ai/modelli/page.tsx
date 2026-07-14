@@ -271,7 +271,7 @@ export default function SettingsAiModelsPage() {
                             onClick={testAiConnection}
                             className={SETTINGS_SECONDARY_BUTTON_CLASS}
                         >
-                            <RefreshCw className={cn("w-4 h-4", aiTestStatus === 'testing' && "animate-spin")} />
+                            <RefreshCw className="w-4 h-4" />
                             Test Connessione
                         </button>
 

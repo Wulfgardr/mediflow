@@ -120,7 +120,7 @@ export default function AiRolloutReadinessPanel() {
     const disabledControlsCount = localControls.filter((control) => control.state === 'disabled').length;
 
     return (
-        <div className="apple-subsection space-y-4" data-testid="ai-rollout-readiness-panel">
+        <div className="mf-section space-y-4" data-testid="ai-rollout-readiness-panel">
             <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
                     <div className="rounded-2xl bg-sky-100/90 p-2.5 text-sky-700 dark:bg-sky-500/15 dark:text-sky-200">
@@ -139,7 +139,7 @@ export default function AiRolloutReadinessPanel() {
                     onClick={() => void loadArtifacts()}
                     className="inline-flex items-center gap-2 rounded-full border border-slate-200/70 bg-white/72 px-3 py-2 text-[11px] font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:border-white/20 dark:hover:text-white"
                 >
-                    <RefreshCw className={cn('h-3.5 w-3.5', state.status === 'loading' && 'animate-spin')} />
+                    <RefreshCw className="h-3.5 w-3.5" />
                     Aggiorna
                 </button>
             </div>

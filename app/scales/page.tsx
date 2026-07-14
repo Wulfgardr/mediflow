@@ -113,15 +113,15 @@ export default function ScalesLibraryPage() {
                 : 'Sono elencate solo le scale già digitalizzate.'}
             navItems={navItems}
         >
-            <section id="catalogo" ref={catalogSectionRef} className="patient-detail-section mf-section p-6 md:p-8 space-y-6 scroll-mt-40">
+            <section id="catalogo" ref={catalogSectionRef} className="mf-section lume-focal space-y-6 p-6 md:p-8 scroll-mt-40">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div className="space-y-1">
                         <p className="mf-eyebrow">Catalogo scale</p>
-                        <h2 className="text-xl font-semibold tracking-tight text-slate-950">
+                        <h2 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--lume-ink)' }}>
                             Scale pronte alla somministrazione
                         </h2>
                     </div>
-                    <span className="apple-chip w-fit">{SCALE_CATALOG.length} scale attive</span>
+                    <span className="lume-registro mf-btn-secondary w-fit">{SCALE_CATALOG.length} scale attive</span>
                 </div>
 
                 <div className="space-y-6">
@@ -140,22 +140,22 @@ export default function ScalesLibraryPage() {
                                             type="button"
                                             onClick={() => handleScaleChoice(item.id)}
                                             aria-pressed={isSelected}
-                                            className={`group flex min-h-[170px] flex-col justify-between rounded-[22px] border p-5 text-left transition-[border-color,background-color,box-shadow,transform] active:scale-[0.99] ${
+                                            className={`lume-press group flex min-h-[170px] flex-col justify-between rounded-[var(--lume-radius-card)] border p-5 text-left transition-[border-color,background-color,box-shadow,transform] ${
                                                 isSelected
-                                                    ? 'border-slate-300 bg-slate-50 shadow-[0_12px_28px_rgba(15,23,42,0.08)]'
-                                                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                                                    ? 'border-[color:var(--lume-accent)] bg-[color:var(--lume-surface-focal)] shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]'
+                                                    : 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] hover:border-[color:color-mix(in_srgb,var(--lume-ink)_22%,transparent)]'
                                             }`}
                                         >
                                             <span className="flex items-start justify-between gap-3">
-                                                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700 transition-colors group-hover:bg-white">
+                                                <span className="flex h-11 w-11 items-center justify-center rounded-[var(--lume-radius-control)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink-muted)] transition-colors">
                                                     <Icon className="h-5 w-5" />
                                                 </span>
                                             </span>
                                             <span className="space-y-2">
-                                                <strong className="block text-lg font-semibold leading-tight text-slate-950">
+                                                <strong className="block text-lg font-semibold leading-tight" style={{ color: 'var(--lume-ink)' }}>
                                                     {scale.title}
                                                 </strong>
-                                                <span className="block text-sm leading-relaxed text-slate-600">
+                                                <span className="block text-sm leading-relaxed" style={{ color: 'var(--lume-ink-muted)' }}>
                                                     {scale.description}
                                                 </span>
                                             </span>
@@ -169,15 +169,15 @@ export default function ScalesLibraryPage() {
             </section>
 
             {selectedScaleDefinition && (
-                <section id="paziente" ref={patientSectionRef} className="patient-detail-section mf-section p-6 md:p-8 space-y-5 scroll-mt-40">
+                <section id="paziente" ref={patientSectionRef} className="mf-section lume-focal space-y-5 p-6 md:p-8 scroll-mt-40">
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div className="space-y-1">
                             <p className="mf-eyebrow">Avvio scala</p>
-                            <h2 className="text-xl font-semibold tracking-tight text-slate-950">
+                            <h2 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--lume-ink)' }}>
                                 Scegli il paziente
                             </h2>
-                            <p className="max-w-3xl text-sm leading-relaxed text-slate-600">
-                                Hai scelto <strong className="font-semibold text-slate-950">{selectedScaleDefinition.title}</strong>.
+                            <p className="max-w-3xl text-sm leading-relaxed" style={{ color: 'var(--lume-ink-muted)' }}>
+                                Hai scelto <strong className="font-semibold" style={{ color: 'var(--lume-ink)' }}>{selectedScaleDefinition.title}</strong>.
                             </p>
                         </div>
                         <button
@@ -191,7 +191,7 @@ export default function ScalesLibraryPage() {
                     </div>
 
                     <div className="relative">
-                        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--lume-ink-muted)' }} />
                         <input
                             ref={patientSearchRef}
                             value={searchTerm}
@@ -208,15 +208,15 @@ export default function ScalesLibraryPage() {
                                 type="button"
                                 onClick={() => handleSelectPatient(patient.id)}
                                 aria-label={`Avvia ${selectedScaleDefinition.title} per ${patient.lastName} ${patient.firstName}`}
-                                className="flex items-center justify-between gap-4 rounded-[18px] border border-slate-200 bg-white p-4 text-left transition-[border-color,background-color] hover:border-slate-300 hover:bg-slate-50"
+                                className="lume-press flex items-center justify-between gap-4 rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-left transition-[border-color,background-color] hover:border-[color:var(--lume-accent)]"
                             >
                                 <span className="min-w-0">
-                                    <strong className="block truncate text-sm font-semibold text-slate-950">
+                                    <strong className="block truncate text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>
                                         {patient.lastName} {patient.firstName}
                                     </strong>
-                                    <span className="mt-1 block truncate text-xs text-slate-500">{patient.taxCode}</span>
+                                    <span className="lume-registro mt-1 block truncate text-xs" style={{ color: 'var(--lume-ink-muted)' }}>{patient.taxCode}</span>
                                 </span>
-                                <span className="inline-flex shrink-0 items-center gap-2 text-xs font-semibold text-slate-600">
+                                <span className="inline-flex shrink-0 items-center gap-2 text-xs font-semibold" style={{ color: 'var(--lume-ink-muted)' }}>
                                     Avvia
                                     <ArrowRight className="h-4 w-4" />
                                 </span>
@@ -224,19 +224,19 @@ export default function ScalesLibraryPage() {
                         ))}
 
                         {patients?.length === 0 && (
-                            <div className="rounded-[18px] border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
+                            <div className="rounded-[var(--lume-radius-card)] border border-dashed border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-5 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
                                 Nessuna scheda corrisponde alla ricerca.
                             </div>
                         )}
 
                         {patients && patients.length >= 8 && (
-                            <div className="rounded-[18px] border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
+                            <div className="rounded-[var(--lume-radius-card)] border border-dashed border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                                 Affina la ricerca per vedere altre schede.
                             </div>
                         )}
                     </div>
 
-                    <div className="flex justify-end border-t border-slate-100 pt-5">
+                    <div className="flex justify-end border-t pt-5" style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 10%, transparent)' }}>
                         <button
                             type="button"
                             onClick={() => router.push('/patients/new')}

@@ -106,7 +106,7 @@ export default function ServiceArchitecturePanel() {
             case 'stopped':
                 return <XCircle className="w-4 h-4 text-red-500" />;
             case 'checking':
-                return <Loader2 className="w-4 h-4 text-amber-500 animate-spin" />;
+                return <Loader2 className="w-4 h-4 text-amber-500" />;
         }
     };
 
@@ -133,25 +133,26 @@ export default function ServiceArchitecturePanel() {
     };
 
     return (
-        <div className="mediflow-vitreous-panel glass-panel border p-6 md:p-7">
+        <div className="mf-section lume-focal p-6 md:p-7">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl text-white">
+                    <div className="rounded-[var(--lume-radius-control)] bg-[color:var(--lume-surface-focal)] p-2 text-[color:var(--lume-accent)]">
                         <Server className="w-5 h-5" />
                     </div>
                     <div>
                         <p className="section-kicker">Topologia locale</p>
-                        <h2 className="text-lg font-bold text-gray-800 dark:text-white">Architettura Servizi</h2>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Visualizza lo stato dei componenti MediFlow</p>
+                        <h2 className="text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>Architettura Servizi</h2>
+                        <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Visualizza lo stato dei componenti MediFlow</p>
                     </div>
                 </div>
                 <button
                     onClick={checkServices}
                     disabled={isRefreshing}
-                    className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+                    className="lume-press rounded-[var(--lume-radius-control)] p-2 transition-colors"
+                    style={{ color: 'var(--lume-ink-muted)' }}
                     title="Aggiorna stato"
                 >
-                    <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    <RefreshCw className="w-5 h-5" />
                 </button>
             </div>
 
@@ -165,7 +166,7 @@ export default function ServiceArchitecturePanel() {
                         stroke="currentColor"
                         strokeWidth="2"
                         strokeDasharray="4 4"
-                        className="text-gray-300 dark:text-gray-600"
+                        className="text-[color:var(--lume-ink-muted)]"
                     />
                     {/* App (Center) to ICD (Right) */}
                     <line
@@ -173,7 +174,7 @@ export default function ServiceArchitecturePanel() {
                         stroke="currentColor"
                         strokeWidth="2"
                         strokeDasharray="4 4"
-                        className="text-gray-300 dark:text-gray-600"
+                        className="text-[color:var(--lume-ink-muted)]"
                     />
                 </svg>
 
@@ -181,16 +182,16 @@ export default function ServiceArchitecturePanel() {
                 <div className="grid grid-cols-3 gap-4 relative z-10">
 
                     {/* AI Node (Moved to First) */}
-                    <div className={`rounded-[24px] border p-4 shadow-[0_12px_26px_rgba(15,23,42,0.05)] backdrop-blur-md transition-all ${getStatusColor(services.ai.status)}`}>
+                    <div className={`rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-field)] p-4 transition-colors ${getStatusColor(services.ai.status)}`}>
                         <div className="flex flex-col items-center text-center space-y-2">
                             <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-xl">
                                 <Brain className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                             </div>
                             <div>
-                                <h3 className="font-bold text-gray-800 dark:text-white">AI Engine</h3>
-                                <p className="text-xs text-gray-500">Ollama</p>
+                                <h3 className="font-bold" style={{ color: 'var(--lume-ink)' }}>AI Engine</h3>
+                                <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Ollama</p>
                             </div>
-                            <div className="text-xs font-mono text-gray-600 dark:text-gray-400">
+                            <div className="lume-registro text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                                 :{services.ai.port}
                             </div>
                             <div className="flex items-center gap-1.5">
@@ -227,16 +228,16 @@ export default function ServiceArchitecturePanel() {
                     </div>
 
                     {/* App Node (Moved to Center) */}
-                    <div className={`rounded-[24px] border p-4 shadow-[0_12px_26px_rgba(15,23,42,0.05)] backdrop-blur-md transition-all ${getStatusColor(services.app.status)}`}>
+                    <div className={`rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-field)] p-4 transition-colors ${getStatusColor(services.app.status)}`}>
                         <div className="flex flex-col items-center text-center space-y-2">
                             <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
                                 <Server className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                             </div>
                             <div>
-                                <h3 className="font-bold text-gray-800 dark:text-white">App</h3>
-                                <p className="text-xs text-gray-500">Next.js</p>
+                                <h3 className="font-bold" style={{ color: 'var(--lume-ink)' }}>App</h3>
+                                <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Next.js</p>
                             </div>
-                            <div className="text-xs font-mono text-gray-600 dark:text-gray-400">
+                            <div className="lume-registro text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                                 :{services.app.port}
                             </div>
                             <div className="flex items-center gap-1.5">
@@ -250,16 +251,16 @@ export default function ServiceArchitecturePanel() {
                     </div>
 
                     {/* ICD Node (Right) */}
-                    <div className={`rounded-[24px] border p-4 shadow-[0_12px_26px_rgba(15,23,42,0.05)] backdrop-blur-md transition-all ${getStatusColor(services.icd.status)}`}>
+                    <div className={`rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-field)] p-4 transition-colors ${getStatusColor(services.icd.status)}`}>
                         <div className="flex flex-col items-center text-center space-y-2">
                             <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl">
                                 <Stethoscope className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
                             </div>
                             <div>
-                                <h3 className="font-bold text-gray-800 dark:text-white">ICD-11</h3>
-                                <p className="text-xs text-gray-500">WHO API</p>
+                                <h3 className="font-bold" style={{ color: 'var(--lume-ink)' }}>ICD-11</h3>
+                                <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>WHO API</p>
                             </div>
-                            <div className="text-xs font-mono text-gray-600 dark:text-gray-400">
+                            <div className="lume-registro text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                                 :{services.icd.port}
                             </div>
                             <div className="flex items-center gap-1.5">

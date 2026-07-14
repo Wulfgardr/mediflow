@@ -324,7 +324,7 @@ export default function AmbulatoryManagerPage() {
                             disabled={!newName || isCreating}
                             className="ui-btn-primary flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 text-sm whitespace-nowrap min-w-[120px] justify-center"
                         >
-                            {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                            {isCreating ? <Loader2 className="w-4 h-4" /> : <Plus className="w-4 h-4 mr-2" />}
                             Aggiungi
                         </button>
                     </div>

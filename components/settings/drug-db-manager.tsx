@@ -85,7 +85,7 @@ export default function DrugDbManager() {
     };
 
     return (
-        <div className="mediflow-vitreous-panel glass-panel border p-6 space-y-6">
+        <div className="mf-section lume-focal space-y-6 p-6">
             <div className="flex justify-between items-start">
                 <div>
                     <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">

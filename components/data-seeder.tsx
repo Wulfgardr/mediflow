@@ -112,7 +112,7 @@ export default function DataSeeder() {
     }
 
     return (
-        <div className={`${PANEL_CLASS} space-y-4 animate-in slide-in-from-top-2 fade-in`}>
+        <div className={`${PANEL_CLASS} space-y-4`}>
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -237,7 +237,7 @@ export default function DataSeeder() {
             <button
                 onClick={handleSeed}
                 disabled={loading || nuking}
-                className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-amber-600 to-orange-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(217,119,6,0.24)] transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_36px_rgba(217,119,6,0.3)] disabled:opacity-50"
+                className="ui-btn-primary lume-press flex w-full justify-center px-4 py-3 text-sm disabled:opacity-50"
             >
                 <Plus className="w-5 h-5" />
                 {loading ? `Generazione... (${progress.current}/${progress.total})` : 'Genera Pazienti'}

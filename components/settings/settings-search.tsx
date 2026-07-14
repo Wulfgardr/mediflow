@@ -126,12 +126,13 @@ export function SettingsSearchOverlay({
                 onKeyDown={handleDialogKeyDown}
                 className="w-full max-w-lg overflow-hidden rounded-[20px] border shadow-2xl"
                 style={{
-                    borderColor: 'rgba(15, 23, 42, 0.12)',
-                    background: 'var(--mf-card, #ffffff)',
+                    borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)',
+                    background: 'var(--lume-surface-focal)',
+                    boxShadow: '0 12px 30px color-mix(in srgb, var(--lume-ink) 18%, transparent)',
                 }}
             >
-                <div className="flex items-center gap-2 border-b px-4 py-3" style={{ borderColor: 'rgba(15, 23, 42, 0.08)' }}>
-                    <Search className="h-4 w-4 shrink-0" style={{ color: 'var(--mf-muted)' }} />
+                <div className="flex items-center gap-2 border-b bg-[color:var(--lume-surface-field)] px-4 py-3" style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 10%, transparent)' }}>
+                    <Search className="h-4 w-4 shrink-0" style={{ color: 'var(--lume-ink-muted)' }} />
                     <input
                         ref={inputRef}
                         type="text"
@@ -149,18 +150,18 @@ export function SettingsSearchOverlay({
                         autoComplete="off"
                         spellCheck={false}
                         className="w-full bg-transparent text-sm focus:outline-none"
-                        style={{ color: 'var(--mf-ink)' }}
+                        style={{ color: 'var(--lume-ink)' }}
                     />
                     <kbd
-                        className="rounded-md border px-1.5 py-0.5 font-mono text-[10px]"
-                        style={{ borderColor: 'rgba(15, 23, 42, 0.12)', color: 'var(--mf-muted)' }}
+                        className="lume-registro rounded-md border px-1.5 py-0.5 text-[10px]"
+                        style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)', color: 'var(--lume-ink-muted)' }}
                     >
                         esc
                     </kbd>
                 </div>
 
                 {matches.length === 0 ? (
-                    <p className="px-3 py-6 text-center text-xs" style={{ color: 'var(--mf-muted)' }}>
+                    <p className="px-3 py-6 text-center text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                         Nessuna impostazione trovata per &ldquo;{query}&rdquo;.
                     </p>
                 ) : (
@@ -179,20 +180,20 @@ export function SettingsSearchOverlay({
                                 onMouseEnter={() => setActiveIndex(index)}
                                 data-testid={`settings-search-result-${match.item.id}`}
                                 className={cn(
-                                    'flex w-full cursor-pointer items-center justify-between gap-3 rounded-[12px] px-3 py-2 text-left transition-colors',
-                                    index === activeIndex && 'bg-[color:rgba(15,23,42,0.06)]',
+                                    'flex w-full cursor-pointer items-center justify-between gap-3 rounded-[var(--lume-radius-control)] px-3 py-2 text-left transition-colors',
+                                    index === activeIndex && 'bg-[color:var(--lume-surface-field)]',
                                 )}
                             >
                                 <span className="min-w-0">
-                                    <span className="block truncate text-sm font-semibold" style={{ color: match.item.tone === 'danger' ? 'var(--mf-critical)' : 'var(--mf-ink)' }}>
+                                    <span className="block truncate text-sm font-semibold" style={{ color: match.item.tone === 'danger' ? 'var(--lume-signal-critical)' : 'var(--lume-ink)' }}>
                                         {match.item.label}
                                     </span>
-                                    <span className="mt-0.5 block truncate text-[11px]" style={{ color: 'var(--mf-muted)' }}>
+                                    <span className="mt-0.5 block truncate text-[11px]" style={{ color: 'var(--lume-ink-muted)' }}>
                                         {match.groupLabel} · {match.matchedLabel}
                                     </span>
                                 </span>
                                 {index === activeIndex ? (
-                                    <CornerDownLeft className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--mf-muted)' }} />
+                                    <CornerDownLeft className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--lume-ink-muted)' }} />
                                 ) : null}
                             </li>
                         ))}
