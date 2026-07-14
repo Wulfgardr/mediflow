@@ -162,10 +162,10 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
             <div
                 {...getRootProps()}
                 className={cn(
-                    "relative cursor-pointer overflow-hidden rounded-[var(--lume-radius-card)] border-2 border-dashed bg-[color:var(--lume-surface-field)] p-6 transition-[background-color,border-color] duration-[var(--lume-dur-riga)]",
-                    isDragActive ? "border-blue-500 bg-[color:var(--lume-surface-focal)]" : "border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] hover:bg-[color:var(--lume-surface-focal)]",
-                    success ? "border-green-500 bg-green-50 dark:bg-green-900/20" : "",
-                    error ? "border-red-500 bg-red-50 dark:bg-red-900/20" : ""
+                    "relative cursor-pointer overflow-hidden rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-field)] p-6 transition-[background-color,border-color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]",
+                    isDragActive ? "lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)]" : "border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]",
+                    success ? "border-[color:color-mix(in_srgb,var(--lume-signal-success)_28%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_10%,var(--lume-surface-field))]" : "",
+                    error ? "border-[color:color-mix(in_srgb,var(--lume-signal-critical)_28%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_10%,var(--lume-surface-field))]" : ""
                 )}
             >
                 <input {...getInputProps()} aria-label="Carica documento" />

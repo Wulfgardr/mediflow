@@ -139,8 +139,8 @@ export default function ExemptionDbManager() {
                     setIsDragging(false);
                 }}
                 onDrop={onDrop}
-                className={`rounded-[var(--lume-radius-panel)] border-2 border-dashed p-5 transition-[border-color,background-color] ${isDragging
-                    ? 'border-emerald-500 bg-emerald-50/80 dark:bg-emerald-900/20'
+                className={`rounded-[var(--lume-radius-panel)] border p-5 transition-[border-color,background-color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)] ${isDragging
+                    ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)]'
                     : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)]'
                     }`}
             >
@@ -156,7 +156,7 @@ export default function ExemptionDbManager() {
 
                 {!isImporting ? (
                     <div className="text-center space-y-3">
-                        <div className="mx-auto w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-300">
+                        <div className="mx-auto w-12 h-12 rounded-full bg-[color:var(--lume-surface-field)] flex items-center justify-center text-[color:var(--lume-ink)]">
                             <Upload className="w-6 h-6" />
                         </div>
                         <div>
@@ -165,7 +165,7 @@ export default function ExemptionDbManager() {
                         </div>
                         <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="inline-flex items-center gap-2 rounded-full border border-emerald-200/80 bg-white/85 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-500/20 dark:bg-white/5 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
+                            className="inline-flex items-center gap-2 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-2 text-sm font-medium text-[color:var(--lume-ink)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]"
                         >
                             Seleziona file
                         </button>

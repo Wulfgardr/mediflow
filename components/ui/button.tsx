@@ -19,7 +19,7 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
     /* Compagna quieta, in penombra opaca. */
     secondary: 'mf-btn-secondary disabled:opacity-50',
     ghost:
-        'inline-flex items-center justify-center gap-2 rounded-full border border-transparent px-3 py-2 text-sm font-semibold text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-plum)_10%,transparent)] hover:text-[color:var(--lume-ink)] disabled:opacity-50',
+        'inline-flex items-center justify-center gap-2 rounded-full border border-transparent px-3 py-2 text-sm font-semibold text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,transparent)] hover:text-[color:var(--lume-ink)] disabled:opacity-50',
     destructive:
         'inline-flex items-center justify-center gap-2 rounded-[18px] px-5 py-2.5 text-sm font-semibold text-white transition-transform active:scale-[0.98] disabled:opacity-50',
 };

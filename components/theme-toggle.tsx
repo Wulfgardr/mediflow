@@ -3,13 +3,11 @@
 import { Moon, Sun, Monitor } from 'lucide-react';
 import { useTheme } from '@/components/theme-provider';
 import { cn } from '@/lib/utils';
-import { useId, useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
 
 export function ThemeToggle() {
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
-    const indicatorLayoutId = useId();
 
     useEffect(() => {
         setMounted(true);
@@ -40,26 +38,14 @@ export function ThemeToggle() {
                         key={tab.id}
                         onClick={() => setTheme(tab.id)}
                         className={cn(
-                            "relative z-10 flex h-7 w-7 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--lume-accent)]",
+                            "relative z-10 flex h-7 w-7 items-center justify-center rounded-full border transition-[background-color,border-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--lume-accent)]",
                             isActive
-                                ? "text-[color:var(--lume-ink)]"
-                                : "text-[color:var(--lume-ink-muted)] hover:text-[color:var(--lume-ink)]"
+                                ? "border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)] shadow-[var(--lume-shadow-focal)]"
+                                : "border-transparent text-[color:var(--lume-ink-muted)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,transparent)] hover:text-[color:var(--lume-ink)]"
                         )}
                         title={tab.label}
                         aria-label={`Tema ${tab.label}`}
                     >
-                        {isActive && (
-                            <motion.div
-                                layoutId={`theme-indicator-${indicatorLayoutId}`}
-                                className="absolute inset-0 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-focal)] shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]"
-                                transition={{
-                                    type: "tween",
-                                    duration: 0.165,
-                                    ease: [0.22, 0.61, 0.36, 1],
-                                }}
-                                style={{ zIndex: -1 }}
-                            />
-                        )}
                         <tab.icon className="w-3.5 h-3.5" strokeWidth={2.5} />
                     </button>
                 );

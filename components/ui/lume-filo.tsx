@@ -285,7 +285,6 @@ function LumeConnettore({
                 strokeWidth="1"
                 style={{
                     '--lume-filo-fill': `${visibleFill}%`,
-                    strokeDashoffset: 100 - visibleFill,
                 } as LumeFiloStyle}
                 vectorEffect="non-scaling-stroke"
             />

@@ -36,19 +36,14 @@
   --k8-accent: var(--lume-accent);
   --k8-accent-soft: rgba(15, 23, 42, 0.07);
   --k8-accent-line: rgba(15, 23, 42, 0.18);
-  /* Lume a11y (WCAG 1.4.11): focus + --mf-focus-ring leggono l'accento minerale
+  /* Lume a11y (WCAG 1.4.11): focus + --lume-focus-ring leggono l'accento minerale
      (>= 7.5:1 su field, non piu lo slate ~2.14:1); si ribaltano via --lume-accent. */
   --k8-focus: var(--lume-accent);
-  --mf-focus-ring: 0 0 0 2px var(--lume-accent);
+  --lume-focus-ring: 0 0 0 2px var(--lume-accent);
   /* Lume: profondita semantica = bordo 1px neutro, nessuna ombra decorativa ne lucido di vetro; l'unica ombra corta
      sollevata vive sul solo fuoco clinico ([data-lume-focus]), mai sulla struttura. */
   --k8-focal: var(--lume-surface-focal);
   --k8-focal-shadow: 0 2px 8px rgba(15, 23, 42, 0.10);
-  --mf-ink: var(--k8-ink);
-  --mf-muted: var(--k8-muted);
-  --mf-bg: var(--k8-canvas);
-  --mf-bg-elevated: var(--k8-soft);
-  --mf-card: var(--k8-surface);
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -56,7 +51,7 @@
   padding: 14px;
   background: var(--k8-canvas);
   color: var(--k8-ink);
-  font-family: var(--mf-font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  font-family: var(--lume-font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -205,7 +200,11 @@
   background: var(--k8-soft);
   color: var(--k8-muted);
   text-decoration: none;
-  transition: background 160ms ease, color 160ms ease, border-color 160ms ease, transform 120ms ease;
+  transition:
+    background var(--lume-dur-fuoco) var(--lume-ease),
+    color var(--lume-dur-fuoco) var(--lume-ease),
+    border-color var(--lume-dur-fuoco) var(--lume-ease),
+    transform var(--lume-dur-riga) var(--lume-ease);
 }
 
 .backButton {
@@ -391,11 +390,6 @@
 /* @Codex WUL-55 F2c: alias semantici SOLO per lo status-glyph, rimappati sui token Lume misurati (testo stato Giorno 5.477:1-8.414:1,
    Grafite 6.205:1-11.542:1; archiviato >= 4.872:1). Non allargarli al guscio: regredirebbero gli sfondi distruttivi e altri consumatori. */
 .shell :global(.status-glyph) {
-  --mf-primary: var(--k8-accent);
-  --mf-plum: var(--k8-pill-info-fg);
-  --mf-success: var(--k8-pill-success-fg);
-  --mf-warning: var(--k8-pill-warning-fg);
-  --mf-critical: var(--k8-pill-critical-fg);
 }
 
 /* Disco icona sulla superficie del guscio; !important perche il selettore globale
@@ -504,23 +498,14 @@
 
 /* Lume focal locus (WUL-55, F2c): il bersaglio attivo dello scrollspy, segnato
    [data-lume-focus], e l'unica superficie focale della vista (Lume 01-lingua
-   ss.1-3). Superficie fuoco, perimetro neutro dipinto inset 1px, un solo filo minerale inset
-   a sinistra e l'ombra corta sollevata esterna. Nessun discendente eredita il
+   ss.1-3). Superficie fuoco e ombra corta della ricetta .lume-focal. Nessun discendente eredita il
    fuoco: una zona, una sola superficie focale. */
 .shell :global([data-lume-focus]) {
   background: var(--k8-focal) !important;
-  /* Lume F2c geometria: perimetro e filo sono disegnati come ombre inset, non
-     come bordo reale, cosi la geometria del box non cambia fra riposo e attivo e
-     lo scrollspy non provoca reflow scorrendo su wrapper eterogenei (stack ancore
-     #quadro, griglia #indicatori, div nudo #dati). Il bordo proprio del bersaglio
-     diventa trasparente a larghezza invariata: niente 1px in piu, niente doppio
-     filo. Il raggio esplicito evita la cornice quadrata sui wrapper senza raggio. */
-  border-color: transparent !important;
+  --lume-focal-shadow-opacity: 1;
+  border-color: var(--k8-line-strong) !important;
   border-radius: 22px !important;
-  box-shadow:
-    inset 1px 0 0 var(--k8-accent),
-    inset 0 0 0 1px var(--k8-line-strong),
-    var(--k8-focal-shadow) !important;
+  box-shadow: none !important;
 }
 
 @media (max-width: 1180px) {

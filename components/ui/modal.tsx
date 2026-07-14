@@ -72,19 +72,23 @@ export function Modal({
                 aria-labelledby={titleId}
                 tabIndex={-1}
                 className={cn(
-                    'mf-modal-shell lume-overlay-shadow relative w-full overflow-hidden animate-in fade-in zoom-in-95 duration-[var(--lume-dur-fuoco)]',
+                    'lume-overlay-shadow relative w-full animate-in fade-in zoom-in-95 duration-[var(--lume-dur-fuoco)]',
                     maxWidthClassName,
                     className,
                 )}
             >
-                <div aria-hidden className="h-1.5 w-full" style={{ background: ACCENT_VAR[accent] }} />
-                <div className="p-6">
+                <div className="mf-modal-shell overflow-hidden">
+                    <div aria-hidden className="h-1.5 w-full" style={{ background: ACCENT_VAR[accent] }} />
+                    <div className="p-6">
                     <div className="mb-5 flex items-start justify-between gap-4">
                         <div className="flex items-center gap-3">
                             {icon ? (
                                 <span
                                     className="flex shrink-0 items-center justify-center rounded-2xl p-3"
-                                    style={{ background: `${ACCENT_VAR[accent]}1f`, color: ACCENT_VAR[accent] }}
+                                    style={{
+                                        background: `color-mix(in srgb, ${ACCENT_VAR[accent]} 12%, var(--lume-surface-field))`,
+                                        color: ACCENT_VAR[accent],
+                                    }}
                                 >
                                     {icon}
                                 </span>
@@ -115,6 +119,7 @@ export function Modal({
                     {children}
 
                     {footer ? <div className="mt-6 flex justify-end gap-3">{footer}</div> : null}
+                    </div>
                 </div>
             </div>
         </div>

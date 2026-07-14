@@ -51,8 +51,6 @@
   --rail-dot-shadow: transparent;
   /* Lume: niente lucido di vetro; le superfici sono opache. */
   --surface-highlight: transparent;
-  --mf-ink: var(--ink);
-  --mf-muted: var(--ink-muted);
   /* Lume: profondita semantica: bordo 1px, nessuna ombra decorativa;
      l'ombra corta resta solo al fuoco e agli overlay. */
   --shadow-card: 0 0 0 1px var(--line-strong);
@@ -75,8 +73,6 @@
   --radius-control: 14px;
   --radius-chip: 14px;
   --radius-pill: 999px;
-  --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
-  --motion-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
 
   position: fixed;
   inset: 0;
@@ -84,7 +80,7 @@
   background: var(--canvas);
   color: var(--ink);
   overflow: hidden;
-  font-family: var(--mf-font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  font-family: var(--lume-font-sans);
   font-feature-settings: "cv11", "ss01";
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
@@ -355,9 +351,17 @@
 
 .canvas {
   /* La scena cambia luce, non posizione: Toolbar e rail restano ferme. */
-  --lume-surface-l: 0;
-  --lume-surface-temp: 0;
-  background: var(--surface);
+  --lume-surface-l: 0%;
+  --lume-surface-temp: 0%;
+  background: color-mix(
+    in srgb,
+    color-mix(
+      in srgb,
+      var(--surface-soft) calc(100% - var(--lume-surface-l)),
+      var(--lume-surface-focal) var(--lume-surface-l)
+    ),
+    var(--lume-surface-focal) var(--lume-surface-temp)
+  );
   border-radius: 28px;
   padding: 18px;
   overflow: auto;
@@ -370,22 +374,11 @@
   transition: --lume-surface-l var(--lume-dur-fuoco) var(--lume-ease), --lume-surface-temp var(--lume-dur-fuoco) var(--lume-ease);
 }
 
-.canvas::before {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: var(--lume-surface-focal);
-  opacity: var(--lume-surface-l);
-}
-
 .canvas > * { position: relative; z-index: 1; }
-.canvas[data-lume-context='turno'] { --lume-surface-l: 0.035; --lume-surface-temp: 0.14; }
-.canvas[data-lume-context='incarico'] { --lume-surface-l: 0.055; --lume-surface-temp: 0.22; }
-.canvas[data-lume-context='scheda'] { --lume-surface-l: 0.07; --lume-surface-temp: 0.3; }
-.canvas[data-lume-context='diario'] { --lume-surface-l: 0.045; --lume-surface-temp: 0.18; }
+.canvas[data-lume-context='turno'] { --lume-surface-l: 3.5%; --lume-surface-temp: 1.1%; }
+.canvas[data-lume-context='incarico'] { --lume-surface-l: 5.5%; --lume-surface-temp: 1.8%; }
+.canvas[data-lume-context='scheda'] { --lume-surface-l: 7%; --lume-surface-temp: 2.4%; }
+.canvas[data-lume-context='diario'] { --lume-surface-l: 4.5%; --lume-surface-temp: 1.4%; }
 
 .canvas::-webkit-scrollbar { width: 10px; }
 .canvas::-webkit-scrollbar-thumb {
@@ -483,8 +476,8 @@
   border: 0;
   cursor: pointer;
   box-shadow: none;
-  transition: transform 140ms var(--motion-spring),
-    filter 160ms var(--motion-ease);
+  transition: transform var(--lume-dur-riga) var(--lume-ease),
+    filter var(--lume-dur-fuoco) var(--lume-ease);
 }
 
 .aiButton:hover { transform: translateY(-1px); filter: brightness(1.04); }
@@ -492,14 +485,14 @@
 
 /* @Codex WUL-UIUX: la chrome del cockpit (la superficie piu usata) era operabile
    da tastiera ma senza indicatore di focus, una regressione WCAG 2.4.7 rispetto
-   alla Sidebar. Anello di focus condiviso, coerente con --mf-focus-ring. */
+   alla Sidebar. Anello di focus condiviso, coerente con --lume-focus-ring. */
 .navItem:focus-visible,
 .search:focus-visible,
 .toolChip:focus-visible,
 .aiButton:focus-visible,
 .exit:focus-visible {
   outline: none;
-  box-shadow: var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.28));
+  box-shadow: var(--lume-focus-ring);
 }
 
 .avatarPill {
@@ -750,7 +743,7 @@
 }
 
 /* commit pulse (replays via React key on state change) */
-.pillCommit { animation: commitPulse 320ms var(--motion-spring); }
+.pillCommit { animation: commitPulse var(--lume-dur-anello) var(--lume-ease); }
 
 @keyframes commitPulse {
   0% { transform: scale(0.85); opacity: 0; }
@@ -807,7 +800,7 @@
   gap: 12px;
   padding: 9px 4px;
   border-bottom: 1px solid var(--line);
-  transition: background 160ms var(--motion-ease);
+  transition: background var(--lume-dur-fuoco) var(--lume-ease);
 }
 
 .row:last-child { border-bottom: 0; }
@@ -940,8 +933,8 @@
   background: transparent;
   color: var(--ink-strong);
   cursor: pointer;
-  transition: background 160ms var(--motion-ease),
-    transform 120ms var(--motion-ease);
+  transition: background var(--lume-dur-fuoco) var(--lume-ease),
+    transform var(--lume-dur-riga) var(--lume-ease);
 }
 
 .stepperBtn:hover:not(:disabled) { background: var(--surface-soft); }
@@ -972,7 +965,7 @@
   cursor: pointer;
   border: 0;
   padding: 0;
-  transition: background 200ms var(--motion-ease);
+  transition: background var(--lume-dur-firma) var(--lume-ease);
   flex-shrink: 0;
 }
 
@@ -985,7 +978,7 @@
   height: 16px;
   background: var(--surface);
   border-radius: var(--radius-pill);
-  transition: transform 200ms var(--motion-spring);
+  transition: transform var(--lume-dur-firma) var(--lume-ease);
 }
 
 .toggleOn { background: var(--solid-action-bg); }
@@ -1353,8 +1346,8 @@
   border: 0;
   cursor: pointer;
   box-shadow: none;
-  transition: transform 140ms var(--motion-spring),
-    filter 160ms var(--motion-ease);
+  transition: transform var(--lume-dur-riga) var(--lume-ease),
+    filter var(--lume-dur-fuoco) var(--lume-ease);
 }
 
 .primaryBtn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.1); }
@@ -1374,8 +1367,8 @@
   border: 0;
   cursor: pointer;
   box-shadow: 0 0 0 1px var(--line-strong);
-  transition: transform 140ms var(--motion-spring),
-    background 160ms var(--motion-ease);
+  transition: transform var(--lume-dur-riga) var(--lume-ease),
+    background var(--lume-dur-fuoco) var(--lume-ease);
 }
 
 .ghostBtn:hover { background: var(--surface-soft); transform: translateY(-1px); }
@@ -1394,8 +1387,8 @@
   border: 0;
   cursor: pointer;
   box-shadow: 0 0 0 1px var(--line-strong);
-  transition: transform 120ms var(--motion-ease),
-    background 160ms var(--motion-ease);
+  transition: transform var(--lume-dur-riga) var(--lume-ease),
+    background var(--lume-dur-fuoco) var(--lume-ease);
 }
 
 .ghostBtnSm:hover { background: var(--surface-soft); transform: translateY(-1px); }
@@ -1409,7 +1402,7 @@
   align-items: center;
   padding: 9px 4px;
   border-bottom: 1px solid var(--line);
-  transition: background 160ms var(--motion-ease);
+  transition: background var(--lume-dur-fuoco) var(--lume-ease);
 }
 
 .catalogRow:last-child { border-bottom: 0; }
@@ -1481,7 +1474,7 @@
 .patientSearchField:focus-within {
   box-shadow:
     0 0 0 1px var(--control-border),
-    var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.28));
+    var(--lume-focus-ring);
 }
 
 .patientSearchField input {
@@ -1553,7 +1546,7 @@
   align-items: center;
   padding: 9px 40px 9px 4px;
   cursor: pointer;
-  transition: background 160ms var(--motion-ease);
+  transition: background var(--lume-dur-fuoco) var(--lume-ease);
   border: 0;
   background: transparent;
   width: 100%;
@@ -1575,7 +1568,7 @@
   height: 26px;
   border-radius: 9px;
   color: var(--ink-faint);
-  transition: background 160ms var(--motion-ease), color 160ms var(--motion-ease);
+  transition: background var(--lume-dur-fuoco) var(--lume-ease), color var(--lume-dur-fuoco) var(--lume-ease);
 }
 
 .patientRowWrap:hover .patientRowOpen,
@@ -1985,7 +1978,7 @@
   border-radius: var(--radius-pill);
   /* Lume: azione flottante = ombra corta (livello sollevato), niente lucido. */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
-  transition: transform 140ms var(--motion-spring), filter 160ms var(--motion-ease);
+  transition: transform var(--lume-dur-riga) var(--lume-ease), filter var(--lume-dur-fuoco) var(--lume-ease);
 }
 
 .exit:hover { filter: brightness(1.1); transform: translateY(-1px); }
@@ -2032,7 +2025,7 @@
   font-weight: 500;
   color: var(--ink-muted);
   cursor: pointer;
-  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+  transition: color var(--lume-dur-riga) ease, border-color var(--lume-dur-riga) ease, background var(--lume-dur-riga) ease;
 }
 
 .subareaTab:hover {
@@ -2042,7 +2035,7 @@
 
 .subareaTab:focus-visible {
   outline: none;
-  box-shadow: var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.28));
+  box-shadow: var(--lume-focus-ring);
 }
 
 .subareaTabActive {

@@ -385,17 +385,17 @@ export default function NewEntryPage() {
                                         Data e ora
                                     </label>
                                     <div className="relative">
-                                        <Clock className="pointer-events-none absolute left-4 top-3.5 h-5 w-5 text-[color:var(--mf-muted)]" />
+                                        <Clock className="pointer-events-none absolute left-4 top-3.5 h-5 w-5 text-[color:var(--lume-ink-muted)]" />
                                         <input
                                             type="datetime-local"
                                             value={entryDate}
                                             onChange={(e) => setEntryDate(e.target.value)}
-                                            className="w-full rounded-[18px] border border-[color:rgba(112,106,100,0.14)] bg-white/82 py-3 pl-12 pr-4 text-sm font-medium text-[color:var(--mf-ink)] outline-none transition-colors focus:border-[color:rgba(182,106,60,0.3)] focus:shadow-[0_0_0_4px_rgba(182,106,60,0.08)] dark:border-white/10 dark:bg-white/5 dark:[color-scheme:dark]"
+                                            className="w-full rounded-[18px] border border-[color:rgba(112,106,100,0.14)] bg-white/82 py-3 pl-12 pr-4 text-sm font-medium text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:rgba(182,106,60,0.3)] focus:shadow-[0_0_0_4px_rgba(182,106,60,0.08)] dark:border-white/10 dark:bg-white/5 dark:[color-scheme:dark]"
                                             aria-label="Data e ora della voce clinica"
                                             required
                                         />
                                     </div>
-                                    <p className="text-xs leading-5 text-[color:var(--mf-muted)]">
+                                    <p className="text-xs leading-5 text-[color:var(--lume-ink-muted)]">
                                         Puoi retrodatare la voce quando ricostruisci il diario.
                                     </p>
                                 </div>
@@ -407,10 +407,10 @@ export default function NewEntryPage() {
                                             type="button"
                                             onClick={() => setSetting('ambulatory')}
                                             className={cn(
-                                                'lume-press flex h-[56px] items-center justify-center gap-3 rounded-[18px] border px-4 text-sm font-semibold transition-[border-color,background-color,color]',
+                                                'lume-press flex h-[56px] items-center justify-center gap-3 rounded-[var(--lume-radius-control)] border px-4 text-sm font-semibold transition-[border-color,background-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]',
                                                 setting === 'ambulatory'
-                                                    ? 'border-[color:rgba(15,123,104,0.22)] bg-[color:rgba(15,123,104,0.08)] text-[color:var(--mf-primary)] shadow-[0_12px_24px_rgba(15,123,104,0.08)]'
-                                                    : 'border-[color:rgba(112,106,100,0.14)] bg-white/76 text-[color:var(--mf-muted)] hover:border-[color:rgba(112,106,100,0.2)] hover:bg-[color:rgba(255,252,247,0.94)]'
+                                                    ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)]'
+                                                    : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]'
                                             )}
                                         >
                                             <Building2 className="h-4 w-4" />
@@ -420,10 +420,10 @@ export default function NewEntryPage() {
                                             type="button"
                                             onClick={() => setSetting('home')}
                                             className={cn(
-                                                'lume-press flex h-[56px] items-center justify-center gap-3 rounded-[18px] border px-4 text-sm font-semibold transition-[border-color,background-color,color]',
+                                                'lume-press flex h-[56px] items-center justify-center gap-3 rounded-[var(--lume-radius-control)] border px-4 text-sm font-semibold transition-[border-color,background-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]',
                                                 setting === 'home'
-                                                    ? 'border-[color:rgba(182,106,60,0.24)] bg-[color:rgba(182,106,60,0.08)] text-[color:var(--mf-accent)] shadow-[0_12px_24px_rgba(182,106,60,0.08)]'
-                                                    : 'border-[color:rgba(112,106,100,0.14)] bg-white/76 text-[color:var(--mf-muted)] hover:border-[color:rgba(112,106,100,0.2)] hover:bg-[color:rgba(255,252,247,0.94)]'
+                                                    ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)]'
+                                                    : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]'
                                             )}
                                         >
                                             <Home className="h-4 w-4" />
@@ -446,23 +446,23 @@ export default function NewEntryPage() {
                                                 type="button"
                                                 onClick={() => setType(currentType.id as 'visit' | 'remote' | 'note')}
                                                 className={cn(
-                                                    'lume-press flex items-center gap-3 rounded-[20px] border px-4 py-4 text-left transition-[border-color,background-color,color]',
+                                                    'lume-press flex items-center gap-3 rounded-[var(--lume-radius-card)] border px-4 py-4 text-left transition-[border-color,background-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]',
                                                     isSelected
-                                                        ? 'border-[color:rgba(94,53,95,0.18)] bg-[color:rgba(94,53,95,0.08)] text-[color:var(--mf-ink)] shadow-[0_12px_24px_rgba(94,53,95,0.08)]'
-                                                        : 'border-[color:rgba(112,106,100,0.14)] bg-white/76 text-[color:var(--mf-muted)] hover:border-[color:rgba(112,106,100,0.2)] hover:bg-[color:rgba(255,252,247,0.94)]'
+                                                        ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)]'
+                                                        : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]'
                                                 )}
                                             >
                                                 <div className={cn(
                                                     'flex h-11 w-11 items-center justify-center rounded-[16px] border',
                                                     isSelected
-                                                        ? 'border-[color:rgba(94,53,95,0.18)] bg-white/82 text-[color:var(--mf-plum)]'
-                                                        : 'border-[color:rgba(112,106,100,0.14)] bg-white/82 text-[color:var(--mf-muted)]',
+                                                        ? 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink)]'
+                                                        : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]',
                                                 )}>
                                                     <Icon className="h-5 w-5" />
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm font-semibold text-[color:var(--mf-ink)]">{currentType.label}</p>
-                                                    <p className="mt-1 text-xs leading-5 text-[color:var(--mf-muted)]">
+                                                    <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{currentType.label}</p>
+                                                    <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
                                                         {currentType.id === 'visit'
                                                             ? 'In presenza, con esame obiettivo e piano.'
                                                             : currentType.id === 'remote'
@@ -482,7 +482,7 @@ export default function NewEntryPage() {
                                     <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                         <div>
                                             <p className="section-kicker">Sessione visita</p>
-                                            <h2 className="mt-1 text-xl font-semibold text-[color:var(--mf-ink)]">
+                                            <h2 className="mt-1 text-xl font-semibold text-[color:var(--lume-ink)]">
                                                 Bozza dettata e revisione
                                             </h2>
                                         </div>
@@ -499,22 +499,22 @@ export default function NewEntryPage() {
                                                     <AlertTriangle className="h-4 w-4" />
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="text-sm font-semibold text-[color:var(--mf-ink)]">Transcript locale</p>
-                                                    <p className="mt-1 text-xs leading-5 text-[color:var(--mf-muted)]">
+                                                    <p className="text-sm font-semibold text-[color:var(--lume-ink)]">Transcript locale</p>
+                                                    <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
                                                         Il backend elabora testo ed eventi pausa; nessun audio viene acquisito da questa vista.
                                                     </p>
                                                 </div>
                                             </div>
                                             <div className="grid gap-2 text-xs">
-                                                <div className="flex items-center justify-between rounded-[14px] bg-[color:rgba(15,123,104,0.08)] px-3 py-2 text-[color:var(--mf-primary)]">
+                                                <div className="flex items-center justify-between rounded-[14px] bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] px-3 py-2 text-[color:var(--lume-accent)]">
                                                     <span className="font-semibold">{visitSessionStatusLabel[visitSessionState]}</span>
-                                                    {visitSessionState === 'processing' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                                                    {visitSessionState === 'processing' ? null : <CheckCircle2 className="h-4 w-4" />}
                                                 </div>
-                                                <div className="flex items-center justify-between rounded-[14px] bg-white/64 px-3 py-2 text-[color:var(--mf-muted)]">
+                                                <div className="flex items-center justify-between rounded-[14px] bg-white/64 px-3 py-2 text-[color:var(--lume-ink-muted)]">
                                                     <span>Pause</span>
                                                     <span>{visitSessionEvents.filter((event) => event.type === 'pause').length}</span>
                                                 </div>
-                                                <div className="flex items-center justify-between rounded-[14px] bg-white/64 px-3 py-2 text-[color:var(--mf-muted)]">
+                                                <div className="flex items-center justify-between rounded-[14px] bg-white/64 px-3 py-2 text-[color:var(--lume-ink-muted)]">
                                                     <span>Eventi</span>
                                                     <span>{visitSessionEvents.length}</span>
                                                 </div>
@@ -527,7 +527,7 @@ export default function NewEntryPage() {
                                                     <button
                                                         type="button"
                                                         onClick={startVisitSession}
-                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:rgba(15,123,104,0.18)] bg-[color:rgba(15,123,104,0.08)] px-3 text-sm font-semibold text-[color:var(--mf-primary)]"
+                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-accent)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] px-3 text-sm font-semibold text-[color:var(--lume-accent)]"
                                                     >
                                                         <Play className="h-4 w-4" />
                                                         <span>Avvia</span>
@@ -547,7 +547,7 @@ export default function NewEntryPage() {
                                                     <button
                                                         type="button"
                                                         onClick={resumeVisitSession}
-                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:rgba(15,123,104,0.18)] bg-[color:rgba(15,123,104,0.08)] px-3 text-sm font-semibold text-[color:var(--mf-primary)]"
+                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-accent)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] px-3 text-sm font-semibold text-[color:var(--lume-accent)]"
                                                     >
                                                         <Play className="h-4 w-4" />
                                                         <span>Riprendi</span>
@@ -557,7 +557,7 @@ export default function NewEntryPage() {
                                                     <button
                                                         type="button"
                                                         onClick={stopVisitSession}
-                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:rgba(112,106,100,0.16)] bg-white/74 px-3 text-sm font-semibold text-[color:var(--mf-ink)]"
+                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:rgba(112,106,100,0.16)] bg-white/74 px-3 text-sm font-semibold text-[color:var(--lume-ink)]"
                                                     >
                                                         <Square className="h-4 w-4" />
                                                         <span>Ferma</span>
@@ -567,7 +567,7 @@ export default function NewEntryPage() {
                                                     <button
                                                         type="button"
                                                         onClick={resetVisitSession}
-                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:rgba(112,106,100,0.16)] bg-white/74 px-3 text-sm font-semibold text-[color:var(--mf-muted)]"
+                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:rgba(112,106,100,0.16)] bg-white/74 px-3 text-sm font-semibold text-[color:var(--lume-ink-muted)]"
                                                     >
                                                         <RotateCcw className="h-4 w-4" />
                                                         <span>Reset</span>
@@ -577,7 +577,7 @@ export default function NewEntryPage() {
                                                     type="button"
                                                     disabled={!canProcessVisitDraft}
                                                     onClick={processVisitDraft}
-                                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:rgba(94,53,95,0.18)] bg-[color:rgba(94,53,95,0.08)] px-3 text-sm font-semibold text-[color:var(--mf-plum)] transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
+                                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-accent)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] px-3 text-sm font-semibold text-[color:var(--lume-accent)] transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
                                                 >
                                                     {visitSessionState === 'processing' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
                                                     <span>Elabora bozza</span>
@@ -598,18 +598,21 @@ export default function NewEntryPage() {
                                                     value={dictatedDraft}
                                                     onChange={(event) => handleDictatedDraftChange(event.target.value)}
                                                     placeholder={VISIT_DRAFT_PLACEHOLDER}
-                                                    className="min-h-[180px] w-full resize-y rounded-[20px] border border-[color:rgba(112,106,100,0.14)] bg-white/82 px-4 py-3 text-sm leading-6 text-[color:var(--mf-ink)] outline-none transition-colors placeholder:text-[color:rgba(71,85,105,0.58)] focus:border-[color:rgba(15,123,104,0.28)] focus:shadow-[0_0_0_4px_rgba(15,123,104,0.08)]"
+                                                    className={cn(
+                                                        'min-h-[180px] w-full resize-y rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm leading-6 outline-none transition-colors duration-[var(--lume-dur-firma)] ease-[var(--lume-ease)] placeholder:text-[color:var(--lume-ink-muted)] focus:border-[color:color-mix(in_srgb,var(--lume-accent)_28%,transparent)] focus:shadow-[var(--lume-focus-ring)]',
+                                                        isDictatedDraftReviewed ? 'text-[color:var(--lume-ink)]' : 'text-[color:var(--lume-ink-muted)]',
+                                                    )}
                                                 />
                                             </div>
 
                                             <div className="flex flex-col gap-3 rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/72 p-4 md:flex-row md:items-center md:justify-between">
-                                                <label className="flex min-w-0 items-start gap-3 text-sm leading-5 text-[color:var(--mf-ink)]">
+                                                <label className="flex min-w-0 items-start gap-3 text-sm leading-5 text-[color:var(--lume-ink)]">
                                                     <input
                                                         type="checkbox"
                                                         checked={isDictatedDraftReviewed}
                                                         disabled={!hasDictatedDraft}
                                                         onChange={(event) => setIsDictatedDraftReviewed(event.target.checked)}
-                                                        className="mt-1 h-4 w-4 rounded border-[color:rgba(112,106,100,0.22)] text-[color:var(--mf-primary)]"
+                                                        className="mt-1 h-4 w-4 rounded border-[color:rgba(112,106,100,0.22)] text-[color:var(--lume-accent)]"
                                                     />
                                                     <span>
                                                         Ho rivisto questa bozza prima di usarla nel resoconto.
@@ -619,7 +622,7 @@ export default function NewEntryPage() {
                                                     type="button"
                                                     disabled={!canInsertReviewedDraft}
                                                     onClick={insertReviewedDraft}
-                                                    className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[color:rgba(15,123,104,0.18)] bg-[color:rgba(15,123,104,0.08)] px-4 text-sm font-semibold text-[color:var(--mf-primary)] transition-[background-color,border-color,color] hover:bg-[color:rgba(15,123,104,0.12)] disabled:cursor-not-allowed disabled:opacity-45"
+                                                    className="inline-flex h-11 items-center justify-center gap-2 rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-accent)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] px-4 text-sm font-semibold text-[color:var(--lume-accent)] transition-[background-color,border-color,color] duration-[var(--lume-dur-firma)] ease-[var(--lume-ease)] hover:bg-[color:color-mix(in_srgb,var(--lume-accent)_12%,var(--lume-surface-field))] disabled:cursor-not-allowed disabled:opacity-45"
                                                 >
                                                     <FileCheck2 className="h-4 w-4" />
                                                     <span>Porta nel resoconto</span>
@@ -637,8 +640,8 @@ export default function NewEntryPage() {
                                                     <div className="grid gap-2">
                                                         {visitMedicationCandidates.map((candidate) => (
                                                             <div key={`${candidate.drugMention}-${candidate.evidence}`} className="rounded-[14px] border border-[color:rgba(112,106,100,0.1)] bg-white/78 px-3 py-2">
-                                                                <p className="text-sm font-semibold text-[color:var(--mf-ink)]">{candidate.drugMention}</p>
-                                                                <p className="mt-1 text-xs leading-5 text-[color:var(--mf-muted)]">
+                                                                <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{candidate.drugMention}</p>
+                                                                <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
                                                                     {candidate.match
                                                                         ? `${candidate.match.name}${candidate.match.atc ? ` · ATC ${candidate.match.atc}` : ''}`
                                                                         : 'Match catalogo non trovato'}
@@ -651,14 +654,14 @@ export default function NewEntryPage() {
 
                                             <div className="grid gap-3 md:grid-cols-2">
                                                 <div className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/68 px-4 py-3">
-                                                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">Bozza</p>
-                                                    <p className="mt-1 text-sm font-semibold text-[color:var(--mf-ink)]">
+                                                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">Bozza</p>
+                                                    <p className={cn('mt-1 text-sm font-semibold transition-colors duration-[var(--lume-dur-firma)] ease-[var(--lume-ease)]', isDictatedDraftReviewed ? 'text-[color:var(--lume-ink)]' : 'text-[color:var(--lume-ink-muted)]')}>
                                                         {hasDictatedDraft ? 'Da revisione' : 'Vuota'}
                                                     </p>
                                                 </div>
                                                 <div className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/68 px-4 py-3">
-                                                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">Resoconto</p>
-                                                    <p className="mt-1 text-sm font-semibold text-[color:var(--mf-ink)]">
+                                                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">Resoconto</p>
+                                                    <p className="mt-1 text-sm font-semibold text-[color:var(--lume-ink-muted)]">
                                                         {acceptedNoteHasContent ? 'In compilazione' : 'Vuoto'}
                                                     </p>
                                                 </div>
@@ -673,7 +676,7 @@ export default function NewEntryPage() {
                                 <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                     <div>
                                         <p className="section-kicker">Resoconto clinico</p>
-                                        <h2 className="mt-1 text-xl font-semibold text-[color:var(--mf-ink)]">
+                                        <h2 className="mt-1 text-xl font-semibold text-[color:var(--lume-ink)]">
                                             Scrivi la voce
                                         </h2>
                                     </div>
@@ -689,49 +692,49 @@ export default function NewEntryPage() {
                             <section id="allegati" className="lume-panel p-5 md:p-6">
                                 <div className="mb-4">
                                     <p className="section-kicker">Allegati</p>
-                                    <h2 className="mt-1 text-xl font-semibold text-[color:var(--mf-ink)]">
+                                    <h2 className="mt-1 text-xl font-semibold text-[color:var(--lume-ink)]">
                                         Documenti e referti collegati
                                     </h2>
                                 </div>
 
                                 <div className="space-y-3">
-                                    <label className="flex items-center gap-2 text-sm font-medium text-[color:var(--mf-ink)]">
-                                        <Paperclip className="h-4 w-4 text-[color:var(--mf-muted)]" />
+                                    <label className="flex items-center gap-2 text-sm font-medium text-[color:var(--lume-ink)]">
+                                        <Paperclip className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
                                         Allegati della voce
                                     </label>
 
                                     <div
                                         {...getRootProps()}
                                         className={cn(
-                                            'rounded-[22px] border-2 border-dashed p-6 text-center transition-[border-color,background-color,color]',
+                                            'rounded-[var(--lume-radius-card)] border p-6 text-center transition-[border-color,background-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]',
                                             isDragActive
-                                                ? 'border-[color:rgba(182,106,60,0.34)] bg-[color:rgba(182,106,60,0.08)]'
-                                                : 'border-[color:rgba(112,106,100,0.18)] bg-white/68 hover:border-[color:rgba(182,106,60,0.24)] hover:bg-[color:rgba(255,252,247,0.92)]'
+                                                ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)]'
+                                                : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))]'
                                         )}
                                     >
                                         <input {...getInputProps()} />
-                                        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 text-[color:var(--mf-accent)]">
+                                        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 text-[color:var(--lume-accent)]">
                                             <Upload className="h-5 w-5" />
                                         </div>
-                                        <p className="text-sm font-semibold text-[color:var(--mf-ink)]">Clicca o trascina qui i file</p>
-                                        <p className="mt-1 text-xs leading-5 text-[color:var(--mf-muted)]">PDF, immagini, referti e documenti clinici.</p>
+                                        <p className="text-sm font-semibold text-[color:var(--lume-ink)]">Clicca o trascina qui i file</p>
+                                        <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">PDF, immagini, referti e documenti clinici.</p>
                                     </div>
 
                                     {files.length > 0 ? (
                                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                             {files.map((file, index) => (
                                                 <div key={index} className="flex items-center gap-3 rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 p-3 shadow-[0_10px_20px_rgba(35,27,22,0.04)]">
-                                                    <div className="flex h-10 w-10 items-center justify-center rounded-[14px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.9)] text-[color:var(--mf-muted)]">
+                                                    <div className="flex h-10 w-10 items-center justify-center rounded-[14px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.9)] text-[color:var(--lume-ink-muted)]">
                                                         <FileText className="h-4 w-4" />
                                                     </div>
                                                     <div className="min-w-0 flex-1">
-                                                        <p className="truncate text-sm font-semibold text-[color:var(--mf-ink)]">{file.name}</p>
-                                                        <p className="text-xs text-[color:var(--mf-muted)]">{(file.size / 1024).toFixed(0)} KB</p>
+                                                        <p className="truncate text-sm font-semibold text-[color:var(--lume-ink)]">{file.name}</p>
+                                                        <p className="text-xs text-[color:var(--lume-ink-muted)]">{(file.size / 1024).toFixed(0)} KB</p>
                                                     </div>
                                                     <button
                                                         type="button"
                                                         onClick={() => removeFile(index)}
-                                                        className="rounded-[12px] p-2 text-[color:var(--mf-muted)] transition-colors hover:bg-[color:rgba(182,106,60,0.08)] hover:text-[color:var(--mf-accent)]"
+                                                        className="rounded-[12px] p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:rgba(182,106,60,0.08)] hover:text-[color:var(--lume-accent)]"
                                                         aria-label={`Rimuovi allegato ${file.name}`}
                                                     >
                                                         <X className="h-4 w-4" />
@@ -770,32 +773,32 @@ export default function NewEntryPage() {
                     <section className="patient-detail-side-section rounded-[20px] border p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Contesto paziente</p>
-                            <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
-                                <ShieldCheck className="h-5 w-5 text-[color:var(--mf-primary)]" />
+                            <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
+                                <ShieldCheck className="h-5 w-5 text-[color:var(--lume-accent)]" />
                                 Sessione ancorata
                             </h3>
                         </div>
                         <div className="space-y-3">
                             <div className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/74 px-4 py-3">
-                                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">Paziente</p>
-                                <p className="mt-1 text-sm font-semibold text-[color:var(--mf-ink)]">
+                                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">Paziente</p>
+                                <p className="mt-1 text-sm font-semibold text-[color:var(--lume-ink)]">
                                     {patient ? `${patient.lastName} ${patient.firstName}` : 'Caricamento...'}
                                 </p>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div className="rounded-[16px] border border-[color:rgba(112,106,100,0.12)] bg-white/70 px-3 py-2">
-                                    <p className="text-xs text-[color:var(--mf-muted)]">Visite</p>
-                                    <p className="text-sm font-semibold text-[color:var(--mf-ink)]">{visitEntryCount}</p>
+                                    <p className="text-xs text-[color:var(--lume-ink-muted)]">Visite</p>
+                                    <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{visitEntryCount}</p>
                                 </div>
                                 <div className="rounded-[16px] border border-[color:rgba(112,106,100,0.12)] bg-white/70 px-3 py-2">
-                                    <p className="text-xs text-[color:var(--mf-muted)]">Fonti</p>
-                                    <p className="text-sm font-semibold text-[color:var(--mf-ink)]">{sourceCount}</p>
+                                    <p className="text-xs text-[color:var(--lume-ink-muted)]">Fonti</p>
+                                    <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{sourceCount}</p>
                                 </div>
                             </div>
                             {patient?.diagnoses?.length ? (
                                 <div className="flex flex-wrap gap-2">
                                     {patient.diagnoses.slice(0, 3).map((diagnosis) => (
-                                        <span key={`${diagnosis.system}-${diagnosis.code}-${diagnosis.description}`} className="rounded-full border border-[color:rgba(15,123,104,0.16)] bg-[color:rgba(15,123,104,0.08)] px-3 py-1 text-xs font-semibold text-[color:var(--mf-primary)]">
+                                        <span key={`${diagnosis.system}-${diagnosis.code}-${diagnosis.description}`} className="rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-1 text-xs font-semibold text-[color:var(--lume-ink)]">
                                             {diagnosis.description}
                                         </span>
                                     ))}
@@ -807,20 +810,20 @@ export default function NewEntryPage() {
                     <section className="patient-detail-side-section rounded-[20px] border p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Revisione recente</p>
-                            <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
-                                <History className="h-5 w-5 text-[color:var(--mf-primary)]" />
+                            <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
+                                <History className="h-5 w-5 text-[color:var(--lume-accent)]" />
                                 Diario paziente
                             </h3>
                         </div>
                         <div className="space-y-3">
                             {recentEntries.length > 0 ? recentEntries.map((entry) => (
                                 <div key={entry.id} className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/74 px-4 py-3">
-                                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">{formatEntryDate(entry.date)}</p>
-                                    <p className="mt-1 text-sm font-semibold text-[color:var(--mf-ink)]">{entry.title}</p>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">{formatEntryDate(entry.date)}</p>
+                                    <p className="mt-1 text-sm font-semibold text-[color:var(--lume-ink)]">{entry.title}</p>
                                 </div>
                             )) : (
                                 <div className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/74 px-4 py-3">
-                                    <p className="text-sm text-[color:var(--mf-muted)]">Nessuna voce recente disponibile.</p>
+                                    <p className="text-sm text-[color:var(--lume-ink-muted)]">Nessuna voce recente disponibile.</p>
                                 </div>
                             )}
                         </div>
@@ -829,12 +832,12 @@ export default function NewEntryPage() {
                     <section className="patient-detail-side-section rounded-[20px] border p-5">
                         <div className="mb-4">
                             <p className="section-kicker">Sicurezza</p>
-                            <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
-                                <Sparkles className="h-5 w-5 text-[color:var(--mf-primary)]" />
+                            <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
+                                <Sparkles className="h-5 w-5 text-[color:var(--lume-accent)]" />
                                 Revisione manuale
                             </h3>
                         </div>
-                        <div className="space-y-3 text-sm leading-6 text-[color:var(--mf-muted)]">
+                        <div className="space-y-3 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
                             <p>La bozza dettata resta fuori dal diario finche non la porti nel resoconto.</p>
                             <p>Il salvataggio crea una voce clinica solo quando premi Registra nel diario.</p>
                         </div>

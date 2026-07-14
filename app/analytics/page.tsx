@@ -338,7 +338,7 @@ export default function AnalyticsPage() {
             </section>
 
             <section id="indicatori" className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 scroll-mt-32">
-                <div className="mf-section p-5" style={{ borderLeft: `3px solid ${K8_TONES.info.accent}` }}>
+                <div className="mf-section p-5">
                     <div className="flex items-start justify-between gap-3">
                         <div>
                             <p className="mf-eyebrow">Schede nel filtro</p>
@@ -352,7 +352,7 @@ export default function AnalyticsPage() {
                     </p>
                 </div>
 
-                <div className="mf-section p-5" style={{ borderLeft: `3px solid ${K8_TONES.warning.accent}` }}>
+                <div className="mf-section p-5">
                     <div className="flex items-start justify-between gap-3">
                         <div>
                             <p className="mf-eyebrow">ADI attive</p>
@@ -366,7 +366,7 @@ export default function AnalyticsPage() {
                     </p>
                 </div>
 
-                <div className="mf-section p-5" style={{ borderLeft: `3px solid ${K8_TONES.success.accent}` }}>
+                <div className="mf-section p-5">
                     <div className="flex items-start justify-between gap-3">
                         <div>
                             <p className="mf-eyebrow">Con diagnosi</p>
@@ -380,7 +380,7 @@ export default function AnalyticsPage() {
                     </p>
                 </div>
 
-                <div className="mf-section p-5" style={{ borderLeft: `3px solid ${K8_TONES.critical.accent}` }}>
+                <div className="mf-section p-5">
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                             <p className="mf-eyebrow">Diagnosi più ricorrente</p>
@@ -538,7 +538,6 @@ function AuditCard({
             style={{
                 background: 'var(--lume-surface-field)',
                 border: '1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent)',
-                borderLeft: `3px solid ${palette.accent}`,
                 boxShadow: 'none',
             }}
         >
