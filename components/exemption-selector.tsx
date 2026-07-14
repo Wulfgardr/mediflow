@@ -165,7 +165,7 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
     return (
         <div ref={rootRef} className="space-y-3">
             <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--mf-muted)]" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--lume-ink-muted)]" />
                 <input
                     type="text"
                     role="combobox"
@@ -192,16 +192,16 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
                         aria-label="Risultati catalogo esenzioni"
                     >
                         {isLoading ? (
-                            <p className="px-3 py-2 text-xs text-[color:var(--mf-muted)]">Ricerca in corso...</p>
+                            <p className="px-3 py-2 text-xs text-[color:var(--lume-ink-muted)]">Ricerca in corso...</p>
                         ) : catalogCount === 0 ? (
-                            <div className="space-y-1 px-3 py-2 text-xs text-[color:var(--mf-warning)] dark:text-[color:rgb(230,180,120)]">
+                            <div className="space-y-1 px-3 py-2 text-xs text-[color:var(--lume-signal-warning)] dark:text-[color:rgb(230,180,120)]">
                                 <p>Catalogo esenzioni vuoto.</p>
-                                <a href="/settings" className="underline text-[color:var(--mf-primary)]">
+                                <a href="/settings" className="underline text-[color:var(--lume-accent)]">
                                     Vai in Impostazioni e importa i file esenzioni.
                                 </a>
                             </div>
                         ) : results.length === 0 ? (
-                            <p className="px-3 py-2 text-xs text-[color:var(--mf-muted)]">Nessun codice trovato.</p>
+                            <p className="px-3 py-2 text-xs text-[color:var(--lume-ink-muted)]">Nessun codice trovato.</p>
                         ) : (
                             <div className="space-y-0.5">
                                 {results.map((result, index) => {
@@ -217,19 +217,19 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
                                             onMouseEnter={() => setActiveIndex(index)}
                                             disabled={selected}
                                             className={`w-full rounded-[var(--lume-radius-control)] px-3 py-2 text-left transition-[background-color] duration-[var(--lume-dur-riga)] ${selected
-                                                ? 'bg-[color:rgba(15,123,104,0.1)] opacity-60'
+                                                ? 'bg-[color:var(--lume-surface-focal)] opacity-60'
                                                 : `hover:bg-[color:var(--lume-surface-focal)] ${index === activeIndex ? 'lume-focal bg-[color:var(--lume-surface-focal)] [--lume-focal-shadow-opacity:1]' : ''}`
                                                 }`}
                                         >
                                             <div className="flex items-center justify-between gap-3">
-                                                <p className="lume-registro text-xs font-semibold text-[color:var(--mf-ink)]">{result.code}</p>
+                                                <p className="lume-registro text-xs font-semibold text-[color:var(--lume-ink)]">{result.code}</p>
                                                 {result.type && (
-                                                    <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] text-[color:var(--mf-muted)] dark:bg-white/10">
+                                                    <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] text-[color:var(--lume-ink-muted)] dark:bg-white/10">
                                                         {result.type}
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="mt-1 text-xs text-[color:var(--mf-muted)]">{result.description}</p>
+                                            <p className="mt-1 text-xs text-[color:var(--lume-ink-muted)]">{result.description}</p>
                                         </button>
                                     );
                                 })}
@@ -246,14 +246,14 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
                         return (
                             <span
                                 key={code}
-                                className="inline-flex items-center gap-2 rounded-full border border-[color:rgba(15,123,104,0.18)] bg-[color:rgba(15,123,104,0.08)] py-1 pl-2.5 pr-2 text-xs text-[color:var(--mf-primary)] dark:border-[color:rgba(94,199,177,0.28)] dark:bg-[color:rgba(94,199,177,0.16)] dark:text-[color:rgb(150,224,204)]"
+                                className="inline-flex items-center gap-2 rounded-full border border-[color:color-mix(in_srgb,var(--lume-accent)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] py-1 pl-2.5 pr-2 text-xs text-[color:var(--lume-accent)]"
                             >
                                 <span className="lume-registro font-semibold">{code}</span>
                                 <span className="max-w-[340px] truncate">{detail?.description || 'Descrizione non caricata'}</span>
                                 <button
                                     type="button"
                                     onClick={() => removeCode(code)}
-                                    className="text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-critical)]"
+                                    className="text-[color:var(--lume-ink-muted)] transition-colors hover:text-[color:var(--lume-signal-critical)]"
                                     aria-label={`Rimuovi ${code}`}
                                 >
                                     <X className="h-3.5 w-3.5" />
@@ -263,7 +263,7 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
                     })}
                 </div>
             ) : (
-                <p className="text-xs text-[color:var(--mf-muted)]">
+                <p className="text-xs text-[color:var(--lume-ink-muted)]">
                     {catalogCount === 0 ? 'Catalogo non ancora caricato: importa i file esenzioni nelle impostazioni.' : 'Nessuna esenzione associata.'}
                 </p>
             )}

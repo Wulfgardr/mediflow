@@ -81,7 +81,7 @@ function PlaceholderBody({ lines }: { lines: number }) {
             {Array.from({ length: lines }).map((_, index) => (
                 <div
                     key={index}
-                    className="rounded-[16px] border border-[color:rgba(112,106,100,0.12)] bg-white/60 px-4 py-3 text-sm text-[color:var(--mf-muted)] dark:border-white/10 dark:bg-white/5"
+                    className="rounded-[16px] border border-[color:rgba(112,106,100,0.12)] bg-white/60 px-4 py-3 text-sm text-[color:var(--lume-ink-muted)] dark:border-white/10 dark:bg-white/5"
                 >
                     Contenuto del gestore reale (placeholder di prova).
                 </div>
@@ -135,11 +135,11 @@ export default function MockSchedaPage() {
                     {/* Narrativa clinica: aperta di default, in cima alla colonna larga. */}
                     <section id="insight" className="patient-detail-section border p-5 md:p-6 scroll-mt-28">
                         <p className="section-kicker">Sintesi AI</p>
-                        <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--mf-ink)]">
-                            <Activity className="h-5 w-5 text-[color:var(--mf-muted)]" />
+                        <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--lume-ink)]">
+                            <Activity className="h-5 w-5 text-[color:var(--lume-ink-muted)]" />
                             Quadro sintetico assistito
                         </h2>
-                        <p className="mt-3 text-sm leading-6 text-[color:var(--mf-ink)]">
+                        <p className="mt-3 text-sm leading-6 text-[color:var(--lume-ink)]">
                             Anziano pluripatologico con scompenso cardiaco e nefropatia diabetica. Aderenza
                             terapeutica buona; ultimo accesso 14 giorni fa. Attenzione alla funzione renale in
                             calo e al rischio di interazione tra ACE-inibitore e diuretico risparmiatore.
@@ -150,7 +150,7 @@ export default function MockSchedaPage() {
                         <div className="mb-5 flex items-center justify-between gap-3">
                             <div>
                                 <p className="section-kicker">Timeline</p>
-                                <h2 className="mt-1 text-xl font-semibold text-[color:var(--mf-ink)]">Timeline clinica</h2>
+                                <h2 className="mt-1 text-xl font-semibold text-[color:var(--lume-ink)]">Timeline clinica</h2>
                             </div>
                             <span className="apple-chip">23 eventi in totale</span>
                         </div>
@@ -161,8 +161,8 @@ export default function MockSchedaPage() {
                         <div className="mb-5 flex items-center justify-between gap-3">
                             <div>
                                 <p className="section-kicker">Diario</p>
-                                <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--mf-ink)]">
-                                    <FileText className="h-5 w-5 text-[color:var(--mf-muted)]" />
+                                <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--lume-ink)]">
+                                    <FileText className="h-5 w-5 text-[color:var(--lume-ink-muted)]" />
                                     Diario clinico
                                 </h2>
                             </div>
@@ -227,7 +227,7 @@ export default function MockSchedaPage() {
                 <div className={workspaceStyles.secondaryStack}>
                     <section className="patient-detail-side-section border p-5 scroll-mt-28">
                         <p className="section-kicker">Evidenze documentali</p>
-                        <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">Referti recenti</h3>
+                        <h3 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">Referti recenti</h3>
                         <div className="mt-4">
                             <PlaceholderBody lines={3} />
                         </div>
@@ -235,13 +235,13 @@ export default function MockSchedaPage() {
 
                     <section id="follow-up" className="patient-detail-side-section border p-5 scroll-mt-28">
                         <p className="section-kicker">Pianificazione</p>
-                        <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--mf-ink)]">
-                            <Calendar className="h-5 w-5 text-[color:var(--mf-muted)]" />
+                        <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
+                            <Calendar className="h-5 w-5 text-[color:var(--lume-ink-muted)]" />
                             Follow-up
                         </h3>
                         <div className="mt-4 space-y-2">
                             <div className="rounded-[12px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 px-4 py-3 dark:bg-white/5">
-                                <p className="text-sm font-semibold text-[color:var(--mf-ink)]">Controllo cardiologico</p>
+                                <p className="text-sm font-semibold text-[color:var(--lume-ink)]">Controllo cardiologico</p>
                                 <span className="apple-chip">22/06/2026</span>
                             </div>
                         </div>

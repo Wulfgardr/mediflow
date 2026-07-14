@@ -82,7 +82,7 @@ export default function Timeline({ entries }: TimelineProps) {
     const auditToggle = (
         <button
             onClick={() => setShowDeleted(!showDeleted)}
-            className="text-xs flex items-center gap-1 text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-ink)]"
+            className="text-xs flex items-center gap-1 text-[color:var(--lume-ink-muted)] transition-colors hover:text-[color:var(--lume-ink)]"
         >
             {showDeleted ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
             {showDeleted ? "Nascondi eliminati" : "Mostra cestino / audit"}
@@ -93,7 +93,7 @@ export default function Timeline({ entries }: TimelineProps) {
         return (
             <div className="space-y-4">
                 <div className="flex justify-end">{auditToggle}</div>
-                <div className="text-center py-10 italic text-[color:var(--mf-muted)]">Nessuna voce visibile nel diario clinico.</div>
+                <div className="text-center py-10 italic text-[color:var(--lume-ink-muted)]">Nessuna voce visibile nel diario clinico.</div>
             </div>
         );
     }

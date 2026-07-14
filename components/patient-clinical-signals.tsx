@@ -17,10 +17,10 @@ export interface ClinicalSignal {
 }
 
 const TONE_VALUE_CLASS: Record<ClinicalSignalTone, string> = {
-    neutral: 'text-[color:var(--mf-ink)]',
-    primary: 'text-[color:var(--mf-primary)] dark:text-[color:rgb(150,224,204)]',
-    warning: 'text-[color:var(--mf-warning)] dark:text-[color:rgb(230,180,120)]',
-    critical: 'text-[color:var(--mf-critical)] dark:text-[color:rgb(240,150,140)]',
+    neutral: 'text-[color:var(--lume-ink)]',
+    primary: 'text-[color:var(--lume-accent)] dark:text-[color:rgb(150,224,204)]',
+    warning: 'text-[color:var(--lume-signal-warning)] dark:text-[color:rgb(230,180,120)]',
+    critical: 'text-[color:var(--lume-signal-critical)] dark:text-[color:rgb(240,150,140)]',
 };
 
 export function PatientClinicalSignals({ signals }: { signals: ClinicalSignal[] }) {
@@ -39,7 +39,7 @@ export function PatientClinicalSignals({ signals }: { signals: ClinicalSignal[] 
                         key={signal.label}
                         className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/72 px-4 py-3 dark:border-[color:rgba(255,247,240,0.1)] dark:bg-white/5"
                     >
-                        <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                        <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                             {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
                             {signal.label}
                         </p>
@@ -47,7 +47,7 @@ export function PatientClinicalSignals({ signals }: { signals: ClinicalSignal[] 
                             {signal.value}
                         </p>
                         {signal.hint ? (
-                            <p className="mt-1 truncate text-[11px] text-[color:var(--mf-muted)]" title={signal.hint}>
+                            <p className="mt-1 truncate text-[11px] text-[color:var(--lume-ink-muted)]" title={signal.hint}>
                                 {signal.hint}
                             </p>
                         ) : null}

@@ -247,7 +247,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
                         </div>
                         <div className="space-y-1">
                             <p className="text-sm font-bold text-slate-700 dark:text-[color:rgba(255,255,255,0.86)]">Analisi in corso</p>
-                            <p className="text-[10px] font-medium uppercase tracking-widest text-[color:var(--mf-muted)]">{progress}</p>
+                            <p className="text-[10px] font-medium uppercase tracking-widest text-[color:var(--lume-ink-muted)]">{progress}</p>
                         </div>
 
                         

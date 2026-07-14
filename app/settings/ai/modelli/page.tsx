@@ -47,13 +47,13 @@ export default function SettingsAiModelsPage() {
                 <div className={SETTINGS_CARD_CLASS}>
                     {/* @Codex WUL-229: hardware tier cards now ride mf-option-card with token-driven accents */}
                     <div className="mb-5 flex items-start gap-3">
-                        <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' }}>
+                        <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--lume-ink)' }}>
                             <Cpu className="h-4 w-4" />
                         </div>
                         <div className="min-w-0">
                             <p className="section-kicker">Profilo hardware</p>
-                            <h3 className="mt-1 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>Capacità del computer</h3>
-                            <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>Imposta i modelli di default in base alla RAM disponibile. Sovrascrive le selezioni manuali.</p>
+                            <h3 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Capacità del computer</h3>
+                            <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Imposta i modelli di default in base alla RAM disponibile. Sovrascrive le selezioni manuali.</p>
                         </div>
                     </div>
 
@@ -64,11 +64,11 @@ export default function SettingsAiModelsPage() {
                             style={hardwareProfile === 'low' ? { borderColor: 'rgba(15, 23, 42, 0.22)', background: 'rgba(248, 250, 252, 0.9)' } : undefined}
                         >
                             <div className="mb-2 flex items-center justify-between gap-3">
-                                <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-ink)' }}>Leggero</span>
-                                {hardwareProfile === 'low' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--mf-ink)' }} />}
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--lume-ink)' }}>Leggero</span>
+                                {hardwareProfile === 'low' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--lume-ink)' }} />}
                             </div>
-                            <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>&lt; 16GB RAM</p>
-                            <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>Usa solo modelli molto compressi (Q4_K_M).</p>
+                            <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>&lt; 16GB RAM</p>
+                            <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>Usa solo modelli molto compressi (Q4_K_M).</p>
                         </div>
 
                         <div
@@ -77,11 +77,11 @@ export default function SettingsAiModelsPage() {
                             style={hardwareProfile === 'medium' ? { borderColor: 'rgba(15, 23, 42, 0.22)', background: 'rgba(248, 250, 252, 0.9)' } : undefined}
                         >
                             <div className="mb-2 flex items-center justify-between gap-3">
-                                <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-ink)' }}>Bilanciato</span>
-                                {hardwareProfile === 'medium' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--mf-ink)' }} />}
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--lume-ink)' }}>Bilanciato</span>
+                                {hardwareProfile === 'medium' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--lume-ink)' }} />}
                             </div>
-                            <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>16-32GB RAM</p>
-                            <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>Qwen 14B per sintesi e reasoning.</p>
+                            <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>16-32GB RAM</p>
+                            <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>Qwen 14B per sintesi e reasoning.</p>
                         </div>
 
                         <div
@@ -90,11 +90,11 @@ export default function SettingsAiModelsPage() {
                             style={hardwareProfile === 'high' ? { borderColor: 'rgba(15, 23, 42, 0.22)', background: 'rgba(248, 250, 252, 0.9)' } : undefined}
                         >
                             <div className="mb-2 flex items-center justify-between gap-3">
-                                <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--mf-ink)' }}>Avanzato</span>
-                                {hardwareProfile === 'high' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--mf-ink)' }} />}
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--lume-ink)' }}>Avanzato</span>
+                                {hardwareProfile === 'high' && <CheckCircle className="w-4 h-4" style={{ color: 'var(--lume-ink)' }} />}
                             </div>
-                            <p className="text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>&gt; 32GB RAM</p>
-                            <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>Qwen 3.5 35B A3B per tutte le superfici text-only.</p>
+                            <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>&gt; 32GB RAM</p>
+                            <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>Qwen 3.5 35B A3B per tutte le superfici text-only.</p>
                         </div>
                     </div>
                 </div>
@@ -103,13 +103,13 @@ export default function SettingsAiModelsPage() {
                 <div className={SETTINGS_CARD_CLASS}>
                     {/* @Codex WUL-273: AI roles header follows the neutral settings surface. */}
                     <div className="mb-5 flex items-start gap-3">
-                        <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' }}>
+                        <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--lume-ink)' }}>
                             <Stethoscope className="h-4 w-4" />
                         </div>
                         <div className="min-w-0">
                             <p className="section-kicker">Ruoli del team AI</p>
-                            <h3 className="mt-1 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>Modelli per superficie clinica</h3>
-                            <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>Ogni ruolo usa un modello dedicato.</p>
+                            <h3 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Modelli per superficie clinica</h3>
+                            <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Ogni ruolo usa un modello dedicato.</p>
                         </div>
                     </div>
 

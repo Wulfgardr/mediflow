@@ -41,12 +41,12 @@ function ReviewQueueRow({ row }: { row: PatientReviewQueueRow }) {
         >
             <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-[color:var(--mf-ink)]">{row.panelLabel}</span>
+                    <span className="text-sm font-semibold text-[color:var(--lume-ink)]">{row.panelLabel}</span>
                     <Badge palette={STATE_PALETTE[row.state]} size="xs">
                         {row.stateLabel}
                     </Badge>
                 </div>
-                <p className="mt-1 text-xs leading-5 text-[color:var(--mf-muted)]">{row.detail}</p>
+                <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">{row.detail}</p>
                 {row.blockedReason ? (
                     <p className="mt-1 text-xs leading-5 text-red-700 dark:text-red-300">
                         Perché non scrive da solo: {row.blockedReason}
@@ -57,12 +57,12 @@ function ReviewQueueRow({ row }: { row: PatientReviewQueueRow }) {
             {row.anchor ? (
                 <a
                     href={row.anchor}
-                    className="shrink-0 self-start text-xs font-semibold text-[color:var(--mf-ink)] underline decoration-[color:rgba(112,106,100,0.35)] underline-offset-4 transition-colors hover:decoration-[color:var(--mf-ink)] sm:self-center"
+                    className="shrink-0 self-start text-xs font-semibold text-[color:var(--lume-ink)] underline decoration-[color:rgba(112,106,100,0.35)] underline-offset-4 transition-colors hover:decoration-[color:var(--lume-ink)] sm:self-center"
                 >
                     {row.actionLabel}
                 </a>
             ) : (
-                <span className="shrink-0 self-start text-xs font-medium italic text-[color:var(--mf-muted)] sm:self-center">
+                <span className="shrink-0 self-start text-xs font-medium italic text-[color:var(--lume-ink-muted)] sm:self-center">
                     {row.actionLabel}
                 </span>
             )}
@@ -90,11 +90,11 @@ export default function PatientReviewQueueSummaryPanel({ summary, embedded = fal
             <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                     <p className="section-kicker">Coda di revisione</p>
-                    <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--mf-ink)]">
-                        <ListChecks className="h-5 w-5 text-[color:var(--mf-muted)]" />
+                    <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--lume-ink)]">
+                        <ListChecks className="h-5 w-5 text-[color:var(--lume-ink-muted)]" />
                         Cosa rivedere adesso
                     </h2>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--lume-ink-muted)]">
                         Riepilogo in sola lettura: nulla viene scritto in automatico nella scheda, ogni modifica passa dal pannello dedicato.
                     </p>
                 </div>

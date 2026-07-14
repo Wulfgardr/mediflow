@@ -50,7 +50,7 @@ function EntryAttachments({ attachmentIds, onView }: { attachmentIds: string[], 
                         </div>
                         <div className="min-w-0 flex-1">
                             <p className="text-xs font-bold truncate">{file.name}</p>
-                            <p className="text-[10px]" style={{ color: 'var(--mf-muted)' }}>{file.summarySnapshot ? 'Analisi IA disponibile' : 'Allegato'}</p>
+                            <p className="text-[10px]" style={{ color: 'var(--lume-ink-muted)' }}>{file.summarySnapshot ? 'Analisi IA disponibile' : 'Allegato'}</p>
                         </div>
                     </button>
                 ))}
@@ -73,24 +73,24 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
     return (
         <div className={`relative pl-8 ${isDeleted ? 'opacity-60 grayscale' : ''}`}>
             {/* Dot */}
-            <div data-lume-timeline-node className={`absolute -left-2 top-0 h-4 w-4 rounded-full border-2 border-[color:var(--mf-bg)] ${isDeleted ? 'bg-[color:var(--mf-critical)]' : 'bg-[color:var(--mf-primary)]'}`}></div>
+            <div data-lume-timeline-node className={`absolute -left-2 top-0 h-4 w-4 rounded-full border-2 border-[color:var(--lume-surface-field)] ${isDeleted ? 'bg-[color:var(--lume-signal-critical)]' : 'bg-[color:var(--lume-accent)]'}`}></div>
 
             {/* Content */}
             <div className={`mf-section p-5 ${isDeleted ? 'border-[color:rgba(163,58,47,0.26)] bg-[color:rgba(163,58,47,0.08)]' : ''}`}>
                 <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-2">
-                        <div className={`mf-icon-disc h-8 w-8 !rounded-[12px] ${isDeleted ? '!text-[color:var(--mf-critical)]' : ''}`}>
+                        <div className={`mf-icon-disc h-8 w-8 !rounded-[12px] ${isDeleted ? '!text-[color:var(--lume-signal-critical)]' : ''}`}>
                             <Icon className="w-4 h-4" />
                         </div>
                         <div>
-                            <span className="block text-xs font-bold uppercase" style={{ color: isDeleted ? 'var(--mf-critical)' : 'var(--mf-primary)' }}>
+                            <span className="block text-xs font-bold uppercase" style={{ color: isDeleted ? 'var(--lume-signal-critical)' : 'var(--lume-accent)' }}>
                                 {TYPE_LABELS[entry.type] || entry.type}
-                                {entry.patientName && <span className="ml-1 font-normal normal-case" style={{ color: 'var(--mf-muted)' }}> - {entry.patientName}</span>}
+                                {entry.patientName && <span className="ml-1 font-normal normal-case" style={{ color: 'var(--lume-ink-muted)' }}> - {entry.patientName}</span>}
                             </span>
-                            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--mf-muted)' }}>
+                            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                                 <span className="lume-registro">{format(new Date(entry.date), 'dd MMMM yyyy HH:mm', { locale: it })}</span>
                                 {entry.setting && (
-                                    <span className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 ${entry.setting === 'home' ? 'border-[color:rgba(197,138,47,0.28)] text-[color:var(--mf-warning)]' : 'border-[color:rgba(63,122,76,0.26)] text-[color:var(--mf-success)]'}`}>
+                                    <span className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 ${entry.setting === 'home' ? 'border-[color:rgba(197,138,47,0.28)] text-[color:var(--lume-signal-warning)]' : 'border-[color:rgba(63,122,76,0.26)] text-[color:var(--lume-signal-success)]'}`}>
                                         {entry.setting === 'home' ? <Home className="w-3 h-3" /> : <Building2 className="w-3 h-3" />}
                                         {entry.setting === 'home' ? 'Dom' : 'Amb'}
                                     </span>
@@ -105,7 +105,7 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
                             onRestore && (
                                 <button
                                     onClick={() => onRestore(entry)}
-                                    className="mf-btn-secondary !p-1.5 !text-[color:var(--mf-success)]"
+                                    className="mf-btn-secondary !p-1.5 !text-[color:var(--lume-signal-success)]"
                                     title="Ripristina"
                                     aria-label="Ripristina voce clinica"
                                 >
@@ -116,7 +116,7 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
                             onDelete && (
                                 <button
                                     onClick={() => onDelete(entry)}
-                                    className="mf-btn-secondary !p-1.5 hover:!text-[color:var(--mf-critical)]"
+                                    className="mf-btn-secondary !p-1.5 hover:!text-[color:var(--lume-signal-critical)]"
                                     title="Elimina con motivazione"
                                     aria-label="Elimina voce clinica con motivazione"
                                 >
@@ -143,7 +143,7 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
                 )}
 
                 {/* Main Text Content */}
-                <div style={{ color: 'var(--mf-ink)' }}>
+                <div style={{ color: 'var(--lume-ink)' }}>
                     <PrivacyBlur>
                         {/* @Codex */}
                         <ClinicalRichTextContent content={entry.content} className="prose prose-sm max-w-none prose-p:leading-relaxed dark:prose-invert" />

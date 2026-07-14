@@ -37,8 +37,8 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
         <div className="space-y-4">
             {fields.length === 0 && (
                 <div className="mf-section mf-section-tight flex flex-col items-center justify-center py-8 px-6 border-dashed text-center">
-                    <Activity className="w-7 h-7 mb-2" style={{ color: 'var(--mf-muted)' }} />
-                    <p className="text-sm font-medium" style={{ color: 'var(--mf-muted)' }}>Nessuna diagnosi registrata.</p>
+                    <Activity className="w-7 h-7 mb-2" style={{ color: 'var(--lume-ink-muted)' }} />
+                    <p className="text-sm font-medium" style={{ color: 'var(--lume-ink-muted)' }}>Nessuna diagnosi registrata.</p>
                 </div>
             )}
 
@@ -131,9 +131,9 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
         <div className="space-y-4">
             {fields.length === 0 && (
                 <div className="mf-section mf-section-tight flex flex-col items-center justify-center py-8 px-6 border-dashed text-center">
-                    <Calendar className="w-7 h-7 mb-2" style={{ color: 'var(--mf-muted)' }} />
-                    <p className="text-sm font-medium" style={{ color: 'var(--mf-muted)' }}>Nessun passaggio programmato.</p>
-                    <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>Pianifica PRIAMO, valutazioni, visite o follow-up.</p>
+                    <Calendar className="w-7 h-7 mb-2" style={{ color: 'var(--lume-ink-muted)' }} />
+                    <p className="text-sm font-medium" style={{ color: 'var(--lume-ink-muted)' }}>Nessun passaggio programmato.</p>
+                    <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Pianifica PRIAMO, valutazioni, visite o follow-up.</p>
                 </div>
             )}
 
@@ -243,8 +243,8 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             <div className={FORM_SECTION_CLASS}>
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 graphite-divider pb-5 mb-2">
                     <div className="flex items-center gap-4">
-                        <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(15, 123, 104, 0.1)' }}>
-                            <User className="w-5 h-5" style={{ color: 'var(--mf-primary)' }} />
+                        <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--lume-accent) 10%, var(--lume-surface-field))' }}>
+                            <User className="w-5 h-5" style={{ color: 'var(--lume-accent)' }} />
                         </div>
                         <div>
                             <p className="mf-eyebrow">Dati anagrafici</p>
@@ -306,7 +306,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             <div className={FORM_SECTION_CLASS}>
                 <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
                     <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(63, 122, 76, 0.12)' }}>
-                        <MapPin className="w-5 h-5" style={{ color: 'var(--mf-success)' }} />
+                        <MapPin className="w-5 h-5" style={{ color: 'var(--lume-signal-success)' }} />
                     </div>
                     <div>
                         <p className="mf-eyebrow">Reperibilità</p>
@@ -327,7 +327,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     <div className="space-y-1">
                         <label className={FORM_LABEL_CLASS}>Cellulare / Telefono</label>
                         <div className="relative">
-                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--mf-muted)' }} />
+                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--lume-ink-muted)' }} />
                             <input
                                 {...register('phone')}
                                 className={`${FORM_INPUT_CLASS} pl-11`}
@@ -339,7 +339,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     <div className="col-span-full space-y-1">
                         <label className={FORM_LABEL_CLASS}>Caregiver o riferimento</label>
                         <div className="relative">
-                            <HeartHandshake className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--mf-plum)' }} />
+                            <HeartHandshake className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--lume-accent)' }} />
                             <input
                                 {...register('caregiver')}
                                 className={`${FORM_INPUT_CLASS} pl-11`}
@@ -354,7 +354,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             <div className={`${FORM_SECTION_CLASS} diagnosis-section-card`}>
                 <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
                     <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(163, 58, 47, 0.1)' }}>
-                        <Activity className="w-5 h-5" style={{ color: 'var(--mf-critical)' }} />
+                        <Activity className="w-5 h-5" style={{ color: 'var(--lume-signal-critical)' }} />
                     </div>
                     <div>
                         <p className="mf-eyebrow">Codifica clinica</p>
@@ -368,13 +368,13 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             {/* Pianificazione operativa */}
             <div className={FORM_SECTION_CLASS}>
                 <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
-                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(94, 53, 95, 0.12)' }}>
-                        <Calendar className="w-5 h-5" style={{ color: 'var(--mf-plum)' }} />
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--lume-accent) 10%, var(--lume-surface-field))' }}>
+                        <Calendar className="w-5 h-5" style={{ color: 'var(--lume-accent)' }} />
                     </div>
                     <div>
                         <p className="mf-eyebrow">Agenda clinica</p>
                         <h3 className={FORM_TITLE_CLASS}>Prossimi passaggi</h3>
-                        <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>PRIAMO, valutazioni, visite programmate, follow-up.</p>
+                        <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>PRIAMO, valutazioni, visite programmate, follow-up.</p>
                     </div>
                 </div>
                 <CheckupsFieldArray register={register} control={control} errors={errors} />
@@ -384,7 +384,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             <div className={FORM_SECTION_CLASS}>
                 <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
                     <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(197, 138, 47, 0.14)' }}>
-                        <Ticket className="w-5 h-5" style={{ color: 'var(--mf-warning)' }} />
+                        <Ticket className="w-5 h-5" style={{ color: 'var(--lume-signal-warning)' }} />
                     </div>
                     <div>
                         <p className="mf-eyebrow">Assetto amministrativo</p>
@@ -415,8 +415,8 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             {/* Clinical Profile Section */}
             <div className={FORM_SECTION_CLASS}>
                 <div className="flex items-center gap-4 graphite-divider pb-5 mb-2">
-                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(15, 123, 104, 0.1)' }}>
-                        <FileText className="w-5 h-5" style={{ color: 'var(--mf-primary)' }} />
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--lume-accent) 10%, var(--lume-surface-field))' }}>
+                        <FileText className="w-5 h-5" style={{ color: 'var(--lume-accent)' }} />
                     </div>
                     <div>
                         <p className="mf-eyebrow">Profilo assistenziale</p>
@@ -432,11 +432,11 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                                 id="adi"
                                 {...register('isAdi')}
                                 className="peer h-5 w-5 rounded-md cursor-pointer"
-                                style={{ accentColor: 'var(--mf-primary)' }}
+                                style={{ accentColor: 'var(--lume-accent)' }}
                             />
-                            <label htmlFor="adi" className="font-semibold cursor-pointer select-none" style={{ color: 'var(--mf-ink)' }}>
+                            <label htmlFor="adi" className="font-semibold cursor-pointer select-none" style={{ color: 'var(--lume-ink)' }}>
                                 Paziente in ADI
-                                <span className="block text-[11px] font-normal" style={{ color: 'var(--mf-muted)' }}>Assistenza Domiciliare Integrata</span>
+                                <span className="block text-[11px] font-normal" style={{ color: 'var(--lume-ink-muted)' }}>Assistenza Domiciliare Integrata</span>
                             </label>
                         </div>
 
@@ -451,14 +451,14 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                                     <option value="extemporaneous">Episodica</option>
                                 </select>
                                 <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2">
-                                    <ChevronDown className="h-4 w-4" style={{ color: 'var(--mf-muted)' }} />
+                                    <ChevronDown className="h-4 w-4" style={{ color: 'var(--lume-ink-muted)' }} />
                                 </div>
                             </div>
 
                             {hasStatusChanged && isEditMode && (
                                 <div className="animate-in fade-in slide-in-from-top-2 pt-2">
                                     <label className="mf-field-label flex items-center gap-1.5">
-                                        <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--mf-warning)' }} />
+                                        <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--lume-signal-warning)' }} />
                                         Motivo cambio stato (obbligatorio)
                                     </label>
                                     <textarea
@@ -485,8 +485,8 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             </div>
 
             <div className="pt-6 flex flex-col md:flex-row items-center justify-between gap-6 graphite-divider">
-                <p className="text-xs font-medium" style={{ color: 'var(--mf-muted)' }}>
-                    Campi obbligatori per creare la scheda: <span style={{ color: 'var(--mf-critical)' }}>*</span>.
+                <p className="text-xs font-medium" style={{ color: 'var(--lume-ink-muted)' }}>
+                    Campi obbligatori per creare la scheda: <span style={{ color: 'var(--lume-signal-critical)' }}>*</span>.
                 </p>
                 <button
                     type="submit"

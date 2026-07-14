@@ -99,13 +99,13 @@ export function PatientIdentityLens({
                     <div className="min-w-0 space-y-5">
                         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.02fr)_minmax(320px,0.98fr)] lg:items-start lg:divide-x lg:divide-[color:rgba(112,106,100,0.12)]">
                             <div className="min-w-0 lg:pr-5">
-                                <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[color:var(--mf-muted)]">
+                                <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[color:var(--lume-ink-muted)]">
                                     Scheda paziente
                                 </p>
-                                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[color:var(--mf-ink)] md:text-[28px]">
+                                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[color:var(--lume-ink)] md:text-[28px]">
                                     <PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur>
                                 </h1>
-                                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[color:var(--mf-muted)]">
+                                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[color:var(--lume-ink-muted)]">
                                     <span className="lume-registro text-[12px] tracking-tight">
                                         <PrivacyBlur intensity="sm">{patient.taxCode}</PrivacyBlur>
                                     </span>
@@ -127,18 +127,18 @@ export function PatientIdentityLens({
                             </div>
 
                             <div className="lg:pl-5">
-                                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                     In due righe
                                 </p>
-                                <p className="mt-2 text-[15px] leading-7 text-[color:var(--mf-ink)]">
+                                <p className="mt-2 text-[15px] leading-7 text-[color:var(--lume-ink)]">
                                     {summary ?? 'Nessuna sintesi clinica disponibile.'}
                                 </p>
                                 {nextStep ? (
                                     <div className="mt-3 border-t border-[color:rgba(112,106,100,0.12)] pt-3">
-                                        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                                        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                             Prossimo passaggio
                                         </p>
-                                        <p className="mt-1.5 text-sm leading-6 text-[color:var(--mf-ink)]">
+                                        <p className="mt-1.5 text-sm leading-6 text-[color:var(--lume-ink)]">
                                             {nextStep}
                                         </p>
                                     </div>
@@ -148,10 +148,10 @@ export function PatientIdentityLens({
 
                         <div className="border-t border-[color:rgba(112,106,100,0.12)] pt-5">
                             <div className="flex flex-wrap items-baseline justify-between gap-3">
-                                <h2 className="text-sm font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                                <h2 className="text-sm font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                     Quadro clinico
                                 </h2>
-                                <div className="flex flex-wrap gap-2 text-[11px] text-[color:var(--mf-muted)]">
+                                <div className="flex flex-wrap gap-2 text-[11px] text-[color:var(--lume-ink-muted)]">
                                     <span>{codedDiagnosisCount} diagnosi</span>
                                     <span aria-hidden>·</span>
                                     <span>{exemptions.length} esenzioni</span>
@@ -160,7 +160,7 @@ export function PatientIdentityLens({
 
                             <div className="mt-3 grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-6">
                                 <div className="min-w-0">
-                                    <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                                    <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                         Diagnosi codificate
                                     </p>
                                     {leadDiagnosis ? (
@@ -170,17 +170,17 @@ export function PatientIdentityLens({
                                                     {leadDiagnosis.code}
                                                 </span>
                                                 <div className="min-w-0 flex-1">
-                                                    <p className="text-[15px] font-semibold leading-6 text-[color:var(--mf-ink)]">
+                                                    <p className="text-[15px] font-semibold leading-6 text-[color:var(--lume-ink)]">
                                                         {leadDiagnosis.description}
                                                     </p>
-                                                    <p className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.06em] text-[color:var(--mf-muted)]">
+                                                    <p className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.06em] text-[color:var(--lume-ink-muted)]">
                                                         {diagnosisSystemLabel(leadDiagnosis.system)}
                                                     </p>
                                                 </div>
                                             </div>
                                         </div>
                                     ) : (
-                                        <p className="mt-2 text-sm leading-6 text-[color:var(--mf-muted)]">
+                                        <p className="mt-2 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
                                             Nessuna diagnosi codificata in primo piano.
                                         </p>
                                     )}
@@ -190,11 +190,11 @@ export function PatientIdentityLens({
                                             {secondaryDiagnoses.map((diagnosis) => (
                                                 <span
                                                     key={`${diagnosis.system}-${diagnosis.code}`}
-                                                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[color:rgba(94,53,95,0.16)] px-2.5 py-1 text-xs text-[color:var(--mf-ink)] dark:border-[color:rgba(255,247,240,0.12)] dark:text-[color:var(--mf-ink)]"
+                                                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[color:rgba(94,53,95,0.16)] px-2.5 py-1 text-xs text-[color:var(--lume-ink)] dark:border-[color:rgba(255,247,240,0.12)] dark:text-[color:var(--lume-ink)]"
                                                 >
                                                     <span className="lume-registro font-semibold">{diagnosis.code}</span>
                                                     <span className="truncate">{diagnosis.description}</span>
-                                                    <span className="shrink-0 text-[10px] uppercase tracking-[0.04em] text-[color:var(--mf-muted)]">
+                                                    <span className="shrink-0 text-[10px] uppercase tracking-[0.04em] text-[color:var(--lume-ink-muted)]">
                                                         {diagnosisSystemLabel(diagnosis.system)}
                                                     </span>
                                                 </span>
@@ -203,14 +203,14 @@ export function PatientIdentityLens({
                                     ) : null}
 
                                     {remainingCodedCount > 0 ? (
-                                        <p className="mt-2 text-xs text-[color:var(--mf-muted)]">
+                                        <p className="mt-2 text-xs text-[color:var(--lume-ink-muted)]">
                                             +{remainingCodedCount} altre diagnosi codificate presenti in scheda.
                                         </p>
                                     ) : null}
                                 </div>
 
                                 <div className="min-w-0 lg:border-l lg:border-[color:rgba(112,106,100,0.12)] lg:pl-6">
-                                    <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                                    <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                         Esenzioni
                                     </p>
                                     {featuredExemptions.length > 0 ? (
@@ -218,7 +218,7 @@ export function PatientIdentityLens({
                                             {featuredExemptions.map((exemption) => (
                                                 <li
                                                     key={exemption.code}
-                                                    className="flex flex-wrap items-baseline gap-2 text-sm leading-6 text-[color:var(--mf-ink)]"
+                                                    className="flex flex-wrap items-baseline gap-2 text-sm leading-6 text-[color:var(--lume-ink)]"
                                                 >
                                                     <span className="patient-code-pill patient-code-pill-primary">
                                                         {exemption.code}
@@ -230,13 +230,13 @@ export function PatientIdentityLens({
                                             ))}
                                         </ul>
                                     ) : (
-                                        <p className="mt-2 text-sm leading-6 text-[color:var(--mf-muted)]">
+                                        <p className="mt-2 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
                                             Nessuna esenzione strutturata registrata.
                                         </p>
                                     )}
 
                                     {remainingExemptionCount > 0 ? (
-                                        <p className="mt-2 text-xs text-[color:var(--mf-muted)]">
+                                        <p className="mt-2 text-xs text-[color:var(--lume-ink-muted)]">
                                             +{remainingExemptionCount} altre esenzioni registrate in scheda.
                                         </p>
                                     ) : null}
@@ -247,16 +247,16 @@ export function PatientIdentityLens({
 
                     <div className="space-y-3">
                         <div className="patient-quick-context-card rounded-[var(--lume-radius-control)] border border-[color:rgba(112,106,100,0.12)] bg-[color:var(--lume-surface-field)] px-4 py-3">
-                            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                 Contesto rapido
                             </p>
-                            <div className="mt-2 space-y-1.5 text-sm text-[color:var(--mf-ink)]">
+                            <div className="mt-2 space-y-1.5 text-sm text-[color:var(--lume-ink)]">
                                 <p className="inline-flex items-center gap-1.5">
-                                    <Phone className="h-3.5 w-3.5 text-[color:var(--mf-muted)]" />
+                                    <Phone className="h-3.5 w-3.5 text-[color:var(--lume-ink-muted)]" />
                                     <PrivacyBlur intensity="sm">{patient.phone || 'Telefono non disponibile'}</PrivacyBlur>
                                 </p>
                                 <p className="inline-flex items-center gap-1.5">
-                                    <MapPin className="h-3.5 w-3.5 text-[color:var(--mf-muted)]" />
+                                    <MapPin className="h-3.5 w-3.5 text-[color:var(--lume-ink-muted)]" />
                                     <PrivacyBlur intensity="sm">{patient.address || 'Indirizzo non disponibile'}</PrivacyBlur>
                                 </p>
                             </div>
@@ -273,13 +273,13 @@ export function PatientIdentityLens({
             <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0 space-y-4">
                     <div className="space-y-2">
-                        <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[color:var(--mf-muted)]">
+                        <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[color:var(--lume-ink-muted)]">
                             Identity Lens
                         </p>
-                        <h1 className="text-3xl font-semibold tracking-tight text-[color:var(--mf-ink)] md:text-4xl">
+                        <h1 className="text-3xl font-semibold tracking-tight text-[color:var(--lume-ink)] md:text-4xl">
                             <PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur>
                         </h1>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[color:var(--mf-muted)]">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[color:var(--lume-ink-muted)]">
                             <span className="lume-registro text-[12px] tracking-tight">
                                 <PrivacyBlur intensity="sm">{patient.taxCode}</PrivacyBlur>
                             </span>
@@ -304,7 +304,7 @@ export function PatientIdentityLens({
 
                     <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
                         <div className="identity-lens-pane rounded-[var(--lume-radius-card)] border border-[color:rgba(112,106,100,0.12)] bg-[color:var(--lume-surface-field)] p-4">
-                            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                 Quadro clinico
                             </p>
                             <div className="mt-3 flex flex-wrap gap-2">
@@ -312,17 +312,17 @@ export function PatientIdentityLens({
                                     diagnoses.map((diagnosis) => (
                                         <span
                                             key={`${diagnosis.system}-${diagnosis.code}`}
-                                            className="inline-flex items-center gap-1.5 rounded-full border border-[color:rgba(94,53,95,0.14)] bg-[color:rgba(94,53,95,0.08)] px-3 py-1 text-[12px] font-medium text-[color:var(--mf-ink)]"
+                                            className="inline-flex items-center gap-1.5 rounded-full border border-[color:rgba(94,53,95,0.14)] bg-[color:rgba(94,53,95,0.08)] px-3 py-1 text-[12px] font-medium text-[color:var(--lume-ink)]"
                                         >
-                                            <span className="lume-registro font-semibold text-[color:var(--mf-plum)]">{diagnosis.code}</span>
+                                            <span className="lume-registro font-semibold text-[color:var(--lume-ink)]">{diagnosis.code}</span>
                                             {diagnosis.description}
-                                            <span className="text-[10px] uppercase tracking-[0.04em] text-[color:var(--mf-muted)]">
+                                            <span className="text-[10px] uppercase tracking-[0.04em] text-[color:var(--lume-ink-muted)]">
                                                 {diagnosisSystemLabel(diagnosis.system)}
                                             </span>
                                         </span>
                                     ))
                                 ) : (
-                                    <p className="text-sm text-[color:var(--mf-muted)]">
+                                    <p className="text-sm text-[color:var(--lume-ink-muted)]">
                                         Nessuna diagnosi strutturata in primo piano.
                                     </p>
                                 )}
@@ -330,16 +330,16 @@ export function PatientIdentityLens({
                         </div>
 
                         <div className="identity-lens-pane rounded-[var(--lume-radius-card)] border border-[color:rgba(112,106,100,0.12)] bg-[color:var(--lume-surface-field)] p-4">
-                            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                 Contesto rapido
                             </p>
-                            <div className="mt-3 space-y-2 text-sm text-[color:var(--mf-ink)]">
+                            <div className="mt-3 space-y-2 text-sm text-[color:var(--lume-ink)]">
                                 <p className="inline-flex items-center gap-1.5">
-                                    <Phone className="h-3.5 w-3.5 text-[color:var(--mf-muted)]" />
+                                    <Phone className="h-3.5 w-3.5 text-[color:var(--lume-ink-muted)]" />
                                     <PrivacyBlur intensity="sm">{patient.phone || 'Telefono non disponibile'}</PrivacyBlur>
                                 </p>
                                 <p className="inline-flex items-center gap-1.5">
-                                    <MapPin className="h-3.5 w-3.5 text-[color:var(--mf-muted)]" />
+                                    <MapPin className="h-3.5 w-3.5 text-[color:var(--lume-ink-muted)]" />
                                     <PrivacyBlur intensity="sm">{patient.address || 'Indirizzo non disponibile'}</PrivacyBlur>
                                 </p>
                                 <p>

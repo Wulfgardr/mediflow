@@ -32,7 +32,7 @@
   transition: background-color var(--lume-dur-riga) var(--lume-ease);
 }
 .mf-listrow:hover {
-  background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, transparent);
+  background-color: color-mix(in srgb, var(--lume-ink) 5%, transparent);
 }
 .mf-listrow:focus-visible {
   outline: none;
@@ -55,28 +55,17 @@
 }
 
 @theme {
-  --font-sans: var(--mf-font-sans);
+  --font-sans: var(--lume-font-sans);
   --font-mono: var(--font-registro), "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
 }
 
 :root {
   --background: var(--lume-surface-canvas);
   --foreground: var(--lume-ink);
-  --mf-bg: var(--lume-surface-field);
-  --mf-bg-elevated: var(--lume-surface-focal);
-  --mf-bg-strong: var(--lume-surface-chrome);
-  --mf-ink: var(--lume-ink);
-  --mf-muted: var(--lume-ink-muted);
-  --mf-primary: var(--lume-accent);
-  --mf-accent: var(--lume-accent);
-  --mf-plum: var(--lume-signal-plum);
-  --mf-warning: var(--lume-signal-warning);
-  --mf-critical: var(--lume-signal-critical);
-  --mf-success: var(--lume-signal-success);
 
   /* @Codex WUL-UIUX: stack tipografico unico, consumato da body e dai module
      css kree8 (shell + cockpit) al posto degli stack duplicati. */
-  --mf-font-sans: var(--font-voce), "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --lume-font-sans: var(--font-voce), "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
 }
 
@@ -84,7 +73,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   /* @Codex: use an Apple-adjacent system stack for a calmer, more native reading rhythm */
-  font-family: var(--mf-font-sans);
+  font-family: var(--lume-font-sans);
   min-height: 100vh;
   letter-spacing: 0;
   background-color: var(--lume-surface-canvas);
@@ -106,11 +95,6 @@ body {
 :root.dark {
   --background: var(--lume-surface-canvas);
   --foreground: var(--lume-ink);
-  --mf-bg: var(--lume-surface-field);
-  --mf-bg-elevated: var(--lume-surface-focal);
-  --mf-bg-strong: var(--lume-surface-chrome);
-  --mf-ink: var(--lume-ink);
-  --mf-muted: var(--lume-ink-muted);
 
   --card: #1a1f28;
   --card-foreground: #f4f7fb;
@@ -172,7 +156,7 @@ body {
 
 :root[data-ui-style='redesign'] .apple-list-row {
   border-radius: 14px;
-  background-color: rgba(255, 255, 255, 0.88);
+  background-color: var(--lume-surface-field);
   box-shadow: none;
 }
 
@@ -183,7 +167,7 @@ body {
 
 :root[data-ui-style='redesign'] .status-glyph-icon {
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--lume-surface-field);
 }
 
 :root[data-ui-style='redesign'] .mediflow-sidebar-shell {
@@ -196,11 +180,11 @@ body {
 }
 
 :root[data-ui-style='redesign'] .mediflow-mobile-nav {
-  background: rgba(248, 250, 252, 0.94);
+  background: var(--lume-surface-chrome);
 }
 
 :root.dark[data-ui-style='redesign'] .mediflow-mobile-nav {
-  background: rgba(20, 18, 22, 0.94);
+  background: var(--lume-surface-chrome);
 }
 
 .mediflow-mobile-nav {
@@ -209,8 +193,8 @@ body {
 
 :root[data-ui-style='redesign'] .patient-inbox-pane,
 :root[data-ui-style='redesign'] .patient-identity-lens-reader {
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+  background: var(--lume-surface-field);
+  box-shadow: var(--lume-shadow-resting);
 }
 
 :root[data-ui-style='redesign'] .patient-workbench-header {
@@ -229,19 +213,16 @@ body {
    command chrome first, a dominant selected-patient lens, then the operational stream. */
 :root[data-ui-style='redesign'] .patient-liquid-commandbar {
   border-radius: 28px;
-  background-color: var(--mf-tier-specular-bg);
-  border-color: var(--mf-tier-specular-border);
-  box-shadow: var(--mf-tier-specular-shadow);
+  background-color: var(--lume-surface-chrome);
+  border-color: var(--lume-border-color);
+  box-shadow: var(--lume-shadow-resting);
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-lens {
   min-height: 20rem;
   display: grid;
   align-content: space-between;
-  background:
-    radial-gradient(circle at 82% 92%, rgba(71, 85, 105, 0.08), transparent 18rem),
-    radial-gradient(circle at 12% 8%, rgba(15, 23, 42, 0.06), transparent 16rem),
-    var(--mf-tier-vitreous-bg);
+  background: var(--lume-surface-focal);
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-lens::after {
@@ -252,8 +233,7 @@ body {
   width: min(34rem, 58vw);
   height: 16rem;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.06), rgba(71, 85, 105, 0.08));
-  filter: blur(4px);
+  display: none;
   pointer-events: none;
 }
 
@@ -266,9 +246,9 @@ body {
 :root[data-ui-style='redesign'] .patient-liquid-signals {
   display: grid;
   align-content: start;
-  background-color: var(--mf-tier-vitreous-bg);
-  border-color: var(--mf-tier-vitreous-border);
-  box-shadow: var(--mf-tier-vitreous-shadow);
+  background-color: var(--lume-surface-field);
+  border-color: var(--lume-border-color);
+  box-shadow: var(--lume-shadow-resting);
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-signal {
@@ -278,34 +258,31 @@ body {
   align-items: center;
   border-radius: 20px;
   padding: 0.85rem;
-  background: rgba(255, 255, 255, 0.44);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  background: var(--lume-surface-field);
+  box-shadow: none;
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-signal span {
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.08);
-  color: var(--mf-ink);
+  background: color-mix(in srgb, var(--lume-ink) 8%, var(--lume-surface-field));
+  color: var(--lume-ink);
   padding: 0.25rem 0.55rem;
   font-size: 0.68rem;
   font-weight: 700;
 }
 
 :root.dark[data-ui-style='redesign'] .patient-liquid-commandbar {
-  background-color: var(--mf-tier-specular-bg);
-  border-color: var(--mf-tier-specular-border);
-  box-shadow: var(--mf-tier-specular-shadow);
+  background-color: var(--lume-surface-chrome);
+  border-color: var(--lume-border-color);
+  box-shadow: var(--lume-shadow-resting);
 }
 
 :root.dark[data-ui-style='redesign'] .patient-liquid-lens {
-  background:
-    radial-gradient(circle at 82% 92%, rgba(148, 163, 184, 0.08), transparent 18rem),
-    radial-gradient(circle at 12% 8%, rgba(203, 213, 225, 0.08), transparent 16rem),
-    var(--mf-tier-vitreous-bg);
+  background: var(--lume-surface-focal);
 }
 
 :root.dark[data-ui-style='redesign'] .patient-liquid-signal {
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--lume-surface-field);
 }
 
 :root[data-ui-style='redesign'] .patient-identity-lens {
@@ -328,13 +305,13 @@ body {
 
 :root[data-ui-style='redesign'] .patient-actions-dock {
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--lume-surface-field);
   box-shadow: none;
 }
 
 :root[data-ui-style='redesign'] .patient-ai-insight-panel {
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  background: var(--lume-surface-field);
+  box-shadow: var(--lume-shadow-resting);
 }
 
 :root[data-ui-style='redesign'] .patient-detail-section,
@@ -343,66 +320,64 @@ body {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
-/* Dark-mode surface restoration for the official redesign shell.
-   Component templates carry inline light tints (e.g. bg-[color:rgba(255,...)])
-   that must be neutralised in dark mode without editing every callsite. */
+/* Dark-mode aliases resolve to the grafite register without translucent overrides. */
 :root.dark[data-ui-style='redesign'] .patient-identity-lens-reader,
 :root.dark[data-ui-style='redesign'] .patient-detail-section,
 :root.dark[data-ui-style='redesign'] .patient-detail-side-section,
 :root.dark[data-ui-style='redesign'] .patient-ai-insight-panel,
 :root.dark[data-ui-style='redesign'] .patient-inbox-pane {
-  background-color: rgba(26, 22, 26, 0.88);
-  border-color: rgba(255, 247, 240, 0.08);
-  box-shadow: 0 16px 30px rgba(6, 5, 7, 0.42);
+  background-color: var(--lume-surface-field);
+  border-color: var(--lume-border-color);
+  box-shadow: var(--lume-shadow-resting);
 }
 
 :root.dark[data-ui-style='redesign'] .patient-actions-dock {
-  background-color: rgba(36, 30, 34, 0.88);
-  border-color: rgba(255, 247, 240, 0.1);
+  background-color: var(--lume-surface-field);
+  border-color: var(--lume-border-color);
 }
 
 :root.dark[data-ui-style='redesign'] .patient-quick-context-card,
 :root.dark[data-ui-style='redesign'] .patient-diagnosis-card {
-  background-color: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 247, 240, 0.08);
+  background-color: var(--lume-surface-field);
+  border-color: var(--lume-border-color);
 }
 
 :root.dark[data-ui-style='redesign'] .patient-actions-dock a:not(.ui-btn-primary),
 :root.dark[data-ui-style='redesign'] .patient-actions-dock button:not(.ui-btn-primary) {
-  background-color: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 247, 240, 0.1);
-  color: var(--mf-ink);
+  background-color: var(--lume-surface-field);
+  border-color: var(--lume-border-color);
+  color: var(--lume-ink);
 }
 
 :root.dark[data-ui-style='redesign'] .patient-actions-dock a:not(.ui-btn-primary):hover,
 :root.dark[data-ui-style='redesign'] .patient-actions-dock button:not(.ui-btn-primary):hover {
-  background-color: rgba(255, 255, 255, 0.08);
-  border-color: rgba(203, 213, 225, 0.22);
+  background-color: color-mix(in srgb, var(--lume-ink) 5%, var(--lume-surface-field));
+  border-color: color-mix(in srgb, var(--lume-ink) 22%, transparent);
 }
 
 :root.dark[data-ui-style='redesign'] .identity-lens-pane,
 :root.dark[data-ui-style='redesign'] .patient-actions-summary,
 :root.dark[data-ui-style='redesign'] .clinical-river-card,
 :root.dark[data-ui-style='redesign'] .evidence-stack-tile {
-  background-color: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 247, 240, 0.08);
+  background-color: var(--lume-surface-field);
+  border-color: var(--lume-border-color);
   box-shadow: none;
 }
 
 :root.dark[data-ui-style='redesign'] .apple-list-row {
-  background-color: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 247, 240, 0.08);
-  color: var(--mf-ink);
+  background-color: var(--lume-surface-field);
+  border-color: var(--lume-border-color);
+  color: var(--lume-ink);
 }
 
 :root.dark[data-ui-style='redesign'] .apple-list-row:hover {
-  background-color: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 247, 240, 0.16);
+  background-color: color-mix(in srgb, var(--lume-ink) 5%, var(--lume-surface-field));
+  border-color: color-mix(in srgb, var(--lume-ink) 16%, transparent);
 }
 
 /* Dark inputs in the official shell: make sure dropdown/popover text remains legible */
 :root.dark select option {
-  background-color: var(--mf-bg-elevated);
+  background-color: var(--lume-surface-focal);
   color: var(--foreground);
 }
 
@@ -448,7 +423,7 @@ body {
   }
 
   .lume-card:hover {
-    background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, var(--lume-surface-field));
+    background-color: color-mix(in srgb, var(--lume-ink) 5%, var(--lume-surface-field));
     transform: none;
   }
 
@@ -479,7 +454,7 @@ body {
 
   .apple-list-row:hover {
     border-color: color-mix(in srgb, var(--lume-ink) 16%, transparent);
-    background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, var(--lume-surface-field));
+    background-color: color-mix(in srgb, var(--lume-ink) 5%, var(--lume-surface-field));
     transform: none;
   }
 
@@ -487,20 +462,20 @@ body {
   .seeder-panel {
     @apply rounded-[var(--lume-radius-panel)] border border-slate-200/70 dark:border-white/10 dark:bg-white/5;
     background: var(--lume-surface-field);
-    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
+    box-shadow: var(--lume-shadow-resting);
   }
 
   /* @Codex */
   .seeder-subsection {
     @apply rounded-[var(--lume-radius-card)] border border-white/70 dark:border-white/10 dark:bg-white/5;
     background: var(--lume-surface-field);
-    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
+    box-shadow: var(--lume-shadow-resting);
   }
 
   /* @Codex */
   .seeder-subsection-danger {
     @apply border-red-200/70 dark:border-red-500/20 dark:bg-red-900/10;
-    background: linear-gradient(135deg, rgba(254, 242, 242, 0.92), rgba(255, 255, 255, 0.72));
+    background: color-mix(in srgb, var(--lume-signal-critical) 10%, var(--lume-surface-field));
   }
 
   .section-kicker {
@@ -533,7 +508,7 @@ body {
   /* @Codex */
   .clinical-rich-text,
   .clinical-rich-editor {
-    color: var(--mf-ink);
+    color: var(--lume-ink);
     line-height: 1.75;
   }
 
@@ -562,7 +537,7 @@ body {
     margin-top: 1rem;
     font-weight: 600;
     letter-spacing: -0.01em;
-    color: var(--mf-ink);
+    color: var(--lume-ink);
   }
 
   .clinical-rich-text h1,
@@ -601,12 +576,12 @@ body {
   .clinical-rich-editor blockquote {
     border-left: 2px solid rgba(15, 23, 42, 0.16);
     padding-left: 0.875rem;
-    color: var(--mf-muted);
+    color: var(--lume-ink-muted);
   }
 
   .clinical-rich-editor[data-empty='true']::before {
     content: attr(data-placeholder);
-    color: var(--mf-muted);
+    color: var(--lume-ink-muted);
     white-space: pre-wrap;
     pointer-events: none;
   }
@@ -674,36 +649,36 @@ body {
   line-height: 1.2;
 }
 
-/* @Codex WUL-UIUX: tinte semantiche allineate ai token --mf-success/--mf-warning
+/* @Codex WUL-UIUX: tinte semantiche allineate ai token Lume success/warning
    (rgba dei token al 10-14%), cosi light e dark comunicano lo stesso stato. */
 .graphite-chip-tone-info {
   border-color: rgba(75, 85, 101, 0.24);
   background-color: rgba(75, 85, 101, 0.08);
-  color: var(--mf-accent);
+  color: var(--lume-accent);
 }
 
 .graphite-chip-tone-success {
   border-color: rgba(75, 99, 84, 0.3);
   background-color: rgba(75, 99, 84, 0.1);
-  color: var(--mf-success);
+  color: var(--lume-signal-success);
 }
 
 .graphite-chip-tone-warning {
   border-color: rgba(154, 106, 47, 0.32);
   background-color: rgba(154, 106, 47, 0.12);
-  color: var(--mf-warning);
+  color: var(--lume-signal-warning);
 }
 
 .graphite-chip-tone-critical {
   border-color: rgba(163, 58, 47, 0.28);
   background-color: rgba(163, 58, 47, 0.1);
-  color: var(--mf-critical);
+  color: var(--lume-signal-critical);
 }
 
 .graphite-chip-tone-muted {
   border-color: rgba(112, 106, 100, 0.18);
   background-color: transparent;
-  color: var(--mf-muted);
+  color: var(--lume-ink-muted);
 }
 
 :root.dark .graphite-chip {
@@ -739,7 +714,7 @@ body {
 :root.dark .graphite-chip-tone-muted {
   border-color: rgba(255, 247, 240, 0.14);
   background-color: transparent;
-  color: var(--mf-muted);
+  color: var(--lume-ink-muted);
 }
 
 .graphite-status-dot {
@@ -747,16 +722,16 @@ body {
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background-color: var(--mf-muted);
+  background-color: var(--lume-ink-muted);
 }
 
-.graphite-status-dot.is-recent { background-color: var(--mf-success); }
-.graphite-status-dot.is-stale  { background-color: var(--mf-warning); }
-.graphite-status-dot.is-absent { background-color: rgba(112, 106, 100, 0.4); }
+.graphite-status-dot.is-recent { background-color: var(--lume-signal-success); }
+.graphite-status-dot.is-stale  { background-color: var(--lume-signal-warning); }
+.graphite-status-dot.is-absent { background-color: var(--lume-ink-muted); }
 
-:root.dark .graphite-status-dot.is-recent { background-color: rgb(140, 210, 160); }
-:root.dark .graphite-status-dot.is-stale  { background-color: rgb(240, 200, 130); }
-:root.dark .graphite-status-dot.is-absent { background-color: rgba(255, 247, 240, 0.28); }
+:root.dark .graphite-status-dot.is-recent { background-color: var(--lume-signal-success); }
+:root.dark .graphite-status-dot.is-stale  { background-color: var(--lume-signal-warning); }
+:root.dark .graphite-status-dot.is-absent { background-color: var(--lume-ink-muted); }
 
 .graphite-row {
   display: flex;
@@ -766,14 +741,14 @@ body {
   padding: 0.45rem 0.6rem;
   border-radius: 10px;
   font-size: 12px;
-  color: var(--mf-ink);
-  background-color: rgba(255, 255, 255, 0.45);
-  border: 1px solid rgba(112, 106, 100, 0.08);
+  color: var(--lume-ink);
+  background-color: var(--lume-surface-field);
+  border: 1px solid var(--lume-border-color);
 }
 
 :root.dark .graphite-row {
-  background-color: rgba(255, 255, 255, 0.03);
-  border-color: rgba(255, 247, 240, 0.06);
+  background-color: var(--lume-surface-field);
+  border-color: var(--lume-border-color);
 }
 
 .graphite-mini-btn {
@@ -781,18 +756,21 @@ body {
   align-items: center;
   gap: 0.3rem;
   border-radius: 10px;
-  border: 1px solid rgba(112, 106, 100, 0.16);
-  background-color: rgba(255, 255, 255, 0.9);
-  color: var(--mf-ink);
+  border: 1px solid var(--lume-border-color);
+  background-color: var(--lume-surface-field);
+  color: var(--lume-ink);
   padding: 0.3rem 0.6rem;
   font-size: 11px;
   font-weight: 600;
-  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+  transition:
+    background-color var(--lume-dur-riga) var(--lume-ease),
+    border-color var(--lume-dur-riga) var(--lume-ease),
+    color var(--lume-dur-riga) var(--lume-ease);
 }
 
 .graphite-mini-btn:hover:not(:disabled) {
   border-color: rgba(15, 23, 42, 0.24);
-  color: var(--mf-ink);
+  color: var(--lume-ink);
 }
 
 .graphite-mini-btn:disabled {
@@ -806,14 +784,14 @@ body {
 }
 
 :root.dark .graphite-mini-btn {
-  border-color: rgba(255, 247, 240, 0.12);
-  background-color: rgba(255, 255, 255, 0.05);
-  color: var(--mf-ink);
+  border-color: var(--lume-border-color);
+  background-color: var(--lume-surface-field);
+  color: var(--lume-ink);
 }
 
 :root.dark .graphite-mini-btn:hover:not(:disabled) {
   border-color: rgba(203, 213, 225, 0.24);
-  color: var(--mf-ink);
+  color: var(--lume-ink);
 }
 
 .siss-action-btn {
@@ -821,18 +799,21 @@ body {
   flex-direction: column;
   gap: 0.22rem;
   border-radius: 12px;
-  border: 1px solid rgba(112, 106, 100, 0.14);
-  background-color: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--lume-border-color);
+  background-color: var(--lume-surface-field);
   padding: 0.58rem 0.7rem;
   text-align: left;
-  color: var(--mf-ink);
-  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+  color: var(--lume-ink);
+  transition:
+    background-color var(--lume-dur-riga) var(--lume-ease),
+    border-color var(--lume-dur-riga) var(--lume-ease),
+    color var(--lume-dur-riga) var(--lume-ease);
   min-height: 0;
 }
 
 .siss-action-btn:hover:not(:disabled) {
   border-color: rgba(15, 23, 42, 0.24);
-  background-color: rgba(255, 255, 255, 0.96);
+  background-color: color-mix(in srgb, var(--lume-ink) 5%, var(--lume-surface-field));
 }
 
 .siss-action-btn:focus-visible {
@@ -854,24 +835,24 @@ body {
 }
 
 .siss-action-btn-head svg {
-  color: var(--mf-muted);
+  color: var(--lume-ink-muted);
 }
 
 .siss-action-btn-caption {
   font-size: 10.8px;
   line-height: 1.35;
-  color: var(--mf-muted);
+  color: var(--lume-ink-muted);
 }
 
 :root.dark .siss-action-btn {
-  border-color: rgba(255, 247, 240, 0.1);
-  background-color: rgba(255, 255, 255, 0.04);
-  color: var(--mf-ink);
+  border-color: var(--lume-border-color);
+  background-color: var(--lume-surface-field);
+  color: var(--lume-ink);
 }
 
 :root.dark .siss-action-btn:hover:not(:disabled) {
-  border-color: rgba(203, 213, 225, 0.24);
-  background-color: rgba(255, 255, 255, 0.07);
+  border-color: color-mix(in srgb, var(--lume-ink) 24%, transparent);
+  background-color: color-mix(in srgb, var(--lume-ink) 5%, var(--lume-surface-field));
 }
 
 :root.dark .siss-action-btn-head svg {
@@ -887,39 +868,39 @@ body {
 }
 
 .siss-feedback-success {
-  border-color: rgba(63, 122, 76, 0.3);
-  background-color: rgba(63, 122, 76, 0.08);
-  color: var(--mf-success);
+  border-color: color-mix(in srgb, var(--lume-signal-success) 20%, transparent);
+  background-color: color-mix(in srgb, var(--lume-signal-success) 10%, var(--lume-surface-field));
+  color: color-mix(in srgb, var(--lume-signal-success) 60%, var(--lume-ink));
 }
 
 .siss-feedback-warning {
-  border-color: rgba(197, 138, 47, 0.32);
-  background-color: rgba(197, 138, 47, 0.1);
-  color: var(--mf-warning);
+  border-color: color-mix(in srgb, var(--lume-signal-warning) 20%, transparent);
+  background-color: color-mix(in srgb, var(--lume-signal-warning) 10%, var(--lume-surface-field));
+  color: color-mix(in srgb, var(--lume-signal-warning) 60%, var(--lume-ink));
 }
 
 .siss-feedback-error {
-  border-color: rgba(163, 58, 47, 0.32);
-  background-color: rgba(163, 58, 47, 0.1);
-  color: var(--mf-critical);
+  border-color: color-mix(in srgb, var(--lume-signal-critical) 20%, transparent);
+  background-color: color-mix(in srgb, var(--lume-signal-critical) 10%, var(--lume-surface-field));
+  color: color-mix(in srgb, var(--lume-signal-critical) 60%, var(--lume-ink));
 }
 
 :root.dark .siss-feedback-success {
-  border-color: rgba(140, 210, 160, 0.32);
-  background-color: rgba(110, 190, 130, 0.1);
-  color: rgb(170, 220, 180);
+  border-color: color-mix(in srgb, var(--lume-signal-success) 20%, transparent);
+  background-color: color-mix(in srgb, var(--lume-signal-success) 10%, var(--lume-surface-field));
+  color: color-mix(in srgb, var(--lume-signal-success) 60%, var(--lume-ink));
 }
 
 :root.dark .siss-feedback-warning {
-  border-color: rgba(232, 180, 96, 0.34);
-  background-color: rgba(232, 180, 96, 0.12);
-  color: rgb(240, 200, 130);
+  border-color: color-mix(in srgb, var(--lume-signal-warning) 20%, transparent);
+  background-color: color-mix(in srgb, var(--lume-signal-warning) 10%, var(--lume-surface-field));
+  color: color-mix(in srgb, var(--lume-signal-warning) 60%, var(--lume-ink));
 }
 
 :root.dark .siss-feedback-error {
-  border-color: rgba(232, 130, 116, 0.34);
-  background-color: rgba(232, 110, 96, 0.12);
-  color: rgb(244, 170, 158);
+  border-color: color-mix(in srgb, var(--lume-signal-critical) 20%, transparent);
+  background-color: color-mix(in srgb, var(--lume-signal-critical) 10%, var(--lume-surface-field));
+  color: color-mix(in srgb, var(--lume-signal-critical) 60%, var(--lume-ink));
 }
 
 .siss-blocked-list {
@@ -933,13 +914,13 @@ body {
   gap: 0.15rem;
   padding: 0.55rem 0.7rem;
   border-radius: 10px;
-  border: 1px solid rgba(112, 106, 100, 0.12);
-  background-color: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--lume-border-color);
+  background-color: var(--lume-surface-field);
 }
 
 :root.dark .siss-blocked-item {
-  background-color: rgba(255, 255, 255, 0.03);
-  border-color: rgba(255, 247, 240, 0.08);
+  background-color: var(--lume-surface-field);
+  border-color: var(--lume-border-color);
 }
 
 @media (min-width: 640px) {
@@ -953,19 +934,19 @@ body {
 .siss-blocked-item-label {
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--mf-ink);
+  color: var(--lume-ink);
 }
 
 .siss-blocked-item-caption {
   font-size: 11.5px;
   line-height: 1.5;
-  color: var(--mf-muted);
+  color: var(--lume-ink-muted);
 }
 
 .siss-blocked-item-reason {
   font-size: 11.5px;
   line-height: 1.5;
-  color: var(--mf-warning);
+  color: var(--lume-signal-warning);
 }
 
 :root.dark .siss-blocked-item-reason {
@@ -988,13 +969,13 @@ body {
 .patient-code-pill-plum {
   border-color: rgba(15, 23, 42, 0.14);
   background-color: rgba(15, 23, 42, 0.05);
-  color: var(--mf-ink);
+  color: var(--lume-ink);
 }
 
 .patient-code-pill-primary {
   border-color: rgba(15, 23, 42, 0.14);
   background-color: rgba(15, 23, 42, 0.05);
-  color: var(--mf-ink);
+  color: var(--lume-ink);
 }
 
 :root.dark .patient-code-pill-plum {
@@ -1009,115 +990,32 @@ body {
   color: rgb(203, 213, 225);
 }
 
-/* @Codex WUL-229: Liquid Glass tier system. Token-driven surface language
-   scoped to the official redesign shell.
-   Specular  = chrome (sidebar shell, mobile header, mobile bottom nav,
-                command capsule). High blur, inner-edge highlight.
-   Vitreous  = workspace (patient identity lens, case lens panel,
-                patient detail sections). Medium blur, soft inner highlight.
-   Crystalline = chips (apple-chip, graphite-chip). Inner highlight only.
-   Falls back to opaque variants under data-ui-reduce-transparency and @media print. */
-
-:root[data-ui-style='redesign'] {
-  --mf-tier-specular-bg: rgba(255, 255, 255, 0.78);
-  --mf-tier-specular-border: rgba(15, 23, 42, 0.08);
-  --mf-tier-specular-shadow:
-    0 18px 38px rgba(15, 23, 42, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.72),
-    inset 1px 0 0 rgba(255, 255, 255, 0.42),
-    inset -1px 0 0 rgba(255, 255, 255, 0.22),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.18);
-  --mf-tier-specular-blur: 22px;
-  --mf-tier-specular-saturate: 1.06;
-
-  --mf-tier-vitreous-bg: rgba(255, 255, 255, 0.88);
-  --mf-tier-vitreous-border: rgba(15, 23, 42, 0.10);
-  --mf-tier-vitreous-shadow:
-    0 10px 22px rgba(15, 23, 42, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.45);
-  --mf-tier-vitreous-blur: 14px;
-  --mf-tier-vitreous-saturate: 1.02;
-
-  --mf-tier-crystalline-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  --mf-focus-ring:
-    0 0 0 2px rgba(15, 23, 42, 0.22),
-    0 0 0 4px rgba(15, 23, 42, 0.08);
-}
-
-:root.dark[data-ui-style='redesign'] {
-  --mf-tier-specular-bg: rgba(26, 31, 40, 0.78);
-  --mf-tier-specular-border: rgba(226, 232, 240, 0.12);
-  --mf-tier-specular-shadow:
-    0 22px 42px rgba(6, 5, 7, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    inset 1px 0 0 rgba(255, 255, 255, 0.05),
-    inset -1px 0 0 rgba(255, 255, 255, 0.04),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.18);
-
-  --mf-tier-vitreous-bg: rgba(26, 31, 40, 0.88);
-  --mf-tier-vitreous-border: rgba(226, 232, 240, 0.08);
-  --mf-tier-vitreous-shadow:
-    0 16px 30px rgba(6, 5, 7, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-
-  --mf-tier-crystalline-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  --mf-focus-ring:
-    0 0 0 2px rgba(203, 213, 225, 0.24),
-    0 0 0 4px rgba(203, 213, 225, 0.10);
-}
-
-:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] {
-  --mf-tier-specular-bg: rgba(255, 255, 255, 0.96);
-  --mf-tier-specular-border: rgba(15, 23, 42, 0.16);
-  --mf-tier-specular-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
-  --mf-tier-specular-blur: 0px;
-  --mf-tier-specular-saturate: 1;
-
-  --mf-tier-vitreous-bg: rgba(255, 255, 255, 0.96);
-  --mf-tier-vitreous-border: rgba(15, 23, 42, 0.14);
-  --mf-tier-vitreous-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
-  --mf-tier-vitreous-blur: 0px;
-  --mf-tier-vitreous-saturate: 1;
-
-  --mf-tier-crystalline-highlight: none;
-}
-
-:root.dark[data-ui-reduce-transparency='true'][data-ui-style='redesign'] {
-  --mf-tier-specular-bg: rgba(28, 23, 27, 0.96);
-  --mf-tier-specular-border: rgba(255, 247, 240, 0.16);
-  --mf-tier-specular-shadow: 0 14px 26px rgba(6, 5, 7, 0.42);
-
-  --mf-tier-vitreous-bg: rgba(28, 23, 27, 0.96);
-  --mf-tier-vitreous-border: rgba(255, 247, 240, 0.14);
-  --mf-tier-vitreous-shadow: 0 10px 22px rgba(6, 5, 7, 0.32);
-}
-
-/* Specular: chrome surfaces */
+/* @Codex: superfici Lume opache per chrome, workspace e chip. */
 :root[data-ui-style='redesign'] .mediflow-sidebar-shell,
 :root[data-ui-style='redesign'] .mediflow-mobile-header {
-  background-color: var(--mf-tier-specular-bg);
-  border-color: var(--mf-tier-specular-border);
-  box-shadow: var(--mf-tier-specular-shadow);
+  background-color: var(--lume-surface-chrome);
+  border-color: var(--lume-border-color);
+  box-shadow: var(--lume-shadow-resting);
 }
 
 :root.dark[data-ui-style='redesign'] .mediflow-sidebar-shell,
 :root.dark[data-ui-style='redesign'] .mediflow-mobile-header {
-  background-color: var(--mf-tier-specular-bg);
-  border-color: var(--mf-tier-specular-border);
-  box-shadow: var(--mf-tier-specular-shadow);
+  background-color: var(--lume-surface-chrome);
+  border-color: var(--lume-border-color);
+  box-shadow: var(--lume-shadow-resting);
 }
 
 :root[data-ui-style='redesign'] .mediflow-mobile-nav {
-  background-color: var(--mf-tier-specular-bg);
-  border-top-color: var(--mf-tier-specular-border);
+  background-color: var(--lume-surface-chrome);
+  border-top-color: var(--lume-border-color);
 }
 
 :root.dark[data-ui-style='redesign'] .mediflow-mobile-nav {
-  background-color: var(--mf-tier-specular-bg);
-  border-top-color: var(--mf-tier-specular-border);
+  background-color: var(--lume-surface-chrome);
+  border-top-color: var(--lume-border-color);
 }
 
-/* Vitreous: workspace surfaces */
+/* Workspace: superfici di penombra opache. */
 :root[data-ui-style='redesign'] .mediflow-vitreous-panel,
 :root[data-ui-style='redesign'] .mediflow-vitreous-side-panel,
 :root[data-ui-style='redesign'] .patient-identity-lens,
@@ -1125,9 +1023,9 @@ body {
 :root[data-ui-style='redesign'] .patient-detail-side-section,
 :root[data-ui-style='redesign'] .patient-inbox-pane,
 :root[data-ui-style='redesign'] .clinical-river-card {
-  background-color: var(--mf-tier-vitreous-bg);
-  border-color: var(--mf-tier-vitreous-border);
-  box-shadow: var(--mf-tier-vitreous-shadow);
+  background-color: var(--lume-surface-field);
+  border-color: var(--lume-border-color);
+  box-shadow: var(--lume-shadow-resting);
 }
 
 :root.dark[data-ui-style='redesign'] .mediflow-vitreous-panel,
@@ -1137,43 +1035,27 @@ body {
 :root.dark[data-ui-style='redesign'] .patient-detail-side-section,
 :root.dark[data-ui-style='redesign'] .patient-inbox-pane,
 :root.dark[data-ui-style='redesign'] .clinical-river-card {
-  background-color: var(--mf-tier-vitreous-bg);
-  border-color: var(--mf-tier-vitreous-border);
-  box-shadow: var(--mf-tier-vitreous-shadow);
+  background-color: var(--lume-surface-field);
+  border-color: var(--lume-border-color);
+  box-shadow: var(--lume-shadow-resting);
 }
 
-:root[data-ui-style='redesign'] .mediflow-vitreous-panel,
-:root[data-ui-style='redesign'] .mediflow-vitreous-side-panel,
-:root[data-ui-style='redesign'] .patient-inbox-pane,
-:root[data-ui-style='redesign'] .clinical-river-card {
-}
-
-/* Crystalline: chips */
+/* Chip appoggiati, senza riflessi o ombre decorative. */
 :root[data-ui-style='redesign'] .apple-chip,
 :root[data-ui-style='redesign'] .graphite-chip {
-  box-shadow: var(--mf-tier-crystalline-highlight);
+  box-shadow: var(--lume-shadow-resting);
 }
 
-/* Liquid Glass focus ring on interactive surfaces inside chrome / workspace */
+/* Focus da tastiera condiviso dentro chrome e workspace. */
 :root[data-ui-style='redesign'] .mediflow-sidebar-link:focus-visible,
 :root[data-ui-style='redesign'] .mediflow-mobile-link:focus-visible,
 :root[data-ui-style='redesign'] .siss-action-btn:focus-visible,
 :root[data-ui-style='redesign'] .graphite-mini-btn:focus-visible {
   outline: none;
-  box-shadow: var(--mf-focus-ring);
+  box-shadow: var(--lume-focus-ring);
 }
 
-:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-sidebar-shell,
-:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-mobile-header,
-:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-mobile-nav,
-:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .patient-liquid-commandbar,
-:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-vitreous-panel,
-:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-vitreous-side-panel,
-:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .patient-inbox-pane,
-:root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .clinical-river-card {
-}
-
-/* Print: opaque, no blur, no inner highlight */
+/* Print: opaco e senza ombre. */
 @media print {
   :root[data-ui-style='redesign'] .mediflow-sidebar-shell,
   :root[data-ui-style='redesign'] .mediflow-mobile-header,
@@ -1339,7 +1221,7 @@ textarea.input-field {
 .ui-btn-secondary:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--lume-ink) 22%, transparent);
   color: var(--lume-ink);
-  background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, var(--lume-surface-field));
+  background-color: color-mix(in srgb, var(--lume-ink) 5%, var(--lume-surface-field));
 }
 
 .mf-btn-secondary:active:not(:disabled),
@@ -1373,7 +1255,7 @@ textarea.input-field {
 :root.dark .ui-btn-secondary:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--lume-ink) 22%, transparent);
   color: var(--lume-ink);
-  background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, var(--lume-surface-field));
+  background-color: color-mix(in srgb, var(--lume-ink) 5%, var(--lume-surface-field));
 }
 
 /* Penombra opaca per i blocchi di lavoro. */
@@ -1496,29 +1378,29 @@ textarea.input-field {
 }
 
 /* @Codex WUL-UIUX: stesse tinte semantiche dei chip graphite (rgba dei token
-   --mf-success/--mf-warning al 10-14%): light e dark comunicano lo stesso stato. */
+   success/warning al 10-14%): light e dark comunicano lo stesso stato. */
 .mf-alert-info {
   border-color: rgba(75, 85, 101, 0.24);
   background-color: rgba(75, 85, 101, 0.08);
-  color: var(--mf-ink);
+  color: var(--lume-ink);
 }
 
 .mf-alert-success {
   border-color: rgba(75, 99, 84, 0.3);
   background-color: rgba(75, 99, 84, 0.1);
-  color: var(--mf-success);
+  color: var(--lume-signal-success);
 }
 
 .mf-alert-warning {
   border-color: rgba(154, 106, 47, 0.32);
   background-color: rgba(154, 106, 47, 0.12);
-  color: var(--mf-warning);
+  color: var(--lume-signal-warning);
 }
 
 .mf-alert-critical {
   border-color: rgba(163, 58, 47, 0.28);
   background-color: rgba(163, 58, 47, 0.1);
-  color: var(--mf-critical);
+  color: var(--lume-signal-critical);
 }
 
 :root.dark .mf-alert-info {
@@ -1598,7 +1480,7 @@ textarea.input-field {
 }
 
 .mf-tab:hover {
-  background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, transparent);
+  background-color: color-mix(in srgb, var(--lume-ink) 5%, transparent);
   color: var(--lume-ink);
 }
 
@@ -1631,7 +1513,7 @@ textarea.input-field {
 
 .mf-option-card:hover {
   border-color: color-mix(in srgb, var(--lume-ink) 20%, transparent);
-  background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, var(--lume-surface-field));
+  background-color: color-mix(in srgb, var(--lume-ink) 5%, var(--lume-surface-field));
 }
 
 .mf-option-card.is-active {
@@ -1660,7 +1542,7 @@ textarea.input-field {
 
 :root.dark .mf-option-card:hover {
   border-color: color-mix(in srgb, var(--lume-ink) 20%, transparent);
-  background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, var(--lume-surface-field));
+  background-color: color-mix(in srgb, var(--lume-ink) 5%, var(--lume-surface-field));
 }
 
 :root.dark .mf-option-card.is-active {
@@ -1682,7 +1564,7 @@ textarea.input-field {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  color: var(--mf-muted);
+  color: var(--lume-ink-muted);
 }
 
 /* Small label/helper text inside forms */
@@ -1691,19 +1573,19 @@ textarea.input-field {
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0;
-  color: var(--mf-muted);
+  color: var(--lume-ink-muted);
   margin-bottom: 0.35rem;
 }
 
 .mf-field-helper {
   font-size: 0.74rem;
-  color: var(--mf-muted);
+  color: var(--lume-ink-muted);
   margin-top: 0.3rem;
 }
 
 .mf-field-error {
   font-size: 0.74rem;
-  color: var(--mf-critical);
+  color: var(--lume-signal-critical);
   margin-top: 0.3rem;
 }
 
@@ -1717,11 +1599,6 @@ textarea.input-field {
   background: var(--lume-signal-warning);
   box-shadow: none;
   color: var(--lume-surface-focal);
-}
-
-.ui-btn-primary.mf-tone-plum {
-  background: var(--lume-signal-plum);
-  box-shadow: none;
 }
 
 .ui-btn-primary.mf-tone-critical {
@@ -1744,9 +1621,7 @@ textarea.input-field {
     0 0 0 4px var(--lume-accent);
 }
 
-/* @Codex WUL-229: make the real patient workbench unmistakably match the dummy.
-   Earlier redesign rules flattened these surfaces too much; this pass restores
-   superfici opache, lenti focali e flussi cardati sulle due viste primarie. */
+/* @Codex WUL-229: workbench Lume opaco, con chrome, fuoco e campo distinti. */
 :root[data-ui-style='redesign'] .patient-liquid-workbench {
   isolation: isolate;
   position: relative;
@@ -1755,15 +1630,7 @@ textarea.input-field {
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-workbench::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    linear-gradient(115deg, transparent 0 18%, rgba(15, 23, 42, 0.04) 18% 19%, transparent 19% 100%),
-    linear-gradient(64deg, transparent 0 58%, rgba(71, 85, 105, 0.04) 58% 59%, transparent 59% 100%);
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.95), transparent 86%);
+  display: none;
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-commandbar {
@@ -1772,14 +1639,9 @@ textarea.input-field {
   z-index: 20;
   border-radius: 34px;
   padding: 0.7rem;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.72), rgba(248, 250, 252, 0.48)),
-    var(--mf-tier-specular-bg);
-  border-color: rgba(255, 255, 255, 0.72);
-  box-shadow:
-    0 28px 72px rgba(15, 23, 42, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.78),
-    inset 0 -1px 0 rgba(112, 106, 100, 0.08);
+  background: var(--lume-surface-chrome);
+  border-color: var(--lume-border-color);
+  box-shadow: var(--lume-shadow-resting);
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-hero {
@@ -1790,27 +1652,13 @@ textarea.input-field {
   min-height: clamp(25rem, 50vh, 36rem);
   border-radius: 46px;
   padding: clamp(1.5rem, 4vw, 3.25rem);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.36), transparent 42%),
-    radial-gradient(ellipse at 78% 78%, rgba(71, 85, 105, 0.12), transparent 22rem),
-    radial-gradient(ellipse at 8% 4%, rgba(15, 23, 42, 0.08), transparent 20rem),
-    rgba(248, 250, 252, 0.78);
-  border-color: rgba(255, 255, 255, 0.7);
-  box-shadow:
-    0 34px 90px rgba(15, 23, 42, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.84),
-    inset 0 -1px 0 rgba(112, 106, 100, 0.08);
+  background: var(--lume-surface-focal);
+  border-color: var(--lume-border-color);
+  box-shadow: var(--lume-shadow-focal);
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-lens::after {
-  right: -8%;
-  bottom: -18%;
-  width: min(42rem, 62vw);
-  height: 19rem;
-  background:
-    linear-gradient(135deg, rgba(15, 23, 42, 0.08), rgba(71, 85, 105, 0.10) 54%, rgba(148, 163, 184, 0.10));
-  filter: blur(1px);
-  opacity: 0.9;
+  display: none;
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-name {
@@ -1820,9 +1668,9 @@ textarea.input-field {
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-chip-row .graphite-chip {
-  background: rgba(255, 255, 255, 0.5);
-  border-color: rgba(255, 255, 255, 0.72);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
+  background: var(--lume-surface-field);
+  border-color: var(--lume-border-color);
+  box-shadow: none;
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-signals,
@@ -1833,13 +1681,9 @@ textarea.input-field {
 :root[data-ui-style='redesign'] .patient-actions-dock,
 :root[data-ui-style='redesign'] .patient-ai-insight-panel {
   border-radius: 34px;
-  border-color: rgba(255, 255, 255, 0.58);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.52), rgba(248, 250, 252, 0.34)),
-    var(--mf-tier-vitreous-bg);
-  box-shadow:
-    0 24px 64px rgba(15, 23, 42, 0.10),
-    inset 0 1px 0 rgba(255, 255, 255, 0.66);
+  border-color: var(--lume-border-color);
+  background: var(--lume-surface-field);
+  box-shadow: var(--lume-shadow-resting);
 }
 
 :root[data-ui-style='redesign'] .patient-workbench-shell {
@@ -1848,9 +1692,9 @@ textarea.input-field {
 
 :root[data-ui-style='redesign'] .patient-liquid-stream-shell {
   border-radius: 30px;
-  border-color: rgba(255, 255, 255, 0.56);
-  background: rgba(248, 250, 252, 0.48);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
+  border-color: var(--lume-border-color);
+  background: var(--lume-surface-canvas);
+  box-shadow: none;
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-stream {
@@ -1863,16 +1707,7 @@ textarea.input-field {
 }
 
 :root[data-ui-style='redesign'] .patient-identity-lens::after {
-  content: "";
-  position: absolute;
-  right: -10%;
-  top: -22%;
-  width: min(34rem, 58vw);
-  height: 18rem;
-  border-radius: 999px;
-  pointer-events: none;
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.07), rgba(71, 85, 105, 0.08));
-  filter: blur(2px);
+  display: none;
 }
 
 :root[data-ui-style='redesign'] .identity-lens-pane,
@@ -1882,9 +1717,9 @@ textarea.input-field {
 :root[data-ui-style='redesign'] .evidence-stack-tile,
 :root[data-ui-style='redesign'] .apple-list-row {
   border-radius: 22px;
-  border-color: rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.46);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
+  border-color: var(--lume-border-color);
+  background: var(--lume-surface-field);
+  box-shadow: none;
 }
 
 :root.dark[data-ui-style='redesign'] .patient-liquid-commandbar,
@@ -1896,13 +1731,9 @@ textarea.input-field {
 :root.dark[data-ui-style='redesign'] .patient-detail-side-section,
 :root.dark[data-ui-style='redesign'] .patient-actions-dock,
 :root.dark[data-ui-style='redesign'] .patient-ai-insight-panel {
-  border-color: rgba(255, 247, 240, 0.12);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 247, 240, 0.03)),
-    rgba(28, 24, 27, 0.74);
-  box-shadow:
-    0 28px 68px rgba(6, 5, 7, 0.46),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-color: var(--lume-border-color);
+  background: var(--lume-surface-field);
+  box-shadow: var(--lume-shadow-resting);
 }
 
 :root.dark[data-ui-style='redesign'] .patient-liquid-stream-shell,
@@ -1912,16 +1743,12 @@ textarea.input-field {
 :root.dark[data-ui-style='redesign'] .clinical-river-card,
 :root.dark[data-ui-style='redesign'] .evidence-stack-tile,
 :root.dark[data-ui-style='redesign'] .apple-list-row {
-  border-color: rgba(255, 247, 240, 0.1);
-  background: rgba(255, 255, 255, 0.055);
+  border-color: var(--lume-border-color);
+  background: var(--lume-surface-field);
 }
 
 :root.dark .ui-btn-primary.mf-tone-warning {
   background: var(--lume-signal-warning);
-}
-
-:root.dark .ui-btn-primary.mf-tone-plum {
-  background: var(--lume-signal-plum);
 }
 
 /* @Codex WUL-273: neutral adapter for legacy Tailwind chroma.
@@ -1942,7 +1769,7 @@ textarea.input-field {
 :root[data-ui-style='redesign'] [class*="bg-indigo-"]:not(.mf-chroma-keep),
 :root[data-ui-style='redesign'] [class*="bg-purple-"]:not(.mf-chroma-keep),
 :root[data-ui-style='redesign'] [class*="bg-violet-"]:not(.mf-chroma-keep) {
-  background-color: rgba(248, 250, 252, 0.88) !important;
+  background-color: var(--lume-surface-field) !important;
 }
 
 :root[data-ui-style='redesign'] [class*="text-blue-"]:not(.mf-chroma-keep),
@@ -1958,7 +1785,7 @@ textarea.input-field {
 :root[data-ui-style='redesign'] [class*="text-indigo-"]:not(.mf-chroma-keep),
 :root[data-ui-style='redesign'] [class*="text-purple-"]:not(.mf-chroma-keep),
 :root[data-ui-style='redesign'] [class*="text-violet-"]:not(.mf-chroma-keep) {
-  color: var(--mf-ink) !important;
+  color: var(--lume-ink) !important;
 }
 
 :root[data-ui-style='redesign'] [class*="border-blue-"]:not(.mf-chroma-keep),
@@ -2006,7 +1833,7 @@ textarea.input-field {
 :root[data-ui-style='redesign'] [class*="accent-indigo-"]:not(.mf-chroma-keep),
 :root[data-ui-style='redesign'] [class*="accent-purple-"]:not(.mf-chroma-keep),
 :root[data-ui-style='redesign'] [class*="accent-violet-"]:not(.mf-chroma-keep) {
-  accent-color: var(--mf-ink) !important;
+  accent-color: var(--lume-ink) !important;
 }
 
 :root.dark[data-ui-style='redesign'] [class*="bg-blue-"]:not(.mf-chroma-keep),
@@ -2022,7 +1849,7 @@ textarea.input-field {
 :root.dark[data-ui-style='redesign'] [class*="bg-indigo-"]:not(.mf-chroma-keep),
 :root.dark[data-ui-style='redesign'] [class*="bg-purple-"]:not(.mf-chroma-keep),
 :root.dark[data-ui-style='redesign'] [class*="bg-violet-"]:not(.mf-chroma-keep) {
-  background-color: rgba(255, 255, 255, 0.08) !important;
+  background-color: var(--lume-surface-field) !important;
 }
 
 :root.dark[data-ui-style='redesign'] [class*="text-blue-"]:not(.mf-chroma-keep),

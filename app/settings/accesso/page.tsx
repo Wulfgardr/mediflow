@@ -60,13 +60,13 @@ export default function SettingsAccessPage() {
                 <div className={SETTINGS_CARD_CLASS}>
                     {/* @Codex WUL-229: security card icon switches to MediFlow warning tone */}
                     <div className="mb-5 flex items-start gap-3">
-                        <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' }}>
+                        <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--lume-ink)' }}>
                             <KeyRound className="h-4 w-4" />
                         </div>
                         <div className="min-w-0">
                             <p className="section-kicker">Sicurezza</p>
-                            <h2 className="mt-1 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>Cambio PIN</h2>
-                            <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>Ruota il PIN senza toccare la master key: i dati clinici restano leggibili.</p>
+                            <h2 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Cambio PIN</h2>
+                            <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Ruota il PIN senza toccare la master key: i dati clinici restano leggibili.</p>
                         </div>
                     </div>
 
@@ -148,13 +148,13 @@ export default function SettingsAccessPage() {
                 {/* WUL-297: sessione locale corrente, con blocco immediato. */}
                 <div className={SETTINGS_CARD_CLASS}>
                     <div className="mb-5 flex items-start gap-3">
-                        <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' }}>
+                        <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--lume-ink)' }}>
                             <Lock className="h-4 w-4" />
                         </div>
                         <div className="min-w-0">
                             <p className="section-kicker">Sessione</p>
-                            <h2 className="mt-1 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>Sessione corrente</h2>
-                            <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>
+                            <h2 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Sessione corrente</h2>
+                            <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                                 Una sola sessione attiva su questa postazione. Il blocco richiede il PIN al prossimo accesso.
                             </p>
                         </div>
@@ -163,8 +163,8 @@ export default function SettingsAccessPage() {
                     <div className="space-y-4">
                         <div className="mf-section">
                             <p className="section-kicker">Operatore</p>
-                            <p className="mt-2 text-base font-semibold" style={{ color: 'var(--mf-ink)' }}>{user?.displayName || 'Admin'}</p>
-                            <p className="mt-1 text-xs" style={{ color: 'var(--mf-muted)' }}>{user?.ambulatoryName || 'Ambulatorio non impostato'}</p>
+                            <p className="mt-2 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>{user?.displayName || 'Admin'}</p>
+                            <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>{user?.ambulatoryName || 'Ambulatorio non impostato'}</p>
                         </div>
 
                         <button

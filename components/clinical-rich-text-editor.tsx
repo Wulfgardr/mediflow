@@ -117,11 +117,11 @@ export function ClinicalRichTextEditor({
                         key={`${command}-${label}`}
                         type="button"
                         onClick={() => runCommand(command, actionValue)}
-                        className="inline-flex h-10 items-center gap-2 rounded-[14px] border border-transparent px-3 text-sm font-medium text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(112,106,100,0.16)] hover:bg-[color:rgba(255,252,247,0.9)]"
+                        className="inline-flex h-10 items-center gap-2 rounded-[14px] border border-transparent px-3 text-sm font-medium text-[color:var(--lume-ink)] transition-colors hover:border-[color:rgba(112,106,100,0.16)] hover:bg-[color:rgba(255,252,247,0.9)]"
                         aria-label={label}
                         title={label}
                     >
-                        <Icon className="h-4 w-4 text-[color:var(--mf-muted)]" />
+                        <Icon className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
                         <span className="hidden sm:inline">{label}</span>
                     </button>
                 ))}
@@ -133,11 +133,11 @@ export function ClinicalRichTextEditor({
                         key={command}
                         type="button"
                         onClick={() => runCommand(command)}
-                        className="inline-flex h-10 items-center gap-2 rounded-[14px] border border-transparent px-3 text-sm font-medium text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(112,106,100,0.16)] hover:bg-[color:rgba(255,252,247,0.9)]"
+                        className="inline-flex h-10 items-center gap-2 rounded-[14px] border border-transparent px-3 text-sm font-medium text-[color:var(--lume-ink)] transition-colors hover:border-[color:rgba(112,106,100,0.16)] hover:bg-[color:rgba(255,252,247,0.9)]"
                         aria-label={label}
                         title={label}
                     >
-                        <Icon className="h-4 w-4 text-[color:var(--mf-muted)]" />
+                        <Icon className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
                         <span className="hidden sm:inline">{label}</span>
                     </button>
                 ))}
@@ -146,7 +146,7 @@ export function ClinicalRichTextEditor({
                     <button
                         type="button"
                         onClick={() => runCommand('outdent')}
-                        className="inline-flex h-10 items-center justify-center rounded-[14px] px-3 text-[color:var(--mf-muted)] transition-colors hover:bg-[color:rgba(255,252,247,0.9)]"
+                        className="inline-flex h-10 items-center justify-center rounded-[14px] px-3 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:rgba(255,252,247,0.9)]"
                         aria-label="Riduci rientro"
                         title="Riduci rientro"
                     >
@@ -155,7 +155,7 @@ export function ClinicalRichTextEditor({
                     <button
                         type="button"
                         onClick={() => runCommand('indent')}
-                        className="inline-flex h-10 items-center justify-center rounded-[14px] px-3 text-[color:var(--mf-muted)] transition-colors hover:bg-[color:rgba(255,252,247,0.9)]"
+                        className="inline-flex h-10 items-center justify-center rounded-[14px] px-3 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:rgba(255,252,247,0.9)]"
                         aria-label="Aumenta rientro"
                         title="Aumenta rientro"
                     >

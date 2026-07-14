@@ -118,7 +118,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
         // @Codex WUL-229: drug autocomplete now uses mf-input + mf-popover (vitreous tier)
         <div ref={wrapperRef} className="relative w-full">
             <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--mf-muted)' }} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--lume-ink-muted)' }} />
                 <input
                     type="text"
                     role="combobox"
@@ -139,7 +139,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
 
                 {isLoading && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--mf-ink)', borderTopColor: 'transparent' }}></div>
+                        <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--lume-ink)', borderTopColor: 'transparent' }}></div>
                     </div>
                 )}
 
@@ -147,8 +147,8 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                     <button
                         type="button"
                         onClick={() => commitDrugAutocompleteQueryChange(drugSearch, setQuery, '')} // @Codex WUL-488
-                        className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-[color:var(--mf-muted)] transition-colors hover:bg-[color:rgba(248,250,252,0.86)] hover:text-[color:var(--mf-ink)] dark:hover:bg-white/8"
-                        style={{ color: 'var(--mf-muted)' }}
+                        className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:rgba(248,250,252,0.86)] hover:text-[color:var(--lume-ink)] dark:hover:bg-white/8"
+                        style={{ color: 'var(--lume-ink-muted)' }}
                         title="Cancella ricerca"
                         aria-label="Cancella ricerca"
                     >
@@ -159,7 +159,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
 
             {isOpen && results.length > 0 && (
                 <div className={drugPopoverClassName} role="listbox" id={listboxId} aria-label="Risultati catalogo farmaci">
-                    <div role="presentation" className="mb-1 flex items-center justify-between gap-3 border-b border-[color:rgba(112,106,100,0.10)] px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--mf-muted)] dark:border-white/10">
+                    <div role="presentation" className="mb-1 flex items-center justify-between gap-3 border-b border-[color:rgba(112,106,100,0.10)] px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)] dark:border-white/10">
                         <span>Risultati catalogo ({results.length})</span>
                         <span className="flex items-center gap-1"><Database className="w-3 h-3" /> AIFA locale</span>
                     </div>
@@ -178,11 +178,11 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                         >
                             <div className="flex justify-between items-start w-full">
                                 <div className="flex-1 pr-2">
-                                    <div className="text-sm font-semibold text-[color:var(--mf-ink)]">{drug.name}</div>
+                                    <div className="text-sm font-semibold text-[color:var(--lume-ink)]">{drug.name}</div>
                                     {drug.packaging && (
-                                        <div className="mt-0.5 text-xs font-medium text-[color:var(--mf-muted)]">{drug.packaging}</div>
+                                        <div className="mt-0.5 text-xs font-medium text-[color:var(--lume-ink-muted)]">{drug.packaging}</div>
                                     )}
-                                    <div className="mt-1 flex items-center gap-1 text-xs font-medium text-[color:var(--mf-muted)]">
+                                    <div className="mt-1 flex items-center gap-1 text-xs font-medium text-[color:var(--lume-ink-muted)]">
                                         <Activity className="w-3 h-3" />
                                         {drug.activePrinciple}
                                     </div>
@@ -193,7 +193,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                                 <div className="text-right shrink-0">
                                     <span className="apple-chip lume-registro text-[10px]">AIC {drug.aic}</span>
                                     {drug.price !== undefined && drug.price > 0 && (
-                                        <div className="mt-1 text-xs font-medium text-[color:var(--mf-muted)]">€ {drug.price.toFixed(2)}</div>
+                                        <div className="mt-1 text-xs font-medium text-[color:var(--lume-ink-muted)]">€ {drug.price.toFixed(2)}</div>
                                     )}
                                 </div>
                             </div>
@@ -204,9 +204,9 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
 
             {isOpen && query.length > 2 && results.length === 0 && !isLoading && (
                 <div className={`${drugPopoverClassName} p-5 text-center`}>
-                    <Pill className="mx-auto mb-2 h-7 w-7 text-[color:var(--mf-muted)]" />
-                    <p className="text-sm font-semibold text-[color:var(--mf-ink)]">Nessun farmaco trovato nel catalogo locale.</p>
-                    <p className="mt-1 text-xs leading-5 text-[color:var(--mf-muted)]">Prova nome commerciale o principio attivo, oppure usa “Farmaco manuale o galenico”.</p>
+                    <Pill className="mx-auto mb-2 h-7 w-7 text-[color:var(--lume-ink-muted)]" />
+                    <p className="text-sm font-semibold text-[color:var(--lume-ink)]">Nessun farmaco trovato nel catalogo locale.</p>
+                    <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">Prova nome commerciale o principio attivo, oppure usa “Farmaco manuale o galenico”.</p>
                 </div>
             )}
         </div>

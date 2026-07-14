@@ -36,11 +36,11 @@ export default function DocumentViewer({ file, fileName, onClose }: DocumentView
                     <div className="flex items-center gap-3">
                         <div
                             className="p-2 rounded-xl flex items-center justify-center"
-                            style={{ background: 'rgba(15, 123, 104, 0.12)', color: 'var(--mf-primary)' }}
+                            style={{ background: 'color-mix(in srgb, var(--lume-accent) 12%, var(--lume-surface-field))', color: 'var(--lume-accent)' }}
                         >
                             <FileText className="w-5 h-5" />
                         </div>
-                        <h3 className="font-semibold text-sm md:text-base truncate" style={{ color: 'var(--mf-ink)' }}>{fileName}</h3>
+                        <h3 className="font-semibold text-sm md:text-base truncate" style={{ color: 'var(--lume-ink)' }}>{fileName}</h3>
                     </div>
                     <button
                         onClick={onClose}
@@ -54,7 +54,7 @@ export default function DocumentViewer({ file, fileName, onClose }: DocumentView
 
                 <div
                     className="flex-1 relative"
-                    style={{ background: 'var(--mf-tier-vitreous-bg, rgba(255,252,247,0.55))' }}
+                    style={{ background: 'var(--lume-surface-field)' }}
                 >
                     {url ? (
                         <iframe
@@ -65,7 +65,7 @@ export default function DocumentViewer({ file, fileName, onClose }: DocumentView
                     ) : (
                         <div
                             className="flex items-center justify-center h-full text-sm"
-                            style={{ color: 'var(--mf-muted)' }}
+                            style={{ color: 'var(--lume-ink-muted)' }}
                         >
                             Caricamento anteprima...
                         </div>

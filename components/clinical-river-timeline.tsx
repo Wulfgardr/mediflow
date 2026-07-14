@@ -97,20 +97,20 @@ function getItemPresentation(kind: RiverItem['kind']) {
     if (kind === 'checkup') {
         return {
             icon: CalendarClock,
-            tint: 'text-[color:var(--mf-accent)]',
+            tint: 'text-[color:var(--lume-accent)]',
             label: 'Follow-up',
         };
     }
     if (kind === 'document') {
         return {
             icon: ScanText,
-            tint: 'text-[color:var(--mf-plum)]',
+            tint: 'text-[color:var(--lume-ink)]',
             label: 'Evidenza',
         };
     }
     return {
         icon: Stethoscope,
-        tint: 'text-[color:var(--mf-primary)]',
+        tint: 'text-[color:var(--lume-accent)]',
         label: 'Clinico',
     };
 }
@@ -128,7 +128,7 @@ export function ClinicalRiverTimeline({
 
     if (items.length === 0) {
         return (
-            <div className="rounded-[26px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-5 py-8 text-sm text-[color:var(--mf-muted)]">
+            <div className="rounded-[26px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-5 py-8 text-sm text-[color:var(--lume-ink-muted)]">
                 Nessun evento recente: visite, documenti e controlli compariranno qui.
             </div>
         );
@@ -151,17 +151,17 @@ export function ClinicalRiverTimeline({
                             </div>
                             <article className="clinical-river-card rounded-[22px] border p-4">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                         {item.typeLabel ?? presentation.label}
                                     </span>
-                                    <span className="lume-registro inline-flex items-center gap-1 text-[12px] text-[color:var(--mf-muted)]">
+                                    <span className="lume-registro inline-flex items-center gap-1 text-[12px] text-[color:var(--lume-ink-muted)]">
                                         <FileText className="h-3.5 w-3.5" />
                                         {formatDate(item.date)}
                                     </span>
                                 </div>
-                                <h3 className="mt-2 text-base font-semibold text-[color:var(--mf-ink)]">{item.title}</h3>
+                                <h3 className="mt-2 text-base font-semibold text-[color:var(--lume-ink)]">{item.title}</h3>
                                 {item.summary ? (
-                                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-[color:var(--mf-muted)]">
+                                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
                                         {item.summary}
                                     </p>
                                 ) : null}
@@ -172,7 +172,7 @@ export function ClinicalRiverTimeline({
             </div>
 
             {hiddenCount > 0 ? (
-                <p className="pl-[44px] text-[12px] text-[color:var(--mf-muted)]">
+                <p className="pl-[44px] text-[12px] text-[color:var(--lume-ink-muted)]">
                     Mostrati gli ultimi {items.length} eventi di {totalAvailable}. La cronologia completa è nel diario e nei documenti del paziente.
                 </p>
             ) : null}
