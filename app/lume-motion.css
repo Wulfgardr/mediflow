@@ -1,0 +1,134 @@
+/* @Codex: shared Lume gesture primitives, with no ambient animation. */
+@property --lume-surface-l {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --lume-surface-temp {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --lume-filo-fill {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+:root {
+  --lume-motion-factor: 1;
+  --lume-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --lume-dur-riga: calc(100ms * var(--lume-motion-factor));
+  --lume-dur-fuoco: calc(165ms * var(--lume-motion-factor));
+  --lume-dur-firma: calc(210ms * var(--lume-motion-factor));
+  --lume-dur-anello: calc(350ms * var(--lume-motion-factor));
+  --lume-radius-panel: 20px;
+  --lume-radius-card: 14px;
+  --lume-radius-control: 10px;
+}
+
+.lume-press {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transition: transform var(--lume-dur-riga) var(--lume-ease);
+}
+
+.lume-press:hover {
+  transform: translateY(-1px);
+}
+
+.lume-press:active {
+  transform: scale(0.97);
+}
+
+.lume-anello {
+  position: absolute;
+  z-index: 0;
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0.45;
+  animation: lume-anello var(--lume-dur-anello) var(--lume-ease) forwards;
+}
+
+@keyframes lume-anello {
+  to {
+    transform: translate(-50%, -50%) scale(7);
+    opacity: 0;
+  }
+}
+
+.lume-focal {
+  position: relative;
+  isolation: isolate;
+  transition:
+    --lume-surface-l var(--lume-dur-fuoco) var(--lume-ease),
+    --lume-surface-temp var(--lume-dur-fuoco) var(--lume-ease);
+}
+
+.lume-focal::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 12px 24px rgba(24, 24, 28, 0.14);
+  content: '';
+  opacity: var(--lume-focal-shadow-opacity, 0);
+  pointer-events: none;
+  transition: opacity var(--lume-dur-fuoco) var(--lume-ease);
+}
+
+.lume-filo-draw {
+  --lume-filo-fill: 0%;
+  stroke-dasharray: 100%;
+  stroke-dashoffset: calc(100% - var(--lume-filo-fill));
+  transition: --lume-filo-fill var(--lume-dur-firma) var(--lume-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --lume-motion-factor: 0.5;
+  }
+
+  .lume-anello {
+    display: none;
+    animation: none;
+  }
+
+  .lume-press {
+    transition-duration: var(--lume-dur-riga) !important;
+  }
+
+  .lume-focal {
+    transition-duration: var(--lume-dur-fuoco), var(--lume-dur-fuoco) !important;
+  }
+
+  .lume-focal::before {
+    transition-duration: var(--lume-dur-fuoco) !important;
+  }
+
+  .lume-filo-draw {
+    --lume-filo-fill: 100%;
+    transition: none;
+  }
+}
+
+:root[data-ui-reduce-motion='true'] {
+  --lume-motion-factor: 0.5;
+}
+
+:root[data-ui-reduce-motion='true'] .lume-anello {
+  display: none;
+  animation: none;
+}
+
+:root[data-ui-reduce-motion='true'] .lume-filo-draw {
+  --lume-filo-fill: 100%;
+  transition: none;
+}

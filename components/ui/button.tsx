@@ -4,8 +4,11 @@
    nel codice usano `ui-btn-primary px-5 py-2.5`; qui il padding di default e
    incapsulato. */
 
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+'use client';
 
+import { forwardRef, type ButtonHTMLAttributes, type PointerEvent, type ReactNode } from 'react';
+
+import { useLumeAnello } from '@/hooks/use-lume-anello';
 import { cn } from '@/lib/utils';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'destructive';
@@ -28,20 +31,36 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-    { variant = 'primary', className, children, type = 'button', style, ...rest },
+    { variant = 'primary', className, children, type = 'button', style, onPointerDown, ...rest },
     ref,
 ) {
+    // @Codex: the anello is only a transient response to the direct gesture.
+    const { anello, onLumePointerDown } = useLumeAnello();
     const destructiveStyle =
         variant === 'destructive' ? { background: 'var(--mf-critical)', ...style } : style;
+
+    const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+        onLumePointerDown(event);
+        onPointerDown?.(event);
+    };
+
     return (
         <button
             ref={ref}
             type={type}
-            className={cn(VARIANT_CLASSES[variant], className)}
+            className={cn(VARIANT_CLASSES[variant], 'lume-press', className)}
             style={destructiveStyle}
+            onPointerDown={handlePointerDown}
             {...rest}
         >
             {children}
+            {anello ? (
+                <span
+                    aria-hidden="true"
+                    className="lume-anello"
+                    style={{ left: anello.x, top: anello.y }}
+                />
+            ) : null}
         </button>
     );
 });

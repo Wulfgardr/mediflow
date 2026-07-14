@@ -68,8 +68,8 @@
 }
 
 @theme {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--mf-font-sans);
+  --font-mono: var(--font-registro), "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
 }
 
 :root {
@@ -92,7 +92,7 @@
 
   /* @Codex WUL-UIUX: stack tipografico unico, consumato da body e dai module
      css kree8 (shell + cockpit) al posto degli stack duplicati. */
-  --mf-font-sans: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mf-font-sans: var(--font-voce), "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
   --glass-border: rgba(15, 23, 42, 0.08);
   --glass-bg: rgba(255, 255, 255, 0.74);
@@ -170,6 +170,12 @@ body {
   background-image: var(--ui-canvas-background);
   background-size: 100% 100%;
   background-attachment: fixed;
+}
+
+.lume-registro {
+  font-family: var(--font-registro), "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95em;
 }
 
 /* Ensure selected text is readable in dark mode */
