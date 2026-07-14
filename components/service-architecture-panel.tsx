@@ -181,15 +181,15 @@ export default function ServiceArchitecturePanel() {
                 {/* Service Nodes */}
                 <div className="grid grid-cols-3 gap-4 relative z-10">
 
-                    {/* AI Node (Moved to First) */}
+                    {/* Nodo di elaborazione locale */}
                     <div className={`rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-field)] p-4 transition-colors ${getStatusColor(services.ai.status)}`}>
                         <div className="flex flex-col items-center text-center space-y-2">
                             <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-xl">
                                 <Brain className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                             </div>
                             <div>
-                                <h3 className="font-bold" style={{ color: 'var(--lume-ink)' }}>AI Engine</h3>
-                                <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Ollama</p>
+                                <h3 className="font-bold" style={{ color: 'var(--lume-ink)' }}>Servizio di elaborazione locale</h3>
+                                <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Modelli disponibili sul dispositivo</p>
                             </div>
                             <div className="lume-registro text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                                 :{services.ai.port}
@@ -220,7 +220,7 @@ export default function ServiceArchitecturePanel() {
                                         rel="noopener noreferrer"
                                         className="text-[10px] text-purple-600 hover:underline flex items-center justify-center gap-1"
                                     >
-                                        <ExternalLink className="w-3 h-3" /> Scarica Ollama
+                                        <ExternalLink className="w-3 h-3" /> Configura il servizio locale
                                     </a>
                                 </div>
                             )}

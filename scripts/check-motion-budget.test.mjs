@@ -34,17 +34,19 @@ test('riconosce le violazioni del contratto in CSS e TSX', () => {
       .shimmer { animation: shimmer 1s infinite; }
       @keyframes shimmer { to { transform: translateX(1px); } }
     `,
-    'components/card.tsx': '<div className="transition-all animate-pulse transition-[box-shadow] animate-[spin_1s_infinite]" />',
+    'components/card.tsx': '<div className="transition-all animate-pulse transition-[box-shadow] animate-spin animate-[spin_1s_infinite]" />',
   }, (rootDir) => scanMotionBudget({ rootDir, allowlist: [] }));
 
   assert.deepEqual(new Set(result.violations.map((item) => item.rule)), new Set([
     'animazione infinita',
     'animazione ambientale shimmer o pulse',
+    'rotazione continua',
     'transizione generica',
     'ombra animata',
     'filo usato come bordo',
   ]));
   assert.match(formatReport(result), /CONTRATTO VIOLATO/);
+  assert.equal(result.violations.filter((item) => item.rule === 'rotazione continua').length, 2);
 });
 
 test('rispetta solo la allowlist con path, regola e dichiarazione esatti', () => {

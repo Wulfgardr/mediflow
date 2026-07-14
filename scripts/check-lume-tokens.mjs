@@ -20,6 +20,8 @@ export const SIGNALS = ['warning', 'critical', 'success', 'plum'];
 // interactive text (links, minerale admin queue), so it uses the text threshold
 // on the work surfaces (field = penombra, focal = fuoco) where it carries text.
 export const TEXT_MIN_RATIO = 4.5;
+export const SIGNAL_TEXT_WEIGHT = 0.6;
+export const SIGNAL_TINT_WEIGHT = 0.1;
 const ACCENT_TEXT_SURFACES = ['field', 'focal'];
 
 // Parse "#rrggbb" (case-insensitive). Fails closed: throws on anything else.
@@ -48,6 +50,18 @@ export function contrastRatio(hexA, hexB) {
   const lb = relativeLuminance(hexB);
   const [hi, lo] = la >= lb ? [la, lb] : [lb, la];
   return (hi + 0.05) / (lo + 0.05);
+}
+
+export function mixHexColors(hexA, weightA, hexB) {
+  if (!Number.isFinite(weightA) || weightA < 0 || weightA > 1) {
+    throw new Error(`invalid color-mix weight: ${weightA}`);
+  }
+  const a = parseHexColor(hexA);
+  const b = parseHexColor(hexB);
+  const channel = (key) => Math.round(a[key] * weightA + b[key] * (1 - weightA));
+  return `#${[channel('r'), channel('g'), channel('b')]
+    .map((value) => value.toString(16).padStart(2, '0'))
+    .join('')}`;
 }
 
 // Resolve a dotted token path to its "#rrggbb" value. Fails closed: throws if
@@ -92,6 +106,16 @@ export function buildContract() {
         minRatio: TEXT_MIN_RATIO,
       });
     }
+    for (const signal of SIGNALS) {
+      checks.push({
+        register,
+        label: `signal.${signal} text on 10% signal tint`,
+        signal: `signal.${signal}`,
+        ink: `register.${register}.ink.primary`,
+        surface: `register.${register}.surface.field`,
+        minRatio: TEXT_MIN_RATIO,
+      });
+    }
   }
   return checks;
 }
@@ -101,8 +125,14 @@ export function buildContract() {
 export function evaluateContract(tokens, contract = buildContract()) {
   for (const signal of SIGNALS) resolveColor(tokens, `signal.${signal}`);
   const checks = contract.map((c) => {
-    const ratio = contrastRatio(resolveColor(tokens, c.text), resolveColor(tokens, c.background));
-    return { ...c, ratio, pass: ratio >= c.minRatio };
+    const text = c.signal
+      ? mixHexColors(resolveColor(tokens, c.signal), SIGNAL_TEXT_WEIGHT, resolveColor(tokens, c.ink))
+      : resolveColor(tokens, c.text);
+    const background = c.signal
+      ? mixHexColors(resolveColor(tokens, c.signal), SIGNAL_TINT_WEIGHT, resolveColor(tokens, c.surface))
+      : resolveColor(tokens, c.background);
+    const ratio = contrastRatio(text, background);
+    return { ...c, measuredText: text, measuredBackground: background, ratio, pass: ratio >= c.minRatio };
   });
   return { checks, pass: checks.every((c) => c.pass) };
 }
