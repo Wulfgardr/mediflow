@@ -122,7 +122,7 @@ export function PatientSynopticSheet({
                 <div className="shrink-0">{actions}</div>
             </header>
 
-            <hr className="my-4 border-0 border-t border-[color:var(--glass-border,rgba(15,23,42,0.08))]" />
+            <hr className="my-4 border-0 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_8%,transparent)]" />
 
             {/* B. Problema guida (prima diagnosi di qualunque sistema) */}
             <div className="flex items-start justify-between gap-3">
@@ -170,7 +170,7 @@ export function PatientSynopticSheet({
                 </div>
             ) : null}
 
-            <hr className="my-4 border-0 border-t border-[color:var(--glass-border,rgba(15,23,42,0.08))]" />
+            <hr className="my-4 border-0 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_8%,transparent)]" />
 
             <div className="grid gap-4 md:grid-cols-2">
                 {/* D. Terapie attive */}
@@ -184,7 +184,7 @@ export function PatientSynopticSheet({
                     ) : therapies.length === 0 ? (
                         <p className="mt-2 text-sm text-[color:var(--mf-muted)]">Nessuna terapia attiva.</p>
                     ) : (
-                        <ul className="mt-1 divide-y divide-[color:var(--glass-border,rgba(15,23,42,0.06))]">
+                        <ul className="mt-1 divide-y divide-[color:color-mix(in_srgb,var(--lume-ink)_6%,transparent)]">
                             {visibleTherapies.map((therapy) => (
                                 <li key={therapy.id} className="flex items-baseline justify-between gap-3 py-1">
                                     <span className="min-w-0 truncate text-[13px] font-medium text-[color:var(--mf-ink)]">{therapy.drugName}</span>

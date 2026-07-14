@@ -43,7 +43,7 @@
 .liquid-blur {
   filter: blur(5px);
   opacity: 0.6;
-  transition: all 0.5s ease-in-out;
+  transition: filter var(--lume-dur-fuoco) var(--lume-ease), opacity var(--lume-dur-fuoco) var(--lume-ease);
   cursor: default;
   -webkit-user-select: none;
   user-select: none;
@@ -78,27 +78,6 @@
      css kree8 (shell + cockpit) al posto degli stack duplicati. */
   --mf-font-sans: var(--font-voce), "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
-  --glass-border: rgba(15, 23, 42, 0.08);
-  --glass-bg: rgba(255, 255, 255, 0.74);
-  --glass-shadow: 0 16px 38px rgba(15, 23, 42, 0.06);
-  --glass-panel-shadow: 0 24px 60px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  --glass-card-shadow: 0 14px 34px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.14);
-
-}
-
-:root[data-ui-style='liquid'] {
-  --glass-border: rgba(15, 23, 42, 0.08);
-  --glass-bg: rgba(255, 255, 255, 0.78);
-  --glass-panel-shadow: 0 28px 70px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.58);
-  --glass-card-shadow: 0 18px 40px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5);
-}
-
-:root[data-ui-style='redesign'] {
-  --glass-border: rgba(15, 23, 42, 0.10);
-  --glass-bg: rgba(255, 255, 255, 0.82);
-  --glass-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
-  --glass-panel-shadow: 0 14px 30px rgba(15, 23, 42, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  --glass-card-shadow: 0 8px 18px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.42);
 }
 
 body {
@@ -133,12 +112,6 @@ body {
   --mf-ink: var(--lume-ink);
   --mf-muted: var(--lume-ink-muted);
 
-  --glass-bg: rgba(26, 31, 40, 0.78);
-  --glass-border: rgba(226, 232, 240, 0.1);
-  --glass-panel-shadow: 0 28px 56px rgba(6, 5, 7, 0.56), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --glass-card-shadow: 0 18px 40px rgba(6, 5, 7, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-
-
   --card: #1a1f28;
   --card-foreground: #f4f7fb;
   --popover: #1a1f28;
@@ -151,20 +124,6 @@ body {
   --primary: #cbd5e1;
 }
 
-:root.dark[data-ui-style='liquid'] {
-  --glass-bg: rgba(28, 34, 44, 0.72);
-  --glass-border: rgba(226, 232, 240, 0.12);
-  --glass-panel-shadow: 0 32px 64px rgba(6, 5, 7, 0.64), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  --glass-card-shadow: 0 20px 42px rgba(6, 5, 7, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
-:root.dark[data-ui-style='redesign'] {
-  --glass-bg: rgba(26, 31, 40, 0.84);
-  --glass-border: rgba(226, 232, 240, 0.1);
-  --glass-panel-shadow: 0 18px 36px rgba(6, 5, 7, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --glass-card-shadow: 0 10px 24px rgba(6, 5, 7, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
 /* Ensure input/card backgrounds are readable in dark mode */
 :root.dark input,
 :root.dark select,
@@ -174,32 +133,6 @@ body {
   border-color: var(--border);
 }
 
-
-:root[data-ui-reduce-transparency='true'] {
-  --glass-bg: rgba(255, 255, 255, 0.92);
-  --glass-border: rgba(15, 23, 42, 0.14);
-  --glass-panel-shadow: 0 16px 32px rgba(15, 23, 42, 0.07);
-  --glass-card-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
-}
-
-:root.dark[data-ui-reduce-transparency='true'] {
-  --glass-bg: rgba(26, 31, 40, 0.94);
-  --glass-border: rgba(226, 232, 240, 0.12);
-}
-
-@media (prefers-contrast: more) {
-  :root {
-    --glass-bg: rgba(255, 255, 255, 0.92);
-    --glass-border: rgba(15, 23, 42, 0.18);
-    --glass-panel-shadow: 0 16px 32px rgba(35, 27, 22, 0.08);
-    --glass-card-shadow: 0 10px 24px rgba(35, 27, 22, 0.06);
-  }
-
-  :root.dark {
-    --glass-bg: rgba(28, 23, 27, 0.94);
-    --glass-border: rgba(255, 247, 240, 0.12);
-  }
-}
 
 @media (prefers-reduced-motion: reduce) {
   html:focus-within {
@@ -226,22 +159,7 @@ body {
   scroll-behavior: auto !important;
 }
 
-:root[data-ui-style='redesign'] .mediflow-sidebar-shell,
-:root[data-ui-style='redesign'] .mediflow-mobile-header {
-  backdrop-filter: blur(18px) saturate(1.04);
-  -webkit-backdrop-filter: blur(18px) saturate(1.04);
-}
-
-:root[data-ui-style='redesign'] .patient-identity-lens,
-:root[data-ui-style='redesign'] .patient-detail-section,
-:root[data-ui-style='redesign'] .patient-detail-side-section,
-:root[data-ui-style='redesign'] .patient-actions-dock,
-:root[data-ui-style='redesign'] .patient-ai-insight-panel {
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-:root[data-ui-style='redesign'] .glass-card:hover,
+:root[data-ui-style='redesign'] .lume-card:hover,
 :root[data-ui-style='redesign'] .ui-btn-primary:hover,
 :root[data-ui-style='redesign'] .apple-list-row:hover {
   transform: none;
@@ -307,15 +225,13 @@ body {
   min-width: 0;
 }
 
-/* @Codex WUL-229: Production workbench follows the liquid-glass dummy composition:
+/* @Codex WUL-229: Il workbench reale segue la composizione di riferimento:
    command chrome first, a dominant selected-patient lens, then the operational stream. */
 :root[data-ui-style='redesign'] .patient-liquid-commandbar {
   border-radius: 28px;
   background-color: var(--mf-tier-specular-bg);
   border-color: var(--mf-tier-specular-border);
   box-shadow: var(--mf-tier-specular-shadow);
-  backdrop-filter: blur(var(--mf-tier-specular-blur)) saturate(var(--mf-tier-specular-saturate));
-  -webkit-backdrop-filter: blur(var(--mf-tier-specular-blur)) saturate(var(--mf-tier-specular-saturate));
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-lens {
@@ -353,8 +269,6 @@ body {
   background-color: var(--mf-tier-vitreous-bg);
   border-color: var(--mf-tier-vitreous-border);
   box-shadow: var(--mf-tier-vitreous-shadow);
-  backdrop-filter: blur(var(--mf-tier-vitreous-blur)) saturate(var(--mf-tier-vitreous-saturate));
-  -webkit-backdrop-filter: blur(var(--mf-tier-vitreous-blur)) saturate(var(--mf-tier-vitreous-saturate));
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-signal {
@@ -499,7 +413,7 @@ body {
   }
 
   /* Lume: superfici strutturali opache. */
-  .glass {
+  .lume-surface {
     @apply border;
     border-radius: var(--lume-radius-card);
     background-color: var(--lume-surface-field);
@@ -516,7 +430,7 @@ body {
     box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
   }
 
-  .glass-panel {
+  .lume-panel {
     @apply border;
     border-radius: var(--lume-radius-panel);
     background-color: var(--lume-surface-chrome);
@@ -525,7 +439,7 @@ body {
   }
 
   /* Card di contesto: penombra, mai vetro. */
-  .glass-card {
+  .lume-card {
     @apply border;
     border-radius: var(--lume-radius-card);
     background-color: var(--lume-surface-field);
@@ -533,7 +447,7 @@ body {
     box-shadow: none;
   }
 
-  .glass-card:hover {
+  .lume-card:hover {
     background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, var(--lume-surface-field));
     transform: none;
   }
@@ -558,7 +472,7 @@ body {
     border-radius: var(--lume-radius-card);
     background-color: var(--lume-surface-field);
     border-color: color-mix(in srgb, var(--lume-ink) 10%, transparent);
-    transition-property: border-color, background-color, box-shadow, transform;
+    transition-property: border-color, background-color, transform;
     transition-duration: var(--lume-dur-riga);
     transition-timing-function: var(--lume-ease);
   }
@@ -571,15 +485,15 @@ body {
 
   /* @Codex */
   .seeder-panel {
-    @apply rounded-[24px] border border-slate-200/70 backdrop-blur-md dark:border-white/10 dark:bg-white/5;
-    background: linear-gradient(135deg, rgba(248, 250, 252, 0.94), rgba(255, 255, 255, 0.8));
+    @apply rounded-[var(--lume-radius-panel)] border border-slate-200/70 dark:border-white/10 dark:bg-white/5;
+    background: var(--lume-surface-field);
     box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
   }
 
   /* @Codex */
   .seeder-subsection {
-    @apply rounded-[20px] border border-white/70 backdrop-blur-md dark:border-white/10 dark:bg-white/5;
-    background: rgba(255, 255, 255, 0.72);
+    @apply rounded-[var(--lume-radius-card)] border border-white/70 dark:border-white/10 dark:bg-white/5;
+    background: var(--lume-surface-field);
     box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
   }
 
@@ -1184,8 +1098,6 @@ body {
   background-color: var(--mf-tier-specular-bg);
   border-color: var(--mf-tier-specular-border);
   box-shadow: var(--mf-tier-specular-shadow);
-  backdrop-filter: blur(var(--mf-tier-specular-blur)) saturate(var(--mf-tier-specular-saturate));
-  -webkit-backdrop-filter: blur(var(--mf-tier-specular-blur)) saturate(var(--mf-tier-specular-saturate));
 }
 
 :root.dark[data-ui-style='redesign'] .mediflow-sidebar-shell,
@@ -1198,8 +1110,6 @@ body {
 :root[data-ui-style='redesign'] .mediflow-mobile-nav {
   background-color: var(--mf-tier-specular-bg);
   border-top-color: var(--mf-tier-specular-border);
-  backdrop-filter: blur(var(--mf-tier-specular-blur)) saturate(var(--mf-tier-specular-saturate));
-  -webkit-backdrop-filter: blur(var(--mf-tier-specular-blur)) saturate(var(--mf-tier-specular-saturate));
 }
 
 :root.dark[data-ui-style='redesign'] .mediflow-mobile-nav {
@@ -1236,8 +1146,6 @@ body {
 :root[data-ui-style='redesign'] .mediflow-vitreous-side-panel,
 :root[data-ui-style='redesign'] .patient-inbox-pane,
 :root[data-ui-style='redesign'] .clinical-river-card {
-  backdrop-filter: blur(var(--mf-tier-vitreous-blur)) saturate(var(--mf-tier-vitreous-saturate));
-  -webkit-backdrop-filter: blur(var(--mf-tier-vitreous-blur)) saturate(var(--mf-tier-vitreous-saturate));
 }
 
 /* Crystalline: chips */
@@ -1255,7 +1163,6 @@ body {
   box-shadow: var(--mf-focus-ring);
 }
 
-/* Reduce-transparency: hard-disable backdrop-filter on tier surfaces */
 :root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-sidebar-shell,
 :root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-mobile-header,
 :root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-mobile-nav,
@@ -1264,8 +1171,6 @@ body {
 :root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .mediflow-vitreous-side-panel,
 :root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .patient-inbox-pane,
 :root[data-ui-reduce-transparency='true'][data-ui-style='redesign'] .clinical-river-card {
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 /* Print: opaque, no blur, no inner highlight */
@@ -1281,19 +1186,17 @@ body {
   :root[data-ui-style='redesign'] .patient-detail-side-section,
   :root[data-ui-style='redesign'] .patient-inbox-pane,
   :root[data-ui-style='redesign'] .clinical-river-card {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
     background-color: #fff !important;
     box-shadow: none !important;
   }
 }
 
-/* @Codex WUL-229: Reusable liquid-glass primitives applied broadly to forms,
+/* @Codex WUL-229: Primitive Lume riusabili applicate a form,
    modals, dropdowns, secondary buttons and semantic alert blocks so individual
    pages avoid hand-rolled bg-white/border-gray-* SaaS tokens. */
 
 /* @Codex WUL-UIUX: .input-field era usata in form prestazioni/protesica/SISS
-   ma non definita da nessuna parte (input nativi senza glass ne focus ring).
+   ma non definita da nessuna parte (input nativi senza superficie ne focus ring).
    La si allinea a .mf-input cosi decine di campi rientrano nel sistema. */
 .mf-input,
 .input-field {
@@ -1505,14 +1408,12 @@ textarea.input-field {
   color: var(--lume-ink);
 }
 
-/* Specular shell: chrome for modals and floating sheets */
+/* Overlay Lume: superficie focale opaca, ombra su strato e scrim separato. */
 .mf-modal-shell {
   border-radius: var(--lume-radius-panel);
-  border: 1px solid var(--mf-tier-specular-border, rgba(255, 255, 255, 0.6));
-  background-color: var(--mf-tier-specular-bg, rgba(255, 255, 255, 0.78));
-  box-shadow: var(--mf-tier-specular-shadow, 0 18px 38px rgba(15, 23, 42, 0.08));
-  backdrop-filter: blur(var(--mf-tier-specular-blur, 22px)) saturate(var(--mf-tier-specular-saturate, 1.06));
-  -webkit-backdrop-filter: blur(var(--mf-tier-specular-blur, 22px)) saturate(var(--mf-tier-specular-saturate, 1.06));
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+  background-color: var(--lume-surface-focal);
+  box-shadow: none;
   color: var(--lume-ink);
 }
 
@@ -1523,30 +1424,26 @@ textarea.input-field {
   display: grid;
   place-items: center;
   padding: 1.25rem;
-  background: radial-gradient(circle at 50% 30%, rgba(35, 27, 22, 0.42), rgba(35, 27, 22, 0.62));
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(24, 24, 28, 0.62);
 }
 
 :root.dark .mf-modal-backdrop {
-  background: radial-gradient(circle at 50% 30%, rgba(6, 5, 7, 0.6), rgba(6, 5, 7, 0.78));
+  background: rgba(6, 5, 7, 0.78);
 }
 
-/* Vitreous popover/dropdown: autocomplete suggestions, menus */
+/* Popover Lume: opaco e in fuoco, senza filtro strutturale. */
 .mf-popover {
   border-radius: var(--lume-radius-card);
-  border: 1px solid var(--mf-tier-vitreous-border, rgba(112, 106, 100, 0.12));
-  background-color: var(--mf-tier-vitreous-bg, rgba(255, 255, 255, 0.94));
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+  background-color: var(--lume-surface-focal);
   box-shadow: 0 22px 44px rgba(15, 23, 42, 0.14);
-  backdrop-filter: blur(20px) saturate(1.06);
-  -webkit-backdrop-filter: blur(20px) saturate(1.06);
   padding: 0.35rem;
   overflow: hidden;
 }
 
 :root.dark .mf-popover {
-  background-color: rgba(26, 31, 40, 0.94);
-  border-color: rgba(226, 232, 240, 0.1);
+  background-color: var(--lume-surface-focal);
+  border-color: color-mix(in srgb, var(--lume-ink) 12%, transparent);
   box-shadow: 0 26px 52px rgba(6, 5, 7, 0.5);
 }
 
@@ -1849,7 +1746,7 @@ textarea.input-field {
 
 /* @Codex WUL-229: make the real patient workbench unmistakably match the dummy.
    Earlier redesign rules flattened these surfaces too much; this pass restores
-   glass depth, large focal lenses and carded streams on the two primary views. */
+   superfici opache, lenti focali e flussi cardati sulle due viste primarie. */
 :root[data-ui-style='redesign'] .patient-liquid-workbench {
   isolation: isolate;
   position: relative;
@@ -1903,8 +1800,6 @@ textarea.input-field {
     0 34px 90px rgba(15, 23, 42, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.84),
     inset 0 -1px 0 rgba(112, 106, 100, 0.08);
-  backdrop-filter: blur(28px) saturate(1.1);
-  -webkit-backdrop-filter: blur(28px) saturate(1.1);
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-lens::after {
@@ -1928,8 +1823,6 @@ textarea.input-field {
   background: rgba(255, 255, 255, 0.5);
   border-color: rgba(255, 255, 255, 0.72);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
-  backdrop-filter: blur(18px) saturate(1.08);
-  -webkit-backdrop-filter: blur(18px) saturate(1.08);
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-signals,
@@ -1947,8 +1840,6 @@ textarea.input-field {
   box-shadow:
     0 24px 64px rgba(15, 23, 42, 0.10),
     inset 0 1px 0 rgba(255, 255, 255, 0.66);
-  backdrop-filter: blur(24px) saturate(1.08);
-  -webkit-backdrop-filter: blur(24px) saturate(1.08);
 }
 
 :root[data-ui-style='redesign'] .patient-workbench-shell {
@@ -1960,8 +1851,6 @@ textarea.input-field {
   border-color: rgba(255, 255, 255, 0.56);
   background: rgba(248, 250, 252, 0.48);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
-  backdrop-filter: blur(18px) saturate(1.04);
-  -webkit-backdrop-filter: blur(18px) saturate(1.04);
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-stream {

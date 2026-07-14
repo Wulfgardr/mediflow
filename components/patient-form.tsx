@@ -48,7 +48,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                         <button
                             type="button"
                             onClick={() => remove(index)}
-                            className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-all mf-btn-secondary p-2 z-10"
+                            className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-opacity mf-btn-secondary p-2 z-10"
                             aria-label="Rimuovi diagnosi"
                         >
                             <Trash2 className="w-4 h-4" />
@@ -143,7 +143,7 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
                         <button
                             type="button"
                             onClick={() => removeField(index)}
-                            className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-all mf-btn-secondary p-2 z-10"
+                            className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-opacity mf-btn-secondary p-2 z-10"
                             aria-label="Rimuovi pianificazione"
                         >
                             <Trash2 className="w-4 h-4" />

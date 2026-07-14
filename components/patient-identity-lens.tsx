@@ -94,7 +94,7 @@ export function PatientIdentityLens({
 
     if (variant === 'reader') {
         return (
-            <section className="patient-identity-lens patient-identity-lens-reader glass-panel relative overflow-hidden p-5 md:p-6">
+            <section className="patient-identity-lens patient-identity-lens-reader lume-panel relative overflow-hidden p-5 md:p-6">
                 <div className="relative z-10 grid gap-5 xl:grid-cols-[minmax(0,1.38fr)_320px] xl:items-start">
                     <div className="min-w-0 space-y-5">
                         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.02fr)_minmax(320px,0.98fr)] lg:items-start lg:divide-x lg:divide-[color:rgba(112,106,100,0.12)]">
@@ -269,7 +269,7 @@ export function PatientIdentityLens({
     }
 
     return (
-        <section className="patient-identity-lens glass-panel relative overflow-hidden p-6 md:p-8">
+        <section className="patient-identity-lens lume-panel relative overflow-hidden p-6 md:p-8">
             <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0 space-y-4">
                     <div className="space-y-2">

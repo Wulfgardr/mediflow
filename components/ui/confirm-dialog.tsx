@@ -68,7 +68,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         <ConfirmContext.Provider value={confirm}>
             {children}
             {options ? (
-                <div className="mf-modal-backdrop animate-in fade-in duration-200">
+                <div className="mf-modal-backdrop animate-in fade-in duration-[var(--lume-dur-riga)]">
                     <button
                         type="button"
                         aria-label="Chiudi sfondo"
@@ -82,7 +82,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                         aria-labelledby={titleId}
                         aria-describedby={options.message ? messageId : undefined}
                         tabIndex={-1}
-                        className="mf-modal-shell relative w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200"
+                        className="mf-modal-shell lume-overlay-shadow relative w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-[var(--lume-dur-fuoco)]"
                     >
                         <div aria-hidden className="h-1.5 w-full" style={{ background: isDanger ? 'var(--lume-signal-critical)' : 'var(--lume-accent)' }} />
                         <div className="p-6">

@@ -119,7 +119,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
     if (!patient.aiSummary && !isGenerating && !patientInsightEnabled) {
         return (
             <div
-                className="patient-ai-insight-panel glass-panel overflow-hidden border-red-200/70 p-6 dark:border-red-500/20"
+                className="patient-ai-insight-panel lume-panel overflow-hidden border-red-200/70 p-6 dark:border-red-500/20"
                 data-testid="patient-insight-disabled-card"
             >
                 <div className="flex flex-col items-center text-center space-y-5">
@@ -136,7 +136,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
 
                     <Link
                         href="/settings/ai/funzioni"
-                        className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                        className="lume-press inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-[background-color,color] hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
                     >
                         Apri Impostazioni AI
                     </Link>
@@ -147,7 +147,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
 
     if (!patient.aiSummary && !isGenerating) {
         return (
-            <div className="patient-ai-insight-panel glass-panel overflow-hidden p-6">
+            <div className="patient-ai-insight-panel lume-panel overflow-hidden p-6">
                 <div className="flex flex-col items-center text-center space-y-5">
                     <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-slate-900 text-white shadow-[0_12px_24px_rgba(15,23,42,0.14)] dark:bg-white dark:text-slate-900">
                         <Sparkles className="w-8 h-8" />
@@ -168,7 +168,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
 
                     <button
                         onClick={generateInsight}
-                        className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-8 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(15,23,42,0.12)] transition-all hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                        className="lume-press inline-flex items-center gap-2 rounded-full bg-slate-900 px-8 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(15,23,42,0.12)] transition-[background-color,color] hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
                     >
                         <Sparkles className="w-4 h-4" />
                         Avvia supporto
@@ -179,7 +179,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
     }
 
     return (
-        <div className="patient-ai-insight-panel glass-panel overflow-hidden p-0">
+        <div className="patient-ai-insight-panel lume-panel overflow-hidden p-0">
             <div className="border-b border-slate-200/50 p-5 dark:border-white/5">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -207,7 +207,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
                     <button
                         onClick={generateInsight}
                         disabled={isGenerating || !patientInsightEnabled}
-                        className="flex h-9 items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-4 text-xs font-semibold text-slate-700 transition-all hover:bg-white disabled:opacity-50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200"
+                        className="flex h-9 items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-4 text-xs font-semibold text-slate-700 transition-[background-color,color,opacity] hover:bg-white disabled:opacity-50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200"
                     >
                         {isGenerating ? (
                             <RefreshCw className="w-3.5 h-3.5" />

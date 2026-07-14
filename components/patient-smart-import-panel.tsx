@@ -170,7 +170,7 @@ function formatResolverScore(score: number): string {
     return `${Math.round(score)}`;
 }
 
-const smartImportInputClassName = "h-10 w-full rounded-[16px] border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] focus:border-slate-400 focus:ring-2 focus:ring-slate-100 dark:border-white/10 dark:bg-slate-950 dark:text-white dark:focus:border-white/30 dark:focus:ring-white/10";
+const smartImportInputClassName = "h-10 w-full rounded-[16px] border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition-colors focus:border-slate-400 focus:ring-2 focus:ring-slate-100 dark:border-white/10 dark:bg-slate-950 dark:text-white dark:focus:border-white/30 dark:focus:ring-white/10";
 
 // @Codex: Smart Import often renders in a narrow patient side rail, so actions must not share a cramped title row.
 function ReviewActionButtons({
@@ -504,7 +504,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
     if (!analysis && !isGenerating && !smartImportEnabled) {
         return (
             <div
-                className="glass-panel overflow-hidden border-red-200/70 p-6 dark:border-red-500/20"
+                className="lume-panel overflow-hidden border-red-200/70 p-6 dark:border-red-500/20"
                 data-testid="smart-import-disabled-card"
             >
                 <div className="flex flex-col items-center text-center space-y-5">
@@ -531,7 +531,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
     }
 
     return (
-        <div className="patient-detail-section glass-panel overflow-hidden rounded-[28px] border p-0">
+        <div className="patient-detail-section lume-panel overflow-hidden rounded-[28px] border p-0">
             <div className="border-b border-slate-200/60 p-5 dark:border-white/5">
                 <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-3">

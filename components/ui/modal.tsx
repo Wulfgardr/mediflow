@@ -58,7 +58,7 @@ export function Modal({
     if (!open) return null;
 
     return (
-        <div className="mf-modal-backdrop animate-in fade-in duration-200">
+        <div className="mf-modal-backdrop animate-in fade-in duration-[var(--lume-dur-riga)]">
             <button
                 type="button"
                 aria-label="Chiudi sfondo"
@@ -72,7 +72,7 @@ export function Modal({
                 aria-labelledby={titleId}
                 tabIndex={-1}
                 className={cn(
-                    'mf-modal-shell relative w-full overflow-hidden animate-in zoom-in-95 duration-200',
+                    'mf-modal-shell lume-overlay-shadow relative w-full overflow-hidden animate-in fade-in zoom-in-95 duration-[var(--lume-dur-fuoco)]',
                     maxWidthClassName,
                     className,
                 )}

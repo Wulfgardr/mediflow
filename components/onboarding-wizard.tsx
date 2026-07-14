@@ -76,7 +76,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 ))}
             </div>
 
-            <div className="mf-modal-shell overflow-hidden">
+            <div className="mf-modal-shell lume-overlay-shadow overflow-hidden">
                 <div className="p-8">
                     {step === 1 && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">

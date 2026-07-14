@@ -317,7 +317,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
             <div
                 {...getRootProps()}
                 className={cn(
-                    "border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all",
+                    "border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-[border-color,background-color]",
                     isDragActive
                         ? "border-slate-400 bg-slate-50 dark:bg-white/10"
                         : "border-gray-300 dark:border-white/10 hover:border-slate-400 hover:bg-gray-50 dark:hover:bg-white/5 bg-white/50 dark:bg-white/5"
@@ -382,7 +382,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
             {/* File List */}
             <div className="flex flex-col gap-3">
                 {attachments?.map((file) => (
-                    <div key={file.id} className="glass-card group flex items-center gap-3 p-3 transition-colors hover:border-slate-300 dark:hover:border-white/20">
+                    <div key={file.id} className="lume-card group flex items-center gap-3 p-3 transition-colors hover:border-slate-300 dark:hover:border-white/20">
                         <div className="p-2 bg-red-50 dark:bg-red-900/10 rounded-lg text-red-500 dark:text-red-400 border border-red-100 dark:border-white/5">
                             <FileText className="w-5 h-5" />
                         </div>

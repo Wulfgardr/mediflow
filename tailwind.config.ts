@@ -23,13 +23,6 @@ const config: Config = {
                 warning: "var(--lume-signal-warning)",
                 critical: "var(--lume-signal-critical)",
                 success: "var(--lume-signal-success)",
-                glass: {
-                    DEFAULT: "var(--lume-surface-field)",
-                    bg: "var(--lume-surface-canvas)",
-                    elevated: "var(--lume-surface-focal)",
-                    strong: "var(--lume-surface-chrome)",
-                    border: "color-mix(in srgb, var(--lume-ink) 10%, transparent)",
-                },
             },
             fontSize: {
                 /* @Codex WUL-UIUX (STREAM E): scala fissa che copre i px scritti a

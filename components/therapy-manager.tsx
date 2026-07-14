@@ -32,7 +32,7 @@ const therapySchema = z.object({
 type TherapyFormValues = z.infer<typeof therapySchema>;
 
 const fieldLabelClassName = 'section-kicker flex items-center justify-between gap-2 text-[11px]';
-const inputClassName = 'w-full rounded-[14px] border border-[color:rgba(15,23,42,0.12)] bg-white/88 px-3 py-2.5 text-sm text-[color:var(--mf-ink)] outline-none transition-[border-color,box-shadow] placeholder:text-[color:rgba(100,116,139,0.58)] focus:border-[color:rgba(15,23,42,0.28)] focus:shadow-[0_0_0_4px_rgba(15,23,42,0.08)] read-only:bg-[color:rgba(248,250,252,0.72)] dark:border-white/10 dark:bg-white/5 dark:read-only:bg-white/4';
+const inputClassName = 'w-full rounded-[14px] border border-[color:rgba(15,23,42,0.12)] bg-white/88 px-3 py-2.5 text-sm text-[color:var(--mf-ink)] outline-none transition-colors placeholder:text-[color:rgba(100,116,139,0.58)] focus:border-[color:rgba(15,23,42,0.28)] focus:shadow-[0_0_0_4px_rgba(15,23,42,0.08)] read-only:bg-[color:rgba(248,250,252,0.72)] dark:border-white/10 dark:bg-white/5 dark:read-only:bg-white/4';
 const textareaClassName = `${inputClassName} min-h-[88px] resize-y`;
 const quietButtonClassName = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-[11px] border border-[color:rgba(15,23,42,0.12)] bg-white/88 px-3 text-xs font-semibold text-[color:var(--mf-ink)] transition-colors hover:border-[color:rgba(15,23,42,0.26)] hover:bg-white dark:bg-white/6';
 const statusButtonClassName = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-[11px] border border-[color:rgba(15,23,42,0.12)] bg-[color:rgba(248,250,252,0.82)] px-3 text-xs font-semibold text-[color:var(--mf-muted)] transition-colors hover:border-[color:rgba(15,23,42,0.24)] hover:text-[color:var(--mf-ink)] dark:bg-white/5';

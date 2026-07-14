@@ -24,14 +24,14 @@ export default function DocumentViewer({ file, fileName, onClose }: DocumentView
 
     return (
         // @Codex WUL-229: full-screen document viewer reuses specular chrome + vitreous canvas
-        <div className="mf-modal-backdrop p-4 md:p-8 animate-in fade-in duration-200" style={{ zIndex: 100 }}>
+        <div className="mf-modal-backdrop p-4 md:p-8 animate-in fade-in duration-[var(--lume-dur-riga)]" style={{ zIndex: 100 }}>
             <button
                 type="button"
                 aria-label="Chiudi sfondo"
                 className="absolute inset-0 cursor-default"
                 onClick={onClose}
             />
-            <div className="mf-modal-shell relative w-full h-full max-w-6xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="mf-modal-shell lume-overlay-shadow relative w-full h-full max-w-6xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-[var(--lume-dur-fuoco)]">
                 <div className="flex items-center justify-between p-4 graphite-divider">
                     <div className="flex items-center gap-3">
                         <div

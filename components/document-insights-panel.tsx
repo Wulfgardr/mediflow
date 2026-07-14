@@ -129,7 +129,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
     };
 
     return (
-        <div className="patient-detail-side-section glass-panel border p-6">
+        <div className="patient-detail-side-section lume-panel border p-6">
             <div className="mb-4 flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
                     <div className="rounded-2xl bg-amber-50 p-2 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300">
@@ -169,7 +169,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                 {insights.map((insight, index) => (
                     <div
                         key={insight.id}
-                        className={`rounded-xl border transition-all ${expandedId === insight.id
+                        className={`rounded-xl border transition-[border-color,background-color] ${expandedId === insight.id
                                 ? 'border-amber-200 dark:border-amber-500/30 bg-amber-50/40 dark:bg-amber-900/10'
                                 : 'border-slate-200/80 dark:border-white/10 bg-white/75 dark:bg-white/5 hover:border-slate-300'
                             }`}

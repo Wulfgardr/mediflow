@@ -137,7 +137,7 @@ export default function AmbulatoryManagerPage() {
                 role="treeitem"
                 aria-selected={node.isDefault}
                 className={cn(
-                    "bg-[color:var(--mf-bg-elevated)] dark:bg-white/6 border rounded-xl p-6 transition-all flex flex-col gap-5 shadow-sm relative md:flex-row md:items-center md:justify-between",
+                    "bg-[color:var(--mf-bg-elevated)] dark:bg-white/6 border rounded-xl p-6 transition-[border-color,background-color,color] flex flex-col gap-5 shadow-sm relative md:flex-row md:items-center md:justify-between",
                     node.isDefault ? "border-[color:rgba(15,123,104,0.38)] shadow-md ring-1 ring-[color:rgba(15,123,104,0.22)]" : "border-[color:rgba(112,106,100,0.14)]",
                     level > 0 && "ml-8 border-l-4 border-l-[color:rgba(15,123,104,0.18)]"
                 )}
@@ -266,7 +266,7 @@ export default function AmbulatoryManagerPage() {
                 {isLoading ? 'Caricamento sedi...' : `${ambulatories.length} sedi configurate.`}
             </p>
             <section id="nuova-sede" className={cn(
-                'patient-detail-section mf-section p-6 md:p-8 transition-all',
+                'patient-detail-section mf-section p-6 md:p-8 transition-[border-color,background-color,color]',
                 newParentId ? 'border-[color:rgba(15,123,104,0.38)] ring-1 ring-[color:rgba(15,123,104,0.22)]' : 'border-[color:rgba(112,106,100,0.14)]',
             )}>
                 <div className="mb-6 flex items-center gap-4 border-b border-[color:rgba(112,106,100,0.14)] pb-4">

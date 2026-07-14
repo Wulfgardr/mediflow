@@ -165,7 +165,7 @@ export function ClinicalRichTextEditor({
             </div>
 
             <div className={cn(
-                'rounded-[22px] border bg-[color:rgba(255,252,247,0.9)] px-5 py-4 shadow-[0_16px_30px_rgba(35,27,22,0.06)] transition-[border-color,box-shadow]',
+                'rounded-[22px] border bg-[color:rgba(255,252,247,0.9)] px-5 py-4 shadow-[0_16px_30px_rgba(35,27,22,0.06)] transition-colors',
                 isFocused
                     ? 'border-[color:rgba(182,106,60,0.3)] shadow-[0_18px_34px_rgba(182,106,60,0.12)]'
                     : 'border-[color:rgba(112,106,100,0.12)]',

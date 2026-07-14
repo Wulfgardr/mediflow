@@ -17,6 +17,12 @@
   initial-value: 0%;
 }
 
+@property --lume-overlay-shadow-opacity {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+
 :root {
   --lume-motion-factor: 1;
   --lume-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
@@ -84,6 +90,40 @@
   transition: opacity var(--lume-dur-fuoco) var(--lume-ease);
 }
 
+/* Overlay e conferme usano lo stesso strato ombra: cambia soltanto opacity,
+   mai la geometria dell'ombra. */
+.lume-overlay-shadow {
+  position: relative;
+  isolation: isolate;
+}
+
+.lume-overlay-shadow::after {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 24px 56px rgba(24, 24, 28, 0.28);
+  content: '';
+  opacity: var(--lume-overlay-shadow-opacity, 1);
+  pointer-events: none;
+  transition: opacity var(--lume-dur-fuoco) var(--lume-ease);
+}
+
+.lume-overlay-shadow > * {
+  position: relative;
+  z-index: 1;
+}
+
+.lume-toast-confirmation {
+  --lume-overlay-shadow-opacity: 0;
+  animation: lume-toast-confirmation 300ms var(--lume-ease) both;
+}
+
+@keyframes lume-toast-confirmation {
+  45% { --lume-overlay-shadow-opacity: 1; }
+  to { --lume-overlay-shadow-opacity: 0; }
+}
+
 .lume-filo-draw {
   stroke-dasharray: 100;
   transition: stroke-dashoffset var(--lume-dur-firma) var(--lume-ease);
@@ -123,6 +163,10 @@
 
   .lume-focal::before {
     transition-duration: var(--lume-dur-fuoco) !important;
+  }
+
+  .lume-toast-confirmation {
+    animation: none;
   }
 
   .lume-filo-draw {

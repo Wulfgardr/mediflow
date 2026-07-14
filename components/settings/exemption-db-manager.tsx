@@ -139,7 +139,7 @@ export default function ExemptionDbManager() {
                     setIsDragging(false);
                 }}
                 onDrop={onDrop}
-                className={`rounded-[var(--lume-radius-panel)] border-2 border-dashed p-5 transition-all ${isDragging
+                className={`rounded-[var(--lume-radius-panel)] border-2 border-dashed p-5 transition-[border-color,background-color] ${isDragging
                     ? 'border-emerald-500 bg-emerald-50/80 dark:bg-emerald-900/20'
                     : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)]'
                     }`}
@@ -178,7 +178,7 @@ export default function ExemptionDbManager() {
                         </div>
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                             <div
-                                className="h-2 rounded-full bg-emerald-500 transition-all duration-200"
+                                className="h-2 rounded-full bg-emerald-500 transition-[width] duration-200"
                                 style={{ width: `${percent}%` }}
                             />
                         </div>

@@ -140,7 +140,7 @@ export default function ScalesLibraryPage() {
                                             type="button"
                                             onClick={() => handleScaleChoice(item.id)}
                                             aria-pressed={isSelected}
-                                            className={`lume-press group flex min-h-[170px] flex-col justify-between rounded-[var(--lume-radius-card)] border p-5 text-left transition-[border-color,background-color,box-shadow,transform] ${
+                                            className={`lume-press group flex min-h-[170px] flex-col justify-between rounded-[var(--lume-radius-card)] border p-5 text-left transition-[border-color,background-color] ${
                                                 isSelected
                                                     ? 'border-[color:var(--lume-accent)] bg-[color:var(--lume-surface-focal)] shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]'
                                                     : 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] hover:border-[color:color-mix(in_srgb,var(--lume-ink)_22%,transparent)]'

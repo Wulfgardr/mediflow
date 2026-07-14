@@ -70,7 +70,7 @@
   --ring-accept: rgba(21, 128, 61, 0.22);
   --ring-correct: rgba(29, 78, 216, 0.22);
   --ring-ignore: rgba(100, 116, 139, 0.18);
-  --radius-card: 22px;
+  --radius-card: var(--lume-radius-panel);
   --radius-tile: 18px;
   --radius-control: 14px;
   --radius-chip: 14px;
@@ -265,10 +265,7 @@
   background: transparent;
   width: 100%;
   text-align: left;
-  transition: background 160ms var(--motion-ease),
-    color 160ms var(--motion-ease),
-    box-shadow 200ms var(--motion-ease),
-    transform 120ms var(--motion-ease);
+  transition: background var(--lume-dur-fuoco) var(--lume-ease), color var(--lume-dur-fuoco) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease);
 }
 
 .navItem:hover {
@@ -357,15 +354,38 @@
 /* ───────────── main canvas ───────────── */
 
 .canvas {
+  /* La scena cambia luce, non posizione: Toolbar e rail restano ferme. */
+  --lume-surface-l: 0;
+  --lume-surface-temp: 0;
   background: var(--surface);
   border-radius: 28px;
   padding: 18px;
   overflow: auto;
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   gap: 14px;
   box-shadow: 0 0 0 1px var(--line-strong);
+  transition: --lume-surface-l var(--lume-dur-fuoco) var(--lume-ease), --lume-surface-temp var(--lume-dur-fuoco) var(--lume-ease);
 }
+
+.canvas::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: var(--lume-surface-focal);
+  opacity: var(--lume-surface-l);
+}
+
+.canvas > * { position: relative; z-index: 1; }
+.canvas[data-lume-context='turno'] { --lume-surface-l: 0.035; --lume-surface-temp: 0.14; }
+.canvas[data-lume-context='incarico'] { --lume-surface-l: 0.055; --lume-surface-temp: 0.22; }
+.canvas[data-lume-context='scheda'] { --lume-surface-l: 0.07; --lume-surface-temp: 0.3; }
+.canvas[data-lume-context='diario'] { --lume-surface-l: 0.045; --lume-surface-temp: 0.18; }
 
 .canvas::-webkit-scrollbar { width: 10px; }
 .canvas::-webkit-scrollbar-thumb {
@@ -402,8 +422,7 @@
   font-family: inherit;
   text-align: left;
   cursor: pointer;
-  transition: transform 140ms var(--motion-spring),
-    box-shadow 160ms var(--motion-ease);
+  transition: transform var(--lume-dur-riga) var(--lume-ease);
 }
 
 .search:hover { transform: translateY(-1px); }
@@ -438,8 +457,7 @@
   cursor: pointer;
   border: 0;
   box-shadow: 0 0 0 1px var(--control-border);
-  transition: transform 140ms var(--motion-spring),
-    box-shadow 160ms var(--motion-ease);
+  transition: transform var(--lume-dur-riga) var(--lume-ease);
 }
 
 .toolChip:hover { transform: translateY(-1px); }
@@ -556,12 +574,6 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  animation: areaEnter 280ms var(--motion-ease) both;
-}
-
-@keyframes areaEnter {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ───────────── area headers ───────────── */
@@ -766,10 +778,7 @@
   cursor: pointer;
   border: 0;
   background: transparent;
-  transition: background 160ms var(--motion-ease),
-    color 160ms var(--motion-ease),
-    box-shadow 200ms var(--motion-ease),
-    transform 120ms var(--motion-ease);
+  transition: background var(--lume-dur-fuoco) var(--lume-ease), color var(--lume-dur-fuoco) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease);
 }
 
 .segItem:hover { color: var(--ink); }
@@ -1130,9 +1139,7 @@
   border: 0;
   cursor: pointer;
   box-shadow: 0 0 0 1px var(--line-strong);
-  transition: transform 120ms var(--motion-ease),
-    box-shadow 160ms var(--motion-ease),
-    background 160ms var(--motion-ease);
+  transition: transform var(--lume-dur-riga) var(--lume-ease), background var(--lume-dur-fuoco) var(--lume-ease);
 }
 
 .fieldBtn:hover { transform: translateY(-1px); }
@@ -1279,9 +1286,7 @@
   flex-direction: column;
   gap: 4px;
   box-shadow: 0 0 0 1px var(--line-strong);
-  transition: transform 140ms var(--motion-spring),
-    box-shadow 200ms var(--motion-ease),
-    background 200ms var(--motion-ease);
+  transition: transform var(--lume-dur-riga) var(--lume-ease), background var(--lume-dur-fuoco) var(--lume-ease);
   position: relative;
   overflow: hidden;
 }
@@ -1522,10 +1527,7 @@
   cursor: pointer;
   border: 0;
   box-shadow: inset 0 0 0 1px var(--line);
-  transition: background 160ms var(--motion-ease),
-    color 160ms var(--motion-ease),
-    box-shadow 200ms var(--motion-ease),
-    transform 120ms var(--motion-ease);
+  transition: background var(--lume-dur-fuoco) var(--lume-ease), color var(--lume-dur-fuoco) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease);
 }
 
 .scopeChip:hover { color: var(--ink); }
@@ -1655,12 +1657,6 @@
   gap: 12px;
   position: sticky;
   top: 0;
-  animation: lensSlide 280ms var(--motion-ease) both;
-}
-
-@keyframes lensSlide {
-  from { opacity: 0; transform: translateX(8px); }
-  to { opacity: 1; transform: translateX(0); }
 }
 
 .caseLensHero { display: flex; flex-direction: column; gap: 4px; }
@@ -1791,8 +1787,7 @@
   cursor: pointer;
   border: 0;
   text-align: left;
-  transition: transform 140ms var(--motion-spring),
-    box-shadow 200ms var(--motion-ease);
+  transition: transform var(--lume-dur-riga) var(--lume-ease);
 }
 
 .launcherTile:hover { transform: translateY(-2px); }
@@ -1923,9 +1918,7 @@
   border-radius: 14px;
   box-shadow: 0 0 0 1px var(--line-strong);
   text-decoration: none;
-  transition: background 160ms var(--motion-ease),
-    box-shadow 160ms var(--motion-ease),
-    transform 140ms var(--motion-ease);
+  transition: background var(--lume-dur-fuoco) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease);
 }
 
 .settingsQuickItem:hover {

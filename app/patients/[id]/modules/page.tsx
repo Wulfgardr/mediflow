@@ -516,7 +516,7 @@ export default function PatientDetailPage() {
     };
 
     const actionsDock = (
-        <div className="patient-actions-dock glass-card p-4">
+        <div className="patient-actions-dock lume-card p-4">
             <Link
                 href={`/patients/${id}/entries/new`}
                 className="ui-btn-primary flex h-11 w-full items-center justify-center gap-2 px-4 text-sm font-semibold"

@@ -376,7 +376,7 @@ export default function NewEntryPage() {
         >
             <div className={workspaceStyles.workspaceGrid}>
                 <div className={workspaceStyles.primaryStack}>
-                    <div className="patient-detail-section glass-panel border p-6 md:p-7">
+                    <div className="patient-detail-section lume-panel border p-6 md:p-7">
                         <form onSubmit={handleSubmit} className="space-y-8">
                             <div id="dati" className="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
                                 <div className="space-y-2">
@@ -390,7 +390,7 @@ export default function NewEntryPage() {
                                             type="datetime-local"
                                             value={entryDate}
                                             onChange={(e) => setEntryDate(e.target.value)}
-                                            className="w-full rounded-[18px] border border-[color:rgba(112,106,100,0.14)] bg-white/82 py-3 pl-12 pr-4 text-sm font-medium text-[color:var(--mf-ink)] outline-none transition-[border-color,box-shadow] focus:border-[color:rgba(182,106,60,0.3)] focus:shadow-[0_0_0_4px_rgba(182,106,60,0.08)] dark:border-white/10 dark:bg-white/5 dark:[color-scheme:dark]"
+                                            className="w-full rounded-[18px] border border-[color:rgba(112,106,100,0.14)] bg-white/82 py-3 pl-12 pr-4 text-sm font-medium text-[color:var(--mf-ink)] outline-none transition-colors focus:border-[color:rgba(182,106,60,0.3)] focus:shadow-[0_0_0_4px_rgba(182,106,60,0.08)] dark:border-white/10 dark:bg-white/5 dark:[color-scheme:dark]"
                                             aria-label="Data e ora della voce clinica"
                                             required
                                         />
@@ -407,7 +407,7 @@ export default function NewEntryPage() {
                                             type="button"
                                             onClick={() => setSetting('ambulatory')}
                                             className={cn(
-                                                'flex h-[56px] items-center justify-center gap-3 rounded-[18px] border px-4 text-sm font-semibold transition-[border-color,background-color,color,box-shadow,transform]',
+                                                'lume-press flex h-[56px] items-center justify-center gap-3 rounded-[18px] border px-4 text-sm font-semibold transition-[border-color,background-color,color]',
                                                 setting === 'ambulatory'
                                                     ? 'border-[color:rgba(15,123,104,0.22)] bg-[color:rgba(15,123,104,0.08)] text-[color:var(--mf-primary)] shadow-[0_12px_24px_rgba(15,123,104,0.08)]'
                                                     : 'border-[color:rgba(112,106,100,0.14)] bg-white/76 text-[color:var(--mf-muted)] hover:border-[color:rgba(112,106,100,0.2)] hover:bg-[color:rgba(255,252,247,0.94)]'
@@ -420,7 +420,7 @@ export default function NewEntryPage() {
                                             type="button"
                                             onClick={() => setSetting('home')}
                                             className={cn(
-                                                'flex h-[56px] items-center justify-center gap-3 rounded-[18px] border px-4 text-sm font-semibold transition-[border-color,background-color,color,box-shadow,transform]',
+                                                'lume-press flex h-[56px] items-center justify-center gap-3 rounded-[18px] border px-4 text-sm font-semibold transition-[border-color,background-color,color]',
                                                 setting === 'home'
                                                     ? 'border-[color:rgba(182,106,60,0.24)] bg-[color:rgba(182,106,60,0.08)] text-[color:var(--mf-accent)] shadow-[0_12px_24px_rgba(182,106,60,0.08)]'
                                                     : 'border-[color:rgba(112,106,100,0.14)] bg-white/76 text-[color:var(--mf-muted)] hover:border-[color:rgba(112,106,100,0.2)] hover:bg-[color:rgba(255,252,247,0.94)]'
@@ -446,7 +446,7 @@ export default function NewEntryPage() {
                                                 type="button"
                                                 onClick={() => setType(currentType.id as 'visit' | 'remote' | 'note')}
                                                 className={cn(
-                                                    'flex items-center gap-3 rounded-[20px] border px-4 py-4 text-left transition-[border-color,background-color,color,box-shadow,transform]',
+                                                    'lume-press flex items-center gap-3 rounded-[20px] border px-4 py-4 text-left transition-[border-color,background-color,color]',
                                                     isSelected
                                                         ? 'border-[color:rgba(94,53,95,0.18)] bg-[color:rgba(94,53,95,0.08)] text-[color:var(--mf-ink)] shadow-[0_12px_24px_rgba(94,53,95,0.08)]'
                                                         : 'border-[color:rgba(112,106,100,0.14)] bg-white/76 text-[color:var(--mf-muted)] hover:border-[color:rgba(112,106,100,0.2)] hover:bg-[color:rgba(255,252,247,0.94)]'
@@ -478,7 +478,7 @@ export default function NewEntryPage() {
 
                             {type === 'visit' ? (
                                 /* @Codex WUL-420 */
-                                <section id="sessione-visita" className="glass-panel p-5 md:p-6">
+                                <section id="sessione-visita" className="lume-panel p-5 md:p-6">
                                     <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                         <div>
                                             <p className="section-kicker">Sessione visita</p>
@@ -598,7 +598,7 @@ export default function NewEntryPage() {
                                                     value={dictatedDraft}
                                                     onChange={(event) => handleDictatedDraftChange(event.target.value)}
                                                     placeholder={VISIT_DRAFT_PLACEHOLDER}
-                                                    className="min-h-[180px] w-full resize-y rounded-[20px] border border-[color:rgba(112,106,100,0.14)] bg-white/82 px-4 py-3 text-sm leading-6 text-[color:var(--mf-ink)] outline-none transition-[border-color,box-shadow] placeholder:text-[color:rgba(71,85,105,0.58)] focus:border-[color:rgba(15,123,104,0.28)] focus:shadow-[0_0_0_4px_rgba(15,123,104,0.08)]"
+                                                    className="min-h-[180px] w-full resize-y rounded-[20px] border border-[color:rgba(112,106,100,0.14)] bg-white/82 px-4 py-3 text-sm leading-6 text-[color:var(--mf-ink)] outline-none transition-colors placeholder:text-[color:rgba(71,85,105,0.58)] focus:border-[color:rgba(15,123,104,0.28)] focus:shadow-[0_0_0_4px_rgba(15,123,104,0.08)]"
                                                 />
                                             </div>
 
@@ -669,7 +669,7 @@ export default function NewEntryPage() {
                             ) : null}
 
                             {/* @Codex */}
-                            <section id="resoconto" className="glass-panel p-5 md:p-6">
+                            <section id="resoconto" className="lume-panel p-5 md:p-6">
                                 <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                     <div>
                                         <p className="section-kicker">Resoconto clinico</p>
@@ -686,7 +686,7 @@ export default function NewEntryPage() {
                                 />
                             </section>
 
-                            <section id="allegati" className="glass-panel p-5 md:p-6">
+                            <section id="allegati" className="lume-panel p-5 md:p-6">
                                 <div className="mb-4">
                                     <p className="section-kicker">Allegati</p>
                                     <h2 className="mt-1 text-xl font-semibold text-[color:var(--mf-ink)]">
@@ -703,7 +703,7 @@ export default function NewEntryPage() {
                                     <div
                                         {...getRootProps()}
                                         className={cn(
-                                            'rounded-[22px] border-2 border-dashed p-6 text-center transition-[border-color,background-color,color,box-shadow]',
+                                            'rounded-[22px] border-2 border-dashed p-6 text-center transition-[border-color,background-color,color]',
                                             isDragActive
                                                 ? 'border-[color:rgba(182,106,60,0.34)] bg-[color:rgba(182,106,60,0.08)]'
                                                 : 'border-[color:rgba(112,106,100,0.18)] bg-white/68 hover:border-[color:rgba(182,106,60,0.24)] hover:bg-[color:rgba(255,252,247,0.92)]'

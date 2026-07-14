@@ -2,7 +2,7 @@
 
 /* @Codex WUL-UIUX: striscia di segnali clinici sopra la piega. Su pazienti
    complessi dà i numeri che contano subito (problemi, terapie, parametri,
-   referti, prossimo passaggio) senza scorrere i pannelli. Stile glass invariato. */
+   referti, prossimo passaggio) senza scorrere i pannelli. Stile Lume invariato. */
 
 import type { LucideIcon } from 'lucide-react';
 

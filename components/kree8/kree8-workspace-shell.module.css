@@ -49,8 +49,6 @@
   --mf-bg: var(--k8-canvas);
   --mf-bg-elevated: var(--k8-soft);
   --mf-card: var(--k8-surface);
-  --glass-bg: var(--k8-surface);
-  --glass-border: var(--k8-line);
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -334,13 +332,11 @@
   box-shadow: none !important;
   /* Lume: reset del blur strutturale legacy (globals blur(24px)); il riempimento
      opaco da solo non basta, servono entrambe le proprieta. */
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
 }
 
 .shell :global(.patient-detail-side-section),
 .shell :global(.patient-actions-dock) { border-radius: 18px !important; }
-.shell :global(.glass-panel) { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+.shell :global(.lume-panel) { background: var(--k8-surface) !important; }
 
 .shell :global(.patient-identity-lens) {
   min-height: 0 !important;
@@ -493,8 +489,6 @@
   /* Lume: l'insight AI e nello stesso selettore ornamentale globale delle sezioni;
      azzera l'ombra sollevata ereditata, non e una superficie focale. */
   box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
 }
 
 .shell :global(.patient-ai-insight-panel .bg-slate-50) {

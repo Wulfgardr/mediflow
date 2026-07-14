@@ -111,7 +111,7 @@ export function SettingsSearchOverlay({
 
     return (
         <div
-            className="fixed inset-0 z-[1200] flex items-start justify-center bg-slate-950/35 px-4 pt-[12vh] backdrop-blur-[2px]"
+            className="fixed inset-0 z-[1200] flex items-start justify-center bg-[color:rgba(24,24,28,0.62)] px-4 pt-[12vh]"
             role="presentation"
             onMouseDown={(event) => {
                 if (event.target === event.currentTarget) onClose();

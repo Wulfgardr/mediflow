@@ -43,7 +43,7 @@ function ProgressBar({ progress }: { progress: number }) {
         >
             <div
                 ref={barRef}
-                className="h-full transition-all duration-500 ease-out"
+                className="h-full transition-[width] duration-500 ease-out"
                 style={{
                     background: 'linear-gradient(90deg, var(--mf-primary), #2aa37e)'
                 }}

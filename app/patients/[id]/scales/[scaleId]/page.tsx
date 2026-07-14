@@ -123,7 +123,7 @@ export default function ScaleRunnerPage() {
                                 type="button"
                                 onClick={() => setSetting('ambulatory')}
                                 className={cn(
-                                    'flex min-h-[54px] items-center justify-between gap-3 rounded-[16px] border px-4 text-sm font-semibold transition-[border-color,background-color,color,box-shadow]',
+                                    'flex min-h-[54px] items-center justify-between gap-3 rounded-[16px] border px-4 text-sm font-semibold transition-[border-color,background-color,color]',
                                     setting === 'ambulatory'
                                         ? 'border-[color:rgba(15,123,104,0.22)] bg-[color:rgba(15,123,104,0.08)] text-[color:var(--mf-primary)] shadow-[0_12px_24px_rgba(15,123,104,0.08)]'
                                         : 'border-[color:rgba(112,106,100,0.14)] bg-white text-[color:var(--mf-muted)] hover:border-[color:rgba(112,106,100,0.2)]'
@@ -140,7 +140,7 @@ export default function ScaleRunnerPage() {
                                 type="button"
                                 onClick={() => setSetting('home')}
                                 className={cn(
-                                    'flex min-h-[54px] items-center justify-between gap-3 rounded-[16px] border px-4 text-sm font-semibold transition-[border-color,background-color,color,box-shadow]',
+                                    'flex min-h-[54px] items-center justify-between gap-3 rounded-[16px] border px-4 text-sm font-semibold transition-[border-color,background-color,color]',
                                     setting === 'home'
                                         ? 'border-[color:rgba(182,106,60,0.24)] bg-[color:rgba(182,106,60,0.08)] text-[color:var(--mf-accent)] shadow-[0_12px_24px_rgba(182,106,60,0.08)]'
                                         : 'border-[color:rgba(112,106,100,0.14)] bg-white text-[color:var(--mf-muted)] hover:border-[color:rgba(112,106,100,0.2)]'

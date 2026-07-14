@@ -299,7 +299,7 @@ export default function ObservationManager({
     };
 
     return (
-        <div className={embedded ? 'space-y-5' : 'patient-detail-section glass-panel border p-6 space-y-5'}>
+        <div className={embedded ? 'space-y-5' : 'patient-detail-section lume-panel border p-6 space-y-5'}>
             {!embedded && (
                 <div>
                     <p className="section-kicker">Parametri</p>
