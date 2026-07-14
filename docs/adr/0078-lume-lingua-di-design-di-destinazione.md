@@ -133,6 +133,11 @@ Consegnate:
   (`clinicalCardStyle()`, alias `cardStyle()`, `GlassCard` deprecata e resa
   opaca) con test sintetico light/dark (`ClinicalCardStyleTests`) e build del
   bundle (PR #46).
+- **LumeKit nativo, Wave N2**: `LumePalette` code-first con registri
+  giorno/grafite/guardia e parita fail-closed rispetto al JSON, superfici
+  opache `LumeSurface`/`LumeCard`, connettore reale `Filo`, `RigaLista`,
+  `.registro()`, `.lumeInchiostro(bozza:)` e chrome `lumeGlass`, mantenendo gli
+  alias Vetro per i consumatori non ancora migrati.
 - **Grammatica del gesto e del movimento (canone e dimostratori)**:
   `07-gesto-e-movimento.md` distilla il livello di interazione e motion con una
   resa rivista del filo (la luce marca il fuoco, l'inchiostro porta lo stato, il
@@ -145,10 +150,12 @@ Aperte:
 
 - Componenti interni e viste web non ancora migrati: Vetro Clinico resta il
   canone operativo transitorio delle superfici non toccate.
-- Registro guardia come tema attivo, filo, tipografia bundle (Voce e Registro),
-  motion focale e Settings scene.
-- Nativo oltre la card opaca: `LumePalette`/`LumeSurface`, struttura desktop,
-  parity e un target XCUITest macOS dedicato non esistono ancora.
+- Attivazione contestuale del registro guardia nelle viste, tipografia bundle
+  della Voce, adozione completa del Registro, motion nelle viste e Settings
+  scene. Guardia resta soltanto un raffinamento ambientale del dark, non un
+  tema utente.
+- Nativo oltre le primitive Wave N2: struttura desktop, adozione nelle viste,
+  snapshot parity e un target XCUITest macOS dedicato non esistono ancora.
 - Accessibilita, sicurezza e computer-use verificati manualmente end-to-end: le
   prove correnti sono sintetiche o di CI (misura contrasti, smoke E2E, test
   unitari), non una QA manuale completa.

@@ -1,6 +1,4 @@
-// Vetro Clinico: the shared design kit for the universal app.
-// Liquid Glass belongs to controls and service chrome; clinical content stays
-// opaque on every supported OS.
+// Compatibility surface while consumers migrate from Vetro Clinico to Lume.
 import SwiftUI
 #if os(macOS)
 import AppKit
@@ -8,28 +6,8 @@ import AppKit
 import UIKit
 #endif
 
-/// Clinical tone for status surfaces. Maps to a single source-of-truth color.
-public enum VetroTone: Equatable {
-    case neutral
-    case info
-    case positive
-    case attention
-    case critical
-}
-
-/// Centralized Vetro Clinico palette. One place for clinical status colors so
-/// badges, cards and indicators stay consistent across platforms.
-public enum VetroPalette {
-    public static func tint(for tone: VetroTone) -> Color {
-        switch tone {
-        case .neutral: return .secondary
-        case .info: return .blue
-        case .positive: return .green
-        case .attention: return .orange
-        case .critical: return .red
-        }
-    }
-}
+public typealias VetroTone = LumeTone
+public typealias VetroPalette = LumePalette
 
 enum PlatformColors {
     static var groupedBackground: Color {
@@ -57,54 +35,10 @@ enum PlatformColors {
     }
 }
 
-/// Applies Liquid Glass over a shape on supported OS, falling back to a system
-/// material otherwise. Use via the `.vetroGlass(...)` View modifier below.
-struct VetroGlassModifier<S: Shape>: ViewModifier {
-    let shape: S
-    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
-    @Environment(\.appleReduceMotionOverride) private var reduceMotionOverride
-
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, macOS 26.0, *), !AppleAppearanceStore.shouldReduceMotion(
-            systemReduceMotion: systemReduceMotion,
-            override: reduceMotionOverride
-        ) {
-            content.glassEffect(.regular, in: shape)
-        } else {
-            content.background(.regularMaterial, in: shape)
-        }
-    }
-}
-
 public extension View {
-    /// Apply Vetro Clinico Liquid Glass over `shape`: real Liquid Glass on
-    /// iOS 26 / macOS 26, a system material on the deployment floor below.
-    /// Convey clinical status with foreground color (see StatusBadge/VetroPalette),
-    /// not by tinting the glass, so the signal survives the material fallback.
+    /// Compatibility alias for chrome, controls and transient overlays.
     func vetroGlass<S: Shape>(in shape: S = Capsule()) -> some View {
-        modifier(VetroGlassModifier(shape: shape))
-    }
-}
-
-/* @Codex */
-private struct ClinicalCardStyleModifier: ViewModifier {
-    let cornerRadius: CGFloat
-
-    func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-
-        content
-            .padding(16)
-            .background(shape.fill(PlatformColors.cardBackground))
-            .overlay(shape.stroke(PlatformColors.separator, lineWidth: 1))
-    }
-}
-
-public extension View {
-    /// Applies the shared opaque surface for clinical content. Liquid Glass is
-    /// intentionally excluded so legibility does not depend on OS appearance.
-    func clinicalCardStyle(cornerRadius: CGFloat = 14) -> some View {
-        modifier(ClinicalCardStyleModifier(cornerRadius: cornerRadius))
+        lumeGlass(in: shape)
     }
 }
 
