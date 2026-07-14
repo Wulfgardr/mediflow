@@ -463,7 +463,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 {flowError && (
                     <div
                         role="alert"
-                        className="fixed top-4 left-1/2 z-[110] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-700 shadow-lg"
+                        className="fixed top-4 left-1/2 z-[110] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_28%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_12%,var(--lume-surface-field))] px-4 py-3 text-center text-sm text-[color:var(--lume-signal-critical)] shadow-lg"
                     >
                         {flowError}
                     </div>
@@ -480,18 +480,18 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     // Loading state
     if (requiresSetup === null) {
-        return <div className="h-screen flex items-center justify-center bg-gray-50 text-gray-400">Caricamento sicurezza...</div>;
+        return <div className="flex h-screen items-center justify-center bg-[color:var(--lume-surface-canvas)] text-[color:var(--lume-ink-muted)]">Caricamento sicurezza...</div>;
     }
 
     // Onboarding Wizard for first-time setup
     if (requiresSetup) {
         return (
-            <div className="h-screen w-screen fixed inset-0 z-[100] bg-gradient-to-br from-indigo-50 to-blue-100 flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[100] flex h-screen w-screen items-center justify-center bg-[color:var(--lume-surface-canvas)] p-4 text-[color:var(--lume-ink)]">
                 <div className="w-full max-w-2xl space-y-4">
                     {flowError && (
                         <div
                             role="alert"
-                            className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                            className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_28%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_12%,var(--lume-surface-field))] px-4 py-3 text-sm text-[color:var(--lume-signal-critical)]"
                         >
                             {flowError}
                         </div>

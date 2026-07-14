@@ -38,39 +38,39 @@ const GLYPH_MAP: Record<
     active: {
         icon: HeartPulse,
         label: 'Active',
-        className: 'border-[color:rgba(15,123,104,0.18)] bg-[color:rgba(15,123,104,0.1)] text-[color:var(--mf-primary)]',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-accent)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_10%,transparent)] text-[color:var(--lume-accent)]',
     },
     review: {
         icon: ScanSearch,
         label: 'In review',
-        className: 'border-[color:rgba(94,53,95,0.18)] bg-[color:rgba(94,53,95,0.1)] text-[color:var(--mf-plum)]',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-signal-plum)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-plum)_10%,transparent)] text-[color:var(--lume-signal-plum)]',
     },
     completed: {
         icon: Check,
         label: 'Completed',
-        className: 'border-[color:rgba(63,122,76,0.18)] bg-[color:rgba(63,122,76,0.1)] text-[color:var(--mf-success)]',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-signal-success)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_10%,transparent)] text-[color:var(--lume-signal-success)]',
     },
     high: {
         icon: AlertTriangle,
         /* @Codex WUL-UIUX: 'high' (critico) deve gridare, non avere la stessa
            ricetta tenue di 'archived'. Bordo e fondo a piena forza + ombra. */
         label: 'High',
-        className: 'border-[color:rgba(163,58,47,0.55)] bg-[color:rgba(163,58,47,0.16)] text-[color:var(--mf-critical)] shadow-[0_2px_10px_rgba(163,58,47,0.2)]',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-signal-critical)_55%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_16%,transparent)] text-[color:var(--lume-signal-critical)] shadow-[0_2px_10px_color-mix(in_srgb,var(--lume-signal-critical)_20%,transparent)]',
     },
     'follow-up': {
         icon: Clock3,
         label: 'Follow-up',
-        className: 'border-[color:rgba(197,138,47,0.2)] bg-[color:rgba(197,138,47,0.1)] text-[color:var(--mf-warning)]',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_20%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_10%,transparent)] text-[color:var(--lume-signal-warning)]',
     },
     archived: {
         icon: Archive,
         label: 'Archived',
-        className: 'border-[color:rgba(112,106,100,0.18)] bg-[color:rgba(112,106,100,0.1)] text-[color:var(--mf-muted)]',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]',
     },
     ambulatory: {
         icon: CircleDashed,
         label: 'Ambulatory',
-        className: 'border-[color:rgba(15,123,104,0.12)] bg-[color:rgba(15,123,104,0.06)] text-[color:var(--mf-primary)]',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-accent)_12%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_6%,transparent)] text-[color:var(--lume-accent)]',
     },
 };
 

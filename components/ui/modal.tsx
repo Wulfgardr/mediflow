@@ -15,10 +15,10 @@ import { useDialogA11y } from './use-dialog-a11y';
 export type ModalAccent = 'primary' | 'critical' | 'warning' | 'success';
 
 const ACCENT_VAR: Record<ModalAccent, string> = {
-    primary: 'var(--mf-primary)',
-    critical: 'var(--mf-critical)',
-    warning: 'var(--mf-warning)',
-    success: 'var(--mf-success)',
+    primary: 'var(--lume-accent)',
+    critical: 'var(--lume-signal-critical)',
+    warning: 'var(--lume-signal-warning)',
+    success: 'var(--lume-signal-success)',
 };
 
 export interface ModalProps {
@@ -92,12 +92,12 @@ export function Modal({
                             <div>
                                 <h3
                                     id={titleId}
-                                    className="text-lg font-semibold tracking-tight text-[color:var(--mf-ink)]"
+                                    className="text-lg font-semibold tracking-tight text-[color:var(--lume-ink)]"
                                 >
                                     {title}
                                 </h3>
                                 {subtitle ? (
-                                    <p className="text-xs font-medium text-[color:var(--mf-muted)]">{subtitle}</p>
+                                    <p className="text-xs font-medium text-[color:var(--lume-ink-muted)]">{subtitle}</p>
                                 ) : null}
                             </div>
                         </div>

@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { AppRevisionGuard } from '@/components/app-revision-guard';
-import { FlowFieldBackground } from '@/components/flow-field-background';
 import { PrivacyProvider } from '@/components/privacy-provider';
 import { SecurityProvider } from '@/components/security-provider';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -38,7 +37,6 @@ export function RootRuntimeShell({
      Rimossa: il cambio sede rapido vive in /settings/ambulatories. */
   return (
     <>
-      <FlowFieldBackground />
       <ThemeProvider defaultTheme="system" storageKey="mediflow-theme">
         <AppRevisionGuard fingerprint={fingerprint} />
         <SecurityProvider>

@@ -84,16 +84,16 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                         tabIndex={-1}
                         className="mf-modal-shell relative w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200"
                     >
-                        <div aria-hidden className="h-1.5 w-full" style={{ background: isDanger ? 'var(--mf-critical)' : 'var(--mf-primary)' }} />
+                        <div aria-hidden className="h-1.5 w-full" style={{ background: isDanger ? 'var(--lume-signal-critical)' : 'var(--lume-accent)' }} />
                         <div className="p-6">
                             <div className="mb-4 flex items-start justify-between gap-4">
                                 <div className="flex items-center gap-3">
                                     {isDanger ? (
-                                        <span className="rounded-2xl p-3" style={{ background: 'rgba(163,58,47,0.12)', color: 'var(--mf-critical)' }}>
+                                        <span className="rounded-[var(--lume-radius-control)] p-3" style={{ background: 'color-mix(in srgb, var(--lume-signal-critical) 12%, transparent)', color: 'var(--lume-signal-critical)' }}>
                                             <AlertTriangle className="h-5 w-5" />
                                         </span>
                                     ) : null}
-                                    <h3 id={titleId} className="text-lg font-semibold tracking-tight text-[color:var(--mf-ink)]">
+                                    <h3 id={titleId} className="text-lg font-semibold tracking-tight text-[color:var(--lume-ink)]">
                                         {options.title}
                                     </h3>
                                 </div>
@@ -103,13 +103,13 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                             </div>
 
                             {options.message ? (
-                                <p id={messageId} className="text-sm leading-6 text-[color:var(--mf-muted)]">{options.message}</p>
+                                <p id={messageId} className="text-sm leading-6 text-[color:var(--lume-ink-muted)]">{options.message}</p>
                             ) : null}
 
                             {options.requireReason ? (
                                 <div className="mt-4">
                                     <label htmlFor={reasonId} className="mf-field-label">
-                                        {options.reasonLabel ?? 'Motivazione'} <span style={{ color: 'var(--mf-critical)' }}>*</span>
+                                        {options.reasonLabel ?? 'Motivazione'} <span style={{ color: 'var(--lume-signal-critical)' }}>*</span>
                                     </label>
                                     <textarea
                                         id={reasonId}
@@ -132,7 +132,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                                     disabled={reasonMissing}
                                     onClick={() => close({ confirmed: true, reason: options.requireReason ? reason.trim() : undefined })}
                                     className="ui-btn-primary px-5 py-2.5 disabled:opacity-50"
-                                    style={isDanger ? { background: 'var(--mf-critical)' } : undefined}
+                                    style={isDanger ? { background: 'var(--lume-signal-critical)' } : undefined}
                                 >
                                     {options.confirmLabel ?? 'Conferma'}
                                 </button>

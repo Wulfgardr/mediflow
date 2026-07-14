@@ -2,7 +2,7 @@
 
 /* @Codex WUL-UIUX: sistema toast unico. Sostituisce gli alert() nativi per il
    feedback non bloccante (esiti di salvataggio, errori). Regione aria-live polite
-   cosi gli screen reader annunciano l'esito. Stile Vetro Clinico, token semantici.
+   cosi gli screen reader annunciano l'esito. Materiale overlay invariato, toni Lume.
    Niente dipendenze nuove. Due firme equivalenti:
    showToast('Messaggio', 'success') oppure
    showToast({ tone: 'warning', title: 'Titolo', description: 'Dettaglio' }). */
@@ -36,10 +36,10 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 let toastCounter = 0;
 
 const TONE_STYLE: Record<ToastTone, { color: string; tint: string; Icon: typeof Info }> = {
-    success: { color: 'var(--mf-success)', tint: 'rgba(45, 122, 90, 0.12)', Icon: CheckCircle2 },
-    error: { color: 'var(--mf-critical)', tint: 'rgba(163, 58, 47, 0.12)', Icon: XCircle },
-    warning: { color: 'var(--mf-warning)', tint: 'rgba(154, 106, 47, 0.12)', Icon: AlertTriangle },
-    info: { color: 'var(--mf-primary)', tint: 'rgba(15, 123, 104, 0.12)', Icon: Info },
+    success: { color: 'var(--lume-signal-success)', tint: 'color-mix(in srgb, var(--lume-signal-success) 12%, transparent)', Icon: CheckCircle2 },
+    error: { color: 'var(--lume-signal-critical)', tint: 'color-mix(in srgb, var(--lume-signal-critical) 12%, transparent)', Icon: XCircle },
+    warning: { color: 'var(--lume-signal-warning)', tint: 'color-mix(in srgb, var(--lume-signal-warning) 12%, transparent)', Icon: AlertTriangle },
+    info: { color: 'var(--lume-accent)', tint: 'color-mix(in srgb, var(--lume-accent) 12%, transparent)', Icon: Info },
 };
 
 const TONE_DURATION: Record<ToastTone, number> = {
@@ -61,22 +61,22 @@ function ToastCard({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
     return (
         <div
             role={toast.tone === 'error' || toast.tone === 'warning' ? 'alert' : 'status'}
-            className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-[14px] border border-[color:rgba(15,23,42,0.12)] bg-[color:var(--glass-bg,rgba(255,255,255,0.92))] px-4 py-3 shadow-[0_18px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-white/10 dark:bg-[color:rgba(28,31,40,0.92)]"
+            className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--glass-bg,rgba(255,255,255,0.92))] px-4 py-3 shadow-[0_18px_45px_rgba(15,23,42,0.18)] backdrop-blur dark:border-white/10 dark:bg-[color:rgba(28,31,40,0.92)]"
         >
             <span className="mt-0.5 shrink-0 rounded-full p-1" style={{ background: tint, color }}>
                 <Icon className="h-4 w-4" />
             </span>
             <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium leading-5 text-[color:var(--mf-ink)]">{toast.title}</p>
+                <p className="text-sm font-medium leading-5 text-[color:var(--lume-ink)]">{toast.title}</p>
                 {toast.description ? (
-                    <p className="mt-0.5 text-xs leading-4 text-[color:var(--mf-muted)]">{toast.description}</p>
+                    <p className="mt-0.5 text-xs leading-4 text-[color:var(--lume-ink-muted)]">{toast.description}</p>
                 ) : null}
             </div>
             <button
                 type="button"
                 onClick={onDismiss}
                 aria-label="Chiudi notifica"
-                className="shrink-0 rounded-lg p-1 text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-ink)]"
+                className="shrink-0 rounded-[var(--lume-radius-control)] p-1 text-[color:var(--lume-ink-muted)] transition-colors hover:text-[color:var(--lume-ink)]"
             >
                 <X className="h-3.5 w-3.5" />
             </button>

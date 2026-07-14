@@ -10,22 +10,11 @@
    seguono la stessa sorgente: dark mode coerente per costruzione. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* @Codex WUL-UIUX: skeleton condiviso per gli stati di caricamento, sostituisce i
-   pulse inline eterogenei. Rispetta prefers-reduced-motion. */
+/* @Codex: skeleton condiviso, statico e quieto. La penombra comunica attesa
+   senza introdurre una pulsazione ambientale. */
 .mf-skeleton {
-  border-radius: 18px;
-  background: rgba(15, 23, 42, 0.06);
-  animation: mf-skeleton-pulse 1.6s ease-in-out infinite;
-}
-:root.dark .mf-skeleton {
-  background: rgba(255, 255, 255, 0.06);
-}
-@keyframes mf-skeleton-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .mf-skeleton { animation: none; }
+  border-radius: var(--lume-radius-card);
+  background: var(--lume-surface-field);
 }
 
 /* @Codex WUL-UIUX: riga maestra densa per le liste cliniche (parametri, farmaci).
@@ -37,20 +26,18 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 0.75rem;
-  border-radius: 12px;
+  border-radius: var(--lume-radius-control);
   text-align: left;
-  color: var(--mf-ink);
-  transition: background-color 160ms ease;
+  color: var(--lume-ink);
+  transition: background-color var(--lume-dur-riga) var(--lume-ease), box-shadow var(--lume-dur-fuoco) var(--lume-ease);
 }
 .mf-listrow:hover {
-  background-color: rgba(15, 23, 42, 0.04);
-}
-:root.dark .mf-listrow:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, transparent);
 }
 .mf-listrow:focus-visible {
   outline: none;
-  box-shadow: var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.22));
+  background-color: var(--lume-surface-focal);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 12%, transparent), 0 0 0 2px var(--lume-accent);
 }
 
 .liquid-blur {
@@ -73,22 +60,19 @@
 }
 
 :root {
-  --background: #f6f7f9;
-  --foreground: #151316;
-  --ui-canvas-background: linear-gradient(180deg, #fbfcfd 0%, #f6f7f9 48%, #edf0f4 100%);
-  --mf-bg: #f6f7f9;
-  --mf-bg-elevated: #ffffff;
-  --mf-bg-strong: #e8edf3;
-  --mf-ink: #151316;
-  --mf-muted: #667085;
-  --mf-primary: #2f3a48;
-  --mf-accent: #4b5565;
-  --mf-plum: #555161;
-  --mf-warning: #9a6a2f;
-  --mf-critical: #a33a2f;
-  --mf-success: #4b6354;
-  --mf-flow-primary: rgba(47, 58, 72, 0.48);
-  --mf-flow-secondary: rgba(85, 81, 97, 0.32);
+  --background: var(--lume-surface-canvas);
+  --foreground: var(--lume-ink);
+  --mf-bg: var(--lume-surface-field);
+  --mf-bg-elevated: var(--lume-surface-focal);
+  --mf-bg-strong: var(--lume-surface-chrome);
+  --mf-ink: var(--lume-ink);
+  --mf-muted: var(--lume-ink-muted);
+  --mf-primary: var(--lume-accent);
+  --mf-accent: var(--lume-accent);
+  --mf-plum: var(--lume-signal-plum);
+  --mf-warning: var(--lume-signal-warning);
+  --mf-critical: var(--lume-signal-critical);
+  --mf-success: var(--lume-signal-success);
 
   /* @Codex WUL-UIUX: stack tipografico unico, consumato da body e dai module
      css kree8 (shell + cockpit) al posto degli stack duplicati. */
@@ -100,64 +84,21 @@
   --glass-panel-shadow: 0 24px 60px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   --glass-card-shadow: 0 14px 34px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.14);
 
-  --paper-bg: rgba(255, 255, 255, 0.94);
-  --paper-border: rgba(15, 23, 42, 0.08);
-  --paper-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
-  --ui-chip-bg: rgba(255, 255, 255, 0.72);
-  --ui-chip-border: rgba(15, 23, 42, 0.08);
-  --ui-panel-radius: 30px;
-  --ui-card-radius: 24px;
-  --ui-subsection-radius: 22px;
-  --ui-orb-opacity: 0.12;
-  --ui-btn-primary-bg: linear-gradient(135deg, #151923, #2f3a48 58%, #475569);
-  --ui-btn-primary-shadow: 0 18px 34px rgba(15, 23, 42, 0.16);
-  --ui-btn-primary-radius: 18px;
-  /* @Codex WUL-UIUX: colore testo della CTA primaria. Era usato da
-     .ui-btn-primary.mf-tone-warning (unlayered) ma mai definito: var() senza
-     fallback rendeva la dichiarazione invalida e il testo poteva ereditare l'ink
-     scuro del contenitore. Definirlo bianco chiude il difetto latente. */
-  --ui-btn-primary-fg: #ffffff;
 }
 
 :root[data-ui-style='liquid'] {
-  --ui-canvas-background: linear-gradient(180deg, #ffffff 0%, #f6f8fb 50%, #e9eef5 100%);
   --glass-border: rgba(15, 23, 42, 0.08);
   --glass-bg: rgba(255, 255, 255, 0.78);
   --glass-panel-shadow: 0 28px 70px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.58);
   --glass-card-shadow: 0 18px 40px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  --paper-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
-  --ui-chip-bg: rgba(255, 255, 255, 0.8);
-  --ui-chip-border: rgba(15, 23, 42, 0.08);
-  --ui-panel-radius: 34px;
-  --ui-card-radius: 28px;
-  --ui-subsection-radius: 24px;
-  --ui-orb-opacity: 0.18;
-  --ui-btn-primary-bg: linear-gradient(145deg, #111827, #334155 58%, #52525b);
-  --ui-btn-primary-shadow: 0 24px 44px rgba(15, 23, 42, 0.18);
-  --ui-btn-primary-radius: 28px;
 }
 
 :root[data-ui-style='redesign'] {
-  --ui-canvas-background: linear-gradient(180deg, #f9fafb 0%, #f3f6fa 50%, #e9eef5 100%);
   --glass-border: rgba(15, 23, 42, 0.10);
   --glass-bg: rgba(255, 255, 255, 0.82);
   --glass-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
   --glass-panel-shadow: 0 14px 30px rgba(15, 23, 42, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.5);
   --glass-card-shadow: 0 8px 18px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.42);
-  --paper-bg: rgba(255, 255, 255, 0.96);
-  --paper-border: rgba(15, 23, 42, 0.08);
-  --paper-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
-  --ui-chip-bg: rgba(255, 255, 255, 0.92);
-  --ui-chip-border: rgba(15, 23, 42, 0.10);
-  --ui-panel-radius: 22px;
-  --ui-card-radius: 16px;
-  --ui-subsection-radius: 16px;
-  --ui-orb-opacity: 0;
-  --ui-btn-primary-bg: linear-gradient(135deg, #151923, #2f3a48 60%, #475569);
-  --ui-btn-primary-shadow: 0 12px 22px rgba(15, 23, 42, 0.16);
-  --ui-btn-primary-radius: 14px;
-  --mf-flow-primary: rgba(47, 58, 72, 0.24);
-  --mf-flow-secondary: rgba(85, 81, 97, 0.10);
 }
 
 body {
@@ -167,9 +108,7 @@ body {
   font-family: var(--mf-font-sans);
   min-height: 100vh;
   letter-spacing: 0;
-  background-image: var(--ui-canvas-background);
-  background-size: 100% 100%;
-  background-attachment: fixed;
+  background-color: var(--lume-surface-canvas);
 }
 
 .lume-registro {
@@ -186,27 +125,19 @@ body {
 
 /* Manually handle dark mode via class */
 :root.dark {
-  --background: #111318;
-  --foreground: #f4f7fb;
-  --ui-canvas-background: linear-gradient(180deg, #12151b 0%, #171b22 52%, #101318 100%);
-  --mf-bg: #111318;
-  --mf-bg-elevated: #1a1f28;
-  --mf-bg-strong: #222936;
-  --mf-ink: #f4f7fb;
-  --mf-muted: #a8b1c1;
-  --mf-flow-primary: rgba(148, 163, 184, 0.34);
-  --mf-flow-secondary: rgba(148, 163, 184, 0.20);
+  --background: var(--lume-surface-canvas);
+  --foreground: var(--lume-ink);
+  --mf-bg: var(--lume-surface-field);
+  --mf-bg-elevated: var(--lume-surface-focal);
+  --mf-bg-strong: var(--lume-surface-chrome);
+  --mf-ink: var(--lume-ink);
+  --mf-muted: var(--lume-ink-muted);
 
   --glass-bg: rgba(26, 31, 40, 0.78);
   --glass-border: rgba(226, 232, 240, 0.1);
   --glass-panel-shadow: 0 28px 56px rgba(6, 5, 7, 0.56), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   --glass-card-shadow: 0 18px 40px rgba(6, 5, 7, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 
-  --paper-bg: rgba(26, 31, 40, 0.92);
-  --paper-border: rgba(226, 232, 240, 0.09);
-  --paper-shadow: 0 16px 32px rgba(6, 5, 7, 0.24);
-  --ui-chip-bg: rgba(255, 255, 255, 0.06);
-  --ui-chip-border: rgba(226, 232, 240, 0.1);
 
   --card: #1a1f28;
   --card-foreground: #f4f7fb;
@@ -221,32 +152,17 @@ body {
 }
 
 :root.dark[data-ui-style='liquid'] {
-  --ui-canvas-background: linear-gradient(180deg, #11151b 0%, #1a2029 52%, #10151d 100%);
   --glass-bg: rgba(28, 34, 44, 0.72);
   --glass-border: rgba(226, 232, 240, 0.12);
   --glass-panel-shadow: 0 32px 64px rgba(6, 5, 7, 0.64), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   --glass-card-shadow: 0 20px 42px rgba(6, 5, 7, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  --ui-chip-bg: rgba(255, 255, 255, 0.08);
-  --ui-chip-border: rgba(226, 232, 240, 0.12);
-  --ui-orb-opacity: 1;
-  --ui-btn-primary-shadow: 0 24px 48px rgba(15, 23, 42, 0.34);
 }
 
 :root.dark[data-ui-style='redesign'] {
-  --ui-canvas-background: linear-gradient(180deg, #11151b 0%, #171d25 52%, #101318 100%);
   --glass-bg: rgba(26, 31, 40, 0.84);
   --glass-border: rgba(226, 232, 240, 0.1);
   --glass-panel-shadow: 0 18px 36px rgba(6, 5, 7, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   --glass-card-shadow: 0 10px 24px rgba(6, 5, 7, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  --paper-bg: rgba(26, 31, 40, 0.96);
-  --paper-border: rgba(226, 232, 240, 0.08);
-  --paper-shadow: 0 8px 22px rgba(6, 5, 7, 0.24);
-  --ui-chip-bg: rgba(255, 255, 255, 0.06);
-  --ui-chip-border: rgba(226, 232, 240, 0.1);
-  --ui-orb-opacity: 0;
-  --ui-btn-primary-shadow: 0 14px 28px rgba(15, 23, 42, 0.28);
-  --mf-flow-primary: rgba(148, 163, 184, 0.22);
-  --mf-flow-secondary: rgba(148, 163, 184, 0.08);
 }
 
 /* Ensure input/card backgrounds are readable in dark mode */
@@ -258,44 +174,12 @@ body {
   border-color: var(--border);
 }
 
-.mediflow-ambient-plane {
-  background:
-    radial-gradient(circle at 12% 8%, rgba(15, 23, 42, 0.07), transparent 34%),
-    radial-gradient(circle at 86% 14%, rgba(71, 85, 105, 0.06), transparent 32%),
-    radial-gradient(circle at 72% 88%, rgba(148, 163, 184, 0.08), transparent 30%);
-}
-
-:root.dark .mediflow-ambient-plane {
-  background:
-    radial-gradient(circle at 12% 8%, rgba(148, 163, 184, 0.10), transparent 34%),
-    radial-gradient(circle at 86% 14%, rgba(148, 163, 184, 0.07), transparent 32%),
-    radial-gradient(circle at 72% 88%, rgba(148, 163, 184, 0.09), transparent 30%);
-}
-
-.mediflow-flow-bloom {
-  border-radius: 999px;
-  filter: blur(70px);
-  opacity: var(--ui-orb-opacity);
-}
-
-.mediflow-flow-bloom-top {
-  background: radial-gradient(circle, rgba(15, 23, 42, 0.08), transparent 72%);
-}
-
-.mediflow-flow-bloom-side {
-  background: radial-gradient(circle, rgba(71, 85, 105, 0.07), transparent 72%);
-}
-
-.mediflow-flow-bloom-bottom {
-  background: radial-gradient(circle, rgba(148, 163, 184, 0.08), transparent 72%);
-}
 
 :root[data-ui-reduce-transparency='true'] {
   --glass-bg: rgba(255, 255, 255, 0.92);
   --glass-border: rgba(15, 23, 42, 0.14);
   --glass-panel-shadow: 0 16px 32px rgba(15, 23, 42, 0.07);
   --glass-card-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
-  --ui-orb-opacity: 0;
 }
 
 :root.dark[data-ui-reduce-transparency='true'] {
@@ -309,19 +193,12 @@ body {
     --glass-border: rgba(15, 23, 42, 0.18);
     --glass-panel-shadow: 0 16px 32px rgba(35, 27, 22, 0.08);
     --glass-card-shadow: 0 10px 24px rgba(35, 27, 22, 0.06);
-    --ui-orb-opacity: 0;
   }
 
   :root.dark {
     --glass-bg: rgba(28, 23, 27, 0.94);
     --glass-border: rgba(255, 247, 240, 0.12);
   }
-}
-
-:root[data-ui-reduce-transparency='true'] .mediflow-ambient-plane,
-:root[data-ui-reduce-transparency='true'] .mediflow-flow-bloom {
-  opacity: 0.28;
-  filter: blur(18px);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -338,11 +215,6 @@ body {
     scroll-behavior: auto !important;
   }
 
-  .liquid-orb,
-  .mediflow-flow-bloom {
-    opacity: 0.18;
-    filter: blur(18px);
-  }
 }
 
 :root[data-ui-reduce-motion='true'] *,
@@ -352,38 +224,6 @@ body {
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
-}
-
-:root[data-ui-reduce-motion='true'] .liquid-orb,
-:root[data-ui-reduce-motion='true'] .mediflow-flow-bloom {
-  opacity: 0.18;
-  filter: blur(18px);
-}
-
-:root[data-ui-style='redesign'] .mediflow-ambient-plane {
-  background:
-    radial-gradient(circle at 12% 8%, rgba(15, 23, 42, 0.05), transparent 32%),
-    radial-gradient(circle at 84% 16%, rgba(71, 85, 105, 0.04), transparent 28%);
-}
-
-:root.dark[data-ui-style='redesign'] .mediflow-ambient-plane {
-  background:
-    radial-gradient(circle at 12% 8%, rgba(148, 163, 184, 0.07), transparent 32%),
-    radial-gradient(circle at 84% 16%, rgba(148, 163, 184, 0.05), transparent 28%);
-}
-
-:root[data-ui-style='redesign'] .mediflow-flow-bloom {
-  opacity: 0;
-  filter: blur(24px);
-}
-
-:root[data-ui-style='redesign'] .mediflow-flow-contours-primary {
-  opacity: 0.22;
-}
-
-:root[data-ui-style='redesign'] .mediflow-flow-contours-secondary {
-  opacity: 0.08;
-  mix-blend-mode: normal;
 }
 
 :root[data-ui-style='redesign'] .mediflow-sidebar-shell,
@@ -655,81 +495,78 @@ body {
 @layer utilities {
   .liquid-hero {
     @apply relative overflow-hidden;
-    border-radius: var(--ui-panel-radius);
+    border-radius: var(--lume-radius-panel);
   }
 
-  .liquid-orb {
-    @apply pointer-events-none absolute rounded-full blur-3xl transition-opacity duration-300;
-    opacity: var(--ui-orb-opacity);
-  }
-
-  /* Disciplined Glass: The Chrome */
+  /* Lume: superfici strutturali opache. */
   .glass {
-    @apply border backdrop-blur-xl;
-    border-radius: var(--ui-card-radius);
-    background-color: var(--glass-bg);
-    border-color: var(--glass-border);
-    box-shadow: var(--glass-card-shadow);
+    @apply border;
+    border-radius: var(--lume-radius-card);
+    background-color: var(--lume-surface-field);
+    border-color: color-mix(in srgb, var(--lume-ink) 10%, transparent);
+    box-shadow: none;
   }
 
-  /* Clinical Paper: The Content */
+  /* Il contenuto in lettura e il solo livello che puo sollevarsi. */
   .clinical-paper {
     @apply border;
-    border-radius: var(--ui-card-radius);
-    background-color: var(--paper-bg);
-    border-color: var(--paper-border);
-    box-shadow: var(--paper-shadow);
+    border-radius: var(--lume-radius-card);
+    background-color: var(--lume-surface-focal);
+    border-color: color-mix(in srgb, var(--lume-ink) 10%, transparent);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
   }
 
   .glass-panel {
-    @apply border backdrop-blur-3xl;
-    border-radius: var(--ui-panel-radius);
-    background-color: var(--glass-bg);
-    border-color: var(--glass-border);
-    box-shadow: var(--glass-panel-shadow);
+    @apply border;
+    border-radius: var(--lume-radius-panel);
+    background-color: var(--lume-surface-chrome);
+    border-color: color-mix(in srgb, var(--lume-ink) 8%, transparent);
+    box-shadow: none;
   }
 
-  /* Disciplined Glass Card: premium but calmer than the shell chrome */
+  /* Card di contesto: penombra, mai vetro. */
   .glass-card {
-    @apply border backdrop-blur-xl;
-    border-radius: var(--ui-card-radius);
-    background-color: var(--glass-bg);
-    border-color: var(--glass-border);
-    box-shadow: var(--glass-card-shadow);
+    @apply border;
+    border-radius: var(--lume-radius-card);
+    background-color: var(--lume-surface-field);
+    border-color: color-mix(in srgb, var(--lume-ink) 10%, transparent);
+    box-shadow: none;
   }
 
   .glass-card:hover {
-    box-shadow: var(--glass-panel-shadow);
-    transform: translateY(-1px);
+    background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, var(--lume-surface-field));
+    transform: none;
   }
 
   .apple-subsection {
     @apply border p-4 md:p-5;
-    border-radius: var(--ui-subsection-radius);
-    background-color: var(--paper-bg);
-    border-color: var(--paper-border);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    border-radius: var(--lume-radius-card);
+    background-color: var(--lume-surface-field);
+    border-color: color-mix(in srgb, var(--lume-ink) 10%, transparent);
+    box-shadow: none;
   }
 
   .apple-chip {
     @apply inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold tracking-tight;
-    background-color: var(--ui-chip-bg);
-    border-color: var(--ui-chip-border);
-    color: var(--mf-muted);
+    background-color: var(--lume-surface-field);
+    border-color: color-mix(in srgb, var(--lume-ink) 10%, transparent);
+    color: var(--lume-ink-muted);
   }
 
   .apple-list-row {
-    @apply flex items-center justify-between gap-3 rounded-[20px] border px-4 py-3 text-sm;
-    background-color: var(--paper-bg);
-    border-color: var(--paper-border);
+    @apply flex items-center justify-between gap-3 border px-4 py-3 text-sm;
+    border-radius: var(--lume-radius-card);
+    background-color: var(--lume-surface-field);
+    border-color: color-mix(in srgb, var(--lume-ink) 10%, transparent);
     transition-property: border-color, background-color, box-shadow, transform;
-    transition-duration: 200ms;
-    transition-timing-function: ease;
+    transition-duration: var(--lume-dur-riga);
+    transition-timing-function: var(--lume-ease);
   }
 
   .apple-list-row:hover {
-    @apply border-gray-300 dark:border-gray-600;
-    transform: translateY(-0.5px);
+    border-color: color-mix(in srgb, var(--lume-ink) 16%, transparent);
+    background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, var(--lume-surface-field));
+    transform: none;
   }
 
   /* @Codex */
@@ -757,25 +594,26 @@ body {
   }
 
   .ui-btn-primary {
-    @apply inline-flex items-center justify-center gap-2 text-sm font-semibold text-white active:scale-[0.98];
-    border-radius: var(--ui-btn-primary-radius);
-    background: var(--ui-btn-primary-bg);
-    box-shadow: var(--ui-btn-primary-shadow);
-    transition-property: opacity, transform, box-shadow, background-color;
-    transition-duration: 200ms;
-    transition-timing-function: ease;
+    @apply inline-flex items-center justify-center gap-2 text-sm font-semibold;
+    border-radius: var(--lume-radius-control);
+    background: var(--lume-accent);
+    color: var(--lume-surface-focal);
+    box-shadow: none;
+    transition-property: opacity, background-color;
+    transition-duration: var(--lume-dur-riga);
+    transition-timing-function: var(--lume-ease);
   }
 
   .ui-btn-primary:hover {
-    transform: translateY(-1px);
+    background-color: color-mix(in srgb, var(--lume-accent) 90%, var(--lume-ink));
   }
 
   /* @Codex WUL-UIUX: la CTA primaria piu usata non aveva alcun anello di focus. */
   .ui-btn-primary:focus-visible {
     outline: none;
     box-shadow:
-      var(--ui-btn-primary-shadow),
-      var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.22));
+      0 0 0 2px var(--lume-surface-canvas),
+      0 0 0 4px var(--lume-accent);
   }
 
   /* @Codex */
@@ -887,23 +725,23 @@ body {
    .patient-detail-section so the SISS panel scans like sibling content. */
 
 .graphite-block {
-  border-radius: 14px;
-  border: 1px solid rgba(112, 106, 100, 0.12);
-  background-color: rgba(255, 255, 255, 0.84);
+  border-radius: var(--lume-radius-card);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 10%, transparent);
+  background-color: var(--lume-surface-field);
   padding: 0.85rem 0.95rem;
 }
 
 :root.dark .graphite-block {
-  border-color: rgba(255, 247, 240, 0.08);
-  background-color: rgba(255, 255, 255, 0.04);
+  border-color: color-mix(in srgb, var(--lume-ink) 10%, transparent);
+  background-color: var(--lume-surface-field);
 }
 
 .graphite-divider {
-  border-top: 1px solid rgba(112, 106, 100, 0.12);
+  border-top: 1px solid color-mix(in srgb, var(--lume-ink) 10%, transparent);
 }
 
 :root.dark .graphite-divider {
-  border-top-color: rgba(255, 247, 240, 0.08);
+  border-top-color: color-mix(in srgb, var(--lume-ink) 10%, transparent);
 }
 
 .graphite-chip {
@@ -911,9 +749,9 @@ body {
   align-items: center;
   gap: 0.35rem;
   border-radius: 999px;
-  border: 1px solid var(--ui-chip-border);
-  background-color: var(--ui-chip-bg);
-  color: var(--mf-muted);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 10%, transparent);
+  background-color: var(--lume-surface-field);
+  color: var(--lume-ink-muted);
   padding: 0.18rem 0.55rem;
   font-size: 11px;
   font-weight: 600;
@@ -955,9 +793,9 @@ body {
 }
 
 :root.dark .graphite-chip {
-  border-color: rgba(255, 247, 240, 0.12);
-  background-color: rgba(255, 255, 255, 0.05);
-  color: var(--mf-muted);
+  border-color: color-mix(in srgb, var(--lume-ink) 10%, transparent);
+  background-color: var(--lume-surface-field);
+  color: var(--lume-ink-muted);
 }
 
 :root.dark .graphite-chip-tone-info {
@@ -1460,37 +1298,37 @@ body {
 .mf-input,
 .input-field {
   width: 100%;
-  border-radius: 16px;
-  border: 1px solid rgba(112, 106, 100, 0.18);
-  background-color: rgba(255, 255, 255, 0.86);
-  color: var(--mf-ink);
+  border-radius: var(--lume-radius-control);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+  background-color: var(--lume-surface-field);
+  color: var(--lume-ink);
   padding: 0.7rem 0.95rem;
   font-size: 0.92rem;
   line-height: 1.4;
   outline: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
-  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+  box-shadow: none;
+  transition: border-color var(--lume-dur-riga) var(--lume-ease), box-shadow var(--lume-dur-fuoco) var(--lume-ease), background-color var(--lume-dur-fuoco) var(--lume-ease);
 }
 
 .mf-input::placeholder,
 .input-field::placeholder {
-  color: var(--mf-muted);
+  color: var(--lume-ink-muted);
 }
 
 .mf-input:hover:not(:disabled),
 .input-field:hover:not(:disabled) {
-  border-color: rgba(15, 23, 42, 0.22);
+  border-color: color-mix(in srgb, var(--lume-ink) 22%, transparent);
 }
 
 .mf-input:focus,
 .mf-input:focus-visible,
 .input-field:focus,
 .input-field:focus-visible {
-  border-color: rgba(15, 23, 42, 0.34);
+  border-color: transparent;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.10));
-  background-color: rgba(255, 255, 255, 0.96);
+    0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent),
+    0 0 0 2px var(--lume-accent);
+  background-color: var(--lume-surface-focal);
 }
 
 .mf-input:disabled,
@@ -1507,7 +1345,7 @@ textarea.input-field {
 .mf-input-sm {
   padding: 0.45rem 0.7rem;
   font-size: 0.84rem;
-  border-radius: 12px;
+  border-radius: var(--lume-radius-control);
 }
 
 /* @Codex WUL-339: ICD autocomplete uses inset icons, so compact input padding
@@ -1536,39 +1374,39 @@ textarea.input-field {
 
 .mf-textarea {
   width: 100%;
-  border-radius: 16px;
-  border: 1px solid rgba(112, 106, 100, 0.18);
-  background-color: rgba(255, 255, 255, 0.86);
-  color: var(--mf-ink);
+  border-radius: var(--lume-radius-control);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+  background-color: var(--lume-surface-field);
+  color: var(--lume-ink);
   padding: 0.7rem 0.95rem;
   font-size: 0.92rem;
   line-height: 1.4;
   outline: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
-  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+  box-shadow: none;
+  transition: border-color var(--lume-dur-riga) var(--lume-ease), box-shadow var(--lume-dur-fuoco) var(--lume-ease), background-color var(--lume-dur-fuoco) var(--lume-ease);
   min-height: 6rem;
   resize: vertical;
 }
 
 :root.dark .mf-input,
 :root.dark .input-field {
-  border-color: rgba(255, 247, 240, 0.12);
-  background-color: rgba(255, 255, 255, 0.05);
-  color: var(--mf-ink);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-color: color-mix(in srgb, var(--lume-ink) 14%, transparent);
+  background-color: var(--lume-surface-field);
+  color: var(--lume-ink);
+  box-shadow: none;
 }
 
 :root.dark .mf-input:hover:not(:disabled),
 :root.dark .input-field:hover:not(:disabled) {
-  border-color: rgba(203, 213, 225, 0.28);
+  border-color: color-mix(in srgb, var(--lume-ink) 22%, transparent);
 }
 
 :root.dark .mf-input:focus,
 :root.dark .mf-input:focus-visible,
 :root.dark .input-field:focus,
 :root.dark .input-field:focus-visible {
-  border-color: rgba(203, 213, 225, 0.42);
-  background-color: rgba(255, 255, 255, 0.07);
+  border-color: transparent;
+  background-color: var(--lume-surface-focal);
 }
 
 /* Secondary button: calm chrome companion to .ui-btn-primary */
@@ -1582,36 +1420,36 @@ textarea.input-field {
   justify-content: center;
   gap: 0.45rem;
   border-radius: 999px;
-  border: 1px solid rgba(112, 106, 100, 0.18);
-  background-color: rgba(255, 255, 255, 0.86);
-  color: var(--mf-ink);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+  background-color: var(--lume-surface-field);
+  color: var(--lume-ink);
   padding: 0.55rem 1rem;
   font-size: 0.86rem;
   font-weight: 600;
   letter-spacing: 0;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
+  box-shadow: none;
+  transition: background-color var(--lume-dur-riga) var(--lume-ease), border-color var(--lume-dur-riga) var(--lume-ease), color var(--lume-dur-riga) var(--lume-ease);
   cursor: pointer;
 }
 
 .mf-btn-secondary:hover:not(:disabled),
 .ui-btn-secondary:hover:not(:disabled) {
-  border-color: rgba(15, 23, 42, 0.24);
-  color: var(--mf-ink);
-  background-color: rgba(255, 255, 255, 0.96);
+  border-color: color-mix(in srgb, var(--lume-ink) 22%, transparent);
+  color: var(--lume-ink);
+  background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, var(--lume-surface-field));
 }
 
 .mf-btn-secondary:active:not(:disabled),
 .ui-btn-secondary:active:not(:disabled) {
-  transform: scale(0.98);
+  transform: none;
 }
 
 .mf-btn-secondary:focus-visible,
 .ui-btn-secondary:focus-visible {
   outline: none;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.10));
+    0 0 0 2px var(--lume-surface-canvas),
+    0 0 0 4px var(--lume-accent);
 }
 
 .mf-btn-secondary:disabled,
@@ -1622,25 +1460,25 @@ textarea.input-field {
 
 :root.dark .mf-btn-secondary,
 :root.dark .ui-btn-secondary {
-  border-color: rgba(255, 247, 240, 0.12);
-  background-color: rgba(255, 255, 255, 0.05);
-  color: var(--mf-ink);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-color: color-mix(in srgb, var(--lume-ink) 14%, transparent);
+  background-color: var(--lume-surface-field);
+  color: var(--lume-ink);
+  box-shadow: none;
 }
 
 :root.dark .mf-btn-secondary:hover:not(:disabled),
 :root.dark .ui-btn-secondary:hover:not(:disabled) {
-  border-color: rgba(203, 213, 225, 0.28);
-  color: var(--mf-ink);
-  background-color: rgba(255, 255, 255, 0.08);
+  border-color: color-mix(in srgb, var(--lume-ink) 22%, transparent);
+  color: var(--lume-ink);
+  background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, var(--lume-surface-field));
 }
 
-/* Vitreous section card: workspace block (forms, settings panels, lists) */
+/* Penombra opaca per i blocchi di lavoro. */
 .mf-section {
-  border-radius: var(--ui-card-radius);
-  border: 1px solid var(--mf-tier-vitreous-border, rgba(112, 106, 100, 0.12));
-  background-color: var(--mf-tier-vitreous-bg, rgba(255, 255, 255, 0.88));
-  box-shadow: var(--mf-tier-vitreous-shadow, 0 10px 22px rgba(15, 23, 42, 0.05));
+  border-radius: var(--lume-radius-card);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 10%, transparent);
+  background-color: var(--lume-surface-field);
+  box-shadow: none;
   padding: 1.25rem 1.35rem;
   position: relative;
   overflow: hidden;
@@ -1648,33 +1486,34 @@ textarea.input-field {
 
 .mf-section-tight {
   padding: 0.9rem 1rem;
-  border-radius: 18px;
+  border-radius: var(--lume-radius-card);
 }
 
 .mf-icon-disc {
   display: inline-grid;
   place-items: center;
-  border-radius: 16px;
-  border: 1px solid rgba(112, 106, 100, 0.12);
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.74));
-  color: var(--mf-ink);
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.48);
+  border-radius: var(--lume-radius-control);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 10%, transparent);
+  background: var(--lume-surface-focal);
+  color: var(--lume-ink);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
 }
 
 :root.dark .mf-icon-disc {
-  border-color: rgba(226, 232, 240, 0.1);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgb(203, 213, 225);
+  border-color: color-mix(in srgb, var(--lume-ink) 10%, transparent);
+  background: var(--lume-surface-focal);
+  color: var(--lume-ink);
 }
 
 /* Specular shell: chrome for modals and floating sheets */
 .mf-modal-shell {
-  border-radius: 26px;
+  border-radius: var(--lume-radius-panel);
   border: 1px solid var(--mf-tier-specular-border, rgba(255, 255, 255, 0.6));
   background-color: var(--mf-tier-specular-bg, rgba(255, 255, 255, 0.78));
   box-shadow: var(--mf-tier-specular-shadow, 0 18px 38px rgba(15, 23, 42, 0.08));
   backdrop-filter: blur(var(--mf-tier-specular-blur, 22px)) saturate(var(--mf-tier-specular-saturate, 1.06));
   -webkit-backdrop-filter: blur(var(--mf-tier-specular-blur, 22px)) saturate(var(--mf-tier-specular-saturate, 1.06));
+  color: var(--lume-ink);
 }
 
 .mf-modal-backdrop {
@@ -1695,7 +1534,7 @@ textarea.input-field {
 
 /* Vitreous popover/dropdown: autocomplete suggestions, menus */
 .mf-popover {
-  border-radius: 18px;
+  border-radius: var(--lume-radius-card);
   border: 1px solid var(--mf-tier-vitreous-border, rgba(112, 106, 100, 0.12));
   background-color: var(--mf-tier-vitreous-bg, rgba(255, 255, 255, 0.94));
   box-shadow: 0 22px 44px rgba(15, 23, 42, 0.14);
@@ -1716,41 +1555,43 @@ textarea.input-field {
   align-items: center;
   gap: 0.65rem;
   padding: 0.6rem 0.7rem;
-  border-radius: 12px;
+  border-radius: var(--lume-radius-control);
   font-size: 0.85rem;
-  color: var(--mf-ink);
+  color: var(--lume-ink);
   cursor: pointer;
-  transition: background-color 160ms ease, color 160ms ease;
+  transition: background-color var(--lume-dur-riga) var(--lume-ease), box-shadow var(--lume-dur-fuoco) var(--lume-ease), color var(--lume-dur-riga) var(--lume-ease);
 }
 
 .mf-popover-row:hover,
 .mf-popover-row[aria-selected='true'],
 .mf-popover-row.is-active {
-  background-color: rgba(15, 23, 42, 0.07);
-  color: var(--mf-ink);
+  background-color: var(--lume-surface-focal);
+  color: var(--lume-ink);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
 }
 
 :root.dark .mf-popover-row:hover,
 :root.dark .mf-popover-row[aria-selected='true'],
 :root.dark .mf-popover-row.is-active {
-  background-color: rgba(203, 213, 225, 0.10);
-  color: var(--mf-ink);
+  background-color: var(--lume-surface-focal);
+  color: var(--lume-ink);
 }
 
 /* @Codex WUL-UIUX: anello di focus da tastiera per le righe dei popover risultati
    (autocomplete). Prima mancava e alcuni consumer azzeravano l'outline. */
 .mf-popover-row:focus-visible {
   outline: none;
-  box-shadow: var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.22));
+  background-color: var(--lume-surface-focal);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent), 0 0 0 2px var(--lume-accent);
 }
 
 /* Semantic alert blocks reused across diagnostics/SISS/import flows */
 .mf-alert {
-  border-radius: 16px;
-  border: 1px solid var(--mf-tier-vitreous-border, rgba(112, 106, 100, 0.12));
-  background-color: var(--mf-tier-vitreous-bg, rgba(255, 255, 255, 0.88));
+  border-radius: var(--lume-radius-card);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 10%, transparent);
+  background-color: var(--lume-surface-field);
   padding: 0.85rem 1rem;
-  color: var(--mf-ink);
+  color: var(--lume-ink);
   display: grid;
   gap: 0.4rem;
   font-size: 0.86rem;
@@ -1816,30 +1657,30 @@ textarea.input-field {
   border-radius: 999px;
   font-size: 0.82rem;
   font-weight: 700;
-  color: var(--mf-muted);
-  background-color: var(--ui-chip-bg, rgba(255, 255, 255, 0.78));
-  border: 1px solid var(--ui-chip-border, rgba(112, 106, 100, 0.14));
-  transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+  color: var(--lume-ink-muted);
+  background-color: var(--lume-surface-field);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 10%, transparent);
+  transition: background-color var(--lume-dur-riga) var(--lume-ease), color var(--lume-dur-riga) var(--lume-ease), box-shadow var(--lume-dur-fuoco) var(--lume-ease);
 }
 
 .mf-step-pill.is-active,
 .mf-step-pill.is-complete {
-  color: white;
-  background: linear-gradient(135deg, #151923, #475569);
-  border-color: rgba(15, 23, 42, 0.24);
-  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.16);
+  color: var(--lume-surface-focal);
+  background: var(--lume-accent);
+  border-color: var(--lume-accent);
+  box-shadow: none;
 }
 
 .mf-step-divider {
   height: 2px;
   width: 2rem;
   border-radius: 999px;
-  background-color: var(--ui-chip-border, rgba(112, 106, 100, 0.18));
-  transition: background-color 180ms ease;
+  background-color: color-mix(in srgb, var(--lume-ink) 14%, transparent);
+  transition: background-color var(--lume-dur-riga) var(--lume-ease);
 }
 
 .mf-step-divider.is-complete {
-  background: linear-gradient(135deg, #151923, #475569);
+  background: var(--lume-accent);
 }
 
 /* Tabs styled like the dummy navigation pills (calmer than chrome buttons) */
@@ -1847,88 +1688,87 @@ textarea.input-field {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  border-radius: 14px;
+  border-radius: var(--lume-radius-control);
   border: 1px solid transparent;
   background-color: transparent;
-  color: var(--mf-muted);
+  color: var(--lume-ink-muted);
   padding: 0.55rem 0.95rem;
   font-size: 0.86rem;
   font-weight: 600;
   letter-spacing: 0;
-  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+  transition: background-color var(--lume-dur-riga) var(--lume-ease), color var(--lume-dur-riga) var(--lume-ease), border-color var(--lume-dur-riga) var(--lume-ease), box-shadow var(--lume-dur-fuoco) var(--lume-ease);
   cursor: pointer;
 }
 
 .mf-tab:hover {
-  background-color: rgba(15, 23, 42, 0.06);
-  color: var(--mf-ink);
+  background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, transparent);
+  color: var(--lume-ink);
 }
 
 .mf-tab.is-active {
-  background-color: rgba(15, 23, 42, 0.08);
-  color: var(--mf-ink);
-  border-color: rgba(15, 23, 42, 0.16);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  background-color: var(--lume-surface-focal);
+  color: var(--lume-ink);
+  border-color: transparent;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
 }
 
 :root.dark .mf-tab.is-active {
-  background-color: rgba(203, 213, 225, 0.10);
-  color: var(--mf-ink);
-  border-color: rgba(203, 213, 225, 0.22);
+  background-color: var(--lume-surface-focal);
+  color: var(--lume-ink);
+  border-color: transparent;
 }
 
 /* Soft option card: used by onboarding role choices, scale picker, etc. */
 .mf-option-card {
   display: grid;
   gap: 0.4rem;
-  border-radius: 18px;
-  border: 1px solid var(--mf-tier-vitreous-border, rgba(112, 106, 100, 0.12));
-  background-color: var(--mf-tier-vitreous-bg, rgba(255, 255, 255, 0.86));
+  border-radius: var(--lume-radius-card);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 10%, transparent);
+  background-color: var(--lume-surface-field);
   padding: 1rem 1.1rem;
   text-align: left;
   cursor: pointer;
-  color: var(--mf-ink);
-  transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  color: var(--lume-ink);
+  transition: border-color var(--lume-dur-riga) var(--lume-ease), background-color var(--lume-dur-fuoco) var(--lume-ease), box-shadow var(--lume-dur-fuoco) var(--lume-ease);
 }
 
 .mf-option-card:hover {
-  border-color: rgba(15, 23, 42, 0.22);
-  background-color: rgba(255, 255, 255, 0.96);
+  border-color: color-mix(in srgb, var(--lume-ink) 20%, transparent);
+  background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, var(--lume-surface-field));
 }
 
 .mf-option-card.is-active {
-  border-color: rgba(15, 23, 42, 0.28);
-  background-color: rgba(15, 23, 42, 0.06);
-  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.10);
+  border-color: transparent;
+  background-color: var(--lume-surface-focal);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
 }
 
 /* @Codex WUL-UIUX: le option-card (scale da 30+ domande) erano operabili da
    tastiera ma senza indicatore di focus visibile. */
 .mf-option-card:focus-visible {
   outline: none;
-  border-color: rgba(15, 23, 42, 0.34);
-  box-shadow: var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.12));
+  border-color: transparent;
+  background-color: var(--lume-surface-focal);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent), 0 0 0 2px var(--lume-accent);
 }
 
-/* @Codex WUL-UIUX: in dark mode il bordo navy del focus e quasi invisibile;
-   l'anello resta dato dal box-shadow, ma riallineiamo anche il bordo. */
 :root.dark .mf-option-card:focus-visible {
-  border-color: rgba(203, 213, 225, 0.4);
+  border-color: transparent;
 }
 
 :root.dark .mf-option-card {
-  border-color: rgba(255, 247, 240, 0.1);
-  background-color: rgba(255, 255, 255, 0.04);
+  border-color: color-mix(in srgb, var(--lume-ink) 10%, transparent);
+  background-color: var(--lume-surface-field);
 }
 
 :root.dark .mf-option-card:hover {
-  border-color: rgba(203, 213, 225, 0.22);
-  background-color: rgba(255, 255, 255, 0.07);
+  border-color: color-mix(in srgb, var(--lume-ink) 20%, transparent);
+  background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, var(--lume-surface-field));
 }
 
 :root.dark .mf-option-card.is-active {
-  border-color: rgba(203, 213, 225, 0.28);
-  background-color: rgba(203, 213, 225, 0.10);
+  border-color: transparent;
+  background-color: var(--lume-surface-focal);
 }
 
 .mf-option-card:disabled,
@@ -1972,28 +1812,28 @@ textarea.input-field {
 
 /* @Codex WUL-273: legacy tone modifiers now inherit the neutral CTA language. */
 .ui-btn-primary.mf-tone-success {
-  background: var(--ui-btn-primary-bg);
-  box-shadow: var(--ui-btn-primary-shadow);
+  background: var(--lume-signal-success);
+  box-shadow: none;
 }
 
 .ui-btn-primary.mf-tone-warning {
-  background: var(--ui-btn-primary-bg);
-  box-shadow: var(--ui-btn-primary-shadow);
-  color: var(--ui-btn-primary-fg);
+  background: var(--lume-signal-warning);
+  box-shadow: none;
+  color: var(--lume-surface-focal);
 }
 
 .ui-btn-primary.mf-tone-plum {
-  background: var(--ui-btn-primary-bg);
-  box-shadow: var(--ui-btn-primary-shadow);
+  background: var(--lume-signal-plum);
+  box-shadow: none;
 }
 
 .ui-btn-primary.mf-tone-critical {
-  background: linear-gradient(135deg, #c0463b, #a13127 58%, #7d231b);
-  box-shadow: 0 16px 30px rgba(192, 70, 59, 0.24);
+  background: var(--lume-signal-critical);
+  box-shadow: none;
 }
 
 :root.dark .ui-btn-primary.mf-tone-success {
-  background: var(--ui-btn-primary-bg);
+  background: var(--lume-signal-success);
 }
 
 /* @Codex WUL-UIUX: le varianti di tono (.mf-tone-*) sono unlayered e il loro
@@ -2003,8 +1843,8 @@ textarea.input-field {
 .ui-btn-primary:focus-visible {
   outline: none;
   box-shadow:
-    var(--ui-btn-primary-shadow),
-    var(--mf-focus-ring, 0 0 0 3px rgba(15, 23, 42, 0.22));
+    0 0 0 2px var(--lume-surface-canvas),
+    0 0 0 4px var(--lume-accent);
 }
 
 /* @Codex WUL-229: make the real patient workbench unmistakably match the dummy.
@@ -2188,11 +2028,11 @@ textarea.input-field {
 }
 
 :root.dark .ui-btn-primary.mf-tone-warning {
-  background: var(--ui-btn-primary-bg);
+  background: var(--lume-signal-warning);
 }
 
 :root.dark .ui-btn-primary.mf-tone-plum {
-  background: var(--ui-btn-primary-bg);
+  background: var(--lume-signal-plum);
 }
 
 /* @Codex WUL-273: neutral adapter for legacy Tailwind chroma.
