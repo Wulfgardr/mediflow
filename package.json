@@ -161,7 +161,7 @@
     "test:native:xcode": "MEDIFLOW_NATIVE_TEST_RUNNER=xcode bash scripts/native-test.sh",
     "test:native:clickmap:probe": "swift scripts/native-click-map-probe.swift",
     "test:parity:smoke": "bash scripts/parity-smoke.sh",
-    "e2e:web": "npx playwright test e2e/web-smoke.spec.ts",
+    "e2e:web": "E2E_SPECS='e2e/web-smoke.spec.ts' bash scripts/e2e-smoke.sh",
     "e2e:ai-rollout-readiness": "E2E_SPECS='e2e/ai-rollout-readiness-panel.spec.ts e2e/ai-rollout-guard-settings.spec.ts' bash scripts/e2e-smoke.sh",
     "e2e:ai-rollout-governance": "E2E_SPECS='e2e/ai-rollout-readiness-panel.spec.ts e2e/ai-rollout-guard-settings.spec.ts e2e/patient-insight-kill-switch.spec.ts e2e/smart-import-kill-switch.spec.ts e2e/document-synthesis-kill-switch.spec.ts e2e/treatment-reasoning-kill-switch.spec.ts' bash scripts/e2e-smoke.sh",
     "e2e:smoke": "bash scripts/e2e-smoke.sh"
