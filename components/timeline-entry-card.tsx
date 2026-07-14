@@ -84,7 +84,7 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
                                 {entry.patientName && <span className="ml-1 font-normal normal-case" style={{ color: 'var(--mf-muted)' }}> - {entry.patientName}</span>}
                             </span>
                             <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--mf-muted)' }}>
-                                <span>{format(new Date(entry.date), 'dd MMMM yyyy HH:mm', { locale: it })}</span>
+                                <span className="lume-registro">{format(new Date(entry.date), 'dd MMMM yyyy HH:mm', { locale: it })}</span>
                                 {entry.setting && (
                                     <span className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 ${entry.setting === 'home' ? 'border-[color:rgba(197,138,47,0.28)] text-[color:var(--mf-warning)]' : 'border-[color:rgba(63,122,76,0.26)] text-[color:var(--mf-success)]'}`}>
                                         {entry.setting === 'home' ? <Home className="w-3 h-3" /> : <Building2 className="w-3 h-3" />}
@@ -132,7 +132,7 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
                             {/* Window check to prevent hydration mismatch if SSR (though this is Client Component) */}
                             {typeof window !== 'undefined' && <span className="italic">{entry.deletionReason}</span>}
                             <div className="text-[10px] opacity-70 mt-0.5">
-                                {entry.deletedAt && format(new Date(entry.deletedAt), 'dd/MM/yyyy HH:mm', { locale: it })}
+                                {entry.deletedAt && <span className="lume-registro">{format(new Date(entry.deletedAt), 'dd/MM/yyyy HH:mm', { locale: it })}</span>}
                             </div>
                         </div>
                     </div>

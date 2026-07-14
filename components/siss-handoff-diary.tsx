@@ -302,7 +302,7 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                             <div className="flex items-start justify-between gap-3">
                                 <div>
                                     <p className="text-sm font-semibold text-[color:var(--mf-ink)]">{item.moduleLabel}</p>
-                                    <p className="mt-1 text-xs text-[color:var(--mf-muted)]">
+                                    <p className="lume-registro mt-1 text-xs text-[color:var(--mf-muted)]">
                                         {formatDate(item.startedAt)} · {outcomeLabel(item.outcome)}
                                     </p>
                                 </div>

@@ -162,8 +162,8 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
             <div
                 {...getRootProps()}
                 className={cn(
-                    "relative border-2 border-dashed rounded-xl p-6 transition-all cursor-pointer overflow-hidden backdrop-blur-sm",
-                    isDragActive ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-gray-200 dark:border-white/10 hover:border-blue-400 hover:bg-gray-50 dark:hover:bg-white/5",
+                    "relative cursor-pointer overflow-hidden rounded-[var(--lume-radius-card)] border-2 border-dashed bg-[color:var(--lume-surface-field)] p-6 transition-[background-color,border-color] duration-[var(--lume-dur-riga)]",
+                    isDragActive ? "border-blue-500 bg-[color:var(--lume-surface-focal)]" : "border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] hover:bg-[color:var(--lume-surface-focal)]",
                     success ? "border-green-500 bg-green-50 dark:bg-green-900/20" : "",
                     error ? "border-red-500 bg-red-50 dark:bg-red-900/20" : ""
                 )}
@@ -173,7 +173,7 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                 {isProcessing ? (
                     <div className="flex flex-col items-center justify-center py-4 text-blue-600">
                         <Loader2 className="w-8 h-8 animate-spin mb-2" />
-                        <p className="font-medium animate-pulse">Lettura documento in corso...</p>
+                        <p className="font-medium">Lettura documento in corso...</p>
                         <p className="text-xs text-blue-500 mt-1">{aiStage || "OCR locale in elaborazione"}</p>
                         {aiModels && (
                             <p className="text-[10px] text-blue-400 mt-1">OCR: {aiModels.ocr} · Clinico: {aiModels.clinical}</p>

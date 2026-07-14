@@ -157,7 +157,7 @@ export function ClinicalRiverTimeline({
                                 <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
                                     {item.typeLabel ?? presentation.label}
                                 </span>
-                                <span className="inline-flex items-center gap-1 text-[12px] text-[color:var(--mf-muted)]">
+                                <span className="lume-registro inline-flex items-center gap-1 text-[12px] text-[color:var(--mf-muted)]">
                                     <FileText className="h-3.5 w-3.5" />
                                     {formatDate(item.date)}
                                 </span>

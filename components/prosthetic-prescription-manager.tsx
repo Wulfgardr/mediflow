@@ -227,7 +227,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                     <div className="grid gap-3 md:grid-cols-2">
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
                             Data prescrizione
-                            <input className="input-field" type="date" value={form.prescribedAt} onChange={(event) => updateForm('prescribedAt', event.target.value)} />
+                            <input className="input-field lume-registro" type="date" value={form.prescribedAt} onChange={(event) => updateForm('prescribedAt', event.target.value)} />
                         </label>
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
                             Stato
@@ -243,7 +243,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                         </label>
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
                             Codice ISO
-                            <input className="input-field" value={form.isoCode} onChange={(event) => updateForm('isoCode', event.target.value)} placeholder="es. 12.22.03.006" />
+                            <input className="input-field lume-registro" value={form.isoCode} onChange={(event) => updateForm('isoCode', event.target.value)} placeholder="es. 12.22.03.006" />
                         </label>
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)] md:col-span-2">
                             Descrizione ausilio <span aria-hidden className="text-rose-600">*</span>
@@ -259,7 +259,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                         </label>
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
                             Numero pratica / prescrizione
-                            <input className="input-field" value={form.regionalPrescriptionId} onChange={(event) => updateForm('regionalPrescriptionId', event.target.value)} />
+                            <input className="input-field lume-registro" value={form.regionalPrescriptionId} onChange={(event) => updateForm('regionalPrescriptionId', event.target.value)} />
                         </label>
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
                             Fornitore / struttura
@@ -267,7 +267,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                         </label>
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
                             Data collaudo
-                            <input className="input-field" type="date" value={form.collaudoAt} onChange={(event) => updateForm('collaudoAt', event.target.value)} />
+                            <input className="input-field lume-registro" type="date" value={form.collaudoAt} onChange={(event) => updateForm('collaudoAt', event.target.value)} />
                         </label>
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
                             Esito collaudo
@@ -315,19 +315,19 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                     <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <span className="apple-chip">{new Date(item.prescribedAt).toLocaleDateString('it-IT')}</span>
+                                            <span className="apple-chip lume-registro">{new Date(item.prescribedAt).toLocaleDateString('it-IT')}</span>
                                             <span className="apple-chip">{statusLabel(item.status)}</span>
                                             <span className="apple-chip">{categoryLabel(item.category)}</span>
                                             {item.source === 'document_review' && <span className="apple-chip">document-backed</span>}
                                         </div>
                                         <h3 className="mt-3 text-base font-semibold text-[color:var(--mf-ink)]">{item.description}</h3>
                                         <div className="mt-2 grid gap-2 text-sm text-[color:var(--mf-muted)] md:grid-cols-2">
-                                            {item.isoCode && <p><span className="font-semibold text-[color:var(--mf-ink)]">ISO:</span> {item.isoCode}</p>}
-                                            {item.regionalPrescriptionId && <p><span className="font-semibold text-[color:var(--mf-ink)]">Pratica:</span> {item.regionalPrescriptionId}</p>}
+                                            {item.isoCode && <p><span className="font-semibold text-[color:var(--mf-ink)]">ISO:</span> <span className="lume-registro">{item.isoCode}</span></p>}
+                                            {item.regionalPrescriptionId && <p><span className="font-semibold text-[color:var(--mf-ink)]">Pratica:</span> <span className="lume-registro">{item.regionalPrescriptionId}</span></p>}
                                             {item.measures && <p><span className="font-semibold text-[color:var(--mf-ink)]">Misure:</span> {item.measures}</p>}
                                             {item.clinicalReason && <p><span className="font-semibold text-[color:var(--mf-ink)]">Motivo:</span> {item.clinicalReason}</p>}
                                             {item.supplier && <p><span className="font-semibold text-[color:var(--mf-ink)]">Fornitore:</span> {item.supplier}</p>}
-                                            {item.collaudoAt && <p><span className="font-semibold text-[color:var(--mf-ink)]">Collaudo:</span> {new Date(item.collaudoAt).toLocaleDateString('it-IT')}</p>}
+                                            {item.collaudoAt && <p><span className="font-semibold text-[color:var(--mf-ink)]">Collaudo:</span> <span className="lume-registro">{new Date(item.collaudoAt).toLocaleDateString('it-IT')}</span></p>}
                                         </div>
                                         {item.collaudoOutcome && <p className="mt-2 text-sm text-[color:var(--mf-muted)]">{item.collaudoOutcome}</p>}
                                         <DocumentReferenceChip references={refs} />

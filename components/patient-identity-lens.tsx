@@ -94,7 +94,7 @@ export function PatientIdentityLens({
 
     if (variant === 'reader') {
         return (
-            <section className="patient-identity-lens patient-identity-lens-reader relative overflow-hidden border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.94)] p-5 md:p-6">
+            <section className="patient-identity-lens patient-identity-lens-reader glass-panel relative overflow-hidden p-5 md:p-6">
                 <div className="relative z-10 grid gap-5 xl:grid-cols-[minmax(0,1.38fr)_320px] xl:items-start">
                     <div className="min-w-0 space-y-5">
                         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.02fr)_minmax(320px,0.98fr)] lg:items-start lg:divide-x lg:divide-[color:rgba(112,106,100,0.12)]">
@@ -106,7 +106,7 @@ export function PatientIdentityLens({
                                     <PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur>
                                 </h1>
                                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[color:var(--mf-muted)]">
-                                    <span className="font-mono text-[12px] tracking-tight">
+                                    <span className="lume-registro text-[12px] tracking-tight">
                                         <PrivacyBlur intensity="sm">{patient.taxCode}</PrivacyBlur>
                                     </span>
                                     <span>{ageLabel}</span>
@@ -164,7 +164,7 @@ export function PatientIdentityLens({
                                         Diagnosi codificate
                                     </p>
                                     {leadDiagnosis ? (
-                                        <div className="patient-diagnosis-card mt-2 rounded-[12px] border border-[color:rgba(94,53,95,0.16)] bg-white/70 p-3">
+                                        <div className="patient-diagnosis-card mt-2 rounded-[var(--lume-radius-control)] border border-[color:rgba(94,53,95,0.16)] bg-[color:var(--lume-surface-field)] p-3">
                                             <div className="flex flex-wrap items-start gap-3">
                                                 <span className="patient-code-pill patient-code-pill-plum">
                                                     {leadDiagnosis.code}
@@ -192,7 +192,7 @@ export function PatientIdentityLens({
                                                     key={`${diagnosis.system}-${diagnosis.code}`}
                                                     className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[color:rgba(94,53,95,0.16)] px-2.5 py-1 text-xs text-[color:var(--mf-ink)] dark:border-[color:rgba(255,247,240,0.12)] dark:text-[color:var(--mf-ink)]"
                                                 >
-                                                    <span className="font-semibold">{diagnosis.code}</span>
+                                                    <span className="lume-registro font-semibold">{diagnosis.code}</span>
                                                     <span className="truncate">{diagnosis.description}</span>
                                                     <span className="shrink-0 text-[10px] uppercase tracking-[0.04em] text-[color:var(--mf-muted)]">
                                                         {diagnosisSystemLabel(diagnosis.system)}
@@ -246,7 +246,7 @@ export function PatientIdentityLens({
                     </div>
 
                     <div className="space-y-3">
-                        <div className="patient-quick-context-card rounded-[12px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 px-4 py-3">
+                        <div className="patient-quick-context-card rounded-[var(--lume-radius-control)] border border-[color:rgba(112,106,100,0.12)] bg-[color:var(--lume-surface-field)] px-4 py-3">
                             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
                                 Contesto rapido
                             </p>
@@ -269,7 +269,7 @@ export function PatientIdentityLens({
     }
 
     return (
-        <section className="patient-identity-lens relative overflow-hidden rounded-[34px] border border-[color:var(--glass-border)] bg-[color:var(--glass-bg)] p-6 shadow-[var(--glass-panel-shadow)] backdrop-blur-3xl md:p-8">
+        <section className="patient-identity-lens glass-panel relative overflow-hidden p-6 md:p-8">
             <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0 space-y-4">
                     <div className="space-y-2">
@@ -280,7 +280,7 @@ export function PatientIdentityLens({
                             <PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur>
                         </h1>
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[color:var(--mf-muted)]">
-                            <span className="font-mono text-[12px] tracking-tight">
+                            <span className="lume-registro text-[12px] tracking-tight">
                                 <PrivacyBlur intensity="sm">{patient.taxCode}</PrivacyBlur>
                             </span>
                             <span>{ageLabel}</span>
@@ -303,7 +303,7 @@ export function PatientIdentityLens({
                     </div>
 
                     <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-                        <div className="identity-lens-pane rounded-[22px] border border-[color:rgba(112,106,100,0.12)] bg-white/70 p-4 dark:bg-white/4">
+                        <div className="identity-lens-pane rounded-[var(--lume-radius-card)] border border-[color:rgba(112,106,100,0.12)] bg-[color:var(--lume-surface-field)] p-4">
                             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
                                 Quadro clinico
                             </p>
@@ -314,7 +314,7 @@ export function PatientIdentityLens({
                                             key={`${diagnosis.system}-${diagnosis.code}`}
                                             className="inline-flex items-center gap-1.5 rounded-full border border-[color:rgba(94,53,95,0.14)] bg-[color:rgba(94,53,95,0.08)] px-3 py-1 text-[12px] font-medium text-[color:var(--mf-ink)]"
                                         >
-                                            <span className="font-semibold text-[color:var(--mf-plum)]">{diagnosis.code}</span>
+                                            <span className="lume-registro font-semibold text-[color:var(--mf-plum)]">{diagnosis.code}</span>
                                             {diagnosis.description}
                                             <span className="text-[10px] uppercase tracking-[0.04em] text-[color:var(--mf-muted)]">
                                                 {diagnosisSystemLabel(diagnosis.system)}
@@ -329,7 +329,7 @@ export function PatientIdentityLens({
                             </div>
                         </div>
 
-                        <div className="identity-lens-pane rounded-[22px] border border-[color:rgba(112,106,100,0.12)] bg-white/70 p-4 dark:bg-white/4">
+                        <div className="identity-lens-pane rounded-[var(--lume-radius-card)] border border-[color:rgba(112,106,100,0.12)] bg-[color:var(--lume-surface-field)] p-4">
                             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
                                 Contesto rapido
                             </p>

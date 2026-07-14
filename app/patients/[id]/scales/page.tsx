@@ -71,7 +71,7 @@ export default function ScalesPage() {
                                 <Link
                                     key={scale.id}
                                     href={`/patients/${id}/scales/${scale.id}`}
-                                    className="group rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(248,250,252,0.92)] p-4 text-left transition-[border-color,background-color,box-shadow,transform] hover:border-[color:rgba(15,123,104,0.22)] hover:bg-white hover:shadow-[0_14px_26px_rgba(15,23,42,0.06)] active:scale-[0.992]"
+                                    className="lume-press glass-card group p-4 text-left transition-[border-color,background-color] duration-[var(--lume-dur-riga)] hover:bg-[color:var(--lume-surface-focal)]"
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <span className="inline-flex h-11 w-11 items-center justify-center rounded-[15px] border border-[color:rgba(15,23,42,0.07)] bg-white text-[color:var(--mf-primary)]">

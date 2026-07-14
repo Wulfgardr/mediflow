@@ -198,24 +198,24 @@ export default function TreatmentReasoningPanel({
                 </div>
 
                 {!draft && !isGenerating ? (
-                    <div className="rounded-[16px] border border-slate-200 bg-slate-50/70 p-4 text-sm leading-6 text-[color:var(--mf-muted)] dark:border-white/10 dark:bg-white/5">
-                        Bozza locale per verificare coerenza del piano, rischi e prossime azioni senza scrivere nulla in scheda. La fonte effettiva compare dopo la generazione.
+                    <div className="rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-sm leading-6 text-[color:var(--lume-ink-muted)] transition-colors duration-[var(--lume-dur-firma)]">
+                        Bozza da strumento locale per verificare coerenza del piano, rischi e prossime azioni senza scrivere nulla in scheda. La fonte effettiva compare dopo la generazione.
                     </div>
                 ) : null}
 
                 {isGenerating ? (
                     <div role="status" aria-live="polite" className="space-y-3 py-8 text-center">
-                        <RefreshCw className="mx-auto h-7 w-7 animate-spin text-slate-500" />
+                        <RefreshCw className="mx-auto h-7 w-7 text-slate-500" />
                         <p className="text-xs font-bold uppercase tracking-widest text-[color:var(--mf-muted)]">Chiamata al modello locale...</p>
                     </div>
                 ) : null}
 
                 {draft && !isGenerating ? (
                     <div className="space-y-5">
-                        <div className="rounded-[16px] border border-slate-200 bg-white/80 p-4 dark:border-white/10 dark:bg-white/5">
+                        <div className="rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-[color:var(--lume-ink-muted)] transition-colors duration-[var(--lume-dur-firma)]">
                             <div className="flex items-center gap-2">
                                 <ShieldCheck className="h-4 w-4 text-slate-500" />
-                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--mf-muted)]">Raccomandazione di supporto</p>
+                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">Proposta dallo strumento locale</p>
                             </div>
                             <p className="mt-2 text-sm leading-6 text-[color:var(--mf-ink)]"><PrivacyBlur intensity="sm">{draft.envelope.data.recommendation || draft.envelope.summary || 'Nessuna raccomandazione utilizzabile.'}</PrivacyBlur></p>
                             <div className="mt-3 flex items-start gap-2 border-t border-slate-200 pt-3 text-xs leading-5 text-[color:var(--mf-muted)] dark:border-white/10">

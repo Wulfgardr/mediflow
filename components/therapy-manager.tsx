@@ -449,10 +449,10 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                         </span>
                                         {t.activePrinciple && <span className="rounded-full bg-[color:rgba(248,250,252,0.92)] px-2 py-0.5 text-xs font-medium text-[color:var(--mf-muted)] dark:bg-white/10">{t.activePrinciple}</span>}
                                     </div>
-                                    <p className="text-[color:var(--mf-ink)] dark:text-slate-100 font-medium mt-1">{t.dosage}</p>
+                                    <p className="lume-registro mt-1 font-medium text-[color:var(--mf-ink)] dark:text-slate-100">{t.dosage}</p>
                                     {t.startDate && (
                                         <p className="mt-0.5 text-xs text-[color:var(--mf-muted)]">
-                                            In corso dal {format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}
+                                            In corso dal <span className="lume-registro">{format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</span>
                                         </p>
                                     )}
 
@@ -529,7 +529,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                                 <span className="font-semibold text-[color:var(--mf-ink)]">{t.drugName}</span>
                                                 <span className="rounded-full bg-white/78 px-2 py-0.5 text-xs font-semibold text-[color:var(--mf-muted)] dark:bg-white/10">Sospesa</span>
                                             </div>
-                                            <p className="mt-0.5 text-xs text-[color:var(--mf-muted)]">{t.dosage}</p>
+                                            <p className="lume-registro mt-0.5 text-xs text-[color:var(--mf-muted)]">{t.dosage}</p>
                                         </div>
                                         <div className="flex gap-2">
                                             <button
@@ -562,7 +562,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                 <div>
                                     <span className="font-semibold text-[color:var(--mf-muted)] line-through decoration-[color:rgba(112,106,100,0.42)]">{t.drugName}</span>
                                     <div className="text-xs text-[color:var(--mf-muted)]">
-                                        Conclusa il {format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}
+                                        Conclusa il <span className="lume-registro">{format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</span>
                                     </div>
                                 </div>
                                 <div className="flex gap-2 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">

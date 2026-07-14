@@ -186,7 +186,7 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
 
                 {isOpen && (
                     <div
-                        className="mf-popover absolute z-30 mt-2 max-h-72 w-full overflow-auto"
+                        className="absolute z-30 mt-2 max-h-72 w-full overflow-auto rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-1 shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]"
                         role="listbox"
                         id={listboxId}
                         aria-label="Risultati catalogo esenzioni"
@@ -216,13 +216,13 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
                                             onClick={() => addCode(result.code)}
                                             onMouseEnter={() => setActiveIndex(index)}
                                             disabled={selected}
-                                            className={`w-full rounded-xl px-3 py-2 text-left transition-colors ${selected
+                                            className={`w-full rounded-[var(--lume-radius-control)] px-3 py-2 text-left transition-[background-color,box-shadow] duration-[var(--lume-dur-riga)] ${selected
                                                 ? 'bg-[color:rgba(15,123,104,0.1)] opacity-60'
-                                                : `hover:bg-[color:rgba(15,23,42,0.06)] dark:hover:bg-white/5 ${index === activeIndex ? 'bg-[color:rgba(15,23,42,0.06)] dark:bg-white/5' : ''}`
+                                                : `hover:bg-[color:var(--lume-surface-focal)] ${index === activeIndex ? 'lume-focal bg-[color:var(--lume-surface-focal)] [--lume-focal-shadow-opacity:1]' : ''}`
                                                 }`}
                                         >
                                             <div className="flex items-center justify-between gap-3">
-                                                <p className="font-mono text-xs font-semibold text-[color:var(--mf-ink)]">{result.code}</p>
+                                                <p className="lume-registro text-xs font-semibold text-[color:var(--mf-ink)]">{result.code}</p>
                                                 {result.type && (
                                                     <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] text-[color:var(--mf-muted)] dark:bg-white/10">
                                                         {result.type}
@@ -248,7 +248,7 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
                                 key={code}
                                 className="inline-flex items-center gap-2 rounded-full border border-[color:rgba(15,123,104,0.18)] bg-[color:rgba(15,123,104,0.08)] py-1 pl-2.5 pr-2 text-xs text-[color:var(--mf-primary)] dark:border-[color:rgba(94,199,177,0.28)] dark:bg-[color:rgba(94,199,177,0.16)] dark:text-[color:rgb(150,224,204)]"
                             >
-                                <span className="font-mono font-semibold">{code}</span>
+                                <span className="lume-registro font-semibold">{code}</span>
                                 <span className="max-w-[340px] truncate">{detail?.description || 'Descrizione non caricata'}</span>
                                 <button
                                     type="button"

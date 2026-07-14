@@ -516,7 +516,7 @@ export default function PatientDetailPage() {
     };
 
     const actionsDock = (
-        <div className="patient-actions-dock rounded-[14px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 p-4 dark:bg-white/4">
+        <div className="patient-actions-dock glass-card p-4">
             <Link
                 href={`/patients/${id}/entries/new`}
                 className="ui-btn-primary flex h-11 w-full items-center justify-center gap-2 px-4 text-sm font-semibold"

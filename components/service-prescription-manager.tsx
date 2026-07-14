@@ -457,7 +457,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
                             Data prescrizione
                             <input
-                                className="input-field"
+                                className="input-field lume-registro"
                                 type="date"
                                 value={form.prescribedAt}
                                 onChange={(event) => updateForm('prescribedAt', event.target.value)}
@@ -506,7 +506,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
                             Sistema codice
                             <input
-                                className="input-field"
+                                className="input-field lume-registro"
                                 value={form.codeSystem}
                                 onChange={(event) => updateForm('codeSystem', event.target.value)}
                                 placeholder="es. nomenclatore regionale, LOINC, SNOMED"
@@ -515,7 +515,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
                             Codice prestazione
                             <input
-                                className="input-field"
+                                className="input-field lume-registro"
                                 value={form.serviceCode}
                                 onChange={(event) => updateForm('serviceCode', event.target.value)}
                                 placeholder="es. 89.7"
@@ -542,7 +542,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
                             Riferimento ricetta / impegnativa
                             <input
-                                className="input-field"
+                                className="input-field lume-registro"
                                 value={form.requestReference}
                                 onChange={(event) => updateForm('requestReference', event.target.value)}
                                 placeholder="es. NRE / numero pratica"
@@ -551,7 +551,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
                             Data prenotazione
                             <input
-                                className="input-field"
+                                className="input-field lume-registro"
                                 type="date"
                                 value={form.scheduledAt}
                                 onChange={(event) => updateForm('scheduledAt', event.target.value)}
@@ -560,7 +560,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
                             Data esecuzione
                             <input
-                                className="input-field"
+                                className="input-field lume-registro"
                                 type="date"
                                 value={form.performedAt}
                                 onChange={(event) => updateForm('performedAt', event.target.value)}
@@ -569,7 +569,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
                             Data referto
                             <input
-                                className="input-field"
+                                className="input-field lume-registro"
                                 type="date"
                                 value={form.reportReceivedAt}
                                 onChange={(event) => updateForm('reportReceivedAt', event.target.value)}
@@ -660,7 +660,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                     <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <span className="apple-chip">{formatDate(item.prescribedAt) ?? '–'}</span>
+                                            <span className="apple-chip lume-registro">{formatDate(item.prescribedAt) ?? '–'}</span>
                                             <span className="apple-chip">{statusLabel(item.status)}</span>
                                             <span className="apple-chip">{categoryLabel(item.category)}</span>
                                             {priority !== 'unknown' && <span className="apple-chip">{priorityLabel(priority)}</span>}
@@ -695,19 +695,19 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                             {item.scheduledAt && (
                                                 <p>
                                                     <span className="font-semibold text-[color:var(--mf-ink)]">Prenotazione:</span>{' '}
-                                                    {formatDate(item.scheduledAt)}
+                                                    <span className="lume-registro">{formatDate(item.scheduledAt)}</span>
                                                 </p>
                                             )}
                                             {item.performedAt && (
                                                 <p>
                                                     <span className="font-semibold text-[color:var(--mf-ink)]">Esecuzione:</span>{' '}
-                                                    {formatDate(item.performedAt)}
+                                                    <span className="lume-registro">{formatDate(item.performedAt)}</span>
                                                 </p>
                                             )}
                                             {item.reportReceivedAt && (
                                                 <p>
                                                     <span className="font-semibold text-[color:var(--mf-ink)]">Referto:</span>{' '}
-                                                    {formatDate(item.reportReceivedAt)}
+                                                    <span className="lume-registro">{formatDate(item.reportReceivedAt)}</span>
                                                 </p>
                                             )}
                                             {item.clinicalQuestion && (
@@ -743,7 +743,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                                                 <div className="min-w-0 flex-1">
                                                                     <span className="font-medium text-[color:var(--mf-ink)]">{child.serviceName}</span>
                                                                     {child.serviceCode && (
-                                                                        <span className="ml-2 font-mono text-xs text-[color:var(--mf-muted)]">
+                                                                        <span className="lume-registro ml-2 text-xs text-[color:var(--mf-muted)]">
                                                                             {child.serviceCode}
                                                                             {child.codeSystem ? ` · ${child.codeSystem}` : ''}
                                                                         </span>

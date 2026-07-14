@@ -15,9 +15,9 @@ interface DrugAutocompleteProps {
     defaultValue?: string;
 }
 
-const drugInputClassName = 'h-11 w-full rounded-[14px] border border-[color:rgba(15,23,42,0.12)] bg-white/88 px-3 py-2.5 pl-9 pr-9 text-sm text-[color:var(--mf-ink)] outline-none transition-[border-color,box-shadow] placeholder:text-[color:rgba(100,116,139,0.58)] focus:border-[color:rgba(15,23,42,0.28)] focus:shadow-[0_0_0_4px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/5';
-const drugPopoverClassName = 'absolute z-[100] mt-2 max-h-80 w-full overflow-y-auto rounded-[18px] border border-[color:rgba(112,106,100,0.14)] bg-white/96 p-2 shadow-[0_22px_60px_rgba(54,45,38,0.14)] backdrop-blur dark:border-white/10 dark:bg-[color:rgba(24,24,22,0.96)]';
-const drugRowClassName = 'w-full rounded-[14px] px-3 py-3 text-left transition-colors hover:bg-[color:rgba(248,250,252,0.86)] focus:bg-[color:rgba(248,250,252,0.86)] focus:outline-none dark:hover:bg-white/6 dark:focus:bg-white/6';
+const drugInputClassName = 'mf-input h-11 px-3 py-2.5 pl-9 pr-9 text-sm';
+const drugPopoverClassName = 'absolute z-[100] mt-2 max-h-80 w-full overflow-y-auto rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-2 shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]';
+const drugRowClassName = 'w-full rounded-[var(--lume-radius-control)] px-3 py-3 text-left transition-[background-color,box-shadow] duration-[var(--lume-dur-riga)] hover:bg-[color:var(--lume-surface-focal)] focus:bg-[color:var(--lume-surface-focal)] focus:outline-none';
 
 export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per nome o principio attivo...", autoFocus = false, defaultValue = "" }: DrugAutocompleteProps) {
     const [query, setQuery] = useState(defaultValue);
@@ -173,7 +173,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                             aria-selected={index === activeIndex}
                             onClick={() => handleSelect(drug)}
                             onMouseEnter={() => setActiveIndex(index)}
-                            className={`${drugRowClassName} ${index === activeIndex ? 'bg-[color:rgba(248,250,252,0.86)] dark:bg-white/6' : ''}`}
+                            className={`${drugRowClassName} ${index === activeIndex ? 'lume-focal bg-[color:var(--lume-surface-focal)] [--lume-focal-shadow-opacity:1]' : ''}`}
                             aria-label={`Seleziona ${drug.name}`}
                         >
                             <div className="flex justify-between items-start w-full">
@@ -191,7 +191,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                                     </div>
                                 </div>
                                 <div className="text-right shrink-0">
-                                    <span className="apple-chip font-mono text-[10px]">AIC {drug.aic}</span>
+                                    <span className="apple-chip lume-registro text-[10px]">AIC {drug.aic}</span>
                                     {drug.price !== undefined && drug.price > 0 && (
                                         <div className="mt-1 text-xs font-medium text-[color:var(--mf-muted)]">€ {drug.price.toFixed(2)}</div>
                                     )}

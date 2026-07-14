@@ -481,7 +481,7 @@ export default function ObservationManager({
                         {[0, 1, 2].map((row) => (
                             <div
                                 key={row}
-                                className="h-16 animate-pulse rounded-[18px] border border-slate-200/70 bg-white/60 dark:border-white/10 dark:bg-white/5"
+                                className="mf-skeleton h-16 border border-slate-200/70 dark:border-white/10"
                             />
                         ))}
                     </div>
