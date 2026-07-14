@@ -13,7 +13,7 @@ In ogni istante l'interfaccia ha un solo **fuoco**: l'oggetto clinico in lavoraz
 
 | Zona | Cosa contiene | Resa |
 | --- | --- | --- |
-| **Fuoco** | L'oggetto in lavorazione | Superficie più chiara e leggermente più calda, contrasto pieno, ombra corta che la solleva, filo pieno sul bordo sinistro |
+| **Fuoco** | L'oggetto in lavorazione | Superficie più chiara e leggermente più calda, contrasto pieno, ombra corta che la solleva |
 | **Penombra** | Il contesto di lavoro (worklist, pannelli vicini) | Superficie neutra, contrasto pieno del testo ma cromatismo trattenuto, nessuna ombra |
 | **Buio operativo** | Il telaio (rail, barre, chrome) | Superficie leggermente più scura e più fredda, contenuti attenuati, zero ornamento |
 
@@ -58,16 +58,17 @@ Il blur resta ammesso in un solo punto: gli overlay transitori (modale, popover)
 
 ## 3. Il filo
 
+> Revisione 2026-07-14: la resa di questa sezione è aggiornata da [07-gesto-e-movimento.md](./07-gesto-e-movimento.md). Il fuoco si marca con la luce (par. 1), non con il filo; lo stato epistemico si rende con l'inchiostro (tono e asciugatura della firma), non con il tratteggio. Il filo resta la firma grafica solo dove connette davvero, come geometria SVG continua.
+
 La firma grafica di Lume è una linea sottile (1px, `accent.minerale` o tono semantico) con un solo significato: la continuità della cura.
 
 | Dove | Cosa fa |
 | --- | --- |
-| Bordo sinistro dell'oggetto focale | Marca il fuoco (al posto delle campiture di selezione) |
 | Spina della timeline del diario | Le voci si appendono al filo, in ordine di tempo |
 | Storia di un valore di laboratorio | Il filo collega le rilevazioni, con la banda di riferimento dietro |
 | Connettore di provenienza | Lega un contenuto alla sua fonte (referto, trascrizione) |
 
-**Il tratto è lo stato epistemico, e il tratto pieno è il commit**: tratteggiato = bozza (contenuto proposto o non ancora rivisto), pieno = firmato dal medico. Niente parte (prescrizione, ordine, invio) finché il tratto non è pieno; un inserimento errato si marca come tale, non si cancella. Una regola sola, applicata ovunque: si vede a colpo d'occhio cosa è consolidato e cosa no, senza badge chiassosi. I contenuti proposti dagli strumenti di supporto seguono la stessa regola: entrano tratteggiati e diventano pieni solo con la revisione esplicita del medico. E ogni inferenza o sintesi apre le sue fonti con un gesto (documento, data, frammento): il filo di provenienza è un contratto, non una decorazione (vedi [04-perlustrazione.md](./04-perlustrazione.md)).
+**Lo stato epistemico è un contratto, e la firma è il commit**: un contenuto proposto o non ancora rivisto è bozza, quello firmato dal medico è consolidato. La resa di questo passaggio è l'inchiostro che asciuga, non più il tratteggio del filo (vedi [07-gesto-e-movimento.md](./07-gesto-e-movimento.md)). Niente parte (prescrizione, ordine, invio) finché il tratto non è pieno; un inserimento errato si marca come tale, non si cancella. Una regola sola, applicata ovunque: si vede a colpo d'occhio cosa è consolidato e cosa no, senza badge chiassosi. I contenuti proposti dagli strumenti di supporto seguono la stessa regola: entrano come bozza in inchiostro tenue e diventano pieni solo con la revisione esplicita del medico. E ogni inferenza o sintesi apre le sue fonti con un gesto (documento, data, frammento): il filo di provenienza è un contratto, non una decorazione (vedi [04-perlustrazione.md](./04-perlustrazione.md)).
 
 Il filo non si moltiplica: mai più di un filo per contenitore. Non è un divisore (i divisori restano bordi neutri): se una linea è `accent.minerale`, porta significato.
 
@@ -109,7 +110,7 @@ Il layout di Lume non presenta dati: presenta decisioni.
 
 ## 7. Motion: la luce si sposta
 
-- Quando il fuoco cambia, si muove la luce, non le superfici: cross-fade di luminanza e temperatura (150-200ms, ease-out) dal vecchio al nuovo fuoco; il filo si ridisegna sul nuovo bordo.
+- Quando il fuoco cambia, si muove la luce, non le superfici: cross-fade di luminanza e temperatura (150-200ms, ease-out) dal vecchio al nuovo fuoco. Il fuoco è la luce, non un filo sul bordo; i connettori (spina, provenienza) si ridisegnano come geometria SVG (vedi [07-gesto-e-movimento.md](./07-gesto-e-movimento.md)).
 - Il filo può estendersi (una linea che si allunga, 200ms) per esprimere continuità: Quadro -> Scheda è il filo che prosegue, non una pagina che vola.
 - La manipolazione diretta (drag, riordino) mantiene le spring interrompibili di Vetro Clinico ([../vetro-clinico/04-interazione.md](../vetro-clinico/04-interazione.md)): la fisica resta dove c'è un gesto.
 - Niente parallasse, niente morphing di superfici, niente blur animato. Reduce Motion è quasi già soddisfatto per costruzione: il cross-fade è il comportamento di default, non il fallback.

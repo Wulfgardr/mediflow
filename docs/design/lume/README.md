@@ -18,7 +18,7 @@ Vetro Clinico ha dato a MediFlow una disciplina dei materiali: vetro per il tela
 Quattro rotture rispetto al paradigma attuale, tutte motivate dalla ricerca:
 
 1. **La luce sostituisce il vetro come sistema di gerarchia.** Profondità e importanza si esprimono con luminanza, temperatura e ombre brevi, non con blur e trasparenza. Il vetro si ritira a rendering opzionale degli overlay transitori. È la direzione post-glass della frontiera 2026 e la lezione della stessa Apple, che ha ridotto la trasparenza di default un anno dopo averla lanciata.
-2. **Il filo è la firma grafica.** Una sola linea sottile porta il significato di continuità della cura: spina della timeline, bordo dell'oggetto focale, connettore della storia di un valore. E il suo tratto codifica lo stato epistemico: tratteggiato è bozza, pieno è firmato. Niente ornamento: la linea è dato.
+2. **Il filo è la firma grafica, e connette.** Una sola linea sottile porta il significato di continuità della cura, resa come geometria SVG continua: spina della timeline, connettore della storia di un valore, legame di provenienza. Il fuoco però si marca con la luce, non con il filo, e lo stato epistemico (bozza o firmato) si rende con l'inchiostro, non con il tratteggio: la resa è fissata in [07-gesto-e-movimento.md](./07-gesto-e-movimento.md). Niente ornamento: la linea è dato.
 3. **Due voci tipografiche.** La Voce (sans umanista, con optical sizing dove disponibile) parla; il Registro (mono) certifica. Ogni atomo verificabile della clinica (dose, valore, codice, orario) è composto nel Registro con cifre tabellari: si riconosce a colpo d'occhio cosa è dato e cosa è discorso.
 4. **La grammatica dell'attenzione.** Testata paziente invariabile, colonna di ciò che richiede attenzione (non di tutto ciò che esiste), baseline personale prima del benchmark, provenienza sempre visibile. Il layout non presenta dati: presenta decisioni da prendere.
 
@@ -32,7 +32,8 @@ Ciò che NON cambia: le leggi cliniche di Vetro Clinico restano fondamenta anche
 4. [04-perlustrazione.md](./04-perlustrazione.md): la perlustrazione EHR/provider e le 12 integrazioni normative alla grammatica.
 5. [05-app-native.md](./05-app-native.md): mappa generale delle app native, grammatica compatta iPhone e note tri-OS prospettiche.
 6. [06-macos-apple-contract.md](./06-macos-apple-contract.md): contratto di destinazione macOS, fonti Apple, availability, disposizione, materiali, debito corrente e sequenza verificabile.
-7. [mockups/lume.html](./mockups/lume.html): dimostratore interattivo (aprire nel browser, nessuna dipendenza): modello focale, filo, due voci, registri giorno/grafite/guardia.
+7. [07-gesto-e-movimento.md](./07-gesto-e-movimento.md): la grammatica del gesto e del movimento: luce per il fuoco, inchiostro per lo stato, filo come connettore SVG; leggi di moto, atomi, scene, primitive tecniche.
+8. [mockups/](./mockups/): dimostratori interattivi (aprire nel browser, nessuna dipendenza). `lume.html`: modello focale, due voci, registri giorno/grafite/guardia. `lume-dinamica.html`: studio prima/dopo (filo lineare contro luce e inchiostro). `lume-cockpit-vivo.html`, `lume-campi.html`, `lume-voce.html`, `lume-impostazioni.html`: le movenze nel linguaggio luce e inchiostro.
 
 ## Rapporto con il canone
 
