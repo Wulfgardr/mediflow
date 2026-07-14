@@ -1,11 +1,12 @@
 // @Codex
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { formatReport, scanMotionBudget } from './check-motion-budget.mjs';
+import { formatReport, scanMotionBudget, scanMotionBudgetDelta } from './check-motion-budget.mjs';
 
 function withFixture(files, run) {
   const rootDir = mkdtempSync(path.join(os.tmpdir(), 'mediflow-motion-budget-'));
@@ -80,4 +81,141 @@ test('collega un keyframe shimmer alla utility Tailwind infinita', () => {
     'components/shimmer.tsx': '<div className="animate-[shimmer_1.5s_infinite_linear]" />\n<style>{`@keyframes shimmer { to { opacity: 1; } }`}</style>',
   }, (rootDir) => scanMotionBudget({ rootDir, allowlist: [] }));
   assert.ok(result.violations.some((item) => item.snippet === '@keyframes shimmer'));
+});
+
+test('il gate incrementale conserva il debito ma blocca una nuova violazione', () => {
+  withFixture({
+    'app/surface.tsx': '<div className="transition-all" />',
+  }, (rootDir) => {
+    execFileSync('git', ['init', '-q'], { cwd: rootDir });
+    execFileSync('git', ['config', 'user.email', 'test@example.invalid'], { cwd: rootDir });
+    execFileSync('git', ['config', 'user.name', 'Motion Test'], { cwd: rootDir });
+    execFileSync('git', ['add', '.'], { cwd: rootDir });
+    execFileSync('git', ['commit', '-qm', 'baseline'], { cwd: rootDir });
+
+    writeFileSync(
+      path.join(rootDir, 'app/surface.tsx'),
+      '<div className="transition-all" />\n<div className="animate-pulse" />',
+    );
+
+    const result = scanMotionBudgetDelta({ rootDir, allowlist: [], baseRef: 'HEAD' });
+    assert.equal(result.existing, 1);
+    assert.equal(result.violations.length, 1);
+    assert.equal(result.violations[0].snippet, 'animate-pulse');
+  });
+});
+
+test('un branch pulito confronta tutta la divergenza dal branch base', () => {
+  withFixture({
+    'app/surface.tsx': '<div />',
+  }, (rootDir) => {
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: rootDir });
+    execFileSync('git', ['config', 'user.email', 'test@example.invalid'], { cwd: rootDir });
+    execFileSync('git', ['config', 'user.name', 'Motion Test'], { cwd: rootDir });
+    execFileSync('git', ['add', '.'], { cwd: rootDir });
+    execFileSync('git', ['commit', '-qm', 'baseline'], { cwd: rootDir });
+    execFileSync('git', ['switch', '-qc', 'feature'], { cwd: rootDir });
+
+    writeFileSync(path.join(rootDir, 'app/surface.tsx'), '<div className="animate-pulse" />');
+    execFileSync('git', ['add', '.'], { cwd: rootDir });
+    execFileSync('git', ['commit', '-qm', 'introduce motion'], { cwd: rootDir });
+    writeFileSync(path.join(rootDir, 'components/stable.tsx'), '<div />');
+    execFileSync('git', ['add', '.'], { cwd: rootDir });
+    execFileSync('git', ['commit', '-qm', 'later clean commit'], { cwd: rootDir });
+
+    const result = scanMotionBudgetDelta({ rootDir, allowlist: [] });
+    assert.equal(result.existing, 0);
+    assert.equal(result.violations.length, 1);
+    assert.equal(result.violations[0].snippet, 'animate-pulse');
+  });
+});
+
+test('un push multi-commit usa lo SHA precedente dichiarato da GitHub', () => {
+  withFixture({
+    'app/surface.tsx': '<div />',
+  }, (rootDir) => {
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: rootDir });
+    execFileSync('git', ['config', 'user.email', 'test@example.invalid'], { cwd: rootDir });
+    execFileSync('git', ['config', 'user.name', 'Motion Test'], { cwd: rootDir });
+    execFileSync('git', ['add', '.'], { cwd: rootDir });
+    execFileSync('git', ['commit', '-qm', 'baseline'], { cwd: rootDir });
+    const before = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: rootDir, encoding: 'utf8' }).trim();
+
+    writeFileSync(path.join(rootDir, 'app/surface.tsx'), '<div className="animate-pulse" />');
+    execFileSync('git', ['add', '.'], { cwd: rootDir });
+    execFileSync('git', ['commit', '-qm', 'introduce motion'], { cwd: rootDir });
+    writeFileSync(path.join(rootDir, 'components/stable.tsx'), '<div />');
+    execFileSync('git', ['add', '.'], { cwd: rootDir });
+    execFileSync('git', ['commit', '-qm', 'later clean commit'], { cwd: rootDir });
+
+    const eventPath = path.join(rootDir, 'push-event.json');
+    writeFileSync(eventPath, JSON.stringify({ before }));
+    const previousEventPath = process.env.GITHUB_EVENT_PATH;
+    process.env.GITHUB_EVENT_PATH = eventPath;
+    try {
+      const result = scanMotionBudgetDelta({ rootDir, allowlist: [] });
+      assert.equal(result.baseRef, before);
+      assert.equal(result.violations.length, 1);
+      assert.equal(result.violations[0].snippet, 'animate-pulse');
+    } finally {
+      if (previousEventPath === undefined) delete process.env.GITHUB_EVENT_PATH;
+      else process.env.GITHUB_EVENT_PATH = previousEventPath;
+    }
+  });
+});
+
+test('una violazione spostata su un nuovo selettore non eredita il debito', () => {
+  withFixture({
+    'app/surface.css': '.old { transition: all 200ms; }',
+  }, (rootDir) => {
+    execFileSync('git', ['init', '-q'], { cwd: rootDir });
+    execFileSync('git', ['config', 'user.email', 'test@example.invalid'], { cwd: rootDir });
+    execFileSync('git', ['config', 'user.name', 'Motion Test'], { cwd: rootDir });
+    execFileSync('git', ['add', '.'], { cwd: rootDir });
+    execFileSync('git', ['commit', '-qm', 'baseline'], { cwd: rootDir });
+
+    writeFileSync(path.join(rootDir, 'app/surface.css'), '.new { transition: all 200ms; }');
+    const result = scanMotionBudgetDelta({ rootDir, allowlist: [], baseRef: 'HEAD' });
+    assert.equal(result.existing, 0);
+    assert.equal(result.violations.length, 2);
+    assert.ok(result.violations.every((violation) => violation.context === '.new'));
+  });
+});
+
+test('una violazione TSX spostata fra elementi multilinea resta nuova', () => {
+  withFixture({
+    'components/panel.tsx': `
+      export function Panel() {
+        return <section>
+          <button
+            data-slot="old"
+            className="transition-all"
+          />
+          <button data-slot="new" />
+        </section>;
+      }
+    `,
+  }, (rootDir) => {
+    execFileSync('git', ['init', '-q'], { cwd: rootDir });
+    execFileSync('git', ['config', 'user.email', 'test@example.invalid'], { cwd: rootDir });
+    execFileSync('git', ['config', 'user.name', 'Motion Test'], { cwd: rootDir });
+    execFileSync('git', ['add', '.'], { cwd: rootDir });
+    execFileSync('git', ['commit', '-qm', 'baseline'], { cwd: rootDir });
+
+    writeFileSync(path.join(rootDir, 'components/panel.tsx'), `
+      export function Panel() {
+        return <section>
+          <button data-slot="old" />
+          <button
+            data-slot="new"
+            className="transition-all"
+          />
+        </section>;
+      }
+    `);
+    const result = scanMotionBudgetDelta({ rootDir, allowlist: [], baseRef: 'HEAD' });
+    assert.equal(result.existing, 0);
+    assert.equal(result.violations.length, 1);
+    assert.ok(result.violations.every((violation) => violation.context.includes('data-slot="new"')));
+  });
 });

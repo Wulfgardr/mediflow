@@ -7,6 +7,7 @@ import DocumentViewer from './document-viewer';
 import { TimelineEntryCard, TimelineEntryData } from './timeline-entry-card';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/ui/toast-provider';
+import { LumeFilo } from '@/components/ui/lume-filo';
 
 interface TimelineProps {
     entries: TimelineEntryData[];
@@ -101,7 +102,8 @@ export default function Timeline({ entries }: TimelineProps) {
         <div className="space-y-6">
             <div className="flex justify-end">{auditToggle}</div>
 
-            <div className="relative border-l-2 border-[color:rgba(112,106,100,0.18)] dark:border-white/10 ml-3 space-y-8 pb-8">
+            <div className="relative ml-3 space-y-8 pb-8">
+                <LumeFilo variant="spina" anchorSelector="[data-lume-timeline-node]" className="absolute left-[-0.5px] w-px" />
                 {visibleEntries.map((entry) => (
                     <TimelineEntryCard
                         key={entry.id}

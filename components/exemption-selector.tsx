@@ -216,7 +216,7 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
                                             onClick={() => addCode(result.code)}
                                             onMouseEnter={() => setActiveIndex(index)}
                                             disabled={selected}
-                                            className={`w-full rounded-[var(--lume-radius-control)] px-3 py-2 text-left transition-[background-color,box-shadow] duration-[var(--lume-dur-riga)] ${selected
+                                            className={`w-full rounded-[var(--lume-radius-control)] px-3 py-2 text-left transition-[background-color] duration-[var(--lume-dur-riga)] ${selected
                                                 ? 'bg-[color:rgba(15,123,104,0.1)] opacity-60'
                                                 : `hover:bg-[color:var(--lume-surface-focal)] ${index === activeIndex ? 'lume-focal bg-[color:var(--lume-surface-focal)] [--lume-focal-shadow-opacity:1]' : ''}`
                                                 }`}

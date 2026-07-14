@@ -29,7 +29,7 @@
   border-radius: var(--lume-radius-control);
   text-align: left;
   color: var(--lume-ink);
-  transition: background-color var(--lume-dur-riga) var(--lume-ease), box-shadow var(--lume-dur-fuoco) var(--lume-ease);
+  transition: background-color var(--lume-dur-riga) var(--lume-ease);
 }
 .mf-listrow:hover {
   background-color: color-mix(in srgb, var(--lume-signal-plum) 10%, transparent);
@@ -1307,7 +1307,7 @@ body {
   line-height: 1.4;
   outline: none;
   box-shadow: none;
-  transition: border-color var(--lume-dur-riga) var(--lume-ease), box-shadow var(--lume-dur-fuoco) var(--lume-ease), background-color var(--lume-dur-fuoco) var(--lume-ease);
+  transition: border-color var(--lume-dur-riga) var(--lume-ease), background-color var(--lume-dur-fuoco) var(--lume-ease);
 }
 
 .mf-input::placeholder,
@@ -1383,7 +1383,7 @@ textarea.input-field {
   line-height: 1.4;
   outline: none;
   box-shadow: none;
-  transition: border-color var(--lume-dur-riga) var(--lume-ease), box-shadow var(--lume-dur-fuoco) var(--lume-ease), background-color var(--lume-dur-fuoco) var(--lume-ease);
+  transition: border-color var(--lume-dur-riga) var(--lume-ease), background-color var(--lume-dur-fuoco) var(--lume-ease);
   min-height: 6rem;
   resize: vertical;
 }
@@ -1559,7 +1559,7 @@ textarea.input-field {
   font-size: 0.85rem;
   color: var(--lume-ink);
   cursor: pointer;
-  transition: background-color var(--lume-dur-riga) var(--lume-ease), box-shadow var(--lume-dur-fuoco) var(--lume-ease), color var(--lume-dur-riga) var(--lume-ease);
+  transition: background-color var(--lume-dur-riga) var(--lume-ease), color var(--lume-dur-riga) var(--lume-ease);
 }
 
 .mf-popover-row:hover,
@@ -1660,7 +1660,7 @@ textarea.input-field {
   color: var(--lume-ink-muted);
   background-color: var(--lume-surface-field);
   border: 1px solid color-mix(in srgb, var(--lume-ink) 10%, transparent);
-  transition: background-color var(--lume-dur-riga) var(--lume-ease), color var(--lume-dur-riga) var(--lume-ease), box-shadow var(--lume-dur-fuoco) var(--lume-ease);
+  transition: background-color var(--lume-dur-riga) var(--lume-ease), color var(--lume-dur-riga) var(--lume-ease);
 }
 
 .mf-step-pill.is-active,
@@ -1696,7 +1696,7 @@ textarea.input-field {
   font-size: 0.86rem;
   font-weight: 600;
   letter-spacing: 0;
-  transition: background-color var(--lume-dur-riga) var(--lume-ease), color var(--lume-dur-riga) var(--lume-ease), border-color var(--lume-dur-riga) var(--lume-ease), box-shadow var(--lume-dur-fuoco) var(--lume-ease);
+  transition: background-color var(--lume-dur-riga) var(--lume-ease), color var(--lume-dur-riga) var(--lume-ease), border-color var(--lume-dur-riga) var(--lume-ease);
   cursor: pointer;
 }
 
@@ -1729,7 +1729,7 @@ textarea.input-field {
   text-align: left;
   cursor: pointer;
   color: var(--lume-ink);
-  transition: border-color var(--lume-dur-riga) var(--lume-ease), background-color var(--lume-dur-fuoco) var(--lume-ease), box-shadow var(--lume-dur-fuoco) var(--lume-ease);
+  transition: border-color var(--lume-dur-riga) var(--lume-ease), background-color var(--lume-dur-fuoco) var(--lume-ease);
 }
 
 .mf-option-card:hover {

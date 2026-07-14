@@ -6,6 +6,7 @@ import { FileText, Stethoscope, Activity, Trash2, AlertCircle, Undo, Phone, Home
 import { ClinicalRichTextContent } from '@/components/clinical-rich-text-content';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useLiveQuery } from '@/lib/live-query';
+import { LumeFilo } from '@/components/ui/lume-filo';
 
 export type TimelineEntryData = ClinicalEntry & { patientName?: string };
 
@@ -35,22 +36,25 @@ function EntryAttachments({ attachmentIds, onView }: { attachmentIds: string[], 
     if (!attachments?.length) return null;
 
     return (
-        <div className="mt-4 grid grid-cols-1 gap-2 border-t border-[color:rgba(112,106,100,0.12)] pt-3 sm:grid-cols-2">
-            {attachments.map(file => (
-                <button
-                    key={file.id}
-                    onClick={() => onView(file)}
-                    className="mf-option-card !flex !grid-cols-none items-center gap-2 !rounded-[14px] !p-2 text-left"
-                >
-                    <div className="mf-icon-disc h-7 w-7 !rounded-[10px]">
-                        <Paperclip className="w-3 h-3" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold truncate">{file.name}</p>
-                        <p className="text-[10px]" style={{ color: 'var(--mf-muted)' }}>{file.summarySnapshot ? 'Analisi IA disponibile' : 'Allegato'}</p>
-                    </div>
-                </button>
-            ))}
+        <div className="relative mt-4 pl-5">
+            <LumeFilo variant="connettore" fill={100} className="absolute left-0 top-0 h-4 w-5" />
+            <div className="grid grid-cols-1 gap-2 border-t border-[color:rgba(112,106,100,0.12)] pt-3 sm:grid-cols-2">
+                {attachments.map(file => (
+                    <button
+                        key={file.id}
+                        onClick={() => onView(file)}
+                        className="mf-option-card !flex !grid-cols-none items-center gap-2 !rounded-[14px] !p-2 text-left"
+                    >
+                        <div className="mf-icon-disc h-7 w-7 !rounded-[10px]">
+                            <Paperclip className="w-3 h-3" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold truncate">{file.name}</p>
+                            <p className="text-[10px]" style={{ color: 'var(--mf-muted)' }}>{file.summarySnapshot ? 'Analisi IA disponibile' : 'Allegato'}</p>
+                        </div>
+                    </button>
+                ))}
+            </div>
         </div>
     );
 }
@@ -69,7 +73,7 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
     return (
         <div className={`relative pl-8 ${isDeleted ? 'opacity-60 grayscale' : ''}`}>
             {/* Dot */}
-            <div className={`absolute -left-[9px] top-0 h-4 w-4 rounded-full border-2 border-[color:var(--mf-bg)] ${isDeleted ? 'bg-[color:var(--mf-critical)]' : 'bg-[color:var(--mf-primary)]'}`}></div>
+            <div data-lume-timeline-node className={`absolute -left-2 top-0 h-4 w-4 rounded-full border-2 border-[color:var(--mf-bg)] ${isDeleted ? 'bg-[color:var(--mf-critical)]' : 'bg-[color:var(--mf-primary)]'}`}></div>
 
             {/* Content */}
             <div className={`mf-section p-5 ${isDeleted ? 'border-[color:rgba(163,58,47,0.26)] bg-[color:rgba(163,58,47,0.08)]' : ''}`}>

@@ -33,6 +33,7 @@ import type {
     TreatmentReasoningSafetySeverity,
     TreatmentReasoningSuggestedAction,
 } from '@/lib/treatment-reasoning-contract';
+import { DocumentReferenceChip } from '@/components/document-reference-chip';
 
 interface TreatmentReasoningPanelProps {
     patient: Patient;
@@ -258,7 +259,7 @@ export default function TreatmentReasoningPanel({
                                 ) : draft.envelope.data.keyEvidence.map((evidence) => (
                                     <div key={evidence.id} className="rounded-[16px] border border-slate-200 bg-white/75 p-3 dark:border-white/10 dark:bg-white/5">
                                         <p className="text-sm font-semibold leading-5 text-[color:var(--mf-ink)]"><PrivacyBlur intensity="sm">{evidence.statement}</PrivacyBlur></p>
-                                        <p className="mt-2 break-all text-[10px] uppercase tracking-wide text-[color:var(--mf-muted)]">{evidence.evidenceRefs.join(' · ')}</p>
+                                        <DocumentReferenceChip references={evidence.evidenceRefs} />
                                     </div>
                                 ))}
                             </div>

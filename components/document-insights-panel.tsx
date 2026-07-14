@@ -13,6 +13,7 @@ import { notifyDbChange } from '@/lib/live-query';
 import { persistDocumentInsightsArchive } from '@/lib/domain/documents/document-insights-archive';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { LumeFilo } from '@/components/ui/lume-filo';
 
 interface DocumentInsightsPanelProps {
     patient: Patient;
@@ -233,7 +234,8 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                         </div>
 
                         {expandedId === insight.id && (
-                            <div className="px-4 pb-4">
+                            <div className="relative px-4 pb-4 pl-9">
+                                <LumeFilo variant="connettore" fill={100} className="absolute left-4 top-0 h-4 w-5" />
                                 {Array.isArray(insight.extractedData?.diagnoses) && insight.extractedData.diagnoses.length > 0 && (
                                     <div className="mb-3 flex flex-wrap gap-2">
                                         {insight.extractedData.diagnoses.map((diagnosis) => (

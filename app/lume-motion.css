@@ -85,10 +85,22 @@
 }
 
 .lume-filo-draw {
-  --lume-filo-fill: 0%;
-  stroke-dasharray: 100%;
-  stroke-dashoffset: calc(100% - var(--lume-filo-fill));
-  transition: --lume-filo-fill var(--lume-dur-firma) var(--lume-ease);
+  stroke-dasharray: 100;
+  transition: stroke-dashoffset var(--lume-dur-firma) var(--lume-ease);
+}
+
+.lume-filo-draw[data-lume-filo-static='true'] {
+  transition: none;
+}
+
+.lume-filo-spina {
+  transform: scaleY(var(--lume-spina-scale, 0));
+  transform-origin: 50% 0;
+  transition: transform var(--lume-dur-firma) var(--lume-ease);
+}
+
+.lume-filo-spina[data-lume-filo-static='true'] {
+  transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -115,7 +127,13 @@
 
   .lume-filo-draw {
     --lume-filo-fill: 100%;
+    stroke-dashoffset: 0 !important;
     transition: none;
+  }
+
+  .lume-filo-spina {
+    --lume-spina-scale: 1 !important;
+    transition: none !important;
   }
 }
 
@@ -130,5 +148,11 @@
 
 :root[data-ui-reduce-motion='true'] .lume-filo-draw {
   --lume-filo-fill: 100%;
+  stroke-dashoffset: 0 !important;
   transition: none;
+}
+
+:root[data-ui-reduce-motion='true'] .lume-filo-spina {
+  --lume-spina-scale: 1 !important;
+  transition: none !important;
 }

@@ -5,6 +5,7 @@ import { CalendarClock, FileText, ScanText, Stethoscope } from 'lucide-react';
 /* @Codex */
 import { compactClinicalRichText } from '@/lib/clinical-rich-text';
 import type { Checkup, ClinicalEntry, DocumentInsight } from '@/lib/db';
+import { LumeFilo } from '@/components/ui/lume-filo';
 
 interface ClinicalRiverTimelineProps {
     entries: ClinicalEntry[];
@@ -97,7 +98,6 @@ function getItemPresentation(kind: RiverItem['kind']) {
         return {
             icon: CalendarClock,
             tint: 'text-[color:var(--mf-accent)]',
-            line: 'bg-[color:rgba(182,106,60,0.28)]',
             label: 'Follow-up',
         };
     }
@@ -105,14 +105,12 @@ function getItemPresentation(kind: RiverItem['kind']) {
         return {
             icon: ScanText,
             tint: 'text-[color:var(--mf-plum)]',
-            line: 'bg-[color:rgba(94,53,95,0.24)]',
             label: 'Evidenza',
         };
     }
     return {
         icon: Stethoscope,
         tint: 'text-[color:var(--mf-primary)]',
-        line: 'bg-[color:rgba(15,123,104,0.26)]',
         label: 'Clinico',
     };
 }
@@ -138,40 +136,40 @@ export function ClinicalRiverTimeline({
 
     return (
         <div className="space-y-4">
-            {items.map((item, index) => {
-                const presentation = getItemPresentation(item.kind);
-                const Icon = presentation.icon;
+            <div className="relative space-y-4">
+                <LumeFilo variant="spina" anchorSelector="[data-lume-river-node]" className="absolute left-[13.5px] w-px" />
+                {items.map((item) => {
+                    const presentation = getItemPresentation(item.kind);
+                    const Icon = presentation.icon;
 
-                return (
-                    <div key={item.id} className="grid grid-cols-[28px_minmax(0,1fr)] gap-4">
-                        <div className="flex flex-col items-center">
-                            <div className={`flex h-8 w-8 items-center justify-center rounded-full bg-white/72 ${presentation.tint} dark:bg-white/6`}>
-                                <Icon className="h-4 w-4" />
+                    return (
+                        <div key={item.id} className="grid grid-cols-[28px_minmax(0,1fr)] gap-4">
+                            <div className="flex flex-col items-center">
+                                <div data-lume-river-node className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/72 ${presentation.tint} dark:bg-white/6`}>
+                                    <Icon className="h-4 w-4" />
+                                </div>
                             </div>
-                            {index < items.length - 1 ? (
-                                <div className={`mt-2 h-full min-h-10 w-px ${presentation.line}`} />
-                            ) : null}
+                            <article className="clinical-river-card rounded-[22px] border p-4">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
+                                        {item.typeLabel ?? presentation.label}
+                                    </span>
+                                    <span className="lume-registro inline-flex items-center gap-1 text-[12px] text-[color:var(--mf-muted)]">
+                                        <FileText className="h-3.5 w-3.5" />
+                                        {formatDate(item.date)}
+                                    </span>
+                                </div>
+                                <h3 className="mt-2 text-base font-semibold text-[color:var(--mf-ink)]">{item.title}</h3>
+                                {item.summary ? (
+                                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-[color:var(--mf-muted)]">
+                                        {item.summary}
+                                    </p>
+                                ) : null}
+                            </article>
                         </div>
-                        <article className="clinical-river-card rounded-[22px] border p-4">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--mf-muted)]">
-                                    {item.typeLabel ?? presentation.label}
-                                </span>
-                                <span className="lume-registro inline-flex items-center gap-1 text-[12px] text-[color:var(--mf-muted)]">
-                                    <FileText className="h-3.5 w-3.5" />
-                                    {formatDate(item.date)}
-                                </span>
-                            </div>
-                            <h3 className="mt-2 text-base font-semibold text-[color:var(--mf-ink)]">{item.title}</h3>
-                            {item.summary ? (
-                                <p className="mt-2 line-clamp-3 text-sm leading-6 text-[color:var(--mf-muted)]">
-                                    {item.summary}
-                                </p>
-                            ) : null}
-                        </article>
-                    </div>
-                );
-            })}
+                    );
+                })}
+            </div>
 
             {hiddenCount > 0 ? (
                 <p className="pl-[44px] text-[12px] text-[color:var(--mf-muted)]">
