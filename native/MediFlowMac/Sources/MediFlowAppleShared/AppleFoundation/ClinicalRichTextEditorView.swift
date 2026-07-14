@@ -285,13 +285,17 @@ struct VisitDraftComposerView: View {
                 draftReview(draft)
             }
         }
-        .lumeInchiostro(bozza: model.newEntryVisitDraftResponse != nil && !model.newEntryVisitDraftReviewed)
+    }
+
+    private var isUnsignedDraft: Bool {
+        model.newEntryVisitDraftResponse != nil && !model.newEntryVisitDraftReviewed
     }
 
     private func draftReview(_ draft: HomeBaseVisitDraftResponse) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Bozza da rivedere")
                 .font(.caption.weight(.semibold))
+                .lumeInchiostro(bozza: isUnsignedDraft)
                 .accessibilityIdentifier("visit-draft-review-heading")
 
             sectionPreview("S", draft.sections.subjective)
@@ -305,7 +309,7 @@ struct VisitDraftComposerView: View {
                 ForEach(Array(draft.medications.enumerated()), id: \.offset) { _, medication in
                     Text(medicationLine(medication))
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .lumeInchiostro(bozza: isUnsignedDraft)
                 }
             }
 
@@ -356,9 +360,10 @@ struct VisitDraftComposerView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(label).font(.caption2.weight(.semibold))
                 ForEach(Array(nonEmpty.enumerated()), id: \.offset) { _, line in
-                    Text(line).font(.caption2).foregroundStyle(.secondary)
+                    Text(line).font(.caption2)
                 }
             }
+            .lumeInchiostro(bozza: isUnsignedDraft)
         }
     }
 }

@@ -27,6 +27,16 @@ final class PatientSummaryPresentationTests: XCTestCase {
         XCTAssertNil(PairedPatientsWorkspaceView.age(from: ancient))
     }
 
+    /* @Codex */
+    func testCompactTaxCodeKeepsOnlyLastSixCharacters() {
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.compactTaxCode("RSSMRA80A01H501U"), "…1H501U")
+    }
+
+    /* @Codex */
+    func testCompactTaxCodeDoesNotExpandShortValues() {
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.compactTaxCode("ABC123"), "ABC123")
+    }
+
     // G3 (observations sparkline): only scalar numeric values feed the chart.
     func testParseObservationValueAcceptsNumbersAndComma() {
         XCTAssertEqual(PairedPatientsWorkspaceView.parseObservationValue("120"), 120)

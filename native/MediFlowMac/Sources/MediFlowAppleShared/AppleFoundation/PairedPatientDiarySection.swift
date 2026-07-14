@@ -103,6 +103,7 @@ struct PairedPatientDiarySection: View {
                             }
                             Text(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: entry.date))
                                 .font(.caption2)
+                                .registro()
                                 .foregroundStyle(.secondary)
                         }
                         Text(ClinicalContentRendering.attributedString(from: entry.content))

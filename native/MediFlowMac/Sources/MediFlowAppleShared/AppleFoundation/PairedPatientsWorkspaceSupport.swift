@@ -19,6 +19,20 @@ enum PairedPatientsWorkspaceSupport {
         return years
     }
 
+    /* @Codex */
+    static func birthYear(from birthDate: Date?) -> Int? {
+        guard let birthDate else { return nil }
+        let year = Calendar.current.component(.year, from: birthDate)
+        return year > 0 ? year : nil
+    }
+
+    /* @Codex */
+    static func compactTaxCode(_ taxCode: String) -> String {
+        let normalized = taxCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalized.count > 6 else { return normalized }
+        return "…\(normalized.suffix(6))"
+    }
+
     private static let relativeUpdatedFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
         formatter.locale = Locale(identifier: "it_IT")
@@ -167,7 +181,7 @@ struct PairedPatientCounterStrip: View {
                         HStack(spacing: 6) {
                             Text("\(value)")
                                 .font(.caption.weight(.semibold))
-                                .monospacedDigit()
+                                .registro()
                             Text(label)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
@@ -184,7 +198,7 @@ struct PairedPatientCounterStrip: View {
                         VStack(spacing: 2) {
                             Text("\(value)")
                                 .font(.caption.weight(.semibold))
-                                .monospacedDigit()
+                                .registro()
                             Text(label)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)

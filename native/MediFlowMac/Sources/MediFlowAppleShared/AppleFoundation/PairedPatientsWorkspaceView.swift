@@ -322,8 +322,8 @@ struct PairedPatientsWorkspaceView: View {
                             Spacer(minLength: 8)
                             compactHeaderChevron
                         }
-                        if let birthDate = detail.birthDate {
-                            Text(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birthDate))
+                        if let birthYear = PairedPatientsWorkspaceSupport.birthYear(from: detail.birthDate) {
+                            Text("\(birthYear)")
                                 .font(.caption)
                                 .registro()
                                 .foregroundStyle(.secondary)
@@ -333,8 +333,8 @@ struct PairedPatientsWorkspaceView: View {
                     HStack(spacing: 8) {
                         Text("\(detail.lastName) \(detail.firstName)")
                             .font(.subheadline.weight(.semibold))
-                        if let birthDate = detail.birthDate {
-                            Text(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birthDate))
+                        if let birthYear = PairedPatientsWorkspaceSupport.birthYear(from: detail.birthDate) {
+                            Text("\(birthYear)")
                                 .font(.caption)
                                 .registro()
                                 .foregroundStyle(.secondary)
@@ -344,10 +344,19 @@ struct PairedPatientsWorkspaceView: View {
                     }
                 }
                 if isCompactPatientHeaderExpanded {
-                    Text("Codice fiscale: \(detail.taxCode)")
-                        .font(.caption)
-                        .registro()
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        if let birthDate = detail.birthDate {
+                            Text("Data di nascita: \(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birthDate))")
+                                .font(.caption)
+                                .registro()
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Text("Codice fiscale: \(PairedPatientsWorkspaceSupport.compactTaxCode(detail.taxCode))")
+                            .font(.caption)
+                            .registro()
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .foregroundStyle(.secondary)
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)

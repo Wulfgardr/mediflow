@@ -188,8 +188,9 @@ struct PairedPatientsWorklistView: View {
                                     PairedPatientFlagChip("Nel cestino", tone: .attention)
                                 }
                                 HStack(spacing: 6) {
-                                    Text(patient.taxCode)
+                                    Text(PairedPatientsWorkspaceSupport.compactTaxCode(patient.taxCode))
                                         .font(.caption)
+                                        .registro()
                                         .foregroundStyle(.secondary)
                                     if let deletedAt = patient.deletedAt {
                                         Text("Eliminato il \(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: deletedAt))")
@@ -250,6 +251,7 @@ struct PairedPatientsWorklistView: View {
                 patientUpdate(patient, alignment: .leading)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         } else {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -260,6 +262,7 @@ struct PairedPatientsWorklistView: View {
                 patientUpdate(patient, alignment: .trailing)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
     }
 
@@ -275,12 +278,14 @@ struct PairedPatientsWorklistView: View {
 
     private func patientMetadata(_ patient: HomeBasePatientSummary) -> some View {
         HStack(spacing: 6) {
-            Text(patient.taxCode)
+            Text(PairedPatientsWorkspaceSupport.compactTaxCode(patient.taxCode))
                 .font(.caption)
+                .registro()
                 .foregroundStyle(.secondary)
             if let age = PairedPatientsWorkspaceSupport.age(from: patient.birthDate) {
                 Text("· \(age) anni")
                     .font(.caption)
+                    .registro()
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("patient-cell-age-\(patient.id)")
             }
@@ -292,6 +297,7 @@ struct PairedPatientsWorklistView: View {
             if let updated = patient.updatedAt {
                 Text(PairedPatientsWorkspaceSupport.relativeUpdated(updated))
                     .font(.caption2)
+                    .registro()
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("patient-cell-updated-\(patient.id)")

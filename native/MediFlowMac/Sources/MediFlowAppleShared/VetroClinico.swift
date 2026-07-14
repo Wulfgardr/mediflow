@@ -64,6 +64,8 @@ public struct GlassCard<Content: View>: View {
 public struct StatusBadge: View {
     private let text: String
     private let tone: VetroTone
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.lumeGuardia) private var isGuardia
 
     public init(_ text: String, tone: VetroTone = .neutral) {
         self.text = text
@@ -71,14 +73,15 @@ public struct StatusBadge: View {
     }
 
     public var body: some View {
-        // Status color lives on the text, over a neutral glass capsule, so it
-        // stays legible (no same-color text-on-tint) and survives the fallback.
+        /* @Codex */
+        let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
         Text(text)
             .font(.caption.weight(.semibold))
             .foregroundStyle(VetroPalette.tint(for: tone))
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .vetroGlass(in: Capsule())
+            .background(palette.field, in: Capsule())
+            .overlay(Capsule().strokeBorder(palette.inkMuted.opacity(0.28), lineWidth: 0.5))
     }
 }
 
@@ -122,6 +125,7 @@ public struct InfoRow: View {
     private var valueText: some View {
         Text(value)
             .font(.callout)
+            .registro()
             .fixedSize(horizontal: false, vertical: true)
     }
 }
