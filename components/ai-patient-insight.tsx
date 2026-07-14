@@ -262,9 +262,14 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
                     <div className="space-y-5">
                         {readable.nextSteps.length > 0 && (
                             <div className="rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-[color:var(--lume-ink-muted)] transition-colors duration-[var(--lume-dur-firma)]">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                    Bozza da strumento locale
-                                </p>
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                        Follow-up proposto
+                                    </p>
+                                    <span className="rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-[color:var(--lume-ink-muted)]">
+                                        Bozza
+                                    </span>
+                                </div>
                                 <div className="mt-3 space-y-2">
                                     {readable.nextSteps.map((step, index) => (
                                         <div
