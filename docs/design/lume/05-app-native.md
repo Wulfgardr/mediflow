@@ -34,9 +34,9 @@ Lume nasce multipiattaforma per costruzione, ma la delivery corrente e Apple-fir
 | --- | --- | --- |
 | `VetroGlassModifier` | `LumeSurface(zone:)` | Rende canvas/field/focal/chrome; niente `glassEffect` sulle superfici strutturali; la guardia `accessibilityReduceTransparency` resta per gli overlay |
 | `GlassCard` | `LumeCard(zone:)` | Opaca, bordo 1px, ombra solo se focale |
-| `StatusBadge`, `VetroTone`/`VetroPalette` | Invariati nei valori, rinominati `LumeTone`/`LumePalette` | I segnali clinici non cambiano |
+| `StatusBadge`, `VetroTone`/`VetroPalette` | Invariati nei valori, rinominati `LumeTone`/`LumePalette` | Badge su superficie field opaca; il segnale clinico resta soltanto su testo o glifo |
 | `InfoRow` | `RigaLista` | Altezza 44pt touch, fuoco di selezione reso con la luce, cifre tabellari |
-| (nuovo) | `TestataPaziente` | Identità verificabile (nome, anno, identificativo, allergie), compressa in compact, `safeAreaInset(edge: .top)` nel contesto paziente; si integra con il privacy shield esistente |
+| (nuovo) | `TestataPaziente` | Identità verificabile: nome e anno in compact; dettagli espandibili e identificativo abbreviato sotto il privacy shield. Il glifo allergie compare solo quando esiste un dato strutturato affidabile |
 | (nuovo) | `RigaLaboratorio` | Anatomia canonica: nome (Voce), valore (Registro), unità, banda di range + banda personale (Canvas/Gauge custom), delta, data |
 | (nuovo) | `Filo` | Connettore reale continuo: timeline, provenienza e continuità |
 | (nuovo) | `.lumeInchiostro(bozza:)` | Porta lo stato epistemico: bozza tenue con micro-etichetta del chiamante, firma a contrasto pieno |
@@ -53,7 +53,7 @@ Sulla fascia compatta il modello focale si semplifica, non si spegne:
 
 - **Il fuoco è lo schermo corrente**: la penombra è lo stack di navigazione alle spalle; niente tre zone simultanee su 390pt.
 - **La coda dell'attenzione è la home**: la tab primaria del client accoppiato mostra la coda con i due binari come filtri; ogni voce porta perché e scadenza; le azioni delegabili sono swipe actions.
-- **La testata si comprime a barra** (nome, anno, glifo allergie) e resta appuntata sopra il contenuto paziente; il tap la espande.
+- **La testata si comprime a barra** (nome e anno) e resta appuntata sopra il contenuto paziente; il tap la espande. Il glifo allergie compare solo se il modello espone il dato. Il modello paired corrente non lo espone, quindi la UI non lo inventa.
 - **Il Registro non si negozia**: le cifre tabellari servono proprio dove lo spazio è poco.
 - **Registro guardia**: sul telefono è il caso d'uso principe (reperibilità notturna); segue il dark di sistema con i token notte.
 - I target restano 44pt; la densità densa non esiste in compact.
@@ -84,10 +84,10 @@ Il punto strategico: **Lume elimina il problema del degrado**. Con Vetro Clinico
 
 ## 6. Sequenza nativa
 
-Stato al 2026-07-14: oltre alla thin slice delle card cliniche opache, la Wave N2 introduce `LumePalette`, `LumeSurface`, `LumeCard`, `Filo`, `RigaLista`, `.registro()`, `.lumeInchiostro(bozza:)` e `lumeGlass`, con alias di compatibilità Vetro. Struttura desktop, adozione nelle viste, parity completa e un target XCUITest macOS dedicato restano aperti.
+Stato al 2026-07-15: oltre alla thin slice delle card cliniche opache, la Wave N2 consegna `LumePalette`, `LumeSurface`, `LumeCard`, `Filo`, `RigaLista`, `.registro()`, `.lumeInchiostro(bozza:)` e `lumeGlass`, con alias di compatibilità Vetro. Il branch `feat/lume-apple` consegna anche lo spacchettamento del workspace e l'adozione L2-L4 su worklist, Scheda, diario e impostazioni del client accoppiato. Coda dell'attenzione, trigger contestuale della guardia, parity completa e un target XCUITest macOS dedicato restano aperti.
 
-1. Con DS-2 (prerequisito): `NavigationSplitView`, spacchettamento workspace, guardie di accessibilità.
+1. Con DS-2 (prerequisito): spacchettamento workspace e guardie di accessibilita consegnati sul branch nativo; struttura desktop completa ancora aperta.
 2. L1 nativa: `LumePalette` code-first con i tre registri e test di parità fail-closed. Consegnata in Wave N2.
-3. L2-L3 nativa: primitive `LumeSurface`/`LumeCard`/`Filo` in LumeKit consegnate in Wave N2; adozione su worklist e Quadro del client accoppiato resta successiva.
-4. L4 nativa: modifier `.registro()` disponibile; l'adozione su tutti gli atomi verificabili (dosi, valori, date già presenti nel workspace) resta successiva.
-5. L5-L6: coda dell'attenzione come home compatta; tri-OS resta fermo finché una lane separata non viene autorizzata.
+3. L2-L3 nativa: primitive e adozione su worklist, Scheda, diario e impostazioni consegnate sul branch nativo. La timeline usa una sola spina continua dietro le voci.
+4. L4 nativa: `.registro()` adottato sui valori, codici, date e contatori toccati dalla tranche; etichette e copy restano nella Voce. Il completamento sulle altre superfici resta progressivo.
+5. L5-L6: coda dell'attenzione come home compatta e trigger contestuale della guardia restano debito; tri-OS resta fermo finche una lane separata non viene autorizzata.
