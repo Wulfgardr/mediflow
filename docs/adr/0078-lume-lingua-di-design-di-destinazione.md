@@ -133,6 +133,13 @@ Consegnate:
   (`clinicalCardStyle()`, alias `cardStyle()`, `GlassCard` deprecata e resa
   opaca) con test sintetico light/dark (`ClinicalCardStyleTests`) e build del
   bundle (PR #46).
+- **Grammatica del gesto e del movimento (canone e dimostratori)**:
+  `07-gesto-e-movimento.md` distilla il livello di interazione e motion con una
+  resa rivista del filo (la luce marca il fuoco, l'inchiostro porta lo stato, il
+  filo resta connettore come geometria SVG), con cinque dimostratori interattivi
+  in `mockups/`. Revisiona la resa descritta in `01-lingua.md` par. 3 e 7. Resta
+  specifica e dimostratore, non implementazione: i consumatori web e nativi
+  restano da migrare.
 
 Aperte:
 

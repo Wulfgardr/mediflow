@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lume: impostazioni sartoriali (luce e inchiostro)</title>
+<style>
+/* ============================================================
+   Lume: impostazioni sartoriali.
+   La scena delle impostazioni dentro ADR 0047 (nessun selettore
+   di stile UI persistito). Ogni opzione ha anteprima immediata e
+   reversibile sul frammento di UI accanto. Il rapporto conflittuale
+   con le impostazioni si scioglie perche niente e nascosto o
+   irreversibile: la luce porta il fuoco, l'inchiostro porta lo
+   stato, il filo connette solo dove connette davvero.
+   File autonomo, nessuna dipendenza, nessun font remoto.
+   Dati esclusivamente dimostrativi.
+   ============================================================ */
+
+:root {
+  --canvas:#eef0f2; --field:#f5f5f4; --focal:#fbfaf7; --chrome:#e6e8eb;
+  --ink:#1a1c1e; --ink-muted:#5c6772; --minerale:#33506b;
+  --warning:#9a6a2f; --critical:#a33a2f; --success:#4b6354; --plum:#555161;
+  --warning-tint:rgba(154,106,47,0.10); --critical-tint:rgba(163,58,47,0.10); --success-tint:rgba(75,99,84,0.12);
+  --minerale-tint:rgba(51,80,107,0.10);
+  --border:rgba(26,28,30,0.10); --border-chrome:rgba(26,28,30,0.06);
+  --shadow-focal:0 2px 8px rgba(26,28,30,0.10); --shadow-lift:0 6px 20px rgba(26,28,30,0.12);
+  --r-panel:20px; --r-card:14px; --r-control:10px;
+  --voce:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Inter",sans-serif;
+  --registro:ui-monospace,"SF Mono","IBM Plex Mono","Cascadia Mono",Menlo,monospace;
+  --focus-ring:0 0 0 2px var(--canvas),0 0 0 4px var(--minerale);
+  --warm:rgba(154,106,47,0.05);
+}
+.grafite { --canvas:#121417; --field:#191c21; --focal:#22252b; --chrome:#0e1013; --ink:#e9ecef; --ink-muted:#8f9aa6; --minerale:#8fb0cc; --warning:#c89c5a; --critical:#d67668; --success:#7e9e8a; --plum:#9691a5; --warning-tint:rgba(200,156,90,0.14); --critical-tint:rgba(214,118,104,0.14); --success-tint:rgba(126,158,138,0.16); --minerale-tint:rgba(143,176,204,0.14); --border:rgba(233,236,239,0.10); --border-chrome:rgba(233,236,239,0.05); --shadow-focal:0 2px 10px rgba(0,0,0,0.5); --shadow-lift:0 8px 26px rgba(0,0,0,0.6); --warm:rgba(200,156,90,0.06); }
+.guardia { --canvas:#0c0e12; --field:#14171d; --focal:#1a1e26; --chrome:#090b0e; --ink:#e3e8ee; --ink-muted:#8792a3; --minerale:#7fa0bc; --warning:#cfa35f; --critical:#d98a7d; --success:#85a291; --plum:#9691a5; --warning-tint:rgba(207,163,95,0.14); --critical-tint:rgba(217,138,125,0.14); --success-tint:rgba(133,162,145,0.16); --minerale-tint:rgba(127,160,188,0.14); --border:rgba(227,232,238,0.09); --border-chrome:rgba(227,232,238,0.04); --shadow-focal:0 2px 10px rgba(0,0,0,0.6); --shadow-lift:0 8px 26px rgba(0,0,0,0.7); --warm:rgba(207,163,95,0.06); }
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family:var(--voce); background:var(--canvas); color:var(--ink);
+  font-size:14px; line-height:1.5; min-height:100vh;
+  transition:background 200ms ease-out, color 200ms ease-out;
+}
+.reg { font-family:var(--registro); font-variant-numeric:tabular-nums; font-size:0.95em; }
+
+/* ---------- Barra di controllo (buio operativo) ---------- */
+.bar {
+  position:sticky; top:0; z-index:60; display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  padding:12px 22px; background:var(--chrome); border-bottom:1px solid var(--border-chrome);
+}
+.bar h1 { font-size:14px; font-weight:600; letter-spacing:-0.01em; }
+.bar .hint { font-size:11px; color:var(--ink-muted); max-width:46ch; }
+.seg { display:flex; gap:3px; background:var(--canvas); border-radius:999px; padding:3px; }
+.seg button {
+  border:0; background:transparent; color:var(--ink-muted); font:inherit; font-size:12px; font-weight:500;
+  padding:5px 14px; border-radius:999px; cursor:pointer; transition:color 150ms ease-out;
+}
+.seg button:focus-visible { outline:none; box-shadow:var(--focus-ring); }
+.seg button[aria-pressed="true"] { background:var(--focal); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,0.10); }
+.seg-label { font-size:10.5px; font-weight:650; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-muted); }
+
+/* ---------- Testata invariabile ---------- */
+.testata {
+  max-width:1180px; margin:20px auto 0; padding:12px 18px; display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
+  background:var(--field); border:1px solid var(--border); border-radius:var(--r-card);
+}
+.testata .nome { font-size:17px; font-weight:650; letter-spacing:-0.01em; }
+.testata .dato { font-size:12px; color:var(--ink-muted); }
+.testata .allergia { font-size:12px; font-weight:600; color:var(--critical); }
+
+/* ---------- Palco ---------- */
+.stage { max-width:1180px; margin:14px auto 56px; position:relative; }
+.viewnote { font-size:12px; color:var(--ink-muted); margin:0 2px 14px; max-width:92ch; }
+.cols { position:relative; display:grid; grid-template-columns:1fr 372px; gap:16px; align-items:start; }
+@media (max-width:900px){ .cols { grid-template-columns:1fr; } .preview { position:static !important; } .filo-layer { display:none; } }
+
+/* ---------- Il filo: connettore SVG che si disegna (draw-on) ----------
+   Legittimo qui perche connette davvero: lega l'impostazione che tocchi
+   alla parte della UI che governa (la provenienza dell'effetto).
+   Continuo, mai tratteggiato, mai sul bordo di un riquadro. */
+.filo-layer { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:5; overflow:visible; }
+.filo-layer path {
+  fill:none; stroke:var(--minerale); stroke-width:1.5; stroke-linecap:round; opacity:0;
+  transition:opacity 180ms ease-out;
+}
+.filo-layer path.vivo { opacity:0.62; }
+
+/* ---------- Colonna impostazioni ---------- */
+.settings { display:flex; flex-direction:column; gap:14px; }
+.section {
+  position:relative; background:var(--field); border:1px solid var(--border); border-radius:var(--r-card);
+  padding:15px 16px; transition:background 190ms ease-out, box-shadow 190ms ease-out;
+}
+/* La luce porta il fuoco: la sezione che stai regolando sale nella luce.
+   Nessuna linea, nessuna stanghetta sul bordo. Il calore appartiene solo al fuoco. */
+.section.attiva { background:linear-gradient(var(--warm), var(--warm)), var(--focal); box-shadow:var(--shadow-focal); }
+.section:focus-within { outline:none; }
+.section > .lbl { display:flex; align-items:baseline; gap:8px; }
+.section h2 { font-size:13.5px; font-weight:650; letter-spacing:-0.005em; }
+.section .num { font-size:10px; font-weight:700; color:var(--minerale); font-family:var(--registro); }
+.section .desc { font-size:11.5px; color:var(--ink-muted); margin:3px 0 12px; max-width:56ch; }
+
+/* La pulsazione di conferma: transiente, poi si spegne (~300ms). Mai un peso. */
+@keyframes assicura {
+  0% { box-shadow:var(--shadow-focal), 0 0 0 0 var(--minerale-tint); }
+  35% { box-shadow:var(--shadow-lift), 0 0 0 6px var(--minerale-tint); }
+  100% { box-shadow:var(--shadow-focal), 0 0 0 0 rgba(0,0,0,0); }
+}
+.section.assicura { animation:assicura 320ms ease-out; }
+
+/* ---------- Segmenti / opzioni ---------- */
+.opts { display:flex; gap:4px; background:var(--canvas); border-radius:999px; padding:4px; width:fit-content; }
+.opts button {
+  border:0; background:transparent; color:var(--ink-muted); font:inherit; font-size:12.5px; font-weight:550;
+  padding:6px 15px; border-radius:999px; cursor:pointer;
+  transition:color 150ms ease-out, transform 150ms cubic-bezier(0.2,0,0,1);
+}
+.opts button:active { transform:scale(0.97); }
+.opts button:focus-visible { outline:none; box-shadow:var(--focus-ring); }
+/* L'opzione scelta sale nella luce, con pulsazione transiente (in JS). */
+.opts button[aria-pressed="true"] { background:var(--focal); color:var(--ink); box-shadow:var(--shadow-focal); }
+@keyframes accendi { 0%{ box-shadow:var(--shadow-focal),0 0 0 0 var(--minerale-tint);} 40%{ box-shadow:var(--shadow-focal),0 0 0 5px var(--minerale-tint);} 100%{ box-shadow:var(--shadow-focal),0 0 0 0 rgba(0,0,0,0);} }
+.opts button.accendi { animation:accendi 300ms ease-out; }
+
+.hintline { font-size:11px; color:var(--ink-muted); margin-top:9px; }
+.hintline b { color:var(--ink); font-weight:600; }
+
+/* ---------- Viste salvate (chip) ---------- */
+.chips { display:flex; flex-wrap:wrap; gap:7px; }
+.vchip {
+  border:1px solid var(--border); background:transparent; color:var(--ink); font:inherit; font-size:12px; font-weight:550;
+  padding:6px 13px; border-radius:999px; cursor:pointer;
+  transition:background 150ms ease-out, box-shadow 190ms ease-out, transform 150ms cubic-bezier(0.2,0,0,1);
+}
+.vchip:hover { background:var(--canvas); }
+.vchip:active { transform:scale(0.97); }
+.vchip:focus-visible { outline:none; box-shadow:var(--focus-ring); }
+.vchip[aria-pressed="true"] { background:var(--focal); border-color:transparent; box-shadow:var(--shadow-focal); }
+.vchip .cnt { font-family:var(--registro); font-size:10.5px; color:var(--ink-muted); margin-left:5px; }
+
+/* ---------- Interruttori di routing (materia, non stanghetta) ---------- */
+.route { display:flex; flex-direction:column; gap:2px; }
+.route .r-row {
+  display:flex; align-items:center; gap:12px; padding:9px 4px; cursor:pointer; border-radius:var(--r-control);
+  transition:background 150ms ease-out;
+}
+.route .r-row:hover { background:var(--canvas); }
+.route .r-row:focus-visible { outline:none; box-shadow:var(--focus-ring); }
+.route .r-txt { flex:1; }
+.route .r-txt b { display:block; font-size:13px; font-weight:600; }
+.route .r-txt span { font-size:11px; color:var(--ink-muted); }
+/* Lo switch: la pastiglia scivola, niente lampeggio a loop. */
+.sw { width:40px; height:23px; border-radius:999px; background:var(--canvas); position:relative; flex:none; border:1px solid var(--border);
+  transition:background 180ms ease-out; }
+.sw::after { content:""; position:absolute; top:2px; left:2px; width:17px; height:17px; border-radius:50%; background:var(--ink-muted);
+  transition:transform 200ms cubic-bezier(0.2,0.9,0.2,1), background 180ms ease-out; }
+.r-row[aria-checked="true"] .sw { background:var(--minerale-tint); border-color:transparent; }
+.r-row[aria-checked="true"] .sw::after { transform:translateX(17px); background:var(--minerale); }
+
+/* ---------- Scorciatoie ---------- */
+.keys { display:flex; flex-direction:column; }
+.krow { display:grid; grid-template-columns:1fr auto; gap:8px 12px; align-items:center; padding:9px 2px; border-bottom:1px solid var(--border); }
+.krow:last-child { border-bottom:0; }
+.krow .k-what { font-size:13px; font-weight:550; }
+.krow .k-note { font-size:10.5px; color:var(--ink-muted); grid-column:1 / -1; margin-top:2px; }
+/* L'inchiostro porta lo stato: la nuova scorciatoia entra come bozza
+   (solo tono a contrasto piu basso) con etichetta onesta, e la firma la asciuga.
+   Niente calore, niente colore clinico: lo stato di editing e inchiostro. */
+.kbind { display:inline-flex; align-items:center; gap:8px; }
+.kcap {
+  font-family:var(--registro); font-size:12px; font-weight:600; color:var(--ink);
+  background:var(--canvas); border:1px solid var(--border); border-radius:7px; padding:3px 9px; min-width:30px; text-align:center;
+  transition:color 380ms ease-out;
+}
+.krow.bozza .kcap { color:var(--ink-muted); }
+.k-stato { font-size:10px; font-weight:600; color:var(--ink-muted); }
+.krow.firmata .k-stato { color:var(--success); }
+/* Il tick della firma: si disegna, non appare per opacita. Il success e la
+   conferma della firma (l'inchiostro asciuga), non un segnale di stato-bozza. */
+.ktick { display:inline-block; height:2px; width:0; background:var(--success); border-radius:2px; vertical-align:middle; transition:width 360ms ease-out; }
+.krow.firmata .ktick { width:20px; }
+.k-acts { display:flex; gap:6px; align-items:center; }
+.mini { border:1px solid var(--border); background:transparent; color:var(--ink); font:inherit; font-size:11px; font-weight:600;
+  padding:5px 10px; border-radius:999px; cursor:pointer; position:relative; overflow:hidden;
+  transition:background 150ms ease-out, transform 150ms cubic-bezier(0.2,0,0,1); }
+.mini:hover { background:var(--canvas); }
+.mini:active { transform:scale(0.97); }
+.mini:focus-visible { outline:none; box-shadow:var(--focus-ring); }
+.mini.primario { background:var(--minerale); border-color:transparent; color:var(--focal); }
+.mini.primario:hover { filter:brightness(1.06); background:var(--minerale); }
+
+/* ---------- Ordine menu: manipolazione diretta ---------- */
+.menulist { list-style:none; display:flex; flex-direction:column; gap:6px; touch-action:none; }
+.mitem {
+  display:flex; align-items:center; gap:10px; padding:9px 11px; background:var(--canvas); border:1px solid var(--border);
+  border-radius:var(--r-control); cursor:grab; user-select:none; will-change:transform;
+}
+.mitem:focus-visible { outline:none; box-shadow:var(--focus-ring); }
+.mitem .grip { display:flex; flex-direction:column; gap:2px; flex:none; }
+.mitem .grip i { display:block; width:14px; height:1.5px; border-radius:2px; background:var(--ink-muted); }
+.mitem .m-name { flex:1; font-size:13px; font-weight:600; }
+.mitem .m-ord { font-family:var(--registro); font-size:10.5px; color:var(--ink-muted); }
+/* La voce presa sale nella luce e resta sotto il dito; le altre si scostano
+   con una molla (spring interrompibile). Nessuna stanghetta, nessun tratteggio. */
+.mitem.dragging { cursor:grabbing; background:var(--focal); box-shadow:var(--shadow-lift); z-index:20; position:relative; }
+.mitem.shift { transition:transform 260ms cubic-bezier(0.2,0.9,0.2,1); }
+.mitem.settle { transition:transform 320ms cubic-bezier(0.2,1.2,0.3,1); }
+
+/* ---------- Azioni globali ---------- */
+.foot { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:2px; }
+.note-adr { font-size:11px; color:var(--ink-muted); max-width:60ch; }
+.btn-quiet { border:1px solid var(--border); background:transparent; color:var(--ink); font:inherit; font-size:12px;
+  font-weight:600; cursor:pointer; padding:8px 15px; border-radius:999px; position:relative; overflow:hidden;
+  transition:transform 150ms cubic-bezier(0.2,0,0,1), background 150ms ease-out; }
+.btn-quiet:hover { background:var(--field); }
+.btn-quiet:active { transform:scale(0.97); }
+.btn-quiet:focus-visible { outline:none; box-shadow:var(--focus-ring); }
+
+/* Anello che si spegne dal punto del tocco. */
+.ripple { position:absolute; border-radius:50%; transform:translate(-50%,-50%) scale(0); background:currentColor; opacity:0.28; pointer-events:none; }
+@keyframes onda { to { transform:translate(-50%,-50%) scale(1); opacity:0; } }
+.ripple.go { animation:onda 460ms ease-out forwards; }
+
+/* ---------- Anteprima (frammento di UI, sticky) ---------- */
+.preview {
+  position:sticky; top:78px; background:var(--field); border:1px solid var(--border); border-radius:var(--r-panel);
+  padding:15px 16px; align-self:start;
+}
+.preview .pv-hd { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+.preview h2 { font-size:14px; font-weight:650; }
+#pvContext { font-size:11.5px; color:var(--ink-muted); margin:4px 0 12px; transition:color 200ms ease-out, opacity 160ms ease-out; }
+#pvContext b { color:var(--ink); font-weight:600; }
+
+/* Menu strip dell'anteprima: rispecchia l'ordine delle voci. */
+.pv-menu { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:12px; }
+.pv-menu .mtab { font-size:11.5px; font-weight:600; color:var(--ink-muted); padding:5px 10px; border-radius:999px; background:var(--canvas);
+  transition:transform 260ms cubic-bezier(0.2,0.9,0.2,1); }
+.pv-menu .mtab.primo { color:var(--ink); background:var(--focal); box-shadow:var(--shadow-focal); }
+
+.pv-sub { font-size:10px; font-weight:650; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-muted); margin:2px 0 6px; }
+
+/* Lista dell'anteprima: la densita cambia subito qui. */
+#pvList { display:flex; flex-direction:column; }
+.pv-row { display:flex; align-items:center; gap:9px; border-radius:var(--r-control);
+  transition:padding 200ms ease-out, background 150ms ease-out, box-shadow 190ms ease-out; }
+.stage.densa .pv-row { padding:4px 8px; }
+.stage.comoda .pv-row { padding:9px 8px; }
+.pv-row .glyph { width:7px; height:7px; border-radius:50%; flex:none; }
+.pv-row .who { flex:1; min-width:0; }
+.pv-row .who b { display:block; font-weight:600; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pv-row .who span { font-size:11px; color:var(--ink-muted); }
+.stage.densa .pv-row .who span { display:none; }
+.pv-row .chip-c { font-size:10px; font-weight:650; padding:2px 8px; border-radius:999px; color:var(--critical); background:var(--critical-tint); }
+.pv-row.evidenza { background:var(--focal); box-shadow:var(--shadow-focal); }
+.pv-empty { font-size:11.5px; color:var(--ink-muted); padding:10px 8px; }
+
+/* Coda / promemoria: destinazione del routing. Come .pv-row.evidenza:
+   solo luce (--focal) e glyph semantico, mai calore persistente. */
+.pv-coda { margin-top:14px; padding-top:12px; border-top:1px solid var(--border); }
+.coda-item { display:flex; align-items:center; gap:8px; font-size:12px; padding:7px 8px; border-radius:var(--r-control);
+  background:var(--focal); box-shadow:var(--shadow-focal); margin-bottom:6px; }
+.coda-item .glyph { width:7px; height:7px; border-radius:50%; flex:none; }
+.coda-item .reg { color:var(--ink-muted); }
+.coda-vuota { font-size:11.5px; color:var(--ink-muted); padding:6px 8px; }
+
+/* La voce bozza dell'anteprima: inchiostro tenue + etichetta, mai tratteggio,
+   mai calore, mai colore clinico per uno stato di editing. */
+.pv-diario { margin-top:6px; }
+.pv-nota { font-size:12px; padding:7px 8px; border-radius:var(--r-control); background:var(--canvas); }
+.pv-nota .st { font-size:10px; font-weight:650; color:var(--ink-muted); }
+.pv-nota .body { color:var(--ink-muted); margin-top:1px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition:none !important; animation:none !important; }
+  .krow.firmata .ktick { width:20px; }
+  .filo-layer path.vivo { opacity:0.62; }
+}
+</style>
+</head>
+<body class="giorno">
+
+<div class="bar">
+  <h1>Lume, impostazioni sartoriali</h1>
+  <div>
+    <div class="seg-label">Registro di luce (solo demo)</div>
+    <div class="seg" role="group" aria-label="Registro di luce, controllo di demo">
+      <button data-reg="giorno" aria-pressed="true">Giorno</button>
+      <button data-reg="grafite" aria-pressed="false">Grafite</button>
+      <button data-reg="guardia" aria-pressed="false">Guardia</button>
+    </div>
+  </div>
+  <span class="hint">Il registro di luce qui e un controllo di demo. Nel prodotto segue il sistema, non e un selettore persistito (ADR 0047).</span>
+</div>
+
+<div class="testata" role="banner">
+  <span class="nome">Bianchi Aurora (demo)</span>
+  <span class="dato reg">1954</span>
+  <span class="dato">dati dimostrativi</span>
+  <span class="allergia">Allergia: penicillina</span>
+  <span class="dato">Ambulatorio: <span id="testataAmb">Poliambulatorio Nord (demo)</span></span>
+</div>
+
+<div class="stage comoda" id="stage">
+  <p class="viewnote">Ogni impostazione ha anteprima immediata e reversibile sul frammento a destra: quando tocchi un comando, la parte che governa sale nella luce e un filo continuo la collega al comando. Niente e nascosto, niente e irreversibile. Colore = solo semantica clinica. Dati dimostrativi.</p>
+
+  <div class="cols">
+    <svg class="filo-layer" id="filoLayer" aria-hidden="true"><path id="filoPath" d=""></path></svg>
+
+    <div class="settings">
+
+      <!-- 1. DENSITA -->
+      <section class="section" data-section data-governs="pvList" tabindex="-1" aria-labelledby="s1">
+        <div class="lbl"><span class="num">01</span><h2 id="s1">Densita</h2></div>
+        <p class="desc">Quanto respira la lista. Cambia subito qui accanto, e torni indietro con un tocco.</p>
+        <div class="opts" role="group" aria-label="Densita">
+          <button data-density="comoda" aria-pressed="true">Comoda</button>
+          <button data-density="densa" aria-pressed="false">Densa</button>
+        </div>
+        <p class="hintline">Ora: <b id="densLbl">comoda</b>. In densa la lista mostra piu righe e nasconde il sottotitolo.</p>
+      </section>
+
+      <!-- 2. SCORCIATOIE -->
+      <section class="section" data-section data-governs="pvList" tabindex="-1" aria-labelledby="s2">
+        <div class="lbl"><span class="num">02</span><h2 id="s2">Scorciatoie da tastiera</h2></div>
+        <p class="desc">Ogni scorciatoia e ispezionabile e ri-legabile. La nuova combinazione entra come bozza in inchiostro tenue: accettarla non e firmarla. La firma asciuga l'inchiostro.</p>
+        <div class="keys" id="keys">
+          <div class="krow firmata" data-key="fuoco">
+            <div class="k-what">Sposta il fuoco</div>
+            <div class="k-acts">
+              <span class="kbind"><span class="kcap">&uarr; &darr;</span><span class="k-stato">in vigore</span><span class="ktick" aria-hidden="true"></span></span>
+              <button class="mini" data-rebind>Rilega</button>
+            </div>
+          </div>
+          <div class="krow firmata" data-key="firma">
+            <div class="k-what">Firma la voce</div>
+            <div class="k-acts">
+              <span class="kbind"><span class="kcap">F</span><span class="k-stato">in vigore</span><span class="ktick" aria-hidden="true"></span></span>
+              <button class="mini" data-rebind>Rilega</button>
+            </div>
+          </div>
+          <div class="krow firmata" data-key="nuova">
+            <div class="k-what">Nuova voce</div>
+            <div class="k-acts">
+              <span class="kbind"><span class="kcap">N</span><span class="k-stato">in vigore</span><span class="ktick" aria-hidden="true"></span></span>
+              <button class="mini" data-rebind>Rilega</button>
+            </div>
+          </div>
+          <div class="krow firmata" data-key="cerca">
+            <div class="k-what">Cerca</div>
+            <div class="k-acts">
+              <span class="kbind"><span class="kcap">/</span><span class="k-stato">in vigore</span><span class="ktick" aria-hidden="true"></span></span>
+              <button class="mini" data-rebind>Rilega</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. VISTE SALVATE -->
+      <section class="section" data-section data-governs="pvList" tabindex="-1" aria-labelledby="s3">
+        <div class="lbl"><span class="num">03</span><h2 id="s3">Viste salvate</h2></div>
+        <p class="desc">Un filtro che ti sei costruito. Sceglierne una ricompone la lista accanto: la vista scelta sale nella luce.</p>
+        <div class="chips" role="group" aria-label="Viste salvate">
+          <button class="vchip" data-view="tutti" aria-pressed="true">Tutti<span class="cnt reg" data-cnt="tutti"></span></button>
+          <button class="vchip" data-view="critici" aria-pressed="false">Solo critici<span class="cnt reg" data-cnt="critici"></span></button>
+          <button class="vchip" data-view="dafirmare" aria-pressed="false">Da firmare<span class="cnt reg" data-cnt="dafirmare"></span></button>
+        </div>
+      </section>
+
+      <!-- 4. DEFAULT AMBULATORIO -->
+      <section class="section" data-section data-governs="pvContext" tabindex="-1" aria-labelledby="s4">
+        <div class="lbl"><span class="num">04</span><h2 id="s4">Default di ambulatorio</h2></div>
+        <p class="desc">Dove apre lo strumento all'avvio. La luce del contesto si ricalibra subito, la testata resta ferma e leggibile.</p>
+        <div class="opts" role="group" aria-label="Default di ambulatorio">
+          <button data-amb="Poliambulatorio Nord (demo)" aria-pressed="true">Nord</button>
+          <button data-amb="Sede Centro (demo)" aria-pressed="false">Centro</button>
+          <button data-amb="Domiciliare (demo)" aria-pressed="false">Domiciliare</button>
+        </div>
+      </section>
+
+      <!-- 5. ROUTING CODA / NOTIFICHE -->
+      <section class="section" data-section data-governs="pvCoda" tabindex="-1" aria-labelledby="s5">
+        <div class="lbl"><span class="num">05</span><h2 id="s5">Routing della coda e delle notifiche</h2></div>
+        <p class="desc">Dove finiscono i segnali. Ogni interruttore mostra subito il suo effetto nella coda dell'anteprima, e si annulla con un tocco.</p>
+        <div class="route" id="route">
+          <div class="r-row" role="switch" tabindex="0" aria-checked="true" data-route="critici">
+            <span class="r-txt"><b>Risultati critici in coda</b><span>Un valore fuori soglia entra nella coda in evidenza</span></span>
+            <span class="sw" aria-hidden="true"></span>
+          </div>
+          <div class="r-row" role="switch" tabindex="0" aria-checked="false" data-route="promemoria">
+            <span class="r-txt"><b>Promemoria nel diario</b><span>I richiami programmati entrano come bozza sul filo del diario</span></span>
+            <span class="sw" aria-hidden="true"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. ORDINE VOCI DI MENU -->
+      <section class="section" data-section data-governs="pvMenu" tabindex="-1" aria-labelledby="s6">
+        <div class="lbl"><span class="num">06</span><h2 id="s6">Ordine delle voci di menu</h2></div>
+        <p class="desc">Manipolazione diretta: trascina una voce e resta sotto il dito, le altre si scostano con una molla. Con la tastiera, seleziona una voce e usa &uarr; &darr;. L'ordine si rispecchia subito nel menu dell'anteprima.</p>
+        <ul class="menulist" id="menulist" aria-label="Ordine delle voci di menu">
+          <li class="mitem" data-menu="Agenda" tabindex="0" aria-label="Agenda, posizione 1"><span class="grip" aria-hidden="true"><i></i><i></i><i></i></span><span class="m-name">Agenda</span><span class="m-ord reg">1</span></li>
+          <li class="mitem" data-menu="Coda" tabindex="0" aria-label="Coda, posizione 2"><span class="grip" aria-hidden="true"><i></i><i></i><i></i></span><span class="m-name">Coda</span><span class="m-ord reg">2</span></li>
+          <li class="mitem" data-menu="Diario" tabindex="0" aria-label="Diario, posizione 3"><span class="grip" aria-hidden="true"><i></i><i></i><i></i></span><span class="m-name">Diario</span><span class="m-ord reg">3</span></li>
+          <li class="mitem" data-menu="Referti" tabindex="0" aria-label="Referti, posizione 4"><span class="grip" aria-hidden="true"><i></i><i></i><i></i></span><span class="m-name">Referti</span><span class="m-ord reg">4</span></li>
+          <li class="mitem" data-menu="Terapie" tabindex="0" aria-label="Terapie, posizione 5"><span class="grip" aria-hidden="true"><i></i><i></i><i></i></span><span class="m-name">Terapie</span><span class="m-ord reg">5</span></li>
+        </ul>
+      </section>
+
+      <div class="foot">
+        <button class="btn-quiet" id="resetAll">Riporta tutto ai valori iniziali</button>
+        <span class="note-adr">Nessuna di queste scelte e un tema persistito: sono sartorialita di lavoro (densita, scorciatoie, viste, default, routing, ordine), tutte reversibili.</span>
+      </div>
+
+    </div>
+
+    <!-- ANTEPRIMA -->
+    <aside class="preview" id="preview" aria-label="Anteprima dell'effetto delle impostazioni">
+      <div class="pv-hd"><h2>Anteprima</h2></div>
+      <div id="pvContext">Apre su <b id="pvAmb">Poliambulatorio Nord (demo)</b>, vista <b id="pvView">Tutti</b>.</div>
+
+      <div class="pv-menu" id="pvMenu" aria-label="Menu, riflette l'ordine scelto"></div>
+
+      <div class="pv-sub">Ambulatorio</div>
+      <div id="pvList"></div>
+
+      <div class="pv-coda" id="pvCoda">
+        <div class="pv-sub">Coda e notifiche</div>
+        <div id="codaBox"></div>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  var body = document.body, stage = document.getElementById('stage');
+  var prefersReduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- utilita: anello dal punto del tocco ---------- */
+  function onda(btn, e){
+    if(prefersReduce) return;
+    var r = document.createElement('span'); r.className='ripple';
+    var b = btn.getBoundingClientRect(); var d = Math.max(b.width,b.height)*2;
+    r.style.width = r.style.height = d+'px';
+    r.style.left = ((e && e.clientX ? e.clientX : b.left+b.width/2) - b.left)+'px';
+    r.style.top  = ((e && e.clientY ? e.clientY : b.top+b.height/2) - b.top)+'px';
+    btn.appendChild(r); void r.offsetWidth; r.classList.add('go');
+    setTimeout(function(){ r.remove(); }, 500);
+  }
+  function pulse(el){ if(prefersReduce) return; el.classList.remove('assicura'); void el.offsetWidth; el.classList.add('assicura'); }
+  function accendi(el){ if(prefersReduce) return; el.classList.remove('accendi'); void el.offsetWidth; el.classList.add('accendi'); }
+
+  /* ---------- registro di luce (solo demo, alta frequenza: nessuna anim di contenuto) ---------- */
+  document.querySelectorAll('[data-reg]').forEach(function(bn){
+    bn.addEventListener('click', function(){
+      var keep = stage.className;
+      body.className = bn.dataset.reg;
+      stage.className = keep;
+      document.querySelectorAll('[data-reg]').forEach(function(x){ x.setAttribute('aria-pressed', String(x===bn)); });
+    });
+  });
+
+  /* ---------- IL FILO: connettore SVG che si disegna dall'impostazione alla parte che governa ---------- */
+  var layer = document.getElementById('filoLayer');
+  var fpath = document.getElementById('filoPath');
+  function drawFilo(fromEl, toEl){
+    if(!fromEl || !toEl || window.innerWidth <= 900) return;
+    var sr = layer.getBoundingClientRect();
+    var a = fromEl.getBoundingClientRect(), b = toEl.getBoundingClientRect();
+    var x1 = a.right - sr.left, y1 = a.top + a.height/2 - sr.top;
+    var x2 = b.left - sr.left,  y2 = b.top + b.height/2 - sr.top;
+    if(x2 < x1) x2 = b.right - sr.left; // se la preview sta a sinistra, aggancia il lato destro
+    var mx = x1 + (x2 - x1)*0.5;
+    fpath.setAttribute('d', 'M '+x1.toFixed(1)+' '+y1.toFixed(1)+' C '+mx.toFixed(1)+' '+y1.toFixed(1)+' '+mx.toFixed(1)+' '+y2.toFixed(1)+' '+x2.toFixed(1)+' '+y2.toFixed(1));
+    var len = fpath.getTotalLength();
+    if(prefersReduce){
+      fpath.style.strokeDasharray=''; fpath.style.strokeDashoffset=''; fpath.classList.add('vivo');
+    } else {
+      fpath.style.transition='none';
+      fpath.style.strokeDasharray=len; fpath.style.strokeDashoffset=len;
+      void fpath.getBoundingClientRect();
+      fpath.classList.add('vivo');
+      fpath.style.transition='stroke-dashoffset 340ms cubic-bezier(0.2,0.9,0.2,1)';
+      fpath.style.strokeDashoffset='0';
+    }
+  }
+  function clearFilo(){ fpath.classList.remove('vivo'); }
+
+  var lastSection = null;
+  function activateSection(sec){
+    if(lastSection && lastSection!==sec) lastSection.classList.remove('attiva');
+    sec.classList.add('attiva'); pulse(sec); lastSection = sec;
+    var target = document.getElementById(sec.dataset.governs);
+    drawFilo(sec, target);
+  }
+  document.querySelectorAll('[data-section]').forEach(function(sec){
+    // il fuoco segue dove lavori: interazione o focus dentro la sezione
+    sec.addEventListener('pointerdown', function(){ activateSection(sec); });
+    sec.addEventListener('focusin', function(){ activateSection(sec); });
+  });
+  // il filo e vitalita di gesto: se scorri, si spegne (niente linee stantie)
+  window.addEventListener('scroll', function(){ clearFilo(); }, {passive:true});
+  window.addEventListener('resize', function(){ clearFilo(); });
+
+  /* ---------- dati anteprima ----------
+     La gravita e SOLO clinica: sev != null solo quando c'e vera gravita
+     (Bianchi ha una PA fuori soglia). Le categorie non-cliniche (rinnovo
+     piano, esiti rientrati, prima visita) restano nel tono dell'inchiostro. */
+  var patients = [
+    { id:'bianchi', nome:'Bianchi Aurora (demo)', sub:'Controllo pressorio', ora:'09:00', sev:'critical', tags:['tutti','critici'], chip:'PA' },
+    { id:'ferri',   nome:'Ferri Giacomo (demo)',  sub:'Rinnovo piano',       ora:'09:30', sev:null,       tags:['tutti','dafirmare'] },
+    { id:'conti',   nome:'Conti Elena (demo)',    sub:'Esiti rientrati',     ora:'10:00', sev:null,       tags:['tutti'] },
+    { id:'riva',    nome:'Riva Pietro (demo)',    sub:'Prima visita',        ora:'10:30', sev:null,       tags:['tutti','dafirmare'] }
+  ];
+  var state = { view:'tutti', routeCritici:true, routePromemoria:false };
+  var pvList = document.getElementById('pvList');
+
+  function renderList(){
+    pvList.innerHTML='';
+    var shown = patients.filter(function(p){ return p.tags.indexOf(state.view)>-1; });
+    if(shown.length===0){
+      var e = document.createElement('div'); e.className='pv-empty';
+      e.textContent = 'Nessuna voce in questa vista, adesso.'; pvList.appendChild(e); return;
+    }
+    shown.forEach(function(p){
+      var row = document.createElement('div'); row.className='pv-row'; row.dataset.pid=p.id;
+      if(state.routeCritici && p.sev==='critical') row.classList.add('evidenza');
+      var g = document.createElement('span'); g.className='glyph';
+      // colore = solo semantica clinica: dot neutro (inchiostro) per le categorie
+      g.style.background = p.sev ? 'var(--'+p.sev+')' : 'var(--ink-muted)';
+      var who = document.createElement('span'); who.className='who';
+      who.innerHTML = '<b>'+p.nome+'</b><span>'+p.sub+', <span class="reg">'+p.ora+'</span></span>';
+      row.appendChild(g); row.appendChild(who);
+      if(p.chip){ var c=document.createElement('span'); c.className='chip-c'; c.textContent=p.chip; row.appendChild(c); }
+      pvList.appendChild(row);
+    });
+  }
+
+  // conteggi viste
+  document.querySelectorAll('[data-cnt]').forEach(function(el){
+    var v=el.dataset.cnt; el.textContent = patients.filter(function(p){return p.tags.indexOf(v)>-1;}).length;
+  });
+
+  /* ---------- coda / notifiche ---------- */
+  var codaBox = document.getElementById('codaBox');
+  function renderCoda(){
+    codaBox.innerHTML='';
+    if(state.routeCritici){
+      var it = document.createElement('div'); it.className='coda-item';
+      it.innerHTML='<span class="glyph" style="background:var(--critical)"></span><span>PA sistolica <span class="reg">158 mmHg</span>, Bianchi Aurora (demo)</span>';
+      codaBox.appendChild(it);
+    }
+    if(state.routePromemoria){
+      var nt = document.createElement('div'); nt.className='pv-nota';
+      nt.innerHTML='<span class="st">bozza, sul filo del diario</span><div class="body">Richiamo a <span class="reg">7</span> giorni con diario pressorio.</div>';
+      codaBox.appendChild(nt);
+    }
+    if(!state.routeCritici && !state.routePromemoria){
+      var v=document.createElement('div'); v.className='coda-vuota';
+      v.textContent='Nessun instradamento attivo: la coda resta vuota.'; codaBox.appendChild(v);
+    }
+  }
+
+  /* ---------- 1. DENSITA ---------- */
+  document.querySelectorAll('[data-density]').forEach(function(bn){
+    bn.addEventListener('click', function(){
+      stage.classList.remove('comoda','densa'); stage.classList.add(bn.dataset.density);
+      document.querySelectorAll('[data-density]').forEach(function(x){ x.setAttribute('aria-pressed', String(x===bn)); });
+      document.getElementById('densLbl').textContent = bn.dataset.density;
+      accendi(bn);
+    });
+  });
+
+  /* ---------- 3. VISTE SALVATE ---------- */
+  document.querySelectorAll('[data-view]').forEach(function(bn){
+    bn.addEventListener('click', function(){
+      state.view = bn.dataset.view;
+      document.querySelectorAll('[data-view]').forEach(function(x){ x.setAttribute('aria-pressed', String(x===bn)); });
+      document.getElementById('pvView').textContent = bn.textContent.replace(/\d+$/,'').trim();
+      accendi(bn); renderList();
+    });
+  });
+
+  /* ---------- 4. DEFAULT AMBULATORIO ---------- */
+  document.querySelectorAll('[data-amb]').forEach(function(bn){
+    bn.addEventListener('click', function(){
+      document.querySelectorAll('[data-amb]').forEach(function(x){ x.setAttribute('aria-pressed', String(x===bn)); });
+      var name = bn.dataset.amb;
+      // la luce del contesto si ricalibra: breve cross-fade, la testata resta ferma
+      var ctx = document.getElementById('pvContext');
+      if(!prefersReduce){ ctx.style.opacity='0'; setTimeout(function(){ ctx.style.opacity='1'; }, 140); }
+      document.getElementById('pvAmb').textContent = name;
+      document.getElementById('testataAmb').textContent = name;
+      accendi(bn);
+    });
+  });
+
+  /* ---------- 5. ROUTING ---------- */
+  document.querySelectorAll('#route .r-row').forEach(function(rw){
+    function toggle(){
+      var on = rw.getAttribute('aria-checked')!=='true';
+      rw.setAttribute('aria-checked', String(on));
+      if(rw.dataset.route==='critici') state.routeCritici = on;
+      if(rw.dataset.route==='promemoria') state.routePromemoria = on;
+      renderCoda(); renderList();
+    }
+    rw.addEventListener('click', toggle);
+    rw.addEventListener('keydown', function(e){ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); toggle(); } });
+  });
+
+  /* ---------- 2. SCORCIATOIE: bozza in inchiostro tenue, firma che asciuga ---------- */
+  var recording = null;
+  function currentCaps(){
+    var m={}; document.querySelectorAll('#keys .krow').forEach(function(r){ m[r.dataset.key]=r.querySelector('.kcap').textContent.trim(); }); return m;
+  }
+  document.querySelectorAll('#keys .krow').forEach(function(row){
+    var acts = row.querySelector('.k-acts');
+    var rebindBtn = row.querySelector('[data-rebind]');
+    var stEl = row.querySelector('.k-stato');
+    var capEl = row.querySelector('.kcap');
+
+    function beginRecord(e){
+      if(recording) recording.cancel();
+      onda(rebindBtn, e);
+      row.classList.remove('firmata','conflitto'); row.classList.add('bozza');
+      var prev = capEl.textContent;
+      capEl.textContent='premi un tasto'; stEl.textContent='in ascolto';
+      // note riga
+      var note = document.createElement('div'); note.className='k-note'; note.textContent='In ascolto di un tasto. Esc per annullare.'; row.appendChild(note);
+      // rimpiazza azioni con annulla
+      acts.style.display='none';
+      var cancelWrap = document.createElement('div'); cancelWrap.className='k-acts';
+      var cancel = document.createElement('button'); cancel.className='mini'; cancel.textContent='Annulla';
+      cancelWrap.appendChild(cancel); row.appendChild(cancelWrap);
+
+      function cleanup(){ document.removeEventListener('keydown', onKey, true); note.remove(); cancelWrap.remove(); acts.style.display=''; recording=null; }
+      recording = { cancel: function(){ capEl.textContent=prev; row.classList.remove('bozza','conflitto'); row.classList.add('firmata'); stEl.textContent='in vigore'; cleanup(); } };
+      cancel.addEventListener('click', function(){ recording.cancel(); });
+
+      function onKey(ev){
+        if(ev.key==='Tab') return; // Tab non e firma, non lo catturiamo come binding
+        ev.preventDefault(); ev.stopPropagation();
+        if(ev.key==='Escape'){ recording.cancel(); return; }
+        var cap = ev.key===' ' ? 'Spazio' : (ev.key.length===1 ? ev.key.toUpperCase() : ev.key);
+        capEl.textContent = cap;
+        // conflitto onesto: nessun disabled muto, spieghiamo
+        var caps = currentCaps(); var conflict=null;
+        Object.keys(caps).forEach(function(k){ if(k!==row.dataset.key && caps[k].toUpperCase()===cap.toUpperCase()) conflict=k; });
+        cleanup();
+        // la nuova combinazione e BOZZA finche non la firmi
+        row.classList.add('bozza');
+        if(conflict){
+          row.classList.add('conflitto'); stEl.textContent='in conflitto';
+          var cnote=document.createElement('div'); cnote.className='k-note';
+          cnote.textContent='"'+cap+'" e gia legata a un\'altra azione. Scegline un\'altra o firma comunque per sostituirla.';
+          row.appendChild(cnote);
+          setTimeout(function(){ var n=row.querySelector('.k-note'); if(n) n.remove(); }, 4200);
+        } else {
+          stEl.textContent='bozza, da firmare';
+        }
+        // aggiungi bottoni Firma / Riporta
+        offerSign(prev);
+      }
+      document.addEventListener('keydown', onKey, true);
+    }
+
+    function offerSign(prev){
+      // sostituisci "Rilega" con Firma + Riporta finche la bozza non e risolta
+      var acts2 = row.querySelector('.k-acts');
+      acts2.innerHTML='';
+      var kb = document.createElement('span'); kb.className='kbind';
+      kb.appendChild(capEl); kb.appendChild(stEl);
+      var tick=document.createElement('span'); tick.className='ktick'; tick.setAttribute('aria-hidden','true'); kb.appendChild(tick);
+      acts2.appendChild(kb);
+      var firma=document.createElement('button'); firma.className='mini primario'; firma.textContent='Firma';
+      var back=document.createElement('button'); back.className='mini'; back.textContent='Riporta';
+      acts2.appendChild(firma); acts2.appendChild(back);
+      firma.addEventListener('click', function(e){
+        onda(firma,e);
+        row.classList.remove('bozza','conflitto'); row.classList.add('firmata');
+        stEl.textContent='in vigore';
+        var n=row.querySelector('.k-note'); if(n) n.remove();
+        restoreRebind();
+      });
+      back.addEventListener('click', function(e){
+        onda(back,e);
+        capEl.textContent=prev; row.classList.remove('bozza','conflitto'); row.classList.add('firmata'); stEl.textContent='in vigore';
+        var n=row.querySelector('.k-note'); if(n) n.remove();
+        restoreRebind();
+      });
+    }
+    function restoreRebind(){
+      var acts2=row.querySelector('.k-acts'); acts2.innerHTML='';
+      var kb=document.createElement('span'); kb.className='kbind';
+      kb.appendChild(capEl); kb.appendChild(stEl);
+      var tick=document.createElement('span'); tick.className='ktick'; tick.setAttribute('aria-hidden','true'); kb.appendChild(tick);
+      acts2.appendChild(kb);
+      var rb=document.createElement('button'); rb.className='mini'; rb.textContent='Rilega'; acts2.appendChild(rb);
+      rb.addEventListener('click', beginRecord);
+    }
+    rebindBtn.addEventListener('click', beginRecord);
+  });
+
+  /* ---------- 6. ORDINE MENU: manipolazione diretta, spring interrompibile ---------- */
+  var list = document.getElementById('menulist');
+  var pvMenu = document.getElementById('pvMenu');
+  function order(){ return Array.prototype.map.call(list.children, function(li){ return li.dataset.menu; }); }
+  function renumber(){ Array.prototype.forEach.call(list.children, function(li,i){ li.querySelector('.m-ord').textContent=i+1; li.setAttribute('aria-label', li.dataset.menu+', posizione '+(i+1)); }); }
+  function renderMenu(){
+    pvMenu.innerHTML='';
+    order().forEach(function(name,i){ var t=document.createElement('span'); t.className='mtab'+(i===0?' primo':''); t.textContent=name; pvMenu.appendChild(t); });
+  }
+  renderMenu();
+
+  // --- pointer drag ---
+  var drag = null;
+  list.addEventListener('pointerdown', function(e){
+    var li = e.target.closest('.mitem'); if(!li) return;
+    var items = Array.prototype.slice.call(list.children);
+    var rects = items.map(function(el){ return el.getBoundingClientRect(); });
+    var idx = items.indexOf(li);
+    drag = { li:li, items:items, rects:rects, startY:e.clientY, from:idx, to:idx, h:rects[0].height, gap:6 };
+    li.setPointerCapture(e.pointerId);
+    li.classList.add('dragging');
+    items.forEach(function(el){ if(el!==li) el.classList.add('shift'); });
+    e.preventDefault();
+  });
+  list.addEventListener('pointermove', function(e){
+    if(!drag) return;
+    var dy = e.clientY - drag.startY;
+    // la voce presa resta sotto il dito (nessuna transizione su di lei)
+    drag.li.style.transform = 'translateY('+dy+'px)';
+    var step = drag.h + drag.gap;
+    var to = drag.from + Math.round(dy/step);
+    to = Math.max(0, Math.min(drag.items.length-1, to));
+    if(to!==drag.to){
+      drag.to = to;
+      // le altre si scostano con la molla
+      drag.items.forEach(function(el, i){
+        if(el===drag.li) return;
+        var shift = 0;
+        if(drag.from < to && i>drag.from && i<=to) shift = -step;
+        else if(drag.from > to && i<drag.from && i>=to) shift = step;
+        el.style.transform = shift ? 'translateY('+shift+'px)' : '';
+      });
+    }
+  });
+  function endDrag(e){
+    if(!drag) return;
+    var d = drag; drag = null;
+    d.li.classList.remove('dragging');
+    d.items.forEach(function(el){ el.classList.remove('shift'); el.style.transform=''; });
+    if(d.to!==d.from){
+      // riordino reale nel DOM
+      if(d.to > d.from) list.insertBefore(d.li, d.items[d.to].nextSibling);
+      else list.insertBefore(d.li, d.items[d.to]);
+      // assestamento a molla della voce posata
+      if(!prefersReduce){
+        var prevY = e.clientY - d.startY - (d.to - d.from)*(d.h+d.gap);
+        d.li.style.transform='translateY('+prevY+'px)'; d.li.classList.add('settle');
+        void d.li.offsetWidth; d.li.style.transform='';
+        setTimeout(function(){ d.li.classList.remove('settle'); }, 340);
+      }
+      renumber(); renderMenu();
+    }
+  }
+  list.addEventListener('pointerup', endDrag);
+  list.addEventListener('pointercancel', endDrag);
+
+  // --- tastiera: sposta con le frecce ---
+  list.addEventListener('keydown', function(e){
+    var li = e.target.closest('.mitem'); if(!li) return;
+    if(e.key==='ArrowUp' && li.previousElementSibling){ e.preventDefault(); list.insertBefore(li, li.previousElementSibling); renumber(); renderMenu(); li.focus(); }
+    else if(e.key==='ArrowDown' && li.nextElementSibling){ e.preventDefault(); list.insertBefore(li.nextElementSibling, li); renumber(); renderMenu(); li.focus(); }
+  });
+
+  /* ---------- RIPORTA TUTTO ---------- */
+  document.getElementById('resetAll').addEventListener('click', function(e){
+    onda(this, e);
+    // densita
+    stage.classList.remove('densa'); stage.classList.add('comoda');
+    document.querySelectorAll('[data-density]').forEach(function(x){ x.setAttribute('aria-pressed', String(x.dataset.density==='comoda')); });
+    document.getElementById('densLbl').textContent='comoda';
+    // vista
+    state.view='tutti';
+    document.querySelectorAll('[data-view]').forEach(function(x){ x.setAttribute('aria-pressed', String(x.dataset.view==='tutti')); });
+    document.getElementById('pvView').textContent='Tutti';
+    // ambulatorio
+    document.querySelectorAll('[data-amb]').forEach(function(x){ x.setAttribute('aria-pressed', String(x.dataset.amb.indexOf('Nord')>-1)); });
+    document.getElementById('pvAmb').textContent='Poliambulatorio Nord (demo)';
+    document.getElementById('testataAmb').textContent='Poliambulatorio Nord (demo)';
+    // routing
+    state.routeCritici=true; state.routePromemoria=false;
+    document.querySelectorAll('#route .r-row').forEach(function(rw){ rw.setAttribute('aria-checked', String(rw.dataset.route==='critici')); });
+    // menu
+    ['Agenda','Coda','Diario','Referti','Terapie'].forEach(function(name){
+      var li = list.querySelector('[data-menu="'+name+'"]'); list.appendChild(li);
+    });
+    renumber(); renderMenu();
+    clearFilo();
+    renderList(); renderCoda();
+  });
+
+  /* ---------- primo render ---------- */
+  renumber(); renderList(); renderCoda();
+})();
+</script>
+</body>
+</html>
