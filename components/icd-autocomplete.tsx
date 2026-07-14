@@ -167,7 +167,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
         // @Codex WUL-229: ICD autocomplete shares mf-input + mf-popover language with drug picker
         <div ref={wrapperRef} className="relative w-full">
             <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--mf-muted)' }} aria-hidden="true" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--lume-ink-muted)' }} aria-hidden="true" />
                 <input
                     type="text"
                     role="combobox"
@@ -184,7 +184,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                 />
                 {isLoading && (
                     <div className="absolute right-9 top-1/2 -translate-y-1/2">
-                        <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--mf-primary)', borderTopColor: 'transparent' }}></div>
+                        <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--lume-accent)', borderTopColor: 'transparent' }}></div>
                     </div>
                 )}
 
@@ -206,7 +206,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                             if (onSelect) onSelect('', '');
                         }}
                         className="absolute right-2 top-1/2 -translate-y-1/2"
-                        style={{ color: 'var(--mf-muted)' }}
+                        style={{ color: 'var(--lume-ink-muted)' }}
                         aria-label="Cancella ricerca"
                     >
                         <X className="w-4 h-4" />
@@ -215,7 +215,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
             </div>
 
             {isOpen && results.length > 0 && (
-                <div className="absolute z-[100] w-full mt-2 mf-popover max-h-64 overflow-y-auto" role="listbox" id={listboxId} aria-label="Risultati diagnosi ICD">
+                <div className="absolute z-[100] mt-2 w-full max-h-64 overflow-y-auto rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-1 shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]" role="listbox" id={listboxId} aria-label="Risultati diagnosi ICD">
                     {results.map((item, index) => (
                         <button
                             key={`${item.system}-${item.code}`}
@@ -225,11 +225,11 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                             aria-selected={index === activeIndex}
                             onClick={() => handleSelect(item)}
                             onMouseEnter={() => setActiveIndex(index)}
-                            className={`mf-popover-row w-full text-left flex items-center justify-between ${index === activeIndex ? 'is-active' : ''}`}
+                            className={`mf-popover-row w-full text-left flex items-center justify-between ${index === activeIndex ? 'lume-focal is-active [--lume-focal-shadow-opacity:1]' : ''}`}
                         >
-                            <span className="font-medium text-sm truncate" style={{ color: 'var(--mf-ink)' }}>{item.description}</span>
+                            <span className="font-medium text-sm truncate" style={{ color: 'var(--lume-ink)' }}>{item.description}</span>
                             <div className="flex items-center gap-2 shrink-0">
-                                <span className="patient-code-pill patient-code-pill-primary text-[10px]">
+                                <span className="patient-code-pill patient-code-pill-primary lume-registro text-[10px]">
                                     <Server className="w-3 h-3 mr-1" />
                                     {item.system} {item.code}
                                 </span>
@@ -241,8 +241,8 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
 
             {isOpen && searchError && (
                 <div
-                    className="absolute z-[100] w-full mt-2 mf-popover p-3 text-left text-xs leading-5"
-                    style={{ color: 'var(--mf-warning)' }}
+                    className="absolute z-[100] mt-2 w-full rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-3 text-left text-xs leading-5 shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]"
+                    style={{ color: 'var(--lume-signal-warning)' }}
                     role="status"
                 >
                     {searchError}
@@ -250,7 +250,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
             )}
 
             {isOpen && !searchError && results.length === 0 && query.length > 1 && (
-                <div className="absolute z-[100] w-full mt-2 mf-popover p-3 text-center text-xs italic" style={{ color: 'var(--mf-muted)' }}>
+                <div className="absolute z-[100] mt-2 w-full rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-3 text-center text-xs italic shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]" style={{ color: 'var(--lume-ink-muted)' }}>
                     Nessuna corrispondenza. Prova a cercare in Inglese (es. &quot;Amyloid&quot;).
                 </div>
             )}

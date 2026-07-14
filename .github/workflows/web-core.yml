@@ -24,4 +24,5 @@ jobs:
       - run: npm run build
       - run: npm run check:lume-tokens
       - run: npm run test:lume-tokens
+      - run: npm run check:motion-budget
       - run: npm run test:unit

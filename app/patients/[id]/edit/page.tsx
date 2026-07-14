@@ -256,27 +256,27 @@ export default function EditPatientPage() {
             <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 pb-8">
                 {patient.isArchived && (
                     <div className="mf-alert mf-alert-warning !flex items-start gap-4 !p-6 animate-in fade-in slide-in-from-top-4 duration-500">
-                        <div className="mf-icon-disc h-12 w-12 shrink-0 !text-[color:var(--mf-warning)]">
+                        <div className="mf-icon-disc h-12 w-12 shrink-0 !text-[color:var(--lume-signal-warning)]">
                             <Archive className="w-6 h-6 shrink-0" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold" style={{ color: 'var(--mf-ink)' }}>Paziente archiviato</h3>
-                            <p className="mt-1 text-sm font-medium leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
+                            <h3 className="text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>Paziente archiviato</h3>
+                            <p className="mt-1 text-sm font-medium leading-relaxed" style={{ color: 'var(--lume-ink-muted)' }}>
                                 Questa scheda è attualmente in sola lettura per l&apos;agenda corrente. Ripristina per tornare alle operazioni standard.
                             </p>
                             {patient.archiveReason && (
-                                <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--mf-ink)' }}>
+                                <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>
                                     Motivo: {patient.archiveReason === 'assigned_mmg' ? 'Assegnato a MMG' : patient.archiveReason === 'deceased' ? 'Decesso' : 'Altro'}
                                 </p>
                             )}
                             {patient.archiveNote && (
-                                <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--mf-muted)' }}>
+                                <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--lume-ink-muted)' }}>
                                     {patient.archiveNote}
                                 </p>
                             )}
                             <button
                                 onClick={handleRestore}
-                                className="mf-btn-secondary mt-4 !text-[color:var(--mf-warning)]"
+                                className="mf-btn-secondary mt-4 !text-[color:var(--lume-signal-warning)]"
                             >
                                 <RotateCcw className="w-3.5 h-3.5" />
                                 Ripristina in elenco Attivi
@@ -296,12 +296,12 @@ export default function EditPatientPage() {
 
                 <div id="azioni" className="border-t border-[color:rgba(112,106,100,0.12)] pt-6">
                     <div className="flex items-center gap-3 mb-8">
-                        <div className="mf-icon-disc h-10 w-10 !text-[color:var(--mf-critical)]">
+                        <div className="mf-icon-disc h-10 w-10 !text-[color:var(--lume-signal-critical)]">
                             <ShieldAlert className="w-5 h-5" />
                         </div>
                         <div>
-                            <p className="mf-eyebrow !text-[color:var(--mf-critical)]">Azioni sensibili</p>
-                            <h3 className="text-xl font-black tracking-tight" style={{ color: 'var(--mf-ink)' }}>Stato scheda ed export</h3>
+                            <p className="mf-eyebrow !text-[color:var(--lume-signal-critical)]">Azioni sensibili</p>
+                            <h3 className="text-xl font-black tracking-tight" style={{ color: 'var(--lume-ink)' }}>Stato scheda ed export</h3>
                         </div>
                     </div>
 
@@ -325,7 +325,7 @@ export default function EditPatientPage() {
                                         setActionType('archive');
                                         setIsActionModalOpen(true);
                                     }}
-                                    className="mf-btn-secondary flex-1 !text-[color:var(--mf-warning)] lg:flex-none"
+                                    className="mf-btn-secondary flex-1 !text-[color:var(--lume-signal-warning)] lg:flex-none"
                                 >
                                     <Archive className="w-4 h-4" />
                                     Archivia
@@ -333,7 +333,7 @@ export default function EditPatientPage() {
                             ) : (
                                 <button
                                     onClick={handleRestore}
-                                    className="mf-btn-secondary flex-1 !text-[color:var(--mf-success)] lg:flex-none"
+                                    className="mf-btn-secondary flex-1 !text-[color:var(--lume-signal-success)] lg:flex-none"
                                 >
                                     <RotateCcw className="w-4 h-4" />
                                     Ripristina

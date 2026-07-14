@@ -112,7 +112,7 @@ export default function DataSeeder() {
     }
 
     return (
-        <div className={`${PANEL_CLASS} space-y-4 animate-in slide-in-from-top-2 fade-in`}>
+        <div className={`${PANEL_CLASS} space-y-4`}>
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -169,7 +169,7 @@ export default function DataSeeder() {
             {/* Options */}
             <div className="grid grid-cols-3 gap-2">
                 <label className={cn(
-                    "flex flex-col items-center gap-2 rounded-[20px] border p-3 text-xs transition-all",
+                    "flex flex-col items-center gap-2 rounded-[20px] border p-3 text-xs transition-colors",
                     includeEntries
                         ? "border-amber-300 bg-amber-50/90 text-amber-900 shadow-[0_10px_22px_rgba(217,119,6,0.08)] dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-100"
                         : "border-white/70 bg-white/72 text-amber-700 dark:border-white/10 dark:bg-white/5 dark:text-amber-200"
@@ -185,7 +185,7 @@ export default function DataSeeder() {
                 </label>
 
                 <label className={cn(
-                    "flex flex-col items-center gap-2 rounded-[20px] border p-3 text-xs transition-all",
+                    "flex flex-col items-center gap-2 rounded-[20px] border p-3 text-xs transition-colors",
                     includeTherapies
                         ? "border-amber-300 bg-amber-50/90 text-amber-900 shadow-[0_10px_22px_rgba(217,119,6,0.08)] dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-100"
                         : "border-white/70 bg-white/72 text-amber-700 dark:border-white/10 dark:bg-white/5 dark:text-amber-200"
@@ -201,7 +201,7 @@ export default function DataSeeder() {
                 </label>
 
                 <label className={cn(
-                    "flex flex-col items-center gap-2 rounded-[20px] border p-3 text-xs transition-all",
+                    "flex flex-col items-center gap-2 rounded-[20px] border p-3 text-xs transition-colors",
                     includeConditions
                         ? "border-amber-300 bg-amber-50/90 text-amber-900 shadow-[0_10px_22px_rgba(217,119,6,0.08)] dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-100"
                         : "border-white/70 bg-white/72 text-amber-700 dark:border-white/10 dark:bg-white/5 dark:text-amber-200"
@@ -226,7 +226,7 @@ export default function DataSeeder() {
                     </div>
                     <div className="h-2 w-full rounded-full bg-amber-200 dark:bg-amber-950/40">
                         <div
-                            className="bg-amber-600 h-2 rounded-full transition-all duration-150 w-[var(--prog-width)]"
+                            className="bg-amber-600 h-2 rounded-full transition-[width] duration-150 w-[var(--prog-width)]"
                             style={{ '--prog-width': `${(progress.current / progress.total) * 100}%` } as React.CSSProperties}
                         />
                     </div>
@@ -237,7 +237,7 @@ export default function DataSeeder() {
             <button
                 onClick={handleSeed}
                 disabled={loading || nuking}
-                className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-amber-600 to-orange-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(217,119,6,0.24)] transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_36px_rgba(217,119,6,0.3)] disabled:opacity-50"
+                className="ui-btn-primary lume-press flex w-full justify-center px-4 py-3 text-sm disabled:opacity-50"
             >
                 <Plus className="w-5 h-5" />
                 {loading ? `Generazione... (${progress.current}/${progress.total})` : 'Genera Pazienti'}
@@ -262,7 +262,7 @@ export default function DataSeeder() {
                         onClick={handleNuke}
                         disabled={loading || nuking}
                         className={cn(
-                            "flex w-full items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-xs font-bold transition-all disabled:opacity-50",
+                            "flex w-full items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-xs font-bold transition-[background-color,color,opacity] disabled:opacity-50",
                             nukeAll
                                 ? "border-red-600 bg-red-600 text-white shadow-[0_16px_30px_rgba(220,38,38,0.22)] hover:bg-red-700"
                                 : "border-red-200 bg-white/85 text-red-600 hover:bg-red-50 dark:border-red-500/20 dark:bg-red-950/10 dark:text-red-200 dark:hover:bg-red-900/20"

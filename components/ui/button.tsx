@@ -4,20 +4,22 @@
    nel codice usano `ui-btn-primary px-5 py-2.5`; qui il padding di default e
    incapsulato. */
 
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+'use client';
 
+import { forwardRef, type ButtonHTMLAttributes, type PointerEvent, type ReactNode } from 'react';
+
+import { useLumeAnello } from '@/hooks/use-lume-anello';
 import { cn } from '@/lib/utils';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'destructive';
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
-    /* .ui-btn-primary porta gradiente, ombra, focus ring e text-white; qui aggiungo
-       solo il padding che i call-site ripetevano. */
+    /* La CTA primaria usa l'accento minerale e il gesto condiviso. */
     primary: 'ui-btn-primary px-5 py-2.5 disabled:opacity-50',
-    /* .mf-btn-secondary e la chrome calma companion definita in css. */
+    /* Compagna quieta, in penombra opaca. */
     secondary: 'mf-btn-secondary disabled:opacity-50',
     ghost:
-        'inline-flex items-center justify-center gap-2 rounded-full border border-transparent px-3 py-2 text-sm font-semibold text-[color:var(--mf-muted)] transition-colors hover:bg-[color:rgba(112,106,100,0.08)] hover:text-[color:var(--mf-ink)] disabled:opacity-50',
+        'inline-flex items-center justify-center gap-2 rounded-full border border-transparent px-3 py-2 text-sm font-semibold text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,transparent)] hover:text-[color:var(--lume-ink)] disabled:opacity-50',
     destructive:
         'inline-flex items-center justify-center gap-2 rounded-[18px] px-5 py-2.5 text-sm font-semibold text-white transition-transform active:scale-[0.98] disabled:opacity-50',
 };
@@ -28,20 +30,36 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-    { variant = 'primary', className, children, type = 'button', style, ...rest },
+    { variant = 'primary', className, children, type = 'button', style, onPointerDown, ...rest },
     ref,
 ) {
+    // @Codex: the anello is only a transient response to the direct gesture.
+    const { anello, onLumePointerDown } = useLumeAnello();
     const destructiveStyle =
-        variant === 'destructive' ? { background: 'var(--mf-critical)', ...style } : style;
+        variant === 'destructive' ? { background: 'var(--lume-signal-critical)', ...style } : style;
+
+    const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+        onLumePointerDown(event);
+        onPointerDown?.(event);
+    };
+
     return (
         <button
             ref={ref}
             type={type}
-            className={cn(VARIANT_CLASSES[variant], className)}
+            className={cn(VARIANT_CLASSES[variant], 'lume-press', className)}
             style={destructiveStyle}
+            onPointerDown={handlePointerDown}
             {...rest}
         >
             {children}
+            {anello ? (
+                <span
+                    aria-hidden="true"
+                    className="lume-anello"
+                    style={{ left: anello.x, top: anello.y }}
+                />
+            ) : null}
         </button>
     );
 });

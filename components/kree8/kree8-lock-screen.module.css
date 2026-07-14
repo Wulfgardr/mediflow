@@ -6,7 +6,7 @@
 .lockShell {
   /* Local layer maps 1:1 to the canonical Lume active aliases (app/lume-tokens.css);
      giorno/grafite flip automatically under html.dark, so no scoped dark block is
-     needed. Opaque surfaces; borders via color-mix. No glass/gradient/glow/shadow. */
+     needed. Opaque surfaces; borders via color-mix. Nessun gradiente o alone. */
   --surface-focal: var(--lume-surface-focal);
   --surface-field: var(--lume-surface-field);
   --canvas: var(--lume-surface-canvas);
@@ -118,9 +118,7 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.4em;
   outline: none;
-  transition: border-color 160ms var(--motion-ease),
-    box-shadow 160ms var(--motion-ease),
-    background 160ms var(--motion-ease);
+  transition: border-color var(--lume-dur-fuoco) var(--lume-ease), background var(--lume-dur-fuoco) var(--lume-ease);
 }
 
 .pinInput::placeholder {

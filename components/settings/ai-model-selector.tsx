@@ -141,19 +141,19 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
     const isInstalled = (name: string) => installedModels.some(m => m.startsWith(name) || name.startsWith(m));
 
     const modelSelectorTone = {
-        iconStyle: { background: 'rgba(15, 23, 42, 0.06)', color: 'var(--mf-ink)' },
-        titleStyle: { color: 'var(--mf-ink)' },
-        descriptionStyle: { color: 'var(--mf-muted)' },
-        selectedCardStyle: { borderColor: 'rgba(15, 23, 42, 0.22)', background: 'rgba(248, 250, 252, 0.9)', boxShadow: '0 14px 28px rgba(15, 23, 42, 0.08)' },
-        selectedDot: 'bg-white',
-        installedBadgeStyle: { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(248, 250, 252, 0.9)', color: 'var(--mf-ink)' },
-        downloadBadgeStyle: { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(248, 250, 252, 0.72)', color: 'var(--mf-ink)' },
-        progressStyle: { background: 'linear-gradient(90deg, #111827, #475569)' },
+        iconStyle: { background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' },
+        titleStyle: { color: 'var(--lume-ink)' },
+        descriptionStyle: { color: 'var(--lume-ink-muted)' },
+        selectedCardStyle: { borderColor: 'var(--lume-accent)', background: 'var(--lume-surface-focal)', boxShadow: '0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent)' },
+        selectedDot: 'bg-[color:var(--lume-surface-focal)]',
+        installedBadgeStyle: { borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' },
+        downloadBadgeStyle: { borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)', background: 'var(--lume-surface-field)', color: 'var(--lume-ink)' },
+        progressStyle: { background: 'var(--lume-accent)' },
     };
     const c = modelSelectorTone;
 
     return (
-        <div className="apple-subsection space-y-4" data-testid={`ai-model-selector-${selectorId}`}>
+        <div className="mf-section space-y-4" data-testid={`ai-model-selector-${selectorId}`}>
             {/* @Codex WUL-229: selector header now uses MediFlow icon disc + ink/muted typography */}
             <div className="flex items-start gap-3">
                 <div className="rounded-2xl p-2.5" style={c.iconStyle}>
@@ -184,14 +184,14 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                                         <div
                                             className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border"
                                             style={selected
-                                                ? { borderColor: 'var(--mf-ink)', background: 'var(--mf-ink)' }
+                                                ? { borderColor: 'var(--lume-ink)', background: 'var(--lume-ink)' }
                                                 : { borderColor: 'rgba(112,106,100,0.28)' }}
                                         >
                                             {selected && <div className={`h-1.5 w-1.5 rounded-full ${c.selectedDot}`} />}
                                         </div>
                                         <div className="min-w-0">
-                                            <span className="block truncate text-xs font-semibold" style={{ color: 'var(--mf-ink)' }}>{model.name}</span>
-                                            <span className="mt-0.5 block text-[11px] leading-5" style={{ color: 'var(--mf-muted)' }}>{model.desc}</span>
+                                            <span className="lume-registro block truncate text-xs font-semibold" style={{ color: 'var(--lume-ink)' }}>{model.name}</span>
+                                            <span className="mt-0.5 block text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>{model.desc}</span>
                                         </div>
                                     </div>
 
@@ -214,7 +214,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                                                 style={c.downloadBadgeStyle}
                                             >
                                                 {isPulling && pullingModel === model.name ? (
-                                                    <RefreshCw className="w-3 h-3 animate-spin" />
+                                                    <RefreshCw className="w-3 h-3" />
                                                 ) : <Download className="w-3 h-3" />}
                                                 Scarica
                                             </button>
@@ -255,21 +255,21 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
             {/* Global Pull Status */}
             {isPulling && (
                 // @Codex WUL-229: pull status card now uses the shared liquid section primitive
-                <div className="mf-section mf-section-tight animate-in fade-in slide-in-from-bottom-2 p-4">
+                <div className="mf-section mf-section-tight p-4">
                     <div className="mb-2 flex items-center justify-between gap-3">
-                        <span className="flex items-center gap-2 text-xs font-semibold" style={{ color: 'var(--mf-ink)' }}>
-                            <RefreshCw className="w-3 h-3 animate-spin" />
+                        <span className="flex items-center gap-2 text-xs font-semibold" style={{ color: 'var(--lume-ink)' }}>
+                            <RefreshCw className="w-3 h-3" />
                             Scaricamento {pullingModel ? `di ${pullingModel}` : 'in corso'}
                         </span>
-                        <span className="text-xs font-mono" style={{ color: 'var(--mf-muted)' }}>{pullProgress}%</span>
+                        <span className="lume-registro text-xs" style={{ color: 'var(--lume-ink-muted)' }}>{pullProgress}%</span>
                     </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full" style={{ background: 'rgba(112,106,100,0.18)' }}>
+                    <div className="h-2 w-full overflow-hidden rounded-full" style={{ background: 'color-mix(in srgb, var(--lume-ink) 12%, transparent)' }}>
                         <div
                             className="h-full transition-[width] duration-300"
                             style={{ width: `${pullProgress}%`, ...c.progressStyle }}
                         />
                     </div>
-                    <p className="mt-2 truncate text-[11px]" style={{ color: 'var(--mf-muted)' }}>{pullStatus}</p>
+                    <p className="mt-2 truncate text-[11px]" style={{ color: 'var(--lume-ink-muted)' }}>{pullStatus}</p>
                 </div>
             )}
         </div>

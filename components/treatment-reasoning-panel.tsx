@@ -33,6 +33,7 @@ import type {
     TreatmentReasoningSafetySeverity,
     TreatmentReasoningSuggestedAction,
 } from '@/lib/treatment-reasoning-contract';
+import { DocumentReferenceChip } from '@/components/document-reference-chip';
 
 interface TreatmentReasoningPanelProps {
     patient: Patient;
@@ -142,12 +143,12 @@ export default function TreatmentReasoningPanel({
                         </div>
                         <div className="min-w-0">
                             <p className="section-kicker">Review terapie</p>
-                            <h3 className="mt-1 text-lg font-semibold text-[color:var(--mf-ink)]">Ragionamento terapeutico</h3>
+                            <h3 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">Ragionamento terapeutico</h3>
                             <div className="mt-2 flex flex-wrap items-center gap-2">
                                 <span className="apple-chip">{sourceSummary.total} fonti</span>
                                 <span className="apple-chip">review-only</span>
                                 {draft ? (
-                                    <span className="break-all text-[10px] font-semibold uppercase tracking-wide text-[color:var(--mf-muted)]">
+                                    <span className="break-all text-[10px] font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                         {draft.model.provider} · {draft.model.model}
                                     </span>
                                 ) : null}
@@ -191,34 +192,34 @@ export default function TreatmentReasoningPanel({
                 <div className="grid gap-2 sm:grid-cols-5">
                     {sourceSummaryItems.map(([label, value]) => (
                         <div key={label} className="rounded-[14px] border border-slate-200 bg-white/75 px-3 py-2 dark:border-white/10 dark:bg-white/5">
-                            <span className="block text-[9px] font-bold uppercase tracking-wide text-[color:var(--mf-muted)]">{label}</span>
-                            <span className="text-sm font-semibold text-[color:var(--mf-ink)]">{value}</span>
+                            <span className="block text-[9px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">{label}</span>
+                            <span className="text-sm font-semibold text-[color:var(--lume-ink)]">{value}</span>
                         </div>
                     ))}
                 </div>
 
                 {!draft && !isGenerating ? (
-                    <div className="rounded-[16px] border border-slate-200 bg-slate-50/70 p-4 text-sm leading-6 text-[color:var(--mf-muted)] dark:border-white/10 dark:bg-white/5">
-                        Bozza locale per verificare coerenza del piano, rischi e prossime azioni senza scrivere nulla in scheda. La fonte effettiva compare dopo la generazione.
+                    <div className="rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-sm leading-6 text-[color:var(--lume-ink-muted)] transition-colors duration-[var(--lume-dur-firma)]">
+                        Bozza da strumento locale per verificare coerenza del piano, rischi e prossime azioni senza scrivere nulla in scheda. La fonte effettiva compare dopo la generazione.
                     </div>
                 ) : null}
 
                 {isGenerating ? (
                     <div role="status" aria-live="polite" className="space-y-3 py-8 text-center">
-                        <RefreshCw className="mx-auto h-7 w-7 animate-spin text-slate-500" />
-                        <p className="text-xs font-bold uppercase tracking-widest text-[color:var(--mf-muted)]">Chiamata al modello locale...</p>
+                        <RefreshCw className="mx-auto h-7 w-7 text-slate-500" />
+                        <p className="text-xs font-bold uppercase tracking-widest text-[color:var(--lume-ink-muted)]">Chiamata al modello locale...</p>
                     </div>
                 ) : null}
 
                 {draft && !isGenerating ? (
                     <div className="space-y-5">
-                        <div className="rounded-[16px] border border-slate-200 bg-white/80 p-4 dark:border-white/10 dark:bg-white/5">
+                        <div className="rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-[color:var(--lume-ink-muted)] transition-colors duration-[var(--lume-dur-firma)] ease-[var(--lume-ease)]">
                             <div className="flex items-center gap-2">
                                 <ShieldCheck className="h-4 w-4 text-slate-500" />
-                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--mf-muted)]">Raccomandazione di supporto</p>
+                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">Bozza da rivedere</p>
                             </div>
-                            <p className="mt-2 text-sm leading-6 text-[color:var(--mf-ink)]"><PrivacyBlur intensity="sm">{draft.envelope.data.recommendation || draft.envelope.summary || 'Nessuna raccomandazione utilizzabile.'}</PrivacyBlur></p>
-                            <div className="mt-3 flex items-start gap-2 border-t border-slate-200 pt-3 text-xs leading-5 text-[color:var(--mf-muted)] dark:border-white/10">
+                            <p className="mt-2 text-sm leading-6 text-[color:var(--lume-ink-muted)]"><PrivacyBlur intensity="sm">{draft.envelope.data.recommendation || draft.envelope.summary || 'Nessuna raccomandazione utilizzabile.'}</PrivacyBlur></p>
+                            <div className="mt-3 flex items-start gap-2 border-t border-slate-200 pt-3 text-xs leading-5 text-[color:var(--lume-ink-muted)] dark:border-white/10">
                                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                                 <p>Supporto locale alla revisione: non è una prescrizione, non applica modifiche e richiede verifica clinica.</p>
                             </div>
@@ -251,14 +252,14 @@ export default function TreatmentReasoningPanel({
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2">
                                     <ClipboardList className="h-4 w-4 text-slate-500" />
-                                    <h4 className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--mf-muted)]">Evidenze chiave</h4>
+                                    <h4 className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">Evidenze chiave</h4>
                                 </div>
                                 {draft.envelope.data.keyEvidence.length === 0 ? (
-                                    <p className="rounded-[14px] border border-slate-200 bg-white/70 p-3 text-xs text-[color:var(--mf-muted)] dark:border-white/10 dark:bg-white/5">Nessuna evidenza chiave strutturata.</p>
+                                    <p className="rounded-[14px] border border-slate-200 bg-white/70 p-3 text-xs text-[color:var(--lume-ink-muted)] dark:border-white/10 dark:bg-white/5">Nessuna evidenza chiave strutturata.</p>
                                 ) : draft.envelope.data.keyEvidence.map((evidence) => (
                                     <div key={evidence.id} className="rounded-[16px] border border-slate-200 bg-white/75 p-3 dark:border-white/10 dark:bg-white/5">
-                                        <p className="text-sm font-semibold leading-5 text-[color:var(--mf-ink)]"><PrivacyBlur intensity="sm">{evidence.statement}</PrivacyBlur></p>
-                                        <p className="mt-2 break-all text-[10px] uppercase tracking-wide text-[color:var(--mf-muted)]">{evidence.evidenceRefs.join(' · ')}</p>
+                                        <p className="text-sm font-semibold leading-5 text-[color:var(--lume-ink)]"><PrivacyBlur intensity="sm">{evidence.statement}</PrivacyBlur></p>
+                                        <DocumentReferenceChip references={evidence.evidenceRefs} />
                                     </div>
                                 ))}
                             </div>
@@ -266,10 +267,10 @@ export default function TreatmentReasoningPanel({
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2">
                                     <AlertTriangle className="h-4 w-4 text-slate-500" />
-                                    <h4 className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--mf-muted)]">Flag e cautele</h4>
+                                    <h4 className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">Flag e cautele</h4>
                                 </div>
                                 {draft.envelope.data.safetyFlags.length === 0 ? (
-                                    <p className="rounded-[14px] border border-slate-200 bg-white/70 p-3 text-xs text-[color:var(--mf-muted)] dark:border-white/10 dark:bg-white/5">Nessun flag strutturato dal modello.</p>
+                                    <p className="rounded-[14px] border border-slate-200 bg-white/70 p-3 text-xs text-[color:var(--lume-ink-muted)] dark:border-white/10 dark:bg-white/5">Nessun flag strutturato dal modello.</p>
                                 ) : draft.envelope.data.safetyFlags.map((flag) => (
                                     <div key={flag.id} className={`rounded-[16px] border p-3 ${severityClasses(flag.severity)}`}>
                                         <p className="text-sm font-semibold"><PrivacyBlur intensity="sm">{flag.label}</PrivacyBlur></p>
@@ -281,17 +282,17 @@ export default function TreatmentReasoningPanel({
 
                         {draft.envelope.data.suggestedActions.length > 0 ? (
                             <div className="space-y-3">
-                                <h4 className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--mf-muted)]">Azioni proposte</h4>
+                                <h4 className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">Azioni proposte</h4>
                                 <div className="grid gap-3 md:grid-cols-2">
                                     {draft.envelope.data.suggestedActions.map((action) => (
                                         <div key={action.id} className="rounded-[16px] border border-slate-200 bg-white/75 p-3 dark:border-white/10 dark:bg-white/5">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <p className="text-sm font-semibold text-[color:var(--mf-ink)]"><PrivacyBlur intensity="sm">{action.label}</PrivacyBlur></p>
+                                                <p className="text-sm font-semibold text-[color:var(--lume-ink)]"><PrivacyBlur intensity="sm">{action.label}</PrivacyBlur></p>
                                                 <span className="apple-chip">{actionPolicyLabel(action)}</span>
                                             </div>
-                                            <p className="mt-2 text-xs leading-5 text-[color:var(--mf-muted)]"><PrivacyBlur intensity="sm">{action.rationale}</PrivacyBlur></p>
+                                            <p className="mt-2 text-xs leading-5 text-[color:var(--lume-ink-muted)]"><PrivacyBlur intensity="sm">{action.rationale}</PrivacyBlur></p>
                                             {action.blockedReason ? (
-                                                <p className="mt-2 text-[11px] font-medium text-[color:var(--mf-muted)]">Blocco: <PrivacyBlur intensity="sm">{action.blockedReason}</PrivacyBlur></p>
+                                                <p className="mt-2 text-[11px] font-medium text-[color:var(--lume-ink-muted)]">Blocco: <PrivacyBlur intensity="sm">{action.blockedReason}</PrivacyBlur></p>
                                             ) : null}
                                         </div>
                                     ))}
@@ -301,14 +302,14 @@ export default function TreatmentReasoningPanel({
 
                         {draft.envelope.data.reasoning.length > 0 ? (
                             <details className="group rounded-[16px] border border-slate-200 bg-white/70 dark:border-white/10 dark:bg-white/5">
-                                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wide text-[color:var(--mf-muted)]">
+                                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                     Traccia sintetica del ragionamento
                                     <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
                                 </summary>
-                                <ol className="space-y-2 border-t border-slate-200 px-4 py-3 text-sm leading-5 text-[color:var(--mf-ink)] dark:border-white/10">
+                                <ol className="space-y-2 border-t border-slate-200 px-4 py-3 text-sm leading-5 text-[color:var(--lume-ink)] dark:border-white/10">
                                     {draft.envelope.data.reasoning.map((item, index) => (
                                         <li key={`${index}-${item}`} className="flex gap-2">
-                                            <span className="font-semibold text-[color:var(--mf-muted)]">{index + 1}.</span>
+                                            <span className="font-semibold text-[color:var(--lume-ink-muted)]">{index + 1}.</span>
                                             <span><PrivacyBlur intensity="sm">{item}</PrivacyBlur></span>
                                         </li>
                                     ))}
@@ -318,7 +319,7 @@ export default function TreatmentReasoningPanel({
 
                         {draft.sources.length > 0 ? (
                             <details className="group rounded-[16px] border border-slate-200 bg-slate-50/70 dark:border-white/10 dark:bg-white/5">
-                                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wide text-[color:var(--mf-muted)]">
+                                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                     Fonti usate dal prompt
                                     <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
                                 </summary>
@@ -327,11 +328,11 @@ export default function TreatmentReasoningPanel({
                                         <div key={source.id} className="rounded-[12px] bg-white/80 p-3 text-xs dark:bg-black/10">
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <span className="apple-chip">{sourceKindLabel(source)}</span>
-                                                <span className="break-all font-mono text-[10px] text-[color:var(--mf-muted)]">{source.id}</span>
+                                                <span className="break-all font-mono text-[10px] text-[color:var(--lume-ink-muted)]">{source.id}</span>
                                             </div>
-                                            <p className="mt-1 font-semibold text-[color:var(--mf-ink)]">{source.label}</p>
+                                            <p className="mt-1 font-semibold text-[color:var(--lume-ink)]">{source.label}</p>
                                             {source.excerpt ? (
-                                                <p className="mt-1 leading-5 text-[color:var(--mf-muted)]">
+                                                <p className="mt-1 leading-5 text-[color:var(--lume-ink-muted)]">
                                                     <PrivacyBlur intensity="sm">{source.excerpt}</PrivacyBlur>
                                                 </p>
                                             ) : null}
@@ -341,7 +342,7 @@ export default function TreatmentReasoningPanel({
                             </details>
                         ) : null}
 
-                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-medium uppercase tracking-wide text-[color:var(--mf-muted)]">
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-medium uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                             <span>Generato {formatDateTime(draft.generatedAt)}</span>
                             {draft.stats ? (
                                 <span>

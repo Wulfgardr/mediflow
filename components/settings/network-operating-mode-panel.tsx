@@ -85,7 +85,7 @@ export default function NetworkOperatingModePanel() {
     };
 
     return (
-        <div className="apple-subsection min-w-[260px] sm:col-span-2">
+        <div className="mf-section min-w-[260px] sm:col-span-2">
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <p className="section-kicker">Modalità operativa</p>
@@ -98,7 +98,7 @@ export default function NetworkOperatingModePanel() {
                 </div>
                 {isLoading ? (
                     <Badge tone="neutral">
-                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <Loader2 className="h-3 w-3" />
                         Lettura
                     </Badge>
                 ) : viewModel ? (
@@ -135,7 +135,7 @@ export default function NetworkOperatingModePanel() {
                             : 'border-slate-200/80 bg-white/76 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'
                     )}
                 >
-                    {isSavingMode ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Network className="h-3.5 w-3.5" />}
+                    {isSavingMode ? <Loader2 className="h-3.5 w-3.5" /> : <Network className="h-3.5 w-3.5" />}
                     Home-base
                     <Badge tone="preview">Guidata</Badge>
                 </button>

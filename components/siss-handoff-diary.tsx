@@ -193,11 +193,11 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                 <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                         <p className="section-kicker">SISS</p>
-                        <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--mf-ink)]">
-                            <ClipboardCheck className="h-5 w-5 text-[color:var(--mf-primary)]" />
+                        <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--lume-ink)]">
+                            <ClipboardCheck className="h-5 w-5 text-[color:var(--lume-accent)]" />
                             Diario portali regionali
                         </h2>
-                        <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--mf-muted)]">
+                        <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--lume-ink-muted)]">
                             Registra il motivo dell&apos;apertura del portale, l&apos;esito e il prossimo passo. Il dato resta locale: l&apos;atto regionale avviene nel portale ufficiale.
                         </p>
                     </div>
@@ -210,11 +210,11 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-amber-700">Da chiudere</p>
-                            <h3 className="mt-1 text-sm font-semibold text-[color:var(--mf-ink)]">
+                            <h3 className="mt-1 text-sm font-semibold text-[color:var(--lume-ink)]">
                                 {pendingHandoff.moduleLabel} aperto {formatDate(pendingHandoff.startedAt)}
                             </h3>
                             {pendingHandoff.reason ? (
-                                <p className="mt-1 text-xs leading-5 text-[color:var(--mf-muted)]">{pendingHandoff.reason}</p>
+                                <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">{pendingHandoff.reason}</p>
                             ) : null}
                         </div>
                         <select
@@ -228,11 +228,11 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                         </select>
                     </div>
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Cosa va ricordato
                             <textarea className="input-field min-h-20" value={closureNotes} onChange={(event) => setClosureNotes(event.target.value)} />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Prossima azione
                             <textarea className="input-field min-h-20" value={closureNextAction} onChange={(event) => setClosureNextAction(event.target.value)} />
                         </label>
@@ -241,7 +241,7 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                         type="button"
                         disabled={isSaving}
                         onClick={() => void closePendingHandoff()}
-                        className="mt-3 inline-flex h-10 items-center justify-center gap-2 rounded-[12px] bg-[color:var(--mf-ink)] px-4 text-sm font-semibold text-white transition-colors hover:bg-[color:var(--mf-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="mt-3 inline-flex h-10 items-center justify-center gap-2 rounded-[12px] bg-[color:var(--lume-ink)] px-4 text-sm font-semibold text-white transition-colors hover:bg-[color:var(--lume-accent)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                         Chiudi passaggio
@@ -252,27 +252,27 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
             {isFormOpen && (
                 <form onSubmit={handleSubmit} className="mb-5 rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 p-4">
                     <div className="grid gap-3 md:grid-cols-2">
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Modulo
                             <select className="input-field" value={form.action} onChange={(event) => handleModuleChange(event.target.value)}>
                                 {MODULE_OPTIONS.map((item) => <option key={item.action} value={item.action}>{item.label}</option>)}
                             </select>
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Esito
                             <select className="input-field" value={form.outcome} onChange={(event) => updateForm('outcome', event.target.value as SissHandoffOutcome)}>
                                 {OUTCOME_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                             </select>
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)] md:col-span-2">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)] md:col-span-2">
                             Perché ho aperto il portale
                             <input className="input-field" value={form.reason} onChange={(event) => updateForm('reason', event.target.value)} placeholder="Verifica anagrafica, prescrizione, consultazione FSE..." />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Cosa va ricordato
                             <textarea className="input-field min-h-24" value={form.notes} onChange={(event) => updateForm('notes', event.target.value)} />
                         </label>
-                        <label className="space-y-1 text-xs font-semibold text-[color:var(--mf-muted)]">
+                        <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Prossima azione
                             <textarea className="input-field min-h-24" value={form.nextAction} onChange={(event) => updateForm('nextAction', event.target.value)} />
                         </label>
@@ -291,7 +291,7 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
 
             {!handoffs || handoffs.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-6 text-center">
-                    <p className="text-sm text-[color:var(--mf-muted)]">
+                    <p className="text-sm text-[color:var(--lume-ink-muted)]">
                         Nessun passaggio SISS registrato per questo paziente.
                     </p>
                 </div>
@@ -301,24 +301,24 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                         <div key={item.id} className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 px-4 py-3">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
-                                    <p className="text-sm font-semibold text-[color:var(--mf-ink)]">{item.moduleLabel}</p>
-                                    <p className="mt-1 text-xs text-[color:var(--mf-muted)]">
+                                    <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{item.moduleLabel}</p>
+                                    <p className="lume-registro mt-1 text-xs text-[color:var(--lume-ink-muted)]">
                                         {formatDate(item.startedAt)} · {outcomeLabel(item.outcome)}
                                     </p>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => void deleteItem(item)}
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-[color:rgba(112,106,100,0.12)] text-[color:var(--mf-muted)] transition-colors hover:border-rose-200 hover:text-rose-700"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-[color:rgba(112,106,100,0.12)] text-[color:var(--lume-ink-muted)] transition-colors hover:border-rose-200 hover:text-rose-700"
                                     aria-label="Elimina passaggio SISS"
                                 >
                                     <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                             </div>
-                            {item.reason ? <p className="mt-2 text-xs leading-5 text-[color:var(--mf-muted)]">{item.reason}</p> : null}
-                            {item.notes ? <p className="mt-2 text-sm leading-6 text-[color:var(--mf-ink)]">{item.notes}</p> : null}
+                            {item.reason ? <p className="mt-2 text-xs leading-5 text-[color:var(--lume-ink-muted)]">{item.reason}</p> : null}
+                            {item.notes ? <p className="mt-2 text-sm leading-6 text-[color:var(--lume-ink)]">{item.notes}</p> : null}
                             {item.nextAction ? (
-                                <p className="mt-2 text-xs font-semibold text-[color:var(--mf-primary)]">Prossimo passo: {item.nextAction}</p>
+                                <p className="mt-2 text-xs font-semibold text-[color:var(--lume-accent)]">Prossimo passo: {item.nextAction}</p>
                             ) : null}
                         </div>
                     ))}

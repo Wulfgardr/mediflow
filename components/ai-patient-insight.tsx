@@ -119,7 +119,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
     if (!patient.aiSummary && !isGenerating && !patientInsightEnabled) {
         return (
             <div
-                className="patient-ai-insight-panel glass-panel overflow-hidden rounded-[28px] border-red-200/70 bg-red-50/20 p-6 backdrop-blur-xl dark:border-red-500/20 dark:bg-red-950/10"
+                className="patient-ai-insight-panel lume-panel overflow-hidden border-red-200/70 p-6 dark:border-red-500/20"
                 data-testid="patient-insight-disabled-card"
             >
                 <div className="flex flex-col items-center text-center space-y-5">
@@ -136,7 +136,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
 
                     <Link
                         href="/settings/ai/funzioni"
-                        className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                        className="lume-press inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-[background-color,color] hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
                     >
                         Apri Impostazioni AI
                     </Link>
@@ -147,7 +147,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
 
     if (!patient.aiSummary && !isGenerating) {
         return (
-            <div className="patient-ai-insight-panel glass-panel overflow-hidden rounded-[28px] border-slate-200/70 bg-white/70 p-6 backdrop-blur-xl dark:border-white/10 dark:bg-white/5">
+            <div className="patient-ai-insight-panel lume-panel overflow-hidden p-6">
                 <div className="flex flex-col items-center text-center space-y-5">
                     <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-slate-900 text-white shadow-[0_12px_24px_rgba(15,23,42,0.14)] dark:bg-white dark:text-slate-900">
                         <Sparkles className="w-8 h-8" />
@@ -168,7 +168,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
 
                     <button
                         onClick={generateInsight}
-                        className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-8 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(15,23,42,0.12)] transition-all hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                        className="lume-press inline-flex items-center gap-2 rounded-full bg-slate-900 px-8 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(15,23,42,0.12)] transition-[background-color,color] hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
                     >
                         <Sparkles className="w-4 h-4" />
                         Avvia supporto
@@ -179,7 +179,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
     }
 
     return (
-        <div className="patient-ai-insight-panel glass-panel overflow-hidden rounded-[28px] border-white/40 bg-white/60 p-0 backdrop-blur-2xl dark:border-white/10 dark:bg-white/5">
+        <div className="patient-ai-insight-panel lume-panel overflow-hidden p-0">
             <div className="border-b border-slate-200/50 p-5 dark:border-white/5">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -207,10 +207,10 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
                     <button
                         onClick={generateInsight}
                         disabled={isGenerating || !patientInsightEnabled}
-                        className="flex h-9 items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-4 text-xs font-semibold text-slate-700 transition-all hover:bg-white disabled:opacity-50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200"
+                        className="flex h-9 items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-4 text-xs font-semibold text-slate-700 transition-[background-color,color,opacity] hover:bg-white disabled:opacity-50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200"
                     >
                         {isGenerating ? (
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <RefreshCw className="w-3.5 h-3.5" />
                         ) : (
                             <RefreshCw className="w-3.5 h-3.5" />
                         )}
@@ -242,18 +242,14 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
 
                 {isGenerating ? (
                     <div className="py-12 text-center space-y-4">
-                        <div className="relative mx-auto h-16 w-16">
-                            <RefreshCw className="w-16 h-16 text-slate-300 animate-[spin_3s_linear_infinite] dark:text-white/15" />
-                            <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-slate-700 animate-pulse dark:text-slate-200" />
+                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[var(--lume-radius-card)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]">
+                            <Sparkles className="h-6 w-6" aria-hidden="true" />
                         </div>
                         <div className="space-y-1">
                             <p className="text-sm font-bold text-slate-700 dark:text-[color:rgba(255,255,255,0.86)]">Analisi in corso</p>
-                            <p className="text-[10px] font-medium uppercase tracking-widest text-[color:var(--mf-muted)]">{progress}</p>
+                            <p className="text-[10px] font-medium uppercase tracking-widest text-[color:var(--lume-ink-muted)]">{progress}</p>
                         </div>
 
-                        <div className="mx-auto w-48 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
-                            <div className="h-1 animate-[shimmer_1.5s_infinite_linear] bg-[linear-gradient(90deg,#111827,#475569,#111827)]" style={{ width: '40%' }} />
-                        </div>
                         
                         <button
                             onClick={stopGeneration}
@@ -265,10 +261,15 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
                 ) : readable.kind === 'structured' ? (
                     <div className="space-y-5">
                         {readable.nextSteps.length > 0 && (
-                            <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/5">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                    Follow-up proposto
-                                </p>
+                            <div className="rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-[color:var(--lume-ink-muted)] transition-colors duration-[var(--lume-dur-firma)]">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                        Follow-up proposto
+                                    </p>
+                                    <span className="rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-[color:var(--lume-ink-muted)]">
+                                        Bozza
+                                    </span>
+                                </div>
                                 <div className="mt-3 space-y-2">
                                     {readable.nextSteps.map((step, index) => (
                                         <div

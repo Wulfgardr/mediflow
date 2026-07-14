@@ -6,6 +6,7 @@ import { FileText, Stethoscope, Activity, Trash2, AlertCircle, Undo, Phone, Home
 import { ClinicalRichTextContent } from '@/components/clinical-rich-text-content';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useLiveQuery } from '@/lib/live-query';
+import { LumeFilo } from '@/components/ui/lume-filo';
 
 export type TimelineEntryData = ClinicalEntry & { patientName?: string };
 
@@ -35,22 +36,25 @@ function EntryAttachments({ attachmentIds, onView }: { attachmentIds: string[], 
     if (!attachments?.length) return null;
 
     return (
-        <div className="mt-4 grid grid-cols-1 gap-2 border-t border-[color:rgba(112,106,100,0.12)] pt-3 sm:grid-cols-2">
-            {attachments.map(file => (
-                <button
-                    key={file.id}
-                    onClick={() => onView(file)}
-                    className="mf-option-card !flex !grid-cols-none items-center gap-2 !rounded-[14px] !p-2 text-left"
-                >
-                    <div className="mf-icon-disc h-7 w-7 !rounded-[10px]">
-                        <Paperclip className="w-3 h-3" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold truncate">{file.name}</p>
-                        <p className="text-[10px]" style={{ color: 'var(--mf-muted)' }}>{file.summarySnapshot ? 'Analisi IA disponibile' : 'Allegato'}</p>
-                    </div>
-                </button>
-            ))}
+        <div className="relative mt-4 pl-5">
+            <LumeFilo variant="connettore" fill={100} className="absolute left-0 top-0 h-4 w-5" />
+            <div className="grid grid-cols-1 gap-2 border-t border-[color:rgba(112,106,100,0.12)] pt-3 sm:grid-cols-2">
+                {attachments.map(file => (
+                    <button
+                        key={file.id}
+                        onClick={() => onView(file)}
+                        className="mf-option-card !flex !grid-cols-none items-center gap-2 !rounded-[14px] !p-2 text-left"
+                    >
+                        <div className="mf-icon-disc h-7 w-7 !rounded-[10px]">
+                            <Paperclip className="w-3 h-3" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold truncate">{file.name}</p>
+                            <p className="text-[10px]" style={{ color: 'var(--lume-ink-muted)' }}>{file.summarySnapshot ? 'Analisi IA disponibile' : 'Allegato'}</p>
+                        </div>
+                    </button>
+                ))}
+            </div>
         </div>
     );
 }
@@ -69,24 +73,24 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
     return (
         <div className={`relative pl-8 ${isDeleted ? 'opacity-60 grayscale' : ''}`}>
             {/* Dot */}
-            <div className={`absolute -left-[9px] top-0 h-4 w-4 rounded-full border-2 border-[color:var(--mf-bg)] ${isDeleted ? 'bg-[color:var(--mf-critical)]' : 'bg-[color:var(--mf-primary)]'}`}></div>
+            <div data-lume-timeline-node className={`absolute -left-2 top-0 h-4 w-4 rounded-full border-2 border-[color:var(--lume-surface-field)] ${isDeleted ? 'bg-[color:var(--lume-signal-critical)]' : 'bg-[color:var(--lume-accent)]'}`}></div>
 
             {/* Content */}
             <div className={`mf-section p-5 ${isDeleted ? 'border-[color:rgba(163,58,47,0.26)] bg-[color:rgba(163,58,47,0.08)]' : ''}`}>
                 <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-2">
-                        <div className={`mf-icon-disc h-8 w-8 !rounded-[12px] ${isDeleted ? '!text-[color:var(--mf-critical)]' : ''}`}>
+                        <div className={`mf-icon-disc h-8 w-8 !rounded-[12px] ${isDeleted ? '!text-[color:var(--lume-signal-critical)]' : ''}`}>
                             <Icon className="w-4 h-4" />
                         </div>
                         <div>
-                            <span className="block text-xs font-bold uppercase" style={{ color: isDeleted ? 'var(--mf-critical)' : 'var(--mf-primary)' }}>
+                            <span className="block text-xs font-bold uppercase" style={{ color: isDeleted ? 'var(--lume-signal-critical)' : 'var(--lume-accent)' }}>
                                 {TYPE_LABELS[entry.type] || entry.type}
-                                {entry.patientName && <span className="ml-1 font-normal normal-case" style={{ color: 'var(--mf-muted)' }}> - {entry.patientName}</span>}
+                                {entry.patientName && <span className="ml-1 font-normal normal-case" style={{ color: 'var(--lume-ink-muted)' }}> - {entry.patientName}</span>}
                             </span>
-                            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--mf-muted)' }}>
-                                <span>{format(new Date(entry.date), 'dd MMMM yyyy HH:mm', { locale: it })}</span>
+                            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
+                                <span className="lume-registro">{format(new Date(entry.date), 'dd MMMM yyyy HH:mm', { locale: it })}</span>
                                 {entry.setting && (
-                                    <span className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 ${entry.setting === 'home' ? 'border-[color:rgba(197,138,47,0.28)] text-[color:var(--mf-warning)]' : 'border-[color:rgba(63,122,76,0.26)] text-[color:var(--mf-success)]'}`}>
+                                    <span className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 ${entry.setting === 'home' ? 'border-[color:rgba(197,138,47,0.28)] text-[color:var(--lume-signal-warning)]' : 'border-[color:rgba(63,122,76,0.26)] text-[color:var(--lume-signal-success)]'}`}>
                                         {entry.setting === 'home' ? <Home className="w-3 h-3" /> : <Building2 className="w-3 h-3" />}
                                         {entry.setting === 'home' ? 'Dom' : 'Amb'}
                                     </span>
@@ -101,7 +105,7 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
                             onRestore && (
                                 <button
                                     onClick={() => onRestore(entry)}
-                                    className="mf-btn-secondary !p-1.5 !text-[color:var(--mf-success)]"
+                                    className="mf-btn-secondary !p-1.5 !text-[color:var(--lume-signal-success)]"
                                     title="Ripristina"
                                     aria-label="Ripristina voce clinica"
                                 >
@@ -112,7 +116,7 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
                             onDelete && (
                                 <button
                                     onClick={() => onDelete(entry)}
-                                    className="mf-btn-secondary !p-1.5 hover:!text-[color:var(--mf-critical)]"
+                                    className="mf-btn-secondary !p-1.5 hover:!text-[color:var(--lume-signal-critical)]"
                                     title="Elimina con motivazione"
                                     aria-label="Elimina voce clinica con motivazione"
                                 >
@@ -132,14 +136,14 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
                             {/* Window check to prevent hydration mismatch if SSR (though this is Client Component) */}
                             {typeof window !== 'undefined' && <span className="italic">{entry.deletionReason}</span>}
                             <div className="text-[10px] opacity-70 mt-0.5">
-                                {entry.deletedAt && format(new Date(entry.deletedAt), 'dd/MM/yyyy HH:mm', { locale: it })}
+                                {entry.deletedAt && <span className="lume-registro">{format(new Date(entry.deletedAt), 'dd/MM/yyyy HH:mm', { locale: it })}</span>}
                             </div>
                         </div>
                     </div>
                 )}
 
                 {/* Main Text Content */}
-                <div style={{ color: 'var(--mf-ink)' }}>
+                <div style={{ color: 'var(--lume-ink)' }}>
                     <PrivacyBlur>
                         {/* @Codex */}
                         <ClinicalRichTextContent content={entry.content} className="prose prose-sm max-w-none prose-p:leading-relaxed dark:prose-invert" />

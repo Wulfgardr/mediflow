@@ -59,12 +59,16 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
     const isExport = actionType === 'export';
 
     const accent: ModalAccent = isDelete ? 'critical' : isExport ? 'primary' : 'warning';
-    const accentVar = `var(--mf-${accent})`;
+    const accentVar = accent === 'critical'
+        ? 'var(--lume-signal-critical)'
+        : accent === 'warning'
+            ? 'var(--lume-signal-warning)'
+            : 'var(--lume-accent)';
     const icon = isDelete ? <Trash2 className="h-5 w-5" /> : isExport ? <Check className="h-5 w-5" /> : <Archive className="h-5 w-5" />;
     const title = isDelete ? 'Elimina scheda' : isExport ? 'Esporta FHIR con controllo FSE' : 'Archivia scheda';
 
     return (
-        // @Codex WUL-229: patient action modal aligned with specular tier (ora via <Modal>)
+        // @Codex WUL-229: patient action modal aligned with the Lume overlay recipe.
         <Modal
             open={isOpen}
             onClose={onClose}
@@ -83,7 +87,7 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                             </p>
                         </div>
                         <div>
-                            <label className="mf-field-label">Motivazione eliminazione <span style={{ color: 'var(--mf-critical)' }}>*</span></label>
+                            <label className="mf-field-label">Motivazione eliminazione <span style={{ color: 'var(--lume-signal-critical)' }}>*</span></label>
                             <textarea
                                 required
                                 value={deletionReason}
@@ -134,7 +138,7 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
 
                         {archiveReason === 'other' && (
                             <div className="animate-in slide-in-from-top-1 fade-in">
-                                <label className="mf-field-label">Specifica altro <span style={{ color: 'var(--mf-warning)' }}>*</span></label>
+                                <label className="mf-field-label">Specifica altro <span style={{ color: 'var(--lume-signal-warning)' }}>*</span></label>
                                 <textarea
                                     required
                                     value={archiveNote}

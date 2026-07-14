@@ -7,6 +7,7 @@ import DocumentViewer from './document-viewer';
 import { TimelineEntryCard, TimelineEntryData } from './timeline-entry-card';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/ui/toast-provider';
+import { LumeFilo } from '@/components/ui/lume-filo';
 
 interface TimelineProps {
     entries: TimelineEntryData[];
@@ -81,7 +82,7 @@ export default function Timeline({ entries }: TimelineProps) {
     const auditToggle = (
         <button
             onClick={() => setShowDeleted(!showDeleted)}
-            className="text-xs flex items-center gap-1 text-[color:var(--mf-muted)] transition-colors hover:text-[color:var(--mf-ink)]"
+            className="text-xs flex items-center gap-1 text-[color:var(--lume-ink-muted)] transition-colors hover:text-[color:var(--lume-ink)]"
         >
             {showDeleted ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
             {showDeleted ? "Nascondi eliminati" : "Mostra cestino / audit"}
@@ -92,7 +93,7 @@ export default function Timeline({ entries }: TimelineProps) {
         return (
             <div className="space-y-4">
                 <div className="flex justify-end">{auditToggle}</div>
-                <div className="text-center py-10 italic text-[color:var(--mf-muted)]">Nessuna voce visibile nel diario clinico.</div>
+                <div className="text-center py-10 italic text-[color:var(--lume-ink-muted)]">Nessuna voce visibile nel diario clinico.</div>
             </div>
         );
     }
@@ -101,7 +102,8 @@ export default function Timeline({ entries }: TimelineProps) {
         <div className="space-y-6">
             <div className="flex justify-end">{auditToggle}</div>
 
-            <div className="relative border-l-2 border-[color:rgba(112,106,100,0.18)] dark:border-white/10 ml-3 space-y-8 pb-8">
+            <div className="relative ml-3 space-y-8 pb-8">
+                <LumeFilo variant="spina" anchorSelector="[data-lume-timeline-node]" className="absolute left-[-0.5px] w-px" />
                 {visibleEntries.map((entry) => (
                     <TimelineEntryCard
                         key={entry.id}

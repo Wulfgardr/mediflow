@@ -43,22 +43,22 @@ function NavGroups({ pathname, testIdPrefix }: { pathname: string; testIdPrefix:
                                         aria-current={isActive ? 'page' : undefined}
                                         data-testid={`${testIdPrefix}${item.id}`}
                                         className={cn(
-                                            'block rounded-[14px] border px-3 py-2 transition-colors',
-                                            !isActive && 'border-transparent hover:border-[color:var(--glass-border)]',
+                                            'block rounded-[var(--lume-radius-card)] border px-3 py-2 transition-colors',
+                                            !isActive && 'border-transparent hover:border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)]',
                                         )}
                                         style={isActive
                                             ? isDanger
                                                 ? { borderColor: 'rgba(192, 57, 43, 0.3)', background: 'rgba(192, 57, 43, 0.08)' }
-                                                : { borderColor: 'var(--glass-border)', background: 'var(--mf-bg-elevated)' }
+                                                : { borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)', background: 'var(--lume-surface-focal)', boxShadow: '0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent)' }
                                             : undefined}
                                     >
                                         <span
                                             className="block text-[13px] font-semibold"
-                                            style={{ color: isDanger ? 'var(--mf-critical)' : 'var(--mf-ink)' }}
+                                            style={{ color: isDanger ? 'var(--lume-signal-critical)' : 'var(--lume-ink)' }}
                                         >
                                             {item.label}
                                         </span>
-                                        <span className="mt-0.5 block text-[11px] leading-4" style={{ color: 'var(--mf-muted)' }}>
+                                        <span className="mt-0.5 block text-[11px] leading-4" style={{ color: 'var(--lume-ink-muted)' }}>
                                             {item.description}
                                         </span>
                                     </Link>
@@ -94,19 +94,19 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
                     aria-expanded={isMobileNavOpen}
                     aria-controls="settings-nav-mobile-groups"
                     data-testid="settings-nav-mobile-toggle"
-                    className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-[14px] border px-3 py-2 text-left transition-colors"
+                    className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-[var(--lume-radius-card)] border px-3 py-2 text-left transition-colors"
                     style={{
-                        borderColor: isDangerActive ? 'rgba(192, 57, 43, 0.3)' : 'var(--glass-border)',
-                        background: isDangerActive ? 'rgba(192, 57, 43, 0.08)' : 'var(--mf-bg-elevated)',
+                        borderColor: isDangerActive ? 'rgba(163, 58, 47, 0.3)' : 'color-mix(in srgb, var(--lume-ink) 14%, transparent)',
+                        background: isDangerActive ? 'rgba(163, 58, 47, 0.08)' : 'var(--lume-surface-focal)',
                     }}
                 >
                     <span className="min-w-0">
-                        <span className="block text-[10px] font-semibold uppercase tracking-[0.12em]" style={{ color: 'var(--mf-muted)' }}>
+                        <span className="block text-[10px] font-semibold uppercase tracking-[0.12em]" style={{ color: 'var(--lume-ink-muted)' }}>
                             {activeEntry ? activeEntry.group.label : 'Impostazioni'}
                         </span>
                         <span
                             className="block truncate text-[13px] font-semibold"
-                            style={{ color: isDangerActive ? 'var(--mf-critical)' : 'var(--mf-ink)' }}
+                            style={{ color: isDangerActive ? 'var(--lume-signal-critical)' : 'var(--lume-ink)' }}
                         >
                             {activeEntry ? activeEntry.item.label : 'Panoramica'}
                         </span>
@@ -114,7 +114,7 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
                     <ChevronDown
                         aria-hidden="true"
                         className={cn('h-4 w-4 shrink-0 transition-transform', isMobileNavOpen && 'rotate-180')}
-                        style={{ color: 'var(--mf-muted)' }}
+                        style={{ color: 'var(--lume-ink-muted)' }}
                     />
                 </button>
                 {onSearchRequest ? (
@@ -123,11 +123,11 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
                         onClick={onSearchRequest}
                         aria-label="Cerca impostazione"
                         data-testid="settings-search-trigger-mobile"
-                        className="flex w-11 shrink-0 items-center justify-center rounded-[14px] border transition-colors"
+                        className="flex w-11 shrink-0 items-center justify-center rounded-[var(--lume-radius-card)] border transition-colors"
                         style={{
-                            borderColor: 'var(--glass-border)',
-                            background: 'var(--mf-bg-elevated)',
-                            color: 'var(--mf-muted)',
+                            borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)',
+                            background: 'var(--lume-surface-focal)',
+                            color: 'var(--lume-ink-muted)',
                         }}
                     >
                         <Search className="h-4 w-4" />
@@ -137,10 +137,9 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
             <div
                 id="settings-nav-mobile-groups"
                 hidden={!isMobileNavOpen}
-                className="mt-2 space-y-5 rounded-[18px] border p-3 lg:hidden"
+                className="mt-2 space-y-5 rounded-[var(--lume-radius-panel)] border bg-[color:var(--lume-surface-field)] p-3 lg:hidden"
                 style={{
-                    borderColor: 'var(--glass-border)',
-                    background: 'var(--mf-bg-elevated)',
+                    borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)',
                 }}
             >
                 <NavGroups pathname={pathname} testIdPrefix="settings-nav-mobile-" />
@@ -153,11 +152,10 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
                         type="button"
                         onClick={onSearchRequest}
                         data-testid="settings-search-trigger"
-                        className="flex w-full items-center justify-between gap-2 rounded-[14px] border px-3 py-2 text-left text-xs font-medium transition-colors"
+                        className="flex w-full items-center justify-between gap-2 rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-field)] px-3 py-2 text-left text-xs font-medium transition-colors"
                         style={{
-                            borderColor: 'var(--glass-border)',
-                            background: 'var(--mf-bg-elevated)',
-                            color: 'var(--mf-muted)',
+                            borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)',
+                            color: 'var(--lume-ink-muted)',
                         }}
                     >
                         <span className="inline-flex items-center gap-2">
@@ -165,8 +163,8 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
                             Cerca impostazione
                         </span>
                         <kbd
-                            className="rounded-md border px-1.5 py-0.5 font-mono text-[10px]"
-                            style={{ borderColor: 'var(--glass-border)', color: 'var(--mf-muted)' }}
+                            className="lume-registro rounded-md border px-1.5 py-0.5 text-[10px]"
+                            style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)', color: 'var(--lume-ink-muted)' }}
                         >
                             ⌘K
                         </kbd>

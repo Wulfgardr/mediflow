@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   parseHexColor,
   contrastRatio,
+  mixHexColors,
   resolveColor,
   evaluateContract,
   formatReport,
@@ -47,18 +48,29 @@ test('WCAG primitives match known reference values', () => {
   assert.equal(Math.round(contrastRatio('#000000', '#ffffff')), 21);
   assert.equal(contrastRatio('#abcdef', '#abcdef'), 1);
   assert.deepEqual(parseHexColor('#33506b'), { r: 0x33, g: 0x50, b: 0x6b });
+  assert.equal(mixHexColors('#ffffff', 0.5, '#000000'), '#808080');
+  assert.throws(() => mixHexColors('#ffffff', 1.1, '#000000'), /invalid color-mix weight/);
 });
 
 test('committed token source passes the whole contract', () => {
   const result = evaluateContract(loadTokens());
   assert.equal(result.pass, true);
-  assert.equal(result.checks.length, 30); // 3 registers x (2 ink x 4 surface + 2 accent)
+  assert.equal(result.checks.length, 42); // 3 registers x (2 ink x 4 surface + 2 accent + 4 signal recipes)
   assert.ok(result.checks.every((c) => c.ratio >= c.minRatio));
   // The adjusted binding pair: giorno muted on chrome clears 4.5 with margin.
   const bind = result.checks.find(
     (c) => c.register === 'giorno' && c.label === 'ink.muted on surface.chrome',
   );
   assert.equal(bind.ratio.toFixed(3), '4.702');
+  const warningTint = result.checks.find(
+    (c) => c.register === 'giorno' && c.label === 'signal.warning text on 10% signal tint',
+  );
+  assert.equal(warningTint.ratio.toFixed(3), '6.532');
+  assert.ok(
+    result.checks
+      .filter((c) => c.signal)
+      .every((c) => c.ratio >= 4.5 && c.measuredText && c.measuredBackground),
+  );
   assert.match(formatReport(result), /CONTRACT VIOLATED|OK/);
 });
 
