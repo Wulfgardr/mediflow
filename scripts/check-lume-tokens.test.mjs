@@ -174,14 +174,44 @@ test('palette guard catches a Tailwind palette utility', () => {
   assert.equal(result.violations[0].kind, 'utility Tailwind');
 });
 
-test('palette guard accepts a declared Lume token and transparent', () => {
+test('palette guard catches neutral and fixed Tailwind color utilities', () => {
   const result = scanPaletteSource({
     relativePath: 'components/example.tsx',
-    source: 'const example = <div style={{ color: "#eef0f2", background: "transparent", outline: "hsl(0 0% 100%)" }} />;',
+    source: 'const example = <div className="bg-slate-500 text-gray-700 border-white bg-black/50" />;',
+    tokens: validTokens(),
+    allowlist: [],
+  });
+  assert.equal(result.violations.length, 4);
+  assert.deepEqual(result.violations.map((finding) => finding.value).sort(), [
+    'bg-black/50',
+    'bg-slate-500',
+    'border-white',
+    'text-gray-700',
+  ]);
+});
+
+test('palette guard accepts a declared Lume token, transparent, currentColor and non-color utilities', () => {
+  const result = scanPaletteSource({
+    relativePath: 'components/example.tsx',
+    source: 'const example = <div className="bg-transparent text-current whitespace-nowrap" style={{ color: "#eef0f2", background: "transparent", outlineColor: "currentColor", borderColor: "inherit", outline: "hsl(0 0% 100%)" }} />;',
     tokens: validTokens(),
     allowlist: [],
   });
   assert.equal(result.violations.length, 0);
+});
+
+test('palette guard rejects an allowlist entry with zero occurrences', () => {
+  assert.throws(() => scanPaletteSource({
+    relativePath: 'components/example.tsx',
+    source: 'export const example = true;',
+    tokens: validTokens(),
+    allowlist: [{
+      path: 'components/example.tsx',
+      reason: 'Fixture sintetica.',
+      occurrences: 0,
+      fingerprint: paletteFingerprint([]),
+    }],
+  }), /voce di allowlist invalida per components\/example\.tsx: occurrences deve essere un intero positivo\. Correggi la voce o rimuovila\./);
 });
 
 test('palette guard respects only the exact allowlisted baseline', () => {
