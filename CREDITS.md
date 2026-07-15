@@ -163,11 +163,11 @@ OpenAI GPT-5.2, GPT-5.3 Codex/Spark, GPT-5.4/mini, GPT-5.5 e GPT-5.6
 Sol/Terra/Luna; sul lato Anthropic, Opus 4.8, Fable 5, Sonnet 5 e una quota
 esplorativa storica di Haiku 4.5.
 
-Lo snapshot locale del 13 luglio 2026 conta circa 12,34 miliardi di token di
-sessione: 7,89 miliardi con Codex e 4,45 con Claude Code. Il dato misura il volume
-assistito, in gran parte contesto riletto o recuperato dalla cache, non righe di
-codice o qualità. Un conteggio precedente basato su una metodologia diversa non
-è direttamente confrontabile.
+Lo snapshot locale del 15 luglio 2026 conta circa 17,56 miliardi di token di
+sessione: 11,33 miliardi con Codex e 6,22 con Claude Code. Circa 16,41 miliardi
+sono input recuperato dalla cache; il dato misura soprattutto contesto riletto
+nel lavoro assistito, non righe di codice, costo o qualità. Un conteggio
+precedente basato su una metodologia diversa non è direttamente confrontabile.
 
 - **[Repo Prompt CE](https://github.com/repoprompt/repoprompt-ce)** (Eric Provencher): context engineering open source, usato in alcune sessioni per preparare selezioni e diff per gli agenti.
 - **[CodexBar](https://github.com/steipete/CodexBar)** (Peter Steinberger): visibilità locale sull'uso dei modelli e fonte del conteggio storico del README.
