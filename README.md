@@ -128,8 +128,12 @@ conteggi e sul significato di ciascuno stato.
 ```bash
 git clone https://github.com/Wulfgardr/mediflow
 cd mediflow
-npm install
+nvm use
+npm ci
 ```
+
+MediFlow richiede Node.js 24.x. Installazione, build e launcher verificano anche
+che il binding nativo `better-sqlite3` appartenga alla stessa ABI di Node.
 
 Poi usa il launcher della tua piattaforma:
 

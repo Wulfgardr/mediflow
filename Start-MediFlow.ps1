@@ -18,14 +18,16 @@ Write-Host ""
 
 # --- 1. Node.js ---
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-    Write-Host "  Node.js non trovato nel PATH. Installa Node 20 LTS da https://nodejs.org e riprova." -ForegroundColor Red
+    Write-Host "  Node.js non trovato nel PATH. Installa Node 24 LTS da https://nodejs.org e riprova." -ForegroundColor Red
     Read-Host "  Premi INVIO per chiudere"
     exit 1
 }
-$nodeCheck = (& node scripts/launcher-helpers.mjs check-node)
+$nodeCheck = (& node scripts/launcher-helpers.mjs check-runtime)
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "  Attenzione: $nodeCheck" -ForegroundColor Yellow
-    Write-Host "  Serve Node 20 LTS (vedi .nvmrc). Con un'altra versione l'install di better-sqlite3 puo fallire." -ForegroundColor Yellow
+    Write-Host "  Runtime Node/better-sqlite3 incompatibile: $nodeCheck" -ForegroundColor Red
+    Write-Host "  Usa Node 24, esegui npm ci e riprova. Non usare npm rebuild." -ForegroundColor Red
+    Read-Host "  Premi INVIO per chiudere"
+    exit 1
 }
 
 # --- 2. Ollama (opzionale: AI/OCR locale) ---

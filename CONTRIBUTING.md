@@ -30,7 +30,7 @@ destinazione di export. Dati e artifact sensibili restano fuori da Git secondo
 
 ## ⚙️ Prerequisiti
 
-- Node.js **v20+** consigliato
+- Node.js **24.x**, come fissato da `.nvmrc` e `package.json`
 - npm (incluso con Node)
 - Docker Desktop (opzionale, per API ICD-11)
 - Ollama (opzionale, per AI/OCR locale)
@@ -47,7 +47,8 @@ platform-specific equivalente in MediFlow.
 ```bash
 git clone https://github.com/Wulfgardr/mediflow
 cd mediflow
-npm install
+nvm use
+npm ci
 ```
 
 ### Avvio (stack web locale consigliato)
