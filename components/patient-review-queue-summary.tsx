@@ -7,7 +7,7 @@
 
 import { ListChecks } from 'lucide-react';
 
-import { Badge, type BadgePalette } from '@/components/ui/badge';
+import { Badge, type BadgeTone } from '@/components/ui/badge';
 import type {
     PatientReviewQueueRow,
     PatientReviewQueueSummary,
@@ -23,14 +23,14 @@ interface PatientReviewQueueSummaryProps {
 
 /* @Codex WUL-UIUX (STREAM W2-B): le sette tinte legacy mappate 1:1 sulla
    dimensione `palette` di Badge (stessa resa, dark-mode inclusa). */
-const STATE_PALETTE: Record<ReviewQueueRowState, BadgePalette> = {
-    'da-rivedere': 'amber',
-    'bloccato': 'red',
-    'serve-testo': 'blue',
-    'pronto-da-applicare': 'emerald',
-    'gia-applicato': 'slate',
-    'disponibile': 'slate-plain',
-    'vuoto': 'dashed',
+const STATE_TONE: Record<ReviewQueueRowState, BadgeTone> = {
+    'da-rivedere': 'warning',
+    'bloccato': 'critical',
+    'serve-testo': 'warning',
+    'pronto-da-applicare': 'success',
+    'gia-applicato': 'success',
+    'disponibile': 'neutral',
+    'vuoto': 'neutral',
 };
 
 function ReviewQueueRow({ row }: { row: PatientReviewQueueRow }) {
@@ -42,7 +42,7 @@ function ReviewQueueRow({ row }: { row: PatientReviewQueueRow }) {
             <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-semibold text-[color:var(--lume-ink)]">{row.panelLabel}</span>
-                    <Badge palette={STATE_PALETTE[row.state]} size="xs">
+                    <Badge tone={STATE_TONE[row.state]} size="xs">
                         {row.stateLabel}
                     </Badge>
                 </div>

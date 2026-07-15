@@ -718,6 +718,24 @@
   border-color: color-mix(in srgb, var(--lume-signal-warning) 30%, transparent);
 }
 
+.pillSuccess {
+  background: color-mix(in srgb, var(--lume-signal-success) 11%, var(--lume-surface-field));
+  color: color-mix(in srgb, var(--lume-signal-success) 60%, var(--lume-ink));
+  border-color: color-mix(in srgb, var(--lume-signal-success) 30%, transparent);
+}
+
+.pillCritical {
+  background: color-mix(in srgb, var(--lume-signal-critical) 11%, var(--lume-surface-field));
+  color: color-mix(in srgb, var(--lume-signal-critical) 60%, var(--lume-ink));
+  border-color: color-mix(in srgb, var(--lume-signal-critical) 30%, transparent);
+}
+
+.pillPlum {
+  background: color-mix(in srgb, var(--lume-signal-plum) 11%, var(--lume-surface-field));
+  color: color-mix(in srgb, var(--lume-signal-plum) 60%, var(--lume-ink));
+  border-color: color-mix(in srgb, var(--lume-signal-plum) 30%, transparent);
+}
+
 .diagnosisPill {
   min-width: 0;
   max-width: 100%;
@@ -1217,7 +1235,7 @@
   top: 0;
   bottom: 0;
   width: 5px;
-  background: var(--rail-green);
+  background: var(--ink-faint);
 }
 
 .freshnessLabel { display: flex; flex-direction: column; gap: 2px; }
@@ -1231,9 +1249,9 @@
   font-variant-numeric: tabular-nums;
 }
 
-.freshnessOk::before { background: var(--rail-blue); }
-.freshnessStale::before { background: var(--rail-yellow); }
-.freshnessBroken::before { background: var(--rail-coral); }
+.freshnessOk::before { background: var(--lume-signal-success); }
+.freshnessStale::before { background: var(--lume-signal-warning); }
+.freshnessBroken::before { background: var(--lume-signal-critical); }
 
 /* ───────────── SISS stage selector ───────────── */
 
@@ -1592,8 +1610,8 @@
   background: var(--rail-slate);
 }
 
-.patientDotGreen,
-.patientDotBlue { background: var(--ink-muted); }
+.patientDotNeutral { background: var(--ink-muted); }
+.patientDotWarning { background: var(--lume-signal-warning); }
 .patientDotMuted { background: var(--ink-faint); }
 
 .patientName { font-size: 14px; color: var(--ink); font-weight: 500; }

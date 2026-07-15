@@ -18,6 +18,7 @@ import type {
   Kree8CatalogRow,
 } from '../cockpit-shared';
 import type { PillVariant } from '@/lib/patient-workspace';
+import { catalogFreshnessSignal } from '@/lib/ui-semantic-signal';
 import styles from '../kree8-clinical-cockpit.module.css';
 
 
@@ -185,7 +186,8 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
       : 0;
   const freshnessClass = classNames(
     styles.freshness,
-    // @Codex: la freschezza normale resta quieta; i segnali sono riservati alle anomalie.
+    // @Codex: freshness usa lo stesso vocabolario delle pillole: fresh, stale e broken
+    // mantengono rispettivamente success, warning e critical anche sulla rail.
     freshnessTier === 'fresh' && styles.freshnessOk,
     freshnessTier === 'stale' && styles.freshnessStale,
     freshnessTier === 'broken' && styles.freshnessBroken,
@@ -248,13 +250,7 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
 
         <div style={{ marginTop: 8 }}>
           {catalogs.map((c) => {
-            const variant = {
-              fresh: 'green',
-              ok: 'blue',
-              stale: 'yellow',
-              broken: 'coral',
-              off: 'muted',
-            }[c.freshness] as PillVariant;
+            const variant: PillVariant = catalogFreshnessSignal(c.freshness);
             const labelText = {
               fresh: 'fresco',
               ok: 'da verificare',
@@ -299,13 +295,7 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
             <header className={styles.panelHeader}>
               <span className={styles.evidenceTitle}>{selectedCatalog.name}</span>
               <PillBadge
-                variant={{
-                  fresh: 'green',
-                  ok: 'blue',
-                  stale: 'yellow',
-                  broken: 'coral',
-                  off: 'muted',
-                }[selectedCatalog.freshness] as PillVariant}
+                variant={catalogFreshnessSignal(selectedCatalog.freshness)}
               >
                 {{
                   fresh: 'fresco',

@@ -7,20 +7,31 @@
 import type { ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
+import {
+    resolveSemanticSignal,
+    type SemanticSignal,
+} from '@/lib/ui-semantic-signal';
 
-export type BadgeTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
+export type BadgeTone = SemanticSignal | 'info' | 'danger';
 
-const TONE_CLASSES: Record<BadgeTone, string> = {
+const TONE_CLASSES: Record<SemanticSignal, string> = {
     neutral:
         'border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]',
-    info: 'border-[color:color-mix(in_srgb,var(--lume-accent)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-accent)_60%,var(--lume-ink))]',
     success:
         'border-[color:color-mix(in_srgb,var(--lume-signal-success)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]',
     warning:
         'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]',
-    danger:
+    critical:
         'border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]',
+    plum:
+        'border-[color:color-mix(in_srgb,var(--lume-signal-plum)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-plum)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-plum)_60%,var(--lume-ink))]',
 };
+
+function resolveBadgeTone(tone: BadgeTone): SemanticSignal {
+    if (tone === 'info') return 'neutral';
+    if (tone === 'danger') return 'critical';
+    return resolveSemanticSignal(tone);
+}
 
 /* @Codex: compatibilita nominale per i consumatori legacy. I nomi della palette
    restano stabili, ma la resa converge sui ruoli Lume: warning, critical,
@@ -36,8 +47,8 @@ export type BadgePalette =
 
 const PALETTE_CLASSES: Record<BadgePalette, string> = {
     amber: TONE_CLASSES.warning,
-    red: TONE_CLASSES.danger,
-    blue: TONE_CLASSES.info,
+    red: TONE_CLASSES.critical,
+    blue: TONE_CLASSES.neutral,
     emerald:
         TONE_CLASSES.success,
     slate: TONE_CLASSES.neutral,
@@ -87,7 +98,7 @@ export function Badge({
             className={cn(
                 'inline-flex items-center rounded-full border',
                 SIZE_CLASSES[size],
-                palette ? PALETTE_CLASSES[palette] : TONE_CLASSES[tone],
+                palette ? PALETTE_CLASSES[palette] : TONE_CLASSES[resolveBadgeTone(tone)],
                 className,
             )}
         >

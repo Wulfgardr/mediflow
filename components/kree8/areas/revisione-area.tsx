@@ -118,7 +118,7 @@ function RevisioneArea() {
           </p>
         </div>
         <div className={styles.headerActions}>
-          <PillBadge variant={canApply ? 'green' : 'yellow'}>
+          <PillBadge variant={canApply ? 'success' : 'warning'}>
             {elaborated} / {total} rivisti
           </PillBadge>
           <button type="button" className={styles.ghostBtn}>
@@ -136,7 +136,7 @@ function RevisioneArea() {
         <header className={styles.panelHeader}>
           <h2 className={styles.panelTitle}>Estratti del documento</h2>
           <span className={styles.panelActions}>
-            <PillBadge variant="violet">
+            <PillBadge variant="plum">
               <Sparkles size={11} /> qwen3.5 · locale
             </PillBadge>
           </span>
@@ -164,10 +164,10 @@ function RevisioneArea() {
       <div className={styles.docGrid}>
         <section className={styles.docPreview}>
           <header style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <PillBadge variant="muted">Anteprima OCR</PillBadge>
+            <PillBadge variant="plum">Anteprima OCR</PillBadge>
             <span className={styles.rowSub}>2 pagine · 87% leggibile</span>
             <span style={{ marginLeft: 'auto' }}>
-              <PillBadge variant="blue">PDF · 318 KB</PillBadge>
+              <PillBadge variant="plum">PDF · 318 KB</PillBadge>
             </span>
           </header>
           <article className={styles.docPaper}>
@@ -189,8 +189,8 @@ function RevisioneArea() {
               previa verifica del medico curante.
             </p>
             <footer style={{ marginTop: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-              <PillBadge variant="muted">pag 1 di 2</PillBadge>
-              <PillBadge variant="muted">firma digitale assente</PillBadge>
+              <PillBadge variant="neutral">pag 1 di 2</PillBadge>
+              <PillBadge variant="critical">firma digitale assente</PillBadge>
             </footer>
           </article>
         </section>
@@ -199,7 +199,7 @@ function RevisioneArea() {
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Campi suggeriti</h2>
             <span className={styles.panelActions}>
-              <PillBadge variant="violet">5 estratti · 1 bloccato</PillBadge>
+              <PillBadge variant="critical">5 estratti · 1 bloccato</PillBadge>
             </span>
           </header>
           <div>
@@ -219,25 +219,25 @@ function RevisioneArea() {
                     <span className={styles.fieldKind}>· {kindLabel}</span>
                     <span style={{ marginLeft: 'auto' }}>
                       {decision === 'apply' && (
-                        <PillBadge variant="green" commitKey={`${f.id}-apply`}>
+                        <PillBadge variant="success" commitKey={`${f.id}-apply`}>
                           applicato
                         </PillBadge>
                       )}
                       {decision === 'note' && (
-                        <PillBadge variant="blue" commitKey={`${f.id}-note`}>
+                        <PillBadge variant="neutral" commitKey={`${f.id}-note`}>
                           come nota
                         </PillBadge>
                       )}
                       {decision === 'ignore' && (
-                        <PillBadge variant="muted" commitKey={`${f.id}-ignore`}>
+                        <PillBadge variant="neutral" commitKey={`${f.id}-ignore`}>
                           ignorato
                         </PillBadge>
                       )}
                       {decision === 'pending' && !isBlocked && (
-                        <PillBadge variant="yellow">da rivedere</PillBadge>
+                        <PillBadge variant="warning">da rivedere</PillBadge>
                       )}
                       {isBlocked && (
-                        <PillBadge variant="coral">
+                        <PillBadge variant="critical">
                           <AlertTriangle size={11} /> bloccato
                         </PillBadge>
                       )}

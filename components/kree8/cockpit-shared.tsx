@@ -17,6 +17,11 @@ import {
 } from 'lucide-react';
 
 import type { ClinicalEntry } from '@/lib/db';
+import {
+  resolveSemanticSignal,
+  type AgendaFilter,
+  type SemanticSignal,
+} from '@/lib/ui-semantic-signal';
 /* @Codex WUL-UIUX Fase 7: pipeline dati del Quadro condivisa con la Scheda. */
 import {
   clinicalEntryTypeLabel,
@@ -44,7 +49,7 @@ export type AreaId =
 export const AREA_ID_VALUES: AreaId[] = ['turno', 'incarico', 'scheda', 'diario', 'revisione', 'repertori', 'handoff', 'governance'];
 type DocDecision = 'pending' | 'apply' | 'note' | 'ignore';
 type StageId = 'identity' | 'consent' | 'handoff' | 'outcome';
-type StatusFilter = 'all' | 'urgent' | 'ai' | 'manual';
+type StatusFilter = AgendaFilter;
 type InboxScope = 'ambulatorio' | 'network' | 'tutti';
 type HandoffFeedback = {
   kind: 'success' | 'warning' | 'error';
@@ -206,43 +211,49 @@ const REVIEW_AGENDA: Kree8AgendaRow[] = [
     time: '08:30',
     title: 'Visita ambulatoriale · paziente AB-2026-014',
     sub: 'Controllo cronicità',
-    pill: 'green',
+    pill: 'success',
     pillLabel: 'Confermata',
+    filterCategory: 'manual',
   },
   {
     time: '09:15',
     title: 'Telefonata follow-up · paziente CD-2026-088',
     sub: 'Esito esami ematochimici',
-    pill: 'blue',
+    pill: 'warning',
     pillLabel: 'Da preparare',
+    filterCategory: 'manual',
   },
   {
     time: '10:00',
     title: 'Domiciliare · paziente EF-2026-002',
     sub: 'Medicazione + vitali',
-    pill: 'yellow',
+    pill: 'plum',
     pillLabel: 'Logistica',
+    filterCategory: 'urgent',
   },
   {
     time: '11:30',
     title: 'Riunione équipe distretto',
     sub: 'Discussione casi complessi',
-    pill: 'muted',
+    pill: 'neutral',
     pillLabel: 'Interno',
+    filterCategory: 'manual',
   },
   {
     time: '15:00',
     title: 'Revisione documenti firmati',
     sub: 'Coda decisioni AI · 7 casi',
-    pill: 'violet',
+    pill: 'plum',
     pillLabel: 'AI',
+    filterCategory: 'ai',
   },
   {
     time: '17:45',
     title: 'Prescrizione SISS',
     sub: 'Sessione consenso scaduta tra 6g',
-    pill: 'coral',
+    pill: 'warning',
     pillLabel: 'Attenzione',
+    filterCategory: 'urgent',
   },
 ];
 
@@ -253,7 +264,7 @@ const REVIEW_PATIENT_LIST: Kree8Patient[] = [
     code: 'AB-2026-014',
     scope: 'ambulatorio',
     list: 'attivi',
-    status: 'green',
+    status: 'neutral',
     statusLabel: 'Cronicità',
     diagnoses: ['Ipertensione', 'Dislipidemia', 'BPCO lieve'],
     lastTouch: '08 mag · Diario',
@@ -270,7 +281,7 @@ const REVIEW_PATIENT_LIST: Kree8Patient[] = [
     code: 'CD-2026-088',
     scope: 'ambulatorio',
     list: 'attivi',
-    status: 'blue',
+    status: 'neutral',
     statusLabel: 'Follow-up',
     diagnoses: ['Esenzione 031', 'Diabete tipo 2'],
     lastTouch: '07 mag · Documento',
@@ -287,7 +298,7 @@ const REVIEW_PATIENT_LIST: Kree8Patient[] = [
     code: 'EF-2026-002',
     scope: 'network',
     list: 'attivi',
-    status: 'green',
+    status: 'neutral',
     statusLabel: 'Territorio attivo',
     diagnoses: ['ADI · medicazione', 'Vitali instabili'],
     lastTouch: '06 mag · Visita domic.',
@@ -304,7 +315,7 @@ const REVIEW_PATIENT_LIST: Kree8Patient[] = [
     code: 'GH-2025-921',
     scope: 'ambulatorio',
     list: 'archivio',
-    status: 'muted',
+    status: 'neutral',
     statusLabel: 'Archiviato',
     diagnoses: ['Storico clinico', 'Percorso chiuso'],
     lastTouch: '12 ott 2025',
@@ -321,7 +332,7 @@ const REVIEW_PATIENT_LIST: Kree8Patient[] = [
     code: 'IL-2026-047',
     scope: 'ambulatorio',
     list: 'attivi',
-    status: 'blue',
+    status: 'warning',
     statusLabel: 'Smart Import in revisione',
     diagnoses: ['Nuova scheda', 'Documento in coda'],
     lastTouch: '08 mag · Smart Import',
@@ -547,7 +558,7 @@ function mapPatientForKree8(patient: Kree8PatientSource): Kree8Patient {
     code: maskTaxCode(patient.taxCode),
     scope: 'ambulatorio',
     list: isArchived ? 'archivio' : 'attivi',
-    status: isArchived ? 'muted' : isAdi ? 'green' : diagnoses.length > 0 ? 'blue' : 'green',
+    status: 'neutral',
     statusLabel: isArchived ? 'Archiviato' : isAdi ? 'ADI' : diagnoses.length > 0 ? 'In carico' : 'Attivo',
     diagnoses: diagnoses.length > 0
       ? diagnoses
@@ -622,19 +633,12 @@ function classNames(...parts: (string | false | undefined)[]) {
   return parts.filter(Boolean).join(' ');
 }
 
-const PILL_VARIANT_CLASS: Record<PillVariant, string> = {
-  /* @Codex: i nomi colore legacy restano solo nel routing dei dati del
-     cockpit; la resa visiva ordinaria e neutra finche il significato non
-     dichiara un segnale clinico esplicito. */
-  blue: styles.pillNeutral,
-  yellow: styles.pillNeutral,
-  green: styles.pillNeutral,
-  coral: styles.pillNeutral,
-  muted: styles.pillNeutral,
-  violet: styles.pillNeutral,
+const PILL_VARIANT_CLASS: Record<SemanticSignal, string> = {
   neutral: styles.pillNeutral,
+  success: styles.pillSuccess,
   warning: styles.pillWarning,
-  ink: styles.pillNeutral,
+  critical: styles.pillCritical,
+  plum: styles.pillPlum,
 };
 
 function PillBadge({
@@ -651,7 +655,7 @@ function PillBadge({
       key={commitKey}
       className={classNames(
         styles.pill,
-        PILL_VARIANT_CLASS[variant],
+        PILL_VARIANT_CLASS[resolveSemanticSignal(variant)],
         commitKey && styles.pillCommit,
       )}
     >
@@ -792,7 +796,7 @@ function ClinicalAgendaBridgePanel({
         <div className={styles.agendaBridgeHeader}>
           <Cloud size={13} />
           <span>Suggerimenti da e-mail e agenda</span>
-          <PillBadge variant="muted">lettura locale</PillBadge>
+          <PillBadge variant="neutral">lettura locale</PillBadge>
         </div>
         <p className={styles.agendaBridgeCopy}>
           Sto cercando solo segnali clinici o FBF gia presenti nelle cache locali.
@@ -807,7 +811,7 @@ function ClinicalAgendaBridgePanel({
         <div className={styles.agendaBridgeHeader}>
           <AlertTriangle size={13} />
           <span>Suggerimenti da e-mail e agenda</span>
-          <PillBadge variant="coral">non disponibile</PillBadge>
+          <PillBadge variant="critical">non disponibile</PillBadge>
         </div>
         <p className={styles.agendaBridgeCopy}>
           Nessun dato acquisito. L&apos;agenda resta sui passaggi confermati.
@@ -822,7 +826,7 @@ function ClinicalAgendaBridgePanel({
         <div className={styles.agendaBridgeHeader}>
           <Cloud size={13} />
           <span>Suggerimenti da e-mail e agenda</span>
-          <PillBadge variant="muted">cache assente</PillBadge>
+          <PillBadge variant="neutral">cache assente</PillBadge>
         </div>
         <p className={styles.agendaBridgeCopy}>
           Pronto per leggere le cache evento del mail assistant, senza importare
@@ -837,7 +841,7 @@ function ClinicalAgendaBridgePanel({
       <div className={styles.agendaBridgeHeader}>
         <Cloud size={13} />
         <span>Suggerimenti da e-mail e agenda</span>
-        <PillBadge variant={candidates.length > 0 ? 'blue' : 'muted'}>
+        <PillBadge variant="neutral">
           {bridge.data.stats.candidates} candidati
         </PillBadge>
       </div>
@@ -867,7 +871,7 @@ function ClinicalAgendaBridgePanel({
                 </span>
               </span>
               <span className={styles.agendaCandidateEnd}>
-                <PillBadge variant="yellow">da rivedere</PillBadge>
+                <PillBadge variant="warning">da rivedere</PillBadge>
               </span>
             </div>
           ))}

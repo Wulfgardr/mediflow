@@ -31,6 +31,8 @@ import { serializeDocumentParseEvidenceArtifact } from '@/lib/domain/documents/d
 import DocumentViewer from '@/components/document-viewer';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { semanticSignalSurfaceClass } from '@/components/ui/semantic-signal';
+import { sharedKillSwitchSignal } from '@/lib/ui-semantic-signal';
 
 interface DocumentUploadProps {
     patientId: string;
@@ -353,7 +355,10 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
 
             {!documentSynthesisEnabled && (
                 <div
-                    className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-3 text-xs leading-5 text-[color:var(--lume-ink-muted)]"
+                    className={cn(
+                        'rounded-2xl border p-3 text-xs leading-5',
+                        semanticSignalSurfaceClass(sharedKillSwitchSignal(documentSynthesisEnabled)),
+                    )}
                     data-testid="document-upload-synthesis-disabled-note"
                 >
                     La sintesi clinica documento è disabilitata localmente. L&apos;upload e l&apos;OCR restano disponibili, ma l&apos;Archivio Intelligente e l&apos;aggiornamento di AI Patient Insight non vengono eseguiti.

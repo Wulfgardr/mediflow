@@ -34,6 +34,10 @@ import type {
     TreatmentReasoningSuggestedAction,
 } from '@/lib/treatment-reasoning-contract';
 import { DocumentReferenceChip } from '@/components/document-reference-chip';
+import {
+    semanticSignalSurfaceClass,
+    semanticSignalTextClass,
+} from '@/components/ui/semantic-signal';
 
 interface TreatmentReasoningPanelProps {
     patient: Patient;
@@ -226,7 +230,9 @@ export default function TreatmentReasoningPanel({
                         </div>
 
                         {(!draft.parse.validJson || !draft.parse.validTask || !draft.parse.validEvidenceRefs) ? (
-                            <div className="rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] p-3 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]">
+                            <div className={`rounded-[16px] border p-3 text-xs ${semanticSignalSurfaceClass(
+                                !draft.parse.validJson || !draft.parse.validTask ? 'critical' : 'warning',
+                            )}`}>
                                 Contratto parziale: JSON {draft.parse.validJson ? 'ok' : 'non valido'}, schema {draft.parse.validTask ? 'ok' : 'non valido'}, citazioni {draft.parse.validEvidenceRefs ? 'ok' : 'da rivedere'}.
                             </div>
                         ) : null}
@@ -255,7 +261,7 @@ export default function TreatmentReasoningPanel({
                                     <h4 className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">Evidenze chiave</h4>
                                 </div>
                                 {draft.envelope.data.keyEvidence.length === 0 ? (
-                                    <p className="rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] p-3 text-xs text-[color:var(--lume-ink-muted)]">Nessuna evidenza chiave strutturata.</p>
+                                    <p className={`rounded-[14px] border p-3 text-xs ${semanticSignalSurfaceClass('critical')}`}>Nessuna evidenza chiave strutturata.</p>
                                 ) : draft.envelope.data.keyEvidence.map((evidence) => (
                                     <div key={evidence.id} className="rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] p-3">
                                         <p className="text-sm font-semibold leading-5 text-[color:var(--lume-ink)]"><PrivacyBlur intensity="sm">{evidence.statement}</PrivacyBlur></p>
@@ -292,7 +298,7 @@ export default function TreatmentReasoningPanel({
                                             </div>
                                             <p className="mt-2 text-xs leading-5 text-[color:var(--lume-ink-muted)]"><PrivacyBlur intensity="sm">{action.rationale}</PrivacyBlur></p>
                                             {action.blockedReason ? (
-                                                <p className="mt-2 text-[11px] font-medium text-[color:var(--lume-ink-muted)]">Blocco: <PrivacyBlur intensity="sm">{action.blockedReason}</PrivacyBlur></p>
+                                                <p className={`mt-2 text-[11px] font-medium ${semanticSignalTextClass('critical')}`}>Blocco: <PrivacyBlur intensity="sm">{action.blockedReason}</PrivacyBlur></p>
                                             ) : null}
                                         </div>
                                     ))}
@@ -327,7 +333,7 @@ export default function TreatmentReasoningPanel({
                                     {draft.sources.slice(0, 10).map((source) => (
                                         <div key={source.id} className="rounded-[12px] bg-[color:var(--lume-surface-focal)] p-3 text-xs">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <span className="apple-chip">{sourceKindLabel(source)}</span>
+                                                <span className={`apple-chip border ${semanticSignalSurfaceClass('plum')}`}>{sourceKindLabel(source)}</span>
                                                 <span className="break-all font-mono text-[10px] text-[color:var(--lume-ink-muted)]">{source.id}</span>
                                             </div>
                                             <p className="mt-1 font-semibold text-[color:var(--lume-ink)]">{source.label}</p>

@@ -193,7 +193,7 @@ function IncaricoArea({
             <h2 className={styles.panelTitle}>
               {list === 'attivi' ? 'Pazienti in carico' : 'Archivio pazienti'}
             </h2>
-            <PillBadge variant="muted">{visible.length} risultati</PillBadge>
+            <PillBadge variant="neutral">{visible.length} risultati</PillBadge>
             <span className={styles.panelActions}>
               <Link href="/patients/new" className={styles.ghostBtnSm}>
                 <Plus size={12} />
@@ -234,12 +234,9 @@ function IncaricoArea({
                   {patientRowVirtualizer.getVirtualItems().map((virtualRow) => {
                     const p = visible[virtualRow.index];
                     const isSelected = p.id === selected?.id;
-                    const dotClass =
-                      p.status === 'green'
-                        ? styles.patientDotGreen
-                        : p.status === 'blue'
-                          ? styles.patientDotBlue
-                          : styles.patientDotMuted;
+                    const dotClass = p.status === 'warning'
+                      ? styles.patientDotWarning
+                      : styles.patientDotNeutral;
                     return (
                       <div
                         key={p.id}
@@ -279,7 +276,7 @@ function IncaricoArea({
                             {p.lastTouch}
                           </span>
                           <span className={styles.patientStatusCell}>
-                            <PillBadge variant="neutral">
+                            <PillBadge variant={p.status}>
                               {p.statusLabel}
                             </PillBadge>
                           </span>
@@ -314,7 +311,7 @@ function IncaricoArea({
             {selected.diagnoses.map((d) => (
               <DiagnosisPill key={d} diagnosis={d} />
             ))}
-            <PillBadge variant="neutral">
+            <PillBadge variant={selected.status}>
               {selected.statusLabel}
             </PillBadge>
           </div>

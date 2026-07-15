@@ -55,7 +55,7 @@ function GovernanceArea() {
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Account &amp; PIN</h2>
             <span className={styles.panelActions}>
-              <PillBadge variant="muted">postazione</PillBadge>
+              <PillBadge variant="neutral">postazione</PillBadge>
             </span>
           </header>
           <p className={styles.panelSubtitle}>
@@ -85,7 +85,7 @@ function GovernanceArea() {
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Funzioni AI</h2>
             <span className={styles.panelActions}>
-              <PillBadge variant="violet">
+              <PillBadge variant="plum">
                 <Sparkles size={11} /> a scelta
               </PillBadge>
             </span>
@@ -129,10 +129,10 @@ function GovernanceArea() {
 
           <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
             {[
-              { name: 'Modello clinico locale', tag: 'attivo', variant: 'green' as const },
-              { name: 'Motore Apple locale', tag: 'in prova', variant: 'blue' as const },
-              { name: 'Redazione dati', tag: 'osservazione', variant: 'violet' as const },
-              { name: 'Confronto esterno', tag: 'su richiesta', variant: 'muted' as const },
+              { name: 'Modello clinico locale', tag: 'attivo', variant: 'neutral' as const },
+              { name: 'Motore Apple locale', tag: 'in prova', variant: 'neutral' as const },
+              { name: 'Redazione dati', tag: 'osservazione', variant: 'plum' as const },
+              { name: 'Confronto esterno', tag: 'su richiesta', variant: 'neutral' as const },
             ].map((m) => (
               <div key={m.name} className={styles.compositeCard}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -151,7 +151,7 @@ function GovernanceArea() {
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Modalità di rete</h2>
             <span className={styles.panelActions}>
-              <PillBadge variant="green">locale di default</PillBadge>
+              <PillBadge variant="neutral">locale di default</PillBadge>
             </span>
           </header>
           <p className={styles.panelSubtitle}>
@@ -182,7 +182,7 @@ function GovernanceArea() {
                 Mac principale raggiungibile sulla rete locale
               </span>
             </span>
-            <PillBadge variant="green">attivo</PillBadge>
+            <PillBadge variant="neutral">attivo</PillBadge>
           </div>
         </section>
 
@@ -190,7 +190,7 @@ function GovernanceArea() {
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Backup e repertori</h2>
             <span className={styles.panelActions}>
-              <PillBadge variant="muted">programmato</PillBadge>
+              <PillBadge variant="neutral">programmato</PillBadge>
             </span>
           </header>
           <p className={styles.panelSubtitle}>
@@ -236,7 +236,7 @@ function GovernanceArea() {
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Controlli locali</h2>
             <span className={styles.panelActions}>
-              <PillBadge variant="muted">tracciato</PillBadge>
+              <PillBadge variant="neutral">tracciato</PillBadge>
             </span>
           </header>
           <p className={styles.panelSubtitle}>
@@ -277,7 +277,7 @@ function GovernanceArea() {
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Versione e stato</h2>
             <span className={styles.panelActions}>
-              <PillBadge variant="green">in linea</PillBadge>
+              <PillBadge variant="success">in linea</PillBadge>
             </span>
           </header>
           <p className={styles.panelSubtitle}>
@@ -304,7 +304,7 @@ function GovernanceArea() {
                 1 modello attivo · 3 disponibili per prova
               </span>
             </span>
-            <PillBadge variant="violet">stabile</PillBadge>
+            <PillBadge variant="success">stabile</PillBadge>
           </div>
         </section>
       </div>

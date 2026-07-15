@@ -32,6 +32,11 @@ import {
     type TherapySuggestionState,
 } from '@/lib/domain/documents/patient-smart-import-service';
 import type { SmartImportReviewSnapshot } from '@/lib/domain/documents/patient-review-queue-summary';
+import { semanticSignalSurfaceClass } from '@/components/ui/semantic-signal';
+import {
+    smartImportReviewStateSignal,
+    therapySuggestionStateSignal,
+} from '@/lib/ui-semantic-signal';
 
 interface PatientSmartImportPanelProps {
     patient: Patient;
@@ -64,9 +69,7 @@ function therapyStateLabel(state: TherapySuggestionState): string {
 }
 
 function therapyStateBadgeClasses(state: TherapySuggestionState): string {
-    if (state === 'transition' || state === 'uncertain') return 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]';
-    if (state === 'active') return 'border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)]';
-    return 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]';
+    return semanticSignalSurfaceClass(therapySuggestionStateSignal(state));
 }
 
 function reviewStateLabel(state: SmartImportReviewState): string {
@@ -79,8 +82,7 @@ function reviewStateLabel(state: SmartImportReviewState): string {
 }
 
 function reviewStateBadgeClasses(state: SmartImportReviewState): string {
-    if (state === 'already-present' || state === 'inactive') return 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]';
-    return 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]';
+    return semanticSignalSurfaceClass(smartImportReviewStateSignal(state));
 }
 
 function reviewStateCardClasses(state: SmartImportReviewState, isSelected: boolean): string {
@@ -90,23 +92,7 @@ function reviewStateCardClasses(state: SmartImportReviewState, isSelected: boole
             : 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] hover:border-[color:color-mix(in_srgb,var(--lume-accent)_30%,transparent)]';
     }
 
-    if (state === 'update') {
-        return 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_24%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_7%,var(--lume-surface-field))]';
-    }
-
-    if (state === 'already-present') {
-        return 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)]';
-    }
-
-    if (state === 'transition') {
-        return 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_24%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_7%,var(--lume-surface-field))]';
-    }
-
-    if (state === 'inactive') {
-        return 'border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)]';
-    }
-
-    return 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_24%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_7%,var(--lume-surface-field))]';
+    return semanticSignalSurfaceClass(smartImportReviewStateSignal(state));
 }
 
 function sourceKindLabel(kind: DiagnosisSmartImportSuggestion['evidence']['sourceKind']): string {
@@ -703,7 +689,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                                 </p>
                                                             )}
                                                             {diagnosis.blockedReason && diagnosis.blockedReason !== diagnosis.review.summary && (
-                                                                <p className="mt-1 text-[color:var(--lume-ink-muted)]">
+                                                                <p className="mt-1 text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
                                                                     Motivo blocco: {diagnosis.blockedReason}
                                                                 </p>
                                                             )}

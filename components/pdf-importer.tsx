@@ -18,6 +18,8 @@ import {
     AiDocumentSynthesisDisabledError,
     isAiDocumentSynthesisEnabledValue,
 } from '@/lib/ai-document-synthesis-kill-switch';
+import { semanticSignalSurfaceClass } from '@/components/ui/semantic-signal';
+import { sharedKillSwitchSignal } from '@/lib/ui-semantic-signal';
 
 interface PdfImporterProps {
     onDataExtracted: (data: ExtractedPatientData) => void;
@@ -249,7 +251,10 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
 
             {!documentSynthesisEnabled && (
                 <div
-                    className="mt-3 rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] p-3 text-xs leading-5 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]"
+                    className={cn(
+                        'mt-3 rounded-2xl border p-3 text-xs leading-5',
+                        semanticSignalSurfaceClass(sharedKillSwitchSignal(documentSynthesisEnabled)),
+                    )}
                     data-testid="document-synthesis-disabled-note"
                 >
                     La sintesi clinica documento è disabilitata localmente. L&apos;OCR e il prefill base restano disponibili, ma diagnosi da controllare, terapie candidate e archivio documenti non vengono generati.

@@ -13,6 +13,11 @@ import type {
   Patient,
   Therapy,
 } from '@/lib/db';
+import type {
+  AgendaFilterCategory,
+  LegacySemanticSignalAlias,
+  SemanticSignal,
+} from '@/lib/ui-semantic-signal';
 
 export type InboxList = 'attivi' | 'archivio';
 
@@ -27,7 +32,7 @@ export type Kree8Patient = {
   code: string;
   scope: 'ambulatorio' | 'network';
   list: InboxList;
-  status: 'green' | 'blue' | 'muted';
+  status: SemanticSignal;
   statusLabel: string;
   diagnoses: string[];
   lastTouch: string;
@@ -39,16 +44,7 @@ export type Kree8Patient = {
   raw: Kree8PatientSource;
 };
 
-export type PillVariant =
-  | 'blue'
-  | 'yellow'
-  | 'green'
-  | 'coral'
-  | 'muted'
-  | 'violet'
-  | 'neutral'
-  | 'warning'
-  | 'ink';
+export type PillVariant = SemanticSignal | LegacySemanticSignalAlias;
 
 /* @Codex */
 export type Kree8PatientWorkspace = {
@@ -70,8 +66,9 @@ export type Kree8AgendaRow = {
   time: string;
   title: string;
   sub: string;
-  pill: 'green' | 'blue' | 'yellow' | 'coral' | 'muted' | 'violet';
+  pill: PillVariant;
   pillLabel: string;
+  filterCategory: AgendaFilterCategory;
 };
 
 export type Kree8CheckupSource = {
@@ -135,15 +132,15 @@ export function classifyCheckupPill(checkup: Kree8CheckupSource): Pick<Kree8Agen
   const date = new Date(checkup.date);
   const now = new Date();
 
-  if (status === 'completed') return { pill: 'green', pillLabel: 'Completato' };
-  if (status === 'cancelled') return { pill: 'muted', pillLabel: 'Annullato' };
+  if (status === 'completed') return { pill: 'success', pillLabel: 'Completato' };
+  if (status === 'cancelled') return { pill: 'neutral', pillLabel: 'Annullato' };
   if (!Number.isNaN(date.getTime()) && date.getTime() < now.getTime() && !isSameCalendarDay(date, now)) {
-    return { pill: 'coral', pillLabel: 'Scaduto' };
+    return { pill: 'warning', pillLabel: 'Scaduto' };
   }
   if (!Number.isNaN(date.getTime()) && isSameCalendarDay(date, now)) {
-    return { pill: 'yellow', pillLabel: 'Oggi' };
+    return { pill: 'neutral', pillLabel: 'Oggi' };
   }
-  return { pill: 'blue', pillLabel: 'Pianificato' };
+  return { pill: 'neutral', pillLabel: 'Pianificato' };
 }
 
 export function mapCheckupsForKree8(
@@ -178,6 +175,7 @@ export function mapCheckupsForKree8(
           ? `${patient.name} · ${patient.code}`
           : 'Paziente non presente nell’elenco pazienti',
         ...pill,
+        filterCategory: isSameCalendarDay(new Date(checkup.date), new Date()) ? 'urgent' : 'manual',
       };
     });
 }
@@ -300,7 +298,7 @@ export function buildPatientWorkspaceFromRecords({
     code: '',
     scope: 'ambulatorio',
     list: patient.isArchived ? 'archivio' : 'attivi',
-    status: 'blue',
+    status: 'neutral',
     statusLabel: '',
     diagnoses: [],
     lastTouch: '',

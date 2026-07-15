@@ -26,6 +26,8 @@ import { buildPatientDocumentDecision } from '@/lib/domain/documents/patient-doc
 /* @Codex */
 import DocumentDecisionReviewCard from '@/components/document-decision-review-card';
 import { confidenceLabel } from '@/lib/ai-labels';
+import { semanticSignalSurfaceClass } from '@/components/ui/semantic-signal';
+import { therapySuggestionStateSignal } from '@/lib/ui-semantic-signal';
 
 interface PatientDocumentImportReviewProps {
     draft: PatientDocumentReviewDraft;
@@ -80,10 +82,7 @@ function qualityTone(level?: 'green' | 'yellow' | 'red') {
 
 /* @Codex */
 function therapyStateBadgeClasses(state: 'active' | 'transition' | 'uncertain' | 'inactive') {
-    if (state === 'transition') return 'bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]';
-    if (state === 'uncertain') return 'bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]';
-    if (state === 'inactive') return 'bg-[color:color-mix(in_srgb,var(--lume-ink)_8%,var(--lume-surface-field))] text-[color:var(--lume-ink-muted)]';
-    return 'bg-[color:color-mix(in_srgb,var(--lume-signal-success)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]';
+    return semanticSignalSurfaceClass(therapySuggestionStateSignal(state));
 }
 
 /* @Codex */
@@ -282,7 +281,7 @@ export default function PatientDocumentImportReview({
                                                 </p>
                                             )}
                                             {diagnosis.blockedReason && (
-                                                <p className="text-[11px] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]">
+                                                <p className="text-[11px] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
                                                     {diagnosis.blockedReason}
                                                 </p>
                                             )}
@@ -437,7 +436,7 @@ export default function PatientDocumentImportReview({
                                                 <p className="text-sm font-bold text-[color:var(--lume-ink)]">
                                                     {medication.drugName || 'Terapia proposta'}
                                                 </p>
-                                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${therapyStateBadgeClasses(medication.therapyState)}`}>
+                                                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${therapyStateBadgeClasses(medication.therapyState)}`}>
                                                     {therapyStateLabel(medication.therapyState)}
                                                 </span>
                                                 <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
@@ -456,7 +455,7 @@ export default function PatientDocumentImportReview({
                                                 </p>
                                             )}
                                             {medication.blockedReason && (
-                                                <p className="text-[11px] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]">
+                                                <p className="text-[11px] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
                                                     {medication.blockedReason}
                                                 </p>
                                             )}

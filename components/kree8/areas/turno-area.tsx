@@ -19,6 +19,7 @@ import type {
   StatusFilter,
 } from '../cockpit-shared';
 import type { PillVariant } from '@/lib/patient-workspace';
+import { agendaFilterMatches } from '@/lib/ui-semantic-signal';
 import styles from '../kree8-clinical-cockpit.module.css';
 
 
@@ -28,7 +29,7 @@ const AI_QUEUE: Kree8DecisionCard[] = [
     body:
       'Paziente AB-2026-014 · ultima visita 14 mesi fa, profilo cronicità incompleto.',
     pill: 'AI',
-    pillVariant: 'violet',
+    pillVariant: 'plum',
     action: 'Apri quadro',
     target: 'scheda',
   },
@@ -37,7 +38,7 @@ const AI_QUEUE: Kree8DecisionCard[] = [
     body:
       '2 documenti in coda con diagnosi senza ICD. Suggerimento automatico disponibile.',
     pill: 'In coda',
-    pillVariant: 'blue',
+    pillVariant: 'warning',
     action: 'Vai alla revisione',
   },
   {
@@ -45,7 +46,7 @@ const AI_QUEUE: Kree8DecisionCard[] = [
     body:
       'Codice 031 su paziente CD-2026-088 · scade tra 27 giorni. Predisporre rinnovo.',
     pill: 'Attenzione',
-    pillVariant: 'coral',
+    pillVariant: 'warning',
     action: 'Apri esenzioni',
   },
 ];
@@ -66,10 +67,7 @@ function TurnoArea({
   onOpenArea: (area: AreaId) => void;
 }) {
   const visibleAgenda = useMemo(() => {
-    if (filter === 'all') return agendaState.rows;
-    if (filter === 'urgent') return agendaState.rows.filter((r) => r.pill === 'coral' || r.pill === 'yellow');
-    if (filter === 'ai') return agendaState.rows.filter((r) => r.pill === 'violet');
-    return agendaState.rows.filter((r) => r.pill === 'green' || r.pill === 'blue' || r.pill === 'muted');
+    return agendaState.rows.filter((row) => agendaFilterMatches(filter, row.filterCategory));
   }, [agendaState.rows, filter]);
   const activePatientCount = patientState.patients.filter((patient) => patient.list === 'attivi').length;
   const patientCountLabel =
@@ -117,7 +115,7 @@ function TurnoArea({
           ? `${patientState.patients.length} schede pronte nell’archivio locale.`
           : 'Preparazione della lista pazienti.',
         pill: patientState.status === 'error' ? 'Errore' : 'In carico',
-        pillVariant: patientState.status === 'error' ? 'coral' : 'green',
+        pillVariant: patientState.status === 'error' ? 'critical' : 'neutral',
         action: 'Vai ai pazienti',
         target: 'incarico',
       },
@@ -129,7 +127,7 @@ function TurnoArea({
             ? 'Agenda non disponibile: resta visibile la lista pazienti.'
             : 'Preparazione degli appuntamenti.',
         pill: agendaState.status === 'error' ? 'Errore' : 'Agenda',
-        pillVariant: agendaState.status === 'error' ? 'coral' : 'blue',
+        pillVariant: agendaState.status === 'error' ? 'critical' : 'neutral',
         action: 'Rivedi agenda',
         target: 'turno',
       },
@@ -137,7 +135,7 @@ function TurnoArea({
         title: 'Revisione e codifiche',
         body: 'Usa la scheda paziente per rivedere documenti, suggerimenti AI e codifiche prima di applicare aggiornamenti clinici.',
         pill: 'AI',
-        pillVariant: 'violet',
+        pillVariant: 'plum',
         action: 'Apri revisione',
         target: 'revisione',
       },
@@ -201,9 +199,9 @@ function TurnoArea({
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Agenda di oggi</h2>
-            <PillBadge variant="muted">{visibleAgenda.length} eventi</PillBadge>
+            <PillBadge variant="neutral">{visibleAgenda.length} eventi</PillBadge>
             {agendaBridge.data?.stats.candidates ? (
-              <PillBadge variant="blue">
+              <PillBadge variant="neutral">
                 {agendaBridge.data.stats.candidates} esterni
               </PillBadge>
             ) : null}
@@ -244,7 +242,7 @@ function TurnoArea({
             <h2 className={styles.panelTitle}>
               {isReview ? 'Documenti da revisionare' : 'Da fare oggi'}
             </h2>
-            {isReview ? <PillBadge variant="violet">7 casi</PillBadge> : null}
+            {isReview ? <PillBadge variant="warning">7 casi</PillBadge> : null}
           </header>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
             {decisionCards.map((card) => (

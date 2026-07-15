@@ -68,10 +68,10 @@ function RealPatientArea({
             {patient.diagnoses.map((diagnosis) => (
               <DiagnosisPill key={diagnosis} diagnosis={diagnosis} />
             ))}
-            <PillBadge variant="neutral">
+            <PillBadge variant={patient.status}>
               {patient.statusLabel}
             </PillBadge>
-            <PillBadge variant="muted">{patient.code}</PillBadge>
+            <PillBadge variant="neutral">{patient.code}</PillBadge>
           </div>
         </div>
 
@@ -123,7 +123,7 @@ function RealPatientArea({
             <div className={styles.compositeCard}>
               <header className={styles.panelHeader}>
                 <span className={styles.evidenceTitle}>Diario clinico</span>
-                <PillBadge variant="muted">{workspace?.entriesCount ?? 0} voci</PillBadge>
+                <PillBadge variant="neutral">{workspace?.entriesCount ?? 0} voci</PillBadge>
               </header>
               <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.55 }}>
                 {isWorkspaceLoading
@@ -141,7 +141,7 @@ function RealPatientArea({
             <div className={styles.compositeCard}>
               <header className={styles.panelHeader}>
                 <span className={styles.evidenceTitle}>Terapie e osservazioni</span>
-                <PillBadge variant="green">{workspace?.activeTherapiesCount ?? 0} attive</PillBadge>
+                <PillBadge variant="neutral">{workspace?.activeTherapiesCount ?? 0} attive</PillBadge>
               </header>
               <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.55 }}>
                 {isWorkspaceLoading
@@ -162,7 +162,7 @@ function RealPatientArea({
             <div className={styles.compositeCard}>
               <header className={styles.panelHeader}>
                 <span className={styles.evidenceTitle}>Agenda del caso</span>
-                <PillBadge variant={nextCheckup?.pill ?? 'muted'}>
+                <PillBadge variant={nextCheckup?.pill ?? 'neutral'}>
                   {nextCheckup?.pillLabel ?? 'libera'}
                 </PillBadge>
               </header>
@@ -184,7 +184,7 @@ function RealPatientArea({
         <section className={styles.panelInset}>
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Documenti e codifiche</h2>
-            <PillBadge variant={codingHints.length ? 'violet' : 'green'}>
+            <PillBadge variant={codingHints.length ? 'warning' : 'success'}>
               {codingHints.length ? `${codingHints.length} da rivedere` : 'allineato'}
             </PillBadge>
           </header>
