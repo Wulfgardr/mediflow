@@ -204,6 +204,19 @@ async function main() {
   const originalTsconfig = fs.readFileSync(TSCONFIG_PATH, 'utf8');
   await run('npm', ['run', 'check:node-runtime']);
   if (!REUSE_SERVER) {
+    /* Preflight fail-closed: un server stantio sulla porta risponderebbe con un
+       database gia' popolato e i seed collidono. Meglio fermarsi con un rimedio
+       chiaro che catturare dati imprevedibili. */
+    const stale = await fetch(BASE_URL, { signal: AbortSignal.timeout(1500) })
+      .then(() => true)
+      .catch(() => false);
+    if (stale) {
+      console.error(
+        `Un server risponde gia' su ${BASE_URL}: chiudilo prima di rilanciare, ` +
+        'oppure usa README_SHOTS_REUSE_SERVER=1 per riusarlo consapevolmente.',
+      );
+      process.exit(1);
+    }
     fs.rmSync(DATA_DIR, { recursive: true, force: true });
     fs.rmSync(path.join(ROOT_DIR, DIST_DIR), { recursive: true, force: true });
     fs.mkdirSync(DATA_DIR, { recursive: true });
