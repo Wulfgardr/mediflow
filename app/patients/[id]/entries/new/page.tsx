@@ -377,7 +377,8 @@ export default function NewEntryPage() {
             <div className={workspaceStyles.workspaceGrid}>
                 <div className={workspaceStyles.primaryStack}>
                     <div className="patient-detail-section lume-panel border p-6 md:p-7">
-                        <form onSubmit={handleSubmit} className="space-y-8">
+                        {/* @Codex #71: stato, focus e colore Lume restano leggibili anche senza percezione cromatica. */}
+                        <form onSubmit={handleSubmit} className="space-y-8" aria-label="Nuova voce clinica">
                             <div id="dati" className="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
                                 <div className="space-y-2">
                                     <label className="section-kicker flex items-center gap-2">
@@ -390,22 +391,24 @@ export default function NewEntryPage() {
                                             type="datetime-local"
                                             value={entryDate}
                                             onChange={(e) => setEntryDate(e.target.value)}
-                                            className="w-full rounded-[18px] border border-[color:rgba(112,106,100,0.14)] bg-white/82 py-3 pl-12 pr-4 text-sm font-medium text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:rgba(182,106,60,0.3)] focus:shadow-[0_0_0_4px_rgba(182,106,60,0.08)] dark:border-white/10 dark:bg-white/5 dark:[color-scheme:dark]"
+                                            className="w-full rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] py-3 pl-12 pr-4 text-sm font-medium text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:color-mix(in_srgb,var(--lume-accent)_30%,transparent)] focus:shadow-[var(--lume-focus-ring)] dark:[color-scheme:dark]"
                                             aria-label="Data e ora della voce clinica"
+                                            aria-describedby="entry-date-description"
                                             required
                                         />
                                     </div>
-                                    <p className="text-xs leading-5 text-[color:var(--lume-ink-muted)]">
+                                    <p id="entry-date-description" className="text-xs leading-5 text-[color:var(--lume-ink-muted)]">
                                         Puoi retrodatare la voce quando ricostruisci il diario.
                                     </p>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="section-kicker">Luogo</label>
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <p id="entry-setting-label" className="section-kicker">Luogo</p>
+                                    <div className="grid grid-cols-2 gap-3" role="group" aria-labelledby="entry-setting-label">
                                         <button
                                             type="button"
                                             onClick={() => setSetting('ambulatory')}
+                                            aria-pressed={setting === 'ambulatory'}
                                             className={cn(
                                                 'lume-press flex h-[56px] items-center justify-center gap-3 rounded-[var(--lume-radius-control)] border px-4 text-sm font-semibold transition-[border-color,background-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]',
                                                 setting === 'ambulatory'
@@ -419,6 +422,7 @@ export default function NewEntryPage() {
                                         <button
                                             type="button"
                                             onClick={() => setSetting('home')}
+                                            aria-pressed={setting === 'home'}
                                             className={cn(
                                                 'lume-press flex h-[56px] items-center justify-center gap-3 rounded-[var(--lume-radius-control)] border px-4 text-sm font-semibold transition-[border-color,background-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]',
                                                 setting === 'home'
@@ -434,8 +438,8 @@ export default function NewEntryPage() {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="section-kicker">Tipo di voce</label>
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                <p id="entry-type-label" className="section-kicker">Tipo di voce</p>
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-3" role="group" aria-labelledby="entry-type-label">
                                     {types.map((currentType) => {
                                         const Icon = currentType.icon;
                                         const isSelected = type === currentType.id;
@@ -445,6 +449,7 @@ export default function NewEntryPage() {
                                                 key={currentType.id}
                                                 type="button"
                                                 onClick={() => setType(currentType.id as 'visit' | 'remote' | 'note')}
+                                                aria-pressed={isSelected}
                                                 className={cn(
                                                     'lume-press flex items-center gap-3 rounded-[var(--lume-radius-card)] border px-4 py-4 text-left transition-[border-color,background-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]',
                                                     isSelected
@@ -486,16 +491,16 @@ export default function NewEntryPage() {
                                                 Bozza dettata e revisione
                                             </h2>
                                         </div>
-                                        <div className="inline-flex items-center gap-2 rounded-[14px] border border-[color:rgba(146,64,14,0.18)] bg-[color:rgba(254,243,199,0.74)] px-3 py-2 text-xs font-semibold text-[color:#92400e]">
+                                        <div className="inline-flex items-center gap-2 rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))] px-3 py-2 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                                             <MicOff className="h-4 w-4" />
                                             <span>Audio non attivo</span>
                                         </div>
                                     </div>
 
                                     <div className="grid gap-4 xl:grid-cols-[240px_minmax(0,1fr)]">
-                                        <div className="space-y-3 rounded-[20px] border border-[color:rgba(112,106,100,0.12)] bg-white/74 p-4">
+                                        <div className="space-y-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
                                             <div className="flex items-start gap-3">
-                                                <div className="flex h-10 w-10 items-center justify-center rounded-[14px] border border-[color:rgba(146,64,14,0.14)] bg-[color:rgba(254,243,199,0.68)] text-[color:#92400e]">
+                                                <div className="flex h-10 w-10 items-center justify-center rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))] text-[color:var(--lume-ink-muted)]">
                                                     <AlertTriangle className="h-4 w-4" />
                                                 </div>
                                                 <div className="min-w-0">
@@ -506,15 +511,15 @@ export default function NewEntryPage() {
                                                 </div>
                                             </div>
                                             <div className="grid gap-2 text-xs">
-                                                <div className="flex items-center justify-between rounded-[14px] bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] px-3 py-2 text-[color:var(--lume-accent)]">
+                                                <div className="flex items-center justify-between rounded-[14px] bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] px-3 py-2 text-[color:var(--lume-accent)]" role="status" aria-live="polite">
                                                     <span className="font-semibold">{visitSessionStatusLabel[visitSessionState]}</span>
                                                     {visitSessionState === 'processing' ? null : <CheckCircle2 className="h-4 w-4" />}
                                                 </div>
-                                                <div className="flex items-center justify-between rounded-[14px] bg-white/64 px-3 py-2 text-[color:var(--lume-ink-muted)]">
+                                                <div className="flex items-center justify-between rounded-[14px] bg-[color:color-mix(in_srgb,var(--lume-ink)_3%,var(--lume-surface-field))] px-3 py-2 text-[color:var(--lume-ink-muted)]">
                                                     <span>Pause</span>
                                                     <span>{visitSessionEvents.filter((event) => event.type === 'pause').length}</span>
                                                 </div>
-                                                <div className="flex items-center justify-between rounded-[14px] bg-white/64 px-3 py-2 text-[color:var(--lume-ink-muted)]">
+                                                <div className="flex items-center justify-between rounded-[14px] bg-[color:color-mix(in_srgb,var(--lume-ink)_3%,var(--lume-surface-field))] px-3 py-2 text-[color:var(--lume-ink-muted)]">
                                                     <span>Eventi</span>
                                                     <span>{visitSessionEvents.length}</span>
                                                 </div>
@@ -537,7 +542,7 @@ export default function NewEntryPage() {
                                                     <button
                                                         type="button"
                                                         onClick={pauseVisitSession}
-                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:rgba(146,64,14,0.18)] bg-[color:rgba(254,243,199,0.72)] px-3 text-sm font-semibold text-[color:#92400e]"
+                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] bg-[color:var(--lume-surface-field)] px-3 text-sm font-semibold text-[color:var(--lume-ink)]"
                                                     >
                                                         <Pause className="h-4 w-4" />
                                                         <span>Pausa</span>
@@ -557,7 +562,7 @@ export default function NewEntryPage() {
                                                     <button
                                                         type="button"
                                                         onClick={stopVisitSession}
-                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:rgba(112,106,100,0.16)] bg-white/74 px-3 text-sm font-semibold text-[color:var(--lume-ink)]"
+                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] bg-[color:var(--lume-surface-field)] px-3 text-sm font-semibold text-[color:var(--lume-ink)]"
                                                     >
                                                         <Square className="h-4 w-4" />
                                                         <span>Ferma</span>
@@ -567,7 +572,7 @@ export default function NewEntryPage() {
                                                     <button
                                                         type="button"
                                                         onClick={resetVisitSession}
-                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:rgba(112,106,100,0.16)] bg-white/74 px-3 text-sm font-semibold text-[color:var(--lume-ink-muted)]"
+                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] bg-[color:var(--lume-surface-field)] px-3 text-sm font-semibold text-[color:var(--lume-ink-muted)]"
                                                     >
                                                         <RotateCcw className="h-4 w-4" />
                                                         <span>Reset</span>
@@ -584,8 +589,9 @@ export default function NewEntryPage() {
                                                 </button>
                                             </div>
                                             {visitDraftError ? (
-                                                <div className="rounded-[14px] border border-[color:rgba(190,18,60,0.16)] bg-[color:rgba(254,226,226,0.64)] px-3 py-2 text-xs font-semibold text-[color:#be123c]">
-                                                    {visitDraftError}
+                                                <div role="alert" className="flex items-start gap-2 rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-2 text-xs font-semibold text-[color:var(--lume-ink)]">
+                                                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
+                                                    <span>{visitDraftError}</span>
                                                 </div>
                                             ) : null}
                                             <div className="space-y-2">
@@ -605,14 +611,14 @@ export default function NewEntryPage() {
                                                 />
                                             </div>
 
-                                            <div className="flex flex-col gap-3 rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/72 p-4 md:flex-row md:items-center md:justify-between">
+                                            <div className="flex flex-col gap-3 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4 md:flex-row md:items-center md:justify-between">
                                                 <label className="flex min-w-0 items-start gap-3 text-sm leading-5 text-[color:var(--lume-ink)]">
                                                     <input
                                                         type="checkbox"
                                                         checked={isDictatedDraftReviewed}
                                                         disabled={!hasDictatedDraft}
                                                         onChange={(event) => setIsDictatedDraftReviewed(event.target.checked)}
-                                                        className="mt-1 h-4 w-4 rounded border-[color:rgba(112,106,100,0.22)] text-[color:var(--lume-accent)]"
+                                                        className="mt-1 h-4 w-4 rounded border-[color:color-mix(in_srgb,var(--lume-ink)_22%,transparent)] text-[color:var(--lume-accent)]"
                                                     />
                                                     <span>
                                                         Ho rivisto questa bozza prima di usarla nel resoconto.
@@ -630,16 +636,16 @@ export default function NewEntryPage() {
                                             </div>
 
                                             {visitMedicationCandidates.length > 0 ? (
-                                                <div className="space-y-2 rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/72 p-4">
+                                                <div className="space-y-2 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
                                                     <div className="flex items-center justify-between gap-3">
                                                         <p className="section-kicker">Farmaci rilevati</p>
-                                                        <span className="rounded-full border border-[color:rgba(146,64,14,0.16)] bg-[color:rgba(254,243,199,0.64)] px-2.5 py-1 text-[11px] font-semibold text-[color:#92400e]">
+                                                        <span className="rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--lume-ink-muted)]">
                                                             Non importati
                                                         </span>
                                                     </div>
                                                     <div className="grid gap-2">
                                                         {visitMedicationCandidates.map((candidate) => (
-                                                            <div key={`${candidate.drugMention}-${candidate.evidence}`} className="rounded-[14px] border border-[color:rgba(112,106,100,0.1)] bg-white/78 px-3 py-2">
+                                                            <div key={`${candidate.drugMention}-${candidate.evidence}`} className="rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_3%,var(--lume-surface-field))] px-3 py-2">
                                                                 <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{candidate.drugMention}</p>
                                                                 <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
                                                                     {candidate.match
@@ -653,13 +659,13 @@ export default function NewEntryPage() {
                                             ) : null}
 
                                             <div className="grid gap-3 md:grid-cols-2">
-                                                <div className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/68 px-4 py-3">
+                                                <div className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3">
                                                     <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">Bozza</p>
                                                     <p className={cn('mt-1 text-sm font-semibold transition-colors duration-[var(--lume-dur-firma)] ease-[var(--lume-ease)]', isDictatedDraftReviewed ? 'text-[color:var(--lume-ink)]' : 'text-[color:var(--lume-ink-muted)]')}>
                                                         {hasDictatedDraft ? 'Da revisione' : 'Vuota'}
                                                     </p>
                                                 </div>
-                                                <div className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/68 px-4 py-3">
+                                                <div className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3">
                                                     <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">Resoconto</p>
                                                     <p className="mt-1 text-sm font-semibold text-[color:var(--lume-ink-muted)]">
                                                         {acceptedNoteHasContent ? 'In compilazione' : 'Vuoto'}
@@ -704,7 +710,7 @@ export default function NewEntryPage() {
                                     </label>
 
                                     <div
-                                        {...getRootProps()}
+                                        {...getRootProps({ role: 'button', 'aria-label': 'Aggiungi allegati alla voce clinica' })}
                                         className={cn(
                                             'rounded-[var(--lume-radius-card)] border p-6 text-center transition-[border-color,background-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]',
                                             isDragActive
@@ -713,7 +719,7 @@ export default function NewEntryPage() {
                                         )}
                                     >
                                         <input {...getInputProps()} />
-                                        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 text-[color:var(--lume-accent)]">
+                                        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-accent)]">
                                             <Upload className="h-5 w-5" />
                                         </div>
                                         <p className="text-sm font-semibold text-[color:var(--lume-ink)]">Clicca o trascina qui i file</p>
@@ -723,8 +729,8 @@ export default function NewEntryPage() {
                                     {files.length > 0 ? (
                                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                             {files.map((file, index) => (
-                                                <div key={index} className="flex items-center gap-3 rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 p-3 shadow-[0_10px_20px_rgba(35,27,22,0.04)]">
-                                                    <div className="flex h-10 w-10 items-center justify-center rounded-[14px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.9)] text-[color:var(--lume-ink-muted)]">
+                                                <div key={index} className="flex items-center gap-3 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-3 shadow-[var(--lume-shadow-resting)]">
+                                                    <div className="flex h-10 w-10 items-center justify-center rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink-muted)]">
                                                         <FileText className="h-4 w-4" />
                                                     </div>
                                                     <div className="min-w-0 flex-1">
@@ -734,7 +740,7 @@ export default function NewEntryPage() {
                                                     <button
                                                         type="button"
                                                         onClick={() => removeFile(index)}
-                                                        className="rounded-[12px] p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:rgba(182,106,60,0.08)] hover:text-[color:var(--lume-accent)]"
+                                                        className="rounded-[12px] p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] hover:text-[color:var(--lume-accent)]"
                                                         aria-label={`Rimuovi allegato ${file.name}`}
                                                     >
                                                         <X className="h-4 w-4" />
@@ -746,7 +752,7 @@ export default function NewEntryPage() {
                                 </div>
                             </section>
 
-                            <div className="flex justify-end border-t border-[color:rgba(112,106,100,0.12)] pt-4">
+                            <div className="flex justify-end border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-4">
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
@@ -779,18 +785,18 @@ export default function NewEntryPage() {
                             </h3>
                         </div>
                         <div className="space-y-3">
-                            <div className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/74 px-4 py-3">
+                            <div className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3">
                                 <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">Paziente</p>
                                 <p className="mt-1 text-sm font-semibold text-[color:var(--lume-ink)]">
                                     {patient ? `${patient.lastName} ${patient.firstName}` : 'Caricamento...'}
                                 </p>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                                <div className="rounded-[16px] border border-[color:rgba(112,106,100,0.12)] bg-white/70 px-3 py-2">
+                                <div className="rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-2">
                                     <p className="text-xs text-[color:var(--lume-ink-muted)]">Visite</p>
                                     <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{visitEntryCount}</p>
                                 </div>
-                                <div className="rounded-[16px] border border-[color:rgba(112,106,100,0.12)] bg-white/70 px-3 py-2">
+                                <div className="rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-2">
                                     <p className="text-xs text-[color:var(--lume-ink-muted)]">Fonti</p>
                                     <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{sourceCount}</p>
                                 </div>
@@ -817,12 +823,12 @@ export default function NewEntryPage() {
                         </div>
                         <div className="space-y-3">
                             {recentEntries.length > 0 ? recentEntries.map((entry) => (
-                                <div key={entry.id} className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/74 px-4 py-3">
+                                <div key={entry.id} className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3">
                                     <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">{formatEntryDate(entry.date)}</p>
                                     <p className="mt-1 text-sm font-semibold text-[color:var(--lume-ink)]">{entry.title}</p>
                                 </div>
                             )) : (
-                                <div className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/74 px-4 py-3">
+                                <div className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3">
                                     <p className="text-sm text-[color:var(--lume-ink-muted)]">Nessuna voce recente disponibile.</p>
                                 </div>
                             )}
