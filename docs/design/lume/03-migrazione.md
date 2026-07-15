@@ -52,6 +52,8 @@ Le fasi L2-L5 atterrano in fette piccole per superficie (prima il cockpit, poi l
 
 Stato al 2026-07-13: L0, L1a e L1b sono atterrate su main; L2 è in corso con le prime superfici (cockpit, shell del workspace, lock screen). Restano aperte L3-L5 (filo, due voci con tipografia bundle, overlay e motion) e L6 nativa oltre la thin slice della card clinica opaca. Il dettaglio verificabile, con le PR di riferimento e la distinzione tra tranche consegnate e aperte, è nel ledger di [ADR 0078](../../adr/0078-lume-lingua-di-design-di-destinazione.md).
 
+Aggiornamento mirato 2026-07-15, issue #71: il layer page-owned in `app/patients/[id]/entries/new/page.tsx` non contiene più occorrenze del vocabolario colore legacy e la relativa voce è stata rimossa dall'allowlist, senza rigenerarne l'impronta. Sul tree della slice, `check:lume-tokens` misura 271 occorrenze di debito clinico allowlisted, contro le 328 precedenti: la riduzione di 57 occorrenze riguarda solo quel file. L'editor condiviso renderizzato dalla pagina conserva 13 occorrenze allowlisted fino alla foglia #75; il debito globale resta aperto e la condizione di uscita da `data-lume` definita in ADR 0078 non è ancora soddisfatta.
+
 ## 4. Rischi
 
 - **Il gradiente di temperatura è sottile**: su monitor scadenti può sparire. Mitigazione: la gerarchia non dipende MAI dalla sola temperatura (c'è sempre luminanza + ombra + filo); la temperatura è rifinitura.
