@@ -25,6 +25,7 @@ interface StatusGlyphProps {
     kind: StatusGlyphKind;
     label?: string;
     className?: string;
+    tone?: 'semantic' | 'neutral';
 }
 
 const GLYPH_MAP: Record<
@@ -74,7 +75,7 @@ const GLYPH_MAP: Record<
     },
 };
 
-export function StatusGlyph({ kind, label, className }: StatusGlyphProps) {
+export function StatusGlyph({ kind, label, className, tone = 'semantic' }: StatusGlyphProps) {
     const glyph = GLYPH_MAP[kind];
     const Icon = glyph.icon;
 
@@ -82,7 +83,9 @@ export function StatusGlyph({ kind, label, className }: StatusGlyphProps) {
         <span
             className={cn(
                 'status-glyph inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-tight',
-                glyph.className,
+                tone === 'neutral'
+                    ? 'border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]'
+                    : glyph.className,
                 className,
             )}
         >

@@ -143,11 +143,11 @@ function RevisioneArea() {
         </header>
         <div className={styles.docCounters}>
           <span className={styles.docCounter}>
-            <Check size={11} color="var(--pill-green-fg)" />
+            <Check size={11} color="var(--lume-ink-muted)" />
             <b>{structuredWrites}</b> campi aggiornabili
           </span>
           <span className={styles.docCounter}>
-            <Edit3 size={11} color="var(--pill-blue-fg)" />
+            <Edit3 size={11} color="var(--lume-ink-muted)" />
             <b>{noteWrites}</b> note da riconciliare
           </span>
           <span className={styles.docCounter}>
@@ -155,7 +155,7 @@ function RevisioneArea() {
             <b>{ignored}</b> ignorati
           </span>
           <span className={styles.docCounter}>
-            <AlertTriangle size={11} color="var(--pill-coral-fg)" />
+            <AlertTriangle size={11} color="var(--lume-ink-muted)" />
             <b>{blocked}</b> solo portale ufficiale
           </span>
         </div>

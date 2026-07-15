@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 
 import {
+  DiagnosisPill,
   PillBadge,
   classNames,
 } from '../cockpit-shared';
@@ -65,9 +66,9 @@ function RealPatientArea({
         <div className={styles.identityDock}>
           <div className={styles.identityChips}>
             {patient.diagnoses.map((diagnosis) => (
-              <PillBadge key={diagnosis} variant="blue">{diagnosis}</PillBadge>
+              <DiagnosisPill key={diagnosis} diagnosis={diagnosis} />
             ))}
-            <PillBadge variant={patient.status === 'muted' ? 'muted' : patient.status === 'blue' ? 'blue' : 'green'}>
+            <PillBadge variant="neutral">
               {patient.statusLabel}
             </PillBadge>
             <PillBadge variant="muted">{patient.code}</PillBadge>

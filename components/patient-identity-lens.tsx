@@ -120,9 +120,10 @@ export function PatientIdentityLens({
                                     <StatusGlyph
                                         kind={patient.isArchived ? 'archived' : patient.isAdi ? 'active' : 'follow-up'}
                                         label={patient.isArchived ? 'Archiviato' : patient.isAdi ? 'Attivo' : 'Follow-up'}
+                                        tone="neutral"
                                     />
-                                    {codedDiagnosisCount > 0 ? <StatusGlyph kind="review" label={`${codedDiagnosisCount} diagnosi`} /> : null}
-                                    {exemptions.length > 0 ? <StatusGlyph kind="completed" label={`${exemptions.length} esenzioni`} /> : null}
+                                    {codedDiagnosisCount > 0 ? <StatusGlyph kind="review" label={`${codedDiagnosisCount} diagnosi`} tone="neutral" /> : null}
+                                    {exemptions.length > 0 ? <StatusGlyph kind="completed" label={`${exemptions.length} esenzioni`} tone="neutral" /> : null}
                                 </div>
                             </div>
 
@@ -164,9 +165,9 @@ export function PatientIdentityLens({
                                         Diagnosi codificate
                                     </p>
                                     {leadDiagnosis ? (
-                                        <div className="patient-diagnosis-card mt-2 rounded-[var(--lume-radius-control)] border border-[color:rgba(94,53,95,0.16)] bg-[color:var(--lume-surface-field)] p-3">
+                                        <div className="patient-diagnosis-card mt-2 rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-3">
                                             <div className="flex flex-wrap items-start gap-3">
-                                                <span className="patient-code-pill patient-code-pill-plum">
+                                                <span className="patient-code-pill patient-code-pill-primary lume-registro">
                                                     {leadDiagnosis.code}
                                                 </span>
                                                 <div className="min-w-0 flex-1">
@@ -190,7 +191,9 @@ export function PatientIdentityLens({
                                             {secondaryDiagnoses.map((diagnosis) => (
                                                 <span
                                                     key={`${diagnosis.system}-${diagnosis.code}`}
-                                                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[color:rgba(94,53,95,0.16)] px-2.5 py-1 text-xs text-[color:var(--lume-ink)] dark:border-[color:rgba(255,247,240,0.12)] dark:text-[color:var(--lume-ink)]"
+                                                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] px-2.5 py-1 text-xs text-[color:var(--lume-ink)]"
+                                                    title={`${diagnosis.code} · ${diagnosis.description}`}
+                                                    aria-label={`${diagnosis.code} · ${diagnosis.description}`}
                                                 >
                                                     <span className="lume-registro font-semibold">{diagnosis.code}</span>
                                                     <span className="truncate">{diagnosis.description}</span>
@@ -295,10 +298,11 @@ export function PatientIdentityLens({
                         <StatusGlyph
                             kind={patient.isArchived ? 'archived' : patient.isAdi ? 'active' : 'follow-up'}
                             label={patient.isArchived ? 'Archiviato' : patient.isAdi ? 'Attivo' : 'Follow-up'}
+                            tone="neutral"
                         />
-                        <StatusGlyph kind="review" label="Percorso clinico" />
+                        <StatusGlyph kind="review" label="Percorso clinico" tone="neutral" />
                         {exemptions.length > 0 ? (
-                            <StatusGlyph kind="completed" label={`${exemptions.length} esenzioni`} />
+                            <StatusGlyph kind="completed" label={`${exemptions.length} esenzioni`} tone="neutral" />
                         ) : null}
                     </div>
 
@@ -312,11 +316,13 @@ export function PatientIdentityLens({
                                     diagnoses.map((diagnosis) => (
                                         <span
                                             key={`${diagnosis.system}-${diagnosis.code}`}
-                                            className="inline-flex items-center gap-1.5 rounded-full border border-[color:rgba(94,53,95,0.14)] bg-[color:rgba(94,53,95,0.08)] px-3 py-1 text-[12px] font-medium text-[color:var(--lume-ink)]"
+                                            className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-1 text-[12px] font-medium text-[color:var(--lume-ink)]"
+                                            title={`${diagnosis.code} · ${diagnosis.description}`}
+                                            aria-label={`${diagnosis.code} · ${diagnosis.description}`}
                                         >
-                                            <span className="lume-registro font-semibold text-[color:var(--lume-ink)]">{diagnosis.code}</span>
-                                            {diagnosis.description}
-                                            <span className="text-[10px] uppercase tracking-[0.04em] text-[color:var(--lume-ink-muted)]">
+                                            <span className="lume-registro shrink-0 font-semibold text-[color:var(--lume-ink)]">{diagnosis.code}</span>
+                                            <span className="min-w-0 truncate">{diagnosis.description}</span>
+                                            <span className="shrink-0 text-[10px] uppercase tracking-[0.04em] text-[color:var(--lume-ink-muted)]">
                                                 {diagnosisSystemLabel(diagnosis.system)}
                                             </span>
                                         </span>

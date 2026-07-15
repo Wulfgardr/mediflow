@@ -39,7 +39,16 @@ export type Kree8Patient = {
   raw: Kree8PatientSource;
 };
 
-export type PillVariant = 'blue' | 'yellow' | 'green' | 'coral' | 'muted' | 'violet' | 'ink';
+export type PillVariant =
+  | 'blue'
+  | 'yellow'
+  | 'green'
+  | 'coral'
+  | 'muted'
+  | 'violet'
+  | 'neutral'
+  | 'warning'
+  | 'ink';
 
 /* @Codex */
 export type Kree8PatientWorkspace = {

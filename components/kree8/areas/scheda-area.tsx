@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 
 import {
+  DiagnosisPill,
   PillBadge,
   classNames,
 } from '../cockpit-shared';
@@ -112,9 +113,9 @@ function SchedaArea({
       <section className={styles.panel}>
         <div className={styles.identityDock}>
           <div className={styles.identityChips}>
-            <PillBadge variant="blue">Ipertensione</PillBadge>
-            <PillBadge variant="violet">Dislipidemia</PillBadge>
-            <PillBadge variant="green">BPCO lieve</PillBadge>
+            <DiagnosisPill diagnosis="Ipertensione" />
+            <DiagnosisPill diagnosis="Dislipidemia" />
+            <DiagnosisPill diagnosis="BPCO lieve" />
             <PillBadge variant="muted">PA 132/84</PillBadge>
             <PillBadge variant="muted">HR 76</PillBadge>
             <PillBadge variant="muted">SpO₂ 97%</PillBadge>
@@ -294,7 +295,7 @@ function SchedaArea({
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <PillBadge variant="green">farmaco riconosciuto AIFA</PillBadge>
               <PillBadge variant="blue">diagnosi codificata ICD</PillBadge>
-              <PillBadge variant="yellow">posologia incerta</PillBadge>
+              <PillBadge variant="warning">posologia incerta</PillBadge>
               <PillBadge variant="coral">SISS bloccato</PillBadge>
             </div>
             <button type="button" className={styles.ghostBtnSm} style={{ alignSelf: 'flex-start' }} onClick={() => onOpenArea('revisione')}>

@@ -117,7 +117,7 @@ function LiveDocumentReviewArea({
               <p className={styles.panelSubtitle}>Caricamento suggerimenti e codifiche.</p>
             ) : codingHints.length ? codingHints.map((hint) => (
               <div key={hint} className={styles.evidenceItem}>
-                <Sparkles size={14} color="var(--pill-violet-fg)" />
+                <Sparkles size={14} color="var(--lume-ink-muted)" />
                 <span>
                   <span className={styles.evidenceTitle}>{hint}</span>
                 </span>

@@ -26,18 +26,6 @@
   --rail-coral: #dc2626;
   --rail-violet: #6d28d9;
   --rail-slate: #64748b;
-  --pill-green-bg: #dcfce7;
-  --pill-green-fg: #166534;
-  --pill-blue-bg: #dbeafe;
-  --pill-blue-fg: #1e3a8a;
-  --pill-yellow-bg: #fef3c7;
-  --pill-yellow-fg: #92400e;
-  --pill-coral-bg: #ffe2dd;
-  --pill-coral-fg: #9a3412;
-  --pill-violet-bg: #ede9fe;
-  --pill-violet-fg: #5b21b6;
-  --pill-muted-bg: #eef0f2;
-  --pill-muted-fg: #475569;
   /* Lume: la coda AI/amministrativa usa il neutro minerale, non un
      gradiente ornamentale; le azioni piene usano l'inchiostro Lume. */
   --accent-ai: var(--lume-accent);
@@ -65,8 +53,6 @@
   --sweep-tint: transparent;
   --halo-green: transparent;
   --halo-blue: transparent;
-  --ring-accept: rgba(21, 128, 61, 0.22);
-  --ring-correct: rgba(29, 78, 216, 0.22);
   --ring-ignore: rgba(100, 116, 139, 0.18);
   --radius-card: var(--lume-radius-panel);
   --radius-tile: 18px;
@@ -107,18 +93,6 @@
   --rail-coral: #f87171;
   --rail-violet: #a78bfa;
   --rail-slate: #94a3b8;
-  --pill-green-bg: rgba(74, 222, 128, 0.16);
-  --pill-green-fg: #bbf7d0;
-  --pill-blue-bg: rgba(96, 165, 250, 0.18);
-  --pill-blue-fg: #bfdbfe;
-  --pill-yellow-bg: rgba(251, 191, 36, 0.16);
-  --pill-yellow-fg: #fde68a;
-  --pill-coral-bg: rgba(248, 113, 113, 0.16);
-  --pill-coral-fg: #fecaca;
-  --pill-violet-bg: rgba(167, 139, 250, 0.18);
-  --pill-violet-fg: #ddd6fe;
-  --pill-muted-bg: rgba(148, 163, 184, 0.14);
-  --pill-muted-fg: #cbd5e1;
   --accent-ai: var(--lume-accent);
   --accent-ai-fg: #020617;
   --solid-action-bg: var(--lume-ink);
@@ -136,8 +110,6 @@
   --sweep-tint: transparent;
   --halo-green: transparent;
   --halo-blue: transparent;
-  --ring-accept: rgba(74, 222, 128, 0.38);
-  --ring-correct: rgba(96, 165, 250, 0.38);
   --ring-ignore: rgba(148, 163, 184, 0.32);
 }
 
@@ -678,13 +650,13 @@
 
 .statTrend {
   font-size: 11px;
-  color: var(--pill-green-fg);
+  color: var(--ink-muted);
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-.statTrendDown { color: var(--rail-coral); }
+.statTrendDown { color: var(--ink-muted); }
 .statTrendMuted { color: var(--ink-subtle); }
 
 .twoCol {
@@ -729,19 +701,41 @@
   font-weight: 500;
   letter-spacing: 0.01em;
   white-space: nowrap;
+  border: 1px solid transparent;
 }
 
-.pillBlue { background: var(--pill-blue-bg); color: var(--pill-blue-fg); }
-.pillYellow { background: var(--pill-yellow-bg); color: var(--pill-yellow-fg); }
-.pillGreen { background: var(--pill-green-bg); color: var(--pill-green-fg); }
-.pillCoral { background: var(--pill-coral-bg); color: var(--pill-coral-fg); }
-.pillMuted { background: var(--pill-muted-bg); color: var(--pill-muted-fg); }
-.pillViolet { background: var(--pill-violet-bg); color: var(--pill-violet-fg); }
-.pillInk {
-  background: var(--solid-action-bg);
-  color: var(--solid-action-fg);
+.pillNeutral,
+.diagnosisPill {
+  background: var(--surface-soft);
+  color: var(--ink-muted);
+  border-color: var(--line-strong);
 }
 
+.pillWarning {
+  background: color-mix(in srgb, var(--lume-signal-warning) 11%, var(--lume-surface-field));
+  color: color-mix(in srgb, var(--lume-signal-warning) 60%, var(--lume-ink));
+  border-color: color-mix(in srgb, var(--lume-signal-warning) 30%, transparent);
+}
+
+.diagnosisPill {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--ink);
+}
+
+.diagnosisCode {
+  flex: none;
+  font-family: var(--font-registro), "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.diagnosisLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* commit pulse (replays via React key on state change) */
 .pillCommit { animation: commitPulse var(--lume-dur-anello) var(--lume-ease); }
 
@@ -835,7 +829,7 @@
   font-weight: 600;
 }
 
-.agendaBridgeHeader :global(svg) { color: var(--pill-blue-fg); }
+.agendaBridgeHeader :global(svg) { color: var(--lume-accent); }
 
 .agendaBridgeCopy {
   margin: 8px 0 0;
@@ -1041,7 +1035,7 @@
   display: inline-block;
   padding: 0 4px;
   border-radius: 4px;
-  background: var(--pill-yellow-bg);
+  background: var(--lume-surface-focal);
   color: var(--ink);
   font-weight: 500;
 }
@@ -1108,8 +1102,9 @@
 
 .fieldBlocked {
   font-size: 11px;
-  color: var(--pill-coral-fg);
-  background: var(--pill-coral-bg);
+  color: var(--ink-muted);
+  background: var(--lume-surface-field);
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
   padding: 6px 10px;
   display: inline-flex;
@@ -1139,19 +1134,19 @@
 .fieldBtn:active { transform: scale(0.96); }
 
 .fieldBtnActiveAccept {
-  background: var(--pill-green-bg);
-  color: var(--pill-green-fg);
-  box-shadow: 0 0 0 1px var(--ring-accept);
+  background: var(--lume-surface-focal);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line-strong);
 }
 
 .fieldBtnActiveCorrect {
-  background: var(--pill-blue-bg);
-  color: var(--pill-blue-fg);
-  box-shadow: 0 0 0 1px var(--ring-correct);
+  background: var(--lume-surface-focal);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line-strong);
 }
 
 .fieldBtnActiveIgnore {
-  background: var(--pill-muted-bg);
+  background: var(--lume-surface-field);
   color: var(--ink-muted);
   box-shadow: 0 0 0 1px var(--ring-ignore);
 }
@@ -1596,8 +1591,8 @@
   background: var(--rail-slate);
 }
 
-.patientDotGreen { background: var(--rail-green); box-shadow: 0 0 0 3px var(--halo-green); }
-.patientDotBlue { background: var(--rail-blue); box-shadow: 0 0 0 3px var(--halo-blue); }
+.patientDotGreen,
+.patientDotBlue { background: var(--ink-muted); }
 .patientDotMuted { background: var(--ink-faint); }
 
 .patientName { font-size: 14px; color: var(--ink); font-weight: 500; }

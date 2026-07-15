@@ -623,13 +623,18 @@ function classNames(...parts: (string | false | undefined)[]) {
 }
 
 const PILL_VARIANT_CLASS: Record<PillVariant, string> = {
-  blue: styles.pillBlue,
-  yellow: styles.pillYellow,
-  green: styles.pillGreen,
-  coral: styles.pillCoral,
-  muted: styles.pillMuted,
-  violet: styles.pillViolet,
-  ink: styles.pillInk,
+  /* @Codex: i nomi colore legacy restano solo nel routing dei dati del
+     cockpit; la resa visiva ordinaria e neutra finche il significato non
+     dichiara un segnale clinico esplicito. */
+  blue: styles.pillNeutral,
+  yellow: styles.pillNeutral,
+  green: styles.pillNeutral,
+  coral: styles.pillNeutral,
+  muted: styles.pillNeutral,
+  violet: styles.pillNeutral,
+  neutral: styles.pillNeutral,
+  warning: styles.pillWarning,
+  ink: styles.pillNeutral,
 };
 
 function PillBadge({
@@ -651,6 +656,25 @@ function PillBadge({
       )}
     >
       {children}
+    </span>
+  );
+}
+
+/* @Codex */
+function DiagnosisPill({ diagnosis }: { diagnosis: string }) {
+  const separatorIndex = diagnosis.indexOf(' · ');
+  const code = separatorIndex >= 0 ? diagnosis.slice(0, separatorIndex) : '';
+  const description = separatorIndex >= 0 ? diagnosis.slice(separatorIndex + 3) : diagnosis;
+
+  return (
+    <span
+      className={classNames(styles.pill, styles.diagnosisPill)}
+      title={diagnosis}
+      aria-label={diagnosis}
+    >
+      {code ? <span className={styles.diagnosisCode}>{code}</span> : null}
+      {code ? <span aria-hidden>·</span> : null}
+      <span className={styles.diagnosisLabel}>{description}</span>
     </span>
   );
 }
@@ -868,6 +892,7 @@ export {
   buildGlobalDiaryState,
   classNames,
   PillBadge,
+  DiagnosisPill,
   Toolbar,
   ClinicalAgendaBridgePanel,
   railAreaIsSelected,

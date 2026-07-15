@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 
 import {
+  DiagnosisPill,
   PillBadge,
   classNames,
   normalizeClinicalSearch,
@@ -270,7 +271,7 @@ function IncaricoArea({
                           <span className={styles.patientMeta}>
                             {p.diagnoses.map((d) => (
                               <span key={d} className={styles.patientDiagnosisPill}>
-                                <PillBadge variant="muted">{d}</PillBadge>
+                                <DiagnosisPill diagnosis={d} />
                               </span>
                             ))}
                           </span>
@@ -278,9 +279,7 @@ function IncaricoArea({
                             {p.lastTouch}
                           </span>
                           <span className={styles.patientStatusCell}>
-                            <PillBadge
-                              variant={p.status === 'muted' ? 'muted' : p.status === 'blue' ? 'blue' : 'green'}
-                            >
+                            <PillBadge variant="neutral">
                               {p.statusLabel}
                             </PillBadge>
                           </span>
@@ -313,11 +312,9 @@ function IncaricoArea({
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {selected.diagnoses.map((d) => (
-              <PillBadge key={d} variant="blue">{d}</PillBadge>
+              <DiagnosisPill key={d} diagnosis={d} />
             ))}
-            <PillBadge
-              variant={selected.status === 'muted' ? 'muted' : selected.status === 'blue' ? 'blue' : 'green'}
-            >
+            <PillBadge variant="neutral">
               {selected.statusLabel}
             </PillBadge>
           </div>

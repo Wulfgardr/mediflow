@@ -220,7 +220,7 @@ function HandoffArea() {
           {BLOCKED_CAPS.map((c) => (
             <div key={c.id} className={classNames(styles.launcherTile, styles.launcherTileBlocked)}>
               <div className={styles.launcherTileHeader}>
-                <AlertTriangle size={14} color="var(--pill-coral-fg)" />
+                <AlertTriangle size={14} color="var(--lume-ink-muted)" />
                 <span className={styles.evidenceTitle}>{c.label}</span>
                 <span style={{ marginLeft: 'auto' }}>
                   <PillBadge variant="coral">solo portale ufficiale</PillBadge>
