@@ -1,9 +1,10 @@
 // @Codex
 // LumeKit: opaque clinical surfaces and platform-native transient chrome for
 // the universal Apple app.
+import Foundation
 import SwiftUI
 
-public enum LumeTone: Equatable {
+public enum LumeTone: CaseIterable, Hashable, Sendable {
     case neutral
     case info
     case positive
@@ -86,15 +87,48 @@ public enum LumePalette {
     public static var success: Color { Color(lumeHex: successHex) }
     public static var plum: Color { Color(lumeHex: plumHex) }
 
-    /// Keeps the existing clinical tone mapping stable during the rename.
-    public static func tint(for tone: LumeTone) -> Color {
+    /// Resolves a clinical tone to its canonical DTCG value. Neutral and
+    /// informational tones follow the active register; clinical signals stay
+    /// register-independent. Plum remains outside this mapping until a
+    /// structured state explicitly adopts it.
+    public static func hex(for tone: LumeTone, using palette: LumeRegisterPalette) -> String {
         switch tone {
-        case .neutral: return .secondary
-        case .info: return .blue
-        case .positive: return .green
-        case .attention: return .orange
-        case .critical: return .red
+        case .neutral: return palette.inkMutedHex
+        case .info: return palette.mineraleHex
+        case .positive: return successHex
+        case .attention: return warningHex
+        case .critical: return criticalHex
         }
+    }
+
+    /// The exact sRGB value rendered by `tint(for:using:)`; internal so tests
+    /// can fail closed on the derived signal, not only on its DTCG seed.
+    static func resolvedHex(for tone: LumeTone, using palette: LumeRegisterPalette) -> String {
+        let seed = hex(for: tone, using: palette)
+        switch tone {
+        case .neutral, .info:
+            return seed
+        case .positive, .attention, .critical:
+            return mix(seed, with: palette.inkPrimaryHex, seedWeight: 0.6)
+        }
+    }
+
+    public static func tint(for tone: LumeTone, using palette: LumeRegisterPalette) -> Color {
+        Color(lumeHex: resolvedHex(for: tone, using: palette))
+    }
+
+    /// Mirrors the web status derivation: preserve the canonical signal seed,
+    /// then mix it with register ink so status text remains readable at night.
+    private static func mix(_ seed: String, with ink: String, seedWeight: Double) -> String {
+        guard
+            let seedRGB = UInt64(seed.dropFirst(), radix: 16),
+            let inkRGB = UInt64(ink.dropFirst(), radix: 16)
+        else { preconditionFailure("Invalid Lume signal or ink hex") }
+        let channel: (Int) -> Int = { shift in
+            Int((Double((seedRGB >> shift) & 0xff) * seedWeight
+                + Double((inkRGB >> shift) & 0xff) * (1 - seedWeight)).rounded())
+        }
+        return String(format: "#%02x%02x%02x", channel(16), channel(8), channel(0))
     }
 
     public static func palette(for colorScheme: ColorScheme, isGuardia: Bool) -> LumeRegisterPalette {

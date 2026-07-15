@@ -7,6 +7,8 @@ struct PairedScalesSection: View {
     let hasSelectedPatient: Bool
     let onRefresh: () -> Void
     let onStartScale: (ClinicalScaleDefinition) -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.lumeGuardia) private var isGuardia
 
     private var historyItems: [ScaleHistoryItem] {
         ScaleHistoryPresentation.items(from: entries)
@@ -135,12 +137,15 @@ struct PairedScalesSection: View {
     }
 
     private func scaleChip(_ text: String, tone: VetroTone) -> some View {
-        Text(text)
+        let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
+        let toneColor = LumePalette.tint(for: tone, using: palette)
+        return Text(text)
             .font(.caption2.weight(.semibold))
-            .foregroundStyle(VetroPalette.tint(for: tone))
+            .foregroundStyle(toneColor)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(VetroPalette.tint(for: tone).opacity(0.12), in: Capsule())
+            .background(palette.field, in: Capsule())
+            .overlay(Capsule().strokeBorder(toneColor.opacity(0.4), lineWidth: 0.5))
     }
 
     static func area(for scaleId: String) -> String {
