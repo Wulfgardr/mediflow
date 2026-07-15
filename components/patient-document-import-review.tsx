@@ -49,33 +49,41 @@ function cloneDraft(draft: PatientDocumentReviewDraft): PatientDocumentReviewDra
 function qualityTone(level?: 'green' | 'yellow' | 'red') {
     if (level === 'red') {
         return {
-            panel: 'border-red-200 bg-red-50/60 dark:border-red-500/20 dark:bg-red-950/10',
-            icon: 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300',
-            text: 'text-red-700 dark:text-red-200',
+            panel: 'border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))]',
+            icon: 'bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]',
+            text: 'text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]',
         };
     }
 
     if (level === 'green') {
         return {
-            panel: 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-500/20 dark:bg-emerald-950/10',
-            icon: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300',
-            text: 'text-emerald-700 dark:text-emerald-200',
+            panel: 'border-[color:color-mix(in_srgb,var(--lume-signal-success)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_11%,var(--lume-surface-field))]',
+            icon: 'bg-[color:color-mix(in_srgb,var(--lume-signal-success)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]',
+            text: 'text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]',
+        };
+    }
+
+    if (level === 'yellow') {
+        return {
+            panel: 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))]',
+            icon: 'bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]',
+            text: 'text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]',
         };
     }
 
     return {
-        panel: 'border-blue-200 bg-blue-50/60 dark:border-blue-500/20 dark:bg-blue-950/10',
-        icon: 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300',
-        text: 'text-blue-700 dark:text-blue-200',
+        panel: 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)]',
+        icon: 'bg-[color:color-mix(in_srgb,var(--lume-accent)_11%,var(--lume-surface-field))] text-[color:var(--lume-accent)]',
+        text: 'text-[color:var(--lume-ink-muted)]',
     };
 }
 
 /* @Codex */
 function therapyStateBadgeClasses(state: 'active' | 'transition' | 'uncertain' | 'inactive') {
-    if (state === 'transition') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-200';
-    if (state === 'uncertain') return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-200';
-    if (state === 'inactive') return 'bg-slate-200 text-slate-600 dark:bg-white/10 dark:text-slate-300';
-    return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200';
+    if (state === 'transition') return 'bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]';
+    if (state === 'uncertain') return 'bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]';
+    if (state === 'inactive') return 'bg-[color:color-mix(in_srgb,var(--lume-ink)_8%,var(--lume-surface-field))] text-[color:var(--lume-ink-muted)]';
+    return 'bg-[color:color-mix(in_srgb,var(--lume-signal-success)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]';
 }
 
 /* @Codex */
@@ -127,7 +135,7 @@ export default function PatientDocumentImportReview({
                     <div className="space-y-2">
                         <div>
                             <p className="section-kicker">Controllo documento</p>
-                            <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+                            <h2 className="text-2xl font-black tracking-tight text-[color:var(--lume-ink)]">
                                 Scegli cosa portare nella scheda
                             </h2>
                         </div>
@@ -136,16 +144,16 @@ export default function PatientDocumentImportReview({
                             ogni gruppo prima di applicarlo alla scheda.
                         </p>
                         <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
-                            <span className="rounded-full bg-white/80 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-200">
+                            <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-3 py-1 text-[color:var(--lume-ink-muted)]">
                                 {localDraft.sourceLabel}
                             </span>
-                            <span className="rounded-full bg-white/80 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-200">
+                            <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-3 py-1 text-[color:var(--lume-ink-muted)]">
                                 Confidenza import {Math.round(localDraft.confidence * 100)}%
                             </span>
-                            <span className="rounded-full bg-white/80 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-200">
+                            <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-3 py-1 text-[color:var(--lume-ink-muted)]">
                                 {counters.fields} campi · {counters.diagnoses} diagnosi · {counters.medications} terapie · {counters.servicePrescriptions} prestazioni
                             </span>
-                            <span className="rounded-full bg-white/80 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-200">
+                            <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-3 py-1 text-[color:var(--lume-ink-muted)]">
                                 {importDecision.summary.structuredDiagnosisCount} diagnosi pronte · {importDecision.summary.structuredTherapyCount} terapie pronte · {importDecision.summary.servicePrescriptionProposalCount} prestazioni proposte · {importDecision.summary.noteOnlyTherapyCount} note da ricontrollare
                             </span>
                         </div>
@@ -155,7 +163,7 @@ export default function PatientDocumentImportReview({
                 <button
                     type="button"
                     onClick={onDismiss}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-xs font-bold uppercase tracking-wide text-slate-600 transition-[border-color,background-color,color] hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:border-red-400/30 dark:hover:bg-red-950/20 dark:hover:text-red-200"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)] transition-[border-color,background-color,color] hover:border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
                 >
                     <X className="h-4 w-4" />
                     Scarta documento
@@ -172,11 +180,11 @@ export default function PatientDocumentImportReview({
                         )}
                     </div>
                     <div className="space-y-1">
-                        <p className="text-sm font-bold text-slate-900 dark:text-white">
+                        <p className="text-sm font-bold text-[color:var(--lume-ink)]">
                             Qualità documento: {localDraft.quality.reason}
                         </p>
                         {localDraft.sourceExcerpt && (
-                            <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                            <p className="text-xs leading-relaxed text-[color:var(--lume-ink-muted)]">
                                 Estratto fonte: &ldquo;{localDraft.sourceExcerpt}&rdquo;
                             </p>
                         )}
@@ -192,19 +200,19 @@ export default function PatientDocumentImportReview({
                 {localDraft.fields.length > 0 && (
                     <section className="space-y-3">
                         <div className="flex items-center gap-2 px-1">
-                            <FileText className="h-4 w-4 text-blue-500" />
-                            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                            <FileText className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
+                            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[color:var(--lume-ink-muted)]">
                                 Anagrafica e contatti
                             </h3>
                         </div>
 
                         <div className="grid gap-3 md:grid-cols-2">
                             {localDraft.fields.map((field) => (
-                                <div key={field.key} className="rounded-[24px] border border-slate-200/70 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+                                <div key={field.key} className="rounded-[24px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
                                     <div className="mb-3 flex items-start justify-between gap-3">
                                         <div className="space-y-1">
-                                            <p className="text-sm font-bold text-slate-900 dark:text-white">{field.label}</p>
-                                            <p className="text-[11px] text-slate-500 dark:text-slate-400">{field.sourceLabel}</p>
+                                            <p className="text-sm font-bold text-[color:var(--lume-ink)]">{field.label}</p>
+                                            <p className="text-[11px] text-[color:var(--lume-ink-muted)]">{field.sourceLabel}</p>
                                         </div>
                                         <input
                                             type="checkbox"
@@ -213,7 +221,7 @@ export default function PatientDocumentImportReview({
                                                 ...current,
                                                 fields: current.fields.map((item) => item.key === field.key ? { ...item, included: !item.included } : item),
                                             }))}
-                                            className="mt-1 h-4 w-4 rounded-full border-slate-300 text-blue-600 focus:ring-blue-500"
+                                            className="mt-1 h-4 w-4 rounded-full border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] text-[color:var(--lume-accent)] focus:ring-[color:var(--lume-accent)]"
                                         />
                                     </div>
 
@@ -225,7 +233,7 @@ export default function PatientDocumentImportReview({
                                                 fields: current.fields.map((item) => item.key === field.key ? { ...item, value: event.target.value } : item),
                                             }))}
                                             rows={4}
-                                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="w-full rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:var(--lume-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--lume-accent)_24%,transparent)]"
                                         />
                                     ) : (
                                         <input
@@ -235,7 +243,7 @@ export default function PatientDocumentImportReview({
                                                 ...current,
                                                 fields: current.fields.map((item) => item.key === field.key ? { ...item, value: event.target.value } : item),
                                             }))}
-                                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="w-full rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:var(--lume-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--lume-accent)_24%,transparent)]"
                                         />
                                     )}
                                 </div>
@@ -247,34 +255,34 @@ export default function PatientDocumentImportReview({
                 {localDraft.diagnoses.length > 0 && (
                     <section className="space-y-3">
                         <div className="flex items-center gap-2 px-1">
-                            <Stethoscope className="h-4 w-4 text-rose-500" />
-                            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                            <Stethoscope className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
+                            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[color:var(--lume-ink-muted)]">
                                 Diagnosi candidate
                             </h3>
                         </div>
 
                         <div className="space-y-3">
                             {localDraft.diagnoses.map((diagnosis) => (
-                                <div key={diagnosis.id} className="rounded-[24px] border border-slate-200/70 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+                                <div key={diagnosis.id} className="rounded-[24px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
                                     <div className="mb-3 flex items-start justify-between gap-3">
                                         <div className="space-y-1">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:bg-rose-900/30 dark:text-rose-200">
+                                                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                                     {diagnosis.system}
                                                 </span>
                                                 {diagnosis.confidence && (
-                                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                                                    <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                                         {confidenceLabel(diagnosis.confidence)}
                                                     </span>
                                                 )}
                                             </div>
                                             {diagnosis.evidence && (
-                                                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                <p className="text-[11px] text-[color:var(--lume-ink-muted)]">
                                                     Evidenza: {diagnosis.evidence}
                                                 </p>
                                             )}
                                             {diagnosis.blockedReason && (
-                                                <p className="text-[11px] text-amber-600 dark:text-amber-300">
+                                                <p className="text-[11px] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]">
                                                     {diagnosis.blockedReason}
                                                 </p>
                                             )}
@@ -286,7 +294,7 @@ export default function PatientDocumentImportReview({
                                                 ...current,
                                                 diagnoses: current.diagnoses.map((item) => item.id === diagnosis.id ? { ...item, included: !item.included } : item),
                                             }))}
-                                            className="mt-1 h-4 w-4 rounded-full border-slate-300 text-blue-600 focus:ring-blue-500"
+                                            className="mt-1 h-4 w-4 rounded-full border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] text-[color:var(--lume-accent)] focus:ring-[color:var(--lume-accent)]"
                                         />
                                     </div>
 
@@ -297,7 +305,7 @@ export default function PatientDocumentImportReview({
                                                 ...current,
                                                 diagnoses: current.diagnoses.map((item) => item.id === diagnosis.id ? { ...item, code: event.target.value } : item),
                                             }))}
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-mono text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm font-mono text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:var(--lume-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--lume-accent)_24%,transparent)]"
                                         />
                                         <input
                                             value={diagnosis.description}
@@ -305,7 +313,7 @@ export default function PatientDocumentImportReview({
                                                 ...current,
                                                 diagnoses: current.diagnoses.map((item) => item.id === diagnosis.id ? { ...item, description: event.target.value } : item),
                                             }))}
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:var(--lume-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--lume-accent)_24%,transparent)]"
                                         />
                                     </div>
                                 </div>
@@ -317,34 +325,34 @@ export default function PatientDocumentImportReview({
                 {(localDraft.servicePrescriptions ?? []).length > 0 && (
                     <section className="space-y-3">
                         <div className="flex items-center gap-2 px-1">
-                            <ClipboardCheck className="h-4 w-4 text-sky-500" />
-                            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                            <ClipboardCheck className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
+                            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[color:var(--lume-ink-muted)]">
                                 Prestazioni prescritte
                             </h3>
                         </div>
 
-                        <div className="rounded-[8px] border border-sky-200 bg-sky-50/70 p-4 text-xs leading-relaxed text-sky-800 dark:border-sky-500/20 dark:bg-sky-950/10 dark:text-sky-200">
+                        <div className="rounded-[8px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-xs leading-relaxed text-[color:var(--lume-ink-muted)]">
                             Queste voci sono visite, esami, imaging o riabilitazione: restano fuori dal piano farmacologico e vengono proposte per il dominio dedicato.
                         </div>
 
                         <div className="space-y-3">
                             {(localDraft.servicePrescriptions ?? []).map((item) => (
-                                <div key={item.id} className="rounded-[8px] border border-slate-200/70 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+                                <div key={item.id} className="rounded-[8px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
                                     <div className="mb-3 flex items-start justify-between gap-3">
                                         <div className="space-y-1">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <p className="text-sm font-bold text-slate-900 dark:text-white">{item.serviceName}</p>
-                                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                                                <p className="text-sm font-bold text-[color:var(--lume-ink)]">{item.serviceName}</p>
+                                                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                                     {item.category ?? 'other'}
                                                 </span>
                                                 {item.confidence && (
-                                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                                                    <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                                         {confidenceLabel(item.confidence)}
                                                     </span>
                                                 )}
                                             </div>
                                             {item.evidence && (
-                                                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                <p className="text-[11px] text-[color:var(--lume-ink-muted)]">
                                                     Evidenza: {item.evidence}
                                                 </p>
                                             )}
@@ -358,7 +366,7 @@ export default function PatientDocumentImportReview({
                                                     candidate.id === item.id ? { ...candidate, included: !candidate.included } : candidate
                                                 )),
                                             }))}
-                                            className="mt-1 h-4 w-4 rounded-full border-slate-300 text-blue-600 focus:ring-blue-500"
+                                            className="mt-1 h-4 w-4 rounded-full border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] text-[color:var(--lume-accent)] focus:ring-[color:var(--lume-accent)]"
                                         />
                                     </div>
 
@@ -370,7 +378,7 @@ export default function PatientDocumentImportReview({
                                                 servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => candidate.id === item.id ? { ...candidate, serviceName: event.target.value } : candidate),
                                             }))}
                                             placeholder="Nome prestazione"
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:var(--lume-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--lume-accent)_24%,transparent)]"
                                         />
                                         <input
                                             value={item.serviceCode || ''}
@@ -379,7 +387,7 @@ export default function PatientDocumentImportReview({
                                                 servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => candidate.id === item.id ? { ...candidate, serviceCode: event.target.value } : candidate),
                                             }))}
                                             placeholder="Codice prestazione"
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:var(--lume-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--lume-accent)_24%,transparent)]"
                                         />
                                         <input
                                             value={item.clinicalQuestion || ''}
@@ -388,7 +396,7 @@ export default function PatientDocumentImportReview({
                                                 servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => candidate.id === item.id ? { ...candidate, clinicalQuestion: event.target.value } : candidate),
                                             }))}
                                             placeholder="Quesito clinico"
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:var(--lume-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--lume-accent)_24%,transparent)]"
                                         />
                                         <input
                                             value={item.provider || ''}
@@ -397,7 +405,7 @@ export default function PatientDocumentImportReview({
                                                 servicePrescriptions: (current.servicePrescriptions ?? []).map((candidate) => candidate.id === item.id ? { ...candidate, provider: event.target.value } : candidate),
                                             }))}
                                             placeholder="Struttura / specialita"
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:var(--lume-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--lume-accent)_24%,transparent)]"
                                         />
                                     </div>
                                 </div>
@@ -409,46 +417,46 @@ export default function PatientDocumentImportReview({
                 {localDraft.medications.length > 0 && (
                     <section className="space-y-3">
                         <div className="flex items-center gap-2 px-1">
-                            <Pill className="h-4 w-4 text-emerald-500" />
-                            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                            <Pill className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
+                            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[color:var(--lume-ink-muted)]">
                                 Terapie candidate
                             </h3>
                         </div>
 
-                        <div className="rounded-[24px] border border-emerald-200 bg-emerald-50/70 p-4 text-xs leading-relaxed text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-950/10 dark:text-emerald-200">
+                        <div className="rounded-[24px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-xs leading-relaxed text-[color:var(--lume-ink-muted)]">
                             Le terapie attive confermate con nome farmaco e posologia verranno salvate come terapia strutturata subito dopo la creazione della scheda.
                             I casi incompleti o non attivi possono restare come promemoria nelle note solo se li mantieni selezionati.
                         </div>
 
                         <div className="space-y-3">
                             {localDraft.medications.map((medication) => (
-                                <div key={medication.id} className="rounded-[24px] border border-slate-200/70 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+                                <div key={medication.id} className="rounded-[24px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
                                     <div className="mb-3 flex items-start justify-between gap-3">
                                         <div className="space-y-1">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <p className="text-sm font-bold text-slate-900 dark:text-white">
+                                                <p className="text-sm font-bold text-[color:var(--lume-ink)]">
                                                     {medication.drugName || 'Terapia proposta'}
                                                 </p>
                                                 <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${therapyStateBadgeClasses(medication.therapyState)}`}>
                                                     {therapyStateLabel(medication.therapyState)}
                                                 </span>
-                                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                                                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                                     {therapyMatchLabel(medication.matchType)}
                                                 </span>
                                                 {medication.confidence && (
-                                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                                                    <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                                         {confidenceLabel(medication.confidence)}
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="text-[11px] text-slate-500 dark:text-slate-400">{medication.sourceLabel}</p>
+                                            <p className="text-[11px] text-[color:var(--lume-ink-muted)]">{medication.sourceLabel}</p>
                                             {medication.evidence && (
-                                                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                <p className="text-[11px] text-[color:var(--lume-ink-muted)]">
                                                     Evidenza: {medication.evidence}
                                                 </p>
                                             )}
                                             {medication.blockedReason && (
-                                                <p className="text-[11px] text-amber-600 dark:text-amber-300">
+                                                <p className="text-[11px] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]">
                                                     {medication.blockedReason}
                                                 </p>
                                             )}
@@ -460,7 +468,7 @@ export default function PatientDocumentImportReview({
                                                 ...current,
                                                 medications: current.medications.map((item) => item.id === medication.id ? { ...item, included: !item.included } : item),
                                             }))}
-                                            className="mt-1 h-4 w-4 rounded-full border-slate-300 text-blue-600 focus:ring-blue-500"
+                                            className="mt-1 h-4 w-4 rounded-full border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] text-[color:var(--lume-accent)] focus:ring-[color:var(--lume-accent)]"
                                         />
                                     </div>
 
@@ -472,7 +480,7 @@ export default function PatientDocumentImportReview({
                                                 medications: current.medications.map((item) => item.id === medication.id ? { ...item, drugName: event.target.value } : item),
                                             }))}
                                             placeholder="Nome farmaco"
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:var(--lume-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--lume-accent)_24%,transparent)]"
                                         />
                                         <input
                                             value={medication.dosage || ''}
@@ -481,7 +489,7 @@ export default function PatientDocumentImportReview({
                                                 medications: current.medications.map((item) => item.id === medication.id ? { ...item, dosage: event.target.value } : item),
                                             }))}
                                             placeholder="Posologia"
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:var(--lume-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--lume-accent)_24%,transparent)]"
                                         />
                                         <input
                                             value={medication.activePrinciple || ''}
@@ -490,7 +498,7 @@ export default function PatientDocumentImportReview({
                                                 medications: current.medications.map((item) => item.id === medication.id ? { ...item, activePrinciple: event.target.value } : item),
                                             }))}
                                             placeholder="Principio attivo"
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:var(--lume-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--lume-accent)_24%,transparent)]"
                                         />
                                         <input
                                             value={medication.motivation || ''}
@@ -499,19 +507,19 @@ export default function PatientDocumentImportReview({
                                                 medications: current.medications.map((item) => item.id === medication.id ? { ...item, motivation: event.target.value } : item),
                                             }))}
                                             placeholder="Indicazione / contesto"
-                                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                                            className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:var(--lume-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--lume-accent)_24%,transparent)]"
                                         />
                                     </div>
 
                                     {(medication.aic || medication.atc) && (
-                                        <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                                        <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                             {medication.aic && (
-                                                <span className="rounded-full bg-slate-100 px-2 py-1 dark:bg-white/10">
+                                                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-1">
                                                     AIC {medication.aic}
                                                 </span>
                                             )}
                                             {medication.atc && (
-                                                <span className="rounded-full bg-slate-100 px-2 py-1 dark:bg-white/10">
+                                                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-1">
                                                     ATC {medication.atc}
                                                 </span>
                                             )}
@@ -525,7 +533,7 @@ export default function PatientDocumentImportReview({
             </div>
 
             <div className="mt-6 flex flex-col gap-3 border-t border-black/5 pt-6 dark:border-white/5 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <div className="flex items-center gap-2 text-xs text-[color:var(--lume-ink-muted)]">
                     <FileSearch className="h-4 w-4" />
                     Il passaggio alla scheda resta esplicito: nessun campo viene salvato in automatico.
                 </div>
@@ -533,7 +541,7 @@ export default function PatientDocumentImportReview({
                 <button
                     type="button"
                     onClick={() => onApply(applyPatientDocumentReview(localDraft))}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-blue-600 px-6 text-xs font-bold uppercase tracking-wide text-white shadow-lg shadow-blue-500/20 transition-[background-color,opacity,transform] hover:bg-blue-700 active:scale-95"
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[color:var(--lume-accent)] px-6 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-surface-focal)] shadow-lg transition-[background-color,opacity,transform] hover:bg-[color:color-mix(in_srgb,var(--lume-accent)_82%,var(--lume-ink))] active:scale-95"
                 >
                     <CheckCircle2 className="h-4 w-4" />
                     Porta nella scheda
