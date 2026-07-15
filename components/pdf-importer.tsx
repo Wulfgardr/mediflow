@@ -144,9 +144,9 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
     const getSourceBadge = () => {
         if (!extractionSource) return null;
         const badges = {
-            ai: { icon: Sparkles, text: 'OCR locale', color: 'text-purple-600 bg-purple-100' },
-            hybrid: { icon: Sparkles, text: 'AI + pattern', color: 'text-blue-600 bg-blue-100' },
-            regex: { icon: FileText, text: 'Pattern', color: 'text-gray-600 bg-gray-100' }
+            ai: { icon: Sparkles, text: 'OCR locale', color: 'bg-[color:color-mix(in_srgb,var(--lume-signal-plum)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-plum)_60%,var(--lume-ink))]' },
+            hybrid: { icon: Sparkles, text: 'AI + pattern', color: 'bg-[color:color-mix(in_srgb,var(--lume-accent)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-accent)_60%,var(--lume-ink))]' },
+            regex: { icon: FileText, text: 'Pattern', color: 'bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]' }
         };
         const badge = badges[extractionSource];
         return (
@@ -171,30 +171,30 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                 <input {...getInputProps()} aria-label="Carica documento" />
 
                 {isProcessing ? (
-                    <div className="flex flex-col items-center justify-center py-4 text-blue-600">
+                    <div className="flex flex-col items-center justify-center py-4 text-[color:var(--lume-accent)]">
                         <Loader2 className="w-8 h-8 animate-spin mb-2" />
                         <p className="font-medium">Lettura documento in corso...</p>
-                        <p className="text-xs text-blue-500 mt-1">{aiStage || "OCR locale in elaborazione"}</p>
+                        <p className="mt-1 text-xs text-[color:var(--lume-accent)]">{aiStage || "OCR locale in elaborazione"}</p>
                         {aiModels && (
-                            <p className="text-[10px] text-blue-400 mt-1">OCR: {aiModels.ocr} · Clinico: {aiModels.clinical}</p>
+                            <p className="mt-1 text-[10px] text-[color:var(--lume-ink-muted)]">OCR: {aiModels.ocr} · Clinico: {aiModels.clinical}</p>
                         )}
                     </div>
                 ) : error ? (
-                    <div className="flex flex-col items-center justify-center py-4 text-red-600">
+                    <div className="flex flex-col items-center justify-center py-4 text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
                         <AlertCircle className="w-8 h-8 mb-2" />
                         <p className="font-bold">Errore</p>
-                        <p className="text-xs text-red-700">{error}</p>
+                        <p className="text-xs">{error}</p>
                     </div>
                 ) : success ? (
-                    <div className="flex flex-col items-center justify-center py-4 text-green-600">
+                    <div className="flex flex-col items-center justify-center py-4 text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]">
                         <CheckCircle className="w-8 h-8 mb-2" />
                         <div className="flex items-center gap-2">
                             <p className="font-bold">Dati estratti</p>
                             {getSourceBadge()}
                         </div>
-                        <p className="text-xs text-green-700">Controlla le proposte prima del salvataggio.</p>
+                        <p className="text-xs">Controlla le proposte prima del salvataggio.</p>
                         {!patientId && (
-                            <p className="text-xs text-green-700">
+                            <p className="text-xs">
                                 Diagnosi e terapie vengono riconciliate localmente e poi mostrate per il controllo.
                             </p>
                         )}
@@ -203,12 +203,12 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                         {patientId && (
                             <div className="mt-2 flex items-center gap-2">
                                 {isSynthesizing ? (
-                                    <span className="inline-flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] px-2 py-1 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]">
                                         <Loader2 className="w-3 h-3 animate-spin" />
                                         Salvataggio in Archivio...
                                     </span>
                                 ) : archiveSaved ? (
-                                    <span className="inline-flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[color:color-mix(in_srgb,var(--lume-signal-success)_11%,var(--lume-surface-field))] px-2 py-1 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]">
                                         <Archive className="w-3 h-3" />
                                         Salvato nell&apos;archivio documenti
                                     </span>
@@ -218,27 +218,27 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                     </div>
                 ) : (
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg shrink-0">
+                        <div className="shrink-0 rounded-lg bg-[color:color-mix(in_srgb,var(--lume-accent)_11%,var(--lume-surface-field))] p-3">
                             <div className="relative">
-                                <FileText className="w-6 h-6 text-blue-600" />
-                                <Sparkles className="w-3 h-3 text-purple-500 absolute -top-1 -right-1" />
+                                <FileText className="h-6 w-6 text-[color:var(--lume-accent)]" />
+                                <Sparkles className="absolute -right-1 -top-1 h-3 w-3 text-[color:color-mix(in_srgb,var(--lume-signal-plum)_60%,var(--lume-ink))]" />
                             </div>
                         </div>
                         <div>
-                            <h3 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                            <h3 className="flex items-center gap-2 font-bold text-[color:var(--lume-ink)]">
                                 Importa da documento
-                                <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-signal-plum)_11%,var(--lume-surface-field))] px-2 py-0.5 text-xs font-normal text-[color:color-mix(in_srgb,var(--lume-signal-plum)_60%,var(--lume-ink))]">
                                     OCR locale
                                 </span>
                             </h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                            <p className="text-sm text-[color:var(--lume-ink-muted)]">
                                 Trascina un PDF o immagine (referto, scheda) per compilare automaticamente i campi.
                             </p>
                             <div className="flex gap-2 mt-1">
-                                <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                                <span className="inline-flex items-center gap-1 text-xs text-[color:var(--lume-ink-muted)]">
                                     <FileText className="w-3 h-3" /> PDF
                                 </span>
-                                <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                                <span className="inline-flex items-center gap-1 text-xs text-[color:var(--lume-ink-muted)]">
                                     <Image className="w-3 h-3" /> JPG, PNG
                                 </span>
                             </div>
@@ -249,7 +249,7 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
 
             {!documentSynthesisEnabled && (
                 <div
-                    className="mt-3 rounded-2xl border border-amber-200/80 bg-amber-50/80 p-3 text-xs leading-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200"
+                    className="mt-3 rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] p-3 text-xs leading-5 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]"
                     data-testid="document-synthesis-disabled-note"
                 >
                     La sintesi clinica documento è disabilitata localmente. L&apos;OCR e il prefill base restano disponibili, ma diagnosi da controllare, terapie candidate e archivio documenti non vengono generati.

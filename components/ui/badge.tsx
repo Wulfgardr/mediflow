@@ -13,21 +13,18 @@ export type BadgeTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
 const TONE_CLASSES: Record<BadgeTone, string> = {
     neutral:
         'border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]',
-    info: 'border-[color:color-mix(in_srgb,var(--lume-signal-plum)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-plum)_10%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-plum)_60%,var(--lume-ink))]',
+    info: 'border-[color:color-mix(in_srgb,var(--lume-accent)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-accent)_60%,var(--lume-ink))]',
     success:
-        'border-[color:color-mix(in_srgb,var(--lume-signal-success)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_10%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]',
+        'border-[color:color-mix(in_srgb,var(--lume-signal-success)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]',
     warning:
-        'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_20%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_10%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]',
+        'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]',
     danger:
-        'border-[color:color-mix(in_srgb,var(--lume-signal-critical)_28%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_10%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]',
+        'border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]',
 };
 
-/* @Codex WUL-UIUX (STREAM W2-B): dimensione "palette" a famiglie di colore Tailwind.
-   Le pillole di stato fuori dal cockpit non parlano il vocabolario semantico Lume
-   ma tinte Tailwind con override dark-mode scritti a mano (amber/emerald/blue/red/
-   slate). Invece di forzarle sui toni semantici (che sarebbe un ridisegno), qui le
-   riproduco fedelmente, classe per classe, cosi i call-site possono migrare senza
-   deriva visiva. Chi vuole la resa semantica continua a usare `tone`. */
+/* @Codex: compatibilita nominale per i consumatori legacy. I nomi della palette
+   restano stabili, ma la resa converge sui ruoli Lume: warning, critical,
+   accento minerale informativo, success e neutri d'inchiostro. */
 export type BadgePalette =
     | 'amber'
     | 'red'
@@ -38,15 +35,15 @@ export type BadgePalette =
     | 'dashed';
 
 const PALETTE_CLASSES: Record<BadgePalette, string> = {
-    amber: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-900/20 dark:text-amber-300',
-    red: 'border-red-200 bg-red-50 text-red-700 dark:border-red-400/30 dark:bg-red-950/20 dark:text-red-300',
-    blue: 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-950/20 dark:text-blue-300',
+    amber: TONE_CLASSES.warning,
+    red: TONE_CLASSES.danger,
+    blue: TONE_CLASSES.info,
     emerald:
-        'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-950/20 dark:text-emerald-300',
-    slate: 'border-slate-200 bg-slate-100 text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-300',
+        TONE_CLASSES.success,
+    slate: TONE_CLASSES.neutral,
     'slate-plain':
-        'border-slate-200 bg-white text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300',
-    dashed: 'border-dashed border-slate-300 bg-transparent text-slate-500 dark:border-white/15 dark:text-slate-400',
+        'border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink-muted)]',
+    dashed: 'border-dashed border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-transparent text-[color:var(--lume-ink-muted)]',
 };
 
 /* Le pillole a palette usano una geometria piu compatta di quelle semantiche:
@@ -62,7 +59,7 @@ const SIZE_CLASSES: Record<BadgeSize, string> = {
 export interface BadgeProps {
     /** Resa semantica sui token Lume. Ignorata quando `palette` e presente. */
     tone?: BadgeTone;
-    /** Resa a famiglia di colore Tailwind (con dark-mode), per le pillole legacy. */
+    /** Alias nominale legacy, reso attraverso i ruoli semantici Lume. */
     palette?: BadgePalette;
     size?: BadgeSize;
     children: ReactNode;

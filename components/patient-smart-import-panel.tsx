@@ -64,10 +64,9 @@ function therapyStateLabel(state: TherapySuggestionState): string {
 }
 
 function therapyStateBadgeClasses(state: TherapySuggestionState): string {
-    if (state === 'active') return 'border-slate-300 bg-white text-slate-700 dark:border-white/15 dark:bg-white/10 dark:text-slate-200';
-    if (state === 'transition') return 'border-slate-300 bg-slate-50 text-slate-700 dark:border-white/15 dark:bg-white/10 dark:text-slate-200';
-    if (state === 'uncertain') return 'border-slate-300 bg-slate-100 text-slate-700 dark:border-white/15 dark:bg-white/10 dark:text-slate-200';
-    return 'border-slate-200 bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400';
+    if (state === 'transition' || state === 'uncertain') return 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]';
+    if (state === 'active') return 'border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)]';
+    return 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]';
 }
 
 function reviewStateLabel(state: SmartImportReviewState): string {
@@ -80,35 +79,34 @@ function reviewStateLabel(state: SmartImportReviewState): string {
 }
 
 function reviewStateBadgeClasses(state: SmartImportReviewState): string {
-    if (state === 'already-present') return 'border-slate-200 bg-slate-100 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-400';
-    if (state === 'inactive') return 'border-slate-200 bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400';
-    return 'border-slate-300 bg-white text-slate-700 dark:border-white/15 dark:bg-white/10 dark:text-slate-200';
+    if (state === 'already-present' || state === 'inactive') return 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]';
+    return 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]';
 }
 
 function reviewStateCardClasses(state: SmartImportReviewState, isSelected: boolean): string {
     if (state === 'new') {
         return isSelected
-            ? 'border-slate-300 bg-white shadow-[0_0_0_1px_rgba(15,23,42,0.12)] dark:border-white/20 dark:bg-white/10'
-            : 'border-slate-100 bg-white hover:border-slate-300 dark:border-white/5 dark:bg-white/5';
+            ? 'border-[color:color-mix(in_srgb,var(--lume-accent)_30%,transparent)] bg-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)]'
+            : 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] hover:border-[color:color-mix(in_srgb,var(--lume-accent)_30%,transparent)]';
     }
 
     if (state === 'update') {
-        return 'border-slate-200 bg-slate-50/70 dark:border-white/10 dark:bg-white/[0.04]';
+        return 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_24%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_7%,var(--lume-surface-field))]';
     }
 
     if (state === 'already-present') {
-        return 'border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.03]';
+        return 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)]';
     }
 
     if (state === 'transition') {
-        return 'border-slate-300 bg-slate-50/85 dark:border-white/15 dark:bg-white/[0.05]';
+        return 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_24%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_7%,var(--lume-surface-field))]';
     }
 
     if (state === 'inactive') {
-        return 'border-slate-200 bg-slate-50/60 dark:border-white/10 dark:bg-white/[0.03]';
+        return 'border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)]';
     }
 
-    return 'border-slate-200 bg-slate-50/60 dark:border-white/10 dark:bg-white/[0.03]';
+    return 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_24%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_7%,var(--lume-surface-field))]';
 }
 
 function sourceKindLabel(kind: DiagnosisSmartImportSuggestion['evidence']['sourceKind']): string {
@@ -170,7 +168,7 @@ function formatResolverScore(score: number): string {
     return `${Math.round(score)}`;
 }
 
-const smartImportInputClassName = "h-10 w-full rounded-[16px] border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition-colors focus:border-slate-400 focus:ring-2 focus:ring-slate-100 dark:border-white/10 dark:bg-slate-950 dark:text-white dark:focus:border-white/30 dark:focus:ring-white/10";
+const smartImportInputClassName = "h-10 w-full rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] px-3 text-sm text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:var(--lume-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--lume-accent)_20%,transparent)]";
 
 // @Codex: Smart Import often renders in a narrow patient side rail, so actions must not share a cramped title row.
 function ReviewActionButtons({
@@ -187,7 +185,7 @@ function ReviewActionButtons({
             <button
                 type="button"
                 onClick={onToggleEditor}
-                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3 text-[10px] font-bold uppercase tracking-wide text-slate-600 transition-[border-color,background-color,color] hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-white/10 dark:hover:text-white"
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] px-3 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)] transition-[border-color,background-color,color] hover:border-[color:color-mix(in_srgb,var(--lume-accent)_30%,transparent)] hover:bg-[color:var(--lume-surface-focal)] hover:text-[color:var(--lume-ink)]"
             >
                 <Edit3 className="h-3 w-3" />
                 {isEditing ? 'Chiudi modifica' : 'Modifica'}
@@ -195,7 +193,7 @@ function ReviewActionButtons({
             <button
                 type="button"
                 onClick={onDiscard}
-                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-slate-200 px-3 text-[10px] font-bold uppercase tracking-wide text-slate-600 transition-[border-color,background-color,color] hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-white/10 dark:text-slate-300 dark:hover:border-red-400/30 dark:hover:bg-red-950/20 dark:hover:text-red-200"
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] px-3 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)] transition-[border-color,background-color,color] hover:border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
             >
                 <Trash2 className="h-3 w-3" />
                 Scarta
@@ -206,11 +204,11 @@ function ReviewActionButtons({
 
 function DiagnosisResolverPreview({ diagnosis }: { diagnosis: DiagnosisSmartImportSuggestion }) {
     return (
-        <div className="space-y-2 rounded-[20px] border border-slate-100 bg-slate-50/80 p-3 dark:border-white/5 dark:bg-white/[0.03]">
+        <div className="space-y-2 rounded-[20px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-3">
             <div className="flex flex-wrap items-center gap-2">
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Resolver ICD locale</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">Resolver ICD locale</p>
                 {diagnosis.resolver.queries.length > 0 && (
-                    <span className="max-w-full break-words rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-black/20 dark:text-slate-300">
+                    <span className="max-w-full break-words rounded-full bg-[color:var(--lume-surface-focal)] px-2 py-0.5 text-[10px] font-medium text-[color:var(--lume-ink-muted)]">
                         {diagnosis.resolver.queries.join(' · ')}
                     </span>
                 )}
@@ -220,23 +218,23 @@ function DiagnosisResolverPreview({ diagnosis }: { diagnosis: DiagnosisSmartImpo
                     {diagnosis.resolver.candidates.map((candidate) => (
                         <div
                             key={`${candidate.code}-${candidate.query}`}
-                            className="rounded-[16px] border border-white/70 bg-white/80 p-2.5 dark:border-white/5 dark:bg-black/10"
+                            className="rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-focal)] p-2.5"
                         >
                             <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-mono text-[10px] font-bold text-slate-700 dark:text-slate-200">
+                                <span className="font-mono text-[10px] font-bold text-[color:var(--lume-ink)]">
                                     {candidate.code}
                                 </span>
-                                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight ${candidate.selected ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300'}`}>
+                                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight ${candidate.selected ? 'bg-[color:var(--lume-ink)] text-[color:var(--lume-surface-focal)]' : 'bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]'}`}>
                                     {candidate.selected ? 'scelto' : `score ${formatResolverScore(candidate.score)}`}
                                 </span>
                             </div>
-                            <p className="mt-1 break-words text-[11px] font-medium text-slate-700 dark:text-slate-100">{candidate.description}</p>
-                            <p className="mt-1 break-words text-[10px] text-slate-500 dark:text-slate-400">Query: {candidate.query}</p>
+                            <p className="mt-1 break-words text-[11px] font-medium text-[color:var(--lume-ink)]">{candidate.description}</p>
+                            <p className="mt-1 break-words text-[10px] text-[color:var(--lume-ink-muted)]">Query: {candidate.query}</p>
                         </div>
                     ))}
                 </div>
             ) : (
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">Nessun candidato ICD-11 locale affidabile.</p>
+                <p className="text-[11px] text-[color:var(--lume-ink-muted)]">Nessun candidato ICD-11 locale affidabile.</p>
             )}
         </div>
     );
@@ -244,11 +242,11 @@ function DiagnosisResolverPreview({ diagnosis }: { diagnosis: DiagnosisSmartImpo
 
 function TherapyResolverPreview({ therapy }: { therapy: TherapySmartImportSuggestion }) {
     return (
-        <div className="space-y-2 rounded-[20px] border border-slate-100 bg-slate-50/80 p-3 dark:border-white/5 dark:bg-white/[0.03]">
+        <div className="space-y-2 rounded-[20px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-3">
             <div className="flex flex-wrap items-center gap-2">
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Resolver AIFA locale</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">Resolver AIFA locale</p>
                 {therapy.resolver.searchTerms.length > 0 && (
-                    <span className="max-w-full break-words rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-black/20 dark:text-slate-300">
+                    <span className="max-w-full break-words rounded-full bg-[color:var(--lume-surface-focal)] px-2 py-0.5 text-[10px] font-medium text-[color:var(--lume-ink-muted)]">
                         {therapy.resolver.searchTerms.join(' · ')}
                     </span>
                 )}
@@ -258,31 +256,31 @@ function TherapyResolverPreview({ therapy }: { therapy: TherapySmartImportSugges
                     {therapy.resolver.candidates.map((candidate) => (
                         <div
                             key={`${candidate.aic}-${candidate.searchTerm}`}
-                            className="rounded-[16px] border border-white/70 bg-white/80 p-2.5 dark:border-white/5 dark:bg-black/10"
+                            className="rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-focal)] p-2.5"
                         >
                             <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-mono text-[10px] font-bold text-slate-700 dark:text-slate-200">
+                                <span className="font-mono text-[10px] font-bold text-[color:var(--lume-ink)]">
                                     AIC {candidate.aic}
                                 </span>
-                                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight ${candidate.selected ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300'}`}>
+                                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight ${candidate.selected ? 'bg-[color:var(--lume-ink)] text-[color:var(--lume-surface-focal)]' : 'bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]'}`}>
                                     {candidate.selected ? 'scelto' : `score ${formatResolverScore(candidate.score)}`}
                                 </span>
-                                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight ${candidate.dosageAligned ? 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200' : 'bg-slate-200 text-slate-700 dark:bg-white/15 dark:text-slate-200'}`}>
+                                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight ${candidate.dosageAligned ? 'bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink)]' : 'bg-[color:var(--lume-surface-canvas)] text-[color:var(--lume-ink-muted)]'}`}>
                                     {candidate.dosageAligned ? 'dosaggio coerente' : 'dosaggio divergente'}
                                 </span>
                             </div>
-                            <p className="mt-1 break-words text-[11px] font-medium text-slate-700 dark:text-slate-100">{candidate.name}</p>
-                            <p className="mt-1 break-words text-[10px] text-slate-500 dark:text-slate-400">
+                            <p className="mt-1 break-words text-[11px] font-medium text-[color:var(--lume-ink)]">{candidate.name}</p>
+                            <p className="mt-1 break-words text-[10px] text-[color:var(--lume-ink-muted)]">
                                 {[candidate.activePrinciple, candidate.packaging, candidate.atc ? `ATC ${candidate.atc}` : undefined]
                                     .filter(Boolean)
                                     .join(' · ')}
                             </p>
-                            <p className="mt-1 break-words text-[10px] text-slate-500 dark:text-slate-400">Search: {candidate.searchTerm}</p>
+                            <p className="mt-1 break-words text-[10px] text-[color:var(--lume-ink-muted)]">Search: {candidate.searchTerm}</p>
                         </div>
                     ))}
                 </div>
             ) : (
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">Nessun candidato AIFA locale affidabile.</p>
+                <p className="text-[11px] text-[color:var(--lume-ink-muted)]">Nessun candidato AIFA locale affidabile.</p>
             )}
         </div>
     );
@@ -504,24 +502,24 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
     if (!analysis && !isGenerating && !smartImportEnabled) {
         return (
             <div
-                className="lume-panel overflow-hidden border-red-200/70 p-6 dark:border-red-500/20"
+                className="lume-panel overflow-hidden border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] p-6"
                 data-testid="smart-import-disabled-card"
             >
                 <div className="flex flex-col items-center text-center space-y-5">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-red-100 text-red-600 shadow-[0_12px_24px_rgba(239,68,68,0.12)] dark:bg-red-500/10 dark:text-red-300">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))] shadow-[var(--lume-shadow-focal)]">
                         <AlertTriangle className="w-8 h-8" />
                     </div>
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-500">Funzione AI disattivata</p>
-                        <h3 className="mt-2 text-xl font-bold text-slate-900 dark:text-white">Smart Import disabilitato</h3>
-                        <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">Funzione AI disattivata</p>
+                        <h3 className="mt-2 text-xl font-bold text-[color:var(--lume-ink)]">Smart Import disabilitato</h3>
+                        <p className="mt-2 max-w-sm text-sm leading-relaxed text-[color:var(--lume-ink-muted)]">
                             La funzione è stata fermata localmente per prudenza. La scheda resta consultabile, ma non avvia analisi né applicazioni finché l&apos;interruttore non viene riattivato in Impostazioni.
                         </p>
                     </div>
 
                     <Link
                         href="/settings/ai/funzioni"
-                        className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-[background-color,transform] hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                        className="inline-flex items-center gap-2 rounded-full bg-[color:var(--lume-ink)] px-6 py-3 text-sm font-semibold text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)] transition-[background-color,transform] hover:-translate-y-0.5 hover:bg-[color:var(--lume-accent)]"
                     >
                         Apri Impostazioni AI
                     </Link>
@@ -532,20 +530,20 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
 
     return (
         <div className="patient-detail-section lume-panel overflow-hidden rounded-[28px] border p-0">
-            <div className="border-b border-slate-200/60 p-5 dark:border-white/5">
+            <div className="border-b border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] p-5">
                 <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[18px] bg-slate-900 text-white shadow-[0_12px_24px_rgba(15,23,42,0.14)] dark:bg-white dark:text-slate-900">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[18px] bg-[color:var(--lume-ink)] text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)]">
                             <Brain className="h-5 w-5" />
                         </div>
                         <div className="min-w-0 flex-1">
-                            <h3 className="text-base font-bold text-slate-900 dark:text-white">Smart Import</h3>
+                            <h3 className="text-base font-bold text-[color:var(--lume-ink)]">Smart Import</h3>
                             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                                <span className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                                <span className="inline-flex items-center rounded-full bg-[color:var(--lume-surface-field)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight text-[color:var(--lume-ink-muted)]">
                                     {sourceCount} fonti
                                 </span>
                                 {analysis && (
-                                    <span className="break-all text-[9px] font-medium uppercase tracking-tight text-slate-400">
+                                    <span className="break-all text-[9px] font-medium uppercase tracking-tight text-[color:var(--lume-ink-muted)]">
                                         {analysis.model.model}
                                     </span>
                                 )}
@@ -556,7 +554,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                     <button
                         onClick={generateSuggestions}
                         disabled={isGenerating || isApplying || !smartImportEnabled}
-                        className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-full bg-slate-900 px-5 text-xs font-bold text-white shadow-[0_14px_28px_rgba(15,23,42,0.12)] transition-[background-color,opacity,transform] hover:bg-slate-800 active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                        className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-full bg-[color:var(--lume-ink)] px-5 text-xs font-bold text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)] transition-[background-color,opacity,transform] hover:bg-[color:var(--lume-accent)] active:scale-95 disabled:opacity-50"
                     >
                         {isGenerating ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                         {analysis ? (smartImportEnabled ? 'Aggiorna' : 'Disabilitata') : (smartImportEnabled ? 'Analizza fonti' : 'Disabilitata')}
@@ -566,14 +564,14 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
 
             <div className="p-5">
                 {error && (
-                    <div className="mb-4 flex items-start gap-2 rounded-[20px] border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+                    <div className="mb-4 flex items-start gap-2 rounded-[20px] border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] p-3 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
                         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                         <span>{error}</span>
                     </div>
                 )}
 
                 {statusMessage && (
-                    <div className="mb-4 flex items-start gap-2 rounded-[20px] border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+                    <div className="mb-4 flex items-start gap-2 rounded-[20px] border border-[color:color-mix(in_srgb,var(--lume-signal-success)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_11%,var(--lume-surface-field))] p-3 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]">
                         <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                         <span>{statusMessage}</span>
                     </div>
@@ -581,7 +579,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
 
                 {!smartImportEnabled && (
                     <div
-                        className="mb-4 flex items-start gap-2 rounded-[20px] border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-200"
+                        className="mb-4 flex items-start gap-2 rounded-[20px] border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] p-3 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
                         data-testid="smart-import-disabled-banner"
                     >
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -593,7 +591,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                 )}
 
                 {!analysis && !isGenerating && (
-                    <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4 text-sm leading-relaxed text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+                    <div className="rounded-[24px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-sm leading-relaxed text-[color:var(--lume-ink)]">
                         Analisi automatica di note, diario e documenti per suggerire diagnosi ICD-11 e terapie farmacologiche da importare in scheda.
                     </div>
                 )}
@@ -601,29 +599,29 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                 {isGenerating && (
                     <div className="space-y-4 py-10 text-center">
                         <div className="relative mx-auto h-12 w-12">
-                            <Brain className="h-12 w-12 text-slate-300 dark:text-white/15" />
+                            <Brain className="h-12 w-12 text-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)]" />
                             <div className="absolute inset-0 flex items-center justify-center">
-                                <RefreshCw className="h-5 w-5 animate-spin text-slate-700 dark:text-slate-200" />
+                                <RefreshCw className="h-5 w-5 animate-spin text-[color:var(--lume-ink)]" />
                             </div>
                         </div>
-                        <p className="text-xs font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Elaborazione fonti cliniche in corso...</p>
+                        <p className="text-xs font-bold uppercase tracking-widest text-[color:var(--lume-ink-muted)]">Elaborazione fonti cliniche in corso...</p>
                     </div>
                 )}
 
                 {analysis && !isGenerating && (
                     <div className="space-y-6">
-                        <div className="grid grid-cols-1 gap-5 rounded-[24px] border border-slate-100 bg-white/70 p-4 dark:border-white/5 dark:bg-white/[0.03] lg:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-5 rounded-[24px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-focal)] p-4 lg:grid-cols-3">
                             <div className="flex flex-col">
-                                <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Selezionati</span>
-                                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{selectedCount} pronti</span>
+                                <span className="text-[9px] font-bold uppercase tracking-widest text-[color:var(--lume-ink-muted)]">Selezionati</span>
+                                <span className="text-sm font-bold text-[color:var(--lume-ink)]">{selectedCount} pronti</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Reviewabili</span>
-                                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{reviewableCount} da confermare</span>
+                                <span className="text-[9px] font-bold uppercase tracking-widest text-[color:var(--lume-ink-muted)]">Reviewabili</span>
+                                <span className="text-sm font-bold text-[color:var(--lume-ink)]">{reviewableCount} da confermare</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Bloccati</span>
-                                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{blockedCount} da correggere o scartare</span>
+                                <span className="text-[9px] font-bold uppercase tracking-widest text-[color:var(--lume-ink-muted)]">Bloccati</span>
+                                <span className="text-sm font-bold text-[color:var(--lume-ink)]">{blockedCount} da correggere o scartare</span>
                             </div>
                         </div>
 
@@ -633,13 +631,13 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                         >
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2 px-1">
-                                    <Stethoscope className="h-3.5 w-3.5 text-slate-500" />
-                                    <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Diagnosi Candidate</h4>
+                                    <Stethoscope className="h-3.5 w-3.5 text-[color:var(--lume-ink-muted)]" />
+                                    <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--lume-ink-muted)]">Diagnosi Candidate</h4>
                                 </div>
 
                                 <div className="space-y-3">
                                     {analysis.diagnoses.length === 0 && (
-                                        <p className="py-4 text-center text-xs italic text-slate-400">Nessun match trovato</p>
+                                        <p className="py-4 text-center text-xs italic text-[color:var(--lume-ink-muted)]">Nessun match trovato</p>
                                     )}
 
                                     {analysis.diagnoses.map((diagnosis) => {
@@ -661,7 +659,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                             checked={isSelected}
                                                             disabled={!diagnosis.canApply || isApplying}
                                                             onChange={() => toggleDiagnosis(diagnosis.id)}
-                                                            className={`h-4 w-4 rounded-full border-slate-300 text-slate-900 focus:ring-slate-400 ${diagnosis.canApply ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                                                            className={`h-4 w-4 rounded-full border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] text-[color:var(--lume-accent)] focus:ring-[color:var(--lume-accent)] ${diagnosis.canApply ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
                                                         />
                                                     </div>
 
@@ -670,21 +668,21 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                             <div className="min-w-0 space-y-1.5">
                                                                 <div className="flex flex-wrap items-center gap-2">
                                                                     {diagnosis.canApply ? (
-                                                                        <label htmlFor={checkboxId} className="cursor-pointer break-words text-sm font-bold text-slate-900 dark:text-white">
+                                                                        <label htmlFor={checkboxId} className="cursor-pointer break-words text-sm font-bold text-[color:var(--lume-ink)]">
                                                                             {displayLabel}
                                                                         </label>
                                                                     ) : (
-                                                                        <p className="break-words text-sm font-bold text-slate-900 dark:text-white">{displayLabel}</p>
+                                                                        <p className="break-words text-sm font-bold text-[color:var(--lume-ink)]">{displayLabel}</p>
                                                                     )}
                                                                     <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-tighter ${reviewStateBadgeClasses(diagnosis.review.state)}`}>
                                                                         {reviewStateLabel(diagnosis.review.state)}
                                                                     </span>
-                                                                    <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-tighter text-slate-500 dark:bg-white/10">
+                                                                    <span className="rounded-full bg-[color:var(--lume-surface-field)] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-tighter text-[color:var(--lume-ink-muted)]">
                                                                         {confidenceLabel(diagnosis.confidence)}
                                                                     </span>
                                                                 </div>
                                                                 {diagnosis.match && (
-                                                                    <p className="break-words lume-registro text-[10px] font-bold text-slate-700 dark:text-slate-200">
+                                                                    <p className="break-words lume-registro text-[10px] font-bold text-[color:var(--lume-ink)]">
                                                                         ICD-11 {diagnosis.match.code} · {diagnosis.match.description}
                                                                     </p>
                                                                 )}
@@ -697,25 +695,25 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                             />
                                                         </div>
 
-                                                        <div className="rounded-[20px] border border-slate-100 bg-white/80 p-3 text-[11px] text-slate-600 dark:border-white/5 dark:bg-black/10 dark:text-slate-300">
-                                                            <p className="font-semibold text-slate-700 dark:text-slate-100">{diagnosis.review.summary}</p>
+                                                        <div className="rounded-[20px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-focal)] p-3 text-[11px] text-[color:var(--lume-ink-muted)]">
+                                                            <p className="font-semibold text-[color:var(--lume-ink)]">{diagnosis.review.summary}</p>
                                                             {diagnosis.review.comparison && (
-                                                                <p className="mt-1 text-slate-500 dark:text-slate-400">
+                                                                <p className="mt-1 text-[color:var(--lume-ink-muted)]">
                                                                     Profilo attuale: {diagnosis.review.comparison}
                                                                 </p>
                                                             )}
                                                             {diagnosis.blockedReason && diagnosis.blockedReason !== diagnosis.review.summary && (
-                                                                <p className="mt-1 text-slate-500 dark:text-slate-400">
+                                                                <p className="mt-1 text-[color:var(--lume-ink-muted)]">
                                                                     Motivo blocco: {diagnosis.blockedReason}
                                                                 </p>
                                                             )}
                                                         </div>
 
                                                         <div className="space-y-1.5">
-                                                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                                                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">
                                                                 Provenienza · {formatEvidenceMeta(diagnosis.evidence)}
                                                             </p>
-                                                            <div className="rounded-[18px] bg-slate-50 p-2 text-[10px] italic text-slate-500 dark:bg-white/5">
+                                                            <div className="rounded-[18px] bg-[color:var(--lume-surface-field)] p-2 text-[10px] italic text-[color:var(--lume-ink-muted)]">
                                                                 &ldquo;<PrivacyBlur intensity="sm">{diagnosis.evidence.excerpt}</PrivacyBlur>&rdquo;
                                                             </div>
                                                         </div>
@@ -723,9 +721,9 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                         <DiagnosisResolverPreview diagnosis={diagnosis} />
 
                                                         {isEditing && (
-                                                            <div className="grid gap-3 rounded-[20px] border border-slate-100 bg-slate-50/80 p-3 dark:border-white/5 dark:bg-white/[0.03]">
+                                                            <div className="grid gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-3">
                                                                 <label className="space-y-1">
-                                                                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                                                                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">
                                                                         Descrizione da importare
                                                                     </span>
                                                                     <input
@@ -737,7 +735,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                                         className={smartImportInputClassName}
                                                                     />
                                                                 </label>
-                                                                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                                <p className="text-[11px] text-[color:var(--lume-ink-muted)]">
                                                                     La modifica agisce sulla descrizione salvata, mantenendo il codice ICD-11 gia riconciliato.
                                                                 </p>
                                                             </div>
@@ -752,13 +750,13 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
 
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2 px-1">
-                                    <Pill className="h-3.5 w-3.5 text-slate-500" />
-                                    <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Terapie Candidate</h4>
+                                    <Pill className="h-3.5 w-3.5 text-[color:var(--lume-ink-muted)]" />
+                                    <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--lume-ink-muted)]">Terapie Candidate</h4>
                                 </div>
 
                                 <div className="space-y-3">
                                     {analysis.therapies.length === 0 && (
-                                        <p className="py-4 text-center text-xs italic text-slate-400">Nessun match trovato</p>
+                                        <p className="py-4 text-center text-xs italic text-[color:var(--lume-ink-muted)]">Nessun match trovato</p>
                                     )}
 
                                     {analysis.therapies.map((therapy) => {
@@ -782,7 +780,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                             checked={isSelected}
                                                             disabled={!therapy.canApply || isApplying}
                                                             onChange={() => toggleTherapy(therapy.id)}
-                                                            className={`h-4 w-4 rounded-full border-slate-300 text-slate-900 focus:ring-slate-400 ${therapy.canApply ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                                                            className={`h-4 w-4 rounded-full border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] text-[color:var(--lume-accent)] focus:ring-[color:var(--lume-accent)] ${therapy.canApply ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
                                                         />
                                                     </div>
 
@@ -791,11 +789,11 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                             <div className="min-w-0 space-y-1.5">
                                                                 <div className="flex flex-wrap items-center gap-2">
                                                                     {therapy.canApply ? (
-                                                                        <label htmlFor={checkboxId} className="cursor-pointer break-words text-sm font-bold text-slate-900 dark:text-white">
+                                                                        <label htmlFor={checkboxId} className="cursor-pointer break-words text-sm font-bold text-[color:var(--lume-ink)]">
                                                                             {displayName}
                                                                         </label>
                                                                     ) : (
-                                                                        <p className="break-words text-sm font-bold text-slate-900 dark:text-white">{displayName}</p>
+                                                                        <p className="break-words text-sm font-bold text-[color:var(--lume-ink)]">{displayName}</p>
                                                                     )}
                                                                     <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-tighter ${reviewStateBadgeClasses(therapy.review.state)}`}>
                                                                         {reviewStateLabel(therapy.review.state)}
@@ -803,15 +801,15 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                                     <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-tighter ${therapyStateBadgeClasses(therapy.therapyState)}`}>
                                                                         {therapyStateLabel(therapy.therapyState)}
                                                                     </span>
-                                                                    <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-tighter text-slate-500 dark:bg-white/10">
+                                                                    <span className="rounded-full bg-[color:var(--lume-surface-field)] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-tighter text-[color:var(--lume-ink-muted)]">
                                                                         {matchTypeLabel(therapy.matchType)}
                                                                     </span>
                                                                 </div>
-                                                                <p className="break-words text-[10px] font-bold text-slate-700 dark:text-slate-200">
+                                                                <p className="break-words text-[10px] font-bold text-[color:var(--lume-ink)]">
                                                                     {[displayPrinciple, displayDosage].filter(Boolean).join(' · ')}
                                                                 </p>
                                                                 {therapy.match?.aic && (
-                                                                    <p className="break-words lume-registro text-[10px] font-bold text-slate-500 dark:text-slate-300">
+                                                                    <p className="break-words lume-registro text-[10px] font-bold text-[color:var(--lume-ink-muted)]">
                                                                         AIC {therapy.match.aic}{therapy.match.atc ? ` · ATC ${therapy.match.atc}` : ''}
                                                                     </p>
                                                                 )}
@@ -824,25 +822,25 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                             />
                                                         </div>
 
-                                                        <div className="rounded-[20px] border border-slate-100 bg-white/80 p-3 text-[11px] text-slate-600 dark:border-white/5 dark:bg-black/10 dark:text-slate-300">
-                                                            <p className="font-semibold text-slate-700 dark:text-slate-100">{therapy.review.summary}</p>
+                                                        <div className="rounded-[20px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-focal)] p-3 text-[11px] text-[color:var(--lume-ink-muted)]">
+                                                            <p className="font-semibold text-[color:var(--lume-ink)]">{therapy.review.summary}</p>
                                                             {therapy.review.comparison && (
-                                                                <p className="mt-1 text-slate-500 dark:text-slate-400">
+                                                                <p className="mt-1 text-[color:var(--lume-ink-muted)]">
                                                                     Profilo attuale: {therapy.review.comparison}
                                                                 </p>
                                                             )}
                                                             {therapy.blockedReason && therapy.blockedReason !== therapy.review.summary && (
-                                                                <p className="mt-1 text-slate-500 dark:text-slate-400">
+                                                                <p className="mt-1 text-[color:var(--lume-ink-muted)]">
                                                                     Motivo blocco: {therapy.blockedReason}
                                                                 </p>
                                                             )}
                                                         </div>
 
                                                         <div className="space-y-1.5">
-                                                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                                                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">
                                                                 Provenienza · {formatEvidenceMeta(therapy.evidence)}
                                                             </p>
-                                                            <div className="rounded-[18px] bg-slate-50 p-2 text-[10px] italic text-slate-500 dark:bg-white/5">
+                                                            <div className="rounded-[18px] bg-[color:var(--lume-surface-field)] p-2 text-[10px] italic text-[color:var(--lume-ink-muted)]">
                                                                 &ldquo;<PrivacyBlur intensity="sm">{therapy.evidence.excerpt}</PrivacyBlur>&rdquo;
                                                             </div>
                                                         </div>
@@ -850,10 +848,10 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                         <TherapyResolverPreview therapy={therapy} />
 
                                                         {isEditing && (
-                                                            <div className="grid gap-3 rounded-[20px] border border-slate-100 bg-slate-50/80 p-3 dark:border-white/5 dark:bg-white/[0.03]">
+                                                            <div className="grid gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-3">
                                                                 <div className="grid gap-3 md:grid-cols-2">
                                                                     <label className="space-y-1">
-                                                                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                                                                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">
                                                                             Nome farmaco
                                                                         </span>
                                                                         <input
@@ -866,7 +864,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                                         />
                                                                     </label>
                                                                     <label className="space-y-1">
-                                                                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                                                                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">
                                                                             Principio attivo
                                                                         </span>
                                                                         <input
@@ -879,7 +877,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                                         />
                                                                     </label>
                                                                     <label className="space-y-1">
-                                                                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                                                                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">
                                                                             Posologia
                                                                         </span>
                                                                         <input
@@ -892,7 +890,7 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                                                                         />
                                                                     </label>
                                                                     <label className="space-y-1">
-                                                                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                                                                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">
                                                                             Motivazione
                                                                         </span>
                                                                         <input
@@ -916,15 +914,15 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
                             </div>
                         </div>
 
-                        <div className="flex flex-col gap-4 border-t border-slate-100 pt-5 dark:border-white/5 sm:flex-row sm:items-center sm:justify-between">
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                        <div className="flex flex-col gap-4 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] pt-5 sm:flex-row sm:items-center sm:justify-between">
+                            <p className="text-xs text-[color:var(--lume-ink-muted)]">
                                 Le righe non applicabili restano modificabili o scartabili, ma non vengono selezionate finche non risultano coerenti con il profilo attuale.
                             </p>
 
                             <button
                                 onClick={applySelection}
                                 disabled={isApplying || selectedCount === 0 || !smartImportEnabled}
-                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-slate-900 px-8 text-xs font-bold text-white shadow-[0_14px_28px_rgba(15,23,42,0.12)] transition-[background-color,opacity,transform] hover:bg-slate-800 active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[color:var(--lume-ink)] px-8 text-xs font-bold text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)] transition-[background-color,opacity,transform] hover:bg-[color:var(--lume-accent)] active:scale-95 disabled:opacity-50"
                             >
                                 {isApplying ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                                 {smartImportEnabled ? 'Applica selezionati' : 'Disabilitata'}
