@@ -33,31 +33,31 @@ const LAUNCHERS: {
     label: 'Prescrittivo Regionale (PRREG)',
     caption:
       'Apri il portale ufficiale del Prescrittivo Regionale (PRREG) con il CF pronto da incollare.',
-    variant: 'blue',
+    variant: 'plum',
   },
   {
     id: 'protesica',
     label: 'Protesica-RL',
     caption: 'Apri Assistente RL / Protesica-RL con il CF del paziente.',
-    variant: 'violet',
+    variant: 'plum',
   },
   {
     id: 'fse',
     label: 'FSE · OpeFseIE',
     caption: 'Apri OpeFseIE per consultazione FSE governata da consenso.',
-    variant: 'green',
+    variant: 'plum',
   },
   {
     id: 'anagrafe',
     label: 'Anagrafe · Gaia',
     caption: 'Apri Gaia con il CF pronto da incollare.',
-    variant: 'muted',
+    variant: 'plum',
   },
   {
     id: 'menu',
     label: 'Menu SISS',
     caption: 'Apri la home della sessione SISS regionale.',
-    variant: 'muted',
+    variant: 'plum',
   },
 ];
 
@@ -108,8 +108,8 @@ function HandoffArea() {
         <header className={styles.panelHeader}>
           <h2 className={styles.panelTitle}>Portali disponibili</h2>
           <span className={styles.panelActions}>
-            <PillBadge variant="muted">5 portali ufficiali</PillBadge>
-            <PillBadge variant="green">CF pronto · solo copia-incolla</PillBadge>
+            <PillBadge variant="plum">5 portali ufficiali</PillBadge>
+            <PillBadge variant="success">CF pronto · solo copia-incolla</PillBadge>
           </span>
         </header>
         <p className={styles.panelSubtitle}>
@@ -133,7 +133,7 @@ function HandoffArea() {
               </div>
               <p className={styles.launcherTileBody}>{l.caption}</p>
               <div className={styles.launcherTileFoot}>
-                <PillBadge variant="muted">CF pronto</PillBadge>
+                <PillBadge variant="success">CF pronto</PillBadge>
                 <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 4, alignItems: 'center' }}>
                   Apri portale <ArrowUpRight size={11} />
                 </span>
@@ -146,7 +146,7 @@ function HandoffArea() {
       <section className={styles.panel}>
         <header className={styles.panelHeader}>
           <h2 className={styles.panelTitle}>Passaggi SISS</h2>
-          <PillBadge variant="muted">{currentIndex + 1} di {STAGES.length}</PillBadge>
+          <PillBadge variant="neutral">{currentIndex + 1} di {STAGES.length}</PillBadge>
         </header>
         <p className={styles.panelSubtitle}>
           Identità, consenso, portale ufficiale e nota di esito restano in una sequenza unica.
@@ -176,14 +176,14 @@ function HandoffArea() {
                 <span className={styles.stageBtnTitle}>{s.title}</span>
                 {isDone && (
                   <span>
-                    <PillBadge variant="green">
+                    <PillBadge variant="success">
                       <Check size={11} /> completato
                     </PillBadge>
                   </span>
                 )}
                 {isActive && !isDone && (
                   <span>
-                    <PillBadge variant="ink">in corso</PillBadge>
+                    <PillBadge variant="neutral">in corso</PillBadge>
                   </span>
                 )}
               </button>
@@ -207,7 +207,7 @@ function HandoffArea() {
         <header className={styles.panelHeader}>
           <h2 className={styles.panelTitle}>Azioni da completare sul portale ufficiale</h2>
           <span className={styles.panelActions}>
-            <PillBadge variant="coral">
+            <PillBadge variant="critical">
               <AlertTriangle size={11} /> da ricordare
             </PillBadge>
           </span>
@@ -220,10 +220,10 @@ function HandoffArea() {
           {BLOCKED_CAPS.map((c) => (
             <div key={c.id} className={classNames(styles.launcherTile, styles.launcherTileBlocked)}>
               <div className={styles.launcherTileHeader}>
-                <AlertTriangle size={14} color="var(--pill-coral-fg)" />
+                <AlertTriangle size={14} color="var(--lume-ink-muted)" />
                 <span className={styles.evidenceTitle}>{c.label}</span>
                 <span style={{ marginLeft: 'auto' }}>
-                  <PillBadge variant="coral">solo portale ufficiale</PillBadge>
+                  <PillBadge variant="critical">solo portale ufficiale</PillBadge>
                 </span>
               </div>
               <p className={styles.launcherTileBody}>{c.reason}</p>
@@ -251,7 +251,7 @@ function HandoffStageBody({
           <ShieldCheck size={16} color="var(--ink-muted)" />
           <h3 className={styles.panelTitle}>Identità &amp; ruolo MMG</h3>
           <span style={{ marginLeft: 'auto' }}>
-            <PillBadge variant="muted">TS-CNS · cookie ufficiale</PillBadge>
+            <PillBadge variant="plum">TS-CNS · cookie ufficiale</PillBadge>
           </span>
         </header>
         <dl className={styles.stagePanelKv}>
@@ -279,7 +279,7 @@ function HandoffStageBody({
           <FileSignature size={16} color="var(--ink-muted)" />
           <h3 className={styles.panelTitle}>Consenso assistito</h3>
           <span style={{ marginLeft: 'auto' }}>
-            <PillBadge variant="green">consenso registrato</PillBadge>
+            <PillBadge variant="success">consenso registrato</PillBadge>
           </span>
         </header>
         <dl className={styles.stagePanelKv}>
@@ -310,7 +310,7 @@ function HandoffStageBody({
           <ArrowUpRight size={16} color="var(--ink-muted)" />
           <h3 className={styles.panelTitle}>Passaggio al portale ufficiale</h3>
           <span style={{ marginLeft: 'auto' }}>
-            <PillBadge variant="blue">via portale SISS</PillBadge>
+            <PillBadge variant="plum">via portale SISS</PillBadge>
           </span>
         </header>
         <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.6 }}>
@@ -342,7 +342,7 @@ function HandoffStageBody({
         <Check size={16} color="var(--ink-muted)" />
         <h3 className={styles.panelTitle}>Esito registrato manualmente</h3>
         <span style={{ marginLeft: 'auto' }}>
-          <PillBadge variant="yellow">esito registrato a mano</PillBadge>
+          <PillBadge variant="warning">esito registrato a mano</PillBadge>
         </span>
       </header>
       <div className={styles.outcomeCapsule}>

@@ -25,6 +25,7 @@ interface StatusGlyphProps {
     kind: StatusGlyphKind;
     label?: string;
     className?: string;
+    tone?: 'semantic' | 'neutral';
 }
 
 const GLYPH_MAP: Record<
@@ -38,29 +39,29 @@ const GLYPH_MAP: Record<
     active: {
         icon: HeartPulse,
         label: 'Attivo',
-        className: 'border-[color:color-mix(in_srgb,var(--lume-accent)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_10%,transparent)] text-[color:var(--lume-accent)]',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]',
     },
     review: {
         icon: ScanSearch,
         label: 'Da rivedere',
-        className: 'border-[color:color-mix(in_srgb,var(--lume-signal-plum)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-plum)_10%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-plum)_60%,var(--lume-ink))]',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]',
     },
     completed: {
         icon: Check,
         label: 'Completato',
-        className: 'border-[color:color-mix(in_srgb,var(--lume-signal-success)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_10%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-signal-success)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]',
     },
     high: {
         icon: AlertTriangle,
         /* @Codex WUL-UIUX: 'high' (critico) deve gridare, non avere la stessa
            ricetta tenue di 'archived'. Bordo e fondo a piena forza + ombra. */
         label: 'Priorità alta',
-        className: 'border-[color:color-mix(in_srgb,var(--lume-signal-critical)_28%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_10%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))] shadow-[var(--lume-shadow-focal)]',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]',
     },
     'follow-up': {
         icon: Clock3,
         label: 'Da ricontattare',
-        className: 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_20%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_10%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]',
     },
     archived: {
         icon: Archive,
@@ -70,11 +71,11 @@ const GLYPH_MAP: Record<
     ambulatory: {
         icon: CircleDashed,
         label: 'Ambulatorio',
-        className: 'border-[color:color-mix(in_srgb,var(--lume-accent)_12%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-accent)_6%,transparent)] text-[color:var(--lume-accent)]',
+        className: 'border-[color:color-mix(in_srgb,var(--lume-signal-plum)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-plum)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-plum)_60%,var(--lume-ink))]',
     },
 };
 
-export function StatusGlyph({ kind, label, className }: StatusGlyphProps) {
+export function StatusGlyph({ kind, label, className, tone = 'semantic' }: StatusGlyphProps) {
     const glyph = GLYPH_MAP[kind];
     const Icon = glyph.icon;
 
@@ -82,11 +83,13 @@ export function StatusGlyph({ kind, label, className }: StatusGlyphProps) {
         <span
             className={cn(
                 'status-glyph inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-tight',
-                glyph.className,
+                tone === 'neutral'
+                    ? 'border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]'
+                    : glyph.className,
                 className,
             )}
         >
-            <span className="status-glyph-icon flex h-4 w-4 items-center justify-center rounded-full bg-white/60 dark:bg-black/15">
+            <span className="status-glyph-icon flex h-4 w-4 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_7%,transparent)]">
                 <Icon className="h-3 w-3" strokeWidth={2.3} />
             </span>
             <span>{label ?? glyph.label}</span>

@@ -14,38 +14,27 @@
      subtle/faint confluiscono nell'attenuato Lume, misurato >= 4,5:1. */
   --ink-subtle: var(--lume-ink-muted);
   --ink-faint: var(--lume-ink-muted);
-  --line: rgba(15, 23, 42, 0.05);
-  --line-strong: rgba(15, 23, 42, 0.08);
+  --line: color-mix(in srgb, var(--lume-ink) 5%, transparent);
+  --line-strong: color-mix(in srgb, var(--lume-ink) 8%, transparent);
   /* Lume: bordo di controllo interattivo (WCAG 1.4.11), derivato dall'alias
      ink-muted Lume (>= 4,5:1 su ogni superficie attiva; ri-risolve per registro). */
   --control-border: var(--lume-ink-muted);
-  --rail-green: #2f7d4f;
-  /* @Codex WUL-UIUX: ex #1d4ed8, portato su slate per coerenza col focus globale */
-  --rail-blue: var(--lume-accent);
-  --rail-yellow: #b45309;
-  --rail-coral: #dc2626;
-  --rail-violet: #6d28d9;
-  --rail-slate: #64748b;
-  --pill-green-bg: #dcfce7;
-  --pill-green-fg: #166534;
-  --pill-blue-bg: #dbeafe;
-  --pill-blue-fg: #1e3a8a;
-  --pill-yellow-bg: #fef3c7;
-  --pill-yellow-fg: #92400e;
-  --pill-coral-bg: #ffe2dd;
-  --pill-coral-fg: #9a3412;
-  --pill-violet-bg: #ede9fe;
-  --pill-violet-fg: #5b21b6;
-  --pill-muted-bg: #eef0f2;
-  --pill-muted-fg: #475569;
+  --rail-green: var(--lume-signal-success);
+  /* @Codex WUL-UIUX: ex blu Tailwind, portato su inchiostro attenuato per
+     freschezza quieta e bordi di evidenza non allarmanti. */
+  --rail-blue: var(--lume-ink-muted);
+  --rail-yellow: var(--lume-signal-warning);
+  --rail-coral: var(--lume-signal-critical);
+  --rail-violet: var(--lume-signal-plum);
+  --rail-slate: var(--lume-ink-muted);
   /* Lume: la coda AI/amministrativa usa il neutro minerale, non un
      gradiente ornamentale; le azioni piene usano l'inchiostro Lume. */
   --accent-ai: var(--lume-accent);
-  --accent-ai-fg: #ffffff;
+  --accent-ai-fg: var(--lume-surface-focal);
   --solid-action-bg: var(--lume-ink);
-  --solid-action-fg: #ffffff;
+  --solid-action-fg: var(--lume-surface-focal);
   --brand-dot-bg: var(--lume-ink);
-  --brand-dot-fg: #ffffff;
+  --brand-dot-fg: var(--lume-surface-focal);
   /* Lume: il telaio (buio operativo) e chrome opaco, non un gradiente. */
   --rail-bg: var(--lume-surface-chrome);
   --rail-dot-shadow: transparent;
@@ -56,18 +45,16 @@
   --shadow-card: 0 0 0 1px var(--line-strong);
   --shadow-panel: 0 0 0 1px var(--line-strong);
   /* Lume: livello sollevato (il fuoco) = ombra corta 0 2px 8px a bassa opacita. */
-  --shadow-focal: 0 2px 8px rgba(15, 23, 42, 0.10);
+  --shadow-focal: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
   /* Lume: le righe candidate ordinarie restano non-focali (campo); il fuoco
      e riservato al solo paziente selezionato. */
   --row-raised: var(--lume-surface-field);
-  --toggle-track: #d1d5db;
+  --toggle-track: color-mix(in srgb, var(--lume-ink) 18%, transparent);
   /* Lume: niente sweep decorativo ne aloni di luce. */
   --sweep-tint: transparent;
   --halo-green: transparent;
   --halo-blue: transparent;
-  --ring-accept: rgba(21, 128, 61, 0.22);
-  --ring-correct: rgba(29, 78, 216, 0.22);
-  --ring-ignore: rgba(100, 116, 139, 0.18);
+  --ring-ignore: color-mix(in srgb, var(--lume-ink) 18%, transparent);
   --radius-card: var(--lume-radius-panel);
   --radius-tile: 18px;
   --radius-control: 14px;
@@ -99,32 +86,20 @@
   --ink-muted: var(--lume-ink-muted);
   --ink-subtle: var(--lume-ink-muted);
   --ink-faint: var(--lume-ink-muted);
-  --line: rgba(226, 232, 240, 0.10);
-  --line-strong: rgba(226, 232, 240, 0.16);
-  --rail-green: #4ade80;
-  --rail-blue: var(--lume-accent);
-  --rail-yellow: #fbbf24;
-  --rail-coral: #f87171;
-  --rail-violet: #a78bfa;
-  --rail-slate: #94a3b8;
-  --pill-green-bg: rgba(74, 222, 128, 0.16);
-  --pill-green-fg: #bbf7d0;
-  --pill-blue-bg: rgba(96, 165, 250, 0.18);
-  --pill-blue-fg: #bfdbfe;
-  --pill-yellow-bg: rgba(251, 191, 36, 0.16);
-  --pill-yellow-fg: #fde68a;
-  --pill-coral-bg: rgba(248, 113, 113, 0.16);
-  --pill-coral-fg: #fecaca;
-  --pill-violet-bg: rgba(167, 139, 250, 0.18);
-  --pill-violet-fg: #ddd6fe;
-  --pill-muted-bg: rgba(148, 163, 184, 0.14);
-  --pill-muted-fg: #cbd5e1;
+  --line: color-mix(in srgb, var(--lume-ink) 10%, transparent);
+  --line-strong: color-mix(in srgb, var(--lume-ink) 16%, transparent);
+  --rail-green: var(--lume-signal-success);
+  --rail-blue: var(--lume-ink-muted);
+  --rail-yellow: var(--lume-signal-warning);
+  --rail-coral: var(--lume-signal-critical);
+  --rail-violet: var(--lume-signal-plum);
+  --rail-slate: var(--lume-ink-muted);
   --accent-ai: var(--lume-accent);
-  --accent-ai-fg: #020617;
+  --accent-ai-fg: var(--lume-surface-focal);
   --solid-action-bg: var(--lume-ink);
-  --solid-action-fg: #020617;
+  --solid-action-fg: var(--lume-surface-focal);
   --brand-dot-bg: var(--lume-ink);
-  --brand-dot-fg: #0f172a;
+  --brand-dot-fg: var(--lume-surface-focal);
   --rail-bg: var(--lume-surface-chrome);
   --rail-dot-shadow: transparent;
   --surface-highlight: transparent;
@@ -132,13 +107,11 @@
   --shadow-panel: 0 0 0 1px var(--line-strong);
   --shadow-focal: 0 2px 8px rgba(0, 0, 0, 0.28);
   --row-raised: var(--lume-surface-field);
-  --toggle-track: rgba(148, 163, 184, 0.28);
+  --toggle-track: color-mix(in srgb, var(--lume-ink) 28%, transparent);
   --sweep-tint: transparent;
   --halo-green: transparent;
   --halo-blue: transparent;
-  --ring-accept: rgba(74, 222, 128, 0.38);
-  --ring-correct: rgba(96, 165, 250, 0.38);
-  --ring-ignore: rgba(148, 163, 184, 0.32);
+  --ring-ignore: color-mix(in srgb, var(--lume-ink) 32%, transparent);
 }
 
 @media (max-width: 1024px) {
@@ -382,7 +355,7 @@
 
 .canvas::-webkit-scrollbar { width: 10px; }
 .canvas::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.36);
+  background: color-mix(in srgb, var(--lume-ink) 36%, transparent);
   border-radius: var(--radius-pill);
   border: 2px solid var(--surface);
 }
@@ -629,7 +602,7 @@
   border-radius: var(--radius-card);
   padding: 16px;
   box-shadow: inset 0 1px 0 var(--surface-highlight),
-    inset 0 0 0 1px rgba(15, 23, 42, 0.03);
+    inset 0 0 0 1px color-mix(in srgb, var(--lume-ink) 3%, transparent);
 }
 
 .panelHeader {
@@ -678,13 +651,13 @@
 
 .statTrend {
   font-size: 11px;
-  color: var(--pill-green-fg);
+  color: var(--ink-muted);
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-.statTrendDown { color: var(--rail-coral); }
+.statTrendDown { color: var(--ink-muted); }
 .statTrendMuted { color: var(--ink-subtle); }
 
 .twoCol {
@@ -729,19 +702,59 @@
   font-weight: 500;
   letter-spacing: 0.01em;
   white-space: nowrap;
+  border: 1px solid transparent;
 }
 
-.pillBlue { background: var(--pill-blue-bg); color: var(--pill-blue-fg); }
-.pillYellow { background: var(--pill-yellow-bg); color: var(--pill-yellow-fg); }
-.pillGreen { background: var(--pill-green-bg); color: var(--pill-green-fg); }
-.pillCoral { background: var(--pill-coral-bg); color: var(--pill-coral-fg); }
-.pillMuted { background: var(--pill-muted-bg); color: var(--pill-muted-fg); }
-.pillViolet { background: var(--pill-violet-bg); color: var(--pill-violet-fg); }
-.pillInk {
-  background: var(--solid-action-bg);
-  color: var(--solid-action-fg);
+.pillNeutral,
+.diagnosisPill {
+  background: var(--surface-soft);
+  color: var(--ink-muted);
+  border-color: var(--line-strong);
 }
 
+.pillWarning {
+  background: color-mix(in srgb, var(--lume-signal-warning) 11%, var(--lume-surface-field));
+  color: color-mix(in srgb, var(--lume-signal-warning) 60%, var(--lume-ink));
+  border-color: color-mix(in srgb, var(--lume-signal-warning) 30%, transparent);
+}
+
+.pillSuccess {
+  background: color-mix(in srgb, var(--lume-signal-success) 11%, var(--lume-surface-field));
+  color: color-mix(in srgb, var(--lume-signal-success) 60%, var(--lume-ink));
+  border-color: color-mix(in srgb, var(--lume-signal-success) 30%, transparent);
+}
+
+.pillCritical {
+  background: color-mix(in srgb, var(--lume-signal-critical) 11%, var(--lume-surface-field));
+  color: color-mix(in srgb, var(--lume-signal-critical) 60%, var(--lume-ink));
+  border-color: color-mix(in srgb, var(--lume-signal-critical) 30%, transparent);
+}
+
+.pillPlum {
+  background: color-mix(in srgb, var(--lume-signal-plum) 11%, var(--lume-surface-field));
+  color: color-mix(in srgb, var(--lume-signal-plum) 60%, var(--lume-ink));
+  border-color: color-mix(in srgb, var(--lume-signal-plum) 30%, transparent);
+}
+
+.diagnosisPill {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--ink);
+}
+
+.diagnosisCode {
+  flex: none;
+  font-family: var(--font-registro), "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.diagnosisLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* commit pulse (replays via React key on state change) */
 .pillCommit { animation: commitPulse var(--lume-dur-anello) var(--lume-ease); }
 
@@ -760,7 +773,7 @@
   background: var(--surface-soft);
   gap: 2px;
   box-shadow: inset 0 1px 0 var(--surface-highlight),
-    inset 0 0 0 1px rgba(15, 23, 42, 0.04);
+    inset 0 0 0 1px color-mix(in srgb, var(--lume-ink) 4%, transparent);
 }
 
 .segItem {
@@ -835,7 +848,7 @@
   font-weight: 600;
 }
 
-.agendaBridgeHeader :global(svg) { color: var(--pill-blue-fg); }
+.agendaBridgeHeader :global(svg) { color: var(--lume-accent); }
 
 .agendaBridgeCopy {
   margin: 8px 0 0;
@@ -859,7 +872,7 @@
   padding: 9px 10px;
   border-radius: var(--radius-control);
   background: var(--row-raised);
-  box-shadow: inset 0 0 0 1px rgba(59, 72, 96, 0.045);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lume-ink) 4.5%, transparent);
 }
 
 .agendaCandidateTime {
@@ -1014,7 +1027,7 @@
   border-radius: var(--radius-card);
   padding: 16px;
   box-shadow: inset 0 1px 0 var(--surface-highlight),
-    inset 0 0 0 1px rgba(15, 23, 42, 0.03);
+    inset 0 0 0 1px color-mix(in srgb, var(--lume-ink) 3%, transparent);
   min-height: 240px;
   display: flex;
   flex-direction: column;
@@ -1041,7 +1054,7 @@
   display: inline-block;
   padding: 0 4px;
   border-radius: 4px;
-  background: var(--pill-yellow-bg);
+  background: var(--lume-surface-focal);
   color: var(--ink);
   font-weight: 500;
 }
@@ -1108,8 +1121,9 @@
 
 .fieldBlocked {
   font-size: 11px;
-  color: var(--pill-coral-fg);
-  background: var(--pill-coral-bg);
+  color: var(--ink-muted);
+  background: var(--lume-surface-field);
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
   padding: 6px 10px;
   display: inline-flex;
@@ -1139,19 +1153,19 @@
 .fieldBtn:active { transform: scale(0.96); }
 
 .fieldBtnActiveAccept {
-  background: var(--pill-green-bg);
-  color: var(--pill-green-fg);
-  box-shadow: 0 0 0 1px var(--ring-accept);
+  background: var(--lume-surface-focal);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line-strong);
 }
 
 .fieldBtnActiveCorrect {
-  background: var(--pill-blue-bg);
-  color: var(--pill-blue-fg);
-  box-shadow: 0 0 0 1px var(--ring-correct);
+  background: var(--lume-surface-focal);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line-strong);
 }
 
 .fieldBtnActiveIgnore {
-  background: var(--pill-muted-bg);
+  background: var(--lume-surface-field);
   color: var(--ink-muted);
   box-shadow: 0 0 0 1px var(--ring-ignore);
 }
@@ -1174,7 +1188,7 @@
   background: var(--surface-soft);
   border-radius: var(--radius-tile);
   padding: 14px 16px;
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.03);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lume-ink) 3%, transparent);
 }
 
 .insightBody b { color: var(--ink); font-weight: 600; }
@@ -1221,7 +1235,7 @@
   top: 0;
   bottom: 0;
   width: 5px;
-  background: var(--rail-green);
+  background: var(--ink-faint);
 }
 
 .freshnessLabel { display: flex; flex-direction: column; gap: 2px; }
@@ -1235,9 +1249,9 @@
   font-variant-numeric: tabular-nums;
 }
 
-.freshnessOk::before { background: var(--rail-blue); }
-.freshnessStale::before { background: var(--rail-yellow); }
-.freshnessBroken::before { background: var(--rail-coral); }
+.freshnessOk::before { background: var(--lume-signal-success); }
+.freshnessStale::before { background: var(--lume-signal-warning); }
+.freshnessBroken::before { background: var(--lume-signal-critical); }
 
 /* ───────────── SISS stage selector ───────────── */
 
@@ -1318,7 +1332,7 @@
   border-radius: var(--radius-card);
   padding: 16px;
   box-shadow: inset 0 1px 0 var(--surface-highlight),
-    inset 0 0 0 1px rgba(15, 23, 42, 0.03);
+    inset 0 0 0 1px color-mix(in srgb, var(--lume-ink) 3%, transparent);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1596,8 +1610,8 @@
   background: var(--rail-slate);
 }
 
-.patientDotGreen { background: var(--rail-green); box-shadow: 0 0 0 3px var(--halo-green); }
-.patientDotBlue { background: var(--rail-blue); box-shadow: 0 0 0 3px var(--halo-blue); }
+.patientDotNeutral { background: var(--ink-muted); }
+.patientDotWarning { background: var(--lume-signal-warning); }
 .patientDotMuted { background: var(--ink-faint); }
 
 .patientName { font-size: 14px; color: var(--ink); font-weight: 500; }
@@ -1644,7 +1658,7 @@
   border-radius: var(--radius-card);
   padding: 16px;
   box-shadow: inset 0 1px 0 var(--surface-highlight),
-    inset 0 0 0 1px rgba(15, 23, 42, 0.03);
+    inset 0 0 0 1px color-mix(in srgb, var(--lume-ink) 3%, transparent);
   display: flex;
   flex-direction: column;
   gap: 12px;

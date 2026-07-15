@@ -188,9 +188,9 @@ function LiveHandoffArea({
 
       <div className={styles.threeCol}>
         {[
-          { title: 'Identità e consenso', sub: patient ? `${patient.code} · ${patient.ageLabel}` : 'paziente non selezionato', pill: fiscalCodeReady ? 'pronto' : 'attesa', variant: fiscalCodeReady ? 'green' as const : 'muted' as const },
-          { title: 'Azione regionale', sub: 'prepara portale ufficiale e contesto paziente', pill: 'assistita', variant: 'blue' as const },
-          { title: 'Esito', sub: 'registra risultato e prossima azione in diario', pill: 'diario', variant: 'violet' as const },
+          { title: 'Identità e consenso', sub: patient ? `${patient.code} · ${patient.ageLabel}` : 'paziente non selezionato', pill: fiscalCodeReady ? 'pronto' : 'attesa', variant: fiscalCodeReady ? 'success' as const : 'neutral' as const },
+          { title: 'Azione regionale', sub: 'prepara portale ufficiale e contesto paziente', pill: 'assistita', variant: 'plum' as const },
+          { title: 'Esito', sub: 'registra risultato e prossima azione in diario', pill: 'diario', variant: 'plum' as const },
         ].map((item) => (
           <section key={item.title} className={styles.panel}>
             <header className={styles.panelHeader}>
@@ -205,7 +205,7 @@ function LiveHandoffArea({
       <section className={styles.panelInset}>
         <header className={styles.panelHeader}>
           <h2 className={styles.panelTitle}>Azioni rapide</h2>
-          <PillBadge variant="muted">in MediFlow</PillBadge>
+          <PillBadge variant="neutral">in MediFlow</PillBadge>
         </header>
         <div className={styles.caseLensActions} style={{ marginTop: 12 }}>
           <Link href="/settings/repertori" className={styles.ghostBtnSm}>
@@ -243,10 +243,10 @@ function LiveHandoffArea({
               <PillBadge
                 variant={
                   feedback.kind === 'success'
-                    ? 'green'
+                    ? 'success'
                     : feedback.kind === 'warning'
-                      ? 'yellow'
-                      : 'coral'
+                      ? 'warning'
+                      : 'critical'
                 }
               >
                 esito SISS

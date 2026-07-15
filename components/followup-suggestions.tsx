@@ -70,14 +70,14 @@ export default function FollowupSuggestions({ patientId, suggestions, existingTi
     };
 
     return (
-        <div className="mt-3 space-y-2 border-t border-[color:rgba(112,106,100,0.12)] pt-3 dark:border-[color:rgba(255,247,240,0.08)]">
+        <div className="mt-3 space-y-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-3">
             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                 Trovati nei documenti, da valutare
             </p>
             {visible.map((suggestion) => (
                 <div
                     key={suggestion.id}
-                    className="rounded-[12px] border border-dashed border-[color:rgba(112,106,100,0.2)] px-4 py-3 dark:border-[color:rgba(255,247,240,0.14)]"
+                    className="rounded-[12px] border border-dashed border-[color:color-mix(in_srgb,var(--lume-ink)_20%,transparent)] px-4 py-3"
                 >
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -96,7 +96,7 @@ export default function FollowupSuggestions({ patientId, suggestions, existingTi
                             <button
                                 type="button"
                                 onClick={() => openForm(suggestion)}
-                                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[color:rgba(112,106,100,0.2)] px-3 py-1.5 text-xs font-medium text-[color:var(--lume-ink)] transition-colors hover:bg-white/60 dark:border-[color:rgba(255,247,240,0.14)] dark:hover:bg-white/5"
+                                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_20%,transparent)] px-3 py-1.5 text-xs font-medium text-[color:var(--lume-ink)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))]"
                             >
                                 <CalendarPlus className="h-3.5 w-3.5" />
                                 Crea follow-up
@@ -105,7 +105,7 @@ export default function FollowupSuggestions({ patientId, suggestions, existingTi
                     </div>
 
                     {openId === suggestion.id ? (
-                        <div className="mt-3 space-y-2 border-t border-[color:rgba(112,106,100,0.12)] pt-3">
+                        <div className="mt-3 space-y-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-3">
                             <label className="block text-[11px] font-medium text-[color:var(--lume-ink-muted)]">
                                 Titolo
                                 <input

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 
 import {
+  DiagnosisPill,
   PillBadge,
   classNames,
 } from '../cockpit-shared';
@@ -111,24 +112,25 @@ function SchedaArea({
 
       <section className={styles.panel}>
         <div className={styles.identityDock}>
-          <div className={styles.identityChips}>
-            <PillBadge variant="blue">Ipertensione</PillBadge>
-            <PillBadge variant="violet">Dislipidemia</PillBadge>
-            <PillBadge variant="green">BPCO lieve</PillBadge>
-            <PillBadge variant="muted">PA 132/84</PillBadge>
-            <PillBadge variant="muted">HR 76</PillBadge>
-            <PillBadge variant="muted">SpO₂ 97%</PillBadge>
-          </div>
+          {/* @Codex */}
+          <ul className={styles.identityChips} aria-label="Diagnosi e stato del paziente">
+            <li className={styles.patientDiagnosisPill}><DiagnosisPill diagnosis="Ipertensione" /></li>
+            <li className={styles.patientDiagnosisPill}><DiagnosisPill diagnosis="Dislipidemia" /></li>
+            <li className={styles.patientDiagnosisPill}><DiagnosisPill diagnosis="BPCO lieve" /></li>
+            <li><PillBadge variant="neutral">PA 132/84</PillBadge></li>
+            <li><PillBadge variant="neutral">HR 76</PillBadge></li>
+            <li><PillBadge variant="neutral">SpO₂ 97%</PillBadge></li>
+          </ul>
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6 }}>
-            <PillBadge variant="ink">
+            <PillBadge variant="success">
               <Sparkles size={11} />
               MediFlow Insight
             </PillBadge>
-            <PillBadge variant="muted">
+            <PillBadge variant="plum">
               <ShieldCheck size={11} />
               Contesto SISS pronto
             </PillBadge>
-            <PillBadge variant="violet">Protesica-RL · monitorato</PillBadge>
+            <PillBadge variant="plum">Protesica-RL · monitorato</PillBadge>
           </span>
         </div>
 
@@ -178,7 +180,7 @@ function SchedaArea({
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Timeline del caso</h2>
-            <PillBadge variant="muted">12 voci</PillBadge>
+            <PillBadge variant="neutral">12 voci</PillBadge>
             <span className={styles.panelActions}>
               <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('diario')}>
                 <Plus size={12} /> Nuova voce
@@ -187,10 +189,10 @@ function SchedaArea({
           </header>
           <div>
             {[
-              { time: '08 mag', text: 'Controllo pressorio domiciliare 130/82', tag: 'Diario', variant: 'muted' as const },
-              { time: '02 mag', text: 'Referto Holter (24h) nella norma', tag: 'Documento', variant: 'blue' as const },
-              { time: '21 apr', text: 'Rinnovo Ramipril 5 mg · 90 giorni', tag: 'Terapia', variant: 'violet' as const },
-              { time: '04 apr', text: 'Visita ambulatoriale · obiettività nella norma', tag: 'Visita', variant: 'green' as const },
+              { time: '08 mag', text: 'Controllo pressorio domiciliare 130/82', tag: 'Diario', variant: 'plum' as const },
+              { time: '02 mag', text: 'Referto Holter (24h) nella norma', tag: 'Documento', variant: 'plum' as const },
+              { time: '21 apr', text: 'Rinnovo Ramipril 5 mg · 90 giorni', tag: 'Terapia', variant: 'plum' as const },
+              { time: '04 apr', text: 'Visita ambulatoriale · obiettività nella norma', tag: 'Visita', variant: 'plum' as const },
             ].map((row) => (
               <div key={row.time + row.text} className={styles.row}>
                 <span className={styles.rowTime}>{row.time}</span>
@@ -208,15 +210,15 @@ function SchedaArea({
         <section className={styles.panelInset}>
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Terapia attiva</h2>
-            <PillBadge variant="muted">3 prescrizioni</PillBadge>
+            <PillBadge variant="neutral">3 prescrizioni</PillBadge>
           </header>
           <p className={styles.panelSubtitle}>
             1 piano terapeutico AIFA · prossimo rinnovo tra 27 giorni.
           </p>
           {[
-            { drug: 'Ramipril', dose: '5 mg · 1 cpr/die', tag: 'Cronicità', variant: 'green' as const },
-            { drug: 'Atorvastatina', dose: '20 mg · 1 cpr/sera', tag: 'PT AIFA', variant: 'violet' as const },
-            { drug: 'Salbutamolo', dose: 'al bisogno', tag: 'Al bisogno', variant: 'muted' as const },
+            { drug: 'Ramipril', dose: '5 mg · 1 cpr/die', tag: 'Cronicità', variant: 'neutral' as const },
+            { drug: 'Atorvastatina', dose: '20 mg · 1 cpr/sera', tag: 'PT AIFA', variant: 'plum' as const },
+            { drug: 'Salbutamolo', dose: 'al bisogno', tag: 'Al bisogno', variant: 'neutral' as const },
           ].map((row) => (
             <div key={row.drug} className={styles.compositeCard} style={{ marginBottom: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -238,7 +240,7 @@ function SchedaArea({
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Evidenze recenti</h2>
-            <PillBadge variant="muted">5 fonti</PillBadge>
+            <PillBadge variant="neutral">5 fonti</PillBadge>
           </header>
           <p className={styles.panelSubtitle}>Referti, note ed evidenze recenti citabili.</p>
           {[
@@ -247,21 +249,21 @@ function SchedaArea({
               title: 'Referto cardiologico ASL',
               snippet: '«Holter 24h nella norma. Si conferma terapia per 90 giorni.»',
               tag: 'Documento',
-              variant: 'blue' as const,
+              variant: 'plum' as const,
             },
             {
               date: '21 apr',
               title: 'Nota diario · pressione domiciliare',
               snippet: 'Serie 7 giorni: media 128/80 · variabilità contenuta.',
               tag: 'Diario',
-              variant: 'muted' as const,
+              variant: 'plum' as const,
             },
             {
               date: '04 apr',
               title: 'Visita ambulatoriale',
               snippet: 'Obiettività cardiopolmonare nei limiti · suggerito follow-up 6 mesi.',
               tag: 'Visita',
-              variant: 'green' as const,
+              variant: 'plum' as const,
             },
           ].map((e) => (
             <div key={e.title} className={styles.evidenceItem}>
@@ -278,7 +280,7 @@ function SchedaArea({
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Smart Import</h2>
-            <PillBadge variant="violet">
+            <PillBadge variant="plum">
               <Sparkles size={11} /> qwen3.5
             </PillBadge>
           </header>
@@ -292,10 +294,10 @@ function SchedaArea({
             </header>
             <span className={styles.rowSub}>3 campi aggiornabili · 2 note da riconciliare · 1 bloccato</span>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <PillBadge variant="green">farmaco riconosciuto AIFA</PillBadge>
-              <PillBadge variant="blue">diagnosi codificata ICD</PillBadge>
-              <PillBadge variant="yellow">posologia incerta</PillBadge>
-              <PillBadge variant="coral">SISS bloccato</PillBadge>
+              <PillBadge variant="success">farmaco riconosciuto AIFA</PillBadge>
+              <PillBadge variant="success">diagnosi codificata ICD</PillBadge>
+              <PillBadge variant="neutral">posologia incerta</PillBadge>
+              <PillBadge variant="critical">SISS bloccato</PillBadge>
             </div>
             <button type="button" className={styles.ghostBtnSm} style={{ alignSelf: 'flex-start' }} onClick={() => onOpenArea('revisione')}>
               Apri documenti
@@ -307,7 +309,7 @@ function SchedaArea({
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Prossimi passaggi</h2>
-            <PillBadge variant="muted">3 attività</PillBadge>
+            <PillBadge variant="neutral">3 attività</PillBadge>
           </header>
           {[
             {
@@ -315,21 +317,21 @@ function SchedaArea({
               title: 'Controllo cardiologico',
               sub: 'pianificato per 18 lug · 6 mesi dall’ultima visita',
               tag: 'Follow-up',
-              variant: 'blue' as const,
+              variant: 'neutral' as const,
             },
             {
               icon: <FileSignature size={14} />,
               title: 'Rinnovo esenzione 031',
               sub: 'scadenza tra 27 giorni · azione MMG',
               tag: 'Attenzione',
-              variant: 'coral' as const,
+              variant: 'warning' as const,
             },
             {
               icon: <ListChecks size={14} />,
               title: 'Scale e misure',
               sub: 'Tinetti · MMSE in finestra di rivalutazione',
               tag: 'Scales',
-              variant: 'muted' as const,
+              variant: 'neutral' as const,
             },
           ].map((row) => (
             <div key={row.title} className={styles.plannedItem}>

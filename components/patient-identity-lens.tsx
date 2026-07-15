@@ -97,7 +97,7 @@ export function PatientIdentityLens({
             <section className="patient-identity-lens patient-identity-lens-reader lume-panel relative overflow-hidden p-5 md:p-6">
                 <div className="relative z-10 grid gap-5 xl:grid-cols-[minmax(0,1.38fr)_320px] xl:items-start">
                     <div className="min-w-0 space-y-5">
-                        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.02fr)_minmax(320px,0.98fr)] lg:items-start lg:divide-x lg:divide-[color:rgba(112,106,100,0.12)]">
+                        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.02fr)_minmax(320px,0.98fr)] lg:items-start lg:divide-x lg:divide-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)]">
                             <div className="min-w-0 lg:pr-5">
                                 <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[color:var(--lume-ink-muted)]">
                                     Scheda paziente
@@ -120,9 +120,10 @@ export function PatientIdentityLens({
                                     <StatusGlyph
                                         kind={patient.isArchived ? 'archived' : patient.isAdi ? 'active' : 'follow-up'}
                                         label={patient.isArchived ? 'Archiviato' : patient.isAdi ? 'Attivo' : 'Follow-up'}
+                                        tone="neutral"
                                     />
-                                    {codedDiagnosisCount > 0 ? <StatusGlyph kind="review" label={`${codedDiagnosisCount} diagnosi`} /> : null}
-                                    {exemptions.length > 0 ? <StatusGlyph kind="completed" label={`${exemptions.length} esenzioni`} /> : null}
+                                    {codedDiagnosisCount > 0 ? <StatusGlyph kind="review" label={`${codedDiagnosisCount} diagnosi`} tone="neutral" /> : null}
+                                    {exemptions.length > 0 ? <StatusGlyph kind="completed" label={`${exemptions.length} esenzioni`} tone="neutral" /> : null}
                                 </div>
                             </div>
 
@@ -134,7 +135,7 @@ export function PatientIdentityLens({
                                     {summary ?? 'Nessuna sintesi clinica disponibile.'}
                                 </p>
                                 {nextStep ? (
-                                    <div className="mt-3 border-t border-[color:rgba(112,106,100,0.12)] pt-3">
+                                    <div className="mt-3 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-3">
                                         <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                             Prossimo passaggio
                                         </p>
@@ -146,7 +147,7 @@ export function PatientIdentityLens({
                             </div>
                         </div>
 
-                        <div className="border-t border-[color:rgba(112,106,100,0.12)] pt-5">
+                        <div className="border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-5">
                             <div className="flex flex-wrap items-baseline justify-between gap-3">
                                 <h2 className="text-sm font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                     Quadro clinico
@@ -164,9 +165,9 @@ export function PatientIdentityLens({
                                         Diagnosi codificate
                                     </p>
                                     {leadDiagnosis ? (
-                                        <div className="patient-diagnosis-card mt-2 rounded-[var(--lume-radius-control)] border border-[color:rgba(94,53,95,0.16)] bg-[color:var(--lume-surface-field)] p-3">
+                                        <div className="patient-diagnosis-card mt-2 rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-3">
                                             <div className="flex flex-wrap items-start gap-3">
-                                                <span className="patient-code-pill patient-code-pill-plum">
+                                                <span className="patient-code-pill patient-code-pill-primary lume-registro">
                                                     {leadDiagnosis.code}
                                                 </span>
                                                 <div className="min-w-0 flex-1">
@@ -186,20 +187,25 @@ export function PatientIdentityLens({
                                     )}
 
                                     {secondaryDiagnoses.length > 0 ? (
-                                        <div className="mt-2 flex flex-wrap gap-1.5">
+                                        /* @Codex: le diagnosi secondarie sono una lista informativa;
+                                           la semantica nativa rende verificabile il nome accessibile dei chip. */
+                                        <ul
+                                            aria-label="Diagnosi codificate secondarie"
+                                            className="mt-2 flex flex-wrap gap-1.5"
+                                        >
                                             {secondaryDiagnoses.map((diagnosis) => (
-                                                <span
+                                                <li
                                                     key={`${diagnosis.system}-${diagnosis.code}`}
-                                                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[color:rgba(94,53,95,0.16)] px-2.5 py-1 text-xs text-[color:var(--lume-ink)] dark:border-[color:rgba(255,247,240,0.12)] dark:text-[color:var(--lume-ink)]"
+                                                    className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] px-2.5 py-1 text-xs text-[color:var(--lume-ink)]"
                                                 >
                                                     <span className="lume-registro font-semibold">{diagnosis.code}</span>
-                                                    <span className="truncate">{diagnosis.description}</span>
+                                                    <span className="truncate" title={diagnosis.description}>{diagnosis.description}</span>
                                                     <span className="shrink-0 text-[10px] uppercase tracking-[0.04em] text-[color:var(--lume-ink-muted)]">
                                                         {diagnosisSystemLabel(diagnosis.system)}
                                                     </span>
-                                                </span>
+                                                </li>
                                             ))}
-                                        </div>
+                                        </ul>
                                     ) : null}
 
                                     {remainingCodedCount > 0 ? (
@@ -209,7 +215,7 @@ export function PatientIdentityLens({
                                     ) : null}
                                 </div>
 
-                                <div className="min-w-0 lg:border-l lg:border-[color:rgba(112,106,100,0.12)] lg:pl-6">
+                                <div className="min-w-0 lg:border-l lg:border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] lg:pl-6">
                                     <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                         Esenzioni
                                     </p>
@@ -246,7 +252,7 @@ export function PatientIdentityLens({
                     </div>
 
                     <div className="space-y-3">
-                        <div className="patient-quick-context-card rounded-[var(--lume-radius-control)] border border-[color:rgba(112,106,100,0.12)] bg-[color:var(--lume-surface-field)] px-4 py-3">
+                        <div className="patient-quick-context-card rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3">
                             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                 Contesto rapido
                             </p>
@@ -295,41 +301,47 @@ export function PatientIdentityLens({
                         <StatusGlyph
                             kind={patient.isArchived ? 'archived' : patient.isAdi ? 'active' : 'follow-up'}
                             label={patient.isArchived ? 'Archiviato' : patient.isAdi ? 'Attivo' : 'Follow-up'}
+                            tone="neutral"
                         />
-                        <StatusGlyph kind="review" label="Percorso clinico" />
+                        <StatusGlyph kind="review" label="Percorso clinico" tone="neutral" />
                         {exemptions.length > 0 ? (
-                            <StatusGlyph kind="completed" label={`${exemptions.length} esenzioni`} />
+                            <StatusGlyph kind="completed" label={`${exemptions.length} esenzioni`} tone="neutral" />
                         ) : null}
                     </div>
 
                     <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-                        <div className="identity-lens-pane rounded-[var(--lume-radius-card)] border border-[color:rgba(112,106,100,0.12)] bg-[color:var(--lume-surface-field)] p-4">
+                        <div className="identity-lens-pane rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
                             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                 Quadro clinico
                             </p>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                                {diagnoses.length > 0 ? (
-                                    diagnoses.map((diagnosis) => (
-                                        <span
+                            {diagnoses.length > 0 ? (
+                                /* @Codex: il contenitore nomina la collezione; ogni voce
+                                   conserva codice, descrizione e sistema come contenuto naturale. */
+                                <ul
+                                    aria-label="Diagnosi del quadro clinico"
+                                    className="mt-3 flex flex-wrap gap-2"
+                                >
+                                    {diagnoses.map((diagnosis) => (
+                                        <li
                                             key={`${diagnosis.system}-${diagnosis.code}`}
-                                            className="inline-flex items-center gap-1.5 rounded-full border border-[color:rgba(94,53,95,0.14)] bg-[color:rgba(94,53,95,0.08)] px-3 py-1 text-[12px] font-medium text-[color:var(--lume-ink)]"
+                                            className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-1 text-[12px] font-medium text-[color:var(--lume-ink)]"
                                         >
-                                            <span className="lume-registro font-semibold text-[color:var(--lume-ink)]">{diagnosis.code}</span>
-                                            {diagnosis.description}
-                                            <span className="text-[10px] uppercase tracking-[0.04em] text-[color:var(--lume-ink-muted)]">
+                                            <span className="lume-registro shrink-0 font-semibold text-[color:var(--lume-ink)]">{diagnosis.code}</span>
+                                            <span className="min-w-0 truncate" title={diagnosis.description}>{diagnosis.description}</span>
+                                            <span className="shrink-0 text-[10px] uppercase tracking-[0.04em] text-[color:var(--lume-ink-muted)]">
                                                 {diagnosisSystemLabel(diagnosis.system)}
                                             </span>
-                                        </span>
-                                    ))
-                                ) : (
-                                    <p className="text-sm text-[color:var(--lume-ink-muted)]">
-                                        Nessuna diagnosi strutturata in primo piano.
-                                    </p>
-                                )}
-                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="mt-3 text-sm text-[color:var(--lume-ink-muted)]">
+                                    Nessuna diagnosi strutturata in primo piano.
+                                </p>
+                            )}
                         </div>
 
-                        <div className="identity-lens-pane rounded-[var(--lume-radius-card)] border border-[color:rgba(112,106,100,0.12)] bg-[color:var(--lume-surface-field)] p-4">
+                        <div className="identity-lens-pane rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
                             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                 Contesto rapido
                             </p>

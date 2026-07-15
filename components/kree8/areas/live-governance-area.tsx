@@ -33,7 +33,7 @@ function LiveGovernanceArea({
       sub: 'sessione, servizi e dati locali',
       icon: Activity,
       pill: 'operativo',
-      variant: 'green',
+      variant: 'success',
     },
     {
       href: '/settings/profilo',
@@ -41,7 +41,7 @@ function LiveGovernanceArea({
       sub: 'profilo medico, ambulatorio e rotazione PIN',
       icon: KeyRound,
       pill: 'locale',
-      variant: 'muted',
+      variant: 'neutral',
     },
     {
       href: '/settings/ai/modelli',
@@ -49,7 +49,7 @@ function LiveGovernanceArea({
       sub: 'provider, modelli attivi e controlli di sicurezza',
       icon: Sparkles,
       pill: 'controlli attivi',
-      variant: 'violet',
+      variant: 'plum',
     },
     {
       href: '/settings/backup',
@@ -57,7 +57,7 @@ function LiveGovernanceArea({
       sub: 'schedulazione, ripristino e prove operative',
       icon: HardDrive,
       pill: 'manuale',
-      variant: 'blue',
+      variant: 'neutral',
     },
     {
       href: '/settings/repertori',
@@ -65,7 +65,7 @@ function LiveGovernanceArea({
       sub: 'AIFA, ICD ed esenzioni',
       icon: Database,
       pill: 'importazione manuale',
-      variant: 'green',
+      variant: 'neutral',
     },
     {
       href: '/settings/diagnostica',
@@ -73,7 +73,7 @@ function LiveGovernanceArea({
       sub: 'servizi locali, manutenzione e app nativa',
       icon: Activity,
       pill: 'Mac locale',
-      variant: 'muted',
+      variant: 'neutral',
     },
     {
       href: '/settings/aspetto',
@@ -81,7 +81,7 @@ function LiveGovernanceArea({
       sub: 'riduzione movimento, leggibilità e aspetto',
       icon: SettingsIcon,
       pill: 'preferenze',
-      variant: 'yellow',
+      variant: 'neutral',
     },
   ];
 
@@ -104,21 +104,21 @@ function LiveGovernanceArea({
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Sessione</h2>
-            <PillBadge variant="green">attiva</PillBadge>
+            <PillBadge variant="neutral">attiva</PillBadge>
           </header>
           <p className={styles.panelSubtitle}>{patientCount} pazienti disponibili in elenco.</p>
         </section>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Audit</h2>
-            <PillBadge variant="muted">locale</PillBadge>
+            <PillBadge variant="neutral">locale</PillBadge>
           </header>
           <p className={styles.panelSubtitle}>Registro locale consultabile dalle impostazioni di sistema.</p>
         </section>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Backup</h2>
-            <PillBadge variant="blue">Mac principale</PillBadge>
+            <PillBadge variant="neutral">Mac principale</PillBadge>
           </header>
           <p className={styles.panelSubtitle}>Backup e ripristino restano operazioni esplicite sul Mac.</p>
         </section>

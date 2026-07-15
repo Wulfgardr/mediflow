@@ -7,7 +7,7 @@
 
 import { ListChecks } from 'lucide-react';
 
-import { Badge, type BadgePalette } from '@/components/ui/badge';
+import { Badge, type BadgeTone } from '@/components/ui/badge';
 import type {
     PatientReviewQueueRow,
     PatientReviewQueueSummary,
@@ -23,32 +23,32 @@ interface PatientReviewQueueSummaryProps {
 
 /* @Codex WUL-UIUX (STREAM W2-B): le sette tinte legacy mappate 1:1 sulla
    dimensione `palette` di Badge (stessa resa, dark-mode inclusa). */
-const STATE_PALETTE: Record<ReviewQueueRowState, BadgePalette> = {
-    'da-rivedere': 'amber',
-    'bloccato': 'red',
-    'serve-testo': 'blue',
-    'pronto-da-applicare': 'emerald',
-    'gia-applicato': 'slate',
-    'disponibile': 'slate-plain',
-    'vuoto': 'dashed',
+const STATE_TONE: Record<ReviewQueueRowState, BadgeTone> = {
+    'da-rivedere': 'warning',
+    'bloccato': 'critical',
+    'serve-testo': 'warning',
+    'pronto-da-applicare': 'success',
+    'gia-applicato': 'success',
+    'disponibile': 'neutral',
+    'vuoto': 'neutral',
 };
 
 function ReviewQueueRow({ row }: { row: PatientReviewQueueRow }) {
     return (
         <li
-            className="flex flex-col gap-2 rounded-[12px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 px-4 py-3 dark:border-[color:rgba(255,247,240,0.08)] dark:bg-white/5 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+            className="flex flex-col gap-2 rounded-[12px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
             data-testid={`review-queue-row-${row.id}`}
         >
             <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-semibold text-[color:var(--lume-ink)]">{row.panelLabel}</span>
-                    <Badge palette={STATE_PALETTE[row.state]} size="xs">
+                    <Badge tone={STATE_TONE[row.state]} size="xs">
                         {row.stateLabel}
                     </Badge>
                 </div>
                 <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">{row.detail}</p>
                 {row.blockedReason ? (
-                    <p className="mt-1 text-xs leading-5 text-red-700 dark:text-red-300">
+                    <p className="mt-1 text-xs leading-5 text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
                         Perché non scrive da solo: {row.blockedReason}
                     </p>
                 ) : null}
@@ -57,7 +57,7 @@ function ReviewQueueRow({ row }: { row: PatientReviewQueueRow }) {
             {row.anchor ? (
                 <a
                     href={row.anchor}
-                    className="shrink-0 self-start text-xs font-semibold text-[color:var(--lume-ink)] underline decoration-[color:rgba(112,106,100,0.35)] underline-offset-4 transition-colors hover:decoration-[color:var(--lume-ink)] sm:self-center"
+                    className="shrink-0 self-start text-xs font-semibold text-[color:var(--lume-ink)] underline decoration-[color:color-mix(in_srgb,var(--lume-ink)_35%,transparent)] underline-offset-4 transition-colors hover:decoration-[color:var(--lume-ink)] sm:self-center"
                 >
                     {row.actionLabel}
                 </a>

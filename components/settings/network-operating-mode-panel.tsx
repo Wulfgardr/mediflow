@@ -10,7 +10,9 @@ import {
     type NetworkOverviewPayload,
 } from '@/lib/network-operating-mode';
 
-const INPUT_SEGMENT_CLASS = 'inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors';
+// @Codex: il fetch iniziale cambia tre colori per segmento senza un gesto;
+// questi controlli ad alta frequenza devono scattare, non animarsi in ambiente.
+const INPUT_SEGMENT_CLASS = 'inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold';
 
 function Badge({
     children,
