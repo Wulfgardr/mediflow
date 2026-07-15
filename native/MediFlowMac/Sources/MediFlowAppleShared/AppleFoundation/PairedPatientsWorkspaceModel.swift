@@ -28,12 +28,23 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var pairedClientToken = ""
     @Published var username = ""
     @Published var password = ""
-    @Published var ambulatoryId = ""
+    @Published var ambulatoryId = "" {
+        didSet { if oldValue.trimmedOrNil != ambulatoryId.trimmedOrNil { clearSelectedPatientWorkspace() } } // @Codex
+    }
     @Published private(set) var availableAmbulatories: [NetworkAmbulatorySummary] = []
     @Published private(set) var patients: [HomeBasePatientSummary] = []
+    /* @Codex */
+    @Published private(set) var selectedPatientID: String?
     @Published private(set) var selectedPatient: HomeBasePatientDetail? {
         didSet {
-            guard oldValue?.id != selectedPatient?.id else { return }
+            let previousID = oldValue?.id
+            let currentID = selectedPatient?.id
+            if let currentID {
+                selectedPatientID = currentID
+            } else if selectedPatientID == previousID {
+                selectedPatientID = nil
+            }
+            guard previousID != currentID else { return }
             /* @Codex */
             editablePatientFields = [:]
             lockedPatientFields = []
@@ -343,7 +354,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         sessionCookie: String = "sid=test",
         masterKey: SymmetricKey? = nil,
         patients: [HomeBasePatientSummary] = [],
-        selectedPatient: HomeBasePatientDetail? = nil
+        selectedPatient: HomeBasePatientDetail? = nil,
+        entries: [HomeBaseEntrySummary] = [],
+        therapies: [HomeBaseTherapySummary] = [],
+        attachments: [HomeBaseAttachmentSummary] = []
     ) {
         self.pairedClientId = credentials.clientId
         self.pairedClientToken = credentials.clientToken
@@ -351,7 +365,28 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         self.masterKey = masterKey
         self.patients = patients
         self.selectedPatient = selectedPatient
+        self.entries = entries
+        self.therapies = therapies
+        self.attachments = attachments
+        self.attachmentsPatientId = attachments.isEmpty ? nil : selectedPatient?.id
         self.connectionState = .pairedOnline
+    }
+
+    /* @Codex */
+    func applyPatientRefreshForSelectionTests(_ refreshedPatients: [HomeBasePatientSummary]) {
+        patients = refreshedPatients
+        reconcilePatientSelection(selectedPatientID, in: refreshedPatients)
+    }
+
+    func applyPatientRevisionRefreshForSelectionTests(_ refreshedPatients: [HomeBasePatientSummary]) { // @Codex
+        patients = refreshedPatients
+        reconcilePatientSelection(selectedPatientID, in: refreshedPatients, invalidatingWorkspace: false)
+    }
+
+    /* @Codex */
+    func applyPatientTrashRefreshForSelectionTests(_ refreshedPatients: [HomeBasePatientSummary]) {
+        patients = refreshedPatients
+        clearSelectedPatientWorkspace()
     }
     #endif
 
@@ -696,6 +731,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             errorMessage = "Inserisci le credenziali paired rilasciate dal Mac."
             return
         }
+        let selectionBeforeRefresh = selectedPatientID
         await runTask {
             do {
                 self.patients = try await self.makeClient().fetchPatients(
@@ -712,21 +748,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 }
                 throw error
             }
-            self.selectedPatient = nil
-            self.entries = []
-            self.therapies = []
-            self.checkups = []
-            self.observations = []
-            self.patientReportURL = nil
-            self.servicePrescriptions = []
-            self.servicePrescriptionItems = []
-            self.prostheticPrescriptions = []
-            self.patientFHIRExportURL = nil
-            self.pendingFHIRWarningValidation = nil
-            self.cancelEditingEntry()
-            self.cancelEditingTherapy()
-            self.cancelEditingCheckup()
-            self.cancelEditingObservation()
+            self.reconcilePatientSelection(selectionBeforeRefresh, in: self.patients)
             // Best-effort: populate the scope picker. A failure here must not
             // break the patient load, so keep whatever list we already have.
             self.availableAmbulatories = (try? await self.makeClient().fetchNetworkAmbulatories(
@@ -756,30 +778,17 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /* @Codex */
     func loadPatientTrash() async {
         await loadPatients(includeDeleted: true)
-        selectedPatient = nil
-        entries = []
-        therapies = []
-        checkups = []
-        observations = []
-        patientReportURL = nil
-        servicePrescriptions = []
-        servicePrescriptionItems = []
-        prostheticPrescriptions = []
-        patientFHIRExportURL = nil
-        pendingFHIRWarningValidation = nil
-        attachments = []
-        selectedAttachmentDetail = nil
-        attachmentShareURL = nil
-        fseDocumentValidationResult = nil
-        fseDocumentValidationTargetLabel = nil
+        clearSelectedPatientWorkspace()
     }
 
     func loadPatient(_ patient: HomeBasePatientSummary) async {
+        let previousSelectionID = selectedPatientID
         if selectedPatient?.id != patient.id {
             invalidateAttachmentPatientState()
         }
         #if DEBUG
         if let detail = Self.uiTestSeededDetail(for: patient) {
+            selectedPatientID = patient.id
             setSelectedPatient(detail) // @Codex
             entries = Self.uiTestSeededEntries(patientId: patient.id)
             therapies = Self.uiTestSeededTherapies(patientId: patient.id)
@@ -796,6 +805,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         }
         #endif
         guard let sessionCookie, let credentials = pairedCredentials else { return }
+        selectedPatientID = patient.id
         await runTask {
             self.patientReportURL = nil
             self.patientFHIRExportURL = nil
@@ -858,6 +868,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             self.cancelEditingCheckup()
             self.cancelEditingObservation()
             self.statusMessage = "Dettaglio \(patient.lastName) aperto."
+        }
+        if selectedPatient?.id != patient.id {
+            selectedPatientID = selectedPatient?.id ?? previousSelectionID
         }
     }
 
@@ -3123,6 +3136,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             ambulatoryId = ""
             patients = []
             selectedPatient = nil
+            selectedPatientID = nil // @Codex
             entries = []
             therapies = []
             checkups = []
@@ -3737,8 +3751,17 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         credentials: HomeBasePairedCredentials,
         sessionCookie: String
     ) async throws {
-        if let current = selectedPatient {
-            let patientId = current.id
+        let selectionBeforeRefresh = selectedPatientID
+        patients = try await makeClient().fetchPatients(
+            credentials: credentials,
+            sessionCookie: sessionCookie,
+            ambulatoryId: ambulatoryId.trimmedOrNil,
+            includeDeleted: false
+        )
+        .map { PatientFieldCrypto.decryptSummary($0, masterKey: masterKey) }
+        if let patientId = reconcilePatientSelection(
+            selectionBeforeRefresh, in: patients, invalidatingWorkspace: false
+        ) {
             let fetchedDetail = try await makeClient().fetchPatient(
                 id: patientId,
                 credentials: credentials,
@@ -3755,14 +3778,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             prostheticPrescriptions = try await fetchProstheticPrescriptions(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
             patientReportURL = nil
             patientFHIRExportURL = nil
-        } else {
-            patients = try await makeClient().fetchPatients(
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: ambulatoryId.trimmedOrNil,
-                includeDeleted: false
-            )
-            .map { PatientFieldCrypto.decryptSummary($0, masterKey: masterKey) }
         }
     }
 
@@ -3812,16 +3827,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             ) else {
                 return false
             }
+            let selectionBeforeRefresh = selectedPatientID
             patients = snapshot.patients
-            selectedPatient = nil
-            entries = []
-            therapies = []
-            checkups = []
-            observations = []
-            cancelEditingEntry()
-            cancelEditingTherapy()
-            cancelEditingCheckup()
-            cancelEditingObservation()
+            reconcilePatientSelection(selectionBeforeRefresh, in: patients)
             connectionState = markOffline ? .pairedOfflineDegraded : .cached
             statusMessage = markOffline ? "\(snapshot.reviewLine) Home-base non raggiungibile." : snapshot.reviewLine
             reconciliationLine = markOffline
@@ -3832,6 +3840,59 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             errorMessage = "Cache locale non leggibile: \(error.localizedDescription)"
             return false
         }
+    }
+
+    static func reconciledPatientSelectionID( // @Codex
+        _ currentID: String?,
+        in patients: [HomeBasePatientSummary]
+    ) -> String? {
+        guard let currentID, patients.contains(where: { $0.id == currentID }) else {
+            return nil
+        }
+        return currentID
+    }
+
+    @discardableResult // @Codex
+    private func reconcilePatientSelection(
+        _ currentID: String?, in patients: [HomeBasePatientSummary],
+        invalidatingWorkspace: Bool = true
+    ) -> String? {
+        let reconciledID = Self.reconciledPatientSelectionID(currentID, in: patients)
+        guard let reconciledID else {
+            if currentID != nil {
+                clearSelectedPatientWorkspace()
+            }
+            return nil
+        }
+
+        selectedPatientID = reconciledID
+        if invalidatingWorkspace { clearSelectedPatientWorkspace(preservingSelectionID: reconciledID) }
+        return reconciledID
+    }
+
+    /* @Codex */
+    private func clearSelectedPatientWorkspace(preservingSelectionID: String? = nil) {
+        let needsDirectPatientStateInvalidation = selectedPatient == nil
+        selectedPatient = nil
+        selectedPatientID = preservingSelectionID
+        if needsDirectPatientStateInvalidation {
+            invalidateAttachmentPatientState()
+            invalidatePatientBoundNewEntryState()
+        }
+        entries = []
+        therapies = []
+        checkups = []
+        observations = []
+        patientReportURL = nil
+        servicePrescriptions = []
+        servicePrescriptionItems = []
+        prostheticPrescriptions = []
+        patientFHIRExportURL = nil
+        pendingFHIRWarningValidation = nil
+        cancelEditingEntry()
+        cancelEditingTherapy()
+        cancelEditingCheckup()
+        cancelEditingObservation()
     }
 
     private func runTask(_ operation: @escaping () async throws -> Void) async {
