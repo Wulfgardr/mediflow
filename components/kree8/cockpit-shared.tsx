@@ -674,7 +674,6 @@ function DiagnosisPill({ diagnosis }: { diagnosis: string }) {
     <span
       className={classNames(styles.pill, styles.diagnosisPill)}
       title={diagnosis}
-      aria-label={diagnosis}
     >
       {code ? <span className={styles.diagnosisCode}>{code}</span> : null}
       {code ? <span aria-hidden>·</span> : null}

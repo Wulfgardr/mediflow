@@ -64,15 +64,21 @@ function RealPatientArea({
 
       <section className={styles.panel}>
         <div className={styles.identityDock}>
-          <div className={styles.identityChips}>
+          {/* @Codex: diagnosi e stato formano una lista nominata; i nomi delle
+              voci provengono dal contenuto visibile, non da aria-label. */}
+          <ul className={styles.identityChips} aria-label="Diagnosi e stato del paziente">
             {patient.diagnoses.map((diagnosis) => (
-              <DiagnosisPill key={diagnosis} diagnosis={diagnosis} />
+              <li key={diagnosis} className={styles.patientDiagnosisPill}>
+                <DiagnosisPill diagnosis={diagnosis} />
+              </li>
             ))}
-            <PillBadge variant={patient.status}>
-              {patient.statusLabel}
-            </PillBadge>
-            <PillBadge variant="neutral">{patient.code}</PillBadge>
-          </div>
+            <li>
+              <PillBadge variant={patient.status}>
+                {patient.statusLabel}
+              </PillBadge>
+            </li>
+            <li><PillBadge variant="neutral">{patient.code}</PillBadge></li>
+          </ul>
         </div>
 
         <div style={{ marginTop: 14 }}>

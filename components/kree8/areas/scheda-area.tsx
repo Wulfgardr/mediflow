@@ -112,14 +112,15 @@ function SchedaArea({
 
       <section className={styles.panel}>
         <div className={styles.identityDock}>
-          <div className={styles.identityChips}>
-            <DiagnosisPill diagnosis="Ipertensione" />
-            <DiagnosisPill diagnosis="Dislipidemia" />
-            <DiagnosisPill diagnosis="BPCO lieve" />
-            <PillBadge variant="neutral">PA 132/84</PillBadge>
-            <PillBadge variant="neutral">HR 76</PillBadge>
-            <PillBadge variant="neutral">SpO₂ 97%</PillBadge>
-          </div>
+          {/* @Codex */}
+          <ul className={styles.identityChips} aria-label="Diagnosi e stato del paziente">
+            <li className={styles.patientDiagnosisPill}><DiagnosisPill diagnosis="Ipertensione" /></li>
+            <li className={styles.patientDiagnosisPill}><DiagnosisPill diagnosis="Dislipidemia" /></li>
+            <li className={styles.patientDiagnosisPill}><DiagnosisPill diagnosis="BPCO lieve" /></li>
+            <li><PillBadge variant="neutral">PA 132/84</PillBadge></li>
+            <li><PillBadge variant="neutral">HR 76</PillBadge></li>
+            <li><PillBadge variant="neutral">SpO₂ 97%</PillBadge></li>
+          </ul>
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6 }}>
             <PillBadge variant="success">
               <Sparkles size={11} />

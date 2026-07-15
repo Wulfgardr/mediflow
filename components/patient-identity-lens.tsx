@@ -187,22 +187,25 @@ export function PatientIdentityLens({
                                     )}
 
                                     {secondaryDiagnoses.length > 0 ? (
-                                        <div className="mt-2 flex flex-wrap gap-1.5">
+                                        /* @Codex: le diagnosi secondarie sono una lista informativa;
+                                           la semantica nativa rende verificabile il nome accessibile dei chip. */
+                                        <ul
+                                            aria-label="Diagnosi codificate secondarie"
+                                            className="mt-2 flex flex-wrap gap-1.5"
+                                        >
                                             {secondaryDiagnoses.map((diagnosis) => (
-                                                <span
+                                                <li
                                                     key={`${diagnosis.system}-${diagnosis.code}`}
-                                                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] px-2.5 py-1 text-xs text-[color:var(--lume-ink)]"
-                                                    title={`${diagnosis.code} · ${diagnosis.description}`}
-                                                    aria-label={`${diagnosis.code} · ${diagnosis.description}`}
+                                                    className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] px-2.5 py-1 text-xs text-[color:var(--lume-ink)]"
                                                 >
                                                     <span className="lume-registro font-semibold">{diagnosis.code}</span>
-                                                    <span className="truncate">{diagnosis.description}</span>
+                                                    <span className="truncate" title={diagnosis.description}>{diagnosis.description}</span>
                                                     <span className="shrink-0 text-[10px] uppercase tracking-[0.04em] text-[color:var(--lume-ink-muted)]">
                                                         {diagnosisSystemLabel(diagnosis.system)}
                                                     </span>
-                                                </span>
+                                                </li>
                                             ))}
-                                        </div>
+                                        </ul>
                                     ) : null}
 
                                     {remainingCodedCount > 0 ? (
@@ -311,28 +314,31 @@ export function PatientIdentityLens({
                             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                 Quadro clinico
                             </p>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                                {diagnoses.length > 0 ? (
-                                    diagnoses.map((diagnosis) => (
-                                        <span
+                            {diagnoses.length > 0 ? (
+                                /* @Codex: il contenitore nomina la collezione; ogni voce
+                                   conserva codice, descrizione e sistema come contenuto naturale. */
+                                <ul
+                                    aria-label="Diagnosi del quadro clinico"
+                                    className="mt-3 flex flex-wrap gap-2"
+                                >
+                                    {diagnoses.map((diagnosis) => (
+                                        <li
                                             key={`${diagnosis.system}-${diagnosis.code}`}
-                                            className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-1 text-[12px] font-medium text-[color:var(--lume-ink)]"
-                                            title={`${diagnosis.code} · ${diagnosis.description}`}
-                                            aria-label={`${diagnosis.code} · ${diagnosis.description}`}
+                                            className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-1 text-[12px] font-medium text-[color:var(--lume-ink)]"
                                         >
                                             <span className="lume-registro shrink-0 font-semibold text-[color:var(--lume-ink)]">{diagnosis.code}</span>
-                                            <span className="min-w-0 truncate">{diagnosis.description}</span>
+                                            <span className="min-w-0 truncate" title={diagnosis.description}>{diagnosis.description}</span>
                                             <span className="shrink-0 text-[10px] uppercase tracking-[0.04em] text-[color:var(--lume-ink-muted)]">
                                                 {diagnosisSystemLabel(diagnosis.system)}
                                             </span>
-                                        </span>
-                                    ))
-                                ) : (
-                                    <p className="text-sm text-[color:var(--lume-ink-muted)]">
-                                        Nessuna diagnosi strutturata in primo piano.
-                                    </p>
-                                )}
-                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="mt-3 text-sm text-[color:var(--lume-ink-muted)]">
+                                    Nessuna diagnosi strutturata in primo piano.
+                                </p>
+                            )}
                         </div>
 
                         <div className="identity-lens-pane rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
