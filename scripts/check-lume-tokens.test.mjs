@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 import {
   parseHexColor,
@@ -15,6 +18,7 @@ import {
   verifyCssMirror,
   ACTIVE_ALIASES,
   paletteFingerprint,
+  scanPalette,
   scanPaletteSource,
 } from './check-lume-tokens.mjs';
 
@@ -201,4 +205,98 @@ test('palette guard respects only the exact allowlisted baseline', () => {
     tokens: validTokens(),
     allowlist,
   }).violations.length, 2);
+});
+
+test('palette guard fails an over-provisioned stale allowlist entry', () => {
+  const source = 'const example = <div className="text-amber-600" />;';
+  const baseline = scanPaletteSource({ relativePath: 'components/example.tsx', source, tokens: validTokens(), allowlist: [] });
+  const result = scanPaletteSource({
+    relativePath: 'components/example.tsx',
+    source,
+    tokens: validTokens(),
+    allowlist: [{
+      path: 'components/example.tsx',
+      reason: 'Fixture sintetica.',
+      occurrences: 2,
+      fingerprint: paletteFingerprint([...baseline.violations, ...baseline.violations]),
+    }],
+  });
+  assert.equal(result.allowlistIssues.length, 1);
+  assert.match(result.allowlistIssues[0].message, /voce di allowlist stale per components\/example\.tsx: dichiarate 2, trovate 1\. Aggiorna occurrences\+fingerprint o rimuovi la voce\./);
+});
+
+test('palette guard fails a stale allowlist fingerprint even with the declared count', () => {
+  const source = 'const example = <div className="text-amber-600" />;';
+  const result = scanPaletteSource({
+    relativePath: 'components/example.tsx',
+    source,
+    tokens: validTokens(),
+    allowlist: [{
+      path: 'components/example.tsx',
+      reason: 'Fixture sintetica.',
+      occurrences: 1,
+      fingerprint: paletteFingerprint([]),
+    }],
+  });
+  assert.equal(result.allowlistIssues.length, 1);
+  assert.match(result.allowlistIssues[0].message, /L'impronta non coincide con la baseline dichiarata\./);
+});
+
+test('palette guard fails an orphaned allowlist entry', () => {
+  const rootDir = mkdtempSync(path.join(tmpdir(), 'lume-palette-'));
+  try {
+    mkdirSync(path.join(rootDir, 'app'));
+    mkdirSync(path.join(rootDir, 'components'));
+    writeFileSync(path.join(rootDir, 'components', 'present.tsx'), 'export const present = true;');
+    const result = scanPalette({
+      rootDir,
+      tokens: validTokens(),
+      allowlist: [{
+        path: 'components/missing.tsx',
+        reason: 'Fixture sintetica.',
+        occurrences: 1,
+        fingerprint: paletteFingerprint([]),
+      }],
+    });
+    assert.equal(result.allowlistIssues.length, 1);
+    assert.match(result.allowlistIssues[0].message, /voce orfana di allowlist per components\/missing\.tsx/);
+  } finally {
+    rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('palette guard accepts an exact allowlist entry', () => {
+  const source = 'const example = <div className="text-amber-600" />;';
+  const baseline = scanPaletteSource({ relativePath: 'components/example.tsx', source, tokens: validTokens(), allowlist: [] });
+  const result = scanPaletteSource({
+    relativePath: 'components/example.tsx',
+    source,
+    tokens: validTokens(),
+    allowlist: [{
+      path: 'components/example.tsx',
+      reason: 'Fixture sintetica.',
+      occurrences: 1,
+      fingerprint: paletteFingerprint(baseline.violations),
+    }],
+  });
+  assert.equal(result.violations.length, 0);
+  assert.equal(result.allowlistIssues.length, 0);
+});
+
+test('palette guard fails a regression beyond the declared allowlist entry', () => {
+  const source = 'const example = <div className="text-amber-600" />;';
+  const baseline = scanPaletteSource({ relativePath: 'components/example.tsx', source, tokens: validTokens(), allowlist: [] });
+  const result = scanPaletteSource({
+    relativePath: 'components/example.tsx',
+    source: `${source}\nconst extra = <div className="text-amber-600" />;`,
+    tokens: validTokens(),
+    allowlist: [{
+      path: 'components/example.tsx',
+      reason: 'Fixture sintetica.',
+      occurrences: 1,
+      fingerprint: paletteFingerprint(baseline.violations),
+    }],
+  });
+  assert.equal(result.violations.length, 2);
+  assert.equal(result.allowlistIssues.length, 0);
 });
