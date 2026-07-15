@@ -14,9 +14,36 @@ import type Database from 'better-sqlite3';
 
 type ForeignKeyViolationRow = { table: string };
 
+const SQLITE_LOCK_RETRY_MS = 50;
+const SQLITE_LOCK_TIMEOUT_MS = 5000;
+const sqliteLockWaiter = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
+
+function isSqliteLockError(error: unknown): boolean {
+    if (!error || typeof error !== 'object' || !('code' in error)) return false;
+    const code = String((error as { code: unknown }).code);
+    return code.startsWith('SQLITE_BUSY') || code.startsWith('SQLITE_LOCKED');
+}
+
+/* @Codex */
+function enableWalWithBoundedRetry(connection: Database.Database): void {
+    const deadline = Date.now() + SQLITE_LOCK_TIMEOUT_MS;
+    while (true) {
+        try {
+            connection.pragma('journal_mode = WAL');
+            return;
+        } catch (error) {
+            if (!isSqliteLockError(error) || Date.now() >= deadline) throw error;
+            Atomics.wait(sqliteLockWaiter, 0, 0, SQLITE_LOCK_RETRY_MS);
+        }
+    }
+}
+
 export function initSqlitePragmas(connection: Database.Database): void {
-    connection.pragma('journal_mode = WAL');
+    // @Codex Configure waiting before the first pragma that may need the
+    // database write lock. Next.js evaluates server modules in parallel build
+    // workers, so setting WAL first would otherwise fail immediately.
     connection.pragma('busy_timeout = 5000');
+    enableWalWithBoundedRetry(connection);
     connection.pragma('synchronous = NORMAL');
 
     try {

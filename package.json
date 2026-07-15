@@ -105,6 +105,7 @@
     "test:audit": "bash scripts/audit-test.sh",
     "test:sqlite-repair": "bash scripts/sqlite-repair-test.sh",
     "test:sqlite-pragmas": "node scripts/run-strip-types.mjs --test lib/sqlite-pragmas.test.ts",
+    "test:db-bootstrap-concurrency": "node scripts/run-strip-types.mjs --test lib/db-server-bootstrap-concurrency.test.ts",
     "test:db-transaction-rollback": "node scripts/run-strip-types.mjs --test lib/db-transaction-rollback.test.ts",
     "test:schema-drift": "node scripts/run-strip-types.mjs --test scripts/check-schema-drift.test.ts",
     "benchmark:clinical-facts:observations": "node scripts/run-strip-types.mjs scripts/benchmark-observation-facts.mjs",

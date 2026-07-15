@@ -14,6 +14,48 @@ function tempDbPath(): string {
     return path.join(dir, 'test.db');
 }
 
+test('initSqlitePragmas configures busy_timeout before the WAL write lock', () => {
+    const calls: string[] = [];
+    const connection = {
+        pragma(statement: string) {
+            calls.push(statement);
+            return statement === 'foreign_key_check' ? [] : undefined;
+        },
+    } as unknown as Database.Database;
+
+    initSqlitePragmas(connection);
+
+    assert.deepEqual(calls.slice(0, 2), ['busy_timeout = 5000', 'journal_mode = WAL']);
+});
+
+test('initSqlitePragmas retries a transient WAL lock without hiding other errors', () => {
+    let walAttempts = 0;
+    const connection = {
+        pragma(statement: string) {
+            if (statement === 'journal_mode = WAL') {
+                walAttempts += 1;
+                if (walAttempts < 3) {
+                    throw Object.assign(new Error('database is locked'), { code: 'SQLITE_BUSY' });
+                }
+            }
+            return statement === 'foreign_key_check' ? [] : undefined;
+        },
+    } as unknown as Database.Database;
+
+    assert.doesNotThrow(() => initSqlitePragmas(connection));
+    assert.equal(walAttempts, 3);
+
+    const invalidConnection = {
+        pragma(statement: string) {
+            if (statement === 'journal_mode = WAL') {
+                throw Object.assign(new Error('invalid database'), { code: 'SQLITE_CORRUPT' });
+            }
+            return undefined;
+        },
+    } as unknown as Database.Database;
+    assert.throws(() => initSqlitePragmas(invalidConnection), /invalid database/);
+});
+
 test('initSqlitePragmas sets WAL, busy_timeout, synchronous NORMAL and foreign_keys ON', () => {
     const db = new Database(tempDbPath());
     try {
