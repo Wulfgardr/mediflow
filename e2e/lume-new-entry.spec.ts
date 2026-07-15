@@ -107,13 +107,13 @@ async function attachVisualProof(
       }),
     };
   });
-  expect(overflowProof.canvas.scrollWidth).toBeLessThanOrEqual(overflowProof.canvas.clientWidth + 1);
   expect(['auto', 'scroll']).toContain(overflowProof.sectionRailOverflowX);
   for (const target of overflowProof.targets) {
     expect(target.scrollWidth, `${target.label} non deve scorrere orizzontalmente`).toBeLessThanOrEqual(target.clientWidth + 1);
     expect(target.clippedLeft, `${target.label} non deve essere tagliato a sinistra`).toBe(false);
     expect(target.clippedRight, `${target.label} non deve essere tagliato a destra`).toBe(false);
   }
+  expect(overflowProof.canvas.scrollWidth).toBeLessThanOrEqual(overflowProof.canvas.clientWidth + 1);
 
   const clinicalSurfaces = await page.locator('.lume-panel, .patient-detail-side-section').evaluateAll((elements) =>
     elements.map((element) => {

@@ -787,7 +787,7 @@ export default function NewEntryPage() {
                         <div className="space-y-3">
                             <div className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3">
                                 <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">Paziente</p>
-                                <p className="mt-1 text-sm font-semibold text-[color:var(--lume-ink)]">
+                                <p className="mt-1 break-words text-sm font-semibold text-[color:var(--lume-ink)]">
                                     {patient ? `${patient.lastName} ${patient.firstName}` : 'Caricamento...'}
                                 </p>
                             </div>
