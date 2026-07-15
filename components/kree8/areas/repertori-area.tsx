@@ -185,6 +185,8 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
       : 0;
   const freshnessClass = classNames(
     styles.freshness,
+    // @Codex: la freschezza normale resta quieta; i segnali sono riservati alle anomalie.
+    freshnessTier === 'fresh' && styles.freshnessOk,
     freshnessTier === 'stale' && styles.freshnessStale,
     freshnessTier === 'broken' && styles.freshnessBroken,
   );

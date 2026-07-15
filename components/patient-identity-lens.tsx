@@ -97,7 +97,7 @@ export function PatientIdentityLens({
             <section className="patient-identity-lens patient-identity-lens-reader lume-panel relative overflow-hidden p-5 md:p-6">
                 <div className="relative z-10 grid gap-5 xl:grid-cols-[minmax(0,1.38fr)_320px] xl:items-start">
                     <div className="min-w-0 space-y-5">
-                        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.02fr)_minmax(320px,0.98fr)] lg:items-start lg:divide-x lg:divide-[color:rgba(112,106,100,0.12)]">
+                        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.02fr)_minmax(320px,0.98fr)] lg:items-start lg:divide-x lg:divide-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)]">
                             <div className="min-w-0 lg:pr-5">
                                 <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[color:var(--lume-ink-muted)]">
                                     Scheda paziente
@@ -135,7 +135,7 @@ export function PatientIdentityLens({
                                     {summary ?? 'Nessuna sintesi clinica disponibile.'}
                                 </p>
                                 {nextStep ? (
-                                    <div className="mt-3 border-t border-[color:rgba(112,106,100,0.12)] pt-3">
+                                    <div className="mt-3 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-3">
                                         <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                             Prossimo passaggio
                                         </p>
@@ -147,7 +147,7 @@ export function PatientIdentityLens({
                             </div>
                         </div>
 
-                        <div className="border-t border-[color:rgba(112,106,100,0.12)] pt-5">
+                        <div className="border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-5">
                             <div className="flex flex-wrap items-baseline justify-between gap-3">
                                 <h2 className="text-sm font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                     Quadro clinico
@@ -212,7 +212,7 @@ export function PatientIdentityLens({
                                     ) : null}
                                 </div>
 
-                                <div className="min-w-0 lg:border-l lg:border-[color:rgba(112,106,100,0.12)] lg:pl-6">
+                                <div className="min-w-0 lg:border-l lg:border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] lg:pl-6">
                                     <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                         Esenzioni
                                     </p>
@@ -249,7 +249,7 @@ export function PatientIdentityLens({
                     </div>
 
                     <div className="space-y-3">
-                        <div className="patient-quick-context-card rounded-[var(--lume-radius-control)] border border-[color:rgba(112,106,100,0.12)] bg-[color:var(--lume-surface-field)] px-4 py-3">
+                        <div className="patient-quick-context-card rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3">
                             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                 Contesto rapido
                             </p>
@@ -307,7 +307,7 @@ export function PatientIdentityLens({
                     </div>
 
                     <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-                        <div className="identity-lens-pane rounded-[var(--lume-radius-card)] border border-[color:rgba(112,106,100,0.12)] bg-[color:var(--lume-surface-field)] p-4">
+                        <div className="identity-lens-pane rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
                             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                 Quadro clinico
                             </p>
@@ -335,7 +335,7 @@ export function PatientIdentityLens({
                             </div>
                         </div>
 
-                        <div className="identity-lens-pane rounded-[var(--lume-radius-card)] border border-[color:rgba(112,106,100,0.12)] bg-[color:var(--lume-surface-field)] p-4">
+                        <div className="identity-lens-pane rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
                             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                 Contesto rapido
                             </p>
