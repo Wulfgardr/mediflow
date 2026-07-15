@@ -611,7 +611,16 @@ struct ClinicalScalesWorkspaceView: View {
     private var patientPicker: some View {
         NavigationStack {
             List(model.visiblePatients) { patient in
-                Button { Task { await open(patient) } } label: { VStack(alignment: .leading) { Text("\(patient.firstName) \(patient.lastName)"); Text(patient.taxCode).font(.caption).foregroundStyle(.secondary) } }
+                /* @Codex */
+                Button { Task { await open(patient) } } label: {
+                    VStack(alignment: .leading) {
+                        Text("\(patient.firstName) \(patient.lastName)")
+                        Text(PairedPatientsWorkspaceSupport.compactTaxCode(patient.taxCode))
+                            .font(.caption)
+                            .registro()
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             .searchable(text: $query, prompt: "Cerca paziente")
             .onChange(of: query) { model.search($0) }

@@ -110,7 +110,8 @@ public struct HomeBaseRuntimeStatusView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .cardStyle()
+        .padding(16)
+        .lumeSurface(zone: .field)
         .accessibilityIdentifier("homebase-runtime-status-card")
         .task {
             await refreshOptionalServices()
@@ -124,6 +125,7 @@ public struct HomeBaseRuntimeStatusView: View {
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.caption)
+                .registro()
                 .foregroundStyle(.primary)
                 .textSelection(.enabled)
         }
