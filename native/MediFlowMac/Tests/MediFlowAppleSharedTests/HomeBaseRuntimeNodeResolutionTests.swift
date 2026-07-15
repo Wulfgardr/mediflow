@@ -52,4 +52,39 @@ final class HomeBaseRuntimeNodeResolutionTests: XCTestCase {
         XCTAssertEqual(HomeBaseRuntimeSupervisor.semanticVersion("v24.18.0"), [24, 18, 0])
         XCTAssertEqual(HomeBaseRuntimeSupervisor.semanticVersion("20.1.0"), [20, 1, 0])
     }
+
+    func testSelectsMatchingABIInsteadOfNewestNode() throws {
+        let node24 = tempRoot.appendingPathComponent("node24")
+        let node26 = tempRoot.appendingPathComponent("node26")
+        try Data("#!/bin/sh\nprintf '24.18.0 137 darwin arm64'\n".utf8).write(to: node24)
+        try Data("#!/bin/sh\nprintf '26.4.0 147 darwin arm64'\n".utf8).write(to: node26)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: node24.path)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: node26.path)
+        let contract = HomeBaseNodeRuntimeContract(
+            node: .init(major: 24, version: "24.18.0", moduleVersion: "137"),
+            platform: "darwin",
+            arch: "arm64"
+        )
+
+        let result = HomeBaseRuntimeSupervisor.compatibleNode(
+            in: [node26.path, node24.path], contract: contract, fileManager: .default
+        )
+
+        XCTAssertEqual(result, node24.path)
+    }
+
+    func testRejectsMatchingABIDifferentArchitecture() throws {
+        let x64Node = tempRoot.appendingPathComponent("node24-x64")
+        try Data("#!/bin/sh\nprintf '24.18.0 137 darwin x64'\n".utf8).write(to: x64Node)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: x64Node.path)
+        let contract = HomeBaseNodeRuntimeContract(
+            node: .init(major: 24, version: "24.18.0", moduleVersion: "137"),
+            platform: "darwin",
+            arch: "arm64"
+        )
+
+        XCTAssertNil(HomeBaseRuntimeSupervisor.compatibleNode(
+            in: [x64Node.path], contract: contract, fileManager: .default
+        ))
+    }
 }

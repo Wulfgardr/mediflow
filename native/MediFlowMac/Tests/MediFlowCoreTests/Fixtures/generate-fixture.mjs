@@ -4,8 +4,8 @@
 // so the Swift test can decrypt without an operator PIN and assert byte-equal
 // plaintext. The patients table uses the real web schema verbatim.
 //
-// Run with Node 20 (matches better-sqlite3 ABI):
-//   ~/.nvm/versions/node/v20.20.2/bin/node native/MediFlowMac/Tests/MediFlowCoreTests/Fixtures/generate-fixture.mjs
+// Run with Node 24 (matches the repository better-sqlite3 ABI contract):
+//   nvm exec 24 node native/MediFlowMac/Tests/MediFlowCoreTests/Fixtures/generate-fixture.mjs
 
 import { webcrypto } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
