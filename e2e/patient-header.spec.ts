@@ -34,6 +34,7 @@ test('patient header renders ICD chips and explicit empty state', async ({ page 
   const pin = process.env.E2E_PIN || '1234';
   const suffix = `${Date.now()}`.slice(-4);
   const diagnosisDescription = 'Disturbo depressivo maggiore, episodio singolo lieve';
+  const secondaryDiagnosisDescription = 'Ipertensione essenziale primaria';
 
   await bootstrapUnlockedSession(page, pin);
 
@@ -51,6 +52,12 @@ test('patient header renders ICD chips and explicit empty state', async ({ page 
         description: diagnosisDescription,
         date: new Date().toISOString(),
       },
+      {
+        system: 'ICD-11',
+        code: 'BA00',
+        description: secondaryDiagnosisDescription,
+        date: new Date().toISOString(),
+      },
     ],
   });
 
@@ -64,17 +71,53 @@ test('patient header renders ICD chips and explicit empty state', async ({ page 
     diagnoses: [],
   });
 
-  const diagnosisChip = `EF00 · ${diagnosisDescription}`;
+  const diagnosisList = page.getByRole('list', {
+    name: 'Diagnosi e stato del paziente',
+    exact: true,
+  });
+  const diagnosisChip = diagnosisList
+    .getByRole('listitem')
+    .filter({ hasText: diagnosisDescription });
 
+  /* @Codex: il chip e' una voce di lista nominata dal contenuto visibile.
+     Il match esatto, lo snapshot ARIA e la cardinalita' esplicita evitano che
+     un attributo non esposto o un duplicato rendano verde il contratto. */
   await page.goto(`/patients/${patientWithDiagnosisId}`);
   await expect(page.getByText('Quadro paziente')).toBeVisible();
-  await expect(page.getByText(diagnosisChip)).toBeVisible();
+  await expect(diagnosisList).toHaveCount(1);
+  await expect(diagnosisChip).toHaveCount(1);
+  await expect(diagnosisChip).toBeVisible();
+  await expect(diagnosisChip).toHaveCSS('min-width', '0px');
+  await expect(diagnosisChip).toHaveCSS('max-width', '100%');
+  await expect(diagnosisChip).toContainText('EF00');
+  await expect(diagnosisChip).toContainText(diagnosisDescription);
+  await expect(diagnosisChip).toMatchAriaSnapshot(
+    `- listitem: EF00 ${diagnosisDescription}`
+  );
 
   await page.reload();
-  await expect(page.getByText(diagnosisChip)).toBeVisible();
+  await expect(diagnosisChip).toHaveCount(1);
+  await expect(diagnosisChip).toBeVisible();
+
+  /* @Codex: la lente clinica deve lasciare il listitem senza nome d'autore e
+     conservare codice, descrizione e sistema nel contenuto accessibile. */
+  await page.goto(`/patients/${patientWithDiagnosisId}/modules`);
+  const secondaryDiagnosisList = page.getByRole('list', {
+    name: 'Diagnosi codificate secondarie',
+    exact: true,
+  });
+  const secondaryDiagnosisItem = secondaryDiagnosisList
+    .getByRole('listitem')
+    .filter({ hasText: secondaryDiagnosisDescription });
+  await expect(secondaryDiagnosisList).toHaveCount(1);
+  await expect(secondaryDiagnosisItem).toHaveCount(1);
+  await expect(secondaryDiagnosisItem).not.toHaveAttribute('title');
+  await expect(secondaryDiagnosisItem).toMatchAriaSnapshot(
+    `- listitem: BA00 ${secondaryDiagnosisDescription} ICD-11`
+  );
 
   await page.goto(`/patients/${patientWithoutDiagnosisId}`);
   await expect(page.getByText('Quadro paziente')).toBeVisible();
   await expect(page.getByText('Profilo da completare')).toBeVisible();
-  await expect(page.getByText(diagnosisChip)).toHaveCount(0);
+  await expect(diagnosisChip).toHaveCount(0);
 });

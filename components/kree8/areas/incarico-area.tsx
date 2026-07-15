@@ -265,6 +265,8 @@ function IncaricoArea({
                             <span className={styles.patientName}>{p.name}</span>
                             <span className={styles.patientCode}>{p.code} · {p.pathway}</span>
                           </span>
+                          {/* @Codex: dentro il button conserviamo il testo naturale;
+                              i ruoli annidati sarebbero presentazionali e non una lista reale. */}
                           <span className={styles.patientMeta}>
                             {p.diagnoses.map((d) => (
                               <span key={d} className={styles.patientDiagnosisPill}>
@@ -307,14 +309,19 @@ function IncaricoArea({
               {selected.ageLabel} · aggiornato {selected.lastTouch}
             </span>
           </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {/* @Codex */}
+          <ul aria-label={`Diagnosi e stato di ${selected.name}`} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {selected.diagnoses.map((d) => (
-              <DiagnosisPill key={d} diagnosis={d} />
+              <li key={d} className={styles.patientDiagnosisPill}>
+                <DiagnosisPill diagnosis={d} />
+              </li>
             ))}
-            <PillBadge variant={selected.status}>
-              {selected.statusLabel}
-            </PillBadge>
-          </div>
+            <li>
+              <PillBadge variant={selected.status}>
+                {selected.statusLabel}
+              </PillBadge>
+            </li>
+          </ul>
           <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.6 }}>
             {selected.summary}
           </p>
