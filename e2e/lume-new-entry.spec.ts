@@ -1,4 +1,4 @@
-/* @Codex #71 */
+/* @Codex #71, #75 */
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { bootstrapUnlockedSession, setAiLaneKillSwitch } from './utils';
 
@@ -66,7 +66,20 @@ async function attachVisualProof(
 ): Promise<void> {
   await page.setViewportSize(viewport);
   await setRegister(page, register);
-  await page.getByLabel('Data e ora della voce clinica').focus();
+  const draftError = page.getByRole('alert').filter({
+    hasText: 'Elaborazione non riuscita. Il transcript resta modificabile manualmente.',
+  });
+  await expect(draftError).toBeVisible();
+  await draftError.scrollIntoViewIfNeeded();
+  await testInfo.attach(`${name}-error`, {
+    body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
+    contentType: 'image/png',
+  });
+
+  const editor = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
+  await editor.fill(`${SYNTHETIC_ENTRY} ${'VoceSinteticaEstesa'.repeat(12)}`);
+  await editor.focus();
+  await expect(editor).toBeFocused();
 
   const overflowProof = await page.evaluate(() => {
     const form = document.querySelector<HTMLElement>('form[aria-label="Nuova voce clinica"]');
@@ -128,6 +141,35 @@ async function attachVisualProof(
     expect(surface.backdropFilter).toBe('none');
   }
 
+  /* @Codex #75: toolbar, canvas e campo restano opachi e contenuti sul viewport reale. */
+  const editorSurfaces = await page.locator('[data-lume-editor-surface]').evaluateAll((elements) =>
+    elements.map((element) => {
+      const node = element as HTMLElement;
+      const style = getComputedStyle(node);
+      const alpha = style.backgroundColor.startsWith('rgb(')
+        ? 1
+        : Number(style.backgroundColor.match(/^rgba\([^,]+,[^,]+,[^,]+,\s*([0-9.]+)\)$/)?.[1] ?? Number.NaN);
+      return {
+        surface: node.dataset.lumeEditorSurface,
+        background: style.backgroundColor,
+        alpha,
+        backdropFilter: style.backdropFilter,
+        boxShadow: style.boxShadow,
+        clientWidth: node.clientWidth,
+        scrollWidth: node.scrollWidth,
+      };
+    }),
+  );
+  expect(editorSurfaces.map((surface) => surface.surface).sort()).toEqual(['canvas', 'field', 'toolbar']);
+  for (const surface of editorSurfaces) {
+    expect(surface.background, `${surface.surface} deve restare opaca`).not.toBe('rgba(0, 0, 0, 0)');
+    expect(surface.background, `${surface.surface} deve restare opaca`).not.toBe('transparent');
+    expect(surface.alpha, `${surface.surface} deve avere alpha esatto 1`).toBe(1);
+    expect(surface.backdropFilter, `${surface.surface} non deve usare blur`).toBe('none');
+    expect(surface.scrollWidth, `${surface.surface} non deve scorrere orizzontalmente`).toBeLessThanOrEqual(surface.clientWidth + 1);
+  }
+  expect(editorSurfaces.find((surface) => surface.surface === 'canvas')?.boxShadow).not.toBe('none');
+
   await testInfo.attach(name, {
     body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
     contentType: 'image/png',
@@ -148,6 +190,28 @@ test('nuova voce Lume espone stato, focus, errori e salvataggio senza affidarsi 
     await expect(page.locator('#entry-date-description')).toHaveText(
       'Puoi retrodatare la voce quando ricostruisci il diario.',
     );
+
+    /* @Codex #75 */
+    const editor = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
+    await expect(editor).toHaveAttribute('aria-multiline', 'true');
+    await expect(editor).toHaveAttribute('aria-required', 'true');
+    await expect(editor).toHaveAccessibleDescription(
+      'Editor su più righe. Usa la barra degli strumenti per formattare il resoconto; Tab sposta il focus al controllo successivo.',
+    );
+    await expect(page.getByRole('group', { name: 'Strumenti del resoconto clinico', exact: true })).toMatchAriaSnapshot(`
+      - group "Strumenti del resoconto clinico":
+        - button "Titolo"
+        - button "Sezione"
+        - button "Paragrafo"
+        - button "Bullet"
+        - button "Numero"
+        - button "Grassetto"
+        - button "Corsivo"
+        - button "Sottolinea"
+        - button "Barrato"
+        - button "Riduci rientro"
+        - button "Aumenta rientro"
+    `);
 
     const settingGroup = page.getByRole('group', { name: 'Luogo', exact: true });
     await expect(settingGroup).toMatchAriaSnapshot(`
@@ -186,8 +250,16 @@ test('nuova voce Lume espone stato, focus, errori e salvataggio senza affidarsi 
     await expect(emptyEntryAlert).toContainText('Inserisci un resoconto clinico prima di registrare la voce.');
     await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/entries/new$`));
 
+    await editor.focus();
+    await expect(editor).toBeFocused();
+    await page.keyboard.press('Tab');
+    const attachmentButton = page.getByRole('button', { name: 'Aggiungi allegati alla voce clinica', exact: true });
+    await expect(attachmentButton).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(editor).toBeFocused();
+
     await forceSyntheticDraftError(page);
-    await page.locator('.clinical-rich-editor[contenteditable="true"]').fill(SYNTHETIC_ENTRY);
+    await editor.fill(SYNTHETIC_ENTRY);
     await page.getByRole('button', { name: 'Registra nel diario', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`), { timeout: 45_000 });
 
