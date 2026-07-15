@@ -57,17 +57,17 @@ function DiarioArea({
             <UserSquare2 size={13} />
             Apri quadro
           </button>
-          <PillBadge variant="blue">{isLoading ? '…' : `${diaryState.activeCount} attive`}</PillBadge>
-          <PillBadge variant="muted">{isLoading ? '…' : `${diaryState.patientCount} pazienti`}</PillBadge>
+          <PillBadge variant="neutral">{isLoading ? '…' : `${diaryState.activeCount} attive`}</PillBadge>
+          <PillBadge variant="neutral">{isLoading ? '…' : `${diaryState.patientCount} pazienti`}</PillBadge>
         </div>
       </header>
 
       <section className={styles.panel}>
         <header className={styles.panelHeader}>
           <h2 className={styles.panelTitle}>Timeline recente</h2>
-          <PillBadge variant="muted">{visibleEntries.length} voci</PillBadge>
+          <PillBadge variant="neutral">{visibleEntries.length} voci</PillBadge>
           <span className={styles.panelActions}>
-            <PillBadge variant="green">dati locali</PillBadge>
+            <PillBadge variant="neutral">dati locali</PillBadge>
           </span>
         </header>
 
@@ -104,9 +104,9 @@ function DiarioArea({
                           <span className={styles.evidenceDate}>{entry.dateLabel}</span>
                           <span className={styles.evidenceTitle}>{entry.title}</span>
                           <span className={styles.panelActions}>
-                            <PillBadge variant={entry.deleted ? 'coral' : 'blue'}>{entry.typeLabel}</PillBadge>
+                            <PillBadge variant={entry.deleted ? 'critical' : 'plum'}>{entry.typeLabel}</PillBadge>
                             {/* @Codex WUL-UIUX: lo stato eliminato non puo essere solo colore (WCAG 1.4.1). */}
-                            {entry.deleted ? <PillBadge variant="coral">Eliminata</PillBadge> : null}
+                            {entry.deleted ? <PillBadge variant="critical">Eliminata</PillBadge> : null}
                           </span>
                         </header>
                         <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.55 }}>
@@ -114,9 +114,9 @@ function DiarioArea({
                         </p>
                         <div className={styles.identityDock}>
                           <span className={styles.patientName}>{entry.patientName}</span>
-                          <PillBadge variant="muted">{entry.patientCode}</PillBadge>
+                          <PillBadge variant="neutral">{entry.patientCode}</PillBadge>
                           {entry.attachmentCount > 0 ? (
-                            <PillBadge variant="violet">
+                            <PillBadge variant="plum">
                               <Paperclip size={11} />
                               {entry.attachmentCount} allegati
                             </PillBadge>

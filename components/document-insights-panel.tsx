@@ -45,9 +45,9 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
 
     /* @Codex */
     const qualityTone = (level?: string) => {
-        if (level === 'green') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-        if (level === 'red') return 'bg-red-50 text-red-700 border-red-200';
-        return 'bg-amber-50 text-amber-700 border-amber-200';
+        if (level === 'green') return 'border-[color:color-mix(in_srgb,var(--lume-signal-success)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]';
+        if (level === 'red') return 'border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]';
+        return 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]';
     };
 
     /* @Codex */
@@ -132,24 +132,24 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
         <div className="patient-detail-side-section lume-panel border p-6">
             <div className="mb-4 flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
-                    <div className="rounded-2xl bg-amber-50 p-2 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300">
+                    <div className="rounded-2xl bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] p-2 text-[color:var(--lume-ink-muted)]">
                         <FileText className="w-5 h-5" />
                     </div>
                     <div>
                         <p className="section-kicker">Archivio paziente</p>
-                        <h3 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">Archivio Intelligente</h3>
-                        <p className="text-xs text-slate-500">Ultimi {insights.length} documenti analizzati</p>
+                        <h3 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">Archivio Intelligente</h3>
+                        <p className="text-xs text-[color:var(--lume-ink-muted)]">Ultimi {insights.length} documenti analizzati</p>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-2">
                     {busyAction && (
-                        <div className="flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1 text-[11px] text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                        <div className="flex items-center gap-1 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-2 py-1 text-[11px] text-[color:var(--lume-ink-muted)]">
                             <Loader2 className="w-3 h-3 animate-spin" />
                             Aggiornamento...
                         </div>
                     )}
-                    <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-600 dark:bg-amber-900/20 dark:text-amber-400">
+                    <div className="flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-1 text-xs font-medium text-[color:var(--lume-ink-muted)]">
                         <Sparkles className="w-3 h-3" />
                         OCR + AI
                     </div>
@@ -157,7 +157,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                         type="button"
                         onClick={() => void handleClearArchive()}
                         disabled={busyAction !== null}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-red-200 text-red-600 text-xs font-medium hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="inline-flex items-center gap-1 rounded-full border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] px-2 py-1 text-xs font-medium text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {busyAction === 'all' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
                         Svuota archivio
@@ -170,8 +170,8 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                     <div
                         key={insight.id}
                         className={`rounded-xl border transition-[border-color,background-color] ${expandedId === insight.id
-                                ? 'border-amber-200 dark:border-amber-500/30 bg-amber-50/40 dark:bg-amber-900/10'
-                                : 'border-slate-200/80 dark:border-white/10 bg-white/75 dark:bg-white/5 hover:border-slate-300'
+                                ? 'border-[color:color-mix(in_srgb,var(--lume-accent)_30%,transparent)] bg-[color:var(--lume-surface-focal)]'
+                                : 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] hover:border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)]'
                             }`}
                     >
                         <div className="flex items-start gap-2 p-3">
@@ -182,16 +182,16 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                             >
                                 <div className="flex items-center gap-3">
                                     <div className={`p-2 rounded-lg ${index === 0
-                                            ? 'bg-amber-100 text-amber-600'
-                                            : 'bg-gray-100 text-gray-500'
+                                            ? 'bg-[color:color-mix(in_srgb,var(--lume-accent)_11%,var(--lume-surface-field))] text-[color:var(--lume-accent)]'
+                                            : 'bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] text-[color:var(--lume-ink-muted)]'
                                         }`}>
                                         <FileText className="w-4 h-4" />
                                     </div>
                                     <div>
-                                        <p className="max-w-[200px] truncate text-sm font-medium text-slate-900 dark:text-white">
+                                        <p className="max-w-[200px] truncate text-sm font-medium text-[color:var(--lume-ink)]">
                                             {insight.fileName}
                                         </p>
-                                        <div className="flex flex-wrap items-center gap-1 text-xs text-slate-400">
+                                        <div className="flex flex-wrap items-center gap-1 text-xs text-[color:var(--lume-ink-muted)]">
                                             <Calendar className="w-3 h-3" />
                                             {formatDate(insight.date)}
                                             {insight.quality?.level && (
@@ -200,13 +200,13 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                                                 </span>
                                             )}
                                             {insight.routedClass?.classification && insight.routedClass.classification !== 'unknown' && (
-                                                <span className="ml-1 inline-flex items-center rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:border-white/10 dark:text-slate-300">
+                                                <span className="ml-1 inline-flex items-center rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] px-2 py-0.5 text-[10px] font-medium text-[color:var(--lume-ink-muted)]">
                                                     {documentClassLabel(insight.routedClass.classification)}
                                                 </span>
                                             )}
                                             {insight.routedClass?.synthesis?.kind === 'deterministic' && (
                                                 <span
-                                                    className="ml-1 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-200"
+                                                    className="ml-1 inline-flex items-center rounded-full border border-[color:color-mix(in_srgb,var(--lume-signal-success)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_11%,var(--lume-surface-field))] px-2 py-0.5 text-[10px] font-medium text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]"
                                                     title={insight.routedClass.synthesis.rationale}
                                                 >
                                                     Sintesi senza modello: {documentClassLabel(insight.routedClass.classification)}
@@ -216,16 +216,16 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                                     </div>
                                 </div>
                                 {expandedId === insight.id ? (
-                                    <ChevronUp className="w-4 h-4 text-slate-400" />
+                                    <ChevronUp className="w-4 h-4 text-[color:var(--lume-ink-muted)]" />
                                 ) : (
-                                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                                    <ChevronDown className="w-4 h-4 text-[color:var(--lume-ink-muted)]" />
                                 )}
                             </button>
                             <button
                                 type="button"
                                 onClick={() => void handleRemoveInsight(insight.id, insight.fileName)}
                                 disabled={busyAction !== null}
-                                className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="rounded-lg p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))] disabled:cursor-not-allowed disabled:opacity-50"
                                 title="Rimuovi dall'archivio intelligente"
                                 aria-label={`Rimuovi ${insight.fileName} dall'archivio intelligente`}
                             >
@@ -241,7 +241,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                                         {insight.extractedData.diagnoses.map((diagnosis) => (
                                             <span
                                                 key={`${diagnosis.system}-${diagnosis.code}`}
-                                                className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-700"
+                                                className="inline-flex items-center rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2.5 py-1 text-[11px] font-medium text-[color:var(--lume-ink)]"
                                             >
                                                 {diagnosis.system} {diagnosis.code} · {diagnosis.description}
                                             </span>
@@ -254,7 +254,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                                         {insight.extractedData.medications.map((medication) => (
                                             <span
                                                 key={`${insight.id}:${medication}`}
-                                                className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700"
+                                                className="inline-flex items-center rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2.5 py-1 text-[11px] font-medium text-[color:var(--lume-ink)]"
                                             >
                                                 Terapia · {medication}
                                             </span>
@@ -263,18 +263,18 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                                 )}
 
                                 {insight.quality?.reason && (
-                                    <p className="mb-3 text-xs text-slate-500">
+                                    <p className="mb-3 text-xs text-[color:var(--lume-ink-muted)]">
                                         Qualita documento: {insight.quality.reason}
                                     </p>
                                 )}
 
                                 {insight.autofill?.appliedDiagnoses && insight.autofill.appliedDiagnoses.length > 0 && (
-                                    <p className="mb-3 text-xs font-medium text-emerald-700">
+                                    <p className="mb-3 text-xs font-medium text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]">
                                         Diagnosi aggiunte alla scheda: {insight.autofill.appliedDiagnoses.join(', ')}
                                     </p>
                                 )}
 
-                                <div className="prose prose-sm max-w-none text-slate-700 prose-headings:text-slate-900 prose-strong:text-slate-900 dark:text-slate-300 dark:prose-headings:text-white dark:prose-strong:text-white">
+                                <div className="prose prose-sm max-w-none text-[color:var(--lume-ink-muted)] prose-headings:text-[color:var(--lume-ink)] prose-strong:text-[color:var(--lume-ink)]">
                                     <PrivacyBlur>
                                         <ReactMarkdown>
                                             {insight.summary}
@@ -287,8 +287,8 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                 ))}
             </div>
 
-            <div className="mt-4 flex items-center gap-2 border-t border-slate-200/80 pt-3 text-[10px] text-slate-400 dark:border-white/10">
-                <AlertTriangle className="w-3 h-3 text-amber-500" />
+            <div className="mt-4 flex items-center gap-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-3 text-[10px] text-[color:var(--lume-ink-muted)]">
+                <AlertTriangle className="w-3 h-3 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]" />
                 <span>{modelLabels ? `Sintesi generata da IA locale (${modelLabels.ocr} + ${modelLabels.clinical}). Verificare sempre.` : 'Sintesi generata da IA locale. Verificare sempre.'}</span>
             </div>
         </div>

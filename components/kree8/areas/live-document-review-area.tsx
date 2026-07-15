@@ -86,7 +86,7 @@ function LiveDocumentReviewArea({
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Documenti del caso</h2>
-            <PillBadge variant="muted">{documentNames.length} recenti</PillBadge>
+            <PillBadge variant="neutral">{documentNames.length} recenti</PillBadge>
           </header>
           <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
             {isWorkspaceLoading ? (
@@ -96,7 +96,7 @@ function LiveDocumentReviewArea({
                 <header className={styles.panelHeader}>
                   <FileText size={14} color="var(--ink-muted)" />
                   <span className={styles.evidenceTitle}>{name}</span>
-                  <PillBadge variant="blue">da leggere</PillBadge>
+                  <PillBadge variant="warning">da leggere</PillBadge>
                 </header>
               </div>
             )) : (
@@ -108,7 +108,7 @@ function LiveDocumentReviewArea({
         <section className={styles.panelInset}>
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Suggerimenti AI</h2>
-            <PillBadge variant={codingHints.length ? 'violet' : 'green'}>
+            <PillBadge variant={codingHints.length ? 'warning' : 'success'}>
               {codingHints.length ? 'review' : 'ok'}
             </PillBadge>
           </header>
@@ -117,7 +117,7 @@ function LiveDocumentReviewArea({
               <p className={styles.panelSubtitle}>Caricamento suggerimenti e codifiche.</p>
             ) : codingHints.length ? codingHints.map((hint) => (
               <div key={hint} className={styles.evidenceItem}>
-                <Sparkles size={14} color="var(--pill-violet-fg)" />
+                <Sparkles size={14} color="var(--lume-ink-muted)" />
                 <span>
                   <span className={styles.evidenceTitle}>{hint}</span>
                 </span>

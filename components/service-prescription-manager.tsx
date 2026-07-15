@@ -25,6 +25,11 @@ import {
 import { useLiveQuery } from '@/lib/live-query';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { DocumentReferenceChip } from '@/components/document-reference-chip';
+import { Badge } from '@/components/ui/badge';
+import {
+    catalogMatchStatusSignal,
+    type SemanticSignal,
+} from '@/lib/ui-semantic-signal';
 
 type Props = {
     patientId: string;
@@ -125,6 +130,16 @@ function categoryLabel(value: ServicePrescriptionCategory): string {
 
 function priorityLabel(value: ServicePrescriptionPriority): string {
     return PRIORITY_OPTIONS.find((item) => item.value === value)?.label ?? value;
+}
+
+function serviceStatusSignal(value: ServicePrescriptionStatus): SemanticSignal {
+    return value === 'performed' || value === 'report_received' ? 'success' : 'neutral';
+}
+
+function servicePrioritySignal(value: ServicePrescriptionPriority): SemanticSignal {
+    if (value === 'U') return 'critical';
+    if (value === 'B') return 'warning';
+    return 'neutral';
 }
 
 function parseDocumentRefs(value: string | undefined): string[] {
@@ -416,7 +431,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
             {isFormOpen && (
                 <form
                     onSubmit={handleSubmit}
-                    className="mb-5 rounded-[8px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 p-4"
+                    className="mb-5 rounded-[8px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4"
                 >
                     <div className="grid gap-3 md:grid-cols-2">
                         <div className="md:col-span-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
@@ -424,7 +439,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                             Prestazione e voci richieste
                         </div>
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)] md:col-span-2">
-                            Nome prestazione (raggruppa le voci) <span aria-hidden className="text-rose-600">*</span>
+                            Nome prestazione (raggruppa le voci) <span aria-hidden className="text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">*</span>
                             <input
                                 className="input-field"
                                 value={form.serviceName}
@@ -450,7 +465,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                     : `${parsedItemsPreview.length} voci pronte al salvataggio.`}
                             </p>
                         </label>
-                        <div className="md:col-span-2 mt-1 border-t border-[color:rgba(112,106,100,0.1)] pt-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
+                        <div className="md:col-span-2 mt-1 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] pt-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                             <CalendarClock className="h-3.5 w-3.5" aria-hidden />
                             Inquadramento e pianificazione
                         </div>
@@ -499,7 +514,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                 ))}
                             </select>
                         </label>
-                        <div className="md:col-span-2 mt-1 border-t border-[color:rgba(112,106,100,0.1)] pt-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
+                        <div className="md:col-span-2 mt-1 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] pt-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                             <FileText className="h-3.5 w-3.5" aria-hidden />
                             Codifica, contesto e note
                         </div>
@@ -613,7 +628,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                             />
                         </label>
                     </div>
-                    {error && <p className="mt-3 text-xs font-medium text-rose-700">{error}</p>}
+                    {error && <p className="mt-3 text-xs font-medium text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{error}</p>}
                     <div className="mt-4 flex justify-end gap-2">
                         <button
                             type="button"
@@ -635,7 +650,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
             )}
 
             {!prescriptions ? null : prescriptions.length === 0 ? (
-                <div className="rounded-[8px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-6 text-center">
+                <div className="rounded-[8px] border border-dashed border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] px-4 py-6 text-center">
                     <ClipboardList className="mx-auto mb-2 h-5 w-5 text-[color:var(--lume-ink-muted)]" aria-hidden />
                     <p className="text-sm text-[color:var(--lume-ink-muted)]">
                         Nessuna prestazione prescritta registrata. Aggiungi visite, esami o riabilitazione quando vuoi seguirne stato ed esito.
@@ -655,23 +670,23 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                         return (
                             <article
                                 key={item.id}
-                                className="rounded-[8px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 p-4"
+                                className="rounded-[8px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4"
                             >
                                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                     <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
                                             <span className="apple-chip lume-registro">{formatDate(item.prescribedAt) ?? '–'}</span>
-                                            <span className="apple-chip">{statusLabel(item.status)}</span>
-                                            <span className="apple-chip">{categoryLabel(item.category)}</span>
-                                            {priority !== 'unknown' && <span className="apple-chip">{priorityLabel(priority)}</span>}
+                                            <Badge tone={serviceStatusSignal(item.status)} size="xs">{statusLabel(item.status)}</Badge>
+                                            <Badge tone="plum" size="xs">{categoryLabel(item.category)}</Badge>
+                                            {priority !== 'unknown' && <Badge tone={servicePrioritySignal(priority)} size="xs">{priorityLabel(priority)}</Badge>}
                                             {childItems.length > 0 && (
                                                 <span className="apple-chip inline-flex items-center gap-1">
                                                     <ListChecks className="h-3 w-3" aria-hidden />
                                                     {childItems.length} {childItems.length === 1 ? 'voce' : 'voci'}
                                                 </span>
                                             )}
-                                            {item.source === 'document_review' && <span className="apple-chip">document-backed</span>}
-                                            {item.source === 'legacy_therapy_cleanup' && <span className="apple-chip">da pulizia diario</span>}
+                                            {item.source === 'document_review' && <Badge tone="plum" size="xs">document-backed</Badge>}
+                                            {item.source === 'legacy_therapy_cleanup' && <Badge tone="plum" size="xs">da pulizia diario</Badge>}
                                         </div>
                                         <h3 className="mt-3 text-base font-semibold text-[color:var(--lume-ink)]">{item.serviceName}</h3>
                                         <div className="mt-2 grid gap-2 text-sm text-[color:var(--lume-ink-muted)] md:grid-cols-2">
@@ -720,12 +735,12 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                             <p className="mt-2 text-sm leading-6 text-[color:var(--lume-ink-muted)]">{item.outcomeNote}</p>
                                         )}
                                         {childItems.length > 0 && (
-                                            <div className="mt-3 border-t border-[color:rgba(112,106,100,0.12)] pt-3">
+                                            <div className="mt-3 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-3">
                                                 <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                                     <ListChecks className="h-3.5 w-3.5" aria-hidden />
                                                     Voci richieste · {childItems.length}
                                                 </p>
-                                                <ul className="divide-y divide-[color:rgba(112,106,100,0.08)]">
+                                                <ul className="divide-y divide-[color:color-mix(in_srgb,var(--lume-ink)_8%,transparent)]">
                                                     {childItems.map((child) => {
                                                         const matchLabel =
                                                             child.matchStatus === 'matched'
@@ -752,7 +767,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                                                         <span className="ml-2 text-xs italic text-[color:var(--lume-ink-muted)]">in attesa di matching repertorio</span>
                                                                     )}
                                                                 </div>
-                                                                <span className="apple-chip shrink-0 text-[10px]">{matchLabel}</span>
+                                                                <Badge tone={catalogMatchStatusSignal(child.matchStatus)} size="xs" className="shrink-0">{matchLabel}</Badge>
                                                             </li>
                                                         );
                                                     })}
@@ -798,7 +813,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                         {canCancel && (
                                             <button
                                                 type="button"
-                                                className="ui-btn-secondary h-9 px-3 text-xs text-rose-700"
+                                                className="ui-btn-secondary h-9 px-3 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
                                                 onClick={() => void cancelItem(item)}
                                             >
                                                 <XCircle className="h-4 w-4" />
@@ -808,7 +823,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                         {isClosed && (
                                             <button
                                                 type="button"
-                                                className="ui-btn-secondary h-9 px-3 text-xs text-rose-700"
+                                                className="ui-btn-secondary h-9 px-3 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
                                                 onClick={() => void deleteItem(item)}
                                                 aria-label="Elimina voce"
                                             >

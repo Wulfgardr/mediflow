@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 
 import {
+  DiagnosisPill,
   PillBadge,
   classNames,
   normalizeClinicalSearch,
@@ -192,7 +193,7 @@ function IncaricoArea({
             <h2 className={styles.panelTitle}>
               {list === 'attivi' ? 'Pazienti in carico' : 'Archivio pazienti'}
             </h2>
-            <PillBadge variant="muted">{visible.length} risultati</PillBadge>
+            <PillBadge variant="neutral">{visible.length} risultati</PillBadge>
             <span className={styles.panelActions}>
               <Link href="/patients/new" className={styles.ghostBtnSm}>
                 <Plus size={12} />
@@ -233,12 +234,9 @@ function IncaricoArea({
                   {patientRowVirtualizer.getVirtualItems().map((virtualRow) => {
                     const p = visible[virtualRow.index];
                     const isSelected = p.id === selected?.id;
-                    const dotClass =
-                      p.status === 'green'
-                        ? styles.patientDotGreen
-                        : p.status === 'blue'
-                          ? styles.patientDotBlue
-                          : styles.patientDotMuted;
+                    const dotClass = p.status === 'warning'
+                      ? styles.patientDotWarning
+                      : styles.patientDotNeutral;
                     return (
                       <div
                         key={p.id}
@@ -267,10 +265,12 @@ function IncaricoArea({
                             <span className={styles.patientName}>{p.name}</span>
                             <span className={styles.patientCode}>{p.code} · {p.pathway}</span>
                           </span>
+                          {/* @Codex: dentro il button conserviamo il testo naturale;
+                              i ruoli annidati sarebbero presentazionali e non una lista reale. */}
                           <span className={styles.patientMeta}>
                             {p.diagnoses.map((d) => (
                               <span key={d} className={styles.patientDiagnosisPill}>
-                                <PillBadge variant="muted">{d}</PillBadge>
+                                <DiagnosisPill diagnosis={d} />
                               </span>
                             ))}
                           </span>
@@ -278,9 +278,7 @@ function IncaricoArea({
                             {p.lastTouch}
                           </span>
                           <span className={styles.patientStatusCell}>
-                            <PillBadge
-                              variant={p.status === 'muted' ? 'muted' : p.status === 'blue' ? 'blue' : 'green'}
-                            >
+                            <PillBadge variant={p.status}>
                               {p.statusLabel}
                             </PillBadge>
                           </span>
@@ -311,16 +309,19 @@ function IncaricoArea({
               {selected.ageLabel} · aggiornato {selected.lastTouch}
             </span>
           </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {/* @Codex */}
+          <ul aria-label={`Diagnosi e stato di ${selected.name}`} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {selected.diagnoses.map((d) => (
-              <PillBadge key={d} variant="blue">{d}</PillBadge>
+              <li key={d} className={styles.patientDiagnosisPill}>
+                <DiagnosisPill diagnosis={d} />
+              </li>
             ))}
-            <PillBadge
-              variant={selected.status === 'muted' ? 'muted' : selected.status === 'blue' ? 'blue' : 'green'}
-            >
-              {selected.statusLabel}
-            </PillBadge>
-          </div>
+            <li>
+              <PillBadge variant={selected.status}>
+                {selected.statusLabel}
+              </PillBadge>
+            </li>
+          </ul>
           <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.6 }}>
             {selected.summary}
           </p>

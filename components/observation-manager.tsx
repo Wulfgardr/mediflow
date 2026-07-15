@@ -305,7 +305,7 @@ export default function ObservationManager({
                     <p className="section-kicker">Parametri</p>
                     <div className="mt-1 flex items-center gap-2">
                         <Activity className="w-5 h-5 text-[color:var(--lume-ink-muted)]" />
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Parametri clinici</h3>
+                        <h3 className="text-lg font-semibold text-[color:var(--lume-ink)]">Parametri clinici</h3>
                     </div>
                     <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
                         Valori misurati per il paziente, raggruppati per parametro. La codifica clinica resta visibile come metadata.
@@ -315,8 +315,8 @@ export default function ObservationManager({
 
             <form onSubmit={saveObservation} className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {servicePrescriptionItemId && servicePrescriptionItem ? (
-                    <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-[18px] border border-[color:rgba(15,23,42,0.12)] bg-white/70 px-3.5 py-2.5 dark:border-white/10 dark:bg-white/5">
-                        <span className="text-sm text-[color:var(--lume-ink)] dark:text-slate-100">
+                    <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3.5 py-2.5">
+                        <span className="text-sm text-[color:var(--lume-ink)]">
                             Collegata a: <strong>{servicePrescriptionItem.serviceName}</strong> (prescrizione del {new Date(servicePrescriptionItem.prescriptionDate).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })})
                         </span>
                         <button
@@ -354,7 +354,7 @@ export default function ObservationManager({
                         ))}
                     </select>
                     {selectedLoinc ? (
-                        <span className="block text-[10.5px] font-mono uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                        <span className="block text-[10.5px] font-mono uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                             LOINC {selectedLoinc.code}
                         </span>
                     ) : null}
@@ -385,7 +385,7 @@ export default function ObservationManager({
                         className="mf-input"
                     />
                     {valueError ? (
-                        <span className="block text-[11px] text-[color:var(--lume-signal-critical)]">{valueError}</span>
+                        <span className="block text-[11px] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{valueError}</span>
                     ) : null}
                 </label>
 
@@ -403,7 +403,7 @@ export default function ObservationManager({
                             </option>
                         ))}
                     </select>
-                    <span className="block text-[10.5px] font-mono uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                    <span className="block text-[10.5px] font-mono uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                         UCUM {unitCode}
                     </span>
                 </label>
@@ -456,7 +456,7 @@ export default function ObservationManager({
             <div className="space-y-3">
                 {groups && groups.length > 0 ? (
                     <div className="flex justify-end">
-                        <div role="group" aria-label="Vista parametri" className="inline-flex rounded-full border border-[color:rgba(15,23,42,0.12)] bg-white/70 p-0.5 text-xs dark:border-white/10 dark:bg-white/5">
+                        <div role="group" aria-label="Vista parametri" className="inline-flex rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-0.5 text-xs">
                             <button
                                 type="button"
                                 aria-pressed={viewMode === 'parametro'}
@@ -481,7 +481,7 @@ export default function ObservationManager({
                         {[0, 1, 2].map((row) => (
                             <div
                                 key={row}
-                                className="mf-skeleton h-16 border border-slate-200/70 dark:border-white/10"
+                                className="mf-skeleton h-16 border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)]"
                             />
                         ))}
                     </div>
@@ -493,32 +493,32 @@ export default function ObservationManager({
                     (byDay ?? []).map((day) => (
                         <section
                             key={day.key}
-                            className="overflow-hidden rounded-[18px] border border-slate-200/80 bg-white/78 dark:border-white/10 dark:bg-white/5"
+                            className="overflow-hidden rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)]"
                         >
-                            <header className="border-b border-slate-200/70 bg-white/55 px-3.5 py-2 dark:border-white/10 dark:bg-white/5">
-                                <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                            <header className="border-b border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] px-3.5 py-2">
+                                <span className="text-sm font-semibold text-[color:var(--lume-ink)]">
                                     Misure del {day.date.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}
                                 </span>
                                 <span className="ml-2 text-[11px] text-[color:var(--lume-ink-muted)]">
                                     {day.items.length} {day.items.length === 1 ? 'misura' : 'misure'}
                                 </span>
                             </header>
-                            <div className="divide-y divide-slate-200/60 dark:divide-white/5">
+                            <div className="divide-y divide-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)]">
                                 {day.items.map((item) => {
                                     const flag = classifyObservationRange(item.value, item.refLow, item.refHigh);
                                     const range = formatReferenceRange(item.refLow, item.refHigh, item.refText);
                                     return (
                                         <div key={item.id} className="grid grid-cols-[1fr_auto] items-center gap-2 px-3.5 py-1.5">
-                                            <span className="min-w-0 truncate text-[13px] text-slate-800 dark:text-slate-100">
+                                            <span className="min-w-0 truncate text-[13px] text-[color:var(--lume-ink)]">
                                                 {italianLoincLabel(item.code, item.display)}
                                             </span>
                                             <span className="inline-flex items-center gap-2">
-                                                <span className={flag ? 'text-sm font-semibold tabular-nums text-[color:var(--lume-signal-critical)]' : 'text-sm tabular-nums text-slate-800 dark:text-slate-100'}>
+                                                <span className={flag ? 'text-sm font-semibold tabular-nums text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]' : 'text-sm tabular-nums text-[color:var(--lume-ink)]'}>
                                                     {item.value}{item.unitCode ? ` ${item.unitCode}` : ''}
                                                 </span>
-                                                {range ? <span className="text-[10px] text-slate-400 dark:text-slate-500">rif {range}</span> : null}
+                                                {range ? <span className="text-[10px] text-[color:var(--lume-ink-muted)]">rif {range}</span> : null}
                                                 {flag ? (
-                                                    <span className="rounded-md bg-[color:rgba(163,58,47,0.12)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--lume-signal-critical)]">
+                                                    <span className="rounded-md border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] px-1.5 py-0.5 text-[10px] font-semibold text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
                                                         {flag === 'alto' ? 'Alto' : 'Basso'}
                                                     </span>
                                                 ) : null}
@@ -551,7 +551,7 @@ export default function ObservationManager({
                         return (
                             <section
                                 key={group.code}
-                                className="overflow-hidden rounded-[18px] border border-slate-200/80 bg-white/78 dark:border-white/10 dark:bg-white/5"
+                                className="overflow-hidden rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)]"
                             >
                                 <button
                                     type="button"
@@ -562,7 +562,7 @@ export default function ObservationManager({
                                 >
                                     <span className="min-w-0">
                                         <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                                            <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                                            <span className="text-sm font-semibold text-[color:var(--lume-ink)]">
                                                 {label}
                                             </span>
                                             <span className="text-[11px] text-[color:var(--lume-ink-muted)]">
@@ -570,13 +570,13 @@ export default function ObservationManager({
                                                 {group.items.length === 1 ? 'misura' : 'misure'}
                                             </span>
                                         </span>
-                                        <span className="block font-mono text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                                        <span className="block font-mono text-[10px] uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                             {group.codeSystem} {group.code}
                                         </span>
                                     </span>
                                     <span className="flex shrink-0 items-center gap-2.5">
                                         <Sparkline values={chartValues} />
-                                        <span className={`text-base font-semibold tabular-nums ${classifyObservationRange(latest.value, latest.refLow, latest.refHigh) ? 'text-[color:var(--lume-signal-critical)]' : 'text-slate-900 dark:text-white'}`}>
+                                        <span className={`text-base font-semibold tabular-nums ${classifyObservationRange(latest.value, latest.refLow, latest.refHigh) ? 'text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]' : 'text-[color:var(--lume-ink)]'}`}>
                                             {latest.value}
                                         </span>
                                         {hasTrend ? (
@@ -598,7 +598,7 @@ export default function ObservationManager({
                                 <div id={regionId} hidden={!isOpen}>
                                     {isOpen ? (
                                         <>
-                                            <div className="divide-y divide-slate-200/60 border-t border-slate-200/70 dark:divide-white/5 dark:border-white/10">
+                                            <div className="divide-y divide-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)]">
                                                 {visibleItems.map((item) => {
                                                     const interpretation = classifyObservationRange(item.value, item.refLow, item.refHigh);
                                                     const rangeLabel = formatReferenceRange(item.refLow, item.refHigh, item.refText);
@@ -622,19 +622,19 @@ export default function ObservationManager({
                                                                     <span
                                                                         className={
                                                                             interpretation
-                                                                                ? 'text-sm font-semibold tabular-nums text-[color:var(--lume-signal-critical)]'
-                                                                                : 'text-sm tabular-nums text-slate-800 dark:text-slate-100'
+                                                                                ? 'text-sm font-semibold tabular-nums text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]'
+                                                                                : 'text-sm tabular-nums text-[color:var(--lume-ink)]'
                                                                         }
                                                                     >
                                                                         {item.value}
                                                                     </span>
                                                                     {rangeLabel ? (
-                                                                        <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                                                                        <span className="text-[10px] text-[color:var(--lume-ink-muted)]">
                                                                             rif {rangeLabel}
                                                                         </span>
                                                                     ) : null}
                                                                     {interpretation ? (
-                                                                        <span className="rounded-md bg-[color:rgba(163,58,47,0.12)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--lume-signal-critical)]">
+                                                                        <span className="rounded-md border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] px-1.5 py-0.5 text-[10px] font-semibold text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
                                                                             {interpretation === 'alto' ? 'Alto' : 'Basso'}
                                                                         </span>
                                                                     ) : null}
@@ -650,7 +650,7 @@ export default function ObservationManager({
                                                             </div>
                                                             <button
                                                                 onClick={() => deleteObservation(item.id)}
-                                                                className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
+                                                                className="rounded-lg p-1.5 text-[color:var(--lume-ink-muted)] hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
                                                                 title="Elimina misura"
                                                                 aria-label={`Elimina misura ${label} del ${new Date(item.observedAt).toLocaleDateString('it-IT')}`}
                                                             >

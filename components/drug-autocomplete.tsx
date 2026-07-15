@@ -147,7 +147,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                     <button
                         type="button"
                         onClick={() => commitDrugAutocompleteQueryChange(drugSearch, setQuery, '')} // @Codex WUL-488
-                        className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:rgba(248,250,252,0.86)] hover:text-[color:var(--lume-ink)] dark:hover:bg-white/8"
+                        className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:var(--lume-surface-focal)] hover:text-[color:var(--lume-ink)]"
                         style={{ color: 'var(--lume-ink-muted)' }}
                         title="Cancella ricerca"
                         aria-label="Cancella ricerca"
@@ -159,7 +159,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
 
             {isOpen && results.length > 0 && (
                 <div className={drugPopoverClassName} role="listbox" id={listboxId} aria-label="Risultati catalogo farmaci">
-                    <div role="presentation" className="mb-1 flex items-center justify-between gap-3 border-b border-[color:rgba(112,106,100,0.10)] px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)] dark:border-white/10">
+                    <div role="presentation" className="mb-1 flex items-center justify-between gap-3 border-b border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">
                         <span>Risultati catalogo ({results.length})</span>
                         <span className="flex items-center gap-1"><Database className="w-3 h-3" /> AIFA locale</span>
                     </div>
@@ -186,7 +186,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                                         <Activity className="w-3 h-3" />
                                         {drug.activePrinciple}
                                     </div>
-                                    <div className="mt-1 truncate text-[10px] text-[color:rgba(112,106,100,0.72)]">
+                                    <div className="mt-1 truncate text-[10px] text-[color:var(--lume-ink-muted)]">
                                         {drug.company} {drug.class ? `• Fascia ${drug.class}` : ''} {drug.atc ? `• ATC: ${drug.atc}` : ''}
                                     </div>
                                 </div>

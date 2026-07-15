@@ -7,6 +7,8 @@ import { db, type ProstheticPrescription, type ProstheticPrescriptionCategory, t
 import { useLiveQuery } from '@/lib/live-query';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { DocumentReferenceChip } from '@/components/document-reference-chip';
+import { Badge } from '@/components/ui/badge';
+import type { SemanticSignal } from '@/lib/ui-semantic-signal';
 
 type Props = {
     patientId: string;
@@ -83,6 +85,12 @@ function statusLabel(value: ProstheticPrescriptionStatus): string {
 
 function categoryLabel(value: ProstheticPrescriptionCategory): string {
     return CATEGORY_OPTIONS.find((item) => item.value === value)?.label ?? value;
+}
+
+function prostheticStatusSignal(value: ProstheticPrescriptionStatus): SemanticSignal {
+    return value === 'authorized' || value === 'delivered' || value === 'tested'
+        ? 'success'
+        : 'neutral';
 }
 
 function parseDocumentRefs(value: string | undefined): string[] {
@@ -223,7 +231,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
             )}
 
             {isFormOpen && (
-                <form onSubmit={handleSubmit} className="mb-5 rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 p-4">
+                <form onSubmit={handleSubmit} className="mb-5 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
                     <div className="grid gap-3 md:grid-cols-2">
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Data prescrizione
@@ -246,7 +254,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                             <input className="input-field lume-registro" value={form.isoCode} onChange={(event) => updateForm('isoCode', event.target.value)} placeholder="es. 12.22.03.006" />
                         </label>
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)] md:col-span-2">
-                            Descrizione ausilio <span aria-hidden className="text-rose-600">*</span>
+                            Descrizione ausilio <span aria-hidden className="text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">*</span>
                             <input className="input-field" value={form.description} onChange={(event) => updateForm('description', event.target.value)} placeholder="Carrozzina ad autospinta..." aria-required="true" />
                         </label>
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
@@ -289,7 +297,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                             <textarea className="input-field min-h-20" value={form.notes} onChange={(event) => updateForm('notes', event.target.value)} />
                         </label>
                     </div>
-                    {error && <p className="mt-3 text-xs font-medium text-rose-700">{error}</p>}
+                    {error && <p className="mt-3 text-xs font-medium text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{error}</p>}
                     <div className="mt-4 flex justify-end gap-2">
                         <button type="button" className="ui-btn-secondary h-10 px-4 text-sm" onClick={() => setIsFormOpen(false)}>Annulla</button>
                         <button type="submit" className="ui-btn-primary h-10 px-4 text-sm" disabled={isSaving}>
@@ -301,7 +309,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
             )}
 
             {!prescriptions ? null : prescriptions.length === 0 ? (
-                <div className="rounded-[18px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-6 text-center">
+                <div className="rounded-[18px] border border-dashed border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] px-4 py-6 text-center">
                     <p className="text-sm text-[color:var(--lume-ink-muted)]">
                         Nessuna prescrizione protesica registrata per questo paziente.
                     </p>
@@ -311,14 +319,14 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                     {prescriptions.map((item) => {
                         const refs = parseDocumentRefs(item.documentRefs);
                         return (
-                            <article key={item.id} className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 p-4">
+                            <article key={item.id} className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
                                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                     <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
                                             <span className="apple-chip lume-registro">{new Date(item.prescribedAt).toLocaleDateString('it-IT')}</span>
-                                            <span className="apple-chip">{statusLabel(item.status)}</span>
-                                            <span className="apple-chip">{categoryLabel(item.category)}</span>
-                                            {item.source === 'document_review' && <span className="apple-chip">document-backed</span>}
+                                            <Badge tone={prostheticStatusSignal(item.status)} size="xs">{statusLabel(item.status)}</Badge>
+                                            <Badge tone="plum" size="xs">{categoryLabel(item.category)}</Badge>
+                                            {item.source === 'document_review' && <Badge tone="plum" size="xs">document-backed</Badge>}
                                         </div>
                                         <h3 className="mt-3 text-base font-semibold text-[color:var(--lume-ink)]">{item.description}</h3>
                                         <div className="mt-2 grid gap-2 text-sm text-[color:var(--lume-ink-muted)] md:grid-cols-2">
@@ -340,7 +348,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                                                 Collaudo
                                             </button>
                                         )}
-                                        <button type="button" aria-label={`Elimina ${item.description}`} className="ui-btn-secondary h-9 px-3 text-xs text-rose-700" onClick={() => void deleteItem(item)}>
+                                        <button type="button" aria-label={`Elimina ${item.description}`} className="ui-btn-secondary h-9 px-3 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]" onClick={() => void deleteItem(item)}>
                                             <Trash2 className="h-4 w-4" />
                                         </button>
                                     </div>

@@ -206,10 +206,10 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
             )}
 
             {pendingHandoff ? (
-                <div className="mb-5 rounded-[18px] border border-amber-200 bg-amber-50/80 p-4">
+                <div className="mb-5 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] p-4">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-amber-700">Da chiudere</p>
+                            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]">Da chiudere</p>
                             <h3 className="mt-1 text-sm font-semibold text-[color:var(--lume-ink)]">
                                 {pendingHandoff.moduleLabel} aperto {formatDate(pendingHandoff.startedAt)}
                             </h3>
@@ -241,7 +241,7 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                         type="button"
                         disabled={isSaving}
                         onClick={() => void closePendingHandoff()}
-                        className="mt-3 inline-flex h-10 items-center justify-center gap-2 rounded-[12px] bg-[color:var(--lume-ink)] px-4 text-sm font-semibold text-white transition-colors hover:bg-[color:var(--lume-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="mt-3 inline-flex h-10 items-center justify-center gap-2 rounded-[12px] bg-[color:var(--lume-ink)] px-4 text-sm font-semibold text-[color:var(--lume-surface-focal)] transition-colors hover:bg-[color:var(--lume-accent)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                         Chiudi passaggio
@@ -250,7 +250,7 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
             ) : null}
 
             {isFormOpen && (
-                <form onSubmit={handleSubmit} className="mb-5 rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 p-4">
+                <form onSubmit={handleSubmit} className="mb-5 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] p-4">
                     <div className="grid gap-3 md:grid-cols-2">
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Modulo
@@ -277,7 +277,7 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                             <textarea className="input-field min-h-24" value={form.nextAction} onChange={(event) => updateForm('nextAction', event.target.value)} />
                         </label>
                     </div>
-                    {error ? <p className="mt-3 text-xs font-semibold text-rose-700">{error}</p> : null}
+                    {error ? <p className="mt-3 text-xs font-semibold text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{error}</p> : null}
                     <div className="mt-4 flex justify-end">
                         <button type="submit" disabled={isSaving} className="ui-btn-primary h-10 px-4 text-sm font-semibold">
                             {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
@@ -287,10 +287,10 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                 </form>
             )}
 
-            {error && !isFormOpen ? <p className="mb-3 text-xs font-semibold text-rose-700">{error}</p> : null}
+            {error && !isFormOpen ? <p className="mb-3 text-xs font-semibold text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{error}</p> : null}
 
             {!handoffs || handoffs.length === 0 ? (
-                <div className="rounded-[24px] border border-dashed border-[color:rgba(112,106,100,0.18)] px-4 py-6 text-center">
+                <div className="rounded-[24px] border border-dashed border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] px-4 py-6 text-center">
                     <p className="text-sm text-[color:var(--lume-ink-muted)]">
                         Nessun passaggio SISS registrato per questo paziente.
                     </p>
@@ -298,7 +298,7 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
             ) : (
                 <div className="grid gap-3">
                     {handoffs.slice(0, 6).map((item) => (
-                        <div key={item.id} className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 px-4 py-3">
+                        <div key={item.id} className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] px-4 py-3">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
                                     <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{item.moduleLabel}</p>
@@ -309,7 +309,7 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                                 <button
                                     type="button"
                                     onClick={() => void deleteItem(item)}
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-[color:rgba(112,106,100,0.12)] text-[color:var(--lume-ink-muted)] transition-colors hover:border-rose-200 hover:text-rose-700"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] text-[color:var(--lume-ink-muted)] transition-colors hover:border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
                                     aria-label="Elimina passaggio SISS"
                                 >
                                     <Trash2 className="h-3.5 w-3.5" />

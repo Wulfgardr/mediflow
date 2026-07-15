@@ -31,6 +31,8 @@ import { serializeDocumentParseEvidenceArtifact } from '@/lib/domain/documents/d
 import DocumentViewer from '@/components/document-viewer';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { semanticSignalSurfaceClass } from '@/components/ui/semantic-signal';
+import { sharedKillSwitchSignal } from '@/lib/ui-semantic-signal';
 
 interface DocumentUploadProps {
     patientId: string;
@@ -324,15 +326,15 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                 )}
             >
                 <input {...getInputProps()} />
-                <div className="mb-3 rounded-full bg-slate-100 p-3 text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                <div className="mb-3 rounded-full bg-[color:color-mix(in_srgb,var(--lume-accent)_11%,var(--lume-surface-field))] p-3 text-[color:var(--lume-accent)]">
                     {isProcessing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Upload className="w-6 h-6" />}
                 </div>
-                <p className="text-gray-700 dark:text-gray-200 font-medium text-sm">Carica Documenti</p>
-                <p className="text-gray-400 text-xs mt-1">L&apos;IA estrarrà il contesto (max 10 file, 25 MB ciascuno).</p>
+                <p className="text-sm font-medium text-[color:var(--lume-ink)]">Carica Documenti</p>
+                <p className="mt-1 text-xs text-[color:var(--lume-ink-muted)]">L&apos;IA estrarrà il contesto (max 10 file, 25 MB ciascuno).</p>
             </div>
 
             {fileRejections.length > 0 && (
-                <ul className="mt-2 space-y-1 rounded-xl border border-[color:rgba(163,58,47,0.28)] bg-[color:rgba(163,58,47,0.08)] px-3 py-2 text-xs text-[color:var(--lume-signal-critical)]">
+                <ul className="mt-2 space-y-1 rounded-xl border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] px-3 py-2 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
                     {fileRejections.map((message) => (
                         <li key={message}>{message}</li>
                     ))}
@@ -341,10 +343,10 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
 
             {/* @Codex */}
             {(isProcessing || aiStage) && (
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-[color:var(--lume-ink-muted)]">
                     <span className="font-medium">AI:</span> {aiStage || "Attesa..."}
                     {aiModels && (
-                        <div className="mt-1 text-[10px] text-gray-400">
+                        <div className="mt-1 text-[10px] text-[color:var(--lume-ink-muted)]">
                             OCR: {aiModels.ocr} · Sintesi: {aiModels.clinical}
                         </div>
                     )}
@@ -353,7 +355,10 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
 
             {!documentSynthesisEnabled && (
                 <div
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+                    className={cn(
+                        'rounded-2xl border p-3 text-xs leading-5',
+                        semanticSignalSurfaceClass(sharedKillSwitchSignal(documentSynthesisEnabled)),
+                    )}
                     data-testid="document-upload-synthesis-disabled-note"
                 >
                     La sintesi clinica documento è disabilitata localmente. L&apos;upload e l&apos;OCR restano disponibili, ma l&apos;Archivio Intelligente e l&apos;aggiornamento di AI Patient Insight non vengono eseguiti.
@@ -363,7 +368,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
             {/* Coda OCR-needed: documenti bloccati con stato e motivo */}
             {ocrQueueEntries.length > 0 && (
                 <div
-                    className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200"
+                    className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] p-3 text-xs leading-5 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]"
                     data-testid="document-ocr-queue-panel"
                 >
                     <p className="font-medium">
@@ -382,24 +387,24 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
             {/* File List */}
             <div className="flex flex-col gap-3">
                 {attachments?.map((file) => (
-                    <div key={file.id} className="lume-card group flex items-center gap-3 p-3 transition-colors hover:border-slate-300 dark:hover:border-white/20">
-                        <div className="p-2 bg-red-50 dark:bg-red-900/10 rounded-lg text-red-500 dark:text-red-400 border border-red-100 dark:border-white/5">
+                    <div key={file.id} className="lume-card group flex items-center gap-3 p-3 transition-colors hover:border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)]">
+                        <div className="rounded-lg border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] p-2 text-[color:var(--lume-ink-muted)]">
                             <FileText className="w-5 h-5" />
                         </div>
 
                         <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-gray-800 dark:text-gray-100 text-sm truncate">{file.name}</h4>
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            <h4 className="truncate text-sm font-bold text-[color:var(--lume-ink)]">{file.name}</h4>
+                            <p className="text-[10px] uppercase tracking-wider text-[color:var(--lume-ink-muted)]">
                                 {new Date(file.createdAt).toLocaleDateString()}
                             </p>
                             {file.summarySnapshot && (
-                                <p className="mt-0.5 truncate text-xs text-slate-600 dark:text-slate-300">
+                                <p className="mt-0.5 truncate text-xs text-[color:var(--lume-ink-muted)]">
                                     AI: {file.summarySnapshot}
                                 </p>
                             )}
                             {file.ocrQueueState && (
                                 <p
-                                    className="mt-0.5 truncate text-xs font-medium text-amber-600 dark:text-amber-400"
+                                    className="mt-0.5 truncate text-xs font-medium text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]"
                                     data-testid="document-ocr-queue-entry"
                                 >
                                     OCR: {describeDocumentOcrQueueEntry(file.ocrQueueState as string, file.ocrQueueReason)}
@@ -412,7 +417,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                                 <button
                                     onClick={() => handleOcrReplay(file)}
                                     disabled={replayingId !== null}
-                                    className="rounded-lg p-2 text-[color:var(--lume-signal-warning)] transition-colors hover:bg-[color:rgba(154,106,47,0.1)] disabled:opacity-50 dark:hover:bg-white/10"
+                                    className="rounded-lg p-2 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] disabled:opacity-50"
                                     title="Riprova OCR"
                                     aria-label={`Riprova OCR su ${file.name}`}
                                 >
@@ -423,7 +428,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                                 <button
                                     onClick={() => handleOcrManualReview(file)}
                                     disabled={replayingId !== null}
-                                    className="rounded-lg p-2 text-[color:var(--lume-signal-warning)] transition-colors hover:bg-[color:rgba(154,106,47,0.1)] disabled:opacity-50 dark:hover:bg-white/10"
+                                    className="rounded-lg p-2 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] disabled:opacity-50"
                                     title="Segna per revisione manuale"
                                     aria-label={`Segna ${file.name} per revisione manuale`}
                                 >
@@ -432,7 +437,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                             )}
                             <button
                                 onClick={() => setViewingFile(file)}
-                                className="rounded-lg p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:rgba(15,23,42,0.06)] hover:text-[color:var(--lume-ink)] dark:hover:bg-white/10"
+                                className="rounded-lg p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] hover:text-[color:var(--lume-ink)]"
                                 title="Visualizza"
                                 aria-label={`Visualizza ${file.name}`}
                             >
@@ -441,7 +446,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
 
                             <button
                                 onClick={() => handleDelete(file.id)}
-                                className="p-2 text-[color:var(--lume-ink-muted)] hover:text-[color:var(--lume-signal-critical)] hover:bg-[color:rgba(163,58,47,0.1)] rounded-lg transition-colors"
+                                className="rounded-lg p-2 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
                                 title="Elimina"
                                 aria-label={`Elimina ${file.name}`}
                             >
