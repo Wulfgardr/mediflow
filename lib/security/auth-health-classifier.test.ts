@@ -14,7 +14,7 @@ test('classifies better-sqlite3 NODE_MODULE_VERSION mismatch as native dependenc
     assert.equal(result.category, 'native-dependency-invalid');
     assert.equal(result.dbState, 'unavailable');
     assert.equal(result.message, 'Modulo nativo SQLite incompatibile con il runtime Node corrente.');
-    assert.equal(result.remediationCommand, 'npm rebuild better-sqlite3');
+    assert.equal(result.remediationCommand, 'npm ci');
     assert.match(result.nextAction ?? '', /riavvia/i);
 });
 

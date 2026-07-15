@@ -19,7 +19,7 @@ tecnico, senza sovrastimare la parita.
 
 Il core e gia in larga parte portabile e verificato:
 
-- `next.config.ts` ha `output: "standalone"`; il `Dockerfile` node:20-alpine
+- `next.config.ts` ha `output: "standalone"`; il `Dockerfile` node:24-alpine
   prova l'esecuzione su Linux.
 - `better-sqlite3` 12.x spedisce binari precompilati per win32/darwin/linux.
 - `lib/data-dir.ts` ramifica gia `darwin` (`~/Library/Application Support/MediFlow`)
@@ -62,12 +62,12 @@ Adottiamo l'opzione 3.
   `Start-MediFlow.ps1` (Windows), `scripts/start-mediflow.sh` (Linux).
 - La logica condivisa (rilevamento porta, hash worktree, apertura browser, check
   Node) vive in `scripts/launcher-helpers.mjs`, richiamato da tutti i launcher.
-- `.nvmrc` resta sul toolchain di sviluppo corrente (`24`) per gli script basati
-  su `run-strip-types`, che richiedono Node >=22.6.
-- `package.json` non impone `engines.node`: la CI cross-platform verifica Node
-  20 come runtime minimo supportato per install/build/start, cosi da mantenere
-  coperto il path con binari precompilati `better-sqlite3` senza bloccare il
-  toolchain locale piu recente.
+- `.nvmrc`, `package.json#engines`, `.npmrc`, Docker e CI convergono su Node
+  24.x. Installazione, build, start e launcher falliscono prima dell'avvio se
+  Node o il binding nativo `better-sqlite3` non rispettano il contratto.
+- La build standalone registra major e ABI Node nel bundle. Il supervisor
+  macOS sceglie solo un eseguibile compatibile con quel manifest, anche quando
+  nel sistema e installato un Node generico piu recente.
 - Lo scheduling del backup passa dietro un `SchedulerAdapter`
   (`lib/backup-scheduler-adapter.ts`): `launchd` su macOS, Task Scheduler via
   `schtasks` su Windows, `systemd-timer` (fallback `cron`) su Linux. Il runner
@@ -91,9 +91,9 @@ Adottiamo l'opzione 3.
   verificabile su tre OS via la CI matrix (`.github/workflows/cross-platform.yml`).
 - Positivo: il backup automatico non e piu solo-macOS.
 - Negativo: tre file di launcher da mantenere (mitigato dall'helper condiviso).
-- Nota: alcuni script di tooling che usano `run-strip-types` richiedono un Node
-  piu recente del minimo runtime verificato in CI; per questo `.nvmrc` punta a
-  Node 24 mentre la matrix cross-platform continua a provare Node 20.
+- Negativo: il runtime supportato e intenzionalmente ristretto a Node 24.x;
+  aggiornare Node richiede un cambiamento coordinato del contratto e una nuova
+  verifica cross-platform del binding nativo.
 
 ## First Thin Slice
 

@@ -44,7 +44,13 @@ npm run check:standalone-runtime-bundle
 ```
 
 Il guard fallisce se `.next/standalone` contiene database locali, directory
-temporanee o documentazione privata/non-runtime.
+temporanee o documentazione privata/non-runtime. Verifica inoltre il manifest
+Node/ABI generato dalla build e carica davvero il `better-sqlite3` incluso.
+Il bundle non accetta un Node di sistema incompatibile: il supervisor cerca un
+Node 24.x con la stessa ABI registrata, oppure usa `MEDIFLOW_NODE_BINARY` solo
+se supera lo stesso controllo.
+Poiche `better-sqlite3` e nativo, ogni bundle prodotto e esplicitamente legato
+all'architettura del Node di build (`arm64` oppure `x86_64`), non universale.
 
 Firma e notarizzazione restano esplicite:
 

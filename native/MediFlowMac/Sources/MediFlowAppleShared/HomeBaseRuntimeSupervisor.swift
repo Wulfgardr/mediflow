@@ -31,6 +31,14 @@ public struct HomeBaseRuntimeLaunchPlan: Equatable, Sendable {
     }
 }
 
+/* @Codex */
+struct HomeBaseNodeRuntimeContract: Decodable {
+    struct Node: Decodable { let major: Int; let version: String; let moduleVersion: String }
+    let node: Node
+    let platform: String
+    let arch: String
+}
+
 @MainActor
 public final class HomeBaseRuntimeSupervisor: ObservableObject {
     @Published public private(set) var statusMessage: String?
@@ -151,7 +159,7 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
     func makeLaunchPlan(snapshot: HomeBaseRuntimeSnapshot) throws -> HomeBaseRuntimeLaunchPlan {
         let dataDirectory = URL(fileURLWithPath: snapshot.dataDirectory)
         let scriptURL = try proxyScriptURL()
-        let nodeBinary = try resolveNodeBinary()
+        let nodeBinary = try resolveNodeBinary(contract: bundledNodeContract())
         let port = snapshot.port ?? 3443
         let bindHost = snapshot.bindHost ?? "127.0.0.1"
         let httpTarget = snapshot.httpTarget ?? "http://127.0.0.1:3000"
@@ -185,7 +193,7 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
         let dataDirectory = URL(fileURLWithPath: snapshot.dataDirectory)
         let webRuntimeURL = try webRuntimeURL()
         let serverURL = webRuntimeURL.appendingPathComponent("server.js")
-        let nodeBinary = try resolveNodeBinary()
+        let nodeBinary = try resolveNodeBinary(contract: bundledNodeContract())
         let pidPath = snapshot.webBackendPidPath
         let logPath = dataDirectory.appendingPathComponent("logs/local-web-backend.log").path
 
@@ -223,6 +231,15 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
         throw HomeBaseRuntimeSupervisorError.missingWebRuntime
     }
 
+    private func bundledNodeContract() throws -> HomeBaseNodeRuntimeContract {
+        let url = try webRuntimeURL().appendingPathComponent("mediflow-runtime-contract.json")
+        guard let data = try? Data(contentsOf: url),
+              let contract = try? JSONDecoder().decode(HomeBaseNodeRuntimeContract.self, from: data) else {
+            throw HomeBaseRuntimeSupervisorError.missingRuntimeContract
+        }
+        return contract
+    }
+
     #if os(macOS)
     private func launchProcess(plan: HomeBaseRuntimeLaunchPlan, terminationStatusPrefix: String) throws -> Process {
         try fileManager.createDirectory(
@@ -256,17 +273,20 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
     }
     #endif
 
-    private func resolveNodeBinary() throws -> String {
+    private func resolveNodeBinary(contract: HomeBaseNodeRuntimeContract) throws -> String {
         if let override = processInfo.environment["MEDIFLOW_NODE_BINARY"],
            fileManager.isExecutableFile(atPath: override) {
+            guard Self.compatibleNode(in: [override], contract: contract, fileManager: fileManager) != nil else {
+                throw HomeBaseRuntimeSupervisorError.incompatibleNode(contract.node.major, contract.node.moduleVersion)
+            }
             return override
         }
 
-        for candidate in ["/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node"] {
-            if fileManager.isExecutableFile(atPath: candidate) {
-                return candidate
-            }
-        }
+        var candidates = [
+            "/opt/homebrew/opt/node@\(contract.node.major)/bin/node",
+            "/usr/local/opt/node@\(contract.node.major)/bin/node",
+            "/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node"
+        ]
 
         // Version managers (nvm, fnm) install node outside the standard paths, and
         // a GUI-launched app does not inherit the shell PATH. Probe their dirs and
@@ -279,17 +299,22 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
             home.appendingPathComponent(".nvm/versions/node"),
             home.appendingPathComponent(".local/share/fnm/node-versions")
         ]
-        if let managed = Self.newestVersionManagerNode(in: versionDirs, fileManager: fileManager) {
-            return managed
-        }
+        candidates.append(contentsOf: Self.versionManagerNodes(in: versionDirs, fileManager: fileManager))
         #endif
 
-        throw HomeBaseRuntimeSupervisorError.missingNode
+        guard let compatible = Self.compatibleNode(in: candidates, contract: contract, fileManager: fileManager) else {
+            throw HomeBaseRuntimeSupervisorError.incompatibleNode(contract.node.major, contract.node.moduleVersion)
+        }
+        return compatible
     }
 
     /// Returns the path to the highest-version `node` under nvm/fnm version dirs,
     /// or nil if none. nonisolated + static so it is pure and unit-testable.
     nonisolated static func newestVersionManagerNode(in versionDirs: [URL], fileManager: FileManager) -> String? {
+        versionManagerNodes(in: versionDirs, fileManager: fileManager).first
+    }
+
+    nonisolated static func versionManagerNodes(in versionDirs: [URL], fileManager: FileManager) -> [String] {
         var candidates: [(version: [Int], path: String)] = []
         for dir in versionDirs {
             guard let entries = try? fileManager.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else {
@@ -305,7 +330,36 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
                 }
             }
         }
-        return candidates.max(by: { $0.version.lexicographicallyPrecedes($1.version) })?.path
+        return candidates.sorted { $1.version.lexicographicallyPrecedes($0.version) }.map(\.path)
+    }
+
+    nonisolated static func compatibleNode(
+        in candidates: [String], contract: HomeBaseNodeRuntimeContract, fileManager: FileManager
+    ) -> String? {
+        #if os(macOS)
+        candidates.first { path in
+            guard fileManager.isExecutableFile(atPath: path) else { return false }
+            let process = Process()
+            let pipe = Pipe()
+            process.executableURL = URL(fileURLWithPath: path)
+            process.arguments = [
+                "-p",
+                "[process.versions.node,process.versions.modules,process.platform,process.arch].join(' ')"
+            ]
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+            guard (try? process.run()) != nil else { return false }
+            process.waitUntilExit()
+            let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines).split(separator: " ")
+            return process.terminationStatus == 0 && output.count == 4 &&
+                Int(output[0].split(separator: ".").first ?? "") == contract.node.major &&
+                output[1] == contract.node.moduleVersion &&
+                output[2] == contract.platform && output[3] == contract.arch
+        }
+        #else
+        nil
+        #endif
     }
 
     /// Parses a "vX.Y.Z" directory name into [X, Y, Z] for numeric comparison.
@@ -390,6 +444,8 @@ public enum HomeBaseRuntimeSupervisorError: LocalizedError, Equatable {
     case missingTLSMaterial
     case missingProxyScript
     case missingWebRuntime
+    case missingRuntimeContract
+    case incompatibleNode(Int, String)
     case missingNode
 
     public var errorDescription: String? {
@@ -400,6 +456,10 @@ public enum HomeBaseRuntimeSupervisorError: LocalizedError, Equatable {
             return "Script proxy TLS non incluso nel bundle."
         case .missingWebRuntime:
             return "Runtime web standalone non incluso nel bundle. Ricompila la app con lo script nativo."
+        case .missingRuntimeContract:
+            return "Contratto Node/ABI del runtime web mancante. Ricompila il bundle senza riusare artefatti obsoleti."
+        case .incompatibleNode(let major, let abi):
+            return "Node \(major).x con ABI \(abi) non trovato. Installa la versione richiesta dal bundle o configura MEDIFLOW_NODE_BINARY."
         case .missingNode:
             return "Node.js non trovato. Configura MEDIFLOW_NODE_BINARY o installa Node in un percorso standard."
         }

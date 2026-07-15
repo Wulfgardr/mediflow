@@ -18,14 +18,21 @@ echo "   MediFlow - Avvio (Linux)"
 echo "==================================================="
 echo ""
 
-# --- 1. Node.js ---
-if ! command -v node >/dev/null 2>&1; then
-    echo "  Node.js non trovato. Installa Node 20 LTS e riprova." >&2
+# --- 1. Node.js + native binding ---
+REQUIRED_NODE_MAJOR="$(tr -dc '0-9' < "$DIR/.nvmrc")"
+path_node="$(command -v node 2>/dev/null || true)"
+for candidate in "$path_node" "$HOME"/.nvm/versions/node/v"$REQUIRED_NODE_MAJOR".*/bin/node \
+    "$HOME"/.local/share/fnm/node-versions/v"$REQUIRED_NODE_MAJOR".*/installation/bin/node; do
+    [ -x "$candidate" ] || continue
+    if "$candidate" scripts/launcher-helpers.mjs check-runtime >/dev/null 2>&1; then
+        export PATH="$(dirname "$candidate"):$PATH"
+        break
+    fi
+done
+if ! node scripts/launcher-helpers.mjs check-runtime >/dev/null 2>&1; then
+    echo "  Serve Node ${REQUIRED_NODE_MAJOR}.x con dipendenze installate dalla stessa versione." >&2
+    echo "  Esegui npm ci con Node ${REQUIRED_NODE_MAJOR}; non usare npm rebuild." >&2
     exit 1
-fi
-if ! node scripts/launcher-helpers.mjs check-node >/dev/null 2>&1; then
-    echo "  Attenzione: Node $(node -v) non compatibile, serve Node 20 LTS (vedi .nvmrc)."
-    echo "  Con un'altra versione l'install di better-sqlite3 puo cadere su node-gyp."
 fi
 
 # --- 2. Ollama (opzionale: AI/OCR locale) ---

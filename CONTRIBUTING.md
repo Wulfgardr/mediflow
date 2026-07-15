@@ -30,7 +30,7 @@ destinazione di export. Dati e artifact sensibili restano fuori da Git secondo
 
 ## ⚙️ Prerequisiti
 
-- Node.js **v20+** consigliato
+- Node.js **24.x**, come fissato da `.nvmrc` e `package.json`
 - npm (incluso con Node)
 - Docker Desktop (opzionale, per API ICD-11)
 - Ollama (opzionale, per AI/OCR locale)
@@ -47,7 +47,8 @@ platform-specific equivalente in MediFlow.
 ```bash
 git clone https://github.com/Wulfgardr/mediflow
 cd mediflow
-npm install
+nvm use
+npm ci
 ```
 
 ### Avvio (stack web locale consigliato)
@@ -191,6 +192,13 @@ Documentazione tecnica:
 ---
 
 ## 🗄️ Modifiche database (Drizzle / SQLite)
+
+Le schema guard additive di `lib/db-server.ts` sono serializzate con una
+transazione SQLite `IMMEDIATE`. Questo vincolo vale anche durante `next build`,
+che valuta i moduli server con piu processi: non introdurre guard che aprono una
+seconda connessione o aggirano la transazione. La regressione dedicata e
+`npm run test:db-bootstrap-concurrency` e usa solo un database temporaneo
+sintetico.
 
 Fonti autorevoli:
 - Schema: `lib/schema.ts`
