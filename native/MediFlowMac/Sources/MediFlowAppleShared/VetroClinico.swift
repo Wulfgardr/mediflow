@@ -75,13 +75,15 @@ public struct StatusBadge: View {
     public var body: some View {
         /* @Codex */
         let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
+        let toneColor = LumePalette.tint(for: tone, using: palette)
         Text(text)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(VetroPalette.tint(for: tone))
+            .foregroundStyle(toneColor)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(palette.field, in: Capsule())
-            .overlay(Capsule().strokeBorder(palette.inkMuted.opacity(0.28), lineWidth: 0.5))
+            .overlay(Capsule().strokeBorder(toneColor.opacity(0.4), lineWidth: 0.5))
+            .accessibilityLabel(text)
     }
 }
 

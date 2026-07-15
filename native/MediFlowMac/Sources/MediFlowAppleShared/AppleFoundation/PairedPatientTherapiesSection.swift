@@ -6,6 +6,8 @@ struct PairedPatientTherapiesSection: View {
     @Binding var therapyStatusFilter: TherapyStatusFilter
     @Binding var confirmsDeletingTherapy: Bool
     @Binding var therapyDeletionCandidateId: String?
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.lumeGuardia) private var isGuardia
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -152,12 +154,18 @@ struct PairedPatientTherapiesSection: View {
         }
     }
 
-    // Semantic status color (Vetro Clinico tone), or attention if soft-deleted.
+    // Semantic Lume status color, or attention if soft-deleted.
     // Kept as tinted text rather than a glass badge: Liquid Glass is for the
     // control/navigation layer, not every content row.
     private func therapyStatusColor(_ therapy: HomeBaseTherapySummary) -> Color {
-        if therapy.deletedAt != nil { return VetroPalette.tint(for: .attention) }
-        return VetroPalette.tint(for: PairedTherapyStatus(rawValue: therapy.status)?.tone ?? .neutral)
+        if therapy.deletedAt != nil { return toneColor(.attention) }
+        return toneColor(PairedTherapyStatus(rawValue: therapy.status)?.tone ?? .neutral)
+    }
+
+    /* @Codex */
+    private func toneColor(_ tone: LumeTone) -> Color {
+        let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
+        return LumePalette.tint(for: tone, using: palette)
     }
 
     /* @Codex */
@@ -211,7 +219,7 @@ struct PairedPatientTherapiesSection: View {
             if therapy.deletedAt != nil {
                 Text("Terapia annullata")
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(toneColor(.attention))
             } else if model.canMutateTherapy(therapy) {
                 HStack(spacing: 8) {
                     Button {

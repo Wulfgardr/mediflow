@@ -34,7 +34,7 @@ Lume nasce multipiattaforma per costruzione, ma la delivery corrente e Apple-fir
 | --- | --- | --- |
 | `VetroGlassModifier` | `LumeSurface(zone:)` | Rende canvas/field/focal/chrome; niente `glassEffect` sulle superfici strutturali; la guardia `accessibilityReduceTransparency` resta per gli overlay |
 | `GlassCard` | `LumeCard(zone:)` | Opaca, bordo 1px, ombra solo se focale |
-| `StatusBadge`, `VetroTone`/`VetroPalette` | Invariati nei valori, rinominati `LumeTone`/`LumePalette` | Badge su superficie field opaca; il segnale clinico resta soltanto su testo o glifo |
+| `StatusBadge`, `VetroTone`/`VetroPalette` | `LumeTone`/`LumePalette`, con alias Vetro di compatibilità | Mapping register-aware: neutral -> `ink.muted`, info/amministrativo -> `accent.minerale`, positive -> `signal.success`, attention -> `signal.warning`, critical -> `signal.critical`. Per la resa dei tre signal, il seed DTCG viene miscelato in sRGB al 60% con il 40% di `ink.primary`: il minimo misurato su `field` è 5,41:1 nei tre registri. I badge restano opachi e conservano testo o glifo; `signal.plum` non rappresenta alcun tono finché manca uno stato strutturato dedicato |
 | `InfoRow` | `RigaLista` | Altezza 44pt touch, fuoco di selezione reso con la luce, cifre tabellari |
 | (nuovo) | `TestataPaziente` | Identità verificabile: nome e anno in compact; dettagli espandibili e identificativo abbreviato sotto il privacy shield. Il glifo allergie compare solo quando esiste un dato strutturato affidabile |
 | (nuovo) | `RigaLaboratorio` | Anatomia canonica: nome (Voce), valore (Registro), unità, banda di range + banda personale (Canvas/Gauge custom), delta, data |
@@ -45,7 +45,7 @@ Lume nasce multipiattaforma per costruzione, ma la delivery corrente e Apple-fir
 
 Il commit semantics sul nativo segue l'inchiostro: una bozza (voce diario proposta, prescrizione in preparazione) usa `ink-muted` con una micro-etichetta onesta; un'azione esplicita "Firma" la consolida e l'inchiostro asciuga a contrasto pieno, come definito in [07-gesto-e-movimento.md](./07-gesto-e-movimento.md) par. 3. `confirmationDialog` con ruolo `.destructive` resta per le distruttive; un inserimento errato si marca, non si cancella (pattern Canvas, coerente con l'audit locale).
 
-La palette nativa è code-first nel package condiviso, senza asset catalog. I valori restano nella sorgente unica `tokens/lume.tokens.json`; un test XCTest risolve quel file da `#filePath` e confronta ogni token. Qualunque drift fallisce in modo chiuso e ne elenca i nomi.
+La palette nativa è code-first nel package condiviso, senza asset catalog. I valori restano nella sorgente unica `tokens/lume.tokens.json`; i test XCTest risolvono quel file da `#filePath`, confrontano ogni token e attraversano ogni combinazione registro x `LumeTone`. Qualunque drift o nuovo tono senza mapping fallisce in modo chiuso e ne elenca il token atteso.
 
 ## 3. La grammatica compatta (iPhone)
 

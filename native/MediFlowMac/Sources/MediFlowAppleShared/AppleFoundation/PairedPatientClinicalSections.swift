@@ -9,6 +9,8 @@ struct PairedPatientClinicalSections: View {
     @Binding var checkupDeletionCandidateId: String?
     @Binding var confirmsDeletingObservation: Bool
     @Binding var observationDeletionCandidateId: String?
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.lumeGuardia) private var isGuardia
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -184,8 +186,14 @@ struct PairedPatientClinicalSections: View {
     /* @Codex */
 
     private func checkupStatusColor(_ checkup: HomeBaseCheckupSummary) -> Color {
-        if checkup.deletedAt != nil { return VetroPalette.tint(for: .attention) }
-        return VetroPalette.tint(for: PairedCheckupStatus(rawValue: checkup.status)?.tone ?? .neutral)
+        if checkup.deletedAt != nil { return toneColor(.attention) }
+        return toneColor(PairedCheckupStatus(rawValue: checkup.status)?.tone ?? .neutral)
+    }
+
+    /* @Codex */
+    private func toneColor(_ tone: LumeTone) -> Color {
+        let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
+        return LumePalette.tint(for: tone, using: palette)
     }
 
     private func checkupRow(_ checkup: HomeBaseCheckupSummary) -> some View {
@@ -211,7 +219,7 @@ struct PairedPatientClinicalSections: View {
             if checkup.deletedAt != nil {
                 Text("Controllo annullato")
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(toneColor(.attention))
             } else if model.canMutateCheckup(checkup) {
                 HStack(spacing: 8) {
                     Button {
@@ -282,7 +290,7 @@ struct PairedPatientClinicalSections: View {
             if observation.deletedAt != nil {
                 Text("Osservazione annullata")
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(toneColor(.attention))
             } else if model.canMutateObservation(observation) {
                 HStack(spacing: 8) {
                     Button {
