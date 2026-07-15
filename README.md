@@ -45,18 +45,24 @@ sanitari, credenziali e altri artefatti locali restano fuori da Git secondo
 
 ## Come si presenta
 
+### App macOS
+
+<img src="./screenshots/macos-workspace.png" alt="Panoramica nativa di MediFlow per macOS con navigazione Lume e guardrail local-first" width="820" loading="lazy" decoding="async"/>
+
+### Web locale
+
 <img src="./screenshots/01-worklist.png" alt="Cockpit Lume di MediFlow: lista di lavoro con pazienti dimostrativi sintetici" width="820" loading="lazy" decoding="async"/>
 
-_Render reali delle superfici web che adottano Lume, la lingua visiva di
-MediFlow. Catturati dalla build di produzione con dati dimostrativi sintetici.
-Nessun dato paziente reale._
+_Catture reali dell'app macOS e della build web di produzione che adottano
+Lume, la lingua visiva di MediFlow. Le viste cliniche usano esclusivamente
+fixture dimostrative sintetiche. Nessun dato paziente reale._
 
 <details>
-<summary><b>Altre schermate</b>: scheda paziente, quadro clinico, revisione documenti e sicurezza</summary>
+<summary><b>Altre schermate web</b>: scheda paziente, quadro clinico, diario e sicurezza</summary>
 <p><img src="./screenshots/02-scheda.png" alt="Scheda paziente con moduli clinici" width="820" loading="lazy" decoding="async"/></p>
 <p><img src="./screenshots/03-quadro.png" alt="Quadro paziente nel cockpit" width="820" loading="lazy" decoding="async"/></p>
-<p><img src="./screenshots/04-review.png" alt="Revisione documenti e codifiche" width="820" loading="lazy" decoding="async"/></p>
-<p><img src="./screenshots/05-security.png" alt="Impostazioni di sicurezza locale con PIN" width="820" loading="lazy" decoding="async"/></p>
+<p><img src="./screenshots/04-review.png" alt="Diario clinico nel registro grafite di Lume" width="820" loading="lazy" decoding="async"/></p>
+<p><img src="./screenshots/05-security.png" alt="Impostazioni di accesso e sicurezza locale" width="820" loading="lazy" decoding="async"/></p>
 </details>
 
 ## Come è fatto
@@ -89,13 +95,15 @@ plane sono documentati in
 
 ## Stato 0.7.3
 
-La 0.7.3 consolida il percorso local-first avviato dalla 0.7.2. Porta Lume sulle
-prime superfici web e native, rende più modulare lo stack AI locale e rafforza
-backup, cifratura dei campi clinici, packaging e controlli sui claim pubblici.
+La 0.7.3 consolida il percorso local-first avviato dalla 0.7.2. Porta Lume
+sull'interfaccia web e sulle superfici dichiarate dell'app Apple, rende più
+modulare lo stack AI locale e rafforza backup, cifratura dei campi clinici,
+packaging e controlli sui claim pubblici.
 
-Restano aperti la migrazione completa dell'interfaccia, parte della parity dei
-client paired e il collaudo manuale P6 sul bundle macOS. Il gate verso provider
-AI esterni resta chiuso e non è consegnato alcun percorso di consenso o invio.
+Restano aperti la parity dei client paired, gli snapshot di confronto completi,
+la verifica VoiceOver e il collaudo manuale P6 sul bundle macOS. Il gate verso
+provider AI esterni resta chiuso e non è consegnato alcun percorso di consenso
+o invio.
 
 Il dettaglio è nel [CHANGELOG](./CHANGELOG.md). La fotografia completa vive in
 [`docs/STATE_OF_THE_SYSTEM.md`](./docs/STATE_OF_THE_SYSTEM.md); la parity
@@ -175,12 +183,13 @@ sviluppo assistito da AI.
 implementazione, review e verifica. Le proposte dei modelli restano materiale da
 controllare: test reali e guard automatici decidono se una modifica regge.
 
-Uno snapshot dei log locali del 13 luglio 2026 conta circa **12,34 miliardi di
-token di sessione**: 7,89 miliardi con Codex e 4,45 con Claude Code. Sono in gran
-parte contesto riletto o recuperato dalla cache; misurano il volume del lavoro
-assistito, non righe di codice o qualità.
+Uno snapshot dei log locali del 15 luglio 2026 conta circa **17,56 miliardi di
+token di sessione**: 11,33 miliardi con Codex e 6,22 con Claude Code. Circa
+16,41 miliardi sono input recuperato dalla cache; il dato misura soprattutto
+contesto riletto durante il lavoro assistito, non righe di codice, costo o
+qualità.
 
-<img src="./screenshots/token-models.svg" alt="Modelli usati per MediFlow: Codex circa 7,89 miliardi di token nelle famiglie GPT-5.2-5.6; Claude Code circa 4,45 miliardi con Opus 4.8, Fable 5, Sonnet 5 e una quota esplorativa storica di Haiku 4.5" width="720" loading="lazy"/>
+<img src="./screenshots/token-models.svg" alt="Modelli usati per MediFlow: Codex circa 11,33 miliardi di token nelle famiglie GPT-5.2-5.6; Claude Code circa 6,22 miliardi con Opus 4.8, Fable 5, Sonnet 5 e una quota storica di Haiku 4.5" width="720" loading="lazy"/>
 
 Ogni colore corrisponde a un modello o a una famiglia vicina. Le due barre usano
 la stessa scala: mostrano insieme il peso dei due ambienti e la loro composizione
@@ -188,10 +197,10 @@ interna. Non è una classifica di qualità, ma la fotografia di quali modelli ha
 assorbito più contesto durante lo sviluppo.
 
 Per Codex i log registrano anche l'effort: `xhigh` è la quota maggiore, seguito
-da `medium`, `high` e `low`. `Ultra` è mostrato a parte perché indica fan-out tra
-più agenti, non un livello di ragionamento. Nei log storici di Claude Code
-l'effort non è esposto in modo abbastanza uniforme; questa revisione del README
-è stata eseguita con Opus 4.8 a effort `max`.
+da `medium`, `high` e `low`. Le sessioni senza effort registrato restano separate
+perché possono includere fan-out `Ultra`, che non è un livello di ragionamento.
+Nei log storici di Claude Code l'effort non è esposto in modo abbastanza
+uniforme.
 
 Il conteggio precedente del README usava una metodologia diversa e non è
 direttamente confrontabile. La responsabilità del progetto resta mia.
