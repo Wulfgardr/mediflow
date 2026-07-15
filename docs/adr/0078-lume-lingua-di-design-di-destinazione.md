@@ -1,6 +1,6 @@
 # ADR 0078: Lume come lingua di design di destinazione multipiattaforma
 
-Date: 2026-07-12 (ledger aggiornato 2026-07-13)
+Date: 2026-07-12 (ledger aggiornato 2026-07-15)
 Status: Accepted (decisione di prodotto di Leonardo registrata il 2026-07-12; canone mergiato su main con PR #45); implementazione in corso lungo le fasi L0-L6 di migrazione (ledger in fondo)
 
 ---
@@ -58,8 +58,10 @@ Si adotta l'opzione 2:
 1. **Lume** (`docs/design/lume/`) e la lingua di design di destinazione di
    MediFlow su tutte le piattaforme: modello focale (fuoco, penombra, buio
    operativo), materia opaca con registri di luce (giorno, grafite, guardia),
-   il filo come firma grafica con tratto = stato epistemico, due voci
-   tipografiche (Voce e Registro), grammatica dell'attenzione.
+   tre portatori con ruoli distinti: la luce porta il fuoco, l'inchiostro porta
+   lo stato epistemico e il filo continuo collega solo elementi realmente
+   connessi nel tempo o nella provenienza. Le due voci tipografiche sono Voce e
+   Registro; la grammatica dell'attenzione governa la priorita.
 2. **Vetro Clinico** (`docs/design/vetro-clinico/`) resta il canone operativo
    transitorio delle superfici non migrate. Le corsie DS sono prerequisiti
    applicati per piattaforma e superficie, non un blocco globale: DS-1 governa
@@ -111,8 +113,9 @@ marker resta evidenza tecnica della migrazione (ADR 0047).
 ## Ledger di implementazione
 
 Il canone e Accepted; la migrazione resta in corso. Questo ledger distingue le
-tranche gia atterrate su `main` da quelle ancora aperte. Ogni riga consegnata
-cita l'evidenza; il resto e lavoro dichiarato, non stato raggiunto.
+tranche gia atterrate su `main`, quelle consegnate sul branch nativo
+`feat/lume-apple` in attesa di integrazione e quelle ancora aperte. Ogni riga
+consegnata cita l'evidenza; il resto e lavoro dichiarato, non stato raggiunto.
 
 Consegnate:
 
@@ -133,22 +136,48 @@ Consegnate:
   (`clinicalCardStyle()`, alias `cardStyle()`, `GlassCard` deprecata e resa
   opaca) con test sintetico light/dark (`ClinicalCardStyleTests`) e build del
   bundle (PR #46).
+- **Spacchettamento workspace nativo, branch `feat/lume-apple`**: il workspace
+  pazienti condiviso e separato in viste coese senza modificare
+  `PairedPatientsWorkspaceModel`, `MediFlowCore` o le API pubbliche.
+- **LumeKit nativo, Wave N2, branch `feat/lume-apple`**: `LumePalette` code-first con registri
+  giorno/grafite/guardia e parita fail-closed rispetto al JSON, superfici
+  opache `LumeSurface`/`LumeCard`, connettore reale `Filo`, `RigaLista`,
+  `.registro()`, `.lumeInchiostro(bozza:)` e chrome `lumeGlass`, mantenendo gli
+  alias Vetro per i consumatori non ancora migrati.
+- **Adozione L2-L4 nativa, branch `feat/lume-apple`**: worklist, Scheda,
+  diario e impostazioni del client accoppiato adottano le primitive Lume. Il
+  diario usa una sola spina continua nel contenitore; testata, metriche e righe
+  cliniche degradano in verticale alle categorie Dynamic Type accessibility;
+  il Registro resta confinato ai valori e l'inchiostro alla bozza generata.
+  `StatusBadge` e opaco. Il CF e abbreviato nelle liste e nella testata, mentre
+  il valore completo resta nel dettaglio protetto dal privacy shield.
+- **Migrazione web L2-L5 (PR #62)**: tutta l'interfaccia web adotta il modello
+  focale su superfici opache, con le due voci impacchettate in locale (Inter
+  Variable per la Voce, IBM Plex Mono per il Registro, licenze OFL), il
+  Registro sugli atomi verificabili, l'inchiostro sulle bozze, la spina SVG del
+  diario e i connettori di provenienza, gli overlay a ombra e scrim, il ritiro
+  di vetro strutturale, tier e token legacy, il budget di movimento come check
+  CI fail-closed e il contratto dei contrasti esteso a 42 coppie misurate.
 - **Grammatica del gesto e del movimento (canone e dimostratori)**:
   `07-gesto-e-movimento.md` distilla il livello di interazione e motion con una
   resa rivista del filo (la luce marca il fuoco, l'inchiostro porta lo stato, il
   filo resta connettore come geometria SVG), con cinque dimostratori interattivi
-  in `mockups/`. Revisiona la resa descritta in `01-lingua.md` par. 3 e 7. Resta
-  specifica e dimostratore, non implementazione: i consumatori web e nativi
-  restano da migrare.
+  in `mockups/`. Revisiona la resa descritta in `01-lingua.md` par. 3 e 7. La
+  specifica non implica adozione completa: la tranche nativa sopra applica il
+  contratto alle superfici dichiarate, mentre gli altri consumatori restano da
+  migrare.
 
 Aperte:
 
-- Componenti interni e viste web non ancora migrati: Vetro Clinico resta il
-  canone operativo transitorio delle superfici non toccate.
-- Registro guardia come tema attivo, filo, tipografia bundle (Voce e Registro),
-  motion focale e Settings scene.
-- Nativo oltre la card opaca: `LumePalette`/`LumeSurface`, struttura desktop,
-  parity e un target XCUITest macOS dedicato non esistono ancora.
-- Accessibilita, sicurezza e computer-use verificati manualmente end-to-end: le
-  prove correnti sono sintetiche o di CI (misura contrasti, smoke E2E, test
-  unitari), non una QA manuale completa.
+- Sul web restano fuori dal contratto le superfici dimostrative di
+  `app/mockups`; Vetro Clinico resta canone transitorio solo per le superfici
+  native non ancora adottate.
+- Attivazione contestuale del registro guardia nelle viste ed estensione di
+  Registro e motion nativi oltre le superfici dichiarate. Guardia resta
+  soltanto un raffinamento ambientale del dark, non un tema utente.
+- Coda dell'attenzione, trigger contestuale della guardia, snapshot parity
+  completi e un target XCUITest macOS dedicato restano aperti.
+- Il glifo allergie della testata compatta non e mostrato: il modello paired
+  non espone un dato strutturato affidabile e la UI non lo inferisce.
+- Le prove iOS includono build, suite UI e catture Dynamic Type; VoiceOver e la
+  QA manuale macOS end-to-end restano gate separati.

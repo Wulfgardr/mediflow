@@ -71,7 +71,8 @@ public struct AppleFoundationOverviewView: View {
                 }
             }
         }
-        .cardStyle()
+        .padding(16)
+        .lumeSurface(zone: .field)
     }
 
     private var lanes: some View {
@@ -144,7 +145,8 @@ public struct AppleCapabilityLaneCard: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
         }
-        .cardStyle()
+        .padding(16)
+        .lumeSurface(zone: .field)
     }
 
     private func platformHeader(_ title: String) -> some View {
@@ -358,6 +360,7 @@ public struct AppleMilestoneCard: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .cardStyle()
+        .padding(16)
+        .lumeSurface(zone: .field)
     }
 }

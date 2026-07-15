@@ -27,6 +27,32 @@ final class PatientSummaryPresentationTests: XCTestCase {
         XCTAssertNil(PairedPatientsWorkspaceView.age(from: ancient))
     }
 
+    /* @Codex */
+    func testCompactTaxCodeKeepsOnlyLastSixCharacters() {
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.compactTaxCode("RSSMRA80A01H501U"), "…1H501U")
+    }
+
+    /* @Codex */
+    func testCompactTaxCodeDoesNotExpandShortValues() {
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.compactTaxCode("ABC123"), "ABC123")
+    }
+
+    /* @Codex */
+    func testBirthYearTextIsVerbatimWithoutGroupingSeparator() {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.timeZone = TimeZone(secondsFromGMT: 0)
+        components.year = 1980
+        components.month = 1
+        components.day = 1
+
+        let birthDate = try! XCTUnwrap(components.date)
+        let birthYear = PairedPatientsWorkspaceSupport.birthYearText(from: birthDate)
+
+        XCTAssertEqual(birthYear, "1980")
+        XCTAssertNotEqual(birthYear, "1.980")
+    }
+
     // G3 (observations sparkline): only scalar numeric values feed the chart.
     func testParseObservationValueAcceptsNumbersAndComma() {
         XCTAssertEqual(PairedPatientsWorkspaceView.parseObservationValue("120"), 120)
