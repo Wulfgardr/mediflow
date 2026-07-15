@@ -3,6 +3,7 @@ import SwiftUI
 /* @Codex */
 struct PairedPatientDetailSection: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ObservedObject var model: PairedPatientsWorkspaceModel
     let detail: HomeBasePatientDetail
     @Binding var patientLifecycleSheet: PatientLifecycleSheet?
@@ -13,7 +14,7 @@ struct PairedPatientDetailSection: View {
         let exemptions = ExemptionCodesCodec.decode(detail.exemptions)
         return VStack(alignment: .leading, spacing: 8) {
             /* @Codex */
-            if dynamicTypeSize >= .accessibility1 {
+            if dynamicTypeSize >= .accessibility1 || horizontalSizeClass == .compact {
                 VStack(alignment: .leading, spacing: 8) {
                     patientHeaderTitle
                     patientHeaderActions
@@ -113,10 +114,21 @@ struct PairedPatientDetailSection: View {
 
     @ViewBuilder
     private var patientHeaderActions: some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 132), spacing: 8, alignment: .leading)],
+            alignment: .leading,
+            spacing: 6
+        ) {
+            patientHeaderActionButtons
+        }
+    }
+
+    @ViewBuilder
+    private var patientHeaderActionButtons: some View {
         Button {
             model.startEditingPatient()
         } label: {
-            Label("Modifica", systemImage: "pencil")
+            patientHeaderActionLabel("Modifica", systemImage: "pencil")
         }
         .font(.caption)
         .disabled(model.isEditingPatient)
@@ -125,7 +137,7 @@ struct PairedPatientDetailSection: View {
             Button {
                 patientLifecycleSheet = .unarchive
             } label: {
-                Label("Riattiva", systemImage: "archivebox")
+                patientHeaderActionLabel("Riattiva", systemImage: "archivebox")
             }
             .font(.caption)
             .disabled(!model.canUnarchivePatient)
@@ -134,7 +146,7 @@ struct PairedPatientDetailSection: View {
             Button {
                 patientLifecycleSheet = .archive
             } label: {
-                Label("Archivia", systemImage: "archivebox")
+                patientHeaderActionLabel("Archivia", systemImage: "archivebox")
             }
             .font(.caption)
             .disabled(!model.canArchivePatient)
@@ -143,7 +155,7 @@ struct PairedPatientDetailSection: View {
         Button(role: .destructive) {
             patientLifecycleSheet = .delete
         } label: {
-            Label("Elimina", systemImage: "trash")
+            patientHeaderActionLabel("Elimina", systemImage: "trash")
         }
         .font(.caption)
         .disabled(!model.canSoftDeletePatient)
@@ -151,14 +163,14 @@ struct PairedPatientDetailSection: View {
         Button {
             confirmsFHIRExport = true
         } label: {
-            Label("Esporta FHIR", systemImage: "doc.badge.arrow.up")
+            patientHeaderActionLabel("Esporta FHIR", systemImage: "doc.badge.arrow.up")
         }
         .font(.caption)
         .disabled(!model.canPrepareFHIRExport)
         .accessibilityIdentifier("patient-export-fhir-button")
         if let fhirURL = model.patientFHIRExportURL {
             ShareLink(item: fhirURL) {
-                Label("Condividi FHIR", systemImage: "square.and.arrow.up")
+                patientHeaderActionLabel("Condividi FHIR", systemImage: "square.and.arrow.up")
                     .font(.caption)
             }
             .accessibilityIdentifier("patient-share-fhir-button")
@@ -166,10 +178,17 @@ struct PairedPatientDetailSection: View {
         Button {
             Task { await model.openPrregHandoff() }
         } label: {
-            Label("Prescrittivo regionale", systemImage: "arrow.up.forward.app")
+            patientHeaderActionLabel("Prescrittivo regionale", systemImage: "arrow.up.forward.app")
         }
         .font(.caption)
         .accessibilityIdentifier("patient-prreg-handoff-button")
+    }
+
+    private func patientHeaderActionLabel(_ title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
     }
 
     private var patientEditForm: some View {

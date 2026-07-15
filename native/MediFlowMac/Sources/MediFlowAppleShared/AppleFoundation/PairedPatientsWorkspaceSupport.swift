@@ -27,6 +27,11 @@ enum PairedPatientsWorkspaceSupport {
     }
 
     /* @Codex */
+    static func birthYearText(from birthDate: Date?) -> String? {
+        birthYear(from: birthDate).map(String.init)
+    }
+
+    /* @Codex */
     static func compactTaxCode(_ taxCode: String) -> String {
         let normalized = taxCode.trimmingCharacters(in: .whitespacesAndNewlines)
         guard normalized.count > 6 else { return normalized }

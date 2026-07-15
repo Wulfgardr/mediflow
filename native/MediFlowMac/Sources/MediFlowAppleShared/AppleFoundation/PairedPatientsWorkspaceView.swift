@@ -322,8 +322,8 @@ struct PairedPatientsWorkspaceView: View {
                             Spacer(minLength: 8)
                             compactHeaderChevron
                         }
-                        if let birthYear = PairedPatientsWorkspaceSupport.birthYear(from: detail.birthDate) {
-                            Text("\(birthYear)")
+                        if let birthYear = PairedPatientsWorkspaceSupport.birthYearText(from: detail.birthDate) {
+                            Text(birthYear)
                                 .font(.caption)
                                 .registro()
                                 .foregroundStyle(.secondary)
@@ -333,8 +333,8 @@ struct PairedPatientsWorkspaceView: View {
                     HStack(spacing: 8) {
                         Text("\(detail.lastName) \(detail.firstName)")
                             .font(.subheadline.weight(.semibold))
-                        if let birthYear = PairedPatientsWorkspaceSupport.birthYear(from: detail.birthDate) {
-                            Text("\(birthYear)")
+                        if let birthYear = PairedPatientsWorkspaceSupport.birthYearText(from: detail.birthDate) {
+                            Text(birthYear)
                                 .font(.caption)
                                 .registro()
                                 .foregroundStyle(.secondary)
