@@ -151,6 +151,13 @@ Consegnate:
   il Registro resta confinato ai valori e l'inchiostro alla bozza generata.
   `StatusBadge` e opaco. Il CF e abbreviato nelle liste e nella testata, mentre
   il valore completo resta nel dettaglio protetto dal privacy shield.
+- **Migrazione web L2-L5 (PR #62)**: tutta l'interfaccia web adotta il modello
+  focale su superfici opache, con le due voci impacchettate in locale (Inter
+  Variable per la Voce, IBM Plex Mono per il Registro, licenze OFL), il
+  Registro sugli atomi verificabili, l'inchiostro sulle bozze, la spina SVG del
+  diario e i connettori di provenienza, gli overlay a ombra e scrim, il ritiro
+  di vetro strutturale, tier e token legacy, il budget di movimento come check
+  CI fail-closed e il contratto dei contrasti esteso a 42 coppie misurate.
 - **Grammatica del gesto e del movimento (canone e dimostratori)**:
   `07-gesto-e-movimento.md` distilla il livello di interazione e motion con una
   resa rivista del filo (la luce marca il fuoco, l'inchiostro porta lo stato, il
@@ -162,12 +169,12 @@ Consegnate:
 
 Aperte:
 
-- Componenti interni e viste web non ancora migrati: Vetro Clinico resta il
-  canone operativo transitorio delle superfici non toccate.
-- Attivazione contestuale del registro guardia nelle viste, tipografia bundle
-  della Voce, completamento del Registro oltre gli atomi adottati e motion
-  nelle viste. Guardia resta soltanto un raffinamento ambientale del dark, non
-  un tema utente.
+- Sul web restano fuori dal contratto le superfici dimostrative di
+  `app/mockups`; Vetro Clinico resta canone transitorio solo per le superfici
+  native non ancora adottate.
+- Attivazione contestuale del registro guardia nelle viste ed estensione di
+  Registro e motion nativi oltre le superfici dichiarate. Guardia resta
+  soltanto un raffinamento ambientale del dark, non un tema utente.
 - Coda dell'attenzione, trigger contestuale della guardia, snapshot parity
   completi e un target XCUITest macOS dedicato restano aperti.
 - Il glifo allergie della testata compatta non e mostrato: il modello paired
