@@ -124,9 +124,12 @@ public enum LumePalette {
             let seedRGB = UInt64(seed.dropFirst(), radix: 16),
             let inkRGB = UInt64(ink.dropFirst(), radix: 16)
         else { preconditionFailure("Invalid Lume signal or ink hex") }
+        let inkWeight = 1 - seedWeight
         let channel: (Int) -> Int = { shift in
-            Int((Double((seedRGB >> shift) & 0xff) * seedWeight
-                + Double((inkRGB >> shift) & 0xff) * (1 - seedWeight)).rounded())
+            let seedByte = Double((seedRGB >> shift) & 0xff)
+            let inkByte = Double((inkRGB >> shift) & 0xff)
+            let weightedValue = seedByte * seedWeight + inkByte * inkWeight
+            return Int(weightedValue.rounded())
         }
         return String(format: "#%02x%02x%02x", channel(16), channel(8), channel(0))
     }
