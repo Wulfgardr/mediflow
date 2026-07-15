@@ -1,7 +1,7 @@
 'use client';
 
 /* @Codex */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Bold, Heading1, Heading2, IndentDecrease, IndentIncrease, Italic, List, ListOrdered, Pilcrow, Strikethrough, Underline } from 'lucide-react';
 
 import { clinicalRichTextToPlainText } from '@/lib/clinical-rich-text';
@@ -51,10 +51,16 @@ const BLOCK_ACTIONS: Array<ToolbarAction & { icon: typeof Heading1 }> = [
 
 interface ClinicalRichTextEditorProps {
     className?: string;
+    description?: string;
+    label?: string;
     onChange: (value: string) => void;
     placeholder?: string;
     value: string;
 }
+
+/* @Codex #75: toolbar e canvas usano solo superfici Lume opache. */
+const TOOLBAR_BUTTON_CLASS = 'inline-flex h-10 items-center gap-2 rounded-[var(--lume-radius-control)] border border-transparent px-3 text-sm font-medium text-[color:var(--lume-ink)] transition-[background-color,border-color,color] duration-[var(--lume-dur-riga)] ease-[var(--lume-ease)] hover:border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))] focus-visible:outline-none focus-visible:shadow-[var(--lume-focus-ring)]';
+const TOOLBAR_ICON_BUTTON_CLASS = 'inline-flex h-10 items-center justify-center rounded-[var(--lume-radius-control)] px-3 text-[color:var(--lume-ink-muted)] transition-[background-color,color] duration-[var(--lume-dur-riga)] ease-[var(--lume-ease)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))] hover:text-[color:var(--lume-ink)] focus-visible:outline-none focus-visible:shadow-[var(--lume-focus-ring)]';
 
 function updateEditorEmptyState(node: HTMLDivElement | null) {
     if (!node) return;
@@ -64,11 +70,15 @@ function updateEditorEmptyState(node: HTMLDivElement | null) {
 
 export function ClinicalRichTextEditor({
     className,
+    description = 'Editor su più righe. Usa la barra degli strumenti per formattare il resoconto; Tab sposta il focus al controllo successivo.',
+    label = 'Resoconto clinico',
     onChange,
     placeholder = '',
     value,
 }: ClinicalRichTextEditorProps) {
     const editorRef = useRef<HTMLDivElement | null>(null);
+    const descriptionId = useId();
+    const editorId = useId();
     const [isFocused, setIsFocused] = useState(false);
 
     /* @Codex */
@@ -111,13 +121,20 @@ export function ClinicalRichTextEditor({
 
     return (
         <div className={cn('space-y-4', className)}>
-            <div className="flex flex-wrap items-center gap-2 rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/78 p-2 dark:bg-white/4">
+            {/* @Codex #75 */}
+            <div
+                role="group"
+                aria-controls={editorId}
+                aria-label="Strumenti del resoconto clinico"
+                data-lume-editor-surface="toolbar"
+                className="flex min-w-0 max-w-full flex-wrap items-center gap-2 rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-2"
+            >
                 {BLOCK_ACTIONS.map(({ command, icon: Icon, label, value: actionValue }) => (
                     <button
                         key={`${command}-${label}`}
                         type="button"
                         onClick={() => runCommand(command, actionValue)}
-                        className="inline-flex h-10 items-center gap-2 rounded-[14px] border border-transparent px-3 text-sm font-medium text-[color:var(--lume-ink)] transition-colors hover:border-[color:rgba(112,106,100,0.16)] hover:bg-[color:rgba(255,252,247,0.9)]"
+                        className={TOOLBAR_BUTTON_CLASS}
                         aria-label={label}
                         title={label}
                     >
@@ -126,14 +143,14 @@ export function ClinicalRichTextEditor({
                     </button>
                 ))}
 
-                <div className="mx-1 hidden h-6 w-px bg-[color:rgba(112,106,100,0.16)] sm:block" />
+                <div className="mx-1 hidden h-6 w-px bg-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] sm:block" />
 
                 {INLINE_ACTIONS.map(({ command, icon: Icon, label }) => (
                     <button
                         key={command}
                         type="button"
                         onClick={() => runCommand(command)}
-                        className="inline-flex h-10 items-center gap-2 rounded-[14px] border border-transparent px-3 text-sm font-medium text-[color:var(--lume-ink)] transition-colors hover:border-[color:rgba(112,106,100,0.16)] hover:bg-[color:rgba(255,252,247,0.9)]"
+                        className={TOOLBAR_BUTTON_CLASS}
                         aria-label={label}
                         title={label}
                     >
@@ -146,7 +163,7 @@ export function ClinicalRichTextEditor({
                     <button
                         type="button"
                         onClick={() => runCommand('outdent')}
-                        className="inline-flex h-10 items-center justify-center rounded-[14px] px-3 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:rgba(255,252,247,0.9)]"
+                        className={TOOLBAR_ICON_BUTTON_CLASS}
                         aria-label="Riduci rientro"
                         title="Riduci rientro"
                     >
@@ -155,7 +172,7 @@ export function ClinicalRichTextEditor({
                     <button
                         type="button"
                         onClick={() => runCommand('indent')}
-                        className="inline-flex h-10 items-center justify-center rounded-[14px] px-3 text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:rgba(255,252,247,0.9)]"
+                        className={TOOLBAR_ICON_BUTTON_CLASS}
                         aria-label="Aumenta rientro"
                         title="Aumenta rientro"
                     >
@@ -164,33 +181,41 @@ export function ClinicalRichTextEditor({
                 </div>
             </div>
 
-            <div className={cn(
-                'rounded-[22px] border bg-[color:rgba(255,252,247,0.9)] px-5 py-4 shadow-[0_16px_30px_rgba(35,27,22,0.06)] transition-colors',
-                isFocused
-                    ? 'border-[color:rgba(182,106,60,0.3)] shadow-[0_18px_34px_rgba(182,106,60,0.12)]'
-                    : 'border-[color:rgba(112,106,100,0.12)]',
-            )}>
+            {/* @Codex #75 */}
+            <div
+                data-lume-editor-surface="canvas"
+                className={cn(
+                    'min-w-0 max-w-full rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-focal)] px-5 py-4 transition-[border-color] duration-[var(--lume-dur-riga)] ease-[var(--lume-ease)]',
+                    isFocused
+                        ? 'border-[color:var(--lume-accent)] shadow-[var(--lume-focus-ring)]'
+                        : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] shadow-none',
+                )}
+            >
                 <div
                     ref={editorRef}
+                    id={editorId}
+                    role="textbox"
+                    aria-describedby={descriptionId}
+                    aria-label={label}
+                    aria-multiline="true"
+                    aria-required="true"
                     contentEditable
                     suppressContentEditableWarning
                     data-empty="true"
+                    data-lume-editor-surface="field"
                     data-placeholder={placeholder}
-                    className="clinical-rich-editor min-h-[320px] outline-none"
+                    className="clinical-rich-editor min-h-[320px] min-w-0 max-w-full break-words bg-[color:var(--lume-surface-focal)] outline-none"
                     onBlur={() => {
                         setIsFocused(false);
                         syncValue();
                     }}
                     onFocus={() => setIsFocused(true)}
                     onInput={syncValue}
-                    onKeyDown={(event) => {
-                        if (event.key === 'Tab') {
-                            event.preventDefault();
-                            runCommand(event.shiftKey ? 'outdent' : 'indent');
-                        }
-                    }}
                     onPaste={handlePaste}
                 />
+                <p id={descriptionId} className="mt-3 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
+                    {description}
+                </p>
             </div>
         </div>
     );
