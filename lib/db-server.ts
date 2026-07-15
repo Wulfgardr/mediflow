@@ -492,7 +492,17 @@ function applySchemaGuards() {
         console.warn('[MediFlow] Audit schema check skipped:', error);
     }
 }
-applySchemaGuards();
+
+/* @Codex */
+function applySchemaGuardsSerially(): void {
+    // Next.js production builds load server modules in multiple processes.
+    // BEGIN IMMEDIATE lets SQLite arbitrate one schema writer while the other
+    // workers wait under busy_timeout, preventing concurrent check-then-ALTER
+    // races and duplicate-column warnings.
+    sqlite.transaction(applySchemaGuards).immediate();
+}
+
+applySchemaGuardsSerially();
 
 /**
  * Replaces the SQLite file from sourcePath without writing under the open
@@ -514,7 +524,7 @@ export async function swapDatabaseFromFile(sourcePath: string, backupPath: strin
         reopenConnection: () => {
             sqlite = new Database(dbPath);
             initSqlitePragmas(sqlite);
-            applySchemaGuards();
+            applySchemaGuardsSerially();
         },
     });
 }

@@ -6,6 +6,7 @@
 // Node version check, worktree hash) so each launcher stays thin.
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
+import { assertNodeRuntime, readNodeContract, verifyNativeBinding } from './node-runtime-contract.mjs';
 
 /** Return the PID listening on a TCP port, or '' if none. */
 function portListenerPid(port) {
@@ -51,10 +52,16 @@ function openUrl(url) {
     return res?.status ?? 0;
 }
 
-/** Check the running Node is supported: >=20 (minimum runtime; the dev/test toolchain uses Node 24, see .nvmrc). */
-function checkNode() {
-    const major = Number(process.versions.node.split('.')[0]);
-    return { ok: major >= 20, version: process.versions.node, required: '>=20' };
+/** Verify the exact project Node contract, optionally including the native SQLite binding. */
+function checkNode(checkNative = false) {
+    try {
+        const contract = readNodeContract();
+        const runtime = assertNodeRuntime(contract);
+        if (checkNative) verifyNativeBinding();
+        return { ok: true, ...runtime, required: contract.engines, nativeBinding: checkNative ? 'ready' : 'not-checked' };
+    } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
 }
 
 /** Short hash of the git worktree status (replaces macOS-only `shasum`). */
@@ -73,8 +80,9 @@ switch (cmd) {
     case 'open':
         process.exit(openUrl(arg));
         break;
-    case 'check-node': {
-        const status = checkNode();
+    case 'check-node':
+    case 'check-runtime': {
+        const status = checkNode(cmd === 'check-runtime');
         console.log(JSON.stringify(status));
         process.exit(status.ok ? 0 : 1);
         break;
@@ -83,6 +91,6 @@ switch (cmd) {
         process.stdout.write(worktreeHash());
         break;
     default:
-        console.error('usage: launcher-helpers.mjs <port-listener <port>|open <url>|check-node|worktree-hash>');
+        console.error('usage: launcher-helpers.mjs <port-listener <port>|open <url>|check-node|check-runtime|worktree-hash>');
         process.exit(2);
 }

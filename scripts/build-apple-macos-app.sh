@@ -15,6 +15,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+NEXT_DIST_DIR="${MEDIFLOW_NEXT_DIST_DIR:-.next}"
+STANDALONE_DIR="$ROOT_DIR/$NEXT_DIST_DIR/standalone"
 PROJECT="$ROOT_DIR/native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj"
 SCHEME="MediFlowMacApp"
 CONFIG="${MEDIFLOW_MAC_CONFIG:-Debug}"
@@ -32,19 +34,28 @@ if [[ "${MEDIFLOW_SKIP_WEB_BUILD:-0}" != "1" ]]; then
   echo "Building web runtime (next build, standalone)..."
   # @Codex: webpack supports the repository's sibling-worktree node_modules
   # layout; Turbopack rejects dependencies resolved outside the worktree root.
-  ( cd "$ROOT_DIR" && npm run build -- --webpack && npm run check:standalone-runtime-bundle )
+  ( cd "$ROOT_DIR" && npm run build -- --webpack )
 fi
-if [[ ! -f "$ROOT_DIR/.next/standalone/server.js" ]]; then
-  echo "Missing .next/standalone/server.js. Run 'npm run build' first (or unset MEDIFLOW_SKIP_WEB_BUILD)." >&2
+( cd "$ROOT_DIR" && npm run check:standalone-runtime-bundle )
+if [[ ! -f "$STANDALONE_DIR/server.js" ]]; then
+  echo "Missing $NEXT_DIST_DIR/standalone/server.js. Run 'npm run build' first (or unset MEDIFLOW_SKIP_WEB_BUILD)." >&2
   exit 1
 fi
+
+# @Codex: better-sqlite3 is architecture-specific, so the app executable must
+# match the WebRuntime built by the active Node process.
+case "$(node -p 'process.arch')" in
+  arm64) XCODE_ARCH="arm64" ;;
+  x64) XCODE_ARCH="x86_64" ;;
+  *) echo "Unsupported Node architecture for MediFlowMac bundle." >&2; exit 1 ;;
+esac
 
 # 2. Regenerate the project (+ guards) and build the macOS app
 "$ROOT_DIR/scripts/generate-apple-xcodeproj.sh"
 echo "Building $SCHEME ($CONFIG)..."
 xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIG" \
-  -derivedDataPath "$DERIVED" -destination 'platform=macOS' \
-  build CODE_SIGNING_ALLOWED=NO
+  -derivedDataPath "$DERIVED" -destination "platform=macOS,arch=$XCODE_ARCH" \
+  build CODE_SIGNING_ALLOWED=NO ARCHS="$XCODE_ARCH" ONLY_ACTIVE_ARCH=YES
 
 APP="$DERIVED/Build/Products/$CONFIG/MediFlow.app"
 [[ -d "$APP" ]] || { echo "Build failed: $APP not found" >&2; exit 1; }
@@ -55,8 +66,8 @@ WEB="$RES/WebRuntime"
 echo "Injecting WebRuntime into the app bundle..."
 rm -rf "$WEB"
 mkdir -p "$WEB/.next"
-cp -R "$ROOT_DIR/.next/standalone/." "$WEB/"
-cp -R "$ROOT_DIR/.next/static" "$WEB/.next/static"
+cp -R "$STANDALONE_DIR/." "$WEB/"
+cp -R "$ROOT_DIR/$NEXT_DIST_DIR/static" "$WEB/.next/static"
 [[ -d "$ROOT_DIR/public" ]] && cp -R "$ROOT_DIR/public" "$WEB/public"
 cp "$ROOT_DIR/scripts/local-api-tls-proxy.mjs" "$RES/local-api-tls-proxy.mjs"
 

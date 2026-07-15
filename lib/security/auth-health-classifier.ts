@@ -83,9 +83,9 @@ export function classifyAuthHealthError(error: unknown): AuthHealthClassificatio
             category: 'native-dependency-invalid',
             dbState: 'unavailable',
             message: 'Modulo nativo SQLite incompatibile con il runtime Node corrente.',
-            remediationCommand: 'npm rebuild better-sqlite3',
+            remediationCommand: 'npm ci',
             nextAction:
-                'Ricompila better-sqlite3 con lo stesso runtime Node usato per avviare MediFlow, poi riavvia l’app.',
+                'Usa Node 24, reinstalla le dipendenze con npm ci e riavvia; i guard verificheranno il binding prima dell’avvio.',
         };
     }
 

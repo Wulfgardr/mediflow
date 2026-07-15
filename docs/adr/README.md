@@ -6,7 +6,7 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
-- [0079-local-open-loops-and-result-link.md](./0079-local-open-loops-and-result-link.md): adotta attese locali deterministiche e collegamento manuale tra prestazione e risultato; la prima slice web locale e consegnata.
+- [0080-serialize-sqlite-schema-guards-at-bootstrap.md](./0080-serialize-sqlite-schema-guards-at-bootstrap.md): propone di serializzare le schema guard SQLite al bootstrap per eliminare le scritture concorrenti durante build e avvio multiprocesso.
 
 ---
 

@@ -2,11 +2,30 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$DIR"
 
-# @Codex
-PREFERRED_NODE_BIN="$HOME/.nvm/versions/node/v20.20.2/bin"
-# @Codex
-if [ -x "$PREFERRED_NODE_BIN/node" ] && [ -x "$PREFERRED_NODE_BIN/npm" ]; then
-    export PATH="$PREFERRED_NODE_BIN:$PATH"
+# @Codex: select a Node runtime that matches both .nvmrc and the installed native binding.
+REQUIRED_NODE_MAJOR="$(tr -dc '0-9' < "$DIR/.nvmrc")"
+select_mediflow_node() {
+    local candidate=""
+    local path_node="$(command -v node 2>/dev/null || true)"
+    for candidate in "$path_node" \
+        "$HOME"/.nvm/versions/node/v"$REQUIRED_NODE_MAJOR".*/bin/node \
+        "$HOME"/.local/share/fnm/node-versions/v"$REQUIRED_NODE_MAJOR".*/installation/bin/node \
+        /opt/homebrew/opt/node@"$REQUIRED_NODE_MAJOR"/bin/node \
+        /usr/local/opt/node@"$REQUIRED_NODE_MAJOR"/bin/node \
+        /opt/homebrew/bin/node /usr/local/bin/node /usr/bin/node; do
+        [ -x "$candidate" ] || continue
+        if "$candidate" "$DIR/scripts/launcher-helpers.mjs" check-runtime >/dev/null 2>&1; then
+            export PATH="$(dirname "$candidate"):$PATH"
+            return 0
+        fi
+    done
+    return 1
+}
+
+if ! select_mediflow_node; then
+    echo "MediFlow richiede Node ${REQUIRED_NODE_MAJOR}.x con dipendenze installate dalla stessa versione." >&2
+    echo "Esegui npm ci con Node ${REQUIRED_NODE_MAJOR}, poi rilancia. npm rebuild non e necessario." >&2
+    exit 1
 fi
 
 echo "==================================================="

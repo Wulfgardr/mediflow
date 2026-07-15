@@ -66,8 +66,11 @@ stays fast and npm-free); the runnable / release app comes from:
 
 It assembles `Contents/Resources/WebRuntime/` (`server.js` + `.next/static` +
 `public`) and `local-api-tls-proxy.mjs`, exactly what the supervisor launches.
-Node is NOT bundled: the supervisor resolves system node, then nvm/fnm installs,
-or `MEDIFLOW_NODE_BINARY`.
+Node is NOT bundled. The WebRuntime carries a build-time Node/ABI manifest; the
+supervisor selects only a matching Node 24.x from system, Homebrew, nvm/fnm, or
+`MEDIFLOW_NODE_BINARY`, and fails closed when none is compatible.
+The build script emits an architecture-specific app (`arm64` or `x86_64`) that
+matches the native WebRuntime; it does not claim a universal macOS artifact.
 
 ## Known limitations (tracked follow-ups)
 
