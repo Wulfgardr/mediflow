@@ -79,6 +79,8 @@ func cleanedPatientWorkspaceValue(_ value: String?) -> String? {
 struct PairedPatientFlagChip: View {
     let text: String
     let tone: VetroTone
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.lumeGuardia) private var isGuardia
 
     init(_ text: String, tone: VetroTone) {
         self.text = text
@@ -86,12 +88,15 @@ struct PairedPatientFlagChip: View {
     }
 
     var body: some View {
+        let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
+        let toneColor = LumePalette.tint(for: tone, using: palette)
         Text(text)
             .font(.caption2.weight(.semibold))
-            .foregroundStyle(VetroPalette.tint(for: tone))
+            .foregroundStyle(toneColor)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(VetroPalette.tint(for: tone).opacity(0.12), in: Capsule())
+            .background(palette.field, in: Capsule())
+            .overlay(Capsule().strokeBorder(toneColor.opacity(0.4), lineWidth: 0.5))
     }
 }
 
