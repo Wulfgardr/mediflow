@@ -74,6 +74,17 @@ func role(of element: AXUIElement) -> String {
 }
 
 /* @Codex */
+func elementAttribute(_ element: AXUIElement, _ name: String) -> AXUIElement? {
+    guard let value = attribute(element, name) else { return nil }
+    return (value as! AXUIElement)
+}
+
+/* @Codex */
+func numericValue(of element: AXUIElement) -> Double? {
+    (attribute(element, kAXValueAttribute) as? NSNumber)?.doubleValue
+}
+
+/* @Codex */
 func nativeList(in element: AXUIElement) -> AXUIElement? {
     let nativeListRoles = [kAXOutlineRole as String, kAXTableRole as String, "AXList"]
     return findElement(in: element, where: { nativeListRoles.contains(role(of: $0)) })
@@ -319,6 +330,77 @@ func detailNameMatches(_ expected: String, app: NSRunningApplication) -> Bool {
 }
 
 /* @Codex */
+func workspaceHeader(
+    exposing expectedName: String,
+    app: NSRunningApplication
+) -> (header: AXUIElement, detail: AXUIElement)? {
+    guard let window = try? appWindow(for: app),
+          let detail = findElement(in: window, where: {
+              identifier(of: $0) == "patient-workspace-detail"
+          }) else {
+        return nil
+    }
+
+    var headers: [AXUIElement] = []
+    collectElements(in: window, where: {
+        identifier(of: $0) == "patient-workspace-header"
+    }, into: &headers)
+    guard headers.count == 1, let header = headers.first else { return nil }
+
+    let exposedText = [descriptionValue(of: header), value(of: header), title(of: header)]
+    guard exposedText.contains(where: { $0.contains(expectedName) }) else { return nil }
+    return (header, detail)
+}
+
+/* @Codex */
+func workspaceHeaderIsAutonomousHeading(
+    exposing expectedName: String,
+    app: NSRunningApplication
+) -> Bool {
+    guard let snapshot = workspaceHeader(exposing: expectedName, app: app),
+          role(of: snapshot.header) == kAXHeadingRole as String,
+          !CFEqual(snapshot.header, snapshot.detail),
+          children(of: snapshot.header).isEmpty,
+          let detailName = findElement(in: snapshot.detail, where: {
+              identifier(of: $0) == "patient-detail-name"
+          }) else {
+        return false
+    }
+    return !CFEqual(snapshot.header, detailName)
+}
+
+/* @Codex */
+func simulatePatientDetailScroll(app: NSRunningApplication) -> Bool {
+    guard let window = try? appWindow(for: app),
+          let detail = findElement(in: window, where: {
+              identifier(of: $0) == "patient-workspace-detail"
+          }) else {
+        return false
+    }
+
+    let scrollArea = role(of: detail) == kAXScrollAreaRole as String
+        ? detail
+        : findElement(in: detail, where: { role(of: $0) == kAXScrollAreaRole as String })
+    let scrollBar = scrollArea.flatMap {
+        elementAttribute($0, kAXVerticalScrollBarAttribute as String)
+    }
+    guard let scrollBar, let initialValue = numericValue(of: scrollBar) else { return false }
+    let targetValue = min(1, max(0.75, initialValue + 0.5))
+    guard targetValue > initialValue + 0.01,
+          AXUIElementSetAttributeValue(
+              scrollBar,
+              kAXValueAttribute as CFString,
+              NSNumber(value: targetValue)
+          ) == .success else {
+        return false
+    }
+    return waitFor(condition: {
+        guard let currentValue = numericValue(of: scrollBar) else { return false }
+        return currentValue > initialValue + 0.01
+    })
+}
+
+/* @Codex */
 func waitForPatientRow(
     _ identifierName: String,
     in app: NSRunningApplication,
@@ -341,22 +423,8 @@ func waitForPatientRow(
     return nil
 }
 
-func runClinicalShellProbe(app: NSRunningApplication, report: inout ProbeReport) throws {
-    let sectionChecks = [
-        ("patients", "patients-selection-list"),
-        ("agenda", "clinical-workspace-agenda-view"),
-        ("diary", "clinical-workspace-diary-view"),
-        ("analytics", "clinical-workspace-analytics-view"),
-        ("scales", "clinical-workspace-scales-view"),
-        ("settings", "clinical-workspace-settings-view"),
-        ("runtime", "apple-foundation-runtime-view"),
-        ("overview", "apple-foundation-overview-view"),
-        ("milestones", "apple-foundation-milestones-view"),
-    ]
-
-    for (section, expectedView) in sectionChecks {
-        try openClinicalSection(section, expectedView: expectedView, app: app, report: &report)
-    }
+/* @Codex */
+func runPatientWorkspaceHeaderProbe(app: NSRunningApplication, report: inout ProbeReport) throws {
     try openClinicalSection("patients", expectedView: "patients-selection-list", app: app, report: &report)
 
     guard let firstPatient = waitForPatientRow("patient-cell-uitest-1", in: app) else {
@@ -389,6 +457,53 @@ func runClinicalShellProbe(app: NSRunningApplication, report: inout ProbeReport)
         throw ProbeFailure(message: "Unable to open the first patient detail")
     }
     report.pass("Selected first patient and opened matching detail")
+
+    guard waitFor(condition: {
+        workspaceHeader(exposing: "Rossi Mario", app: app) != nil
+    }) else {
+        report.fail("Patient workspace header did not expose Rossi Mario")
+        throw ProbeFailure(message: "Patient workspace header did not expose the selected patient name.")
+    }
+    report.pass("Patient workspace header exposes Rossi Mario")
+
+    guard workspaceHeaderIsAutonomousHeading(exposing: "Rossi Mario", app: app) else {
+        report.fail("Patient workspace header is not an autonomous AX heading")
+        throw ProbeFailure(message: "Patient workspace header is not an autonomous AX heading.")
+    }
+    report.pass("Patient workspace header is an autonomous AX heading")
+
+    guard simulatePatientDetailScroll(app: app) else {
+        report.fail("Unable to simulate patient detail scroll")
+        throw ProbeFailure(message: "Unable to simulate patient detail scroll through AX.")
+    }
+    report.pass("Simulated patient detail scroll through AX")
+
+    guard waitFor(condition: {
+        workspaceHeader(exposing: "Rossi Mario", app: app) != nil
+    }) else {
+        report.fail("Patient workspace header disappeared after detail scroll")
+        throw ProbeFailure(message: "Patient workspace header disappeared after detail scroll.")
+    }
+    report.pass("Patient workspace header remains exposed after detail scroll")
+}
+
+func runClinicalShellProbe(app: NSRunningApplication, report: inout ProbeReport) throws {
+    let sectionChecks = [
+        ("patients", "patients-selection-list"),
+        ("agenda", "clinical-workspace-agenda-view"),
+        ("diary", "clinical-workspace-diary-view"),
+        ("analytics", "clinical-workspace-analytics-view"),
+        ("scales", "clinical-workspace-scales-view"),
+        ("settings", "clinical-workspace-settings-view"),
+        ("runtime", "apple-foundation-runtime-view"),
+        ("overview", "apple-foundation-overview-view"),
+        ("milestones", "apple-foundation-milestones-view"),
+    ]
+
+    for (section, expectedView) in sectionChecks {
+        try openClinicalSection(section, expectedView: expectedView, app: app, report: &report)
+    }
+    try runPatientWorkspaceHeaderProbe(app: app, report: &report)
 
     guard let secondPatient = waitForPatientRow("patient-cell-uitest-2", in: app) else {
         report.fail("Missing second synthetic patient row after AX materialization")
@@ -575,6 +690,15 @@ func main() throws {
 
     let window = try appWindow(for: app)
     report.pass("Attached to window \(title(of: window))")
+
+    if CommandLine.arguments.contains("--patient-header-only") {
+        guard windowContainsClinicalShell(window) else {
+            throw ProbeFailure(message: "The selected bundle did not expose the universal clinical shell.")
+        }
+        try runPatientWorkspaceHeaderProbe(app: app, report: &report)
+        print("Patient workspace header AX check passed.")
+        return
+    }
 
     if windowContainsClinicalShell(window) {
         try runClinicalShellProbe(app: app, report: &report)
