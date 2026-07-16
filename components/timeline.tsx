@@ -16,6 +16,7 @@ interface TimelineProps {
 export default function Timeline({ entries }: TimelineProps) {
     const [showDeleted, setShowDeleted] = useState(false);
     const [viewingFile, setViewingFile] = useState<Attachment | null>(null);
+    const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
     const confirm = useConfirm();
     const { showToast } = useToast();
 
@@ -78,6 +79,9 @@ export default function Timeline({ entries }: TimelineProps) {
     const visibleEntries = showDeleted
         ? entries
         : entries.filter(e => !e.deletedAt);
+    const resolvedActiveEntryId = visibleEntries.some((entry) => entry.id === activeEntryId)
+        ? activeEntryId
+        : visibleEntries[0]?.id;
 
     const auditToggle = (
         <button
@@ -102,12 +106,25 @@ export default function Timeline({ entries }: TimelineProps) {
         <div className="space-y-6">
             <div className="flex justify-end">{auditToggle}</div>
 
-            <div className="relative ml-3 space-y-8 pb-8">
-                <LumeFilo variant="spina" anchorSelector="[data-lume-timeline-node]" className="absolute left-[-0.5px] w-px" />
-                {visibleEntries.map((entry) => (
+            <div
+                className="relative ml-3 space-y-3 pb-8"
+                role="feed"
+                aria-label="Diario clinico del paziente"
+            >
+                <LumeFilo
+                    variant="spina"
+                    nodeCount={visibleEntries.length}
+                    anchorSelector="[data-lume-timeline-node]"
+                    className="absolute left-[-0.5px] w-px"
+                />
+                {visibleEntries.map((entry, index) => (
                     <TimelineEntryCard
                         key={entry.id}
                         entry={entry}
+                        active={entry.id === resolvedActiveEntryId}
+                        position={index + 1}
+                        setSize={visibleEntries.length}
+                        onActivate={() => setActiveEntryId(entry.id)}
                         onDelete={handleDelete}
                         onRestore={handleRestore}
                         onViewAttachment={setViewingFile}
