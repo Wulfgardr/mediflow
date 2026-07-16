@@ -30,7 +30,7 @@ type PatientQuadroProps = {
   headingId: string;
   caption: string;
   name: string;
-  atoms: Array<{ value: string; register?: boolean }>;
+  atoms: string[];
   status: string;
   diagnoses: QuadroDiagnosis[];
   summary: string;
@@ -149,11 +149,16 @@ function PatientQuadro({
         <div className={patientStyles.quadroHeading}>
           <p className={patientStyles.quadroCaption}>{caption}</p>
           <h1 id={headingId} className={patientStyles.quadroName}>{name}</h1>
-          <p className={patientStyles.quadroAtoms} data-testid="lume-quadro-atoms">
+          <p
+            className={classNames(patientStyles.quadroAtoms, 'lume-registro')}
+            data-testid="lume-quadro-atoms"
+          >
             {atoms.map((atom, index) => (
-              <span key={`${atom.value}-${index}`} className={patientStyles.quadroAtomGroup}>
+              <span key={`${atom}-${index}`} className={patientStyles.quadroAtomGroup}>
                 {index > 0 ? <span className={patientStyles.quadroDot} aria-hidden="true">·</span> : null}
-                <span className={atom.register ? 'lume-registro' : undefined}>{atom.value}</span>
+                <span className={patientStyles.quadroAtom} data-testid="lume-quadro-atom">
+                  {atom}
+                </span>
               </span>
             ))}
           </p>
@@ -187,7 +192,7 @@ function PatientQuadro({
       <div className={patientStyles.quadroSectionGrid}>
         <div className={patientStyles.quadroSection} data-testid="lume-quadro-section">
           <p className={patientStyles.quadroSectionLabel}>Diagnosi e sintesi</p>
-          <ul className={patientStyles.quadroDiagnoses} aria-label="Diagnosi e stato del paziente">
+          <ul className={patientStyles.quadroDiagnoses} aria-label="Diagnosi">
             {diagnoses.map((diagnosis) => (
               <li
                 key={`${diagnosis.code}-${diagnosis.description}`}
@@ -304,10 +309,10 @@ function RealPatientArea({
         caption="Quadro paziente"
         name={patient.name}
         atoms={[
-          { value: patient.code, register: true },
-          { value: patient.ageLabel, register: true },
-          { value: patient.pathway },
-          { value: `aggiornato ${patient.lastTouch}`, register: true },
+          patient.code,
+          patient.ageLabel,
+          patient.pathway,
+          `aggiornato ${patient.lastTouch}`,
         ]}
         status={patient.statusLabel}
         diagnoses={patient.diagnoses.map(splitDiagnosis)}

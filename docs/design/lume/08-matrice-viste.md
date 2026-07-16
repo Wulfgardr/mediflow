@@ -23,11 +23,11 @@ con la correzione di gesto, fuoco e Filo in
 `docs/design/lume/05-app-native.md` e
 `docs/design/lume/06-macos-apple-contract.md`.
 
-Il sorgente definitivo del canone, atteso dalla dipendenza #87, è
-`docs/design/lume/canon/lume-cockpit.template.html`. Al momento della rilevazione
-questo percorso non è presente nel worktree #88 e quindi non viene contato nella
-verifica di massa seguente. Va riallineato prima di unire questa matrice: non è
-una prova di implementazione locale.
+Il sorgente definitivo del canone è
+`docs/design/lume/canon/lume-cockpit.template.html`. Il comando
+`node scripts/build-lume-canon.mjs /tmp/lume-cockpit.html` ne costruisce la
+versione completa per il confronto locale. La sua presenza non sostituisce la
+prova della vista reale.
 
 Legenda stato:
 
@@ -162,32 +162,30 @@ superfici cliniche costruite dall'app.
 ## Verifica della matrice
 
 La verifica di massa considera tutti i percorsi locali con estensione citati in
-questo documento, esclude soltanto il sorgente canonico #87 dichiarato assente
-all'inizio e fallisce alla prima mancanza:
+questo documento e fallisce alla prima mancanza:
 
 ```zsh
 rg -o '`(app|components|native|docs|scripts|e2e)/[^` ]+\.(tsx|swift|md|html|json|mjs)`' docs/design/lume/08-matrice-viste.md \
   | tr -d '`' \
   | sort -u \
   | while IFS= read -r file_path; do
-      [[ "$file_path" == "docs/design/lume/canon/lume-cockpit.template.html" ]] && continue
       test -e "$file_path" || { print -u2 "manca: $file_path"; exit 1; }
     done
 ```
 
 Esito da registrare al commit: percorsi locali verificati e corretti dopo
-verifica; sorgente #87 separato come dipendenza nota. Controllo editoriale
-obbligatorio: la ricerca del carattere em dash non produce righe.
+verifica. Controllo editoriale obbligatorio: la ricerca del carattere em dash
+non produce righe.
 
 ## Ambiguita che richiedono giudizio umano
 
-- Il template #87 non era disponibile in questo worktree. La corrispondenza
-  puntuale fra le sue sezioni e il mock vivo va verificata al suo arrivo, senza
-  riscrivere retroattivamente i gap come successi.
-- La matrice usa `fedele` per Worklist e carico pazienti e per Lock e sicurezza,
-  sulla base della struttura osservata e degli smoke disponibili. In nessuno
-  dei due casi lo stato sostituisce una prova visuale manuale Giorno e Grafite
-  su display reale.
+- Il template canonico è disponibile e costruibile localmente. La
+  corrispondenza puntuale con Worklist e Quadro resta una verifica di struttura
+  e comportamento, non un'equivalenza visuale automatica.
+- La matrice usa `fedele` per Worklist e carico pazienti, Quadro paziente e Lock
+  e sicurezza, sulla base della struttura osservata e degli smoke disponibili.
+  In nessuno dei tre casi lo stato sostituisce una prova visuale manuale Giorno
+  e Grafite su display reale.
 - La controparte macOS di review, handoff e analytics è segnata assente per la
   vista specifica, non come affermazione di assenza funzionale dell'intera app
   Apple. La QA VoiceOver end-to-end macOS è ancora una decisione manuale.

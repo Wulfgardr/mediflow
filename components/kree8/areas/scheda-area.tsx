@@ -105,7 +105,7 @@ function SchedaArea({
         headingId="lume-quadro-review-title"
         caption="Quadro paziente · cronicità multipla"
         name="M. R."
-        atoms={[{ value: 'AB-2026-014', register: true }, { value: '64 anni · M', register: true }, { value: 'Ambulatorio locale' }, { value: 'aggiornato 08/05', register: true }]}
+        atoms={['AB-2026-014', '64 anni · M', 'Ambulatorio locale', 'aggiornato 08/05']}
         status="Cronicità multipla"
         diagnoses={REVIEW_DIAGNOSES}
         summary="Aderenza terapeutica buona negli ultimi 90 giorni. Vitali nell’ultima rilevazione entro la baseline del caso. Il follow-up cardiologico è vicino e la codifica dell’ultimo documento resta da confermare."

@@ -16,6 +16,38 @@ const QUADRO_CASES: QuadroCase[] = [
   { register: 'grafite', viewport: 'narrow', width: 390, height: 844 },
 ];
 
+type LivePatientFixture = { id: string; name: string };
+
+async function createLivePatientFixture(page: Page): Promise<LivePatientFixture> {
+  const marker = Date.now().toString().slice(-8);
+  const firstName = `Quadro${marker}`;
+  const lastName = `Live${marker}`;
+
+  return page.evaluate(async ({ firstName: fixtureFirstName, lastName: fixtureLastName, marker: fixtureMarker }) => {
+    const response = await fetch('/api/patients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        firstName: fixtureFirstName,
+        lastName: fixtureLastName,
+        taxCode: `QDR${fixtureMarker.padStart(13, '0')}`,
+        birthDate: '1980-01-01T00:00:00.000Z',
+        address: 'Indirizzo sintetico Quadro',
+        phone: '0000000098',
+        diagnoses: [{
+          system: 'ICD-11',
+          code: 'QC00',
+          description: 'Controllo sintetico del Quadro',
+          date: new Date().toISOString(),
+        }],
+      }),
+    });
+    if (!response.ok) throw new Error(`Failed to create Quadro fixture: ${response.status}`);
+    const data = await response.json() as { id: string };
+    return { id: data.id, name: `${fixtureLastName} ${fixtureFirstName}` };
+  }, { firstName, lastName, marker });
+}
+
 async function setRegister(page: Page, register: QuadroCase['register']): Promise<void> {
   await page.evaluate((nextRegister) => {
     const theme = nextRegister === 'grafite' ? 'dark' : 'light';
@@ -50,26 +82,45 @@ async function resolveColor(page: Page, variable: string): Promise<string> {
   }, variable);
 }
 
-async function resolveRegisterFamily(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    const probe = document.createElement('span');
-    probe.className = 'lume-registro';
-    document.body.appendChild(probe);
-    const family = getComputedStyle(probe).fontFamily;
-    probe.remove();
-    return family;
-  });
+async function assertIbmPlexMono(locator: Locator, label: string): Promise<void> {
+  const families = await locator.evaluateAll((elements) =>
+    elements.map((element) => getComputedStyle(element).fontFamily),
+  );
+  expect(families.length, `${label}: nessun elemento osservabile`).toBeGreaterThan(0);
+  for (const family of families) {
+    expect(family, `${label}: famiglia tipografica risolta`).toContain('IBM Plex Mono');
+  }
+}
+
+async function assertSingleFocalShadow(page: Page): Promise<void> {
+  const frameFocus = page.locator(
+    '[data-testid="lume-frame-focus"][data-lume-focus="true"][data-lume-frame-element="focus"]',
+  );
+  await expect(frameFocus).toHaveCount(1);
+
+  const shadowOwners = await frameFocus.evaluate((root) =>
+    [root, ...root.querySelectorAll('*')]
+      .filter((element) => getComputedStyle(element).boxShadow !== 'none')
+      .map((element) => ({
+        isFrameFocus: element === root,
+        testId: element.getAttribute('data-testid'),
+        frameElement: element.getAttribute('data-lume-frame-element'),
+        lumeFocus: element.getAttribute('data-lume-focus'),
+      })),
+  );
+  expect(shadowOwners).toEqual([{
+    isFrameFocus: true,
+    testId: 'lume-frame-focus',
+    frameElement: 'focus',
+    lumeFocus: 'true',
+  }]);
 }
 
 async function assertQuadroContract(page: Page, quadro: Locator): Promise<void> {
   await expect(quadro.getByRole('heading', { name: 'M. R.', level: 1 })).toBeVisible();
   await expect(quadro.locator('[aria-pressed]')).toHaveCount(0);
 
-  const area = page.getByTestId('lume-frame-focus');
-  const elevated = await area.evaluate((root) =>
-    [root, ...root.querySelectorAll('*')].filter((element) => getComputedStyle(element).boxShadow !== 'none').length,
-  );
-  expect(elevated).toBe(1);
+  await assertSingleFocalShadow(page);
   await expect(quadro.locator('[data-lume-surface="focal"]')).toHaveCount(0);
   await expect(quadro.locator('[data-lume-surface="field"]')).toHaveCount(4);
 
@@ -79,16 +130,29 @@ async function assertQuadroContract(page: Page, quadro: Locator): Promise<void> 
   );
   expect(new Set(labelColors)).toEqual(new Set([muted]));
 
-  const registerFamily = await resolveRegisterFamily(page);
-  const valueFamilies = await quadro.getByTestId('lume-quadro-metric-value').evaluateAll((elements) =>
-    elements.map((element) => getComputedStyle(element).fontFamily),
-  );
-  expect(new Set(valueFamilies)).toEqual(new Set([registerFamily]));
+  await assertIbmPlexMono(quadro.getByTestId('lume-quadro-metric-value'), 'Valori metrici');
+  await assertIbmPlexMono(quadro.getByTestId('lume-quadro-atom'), 'Atomi della testata');
 
   const warningValues = quadro.locator('[data-testid="lume-quadro-metric-value"][data-lume-signal="warning"]');
   await expect(warningValues).toHaveCount(1);
   await expect(warningValues).toHaveAttribute('data-lume-clinical-state', 'warning');
   await expect(quadro.locator('[data-testid="lume-quadro-metric-value"][data-lume-clinical-state]:not([data-lume-signal])')).toHaveCount(0);
+
+  const neutralValue = quadro
+    .locator('[data-lume-surface="field"]', { hasText: 'Pressione' })
+    .getByTestId('lume-quadro-metric-value');
+  await expect(neutralValue).toHaveCount(1);
+  expect(await neutralValue.evaluate((element) => ({
+    hasSignal: element.hasAttribute('data-lume-signal'),
+    hasClinicalState: element.hasAttribute('data-lume-clinical-state'),
+    color: getComputedStyle(element).color,
+  }))).toEqual({
+    hasSignal: false,
+    hasClinicalState: false,
+    color: await resolveColor(page, '--lume-ink'),
+  });
+  expect(await warningValues.evaluate((element) => getComputedStyle(element).color))
+    .not.toBe(await neutralValue.evaluate((element) => getComputedStyle(element).color));
 
   const primary = quadro.locator('[data-lume-action="primary"]');
   const quiet = quadro.locator('[data-lume-action="quiet"]');
@@ -123,6 +187,32 @@ async function assertNarrowStack(page: Page, quadro: Locator): Promise<void> {
   expect(sections[1].top).toBeGreaterThanOrEqual(sections[0].bottom - 1);
   expect(sections[3].top).toBeGreaterThanOrEqual(sections[2].bottom - 1);
 }
+
+test('quadro live usa il paziente selezionato dal database sintetico', async ({ page }) => {
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const patient = await createLivePatientFixture(page);
+
+  await page.goto(`/?area=incarico&paziente=${patient.id}`);
+  const lens = page.getByTestId('lume-patient-lens');
+  await expect(lens.getByRole('heading', { name: patient.name, level: 2 })).toBeVisible();
+  await lens.getByRole('button', { name: 'Quadro', exact: true }).click();
+
+  const quadro = page.getByTestId('lume-quadro');
+  await expect(page.getByTestId('lume-frame-canvas')).toHaveAttribute('data-lume-context', 'scheda');
+  await expect(quadro.getByRole('heading', { name: patient.name, level: 1 })).toBeVisible();
+  await expect(quadro.getByRole('list', { name: 'Diagnosi', exact: true })).toContainText(
+    'QC00Controllo sintetico del Quadro',
+  );
+  await expect(quadro.getByTestId('lume-quadro-metric-value')).toHaveCount(4);
+  await expect(quadro.getByTestId('lume-quadro-metric-value').first()).not.toHaveText('in attesa');
+  await assertIbmPlexMono(quadro.getByTestId('lume-quadro-metric-value'), 'Valori metrici live');
+  await assertIbmPlexMono(quadro.getByTestId('lume-quadro-atom'), 'Atomi della testata live');
+  await assertSingleFocalShadow(page);
+  await expect(quadro.locator('[data-lume-action="primary"]')).toHaveAttribute(
+    'href',
+    `/patients/${patient.id}/modules`,
+  );
+});
 
 for (const quadroCase of QUADRO_CASES) {
   test(`quadro Lume ${quadroCase.register} ${quadroCase.viewport}`, async ({ page }) => {

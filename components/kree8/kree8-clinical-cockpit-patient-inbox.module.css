@@ -391,6 +391,7 @@
 
 /* @Codex #98, #68: Quadro paziente, un solo fuoco e nessuna card elevata interna. */
 .quadroFocal {
+  --lume-registro-family: "IBM Plex Mono", var(--font-registro), "SF Mono", monospace;
   min-width: 0; padding: 10px; color: var(--lume-ink);
   display: flex; flex-direction: column; gap: 16px;
 }
@@ -412,6 +413,7 @@
   display: flex; flex-wrap: wrap; align-items: center; gap: 5px 10px;
 }
 .quadroAtomGroup { min-width: 0; display: inline-flex; align-items: center; gap: 10px; }
+.quadroAtom { font-family: var(--lume-registro-family); }
 .quadroDot { opacity: 0.45; }
 .quadroMetrics {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
@@ -428,7 +430,7 @@
 }
 .quadroMetricValue {
   margin-top: 5px; color: var(--lume-ink); font-size: 19px;
-  font-weight: 600; overflow-wrap: anywhere;
+  font-family: var(--lume-registro-family); font-weight: 600; overflow-wrap: anywhere;
 }
 .quadroMetricWarning { color: color-mix(in srgb, var(--lume-signal-warning) 62%, var(--lume-ink)); }
 .quadroMetricCritical { color: color-mix(in srgb, var(--lume-signal-critical) 66%, var(--lume-ink)); }
