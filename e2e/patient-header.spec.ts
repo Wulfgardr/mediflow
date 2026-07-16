@@ -72,7 +72,7 @@ test('patient header renders ICD chips and explicit empty state', async ({ page 
   });
 
   const diagnosisList = page.getByRole('list', {
-    name: 'Diagnosi e stato del paziente',
+    name: 'Diagnosi',
     exact: true,
   });
   const diagnosisChip = diagnosisList
