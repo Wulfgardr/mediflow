@@ -8,10 +8,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import {
-  ChevronRight,
-  X,
-} from 'lucide-react';
+import { X } from 'lucide-react';
 
 import {
   db,
@@ -377,13 +374,17 @@ export function Kree8ClinicalCockpit({
     <div
       className={styles.shell}
       aria-label={isReview ? 'MediFlow · Kree8 review surface' : 'MediFlow · spazio clinico Kree8'}
+      data-testid="lume-frame"
+      data-lume-frame-element="shell"
     >
-      <aside className={styles.rail}>
+      <aside
+        className={styles.rail}
+        data-testid="lume-frame-rail"
+        data-lume-frame-element="rail"
+      >
         <div className={styles.brand}>
           <span className={styles.brandMark}>MF</span>
-          <span className={styles.brandWord}>
-            MEDI<b>FLOW</b>
-          </span>
+          <span className={styles.brandWord}>MEDIFLOW</span>
           <span className={styles.brandActions}>
             {/* WUL-297: persistent privacy affordance in the app header */}
             <PrivacyModeToggle />
@@ -397,7 +398,6 @@ export function Kree8ClinicalCockpit({
 
         <span className={styles.railLabel}>Navigazione</span>
         {AREAS.filter((a) => PRIMARY_AREA_IDS.includes(a.id)).map((a) => {
-          const Icon = a.icon;
           const selected = railAreaIsSelected(a.id, area);
           const navMeta =
             a.id === 'incarico'
@@ -412,11 +412,11 @@ export function Kree8ClinicalCockpit({
               onClick={() => setArea(a.id)}
               className={classNames(styles.navItem, selected && styles.navSelected)}
               aria-current={selected ? 'page' : undefined}
+              data-lume-frame-nav="true"
+              data-lume-frame-element="nav-item"
             >
-              <Icon size={15} />
               <span>{a.label}</span>
-              {navMeta && <span className={styles.navMeta}>{navMeta}</span>}
-              {selected && <ChevronRight size={14} className={styles.navChevron} />}
+              {navMeta && <span className={`${styles.navMeta} lume-registro`}>{navMeta}</span>}
             </button>
           );
         })}
@@ -433,7 +433,12 @@ export function Kree8ClinicalCockpit({
         </div>
       </aside>
 
-      <section className={styles.canvas} data-lume-context={area}>
+      <section
+        className={styles.canvas}
+        data-lume-context={area}
+        data-testid="lume-frame-canvas"
+        data-lume-frame-element="canvas"
+      >
         <Toolbar
           activeArea={area}
           filter={filter}
@@ -445,46 +450,61 @@ export function Kree8ClinicalCockpit({
           }}
           operatorName={operatorName}
         />
-        {/* @Codex WUL-UIUX: where-am-i persistente nelle sotto-aree paziente
-            (il rail le colora come Pazienti): tab Quadro / Documenti / SISS con
-            aria-current e nome del paziente attivo. */}
-        {(area === 'scheda' || area === 'revisione' || area === 'handoff') ? (
-          <nav className={styles.subareaTabs} aria-label="Sezioni del paziente">
-            {selectedPatient ? (
-              <span className={styles.subareaPatient}>{selectedPatient.name}</span>
+        <div
+          className={styles.framePanel}
+          data-testid="lume-frame-panel"
+          data-lume-frame-element="panel"
+        >
+          <main
+            className={styles.focusSurface}
+            data-lume-focus="true"
+            data-testid="lume-frame-focus"
+            data-lume-frame-element="focus"
+          >
+            {/* @Codex WUL-UIUX: where-am-i persistente nelle sotto-aree paziente
+                (il rail le colora come Pazienti): tab Quadro / Documenti / SISS con
+                aria-current e nome del paziente attivo. */}
+            {(area === 'scheda' || area === 'revisione' || area === 'handoff') ? (
+              <nav className={styles.subareaTabs} aria-label="Sezioni del paziente">
+                {selectedPatient ? (
+                  <span className={styles.subareaPatient}>{selectedPatient.name}</span>
+                ) : null}
+                {([
+                  { id: 'scheda' as AreaId, label: 'Quadro' },
+                  { id: 'revisione' as AreaId, label: 'Documenti' },
+                  { id: 'handoff' as AreaId, label: 'SISS' },
+                ]).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setArea(tab.id)}
+                    aria-current={area === tab.id ? 'page' : undefined}
+                    className={`${styles.subareaTab} ${area === tab.id ? styles.subareaTabActive : ''}`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
             ) : null}
-            {([
-              { id: 'scheda' as AreaId, label: 'Quadro' },
-              { id: 'revisione' as AreaId, label: 'Documenti' },
-              { id: 'handoff' as AreaId, label: 'SISS' },
-            ]).map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setArea(tab.id)}
-                aria-current={area === tab.id ? 'page' : undefined}
-                className={`${styles.subareaTab} ${area === tab.id ? styles.subareaTabActive : ''}`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        ) : null}
-        <AreaContent
-          area={area}
-          filter={filter}
-          agendaBridge={agendaBridge}
-          patientState={patientState}
-          agendaState={agendaState}
-          diaryState={diaryState}
-          selectedPatient={selectedPatient}
-          selectedPatientId={selectedPatientId}
-          patientWorkspace={patientWorkspace}
-          patientSearchFocusSignal={patientSearchFocusSignal}
-          isReview={isReview}
-          onSelectPatient={setSelectedPatientId}
-          onOpenArea={setArea}
-        />
+            <div className={styles.focusContent}>
+              <AreaContent
+                area={area}
+                filter={filter}
+                agendaBridge={agendaBridge}
+                patientState={patientState}
+                agendaState={agendaState}
+                diaryState={diaryState}
+                selectedPatient={selectedPatient}
+                selectedPatientId={selectedPatientId}
+                patientWorkspace={patientWorkspace}
+                patientSearchFocusSignal={patientSearchFocusSignal}
+                isReview={isReview}
+                onSelectPatient={setSelectedPatientId}
+                onOpenArea={setArea}
+              />
+            </div>
+          </main>
+        </div>
       </section>
 
       {isReview && (
