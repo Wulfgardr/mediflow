@@ -37,10 +37,19 @@
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
   gap: 12px;
   align-items: start;
+  min-width: 0;
 }
 
 @media (max-width: 1100px) {
   .inboxLayout { grid-template-columns: 1fr; }
+}
+
+.worklistPanel {
+  min-width: 0;
+  padding: 16px;
+  background: var(--lume-surface-field);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+  border-radius: 20px;
 }
 
 .inboxScope {
@@ -70,20 +79,19 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border-radius: var(--radius-chip);
-  background: var(--surface);
-  color: var(--ink-muted);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+  border-radius: 10px;
+  background: var(--lume-surface-field);
+  color: var(--lume-ink-muted);
   padding: 9px 12px;
-  box-shadow: 0 0 0 1px var(--control-border);
 }
 
 /* @Codex WUL-UIUX: l'input azzera il proprio outline; l'indicatore di focus da
    tastiera vive sul contenitore, coerente con l'anello condiviso. */
 
 .patientSearchField:focus-within {
-  box-shadow:
-    0 0 0 1px var(--control-border),
-    var(--lume-focus-ring);
+  border-color: var(--lume-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lume-accent) 36%, transparent);
 }
 
 .patientSearchField input {
@@ -92,29 +100,29 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--ink);
+  color: var(--lume-ink);
   font: inherit;
   font-size: 13px;
 }
 
 .patientSearchField input::placeholder {
-  color: var(--ink-subtle);
+  color: var(--lume-ink-muted);
 }
 
 .patientSearchClear {
-  border: 0;
-  background: var(--surface-soft);
-  color: var(--ink-muted);
-  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+  background: transparent;
+  color: var(--lume-ink-muted);
+  border-radius: 10px;
   padding: 8px 12px;
   font: inherit;
   font-size: 12px;
   cursor: pointer;
-  box-shadow: inset 0 0 0 1px var(--line);
 }
 
 .patientSearchClear:hover {
-  color: var(--ink);
+  color: var(--lume-ink);
+  background: color-mix(in srgb, var(--lume-accent) 6%, var(--lume-surface-field));
 }
 
 .scopeChip {
@@ -122,112 +130,142 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-soft);
-  color: var(--ink-muted);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lume-ink-muted);
   font-size: 12px;
   cursor: pointer;
-  border: 0;
-  box-shadow: inset 0 0 0 1px var(--line);
-  transition: background var(--lume-dur-fuoco) var(--lume-ease), color var(--lume-dur-fuoco) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+  transition: background-color var(--lume-dur-fuoco) var(--lume-ease), color var(--lume-dur-fuoco) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease);
 }
 
-.scopeChip:hover { color: var(--ink); }
+.scopeChip:hover { color: var(--lume-ink); }
 
 .scopeChip:active { transform: scale(0.97); }
 
 .scopeChipActive {
-  background: var(--surface);
-  color: var(--ink);
-  box-shadow: 0 0 0 1px var(--line-strong);
+  background: var(--lume-surface-focal);
+  color: var(--lume-ink);
+  border-color: color-mix(in srgb, var(--lume-ink) 20%, transparent);
 }
 
-.patientRowWrap {
+.resultCount {
+  color: var(--lume-ink-muted);
+  font-size: 12px;
+}
+
+.patientListViewport {
+  max-height: 70vh;
+  overflow: auto;
+  margin-top: 8px;
+  min-width: 0;
+}
+
+.patientList {
   position: relative;
-  border-bottom: 1px solid var(--line);
+  width: 100%;
 }
 
-.patientRowWrap:last-child { border-bottom: 0; }
+.patientRowWrap { position: relative; }
 
 .patientRow {
   display: grid;
-  grid-template-columns: 18px minmax(130px, 1.35fr) minmax(160px, 1fr) 64px 96px;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
   align-items: center;
-  padding: 9px 40px 9px 4px;
+  min-height: 62px;
+  padding: 9px 10px;
   cursor: pointer;
-  transition: background var(--lume-dur-fuoco) var(--lume-ease);
-  border: 0;
+  transition: background-color var(--lume-dur-fuoco) var(--lume-ease), border-color var(--lume-dur-fuoco) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease);
+  border: 1px solid transparent;
   background: transparent;
   width: 100%;
   text-align: left;
-  border-radius: 12px;
+  border-radius: 14px;
+  color: var(--lume-ink);
 }
 
-.patientRow:hover { background: var(--surface-soft); }
-
-.patientRowOpen {
-  position: absolute;
-  top: 50%;
-  right: 8px;
-  transform: translateY(-50%);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 9px;
-  color: var(--ink-faint);
-  transition: background var(--lume-dur-fuoco) var(--lume-ease), color var(--lume-dur-fuoco) var(--lume-ease);
+.patientRow:hover {
+  background: color-mix(in srgb, var(--lume-accent) 6%, var(--lume-surface-field));
 }
 
-.patientRowWrap:hover .patientRowOpen,
-.patientRowOpen:focus-visible {
-  color: var(--ink);
-  background: var(--surface);
-  box-shadow: 0 0 0 1px var(--line-strong);
+.patientRow:active { transform: scale(0.985); }
+
+.patientRow:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lume-accent) 40%, transparent);
 }
 
 .patientRowSelected {
-  background: var(--surface);
-  /* Lume: il paziente in fuoco e l'unica superficie focale della lista: filo
-     minerale 1px sul bordo, bordo neutro 1px e ombra corta del livello
-     sollevato; le altre righe restano non-focali (campo, senza ombra). */
-  box-shadow:
-    inset 1px 0 0 var(--lume-accent),
-    inset 0 0 0 1px var(--line-strong),
-    var(--shadow-focal);
+  background: var(--lume-surface-focal);
+  border-color: color-mix(in srgb, var(--lume-ink) 16%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 8%, transparent);
 }
 
-.patientDot {
-  width: 10px;
-  height: 10px;
-  border-radius: var(--radius-pill);
-  background: var(--rail-slate);
-}
-
-.patientDotNeutral { background: var(--ink-muted); }
-
-.patientDotWarning { background: var(--lume-signal-warning); }
-
-.patientDotMuted { background: var(--ink-faint); }
-
-.patientName { font-size: 14px; color: var(--ink); font-weight: 500; }
-
-.patientCode { font-size: 12px; color: var(--ink-subtle); font-variant-numeric: tabular-nums; }
-
-/* @Codex */
-
-.patientMeta {
+.patientRowContent {
   min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  font-size: 12px;
-  color: var(--ink-muted);
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.patientName {
+  font-size: 14px;
+  color: var(--lume-ink);
+  font-weight: 570;
+  letter-spacing: -0.008em;
+}
+
+.patientSubline {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--lume-ink-muted);
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
+  column-gap: 7px;
+  row-gap: 2px;
+}
+
+.patientCode {
+  color: var(--lume-ink-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.patientSeparator { opacity: 0.45; }
+
+.patientDiagnosisText,
+.patientStatusText {
+  color: var(--lume-ink-muted);
+}
+
+.patientSide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  min-width: 0;
+}
+
+.patientSignal {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 999px;
+}
+
+.patientSignalNeutral { background: var(--lume-ink-muted); }
+.patientSignalWarning { background: var(--lume-signal-warning); }
+.patientSignalCritical { background: var(--lume-signal-critical); }
+.patientSignalSuccess { background: var(--lume-signal-success); }
+.patientSignalPlum { background: var(--lume-signal-plum); }
+
+.patientWhen {
+  color: var(--lume-ink-muted);
+  font-size: 11px;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .patientDiagnosisPill {
@@ -244,34 +282,79 @@
   white-space: nowrap;
 }
 
-.patientLastTouch {
-  justify-self: end;
-}
-
-.patientStatusCell {
-  min-width: 0;
-  display: inline-flex;
-  justify-content: flex-end;
-}
-
 .caseLens {
-  background: var(--surface-soft);
-  border-radius: var(--radius-card);
+  min-width: 0;
+  background: var(--lume-surface-focal);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent);
+  border-radius: 20px;
   padding: 16px;
-  box-shadow: inset 0 1px 0 var(--surface-highlight),
-    inset 0 0 0 1px color-mix(in srgb, var(--lume-ink) 3%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 8%, transparent);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   position: sticky;
   top: 0;
 }
 
-.caseLensHero { display: flex; flex-direction: column; gap: 4px; }
+.caseLensHeader { display: flex; flex-direction: column; gap: 4px; }
 
-.caseLensName { font-size: 16px; font-weight: 600; color: var(--ink); }
+.caseLensName {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 640;
+  letter-spacing: -0.02em;
+  color: var(--lume-ink);
+}
 
-.caseLensSub { font-size: 12px; color: var(--ink-muted); }
+.caseLensAtoms {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+  color: var(--lume-ink-muted);
+  font-size: 12px;
+}
+
+.caseLensDiagnoses {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.caseLensStatus {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--lume-ink-muted);
+  font-size: 12px;
+}
+
+.caseLensSummary {
+  margin: 0;
+  max-width: 70ch;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--lume-surface-field);
+  color: var(--lume-ink-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.caseLensEmpty {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 10%, transparent);
+  border-radius: 14px;
+  background: var(--lume-surface-field);
+  color: var(--lume-ink-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
 
 .caseLensActions { display: flex; gap: 6px; flex-wrap: wrap; }
 
@@ -287,22 +370,20 @@
   }
 
   .patientRow {
-    grid-template-columns: 18px minmax(0, 1fr) 48px 84px;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px;
   }
 
-  .patientMeta {
-    grid-column: 2 / -1;
-    grid-row: 2;
+  .patientWhen {
+    max-width: 92px;
+    white-space: normal;
   }
 
-  .patientLastTouch {
-    grid-column: 3;
-    grid-row: 1;
+  .caseLens {
+    position: static;
   }
 
-  .patientStatusCell {
-    grid-column: 4;
-    grid-row: 1;
+  .caseLensActions > * {
+    max-width: 100%;
   }
 }
