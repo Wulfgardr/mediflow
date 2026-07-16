@@ -1,0 +1,632 @@
+/* @Codex */
+
+/* WUL-271 Kree8-inspired full-surface MediFlow mockup. Scoped to .shell only. */
+
+.shell {
+  /* ── local tokens (scoped; no globals touched) ── */
+  --surface: var(--lume-surface-focal);
+  --surface-soft: var(--lume-surface-field);
+  --surface-inset: var(--lume-surface-chrome);
+  --canvas: var(--lume-surface-canvas);
+  --ink: var(--lume-ink);
+  --ink-strong: var(--lume-ink);
+  --ink-muted: var(--lume-ink-muted);
+  /* Lume: due soli livelli di inchiostro (primario + attenuato);
+     subtle/faint confluiscono nell'attenuato Lume, misurato >= 4,5:1. */
+  --ink-subtle: var(--lume-ink-muted);
+  --ink-faint: var(--lume-ink-muted);
+  --line: color-mix(in srgb, var(--lume-ink) 5%, transparent);
+  --line-strong: color-mix(in srgb, var(--lume-ink) 8%, transparent);
+  /* Lume: bordo di controllo interattivo (WCAG 1.4.11), derivato dall'alias
+     ink-muted Lume (>= 4,5:1 su ogni superficie attiva; ri-risolve per registro). */
+  --control-border: var(--lume-ink-muted);
+  --rail-green: var(--lume-signal-success);
+  /* @Codex WUL-UIUX: ex blu Tailwind, portato su inchiostro attenuato per
+     freschezza quieta e bordi di evidenza non allarmanti. */
+  --rail-blue: var(--lume-ink-muted);
+  --rail-yellow: var(--lume-signal-warning);
+  --rail-coral: var(--lume-signal-critical);
+  --rail-violet: var(--lume-signal-plum);
+  --rail-slate: var(--lume-ink-muted);
+  /* Lume: la coda AI/amministrativa usa il neutro minerale, non un
+     gradiente ornamentale; le azioni piene usano l'inchiostro Lume. */
+  --accent-ai: var(--lume-accent);
+  --accent-ai-fg: var(--lume-surface-focal);
+  --solid-action-bg: var(--lume-ink);
+  --solid-action-fg: var(--lume-surface-focal);
+  --brand-dot-bg: var(--lume-ink);
+  --brand-dot-fg: var(--lume-surface-focal);
+  /* Lume: il telaio (buio operativo) e chrome opaco, non un gradiente. */
+  --rail-bg: var(--lume-surface-chrome);
+  --rail-dot-shadow: transparent;
+  /* Lume: niente lucido di vetro; le superfici sono opache. */
+  --surface-highlight: transparent;
+  /* Lume: profondita semantica: bordo 1px, nessuna ombra decorativa;
+     l'ombra corta resta solo al fuoco e agli overlay. */
+  --shadow-card: 0 0 0 1px var(--line-strong);
+  --shadow-panel: 0 0 0 1px var(--line-strong);
+  /* Lume: livello sollevato (il fuoco) = ombra corta 0 2px 8px a bassa opacita. */
+  --shadow-focal: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
+  /* Lume: le righe candidate ordinarie restano non-focali (campo); il fuoco
+     e riservato al solo paziente selezionato. */
+  --row-raised: var(--lume-surface-field);
+  --toggle-track: color-mix(in srgb, var(--lume-ink) 18%, transparent);
+  /* Lume: niente sweep decorativo ne aloni di luce. */
+  --sweep-tint: transparent;
+  --halo-green: transparent;
+  --halo-blue: transparent;
+  --ring-ignore: color-mix(in srgb, var(--lume-ink) 18%, transparent);
+  --radius-card: var(--lume-radius-panel);
+  --radius-tile: 18px;
+  --radius-control: 14px;
+  --radius-chip: 14px;
+  --radius-pill: 999px;
+
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--canvas);
+  color: var(--ink);
+  overflow: hidden;
+  font-family: var(--lume-font-sans);
+  font-feature-settings: "cv11", "ss01";
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+:global(html.dark) .shell {
+  --surface: var(--lume-surface-focal);
+  --surface-soft: var(--lume-surface-field);
+  --surface-inset: var(--lume-surface-chrome);
+  --canvas: var(--lume-surface-canvas);
+  --ink: var(--lume-ink);
+  --ink-strong: var(--lume-ink);
+  --ink-muted: var(--lume-ink-muted);
+  --ink-subtle: var(--lume-ink-muted);
+  --ink-faint: var(--lume-ink-muted);
+  --line: color-mix(in srgb, var(--lume-ink) 10%, transparent);
+  --line-strong: color-mix(in srgb, var(--lume-ink) 16%, transparent);
+  --rail-green: var(--lume-signal-success);
+  --rail-blue: var(--lume-ink-muted);
+  --rail-yellow: var(--lume-signal-warning);
+  --rail-coral: var(--lume-signal-critical);
+  --rail-violet: var(--lume-signal-plum);
+  --rail-slate: var(--lume-ink-muted);
+  --accent-ai: var(--lume-accent);
+  --accent-ai-fg: var(--lume-surface-focal);
+  --solid-action-bg: var(--lume-ink);
+  --solid-action-fg: var(--lume-surface-focal);
+  --brand-dot-bg: var(--lume-ink);
+  --brand-dot-fg: var(--lume-surface-focal);
+  --rail-bg: var(--lume-surface-chrome);
+  --rail-dot-shadow: transparent;
+  --surface-highlight: transparent;
+  --shadow-card: 0 0 0 1px var(--line-strong);
+  --shadow-panel: 0 0 0 1px var(--line-strong);
+  --shadow-focal: 0 2px 8px rgba(0, 0, 0, 0.28);
+  --row-raised: var(--lume-surface-field);
+  --toggle-track: color-mix(in srgb, var(--lume-ink) 28%, transparent);
+  --sweep-tint: transparent;
+  --halo-green: transparent;
+  --halo-blue: transparent;
+  --ring-ignore: color-mix(in srgb, var(--lume-ink) 32%, transparent);
+}
+
+@media (max-width: 1024px) {
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    padding: 10px;
+    gap: 10px;
+  }
+}
+
+/* ───────────── side rail ───────────── */
+
+.rail {
+  background: var(--rail-bg);
+  border-radius: 22px;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: inset 0 1px 0 var(--surface-highlight);
+  overflow: auto;
+}
+
+@media (max-width: 1024px) {
+  .rail {
+    flex-direction: row;
+    padding: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    align-items: center;
+    gap: 6px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .rail::-webkit-scrollbar { display: none; }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px 14px;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+}
+
+@media (max-width: 1024px) {
+  .brand {
+    padding: 4px 8px;
+    flex: 0 0 auto;
+  }
+}
+
+.brandActions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brandThemeToggle {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .brandThemeToggle {
+    display: inline-flex;
+  }
+}
+
+.brandMark {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--brand-dot-bg);
+  color: var(--brand-dot-fg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.brandWord {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.brandWord b {
+  font-weight: 700;
+}
+
+.railLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-subtle);
+  padding: 14px 10px 6px;
+}
+
+@media (max-width: 1024px) {
+  .railLabel { display: none; }
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-chip);
+  font-size: 14px;
+  color: var(--ink-muted);
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  transition: background var(--lume-dur-fuoco) var(--lume-ease), color var(--lume-dur-fuoco) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease);
+}
+
+.navItem:hover {
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+.navItem:active { transform: scale(0.985); }
+
+@media (max-width: 1024px) {
+  .navItem {
+    flex: 0 0 auto;
+    width: auto;
+    scroll-snap-align: start;
+    padding: 8px 12px;
+  }
+}
+
+.navSelected {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 500;
+  /* Lume: la selezione di navigazione vive nel telaio (buio
+     operativo) e recede: si solleva su chrome piu il peso, senza filo. Il filo
+     minerale resta riservato all'oggetto clinico in fuoco (un solo fuoco). */
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+
+.navChevron {
+  margin-left: auto;
+  opacity: 0.55;
+}
+
+@media (max-width: 1024px) {
+  .navChevron { display: none; }
+}
+
+.navMeta {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--ink-subtle);
+  letter-spacing: 0.02em;
+}
+
+.navMeta + .navChevron {
+  margin-left: 0;
+}
+
+@media (max-width: 1024px) {
+  .navMeta { margin-left: 4px; }
+}
+
+.railFooter {
+  margin-top: auto;
+  padding: 14px 10px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ink-subtle);
+}
+
+.railThemeToggle {
+  align-self: flex-start;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 1024px) {
+  .railFooter { display: none; }
+}
+
+.railTag {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.railDot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--rail-slate);
+  box-shadow: 0 0 0 3px var(--rail-dot-shadow);
+}
+
+/* ───────────── main canvas ───────────── */
+
+.canvas {
+  /* La scena cambia luce, non posizione: Toolbar e rail restano ferme. */
+  --lume-surface-l: 0%;
+  --lume-surface-temp: 0%;
+  background: color-mix(
+    in srgb,
+    color-mix(
+      in srgb,
+      var(--surface-soft) calc(100% - var(--lume-surface-l)),
+      var(--lume-surface-focal) var(--lume-surface-l)
+    ),
+    var(--lume-surface-focal) var(--lume-surface-temp)
+  );
+  border-radius: 28px;
+  padding: 18px;
+  overflow: auto;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 0 0 1px var(--line-strong);
+  transition: --lume-surface-l var(--lume-dur-fuoco) var(--lume-ease), --lume-surface-temp var(--lume-dur-fuoco) var(--lume-ease);
+}
+
+.canvas > * { position: relative; z-index: 1; }
+
+.canvas[data-lume-context='turno'] { --lume-surface-l: 3.5%; --lume-surface-temp: 1.1%; }
+
+.canvas[data-lume-context='incarico'] { --lume-surface-l: 5.5%; --lume-surface-temp: 1.8%; }
+
+.canvas[data-lume-context='scheda'] { --lume-surface-l: 7%; --lume-surface-temp: 2.4%; }
+
+.canvas[data-lume-context='diario'] { --lume-surface-l: 4.5%; --lume-surface-temp: 1.4%; }
+
+.canvas::-webkit-scrollbar { width: 10px; }
+
+.canvas::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--lume-ink) 36%, transparent);
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--surface);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  /* Lume: la chrome strutturale del cockpit consuma la superficie chrome opaca. */
+  background: var(--surface-inset);
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 var(--surface-highlight),
+    0 0 0 1px var(--line);
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border-radius: var(--radius-chip);
+  padding: 8px 14px;
+  flex: 1;
+  min-width: 0;
+  box-shadow: 0 0 0 1px var(--control-border);
+  color: var(--ink-subtle);
+  font-size: 13px;
+  border: 0;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--lume-dur-riga) var(--lume-ease);
+}
+
+.search:hover { transform: translateY(-1px); }
+
+.search:active { transform: scale(0.99); }
+
+.search span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search kbd {
+  margin-left: auto;
+  font-size: 10px;
+  background: var(--surface-soft);
+  color: var(--ink-muted);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-family: inherit;
+}
+
+.toolChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-radius: var(--radius-chip);
+  font-size: 12px;
+  color: var(--ink-strong);
+  cursor: pointer;
+  border: 0;
+  box-shadow: 0 0 0 1px var(--control-border);
+  transition: transform var(--lume-dur-riga) var(--lume-ease);
+}
+
+.toolChip:hover { transform: translateY(-1px); }
+
+.toolChip:active { transform: scale(0.97); }
+
+.toolChipMuted {
+  background: transparent;
+  color: var(--ink-muted);
+  /* Lume: lo stato muted resta interattivo, quindi conserva un bordo di controllo (WCAG 1.4.11). */
+  box-shadow: 0 0 0 1px var(--control-border);
+}
+
+.aiButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-ai);
+  color: var(--accent-ai-fg);
+  font-weight: 500;
+  font-size: 12px;
+  border: 0;
+  cursor: pointer;
+  box-shadow: none;
+  transition: transform var(--lume-dur-riga) var(--lume-ease),
+    filter var(--lume-dur-fuoco) var(--lume-ease);
+}
+
+.aiButton:hover { transform: translateY(-1px); filter: brightness(1.04); }
+
+.aiButton:active { transform: scale(0.97); }
+
+/* @Codex WUL-UIUX: la chrome del cockpit (la superficie piu usata) era operabile
+   da tastiera ma senza indicatore di focus, una regressione WCAG 2.4.7 rispetto
+   alla Sidebar. Anello di focus condiviso, coerente con --lume-focus-ring. */
+
+.navItem:focus-visible,
+.search:focus-visible,
+.toolChip:focus-visible,
+.aiButton:focus-visible,
+.exit:focus-visible {
+  outline: none;
+  box-shadow: var(--lume-focus-ring);
+}
+
+.avatarPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 4px;
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  color: var(--ink-strong);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.avatarDot {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-dot-bg);
+  color: var(--brand-dot-fg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 700px) {
+  .canvas {
+    border-radius: 24px;
+    padding: 14px;
+    overflow-x: hidden;
+  }
+
+  .toolbar {
+    flex-wrap: wrap;
+    align-items: stretch;
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .search {
+    flex: 1 0 100%;
+    min-height: 42px;
+  }
+
+  .search kbd {
+    display: none;
+  }
+
+  .toolChip {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  .aiButton {
+    flex: 1 0 100%;
+    justify-content: center;
+    min-height: 42px;
+  }
+
+  .avatarPill {
+    display: none;
+  }
+}
+
+/* ───────────── escape hatch ───────────── */
+
+.exit {
+  position: fixed;
+  bottom: 14px;
+  right: 14px;
+  z-index: 1001;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  background: var(--solid-action-bg);
+  color: var(--solid-action-fg);
+  font-size: 11px;
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: var(--radius-pill);
+  /* Lume: azione flottante = ombra corta (livello sollevato), niente lucido. */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  transition: transform var(--lume-dur-riga) var(--lume-ease), filter var(--lume-dur-fuoco) var(--lume-ease);
+}
+
+.exit:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+.exit:active { transform: scale(0.97); }
+
+/* ───────────── reduced motion ───────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .shell *,
+  .shell *::before,
+  .shell *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* @Codex WUL-UIUX: tab contestuale delle sotto-aree paziente (Quadro / Documenti
+   / SISS) sotto la Toolbar: where-am-i persistente quando il rail marca
+   'Pazienti'. Stessi token slate del resto del cockpit. */
+
+.subareaTabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 22px 0;
+}
+
+.subareaPatient {
+  margin-right: 6px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.subareaTab {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 5px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition: color var(--lume-dur-riga) ease, border-color var(--lume-dur-riga) ease, background var(--lume-dur-riga) ease;
+}
+
+.subareaTab:hover {
+  color: var(--ink);
+  border-color: var(--ink-subtle);
+}
+
+.subareaTab:focus-visible {
+  outline: none;
+  box-shadow: var(--lume-focus-ring);
+}
+
+.subareaTabActive {
+  color: var(--ink);
+  font-weight: 600;
+  border-color: var(--ink);
+  background: var(--surface-soft);
+}

@@ -13,7 +13,8 @@ import {
   classNames,
 } from '../cockpit-shared';
 import type { DocDecision, FieldKind } from '../cockpit-shared';
-import styles from '../kree8-clinical-cockpit.module.css';
+import styles from '../kree8-clinical-cockpit-foundation.module.css';
+import documentStyles from '../kree8-clinical-cockpit-document-review.module.css';
 
 
 const DOC_FIELDS: {
@@ -141,28 +142,28 @@ function RevisioneArea() {
             </PillBadge>
           </span>
         </header>
-        <div className={styles.docCounters}>
-          <span className={styles.docCounter}>
+        <div className={documentStyles.docCounters}>
+          <span className={documentStyles.docCounter}>
             <Check size={11} color="var(--lume-ink-muted)" />
             <b>{structuredWrites}</b> campi aggiornabili
           </span>
-          <span className={styles.docCounter}>
+          <span className={documentStyles.docCounter}>
             <Edit3 size={11} color="var(--lume-ink-muted)" />
             <b>{noteWrites}</b> note da riconciliare
           </span>
-          <span className={styles.docCounter}>
+          <span className={documentStyles.docCounter}>
             <X size={11} color="var(--ink-subtle)" />
             <b>{ignored}</b> ignorati
           </span>
-          <span className={styles.docCounter}>
+          <span className={documentStyles.docCounter}>
             <AlertTriangle size={11} color="var(--lume-ink-muted)" />
             <b>{blocked}</b> solo portale ufficiale
           </span>
         </div>
       </section>
 
-      <div className={styles.docGrid}>
-        <section className={styles.docPreview}>
+      <div className={documentStyles.docGrid}>
+        <section className={documentStyles.docPreview}>
           <header style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <PillBadge variant="plum">Anteprima OCR</PillBadge>
             <span className={styles.rowSub}>2 pagine · 87% leggibile</span>
@@ -170,18 +171,18 @@ function RevisioneArea() {
               <PillBadge variant="plum">PDF · 318 KB</PillBadge>
             </span>
           </header>
-          <article className={styles.docPaper}>
+          <article className={documentStyles.docPaper}>
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <b>Referto cardiologico · sintetico</b>
               <span className={styles.evidenceDate}>esempio · nessun PHI</span>
             </header>
             <p style={{ margin: 0 }}>
               Paziente con anamnesi positiva per{' '}
-              <span className={styles.docHighlight}>ipertensione essenziale</span>{' '}
+              <span className={documentStyles.docHighlight}>ipertensione essenziale</span>{' '}
               in trattamento con{' '}
-              <span className={styles.docHighlight}>Ramipril 5 mg</span> 1 cpr/die.
+              <span className={documentStyles.docHighlight}>Ramipril 5 mg</span> 1 cpr/die.
               Holter delle 24h nella norma. Si conferma prosecuzione terapia per{' '}
-              <span className={styles.docHighlight}>90 giorni</span> e si raccomanda
+              <span className={documentStyles.docHighlight}>90 giorni</span> e si raccomanda
               controllo a 6 mesi.
             </p>
             <p style={{ margin: 0 }}>
@@ -213,10 +214,10 @@ function RevisioneArea() {
                     ? 'solo nota'
                     : 'solo portale ufficiale';
               return (
-                <div key={f.id} className={styles.fieldRow}>
-                  <div className={styles.fieldHead}>
+                <div key={f.id} className={documentStyles.fieldRow}>
+                  <div className={documentStyles.fieldHead}>
                     <span>{f.label}</span>
-                    <span className={styles.fieldKind}>· {kindLabel}</span>
+                    <span className={documentStyles.fieldKind}>· {kindLabel}</span>
                     <span style={{ marginLeft: 'auto' }}>
                       {decision === 'apply' && (
                         <PillBadge variant="success" commitKey={`${f.id}-apply`}>
@@ -243,25 +244,25 @@ function RevisioneArea() {
                       )}
                     </span>
                   </div>
-                  {!isBlocked && <div className={styles.fieldValue}>{f.value}</div>}
+                  {!isBlocked && <div className={documentStyles.fieldValue}>{f.value}</div>}
                   {!isBlocked && (
-                    <div className={styles.fieldEvidence}>{f.evidence}</div>
+                    <div className={documentStyles.fieldEvidence}>{f.evidence}</div>
                   )}
                   {!isBlocked && <div className={styles.rowSub}>{f.sourceHint}</div>}
                   {isBlocked && (
-                    <div className={styles.fieldBlocked}>
+                    <div className={documentStyles.fieldBlocked}>
                       <AlertTriangle size={12} />
                       {f.blockedReason}
                     </div>
                   )}
                   {!isBlocked && (
-                    <div className={styles.fieldActions}>
+                    <div className={documentStyles.fieldActions}>
                       <button
                         type="button"
                         aria-pressed={decision === 'apply'}
                         className={classNames(
-                          styles.fieldBtn,
-                          decision === 'apply' && styles.fieldBtnActiveAccept,
+                          documentStyles.fieldBtn,
+                          decision === 'apply' && documentStyles.fieldBtnActiveAccept,
                         )}
                         onClick={() => setDecisions((p) => ({ ...p, [f.id]: 'apply' }))}
                       >
@@ -272,8 +273,8 @@ function RevisioneArea() {
                         type="button"
                         aria-pressed={decision === 'note'}
                         className={classNames(
-                          styles.fieldBtn,
-                          decision === 'note' && styles.fieldBtnActiveCorrect,
+                          documentStyles.fieldBtn,
+                          decision === 'note' && documentStyles.fieldBtnActiveCorrect,
                         )}
                         onClick={() => setDecisions((p) => ({ ...p, [f.id]: 'note' }))}
                       >
@@ -284,8 +285,8 @@ function RevisioneArea() {
                         type="button"
                         aria-pressed={decision === 'ignore'}
                         className={classNames(
-                          styles.fieldBtn,
-                          decision === 'ignore' && styles.fieldBtnActiveIgnore,
+                          documentStyles.fieldBtn,
+                          decision === 'ignore' && documentStyles.fieldBtnActiveIgnore,
                         )}
                         onClick={() => setDecisions((p) => ({ ...p, [f.id]: 'ignore' }))}
                       >

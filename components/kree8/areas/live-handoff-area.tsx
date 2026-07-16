@@ -17,7 +17,8 @@ import type {
 import { PillBadge } from '../cockpit-shared';
 import type { AreaId, HandoffFeedback } from '../cockpit-shared';
 import type { Kree8Patient } from '@/lib/patient-workspace';
-import styles from '../kree8-clinical-cockpit.module.css';
+import styles from '../kree8-clinical-cockpit-foundation.module.css';
+import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 
 
 /* @Codex */
@@ -207,7 +208,7 @@ function LiveHandoffArea({
           <h2 className={styles.panelTitle}>Azioni rapide</h2>
           <PillBadge variant="neutral">in MediFlow</PillBadge>
         </header>
-        <div className={styles.caseLensActions} style={{ marginTop: 12 }}>
+        <div className={patientStyles.caseLensActions} style={{ marginTop: 12 }}>
           <Link href="/settings/repertori" className={styles.ghostBtnSm}>
             <Database size={12} />
             Gestisci repertori

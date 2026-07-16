@@ -1,0 +1,169 @@
+/* ───────────── document review ───────────── */
+
+.docGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+@media (max-width: 1100px) {
+  .docGrid { grid-template-columns: 1fr; }
+}
+
+.docPreview {
+  background: var(--surface-soft);
+  border-radius: var(--radius-card);
+  padding: 16px;
+  box-shadow: inset 0 1px 0 var(--surface-highlight),
+    inset 0 0 0 1px color-mix(in srgb, var(--lume-ink) 3%, transparent);
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.docPaper {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 18px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 0 0 1px var(--line-strong);
+  font-size: 12px;
+  color: var(--ink-strong);
+  line-height: 1.55;
+}
+
+.docPaper b { color: var(--ink); font-weight: 600; }
+
+.docHighlight {
+  display: inline-block;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--lume-surface-focal);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.docCounters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 0 0;
+}
+
+.docCounter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  padding: 6px 10px;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px var(--line-strong);
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.docCounter b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.fieldRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.fieldRow:first-child { padding-top: 4px; }
+
+.fieldRow:last-child { border-bottom: 0; padding-bottom: 4px; }
+
+.fieldHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-subtle);
+}
+
+.fieldValue {
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.fieldEvidence {
+  font-size: 11px;
+  color: var(--ink-muted);
+  background: var(--surface-soft);
+  border-left: 2px solid var(--rail-blue);
+  border-radius: 0 8px 8px 0;
+  padding: 6px 10px;
+  margin: 2px 0;
+  line-height: 1.5;
+}
+
+.fieldBlocked {
+  font-size: 11px;
+  color: var(--ink-muted);
+  background: var(--lume-surface-field);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fieldActions { display: inline-flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+
+.fieldBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 500;
+  border: 0;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px var(--line-strong);
+  transition: transform var(--lume-dur-riga) var(--lume-ease), background var(--lume-dur-fuoco) var(--lume-ease);
+}
+
+.fieldBtn:hover { transform: translateY(-1px); }
+
+.fieldBtn:active { transform: scale(0.96); }
+
+.fieldBtnActiveAccept {
+  background: var(--lume-surface-focal);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+
+.fieldBtnActiveCorrect {
+  background: var(--lume-surface-focal);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+
+.fieldBtnActiveIgnore {
+  background: var(--lume-surface-field);
+  color: var(--ink-muted);
+  box-shadow: 0 0 0 1px var(--ring-ignore);
+}
+
+.fieldKind {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}

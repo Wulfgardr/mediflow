@@ -16,7 +16,7 @@ import {
   PillBadge,
   classNames,
 } from '../cockpit-shared';
-import styles from '../kree8-clinical-cockpit.module.css';
+import styles from '../kree8-clinical-cockpit-foundation.module.css';
 
 
 /* ───────────────────────── Sistema ───────────────────────── */

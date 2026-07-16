@@ -19,7 +19,9 @@ import type {
 } from '../cockpit-shared';
 import type { PillVariant } from '@/lib/patient-workspace';
 import { catalogFreshnessSignal } from '@/lib/ui-semantic-signal';
-import styles from '../kree8-clinical-cockpit.module.css';
+import styles from '../kree8-clinical-cockpit-foundation.module.css';
+import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
+import repertoriStyles from '../kree8-clinical-cockpit-repertori.module.css';
 
 
 const REVIEW_CATALOGS: Kree8CatalogRow[] = [
@@ -185,12 +187,12 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
       ? 0
       : 0;
   const freshnessClass = classNames(
-    styles.freshness,
+    repertoriStyles.freshness,
     // @Codex: freshness usa lo stesso vocabolario delle pillole: fresh, stale e broken
     // mantengono rispettivamente success, warning e critical anche sulla rail.
-    freshnessTier === 'fresh' && styles.freshnessOk,
-    freshnessTier === 'stale' && styles.freshnessStale,
-    freshnessTier === 'broken' && styles.freshnessBroken,
+    freshnessTier === 'fresh' && repertoriStyles.freshnessOk,
+    freshnessTier === 'stale' && repertoriStyles.freshnessStale,
+    freshnessTier === 'broken' && repertoriStyles.freshnessBroken,
   );
 
   useEffect(() => {
@@ -225,15 +227,15 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
       <section className={styles.panel}>
         <div className={freshnessClass}>
           <Database size={18} color="var(--ink-muted)" />
-          <div className={styles.freshnessLabel}>
-            <span className={styles.freshnessTitle}>{freshnessTitle}</span>
-            <span className={styles.freshnessSub}>
+          <div className={repertoriStyles.freshnessLabel}>
+            <span className={repertoriStyles.freshnessTitle}>{freshnessTitle}</span>
+            <span className={repertoriStyles.freshnessSub}>
               {isLoading
                 ? 'lettura in corso'
                 : `${availableCatalogs} di ${catalogs.length} pacchetti disponibili`}
             </span>
           </div>
-          <span className={styles.freshnessNum}>{freshnessPct}%</span>
+          <span className={repertoriStyles.freshnessNum}>{freshnessPct}%</span>
         </div>
 
         {catalogState?.status === 'error' ? (
@@ -260,13 +262,13 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
             }[c.freshness];
 
             return (
-              <div key={c.id} className={styles.catalogRow}>
-                <span className={styles.catalogIcon}>
+              <div key={c.id} className={repertoriStyles.catalogRow}>
+                <span className={repertoriStyles.catalogIcon}>
                   <Stethoscope size={13} />
                 </span>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span className={styles.catalogName}>{c.name}</span>
-                  <span className={styles.catalogSub}>{c.sub}</span>
+                  <span className={repertoriStyles.catalogName}>{c.name}</span>
+                  <span className={repertoriStyles.catalogSub}>{c.sub}</span>
                 </div>
                 <span className={styles.rowSub} style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {c.age}
@@ -310,7 +312,7 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
               {selectedCatalog.sub} · aggiornamento {selectedCatalog.age}
             </p>
             {selectedCatalog.href ? (
-              <div className={styles.caseLensActions} style={{ marginTop: 10 }}>
+              <div className={patientStyles.caseLensActions} style={{ marginTop: 10 }}>
                 <Link href={selectedCatalog.href} className={styles.ghostBtnSm}>
                   {selectedCatalog.actionLabel ?? 'Apri'}
                   <ArrowUpRight size={12} />

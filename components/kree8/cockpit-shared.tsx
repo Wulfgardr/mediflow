@@ -32,7 +32,8 @@ import {
   type Kree8PatientSource,
   type PillVariant,
 } from '@/lib/patient-workspace';
-import styles from './kree8-clinical-cockpit.module.css';
+import styles from './kree8-clinical-cockpit-foundation.module.css';
+import shellStyles from './kree8-clinical-cockpit-shell.module.css';
 
 
 export type AreaId =
@@ -700,10 +701,10 @@ function Toolbar({
   const operatorInitials = buildOperatorInitials(operatorName);
 
   return (
-    <div className={styles.toolbar}>
+    <div className={shellStyles.toolbar}>
       <button
         type="button"
-        className={styles.search}
+        className={shellStyles.search}
         onClick={onSearchRequest}
       >
         <Search size={14} />
@@ -715,8 +716,8 @@ function Toolbar({
             type="button"
             aria-pressed={filter === f.id}
             className={classNames(
-              styles.toolChip,
-              filter !== f.id && styles.toolChipMuted,
+              shellStyles.toolChip,
+              filter !== f.id && shellStyles.toolChipMuted,
             )}
             onClick={() => setFilter(f.id)}
           >
@@ -724,18 +725,18 @@ function Toolbar({
             {f.label}
           </button>
         )) : null}
-      <Link href="/patients/new" className={styles.toolChip}>
+      <Link href="/patients/new" className={shellStyles.toolChip}>
         <Upload size={13} />
         Nuova scheda da documento
       </Link>
       {/* @Codex WUL-UIUX: apre la revisione documenti, non una funzione AI:
           icona e stile standard per non promettere piu di quanto consegna. */}
-      <button type="button" className={styles.toolChip} onClick={() => onOpenArea('revisione')}>
+      <button type="button" className={shellStyles.toolChip} onClick={() => onOpenArea('revisione')}>
         <FileSearch size={13} />
         Documenti paziente
       </button>
-      <span className={styles.avatarPill}>
-        <span className={styles.avatarDot}>{operatorInitials}</span>
+      <span className={shellStyles.avatarPill}>
+        <span className={shellStyles.avatarDot}>{operatorInitials}</span>
         {operatorName}
       </span>
     </div>

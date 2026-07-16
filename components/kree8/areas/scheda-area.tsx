@@ -21,7 +21,8 @@ import {
 import type { AreaId } from '../cockpit-shared';
 import type { Kree8Patient, Kree8PatientWorkspace } from '@/lib/patient-workspace';
 import { RealPatientArea } from './real-patient-area';
-import styles from '../kree8-clinical-cockpit.module.css';
+import styles from '../kree8-clinical-cockpit-foundation.module.css';
+import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 
 
 const PATIENT_AI_SUMMARY = (
@@ -114,9 +115,9 @@ function SchedaArea({
         <div className={styles.identityDock}>
           {/* @Codex */}
           <ul className={styles.identityChips} aria-label="Diagnosi e stato del paziente">
-            <li className={styles.patientDiagnosisPill}><DiagnosisPill diagnosis="Ipertensione" /></li>
-            <li className={styles.patientDiagnosisPill}><DiagnosisPill diagnosis="Dislipidemia" /></li>
-            <li className={styles.patientDiagnosisPill}><DiagnosisPill diagnosis="BPCO lieve" /></li>
+            <li className={patientStyles.patientDiagnosisPill}><DiagnosisPill diagnosis="Ipertensione" /></li>
+            <li className={patientStyles.patientDiagnosisPill}><DiagnosisPill diagnosis="Dislipidemia" /></li>
+            <li className={patientStyles.patientDiagnosisPill}><DiagnosisPill diagnosis="BPCO lieve" /></li>
             <li><PillBadge variant="neutral">PA 132/84</PillBadge></li>
             <li><PillBadge variant="neutral">HR 76</PillBadge></li>
             <li><PillBadge variant="neutral">SpO₂ 97%</PillBadge></li>
@@ -160,14 +161,14 @@ function SchedaArea({
           </span>
         </div>
 
-        <div className={styles.insightBody}>
+        <div className={patientStyles.insightBody}>
           {view === 'ai' ? (
             <p style={{ margin: 0 }}>{PATIENT_AI_SUMMARY}</p>
           ) : (
             <div>
               {PATIENT_SOURCES.map((s) => (
-                <div key={s.date + s.text} className={styles.sourceItem}>
-                  <span className={styles.sourceDate}>{s.date}</span>
+                <div key={s.date + s.text} className={patientStyles.sourceItem}>
+                  <span className={patientStyles.sourceDate}>{s.date}</span>
                   <span>{s.text}</span>
                 </div>
               ))}
