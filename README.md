@@ -218,6 +218,9 @@ La responsabilità del progetto resta mia.
 
 <!-- usage-dashboard:end -->
 
+Lo snapshot pubblicato in precedenza (17,56 miliardi al 15 luglio 2026) usava una
+pipeline di conteggio diversa e non è direttamente confrontabile con questo.
+
 ## Licenza
 
 MIT License.
