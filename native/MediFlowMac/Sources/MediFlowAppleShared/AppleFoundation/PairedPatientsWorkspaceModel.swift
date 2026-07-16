@@ -295,6 +295,32 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /* @Codex */
     private var lastSeenNetworkFingerprint: String?
     private let dataSourceFactory: (@MainActor (PairedPatientsWorkspaceModel) -> any HomeBasePatientsDataSource)?
+    /* @Codex */
+    private struct PatientLoadContext {
+        let requestID: UUID
+        let patientID: String
+        let sessionCookie: String
+        let credentials: HomeBasePairedCredentials
+        let ambulatoryID: String?
+        let serverURL: String
+        let tlsPin: String
+        let connectionState: PairedPatientsConnectionState
+        let client: any HomeBasePatientsDataSource
+        let masterKey: SymmetricKey?
+    }
+    /* @Codex */
+    private struct PatientWorkspacePayload {
+        let detail: HomeBasePatientDetail
+        let entries: [HomeBaseEntrySummary]
+        let therapies: [HomeBaseTherapySummary]
+        let checkups: [HomeBaseCheckupSummary]
+        let observations: [HomeBaseObservationSummary]
+        let services: [HomeBaseServicePrescriptionSummary]
+        let serviceItems: [HomeBaseServicePrescriptionItemSummary]
+        let prosthetics: [HomeBaseProstheticPrescriptionSummary]
+    }
+    /* @Codex */
+    private var activePatientLoadRequestID: UUID?
     // S3 (D3, lane PRREG): injectable seam for the "Prescrittivo regionale"
     // handoff action (clipboard + external URL). Defaults to the real
     // implementation; tests inject a spy instead of touching the system
@@ -782,7 +808,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     func loadPatient(_ patient: HomeBasePatientSummary) async {
-        let previousSelectionID = selectedPatientID
         if selectedPatient?.id != patient.id {
             invalidateAttachmentPatientState()
         }
@@ -805,72 +830,33 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         }
         #endif
         guard let sessionCookie, let credentials = pairedCredentials else { return }
-        selectedPatientID = patient.id
-        await runTask {
-            self.patientReportURL = nil
-            self.patientFHIRExportURL = nil
-            self.pendingFHIRWarningValidation = nil
-            self.selectedAttachmentDetail = nil
-            self.attachmentShareURL = nil
-            self.fseDocumentValidationResult = nil
-            self.fseDocumentValidationTargetLabel = nil
-            let fetchedDetail = try await self.makeClient().fetchPatient(
-                id: patient.id,
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
-            )
-            self.setSelectedPatient(fetchedDetail) // @Codex
-            self.entries = try await self.fetchDecryptedEntries(
-                patientId: patient.id,
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
-            )
-            self.therapies = try await self.fetchDecryptedTherapies(
-                patientId: patient.id,
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
-            )
-            self.checkups = try await self.fetchDecryptedCheckups(
-                patientId: patient.id,
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
-            )
-            self.observations = try await self.fetchDecryptedObservations(
-                patientId: patient.id,
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
-            )
-            self.servicePrescriptions = try await self.fetchServicePrescriptions(
-                patientId: patient.id,
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
-            )
-            self.servicePrescriptionItems = try await self.fetchServicePrescriptionItems(
-                patientId: patient.id,
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
-            )
-            self.prostheticPrescriptions = try await self.fetchProstheticPrescriptions(
-                patientId: patient.id,
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
-            )
-            self.cancelEditingEntry()
-            self.cancelEditingTherapy()
-            self.cancelEditingCheckup()
-            self.cancelEditingObservation()
-            self.statusMessage = "Dettaglio \(patient.lastName) aperto."
-        }
-        if selectedPatient?.id != patient.id {
-            selectedPatientID = selectedPatient?.id ?? previousSelectionID
+        let context = PatientLoadContext(
+            requestID: UUID(), patientID: patient.id, sessionCookie: sessionCookie,
+            credentials: credentials, ambulatoryID: ambulatoryId.trimmedOrNil,
+            serverURL: serverURL, tlsPin: tlsPin, connectionState: connectionState,
+            client: makeClient(), masterKey: masterKey)
+        activePatientLoadRequestID = context.requestID
+        clearSelectedPatientWorkspace(preservingSelectionID: patient.id)
+        isWorking = true
+        errorMessage = nil
+        pendingConflict = nil
+        do {
+            let payload = try await fetchPatientWorkspace(context)
+            guard canPublishPatientLoad(context) else { return }
+            setSelectedPatient(payload.detail, masterKey: context.masterKey)
+            entries = payload.entries
+            therapies = payload.therapies
+            checkups = payload.checkups
+            observations = payload.observations
+            servicePrescriptions = payload.services
+            servicePrescriptionItems = payload.serviceItems
+            prostheticPrescriptions = payload.prosthetics
+            statusMessage = "Dettaglio \(patient.lastName) aperto."
+            finishCurrentPatientLoad()
+        } catch {
+            guard canPublishPatientLoad(context) else { return }
+            finishCurrentPatientLoad()
+            applyPatientLoadFailure(error)
         }
     }
 
@@ -1645,6 +1631,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 
     /* @Codex */
     private func setSelectedPatient(_ raw: HomeBasePatientDetail) {
+        setSelectedPatient(raw, masterKey: masterKey)
+    }
+
+    /* @Codex */
+    private func setSelectedPatient(_ raw: HomeBasePatientDetail, masterKey: SymmetricKey?) {
         let fields: [EncryptedPatientField: PatientFieldCrypto.EditableField] = [
             .address: PatientFieldCrypto.resolveStringField(raw.address, masterKey: masterKey),
             .phone: PatientFieldCrypto.resolveStringField(raw.phone, masterKey: masterKey),
@@ -3592,6 +3583,74 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private static var localAuthorityEnabled: Bool {
         let raw = ProcessInfo.processInfo.environment["MEDIFLOW_LOCAL_AUTHORITY"]?.lowercased()
         return raw == "1" || raw == "true" || raw == "yes"
+    }
+
+    /* @Codex */
+    private func fetchPatientWorkspace(_ context: PatientLoadContext) async throws -> PatientWorkspacePayload {
+        let client = context.client
+        let credentials = context.credentials
+        let cookie = context.sessionCookie
+        let scope = context.ambulatoryID
+        let patientID = context.patientID
+        let detail = try await client.fetchPatient(
+            id: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
+        let entries = try await client.fetchEntries(
+            patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
+            .map { ClinicalFieldCrypto.decryptEntry($0, masterKey: context.masterKey) }
+        let therapies = try await client.fetchTherapies(
+            patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
+            .map { ClinicalFieldCrypto.decryptTherapy($0, masterKey: context.masterKey) }
+        let checkups = try await client.fetchCheckups(
+            patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
+            .map { ClinicalFieldCrypto.decryptCheckup($0, masterKey: context.masterKey) }
+        let observations = try await client.fetchObservations(
+            patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
+            .map { ClinicalFieldCrypto.decryptObservation($0, masterKey: context.masterKey) }
+        let services = ServicePrescriptionFiltering.sorted(try await client.fetchServicePrescriptions(
+            patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope))
+        let serviceItems = ServicePrescriptionFiltering.sortedItems(try await client.fetchServicePrescriptionItems(
+            patientId: patientID, prescriptionId: nil, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope))
+        let prosthetics = ProstheticPrescriptionFiltering.sorted(try await client.fetchProstheticPrescriptions(
+            patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope))
+        return PatientWorkspacePayload(
+            detail: detail, entries: entries, therapies: therapies, checkups: checkups,
+            observations: observations, services: services, serviceItems: serviceItems,
+            prosthetics: prosthetics)
+    }
+
+    /* @Codex */
+    private func canPublishPatientLoad(_ context: PatientLoadContext) -> Bool {
+        guard activePatientLoadRequestID == context.requestID else { return false }
+        let contextIsCurrent = selectedPatientID == context.patientID
+            && sessionCookie == context.sessionCookie && pairedCredentials == context.credentials
+            && ambulatoryId.trimmedOrNil == context.ambulatoryID
+            && serverURL == context.serverURL && tlsPin == context.tlsPin
+            && connectionState == context.connectionState
+        guard contextIsCurrent else {
+            finishCurrentPatientLoad()
+            return false
+        }
+        return true
+    }
+
+    /* @Codex */
+    private func finishCurrentPatientLoad() {
+        activePatientLoadRequestID = nil
+        isWorking = false
+    }
+
+    /* @Codex */
+    private func applyPatientLoadFailure(_ error: Error) {
+        if case HomeBaseClientError.httpStatus(let status, _) = error, status == 401 {
+            connectionState = .sessionExpired
+            sessionCookie = nil
+            masterKey = nil
+            operatorIdentity = nil
+            statusMessage = "Sessione operatore scaduta. Accedi di nuovo per scrivere sul Mac."
+        } else if case HomeBaseClientError.httpStatus(let status, _) = error, status == 403 {
+            statusMessage = "Operazione non autorizzata nello scope paired corrente."
+        }
+        errorMessage = error.localizedDescription
     }
 
     /* @Codex */
