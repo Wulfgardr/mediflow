@@ -10,6 +10,8 @@
 		033BF77802FE8AAAEA132414 /* MediFlowAppleShared in Frameworks */ = {isa = PBXBuildFile; productRef = 72EEC18E3E55264AEE14AA58 /* MediFlowAppleShared */; };
 		18CDE82377A243F4B41B0C9B /* MediFlowMacShellApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4691B9860CA77FA5871DC2A8 /* MediFlowMacShellApp.swift */; };
 		45E4F741A3B8FBFFA75DD465 /* MediFlowMobileAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22294E85FD406F50AFBC48A9 /* MediFlowMobileAppUITests.swift */; };
+		4D5A03A67EC34FC88CAF655C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8724FDBA2290730AC0ED1F7E /* Assets.xcassets */; };
+		72DB344A36DDDCFFBD637E1F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8724FDBA2290730AC0ED1F7E /* Assets.xcassets */; };
 		8758DDAC87384F01D87446FD /* MediFlowMobileShellApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121D53CD238781DE1F4D7312 /* MediFlowMobileShellApp.swift */; };
 		F4EE94988286DF1B0F39BFCA /* MediFlowAppleShared in Frameworks */ = {isa = PBXBuildFile; productRef = 5B9F44783C8363DE73DF6AB1 /* MediFlowAppleShared */; };
 /* End PBXBuildFile section */
@@ -31,6 +33,7 @@
 		38F33DF3264115BC2F7E0EF8 /* MediFlowMac */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MediFlowMac; path = ../MediFlowMac; sourceTree = SOURCE_ROOT; };
 		4691B9860CA77FA5871DC2A8 /* MediFlowMacShellApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediFlowMacShellApp.swift; sourceTree = "<group>"; };
 		4D79840B7DA781EA15CC8B29 /* MediFlowMobileApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MediFlowMobileApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8724FDBA2290730AC0ED1F7E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AFEA3F590AD845053A0F0558 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		E91940CED10687F6D9D7CF0F /* MediFlowMacApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MediFlowMacApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FFE1A092411BBD96AD35DDFF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -111,6 +114,7 @@
 		A6E2FDE47D1D4C9EB95044C3 = {
 			isa = PBXGroup;
 			children = (
+				8724FDBA2290730AC0ED1F7E /* Assets.xcassets */,
 				5A05211757BEAF9A94ADA098 /* Packages */,
 				5E9767E8B57B850D9467B739 /* Sources */,
 				53891C2829672641C044EAA0 /* Tests */,
@@ -135,6 +139,7 @@
 			buildConfigurationList = AC3C71FED164CFB09CB99582 /* Build configuration list for PBXNativeTarget "MediFlowMobileApp" */;
 			buildPhases = (
 				BAC69452E54D0AEAB93262BC /* Sources */,
+				E873BA359BC150325C033CCF /* Resources */,
 				F573DB983B2DFA7AA15E6254 /* Frameworks */,
 			);
 			buildRules = (
@@ -172,6 +177,7 @@
 			buildConfigurationList = FB670BBF2C783DA9A209774C /* Build configuration list for PBXNativeTarget "MediFlowMacApp" */;
 			buildPhases = (
 				6B6156056BA56BAF7D5CC8C2 /* Sources */,
+				AC1780543C0DA890CBA6116D /* Resources */,
 				1D23BA1054D75458FD8CAFB2 /* Frameworks */,
 			);
 			buildRules = (
@@ -223,6 +229,25 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AC1780543C0DA890CBA6116D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				72DB344A36DDDCFFBD637E1F /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E873BA359BC150325C033CCF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4D5A03A67EC34FC88CAF655C /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		3650FE585D38822BB00E2415 /* Sources */ = {
