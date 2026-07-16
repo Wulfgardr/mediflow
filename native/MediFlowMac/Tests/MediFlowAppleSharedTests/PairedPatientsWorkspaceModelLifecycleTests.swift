@@ -157,6 +157,68 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         }
     }
 
+    func testOlderPatientLoadCannotReplaceNewerSelection() async {
+        let gate = LifecycleLoadGate(["patient:1"])
+        let source = LifecycleMockDataSource(details: ["a": detail(id: "a", archived: false, version: 1), "b": detail(id: "b", archived: false, version: 1)], loadGate: gate)
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests()
+        let older = Task { await model.loadPatient(summary(id: "a", archived: false, version: 1)) }
+        await gate.wait(for: "patient:1")
+        await model.loadPatient(summary(id: "b", archived: false, version: 1))
+        await gate.release("patient:1"); await older.value
+        let state = await MainActor.run { (model.selectedPatientID, model.selectedPatient?.id, model.isWorking) }
+        XCTAssertEqual(state.0, "b"); XCTAssertEqual(state.1, "b"); XCTAssertFalse(state.2)
+    }
+
+    func testStaleFailureCannotFinishNewerLoadAndContextDriftClosesItsOwner() async {
+        let gate = LifecycleLoadGate(["patient:1", "patient:2"])
+        let source = LifecycleMockDataSource(details: ["b": detail(id: "b", archived: false, version: 1)], loadGate: gate)
+        let model = await makeModel(source: source); await model.configurePairedOnlineForTests()
+        let stale = Task { await model.loadPatient(summary(id: "a", archived: false, version: 1)) }
+        await gate.wait(for: "patient:1")
+        let current = Task { await model.loadPatient(summary(id: "b", archived: false, version: 1)) }
+        await gate.wait(for: "patient:2"); await gate.release("patient:1"); await stale.value
+        let during = await MainActor.run { (model.selectedPatientID, model.isWorking, model.errorMessage, model.statusMessage) }
+        XCTAssertEqual(during.0, "b"); XCTAssertTrue(during.1); XCTAssertNil(during.2); XCTAssertNil(during.3)
+        await model.configurePairedOnlineForTests(credentials: .init(clientId: "other", clientToken: "other"))
+        await gate.release("patient:2"); await current.value
+        let after = await MainActor.run { (model.selectedPatient, model.isWorking, model.errorMessage) }
+        XCTAssertNil(after.0); XCTAssertFalse(after.1); XCTAssertNil(after.2)
+    }
+
+    func testSamePatientLatestRequestTokenWins() async {
+        let gate = LifecycleLoadGate(["patient:1", "patient:2"])
+        let source = LifecycleMockDataSource(details: ["p": detail(id: "p", archived: false, version: 1)], loadGate: gate)
+        let model = await makeModel(source: source); await model.configurePairedOnlineForTests()
+        let first = Task { await model.loadPatient(summary(id: "p", archived: false, version: 1)) }
+        await gate.wait(for: "patient:1"); await source.setDetail(detail(id: "p", archived: false, version: 2))
+        let second = Task { await model.loadPatient(summary(id: "p", archived: false, version: 2)) }
+        await gate.wait(for: "patient:2"); await gate.release("patient:2"); await second.value
+        await gate.release("patient:1"); await first.value
+        let state = await MainActor.run { (model.selectedPatient?.version, model.isWorking) }
+        XCTAssertEqual(state.0, 2); XCTAssertFalse(state.1)
+    }
+
+    func testPatientWorkspacePublishesAtomicallyWithCapturedKeyAndClearsOnChildFailure() async throws {
+        let sealed = try XCTUnwrap(CryptoService.encryptField(CryptoService.jsonEncode("Nota B")!, masterKey: masterKey))
+        let entry = HomeBaseEntrySummary(id: "e", patientId: "b", type: "note", title: sealed, date: .distantPast, content: sealed, setting: nil, metadata: nil, attachments: nil, deletedAt: nil, deletionReason: nil, version: 1, createdAt: nil, updatedAt: nil)
+        let gate = LifecycleLoadGate(["prosthetic:b"])
+        let source = LifecycleMockDataSource(details: ["b": detail(id: "b", archived: false, version: 1), "c": detail(id: "c", archived: false, version: 1)], loadGate: gate, entriesByPatient: ["b": [entry]], entryErrorsByPatient: ["c": .httpStatus(500, "child failed")])
+        let model = await makeModel(source: source); await model.configurePairedOnlineForTests(masterKey: masterKey)
+        let load = Task { await model.loadPatient(summary(id: "b", archived: false, version: 1)) }
+        await gate.wait(for: "prosthetic:b")
+        let pending = await MainActor.run { (model.selectedPatientID, model.selectedPatient, model.entries, model.isWorking) }
+        XCTAssertEqual(pending.0, "b"); XCTAssertNil(pending.1); XCTAssertTrue(pending.2.isEmpty); XCTAssertTrue(pending.3)
+        await model.configurePairedOnlineForTests(masterKey: SymmetricKey(data: Data(repeating: 9, count: 32)))
+        await gate.release("prosthetic:b"); await load.value
+        let loaded = await MainActor.run { (model.selectedPatient?.id, model.entries.first?.title) }
+        XCTAssertEqual(loaded.0, "b"); XCTAssertEqual(loaded.1, "Nota B")
+        await model.loadPatient(summary(id: "c", archived: false, version: 1))
+        let failed = await MainActor.run { (model.selectedPatientID, model.selectedPatient, model.entries, model.errorMessage, model.isWorking) }
+        XCTAssertEqual(failed.0, "c"); XCTAssertNil(failed.1); XCTAssertTrue(failed.2.isEmpty)
+        XCTAssertTrue(failed.3?.contains("child failed") == true); XCTAssertFalse(failed.4)
+    }
+
     func testRestoreUsesTombstoneVersionAndReloadsTrash() async throws {
         let deleted = summary(id: "p1", archived: false, version: 5, deleted: true, reason: "web-delete")
         let source = LifecycleMockDataSource(summaries: [deleted])
@@ -453,6 +515,32 @@ private final class Counter {
     var value = 0
 }
 
+/* @Codex */
+private actor LifecycleLoadGate {
+    private let keys: Set<String>
+    private var reached: Set<String> = []
+    private var blocks: [String: CheckedContinuation<Void, Never>] = [:]
+    private var waiters: [String: [CheckedContinuation<Void, Never>]] = [:]
+
+    init(_ keys: Set<String>) { self.keys = keys }
+
+    func pause(_ key: String) async {
+        guard keys.contains(key) else { return }
+        await withCheckedContinuation { continuation in
+            blocks[key] = continuation
+            reached.insert(key)
+            waiters.removeValue(forKey: key)?.forEach { $0.resume() }
+        }
+    }
+
+    func wait(for key: String) async {
+        guard !reached.contains(key) else { return }
+        await withCheckedContinuation { waiters[key, default: []].append($0) }
+    }
+
+    func release(_ key: String) { blocks.removeValue(forKey: key)?.resume() }
+}
+
 private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     struct PinChangeCall {
         let currentPin: String
@@ -479,6 +567,10 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
 
     private var summaries: [HomeBasePatientSummary]
     private var details: [String: HomeBasePatientDetail]
+    private let loadGate: LifecycleLoadGate?
+    private let entriesByPatient: [String: [HomeBaseEntrySummary]]
+    private let entryErrorsByPatient: [String: HomeBaseClientError]
+    private var patientFetchCount = 0
     private let loginResult: HomeBaseLoginResult
     private let pinChangeError: HomeBaseClientError?
     private let logoutError: HomeBaseClientError?
@@ -496,13 +588,19 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         loginResult: HomeBaseLoginResult = HomeBaseLoginResult(
             sessionCookie: "sid=test", encryptedMasterKey: nil, salt: nil),
         pinChangeError: HomeBaseClientError? = nil,
-        logoutError: HomeBaseClientError? = nil
+        logoutError: HomeBaseClientError? = nil,
+        loadGate: LifecycleLoadGate? = nil,
+        entriesByPatient: [String: [HomeBaseEntrySummary]] = [:],
+        entryErrorsByPatient: [String: HomeBaseClientError] = [:]
     ) {
         self.summaries = summaries
         self.details = details
         self.loginResult = loginResult
         self.pinChangeError = pinChangeError
         self.logoutError = logoutError
+        self.loadGate = loadGate
+        self.entriesByPatient = entriesByPatient
+        self.entryErrorsByPatient = entryErrorsByPatient
         if summaries.isEmpty {
             self.summaries = details.values.map {
                 HomeBasePatientSummary(
@@ -666,9 +764,14 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         sessionCookie: String,
         ambulatoryId: String?
     ) async throws -> HomeBasePatientDetail {
-        guard let detail = details[id] else { throw HomeBaseClientError.httpStatus(404, "Not found") }
+        patientFetchCount += 1
+        let detail = details[id]
+        await loadGate?.pause("patient:\(patientFetchCount)")
+        guard let detail else { throw HomeBaseClientError.httpStatus(404, "Not found") }
         return detail
     }
+
+    func setDetail(_ detail: HomeBasePatientDetail) { details[detail.id] = detail }
 
     func updatePatient(
         patientId: String,
@@ -801,7 +904,8 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         ambulatoryId: String?,
         limit: Int
     ) async throws -> [HomeBaseEntrySummary] {
-        []
+        if let error = entryErrorsByPatient[patientId] { throw error }
+        return entriesByPatient[patientId] ?? []
     }
 
     func createEntry(
@@ -1037,7 +1141,8 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         sessionCookie: String,
         ambulatoryId: String?
     ) async throws -> [HomeBaseProstheticPrescriptionSummary] {
-        []
+        await loadGate?.pause("prosthetic:\(patientId)")
+        return []
     }
 
     func createProstheticPrescription(
