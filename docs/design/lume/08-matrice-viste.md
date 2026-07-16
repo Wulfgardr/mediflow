@@ -184,9 +184,10 @@ obbligatorio: la ricerca del carattere em dash non produce righe.
 - Il template #87 non era disponibile in questo worktree. La corrispondenza
   puntuale fra le sue sezioni e il mock vivo va verificata al suo arrivo, senza
   riscrivere retroattivamente i gap come successi.
-- La matrice usa `fedele` soltanto per lock e sicurezza, sulla base della
-  superficie e dei smoke disponibili. Non sostituisce una prova visuale
-  manuale Giorno e Grafite su display reale.
+- La matrice usa `fedele` per Worklist e carico pazienti e per Lock e sicurezza,
+  sulla base della struttura osservata e degli smoke disponibili. In nessuno
+  dei due casi lo stato sostituisce una prova visuale manuale Giorno e Grafite
+  su display reale.
 - La controparte macOS di review, handoff e analytics è segnata assente per la
   vista specifica, non come affermazione di assenza funzionale dell'intera app
   Apple. La QA VoiceOver end-to-end macOS è ancora una decisione manuale.

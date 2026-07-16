@@ -274,7 +274,7 @@ function IncaricoArea({
                             isSelected && patientStyles.patientRowSelected,
                           )}
                           onClick={() => onSelectPatient(p.id)}
-                          aria-selected={isSelected}
+                          aria-pressed={isSelected}
                           data-testid="lume-patient-row"
                         >
                           <span className={patientStyles.patientRowContent} data-lume-row-part="content">
@@ -287,9 +287,16 @@ function IncaricoArea({
                                 {p.code}
                               </span>
                               <span className={patientStyles.patientSeparator} aria-hidden="true">·</span>
-                              <span className={patientStyles.patientDiagnosisText}>{p.diagnoses.join(' · ')}</span>
+                              <span
+                                className={patientStyles.patientDiagnosisText}
+                                data-lume-row-diagnoses="text"
+                              >
+                                {p.diagnoses.join(' · ')}
+                              </span>
                               <span className={patientStyles.patientSeparator} aria-hidden="true">·</span>
-                              <span className={patientStyles.patientStatusText}>{p.statusLabel}</span>
+                              <span className={patientStyles.patientStatusText} data-lume-row-part="status">
+                                {p.statusLabel}
+                              </span>
                             </span>
                           </span>
                           <span className={patientStyles.patientSide}>
@@ -357,7 +364,7 @@ function IncaricoArea({
             <p className={patientStyles.caseLensSummary}>
               {selected.summary}
             </p>
-            <div className={patientStyles.caseLensActions}>
+            <div className={classNames(patientStyles.caseLensActions, patientStyles.worklistLensActions)}>
               <Link href={selected.modulesHref} className={styles.primaryBtn} data-lume-action="primary">
                 <UserSquare2 size={13} />
                 Apri scheda paziente

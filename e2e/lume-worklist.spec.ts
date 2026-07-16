@@ -49,8 +49,8 @@ async function resolvedRegisterFamily(page: Page): Promise<string> {
   });
 }
 
-async function expectRegister(locator: Locator, expectedFamily: string): Promise<void> {
-  await expect(locator).toHaveCSS('font-family', expectedFamily);
+async function resolvedFontFamily(locator: Locator): Promise<string> {
+  return locator.evaluate((element) => getComputedStyle(element).fontFamily);
 }
 
 async function assertWorklistContract(page: Page): Promise<void> {
@@ -66,21 +66,32 @@ async function assertWorklistContract(page: Page): Promise<void> {
   await expect(firstRow).not.toHaveAttribute('aria-label');
   await expect(firstRow).toHaveAccessibleName(/M\. R\..*Ipertensione.*08 mag/);
   await expect(firstRow).toContainText('Ipertensione · Dislipidemia · BPCO lieve');
+  const rowDiagnosisText = rows.locator('[data-lume-row-diagnoses="text"]');
+  await expect(rowDiagnosisText).toHaveCount(3);
+  await expect(rowDiagnosisText.locator('*')).toHaveCount(0);
   await expect(rows.locator('[class*="diagnosisPill"], [data-lume-diagnosis-list]')).toHaveCount(0);
 
   const registerFamily = await resolvedRegisterFamily(page);
-  await expectRegister(firstRow.getByTestId('lume-patient-code'), registerFamily);
-  await expectRegister(firstRow.getByTestId('lume-patient-when'), registerFamily);
+  const codeFamilies = await rows.getByTestId('lume-patient-code').evaluateAll(
+    (elements) => elements.map((element) => getComputedStyle(element).fontFamily),
+  );
+  const whenFamilies = await rows.getByTestId('lume-patient-when').evaluateAll(
+    (elements) => elements.map((element) => getComputedStyle(element).fontFamily),
+  );
+  expect(new Set(codeFamilies)).toEqual(new Set([registerFamily]));
+  expect(new Set(whenFamilies)).toEqual(new Set([registerFamily]));
 
-  await expect(firstRow).toHaveAttribute('aria-selected', 'true');
+  await expect(firstRow).toHaveAttribute('aria-pressed', 'true');
+  await expect(secondRow).toHaveAttribute('aria-pressed', 'false');
   await secondRow.click();
-  await expect(firstRow).toHaveAttribute('aria-selected', 'false');
-  await expect(secondRow).toHaveAttribute('aria-selected', 'true');
+  await expect(firstRow).toHaveAttribute('aria-pressed', 'false');
+  await expect(secondRow).toHaveAttribute('aria-pressed', 'true');
 
   const rowSurfaces = await Promise.all([firstRow, secondRow].map((row) => row.evaluate((element) => {
     const style = getComputedStyle(element);
     return {
       background: style.backgroundColor,
+      boxShadow: style.boxShadow,
       borderLeftWidth: style.borderLeftWidth,
       borderTopWidth: style.borderTopWidth,
       borderLeftColor: style.borderLeftColor,
@@ -90,6 +101,7 @@ async function assertWorklistContract(page: Page): Promise<void> {
     };
   })));
   expect(rowSurfaces[1].background).not.toBe(rowSurfaces[0].background);
+  expect(rowSurfaces[1].boxShadow).not.toBe(rowSurfaces[0].boxShadow);
   expect(rowSurfaces[1].borderLeftWidth).toBe(rowSurfaces[1].borderTopWidth);
   expect(rowSurfaces[1].borderLeftColor).toBe(rowSurfaces[1].borderTopColor);
   expect(rowSurfaces[1].borderLeftStyle).toBe(rowSurfaces[1].borderTopStyle);
@@ -98,19 +110,22 @@ async function assertWorklistContract(page: Page): Promise<void> {
     const when = element.querySelector<HTMLElement>('[data-lume-row-part="when"]');
     if (!when) return [`riga ${rowIndex}: data assente`];
     const dateBox = when.getBoundingClientRect();
-    return Array.from(element.querySelectorAll<HTMLElement>('[data-lume-row-part]'))
-      .filter((part) => part !== when)
-      .flatMap((part) => {
-        const box = part.getBoundingClientRect();
-        const intersects = dateBox.left < box.right && dateBox.right > box.left
-          && dateBox.top < box.bottom && dateBox.bottom > box.top;
-        return intersects ? [`riga ${rowIndex}: data sovrapposta a ${part.dataset.lumeRowPart}`] : [];
-      });
+    const comparedParts = ['content', 'status', 'signal'].map((partName) => ({
+      partName,
+      part: element.querySelector<HTMLElement>(`[data-lume-row-part="${partName}"]`),
+    }));
+    return comparedParts.flatMap(({ partName, part }) => {
+      if (!part) return [`riga ${rowIndex}: ${partName} assente`];
+      const box = part.getBoundingClientRect();
+      const intersects = dateBox.left < box.right && dateBox.right > box.left
+        && dateBox.top < box.bottom && dateBox.bottom > box.top;
+      return intersects ? [`riga ${rowIndex}: data sovrapposta a ${partName}`] : [];
+    });
   }));
   expect(overlaps).toEqual([]);
 
   const lens = page.getByTestId('lume-patient-lens');
-  await expectRegister(lens.getByTestId('lume-patient-atoms'), registerFamily);
+  expect(await resolvedFontFamily(lens.getByTestId('lume-patient-atoms'))).toBe(registerFamily);
   await expect(lens.locator('[data-lume-action="primary"]')).toHaveCount(1);
   await expect(lens.locator('[data-lume-action="quiet"]')).toHaveCount(4);
 
@@ -144,9 +159,8 @@ async function assertNoHorizontalOverflow(page: Page): Promise<void> {
 for (const worklistCase of WORKLIST_CASES) {
   test(`worklist Lume ${worklistCase.register} ${worklistCase.viewport}`, async ({ page }) => {
     await openSyntheticWorklist(page, worklistCase);
-    if (worklistCase.register === 'giorno' && worklistCase.viewport === 'wide') {
-      await assertWorklistContract(page);
-    }
+    await expect(page.locator('html')).toHaveClass(worklistCase.register === 'grafite' ? /dark/ : /light/);
+    await assertWorklistContract(page);
     if (worklistCase.viewport === 'narrow') {
       await assertNoHorizontalOverflow(page);
       await page.getByTestId('lume-patient-lens').scrollIntoViewIfNeeded();
