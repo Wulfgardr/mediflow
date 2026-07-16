@@ -23,11 +23,11 @@ con la correzione di gesto, fuoco e Filo in
 `docs/design/lume/05-app-native.md` e
 `docs/design/lume/06-macos-apple-contract.md`.
 
-Il sorgente definitivo del canone, atteso dalla dipendenza #87, è
-`docs/design/lume/canon/lume-cockpit.template.html`. Al momento della rilevazione
-questo percorso non è presente nel worktree #88 e quindi non viene contato nella
-verifica di massa seguente. Va riallineato prima di unire questa matrice: non è
-una prova di implementazione locale.
+Il sorgente definitivo del canone è
+`docs/design/lume/canon/lume-cockpit.template.html`. Il comando
+`node scripts/build-lume-canon.mjs /tmp/lume-cockpit.html` ne costruisce la
+versione completa per il confronto locale. La sua presenza non sostituisce la
+prova della vista reale.
 
 Legenda stato:
 
@@ -44,7 +44,7 @@ Legenda stato:
 | Vista | Riferimento nel canone o mock | Route web reale | Vista macOS | Componenti proprietari reali | Gap concreto | Stato |
 | --- | --- | --- | --- | --- | --- | --- |
 | Worklist e carico pazienti | Mock vivo: rail `Ambulatorio`, `Lista di lavoro` in penombra e `Quadro paziente` in fuoco. Spec: modello focale, par. 1 e grammatica dell'attenzione, par. 6 di `docs/design/lume/01-lingua.md`. | `/` con `?area=incarico`, `app/page.tsx` | `native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientsWorklistView.swift` | `components/kree8/kree8-clinical-cockpit.tsx`; `components/kree8/areas/incarico-area.tsx`; `components/kree8/kree8-clinical-cockpit-shell.module.css` | Slice 2 consegnata: lista in penombra, selezione per superficie, stato in sotto-riga e lente paziente unica in fuoco. | `fedele` |
-| Quadro paziente | Mock vivo: pannello `Quadro paziente` e coda dell'attenzione; spec, par. 1 e 6 di `docs/design/lume/01-lingua.md`. | `/patients/[id]`, `app/patients/[id]/page.tsx` | `native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientsWorkspaceView.swift` | `components/kree8/kree8-clinical-cockpit.tsx`; `components/kree8/areas/scheda-area.tsx`; `components/kree8/areas/real-patient-area.tsx` | La lente focale della worklist è consegnata; il Quadro completo conserva metric-card grid e più focalità in competizione. | `parziale` |
+| Quadro paziente | Mock vivo: pannello `Quadro paziente` e coda dell'attenzione; spec, par. 1 e 6 di `docs/design/lume/01-lingua.md`. | `/patients/[id]`, `app/patients/[id]/page.tsx` | `native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientsWorkspaceView.swift` | `components/kree8/kree8-clinical-cockpit.tsx`; `components/kree8/areas/scheda-area.tsx`; `components/kree8/areas/real-patient-area.tsx` | Slice 2b consegnata: un solo fuoco, metriche interne non elevate, sezioni a hairline, Registro per codici e valori, azione primaria unica e stati onesti. | `fedele` |
 | Scheda clinica | Spec: testata invariabile, densità a strati e decisioni prima dei dati, par. 6 di `docs/design/lume/01-lingua.md`. | `/patients/[id]/modules`, `app/patients/[id]/modules/page.tsx` | `native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientsWorkspaceView.swift` | `components/kree8/kree8-workspace-shell.tsx`; `components/kree8/kree8-workspace-shell.module.css`; `components/patient-synoptic-sheet.tsx`; `components/clinical-river-timeline.tsx` | Gap 4: workbench Kree8 con hero e card annidate; serve un workspace clinico organizzato per decisione e una sola superficie focale. | `legacy` |
 | Nuova voce clinica | Spec gesto: campo, bozza, firma e allegato, par. 3 di `docs/design/lume/07-gesto-e-movimento.md`. | `/patients/[id]/entries/new`, `app/patients/[id]/entries/new/page.tsx` | `assente` | `components/kree8/kree8-workspace-shell.tsx`; `components/clinical-rich-text-editor.tsx` | Gap 6: le fondazioni opache sono presenti, ma form, contesto e azioni restano composti come pannelli autonomi anziché come un unico flusso focale. | `parziale` |
 | Editor clinico | Spec gesto: editor, campo codificato e conferma esplicita, par. 3 e 6 di `docs/design/lume/07-gesto-e-movimento.md`. | `/patients/[id]/entries/new`, `app/patients/[id]/entries/new/page.tsx` | `native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/ClinicalRichTextEditorView.swift` | `components/clinical-rich-text-editor.tsx`; `components/kree8/kree8-workspace-shell.module.css` | Gap 6: toolbar, campo e contorno hanno fondazioni Lume, ma il loro insieme è ancora pannellizzato; la firma e il rapporto bozza-firmato vanno verificati nella composizione. | `parziale` |
@@ -162,32 +162,30 @@ superfici cliniche costruite dall'app.
 ## Verifica della matrice
 
 La verifica di massa considera tutti i percorsi locali con estensione citati in
-questo documento, esclude soltanto il sorgente canonico #87 dichiarato assente
-all'inizio e fallisce alla prima mancanza:
+questo documento e fallisce alla prima mancanza:
 
 ```zsh
 rg -o '`(app|components|native|docs|scripts|e2e)/[^` ]+\.(tsx|swift|md|html|json|mjs)`' docs/design/lume/08-matrice-viste.md \
   | tr -d '`' \
   | sort -u \
   | while IFS= read -r file_path; do
-      [[ "$file_path" == "docs/design/lume/canon/lume-cockpit.template.html" ]] && continue
       test -e "$file_path" || { print -u2 "manca: $file_path"; exit 1; }
     done
 ```
 
 Esito da registrare al commit: percorsi locali verificati e corretti dopo
-verifica; sorgente #87 separato come dipendenza nota. Controllo editoriale
-obbligatorio: la ricerca del carattere em dash non produce righe.
+verifica. Controllo editoriale obbligatorio: la ricerca del carattere em dash
+non produce righe.
 
 ## Ambiguita che richiedono giudizio umano
 
-- Il template #87 non era disponibile in questo worktree. La corrispondenza
-  puntuale fra le sue sezioni e il mock vivo va verificata al suo arrivo, senza
-  riscrivere retroattivamente i gap come successi.
-- La matrice usa `fedele` per Worklist e carico pazienti e per Lock e sicurezza,
-  sulla base della struttura osservata e degli smoke disponibili. In nessuno
-  dei due casi lo stato sostituisce una prova visuale manuale Giorno e Grafite
-  su display reale.
+- Il template canonico è disponibile e costruibile localmente. La
+  corrispondenza puntuale con Worklist e Quadro resta una verifica di struttura
+  e comportamento, non un'equivalenza visuale automatica.
+- La matrice usa `fedele` per Worklist e carico pazienti, Quadro paziente e Lock
+  e sicurezza, sulla base della struttura osservata e degli smoke disponibili.
+  In nessuno dei tre casi lo stato sostituisce una prova visuale manuale Giorno
+  e Grafite su display reale.
 - La controparte macOS di review, handoff e analytics è segnata assente per la
   vista specifica, non come affermazione di assenza funzionale dell'intera app
   Apple. La QA VoiceOver end-to-end macOS è ancora una decisione manuale.

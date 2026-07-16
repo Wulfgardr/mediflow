@@ -386,4 +386,154 @@
   .worklistLensActions > * {
     max-width: 100%;
   }
+
+}
+
+/* @Codex #98, #68: Quadro paziente, un solo fuoco e nessuna card elevata interna. */
+.quadroFocal {
+  --lume-registro-family: "IBM Plex Mono", var(--font-registro), "SF Mono", monospace;
+  min-width: 0; padding: 10px; color: var(--lume-ink);
+  display: flex; flex-direction: column; gap: 16px;
+}
+.quadroHeader {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; min-width: 0;
+}
+.quadroHeading { min-width: 0; }
+.quadroCaption {
+  margin: 0 0 4px; color: var(--lume-ink-muted); font-size: 10px;
+  font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+}
+.quadroName {
+  margin: 0; color: var(--lume-ink); font-size: 21px; font-weight: 640;
+  letter-spacing: -0.02em; text-wrap: balance;
+}
+.quadroAtoms {
+  margin: 4px 0 0; color: var(--lume-ink-muted); font-size: 12px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 5px 10px;
+}
+.quadroAtomGroup { min-width: 0; display: inline-flex; align-items: center; gap: 10px; }
+.quadroAtom { font-family: var(--lume-registro-family); }
+.quadroDot { opacity: 0.45; }
+.quadroMetrics {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px; min-width: 0;
+}
+.quadroMetric {
+  min-width: 0; padding: 10px 12px; background: var(--lume-surface-field);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 10%, transparent); border-radius: 14px;
+}
+.quadroMetricLabel, .quadroMetricValue, .quadroMetricNote { margin: 0; }
+.quadroMetricLabel {
+  color: var(--lume-ink-muted); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.09em; text-transform: uppercase;
+}
+.quadroMetricValue {
+  margin-top: 5px; color: var(--lume-ink); font-size: 19px;
+  font-family: var(--lume-registro-family); font-weight: 600; overflow-wrap: anywhere;
+}
+.quadroMetricWarning { color: color-mix(in srgb, var(--lume-signal-warning) 62%, var(--lume-ink)); }
+.quadroMetricCritical { color: color-mix(in srgb, var(--lume-signal-critical) 66%, var(--lume-ink)); }
+.quadroMetricNote { margin-top: 2px; color: var(--lume-ink-muted); font-size: 11px; line-height: 1.45; }
+.quadroSectionGrid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px; min-width: 0;
+}
+.quadroSection {
+  min-width: 0; padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+}
+.quadroSectionLabel {
+  margin: 0 0 9px; color: var(--lume-ink-muted); font-size: 10px;
+  font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+}
+.quadroDiagnoses { margin: 0; padding: 0; list-style: none; }
+.quadroDiagnosis {
+  min-width: 0; display: grid; grid-template-columns: minmax(78px, auto) minmax(0, 1fr);
+  gap: 10px; align-items: baseline; padding: 7px 0; color: var(--lume-ink); font-size: 13px;
+  border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 9%, transparent);
+}
+.quadroDiagnosis:last-child, .quadroTherapy:last-child, .quadroRow:last-child { border-bottom: 0; }
+.quadroDiagnosisCode { color: var(--lume-ink-muted); font-size: 12px; overflow-wrap: anywhere; }
+.quadroStatus {
+  margin: 10px 0 0; display: flex; align-items: baseline;
+  gap: 8px; color: var(--lume-ink-muted); font-size: 12px;
+}
+.quadroStatus strong { color: var(--lume-ink); font-weight: 570; }
+.quadroSummary {
+  margin: 8px 0 0; max-width: 70ch; color: var(--lume-ink-muted);
+  font-size: 13px; line-height: 1.6; text-wrap: pretty;
+}
+.quadroTherapies, .quadroRows { display: flex; flex-direction: column; }
+.quadroTherapy {
+  min-width: 0; min-height: 40px; padding: 7px 0; display: flex;
+  align-items: center; justify-content: space-between; gap: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 9%, transparent);
+}
+.quadroTherapyName { min-width: 0; color: var(--lume-ink); font-size: 13px; font-weight: 540; }
+.quadroTherapyDose { flex: none; color: var(--lume-ink-muted); font-size: 12px; text-align: right; }
+.quadroRow {
+  min-width: 0; display: grid; grid-template-columns: 9px minmax(0, 1fr) auto;
+  gap: 9px; align-items: start; padding: 8px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 9%, transparent);
+}
+.quadroSignal {
+  width: 8px; height: 8px; margin-top: 5px; border-radius: 999px;
+  background: transparent; visibility: hidden;
+}
+.quadroSignalWarning { background: var(--lume-signal-warning); visibility: visible; }
+.quadroSignalCritical { background: var(--lume-signal-critical); visibility: visible; }
+.quadroRowBody { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.quadroRowTitle { color: var(--lume-ink); font-size: 13px; font-weight: 540; overflow-wrap: anywhere; }
+.quadroRowNote { color: var(--lume-ink-muted); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.quadroRowValue {
+  max-width: 16ch; color: var(--lume-ink-muted); font-size: 11px;
+  text-align: right; overflow-wrap: anywhere;
+}
+.quadroEmpty {
+  margin: 0; padding: 12px; background: var(--lume-surface-field);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 10%, transparent); border-radius: 14px;
+  color: var(--lume-ink-muted); font-size: 12px; line-height: 1.55;
+}
+.quadroPrimaryAction, .quadroQuietAction {
+  min-height: 34px; max-width: 100%; padding: 7px 12px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border-radius: 10px; font: inherit; font-size: 12px; font-weight: 570;
+  line-height: 1.2; text-align: center; text-decoration: none; cursor: pointer;
+  transition: background-color var(--lume-dur-fuoco) var(--lume-ease), color var(--lume-dur-fuoco) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease);
+}
+.quadroPrimaryAction {
+  flex: none; background: var(--lume-ink);
+  border: 1px solid var(--lume-ink); color: var(--lume-surface-focal);
+}
+.quadroQuietAction {
+  background: var(--lume-surface-field);
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent); color: var(--lume-ink);
+}
+.quadroPrimaryAction:hover, .quadroQuietAction:hover { transform: translateY(-1px); }
+.quadroQuietAction:hover { background: color-mix(in srgb, var(--lume-accent) 6%, var(--lume-surface-field)); }
+.quadroPrimaryAction:active, .quadroQuietAction:active { transform: scale(0.97); }
+.quadroPrimaryAction:focus-visible, .quadroQuietAction:focus-visible {
+  outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--lume-accent) 40%, transparent);
+}
+.quadroActions {
+  align-items: center; padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+}
+
+@media (max-width: 700px) {
+  .quadroFocal { padding: 10px 4px; }
+  .quadroHeader { flex-direction: column; }
+  .quadroPrimaryAction { width: 100%; align-self: stretch; }
+  .quadroMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .quadroSectionGrid { grid-template-columns: minmax(0, 1fr); }
+  .quadroTherapy { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .quadroTherapyDose { text-align: left; }
+  .quadroRow { grid-template-columns: 9px minmax(0, 1fr); }
+  .quadroRowValue { grid-column: 2; max-width: none; text-align: left; }
+  .quadroActions > * { flex: 1 1 142px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quadroPrimaryAction, .quadroQuietAction { transition-duration: 0.01ms; }
 }
