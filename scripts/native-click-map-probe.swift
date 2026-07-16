@@ -15,7 +15,9 @@ struct ProbeReport {
     var checks: [String] = []
 
     mutating func pass(_ message: String) {
-        checks.append("PASS  \(message)")
+        let line = "PASS  \(message)"
+        checks.append(line)
+        FileHandle.standardOutput.write(Data("\(line)\n".utf8))
     }
 
     mutating func fail(_ message: String) {
@@ -253,17 +255,38 @@ func selectPatientRow(_ row: AXUIElement, within list: AXUIElement) -> Bool {
         candidate = parent(of: element)
     }
 
-    guard let boundary = candidate, CFEqual(boundary, list) else { return false }
-    for element in rowCandidates {
-        if AXUIElementSetAttributeValue(
-                element,
-                kAXSelectedAttribute as CFString,
-                kCFBooleanTrue
-            ) == .success {
-            return true
-        }
+    guard let boundary = candidate,
+          CFEqual(boundary, list),
+          let nativeRow = rowCandidates.last else {
+        return false
     }
-    return rowCandidates.contains(where: press)
+
+    let selectionAttribute: String
+    switch role(of: list) {
+    case kAXOutlineRole, kAXTableRole:
+        selectionAttribute = kAXSelectedRowsAttribute
+    case "AXList":
+        selectionAttribute = kAXSelectedChildrenAttribute
+    default:
+        return false
+    }
+
+    if AXUIElementSetAttributeValue(
+        list,
+        selectionAttribute as CFString,
+        [nativeRow] as CFArray
+    ) == .success {
+        return true
+    }
+
+    if AXUIElementSetAttributeValue(
+        nativeRow,
+        kAXSelectedAttribute as CFString,
+        kCFBooleanTrue
+    ) == .success {
+        return true
+    }
+    return press(nativeRow)
 }
 
 /* @Codex */
@@ -327,29 +350,61 @@ func runClinicalShellProbe(app: NSRunningApplication, report: inout ProbeReport)
 
     guard let firstPatientRow = findElement(in: patientList, where: {
         identifier(of: $0) == "patient-cell-uitest-1"
-    }), selectPatientRow(firstPatientRow, within: patientList), waitFor(condition: {
-        detailNameMatches("Rossi Mario", app: app)
     }) else {
-        report.fail("Unable to open the first patient detail")
-        throw ProbeFailure(message: "Unable to open the first patient detail")
+        report.fail("Missing first synthetic patient row")
+        throw ProbeFailure(message: "Missing first synthetic patient row")
     }
+    report.pass("Resolved first synthetic patient row")
+
+    guard selectPatientRow(firstPatientRow, within: patientList) else {
+        report.fail("Unable to select the first patient row through the native list")
+        throw ProbeFailure(message: "Unable to select the first patient row through the native list")
+    }
+    report.pass("Requested first patient selection through the native list")
+
     guard waitFor(condition: {
         selectedItemsContain("patient-cell-uitest-1", list: patientList)
     }) else {
         report.fail("The native list did not expose the first selected row")
         throw ProbeFailure(message: "The first patient row was not selected in the AX tree.")
     }
+    report.pass("Native list selected the first patient")
+
+    guard waitFor(condition: {
+        detailNameMatches("Rossi Mario", app: app)
+    }) else {
+        report.fail("Unable to open the first patient detail")
+        throw ProbeFailure(message: "Unable to open the first patient detail")
+    }
     report.pass("Selected first patient and opened matching detail")
 
     guard let secondPatientRow = findElement(in: patientList, where: {
         identifier(of: $0) == "patient-cell-uitest-2"
-    }), selectPatientRow(secondPatientRow, within: patientList), waitFor(condition: {
-        detailNameMatches("Bianchi Anna", app: app)
-    }), waitFor(condition: {
+    }) else {
+        report.fail("Missing second synthetic patient row")
+        throw ProbeFailure(message: "Missing second synthetic patient row")
+    }
+    report.pass("Resolved second synthetic patient row")
+
+    guard selectPatientRow(secondPatientRow, within: patientList) else {
+        report.fail("Unable to select the second patient row through the native list")
+        throw ProbeFailure(message: "Unable to select the second patient row through the native list")
+    }
+    report.pass("Requested second patient selection through the native list")
+
+    guard waitFor(condition: {
         selectedItemsContain("patient-cell-uitest-2", list: patientList)
     }) else {
         report.fail("Unable to move selection to the second patient")
-        throw ProbeFailure(message: "A -> B selection did not expose the matching row and detail.")
+        throw ProbeFailure(message: "The second patient row was not selected in the AX tree.")
+    }
+    report.pass("Native list selected the second patient")
+
+    guard waitFor(condition: {
+        detailNameMatches("Bianchi Anna", app: app)
+    }) else {
+        report.fail("The second patient detail did not match the native selection")
+        throw ProbeFailure(message: "A -> B selection did not expose the matching detail.")
     }
     report.pass("Moved native selection A -> B with matching detail")
 
@@ -512,9 +567,6 @@ func main() throws {
     if windowContainsClinicalShell(window) {
         try runClinicalShellProbe(app: app, report: &report)
         print("Native click-map probe passed.")
-        for line in report.checks {
-            print(line)
-        }
         return
     }
 
@@ -525,9 +577,6 @@ func main() throws {
     if windowContainsHomeBaseShell(window) {
         try runHomeBaseShellProbe(app: app, window: window, report: &report)
         print("Native click-map probe passed.")
-        for line in report.checks {
-            print(line)
-        }
         return
     }
 
@@ -594,9 +643,6 @@ func main() throws {
     closeSheetIfPresent(in: app)
 
     print("Native click-map probe passed.")
-    for line in report.checks {
-        print(line)
-    }
 }
 
 do {
