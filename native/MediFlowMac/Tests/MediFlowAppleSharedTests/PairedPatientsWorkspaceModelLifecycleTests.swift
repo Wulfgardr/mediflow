@@ -285,6 +285,87 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertFalse(finished.0); XCTAssertTrue(finished.1)
     }
 
+    func testRevisionSupersededBySelectionLeavesFingerprintRetryable() async {
+        let oldA = detail(id: "a", archived: false, version: 1)
+        let newA = detail(id: "a", archived: false, version: 2)
+        let b = detail(id: "b", archived: false, version: 1)
+        let gate = LifecycleLoadGate(["revision:2"])
+        let source = LifecycleMockDataSource(
+            summaries: [summary(id: "a", archived: false, version: 2), summary(id: "b", archived: false, version: 1)],
+            details: ["a": newA, "b": b], loadGate: gate,
+            revisions: [revision("stable"), revision("changed"), revision("changed")])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(
+            patients: [summary(id: "a", archived: false, version: 1), summary(id: "b", archived: false, version: 1)],
+            selectedPatient: oldA)
+        await model.checkNetworkRevisionOnForeground()
+        let stale = Task { await model.checkNetworkRevisionOnForeground() }
+        await gate.wait(for: "revision:2"); await model.loadPatient(summary(id: "b", archived: false, version: 1))
+        await gate.release("revision:2"); await stale.value
+        var state = await MainActor.run { (model.patients.first?.version, model.selectedPatient?.id, model.statusMessage) }
+        XCTAssertEqual(state.0, 1); XCTAssertEqual(state.1, "b"); XCTAssertEqual(state.2, "Dettaglio Rossi aperto.")
+        await model.checkNetworkRevisionOnForeground()
+        state = await MainActor.run { (model.patients.first?.version, model.selectedPatient?.id, model.statusMessage) }
+        XCTAssertEqual(state.0, 2); XCTAssertEqual(state.1, "b"); XCTAssertEqual(state.2, "Home-base aggiornato, dati ricaricati.")
+    }
+
+    /* @Codex */
+    func testForegroundRevisionDoesNotSupersedeActivePatientLoad() async {
+        let b = detail(id: "b", archived: false, version: 1)
+        let gate = LifecycleLoadGate(["patient:1"])
+        let source = LifecycleMockDataSource(details: ["b": b], loadGate: gate)
+        let model = await makeModel(source: source); await model.configurePairedOnlineForTests()
+        let load = Task { await model.loadPatient(summary(id: "b", archived: false, version: 1)) }
+        await gate.wait(for: "patient:1"); await model.checkNetworkRevisionOnForeground()
+        var state = await MainActor.run { (model.selectedPatientID, model.selectedPatient?.id, model.isWorking) }
+        XCTAssertEqual(state.0, "b"); XCTAssertNil(state.1); XCTAssertTrue(state.2)
+        await gate.release("patient:1"); await load.value
+        state = await MainActor.run { (model.selectedPatientID, model.selectedPatient?.id, model.isWorking) }
+        XCTAssertEqual(state.0, "b"); XCTAssertEqual(state.1, "b"); XCTAssertFalse(state.2)
+    }
+
+    func testRevisionPublishesListWorkspaceAndStatusAtomically() async {
+        let oldA = detail(id: "a", archived: false, version: 1)
+        let gate = LifecycleLoadGate(["prosthetic:a"])
+        let source = LifecycleMockDataSource(
+            summaries: [summary(id: "a", archived: false, version: 2)],
+            details: ["a": detail(id: "a", archived: false, version: 2)], loadGate: gate,
+            revisions: [revision("stable"), revision("changed")])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(
+            patients: [summary(id: "a", archived: false, version: 1)], selectedPatient: oldA)
+        await model.checkNetworkRevisionOnForeground()
+        let refresh = Task { await model.checkNetworkRevisionOnForeground() }
+        await gate.wait(for: "prosthetic:a")
+        var state = await MainActor.run { (model.patients.first?.version, model.selectedPatient?.version, model.statusMessage, model.isWorking) }
+        XCTAssertEqual(state.0, 1); XCTAssertEqual(state.1, 1); XCTAssertNil(state.2); XCTAssertTrue(state.3)
+        await gate.release("prosthetic:a"); await refresh.value
+        state = await MainActor.run { (model.patients.first?.version, model.selectedPatient?.version, model.statusMessage, model.isWorking) }
+        XCTAssertEqual(state.0, 2); XCTAssertEqual(state.1, 2)
+        XCTAssertEqual(state.2, "Home-base aggiornato, dati ricaricati."); XCTAssertFalse(state.3)
+    }
+
+    func testReloadSupersededBySelectionCannotOverwriteNewerConflictState() async {
+        let conflict = await PairedPatientsWorkspaceModel.uiTestSeededConflict()
+        let a = detail(id: "a", archived: false, version: 1)
+        let b = detail(id: "b", archived: false, version: 1)
+        let gate = LifecycleLoadGate(["patient:1"])
+        let source = LifecycleMockDataSource(
+            details: ["a": a, "b": b], pinChangeError: .versionConflict(conflict), loadGate: gate)
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: a)
+        let reload = Task { await model.reloadAfterConflict() }
+        await gate.wait(for: "patient:1"); await model.loadPatient(summary(id: "b", archived: false, version: 1))
+        await model.changePin(currentPin: "1357", newPin: "2468")
+        await gate.release("patient:1"); await reload.value
+        let state = await MainActor.run {
+            (model.selectedPatient?.id, model.pendingConflict, model.statusMessage, model.errorMessage, model.isWorking)
+        }
+        XCTAssertEqual(state.0, "b"); XCTAssertEqual(state.1, conflict)
+        XCTAssertEqual(state.2, HomeBaseClientError.versionConflict(conflict).localizedDescription)
+        XCTAssertNil(state.3); XCTAssertFalse(state.4)
+    }
+
     func testRestoreUsesTombstoneVersionAndReloadsTrash() async throws {
         let deleted = summary(id: "p1", archived: false, version: 5, deleted: true, reason: "web-delete")
         let source = LifecycleMockDataSource(summaries: [deleted])
@@ -575,6 +656,10 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
             deletionReason: deleted ? "web-delete" : nil
         )
     }
+
+    private func revision(_ fingerprint: String) -> NetworkRevisionSummary {
+        NetworkRevisionSummary(revision: fingerprint, sourceFingerprint: "src", fingerprint: fingerprint)
+    }
 }
 
 private final class Counter {
@@ -636,7 +721,9 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     private let loadGate: LifecycleLoadGate?
     private let entriesByPatient: [String: [HomeBaseEntrySummary]]
     private let entryErrorsByPatient: [String: HomeBaseClientError]
+    private let revisions: [NetworkRevisionSummary]
     private var patientFetchCount = 0
+    private var revisionFetchCount = 0
     private let loginResult: HomeBaseLoginResult
     private let pinChangeError: HomeBaseClientError?
     private let logoutError: HomeBaseClientError?
@@ -657,7 +744,10 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         logoutError: HomeBaseClientError? = nil,
         loadGate: LifecycleLoadGate? = nil,
         entriesByPatient: [String: [HomeBaseEntrySummary]] = [:],
-        entryErrorsByPatient: [String: HomeBaseClientError] = [:]
+        entryErrorsByPatient: [String: HomeBaseClientError] = [:],
+        revisions: [NetworkRevisionSummary] = [
+            NetworkRevisionSummary(revision: "1", sourceFingerprint: "src", fingerprint: "stable")
+        ]
     ) {
         self.summaries = summaries
         self.details = details
@@ -667,6 +757,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         self.loadGate = loadGate
         self.entriesByPatient = entriesByPatient
         self.entryErrorsByPatient = entryErrorsByPatient
+        self.revisions = revisions
         if summaries.isEmpty {
             self.summaries = details.values.map {
                 HomeBasePatientSummary(
@@ -1268,7 +1359,10 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         sessionCookie: String,
         ambulatoryId: String?
     ) async throws -> NetworkRevisionSummary {
-        NetworkRevisionSummary(revision: "1", sourceFingerprint: "src", fingerprint: "stable")
+        revisionFetchCount += 1
+        await loadGate?.pause("revision:\(revisionFetchCount)")
+        guard !revisions.isEmpty else { throw HomeBaseClientError.contract }
+        return revisions[min(revisionFetchCount - 1, revisions.count - 1)]
     }
 
     func fetchFseValidatePatient(
