@@ -14,6 +14,7 @@ interface LumeFiloBaseProps {
 interface LumeFiloSpinaProps extends LumeFiloBaseProps {
     variant: 'spina';
     anchorSelector?: string;
+    nodeCount?: number;
 }
 
 interface LumeFiloConnettoreProps extends LumeFiloBaseProps {
@@ -56,11 +57,13 @@ export function LumeFilo(props: LumeFiloProps) {
     const tone = props.tone ?? 'accent';
 
     if (props.variant === 'spina') {
+        if (props.nodeCount !== undefined && props.nodeCount < 2) return null;
         return (
             <LumeSpina
                 anchorSelector={props.anchorSelector}
                 className={props.className}
                 color={filoColor(tone)}
+                nodeCount={props.nodeCount}
                 style={props.style}
             />
         );
@@ -82,11 +85,13 @@ function LumeSpina({
     anchorSelector,
     className,
     color,
+    nodeCount,
     style,
 }: {
     anchorSelector?: string;
     className?: string;
     color: string;
+    nodeCount?: number;
     style?: CSSProperties;
 }) {
     const motionId = useId();
@@ -98,7 +103,7 @@ function LumeSpina({
         if (!svg || !container || !anchorSelector) return;
 
         const updateGeometry = () => {
-            const nodes = container.querySelectorAll<HTMLElement>(anchorSelector);
+            const nodes = container.querySelectorAll<Element>(anchorSelector);
             const first = nodes.item(0);
             const last = nodes.item(nodes.length - 1);
             if (!first || !last) return;
@@ -192,6 +197,8 @@ function LumeSpina({
             aria-hidden="true"
             focusable="false"
             className={`lume-filo-spina pointer-events-none ${className ?? ''}`}
+            data-lume-filo="spina"
+            data-lume-filo-node-count={nodeCount}
             preserveAspectRatio="none"
             viewBox="0 0 1 100"
             style={{ ...style, color, '--lume-spina-scale': 0 } as LumeFiloStyle}
@@ -269,6 +276,7 @@ function LumeConnettore({
             aria-hidden="true"
             focusable="false"
             className={`pointer-events-none overflow-visible ${className ?? ''}`}
+            data-lume-filo="connettore"
             preserveAspectRatio="none"
             viewBox={viewBox}
             style={{ ...style, color } as CSSProperties}

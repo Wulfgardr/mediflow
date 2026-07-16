@@ -1,0 +1,289 @@
+/* @Codex issue 105, riferimento 68: il diario possiede una sola superficie e un solo Filo SVG. */
+.timelineSection {
+  min-width: 0;
+  padding: 16px;
+  border-radius: var(--lume-radius-panel);
+  background: var(--lume-surface-field);
+  color: var(--lume-ink);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 2px 13px;
+  border-bottom: 1px solid var(--lume-border-color);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 620;
+}
+
+.sectionSubtitle {
+  max-width: 68ch;
+  margin: 4px 0 0;
+  color: var(--lume-ink-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.count {
+  flex: none;
+  color: var(--lume-ink-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.feedViewport {
+  max-block-size: 70vh;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.feed {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 13px 2px 4px 34px;
+}
+
+.filo {
+  position: absolute;
+  z-index: 0;
+  left: 17px;
+  width: 1px;
+  overflow: visible;
+}
+
+.entry {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  padding: 13px 14px 12px;
+  border: 0;
+  border-radius: var(--lume-radius-card);
+  outline: 0;
+  background: var(--lume-surface-field);
+  color: var(--lume-ink);
+  transition:
+    background-color var(--lume-dur-fuoco) var(--lume-ease),
+    color var(--lume-dur-firma) var(--lume-ease);
+}
+
+.entry[data-active='true'] {
+  background: var(--lume-surface-focal);
+  box-shadow: var(--lume-shadow-focal);
+}
+
+.entry:focus-visible {
+  box-shadow: var(--lume-focus-ring);
+}
+
+.node {
+  position: absolute;
+  top: 18px;
+  left: -22px;
+  width: 10px;
+  height: 10px;
+  color: var(--lume-accent);
+  overflow: visible;
+}
+
+.entryTop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.titleGroup {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.entryTitle {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--lume-ink);
+  font-size: 14px;
+  font-weight: 610;
+  line-height: 1.35;
+  transition: color var(--lume-dur-firma) var(--lume-ease);
+}
+
+.stateLabel {
+  flex: none;
+  padding: 1px 5px;
+  border: 1px solid var(--lume-border-color);
+  border-radius: 6px;
+  color: var(--lume-ink-muted);
+  font-size: 9.5px;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.date {
+  color: var(--lume-ink-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.preview {
+  max-width: 72ch;
+  margin: 5px 0 0;
+  color: var(--lume-ink);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  transition: color var(--lume-dur-firma) var(--lume-ease);
+}
+
+.entry[data-lume-entry-state='draft'] .entryTitle,
+.entry[data-lume-entry-state='draft'] .preview {
+  color: var(--lume-ink-muted);
+  font-weight: 520;
+}
+
+.entry[data-lume-entry-state='deleted'] .stateLabel {
+  border-color: var(--lume-signal-critical);
+  color: var(--lume-signal-critical);
+}
+
+.provenance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 8px;
+  color: var(--lume-ink-muted);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.entryFooter {
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--lume-border-color);
+  color: var(--lume-ink-muted);
+  font-size: 11px;
+}
+
+.patientIdentity {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px 8px;
+  min-width: 0;
+}
+
+.patientIdentity strong {
+  color: var(--lume-ink);
+  font-size: 12px;
+  font-weight: 590;
+}
+
+.attachmentCount {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.entryActions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+}
+
+.emptyState {
+  margin: 0;
+  padding: 28px 8px 18px;
+  color: var(--lume-ink-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .feedViewport {
+    max-block-size: none;
+    overflow: visible;
+  }
+
+  .timelineSection {
+    padding: 13px 10px;
+  }
+
+  .sectionHeader {
+    display: block;
+  }
+
+  .count {
+    display: block;
+    margin-top: 7px;
+  }
+
+  .feed {
+    padding-left: 29px;
+  }
+
+  .filo {
+    left: 14px;
+  }
+
+  .node {
+    left: -20px;
+  }
+
+  .entry {
+    padding: 12px 10px;
+  }
+
+  .entryTop {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .titleGroup {
+    align-items: flex-start;
+  }
+
+  .date {
+    white-space: normal;
+  }
+
+  .entryFooter {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .entryActions {
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entry,
+  .entryTitle,
+  .preview {
+    transition: none;
+  }
+}
+
+:global(:root[data-ui-reduce-motion='true']) .entry,
+:global(:root[data-ui-reduce-motion='true']) .entryTitle,
+:global(:root[data-ui-reduce-motion='true']) .preview {
+  transition: none;
+}
