@@ -178,7 +178,7 @@ struct PairedPatientsWorklistView: View {
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("patient-search-empty")
             } else {
-                ForEach(results) { patient in
+                let rows = ForEach(results) { patient in
                     if patientViewMode == .trash {
                         HStack(spacing: 8) {
                             VStack(alignment: .leading, spacing: 4) {
@@ -220,6 +220,12 @@ struct PairedPatientsWorklistView: View {
                         .lumeSurface(zone: model.selectedPatient?.id == patient.id ? .focal : .field, cornerRadius: 10)
                         .accessibilityIdentifier("patient-trash-row-\(patient.id)")
                     } else {
+                        #if os(macOS)
+                        activePatientLabel(patient)
+                            .tag(patient.id)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("patient-cell-\(patient.id)")
+                        #else
                         Button {
                             Task { await model.loadPatient(patient) }
                         } label: {
@@ -228,10 +234,39 @@ struct PairedPatientsWorklistView: View {
                         .buttonStyle(.plain)
                         .modifier(LumeRigaListaModifier(isSelected: model.selectedPatient?.id == patient.id))
                         .accessibilityIdentifier("patient-cell-\(patient.id)")
+                        #endif
                     }
                 }
+                #if os(macOS)
+                rows.modifier(
+                    NativePatientSelectionListModifier(
+                        selection: patientSelection,
+                        isEnabled: model.canChangePatientSelection,
+                        allowsSelection: patientViewMode != .trash
+                    )
+                )
+                #else
+                rows
+                #endif
             }
         }
+    }
+
+    /* @Codex */
+    private var patientSelection: Binding<String?> {
+        Binding(
+            get: { model.selectedPatientID },
+            set: { patientID in
+                guard patientViewMode != .trash,
+                      let patientID,
+                      model.canChangePatientSelection,
+                      let patient = filteredPatients.first(where: { $0.id == patientID }),
+                      patientID != model.selectedPatientID || model.selectedPatient == nil else {
+                    return
+                }
+                Task { await model.loadPatient(patient) }
+            }
+        )
     }
 
     private var connectionStateLabel: some View {
@@ -395,6 +430,38 @@ struct PairedPatientsWorklistView: View {
     }
 
     // Plain tinted capsule (no glass): glass inside the glass card would nest.
+}
+
+/* @Codex */
+private struct NativePatientSelectionListModifier: ViewModifier {
+    @Binding var selection: String?
+    let isEnabled: Bool
+    let allowsSelection: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if os(macOS)
+        if allowsSelection {
+            List(selection: $selection) {
+                content
+            }
+            .listStyle(.sidebar)
+            .disabled(!isEnabled)
+            .accessibilityLabel("Elenco pazienti")
+            .accessibilityIdentifier("patients-selection-list")
+        } else {
+            List {
+                content
+            }
+            .listStyle(.sidebar)
+            .disabled(!isEnabled)
+            .accessibilityLabel("Cestino pazienti")
+            .accessibilityIdentifier("patients-trash-list")
+        }
+        #else
+        content
+        #endif
+    }
 }
 
 

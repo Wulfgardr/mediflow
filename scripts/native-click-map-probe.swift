@@ -49,6 +49,12 @@ func children(of element: AXUIElement) -> [AXUIElement] {
     attribute(element, kAXChildrenAttribute) as? [AXUIElement] ?? []
 }
 
+/* @Codex */
+func parent(of element: AXUIElement) -> AXUIElement? {
+    guard let value = attribute(element, kAXParentAttribute) else { return nil }
+    return (value as! AXUIElement)
+}
+
 func identifier(of element: AXUIElement) -> String {
     attribute(element, "AXIdentifier") as? String ?? ""
 }
@@ -63,6 +69,12 @@ func value(of element: AXUIElement) -> String {
 
 func role(of element: AXUIElement) -> String {
     attribute(element, kAXRoleAttribute) as? String ?? ""
+}
+
+/* @Codex */
+func nativeList(in element: AXUIElement) -> AXUIElement? {
+    let nativeListRoles = [kAXOutlineRole as String, kAXTableRole as String, "AXList"]
+    return findElement(in: element, where: { nativeListRoles.contains(role(of: $0)) })
 }
 
 func title(of element: AXUIElement) -> String {
@@ -211,8 +223,12 @@ func openClinicalSection(
     guard let window = try? appWindow(for: app),
           let button = findElement(in: window, where: {
               identifier(of: $0) == "clinical-workspace-section-\(section)-button"
-          }),
-          press(button) else {
+          }) else {
+        report.fail("Unable to open clinical section \(section)")
+        throw ProbeFailure(message: "Unable to open clinical section \(section)")
+    }
+    guard let sidebarList = nativeList(in: window),
+          selectPatientRow(button, within: sidebarList) else {
         report.fail("Unable to open clinical section \(section)")
         throw ProbeFailure(message: "Unable to open clinical section \(section)")
     }
@@ -224,9 +240,64 @@ func openClinicalSection(
     report.pass("Opened clinical section \(section)")
 }
 
+/* @Codex */
+func selectPatientRow(_ row: AXUIElement, within list: AXUIElement) -> Bool {
+    var rowCandidates: [AXUIElement] = []
+    var candidate: AXUIElement? = row
+    for _ in 0..<8 {
+        guard let element = candidate else { return false }
+        if CFEqual(element, list) {
+            break
+        }
+        rowCandidates.append(element)
+        candidate = parent(of: element)
+    }
+
+    guard let boundary = candidate, CFEqual(boundary, list) else { return false }
+    for element in rowCandidates {
+        if AXUIElementSetAttributeValue(
+                element,
+                kAXSelectedAttribute as CFString,
+                kCFBooleanTrue
+            ) == .success {
+            return true
+        }
+    }
+    return rowCandidates.contains(where: press)
+}
+
+/* @Codex */
+func selectedItemsContain(_ identifierName: String, list: AXUIElement) -> Bool {
+    let selectionAttribute: String
+    switch role(of: list) {
+    case kAXOutlineRole, kAXTableRole:
+        selectionAttribute = kAXSelectedRowsAttribute
+    case "AXList":
+        selectionAttribute = kAXSelectedChildrenAttribute
+    default:
+        return false
+    }
+    guard let selectedItems = attribute(list, selectionAttribute) as? [AXUIElement] else {
+        return false
+    }
+    return selectedItems.contains { item in
+        findElement(in: item, where: { identifier(of: $0) == identifierName }) != nil
+    }
+}
+
+/* @Codex */
+func detailNameMatches(_ expected: String, app: NSRunningApplication) -> Bool {
+    guard let window = try? appWindow(for: app),
+          let detailName = findElement(in: window, where: { identifier(of: $0) == "patient-detail-name" }) else {
+        return false
+    }
+    return [descriptionValue(of: detailName), value(of: detailName), title(of: detailName)]
+        .contains(expected)
+}
+
 func runClinicalShellProbe(app: NSRunningApplication, report: inout ProbeReport) throws {
     let sectionChecks = [
-        ("patients", "clinical-workspace-patients-view"),
+        ("patients", "patients-selection-list"),
         ("agenda", "clinical-workspace-agenda-view"),
         ("diary", "clinical-workspace-diary-view"),
         ("analytics", "clinical-workspace-analytics-view"),
@@ -240,25 +311,47 @@ func runClinicalShellProbe(app: NSRunningApplication, report: inout ProbeReport)
     for (section, expectedView) in sectionChecks {
         try openClinicalSection(section, expectedView: expectedView, app: app, report: &report)
     }
-    try openClinicalSection("patients", expectedView: "clinical-workspace-patients-view", app: app, report: &report)
+    try openClinicalSection("patients", expectedView: "patients-selection-list", app: app, report: &report)
 
     guard let window = try? appWindow(for: app) else {
         throw ProbeFailure(message: "Unable to resolve MediFlow window after shell navigation.")
     }
 
-    let patientRow = findElement(in: window, where: {
-        identifier(of: $0).hasPrefix("patient-cell-uitest-")
-    })
-    guard let patientRow else {
-        report.fail("No patient-cell-uitest-* identifier found; launch the synthetic P6 fixture first")
-        throw ProbeFailure(message: "Synthetic patient fixture required but no UI-test patient row was found.")
+    guard let listContainer = findElement(in: window, where: {
+        identifier(of: $0) == "patients-selection-list"
+    }), let patientList = nativeList(in: listContainer) else {
+        report.fail("Missing native patient selection list")
+        throw ProbeFailure(message: "The patient worklist did not expose a native AX list role.")
     }
+    report.pass("Native patient list role \(role(of: patientList))")
 
-    guard press(patientRow), waitForIdentifier("patient-detail-name", in: app) != nil else {
+    guard let firstPatientRow = findElement(in: patientList, where: {
+        identifier(of: $0) == "patient-cell-uitest-1"
+    }), selectPatientRow(firstPatientRow, within: patientList), waitFor(condition: {
+        detailNameMatches("Rossi Mario", app: app)
+    }) else {
         report.fail("Unable to open the first patient detail")
         throw ProbeFailure(message: "Unable to open the first patient detail")
     }
-    report.pass("Opened first patient detail")
+    guard waitFor(condition: {
+        selectedItemsContain("patient-cell-uitest-1", list: patientList)
+    }) else {
+        report.fail("The native list did not expose the first selected row")
+        throw ProbeFailure(message: "The first patient row was not selected in the AX tree.")
+    }
+    report.pass("Selected first patient and opened matching detail")
+
+    guard let secondPatientRow = findElement(in: patientList, where: {
+        identifier(of: $0) == "patient-cell-uitest-2"
+    }), selectPatientRow(secondPatientRow, within: patientList), waitFor(condition: {
+        detailNameMatches("Bianchi Anna", app: app)
+    }), waitFor(condition: {
+        selectedItemsContain("patient-cell-uitest-2", list: patientList)
+    }) else {
+        report.fail("Unable to move selection to the second patient")
+        throw ProbeFailure(message: "A -> B selection did not expose the matching row and detail.")
+    }
+    report.pass("Moved native selection A -> B with matching detail")
 
     let moduleIdentifiers = [
         "patient-clinical-signals",
