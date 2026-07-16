@@ -1,43 +1,100 @@
 ---
-summary: "Lume: the destination design language for MediFlow. Manifesto, relationship to Vetro Clinico, reading order, adoption status."
+summary: "Manifest degli artefatti visuali Lume, con distinzione tra target, studi, evidenza corrente e materiale legacy."
 read_when:
-  - "Evaluating or implementing the Lume design language proposal."
-  - "Deciding the long-term visual direction of MediFlow beyond Vetro Clinico."
+  - "Valutando quale artefatto Lume sia il riferimento visivo da applicare."
+  - "Confrontando una superficie web o macOS con il canone visuale Lume."
 ---
 
-# Lume
+# Lume: manifest degli artefatti visuali
 
-**Stato: lingua di destinazione** (decisione di Leonardo, 2026-07-12, formalizzata in [ADR 0078](../../adr/0078-lume-lingua-di-design-di-destinazione.md)). Lume è la corsia stilistica nuova derivata dalla review di design del 2026-07-12: ricerca di mercato su lane GPT-5.6 (prodotti premium, frontiera clinica, frontiera estetica, perlustrazione dei gestionali GP e degli applicativi provider USA: [02-derivazione.md](./02-derivazione.md) e [04-perlustrazione.md](./04-perlustrazione.md)) e sintesi progettuale Fable. Il canone operativo transitorio resta [Vetro Clinico](../vetro-clinico/README.md) per le superfici non ancora migrate. Al 2026-07-14 sono atterrate la direzione L0, il contratto token L1a, la convivenza runtime web L1b (marker `data-lume="true"`, alias giorno/grafite su `:root`/`.dark`), le prime superfici Lume web (cockpit, shell del workspace, lock screen) e le primitive native Wave N2 (`LumePalette`, `LumeSurface`, `LumeCard`, `Filo`, `RigaLista`, Registro, inchiostro e chrome Liquid Glass con fallback). Restano aperti i componenti interni e le altre viste, l'adozione del registro guardia come raffinamento ambientale del dark, la tipografia bundle della Voce, l'adozione nativa delle primitive, la Settings scene e la verifica manuale piena; il dettaglio verificabile, con le PR di riferimento, è nel ledger di [ADR 0078](../../adr/0078-lume-lingua-di-design-di-destinazione.md) e in [03-migrazione.md](./03-migrazione.md).
+Lume è la lingua visiva di destinazione approvata in [ADR 0078](../../adr/0078-lume-lingua-di-design-di-destinazione.md). Le fondazioni tecniche sono presenti, ma la parità estetica con il canone non è consegnata. Le superfici web e macOS correnti sono composizioni con fondazioni Lume, non il target raggiunto.
 
-## Il manifesto
+Questo manifest distingue il riferimento da applicare, gli studi, le prove dello stato corrente e il materiale storico. Uno studio o una cattura non sostituiscono il canone.
 
-Il vetro era il materiale. Il lume è l'attenzione.
+## Inventario
 
-Vetro Clinico ha dato a MediFlow una disciplina dei materiali: vetro per il telaio, carta per la clinica, colore solo come segnale. Lume fa il passo successivo: smette di chiedersi di cosa sono fatte le superfici e si chiede dove deve andare lo sguardo. In un ambulatorio la risorsa scarsa non è lo schermo: è l'attenzione del medico, sei ore al giorno. L'interfaccia si organizza come la lampada sul tavolo di visita: una zona in piena luce (il caso in lavorazione), una penombra leggibile (il contesto), un buio operativo che non chiede nulla (il telaio). E "a lume di ragione" è esattamente il registro del prodotto: ciò che si vede deve poter essere verificato.
+| Stato | Artefatto | Uso e limite |
+| --- | --- | --- |
+| `TARGET` | [Canone Lume](#target-canone-versionato) | Riferimento visuale da applicare e verificare. |
+| `STUDY` | [Sei mock interattivi](#study-mock-interattivi) | Studi esplorativi, non prova di parità. |
+| `CURRENT EVIDENCE` | [Catture runtime](#current-evidence-catture-runtime) | Evidenza dello stato corrente, non del target. |
+| `LEGACY` | [Kree8](#legacy-riferimenti-storici) | Riferimenti storici, non direzione visuale attiva. |
 
-Quattro rotture rispetto al paradigma attuale, tutte motivate dalla ricerca:
+## TARGET: canone versionato
 
-1. **La luce sostituisce il vetro come sistema di gerarchia.** Profondità e importanza si esprimono con luminanza, temperatura e ombre brevi, non con blur e trasparenza. Il vetro si ritira a rendering opzionale degli overlay transitori. È la direzione post-glass della frontiera 2026 e la lezione della stessa Apple, che ha ridotto la trasparenza di default un anno dopo averla lanciata.
-2. **Il filo è la firma grafica, e connette.** Una sola linea sottile porta il significato di continuità della cura, resa come geometria SVG continua: spina della timeline, connettore della storia di un valore, legame di provenienza. Il fuoco però si marca con la luce, non con il filo, e lo stato epistemico (bozza o firmato) si rende con l'inchiostro, non con il tratteggio: la resa è fissata in [07-gesto-e-movimento.md](./07-gesto-e-movimento.md). Niente ornamento: la linea è dato.
-3. **Due voci tipografiche.** La Voce (sans umanista, con optical sizing dove disponibile) parla; il Registro (mono) certifica. Ogni atomo verificabile della clinica (dose, valore, codice, orario) è composto nel Registro con cifre tabellari: si riconosce a colpo d'occhio cosa è dato e cosa è discorso.
-4. **La grammatica dell'attenzione.** Testata paziente invariabile, colonna di ciò che richiede attenzione (non di tutto ciò che esiste), baseline personale prima del benchmark, provenienza sempre visibile. Il layout non presenta dati: presenta decisioni da prendere.
+Il canone sorgente è [lume-cockpit.template.html](./canon/lume-cockpit.template.html). Il template non contiene font esterni: il build inserisce le versioni base64 dei font locali. Il file HTML generato non è versionato.
 
-Ciò che NON cambia: le leggi cliniche di Vetro Clinico restano fondamenta anche di Lume. Colore solo come semantica, stati onesti, tastiera di prima classe, contratto WCAG 2.2 AA, densità a due livelli, materiali idiomatici per piattaforma, niente meta-testo, trattino lungo bandito.
+| Campo | Valore |
+| --- | --- |
+| URL sorgente | <https://claude.ai/code/artifact/03b0bb95-0e4f-4383-b54b-c3b5c07a0e75> |
+| Titolo | `Lume: il cockpit clinico di MediFlow` |
+| Ultimo aggiornamento | 2026-07-15 |
+| Provenienza | Ricostruito il 2026-07-16 dal transcript della sessione che lo ha pubblicato, tramite replay di Write, Edit e script di build. Il contenuto è stato verificato byte-identico all'artefatto live. |
+| SHA-256 template | `a540eafbe7c3b216f9b1324f5b9a7a66631ed68a01eb1da4c752c2acef0e6502` |
+| SHA-256 build atteso | `0c265db8c4174fd22d7b2e532e27669b6f76b8eed44da215432ee2cedcaab127` |
 
-## Ordine di lettura
+Il build usa `app/fonts/Inter-Variable-Latin.woff2`, `app/fonts/IBM-Plex-Mono-400-Latin.woff2` e `app/fonts/IBM-Plex-Mono-500-Latin.woff2` per sostituire, nell'ordine, `__INTER__`, `__PLEX400__` e `__PLEX500__`.
 
-1. [01-lingua.md](./01-lingua.md): la specifica completa: modello focale, materia, filo, tipografia, profondità, grammatica dell'attenzione, provenienza, motion, note per piattaforma.
-2. [02-derivazione.md](./02-derivazione.md): la ricerca di mercato (tre lane GPT-5.6 Terra con fonti), cosa è stato scartato e perché ogni scelta di Lume discende dai dati.
-3. [03-migrazione.md](./03-migrazione.md): il percorso da Vetro Clinico: mappa dei token, fasi, rischi, cosa sopravvive.
-4. [04-perlustrazione.md](./04-perlustrazione.md): la perlustrazione EHR/provider e le 12 integrazioni normative alla grammatica.
-5. [05-app-native.md](./05-app-native.md): mappa generale delle app native, grammatica compatta iPhone e note tri-OS prospettiche.
-6. [06-macos-apple-contract.md](./06-macos-apple-contract.md): contratto di destinazione macOS, fonti Apple, availability, disposizione, materiali, debito corrente e sequenza verificabile.
-7. [07-gesto-e-movimento.md](./07-gesto-e-movimento.md): la grammatica del gesto e del movimento: luce per il fuoco, inchiostro per lo stato, filo come connettore SVG; leggi di moto, atomi, scene, primitive tecniche.
-8. [mockups/](./mockups/): dimostratori interattivi (aprire nel browser, nessuna dipendenza). `lume.html`: modello focale, due voci, registri giorno/grafite/guardia. `lume-dinamica.html`: studio prima/dopo (filo lineare contro luce e inchiostro). `lume-cockpit-vivo.html`, `lume-campi.html`, `lume-voce.html`, `lume-impostazioni.html`: le movenze nel linguaggio luce e inchiostro.
+Rigenerazione e verifica:
 
-## Rapporto con il canone
+```bash
+node scripts/build-lume-canon.mjs --verify
+```
 
-- Lume e approvata come lingua di destinazione; Vetro Clinico ([../vetro-clinico/](../vetro-clinico/README.md)) resta il canone operativo transitorio finché le fasi di migrazione non sostituiscono i consumatori. I lavori DS-1..DS-3 servono anche a Lume e non vanno fermati.
-- Le esplorazioni Strumento, Guardia e Inchiostro sono compatibili con Lume e vi confluiscono (Guardia diventa il terzo registro di luce; Strumento la densità dello strumento; Inchiostro resta il linguaggio di stampa).
-- Vetro Vivo viene sostituita dal modello di motion di Lume (la luce si sposta, le superfici no), più sobrio e meno costoso.
-- La decisione di prodotto e registrata in ADR 0078. Restano decisioni di delivery: font non-Apple, ordine delle slice e promozione dei singoli componenti dopo prova reale.
+Senza argomenti il build scrive un file temporaneo e stampa percorso e hash. Per scegliere la destinazione:
+
+```bash
+node scripts/build-lume-canon.mjs /tmp/lume-cockpit.html
+```
+
+Caratteristiche osservate del canone:
+
+- telaio operativo con lista in penombra e superficie paziente focale;
+- nessuna striscia di selezione colorata;
+- Inter per la prosa clinica e IBM Plex Mono per codici, date, valori e dosi;
+- Filo continuo per la cronologia;
+- colore riservato alla semantica clinica;
+- varianti Giorno e Grafite.
+
+## STUDY: mock interattivi
+
+Gli studi in [mockups/](./mockups/) sono apribili nel browser e non hanno dipendenze. Servono a discutere ipotesi e comportamento, non a certificare il target.
+
+| File | Oggetto dello studio |
+| --- | --- |
+| [lume.html](./mockups/lume.html) | Modello focale, due voci e registri Giorno, Grafite e Guardia. |
+| [lume-cockpit-vivo.html](./mockups/lume-cockpit-vivo.html) | Studio più vicino al canone, ma non coincidente con esso. |
+| [lume-dinamica.html](./mockups/lume-dinamica.html) | Confronto tra filo lineare e luce con inchiostro. |
+| [lume-campi.html](./mockups/lume-campi.html) | Campi e densità dell'informazione. |
+| [lume-voce.html](./mockups/lume-voce.html) | Ruoli tipografici di Voce e Registro. |
+| [lume-impostazioni.html](./mockups/lume-impostazioni.html) | Applicazione del linguaggio alle impostazioni. |
+
+## CURRENT EVIDENCE: catture runtime
+
+Queste immagini sono evidenza dello stato corrente. Non dichiarano il target Lume raggiunto.
+
+- [01-worklist.png](../../../screenshots/01-worklist.png)
+- [02-scheda.png](../../../screenshots/02-scheda.png)
+- [03-quadro.png](../../../screenshots/03-quadro.png)
+- [04-review.png](../../../screenshots/04-review.png)
+- [05-security.png](../../../screenshots/05-security.png)
+- [macos-workspace.png](../../../screenshots/macos-workspace.png)
+
+## LEGACY: riferimenti storici
+
+- [components/kree8/](../../../components/kree8/)
+- [app/mockups/kree8/](../../../app/mockups/kree8/)
+
+Questi materiali sono legacy. Non sono il canone Lume e non dimostrano la parità con il target.
+
+## Documenti e contratti collegati
+
+1. [01-lingua.md](./01-lingua.md): specifica della lingua, del modello focale, del filo e della tipografia.
+2. [02-derivazione.md](./02-derivazione.md): ricerca e motivazioni della direzione.
+3. [03-migrazione.md](./03-migrazione.md): percorso di migrazione e rischi dichiarati.
+4. [04-perlustrazione.md](./04-perlustrazione.md): perlustrazione EHR e provider.
+5. [05-app-native.md](./05-app-native.md): mappa delle app native e note tri-OS.
+6. [06-macos-apple-contract.md](./06-macos-apple-contract.md): contratto di destinazione macOS.
+7. [07-gesto-e-movimento.md](./07-gesto-e-movimento.md): grammatica del gesto e del movimento.
+8. [Token Lume](./tokens/lume.tokens.json): contratto DTCG dei registri e dei colori.
+9. [ADR 0078](../../adr/0078-lume-lingua-di-design-di-destinazione.md): decisione di prodotto, ledger di implementazione e condizioni della convivenza.

@@ -1,0 +1,922 @@
+<title>Lume: il cockpit clinico di MediFlow</title>
+<style>
+@font-face {
+  font-family: 'Lume Voce';
+  src: url('data:font/woff2;base64,__INTER__') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Lume Registro';
+  src: url('data:font/woff2;base64,__PLEX400__') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Lume Registro';
+  src: url('data:font/woff2;base64,__PLEX500__') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: block;
+}
+
+/* Registro giorno: i valori esatti di docs/design/lume/tokens/lume.tokens.json */
+:root {
+  --canvas: #eef0f2;
+  --field: #f5f5f4;
+  --focal: #fbfaf7;
+  --chrome: #e6e8eb;
+  --ink: #1a1c1e;
+  --ink-muted: #5c6772;
+  --accent: #33506b;
+  --chrome-ink: #1a1c1e;
+  --chrome-ink-muted: #5c6772;
+  --hairline: color-mix(in srgb, var(--ink) 12%, transparent);
+  --hairline-soft: color-mix(in srgb, var(--ink) 8%, transparent);
+  --focal-shadow: 0 12px 28px color-mix(in srgb, var(--ink) 10%, transparent);
+  --wash: color-mix(in srgb, var(--ink) 5%, transparent);
+
+  /* segnali clinici: indipendenti dal registro, mai decorativi */
+  --warning: #9a6a2f;
+  --critical: #a33a2f;
+  --success: #4b6354;
+  --plum: #555161;
+
+  --radius-panel: 20px;
+  --radius-card: 14px;
+  --radius-control: 10px;
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --motion: 1;
+  --dur-riga: calc(100ms * var(--motion));
+  --dur-fuoco: calc(165ms * var(--motion));
+  --dur-firma: calc(210ms * var(--motion));
+}
+
+/* Registro grafite: il notturno, non un'inversione */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #121417;
+    --field: #191c21;
+    --focal: #22252b;
+    --chrome: #0e1013;
+    --ink: #e9ecef;
+    --ink-muted: #8f9aa6;
+    --accent: #8fb0cc;
+    --chrome-ink: #e9ecef;
+    --chrome-ink-muted: #8f9aa6;
+    --hairline: color-mix(in srgb, var(--ink) 14%, transparent);
+    --hairline-soft: color-mix(in srgb, var(--ink) 9%, transparent);
+    --focal-shadow: 0 12px 30px rgba(0, 0, 0, 0.42);
+    --wash: color-mix(in srgb, var(--ink) 7%, transparent);
+    --warning: #c99a58;
+    --critical: #cf6a5c;
+    --success: #7d9a86;
+    --plum: #9a94ab;
+  }
+}
+:root[data-theme='dark'], :root[data-register='grafite'] {
+  --canvas: #121417;
+  --field: #191c21;
+  --focal: #22252b;
+  --chrome: #0e1013;
+  --ink: #e9ecef;
+  --ink-muted: #8f9aa6;
+  --accent: #8fb0cc;
+  --chrome-ink: #e9ecef;
+  --chrome-ink-muted: #8f9aa6;
+  --hairline: color-mix(in srgb, var(--ink) 14%, transparent);
+  --hairline-soft: color-mix(in srgb, var(--ink) 9%, transparent);
+  --focal-shadow: 0 12px 30px rgba(0, 0, 0, 0.42);
+  --wash: color-mix(in srgb, var(--ink) 7%, transparent);
+  --warning: #c99a58;
+  --critical: #cf6a5c;
+  --success: #7d9a86;
+  --plum: #9a94ab;
+}
+:root[data-theme='light'], :root[data-register='giorno'] {
+  --canvas: #eef0f2;
+  --field: #f5f5f4;
+  --focal: #fbfaf7;
+  --chrome: #e6e8eb;
+  --ink: #1a1c1e;
+  --ink-muted: #5c6772;
+  --accent: #33506b;
+  --chrome-ink: #1a1c1e;
+  --chrome-ink-muted: #5c6772;
+  --hairline: color-mix(in srgb, var(--ink) 12%, transparent);
+  --hairline-soft: color-mix(in srgb, var(--ink) 8%, transparent);
+  --focal-shadow: 0 12px 28px color-mix(in srgb, var(--ink) 10%, transparent);
+  --wash: color-mix(in srgb, var(--ink) 5%, transparent);
+  --warning: #9a6a2f;
+  --critical: #a33a2f;
+  --success: #4b6354;
+  --plum: #555161;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion: 0.5; }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: 'Lume Voce', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color var(--dur-fuoco) var(--ease), color var(--dur-fuoco) var(--ease);
+}
+
+.registro {
+  font-family: 'Lume Registro', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.92em;
+  letter-spacing: -0.01em;
+}
+
+.page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Intestazione del mock: fuori dal prodotto, spiega cosa si guarda */
+.preamble {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+.preamble h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 620;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+}
+.preamble p {
+  margin: 6px 0 0;
+  color: var(--ink-muted);
+  font-size: 14px;
+  max-width: 62ch;
+}
+
+.register-switch {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--field);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-control);
+}
+.register-switch button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background-color var(--dur-riga) var(--ease), color var(--dur-riga) var(--ease), border-color var(--dur-riga) var(--ease);
+}
+.register-switch button:hover { background: var(--wash); }
+.register-switch button[aria-pressed='true'] {
+  background: var(--focal);
+  border-color: var(--hairline);
+  color: var(--ink);
+}
+.register-switch button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* Il cockpit */
+.cockpit {
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 14px;
+  align-items: start;
+  min-height: 640px;
+}
+@media (max-width: 940px) {
+  .cockpit { grid-template-columns: 1fr; }
+  .rail { display: none; }
+}
+
+/* Il buio operativo: il telaio recede */
+.rail {
+  background: var(--chrome);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-panel);
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-height: 640px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 2px 6px;
+}
+.brand-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--chrome);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+:root[data-register='grafite'] .brand-mark, :root[data-theme='dark'] .brand-mark { color: #0e1013; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-register='giorno']) .brand-mark { color: #0e1013; }
+}
+.brand-name {
+  font-size: 13px;
+  font-weight: 640;
+  letter-spacing: 0.08em;
+  color: var(--chrome-ink);
+}
+
+.nav-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--chrome-ink-muted);
+  padding: 0 8px;
+  margin-bottom: 6px;
+}
+.nav { display: flex; flex-direction: column; gap: 2px; }
+.nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--chrome-ink-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-control);
+  padding: 8px 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color var(--dur-riga) var(--ease), color var(--dur-riga) var(--ease);
+}
+.nav-item:hover { background: var(--wash); color: var(--chrome-ink); }
+.nav-item[aria-current='page'] {
+  background: var(--field);
+  color: var(--ink);
+  font-weight: 580;
+}
+.nav-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.nav-count {
+  font-size: 12px;
+  color: var(--chrome-ink-muted);
+}
+
+.rail-foot {
+  margin-top: auto;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--chrome-ink-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* La penombra: pannelli non focali */
+.panel {
+  background: var(--field);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-panel);
+  padding: 16px;
+  transition: background-color var(--dur-fuoco) var(--ease), box-shadow var(--dur-fuoco) var(--ease);
+}
+
+/* Il fuoco: la luce sale, l'ombra e' corta */
+.panel.is-focal {
+  background: var(--focal);
+  border-color: var(--hairline);
+  box-shadow: var(--focal-shadow);
+}
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.panel-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.panel-meta {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+/* La worklist */
+.worklist { display: flex; flex-direction: column; gap: 4px; }
+.patient-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  font: inherit;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-card);
+  padding: 9px 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color var(--dur-riga) var(--ease), border-color var(--dur-riga) var(--ease), transform var(--dur-riga) var(--ease);
+}
+.patient-row:hover { background: var(--wash); }
+.patient-row:active { transform: scale(0.985); }
+.patient-row:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.patient-row[aria-selected='true'] {
+  background: var(--focal);
+  border-color: var(--hairline);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--ink) 8%, transparent);
+}
+:root[data-register='grafite'] .patient-row[aria-selected='true'],
+:root[data-theme='dark'] .patient-row[aria-selected='true'] {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+.patient-name {
+  font-size: 14px;
+  font-weight: 570;
+  letter-spacing: -0.008em;
+}
+.patient-sub {
+  grid-column: 1;
+  font-size: 12px;
+  color: var(--ink-muted);
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+.patient-side {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+.row-when { font-size: 11px; color: var(--ink-muted); }
+
+/* I segnali: colore = semantica clinica, mai decorazione */
+.signal {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+.signal--critical {
+  color: color-mix(in srgb, var(--critical) 62%, var(--ink));
+  border-color: color-mix(in srgb, var(--critical) 32%, transparent);
+  background: color-mix(in srgb, var(--critical) 11%, var(--field));
+}
+.signal--warning {
+  color: color-mix(in srgb, var(--warning) 60%, var(--ink));
+  border-color: color-mix(in srgb, var(--warning) 30%, transparent);
+  background: color-mix(in srgb, var(--warning) 11%, var(--field));
+}
+.signal--success {
+  color: color-mix(in srgb, var(--success) 60%, var(--ink));
+  border-color: color-mix(in srgb, var(--success) 30%, transparent);
+  background: color-mix(in srgb, var(--success) 11%, var(--field));
+}
+.signal--plum {
+  color: color-mix(in srgb, var(--plum) 60%, var(--ink));
+  border-color: color-mix(in srgb, var(--plum) 32%, transparent);
+  background: color-mix(in srgb, var(--plum) 11%, var(--field));
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--canvas);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-control);
+  padding: 8px 11px;
+  margin-bottom: 12px;
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+.search svg { flex: none; opacity: 0.7; }
+
+/* La scheda nel fuoco */
+.chart { display: flex; flex-direction: column; gap: 16px; }
+.chart-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.chart-name {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 640;
+  letter-spacing: -0.02em;
+}
+.chart-atoms {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+  align-items: center;
+}
+.dot { opacity: 0.45; }
+
+.action {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+  padding: 7px 12px;
+  min-height: 34px;
+  cursor: pointer;
+  transition: background-color var(--dur-riga) var(--ease), transform var(--dur-riga) var(--ease);
+}
+.action:hover { background: var(--wash); }
+.action:active { transform: scale(0.97); }
+.action:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(102px, 1fr));
+  gap: 8px;
+}
+.metric {
+  background: var(--field);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-card);
+  padding: 10px 12px;
+}
+.metric-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.metric-value {
+  margin-top: 5px;
+  font-size: 19px;
+  font-weight: 600;
+}
+.metric-value.is-warning { color: color-mix(in srgb, var(--warning) 62%, var(--ink)); }
+.metric-note { font-size: 11.5px; color: var(--ink-muted); margin-top: 2px; }
+
+.section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 9px;
+}
+
+/* Il filo: connettore reale, geometria SVG, continuo e pieno */
+.diary { position: relative; padding-left: 22px; }
+.filo {
+  position: absolute;
+  left: 4px;
+  top: 6px;
+  width: 9px;
+  /* l'SVG e' un replaced element: senza altezza esplicita si ferma ai suoi 150px intrinseci */
+  height: calc(100% - 12px);
+  overflow: visible;
+  pointer-events: none;
+}
+.filo line {
+  stroke: var(--accent);
+  stroke-width: 1.25;
+  opacity: 0.55;
+  transform-origin: top center;
+  transform: scaleY(var(--filo-grow, 1));
+  transition: transform var(--dur-firma) var(--ease);
+}
+.filo circle {
+  fill: var(--focal);
+  stroke: var(--accent);
+  stroke-width: 1.25;
+}
+.entries { display: flex; flex-direction: column; gap: 3px; }
+.entry {
+  border-radius: var(--radius-card);
+  padding: 9px 10px;
+  transition: background-color var(--dur-riga) var(--ease);
+}
+.entry:hover { background: var(--wash); }
+.entry-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.entry-title { font-size: 13.5px; font-weight: 570; }
+.entry-when { font-size: 11.5px; color: var(--ink-muted); flex: none; }
+.entry-body {
+  margin: 3px 0 0;
+  font-size: 13px;
+  color: var(--ink-muted);
+  line-height: 1.55;
+}
+
+/* L'inchiostro porta lo stato: la bozza e' tenue, la firma asciuga */
+.entry.is-draft .entry-title,
+.entry.is-draft .entry-body { color: var(--ink-muted); }
+.entry.is-draft .entry-title { font-weight: 520; }
+.tag-draft {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9.5px;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 1px 5px;
+  margin-left: 7px;
+  vertical-align: 1px;
+}
+.entry-sign {
+  margin-top: 7px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.entry.is-signed .entry-title,
+.entry.is-signed .entry-body { color: var(--ink); }
+.entry.is-signed .tag-draft { display: none; }
+.entry.is-signed .entry-sign { display: none; }
+.entry-signed-note {
+  display: none;
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: color-mix(in srgb, var(--success) 58%, var(--ink));
+  align-items: center;
+  gap: 5px;
+}
+.entry.is-signed .entry-signed-note { display: flex; }
+.entry .entry-title, .entry .entry-body {
+  transition: color var(--dur-firma) var(--ease);
+}
+
+.therapies { display: flex; flex-direction: column; gap: 2px; }
+.therapy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 7px 10px;
+  border-radius: var(--radius-control);
+  transition: background-color var(--dur-riga) var(--ease);
+}
+.therapy:hover { background: var(--wash); }
+.therapy-name { font-size: 13.5px; font-weight: 540; }
+.therapy-dose { font-size: 12.5px; color: var(--ink-muted); }
+
+/* Stato vuoto onesto: dice cosa manca, non riempie */
+.empty {
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-card);
+  background: var(--field);
+  padding: 12px;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+
+.legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  gap: 10px;
+}
+.legend-item {
+  background: var(--field);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+}
+.legend-title {
+  font-size: 12.5px;
+  font-weight: 620;
+  margin-bottom: 3px;
+}
+.legend-text {
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+.foot {
+  font-size: 12px;
+  color: var(--ink-muted);
+  border-top: 1px solid var(--hairline-soft);
+  padding-top: 14px;
+  margin: 0;
+}
+.foot a { color: var(--accent); }
+</style>
+
+<div class="page">
+  <header class="preamble">
+    <div>
+      <h1>Lume: il cockpit clinico</h1>
+      <p>I token reali della lingua: tre zone di luce, il Registro sugli atomi verificabili, il filo che connette il diario. Prova a cambiare paziente e a firmare la bozza.</p>
+    </div>
+    <div class="register-switch" role="group" aria-label="Registro di luce">
+      <button type="button" data-set-register="giorno" aria-pressed="true">Giorno</button>
+      <button type="button" data-set-register="grafite" aria-pressed="false">Grafite</button>
+    </div>
+  </header>
+
+  <div class="cockpit">
+    <aside class="rail">
+      <div class="brand">
+        <span class="brand-mark">MF</span>
+        <span class="brand-name">MEDIFLOW</span>
+      </div>
+      <div>
+        <p class="nav-group-label">Navigazione</p>
+        <nav class="nav">
+          <button type="button" class="nav-item">Agenda <span class="nav-count registro">3</span></button>
+          <button type="button" class="nav-item" aria-current="page">Pazienti <span class="nav-count registro">4</span></button>
+          <button type="button" class="nav-item">Diario <span class="nav-count registro">12</span></button>
+          <button type="button" class="nav-item">Repertori</button>
+          <button type="button" class="nav-item">Impostazioni</button>
+        </nav>
+      </div>
+      <div class="rail-foot">
+        <span>Ambulatorio locale</span>
+        <span class="registro">AMB-1</span>
+      </div>
+    </aside>
+
+    <section class="panel" aria-label="Pazienti in carico">
+      <div class="panel-head">
+        <h2 class="panel-title">Pazienti in carico</h2>
+        <span class="panel-meta registro">4</span>
+      </div>
+      <div class="search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <span>Cerca per nome, codice fiscale o diagnosi</span>
+      </div>
+      <div class="worklist" role="listbox" aria-label="Elenco pazienti">
+        <button type="button" class="patient-row" role="option" aria-selected="true" data-patient="colombo">
+          <span class="patient-name">Colombo Renata</span>
+          <span class="patient-sub"><span class="registro">&hellip;4H501X</span><span class="dot">&middot;</span>68 anni</span>
+          <span class="patient-side">
+            <span class="signal signal--critical">Creatinina in salita</span>
+            <span class="row-when registro">oggi</span>
+          </span>
+        </button>
+        <button type="button" class="patient-row" role="option" aria-selected="false" data-patient="ferrero">
+          <span class="patient-name">Ferrero Giulio</span>
+          <span class="patient-sub"><span class="registro">&hellip;2B410K</span><span class="dot">&middot;</span>74 anni</span>
+          <span class="patient-side">
+            <span class="signal signal--warning">Referto da rivedere</span>
+            <span class="row-when registro">14 lug</span>
+          </span>
+        </button>
+        <button type="button" class="patient-row" role="option" aria-selected="false" data-patient="nardi">
+          <span class="patient-name">Nardi Elsa</span>
+          <span class="patient-sub"><span class="registro">&hellip;9C122M</span><span class="dot">&middot;</span>81 anni</span>
+          <span class="patient-side">
+            <span class="signal signal--plum">Codifiche da confermare</span>
+            <span class="row-when registro">12 lug</span>
+          </span>
+        </button>
+        <button type="button" class="patient-row" role="option" aria-selected="false" data-patient="rizzo">
+          <span class="patient-name">Rizzo Marco</span>
+          <span class="patient-sub"><span class="registro">&hellip;7D305P</span><span class="dot">&middot;</span>59 anni</span>
+          <span class="patient-side">
+            <span class="signal signal--success">Piano stabile</span>
+            <span class="row-when registro">9 lug</span>
+          </span>
+        </button>
+      </div>
+    </section>
+
+    <section class="panel is-focal chart" aria-label="Scheda paziente">
+      <div class="chart-head">
+        <div>
+          <h2 class="chart-name" data-bind="name">Colombo Renata</h2>
+          <p class="chart-atoms">
+            <span class="registro" data-bind="cf">&hellip;4H501X</span>
+            <span class="dot">&middot;</span>
+            <span class="registro" data-bind="year">1958</span>
+            <span class="dot">&middot;</span>
+            <span data-bind="ambulatory">Ambulatorio locale</span>
+          </p>
+        </div>
+        <button type="button" class="action">Nuova voce</button>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <p class="metric-label">Creatinina</p>
+          <p class="metric-value is-warning registro" data-bind="crea">1,84</p>
+          <p class="metric-note">mg/dL <span class="registro">&middot;</span> 12 lug</p>
+        </div>
+        <div class="metric">
+          <p class="metric-label">Pressione</p>
+          <p class="metric-value registro" data-bind="bp">148/86</p>
+          <p class="metric-note">mmHg <span class="registro">&middot;</span> oggi</p>
+        </div>
+        <div class="metric">
+          <p class="metric-label">Terapie attive</p>
+          <p class="metric-value registro" data-bind="tx">4</p>
+          <p class="metric-note">1 modificata di recente</p>
+        </div>
+        <div class="metric">
+          <p class="metric-label">Prossimo controllo</p>
+          <p class="metric-value registro" data-bind="next">28/07</p>
+          <p class="metric-note">nefrologia</p>
+        </div>
+      </div>
+
+      <div>
+        <p class="section-label">Diario clinico</p>
+        <div class="diary">
+          <svg class="filo" aria-hidden="true">
+            <line x1="4.5" y1="0" x2="4.5" y2="100%"></line>
+          </svg>
+          <div class="entries">
+            <article class="entry is-draft" id="draft-entry">
+              <div class="entry-top">
+                <p class="entry-title">Visita di controllo<span class="tag-draft">Bozza</span></p>
+                <span class="entry-when registro">oggi, 09:40</span>
+              </div>
+              <p class="entry-body">Astenia riferita da due settimane. Funzione renale in peggioramento rispetto al controllo di giugno: valutato aggiustamento del diuretico e nuovo prelievo a sette giorni.</p>
+              <div class="entry-sign">
+                <button type="button" class="action" id="sign-btn">Firma la voce</button>
+                <span class="entry-when">La bozza resta in penombra finche' non la firmi.</span>
+              </div>
+              <p class="entry-signed-note">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                Firmata ora
+              </p>
+            </article>
+            <article class="entry">
+              <div class="entry-top">
+                <p class="entry-title">Referto di laboratorio</p>
+                <span class="entry-when registro">12/07, 11:05</span>
+              </div>
+              <p class="entry-body">Creatinina <span class="registro">1,84</span> mg/dL, eGFR <span class="registro">31</span> mL/min. Potassio nei limiti.</p>
+            </article>
+            <article class="entry">
+              <div class="entry-top">
+                <p class="entry-title">Contatto telefonico</p>
+                <span class="entry-when registro">09/07, 16:20</span>
+              </div>
+              <p class="entry-body">Caregiver segnala difficolta' con la doppia somministrazione serale. Concordata rivalutazione in visita.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p class="section-label">Terapie attive</p>
+        <div class="therapies">
+          <div class="therapy">
+            <span class="therapy-name">Furosemide</span>
+            <span class="therapy-dose registro">25 mg &middot; 1-0-0</span>
+          </div>
+          <div class="therapy">
+            <span class="therapy-name">Ramipril</span>
+            <span class="therapy-dose registro">5 mg &middot; 1-0-0</span>
+          </div>
+          <div class="therapy">
+            <span class="therapy-name">Atorvastatina</span>
+            <span class="therapy-dose registro">20 mg &middot; 0-0-1</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p class="section-label">Esenzioni</p>
+        <p class="empty">Nessuna esenzione registrata in scheda.</p>
+      </div>
+    </section>
+  </div>
+
+  <section class="legend" aria-label="Come leggere la lingua">
+    <div class="legend-item">
+      <p class="legend-title">La luce porta il fuoco</p>
+      <p class="legend-text">Il pannello attivo sale verso la superficie focale e prende un'ombra breve. Il telaio resta nel buio operativo, le liste in penombra. Nessuna linea colorata marca la selezione.</p>
+    </div>
+    <div class="legend-item">
+      <p class="legend-title">L'inchiostro porta lo stato</p>
+      <p class="legend-text">Una bozza vive a contrasto ridotto con la sua etichetta onesta. La firma asciuga l'inchiostro: il testo torna pieno e la conferma si spegne da sola.</p>
+    </div>
+    <div class="legend-item">
+      <p class="legend-title">Il filo connette e basta</p>
+      <p class="legend-text">La spina del diario e' geometria vettoriale continua, mai un bordo e mai tratteggiata. Compare dove esiste una sequenza reale nel tempo.</p>
+    </div>
+    <div class="legend-item">
+      <p class="legend-title">Le due voci</p>
+      <p class="legend-text">Inter Variable dice la prosa clinica. IBM Plex Mono, con cifre tabellari, dice gli atomi verificabili: dosi, valori, codici, date. Il colore resta semantica clinica.</p>
+    </div>
+  </section>
+
+  <p class="foot">Superfici e colori dai token di <span class="registro">docs/design/lume/tokens/lume.tokens.json</span>, come atterrati in <a href="https://github.com/Wulfgardr/mediflow/pull/62">PR #62</a>. Dati sintetici.</p>
+</div>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+
+    document.querySelectorAll('[data-set-register]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var reg = btn.getAttribute('data-set-register');
+        root.setAttribute('data-register', reg);
+        root.removeAttribute('data-theme');
+        document.querySelectorAll('[data-set-register]').forEach(function (b) {
+          b.setAttribute('aria-pressed', String(b === btn));
+        });
+      });
+    });
+
+    var patients = {
+      colombo: { name: 'Colombo Renata', cf: '&hellip;4H501X', year: '1958', ambulatory: 'Ambulatorio locale', crea: '1,84', bp: '148/86', tx: '4', next: '28/07' },
+      ferrero: { name: 'Ferrero Giulio', cf: '&hellip;2B410K', year: '1952', ambulatory: 'Ambulatorio locale', crea: '1,12', bp: '132/78', tx: '6', next: '02/08' },
+      nardi: { name: 'Nardi Elsa', cf: '&hellip;9C122M', year: '1945', ambulatory: 'Rete locale', crea: '0,94', bp: '126/74', tx: '3', next: '19/08' },
+      rizzo: { name: 'Rizzo Marco', cf: '&hellip;7D305P', year: '1967', ambulatory: 'Ambulatorio locale', crea: '1,02', bp: '124/80', tx: '2', next: '11/09' }
+    };
+
+    document.querySelectorAll('.patient-row').forEach(function (row) {
+      row.addEventListener('click', function () {
+        document.querySelectorAll('.patient-row').forEach(function (r) {
+          r.setAttribute('aria-selected', String(r === row));
+        });
+        var data = patients[row.getAttribute('data-patient')];
+        if (!data) return;
+        Object.keys(data).forEach(function (key) {
+          var node = document.querySelector('[data-bind="' + key + '"]');
+          if (node) node.textContent = data[key];
+        });
+      });
+    });
+
+    var signBtn = document.getElementById('sign-btn');
+    if (signBtn) {
+      signBtn.addEventListener('click', function () {
+        document.getElementById('draft-entry').classList.add('is-signed');
+      });
+    }
+  })();
+</script>
