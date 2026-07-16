@@ -4,7 +4,6 @@ import Link from 'next/link';
 import {
   Activity,
   Archive,
-  ArrowUpRight,
   Cloud,
   FileSearch,
   FileText,
@@ -18,7 +17,6 @@ import {
 
 import {
   DiagnosisPill,
-  PillBadge,
   classNames,
   normalizeClinicalSearch,
   patientMatchesSearch,
@@ -34,6 +32,15 @@ import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 
 
 /* ───────────────────────── Pazienti in carico ───────────────────────── */
+
+/* @Codex */
+const PATIENT_SIGNAL_CLASSES: Record<Kree8Patient['status'], string> = {
+  neutral: patientStyles.patientSignalNeutral,
+  warning: patientStyles.patientSignalWarning,
+  critical: patientStyles.patientSignalCritical,
+  success: patientStyles.patientSignalSuccess,
+  plum: patientStyles.patientSignalPlum,
+};
 
 function IncaricoArea({
   patients,
@@ -108,95 +115,100 @@ function IncaricoArea({
         </div>
       </header>
 
-      <section className={styles.panel}>
-        <div className={patientStyles.inboxScope}>
-          <button
-            type="button"
-            className={classNames(patientStyles.scopeChip, scope === 'ambulatorio' && patientStyles.scopeChipActive)}
-            onClick={() => setScope('ambulatorio')}
-          >
-            <MapPin size={12} />
-            Ambulatorio locale
-          </button>
-          {/* @Codex WUL-UIUX: in live tutti i pazienti hanno scope 'ambulatorio':
-              i filtri Rete locale / Tutti sarebbero affordance morte. Restano nel
-              ramo review finche lo scope di rete non e mappato sui dati reali. */}
-          {isReview ? (
-            <>
-              <button
-                type="button"
-                className={classNames(patientStyles.scopeChip, scope === 'network' && patientStyles.scopeChipActive)}
-                onClick={() => setScope('network')}
-              >
-                <Cloud size={12} />
-                Rete locale
-              </button>
-              <button
-                type="button"
-                className={classNames(patientStyles.scopeChip, scope === 'tutti' && patientStyles.scopeChipActive)}
-                onClick={() => setScope('tutti')}
-              >
-                <Users size={12} />
-                Tutti gli ambulatori
-              </button>
-            </>
-          ) : null}
-
-          <span className={patientStyles.patientScopeActions}>
-            <button
-              type="button"
-              className={classNames(patientStyles.scopeChip, list === 'attivi' && patientStyles.scopeChipActive)}
-              onClick={() => setList('attivi')}
-            >
-              <Activity size={12} />
-              Attivi
-            </button>
-            <button
-              type="button"
-              className={classNames(patientStyles.scopeChip, list === 'archivio' && patientStyles.scopeChipActive)}
-              onClick={() => setList('archivio')}
-            >
-              <Archive size={12} />
-              Archivio
-            </button>
-          </span>
-        </div>
-        <div className={patientStyles.patientSearchRow}>
-          <label className={patientStyles.patientSearchField}>
-            <Search size={14} />
-            <input
-              ref={searchInputRef}
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Cerca per nome, codice fiscale, diagnosi o nota"
-              aria-label="Cerca nella lista pazienti"
-            />
-          </label>
-          {query ? (
-            <button
-              type="button"
-              className={patientStyles.patientSearchClear}
-              onClick={() => {
-                setQuery('');
-                searchInputRef.current?.focus();
-              }}
-            >
-              Cancella
-            </button>
-          ) : null}
-        </div>
-      </section>
-
       <div className={patientStyles.inboxLayout}>
-        <section className={styles.panel}>
+        <section
+          className={patientStyles.worklistPanel}
+          aria-label={list === 'attivi' ? 'Pazienti in carico' : 'Archivio pazienti'}
+          data-testid="lume-worklist"
+        >
+          <div className={patientStyles.inboxScope}>
+            <button
+              type="button"
+              className={classNames(patientStyles.scopeChip, scope === 'ambulatorio' && patientStyles.scopeChipActive)}
+              onClick={() => setScope('ambulatorio')}
+            >
+              <MapPin size={12} />
+              Ambulatorio locale
+            </button>
+            {/* @Codex WUL-UIUX: in live tutti i pazienti hanno scope 'ambulatorio':
+                i filtri Rete locale / Tutti sarebbero affordance morte. Restano nel
+                ramo review finche lo scope di rete non e mappato sui dati reali. */}
+            {isReview ? (
+              <>
+                <button
+                  type="button"
+                  className={classNames(patientStyles.scopeChip, scope === 'network' && patientStyles.scopeChipActive)}
+                  onClick={() => setScope('network')}
+                >
+                  <Cloud size={12} />
+                  Rete locale
+                </button>
+                <button
+                  type="button"
+                  className={classNames(patientStyles.scopeChip, scope === 'tutti' && patientStyles.scopeChipActive)}
+                  onClick={() => setScope('tutti')}
+                >
+                  <Users size={12} />
+                  Tutti gli ambulatori
+                </button>
+              </>
+            ) : null}
+
+            <span className={patientStyles.patientScopeActions}>
+              <button
+                type="button"
+                className={classNames(patientStyles.scopeChip, list === 'attivi' && patientStyles.scopeChipActive)}
+                onClick={() => setList('attivi')}
+              >
+                <Activity size={12} />
+                Attivi
+              </button>
+              <button
+                type="button"
+                className={classNames(patientStyles.scopeChip, list === 'archivio' && patientStyles.scopeChipActive)}
+                onClick={() => setList('archivio')}
+              >
+                <Archive size={12} />
+                Archivio
+              </button>
+            </span>
+          </div>
+
+          <div className={patientStyles.patientSearchRow}>
+            <label className={patientStyles.patientSearchField}>
+              <Search size={14} aria-hidden="true" />
+              <input
+                ref={searchInputRef}
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Cerca per nome, codice fiscale o diagnosi"
+                aria-label="Cerca nella lista pazienti"
+              />
+            </label>
+            {query ? (
+              <button
+                type="button"
+                className={patientStyles.patientSearchClear}
+                onClick={() => {
+                  setQuery('');
+                  searchInputRef.current?.focus();
+                }}
+              >
+                Cancella
+              </button>
+            ) : null}
+          </div>
+
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>
               {list === 'attivi' ? 'Pazienti in carico' : 'Archivio pazienti'}
             </h2>
-            <PillBadge variant="neutral">{visible.length} risultati</PillBadge>
+            <span className={classNames(patientStyles.resultCount, 'lume-registro')}>
+              {visible.length} risultati
+            </span>
             <span className={styles.panelActions}>
-              <Link href="/patients/new" className={styles.ghostBtnSm}>
+              <Link href="/patients/new" className={styles.ghostBtnSm} data-lume-action="quiet">
                 <Plus size={12} />
                 Nuova scheda
               </Link>
@@ -224,26 +236,29 @@ function IncaricoArea({
               </p>
             )}
             {visible.length > 0 && (
-              <div ref={patientListParentRef} style={{ maxHeight: '70vh', overflow: 'auto' }}>
+              <div
+                ref={patientListParentRef}
+                className={patientStyles.patientListViewport}
+                role="list"
+                aria-label="Elenco pazienti in carico"
+                data-testid="lume-patient-list"
+              >
                 <div
+                  className={patientStyles.patientList}
                   style={{
                     height: `${patientRowVirtualizer.getTotalSize()}px`,
-                    width: '100%',
-                    position: 'relative',
                   }}
                 >
                   {patientRowVirtualizer.getVirtualItems().map((virtualRow) => {
                     const p = visible[virtualRow.index];
                     const isSelected = p.id === selected?.id;
-                    const dotClass = p.status === 'warning'
-                      ? patientStyles.patientDotWarning
-                      : patientStyles.patientDotNeutral;
                     return (
                       <div
                         key={p.id}
                         ref={patientRowVirtualizer.measureElement}
                         data-index={virtualRow.index}
                         className={patientStyles.patientRowWrap}
+                        role="listitem"
                         style={{
                           position: 'absolute',
                           top: 0,
@@ -260,38 +275,46 @@ function IncaricoArea({
                           )}
                           onClick={() => onSelectPatient(p.id)}
                           aria-pressed={isSelected}
+                          data-testid="lume-patient-row"
                         >
-                          <span className={classNames(patientStyles.patientDot, dotClass)} />
-                          <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                          <span className={patientStyles.patientRowContent} data-lume-row-part="content">
                             <span className={patientStyles.patientName}>{p.name}</span>
-                            <span className={patientStyles.patientCode}>{p.code} · {p.pathway}</span>
-                          </span>
-                          {/* @Codex: dentro il button conserviamo il testo naturale;
-                              i ruoli annidati sarebbero presentazionali e non una lista reale. */}
-                          <span className={patientStyles.patientMeta}>
-                            {p.diagnoses.map((d) => (
-                              <span key={d} className={patientStyles.patientDiagnosisPill}>
-                                <DiagnosisPill diagnosis={d} />
+                            <span className={patientStyles.patientSubline}>
+                              <span
+                                className={classNames(patientStyles.patientCode, 'lume-registro')}
+                                data-testid="lume-patient-code"
+                              >
+                                {p.code}
                               </span>
-                            ))}
+                              <span className={patientStyles.patientSeparator} aria-hidden="true">·</span>
+                              <span
+                                className={patientStyles.patientDiagnosisText}
+                                data-lume-row-diagnoses="text"
+                              >
+                                {p.diagnoses.join(' · ')}
+                              </span>
+                              <span className={patientStyles.patientSeparator} aria-hidden="true">·</span>
+                              <span className={patientStyles.patientStatusText} data-lume-row-part="status">
+                                {p.statusLabel}
+                              </span>
+                            </span>
                           </span>
-                          <span className={classNames(styles.rowSub, patientStyles.patientLastTouch)}>
-                            {p.lastTouch}
-                          </span>
-                          <span className={patientStyles.patientStatusCell}>
-                            <PillBadge variant={p.status}>
-                              {p.statusLabel}
-                            </PillBadge>
+                          <span className={patientStyles.patientSide}>
+                            <span
+                              className={classNames(patientStyles.patientSignal, PATIENT_SIGNAL_CLASSES[p.status])}
+                              aria-label={`Stato: ${p.statusLabel}`}
+                              title={p.statusLabel}
+                              data-lume-row-part="signal"
+                            />
+                            <span
+                              className={classNames(patientStyles.patientWhen, 'lume-registro')}
+                              data-testid="lume-patient-when"
+                              data-lume-row-part="when"
+                            >
+                              {p.lastTouch}
+                            </span>
                           </span>
                         </button>
-                        <Link
-                          href={p.modulesHref}
-                          className={patientStyles.patientRowOpen}
-                          aria-label={`Apri la scheda di ${p.name}`}
-                          onClick={() => onSelectPatient(p.id)}
-                        >
-                          <ArrowUpRight size={14} />
-                        </Link>
                       </div>
                     );
                   })}
@@ -302,57 +325,72 @@ function IncaricoArea({
         </section>
 
         {selected ? (
-        <aside className={patientStyles.caseLens} key={selected.id}>
-          <span className={styles.areaCaption}>Anteprima paziente</span>
-          <div className={patientStyles.caseLensHero}>
-            <span className={patientStyles.caseLensName}>{selected.name}</span>
-            <span className={patientStyles.caseLensSub}>
-              {selected.ageLabel} · aggiornato {selected.lastTouch}
-            </span>
-          </div>
-          {/* @Codex */}
-          <ul aria-label={`Diagnosi e stato di ${selected.name}`} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {selected.diagnoses.map((d) => (
-              <li key={d} className={patientStyles.patientDiagnosisPill}>
-                <DiagnosisPill diagnosis={d} />
-              </li>
-            ))}
-            <li>
-              <PillBadge variant={selected.status}>
-                {selected.statusLabel}
-              </PillBadge>
-            </li>
-          </ul>
-          <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.6 }}>
-            {selected.summary}
-          </p>
-          <div className={patientStyles.caseLensActions}>
-            <Link href={selected.modulesHref} className={styles.primaryBtn}>
-              <UserSquare2 size={13} />
-              Apri scheda paziente
-            </Link>
-            <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('scheda')}>
-              <FileSearch size={12} />
-              Quadro
-            </button>
-            <Link href={`${selected.href}/entries/new`} className={styles.ghostBtnSm}>
-              <Plus size={12} />
-              Nuova voce
-            </Link>
-            <Link href={`${selected.modulesHref}#documenti`} className={styles.ghostBtnSm}>
-              <FileText size={12} />
-              Documenti
-            </Link>
-            <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('handoff')}>
-              <Workflow size={12} />
-              Prepara SISS
-            </button>
-          </div>
-        </aside>
+          <aside
+            className={patientStyles.caseLens}
+            key={selected.id}
+            aria-label={`Lente paziente: ${selected.name}`}
+            data-testid="lume-patient-lens"
+          >
+            <header className={patientStyles.caseLensHeader}>
+              <span className={styles.areaCaption}>Anteprima paziente</span>
+              <h2 className={patientStyles.caseLensName}>{selected.name}</h2>
+              <p className={classNames(patientStyles.caseLensAtoms, 'lume-registro')} data-testid="lume-patient-atoms">
+                <span>{selected.ageLabel}</span>
+                <span aria-hidden="true">·</span>
+                <span>aggiornato {selected.lastTouch}</span>
+                <span aria-hidden="true">·</span>
+                <span>{selected.pathway}</span>
+              </p>
+            </header>
+            {/* @Codex: codice e descrizione restano contenuto naturale delle voci. */}
+            <ul
+              className={patientStyles.caseLensDiagnoses}
+              aria-label={`Diagnosi codificate di ${selected.name}`}
+              data-lume-diagnosis-list="true"
+            >
+              {selected.diagnoses.map((d) => (
+                <li key={d} className={patientStyles.patientDiagnosisPill}>
+                  <DiagnosisPill diagnosis={d} />
+                </li>
+              ))}
+            </ul>
+            <p className={patientStyles.caseLensStatus}>
+              <span
+                className={classNames(patientStyles.patientSignal, PATIENT_SIGNAL_CLASSES[selected.status])}
+                aria-hidden="true"
+              />
+              {selected.statusLabel}
+            </p>
+            <p className={patientStyles.caseLensSummary}>
+              {selected.summary}
+            </p>
+            <div className={classNames(patientStyles.caseLensActions, patientStyles.worklistLensActions)}>
+              <Link href={selected.modulesHref} className={styles.primaryBtn} data-lume-action="primary">
+                <UserSquare2 size={13} />
+                Apri scheda paziente
+              </Link>
+              <button type="button" className={styles.ghostBtnSm} data-lume-action="quiet" onClick={() => onOpenArea('scheda')}>
+                <FileSearch size={12} />
+                Quadro
+              </button>
+              <Link href={`${selected.href}/entries/new`} className={styles.ghostBtnSm} data-lume-action="quiet">
+                <Plus size={12} />
+                Nuova voce
+              </Link>
+              <Link href={`${selected.modulesHref}#documenti`} className={styles.ghostBtnSm} data-lume-action="quiet">
+                <FileText size={12} />
+                Documenti
+              </Link>
+              <button type="button" className={styles.ghostBtnSm} data-lume-action="quiet" onClick={() => onOpenArea('handoff')}>
+                <Workflow size={12} />
+                Prepara SISS
+              </button>
+            </div>
+          </aside>
         ) : (
-          <aside className={patientStyles.caseLens}>
+          <aside className={patientStyles.caseLens} aria-label="Lente paziente" data-testid="lume-patient-lens">
             <span className={styles.areaCaption}>Anteprima paziente</span>
-            <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.6 }}>
+            <p className={patientStyles.caseLensEmpty} data-testid="lume-patient-lens-empty">
               {normalizedQuery
                 ? 'Nessun paziente corrisponde alla ricerca corrente.'
                 : 'Nessun paziente selezionabile in questa vista.'}
