@@ -20,6 +20,7 @@ import type {
 import type { PillVariant } from '@/lib/patient-workspace';
 import { catalogFreshnessSignal } from '@/lib/ui-semantic-signal';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
+import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 import repertoriStyles from '../kree8-clinical-cockpit-repertori.module.css';
 
 
@@ -311,7 +312,7 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
               {selectedCatalog.sub} · aggiornamento {selectedCatalog.age}
             </p>
             {selectedCatalog.href ? (
-              <div className={styles.caseLensActions} style={{ marginTop: 10 }}>
+              <div className={patientStyles.caseLensActions} style={{ marginTop: 10 }}>
                 <Link href={selectedCatalog.href} className={styles.ghostBtnSm}>
                   {selectedCatalog.actionLabel ?? 'Apri'}
                   <ArrowUpRight size={12} />

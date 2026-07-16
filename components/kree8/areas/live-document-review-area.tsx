@@ -15,6 +15,7 @@ import {
 import type { AreaId } from '../cockpit-shared';
 import type { Kree8Patient, Kree8PatientWorkspace } from '@/lib/patient-workspace';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
+import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 
 
 /* @Codex */
@@ -126,7 +127,7 @@ function LiveDocumentReviewArea({
               <p className={styles.panelSubtitle}>Nessun suggerimento in primo piano per il paziente selezionato.</p>
             )}
           </div>
-          <div className={styles.caseLensActions} style={{ marginTop: 12 }}>
+          <div className={patientStyles.caseLensActions} style={{ marginTop: 12 }}>
             <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('repertori')}>
               <Database size={12} />
               Repertori

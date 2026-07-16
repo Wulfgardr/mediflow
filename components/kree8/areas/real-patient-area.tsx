@@ -18,6 +18,7 @@ import {
 import type { AreaId } from '../cockpit-shared';
 import type { Kree8Patient, Kree8PatientWorkspace } from '@/lib/patient-workspace';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
+import documentStyles from '../kree8-clinical-cockpit-document-review.module.css';
 import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 
 
@@ -197,7 +198,7 @@ function RealPatientArea({
           </header>
           <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
             <div>
-              <span className={styles.fieldKind}>AI coding</span>
+              <span className={documentStyles.fieldKind}>AI coding</span>
               {codingHints.length ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                   {codingHints.map((hint) => (
@@ -213,7 +214,7 @@ function RealPatientArea({
             </div>
 
             <div>
-              <span className={styles.fieldKind}>Archivio recente</span>
+              <span className={documentStyles.fieldKind}>Archivio recente</span>
               {workspace?.recentAttachmentNames.length ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                   {workspace.recentAttachmentNames.map((name) => (

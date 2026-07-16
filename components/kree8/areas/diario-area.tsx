@@ -11,6 +11,7 @@ import {
 import { PillBadge } from '../cockpit-shared';
 import type { AreaId, Kree8DiaryClientState } from '../cockpit-shared';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
+import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 
 
 /* ───────────────────────── Diario clinico ───────────────────────── */
@@ -113,7 +114,7 @@ function DiarioArea({
                           {entry.preview}
                         </p>
                         <div className={styles.identityDock}>
-                          <span className={styles.patientName}>{entry.patientName}</span>
+                          <span className={patientStyles.patientName}>{entry.patientName}</span>
                           <PillBadge variant="neutral">{entry.patientCode}</PillBadge>
                           {entry.attachmentCount > 0 ? (
                             <PillBadge variant="plum">
