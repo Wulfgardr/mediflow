@@ -1,6 +1,15 @@
 <div align="center">
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/design/lume/icona/mediflow-icon-grafite.svg">
+  <source media="(prefers-color-scheme: light)" srcset="./docs/design/lume/icona/mediflow-icon-giorno.svg">
+  <img src="./docs/design/lume/icona/mediflow-icon-giorno.svg" alt="Icona MediFlow: il Filo del diario con il nodo del presente" width="120" height="120">
+</picture>
+
 # MediFlow
+
+<a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/costruito%20con-Claude%20Code-D97757?style=flat&amp;logo=claudecode&amp;logoColor=white" alt="Costruito con Claude Code"></a>
+<a href="https://openai.com/codex"><img src="https://img.shields.io/badge/costruito%20con-Codex-1f2937?style=flat" alt="Costruito con Codex"></a>
 
 _by Ordito & Concilio_
 
@@ -177,6 +186,10 @@ Fluid.
 Modelli, runtime, librerie e ispirazioni, con URL, ruolo e licenza, sono in
 **[CREDITS.md](./CREDITS.md)**.
 
+L'icona MediFlow porta in primo piano il **Filo del diario**, la stessa geometria
+che connette le voci cliniche lungo il tempo. Concetto, registri giorno/grafite
+e asset sono documentati nella [specifica dell'icona](./docs/design/lume/09-icona.md).
+
 ## Sviluppo assistito
 
 Scrivo MediFlow da medico, con un aiuto sostanziale e dichiarato di strumenti di
@@ -187,27 +200,23 @@ sviluppo assistito da AI.
 implementazione, review e verifica. Le proposte dei modelli restano materiale da
 controllare: test reali e guard automatici decidono se una modifica regge.
 
-Uno snapshot dei log locali del 15 luglio 2026 conta circa **17,56 miliardi di
-token di sessione**: 11,33 miliardi con Codex e 6,22 con Claude Code. Circa
-16,41 miliardi sono input recuperato dalla cache; il dato misura soprattutto
-contesto riletto durante il lavoro assistito, non righe di codice, costo o
-qualità.
+<!-- usage-dashboard:start -->
 
-<img src="./screenshots/token-models.svg" alt="Modelli usati per MediFlow: Codex circa 11,33 miliardi di token nelle famiglie GPT-5.2-5.6; Claude Code circa 6,22 miliardi con Opus 4.8, Fable 5, Sonnet 5 e una quota storica di Haiku 4.5" width="720" loading="lazy"/>
+| Snapshot | Token di sessione | Ripartizione | Cache letta |
+| :-- | --: | :-- | --: |
+| **16 luglio 2026** | **24.637.335.544** | Codex 18.203.669.984 · Claude Code 6.433.665.560 | 23.315.122.538 (94,6%) |
 
-Ogni colore corrisponde a un modello o a una famiglia vicina. Le due barre usano
-la stessa scala: mostrano insieme il peso dei due ambienti e la loro composizione
-interna. Non è una classifica di qualità, ma la fotografia di quali modelli hanno
-assorbito più contesto durante lo sviluppo.
+<img src="./screenshots/token-models.svg" alt="Snapshot 16 luglio 2026: 24,64 mld token di sessione, 18,20 mld in Codex e 6,43 mld in Claude Code; 23,32 mld da cache letta." width="720" loading="lazy"/>
 
-Per Codex i log registrano anche l'effort: `xhigh` è la quota maggiore, seguito
-da `medium`, `high` e `low`. Le sessioni senza effort registrato restano separate
-perché possono includere fan-out `Ultra`, che non è un livello di ragionamento.
-Nei log storici di Claude Code l'effort non è esposto in modo abbastanza
-uniforme.
+**Effort Codex:** xhigh 7.066.995.820 · non registrato / Ultra 6.530.502.439 · medium 1.980.214.345 · high 1.524.704.732 · non registrato 1.080.929.187 · low 20.323.461. Le sessioni senza effort registrato restano separate; possono includere fan-out `Ultra`, che non è un livello di ragionamento. Nei transcript Claude Code l'effort non è esposto in modo uniforme.
 
-Il conteggio precedente del README usava una metodologia diversa e non è
-direttamente confrontabile. La responsabilità del progetto resta mia.
+Il conteggio usa i contatori di tutti i log locali dei due ambienti e non è filtrato per repository. Per Codex somma i delta dei totali cumulativi e conserva modello, effort e cache letta; per Claude Code deduplica le richieste e somma input diretto, cache creata, cache letta e output. Sono pubblicati soltanto aggregati: nessun prompt, contenuto di sessione o percorso locale entra nel README o nell'SVG.
+
+Ogni colore corrisponde a un modello o a una famiglia vicina. Le due barre usano la stessa scala: mostrano il peso dei due ambienti e la composizione interna. Il dato misura contesto elaborato, non righe di codice, costo o qualità. [CodexBar](https://github.com/steipete/CodexBar) resta il pannello locale complementare per limiti e uso corrente.
+
+La responsabilità del progetto resta mia.
+
+<!-- usage-dashboard:end -->
 
 ## Licenza
 
