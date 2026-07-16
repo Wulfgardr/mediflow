@@ -191,7 +191,7 @@
 .clinicalAtomGroup { min-width: 0; display: inline-flex; align-items: center; gap: 10px; }
 .clinicalDot { opacity: 0.45; }
 .clinicalBody { width: min(100%, 1180px); align-self: center; }
-.clinicalSurface { min-width: 0; overflow: clip; display: flex; flex-direction: column; background: var(--lume-surface-focal); border: 1px solid var(--k8-line-strong); border-radius: 20px; box-shadow: var(--k8-focal-shadow); }
+.clinicalSurface { --lume-shadow-focal: none; min-width: 0; overflow: clip; display: flex; flex-direction: column; background: var(--lume-surface-focal); border: 1px solid var(--k8-line-strong); border-radius: 20px; box-shadow: var(--k8-focal-shadow); }
 .clinicalStack { min-width: 0; display: flex; flex-direction: column; }
 .attentionBand,
 .synoptic,

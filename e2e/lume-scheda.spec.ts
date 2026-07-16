@@ -52,12 +52,22 @@ async function expectInViewport(locator: Locator): Promise<void> {
   })).toBe(true);
 }
 
-async function expectRegisterFont(locator: Locator): Promise<void> {
-  const families = await locator.evaluateAll((elements) => elements
-    .filter((element) => (element as HTMLElement).offsetParent !== null)
-    .map((element) => getComputedStyle(element).fontFamily));
-  expect(families.length).toBeGreaterThan(4);
-  for (const family of families) expect(family).toContain('IBM Plex Mono');
+async function expectRegisterFont(locator: Locator, label: string, minimum: number): Promise<void> {
+  const evidence = await locator.evaluateAll(async (elements) => {
+    await document.fonts.ready;
+    return elements
+      .filter((element) => (element as HTMLElement).offsetParent !== null)
+      .map((element) => {
+        const style = getComputedStyle(element);
+        const query = `${style.fontWeight} ${style.fontSize} "IBM Plex Mono"`;
+        return { available: document.fonts.check(query), family: style.fontFamily, query };
+      });
+  });
+  expect(evidence.length, label).toBeGreaterThanOrEqual(minimum);
+  for (const specimen of evidence) {
+    expect(specimen.family, `${label}: ${specimen.query}`).toContain('IBM Plex Mono');
+    expect(specimen.available, `${label}: ${specimen.query}`).toBe(true);
+  }
 }
 
 async function expectNarrowContract(page: Page, surface: Locator, header: Locator): Promise<void> {
@@ -95,10 +105,36 @@ for (const schedaCase of CASES) {
     await expectInViewport(header);
 
     await expect(page.locator('[data-lume-elevation]')).toHaveCount(1);
-    await expect(surface.locator('[data-lume-elevation]')).toHaveCount(0);
-    expect(await surface.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe('none');
-    await page.evaluate(() => document.fonts.ready);
-    await expectRegisterFont(page.getByTestId('lume-register-value'));
+    await expect(surface).toHaveAttribute('data-lume-elevation', 'focal');
+    const elevatedSurfaces = await scroll.evaluate((context) => {
+      const expected = context.querySelector('[data-testid="lume-scheda-surface"]');
+      return [context, ...context.querySelectorAll<HTMLElement>('*')]
+        .filter((element) => {
+          const style = getComputedStyle(element);
+          const hasSurfaceBackground = style.backgroundColor !== 'rgba(0, 0, 0, 0)'
+            && style.backgroundColor !== 'transparent';
+          return style.boxShadow !== 'none' && hasSurfaceBackground;
+        })
+        .map((element) => {
+          const style = getComputedStyle(element);
+          return {
+            background: style.backgroundColor,
+            expected: element === expected,
+            shadow: style.boxShadow,
+            tag: element.tagName.toLowerCase(),
+            testId: element.getAttribute('data-testid'),
+          };
+        });
+    });
+    expect(elevatedSurfaces).toHaveLength(1);
+    expect(elevatedSurfaces[0]).toMatchObject({
+      expected: true,
+      tag: 'article',
+      testId: 'lume-scheda-surface',
+    });
+
+    await expectRegisterFont(header.getByTestId('lume-register-value'), 'atomi della testata', 3);
+    await expectRegisterFont(surface.getByTestId('lume-register-value'), 'valori metrici', 4);
 
     await scroll.evaluate((element) => element.scrollTo(0, 0));
     const therapies = page.getByRole('button', { name: /Terapie farmacologiche/ });

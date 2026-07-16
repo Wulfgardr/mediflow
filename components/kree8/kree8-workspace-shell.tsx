@@ -82,7 +82,7 @@ export function Kree8WorkspaceShell({
        vivo (mai un nodo staccato) e allinea la rail. */
     const commit = (href: string | null, el: HTMLElement | null) => {
       if (cancelled) return;
-      /* La Scheda possiede gia una sola superficie focale che contiene tutte le
+      /* La Scheda possiede già una sola superficie focale che contiene tutte le
          sezioni. Lo scrollspy aggiorna soltanto la posizione nella rail e non
          solleva una seconda superficie interna. */
       const nextFocusEl = isClinical ? null : el;
