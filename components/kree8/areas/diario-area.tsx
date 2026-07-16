@@ -9,7 +9,7 @@ import {
 
 import { db, type ClinicalEntry } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
-import { LumeFilo } from '@/components/ui/lume-filo';
+import { LumeFilo, LumeFiloNodo } from '@/components/ui/lume-filo';
 import { PillBadge } from '../cockpit-shared';
 import type { AreaId, Kree8DiaryClientState, Kree8DiaryEntry } from '../cockpit-shared';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
@@ -175,23 +175,10 @@ function DiarioArea({
                     onClick={() => setActiveEntryId(entry.id)}
                     onFocus={() => setActiveEntryId(entry.id)}
                   >
-                    <svg
+                    <LumeFiloNodo
                       className={diaryStyles.node}
                       data-lume-diary-node
-                      aria-hidden="true"
-                      focusable="false"
-                      viewBox="0 0 10 10"
-                    >
-                      <circle
-                        cx="5"
-                        cy="5"
-                        r="4.25"
-                        fill="var(--lume-surface-field)"
-                        stroke="currentColor"
-                        strokeWidth="1.25"
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    </svg>
+                    />
                     <div className={diaryStyles.entryTop}>
                       <div className={diaryStyles.titleGroup}>
                         <span className={diaryStyles.stateLabel}>{presentation.stateLabel}</span>

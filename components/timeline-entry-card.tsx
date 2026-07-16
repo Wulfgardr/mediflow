@@ -6,7 +6,7 @@ import { FileText, Stethoscope, Activity, Trash2, AlertCircle, Undo, Phone, Home
 import { ClinicalRichTextContent } from '@/components/clinical-rich-text-content';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useLiveQuery } from '@/lib/live-query';
-import { LumeFilo } from '@/components/ui/lume-filo';
+import { LumeFilo, LumeFiloNodo } from '@/components/ui/lume-filo';
 
 export type TimelineEntryData = ClinicalEntry & { patientName?: string };
 
@@ -133,8 +133,12 @@ export function TimelineEntryCard({
             onClick={onActivate}
             onFocus={onActivate}
         >
-            {/* Dot */}
-            <div data-lume-timeline-node className={`absolute -left-2 top-0 h-4 w-4 rounded-full border-2 border-[color:var(--lume-surface-field)] ${isDeleted ? 'bg-[color:var(--lume-signal-critical)]' : 'bg-[color:var(--lume-accent)]'}`}></div>
+            <LumeFiloNodo
+                data-lume-timeline-node
+                className="absolute -left-2 top-0 h-4 w-4"
+                fillTone={isDeleted ? 'critical' : 'field'}
+                tone={isDeleted ? 'critical' : 'accent'}
+            />
 
             {/* Content */}
             <div className={`rounded-[var(--lume-radius-card)] p-5 group-focus-visible:shadow-[var(--lume-focus-ring)] ${isDeleted ? 'border border-[color:var(--lume-signal-critical)] bg-[color:var(--lume-surface-field)]' : active ? 'lume-focal' : 'bg-[color:var(--lume-surface-field)]'}`}>

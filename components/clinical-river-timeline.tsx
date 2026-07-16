@@ -5,7 +5,7 @@ import { CalendarClock, FileText, ScanText, Stethoscope } from 'lucide-react';
 /* @Codex */
 import { compactClinicalRichText } from '@/lib/clinical-rich-text';
 import type { Checkup, ClinicalEntry, DocumentInsight } from '@/lib/db';
-import { LumeFilo } from '@/components/ui/lume-filo';
+import { LumeFilo, LumeFiloNodo } from '@/components/ui/lume-filo';
 
 interface ClinicalRiverTimelineProps {
     entries: ClinicalEntry[];
@@ -149,10 +149,9 @@ export function ClinicalRiverTimeline({
 
                     return (
                         <div key={item.id} className="grid grid-cols-[28px_minmax(0,1fr)] gap-4">
-                            <div className="flex flex-col items-center">
-                                <div data-lume-river-node className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full border border-[color:var(--lume-accent)] bg-[color:var(--lume-surface-field)] ${presentation.tint}`}>
-                                    <Icon className="h-4 w-4" />
-                                </div>
+                            <div className="relative flex h-8 w-8 items-center justify-center">
+                                <LumeFiloNodo data-lume-river-node className="absolute inset-0 h-8 w-8" />
+                                <Icon className={`relative z-10 h-4 w-4 ${presentation.tint}`} />
                             </div>
                             <article
                                 className="rounded-[var(--lume-radius-card)] bg-[color:var(--lume-surface-field)] p-4 outline-none focus-visible:bg-[color:var(--lume-surface-focal)] focus-visible:shadow-[var(--lume-focus-ring)]"

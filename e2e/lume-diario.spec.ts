@@ -104,8 +104,6 @@ async function setRegister(page: Page, register: DiaryCase['register']): Promise
   await page.evaluate((nextRegister) => {
     const theme = nextRegister === 'grafite' ? 'dark' : 'light';
     localStorage.setItem('mediflow-theme', theme);
-    document.documentElement.classList.remove('light', 'dark');
-    document.documentElement.classList.add(theme);
   }, register);
 }
 
@@ -113,9 +111,9 @@ async function openDiary(page: Page, diaryCase?: DiaryCase): Promise<Locator> {
   if (diaryCase) await page.setViewportSize({ width: diaryCase.width, height: diaryCase.height });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await ensureSequence(page);
+  if (diaryCase) await setRegister(page, diaryCase.register);
   await page.goto('/diary');
   await page.waitForLoadState('domcontentloaded');
-  if (diaryCase) await setRegister(page, diaryCase.register);
   const diary = page.getByTestId('lume-diario');
   await expect(diary).toBeVisible();
   await expect(diary.getByTestId('lume-diario-entry')).toHaveCount(3);
@@ -133,7 +131,16 @@ async function resolvedRegisterFamily(page: Page): Promise<string> {
   });
 }
 
-async function assertNoSideStripe(entries: Locator): Promise<void> {
+async function assertNoSideStripe(diary: Locator, entries: Locator): Promise<void> {
+  const connector = diary.locator('svg[data-lume-filo="spina"]');
+  await expect(connector).toHaveCount(1);
+  await expect(connector.locator('line, path')).toHaveCount(1);
+  const entryCount = await entries.count();
+  await expect(entries.locator('svg[data-lume-filo-node="true"] > circle')).toHaveCount(entryCount);
+  for (let index = 0; index < entryCount; index += 1) {
+    await expect(entries.nth(index).locator('svg[data-lume-filo-node="true"] > circle')).toHaveCount(1);
+  }
+
   const borders = await entries.evaluateAll((elements) => elements.map((element) => {
     const style = getComputedStyle(element);
     return {
@@ -143,16 +150,41 @@ async function assertNoSideStripe(entries: Locator): Promise<void> {
       topStyle: style.borderTopStyle,
       leftColor: style.borderLeftColor,
       topColor: style.borderTopColor,
+      pseudoElements: ['::before', '::after'].map((pseudoElement) => {
+        const pseudoStyle = getComputedStyle(element, pseudoElement);
+        return {
+          pseudoElement,
+          content: pseudoStyle.content,
+          leftStyle: pseudoStyle.borderLeftStyle,
+          leftWidth: pseudoStyle.borderLeftWidth,
+          rightStyle: pseudoStyle.borderRightStyle,
+          rightWidth: pseudoStyle.borderRightWidth,
+        };
+      }),
     };
   }));
   for (const border of borders) {
     expect(border.leftWidth).toBe(border.topWidth);
     expect(border.leftStyle).toBe(border.topStyle);
     expect(border.leftColor).toBe(border.topColor);
+    for (const pseudoElement of border.pseudoElements) {
+      expect(
+        pseudoElement.leftStyle !== 'none' && Number.parseFloat(pseudoElement.leftWidth) > 0,
+        `${pseudoElement.pseudoElement} non deve disegnare un bordo verticale sinistro`,
+      ).toBe(false);
+      expect(
+        pseudoElement.rightStyle !== 'none' && Number.parseFloat(pseudoElement.rightWidth) > 0,
+        `${pseudoElement.pseudoElement} non deve disegnare un bordo verticale destro`,
+      ).toBe(false);
+    }
   }
 }
 
-async function assertContrastAndFocus(page: Page, entries: Locator): Promise<void> {
+async function assertContrastAndFocus(
+  page: Page,
+  entries: Locator,
+  register: DiaryCase['register'],
+): Promise<void> {
   const ratios = await page.evaluate(() => {
     const parse = (value: string) => value.match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? [0, 0, 0];
     const channel = (value: number) => {
@@ -180,8 +212,8 @@ async function assertContrastAndFocus(page: Page, entries: Locator): Promise<voi
     };
   });
   expect(ratios).not.toBeNull();
-  expect(ratios!.draft).toBeGreaterThanOrEqual(4.5);
-  expect(ratios!.signed).toBeGreaterThan(ratios!.draft);
+  expect(ratios!.draft, `Contrasto bozza nel registro ${register}`).toBeGreaterThanOrEqual(4.5);
+  expect(ratios!.signed, `Gerarchia inchiostro nel registro ${register}`).toBeGreaterThan(ratios!.draft);
 
   await expect(entries.filter({ hasText: `${FIXTURE_PREFIX} 3` })).toHaveAttribute('data-active', 'true');
   await expect(page.locator('[data-testid="lume-diario-entry"][data-active="true"]')).toHaveCount(1);
@@ -259,14 +291,14 @@ test.describe.serial('Diario globale Lume', () => {
     await expect(entries.first()).toContainText('Bozza');
     await expect(entries.first()).toContainText('Fonte: Dettatura sintetica');
     await expect(entries.first()).toContainText('Autore: Dr.ssa Demo');
-    await assertNoSideStripe(entries);
+    await assertNoSideStripe(diary, entries);
 
     const registerFamily = await resolvedRegisterFamily(page);
     const metaFamilies = await diary.locator('[data-lume-entry-part="date"], [data-lume-entry-part="provenance"]').evaluateAll(
       (elements) => elements.map((element) => getComputedStyle(element).fontFamily),
     );
     expect(new Set(metaFamilies)).toEqual(new Set([registerFamily]));
-    await assertContrastAndFocus(page, entries);
+    await assertContrastAndFocus(page, entries, 'giorno');
 
     await page.getByRole('button', { name: 'Apri quadro', exact: true }).first().focus();
     await page.keyboard.press('Tab');
@@ -282,6 +314,24 @@ test.describe.serial('Diario globale Lume', () => {
       };
     });
     expect(motion).toEqual({ entry: '0s', filo: '0s' });
+
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.evaluate(() => document.documentElement.setAttribute('data-ui-reduce-motion', 'true'));
+    const uiReducedMotion = await page.evaluate(() => {
+      const entry = document.querySelector<HTMLElement>('[data-testid="lume-diario-entry"]');
+      const filo = document.querySelector<SVGElement>('[data-lume-filo="spina"]');
+      return {
+        entry: entry ? getComputedStyle(entry).transitionDuration : 'missing',
+        filo: filo ? getComputedStyle(filo).transitionDuration : 'missing',
+      };
+    });
+    for (const [element, duration] of Object.entries(uiReducedMotion)) {
+      expect(
+        Number.parseFloat(duration) * 1000,
+        `Durata ${element} con data-ui-reduce-motion`,
+      ).toBeLessThanOrEqual(0.01);
+    }
+    await page.evaluate(() => document.documentElement.removeAttribute('data-ui-reduce-motion'));
   });
 
   for (const diaryCase of DIARY_CASES) {
@@ -289,7 +339,9 @@ test.describe.serial('Diario globale Lume', () => {
       const diary = await openDiary(page, diaryCase);
       await expect(page.locator('html')).toHaveClass(diaryCase.register === 'grafite' ? /dark/ : /light/);
       await expect(diary.locator('[data-lume-filo="spina"]')).toHaveCount(1);
-      await assertNoSideStripe(diary.getByTestId('lume-diario-entry'));
+      const entries = diary.getByTestId('lume-diario-entry');
+      await assertNoSideStripe(diary, entries);
+      await assertContrastAndFocus(page, entries, diaryCase.register);
       if (diaryCase.viewport === 'narrow') await assertNarrowLayout(page, diary);
       await diary.evaluate((element) => element.scrollIntoView({ block: 'start' }));
       await page.screenshot({

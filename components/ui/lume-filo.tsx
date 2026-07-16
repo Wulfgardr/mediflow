@@ -1,9 +1,9 @@
 'use client';
 
 /* @Codex */
-import { type CSSProperties, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { type CSSProperties, type SVGProps, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 
-type LumeFiloTone = 'accent' | 'muted';
+type LumeFiloTone = 'accent' | 'critical' | 'muted';
 
 interface LumeFiloBaseProps {
     className?: string;
@@ -25,6 +25,11 @@ interface LumeFiloConnettoreProps extends LumeFiloBaseProps {
 }
 
 export type LumeFiloProps = LumeFiloSpinaProps | LumeFiloConnettoreProps;
+
+type LumeFiloNodoProps = SVGProps<SVGSVGElement> & {
+    fillTone?: 'critical' | 'field';
+    tone?: LumeFiloTone;
+};
 
 type LumeFiloStyle = CSSProperties & {
     '--lume-filo-fill'?: string;
@@ -49,7 +54,40 @@ function releaseFiloMotion(id: string) {
 }
 
 function filoColor(tone: LumeFiloTone): string {
+    if (tone === 'critical') return 'var(--lume-signal-critical)';
     return tone === 'muted' ? 'var(--lume-ink-muted)' : 'var(--lume-accent)';
+}
+
+/* @Codex: il nodo appartiene alla stessa geometria SVG del Filo. */
+export function LumeFiloNodo({
+    className,
+    fillTone = 'field',
+    style,
+    tone = 'accent',
+    ...svgProps
+}: LumeFiloNodoProps) {
+    return (
+        <svg
+            {...svgProps}
+            aria-hidden="true"
+            focusable="false"
+            className={`pointer-events-none overflow-visible ${className ?? ''}`}
+            data-lume-filo-node="true"
+            preserveAspectRatio="xMidYMid meet"
+            viewBox="0 0 10 10"
+            style={{ color: filoColor(tone), ...style }}
+        >
+            <circle
+                cx="5"
+                cy="5"
+                r="4.25"
+                fill={fillTone === 'critical' ? 'var(--lume-signal-critical)' : 'var(--lume-surface-field)'}
+                stroke="currentColor"
+                strokeWidth="1.25"
+                vectorEffect="non-scaling-stroke"
+            />
+        </svg>
+    );
 }
 
 /* @Codex: un solo primitivo SVG per la continuita temporale e la provenienza. */
