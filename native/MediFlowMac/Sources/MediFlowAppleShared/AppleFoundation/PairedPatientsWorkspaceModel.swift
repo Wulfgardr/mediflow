@@ -29,7 +29,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var username = ""
     @Published var password = ""
     @Published var ambulatoryId = "" {
-        didSet { if oldValue.trimmedOrNil != ambulatoryId.trimmedOrNil { clearSelectedPatientWorkspace() } } // @Codex
+        didSet {
+            guard oldValue.trimmedOrNil != ambulatoryId.trimmedOrNil else { return }
+            invalidatePatientLoadContext()
+            clearSelectedPatientWorkspace()
+        } // @Codex
     }
     @Published private(set) var availableAmbulatories: [NetworkAmbulatorySummary] = []
     @Published private(set) var patients: [HomeBasePatientSummary] = []
@@ -265,6 +269,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         pendingConflict.map(VersionConflictPresentation.init)
     }
     @Published private(set) var isWorking = false
+    /* @Codex */
+    @Published private(set) var canChangePatientSelection = true
 
     private let pairedStore: HomeBasePairedStore
     private let cacheStore: HomeBasePatientCacheStore
@@ -299,6 +305,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private struct PatientLoadContext {
         let requestID: UUID
         let patientID: String
+        let workspaceGeneration: UInt
         let sessionCookie: String
         let credentials: HomeBasePairedCredentials
         let ambulatoryID: String?
@@ -321,6 +328,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
     /* @Codex */
     private var activePatientLoadRequestID: UUID?
+    /* @Codex */
+    private var workspaceGeneration: UInt = 0
+    /* @Codex */
+    private var exclusiveOperationIDs: Set<UUID> = []
     // S3 (D3, lane PRREG): injectable seam for the "Prescrittivo regionale"
     // handoff action (clipboard + external URL). Defaults to the real
     // implementation; tests inject a spy instead of touching the system
@@ -697,10 +708,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     func lockSessionNow() async {
-        isWorking = true
+        let operationID = beginExclusiveOperation()
         errorMessage = nil
         pendingConflict = nil
-        defer { isWorking = false }
+        defer { finishExclusiveOperation(operationID) }
 
         var remoteLogoutConfirmed = false
         if let sessionCookie, let credentials = pairedCredentials {
@@ -808,6 +819,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     func loadPatient(_ patient: HomeBasePatientSummary) async {
+        guard canChangePatientSelection else { return }
         if selectedPatient?.id != patient.id {
             invalidateAttachmentPatientState()
         }
@@ -831,13 +843,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         #endif
         guard let sessionCookie, let credentials = pairedCredentials else { return }
         let context = PatientLoadContext(
-            requestID: UUID(), patientID: patient.id, sessionCookie: sessionCookie,
-            credentials: credentials, ambulatoryID: ambulatoryId.trimmedOrNil,
-            serverURL: serverURL, tlsPin: tlsPin, connectionState: connectionState,
-            client: makeClient(), masterKey: masterKey)
+            requestID: UUID(), patientID: patient.id, workspaceGeneration: workspaceGeneration,
+            sessionCookie: sessionCookie, credentials: credentials,
+            ambulatoryID: ambulatoryId.trimmedOrNil, serverURL: serverURL, tlsPin: tlsPin,
+            connectionState: connectionState, client: makeClient(), masterKey: masterKey)
         activePatientLoadRequestID = context.requestID
         clearSelectedPatientWorkspace(preservingSelectionID: patient.id)
-        isWorking = true
+        refreshWorkingState()
         errorMessage = nil
         pendingConflict = nil
         do {
@@ -3115,6 +3127,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     func clearPairing() async {
+        let operationID = beginExclusiveOperation()
+        defer { finishExclusiveOperation(operationID) }
         errorMessage = nil
         do {
             try pairedStore.clear()
@@ -3622,6 +3636,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private func canPublishPatientLoad(_ context: PatientLoadContext) -> Bool {
         guard activePatientLoadRequestID == context.requestID else { return false }
         let contextIsCurrent = selectedPatientID == context.patientID
+            && workspaceGeneration == context.workspaceGeneration
             && sessionCookie == context.sessionCookie && pairedCredentials == context.credentials
             && ambulatoryId.trimmedOrNil == context.ambulatoryID
             && serverURL == context.serverURL && tlsPin == context.tlsPin
@@ -3636,12 +3651,40 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /* @Codex */
     private func finishCurrentPatientLoad() {
         activePatientLoadRequestID = nil
-        isWorking = false
+        refreshWorkingState()
+    }
+
+    /* @Codex */
+    private func invalidatePatientLoadContext() {
+        workspaceGeneration &+= 1
+        activePatientLoadRequestID = nil
+        refreshWorkingState()
+    }
+
+    /* @Codex */
+    private func beginExclusiveOperation() -> UUID {
+        let operationID = UUID()
+        exclusiveOperationIDs.insert(operationID)
+        invalidatePatientLoadContext()
+        return operationID
+    }
+
+    /* @Codex */
+    private func finishExclusiveOperation(_ operationID: UUID) {
+        exclusiveOperationIDs.remove(operationID)
+        refreshWorkingState()
+    }
+
+    /* @Codex */
+    private func refreshWorkingState() {
+        canChangePatientSelection = exclusiveOperationIDs.isEmpty
+        isWorking = activePatientLoadRequestID != nil || !exclusiveOperationIDs.isEmpty
     }
 
     /* @Codex */
     private func applyPatientLoadFailure(_ error: Error) {
         if case HomeBaseClientError.httpStatus(let status, _) = error, status == 401 {
+            invalidatePatientLoadContext()
             connectionState = .sessionExpired
             sessionCookie = nil
             masterKey = nil
@@ -3955,15 +3998,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     private func runTask(_ operation: @escaping () async throws -> Void) async {
-        isWorking = true
+        let operationID = beginExclusiveOperation()
         errorMessage = nil
         pendingConflict = nil
-        defer { isWorking = false }
+        defer { finishExclusiveOperation(operationID) }
         do {
             try await operation()
         } catch {
             if case HomeBaseClientError.httpStatus(let status, _) = error,
                status == 401 {
+                invalidatePatientLoadContext()
                 connectionState = .sessionExpired
                 sessionCookie = nil
                 masterKey = nil

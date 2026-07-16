@@ -219,6 +219,72 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertTrue(failed.3?.contains("child failed") == true); XCTAssertFalse(failed.4)
     }
 
+    func testLockInvalidatesPatientLoadBeforeRemoteLogoutCompletes() async {
+        let gate = LifecycleLoadGate(["patient:1", "logout"])
+        let source = LifecycleMockDataSource(
+            details: ["a": detail(id: "a", archived: false, version: 1)], loadGate: gate)
+        let model = await makeModel(source: source); await model.configurePairedOnlineForTests()
+        let load = Task { await model.loadPatient(summary(id: "a", archived: false, version: 1)) }
+        await gate.wait(for: "patient:1")
+        let lock = Task { await model.lockSessionNow() }
+        await gate.wait(for: "logout")
+        await gate.release("patient:1"); await load.value
+        let duringLock = await MainActor.run {
+            (model.selectedPatient, model.isWorking, model.canChangePatientSelection)
+        }
+        XCTAssertNil(duringLock.0); XCTAssertTrue(duringLock.1); XCTAssertFalse(duringLock.2)
+        await gate.release("logout"); await lock.value
+        let locked = await MainActor.run {
+            (model.selectedPatient, model.connectionState, model.isWorking, model.canChangePatientSelection)
+        }
+        XCTAssertNil(locked.0); XCTAssertEqual(locked.1, .sessionExpired)
+        XCTAssertFalse(locked.2); XCTAssertTrue(locked.3)
+    }
+
+    func testScopeRoundTripInvalidatesCapturedPatientLoad() async {
+        let gate = LifecycleLoadGate(["patient:1"])
+        let source = LifecycleMockDataSource(
+            details: ["a": detail(id: "a", archived: false, version: 1)], loadGate: gate)
+        let model = await makeModel(source: source); await model.configurePairedOnlineForTests()
+        await MainActor.run { model.ambulatoryId = "AMB-A" }
+        let load = Task { await model.loadPatient(summary(id: "a", archived: false, version: 1)) }
+        await gate.wait(for: "patient:1")
+        await MainActor.run { model.ambulatoryId = "AMB-B"; model.ambulatoryId = "AMB-A" }
+        let invalidated = await MainActor.run {
+            (model.selectedPatientID, model.selectedPatient, model.isWorking, model.canChangePatientSelection)
+        }
+        XCTAssertNil(invalidated.0); XCTAssertNil(invalidated.1)
+        XCTAssertFalse(invalidated.2); XCTAssertTrue(invalidated.3)
+        await gate.release("patient:1"); await load.value
+        let state = await MainActor.run {
+            (model.selectedPatientID, model.selectedPatient, model.isWorking, model.canChangePatientSelection)
+        }
+        XCTAssertNil(state.0); XCTAssertNil(state.1); XCTAssertFalse(state.2); XCTAssertTrue(state.3)
+    }
+
+    func testOverlappingExclusiveTasksKeepSelectionDisabledUntilLastOwnerFinishes() async {
+        let gate = LifecycleLoadGate(["pin:1", "pin:2"])
+        let initial = detail(id: "a", archived: false, version: 1)
+        let source = LifecycleMockDataSource(details: ["a": initial, "b": detail(id: "b", archived: false, version: 1)], loadGate: gate)
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: initial)
+        let first = Task { await model.changePin(currentPin: "1357", newPin: "2468") }
+        await gate.wait(for: "pin:1")
+        let second = Task { await model.changePin(currentPin: "1357", newPin: "8642") }
+        await gate.wait(for: "pin:2")
+        await model.loadPatient(summary(id: "b", archived: false, version: 1))
+        let overlapping = await MainActor.run {
+            (model.selectedPatientID, model.isWorking, model.canChangePatientSelection)
+        }
+        XCTAssertEqual(overlapping.0, "a"); XCTAssertTrue(overlapping.1); XCTAssertFalse(overlapping.2)
+        await gate.release("pin:1"); await first.value
+        let oneOwner = await MainActor.run { (model.isWorking, model.canChangePatientSelection) }
+        XCTAssertTrue(oneOwner.0); XCTAssertFalse(oneOwner.1)
+        await gate.release("pin:2"); await second.value
+        let finished = await MainActor.run { (model.isWorking, model.canChangePatientSelection) }
+        XCTAssertFalse(finished.0); XCTAssertTrue(finished.1)
+    }
+
     func testRestoreUsesTombstoneVersionAndReloadsTrash() async throws {
         let deleted = summary(id: "p1", archived: false, version: 5, deleted: true, reason: "web-delete")
         let source = LifecycleMockDataSource(summaries: [deleted])
@@ -634,6 +700,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
             encryptedMasterKey: encryptedMasterKey,
             salt: salt
         ))
+        await loadGate?.pause("pin:\(pinChangeCalls.count)")
         if let pinChangeError { throw pinChangeError }
         return HomeBaseMutationAcknowledgement(success: true)
     }
@@ -642,6 +709,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         credentials: HomeBasePairedCredentials, sessionCookie: String
     ) async throws -> HomeBaseMutationAcknowledgement {
         logoutCalls += 1
+        await loadGate?.pause("logout")
         if let logoutError { throw logoutError }
         return HomeBaseMutationAcknowledgement(success: true)
     }
