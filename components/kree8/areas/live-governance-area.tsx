@@ -10,7 +10,7 @@ import {
 
 import { PillBadge } from '../cockpit-shared';
 import type { PillVariant } from '@/lib/patient-workspace';
-import styles from '../kree8-clinical-cockpit.module.css';
+import styles from '../kree8-clinical-cockpit-foundation.module.css';
 
 
 /* @Codex */

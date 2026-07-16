@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const cockpitSourceUrl = new URL('./cockpit-shared.tsx', import.meta.url);
-const cockpitCssUrl = new URL('./kree8-clinical-cockpit.module.css', import.meta.url);
+const cockpitCssUrl = new URL('./kree8-clinical-cockpit-foundation.module.css', import.meta.url);
 
 test('la pillola condivisa non neutralizza i quattro segnali Lume', async () => {
   const source = await readFile(cockpitSourceUrl, 'utf8');
