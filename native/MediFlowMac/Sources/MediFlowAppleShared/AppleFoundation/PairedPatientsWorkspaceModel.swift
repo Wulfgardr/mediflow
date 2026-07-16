@@ -304,7 +304,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /* @Codex */
     private struct PatientLoadContext {
         let requestID: UUID
-        let patientID: String
+        let patientID: String?
         let workspaceGeneration: UInt
         let sessionCookie: String
         let credentials: HomeBasePairedCredentials
@@ -841,28 +841,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         #endif
-        guard let sessionCookie, let credentials = pairedCredentials else { return }
-        let context = PatientLoadContext(
-            requestID: UUID(), patientID: patient.id, workspaceGeneration: workspaceGeneration,
-            sessionCookie: sessionCookie, credentials: credentials,
-            ambulatoryID: ambulatoryId.trimmedOrNil, serverURL: serverURL, tlsPin: tlsPin,
-            connectionState: connectionState, client: makeClient(), masterKey: masterKey)
-        activePatientLoadRequestID = context.requestID
-        clearSelectedPatientWorkspace(preservingSelectionID: patient.id)
-        refreshWorkingState()
+        guard let context = beginPatientLoad(patientID: patient.id, clearingWorkspace: true) else { return }
         errorMessage = nil
         pendingConflict = nil
         do {
             let payload = try await fetchPatientWorkspace(context)
             guard canPublishPatientLoad(context) else { return }
-            setSelectedPatient(payload.detail, masterKey: context.masterKey)
-            entries = payload.entries
-            therapies = payload.therapies
-            checkups = payload.checkups
-            observations = payload.observations
-            servicePrescriptions = payload.services
-            servicePrescriptionItems = payload.serviceItems
-            prostheticPrescriptions = payload.prosthetics
+            publishPatientWorkspace(payload, context: context)
             statusMessage = "Dettaglio \(patient.lastName) aperto."
             finishCurrentPatientLoad()
         } catch {
@@ -883,41 +868,23 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return
         }
         #endif
-        guard let current = selectedPatient, let sessionCookie, let credentials = pairedCredentials else {
+        guard let current = selectedPatient else {
             pendingConflict = nil
             return
         }
-        let id = current.id
-        await runTask {
-            let fetchedDetail = try await self.makeClient().fetchPatient(
-                id: id, credentials: credentials, sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil)
-            self.setSelectedPatient(fetchedDetail) // @Codex
-            self.patientReportURL = nil
-            self.patientFHIRExportURL = nil
-            self.pendingFHIRWarningValidation = nil
-            self.entries = try await self.fetchDecryptedEntries(
-                patientId: id, credentials: credentials, sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil)
-            self.therapies = try await self.fetchDecryptedTherapies(
-                patientId: id, credentials: credentials, sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil)
-            self.checkups = try await self.fetchDecryptedCheckups(
-                patientId: id, credentials: credentials, sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil)
-            self.observations = try await self.fetchDecryptedObservations(
-                patientId: id, credentials: credentials, sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil)
-            self.servicePrescriptions = try await self.fetchServicePrescriptions(
-                patientId: id, credentials: credentials, sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil)
-            self.servicePrescriptionItems = try await self.fetchServicePrescriptionItems(
-                patientId: id, credentials: credentials, sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil)
-            self.prostheticPrescriptions = try await self.fetchProstheticPrescriptions(
-                patientId: id, credentials: credentials, sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil)
-            self.statusMessage = "Dati aggiornati dall'home-base. Riapplica la modifica."
+        guard let context = beginPatientLoad(patientID: current.id, clearingWorkspace: false) else { return }
+        do {
+            let payload = try await fetchPatientWorkspace(context)
+            guard canPublishPatientLoad(context) else { return }
+            publishPatientWorkspace(payload, context: context)
+            pendingConflict = nil
+            errorMessage = nil
+            statusMessage = "Dati aggiornati dall'home-base. Riapplica la modifica."
+            finishCurrentPatientLoad()
+        } catch {
+            guard canPublishPatientLoad(context) else { return }
+            finishCurrentPatientLoad()
+            applyPatientReloadFailure(error)
         }
     }
 
@@ -3600,12 +3567,30 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     /* @Codex */
+    private func beginPatientLoad(
+        patientID: String?, clearingWorkspace: Bool
+    ) -> PatientLoadContext? {
+        guard canChangePatientSelection,
+              let sessionCookie,
+              let credentials = pairedCredentials else { return nil }
+        let context = PatientLoadContext(
+            requestID: UUID(), patientID: patientID, workspaceGeneration: workspaceGeneration,
+            sessionCookie: sessionCookie, credentials: credentials,
+            ambulatoryID: ambulatoryId.trimmedOrNil, serverURL: serverURL, tlsPin: tlsPin,
+            connectionState: connectionState, client: makeClient(), masterKey: masterKey)
+        activePatientLoadRequestID = context.requestID
+        if clearingWorkspace { clearSelectedPatientWorkspace(preservingSelectionID: patientID) }
+        refreshWorkingState()
+        return context
+    }
+
+    /* @Codex */
     private func fetchPatientWorkspace(_ context: PatientLoadContext) async throws -> PatientWorkspacePayload {
         let client = context.client
         let credentials = context.credentials
         let cookie = context.sessionCookie
         let scope = context.ambulatoryID
-        let patientID = context.patientID
+        guard let patientID = context.patientID else { throw HomeBaseClientError.contract }
         let detail = try await client.fetchPatient(
             id: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
         let entries = try await client.fetchEntries(
@@ -3630,6 +3615,23 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             detail: detail, entries: entries, therapies: therapies, checkups: checkups,
             observations: observations, services: services, serviceItems: serviceItems,
             prosthetics: prosthetics)
+    }
+
+    /* @Codex */
+    private func publishPatientWorkspace(
+        _ payload: PatientWorkspacePayload, context: PatientLoadContext
+    ) {
+        setSelectedPatient(payload.detail, masterKey: context.masterKey)
+        entries = payload.entries
+        therapies = payload.therapies
+        checkups = payload.checkups
+        observations = payload.observations
+        servicePrescriptions = payload.services
+        servicePrescriptionItems = payload.serviceItems
+        prostheticPrescriptions = payload.prosthetics
+        patientReportURL = nil
+        patientFHIRExportURL = nil
+        pendingFHIRWarningValidation = nil
     }
 
     /* @Codex */
@@ -3823,64 +3825,63 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 
     /* @Codex */
     private func checkNetworkRevision(refreshOnChange: Bool) async {
-        guard connectionState == .pairedOnline,
-              let sessionCookie,
-              let credentials = pairedCredentials else { return }
+        guard activePatientLoadRequestID == nil,
+              connectionState == .pairedOnline,
+              let context = beginPatientLoad(
+                patientID: selectedPatientID, clearingWorkspace: false
+              ) else { return }
         do {
-            let revision = try await makeClient().fetchNetworkRevision(
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: ambulatoryId.trimmedOrNil
+            let revision = try await context.client.fetchNetworkRevision(
+                credentials: context.credentials,
+                sessionCookie: context.sessionCookie,
+                ambulatoryId: context.ambulatoryID
             )
-            guard self.lastSeenNetworkFingerprint != nil else {
+            guard let previousFingerprint = lastSeenNetworkFingerprint else {
+                guard canPublishPatientLoad(context) else { return }
                 lastSeenNetworkFingerprint = revision.fingerprint
+                finishCurrentPatientLoad()
                 return
             }
-            guard refreshOnChange, lastSeenNetworkFingerprint != revision.fingerprint else { return }
+            guard refreshOnChange, previousFingerprint != revision.fingerprint else {
+                guard canPublishPatientLoad(context) else { return }
+                finishCurrentPatientLoad()
+                return
+            }
+            let refreshed = try await fetchRevisionWorkspace(context)
+            guard canPublishPatientLoad(context) else { return }
+            patients = refreshed.patients
+            if let workspace = refreshed.workspace {
+                publishPatientWorkspace(workspace, context: context)
+            } else {
+                clearSelectedPatientWorkspace()
+            }
             lastSeenNetworkFingerprint = revision.fingerprint
-            try await refreshCurrentWorkspaceAfterRevision(
-                credentials: credentials,
-                sessionCookie: sessionCookie
-            )
             statusMessage = "Home-base aggiornato, dati ricaricati."
+            finishCurrentPatientLoad()
         } catch {
-            // Revision polling must not interrupt manual work when the Mac is offline.
+            guard canPublishPatientLoad(context) else { return }
+            finishCurrentPatientLoad()
+            if case HomeBaseClientError.httpStatus(let status, _) = error, status == 401 {
+                applyPatientLoadFailure(error)
+            }
         }
     }
 
     /* @Codex */
-    private func refreshCurrentWorkspaceAfterRevision(
-        credentials: HomeBasePairedCredentials,
-        sessionCookie: String
-    ) async throws {
-        let selectionBeforeRefresh = selectedPatientID
-        patients = try await makeClient().fetchPatients(
-            credentials: credentials,
-            sessionCookie: sessionCookie,
-            ambulatoryId: ambulatoryId.trimmedOrNil,
+    private func fetchRevisionWorkspace(
+        _ context: PatientLoadContext
+    ) async throws -> (patients: [HomeBasePatientSummary], workspace: PatientWorkspacePayload?) {
+        let refreshedPatients = try await context.client.fetchPatients(
+            credentials: context.credentials,
+            sessionCookie: context.sessionCookie,
+            ambulatoryId: context.ambulatoryID,
             includeDeleted: false
         )
-        .map { PatientFieldCrypto.decryptSummary($0, masterKey: masterKey) }
-        if let patientId = reconcilePatientSelection(
-            selectionBeforeRefresh, in: patients, invalidatingWorkspace: false
-        ) {
-            let fetchedDetail = try await makeClient().fetchPatient(
-                id: patientId,
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: ambulatoryId.trimmedOrNil
-            )
-            setSelectedPatient(fetchedDetail) // @Codex
-            entries = try await fetchDecryptedEntries(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
-            therapies = try await fetchDecryptedTherapies(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
-            checkups = try await fetchDecryptedCheckups(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
-            observations = try await fetchDecryptedObservations(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
-            servicePrescriptions = try await fetchServicePrescriptions(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
-            servicePrescriptionItems = try await fetchServicePrescriptionItems(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
-            prostheticPrescriptions = try await fetchProstheticPrescriptions(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId.trimmedOrNil)
-            patientReportURL = nil
-            patientFHIRExportURL = nil
+        .map { PatientFieldCrypto.decryptSummary($0, masterKey: context.masterKey) }
+        guard Self.reconciledPatientSelectionID(context.patientID, in: refreshedPatients) != nil else {
+            return (refreshedPatients, nil)
         }
+        return (refreshedPatients, try await fetchPatientWorkspace(context))
     }
 
     private func applyLaunchOverrides(_ launchOverrides: AppleFoundationLaunchOverrides) {
@@ -4034,6 +4035,23 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 return
             }
             errorMessage = error.localizedDescription
+        }
+    }
+
+    /* @Codex */
+    private func applyPatientReloadFailure(_ error: Error) {
+        if case HomeBaseClientError.versionConflict(let payload) = error {
+            pendingConflict = payload
+            statusMessage = error.localizedDescription
+            errorMessage = nil
+        } else if case HomeBaseClientError.pinChangeConflict = error {
+            statusMessage = error.localizedDescription
+            errorMessage = nil
+        } else if case HomeBaseClientError.httpStatus(let status, _) = error, status == 409 {
+            statusMessage = "Conflitto versione: ricarica il modulo e confronta la voce prima di salvare."
+            errorMessage = nil
+        } else {
+            applyPatientLoadFailure(error)
         }
     }
 
