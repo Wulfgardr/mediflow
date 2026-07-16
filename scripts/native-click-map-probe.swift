@@ -227,8 +227,8 @@ func openClinicalSection(
         report.fail("Unable to open clinical section \(section)")
         throw ProbeFailure(message: "Unable to open clinical section \(section)")
     }
-    guard let sidebarList = nativeList(in: window),
-          selectPatientRow(button, within: sidebarList) else {
+    // @Codex: The clinical sidebar is action-driven; AXSelected does not invoke its Button.
+    guard press(button) else {
         report.fail("Unable to open clinical section \(section)")
         throw ProbeFailure(message: "Unable to open clinical section \(section)")
     }
