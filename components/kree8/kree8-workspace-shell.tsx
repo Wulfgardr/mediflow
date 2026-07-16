@@ -17,28 +17,33 @@ export type Kree8WorkspaceNavItem = {
 };
 
 type Kree8WorkspaceShellProps = {
+  variant?: 'default' | 'clinical';
   eyebrow: string;
   title: string;
   subtitle: string;
   backHref: string;
   backLabel: string;
   patientLabel?: string;
+  patientAtoms?: string[];
   statusLabel?: string;
   navItems?: Kree8WorkspaceNavItem[];
   children: ReactNode;
 };
 
 export function Kree8WorkspaceShell({
+  variant = 'default',
   eyebrow,
   title,
   subtitle,
   backHref,
   backLabel,
   patientLabel,
+  patientAtoms = [],
   statusLabel,
   navItems = [],
   children,
 }: Kree8WorkspaceShellProps) {
+  const isClinical = variant === 'clinical';
   /* @Codex WUL-UIUX: scrollspy. Su una Scheda lunga la rail evidenzia la sezione
      in vista (aria-current) cosi non si perde l'orientamento. */
   const [activeHref, setActiveHref] = useState<string | null>(null);
@@ -77,12 +82,16 @@ export function Kree8WorkspaceShell({
        vivo (mai un nodo staccato) e allinea la rail. */
     const commit = (href: string | null, el: HTMLElement | null) => {
       if (cancelled) return;
-      if (el !== focusEl) {
+      /* La Scheda possiede gia una sola superficie focale che contiene tutte le
+         sezioni. Lo scrollspy aggiorna soltanto la posizione nella rail e non
+         solleva una seconda superficie interna. */
+      const nextFocusEl = isClinical ? null : el;
+      if (nextFocusEl !== focusEl) {
         if (focusEl) {
           focusEl.removeAttribute('data-lume-focus');
           focusEl.classList.remove('lume-focal');
         }
-        focusEl = el;
+        focusEl = nextFocusEl;
         if (focusEl) {
           focusEl.setAttribute('data-lume-focus', '');
           focusEl.classList.add('lume-focal');
@@ -165,12 +174,15 @@ export function Kree8WorkspaceShell({
         focusEl.classList.remove('lume-focal');
       }
     };
-  }, [navKey]);
+  }, [isClinical, navKey]);
 
   return (
-    <div className={styles.shell} ref={rootRef}>
-      <main className={styles.canvas}>
-        <header className={styles.chrome}>
+    <div className={`${styles.shell} ${isClinical ? styles.clinicalShell : ''}`} ref={rootRef}>
+      <main className={`${styles.canvas} ${isClinical ? styles.clinicalCanvas : ''}`} data-testid={isClinical ? 'lume-scheda-scroll' : undefined}>
+        <header
+          className={`${styles.chrome} ${isClinical ? styles.clinicalChrome : ''}`}
+          data-testid={isClinical ? 'lume-scheda-header' : undefined}
+        >
           <div className={styles.chromeTopRow}>
             <Link href={backHref} className={styles.backButton} aria-label={backLabel} title={backLabel}>
               <ArrowLeft size={13} aria-hidden />
@@ -180,20 +192,35 @@ export function Kree8WorkspaceShell({
             <PrivacyModeToggle showLabel />
           </div>
 
-          <div className={styles.hero}>
-            <span className={styles.brandMark} aria-hidden>
-              <FolderOpen size={12} />
-            </span>
-            <div className={styles.heroText}>
-              <p className={styles.eyebrow}>{eyebrow}</p>
-              <h1 className={styles.title}>
-                <span className={styles.titleMain}>{title}</span>
-              </h1>
-              {patientLabel ? <p className={styles.patientLabel}>{patientLabel}</p> : null}
-              <p className={styles.subtitle}>{subtitle}</p>
-              {statusLabel ? <p className={styles.statusLine}>{statusLabel}</p> : null}
+          {isClinical ? (
+            <div className={styles.clinicalIdentity}>
+              <p className={styles.clinicalLabel}>{eyebrow}</p>
+              <h1 className={styles.clinicalName}>{title}</h1>
+              <p className={`${styles.clinicalAtoms} lume-registro`} data-testid="lume-scheda-atoms">
+                {patientAtoms.map((atom, index) => (
+                  <span key={`${atom}-${index}`} className={styles.clinicalAtomGroup}>
+                    {index > 0 ? <span className={styles.clinicalDot} aria-hidden="true">·</span> : null}
+                    <span data-testid="lume-register-value">{atom}</span>
+                  </span>
+                ))}
+              </p>
             </div>
-          </div>
+          ) : (
+            <div className={styles.hero}>
+              <span className={styles.brandMark} aria-hidden>
+                <FolderOpen size={12} />
+              </span>
+              <div className={styles.heroText}>
+                <p className={styles.eyebrow}>{eyebrow}</p>
+                <h1 className={styles.title}>
+                  <span className={styles.titleMain}>{title}</span>
+                </h1>
+                {patientLabel ? <p className={styles.patientLabel}>{patientLabel}</p> : null}
+                <p className={styles.subtitle}>{subtitle}</p>
+                {statusLabel ? <p className={styles.statusLine}>{statusLabel}</p> : null}
+              </div>
+            </div>
+          )}
         </header>
 
         {navItems.length > 0 ? (
@@ -212,8 +239,16 @@ export function Kree8WorkspaceShell({
           </nav>
         ) : null}
 
-        <div className={styles.workspaceBody}>
-          {children}
+        <div className={`${styles.workspaceBody} ${isClinical ? styles.clinicalBody : ''}`}>
+          {isClinical ? (
+            <article
+              className={styles.clinicalSurface}
+              data-testid="lume-scheda-surface"
+              data-lume-elevation="focal"
+            >
+              {children}
+            </article>
+          ) : children}
         </div>
       </main>
     </div>
