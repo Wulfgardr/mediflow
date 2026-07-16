@@ -1,9 +1,9 @@
 'use client';
 
 /* @Codex */
-import { type CSSProperties, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { type CSSProperties, type SVGProps, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 
-type LumeFiloTone = 'accent' | 'muted';
+type LumeFiloTone = 'accent' | 'critical' | 'muted';
 
 interface LumeFiloBaseProps {
     className?: string;
@@ -14,6 +14,7 @@ interface LumeFiloBaseProps {
 interface LumeFiloSpinaProps extends LumeFiloBaseProps {
     variant: 'spina';
     anchorSelector?: string;
+    nodeCount?: number;
 }
 
 interface LumeFiloConnettoreProps extends LumeFiloBaseProps {
@@ -24,6 +25,11 @@ interface LumeFiloConnettoreProps extends LumeFiloBaseProps {
 }
 
 export type LumeFiloProps = LumeFiloSpinaProps | LumeFiloConnettoreProps;
+
+type LumeFiloNodoProps = SVGProps<SVGSVGElement> & {
+    fillTone?: 'critical' | 'field';
+    tone?: LumeFiloTone;
+};
 
 type LumeFiloStyle = CSSProperties & {
     '--lume-filo-fill'?: string;
@@ -48,7 +54,40 @@ function releaseFiloMotion(id: string) {
 }
 
 function filoColor(tone: LumeFiloTone): string {
+    if (tone === 'critical') return 'var(--lume-signal-critical)';
     return tone === 'muted' ? 'var(--lume-ink-muted)' : 'var(--lume-accent)';
+}
+
+/* @Codex: il nodo appartiene alla stessa geometria SVG del Filo. */
+export function LumeFiloNodo({
+    className,
+    fillTone = 'field',
+    style,
+    tone = 'accent',
+    ...svgProps
+}: LumeFiloNodoProps) {
+    return (
+        <svg
+            {...svgProps}
+            aria-hidden="true"
+            focusable="false"
+            className={`pointer-events-none overflow-visible ${className ?? ''}`}
+            data-lume-filo-node="true"
+            preserveAspectRatio="xMidYMid meet"
+            viewBox="0 0 10 10"
+            style={{ color: filoColor(tone), ...style }}
+        >
+            <circle
+                cx="5"
+                cy="5"
+                r="4.25"
+                fill={fillTone === 'critical' ? 'var(--lume-signal-critical)' : 'var(--lume-surface-field)'}
+                stroke="currentColor"
+                strokeWidth="1.25"
+                vectorEffect="non-scaling-stroke"
+            />
+        </svg>
+    );
 }
 
 /* @Codex: un solo primitivo SVG per la continuita temporale e la provenienza. */
@@ -56,11 +95,13 @@ export function LumeFilo(props: LumeFiloProps) {
     const tone = props.tone ?? 'accent';
 
     if (props.variant === 'spina') {
+        if (props.nodeCount !== undefined && props.nodeCount < 2) return null;
         return (
             <LumeSpina
                 anchorSelector={props.anchorSelector}
                 className={props.className}
                 color={filoColor(tone)}
+                nodeCount={props.nodeCount}
                 style={props.style}
             />
         );
@@ -82,11 +123,13 @@ function LumeSpina({
     anchorSelector,
     className,
     color,
+    nodeCount,
     style,
 }: {
     anchorSelector?: string;
     className?: string;
     color: string;
+    nodeCount?: number;
     style?: CSSProperties;
 }) {
     const motionId = useId();
@@ -98,7 +141,7 @@ function LumeSpina({
         if (!svg || !container || !anchorSelector) return;
 
         const updateGeometry = () => {
-            const nodes = container.querySelectorAll<HTMLElement>(anchorSelector);
+            const nodes = container.querySelectorAll<Element>(anchorSelector);
             const first = nodes.item(0);
             const last = nodes.item(nodes.length - 1);
             if (!first || !last) return;
@@ -192,6 +235,8 @@ function LumeSpina({
             aria-hidden="true"
             focusable="false"
             className={`lume-filo-spina pointer-events-none ${className ?? ''}`}
+            data-lume-filo="spina"
+            data-lume-filo-node-count={nodeCount}
             preserveAspectRatio="none"
             viewBox="0 0 1 100"
             style={{ ...style, color, '--lume-spina-scale': 0 } as LumeFiloStyle}
@@ -269,6 +314,7 @@ function LumeConnettore({
             aria-hidden="true"
             focusable="false"
             className={`pointer-events-none overflow-visible ${className ?? ''}`}
+            data-lume-filo="connettore"
             preserveAspectRatio="none"
             viewBox={viewBox}
             style={{ ...style, color } as CSSProperties}

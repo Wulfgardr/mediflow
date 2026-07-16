@@ -6,9 +6,16 @@ import { FileText, Stethoscope, Activity, Trash2, AlertCircle, Undo, Phone, Home
 import { ClinicalRichTextContent } from '@/components/clinical-rich-text-content';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useLiveQuery } from '@/lib/live-query';
-import { LumeFilo } from '@/components/ui/lume-filo';
+import { LumeFilo, LumeFiloNodo } from '@/components/ui/lume-filo';
 
 export type TimelineEntryData = ClinicalEntry & { patientName?: string };
+
+type EntryPresentation = {
+    author?: string;
+    draft: boolean;
+    source: string;
+    stateLabel: string;
+};
 
 const TYPE_ICONS: Record<string, React.ElementType> = {
     'visit': Stethoscope,
@@ -24,6 +31,36 @@ const TYPE_LABELS: Record<string, string> = {
     'scale': 'Scala'
 };
 
+function firstMetadataText(metadata: unknown, keys: string[]): string | undefined {
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return undefined;
+    const record = metadata as Record<string, unknown>;
+    for (const key of keys) {
+        const value = record[key];
+        if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return undefined;
+}
+
+function presentEntry(entry: TimelineEntryData): EntryPresentation {
+    const workflowState = firstMetadataText(entry.metadata, ['workflowStatus', 'status'])?.toLocaleLowerCase('it-IT');
+    const draft = workflowState === 'draft' || workflowState === 'bozza';
+    const signed = workflowState === 'signed' || workflowState === 'firmata';
+    const settingSource = entry.setting === 'home'
+        ? 'Assistenza domiciliare'
+        : entry.setting === 'hospital'
+            ? 'Ospedale'
+            : entry.setting === 'ambulatory'
+                ? 'Ambulatorio'
+                : undefined;
+
+    return {
+        author: firstMetadataText(entry.metadata, ['authorName', 'author', 'signedBy']),
+        draft,
+        source: firstMetadataText(entry.metadata, ['sourceLabel', 'source']) ?? settingSource ?? 'Diario locale',
+        stateLabel: entry.deletedAt ? 'Eliminata' : draft ? 'Bozza' : signed ? 'Firmata' : 'Registrata',
+    };
+}
+
 function EntryAttachments({ attachmentIds, onView }: { attachmentIds: string[], onView: (file: Attachment) => void }) {
     const attachments = useLiveQuery(
         async () => {
@@ -38,7 +75,7 @@ function EntryAttachments({ attachmentIds, onView }: { attachmentIds: string[], 
     return (
         <div className="relative mt-4 pl-5">
             <LumeFilo variant="connettore" fill={100} className="absolute left-0 top-0 h-4 w-5" />
-            <div className="grid grid-cols-1 gap-2 border-t border-[color:rgba(112,106,100,0.12)] pt-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 border-t border-[color:var(--lume-border-color)] pt-3 sm:grid-cols-2">
                 {attachments.map(file => (
                     <button
                         key={file.id}
@@ -61,22 +98,50 @@ function EntryAttachments({ attachmentIds, onView }: { attachmentIds: string[], 
 
 interface TimelineEntryCardProps {
     entry: TimelineEntryData;
+    active?: boolean;
+    position?: number;
+    setSize?: number;
+    onActivate?: () => void;
     onDelete?: (entry: TimelineEntryData) => void;
     onRestore?: (entry: TimelineEntryData) => void;
     onViewAttachment?: (file: Attachment) => void;
 }
 
-export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment }: TimelineEntryCardProps) {
+export function TimelineEntryCard({
+    entry,
+    active = false,
+    position,
+    setSize,
+    onActivate,
+    onDelete,
+    onRestore,
+    onViewAttachment,
+}: TimelineEntryCardProps) {
     const isDeleted = !!entry.deletedAt;
     const Icon = TYPE_ICONS[entry.type] || FileText;
+    const presentation = presentEntry(entry);
 
     return (
-        <div className={`relative pl-8 ${isDeleted ? 'opacity-60 grayscale' : ''}`}>
-            {/* Dot */}
-            <div data-lume-timeline-node className={`absolute -left-2 top-0 h-4 w-4 rounded-full border-2 border-[color:var(--lume-surface-field)] ${isDeleted ? 'bg-[color:var(--lume-signal-critical)]' : 'bg-[color:var(--lume-accent)]'}`}></div>
+        <article
+            className={`group relative pl-8 outline-none ${isDeleted ? 'opacity-60 grayscale' : ''}`}
+            data-active={active ? 'true' : 'false'}
+            data-lume-entry-state={presentation.draft ? 'draft' : 'settled'}
+            aria-current={active ? 'true' : undefined}
+            aria-posinset={position}
+            aria-setsize={setSize}
+            tabIndex={0}
+            onClick={onActivate}
+            onFocus={onActivate}
+        >
+            <LumeFiloNodo
+                data-lume-timeline-node
+                className="absolute -left-2 top-0 h-4 w-4"
+                fillTone={isDeleted ? 'critical' : 'field'}
+                tone={isDeleted ? 'critical' : 'accent'}
+            />
 
             {/* Content */}
-            <div className={`mf-section p-5 ${isDeleted ? 'border-[color:rgba(163,58,47,0.26)] bg-[color:rgba(163,58,47,0.08)]' : ''}`}>
+            <div className={`rounded-[var(--lume-radius-card)] p-5 group-focus-visible:shadow-[var(--lume-focus-ring)] ${isDeleted ? 'border border-[color:var(--lume-signal-critical)] bg-[color:var(--lume-surface-field)]' : active ? 'lume-focal' : 'bg-[color:var(--lume-surface-field)]'}`}>
                 <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-2">
                         <div className={`mf-icon-disc h-8 w-8 !rounded-[12px] ${isDeleted ? '!text-[color:var(--lume-signal-critical)]' : ''}`}>
@@ -87,10 +152,15 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
                                 {TYPE_LABELS[entry.type] || entry.type}
                                 {entry.patientName && <span className="ml-1 font-normal normal-case" style={{ color: 'var(--lume-ink-muted)' }}> - {entry.patientName}</span>}
                             </span>
-                            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
+                            <div className="lume-registro mt-1 flex flex-wrap items-center gap-2 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
+                                <span className="rounded-md border border-[color:var(--lume-border-color)] px-1.5 py-0.5 font-semibold uppercase">
+                                    {presentation.stateLabel}
+                                </span>
                                 <span className="lume-registro">{format(new Date(entry.date), 'dd MMMM yyyy HH:mm', { locale: it })}</span>
+                                <span>Fonte: {presentation.source}</span>
+                                {presentation.author ? <span>Autore: {presentation.author}</span> : null}
                                 {entry.setting && (
-                                    <span className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 ${entry.setting === 'home' ? 'border-[color:rgba(197,138,47,0.28)] text-[color:var(--lume-signal-warning)]' : 'border-[color:rgba(63,122,76,0.26)] text-[color:var(--lume-signal-success)]'}`}>
+                                    <span className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 ${entry.setting === 'home' ? 'border-[color:var(--lume-signal-warning)] text-[color:var(--lume-signal-warning)]' : 'border-[color:var(--lume-signal-success)] text-[color:var(--lume-signal-success)]'}`}>
                                         {entry.setting === 'home' ? <Home className="w-3 h-3" /> : <Building2 className="w-3 h-3" />}
                                         {entry.setting === 'home' ? 'Dom' : 'Amb'}
                                     </span>
@@ -143,7 +213,7 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
                 )}
 
                 {/* Main Text Content */}
-                <div style={{ color: 'var(--lume-ink)' }}>
+                <div style={{ color: presentation.draft ? 'var(--lume-ink-muted)' : 'var(--lume-ink)' }}>
                     <PrivacyBlur>
                         {/* @Codex */}
                         <ClinicalRichTextContent content={entry.content} className="prose prose-sm max-w-none prose-p:leading-relaxed dark:prose-invert" />
@@ -170,6 +240,6 @@ export function TimelineEntryCard({ entry, onDelete, onRestore, onViewAttachment
                     </div>
                 )}
             </div>
-        </div>
+        </article>
     );
 }
