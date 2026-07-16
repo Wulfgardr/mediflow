@@ -486,21 +486,23 @@ export function Kree8ClinicalCockpit({
                 ))}
               </nav>
             ) : null}
-            <AreaContent
-              area={area}
-              filter={filter}
-              agendaBridge={agendaBridge}
-              patientState={patientState}
-              agendaState={agendaState}
-              diaryState={diaryState}
-              selectedPatient={selectedPatient}
-              selectedPatientId={selectedPatientId}
-              patientWorkspace={patientWorkspace}
-              patientSearchFocusSignal={patientSearchFocusSignal}
-              isReview={isReview}
-              onSelectPatient={setSelectedPatientId}
-              onOpenArea={setArea}
-            />
+            <div className={styles.focusContent}>
+              <AreaContent
+                area={area}
+                filter={filter}
+                agendaBridge={agendaBridge}
+                patientState={patientState}
+                agendaState={agendaState}
+                diaryState={diaryState}
+                selectedPatient={selectedPatient}
+                selectedPatientId={selectedPatientId}
+                patientWorkspace={patientWorkspace}
+                patientSearchFocusSignal={patientSearchFocusSignal}
+                isReview={isReview}
+                onSelectPatient={setSelectedPatientId}
+                onOpenArea={setArea}
+              />
+            </div>
           </main>
         </div>
       </section>

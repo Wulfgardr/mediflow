@@ -1,5 +1,5 @@
 /* @Codex */
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 
 type FrameCase = {
@@ -36,6 +36,17 @@ async function resolveColorVariable(page: Page, variable: string): Promise<strin
   }, variable);
 }
 
+async function resolveBoxShadow(locator: Locator, value: string): Promise<string> {
+  return locator.evaluate((element, shadow) => {
+    const probe = document.createElement('span');
+    probe.style.boxShadow = shadow;
+    element.appendChild(probe);
+    const resolved = getComputedStyle(probe).boxShadow;
+    probe.remove();
+    return resolved;
+  }, value);
+}
+
 async function openSyntheticFrame(page: Page, register: FrameCase['register']): Promise<void> {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await page.goto('/mockups/kree8');
@@ -69,7 +80,13 @@ for (const frameCase of FRAME_CASES) {
     await expect(panel).toHaveCSS('background-color', expected.field);
     await expect(focus).toHaveCSS('background-color', expected.focal);
     await expect(focus).toHaveCSS('border-top-width', '1px');
-    expect(await focus.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe('none');
+    // Gli alias locali sono validati dal token checker e risolvono solo da
+    // --lume-*; il probe eredita qui la derivazione specifica del registro.
+    const expectedFocalShadow = await resolveBoxShadow(
+      focus,
+      '0 2px 8px color-mix(in srgb, var(--k8-shadow-source) var(--k8-shadow-strength), transparent)',
+    );
+    await expect(focus).toHaveCSS('box-shadow', expectedFocalShadow);
 
     const turnNav = page.getByRole('button', { name: /Agenda/ });
     const weights = await Promise.all([
@@ -119,16 +136,15 @@ for (const frameCase of FRAME_CASES) {
     expect(coloredSideBorders).toEqual([]);
 
     if (frameCase.viewport === 'narrow') {
-      const overflow = await page.evaluate(() => {
-        const canvasElement = document.querySelector('[data-testid="lume-frame-canvas"]');
-        if (!(canvasElement instanceof HTMLElement)) throw new Error('Canvas Lume assente');
-        return {
-          document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-          canvas: canvasElement.scrollWidth - canvasElement.clientWidth,
-        };
-      });
-      expect(overflow.document).toBeLessThanOrEqual(1);
-      expect(overflow.canvas).toBeLessThanOrEqual(1);
+      const overflow = {
+        document: await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+        canvas: await canvas.evaluate((element) => element.scrollWidth - element.clientWidth),
+        panel: await panel.evaluate((element) => element.scrollWidth - element.clientWidth),
+        focus: await focus.evaluate((element) => element.scrollWidth - element.clientWidth),
+      };
+      for (const [surface, delta] of Object.entries(overflow)) {
+        expect(delta, `Overflow orizzontale del frame su ${surface}`).toBeLessThanOrEqual(1);
+      }
     }
   });
 }

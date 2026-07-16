@@ -371,7 +371,7 @@
   transition: opacity var(--lume-dur-fuoco) var(--lume-ease);
 }
 
-.focusSurface > * {
+.focusContent {
   position: relative;
   z-index: 1;
 }
