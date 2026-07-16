@@ -318,6 +318,29 @@ func detailNameMatches(_ expected: String, app: NSRunningApplication) -> Bool {
         .contains(expected)
 }
 
+/* @Codex */
+func waitForPatientRow(
+    _ identifierName: String,
+    in app: NSRunningApplication,
+    timeout: TimeInterval = 5.0
+) -> (list: AXUIElement, row: AXUIElement)? {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        if let window = try? appWindow(for: app),
+           let listContainer = findElement(in: window, where: {
+               identifier(of: $0) == "patients-selection-list"
+           }),
+           let patientList = nativeList(in: listContainer),
+           let patientRow = findElement(in: patientList, where: {
+               identifier(of: $0) == identifierName
+           }) {
+            return (patientList, patientRow)
+        }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+    }
+    return nil
+}
+
 func runClinicalShellProbe(app: NSRunningApplication, report: inout ProbeReport) throws {
     let sectionChecks = [
         ("patients", "patients-selection-list"),
@@ -336,24 +359,13 @@ func runClinicalShellProbe(app: NSRunningApplication, report: inout ProbeReport)
     }
     try openClinicalSection("patients", expectedView: "patients-selection-list", app: app, report: &report)
 
-    guard let window = try? appWindow(for: app) else {
-        throw ProbeFailure(message: "Unable to resolve MediFlow window after shell navigation.")
+    guard let firstPatient = waitForPatientRow("patient-cell-uitest-1", in: app) else {
+        report.fail("Missing first synthetic patient row after AX materialization")
+        throw ProbeFailure(message: "Missing first synthetic patient row after AX materialization")
     }
-
-    guard let listContainer = findElement(in: window, where: {
-        identifier(of: $0) == "patients-selection-list"
-    }), let patientList = nativeList(in: listContainer) else {
-        report.fail("Missing native patient selection list")
-        throw ProbeFailure(message: "The patient worklist did not expose a native AX list role.")
-    }
+    let patientList = firstPatient.list
+    let firstPatientRow = firstPatient.row
     report.pass("Native patient list role \(role(of: patientList))")
-
-    guard let firstPatientRow = findElement(in: patientList, where: {
-        identifier(of: $0) == "patient-cell-uitest-1"
-    }) else {
-        report.fail("Missing first synthetic patient row")
-        throw ProbeFailure(message: "Missing first synthetic patient row")
-    }
     report.pass("Resolved first synthetic patient row")
 
     guard selectPatientRow(firstPatientRow, within: patientList) else {
@@ -378,22 +390,22 @@ func runClinicalShellProbe(app: NSRunningApplication, report: inout ProbeReport)
     }
     report.pass("Selected first patient and opened matching detail")
 
-    guard let secondPatientRow = findElement(in: patientList, where: {
-        identifier(of: $0) == "patient-cell-uitest-2"
-    }) else {
-        report.fail("Missing second synthetic patient row")
-        throw ProbeFailure(message: "Missing second synthetic patient row")
+    guard let secondPatient = waitForPatientRow("patient-cell-uitest-2", in: app) else {
+        report.fail("Missing second synthetic patient row after AX materialization")
+        throw ProbeFailure(message: "Missing second synthetic patient row after AX materialization")
     }
+    let secondPatientList = secondPatient.list
+    let secondPatientRow = secondPatient.row
     report.pass("Resolved second synthetic patient row")
 
-    guard selectPatientRow(secondPatientRow, within: patientList) else {
+    guard selectPatientRow(secondPatientRow, within: secondPatientList) else {
         report.fail("Unable to select the second patient row through the native list")
         throw ProbeFailure(message: "Unable to select the second patient row through the native list")
     }
     report.pass("Requested second patient selection through the native list")
 
     guard waitFor(condition: {
-        selectedItemsContain("patient-cell-uitest-2", list: patientList)
+        selectedItemsContain("patient-cell-uitest-2", list: secondPatientList)
     }) else {
         report.fail("Unable to move selection to the second patient")
         throw ProbeFailure(message: "The second patient row was not selected in the AX tree.")
