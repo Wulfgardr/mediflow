@@ -15,7 +15,9 @@ struct ProbeReport {
     var checks: [String] = []
 
     mutating func pass(_ message: String) {
-        checks.append("PASS  \(message)")
+        let line = "PASS  \(message)"
+        checks.append(line)
+        FileHandle.standardOutput.write(Data("\(line)\n".utf8))
     }
 
     mutating func fail(_ message: String) {
@@ -49,6 +51,12 @@ func children(of element: AXUIElement) -> [AXUIElement] {
     attribute(element, kAXChildrenAttribute) as? [AXUIElement] ?? []
 }
 
+/* @Codex */
+func parent(of element: AXUIElement) -> AXUIElement? {
+    guard let value = attribute(element, kAXParentAttribute) else { return nil }
+    return (value as! AXUIElement)
+}
+
 func identifier(of element: AXUIElement) -> String {
     attribute(element, "AXIdentifier") as? String ?? ""
 }
@@ -63,6 +71,12 @@ func value(of element: AXUIElement) -> String {
 
 func role(of element: AXUIElement) -> String {
     attribute(element, kAXRoleAttribute) as? String ?? ""
+}
+
+/* @Codex */
+func nativeList(in element: AXUIElement) -> AXUIElement? {
+    let nativeListRoles = [kAXOutlineRole as String, kAXTableRole as String, "AXList"]
+    return findElement(in: element, where: { nativeListRoles.contains(role(of: $0)) })
 }
 
 func title(of element: AXUIElement) -> String {
@@ -211,8 +225,12 @@ func openClinicalSection(
     guard let window = try? appWindow(for: app),
           let button = findElement(in: window, where: {
               identifier(of: $0) == "clinical-workspace-section-\(section)-button"
-          }),
-          press(button) else {
+          }) else {
+        report.fail("Unable to open clinical section \(section)")
+        throw ProbeFailure(message: "Unable to open clinical section \(section)")
+    }
+    // @Codex: The clinical sidebar is action-driven; AXSelected does not invoke its Button.
+    guard press(button) else {
         report.fail("Unable to open clinical section \(section)")
         throw ProbeFailure(message: "Unable to open clinical section \(section)")
     }
@@ -224,9 +242,108 @@ func openClinicalSection(
     report.pass("Opened clinical section \(section)")
 }
 
+/* @Codex */
+func selectPatientRow(_ row: AXUIElement, within list: AXUIElement) -> Bool {
+    var rowCandidates: [AXUIElement] = []
+    var candidate: AXUIElement? = row
+    for _ in 0..<8 {
+        guard let element = candidate else { return false }
+        if CFEqual(element, list) {
+            break
+        }
+        rowCandidates.append(element)
+        candidate = parent(of: element)
+    }
+
+    guard let boundary = candidate,
+          CFEqual(boundary, list),
+          let nativeRow = rowCandidates.last else {
+        return false
+    }
+
+    let selectionAttribute: String
+    switch role(of: list) {
+    case kAXOutlineRole, kAXTableRole:
+        selectionAttribute = kAXSelectedRowsAttribute
+    case "AXList":
+        selectionAttribute = kAXSelectedChildrenAttribute
+    default:
+        return false
+    }
+
+    if AXUIElementSetAttributeValue(
+        list,
+        selectionAttribute as CFString,
+        [nativeRow] as CFArray
+    ) == .success {
+        return true
+    }
+
+    if AXUIElementSetAttributeValue(
+        nativeRow,
+        kAXSelectedAttribute as CFString,
+        kCFBooleanTrue
+    ) == .success {
+        return true
+    }
+    return press(nativeRow)
+}
+
+/* @Codex */
+func selectedItemsContain(_ identifierName: String, list: AXUIElement) -> Bool {
+    let selectionAttribute: String
+    switch role(of: list) {
+    case kAXOutlineRole, kAXTableRole:
+        selectionAttribute = kAXSelectedRowsAttribute
+    case "AXList":
+        selectionAttribute = kAXSelectedChildrenAttribute
+    default:
+        return false
+    }
+    guard let selectedItems = attribute(list, selectionAttribute) as? [AXUIElement] else {
+        return false
+    }
+    return selectedItems.contains { item in
+        findElement(in: item, where: { identifier(of: $0) == identifierName }) != nil
+    }
+}
+
+/* @Codex */
+func detailNameMatches(_ expected: String, app: NSRunningApplication) -> Bool {
+    guard let window = try? appWindow(for: app),
+          let detailName = findElement(in: window, where: { identifier(of: $0) == "patient-detail-name" }) else {
+        return false
+    }
+    return [descriptionValue(of: detailName), value(of: detailName), title(of: detailName)]
+        .contains(expected)
+}
+
+/* @Codex */
+func waitForPatientRow(
+    _ identifierName: String,
+    in app: NSRunningApplication,
+    timeout: TimeInterval = 5.0
+) -> (list: AXUIElement, row: AXUIElement)? {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        if let window = try? appWindow(for: app),
+           let listContainer = findElement(in: window, where: {
+               identifier(of: $0) == "patients-selection-list"
+           }),
+           let patientList = nativeList(in: listContainer),
+           let patientRow = findElement(in: patientList, where: {
+               identifier(of: $0) == identifierName
+           }) {
+            return (patientList, patientRow)
+        }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+    }
+    return nil
+}
+
 func runClinicalShellProbe(app: NSRunningApplication, report: inout ProbeReport) throws {
     let sectionChecks = [
-        ("patients", "clinical-workspace-patients-view"),
+        ("patients", "patients-selection-list"),
         ("agenda", "clinical-workspace-agenda-view"),
         ("diary", "clinical-workspace-diary-view"),
         ("analytics", "clinical-workspace-analytics-view"),
@@ -240,25 +357,68 @@ func runClinicalShellProbe(app: NSRunningApplication, report: inout ProbeReport)
     for (section, expectedView) in sectionChecks {
         try openClinicalSection(section, expectedView: expectedView, app: app, report: &report)
     }
-    try openClinicalSection("patients", expectedView: "clinical-workspace-patients-view", app: app, report: &report)
+    try openClinicalSection("patients", expectedView: "patients-selection-list", app: app, report: &report)
 
-    guard let window = try? appWindow(for: app) else {
-        throw ProbeFailure(message: "Unable to resolve MediFlow window after shell navigation.")
+    guard let firstPatient = waitForPatientRow("patient-cell-uitest-1", in: app) else {
+        report.fail("Missing first synthetic patient row after AX materialization")
+        throw ProbeFailure(message: "Missing first synthetic patient row after AX materialization")
     }
+    let patientList = firstPatient.list
+    let firstPatientRow = firstPatient.row
+    report.pass("Native patient list role \(role(of: patientList))")
+    report.pass("Resolved first synthetic patient row")
 
-    let patientRow = findElement(in: window, where: {
-        identifier(of: $0).hasPrefix("patient-cell-uitest-")
-    })
-    guard let patientRow else {
-        report.fail("No patient-cell-uitest-* identifier found; launch the synthetic P6 fixture first")
-        throw ProbeFailure(message: "Synthetic patient fixture required but no UI-test patient row was found.")
+    guard selectPatientRow(firstPatientRow, within: patientList) else {
+        report.fail("Unable to select the first patient row through the native list")
+        throw ProbeFailure(message: "Unable to select the first patient row through the native list")
     }
+    report.pass("Requested first patient selection through the native list")
 
-    guard press(patientRow), waitForIdentifier("patient-detail-name", in: app) != nil else {
+    guard waitFor(condition: {
+        selectedItemsContain("patient-cell-uitest-1", list: patientList)
+    }) else {
+        report.fail("The native list did not expose the first selected row")
+        throw ProbeFailure(message: "The first patient row was not selected in the AX tree.")
+    }
+    report.pass("Native list selected the first patient")
+
+    guard waitFor(condition: {
+        detailNameMatches("Rossi Mario", app: app)
+    }) else {
         report.fail("Unable to open the first patient detail")
         throw ProbeFailure(message: "Unable to open the first patient detail")
     }
-    report.pass("Opened first patient detail")
+    report.pass("Selected first patient and opened matching detail")
+
+    guard let secondPatient = waitForPatientRow("patient-cell-uitest-2", in: app) else {
+        report.fail("Missing second synthetic patient row after AX materialization")
+        throw ProbeFailure(message: "Missing second synthetic patient row after AX materialization")
+    }
+    let secondPatientList = secondPatient.list
+    let secondPatientRow = secondPatient.row
+    report.pass("Resolved second synthetic patient row")
+
+    guard selectPatientRow(secondPatientRow, within: secondPatientList) else {
+        report.fail("Unable to select the second patient row through the native list")
+        throw ProbeFailure(message: "Unable to select the second patient row through the native list")
+    }
+    report.pass("Requested second patient selection through the native list")
+
+    guard waitFor(condition: {
+        selectedItemsContain("patient-cell-uitest-2", list: secondPatientList)
+    }) else {
+        report.fail("Unable to move selection to the second patient")
+        throw ProbeFailure(message: "The second patient row was not selected in the AX tree.")
+    }
+    report.pass("Native list selected the second patient")
+
+    guard waitFor(condition: {
+        detailNameMatches("Bianchi Anna", app: app)
+    }) else {
+        report.fail("The second patient detail did not match the native selection")
+        throw ProbeFailure(message: "A -> B selection did not expose the matching detail.")
+    }
+    report.pass("Moved native selection A -> B with matching detail")
 
     let moduleIdentifiers = [
         "patient-clinical-signals",
@@ -419,9 +579,6 @@ func main() throws {
     if windowContainsClinicalShell(window) {
         try runClinicalShellProbe(app: app, report: &report)
         print("Native click-map probe passed.")
-        for line in report.checks {
-            print(line)
-        }
         return
     }
 
@@ -432,9 +589,6 @@ func main() throws {
     if windowContainsHomeBaseShell(window) {
         try runHomeBaseShellProbe(app: app, window: window, report: &report)
         print("Native click-map probe passed.")
-        for line in report.checks {
-            print(line)
-        }
         return
     }
 
@@ -501,9 +655,6 @@ func main() throws {
     closeSheetIfPresent(in: app)
 
     print("Native click-map probe passed.")
-    for line in report.checks {
-        print(line)
-    }
 }
 
 do {

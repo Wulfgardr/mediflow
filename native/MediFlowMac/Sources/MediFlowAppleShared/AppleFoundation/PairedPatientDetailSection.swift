@@ -29,6 +29,8 @@ struct PairedPatientDetailSection: View {
             Text("\(detail.lastName) \(detail.firstName)")
                 .font(.title3.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(detail.lastName) \(detail.firstName)")
                 .accessibilityIdentifier("patient-detail-name")
             if detail.isAdi == true || detail.isArchived == true {
                 HStack(spacing: 6) {

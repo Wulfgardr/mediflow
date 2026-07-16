@@ -40,6 +40,10 @@ struct PairedPatientsWorkspaceView: View {
     @State private var selectedFseObservationId: String?
     @State private var expandedInsightId: String?
     @State private var isCompactPatientHeaderExpanded = false
+    #if os(macOS)
+    /* @Codex */
+    @State private var patientWorkspaceColumnVisibility: NavigationSplitViewVisibility = .all
+    #endif
 
     init(model: PairedPatientsWorkspaceModel, capabilities: ClinicalWorkspaceCapabilitiesStore) {
         self.model = model
@@ -196,6 +200,9 @@ struct PairedPatientsWorkspaceView: View {
     // Regular (iPad/macOS): true master-detail, patient list beside the open patient.
     @ViewBuilder
     private var layoutBody: some View {
+        #if os(macOS)
+        macOSWorkspace
+        #else
         if usesSplitLayout {
             HStack(spacing: 0) {
                 ScrollView {
@@ -251,7 +258,97 @@ struct PairedPatientsWorkspaceView: View {
                 }
             }
         }
+        #endif
     }
+
+    #if os(macOS)
+    /* @Codex */
+    private var macOSWorkspace: some View {
+        NavigationSplitView(columnVisibility: $patientWorkspaceColumnVisibility) {
+            VStack(alignment: .leading, spacing: 0) {
+                ScrollView {
+                    credentialsCard
+                        .padding(16)
+                }
+                .frame(minHeight: 180, idealHeight: 260, maxHeight: 300)
+
+                Divider()
+
+                patientsListContent
+                    .padding(.horizontal, 12)
+                    .padding(.top, 12)
+                    .frame(maxHeight: .infinity)
+            }
+            .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 460)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("patient-workspace-sidebar")
+        } detail: {
+            ScrollView {
+                macOSDetailContent
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxWidth: .infinity)
+            .accessibilityIdentifier("patient-workspace-detail")
+        }
+        .navigationSplitViewStyle(.balanced)
+    }
+
+    /* @Codex */
+    @ViewBuilder
+    private var macOSDetailContent: some View {
+        if let detail = model.selectedPatient {
+            selectedPatientSections(detail)
+                .padding(16)
+                .lumeSurface(zone: .focal)
+        } else if let patientID = model.selectedPatientID {
+            pendingPatientDetail(patientID: patientID)
+        } else {
+            emptyDetailState
+                .accessibilityIdentifier("patient-detail-empty")
+        }
+    }
+
+    /* @Codex */
+    private func pendingPatientDetail(patientID: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if model.isWorking {
+                ProgressView("Caricamento della scheda…")
+                    .accessibilityIdentifier("patient-detail-loading")
+            } else if let error = model.errorMessage {
+                Label("Scheda non disponibile", systemImage: "exclamationmark.triangle")
+                    .font(.headline)
+                    .foregroundStyle(LumePalette.critical)
+                Text(error)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("patient-detail-load-error")
+                retryPatientDetailButton(patientID: patientID)
+            } else {
+                Label("Dettaglio da ricaricare", systemImage: "arrow.clockwise")
+                    .font(.headline)
+                Text("La selezione resta attiva, ma i dati clinici devono essere ricaricati prima di essere mostrati.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                retryPatientDetailButton(patientID: patientID)
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: 520, minHeight: 260, alignment: .leading)
+        .lumeSurface(zone: .focal)
+        .accessibilityIdentifier("patient-detail-pending")
+    }
+
+    /* @Codex */
+    private func retryPatientDetailButton(patientID: String) -> some View {
+        Button("Ricarica scheda") {
+            guard let patient = model.patients.first(where: { $0.id == patientID }) else { return }
+            Task { await model.loadPatient(patient) }
+        }
+        .disabled(!model.canChangePatientSelection)
+        .accessibilityIdentifier("patient-detail-reload-button")
+    }
+    #endif
 
     #if DEBUG
     // Screenshot/UI-test affordance: render only the open patient's clinical

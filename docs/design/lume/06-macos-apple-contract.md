@@ -107,7 +107,7 @@ Confermato localmente e contro-rivisto da Opus 4.8 max:
 | Finding | Stato | Destinazione |
 | --- | --- | --- |
 | Le card cliniche usano `glassEffect` su OS 26+ | Risolto (PR #46): `clinicalCardStyle()` rende opaca la card clinica su ogni OS, `cardStyle()` è alias di compatibilità e `GlassCard` è deprecata e resa opaca | Consolidare le primitive Lume (`LumeSurface`/`LumeCard`) resta lavoro separato. |
-| Il workspace pazienti interno e un `HStack` con colonna fissa 360pt | Confermato | Migrare a `NavigationSplitView` + `List(selection:)` come DS-2. |
+| Il workspace pazienti interno è un `HStack` con colonna fissa 360pt | Risolto nella slice M2a (#74) | `NavigationSplitView` + `List(selection:)` usano l'ID paziente stabile; la visibilità `.all` ripristina la worklist quando si rientra dalla sidebar clinica e il dettaglio resta opaco. |
 | Non esiste `.inspector()` nel workspace | Confermato | Introdurlo dopo lo split, per contesto e drill-down. |
 | Identita paziente scorre via e non esiste `safeAreaInset` | Confermato | Creare `TestataPaziente`; allergie richiedono prima verifica del contratto dati. |
 | Il Registro non e applicato a dose/valore/codice/data | Confermato | Modifier `.registro()` e audit dei call-site. |
@@ -124,8 +124,9 @@ simulate con dati inventati.
 2. **M1, primitive additive**: `LumePalette`, `LumeSurface`, `.registro()` e
    card clinica opaca; nessuna riorganizzazione funzionale. Consegnata finora
    solo la card clinica opaca (PR #46); le altre primitive restano aperte.
-3. **M2, struttura desktop**: `NavigationSplitView`, `List(selection:)`,
-   workspace spacchettato e pairing fuori dalla worklist.
+3. **M2, struttura desktop**: la slice M2a (#74) consegna
+   `NavigationSplitView` e `List(selection:)`; spostare il pairing fuori dalla
+   worklist resta una slice separata.
 4. **M3, sicurezza di contesto**: `TestataPaziente` persistente con i soli dati
    realmente disponibili e blocco esplicito se il contesto e incerto.
 5. **M4, densita a strati**: inspector e provenienza senza perdere la selezione.
@@ -137,10 +138,10 @@ sintetico light/dark (`ClinicalCardStyleTests`) e build del bundle macOS
 (PR #46), senza cambiare navigazione, parity o contratti. Il test e sintetico,
 non una QA manuale completa dei gate qui sotto.
 
-La prossima slice eseguibile resta sotto circa 300 LOC e non combina M1 con M2.
-La candidata riguarda il resto di M1 (`LumePalette`, `LumeSurface`,
-`.registro()` sui call-site esistenti); richiede issue Linear dedicata e prova
-visuale prima del commit. I passi M2-M5 restano aperti.
+La slice M2a resta sotto circa 300 LOC e non combina la struttura desktop con
+inspector, testata persistente o spostamento del pairing. Questi confini restano
+esplicitamente aperti; il debito documentale sulle primitive M1 viene
+riconciliato nel follow-up docs finale di #68, non ampliato in #74.
 
 ## 8. Gate di verifica
 
