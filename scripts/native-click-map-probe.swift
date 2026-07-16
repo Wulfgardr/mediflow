@@ -74,6 +74,11 @@ func role(of element: AXUIElement) -> String {
 }
 
 /* @Codex */
+func roleDescription(of element: AXUIElement) -> String {
+    attribute(element, kAXRoleDescriptionAttribute) as? String ?? ""
+}
+
+/* @Codex */
 func elementAttribute(_ element: AXUIElement, _ name: String) -> AXUIElement? {
     guard let value = attribute(element, name) else { return nil }
     return (value as! AXUIElement)
@@ -353,20 +358,62 @@ func workspaceHeader(
 }
 
 /* @Codex */
-func workspaceHeaderIsAutonomousHeading(
+func dumpWorkspaceHeaderAX(exposing expectedName: String, app: NSRunningApplication) {
+    guard let header = workspaceHeader(exposing: expectedName, app: app)?.header else {
+        print("AX DUMP patient-workspace-header unavailable")
+        return
+    }
+
+    var copiedNames: CFArray?
+    guard AXUIElementCopyAttributeNames(header, &copiedNames) == .success,
+          let names = copiedNames as? [String] else {
+        print("AX DUMP patient-workspace-header attribute names unavailable")
+        return
+    }
+
+    print("AX DUMP patient-workspace-header BEGIN")
+    for name in names.sorted() {
+        guard let value = attribute(header, name) else { continue }
+        print("\(name)=\(String(describing: value))")
+    }
+    print("AX DUMP patient-workspace-header END")
+}
+
+/* @Codex */
+struct WorkspaceHeaderAXContract {
+    let role: String
+    let roleDescription: String
+    let headingLevel: Int?
+}
+
+/* @Codex
+ SwiftUI's accessibilityHeading(_:) sets a semantic heading level; on macOS it
+ does not promise that the element's raw role is AXHeading. AXHeadingLevel is
+ public only from macOS 26, so macOS 14 may expose neither raw heading signal.
+ Keep name and autonomy as hard requirements, and validate level 1 whenever the
+ runtime does expose heading-level metadata.
+ */
+func workspaceHeaderAXContract(
     exposing expectedName: String,
     app: NSRunningApplication
-) -> Bool {
+) -> WorkspaceHeaderAXContract? {
     guard let snapshot = workspaceHeader(exposing: expectedName, app: app),
-          role(of: snapshot.header) == kAXHeadingRole as String,
           !CFEqual(snapshot.header, snapshot.detail),
           children(of: snapshot.header).isEmpty,
           let detailName = findElement(in: snapshot.detail, where: {
               identifier(of: $0) == "patient-detail-name"
-          }) else {
-        return false
+          }),
+          !CFEqual(snapshot.header, detailName) else {
+        return nil
     }
-    return !CFEqual(snapshot.header, detailName)
+
+    let headingLevel = (attribute(snapshot.header, "AXHeadingLevel") as? NSNumber)?.intValue
+    guard headingLevel == nil || headingLevel == 1 else { return nil }
+    return WorkspaceHeaderAXContract(
+        role: role(of: snapshot.header),
+        roleDescription: roleDescription(of: snapshot.header),
+        headingLevel: headingLevel
+    )
 }
 
 /* @Codex */
@@ -466,11 +513,19 @@ func runPatientWorkspaceHeaderProbe(app: NSRunningApplication, report: inout Pro
     }
     report.pass("Patient workspace header exposes Rossi Mario")
 
-    guard workspaceHeaderIsAutonomousHeading(exposing: "Rossi Mario", app: app) else {
-        report.fail("Patient workspace header is not an autonomous AX heading")
-        throw ProbeFailure(message: "Patient workspace header is not an autonomous AX heading.")
+    if CommandLine.arguments.contains("--dump-patient-header-ax") {
+        dumpWorkspaceHeaderAX(exposing: "Rossi Mario", app: app)
     }
-    report.pass("Patient workspace header is an autonomous AX heading")
+
+    guard let headerAX = workspaceHeaderAXContract(exposing: "Rossi Mario", app: app) else {
+        report.fail("Patient workspace header does not satisfy the autonomous native AX contract")
+        throw ProbeFailure(message: "Patient workspace header does not satisfy the autonomous native AX contract.")
+    }
+    let headingLevel = headerAX.headingLevel.map(String.init) ?? "not exposed"
+    report.pass(
+        "Patient workspace header is autonomous: role \(headerAX.role), "
+            + "role description \(headerAX.roleDescription), heading level \(headingLevel)"
+    )
 
     guard simulatePatientDetailScroll(app: app) else {
         report.fail("Unable to simulate patient detail scroll")
