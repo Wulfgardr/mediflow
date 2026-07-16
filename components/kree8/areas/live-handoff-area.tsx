@@ -17,7 +17,8 @@ import type {
 import { PillBadge } from '../cockpit-shared';
 import type { AreaId, HandoffFeedback } from '../cockpit-shared';
 import type { Kree8Patient } from '@/lib/patient-workspace';
-import styles from '../kree8-clinical-cockpit.module.css';
+import styles from '../kree8-clinical-cockpit-foundation.module.css';
+import handoffStyles from '../kree8-clinical-cockpit-handoff.module.css';
 
 
 /* @Codex */

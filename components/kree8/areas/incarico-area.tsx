@@ -29,7 +29,8 @@ import type {
   Kree8PatientStatus,
 } from '../cockpit-shared';
 import type { InboxList, Kree8Patient } from '@/lib/patient-workspace';
-import styles from '../kree8-clinical-cockpit.module.css';
+import styles from '../kree8-clinical-cockpit-foundation.module.css';
+import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 
 
 /* ───────────────────────── Pazienti in carico ───────────────────────── */
@@ -108,10 +109,10 @@ function IncaricoArea({
       </header>
 
       <section className={styles.panel}>
-        <div className={styles.inboxScope}>
+        <div className={patientStyles.inboxScope}>
           <button
             type="button"
-            className={classNames(styles.scopeChip, scope === 'ambulatorio' && styles.scopeChipActive)}
+            className={classNames(patientStyles.scopeChip, scope === 'ambulatorio' && patientStyles.scopeChipActive)}
             onClick={() => setScope('ambulatorio')}
           >
             <MapPin size={12} />
@@ -124,7 +125,7 @@ function IncaricoArea({
             <>
               <button
                 type="button"
-                className={classNames(styles.scopeChip, scope === 'network' && styles.scopeChipActive)}
+                className={classNames(patientStyles.scopeChip, scope === 'network' && patientStyles.scopeChipActive)}
                 onClick={() => setScope('network')}
               >
                 <Cloud size={12} />
@@ -132,7 +133,7 @@ function IncaricoArea({
               </button>
               <button
                 type="button"
-                className={classNames(styles.scopeChip, scope === 'tutti' && styles.scopeChipActive)}
+                className={classNames(patientStyles.scopeChip, scope === 'tutti' && patientStyles.scopeChipActive)}
                 onClick={() => setScope('tutti')}
               >
                 <Users size={12} />
@@ -141,10 +142,10 @@ function IncaricoArea({
             </>
           ) : null}
 
-          <span className={styles.patientScopeActions}>
+          <span className={patientStyles.patientScopeActions}>
             <button
               type="button"
-              className={classNames(styles.scopeChip, list === 'attivi' && styles.scopeChipActive)}
+              className={classNames(patientStyles.scopeChip, list === 'attivi' && patientStyles.scopeChipActive)}
               onClick={() => setList('attivi')}
             >
               <Activity size={12} />
@@ -152,7 +153,7 @@ function IncaricoArea({
             </button>
             <button
               type="button"
-              className={classNames(styles.scopeChip, list === 'archivio' && styles.scopeChipActive)}
+              className={classNames(patientStyles.scopeChip, list === 'archivio' && patientStyles.scopeChipActive)}
               onClick={() => setList('archivio')}
             >
               <Archive size={12} />
@@ -160,8 +161,8 @@ function IncaricoArea({
             </button>
           </span>
         </div>
-        <div className={styles.patientSearchRow}>
-          <label className={styles.patientSearchField}>
+        <div className={patientStyles.patientSearchRow}>
+          <label className={patientStyles.patientSearchField}>
             <Search size={14} />
             <input
               ref={searchInputRef}
@@ -175,7 +176,7 @@ function IncaricoArea({
           {query ? (
             <button
               type="button"
-              className={styles.patientSearchClear}
+              className={patientStyles.patientSearchClear}
               onClick={() => {
                 setQuery('');
                 searchInputRef.current?.focus();
@@ -187,7 +188,7 @@ function IncaricoArea({
         </div>
       </section>
 
-      <div className={styles.inboxLayout}>
+      <div className={patientStyles.inboxLayout}>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>
@@ -235,14 +236,14 @@ function IncaricoArea({
                     const p = visible[virtualRow.index];
                     const isSelected = p.id === selected?.id;
                     const dotClass = p.status === 'warning'
-                      ? styles.patientDotWarning
-                      : styles.patientDotNeutral;
+                      ? patientStyles.patientDotWarning
+                      : patientStyles.patientDotNeutral;
                     return (
                       <div
                         key={p.id}
                         ref={patientRowVirtualizer.measureElement}
                         data-index={virtualRow.index}
-                        className={styles.patientRowWrap}
+                        className={patientStyles.patientRowWrap}
                         style={{
                           position: 'absolute',
                           top: 0,
@@ -254,30 +255,30 @@ function IncaricoArea({
                         <button
                           type="button"
                           className={classNames(
-                            styles.patientRow,
-                            isSelected && styles.patientRowSelected,
+                            patientStyles.patientRow,
+                            isSelected && patientStyles.patientRowSelected,
                           )}
                           onClick={() => onSelectPatient(p.id)}
                           aria-pressed={isSelected}
                         >
-                          <span className={classNames(styles.patientDot, dotClass)} />
+                          <span className={classNames(patientStyles.patientDot, dotClass)} />
                           <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-                            <span className={styles.patientName}>{p.name}</span>
-                            <span className={styles.patientCode}>{p.code} · {p.pathway}</span>
+                            <span className={patientStyles.patientName}>{p.name}</span>
+                            <span className={patientStyles.patientCode}>{p.code} · {p.pathway}</span>
                           </span>
                           {/* @Codex: dentro il button conserviamo il testo naturale;
                               i ruoli annidati sarebbero presentazionali e non una lista reale. */}
-                          <span className={styles.patientMeta}>
+                          <span className={patientStyles.patientMeta}>
                             {p.diagnoses.map((d) => (
-                              <span key={d} className={styles.patientDiagnosisPill}>
+                              <span key={d} className={patientStyles.patientDiagnosisPill}>
                                 <DiagnosisPill diagnosis={d} />
                               </span>
                             ))}
                           </span>
-                          <span className={classNames(styles.rowSub, styles.patientLastTouch)}>
+                          <span className={classNames(styles.rowSub, patientStyles.patientLastTouch)}>
                             {p.lastTouch}
                           </span>
-                          <span className={styles.patientStatusCell}>
+                          <span className={patientStyles.patientStatusCell}>
                             <PillBadge variant={p.status}>
                               {p.statusLabel}
                             </PillBadge>
@@ -285,7 +286,7 @@ function IncaricoArea({
                         </button>
                         <Link
                           href={p.modulesHref}
-                          className={styles.patientRowOpen}
+                          className={patientStyles.patientRowOpen}
                           aria-label={`Apri la scheda di ${p.name}`}
                           onClick={() => onSelectPatient(p.id)}
                         >
@@ -301,18 +302,18 @@ function IncaricoArea({
         </section>
 
         {selected ? (
-        <aside className={styles.caseLens} key={selected.id}>
+        <aside className={patientStyles.caseLens} key={selected.id}>
           <span className={styles.areaCaption}>Anteprima paziente</span>
-          <div className={styles.caseLensHero}>
-            <span className={styles.caseLensName}>{selected.name}</span>
-            <span className={styles.caseLensSub}>
+          <div className={patientStyles.caseLensHero}>
+            <span className={patientStyles.caseLensName}>{selected.name}</span>
+            <span className={patientStyles.caseLensSub}>
               {selected.ageLabel} · aggiornato {selected.lastTouch}
             </span>
           </div>
           {/* @Codex */}
           <ul aria-label={`Diagnosi e stato di ${selected.name}`} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {selected.diagnoses.map((d) => (
-              <li key={d} className={styles.patientDiagnosisPill}>
+              <li key={d} className={patientStyles.patientDiagnosisPill}>
                 <DiagnosisPill diagnosis={d} />
               </li>
             ))}
@@ -325,7 +326,7 @@ function IncaricoArea({
           <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.6 }}>
             {selected.summary}
           </p>
-          <div className={styles.caseLensActions}>
+          <div className={patientStyles.caseLensActions}>
             <Link href={selected.modulesHref} className={styles.primaryBtn}>
               <UserSquare2 size={13} />
               Apri scheda paziente
@@ -349,7 +350,7 @@ function IncaricoArea({
           </div>
         </aside>
         ) : (
-          <aside className={styles.caseLens}>
+          <aside className={patientStyles.caseLens}>
             <span className={styles.areaCaption}>Anteprima paziente</span>
             <p className={styles.rowSub} style={{ margin: 0, lineHeight: 1.6 }}>
               {normalizedQuery

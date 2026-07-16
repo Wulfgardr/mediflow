@@ -65,7 +65,7 @@ import type {
   Kree8PatientClientState,
   StatusFilter,
 } from './cockpit-shared';
-import styles from './kree8-clinical-cockpit.module.css';
+import styles from './kree8-clinical-cockpit-shell.module.css';
 
 export { AREA_ID_VALUES };
 export type { AreaId };

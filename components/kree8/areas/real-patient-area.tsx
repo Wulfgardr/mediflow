@@ -17,7 +17,8 @@ import {
 } from '../cockpit-shared';
 import type { AreaId } from '../cockpit-shared';
 import type { Kree8Patient, Kree8PatientWorkspace } from '@/lib/patient-workspace';
-import styles from '../kree8-clinical-cockpit.module.css';
+import styles from '../kree8-clinical-cockpit-foundation.module.css';
+import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 
 
 /* ───────────────────────── Scheda paziente ───────────────────────── */
@@ -68,7 +69,7 @@ function RealPatientArea({
               voci provengono dal contenuto visibile, non da aria-label. */}
           <ul className={styles.identityChips} aria-label="Diagnosi e stato del paziente">
             {patient.diagnoses.map((diagnosis) => (
-              <li key={diagnosis} className={styles.patientDiagnosisPill}>
+              <li key={diagnosis} className={patientStyles.patientDiagnosisPill}>
                 <DiagnosisPill diagnosis={diagnosis} />
               </li>
             ))}
@@ -83,7 +84,7 @@ function RealPatientArea({
 
         <div style={{ marginTop: 14 }}>
           <h2 className={styles.panelTitle}>Sintesi del caso</h2>
-          <div className={styles.insightBody}>
+          <div className={patientStyles.insightBody}>
             <p style={{ margin: 0 }}>{patient.summary}</p>
           </div>
         </div>
@@ -226,7 +227,7 @@ function RealPatientArea({
               )}
             </div>
 
-            <div className={styles.caseLensActions}>
+            <div className={patientStyles.caseLensActions}>
               <Link href={`${patient.modulesHref}#documenti`} className={styles.primaryBtn}>
                 <Sparkles size={13} />
                 Rivedi documenti

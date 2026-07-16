@@ -14,7 +14,7 @@ import {
 } from '../cockpit-shared';
 import type { AreaId } from '../cockpit-shared';
 import type { Kree8Patient, Kree8PatientWorkspace } from '@/lib/patient-workspace';
-import styles from '../kree8-clinical-cockpit.module.css';
+import styles from '../kree8-clinical-cockpit-foundation.module.css';
 
 
 /* @Codex */

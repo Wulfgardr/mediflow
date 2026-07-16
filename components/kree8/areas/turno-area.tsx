@@ -20,7 +20,7 @@ import type {
 } from '../cockpit-shared';
 import type { PillVariant } from '@/lib/patient-workspace';
 import { agendaFilterMatches } from '@/lib/ui-semantic-signal';
-import styles from '../kree8-clinical-cockpit.module.css';
+import styles from '../kree8-clinical-cockpit-foundation.module.css';
 
 
 const AI_QUEUE: Kree8DecisionCard[] = [

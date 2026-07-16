@@ -10,7 +10,7 @@ import {
 
 import { PillBadge } from '../cockpit-shared';
 import type { AreaId, Kree8DiaryClientState } from '../cockpit-shared';
-import styles from '../kree8-clinical-cockpit.module.css';
+import styles from '../kree8-clinical-cockpit-foundation.module.css';
 
 
 /* ───────────────────────── Diario clinico ───────────────────────── */
