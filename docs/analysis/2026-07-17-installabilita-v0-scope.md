@@ -147,7 +147,10 @@ Il launcher:
 - conserva i dati in `~/Library/Application Support/MediFlow` salvo override;
 - scrive PID e log locali fuori dal bundle;
 - non include token, chiavi, database o altri dati runtime nell'artefatto;
-- rifiuta una porta gia occupata da un processo non registrato dalla proof.
+- riusa un processo registrato solo se home e `/api/system/revision` rispondono
+  con stato `200` e revisione, source fingerprint e fingerprint coincidono con
+  l'identita incorporata nel bundle;
+- rifiuta una porta occupata da un servizio che non supera questi controlli.
 
 Il launcher non modifica il codice applicativo o i contratti dati. Il boundary
 host keyless del runtime resta quello esistente.
@@ -177,7 +180,10 @@ MEDIFLOW_INSTALL_SKIP_WEB_BUILD=1 ./scripts/build-installability-v0-macos.sh
 
 Il build fallisce se Node non e 24, se piattaforma o architettura non sono
 supportate, se manca `server.js`, se il contratto ABI non coincide o se
-`better-sqlite3` non si carica dal bundle standalone.
+`better-sqlite3` non si carica dal bundle standalone. Prima di rimuovere un
+bundle precedente, canonicalizza anche symlink e segmenti `..`: accetta solo
+una directory `tmp-*` figlia diretta della checkout o una directory
+`mediflow-installability-v0-*` figlia diretta di `TMPDIR`.
 
 ## Come provare
 
