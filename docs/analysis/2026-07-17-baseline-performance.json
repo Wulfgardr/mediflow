@@ -1,0 +1,540 @@
+{
+  "schemaVersion": "mediflow.list_route_performance_baseline.v1",
+  "measuredAt": "2026-07-17T13:28:50.625Z",
+  "git": {
+    "head": "7d9ce0f51e5851a3850d99fbb220c92b0be910f0",
+    "base": "d09c949a35b1326a7528bd6d24f4bc96bceaf845"
+  },
+  "environment": {
+    "node": "v24.18.0",
+    "platform": "darwin 27.0.0 arm64",
+    "hardwareModel": "Mac16,5",
+    "cpu": "Apple M4 Max",
+    "logicalCores": 14,
+    "memoryGiB": 36
+  },
+  "protocol": {
+    "server": "Next.js standalone production server",
+    "host": "127.0.0.1",
+    "port": 3113,
+    "measuredRuns": 7,
+    "warmupRunsExcludedPerRoute": 1,
+    "statistic": "median",
+    "seed": "mediflow-performance-2026-07-17",
+    "rowsPerPatient": {
+      "entries": 8,
+      "observations": 6,
+      "documents": 2
+    },
+    "documentRouteUsesMetadataOnly": true,
+    "clientCost": "JSON.parse + AES-256-GCM Node simulation for every ENC field"
+  },
+  "volumes": [
+    {
+      "patients": 200,
+      "routes": {
+        "patients": {
+          "path": "/api/patients",
+          "warmupRunsExcluded": 1,
+          "samples": [
+            {
+              "routeMs": 5.493,
+              "clientDecryptMs": 11.6,
+              "payloadBytes": 229581,
+              "records": 200,
+              "encryptedFields": 1200
+            },
+            {
+              "routeMs": 5.227,
+              "clientDecryptMs": 12.426,
+              "payloadBytes": 229581,
+              "records": 200,
+              "encryptedFields": 1200
+            },
+            {
+              "routeMs": 5.163,
+              "clientDecryptMs": 12.598,
+              "payloadBytes": 229581,
+              "records": 200,
+              "encryptedFields": 1200
+            },
+            {
+              "routeMs": 4.835,
+              "clientDecryptMs": 12.762,
+              "payloadBytes": 229581,
+              "records": 200,
+              "encryptedFields": 1200
+            },
+            {
+              "routeMs": 4.534,
+              "clientDecryptMs": 10.408,
+              "payloadBytes": 229581,
+              "records": 200,
+              "encryptedFields": 1200
+            },
+            {
+              "routeMs": 5.075,
+              "clientDecryptMs": 10.218,
+              "payloadBytes": 229581,
+              "records": 200,
+              "encryptedFields": 1200
+            },
+            {
+              "routeMs": 4.739,
+              "clientDecryptMs": 10.874,
+              "payloadBytes": 229581,
+              "records": 200,
+              "encryptedFields": 1200
+            }
+          ],
+          "median": {
+            "routeMs": 5.075,
+            "clientDecryptMs": 11.6,
+            "payloadBytes": 229581,
+            "records": 200,
+            "encryptedFields": 1200
+          }
+        },
+        "entries": {
+          "path": "/api/entries",
+          "warmupRunsExcluded": 1,
+          "samples": [
+            {
+              "routeMs": 10.529,
+              "clientDecryptMs": 41.596,
+              "payloadBytes": 1018401,
+              "records": 1600,
+              "encryptedFields": 4800
+            },
+            {
+              "routeMs": 9.057,
+              "clientDecryptMs": 47.98,
+              "payloadBytes": 1018401,
+              "records": 1600,
+              "encryptedFields": 4800
+            },
+            {
+              "routeMs": 9.284,
+              "clientDecryptMs": 48.3,
+              "payloadBytes": 1018401,
+              "records": 1600,
+              "encryptedFields": 4800
+            },
+            {
+              "routeMs": 8.039,
+              "clientDecryptMs": 44.404,
+              "payloadBytes": 1018401,
+              "records": 1600,
+              "encryptedFields": 4800
+            },
+            {
+              "routeMs": 9.44,
+              "clientDecryptMs": 49.535,
+              "payloadBytes": 1018401,
+              "records": 1600,
+              "encryptedFields": 4800
+            },
+            {
+              "routeMs": 9.333,
+              "clientDecryptMs": 48.083,
+              "payloadBytes": 1018401,
+              "records": 1600,
+              "encryptedFields": 4800
+            },
+            {
+              "routeMs": 8.942,
+              "clientDecryptMs": 47.495,
+              "payloadBytes": 1018401,
+              "records": 1600,
+              "encryptedFields": 4800
+            }
+          ],
+          "median": {
+            "routeMs": 9.284,
+            "clientDecryptMs": 47.98,
+            "payloadBytes": 1018401,
+            "records": 1600,
+            "encryptedFields": 4800
+          }
+        },
+        "observations": {
+          "path": "/api/observations",
+          "warmupRunsExcluded": 1,
+          "samples": [
+            {
+              "routeMs": 7.984,
+              "clientDecryptMs": 12.681,
+              "payloadBytes": 694941,
+              "records": 1200,
+              "encryptedFields": 1200
+            },
+            {
+              "routeMs": 7.397,
+              "clientDecryptMs": 13.103,
+              "payloadBytes": 694941,
+              "records": 1200,
+              "encryptedFields": 1200
+            },
+            {
+              "routeMs": 8.431,
+              "clientDecryptMs": 12.741,
+              "payloadBytes": 694941,
+              "records": 1200,
+              "encryptedFields": 1200
+            },
+            {
+              "routeMs": 8.349,
+              "clientDecryptMs": 12.364,
+              "payloadBytes": 694941,
+              "records": 1200,
+              "encryptedFields": 1200
+            },
+            {
+              "routeMs": 8.833,
+              "clientDecryptMs": 11.517,
+              "payloadBytes": 694941,
+              "records": 1200,
+              "encryptedFields": 1200
+            },
+            {
+              "routeMs": 8.205,
+              "clientDecryptMs": 13.086,
+              "payloadBytes": 694941,
+              "records": 1200,
+              "encryptedFields": 1200
+            },
+            {
+              "routeMs": 7.142,
+              "clientDecryptMs": 12.98,
+              "payloadBytes": 694941,
+              "records": 1200,
+              "encryptedFields": 1200
+            }
+          ],
+          "median": {
+            "routeMs": 8.205,
+            "clientDecryptMs": 12.741,
+            "payloadBytes": 694941,
+            "records": 1200,
+            "encryptedFields": 1200
+          }
+        },
+        "documents": {
+          "path": "/api/attachments?metadataOnly=true",
+          "warmupRunsExcluded": 1,
+          "samples": [
+            {
+              "routeMs": 4.756,
+              "clientDecryptMs": 13.133,
+              "payloadBytes": 350283,
+              "records": 400,
+              "encryptedFields": 1600
+            },
+            {
+              "routeMs": 4.46,
+              "clientDecryptMs": 14.69,
+              "payloadBytes": 350283,
+              "records": 400,
+              "encryptedFields": 1600
+            },
+            {
+              "routeMs": 4.701,
+              "clientDecryptMs": 16.024,
+              "payloadBytes": 350283,
+              "records": 400,
+              "encryptedFields": 1600
+            },
+            {
+              "routeMs": 4.765,
+              "clientDecryptMs": 16.231,
+              "payloadBytes": 350283,
+              "records": 400,
+              "encryptedFields": 1600
+            },
+            {
+              "routeMs": 3.47,
+              "clientDecryptMs": 16.19,
+              "payloadBytes": 350283,
+              "records": 400,
+              "encryptedFields": 1600
+            },
+            {
+              "routeMs": 4.737,
+              "clientDecryptMs": 16.095,
+              "payloadBytes": 350283,
+              "records": 400,
+              "encryptedFields": 1600
+            },
+            {
+              "routeMs": 4.794,
+              "clientDecryptMs": 16.267,
+              "payloadBytes": 350283,
+              "records": 400,
+              "encryptedFields": 1600
+            }
+          ],
+          "median": {
+            "routeMs": 4.737,
+            "clientDecryptMs": 16.095,
+            "payloadBytes": 350283,
+            "records": 400,
+            "encryptedFields": 1600
+          }
+        }
+      }
+    },
+    {
+      "patients": 2000,
+      "routes": {
+        "patients": {
+          "path": "/api/patients",
+          "warmupRunsExcluded": 1,
+          "samples": [
+            {
+              "routeMs": 20.958,
+              "clientDecryptMs": 108.833,
+              "payloadBytes": 2299401,
+              "records": 2000,
+              "encryptedFields": 12000
+            },
+            {
+              "routeMs": 17.356,
+              "clientDecryptMs": 123.876,
+              "payloadBytes": 2299401,
+              "records": 2000,
+              "encryptedFields": 12000
+            },
+            {
+              "routeMs": 17.591,
+              "clientDecryptMs": 118.78,
+              "payloadBytes": 2299401,
+              "records": 2000,
+              "encryptedFields": 12000
+            },
+            {
+              "routeMs": 16.169,
+              "clientDecryptMs": 118.689,
+              "payloadBytes": 2299401,
+              "records": 2000,
+              "encryptedFields": 12000
+            },
+            {
+              "routeMs": 16.435,
+              "clientDecryptMs": 118.548,
+              "payloadBytes": 2299401,
+              "records": 2000,
+              "encryptedFields": 12000
+            },
+            {
+              "routeMs": 15.823,
+              "clientDecryptMs": 119.273,
+              "payloadBytes": 2299401,
+              "records": 2000,
+              "encryptedFields": 12000
+            },
+            {
+              "routeMs": 15.626,
+              "clientDecryptMs": 118.996,
+              "payloadBytes": 2299401,
+              "records": 2000,
+              "encryptedFields": 12000
+            }
+          ],
+          "median": {
+            "routeMs": 16.435,
+            "clientDecryptMs": 118.78,
+            "payloadBytes": 2299401,
+            "records": 2000,
+            "encryptedFields": 12000
+          }
+        },
+        "entries": {
+          "path": "/api/entries",
+          "warmupRunsExcluded": 1,
+          "samples": [
+            {
+              "routeMs": 67.823,
+              "clientDecryptMs": 437.562,
+              "payloadBytes": 10184001,
+              "records": 16000,
+              "encryptedFields": 48000
+            },
+            {
+              "routeMs": 71.283,
+              "clientDecryptMs": 481.323,
+              "payloadBytes": 10184001,
+              "records": 16000,
+              "encryptedFields": 48000
+            },
+            {
+              "routeMs": 70.075,
+              "clientDecryptMs": 435.388,
+              "payloadBytes": 10184001,
+              "records": 16000,
+              "encryptedFields": 48000
+            },
+            {
+              "routeMs": 66.328,
+              "clientDecryptMs": 434.44,
+              "payloadBytes": 10184001,
+              "records": 16000,
+              "encryptedFields": 48000
+            },
+            {
+              "routeMs": 65.37,
+              "clientDecryptMs": 431.195,
+              "payloadBytes": 10184001,
+              "records": 16000,
+              "encryptedFields": 48000
+            },
+            {
+              "routeMs": 65.547,
+              "clientDecryptMs": 436.633,
+              "payloadBytes": 10184001,
+              "records": 16000,
+              "encryptedFields": 48000
+            },
+            {
+              "routeMs": 65.164,
+              "clientDecryptMs": 457.862,
+              "payloadBytes": 10184001,
+              "records": 16000,
+              "encryptedFields": 48000
+            }
+          ],
+          "median": {
+            "routeMs": 66.328,
+            "clientDecryptMs": 436.633,
+            "payloadBytes": 10184001,
+            "records": 16000,
+            "encryptedFields": 48000
+          }
+        },
+        "observations": {
+          "path": "/api/observations",
+          "warmupRunsExcluded": 1,
+          "samples": [
+            {
+              "routeMs": 58.84,
+              "clientDecryptMs": 139.454,
+              "payloadBytes": 6949941,
+              "records": 12000,
+              "encryptedFields": 12000
+            },
+            {
+              "routeMs": 57.014,
+              "clientDecryptMs": 128.773,
+              "payloadBytes": 6949941,
+              "records": 12000,
+              "encryptedFields": 12000
+            },
+            {
+              "routeMs": 56.714,
+              "clientDecryptMs": 118.424,
+              "payloadBytes": 6949941,
+              "records": 12000,
+              "encryptedFields": 12000
+            },
+            {
+              "routeMs": 55.907,
+              "clientDecryptMs": 135.707,
+              "payloadBytes": 6949941,
+              "records": 12000,
+              "encryptedFields": 12000
+            },
+            {
+              "routeMs": 57.204,
+              "clientDecryptMs": 135.597,
+              "payloadBytes": 6949941,
+              "records": 12000,
+              "encryptedFields": 12000
+            },
+            {
+              "routeMs": 56.423,
+              "clientDecryptMs": 131.246,
+              "payloadBytes": 6949941,
+              "records": 12000,
+              "encryptedFields": 12000
+            },
+            {
+              "routeMs": 61.421,
+              "clientDecryptMs": 138.344,
+              "payloadBytes": 6949941,
+              "records": 12000,
+              "encryptedFields": 12000
+            }
+          ],
+          "median": {
+            "routeMs": 57.014,
+            "clientDecryptMs": 135.597,
+            "payloadBytes": 6949941,
+            "records": 12000,
+            "encryptedFields": 12000
+          }
+        },
+        "documents": {
+          "path": "/api/attachments?metadataOnly=true",
+          "warmupRunsExcluded": 1,
+          "samples": [
+            {
+              "routeMs": 26.221,
+              "clientDecryptMs": 161.109,
+              "payloadBytes": 3497020,
+              "records": 4000,
+              "encryptedFields": 16000
+            },
+            {
+              "routeMs": 21.596,
+              "clientDecryptMs": 161.275,
+              "payloadBytes": 3497020,
+              "records": 4000,
+              "encryptedFields": 16000
+            },
+            {
+              "routeMs": 21.195,
+              "clientDecryptMs": 160.692,
+              "payloadBytes": 3497020,
+              "records": 4000,
+              "encryptedFields": 16000
+            },
+            {
+              "routeMs": 21.087,
+              "clientDecryptMs": 160.828,
+              "payloadBytes": 3497020,
+              "records": 4000,
+              "encryptedFields": 16000
+            },
+            {
+              "routeMs": 21.523,
+              "clientDecryptMs": 172.426,
+              "payloadBytes": 3497020,
+              "records": 4000,
+              "encryptedFields": 16000
+            },
+            {
+              "routeMs": 23.945,
+              "clientDecryptMs": 183.648,
+              "payloadBytes": 3497020,
+              "records": 4000,
+              "encryptedFields": 16000
+            },
+            {
+              "routeMs": 21.142,
+              "clientDecryptMs": 183.524,
+              "payloadBytes": 3497020,
+              "records": 4000,
+              "encryptedFields": 16000
+            }
+          ],
+          "median": {
+            "routeMs": 21.523,
+            "clientDecryptMs": 161.275,
+            "payloadBytes": 3497020,
+            "records": 4000,
+            "encryptedFields": 16000
+          }
+        }
+      }
+    }
+  ]
+}
