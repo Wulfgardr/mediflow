@@ -351,6 +351,14 @@ Endpoint principali:
 - `app/api/v1/drugs/route.ts`
 - `app/api/v1/exemptions/route.ts`
 
+Il catalogo farmaci AIFA viene caricato dalla web UI in
+`Impostazioni -> Sicurezza e Dati -> Repertori` a partire da un CSV locale.
+L'import salva nello stesso database SQLite le righe indicizzate e un manifest
+di provenienza con fonte, URL, data di scarico, versione, nome file, conteggio e
+hash SHA-256. Il file sorgente non viene copiato nel repository. La ricerca web
+e il canale Apple interrogano il server per prefisso con un limite, senza
+scaricare il catalogo completo nel client.
+
 Tipi condivisi:
 - `lib/api/v1/types.ts`
 
@@ -563,10 +571,18 @@ compaiono solo come health diagnostico read-only se gia attivi su localhost; non
 vengono installati, avviati o arrestati dalla app.
 
 La scheda `Impostazioni -> Cataloghi` della shell macOS espone la minima
-operabilita amministrativa dei dataset condivisi: count/stato, import JSON e
-clear per farmaci ed esenzioni. Le operazioni passano dal backend locale
-(`drugs` via `/api/v1`, esenzioni via route locale token-aware) e non creano
-storage cataloghi parallelo nell'app nativa.
+operabilita amministrativa dei dataset condivisi: count/stato, import JSON
+compatibile e clear per farmaci ed esenzioni. Un import farmaci da questo
+percorso legacy non dispone dell'artifact sorgente e invalida quindi il manifest
+AIFA, mostrando il catalogo come non verificato. L'import AIFA con provenienza
+avviene dalla web UI. Le operazioni non creano storage cataloghi parallelo
+nell'app nativa.
+
+I form terapia Apple interrogano gia
+`GET /api/v1/network/drugs?q=<prefisso>&limit=<N>` tramite la capability
+`network.catalogs.readonly`. Il contratto restituisce al massimo 50 righe con
+la shape `DrugSummary`; non trasferisce il dataset e non abilita import o clear
+dal client paired.
 
 I form terapia nativi usano lo stesso contratto `/api/v1/patients/{id}/therapies*`
 della web UI: farmaco AIFA o manuale/galenico, AIC/ATC quando disponibili,

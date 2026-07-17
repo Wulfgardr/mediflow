@@ -703,7 +703,10 @@ paths:
         host `/api/v1/drugs` read route. This paired route requires the
         `network.catalogs.readonly` capability plus a valid paired client
         credential and operator session cookie. Drug catalog data is global
-        reference data and is not filtered by ambulatory scope.
+        reference data and is not filtered by ambulatory scope. When `q` is
+        present, the home-base performs a normalized prefix search against
+        name, active principle, and AIC. The catalog remains local to the
+        home-base and the response is bounded.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -712,7 +715,7 @@ paths:
         - name: q
           in: query
           required: false
-          description: Optional case-insensitive search over drug name, active principle, or AIC.
+          description: Optional accent-insensitive prefix search over drug name, active principle, or AIC.
           schema:
             type: string
         - name: limit
@@ -722,7 +725,7 @@ paths:
           schema:
             type: integer
             minimum: 1
-            maximum: 500
+            maximum: 50
         - name: count
           in: query
           required: false

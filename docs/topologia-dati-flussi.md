@@ -374,7 +374,29 @@ Nota aggiuntiva: se una fonte e solo referral/follow-up senza novita clinica e
 una diagnosi o terapia e gia presente, il suggerimento viene soppresso per
 ridurre rumore operativo.
 
-### 4.7 Modalita `network-home-base` -> paired client read/write limitato
+### 4.7 File AIFA locale -> catalogo indicizzato con provenienza
+
+```mermaid
+sequenceDiagram
+    participant Admin as Amministratore web
+    participant API as /api/drugs
+    participant Import as AIFA importer
+    participant DB as SQLite
+    participant Client as Web o Apple paired
+    Admin->>API: CSV locale + URL + data + versione
+    API->>Import: Valida, calcola SHA-256 e normalizza
+    Import->>DB: Sostituzione atomica righe + manifest
+    Client->>API: Ricerca per prefisso + limite
+    API->>DB: Query su nome/principio attivo/AIC indicizzati
+    DB-->>Client: Top N DrugSummary
+```
+
+Il file sorgente resta locale e non viene aggiunto a Git. Il manifest salva la
+provenienza e l'hash dell'artifact importato. Il canale paired espone solo la
+lettura del catalogo tramite `network.catalogs.readonly`; non accetta dataset
+remoti e non trasferisce il catalogo completo.
+
+### 4.8 Modalita `network-home-base` -> paired client read/write limitato
 
 ```mermaid
 sequenceDiagram
