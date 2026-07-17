@@ -7,8 +7,10 @@ read_when:
 
 # Installabilita v0: scope e proof macOS
 
-Data: 2026-07-17  
-Issue: `WUL-455`  
+Data: 2026-07-17
+
+Issue: `WUL-455`
+
 Stato: `SECONDARY`, proof consegnata su macOS arm64
 
 ## Decisione
@@ -289,4 +291,3 @@ Dimensioni osservate con `du -sh`:
 
 Questi punti bloccano la promozione a installer distribuibile, non la validita
 della proof locale macOS richiesta da `WUL-455`.
-

@@ -84,4 +84,3 @@ done
 kill "$SERVER_PID" 2>/dev/null || true
 rm -f "$PID_FILE"
 fail "timeout in attesa del server; vedere $LOG_FILE"
-
