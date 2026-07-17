@@ -38,6 +38,9 @@ done
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROBE_PATH="$SCRIPT_DIR/native-click-map-probe.swift"
 readonly APP_EXECUTABLE="$APP_PATH/Contents/MacOS/MediFlow"
+readonly PGREP_BIN="${MEDIFLOW_NATIVE_PROBE_PGREP_BIN:-/usr/bin/pgrep}"
+readonly PKILL_BIN="${MEDIFLOW_NATIVE_PROBE_PKILL_BIN:-/usr/bin/pkill}"
+readonly XCRUN_BIN="${MEDIFLOW_NATIVE_PROBE_XCRUN_BIN:-/usr/bin/xcrun}"
 
 if [[ ! -x "$APP_EXECUTABLE" ]]; then
     printf 'MediFlow executable not found: %s\n' "$APP_EXECUTABLE" >&2
@@ -49,31 +52,25 @@ if [[ ! -f "$PROBE_PATH" ]]; then
     exit 2
 fi
 
-/usr/bin/pkill -x MediFlow >/dev/null 2>&1 || true
+"$PKILL_BIN" -x MediFlow >/dev/null 2>&1 || true
 for _ in {1..50}; do
-    if ! /usr/bin/pgrep -x MediFlow >/dev/null 2>&1; then
+    if ! "$PGREP_BIN" -x MediFlow >/dev/null 2>&1; then
         break
     fi
     sleep 0.1
 done
 
-if /usr/bin/pgrep -x MediFlow >/dev/null 2>&1; then
+if "$PGREP_BIN" -x MediFlow >/dev/null 2>&1; then
     printf 'Unable to stop the previous MediFlow process.\n' >&2
     exit 1
 fi
 
-# Stato ermetico: i defaults persistiti (frame degli split, sezione attiva)
-# possono mascherare gli identifier della shell clinica nell'albero AX.
-defaults delete com.mediflow.mobile >/dev/null 2>&1 || true
-
-MEDIFLOW_APPLE_UITEST_PATIENTS=1 \
-    "$APP_EXECUTABLE" -ApplePersistenceIgnoreState YES >/dev/null 2>&1 &
-readonly APP_PID=$!
+APP_PID=""
 
 cleanup() {
     local status=$?
     trap - EXIT INT TERM
-    if kill -0 "$APP_PID" >/dev/null 2>&1; then
+    if [[ -n "$APP_PID" ]] && kill -0 "$APP_PID" >/dev/null 2>&1; then
         kill "$APP_PID" >/dev/null 2>&1 || true
         wait "$APP_PID" >/dev/null 2>&1 || true
     fi
@@ -83,8 +80,22 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
+# Stato ermetico senza mutare il dominio defaults dell'operatore. La fixture
+# DEBUG evita gia store paired e cache reali; gli override di lancio fissano la
+# sezione e l'aspetto nel dominio volatile degli argomenti, mentre AppKit ignora
+# il ripristino persistito della finestra.
+MEDIFLOW_APPLE_UITEST_PATIENTS=1 \
+MEDIFLOW_APPLE_INITIAL_SECTION=patients \
+    "$APP_EXECUTABLE" \
+    -ApplePersistenceIgnoreState YES \
+    -mediflow.apple.appearance.theme system \
+    -mediflow.apple.appearance.reduce-motion false \
+    -mediflow.apple.privacy.shield-enabled false \
+    >/dev/null 2>&1 &
+APP_PID=$!
+
 printf 'Waiting for MediFlow AX readiness...\n'
-xcrun swift -e '
+"$XCRUN_BIN" swift -e '
 import AppKit
 import ApplicationServices
 import Foundation
@@ -132,4 +143,4 @@ exit(1)
 ' "$APP_PID"
 
 printf 'Running native click-map probe...\n'
-xcrun swift "$PROBE_PATH" --app-path "$APP_PATH"
+"$XCRUN_BIN" swift "$PROBE_PATH" --app-path "$APP_PATH"

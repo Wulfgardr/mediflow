@@ -300,9 +300,10 @@ test.describe.serial('Diario globale Lume', () => {
     expect(new Set(metaFamilies)).toEqual(new Set([registerFamily]));
     await assertContrastAndFocus(page, entries, 'giorno');
 
-    await page.getByRole('button', { name: 'Apri quadro', exact: true }).first().focus();
+    const firstEntry = entries.first();
+    await firstEntry.getByRole('button', { name: 'Apri quadro', exact: true }).focus();
     await page.keyboard.press('Tab');
-    await expect(entries.first()).toBeFocused();
+    await expect(firstEntry.getByRole('link', { name: 'Nuova voce', exact: true })).toBeFocused();
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const motion = await page.evaluate(() => {

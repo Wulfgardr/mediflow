@@ -146,7 +146,11 @@ function ProgressLine({ label, value, total }: { label: string; value: number; t
     const percentage = percent(value, total);
     return (
         <div className={styles.progressTrack} role="img" aria-label={`${label}: ${value}, ${percentage}%`}>
-            <span className={styles.progressFill} style={{ width: `${percentage}%` }} />
+            <span
+                className={styles.progressFill}
+                data-testid="analytics-progress-fill"
+                style={{ width: `${percentage}%` }}
+            />
         </div>
     );
 }

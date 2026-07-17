@@ -90,6 +90,8 @@ const ATTENTION_STATES: ReadonlySet<ReviewQueueRowState> = new Set([
 
 const OPEN_PANEL_LABEL = 'Apri pannello';
 const PANEL_UNAVAILABLE_LABEL = 'Pannello non visibile';
+/* @Codex */
+const DOCUMENTS_PANEL_ANCHOR = '#documenti';
 
 function row(
     id: ReviewQueueRowId,
@@ -111,7 +113,7 @@ function row(
 }
 
 function buildInsightRow(input: PatientReviewQueueInput['insight']): PatientReviewQueueRow {
-    const anchor = '#insight';
+    const anchor = DOCUMENTS_PANEL_ANCHOR;
 
     if (!input.enabled) {
         return row(
@@ -169,7 +171,7 @@ function buildInsightRow(input: PatientReviewQueueInput['insight']): PatientRevi
 }
 
 function buildEvidenceRow(evidence: ReviewQueueEvidenceItem[]): PatientReviewQueueRow {
-    const anchor = '#documenti';
+    const anchor = DOCUMENTS_PANEL_ANCHOR;
     const total = evidence.length;
 
     if (total === 0) {
@@ -217,7 +219,7 @@ function buildEvidenceRow(evidence: ReviewQueueEvidenceItem[]): PatientReviewQue
 }
 
 function buildSmartImportRow(input: PatientReviewQueueInput['smartImport']): PatientReviewQueueRow {
-    const anchor = '#smart-import';
+    const anchor = DOCUMENTS_PANEL_ANCHOR;
 
     if (input.sourceCount === 0) {
         return row(
@@ -297,7 +299,7 @@ function buildSmartImportRow(input: PatientReviewQueueInput['smartImport']): Pat
 }
 
 function buildArchiveRow(input: PatientReviewQueueInput['archive']): PatientReviewQueueRow {
-    const anchor = '#archivio';
+    const anchor = DOCUMENTS_PANEL_ANCHOR;
 
     if (input.attachmentsCount === 0) {
         return row(

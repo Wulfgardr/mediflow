@@ -160,6 +160,11 @@ async function verifyAnalytics(page: Page, viewCase: ViewCase): Promise<void> {
 
   await expectRegisterFont(page.locator('[data-lume-register-value="true"]'), 8);
   await expectNoSemanticSideBorders(page, '[data-testid="analytics-focus-surface"], #indicatori, #eta, #diagnosi, #audit');
+  const progressTransitionDurations = await page.getByTestId('analytics-progress-fill').evaluateAll((elements) =>
+    elements.map((element) => getComputedStyle(element).transitionDuration),
+  );
+  expect(progressTransitionDurations.length).toBeGreaterThan(0);
+  expect(new Set(progressTransitionDurations)).toEqual(new Set(['0s']));
 
   await setRange(page, 'Età minima', 120);
   await setRange(page, 'Età massima', 120);
@@ -213,6 +218,7 @@ async function verifySettings(page: Page, viewCase: ViewCase): Promise<void> {
 
   const networkValue = page.getByTestId('settings-network-mode-value');
   const networkAction = page.getByTestId('settings-network-mode-action');
+  expect((await networkAction.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
   await expect(networkValue).toHaveText('Locale');
   await networkAction.click();
   await expect(networkValue).toHaveText('Rete disponibile');
