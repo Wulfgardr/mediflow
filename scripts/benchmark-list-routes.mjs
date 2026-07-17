@@ -29,7 +29,8 @@ function parseArgs(argv) {
     runs: 7,
     port: 3113,
     out: path.join(ROOT_DIR, 'docs/analysis/2026-07-17-baseline-performance.json'),
-    dataRoot: path.join(ROOT_DIR, 'tmp-performance-baseline-data'),
+    // Keep the absolute path below the macOS Unix-socket limit used by PM2.
+    dataRoot: path.join(ROOT_DIR, 'tmp-perf'),
     distDir: '.next-performance-baseline',
     skipBuild: false,
   };
@@ -251,7 +252,7 @@ async function main() {
   fs.mkdirSync(args.dataRoot, { recursive: true });
   const seeded = [];
   for (const patients of args.volumes) {
-    const dataDir = path.join(args.dataRoot, `patients-${patients}`);
+    const dataDir = path.join(args.dataRoot, `p${patients}`);
     await seedVolume(dataDir, patients);
     seeded.push({ patients, dataDir });
   }
