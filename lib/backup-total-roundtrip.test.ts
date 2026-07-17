@@ -101,8 +101,8 @@ async function populateSyntheticClinicalFixture(db: Database.Database): Promise<
         monitoring_profile: 'synthetic-monitoring', is_adi: 1, is_archived: 1, deleted_at: now - 10, version: 7,
         ambulatory_id: 'w7-amb-primary', created_at: now, updated_at: now + 2,
     });
-    insertRow(db, MEMBERSHIP_TABLE, { patient_id: 'w7-patient', ambulatory_id: 'w7-amb-primary', assigned_at: now + 2 });
-    insertRow(db, MEMBERSHIP_TABLE, { patient_id: 'w7-patient', ambulatory_id: 'w7-amb-secondary', assigned_at: now + 2 });
+    insertRow(db, MEMBERSHIP_TABLE, { patient_id: 'w7-patient', ambulatory_id: 'w7-amb-primary', assigned_at: now + 24 });
+    insertRow(db, MEMBERSHIP_TABLE, { patient_id: 'w7-patient', ambulatory_id: 'w7-amb-secondary', assigned_at: now + 25 });
     insertRow(db, 'entries', {
         id: 'w7-entry', patient_id: 'w7-patient', type: 'note', date: now + 3,
         ...(await sealed('entries', ['title', 'content', 'metadata', 'attachments', 'deletion_reason'])),

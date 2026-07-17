@@ -74,6 +74,31 @@ function buildAssignedAmbulatoryIds(
 }
 
 /* @Codex */
+function buildAssignedAmbulatoryMemberships(
+    patient: Record<string, unknown>,
+    rows: PatientAmbulatoryLinkRow[],
+): Array<{ ambulatoryId: string; assignedAt: Date | null }> {
+    const memberships = new Map<string, Date | null>();
+    for (const row of rows) {
+        if (row.patientId === patient.id && row.ambulatoryId.trim().length > 0) {
+            memberships.set(row.ambulatoryId, row.assignedAt);
+        }
+    }
+
+    if (typeof patient.ambulatoryId === 'string' && patient.ambulatoryId.trim().length > 0 && !memberships.has(patient.ambulatoryId)) {
+        const fallback = patient.updatedAt instanceof Date
+            ? patient.updatedAt
+            : patient.createdAt instanceof Date
+                ? patient.createdAt
+                : null;
+        memberships.set(patient.ambulatoryId, fallback);
+    }
+
+    return Array.from(memberships, ([ambulatoryId, assignedAt]) => ({ ambulatoryId, assignedAt }))
+        .sort((left, right) => left.ambulatoryId.localeCompare(right.ambulatoryId));
+}
+
+/* @Codex */
 function filterRowsByReference<T extends Record<string, unknown>>(
     rows: T[],
     foreignKey: 'patientId' | 'conversationId',
@@ -109,8 +134,9 @@ function buildBackupDataset(): BackupDataset {
     const normalizedPatientAmbulatoryRows = sortBackupRows(patientAmbulatoryRows);
     const enrichedPatients = patientsRows.map((patient) => {
         const assignedAmbulatoryIds = buildAssignedAmbulatoryIds(patient, normalizedPatientAmbulatoryRows);
+        const assignedAmbulatoryMemberships = buildAssignedAmbulatoryMemberships(patient, normalizedPatientAmbulatoryRows);
         return assignedAmbulatoryIds.length > 0
-            ? { ...patient, assignedAmbulatoryIds }
+            ? { ...patient, assignedAmbulatoryIds, assignedAmbulatoryMemberships }
             : patient;
     });
     const patientIds = new Set(

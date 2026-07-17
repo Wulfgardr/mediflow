@@ -56,6 +56,10 @@ Adottiamo l'opzione 3.
   `assignedAmbulatoryIds` per preservare le assegnazioni secondarie
   many-to-many senza introdurre una collezione top-level separata nel formato
   v1.
+- I nuovi artifact possono includere anche `assignedAmbulatoryMemberships`,
+  metadato opzionale e retrocompatibile che conserva `ambulatoryId` e
+  `assignedAt` di ogni relazione. Il restore usa questo valore quando presente
+  e mantiene `assignedAmbulatoryIds` come fallback per gli artifact precedenti.
 - Il restore esegue un preflight server-side: format, versione, scope,
   checksum, counts e riferimenti interni devono essere coerenti prima di
   cancellare o reinserire i record.

@@ -36,9 +36,9 @@ test('scheduled backup roundtrip restores both ambulatory memberships for one pa
             sourceDb.prepare('INSERT INTO patients (id, first_name, last_name, tax_code, ambulatory_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
                 .run('roundtrip-patient', 'Synthetic', 'Membership', 'SYNTHETIC-ONLY', primaryAmbulatoryId, 1_700_000_000, 1_700_000_000);
             sourceDb.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id, assigned_at) VALUES (?, ?, ?)')
-                .run('roundtrip-patient', primaryAmbulatoryId, 1_700_000_000);
+                .run('roundtrip-patient', primaryAmbulatoryId, 1_700_000_100);
             sourceDb.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id, assigned_at) VALUES (?, ?, ?)')
-                .run('roundtrip-patient', 'roundtrip-amb-secondary', 1_700_000_000);
+                .run('roundtrip-patient', 'roundtrip-amb-secondary', 1_700_000_200);
         } finally {
             sourceDb.close();
         }
@@ -60,6 +60,10 @@ test('scheduled backup roundtrip restores both ambulatory memberships for one pa
         const artifact = await parseBackupArtifact(JSON.parse(fs.readFileSync(runnerResult.artifactPath, 'utf8')));
         const patient = artifact.payload.patients.find((row) => row.id === 'roundtrip-patient');
         assert.deepEqual(patient?.assignedAmbulatoryIds, [primaryAmbulatoryId, 'roundtrip-amb-secondary'].sort());
+        assert.deepEqual(patient?.assignedAmbulatoryMemberships, [
+            { ambulatoryId: primaryAmbulatoryId, assignedAt: '2023-11-14T22:15:00.000Z' },
+            { ambulatoryId: 'roundtrip-amb-secondary', assignedAt: '2023-11-14T22:16:40.000Z' },
+        ].sort((left, right) => left.ambulatoryId.localeCompare(right.ambulatoryId)));
 
         const targetDb = new Database(path.join(targetDataDir, 'medical.db'));
         try {
@@ -93,8 +97,11 @@ test('scheduled backup roundtrip restores both ambulatory memberships for one pa
                 }
             })();
 
-            const restored = targetDb.prepare('SELECT ambulatory_id FROM patients_to_ambulatories WHERE patient_id = ? ORDER BY ambulatory_id').all('roundtrip-patient') as Array<{ ambulatory_id: string }>;
-            assert.deepEqual(restored.map((row) => row.ambulatory_id), [primaryAmbulatoryId, 'roundtrip-amb-secondary'].sort());
+            const restored = targetDb.prepare('SELECT ambulatory_id, assigned_at FROM patients_to_ambulatories WHERE patient_id = ? ORDER BY ambulatory_id').all('roundtrip-patient') as Array<{ ambulatory_id: string; assigned_at: number }>;
+            assert.deepEqual(restored, [
+                { ambulatory_id: primaryAmbulatoryId, assigned_at: 1_700_000_100 },
+                { ambulatory_id: 'roundtrip-amb-secondary', assigned_at: 1_700_000_200 },
+            ].sort((left, right) => left.ambulatory_id.localeCompare(right.ambulatory_id)));
         } finally {
             targetDb.close();
         }
