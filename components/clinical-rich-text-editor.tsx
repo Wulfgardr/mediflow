@@ -124,10 +124,10 @@ export function ClinicalRichTextEditor({
             data-lume-editor-work-in-progress="true"
             data-testid="lume-clinical-editor"
             className={cn(
-                'min-w-0 max-w-full overflow-hidden rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-focal)] transition-[border-color,box-shadow] duration-[var(--lume-dur-riga)] ease-[var(--lume-ease)]',
+                'min-w-0 max-w-full overflow-hidden rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-focal)] transition-[border-color] duration-[var(--lume-dur-riga)] ease-[var(--lume-ease)]',
                 isFocused
-                    ? 'border-[color:var(--lume-accent)] shadow-none'
-                    : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] shadow-none',
+                    ? 'border-[color:var(--lume-accent)]'
+                    : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)]',
                 className,
             )}
         >
@@ -196,7 +196,7 @@ export function ClinicalRichTextEditor({
                 data-lume-editor-surface="canvas"
                 className={cn(
                     'min-w-0 max-w-full bg-[color:var(--lume-surface-focal)] px-5 py-4',
-                    isFocused ? 'shadow-[var(--lume-focus-ring)]' : 'shadow-none',
+                    isFocused && 'shadow-[var(--lume-focus-ring)]',
                 )}
             >
                 <div

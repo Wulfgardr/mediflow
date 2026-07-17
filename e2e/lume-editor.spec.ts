@@ -88,8 +88,6 @@ async function assertEditorComposition(page: Page, viewCase: ViewCase): Promise<
   const field = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
 
   await expect(workflow).toBeVisible();
-  await expect(page.locator('[data-lume-elevated="true"]')).toHaveCount(1);
-  await expect(workflow.locator('.lume-panel')).toHaveCount(0);
   await expect(workflow.locator('[data-lume-primary="true"]')).toHaveCount(1);
   await expect(editor.locator(':scope > [data-lume-editor-surface]')).toHaveCount(2);
   await expect(toolbar).toBeVisible();
@@ -128,6 +126,26 @@ async function assertEditorComposition(page: Page, viewCase: ViewCase): Promise<
   await field.focus();
   await expect(field).toBeFocused();
   await expect(canvas).not.toHaveCSS('box-shadow', 'none');
+  const expectedSurfaceSelector = '[data-lume-editor-surface="canvas"]';
+  const shadowOwners = await workflow.evaluate((context, selector) => {
+    const expected = context.querySelector<HTMLElement>(selector);
+
+    return [context, ...context.querySelectorAll<HTMLElement>('*')]
+      .filter((element) => getComputedStyle(element).boxShadow !== 'none')
+      .map((element) => ({
+        expected: element === expected,
+        shadow: getComputedStyle(element).boxShadow,
+        surface: element.getAttribute('data-lume-editor-surface'),
+        tag: element.tagName.toLowerCase(),
+      }));
+  }, expectedSurfaceSelector);
+
+  expect(shadowOwners).toHaveLength(1);
+  expect(shadowOwners[0]).toMatchObject({
+    expected: true,
+    surface: 'canvas',
+    tag: 'div',
+  });
 
   if (viewCase.viewport === 'narrow') {
     await toolbar.scrollIntoViewIfNeeded();
