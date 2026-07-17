@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import {
+    AIFA_CATALOG_DEFAULT_SOURCE_URL,
     AIFA_CATALOG_SOURCE,
     AIFA_REUSE_TERMS_URL,
     buildAifaCatalogManifest,
@@ -46,7 +47,7 @@ test('normalizes accents and rejects missing required AIFA headers', () => {
 
 test('builds and validates the persisted provenance manifest', () => {
     const input = validateAifaManifestInput({
-        sourceUrl: 'https://www.aifa.gov.it/open-data',
+        sourceUrl: AIFA_CATALOG_DEFAULT_SOURCE_URL,
         downloadedAt: '2026-07-17',
         version: 'confezioni-2026-07-16',
     });
@@ -63,7 +64,7 @@ test('builds and validates the persisted provenance manifest', () => {
     assert.deepEqual(parseStoredAifaCatalogManifest(JSON.stringify(manifest)), manifest);
     assert.equal(parseStoredAifaCatalogManifest('{"format":"unknown"}'), null);
     assert.throws(() => validateAifaManifestInput({
-        sourceUrl: 'https://www.aifa.gov.it/open-data',
+        sourceUrl: AIFA_CATALOG_DEFAULT_SOURCE_URL,
         downloadedAt: '2026-02-31',
         version: 'invalid-date',
     }), /Data di scarico/);
