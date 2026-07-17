@@ -14,11 +14,9 @@ import type {
   SissPatientContextAction,
   SissPatientContextHandoffResult,
 } from '@/lib/siss-patient-context-shared';
-import { PillBadge } from '../cockpit-shared';
 import type { AreaId, HandoffFeedback } from '../cockpit-shared';
 import type { Kree8Patient } from '@/lib/patient-workspace';
-import styles from '../kree8-clinical-cockpit-foundation.module.css';
-import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
+import styles from '../kree8-clinical-cockpit-handoff.module.css';
 
 
 /* @Codex */
@@ -150,115 +148,134 @@ function LiveHandoffArea({
     }
   };
 
+  const reason = patient
+    ? fiscalCodeReady
+      ? 'Il profilo ha il codice fiscale necessario per preparare il passaggio ufficiale.'
+      : 'Il codice fiscale manca o non è valido: il Prescrittivo Regionale resta bloccato.'
+    : 'Nessun paziente è selezionato nel cockpit.';
+
   return (
-    <div className={styles.areaShell}>
-      <header className={styles.areaHeader}>
-        <div>
-          <p className={styles.areaCaption}>Portali regionali (SISS)</p>
-          <h1 className={styles.areaTitle}>
-            Preparazione SISS <em>· contesto paziente e diario</em>
-          </h1>
-          <p className={styles.areaSubtitle}>
-            {patient
-              ? `Contesto aperto su ${patient.name}.`
-              : 'Seleziona un paziente prima di preparare un passaggio verso i portali regionali.'}
-          </p>
-        </div>
-        <div className={styles.headerActions}>
-          <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('incarico')}>
-            <Inbox size={12} />
-            Scegli paziente
-          </button>
-          {patient ? (
-            <button
-              type="button"
-              className={styles.primaryBtn}
-              disabled={activeAction === 'prescription.create' || !fiscalCodeReady}
-              onClick={() => void startHandoff('prescription.create')}
-            >
-              <Workflow size={13} />
-              {!fiscalCodeReady
-                ? 'CF richiesto'
-                : activeAction === 'prescription.create'
-                  ? 'Apertura…'
-                  : 'Apri Prescrittivo Regionale (PRREG)'}
-            </button>
-          ) : null}
-        </div>
+    <div className={styles.area} data-testid="lume-handoff-area">
+      <header className={styles.header}>
+        <p className={styles.caption}>Handoff regionale</p>
+        <h1 className={styles.title}>Preparazione SISS con responsabilità esplicita</h1>
+        <p className={styles.subtitle}>
+          {patient
+            ? `Un solo passaggio assistito per ${patient.name}, senza invio o writeback automatico.`
+            : 'Seleziona un paziente prima di preparare il passaggio verso i portali regionali.'}
+        </p>
       </header>
 
-      <div className={styles.threeCol}>
-        {[
-          { title: 'Identità e consenso', sub: patient ? `${patient.code} · ${patient.ageLabel}` : 'paziente non selezionato', pill: fiscalCodeReady ? 'pronto' : 'attesa', variant: fiscalCodeReady ? 'success' as const : 'neutral' as const },
-          { title: 'Azione regionale', sub: 'prepara portale ufficiale e contesto paziente', pill: 'assistita', variant: 'plum' as const },
-          { title: 'Esito', sub: 'registra risultato e prossima azione in diario', pill: 'diario', variant: 'plum' as const },
-        ].map((item) => (
-          <section key={item.title} className={styles.panel}>
-            <header className={styles.panelHeader}>
-              <h2 className={styles.panelTitle}>{item.title}</h2>
-              <PillBadge variant={item.variant}>{item.pill}</PillBadge>
-            </header>
-            <p className={styles.panelSubtitle}>{item.sub}</p>
-          </section>
-        ))}
-      </div>
-
-      <section className={styles.panelInset}>
-        <header className={styles.panelHeader}>
-          <h2 className={styles.panelTitle}>Azioni rapide</h2>
-          <PillBadge variant="neutral">in MediFlow</PillBadge>
-        </header>
-        <div className={patientStyles.caseLensActions} style={{ marginTop: 12 }}>
-          <Link href="/settings/repertori" className={styles.ghostBtnSm}>
-            <Database size={12} />
-            Gestisci repertori
-          </Link>
-          {patient ? (
-            <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('scheda')}>
-              <UserSquare2 size={12} />
-              Quadro paziente
-            </button>
-          ) : (
-            <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('incarico')}>
-              <UserSquare2 size={12} />
-              Scegli paziente
-            </button>
-          )}
-          {patient ? (
-            <Link href={`${patient.href}/entries/new`} className={styles.ghostBtnSm}>
-              <Plus size={12} />
-              Nota esito
-            </Link>
-          ) : null}
+      <section
+        className={styles.caseFlow}
+        aria-labelledby="lume-handoff-case-title"
+        data-lume-case="handoff"
+        data-testid="lume-handoff-case"
+      >
+        <div className={styles.section}>
+          <p className={styles.sectionLabel}>Evidenza</p>
+          <h2 id="lume-handoff-case-title" className={styles.sectionHeading}>
+            {patient?.name ?? 'Caso non selezionato'}
+          </h2>
+          <p className={styles.register} data-lume-register="true">
+            Provenienza: profilo locale · Stato: {fiscalCodeReady ? 'CF pronto' : 'CF richiesto'}
+          </p>
+          <ul className={styles.evidenceList} aria-label="Prerequisiti handoff">
+            <li className={styles.evidenceRow}>
+              <span className={styles.evidenceKey}>Identità</span>
+              <span className={styles.evidenceValue}>
+                {patient ? `${patient.code} · ${patient.ageLabel}` : 'Paziente non selezionato'}
+              </span>
+            </li>
+            <li className={styles.evidenceRow}>
+              <span className={styles.evidenceKey}>Canale</span>
+              <span className={styles.evidenceValue}>Portale regionale ufficiale, apertura assistita</span>
+            </li>
+          </ul>
         </div>
-        {feedback ? (
-          <div className={styles.compositeCard} style={{ marginTop: 12 }}>
-            <header className={styles.panelHeader}>
-              <span className={styles.evidenceTitle}>
+
+        <div className={styles.section}>
+          <p className={styles.sectionLabel}>Decisione</p>
+          <h3 className={styles.sectionHeading}>
+            {fiscalCodeReady ? 'Preparare il Prescrittivo Regionale' : 'Non aprire il portale finché manca il CF'}
+          </h3>
+          <p className={styles.sectionCopy}>
+            MediFlow prepara il contesto e registra l&apos;apertura. Prescrizione, conferma e invio restano nel portale ufficiale.
+          </p>
+        </div>
+
+        <div className={styles.section}>
+          <p className={styles.sectionLabel}>Prossimo passo</p>
+          <dl className={styles.decisionGrid}>
+            <div>
+              <dt className={styles.decisionTerm}>Proprietario</dt>
+              <dd className={styles.decisionValue}>Medico in sessione</dd>
+            </div>
+            <div>
+              <dt className={styles.decisionTerm}>Motivo</dt>
+              <dd className={styles.decisionValue}>{reason}</dd>
+            </div>
+          </dl>
+          <div className={styles.actions}>
+            <Link href="/settings/repertori" className={styles.quietAction}>
+              <Database size={12} aria-hidden="true" />
+              Gestisci repertori
+            </Link>
+            {patient ? (
+              <>
+                <button type="button" className={styles.quietAction} onClick={() => onOpenArea('scheda')}>
+                  <UserSquare2 size={12} aria-hidden="true" />
+                  Quadro paziente
+                </button>
+                <Link href={`${patient.href}/entries/new`} className={styles.quietAction}>
+                  <Plus size={12} aria-hidden="true" />
+                  Nota esito
+                </Link>
+              </>
+            ) : null}
+            {patient ? (
+              <button
+                type="button"
+                className={styles.primaryAction}
+                data-lume-primary="true"
+                disabled={activeAction === 'prescription.create' || !fiscalCodeReady}
+                onClick={() => void startHandoff('prescription.create')}
+              >
+                <Workflow size={13} aria-hidden="true" />
+                {!fiscalCodeReady
+                  ? 'CF richiesto'
+                  : activeAction === 'prescription.create'
+                    ? 'Apertura...'
+                    : 'Apri Prescrittivo Regionale (PRREG)'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={styles.primaryAction}
+                data-lume-primary="true"
+                onClick={() => onOpenArea('incarico')}
+              >
+                <Inbox size={13} aria-hidden="true" />
+                Scegli paziente
+              </button>
+            )}
+          </div>
+          {feedback ? (
+            <div className={styles.feedback} role="status">
+              <p className={styles.feedbackTitle}>
                 {feedback.kind === 'success'
                   ? 'Portale aperto'
                   : feedback.kind === 'warning'
                     ? 'Passaggio da completare'
                     : 'Portale non avviato'}
-              </span>
-              <PillBadge
-                variant={
-                  feedback.kind === 'success'
-                    ? 'success'
-                    : feedback.kind === 'warning'
-                      ? 'warning'
-                      : 'critical'
-                }
-              >
-                esito SISS
-              </PillBadge>
-            </header>
-            <p className={styles.rowSub} style={{ margin: 0 }}>
-              {feedback.message}
-              {feedback.correlationId ? ` · ${feedback.correlationId}` : ''}
-            </p>
-          </div>
-        ) : null}
+              </p>
+              <p className={styles.feedbackMessage}>
+                {feedback.message}
+                {feedback.correlationId ? ` · ${feedback.correlationId}` : ''}
+              </p>
+            </div>
+          ) : null}
+        </div>
       </section>
     </div>
   );
