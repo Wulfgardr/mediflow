@@ -36,6 +36,10 @@ case "$APP" in
   *) fail "output non sicuro: $APP" ;;
 esac
 
+# @Codex: il bundle precedente contiene file TypeScript tracciati da Next. Va
+# rimosso prima della nuova build, altrimenti entra nel perimetro del typecheck.
+rm -rf "$APP"
+
 echo "[installabilita-v0] Verifica contratto Node e better-sqlite3"
 (cd "$ROOT_DIR" && "$NODE_BINARY" scripts/node-runtime-contract.mjs verify)
 
@@ -48,7 +52,6 @@ fi
 (cd "$ROOT_DIR" && "$NODE_BINARY" scripts/check-standalone-runtime-bundle.mjs)
 
 echo "[installabilita-v0] Assemblaggio $APP"
-rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/Node/bin" "$APP/Contents/Resources/WebRuntime/.next"
 
 cp "$LAUNCHER_SOURCE" "$APP/Contents/MacOS/MediFlow"
@@ -104,4 +107,3 @@ echo "[installabilita-v0] COMPLETATO"
 echo "Artefatto: $APP"
 echo "Runtime: $($APP/Contents/Resources/Node/bin/node --version), $NODE_PLATFORM/$NODE_ARCH"
 du -sh "$APP"
-
