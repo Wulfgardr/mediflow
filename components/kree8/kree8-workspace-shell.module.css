@@ -13,29 +13,29 @@
   /* Lume: due soli livelli di inchiostro; subtle confluisce nell'attenuato
      misurato (>= 4,5:1 su ogni superficie). */
   --k8-subtle: var(--lume-ink-muted);
-  --k8-line: rgba(15, 23, 42, 0.05);
-  --k8-line-strong: rgba(15, 23, 42, 0.08);
+  --k8-line: color-mix(in srgb, var(--lume-ink) 5%, transparent);
+  --k8-line-strong: color-mix(in srgb, var(--lume-ink) 10%, transparent);
   /* Lume: bordo dei controlli interattivi (WCAG 1.4.11) dall'alias misurato
      ink-muted, mai un separatore a bassa opacita. */
   --k8-control-border: var(--lume-ink-muted);
   --k8-chrome-bg: var(--lume-surface-chrome);
   --k8-control-bg: var(--lume-surface-field);
   --k8-chip-bg: var(--lume-surface-canvas);
-  --k8-pill-success-bg: #dcfce7;
-  --k8-pill-success-fg: #166534;
-  --k8-pill-info-bg: #dbeafe;
-  --k8-pill-info-fg: #1e3a8a;
-  --k8-pill-warning-bg: #fef3c7;
-  --k8-pill-warning-fg: #92400e;
-  --k8-pill-critical-bg: #ffe2dd;
-  --k8-pill-critical-fg: #9a3412;
+  --k8-pill-success-bg: color-mix(in srgb, var(--lume-signal-success) 12%, var(--lume-surface-field));
+  --k8-pill-success-fg: color-mix(in srgb, var(--lume-signal-success) 64%, var(--lume-ink));
+  --k8-pill-info-bg: color-mix(in srgb, var(--lume-accent) 10%, var(--lume-surface-field));
+  --k8-pill-info-fg: var(--lume-accent);
+  --k8-pill-warning-bg: color-mix(in srgb, var(--lume-signal-warning) 12%, var(--lume-surface-field));
+  --k8-pill-warning-fg: color-mix(in srgb, var(--lume-signal-warning) 64%, var(--lume-ink));
+  --k8-pill-critical-bg: color-mix(in srgb, var(--lume-signal-critical) 12%, var(--lume-surface-field));
+  --k8-pill-critical-fg: color-mix(in srgb, var(--lume-signal-critical) 66%, var(--lume-ink));
   --k8-primary-bg: var(--lume-ink);
-  --k8-primary-fg: #ffffff;
+  --k8-primary-fg: var(--lume-surface-focal);
   /* Lume: accento minerale interattivo (ed e anche il filo, quando un contenuto
      interno segna il fuoco clinico, e ora anche l'anello di focus del guscio). */
   --k8-accent: var(--lume-accent);
-  --k8-accent-soft: rgba(15, 23, 42, 0.07);
-  --k8-accent-line: rgba(15, 23, 42, 0.18);
+  --k8-accent-soft: color-mix(in srgb, var(--lume-accent) 7%, transparent);
+  --k8-accent-line: color-mix(in srgb, var(--lume-accent) 24%, transparent);
   /* Lume a11y (WCAG 1.4.11): focus + --lume-focus-ring leggono l'accento minerale
      (>= 7.5:1 su field, non piu lo slate ~2.14:1); si ribaltano via --lume-accent. */
   --k8-focus: var(--lume-accent);
@@ -43,7 +43,7 @@
   /* Lume: profondita semantica = bordo 1px neutro, nessuna ombra decorativa ne lucido di vetro; l'unica ombra corta
      sollevata vive sul solo fuoco clinico ([data-lume-focus]), mai sulla struttura. */
   --k8-focal: var(--lume-surface-focal);
-  --k8-focal-shadow: 0 2px 8px rgba(15, 23, 42, 0.10);
+  --k8-focal-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -56,22 +56,7 @@
 }
 
 :global(html.dark) .shell {
-  /* Lume grafite: surfaces / ink / accent / primary (e ora il focus, via --lume-accent) flip through the active aliases;
-     only the non-alias tokens (neutral lines, clinical pills, primary foreground) need a dark override. */
-  --k8-line: rgba(226, 232, 240, 0.10);
-  --k8-line-strong: rgba(226, 232, 240, 0.16);
-  --k8-pill-success-bg: rgba(74, 222, 128, 0.16);
-  --k8-pill-success-fg: #bbf7d0;
-  --k8-pill-info-bg: rgba(96, 165, 250, 0.18);
-  --k8-pill-info-fg: #bfdbfe;
-  --k8-pill-warning-bg: rgba(251, 191, 36, 0.16);
-  --k8-pill-warning-fg: #fde68a;
-  --k8-pill-critical-bg: rgba(248, 113, 113, 0.16);
-  --k8-pill-critical-fg: #fecaca;
-  --k8-primary-fg: #020617;
-  --k8-accent-soft: rgba(148, 163, 184, 0.16);
-  --k8-accent-line: rgba(203, 213, 225, 0.28);
-  --k8-focal-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  --k8-focal-shadow: 0 2px 8px color-mix(in srgb, var(--lume-surface-chrome) 72%, transparent);
 }
 
 .canvas {
@@ -92,7 +77,7 @@
 .canvas::-webkit-scrollbar-thumb {
   border: 3px solid var(--k8-canvas);
   border-radius: 999px;
-  background: rgba(100, 116, 139, 0.36);
+  background: color-mix(in srgb, var(--lume-ink-muted) 36%, transparent);
 }
 
 .chrome {
@@ -192,6 +177,95 @@
   color: var(--k8-subtle);
   font-size: 11px;
 }
+
+/* @Codex LUME-104/68: testata sticky e una sola elevazione clinica. */
+.clinicalShell { --lume-scheda-registro-family: "IBM Plex Mono", var(--font-registro), "SF Mono", monospace; padding: 10px; }
+.clinicalShell :global(.lume-registro) { font-family: var(--lume-scheda-registro-family); font-variant-numeric: tabular-nums; }
+.clinicalCanvas { --k8-canvas-pad: 12px; gap: 10px; overflow-x: hidden; }
+.clinicalChrome { top: calc(-1 * var(--k8-canvas-pad)); z-index: 30; gap: 8px; border-color: var(--k8-line-strong); border-radius: 14px; }
+.clinicalIdentity { min-width: 0; padding: 0 2px 2px; }
+.clinicalLabel,
+.sectionLabel { margin: 0; color: var(--lume-ink-muted); font-size: 10px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; }
+.clinicalName { margin: 2px 0 0; color: var(--lume-ink); font-size: 20px; font-weight: 640; letter-spacing: -0.02em; line-height: 1.2; overflow-wrap: anywhere; }
+.clinicalAtoms { margin: 4px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 5px 10px; color: var(--lume-ink-muted); font-size: 12px; }
+.clinicalAtomGroup { min-width: 0; display: inline-flex; align-items: center; gap: 10px; }
+.clinicalDot { opacity: 0.45; }
+.clinicalBody { width: min(100%, 1180px); align-self: center; }
+.clinicalSurface { --lume-shadow-focal: none; min-width: 0; overflow: clip; display: flex; flex-direction: column; background: var(--lume-surface-focal); border: 1px solid var(--k8-line-strong); border-radius: 20px; box-shadow: var(--k8-focal-shadow); }
+.clinicalStack { min-width: 0; display: flex; flex-direction: column; }
+.attentionBand,
+.synoptic,
+.clinicalSection { min-width: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.attentionBand { padding: 20px; background: color-mix(in srgb, var(--lume-signal-warning) 4%, var(--lume-surface-focal)); }
+.attentionHead,
+.sectionHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.sectionTitle { margin: 3px 0 0; color: var(--lume-ink); font-size: 18px; font-weight: 620; line-height: 1.3; text-wrap: balance; }
+.sectionCopy,
+.mutedText { margin: 5px 0 0; color: var(--lume-ink-muted); font-size: 12px; line-height: 1.55; }
+.attentionContent { margin-top: 14px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(248px, 0.42fr); gap: 18px; }
+.attentionList { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.attentionRow { min-width: 0; display: grid; grid-template-columns: 9px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 9px 0; border-bottom: 1px solid var(--k8-line); }
+.attentionRow:last-child { border-bottom: 0; }
+.clinicalShell .attentionBand :global([data-testid^="review-queue-row-"]) { padding: 10px 0; border: 0; border-bottom: 1px solid var(--k8-line); border-radius: 0; background: transparent; }
+.clinicalShell .attentionBand :global([data-testid^="review-queue-row-"] [class*="rounded-full"]) { padding: 0; border: 0; border-radius: 0; background: transparent; }
+.attentionMarker { width: 8px; height: 8px; margin-top: 5px; border-radius: 999px; background: var(--lume-signal-warning); }
+.attentionTitle { margin: 0; color: var(--lume-ink); font-size: 13px; font-weight: 560; }
+.attentionNote { margin: 2px 0 0; color: var(--lume-ink-muted); font-size: 11px; line-height: 1.45; }
+.attentionAction,
+.quietAction,
+.primaryAction { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 10px; font: inherit; font-size: 12px; font-weight: 570; text-decoration: none; cursor: pointer; transition: background-color var(--lume-dur-riga) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease); }
+.attentionAction,
+.quietAction { border: 1px solid var(--lume-ink-muted); background: var(--lume-surface-focal); color: var(--lume-ink); }
+.primaryAction { width: 100%; border: 1px solid var(--lume-ink); background: var(--lume-ink); color: var(--lume-surface-focal); }
+.attentionAction:active,
+.quietAction:active,
+.primaryAction:active { transform: scale(0.97); }
+.actionsDock { min-width: 0; align-self: start; }
+.quietActions { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+.quietAction { flex: 1 1 92px; padding: 6px 10px; }
+.clinicalSection,
+.synoptic { padding: 18px 20px; border-top: 1px solid var(--k8-line-strong); }
+.clinicalSection > button { padding: 0 !important; }
+.clinicalSection > div { padding: 16px 0 0 !important; }
+.clinicalShell .clinicalSurface :global(.apple-chip),
+.clinicalShell .clinicalSurface :global(.graphite-chip) { border: 0 !important; border-radius: 0 !important; background: transparent !important; font-family: var(--lume-scheda-registro-family); }
+.emptyState { margin: 10px 0 0; color: var(--lume-ink-muted); font-size: 12px; line-height: 1.55; }
+.evidenceList,
+.followupList { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.followupRow { padding: 9px 0; border-bottom: 1px solid var(--k8-line); }
+.followupRow:last-child { border-bottom: 0; }
+.followupHeader { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.followupDate { flex: none; color: var(--lume-ink-muted); font-size: 11px; }
+.rowLink { display: inline-block; margin-top: 8px; color: var(--lume-ink-muted); font-size: 12px; font-weight: 560; }
+.synopticLink { border-radius: 8px; }
+.synopticLink:hover { background: color-mix(in srgb, var(--lume-accent) 5%, transparent); }
+.synopticCode { color: var(--lume-ink-muted); font-size: 12px; }
+
+/* I consumer storici perdono card, ombre e blur, non i bordi dei controlli. */
+.clinicalShell .clinicalSurface :global(.patient-detail-section),
+.clinicalShell .clinicalSurface :global(.patient-detail-side-section),
+.clinicalShell .clinicalSurface :global(.patient-actions-dock),
+.clinicalShell .clinicalSurface :global(.patient-identity-lens),
+.clinicalShell .clinicalSurface :global(.patient-ai-insight-panel),
+.clinicalShell .clinicalSurface :global(.lume-card),
+.clinicalShell .clinicalSurface :global(.lume-panel),
+.clinicalShell .clinicalSurface :global(.mf-section),
+.clinicalShell .clinicalSurface :global(.apple-subsection),
+.clinicalShell .clinicalSurface :global(.evidence-stack-tile) { background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; backdrop-filter: none !important; }
+.clinicalShell .clinicalSurface :global(.patient-identity-lens) { min-height: 0 !important; padding: 0 !important; }
+.clinicalShell .clinicalSurface :global(.patient-identity-lens::after) { display: none !important; }
+/* @Codex LUME-104/68: gli stati vuoto/disabilitato dell'insight contengono un
+   ornamento e una CTA con vecchie ombre esplicite, non governate dal token
+   neutralizzato sulla Scheda. Nessuno dei due e una superficie elevata. */
+.clinicalShell .clinicalSurface :global(.patient-ai-insight-panel > div > :first-child),
+.clinicalShell .clinicalSurface :global(.patient-ai-insight-panel > div > a),
+.clinicalShell .clinicalSurface :global(.patient-ai-insight-panel > div > button) { box-shadow: none !important; }
+.clinicalShell .clinicalSurface :global(.patient-quick-context-card),
+.clinicalShell .clinicalSurface :global(.patient-diagnosis-card),
+.clinicalShell .clinicalSurface :global(.identity-lens-pane),
+.clinicalShell .clinicalSurface :global(.graphite-block),
+.clinicalShell .clinicalSurface :global(.apple-list-row),
+.clinicalShell .clinicalSurface :global(.graphite-row) { background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
 
 .backButton,
 .sectionLink {
@@ -521,4 +595,23 @@
   .backButton { max-width: 100%; flex: 1 1 auto; justify-content: center; }
   .title { font-size: 18px; }
   .patientLabel { font-size: 12px; }
+  .clinicalShell { padding: 0; }
+  .clinicalCanvas { --k8-canvas-pad: 8px; border: 0; border-radius: 0; }
+  .clinicalChrome { border-radius: 10px; }
+  .clinicalSurface { border-radius: 14px; }
+  .clinicalName { font-size: 18px; }
+  .attentionBand,
+  .clinicalSection,
+  .synoptic { padding: 16px; }
+  .attentionContent { grid-template-columns: minmax(0, 1fr); }
+  .attentionRow { grid-template-columns: 9px minmax(0, 1fr); }
+  .attentionAction { grid-column: 2; justify-self: start; }
+  .sectionRail { max-width: 100%; }
+  .followupHeader { align-items: flex-start; flex-direction: column; gap: 3px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clinicalSurface *,
+  .clinicalSurface *::before,
+  .clinicalSurface *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }

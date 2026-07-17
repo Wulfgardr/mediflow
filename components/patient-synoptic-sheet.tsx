@@ -13,8 +13,8 @@
 import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import PrivacyBlur from '@/components/privacy-blur';
-import type { Diagnosis, Patient } from '@/lib/db';
+import type { Diagnosis } from '@/lib/db';
+import styles from '@/components/kree8/kree8-workspace-shell.module.css';
 
 export interface SynopticTherapyLine {
     id: string;
@@ -46,8 +46,6 @@ export interface SynopticSignal {
 }
 
 export interface PatientSynopticSheetProps {
-    patient: Patient;
-    ageLabel: string;
     leadDiagnosis?: Diagnosis;
     otherProblemsCount: number;
     signals: SynopticSignal[];
@@ -58,7 +56,6 @@ export interface PatientSynopticSheetProps {
     latestMeasure?: SynopticMeasure | null;
     nextCheckupLabel?: string;
     nextCheckupTitle?: string;
-    actions: ReactNode;
 }
 
 const SIGNAL_TONE: Record<NonNullable<SynopticSignal['tone']>, string> = {
@@ -88,8 +85,6 @@ function MicroLabel({ children }: { children: ReactNode }) {
 }
 
 export function PatientSynopticSheet({
-    patient,
-    ageLabel,
     leadDiagnosis,
     otherProblemsCount,
     signals,
@@ -98,39 +93,25 @@ export function PatientSynopticSheet({
     latestMeasure,
     nextCheckupLabel,
     nextCheckupTitle,
-    actions,
 }: PatientSynopticSheetProps) {
     const visibleTherapies = therapies ? therapies.slice(0, THERAPY_CAP) : [];
     const extraTherapies = therapiesTotal !== undefined ? therapiesTotal - visibleTherapies.length : 0;
 
     return (
-        <section aria-labelledby="synoptic-name" className="patient-detail-section border p-5 md:p-6">
-            {/* A. Identita compatta */}
-            <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div className="min-w-0">
-                    <h2 id="synoptic-name" className="text-[17px] font-semibold leading-tight text-[color:var(--lume-ink)]">
-                        <PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur>
-                    </h2>
-                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-[color:var(--lume-ink-muted)]">
-                        {patient.taxCode ? (
-                            <PrivacyBlur intensity="sm"><span className="font-mono uppercase">{patient.taxCode}</span></PrivacyBlur>
-                        ) : null}
-                        <span>{ageLabel}</span>
-                        {patient.isArchived ? <span className="text-[color:var(--lume-ink-muted)]">· Archiviato</span> : null}
-                    </p>
-                </div>
-                <div className="shrink-0">{actions}</div>
-            </header>
+        <section id="quadro" aria-labelledby="synoptic-title" className={styles.synoptic}>
+            <div className="mb-4">
+                <p className={styles.sectionLabel}>Quadro clinico</p>
+                <h2 id="synoptic-title" className={styles.sectionTitle}>Baseline e dati verificabili</h2>
+            </div>
 
-            <hr className="my-4 border-0 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_8%,transparent)]" />
-
-            {/* B. Problema guida (prima diagnosi di qualunque sistema) */}
+            {/* Problema guida (prima diagnosi di qualunque sistema) */}
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     <MicroLabel>Problema guida</MicroLabel>
                     {leadDiagnosis ? (
                         <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
-                            <span className="patient-code-pill patient-code-pill-plum shrink-0">{leadDiagnosis.code}</span>
+                            <span className={`${styles.synopticCode} lume-registro shrink-0`} data-testid="lume-register-value">{leadDiagnosis.code}</span>
+                            <span aria-hidden="true">·</span>
                             <span className="text-[15px] font-semibold leading-6 text-[color:var(--lume-ink)]">{leadDiagnosis.description}</span>
                             <span className="text-[11px] uppercase tracking-wide text-[color:var(--lume-ink-muted)]">{leadDiagnosis.system}</span>
                         </div>
@@ -150,7 +131,7 @@ export function PatientSynopticSheet({
                         const body = (
                             <>
                                 <span className="block text-[11px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">{signal.label}</span>
-                                <span className={`mt-0.5 block text-[18px] font-semibold leading-none tabular-nums ${SIGNAL_TONE[signal.tone ?? 'neutral']}`}>
+                                <span className={`lume-registro mt-0.5 block text-[18px] font-semibold leading-none ${SIGNAL_TONE[signal.tone ?? 'neutral']}`} data-testid="lume-register-value">
                                     {signal.value}
                                 </span>
                             </>
@@ -159,7 +140,7 @@ export function PatientSynopticSheet({
                             <a
                                 key={signal.label}
                                 href={signal.href}
-                                className="rounded-[10px] px-1 py-0.5 transition-colors hover:bg-[color:rgba(15,23,42,0.04)] focus-visible:outline-2 focus-visible:outline-offset-2 dark:hover:bg-white/5"
+                                className={`${styles.synopticLink} px-1 py-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2`}
                             >
                                 {body}
                             </a>
@@ -177,7 +158,7 @@ export function PatientSynopticSheet({
                 <div className="min-w-0">
                     <a href="#terapie" className="mf-listrow !px-1 !py-0.5 justify-between">
                         <MicroLabel>Terapie attive</MicroLabel>
-                        <span className="text-[11px] text-[color:var(--lume-ink-muted)]">{therapiesTotal ?? '–'}</span>
+                        <span className="lume-registro text-[11px] text-[color:var(--lume-ink-muted)]" data-testid="lume-register-value">{therapiesTotal ?? '–'}</span>
                     </a>
                     {therapies === undefined ? (
                         <div className="mt-2"><SkeletonLines rows={3} /></div>
@@ -189,7 +170,7 @@ export function PatientSynopticSheet({
                                 <li key={therapy.id} className="flex items-baseline justify-between gap-3 py-1">
                                     <span className="min-w-0 truncate text-[13px] font-medium text-[color:var(--lume-ink)]">{therapy.drugName}</span>
                                     {therapy.dosage ? (
-                                        <span className="shrink-0 text-[12px] text-[color:var(--lume-ink-muted)]">{therapy.dosage}</span>
+                                        <span className="lume-registro shrink-0 text-[12px] text-[color:var(--lume-ink-muted)]" data-testid="lume-register-value">{therapy.dosage}</span>
                                     ) : null}
                                 </li>
                             ))}
@@ -217,7 +198,7 @@ export function PatientSynopticSheet({
                         ) : (
                             <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
                                 <span className="text-[13px] text-[color:var(--lume-ink)]">{latestMeasure.display}</span>
-                                <span className={`text-[15px] font-semibold tabular-nums ${latestMeasure.outOfRange ? 'text-[color:var(--lume-signal-critical)]' : 'text-[color:var(--lume-ink)]'}`}>
+                                <span className={`lume-registro text-[15px] font-semibold ${latestMeasure.outOfRange ? 'text-[color:var(--lume-signal-critical)]' : 'text-[color:var(--lume-ink)]'}`} data-testid="lume-register-value">
                                     {latestMeasure.valueLabel}
                                 </span>
                                 {latestMeasure.delta ? (
@@ -229,13 +210,13 @@ export function PatientSynopticSheet({
                                         ) : (
                                             <Minus className="h-3.5 w-3.5" aria-label="stabile" />
                                         )}
-                                        <span className="tabular-nums">{latestMeasure.delta.label}</span>
+                                        <span className="lume-registro" data-testid="lume-register-value">{latestMeasure.delta.label}</span>
                                         {latestMeasure.delta.sinceLabel ? (
-                                            <span className="text-[color:var(--lume-ink-muted)]">{latestMeasure.delta.sinceLabel}</span>
+                                            <span className="lume-registro text-[color:var(--lume-ink-muted)]" data-testid="lume-register-value">{latestMeasure.delta.sinceLabel}</span>
                                         ) : null}
                                     </span>
                                 ) : null}
-                                <span className="text-[11px] text-[color:var(--lume-ink-muted)]">{latestMeasure.dateLabel}</span>
+                                <span className="lume-registro text-[11px] text-[color:var(--lume-ink-muted)]" data-testid="lume-register-value">{latestMeasure.dateLabel}</span>
                             </div>
                         )}
                     </div>
@@ -246,7 +227,7 @@ export function PatientSynopticSheet({
                         </a>
                         {nextCheckupLabel ? (
                             <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
-                                <span className="text-[13px] font-semibold text-[color:var(--lume-signal-warning)]">{nextCheckupLabel}</span>
+                                <span className="lume-registro text-[13px] font-semibold text-[color:var(--lume-signal-warning)]" data-testid="lume-register-value">{nextCheckupLabel}</span>
                                 {nextCheckupTitle ? <span className="min-w-0 truncate text-[12px] text-[color:var(--lume-ink-muted)]">{nextCheckupTitle}</span> : null}
                             </div>
                         ) : (
