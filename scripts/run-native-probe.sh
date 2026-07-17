@@ -62,6 +62,10 @@ if /usr/bin/pgrep -x MediFlow >/dev/null 2>&1; then
     exit 1
 fi
 
+# Stato ermetico: i defaults persistiti (frame degli split, sezione attiva)
+# possono mascherare gli identifier della shell clinica nell'albero AX.
+defaults delete com.mediflow.mobile >/dev/null 2>&1 || true
+
 MEDIFLOW_APPLE_UITEST_PATIENTS=1 \
     "$APP_EXECUTABLE" -ApplePersistenceIgnoreState YES >/dev/null 2>&1 &
 readonly APP_PID=$!
