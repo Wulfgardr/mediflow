@@ -1,17 +1,15 @@
 'use client';
 
-// WUL-297: grouped sidebar for the settings information architecture.
-// Below lg the full nav collapses into a compact disclosure bar (current
-// section + accordion) so sub-route content stays above the fold.
-
-import { useEffect, useState } from 'react';
+import { ChevronDown, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronDown, Search } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 import { SETTINGS_NAV_GROUPS } from '@/lib/settings-navigation';
 import type { SettingsNavGroup, SettingsNavItem } from '@/lib/settings-navigation';
 import { cn } from '@/lib/utils';
+
+import styles from './settings-lume.module.css';
 
 function isItemActive(item: SettingsNavItem, pathname: string): boolean {
     return pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -26,41 +24,42 @@ function findActiveEntry(pathname: string): { group: SettingsNavGroup; item: Set
     return null;
 }
 
-function NavGroups({ pathname, testIdPrefix }: { pathname: string; testIdPrefix: string }) {
+function NavGroups({
+    pathname,
+    testIdPrefix,
+    onNavigate,
+}: {
+    pathname: string;
+    testIdPrefix: string;
+    onNavigate?: (isActive: boolean) => void;
+}) {
     return (
-        <>
+        <div className={styles.navGroups}>
             {SETTINGS_NAV_GROUPS.map((group) => (
-                <div key={group.id} className="space-y-1.5">
-                    <p className="section-kicker px-1">{group.label}</p>
-                    <ul className="space-y-1">
+                <div key={group.id} className={styles.navGroup}>
+                    <p className={styles.navGroupLabel}>{group.label}</p>
+                    <ul className={styles.navItems}>
                         {group.items.map((item) => {
                             const isActive = isItemActive(item, pathname);
-                            const isDanger = item.tone === 'danger';
                             return (
                                 <li key={item.id}>
                                     <Link
                                         href={item.href}
                                         aria-current={isActive ? 'page' : undefined}
+                                        data-state={isActive ? 'active' : 'idle'}
                                         data-testid={`${testIdPrefix}${item.id}`}
+                                        onClick={() => onNavigate?.(isActive)}
                                         className={cn(
-                                            'block rounded-[var(--lume-radius-card)] border px-3 py-2 transition-colors',
-                                            !isActive && 'border-transparent hover:border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)]',
+                                            styles.navItem,
+                                            isActive && styles.navItemActive,
+                                            item.tone === 'danger' && styles.navItemDanger,
                                         )}
-                                        style={isActive
-                                            ? isDanger
-                                                ? { borderColor: 'rgba(192, 57, 43, 0.3)', background: 'rgba(192, 57, 43, 0.08)' }
-                                                : { borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)', background: 'var(--lume-surface-focal)', boxShadow: '0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent)' }
-                                            : undefined}
                                     >
-                                        <span
-                                            className="block text-[13px] font-semibold"
-                                            style={{ color: isDanger ? 'var(--lume-signal-critical)' : 'var(--lume-ink)' }}
-                                        >
-                                            {item.label}
+                                        <span className={styles.navItemCopy}>
+                                            <span className={styles.navItemLabel}>{item.label}</span>
+                                            <span className={styles.navItemDescription}>{item.description}</span>
                                         </span>
-                                        <span className="mt-0.5 block text-[11px] leading-4" style={{ color: 'var(--lume-ink-muted)' }}>
-                                            {item.description}
-                                        </span>
+                                        {isActive ? <span className={`${styles.currentLabel} lume-registro`}>Attiva</span> : null}
                                     </Link>
                                 </li>
                             );
@@ -68,53 +67,61 @@ function NavGroups({ pathname, testIdPrefix }: { pathname: string; testIdPrefix:
                     </ul>
                 </div>
             ))}
-        </>
+        </div>
     );
 }
 
+/* @Codex LUME-110/68 */
 export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () => void }) {
     const pathname = usePathname();
     const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+    const mobileToggleRef = useRef<HTMLButtonElement>(null);
+    const restoreFocusAfterNavigation = useRef(false);
+    const activeEntry = findActiveEntry(pathname);
 
-    // Collapse the mobile accordion as soon as navigation lands on a route.
     useEffect(() => {
         setIsMobileNavOpen(false);
+        if (!restoreFocusAfterNavigation.current) return;
+        restoreFocusAfterNavigation.current = false;
+        requestAnimationFrame(() => mobileToggleRef.current?.focus());
     }, [pathname]);
 
-    const activeEntry = findActiveEntry(pathname);
-    const isDangerActive = activeEntry?.item.tone === 'danger';
+    const closeMobileNavigation = (isActive: boolean) => {
+        if (isActive) {
+            restoreFocusAfterNavigation.current = false;
+            setIsMobileNavOpen(false);
+            requestAnimationFrame(() => mobileToggleRef.current?.focus());
+            return;
+        }
+        restoreFocusAfterNavigation.current = true;
+        setIsMobileNavOpen(false);
+    };
+
+    const closeMobileDisclosure = () => {
+        setIsMobileNavOpen(false);
+        requestAnimationFrame(() => mobileToggleRef.current?.focus());
+    };
 
     return (
-        <nav aria-label="Sezioni impostazioni" data-testid="settings-nav-sidebar">
-            {/* Compact treatment for narrow viewports (<lg): disclosure bar + accordion. */}
-            <div className="flex items-stretch gap-2 lg:hidden">
+        <nav aria-label="Sezioni impostazioni" data-testid="settings-nav-sidebar" className={styles.navRoot}>
+            <div className={styles.mobileBar}>
                 <button
+                    ref={mobileToggleRef}
                     type="button"
                     onClick={() => setIsMobileNavOpen((current) => !current)}
                     aria-expanded={isMobileNavOpen}
                     aria-controls="settings-nav-mobile-groups"
+                    aria-label={`${isMobileNavOpen ? 'Chiudi' : 'Apri'} navigazione impostazioni. Sezione attiva: ${activeEntry?.item.label ?? 'Panoramica'}`}
                     data-testid="settings-nav-mobile-toggle"
-                    className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-[var(--lume-radius-card)] border px-3 py-2 text-left transition-colors"
-                    style={{
-                        borderColor: isDangerActive ? 'rgba(163, 58, 47, 0.3)' : 'color-mix(in srgb, var(--lume-ink) 14%, transparent)',
-                        background: isDangerActive ? 'rgba(163, 58, 47, 0.08)' : 'var(--lume-surface-focal)',
-                    }}
+                    className={styles.mobileToggle}
                 >
-                    <span className="min-w-0">
-                        <span className="block text-[10px] font-semibold uppercase tracking-[0.12em]" style={{ color: 'var(--lume-ink-muted)' }}>
-                            {activeEntry ? activeEntry.group.label : 'Impostazioni'}
-                        </span>
-                        <span
-                            className="block truncate text-[13px] font-semibold"
-                            style={{ color: isDangerActive ? 'var(--lume-signal-critical)' : 'var(--lume-ink)' }}
-                        >
-                            {activeEntry ? activeEntry.item.label : 'Panoramica'}
-                        </span>
+                    <span className={styles.mobileCurrent}>
+                        <span>{activeEntry?.group.label ?? 'Impostazioni'}</span>
+                        <strong>{activeEntry?.item.label ?? 'Panoramica'}</strong>
                     </span>
                     <ChevronDown
                         aria-hidden="true"
-                        className={cn('h-4 w-4 shrink-0 transition-transform', isMobileNavOpen && 'rotate-180')}
-                        style={{ color: 'var(--lume-ink-muted)' }}
+                        className={cn(styles.disclosureIcon, isMobileNavOpen && styles.disclosureIconOpen)}
                     />
                 </button>
                 {onSearchRequest ? (
@@ -123,54 +130,38 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
                         onClick={onSearchRequest}
                         aria-label="Cerca impostazione"
                         data-testid="settings-search-trigger-mobile"
-                        className="flex w-11 shrink-0 items-center justify-center rounded-[var(--lume-radius-card)] border transition-colors"
-                        style={{
-                            borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)',
-                            background: 'var(--lume-surface-focal)',
-                            color: 'var(--lume-ink-muted)',
-                        }}
+                        className={styles.mobileSearch}
                     >
-                        <Search className="h-4 w-4" />
+                        <Search aria-hidden="true" />
                     </button>
                 ) : null}
             </div>
+
             <div
                 id="settings-nav-mobile-groups"
                 hidden={!isMobileNavOpen}
-                className="mt-2 space-y-5 rounded-[var(--lume-radius-panel)] border bg-[color:var(--lume-surface-field)] p-3 lg:hidden"
-                style={{
-                    borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)',
+                className={styles.mobileGroups}
+                onKeyDown={(event) => {
+                    if (event.key !== 'Escape') return;
+                    event.preventDefault();
+                    closeMobileDisclosure();
                 }}
             >
-                <NavGroups pathname={pathname} testIdPrefix="settings-nav-mobile-" />
+                <NavGroups pathname={pathname} testIdPrefix="settings-nav-mobile-" onNavigate={closeMobileNavigation} />
             </div>
 
-            {/* Full sidebar from lg up. */}
-            <div className="hidden space-y-5 lg:block">
+            <div className={styles.desktopSidebar}>
                 {onSearchRequest ? (
                     <button
                         type="button"
                         onClick={onSearchRequest}
                         data-testid="settings-search-trigger"
-                        className="flex w-full items-center justify-between gap-2 rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-field)] px-3 py-2 text-left text-xs font-medium transition-colors"
-                        style={{
-                            borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)',
-                            color: 'var(--lume-ink-muted)',
-                        }}
+                        className={styles.searchButton}
                     >
-                        <span className="inline-flex items-center gap-2">
-                            <Search className="h-3.5 w-3.5" />
-                            Cerca impostazione
-                        </span>
-                        <kbd
-                            className="lume-registro rounded-md border px-1.5 py-0.5 text-[10px]"
-                            style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)', color: 'var(--lume-ink-muted)' }}
-                        >
-                            ⌘K
-                        </kbd>
+                        <span><Search aria-hidden="true" /> Cerca impostazione</span>
+                        <kbd className="lume-registro">⌘K</kbd>
                     </button>
                 ) : null}
-
                 <NavGroups pathname={pathname} testIdPrefix="settings-nav-" />
             </div>
         </nav>

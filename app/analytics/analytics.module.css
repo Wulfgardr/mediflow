@@ -1,0 +1,299 @@
+.loadingState {
+    margin: 0;
+    border: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+    border-radius: var(--lume-radius-card);
+    background: var(--lume-surface-field);
+    color: var(--lume-ink-muted);
+    padding: 1.25rem;
+    font-size: 0.875rem;
+}
+.focusSurface {
+    --lume-analytics-register-family: "IBM Plex Mono", var(--font-registro), "SF Mono", monospace;
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(17rem, 0.8fr);
+    gap: 2rem;
+    scroll-margin-top: 8rem;
+    border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+    border-radius: var(--lume-radius-panel);
+    background: var(--lume-surface-field);
+    box-shadow: none;
+    padding: clamp(1.25rem, 3vw, 2rem);
+}
+.focusSurface :global(.lume-registro),
+.layerSection :global(.lume-registro) {
+    font-family: var(--lume-analytics-register-family, "IBM Plex Mono", var(--font-registro), "SF Mono", monospace);
+}
+.answer {
+    min-width: 0;
+}
+.answer h2 {
+    max-width: 32ch;
+    margin: 0.5rem 0 0;
+    color: var(--lume-ink);
+    font-size: 1.3rem;
+    font-weight: 650;
+    line-height: 1.35;
+    text-wrap: balance;
+}
+.primaryValue {
+    margin: 1.25rem 0 0;
+    color: var(--lume-ink);
+    font-size: clamp(2.75rem, 6vw, 4.5rem);
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+    letter-spacing: -0.035em;
+    line-height: 0.95;
+}
+.sectionLabel {
+    margin: 0;
+    color: var(--lume-ink-muted);
+    font-family: var(--lume-analytics-register-family, "IBM Plex Mono", var(--font-registro), "SF Mono", monospace);
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+.mutedNote {
+    max-width: 70ch;
+    margin: 0.75rem 0 0;
+    color: var(--lume-ink-muted);
+    font-size: 0.82rem;
+    line-height: 1.55;
+}
+.filterField {
+    align-self: stretch;
+    display: grid;
+    gap: 1rem;
+    border-radius: var(--lume-radius-card);
+    background: var(--lume-surface-field);
+    padding: 1.1rem;
+}
+.filterField label {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 0.4rem 0.75rem;
+    color: var(--lume-ink);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+.filterField strong {
+    color: var(--lume-ink-muted);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+}
+.filterField input[type='range'] {
+    grid-column: 1 / -1;
+    width: 100%;
+    accent-color: var(--lume-accent);
+}
+.layerSection {
+    scroll-margin-top: 8rem;
+    border-top: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+    padding: clamp(1.25rem, 3vw, 1.75rem) 0;
+}
+.sectionHeading {
+    display: grid;
+    grid-template-columns: minmax(6rem, 0.28fr) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: baseline;
+}
+.sectionHeading h2 {
+    margin: 0;
+    color: var(--lume-ink);
+    font-size: 1.05rem;
+    font-weight: 650;
+    text-wrap: balance;
+}
+.sectionHeading div > p {
+    max-width: 70ch;
+    margin: 0.35rem 0 0;
+    color: var(--lume-ink-muted);
+    font-size: 0.78rem;
+    line-height: 1.55;
+}
+.factList {
+    margin: 1.25rem 0 0;
+}
+.factRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(8rem, auto);
+    gap: 1rem;
+    align-items: baseline;
+    border-top: 1px solid color-mix(in srgb, var(--lume-ink) 10%, transparent);
+    padding: 0.8rem 0;
+}
+.factRow dt {
+    color: var(--lume-ink);
+    font-size: 0.84rem;
+    font-weight: 550;
+}
+.factRow dd {
+    margin: 0;
+    color: var(--lume-ink-muted);
+    font-size: 0.78rem;
+    text-align: right;
+}
+.chart {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1.35rem;
+}
+.chartDatum {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.4rem;
+    color: var(--lume-ink-muted);
+    font-size: 0.78rem;
+}
+.chartDatum strong {
+    color: var(--lume-ink);
+    font-variant-numeric: tabular-nums;
+}
+.progressTrack {
+    height: 0.4rem;
+    overflow: hidden;
+    border-radius: var(--lume-radius-control);
+    background: color-mix(in srgb, var(--lume-ink) 10%, transparent);
+}
+.progressFill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--lume-accent);
+    transition: width 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.tableScroller {
+    max-width: 100%;
+    margin-top: 1.25rem;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    border: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+    border-radius: var(--lume-radius-card);
+    background: var(--lume-surface-field);
+}
+.tableScroller:focus-visible {
+    outline: 2px solid var(--lume-accent);
+    outline-offset: 2px;
+}
+.dataTable {
+    width: 100%;
+    min-width: 36rem;
+    border-collapse: collapse;
+    color: var(--lume-ink);
+    font-size: 0.8rem;
+}
+.dataTable th,
+.dataTable td {
+    border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 10%, transparent);
+    padding: 0.75rem 0.9rem;
+    text-align: left;
+    vertical-align: top;
+}
+.dataTable th {
+    color: var(--lume-ink-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+.dataTable th:last-child,
+.dataTable td:last-child {
+    text-align: right;
+}
+.dataTable tbody tr:last-child td {
+    border-bottom: 0;
+}
+.emptyState {
+    margin: 1.25rem 0 0;
+    color: var(--lume-ink-muted);
+    font-size: 0.82rem;
+    line-height: 1.55;
+}
+.dataTable .emptyState {
+    padding-block: 1.5rem;
+    text-align: center;
+}
+.auditHeading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(10rem, auto);
+    gap: 1.5rem;
+    align-items: start;
+}
+.compactField {
+    display: grid;
+    gap: 0.4rem;
+    color: var(--lume-ink-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+.compactField select {
+    min-height: 2.5rem;
+    border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+    border-radius: var(--lume-radius-control);
+    background: var(--lume-surface-field);
+    color: var(--lume-ink);
+    padding: 0 2rem 0 0.75rem;
+    font: inherit;
+}
+.auditResult {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.8rem;
+    margin-top: 1.25rem;
+}
+.auditResult > svg {
+    width: 1rem;
+    height: 1rem;
+    margin-top: 1rem;
+    color: var(--lume-signal-success);
+}
+.auditResult .factList {
+    margin-top: 0;
+}
+.warningState {
+    display: flex;
+    gap: 0.65rem;
+    align-items: flex-start;
+    margin: 1.25rem 0 0;
+    border-radius: var(--lume-radius-control);
+    background: color-mix(in srgb, var(--lume-signal-warning) 10%, var(--lume-surface-field));
+    color: color-mix(in srgb, var(--lume-signal-warning) 60%, var(--lume-ink));
+    padding: 0.85rem;
+    font-size: 0.82rem;
+}
+.warningState svg {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+}
+@media (max-width: 767px) {
+    .focusSurface,
+    .auditHeading,
+    .sectionHeading {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .focusSurface {
+        gap: 1.25rem;
+    }
+    .filterField {
+        padding: 1rem;
+    }
+    .factRow {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.25rem;
+    }
+    .factRow dd {
+        text-align: left;
+    }
+    .auditResult {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .auditResult > svg {
+        margin-top: 0;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .progressFill {
+        transition-duration: 0.01ms;
+    }
+}
