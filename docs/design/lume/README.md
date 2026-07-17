@@ -73,12 +73,23 @@ Gli studi in [mockups/](./mockups/) sono apribili nel browser e non hanno dipend
 
 Queste immagini sono evidenza dello stato corrente. Non dichiarano il target Lume raggiunto.
 
+Snapshot web di produzione: 2026-07-17, registro Giorno, viewport 1440x900 a
+scala 2, fixture esclusivamente sintetiche. Si rigenera con:
+
+```bash
+node scripts/build-screenshots.mjs
+```
+
 - [01-worklist.png](../../../screenshots/01-worklist.png)
 - [02-scheda.png](../../../screenshots/02-scheda.png)
 - [03-quadro.png](../../../screenshots/03-quadro.png)
 - [04-review.png](../../../screenshots/04-review.png)
 - [05-security.png](../../../screenshots/05-security.png)
-- [macos-workspace.png](../../../screenshots/macos-workspace.png)
+
+La cattura [macos-workspace.png](../../../screenshots/macos-workspace.png) è
+evidenza nativa separata, acquisita con sessione operatore e permessi TCC. Non
+appartiene alla pipeline web e non condivide necessariamente viewport o data
+dello snapshot precedente.
 
 ## LEGACY: riferimenti storici
 
