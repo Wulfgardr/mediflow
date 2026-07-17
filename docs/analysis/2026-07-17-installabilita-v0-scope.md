@@ -146,11 +146,17 @@ Il launcher:
 - usa `127.0.0.1`, con porta `3000` di default;
 - conserva i dati in `~/Library/Application Support/MediFlow` salvo override;
 - scrive PID e log locali fuori dal bundle;
+- serializza gli avvii concorrenti sullo stesso data directory con `lockf`;
 - non include token, chiavi, database o altri dati runtime nell'artefatto;
-- riusa un processo registrato solo se home e `/api/system/revision` rispondono
-  con stato `200` e revisione, source fingerprint e fingerprint coincidono con
-  l'identita incorporata nel bundle;
+- riusa un processo registrato solo se quel PID possiede il listener sulla porta,
+  esegue il Node incluso con `WebRuntime` come directory di lavoro, e home e
+  `/api/system/revision` rispondono con stato `200` e identita coincidente;
 - rifiuta una porta occupata da un servizio che non supera questi controlli.
+
+Il controllo lega il PID registrato al processo e al bundle attesi per evitare
+riusi accidentali o servizi locali estranei, anche se copiano il JSON statico.
+Non e autenticazione crittografica e non difende da un account utente o un host
+gia compromesso, che restano fuori dal threat model della proof.
 
 Il launcher non modifica il codice applicativo o i contratti dati. Il boundary
 host keyless del runtime resta quello esistente.
