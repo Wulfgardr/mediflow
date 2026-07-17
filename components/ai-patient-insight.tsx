@@ -32,7 +32,12 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
     const [modelLabel, setModelLabel] = useState<string>("");
     const aiModelLabels = useAiModelLabels();
     /* @Codex */
-    const patientInsightKillSwitch = useLiveQuery(() => db.settings.get(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY), []);
+    const patientInsightKillSwitch = useLiveQuery(
+        () => db.settings.get(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY),
+        [],
+        undefined,
+        ['settings'],
+    );
 
     const abortControllerRef = useRef<AbortController | null>(null);
     /* @Codex */

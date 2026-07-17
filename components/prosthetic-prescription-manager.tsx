@@ -115,6 +115,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
     const [error, setError] = useState<string | null>(null);
     const [form, setForm] = useState<FormState>(() => emptyForm());
 
+    /* @Codex */
     const prescriptions = useLiveQuery(
         async () => {
             const items = await db.prostheticPrescriptions
@@ -123,6 +124,8 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
             return items.sort((left, right) => new Date(right.prescribedAt).getTime() - new Date(left.prescribedAt).getTime());
         },
         [patientId],
+        undefined,
+        ['prosthetic_prescriptions'],
     );
 
     const testedCount = useMemo(

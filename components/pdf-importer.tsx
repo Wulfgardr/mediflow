@@ -38,7 +38,12 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
     const [aiStage, setAiStage] = useState<string>("");
     /* @Codex */
     const aiModels = useAiModelLabels();
-    const documentSynthesisKillSwitch = useLiveQuery(() => db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY), []);
+    const documentSynthesisKillSwitch = useLiveQuery(
+        () => db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY),
+        [],
+        undefined,
+        ['settings'],
+    );
     const documentSynthesisEnabled = isAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
 
     const onDrop = async (acceptedFiles: File[]) => {

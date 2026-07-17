@@ -11,6 +11,7 @@ export interface ClinicalAlert {
 }
 
 export function useClinicalAlerts() {
+    /* @Codex */
     return useLiveQuery(async () => {
         // Only consider active patients
         const patients = await db.patients
@@ -90,5 +91,5 @@ export function useClinicalAlerts() {
 
         // Return top 5 most urgent
         return alerts.sort((a, _b) => (a.severity === 'high' ? -1 : 1)).slice(0, 5);
-    }, []);
+    }, [], undefined, ['patients', 'patients_to_ambulatories', 'entries']);
 }

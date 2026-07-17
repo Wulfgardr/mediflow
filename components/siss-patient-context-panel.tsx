@@ -276,6 +276,8 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
             return new Map(payload.map((item) => [item.code.trim().toUpperCase(), item.description || '']));
         },
         [prescriptiveExemptionCodes.join('|')],
+        undefined,
+        ['exemptions'],
     );
 
     const handleCopyField = async (field: PrescriptiveCopyField) => {
