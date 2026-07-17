@@ -109,6 +109,8 @@
     "test:db-bootstrap-concurrency": "node scripts/run-strip-types.mjs --test lib/db-server-bootstrap-concurrency.test.ts",
     "test:db-transaction-rollback": "node scripts/run-strip-types.mjs --test lib/db-transaction-rollback.test.ts",
     "test:schema-drift": "node scripts/run-strip-types.mjs --test scripts/check-schema-drift.test.ts",
+    "seed:performance-baseline": "node scripts/run-strip-types.mjs scripts/seed-performance-baseline.mjs",
+    "benchmark:list-routes": "node scripts/benchmark-list-routes.mjs",
     "benchmark:clinical-facts:observations": "node scripts/run-strip-types.mjs scripts/benchmark-observation-facts.mjs",
     "benchmark:icd-resolver": "node scripts/run-strip-types.mjs scripts/benchmark-icd-resolver.ts",
     "benchmark:aifa-resolver": "node scripts/run-strip-types.mjs scripts/benchmark-aifa-resolver.ts",

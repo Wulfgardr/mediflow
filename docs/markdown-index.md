@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-07-15
+Ultimo aggiornamento: 2026-07-17
 
 ## 📚 Come usare questo indice
 
@@ -85,6 +85,7 @@ Ultimo aggiornamento: 2026-07-15
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
+| [docs/analysis/2026-07-17-baseline-performance.md](./analysis/2026-07-17-baseline-performance.md) | Baseline riproducibile delle route list principali su 200 e 2000 pazienti sintetici, con payload, tempi HTTP, costo di decifratura simulato e campioni grezzi JSON. | Quando si misura o confronta una modifica a query list, paginazione, allegati o decifratura client. |
 | [docs/analysis/2026-07-05-audit-esterno-v2-triage.md](./analysis/2026-07-05-audit-esterno-v2-triage.md) | Triage secondario dell'audit esterno V2, collegato a `WUL-470` e figlie `WUL-471`..`WUL-475`, con separazione tra obiezioni misframed e residui azionabili su PIN, FHIR, MDR, sync futuro e drift ADR. | Quando si rivedono le issue nate dall'audit esterno V2 o serve recuperare il razionale completo dietro il tracker Linear. |
 | [docs/analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md](./analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md) | Closeout secondario di provider scaffold, control-flow, attese locali e roadmap dello stack intelligente, riallineato alla verita di `main`. | Quando si pianifica una nuova slice AI/euristica o si verifica cosa resta oltre le PR #39, #41, #42 e #43. |
 | [docs/markdown-index.md](./markdown-index.md) | Indice completo markdown con sintesi. | Per navigazione completa e controllo copertura doc. |
