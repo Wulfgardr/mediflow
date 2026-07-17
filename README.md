@@ -67,7 +67,7 @@ Lume, la lingua visiva di MediFlow. Le viste cliniche usano esclusivamente
 fixture dimostrative sintetiche. Nessun dato paziente reale._
 
 <details>
-<summary><b>Altre schermate web</b>: scheda paziente, quadro clinico, diario e sicurezza</summary>
+<summary><b>Altre schermate web</b>: scheda paziente, quadro clinico, revisione documentale e sicurezza</summary>
 <p><img src="./screenshots/02-scheda.png" alt="Scheda paziente con moduli clinici" width="820" loading="lazy" decoding="async"/></p>
 <p><img src="./screenshots/03-quadro.png" alt="Quadro paziente nel cockpit" width="820" loading="lazy" decoding="async"/></p>
 <p><img src="./screenshots/04-review.png" alt="Revisione documenti e codifiche con evidenze sintetiche da confermare" width="820" loading="lazy" decoding="async"/></p>
