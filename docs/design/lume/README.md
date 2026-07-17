@@ -73,6 +73,8 @@ Gli studi in [mockups/](./mockups/) sono apribili nel browser e non hanno dipend
 
 Queste immagini sono evidenza dello stato corrente. Non dichiarano il target Lume raggiunto.
 
+Snapshot runtime: 2026-07-17, registro Giorno, viewport 1440x900 a scala 2, fixture esclusivamente sintetiche.
+
 - [01-worklist.png](../../../screenshots/01-worklist.png)
 - [02-scheda.png](../../../screenshots/02-scheda.png)
 - [03-quadro.png](../../../screenshots/03-quadro.png)
