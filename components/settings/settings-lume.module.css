@@ -1,0 +1,468 @@
+.overview {
+    --lume-settings-register-family: "IBM Plex Mono", var(--font-registro), "SF Mono", monospace;
+    display: grid;
+    gap: 2rem;
+}
+.overview :global(.lume-registro),
+.navRoot :global(.lume-registro) {
+    font-family: var(--lume-settings-register-family, "IBM Plex Mono", var(--font-registro), "SF Mono", monospace);
+}
+.overviewFocus {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2rem;
+    align-items: end;
+    border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+    border-radius: var(--lume-radius-panel);
+    background: var(--lume-surface-focal);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
+    padding: clamp(1.25rem, 3vw, 2rem);
+}
+.overviewFocus h2,
+.previewSection h2,
+.indexHeading h2,
+.sectionIntro h2 {
+    margin: 0.45rem 0 0;
+    color: var(--lume-ink);
+    font-size: 1.2rem;
+    font-weight: 650;
+    line-height: 1.35;
+    text-wrap: balance;
+}
+.overviewValue {
+    margin: 1rem 0 0;
+    color: var(--lume-ink);
+    font-size: clamp(2.1rem, 5vw, 3.25rem);
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+    letter-spacing: -0.035em;
+    line-height: 1;
+}
+.sectionLabel,
+.navGroupLabel {
+    margin: 0;
+    color: var(--lume-ink-muted);
+    font-family: var(--lume-settings-register-family, "IBM Plex Mono", var(--font-registro), "SF Mono", monospace);
+    font-size: 0.7rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+.supportingCopy {
+    max-width: 70ch;
+    margin: 0.75rem 0 0;
+    color: var(--lume-ink-muted);
+    font-size: 0.82rem;
+    line-height: 1.55;
+}
+.focusActions {
+    display: grid;
+    min-width: 11rem;
+    gap: 0.65rem;
+}
+.errorNote {
+    margin: 0.65rem 0 0;
+    color: color-mix(in srgb, var(--lume-signal-critical) 24%, var(--lume-ink));
+    font-size: 0.75rem;
+    line-height: 1.45;
+}
+.primaryAction,
+.secondaryAction {
+    display: inline-flex;
+    min-height: 2.65rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    border-radius: var(--lume-radius-control);
+    padding: 0.65rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 650;
+    text-decoration: none;
+    transition: background-color 150ms cubic-bezier(0.22, 0.61, 0.36, 1), color 150ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.primaryAction {
+    border: 1px solid var(--lume-accent);
+    background: var(--lume-accent);
+    color: var(--lume-surface-focal);
+}
+.primaryAction:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+.primaryAction svg {
+    width: 0.95rem;
+    height: 0.95rem;
+}
+.secondaryAction {
+    border: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent);
+    background: var(--lume-surface-field);
+    color: var(--lume-ink);
+}
+.primaryAction:hover,
+.primaryAction:focus-visible {
+    background: color-mix(in srgb, var(--lume-accent) 88%, var(--lume-ink));
+}
+.primaryAction:focus-visible,
+.secondaryAction:focus-visible,
+.indexLink:focus-visible,
+.navItem:focus-visible,
+.mobileToggle:focus-visible,
+.mobileSearch:focus-visible,
+.searchButton:focus-visible {
+    outline: 2px solid var(--lume-accent);
+    outline-offset: 2px;
+}
+.previewSection {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(12rem, 0.65fr) auto;
+    gap: 1.25rem;
+    align-items: center;
+    border-top: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+    background: var(--lume-surface-field);
+    padding: 1.25rem;
+}
+.previewField {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.3rem 1rem;
+    border-radius: var(--lume-radius-card);
+    background: var(--lume-surface-focal);
+    padding: 0.9rem 1rem;
+    color: var(--lume-ink-muted);
+    font-size: 0.72rem;
+}
+.previewField strong {
+    grid-row: span 2;
+    align-self: center;
+    color: var(--lume-ink);
+    font-size: 1.1rem;
+    font-variant-numeric: tabular-nums;
+}
+.previewActions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+}
+.settingsIndex {
+    display: grid;
+    gap: 1.4rem;
+}
+.indexHeading {
+    display: grid;
+    grid-template-columns: minmax(5rem, 0.22fr) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: baseline;
+}
+.indexHeading p:last-child {
+    max-width: 70ch;
+    margin: 0.35rem 0 0;
+    color: var(--lume-ink-muted);
+    font-size: 0.78rem;
+    line-height: 1.55;
+}
+.indexGroups {
+    border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+}
+.indexGroup {
+    display: grid;
+    grid-template-columns: minmax(8rem, 0.25fr) minmax(0, 1fr);
+    gap: 1rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+    padding: 1rem 0;
+}
+.indexGroupTitle {
+    margin: 0.75rem 0 0;
+    color: var(--lume-ink-muted);
+    font-size: 0.75rem;
+    font-weight: 650;
+}
+.indexList,
+.navItems {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.indexLink {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem;
+    align-items: center;
+    border-radius: var(--lume-radius-control);
+    color: var(--lume-ink);
+    padding: 0.7rem 0.8rem;
+    text-decoration: none;
+    transition: background-color 120ms ease-out;
+}
+.indexLink:hover {
+    background: var(--lume-surface-focal);
+}
+.indexLink[data-tone='danger'] strong,
+.navItemDanger .navItemLabel {
+    color: var(--lume-signal-critical);
+}
+.indexLink strong,
+.indexLink small {
+    display: block;
+}
+.indexLink strong {
+    font-size: 0.8rem;
+    font-weight: 650;
+}
+.indexLink small {
+    margin-top: 0.2rem;
+    color: var(--lume-ink-muted);
+    font-size: 0.7rem;
+    line-height: 1.4;
+}
+.indexLink > svg {
+    width: 0.9rem;
+    height: 0.9rem;
+    color: var(--lume-ink-muted);
+}
+.sectionIntro {
+    display: grid;
+    gap: 0.25rem;
+}
+.sectionIntro p:last-child {
+    max-width: 70ch;
+    margin: 0.2rem 0 0;
+    color: var(--lume-ink-muted);
+    font-size: 0.82rem;
+    line-height: 1.55;
+}
+.settingSurface {
+    border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+    border-radius: var(--lume-radius-panel);
+    background: var(--lume-surface-focal);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
+}
+.settingLayer {
+    border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+    background: var(--lume-surface-field);
+}
+.settingInput {
+    width: 100%;
+    min-height: 2.75rem;
+    border: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent);
+    border-radius: var(--lume-radius-control);
+    background: var(--lume-surface-field);
+    color: var(--lume-ink);
+    padding: 0.65rem 0.8rem;
+    font-size: 0.85rem;
+}
+.settingInput:focus {
+    border-color: var(--lume-accent);
+    outline: 2px solid var(--lume-accent);
+    outline-offset: 1px;
+}
+.settingLabel {
+    display: block;
+    margin-bottom: 0.4rem;
+    color: var(--lume-ink);
+    font-size: 0.78rem;
+    font-weight: 650;
+}
+.navRoot {
+    color: var(--lume-ink);
+}
+.mobileBar {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+}
+.mobileToggle,
+.mobileSearch,
+.searchButton {
+    border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+    border-radius: var(--lume-radius-control);
+    background: var(--lume-surface-chrome);
+    color: var(--lume-ink);
+}
+.mobileToggle {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.65rem 0.8rem;
+    text-align: left;
+}
+.mobileCurrent {
+    min-width: 0;
+}
+.mobileCurrent span,
+.mobileCurrent strong {
+    display: block;
+}
+.mobileCurrent span {
+    color: var(--lume-ink-muted);
+    font-size: 0.65rem;
+    font-weight: 600;
+}
+.mobileCurrent strong {
+    overflow: hidden;
+    margin-top: 0.15rem;
+    font-size: 0.8rem;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.disclosureIcon {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+    color: var(--lume-ink-muted);
+    transition: transform 150ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.disclosureIconOpen {
+    transform: rotate(180deg);
+}
+.mobileSearch {
+    display: grid;
+    width: 2.75rem;
+    flex: 0 0 auto;
+    place-items: center;
+}
+.mobileSearch svg {
+    width: 1rem;
+    height: 1rem;
+}
+.mobileGroups {
+    margin-top: 0.5rem;
+    border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+    border-radius: var(--lume-radius-card);
+    background: var(--lume-surface-chrome);
+    padding: 0.75rem;
+}
+.desktopSidebar {
+    display: none;
+}
+.navGroups {
+    display: grid;
+    gap: 1.25rem;
+}
+.navGroup {
+    display: grid;
+    gap: 0.45rem;
+}
+.navGroupLabel {
+    padding-inline: 0.35rem;
+}
+.navItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-radius: var(--lume-radius-control);
+    color: var(--lume-ink);
+    padding: 0.55rem 0.65rem;
+    text-decoration: none;
+    transition: background-color 120ms ease-out;
+}
+.navItem:hover {
+    background: color-mix(in srgb, var(--lume-surface-focal) 72%, transparent);
+}
+.navItemActive {
+    background: var(--lume-surface-focal);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 9%, transparent);
+}
+.navItemCopy {
+    min-width: 0;
+}
+.navItemLabel,
+.navItemDescription {
+    display: block;
+}
+.navItemLabel {
+    color: var(--lume-ink);
+    font-size: 0.77rem;
+    font-weight: 620;
+}
+.navItemDescription {
+    margin-top: 0.15rem;
+    color: var(--lume-ink-muted);
+    font-size: 0.67rem;
+    line-height: 1.35;
+}
+.currentLabel {
+    flex: 0 0 auto;
+    color: var(--lume-ink-muted);
+    font-size: 0.62rem;
+    font-variant-numeric: tabular-nums;
+}
+.searchButton {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.6rem 0.7rem;
+    color: var(--lume-ink-muted);
+    font-size: 0.7rem;
+    text-align: left;
+}
+.searchButton span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+.searchButton svg {
+    width: 0.85rem;
+    height: 0.85rem;
+}
+.searchButton kbd {
+    border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+    border-radius: 0.35rem;
+    padding: 0.1rem 0.35rem;
+    font-size: 0.62rem;
+}
+@media (min-width: 1024px) {
+    .mobileBar,
+    .mobileGroups {
+        display: none;
+    }
+    .desktopSidebar {
+        display: grid;
+        gap: 1.25rem;
+    }
+}
+@media (max-width: 767px) {
+    .overviewFocus,
+    .previewSection,
+    .indexHeading,
+    .indexGroup {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .overviewFocus,
+    .previewSection {
+        align-items: stretch;
+        gap: 1.25rem;
+    }
+    .primaryAction {
+        width: 100%;
+    }
+    .focusActions {
+        width: 100%;
+    }
+    .previewActions {
+        align-items: stretch;
+    }
+    .indexGroupTitle {
+        margin-top: 0;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .primaryAction,
+    .secondaryAction,
+    .indexLink,
+    .navItem,
+    .disclosureIcon {
+        transition-duration: 0.01ms;
+    }
+}
