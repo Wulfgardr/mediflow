@@ -39,6 +39,7 @@
     "test:motion-budget": "node --test scripts/check-motion-budget.test.mjs",
     "test:run-strip-types": "node --test scripts/run-strip-types.test.mjs",
     "test:node-runtime-contract": "node --test scripts/node-runtime-contract.test.mjs",
+    "test:installability-v0": "node --test scripts/installability-v0-macos.test.mjs",
     "test:unit": "node scripts/run-strip-types.mjs --test --exclude lib/security/audit.test.ts --exclude lib/patient-ambulatory-membership.test.ts --exclude lib/patient-cascade.test.ts --exclude lib/patient-lifecycle.test.ts --exclude lib/sqlite-repair.test.ts --exclude lib/test-container-clear.test.ts --glob \"lib/**/*.test.ts\" --glob \"components/**/*.test.ts\" scripts/check-schema-drift.test.ts scripts/run-native-probe.test.mjs",
     "test:api-v1-contract-negative": "bash scripts/api-v1-contract-negative-test.sh",
     "test:api-v1-put-negative-routes": "bash scripts/api-v1-put-negative-routes-test.sh",
