@@ -1,26 +1,38 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { shouldReactToChange } from './live-query-scope';
+import { createDbChangeBus } from './live-query-scope';
 
-test('unscoped notification wakes every subscriber (backward compatible)', () => {
-    // notifyDbChange() with no table === undefined changedTable.
-    assert.equal(shouldReactToChange(undefined, undefined), true);
-    assert.equal(shouldReactToChange([], undefined), true);
-    assert.equal(shouldReactToChange(['entries'], undefined), true);
+/* @Codex */
+test('a table notification wakes only matching and unscoped subscribers', () => {
+    const bus = createDbChangeBus();
+    let patientInvalidations = 0;
+    let observationInvalidations = 0;
+    let globalInvalidations = 0;
+
+    bus.subscribe(() => { patientInvalidations += 1; }, ['patients']);
+    bus.subscribe(() => { observationInvalidations += 1; }, ['observations']);
+    bus.subscribe(() => { globalInvalidations += 1; });
+
+    bus.notify('observations');
+
+    assert.equal(patientInvalidations, 0);
+    assert.equal(observationInvalidations, 1);
+    assert.equal(globalInvalidations, 1);
 });
 
-test('unscoped subscriber wakes on any table change', () => {
-    assert.equal(shouldReactToChange(undefined, 'entries'), true);
-    assert.equal(shouldReactToChange([], 'attachments'), true);
-});
+test('an unscoped notification wakes every subscriber', () => {
+    const bus = createDbChangeBus();
+    let patientInvalidations = 0;
+    let observationInvalidations = 0;
+    let globalInvalidations = 0;
 
-test('scoped subscriber wakes only on a matching table', () => {
-    assert.equal(shouldReactToChange(['entries'], 'entries'), true);
-    assert.equal(shouldReactToChange(['entries', 'therapies'], 'therapies'), true);
-});
+    bus.subscribe(() => { patientInvalidations += 1; }, ['patients']);
+    bus.subscribe(() => { observationInvalidations += 1; }, ['observations']);
+    bus.subscribe(() => { globalInvalidations += 1; });
 
-test('scoped subscriber ignores unrelated table changes', () => {
-    assert.equal(shouldReactToChange(['entries'], 'attachments'), false);
-    assert.equal(shouldReactToChange(['patients'], 'checkups'), false);
-    assert.equal(shouldReactToChange(['entries', 'therapies'], 'observations'), false);
+    bus.notify();
+
+    assert.equal(patientInvalidations, 1);
+    assert.equal(observationInvalidations, 1);
+    assert.equal(globalInvalidations, 1);
 });
