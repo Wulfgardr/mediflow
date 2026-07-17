@@ -67,8 +67,8 @@ function loadRouteFunction(sourceFile, functionName) {
 }
 
 test('backup restore normalizes soft-delete tombstone timestamps', () => {
-  const routeSource = parseSource('app/api/system/backup-restore/route.ts', ts.ScriptKind.TS);
-  const dateFields = findDateFields(routeSource);
+  const executorSource = parseSource('lib/backup-restore-executor.ts', ts.ScriptKind.TS);
+  const dateFields = findDateFields(executorSource);
 
   assert.ok(
     dateFields.includes('deletedAt'),
@@ -77,8 +77,8 @@ test('backup restore normalizes soft-delete tombstone timestamps', () => {
 });
 
 test('scheduled runner date-field list matches the restore DATE_FIELDS', () => {
-  const routeSource = parseSource('app/api/system/backup-restore/route.ts', ts.ScriptKind.TS);
-  const routeDateFields = findDateFields(routeSource);
+  const executorSource = parseSource('lib/backup-restore-executor.ts', ts.ScriptKind.TS);
+  const routeDateFields = findDateFields(executorSource);
 
   assert.deepEqual([...RUNNER_DATE_FIELDS].sort(), [...routeDateFields].sort());
 });
@@ -104,8 +104,8 @@ test('scheduled runner converts unix-seconds date fields to ISO strings', () => 
 });
 
 test('backup restore coerces unix-seconds integers from legacy scheduled artifacts', () => {
-  const routeSource = parseSource('app/api/system/backup-restore/route.ts', ts.ScriptKind.TS);
-  const normalizeDateValue = loadRouteFunction(routeSource, 'normalizeDateValue');
+  const executorSource = parseSource('lib/backup-restore-executor.ts', ts.ScriptKind.TS);
+  const normalizeDateValue = loadRouteFunction(executorSource, 'normalizeDateValue');
 
   const fromSeconds = normalizeDateValue(1750000000);
   assert.ok(fromSeconds instanceof Date);
