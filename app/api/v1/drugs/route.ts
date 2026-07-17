@@ -1,8 +1,12 @@
 // Codex: created 2026-02-06
 import { NextResponse } from 'next/server';
 import { sql } from 'drizzle-orm';
+import {
+    AIFA_CATALOG_MANIFEST_SETTING_KEY,
+    normalizeAifaSearchText,
+} from '@/lib/aifa-catalog';
 import { dbServer } from '@/lib/db-server';
-import { drugs } from '@/lib/schema';
+import { drugs, settings } from '@/lib/schema';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { readDrugCatalog } from '@/lib/network-catalog-read';
 
@@ -34,7 +38,10 @@ function normalizeDrug(item: DrugPayload): typeof drugs.$inferInsert | null {
         packaging: item.packaging?.trim() || null,
         class: item.class?.trim() || null,
         price: numericPrice,
-        atc: item.atc?.trim() || null
+        atc: item.atc?.trim() || null,
+        aicSearch: normalizeAifaSearchText(aic),
+        nameSearch: normalizeAifaSearchText(name),
+        activePrincipleSearch: normalizeAifaSearchText(item.activePrinciple || ''),
     };
 }
 
@@ -67,17 +74,27 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'No valid drugs payload' }, { status: 400 });
         }
 
-        await dbServer.insert(drugs).values(items).onConflictDoUpdate({
-            target: drugs.aic,
-            set: {
-                name: sql`excluded.name`,
-                activePrinciple: sql`excluded.active_principle`,
-                company: sql`excluded.company`,
-                packaging: sql`excluded.packaging`,
-                class: sql`excluded.class`,
-                price: sql`excluded.price`,
-                atc: sql`excluded.atc`
-            }
+        dbServer.transaction((transaction) => {
+            transaction.insert(drugs).values(items).onConflictDoUpdate({
+                target: drugs.aic,
+                set: {
+                    name: sql`excluded.name`,
+                    activePrinciple: sql`excluded.active_principle`,
+                    company: sql`excluded.company`,
+                    packaging: sql`excluded.packaging`,
+                    class: sql`excluded.class`,
+                    price: sql`excluded.price`,
+                    atc: sql`excluded.atc`,
+                    aicSearch: sql`excluded.aic_search`,
+                    nameSearch: sql`excluded.name_search`,
+                    activePrincipleSearch: sql`excluded.active_principle_search`,
+                },
+            }).run();
+            // This compatibility endpoint receives no source artifact or hash.
+            // Invalidate any older manifest rather than presenting mixed data as verified.
+            transaction.delete(settings)
+                .where(sql`${settings.key} = ${AIFA_CATALOG_MANIFEST_SETTING_KEY}`)
+                .run();
         });
 
         return NextResponse.json({ success: true, count: items.length });
@@ -92,7 +109,12 @@ export async function DELETE(request: Request) {
     if (authError) return authError;
 
     try {
-        await dbServer.delete(drugs);
+        dbServer.transaction((transaction) => {
+            transaction.delete(drugs).run();
+            transaction.delete(settings)
+                .where(sql`${settings.key} = ${AIFA_CATALOG_MANIFEST_SETTING_KEY}`)
+                .run();
+        });
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('API DELETE /api/v1/drugs error:', error);

@@ -1,0 +1,5 @@
+codice_aic;codice_gruppo_equivalenza;descrizione_gruppo;denominazione;descrizione;codice_ditta;ragione_sociale;tipo_procedura;numero_procedura;stato_amministrativo;codice_atc;pa_associati;fascia;prezzo
+000000101;SYN-01;Gruppo sintetico;ACIDO SINTETICO;"20 compresse da 100 mg; uso orale";SYN-A;AZIENDA SINTETICA UNO;Nazionale;SYN/001;Autorizzato;B01AC06;Acido acetilsalicilico;A;2,50
+000000102;SYN-02;Gruppo sintetico;FARMACO CITTÀ;30 compresse da 500 mg;SYN-B;AZIENDA SINTETICA DUE;Nazionale;SYN/002;Autorizzato;A10BA02;Metformina cloridrato;A;4,75
+000000103;SYN-03;Gruppo sintetico;SOLUZIONE "TEST";1 flacone;SYN-C;AZIENDA SINTETICA TRE;Nazionale;SYN/003;Autorizzato;J01CA04;Amoxicillina;H;10,00
+NONVALIDO;SYN-04;Gruppo sintetico;;Confezione;SYN-D;AZIENDA SINTETICA QUATTRO;Nazionale;SYN/004;Autorizzato;;;;
