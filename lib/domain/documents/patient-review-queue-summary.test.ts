@@ -1,3 +1,4 @@
+/* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -25,7 +26,7 @@ test('empty patient produces explicit empty/unavailable states for every row', (
 
     const insight = summary.rows[0];
     assert.equal(insight.state, 'vuoto');
-    assert.equal(insight.anchor, '#insight');
+    assert.equal(insight.anchor, '#documenti');
 
     const evidence = summary.rows[1];
     assert.equal(evidence.state, 'vuoto');
@@ -41,7 +42,7 @@ test('empty patient produces explicit empty/unavailable states for every row', (
 
     const archive = summary.rows[3];
     assert.equal(archive.state, 'vuoto');
-    assert.equal(archive.anchor, '#archivio');
+    assert.equal(archive.anchor, '#documenti');
 
     // Only the missing-text row asks for action.
     assert.equal(summary.attentionCount, 1);
@@ -62,7 +63,7 @@ test('disabled kill switches surface as "bloccato" with a visible why', () => {
     assert.match(insight.blockedReason ?? '', /non genera né scrive/);
 
     assert.equal(smartImport.state, 'bloccato');
-    assert.equal(smartImport.anchor, '#smart-import');
+    assert.equal(smartImport.anchor, '#documenti');
     assert.match(smartImport.blockedReason ?? '', /nessun suggerimento viene scritto/);
 });
 
@@ -134,7 +135,7 @@ test('smart import without analysis stays on-demand and never auto-runs', () => 
     const smartImport = buildPatientReviewQueueSummary(input).rows[2];
     assert.equal(smartImport.state, 'disponibile');
     assert.match(smartImport.detail, /solo su richiesta/);
-    assert.equal(smartImport.anchor, '#smart-import');
+    assert.equal(smartImport.anchor, '#documenti');
 });
 
 test('smart import analysis counts map to review-first states', () => {

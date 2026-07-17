@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, FolderOpen } from 'lucide-react';
 
 // WUL-297: Privacy Mode is always reachable from the workspace header.
+import PrivacyBlur from '@/components/privacy-blur';
 import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
 import styles from './kree8-workspace-shell.module.css';
 
@@ -195,12 +196,12 @@ export function Kree8WorkspaceShell({
           {isClinical ? (
             <div className={styles.clinicalIdentity}>
               <p className={styles.clinicalLabel}>{eyebrow}</p>
-              <h1 className={styles.clinicalName}>{title}</h1>
+              <h1 className={styles.clinicalName}><PrivacyBlur>{title}</PrivacyBlur></h1>
               <p className={`${styles.clinicalAtoms} lume-registro`} data-testid="lume-scheda-atoms">
                 {patientAtoms.map((atom, index) => (
                   <span key={`${atom}-${index}`} className={styles.clinicalAtomGroup}>
                     {index > 0 ? <span className={styles.clinicalDot} aria-hidden="true">·</span> : null}
-                    <span data-testid="lume-register-value">{atom}</span>
+                    <PrivacyBlur><span data-testid="lume-register-value">{atom}</span></PrivacyBlur>
                   </span>
                 ))}
               </p>
@@ -215,7 +216,11 @@ export function Kree8WorkspaceShell({
                 <h1 className={styles.title}>
                   <span className={styles.titleMain}>{title}</span>
                 </h1>
-                {patientLabel ? <p className={styles.patientLabel}>{patientLabel}</p> : null}
+                {patientLabel ? (
+                  <p className={styles.patientLabel} data-testid="lume-workspace-patient-label">
+                    <PrivacyBlur>{patientLabel}</PrivacyBlur>
+                  </p>
+                ) : null}
                 <p className={styles.subtitle}>{subtitle}</p>
                 {statusLabel ? <p className={styles.statusLine}>{statusLabel}</p> : null}
               </div>
