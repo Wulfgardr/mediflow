@@ -68,4 +68,14 @@ test('builds and validates the persisted provenance manifest', () => {
         downloadedAt: '2026-02-31',
         version: 'invalid-date',
     }), /Data di scarico/);
+    assert.throws(() => validateAifaManifestInput({
+        sourceUrl: 'https://example.com/not-aifa.csv',
+        downloadedAt: '2026-07-17',
+        version: 'untrusted-source',
+    }), /dominio ufficiale aifa\.gov\.it/);
+    assert.throws(() => validateAifaManifestInput({
+        sourceUrl: 'http://www.aifa.gov.it/open-data',
+        downloadedAt: '2026-07-17',
+        version: 'insecure-source',
+    }), /dominio ufficiale aifa\.gov\.it/);
 });

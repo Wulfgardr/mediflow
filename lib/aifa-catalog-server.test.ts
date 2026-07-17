@@ -12,6 +12,8 @@ type CatalogModules = {
     clearAifaCatalog: typeof import('./aifa-catalog-server.ts').clearAifaCatalog;
     getAifaCatalogStatus: typeof import('./aifa-catalog-server.ts').getAifaCatalogStatus;
     replaceAifaCatalog: typeof import('./aifa-catalog-server.ts').replaceAifaCatalog;
+    replaceUnverifiedDrugCatalog: typeof import('./aifa-catalog-server.ts').replaceUnverifiedDrugCatalog;
+    readDrugCatalog: typeof import('./network-catalog-read.ts').readDrugCatalog;
     searchAifaCatalog: typeof import('./aifa-catalog-server.ts').searchAifaCatalog;
 };
 
@@ -35,7 +37,10 @@ async function loadCatalogModules(): Promise<CatalogModules> {
         const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-aifa-catalog-'));
         bootstrapDatabase(dataDir);
         process.env.MEDIFLOW_DATA_DIR = dataDir;
-        modulesPromise = import('./aifa-catalog-server.ts');
+        modulesPromise = Promise.all([
+            import('./aifa-catalog-server.ts'),
+            import('./network-catalog-read.ts'),
+        ]).then(([catalog, network]) => ({ ...catalog, readDrugCatalog: network.readDrugCatalog }));
     }
     return modulesPromise;
 }
@@ -71,4 +76,52 @@ test('import persists the provenance manifest and enables bounded prefix search'
         manifest: null,
         state: 'not-imported',
     });
+});
+
+test('legacy replacement removes AIFA rows without changing price scale or prefix semantics', async () => {
+    const catalog = await loadCatalogModules();
+    const csv = fs.readFileSync(path.join(ROOT_DIR, 'scripts/fixtures/aifa-confezioni-synthetic.csv'));
+    await catalog.replaceAifaCatalog(
+        new File([csv], 'aifa-synthetic.csv', { type: 'text/csv' }),
+        {
+            sourceUrl: AIFA_CATALOG_DEFAULT_SOURCE_URL,
+            downloadedAt: '2026-07-17',
+            version: 'synthetic-before-legacy',
+        },
+    );
+
+    catalog.replaceUnverifiedDrugCatalog([{
+        aic: '000000901',
+        name: 'FARMACO LEGACY',
+        activePrinciple: 'Principio legacy',
+        company: 'Azienda sintetica',
+        packaging: '10 compresse',
+        class: 'A',
+        price: 250,
+        atc: 'A00AA00',
+        aicSearch: '000000901',
+        nameSearch: 'farmaco legacy',
+        activePrincipleSearch: 'principio legacy',
+    }]);
+
+    assert.deepEqual(await catalog.getAifaCatalogStatus(), {
+        count: 1,
+        manifest: null,
+        state: 'unverified',
+    });
+    assert.equal((await catalog.searchAifaCatalog('acido', 10)).rows.length, 0);
+    assert.equal((await catalog.searchAifaCatalog('legacy', 10)).rows.length, 0);
+    assert.equal((await catalog.searchAifaCatalog('farmaco', 10)).rows.length, 1);
+
+    const response = await catalog.readDrugCatalog(new URLSearchParams('q=farmaco&limit=10'));
+    assert.deepEqual(response.body, [{
+        aic: '000000901',
+        name: 'FARMACO LEGACY',
+        activePrinciple: 'Principio legacy',
+        company: 'Azienda sintetica',
+        packaging: '10 compresse',
+        class: 'A',
+        price: 250,
+        atc: 'A00AA00',
+    }]);
 });

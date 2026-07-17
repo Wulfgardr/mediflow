@@ -1,12 +1,8 @@
 // Codex: created 2026-02-06
 import { NextResponse } from 'next/server';
-import { sql } from 'drizzle-orm';
-import {
-    AIFA_CATALOG_MANIFEST_SETTING_KEY,
-    normalizeAifaSearchText,
-} from '@/lib/aifa-catalog';
-import { dbServer } from '@/lib/db-server';
-import { drugs, settings } from '@/lib/schema';
+import { normalizeAifaSearchText } from '@/lib/aifa-catalog';
+import { clearAifaCatalog, replaceUnverifiedDrugCatalog } from '@/lib/aifa-catalog-server';
+import { drugs } from '@/lib/schema';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { readDrugCatalog } from '@/lib/network-catalog-read';
 
@@ -74,28 +70,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'No valid drugs payload' }, { status: 400 });
         }
 
-        dbServer.transaction((transaction) => {
-            transaction.insert(drugs).values(items).onConflictDoUpdate({
-                target: drugs.aic,
-                set: {
-                    name: sql`excluded.name`,
-                    activePrinciple: sql`excluded.active_principle`,
-                    company: sql`excluded.company`,
-                    packaging: sql`excluded.packaging`,
-                    class: sql`excluded.class`,
-                    price: sql`excluded.price`,
-                    atc: sql`excluded.atc`,
-                    aicSearch: sql`excluded.aic_search`,
-                    nameSearch: sql`excluded.name_search`,
-                    activePrincipleSearch: sql`excluded.active_principle_search`,
-                },
-            }).run();
-            // This compatibility endpoint receives no source artifact or hash.
-            // Invalidate any older manifest rather than presenting mixed data as verified.
-            transaction.delete(settings)
-                .where(sql`${settings.key} = ${AIFA_CATALOG_MANIFEST_SETTING_KEY}`)
-                .run();
-        });
+        // This compatibility endpoint receives no source artifact or hash. Treat each
+        // request as a complete atomic replacement so AIFA cents and legacy prices
+        // can never coexist under one catalog-wide provenance state.
+        replaceUnverifiedDrugCatalog(items);
 
         return NextResponse.json({ success: true, count: items.length });
     } catch (error) {
@@ -109,12 +87,7 @@ export async function DELETE(request: Request) {
     if (authError) return authError;
 
     try {
-        dbServer.transaction((transaction) => {
-            transaction.delete(drugs).run();
-            transaction.delete(settings)
-                .where(sql`${settings.key} = ${AIFA_CATALOG_MANIFEST_SETTING_KEY}`)
-                .run();
-        });
+        clearAifaCatalog();
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('API DELETE /api/v1/drugs error:', error);

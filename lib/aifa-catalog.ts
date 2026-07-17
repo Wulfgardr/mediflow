@@ -187,7 +187,11 @@ export function validateAifaManifestInput(input: AifaCatalogManifestInput): Aifa
     } catch {
         throw new Error('URL fonte AIFA non valido');
     }
-    if (!['http:', 'https:'].includes(sourceUrl.protocol)) throw new Error('URL fonte AIFA non valido');
+    const sourceHost = sourceUrl.hostname.toLocaleLowerCase('it-IT');
+    const isOfficialAifaHost = sourceHost === 'aifa.gov.it' || sourceHost.endsWith('.aifa.gov.it');
+    if (sourceUrl.protocol !== 'https:' || !isOfficialAifaHost || sourceUrl.username || sourceUrl.password) {
+        throw new Error('URL fonte AIFA deve usare un dominio ufficiale aifa.gov.it');
+    }
     const parsedDownloadedAt = new Date(`${downloadedAt}T00:00:00Z`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(downloadedAt)
         || Number.isNaN(parsedDownloadedAt.getTime())
