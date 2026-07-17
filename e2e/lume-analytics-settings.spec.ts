@@ -120,7 +120,7 @@ async function expectNarrowAnalytics(page: Page): Promise<void> {
       focusOverflow: focus.scrollWidth - focus.clientWidth,
       answerBeforeFilters: answer.top < filters.top,
       tableDeclared: scroller.dataset.horizontalOverflow,
-      tableOwnsOverflow: scroller.scrollWidth >= scroller.clientWidth,
+      tableOwnsOverflow: scroller.scrollWidth > scroller.clientWidth,
     };
   });
   expect(layout.documentOverflow).toBeLessThanOrEqual(1);
@@ -249,11 +249,16 @@ async function verifySettings(page: Page, viewCase: ViewCase): Promise<void> {
 }
 
 for (const viewCase of CASES) {
-  test(`analytics e settings Lume ${viewCase.register} ${viewCase.viewport}`, async ({ page }) => {
+  test(`analytics Lume ${viewCase.register} ${viewCase.viewport}`, async ({ page }) => {
     await page.setViewportSize({ width: viewCase.width, height: viewCase.height });
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     await createAnalyticsFixture(page);
     await verifyAnalytics(page, viewCase);
+  });
+
+  test(`settings Lume fixture-free ${viewCase.register} ${viewCase.viewport}`, async ({ page }) => {
+    await page.setViewportSize({ width: viewCase.width, height: viewCase.height });
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     await verifySettings(page, viewCase);
   });
 }
