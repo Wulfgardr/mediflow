@@ -294,7 +294,12 @@ export default function PatientSmartImportPanel({ patient, entries = [], onRevie
         undefined,
         ['attachments'],
     );
-    const smartImportKillSwitch = useLiveQuery(() => db.settings.get(AI_SMART_IMPORT_KILL_SWITCH_KEY), []);
+    const smartImportKillSwitch = useLiveQuery(
+        () => db.settings.get(AI_SMART_IMPORT_KILL_SWITCH_KEY),
+        [],
+        undefined,
+        ['settings'],
+    );
 
     const sourceCount = countUsableSources(patient, entries, attachments?.length || 0);
     const smartImportEnabled = isAiSmartImportEnabledValue(smartImportKillSwitch?.value);

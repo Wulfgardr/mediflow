@@ -59,6 +59,7 @@ export default function ScalesLibraryPage() {
         ? [...SCALE_NAV_BASE, { href: '#paziente', label: 'Paziente', meta: 'avvio scala' }]
         : SCALE_NAV_BASE;
 
+    /* @Codex */
     const patients = useLiveQuery(
         () => {
             if (!selectedScaleDefinition) return Promise.resolve([]);
@@ -71,7 +72,9 @@ export default function ScalesLibraryPage() {
                 .limit(8)
                 .toArray();
         },
-        [normalizedSearchTerm, selectedScaleDefinition]
+        [normalizedSearchTerm, selectedScaleDefinition],
+        undefined,
+        ['patients', 'patients_to_ambulatories'],
     );
 
     useEffect(() => {

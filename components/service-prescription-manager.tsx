@@ -194,6 +194,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
     const [error, setError] = useState<string | null>(null);
     const [form, setForm] = useState<FormState>(() => emptyForm());
 
+    /* @Codex */
     const prescriptions = useLiveQuery(
         async () => {
             const items = await db.servicePrescriptions
@@ -204,6 +205,8 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
             );
         },
         [patientId],
+        undefined,
+        ['service_prescriptions'],
     );
 
     const prescriptionItems = useLiveQuery(
@@ -214,6 +217,8 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
             return items.sort((left, right) => left.ordinal - right.ordinal);
         },
         [patientId],
+        undefined,
+        ['service_prescription_items'],
     );
 
     const itemsByPrescription = useMemo(() => {

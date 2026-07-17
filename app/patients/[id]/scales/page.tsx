@@ -30,7 +30,8 @@ function getScaleIcon(scaleId: string) {
 export default function ScalesPage() {
     const params = useParams();
     const id = params.id as string;
-    const patient = useLiveQuery(() => db.patients.get(id), [id]);
+    /* @Codex */
+    const patient = useLiveQuery(() => db.patients.get(id), [id], undefined, ['patients']);
     const scales = Object.values(SCALES);
 
     const workspaceNavItems: Kree8WorkspaceNavItem[] = [

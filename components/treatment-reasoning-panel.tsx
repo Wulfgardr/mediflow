@@ -93,6 +93,8 @@ export default function TreatmentReasoningPanel({
     const treatmentReasoningKillSwitch = useLiveQuery(
         () => db.settings.get(AI_TREATMENT_REASONING_KILL_SWITCH_KEY),
         [],
+        undefined,
+        ['settings'],
     );
     const treatmentReasoningEnabled = isAiTreatmentReasoningEnabledValue(treatmentReasoningKillSwitch?.value);
     const sourceSummary = useMemo(

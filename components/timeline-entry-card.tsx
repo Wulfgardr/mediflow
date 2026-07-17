@@ -62,12 +62,15 @@ function presentEntry(entry: TimelineEntryData): EntryPresentation {
 }
 
 function EntryAttachments({ attachmentIds, onView }: { attachmentIds: string[], onView: (file: Attachment) => void }) {
+    /* @Codex */
     const attachments = useLiveQuery(
         async () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return await db.attachments.filter((a: any) => attachmentIds.includes(a.id)).toArray();
         },
-        [attachmentIds]
+        [attachmentIds],
+        undefined,
+        ['attachments'],
     );
 
     if (!attachments?.length) return null;
