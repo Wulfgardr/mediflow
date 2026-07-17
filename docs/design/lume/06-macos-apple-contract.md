@@ -109,7 +109,7 @@ Confermato localmente e contro-rivisto da Opus 4.8 max:
 | Le card cliniche usano `glassEffect` su OS 26+ | Risolto (PR #46): `clinicalCardStyle()` rende opaca la card clinica su ogni OS, `cardStyle()` è alias di compatibilità e `GlassCard` è deprecata e resa opaca | Consolidare le primitive Lume (`LumeSurface`/`LumeCard`) resta lavoro separato. |
 | Il workspace pazienti interno è un `HStack` con colonna fissa 360pt | Risolto nella slice M2a (#74) | `NavigationSplitView` + `List(selection:)` usano l'ID paziente stabile; la visibilità `.all` ripristina la worklist quando si rientra dalla sidebar clinica e il dettaglio resta opaco. |
 | Non esiste `.inspector()` nel workspace | Confermato | Introdurlo dopo lo split, per contesto e drill-down. |
-| Identita paziente scorre via e non esiste `safeAreaInset` | Confermato | Creare `TestataPaziente`; allergie richiedono prima verifica del contratto dati. |
+| Identità paziente scorre via e non esiste `safeAreaInset` | Implementato nella slice M2b (#106): testata `focal` persistente con nome, codice abbreviato, età se nota e aggiornamento; heading AX autonomo. Il probe interattivo finale resta un gate separato | Le allergie restano escluse finché il contratto dati non espone un valore strutturato affidabile. |
 | Il Registro non e applicato a dose/valore/codice/data | Confermato | Modifier `.registro()` e audit dei call-site. |
 | La storia osservazioni e una sparkline senza assi o banda | Confermato | Non promuoverla come `RigaLaboratorio`; sostituirla solo con dati e fonti disponibili. |
 | Pairing e credenziali occupano la colonna worklist | Confermato | Spostare la configurazione stabile in Settings; toolbar solo per stato/azione. |
@@ -124,11 +124,14 @@ simulate con dati inventati.
 2. **M1, primitive additive**: `LumePalette`, `LumeSurface`, `.registro()` e
    card clinica opaca; nessuna riorganizzazione funzionale. Consegnata finora
    solo la card clinica opaca (PR #46); le altre primitive restano aperte.
-3. **M2, struttura desktop**: la slice M2a (#74) consegna
-   `NavigationSplitView` e `List(selection:)`; spostare il pairing fuori dalla
-   worklist resta una slice separata.
-4. **M3, sicurezza di contesto**: `TestataPaziente` persistente con i soli dati
-   realmente disponibili e blocco esplicito se il contesto e incerto.
+3. **M2, struttura desktop**: la slice M2a (#74, stabilizzata in #94) consegna
+   `NavigationSplitView` e `List(selection:)`; la slice M2b (#106) aggiunge la
+   testata paziente persistente nel dettaglio macOS con i soli dati disponibili,
+   senza cambiare iOS/iPadOS. Il controllo AX diretto è verde sulla fixture
+   sintetica; il run interattivo finale resta da eseguire separatamente.
+   Spostare il pairing fuori dalla worklist resta una slice distinta.
+4. **M3, sicurezza di contesto avanzata**: allergie e altri segnali invariabili
+   entrano solo dopo un contratto dati strutturato; nessuna inferenza dalla prosa.
 5. **M4, densita a strati**: inspector e provenienza senza perdere la selezione.
 6. **M5, firma Lume**: filo, fuoco e motion sobri, dopo la prova della struttura.
 
@@ -138,10 +141,10 @@ sintetico light/dark (`ClinicalCardStyleTests`) e build del bundle macOS
 (PR #46), senza cambiare navigazione, parity o contratti. Il test e sintetico,
 non una QA manuale completa dei gate qui sotto.
 
-La slice M2a resta sotto circa 300 LOC e non combina la struttura desktop con
-inspector, testata persistente o spostamento del pairing. Questi confini restano
-esplicitamente aperti; il debito documentale sulle primitive M1 viene
-riconciliato nel follow-up docs finale di #68, non ampliato in #74.
+Le slice M2a e M2b restano separate: #74/#94 possiedono lo split desktop, #106
+possiede la testata persistente. Inspector, spostamento del pairing e segnali
+clinici senza contratto dati restano esplicitamente aperti; il debito documentale
+sulle primitive M1 viene riconciliato nel follow-up docs finale di #68.
 
 ## 8. Gate di verifica
 

@@ -288,10 +288,84 @@ struct PairedPatientsWorkspaceView: View {
                     .padding(20)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if let detail = model.selectedPatient {
+                    patientWorkspaceHeader(detail)
+                }
+            }
             .frame(maxWidth: .infinity)
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("patient-workspace-detail")
         }
         .navigationSplitViewStyle(.balanced)
+    }
+
+    /* @Codex */
+    private func patientWorkspaceHeader(_ detail: HomeBasePatientDetail) -> some View {
+        let name = "\(detail.lastName) \(detail.firstName)"
+        let metadata = patientWorkspaceHeaderMetadata(detail)
+
+        return Group {
+            if dynamicTypeSize >= .accessibility1 {
+                patientWorkspaceHeaderVertical(name: name, metadata: metadata)
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: 16) {
+                        patientWorkspaceHeaderName(name)
+                        Spacer(minLength: 16)
+                        patientWorkspaceHeaderAtoms(metadata)
+                    }
+                    patientWorkspaceHeaderVertical(name: name, metadata: metadata)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .lumeSurface(zone: .focal, cornerRadius: 0)
+        .overlay(alignment: .bottom) { Divider() }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(name). \(metadata)")
+        .accessibilityHeading(.h1)
+        .accessibilityIdentifier("patient-workspace-header")
+    }
+
+    /* @Codex */
+    private func patientWorkspaceHeaderVertical(name: String, metadata: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            patientWorkspaceHeaderName(name)
+            patientWorkspaceHeaderAtoms(metadata)
+        }
+    }
+
+    /* @Codex */
+    private func patientWorkspaceHeaderName(_ name: String) -> some View {
+        Text(name)
+            .font(.title2.weight(.semibold))
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /* @Codex */
+    private func patientWorkspaceHeaderAtoms(_ metadata: String) -> some View {
+        Text(metadata)
+            .font(.caption)
+            .registro()
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /* @Codex */
+    private func patientWorkspaceHeaderMetadata(_ detail: HomeBasePatientDetail) -> String {
+        var atoms = [PairedPatientsWorkspaceSupport.compactTaxCode(detail.taxCode)]
+        if let age = PairedPatientsWorkspaceSupport.age(from: detail.birthDate) {
+            atoms.append("\(age) anni")
+        }
+        if let updatedAt = detail.updatedAt {
+            atoms.append("Aggiornato \(PairedPatientsWorkspaceSupport.relativeUpdated(updatedAt))")
+        } else {
+            atoms.append("Aggiornamento non disponibile")
+        }
+        return atoms.joined(separator: " · ")
     }
 
     /* @Codex */
