@@ -180,6 +180,16 @@ for (const schedaCase of CASES) {
     await expectRegisterFont(header.getByTestId('lume-register-value'), 'atomi della testata', 3);
     await expectRegisterFont(surface.getByTestId('lume-register-value'), 'valori metrici', 4);
 
+    await page.getByTestId('privacy-mode-header-toggle').click();
+    await expect(header.locator('.liquid-blur')).toHaveCount(4);
+
+    await page.goto(`/patients/${patient.id}/entries/new`);
+    const defaultPatientLabel = page.getByTestId('lume-workspace-patient-label');
+    await expect(defaultPatientLabel).toContainText(patient.name);
+    await expect(defaultPatientLabel.locator('.liquid-blur')).toHaveCount(1);
+    await page.goto(`/patients/${patient.id}/modules`);
+    await expect(page.getByTestId('lume-scheda-header').locator('.liquid-blur')).toHaveCount(4);
+
     await scroll.evaluate((element) => element.scrollTo(0, 0));
     const therapies = page.getByRole('button', { name: /Terapie farmacologiche/ });
     await therapies.focus();
