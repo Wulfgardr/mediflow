@@ -94,6 +94,16 @@ export const NEVER_REGRESS_ALLOWLIST = {
     ],
     externalUrls: [
         {
+            path: 'lib/aifa-catalog.ts',
+            pattern: 'https://www\\.aifa\\.gov\\.it/open-data',
+            reason: 'The official AIFA Open Data page is stored as user-reviewed provenance and opened only through an explicit settings link; the catalog importer reads a user-selected local file and performs no network fetch.',
+        },
+        {
+            path: 'lib/aifa-catalog.ts',
+            pattern: 'https://www\\.aifa\\.gov\\.it/copyright',
+            reason: 'The official AIFA reuse-terms URL is persisted as catalog provenance metadata and is never fetched by the import or search runtime.',
+        },
+        {
             path: 'lib/athena-model-identity.ts',
             pattern: 'https://huggingface\\.co/mims-harvard/ATHENA-R1-Qwen3-8B',
             reason: 'The ATHENA model card URL is provenance documentation inside a comment; the MLX runtime resolves only pre-downloaded local artifacts and never performs network egress.',

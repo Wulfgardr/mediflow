@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import Database from 'better-sqlite3';
+import { AIFA_CATALOG_DEFAULT_SOURCE_URL } from './aifa-catalog';
 
 const ROOT_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 
@@ -45,7 +46,7 @@ test('import persists the provenance manifest and enables bounded prefix search'
     const result = await catalog.replaceAifaCatalog(
         new File([csv], 'aifa-synthetic.csv', { type: 'text/csv' }),
         {
-            sourceUrl: 'https://www.aifa.gov.it/open-data',
+            sourceUrl: AIFA_CATALOG_DEFAULT_SOURCE_URL,
             downloadedAt: '2026-07-17',
             version: 'synthetic-test-v1',
         },
