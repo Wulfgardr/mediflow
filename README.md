@@ -204,11 +204,11 @@ controllare: test reali e guard automatici decidono se una modifica regge.
 
 | Snapshot | Token di sessione | Ripartizione | Cache letta |
 | :-- | --: | :-- | --: |
-| **16 luglio 2026** | **24.637.335.544** | Codex 18.203.669.984 · Claude Code 6.433.665.560 | 23.315.122.538 (94,6%) |
+| **17 luglio 2026** | **22.185.794.772** | Codex 15.546.136.608 · Claude Code 6.639.658.164 | 20.917.134.403 (94,3%) |
 
-<img src="./screenshots/token-models.svg" alt="Snapshot 16 luglio 2026: 24,64 mld token di sessione, 18,20 mld in Codex e 6,43 mld in Claude Code; 23,32 mld da cache letta." width="720" loading="lazy"/>
+<img src="./screenshots/token-models.svg" alt="Snapshot 17 luglio 2026: 22,19 mld token di sessione, 15,55 mld in Codex e 6,64 mld in Claude Code; 20,92 mld da cache letta." width="720" loading="lazy"/>
 
-**Effort Codex:** xhigh 7.066.995.820 · non registrato / Ultra 6.530.502.439 · medium 1.980.214.345 · high 1.524.704.732 · non registrato 1.080.929.187 · low 20.323.461. Le sessioni senza effort registrato restano separate; possono includere fan-out `Ultra`, che non è un livello di ragionamento. Nei transcript Claude Code l'effort non è esposto in modo uniforme.
+**Effort Codex:** xhigh 7.350.462.593 · non registrato / Ultra 4.395.761.468 · high 2.000.320.556 · medium 1.774.948.743 · low 24.643.248 · non registrato 0. Le sessioni senza effort registrato restano separate; possono includere fan-out `Ultra`, che non è un livello di ragionamento. Nei transcript Claude Code l'effort non è esposto in modo uniforme.
 
 Il conteggio usa i contatori di tutti i log locali dei due ambienti e non è filtrato per repository. Per Codex somma i delta dei totali cumulativi e conserva modello, effort e cache letta; per Claude Code deduplica le richieste e somma input diretto, cache creata, cache letta e output. Sono pubblicati soltanto aggregati: nessun prompt, contenuto di sessione o percorso locale entra nel README o nell'SVG.
 
