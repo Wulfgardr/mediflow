@@ -1,4 +1,4 @@
-// Keep in sync with DATE_FIELDS in app/api/system/backup-restore/route.ts
+// Keep in sync with DATE_FIELDS in lib/backup-restore-executor.ts
 // (enforced by scripts/backup-restore-date-fields.test.mjs).
 export const DATE_FIELDS = new Set([
   'assignedAt',

@@ -29,127 +29,20 @@ import {
 import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 import {
     BACKUP_COLLECTIONS,
-    type BackupArtifact,
-    type BackupCollectionName,
     type BackupDataset,
     serializeBackupArtifact,
 } from '@/lib/backup-artifact';
-import { derivePatientAmbulatoryLinks } from '@/lib/backup-patient-ambulatory-links';
+import { restoreBackupArtifact } from '@/lib/backup-restore-executor';
 import { runBackupRestorePreflight } from '@/lib/backup-restore-preflight';
 
 /* @Codex */
 export const dynamic = 'force-dynamic';
-
-const CLEAR_ORDER: BackupCollectionName[] = [
-    'messages',
-    'attachments',
-    'observations',
-    'prostheticPrescriptions',
-    'servicePrescriptionItems',
-    'servicePrescriptions',
-    'serviceCatalogEntries',
-    'sissHandoffs',
-    'checkups',
-    'therapies',
-    'entries',
-    'patients',
-    'conversations',
-    'drugs',
-    'exemptions',
-    'ambulatories',
-];
-
-const INSERT_ORDER: BackupCollectionName[] = [
-    'ambulatories',
-    'drugs',
-    'exemptions',
-    'conversations',
-    'patients',
-    'entries',
-    'therapies',
-    'checkups',
-    'observations',
-    'prostheticPrescriptions',
-    'servicePrescriptions',
-    'servicePrescriptionItems',
-    'serviceCatalogEntries',
-    'sissHandoffs',
-    'attachments',
-    'messages',
-];
-
-const TABLES = {
-    ambulatories,
-    attachments,
-    checkups,
-    conversations,
-    drugs,
-    entries,
-    exemptions,
-    messages,
-    observations,
-    patients,
-    patientsToAmbulatories,
-    prostheticPrescriptions,
-    serviceCatalogEntries,
-    servicePrescriptionItems,
-    servicePrescriptions,
-    sissHandoffs: sissHandoffEvents,
-    therapies,
-} as const;
-
-const TABLE_LOOKUP = {
-    ambulatories,
-    attachments,
-    checkups,
-    conversations,
-    drugs,
-    entries,
-    exemptions,
-    messages,
-    observations,
-    patients,
-    prostheticPrescriptions,
-    serviceCatalogEntries,
-    servicePrescriptionItems,
-    servicePrescriptions,
-    sissHandoffs: sissHandoffEvents,
-    therapies,
-} as const;
-
-type InsertRunner = Pick<typeof dbServer, 'insert'>;
-type InsertableTable =
-    | typeof ambulatories
-    | typeof attachments
-    | typeof checkups
-    | typeof conversations
-    | typeof drugs
-    | typeof entries
-    | typeof exemptions
-    | typeof messages
-    | typeof observations
-    | typeof patients
-    | typeof patientsToAmbulatories
-    | typeof prostheticPrescriptions
-    | typeof serviceCatalogEntries
-    | typeof servicePrescriptionItems
-    | typeof servicePrescriptions
-    | typeof sissHandoffEvents
-    | typeof therapies;
 
 type PatientAmbulatoryLinkRow = {
     patientId: string;
     ambulatoryId: string;
     assignedAt: Date | null;
 };
-
-function chunk<T>(items: T[], size: number): T[][] {
-    const chunks: T[][] = [];
-    for (let index = 0; index < items.length; index += size) {
-        chunks.push(items.slice(index, index + size));
-    }
-    return chunks;
-}
 
 /* @Codex */
 function sortBackupRows<T extends Record<string, unknown>>(rows: T[]): T[] {
@@ -253,64 +146,6 @@ function buildBackupDataset(): BackupDataset {
 }
 
 /* @Codex */
-const DATE_FIELDS = new Set([
-    'assignedAt',
-    'birthDate',
-    'collaudoAt',
-    'createdAt',
-    'date',
-    'endDate',
-    'importedAt',
-    'observedAt',
-    'ocrQueueUpdatedAt',
-    'performedAt',
-    'prescribedAt',
-    'reportReceivedAt',
-    'scheduledAt',
-    'startDate',
-    'startedAt',
-    'completedAt',
-    'deletedAt',
-    'updatedAt',
-]);
-
-function normalizeDateValue(value: unknown): unknown {
-    if (value === null || value === undefined || value === '') return null;
-    if (value instanceof Date) return value;
-    if (typeof value === 'number') {
-        // Scheduled-runner artifacts predating WUL-319 carry raw SQLite unix-seconds
-        // integers; unix-milliseconds for any contemporary date are >= 10^12.
-        const milliseconds = Number.isInteger(value) && Math.abs(value) < 1_000_000_000_000
-            ? value * 1000
-            : value;
-        const parsed = new Date(milliseconds);
-        return Number.isNaN(parsed.getTime()) ? value : parsed;
-    }
-    if (typeof value === 'string') {
-        const parsed = new Date(value);
-        return Number.isNaN(parsed.getTime()) ? value : parsed;
-    }
-    return value;
-}
-
-function normalizeInsertRow<T extends Record<string, unknown>>(row: T): T {
-    const normalized: Record<string, unknown> = { ...row };
-    for (const field of DATE_FIELDS) {
-        if (Object.prototype.hasOwnProperty.call(normalized, field)) {
-            normalized[field] = normalizeDateValue(normalized[field]);
-        }
-    }
-    return normalized as T;
-}
-
-function insertRows<T extends Record<string, unknown>>(runner: InsertRunner, table: InsertableTable, rows: T[]): void {
-    if (rows.length === 0) return;
-    for (const group of chunk(rows, 250)) {
-        runner.insert(table).values(group.map(normalizeInsertRow)).run();
-    }
-}
-
-/* @Codex */
 export async function GET() {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
@@ -347,97 +182,7 @@ export async function POST(request: Request) {
             );
         }
 
-        // @Codex better-sqlite3 transactions are synchronous; promise callbacks break restore execution.
-        dbServer.transaction((tx) => {
-            for (const collection of CLEAR_ORDER) {
-                tx.delete(TABLE_LOOKUP[collection]).run();
-            }
-            tx.delete(TABLES.patientsToAmbulatories).run();
-
-            for (const collection of INSERT_ORDER) {
-                if (collection === 'patients') {
-                    insertRows(tx, TABLE_LOOKUP.patients, artifact.payload.patients);
-                    continue;
-                }
-
-                if (collection === 'ambulatories') {
-                    insertRows(tx, TABLE_LOOKUP.ambulatories, artifact.payload.ambulatories);
-                    continue;
-                }
-
-                if (collection === 'drugs') {
-                    insertRows(tx, TABLE_LOOKUP.drugs, artifact.payload.drugs);
-                    continue;
-                }
-
-                if (collection === 'exemptions') {
-                    insertRows(tx, TABLE_LOOKUP.exemptions, artifact.payload.exemptions);
-                    continue;
-                }
-
-                if (collection === 'conversations') {
-                    insertRows(tx, TABLE_LOOKUP.conversations, artifact.payload.conversations);
-                    continue;
-                }
-
-                if (collection === 'entries') {
-                    insertRows(tx, TABLE_LOOKUP.entries, artifact.payload.entries);
-                    continue;
-                }
-
-                if (collection === 'therapies') {
-                    insertRows(tx, TABLE_LOOKUP.therapies, artifact.payload.therapies);
-                    continue;
-                }
-
-                if (collection === 'checkups') {
-                    insertRows(tx, TABLE_LOOKUP.checkups, artifact.payload.checkups);
-                    continue;
-                }
-
-                if (collection === 'observations') {
-                    insertRows(tx, TABLE_LOOKUP.observations, artifact.payload.observations);
-                    continue;
-                }
-
-                if (collection === 'prostheticPrescriptions') {
-                    insertRows(tx, TABLE_LOOKUP.prostheticPrescriptions, artifact.payload.prostheticPrescriptions);
-                    continue;
-                }
-
-                if (collection === 'servicePrescriptions') {
-                    insertRows(tx, TABLE_LOOKUP.servicePrescriptions, artifact.payload.servicePrescriptions);
-                    continue;
-                }
-
-                if (collection === 'servicePrescriptionItems') {
-                    insertRows(tx, TABLE_LOOKUP.servicePrescriptionItems, artifact.payload.servicePrescriptionItems);
-                    continue;
-                }
-
-                if (collection === 'serviceCatalogEntries') {
-                    insertRows(tx, TABLE_LOOKUP.serviceCatalogEntries, artifact.payload.serviceCatalogEntries);
-                    continue;
-                }
-
-                if (collection === 'sissHandoffs') {
-                    insertRows(tx, TABLE_LOOKUP.sissHandoffs, artifact.payload.sissHandoffs);
-                    continue;
-                }
-
-                if (collection === 'attachments') {
-                    insertRows(tx, TABLE_LOOKUP.attachments, artifact.payload.attachments);
-                    continue;
-                }
-
-                if (collection === 'messages') {
-                    insertRows(tx, TABLE_LOOKUP.messages, artifact.payload.messages);
-                }
-            }
-
-            const patientLinks = derivePatientAmbulatoryLinks(artifact.payload.patients);
-            insertRows(tx, TABLES.patientsToAmbulatories, patientLinks);
-        });
+        restoreBackupArtifact(artifact);
 
         return NextResponse.json({
             success: true,
