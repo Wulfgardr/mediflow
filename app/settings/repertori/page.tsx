@@ -205,9 +205,12 @@ export default function SettingsRepertoriPage() {
 
                         {drugCatalog?.manifest ? (
                             <div className={`rounded-[var(--lume-radius-control)] border p-3 text-xs ${semanticSignalSurfaceClass('success')}`}>
-                                <p className="font-semibold">Provenienza verificabile</p>
+                                <p className="font-semibold">Manifest di provenienza registrato</p>
                                 <p className="mt-1 break-words">
                                     {drugCatalog.manifest.version} · scaricato il {drugCatalog.manifest.downloadedAt} · SHA-256 {drugCatalog.manifest.sha256.slice(0, 12)}…
+                                </p>
+                                <p className="mt-1">
+                                    Il manifest identifica il file importato; non certifica autenticità o licenza dello specifico dataset.
                                 </p>
                             </div>
                         ) : drugCatalog?.state === 'unverified' ? (

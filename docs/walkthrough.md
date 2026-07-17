@@ -572,11 +572,11 @@ vengono installati, avviati o arrestati dalla app.
 
 La scheda `Impostazioni -> Cataloghi` della shell macOS espone la minima
 operabilita amministrativa dei dataset condivisi: count/stato, import JSON
-compatibile e clear per farmaci ed esenzioni. Un import farmaci da questo
-percorso legacy non dispone dell'artifact sorgente e invalida quindi il manifest
-AIFA, mostrando il catalogo come non verificato. L'import AIFA con provenienza
-avviene dalla web UI. Le operazioni non creano storage cataloghi parallelo
-nell'app nativa.
+compatibile e clear per farmaci ed esenzioni. Ogni import farmaci da questo
+percorso legacy sostituisce atomicamente l'intero catalogo, non dispone
+dell'artifact sorgente e invalida quindi il manifest AIFA, mostrando il catalogo
+come non verificato. L'import AIFA con provenienza avviene dalla web UI. Le
+operazioni non creano storage cataloghi parallelo nell'app nativa.
 
 I form terapia Apple interrogano gia
 `GET /api/v1/network/drugs?q=<prefisso>&limit=<N>` tramite la capability

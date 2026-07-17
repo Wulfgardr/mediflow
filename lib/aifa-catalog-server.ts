@@ -15,7 +15,6 @@ import { dbServer } from './db-server';
 import {
     buildDrugPrefixSearchOrder,
     buildDrugPrefixSearchPredicate,
-    buildDrugSearchPredicate,
     normalizeDrugSearchQuery,
 } from './drug-search-query';
 import { drugs, settings } from './schema';
@@ -100,6 +99,20 @@ export function clearAifaCatalog(): void {
     });
 }
 
+export function replaceUnverifiedDrugCatalog(items: readonly (typeof drugs.$inferInsert)[]): void {
+    if (items.length === 0) throw new Error('Catalogo farmaci legacy vuoto');
+
+    dbServer.transaction((transaction) => {
+        transaction.delete(drugs).run();
+        for (let offset = 0; offset < items.length; offset += INSERT_BATCH_SIZE) {
+            transaction.insert(drugs).values(items.slice(offset, offset + INSERT_BATCH_SIZE)).run();
+        }
+        transaction.delete(settings)
+            .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY))
+            .run();
+    });
+}
+
 export async function searchAifaCatalog(
     query: string,
     limit: number,
@@ -107,17 +120,10 @@ export async function searchAifaCatalog(
     const normalized = normalizeDrugSearchQuery(query);
     const status = await getAifaCatalogStatus();
     if (!normalized) return { rows: [], status };
-    const predicate = status.state === 'ready'
-        ? buildDrugPrefixSearchPredicate(normalized)
-        : buildDrugSearchPredicate(query);
-    const order = status.state === 'ready'
-        ? [buildDrugPrefixSearchOrder(normalized), asc(drugs.name), asc(drugs.packaging)]
-        : [asc(drugs.name), asc(drugs.packaging)];
-
     const rows = await dbServer.select()
         .from(drugs)
-        .where(predicate)
-        .orderBy(...order)
+        .where(buildDrugPrefixSearchPredicate(normalized))
+        .orderBy(buildDrugPrefixSearchOrder(normalized), asc(drugs.name), asc(drugs.packaging))
         .limit(limit);
     return { rows, status };
 }
