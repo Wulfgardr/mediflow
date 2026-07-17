@@ -7,8 +7,10 @@ read_when:
 
 # Baseline performance delle route list
 
-Data misura: 17 luglio 2026, 15:28 CEST  
-Base runtime: `origin/main` a `d09c949a35b1326a7528bd6d24f4bc96bceaf845`  
+Data misura: 17 luglio 2026, 15:28 CEST
+
+Base runtime: `origin/main` a `d09c949a35b1326a7528bd6d24f4bc96bceaf845`
+
 Tooling benchmark: `7d9ce0f51e5851a3850d99fbb220c92b0be910f0`
 
 Questa baseline misura le route list reali su un database SQLite interamente
