@@ -3,8 +3,7 @@
 /* @Codex WUL-UIUX: dialogo di conferma accessibile e tematizzato, con campo
    motivazione opzionale (sostituisce prompt() per l'eliminazione clinica). Riusa
    useDialogA11y (Escape, focus trap, restore) e lo stile mf-modal. useConfirm()
-   ritorna una Promise: sostituisce confirm()/prompt() nativi. Fallback nativo se
-   il provider non e montato, cosi nessuna superficie si rompe. */
+   ritorna una Promise e richiede il provider tematizzato. */
 
 import { createContext, useCallback, useContext, useId, useRef, useState, type ReactNode } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
@@ -148,12 +147,6 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 export function useConfirm(): ConfirmFn {
     const context = useContext(ConfirmContext);
     if (context) return context;
-    /* Fallback nativo se il provider non e montato: i chiamanti non si rompono. */
-    return async (options) => {
-        if (options.requireReason) {
-            const reason = window.prompt(options.reasonLabel ?? options.title);
-            return { confirmed: reason !== null && reason.trim().length > 0, reason: reason?.trim() };
-        }
-        return { confirmed: window.confirm(options.message ?? options.title) };
-    };
+    /* @Codex: fail closed invece di degradare a una conferma nativa non tematizzata. */
+    throw new Error('useConfirm deve essere usato dentro ConfirmProvider');
 }
