@@ -8,17 +8,11 @@ import {
   UserSquare2,
 } from 'lucide-react';
 
-import {
-  PillBadge,
-  classNames,
-} from '../cockpit-shared';
 import type { AreaId } from '../cockpit-shared';
 import type { Kree8Patient, Kree8PatientWorkspace } from '@/lib/patient-workspace';
-import styles from '../kree8-clinical-cockpit-foundation.module.css';
-import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
+import styles from '../kree8-clinical-cockpit-document-review.module.css';
 
-
-/* @Codex */
+/* @Codex Issue 109, riferimento 68 */
 function LiveDocumentReviewArea({
   patient,
   workspace,
@@ -31,114 +25,142 @@ function LiveDocumentReviewArea({
   const isWorkspaceLoading = workspace === undefined;
   const codingHints = workspace?.codingHints ?? [];
   const documentNames = workspace?.recentAttachmentNames ?? [];
+  const documentInsightCount = workspace?.documentInsightCount ?? 0;
+  const hasEvidence = documentNames.length > 0 || codingHints.length > 0 || documentInsightCount > 0;
+  const reason = isWorkspaceLoading
+    ? 'Il contesto locale è ancora in caricamento.'
+    : hasEvidence
+      ? `${documentNames.length} documenti recenti · ${documentInsightCount} sintesi locali · ${codingHints.length} richiami da verificare.`
+      : 'Non risultano evidenze recenti o codifiche aperte per questo caso.';
 
   return (
-    <div className={styles.areaShell}>
-      <header className={styles.areaHeader}>
+    <div className={styles.area} data-testid="lume-review-area">
+      <header className={styles.header}>
         <div>
-          <p className={styles.areaCaption}>Revisione documenti</p>
-          <h1 className={styles.areaTitle}>
-            Documenti del paziente <em>· codifiche, evidenze, allegati</em>
-          </h1>
-          <p className={styles.areaSubtitle}>
+          <p className={styles.caption}>Revisione documentale</p>
+          <h1 className={styles.title}>Evidenza, decisione e prossimo passo</h1>
+          <p className={styles.subtitle}>
             {patient
-              ? `Contesto aperto su ${patient.name}.`
-              : 'Seleziona un paziente per vedere documenti, codifiche e suggerimenti collegati.'}
+              ? `Un solo flusso di revisione per ${patient.name}, con provenienza e responsabilità leggibili.`
+              : 'Seleziona un paziente per aprire il suo flusso di revisione documentale.'}
           </p>
-        </div>
-        <div className={styles.headerActions}>
-          <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('incarico')}>
-            <Inbox size={12} />
-            Scegli paziente
-          </button>
-          {patient ? (
-            <Link href={`${patient.modulesHref}#documenti`} className={styles.primaryBtn}>
-              <ArrowUpRight size={13} />
-              Apri documenti
-            </Link>
-          ) : null}
         </div>
       </header>
 
-      <div className={styles.statsRow}>
-        <div className={styles.statCard}>
-          <span className={styles.statLabel}>Documenti</span>
-          <span className={styles.statValue}>{workspace === undefined ? '…' : workspace?.attachmentsCount ?? 0}</span>
-          <span className={classNames(styles.statTrend, styles.statTrendMuted)}>allegati del caso</span>
-        </div>
-        <div className={styles.statCard}>
-          <span className={styles.statLabel}>Sintesi</span>
-          <span className={styles.statValue}>{workspace === undefined ? '…' : workspace?.documentInsightCount ?? 0}</span>
-          <span className={classNames(styles.statTrend, styles.statTrendMuted)}>evidenze estratte</span>
-        </div>
-        <div className={styles.statCard}>
-          <span className={styles.statLabel}>Codifiche</span>
-          <span className={styles.statValue}>{workspace === undefined ? '…' : codingHints.length}</span>
-          <span className={classNames(styles.statTrend, styles.statTrendMuted)}>da confermare</span>
-        </div>
-        <div className={styles.statCard}>
-          <span className={styles.statLabel}>Repertori</span>
-          <span className={styles.statValue}>locali</span>
-          <span className={classNames(styles.statTrend, styles.statTrendMuted)}>AIFA, esenzioni, ICD</span>
-        </div>
-      </div>
-
-      <div className={styles.twoCol}>
-        <section className={styles.panel}>
-          <header className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>Documenti del caso</h2>
-            <PillBadge variant="neutral">{documentNames.length} recenti</PillBadge>
-          </header>
-          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+      <section
+        className={styles.caseFlow}
+        aria-labelledby="lume-review-case-title"
+        data-lume-case="review"
+        data-testid="lume-review-case"
+      >
+        <div className={styles.section}>
+          <p className={styles.sectionLabel}>Evidenza</p>
+          <h2 id="lume-review-case-title" className={styles.sectionHeading}>
+            {patient?.name ?? 'Caso non selezionato'}
+          </h2>
+          <p className={styles.register} data-lume-register="true">
+            Provenienza: archivio locale · Stato: {isWorkspaceLoading ? 'caricamento' : 'da rivedere'} · Sintesi: {documentInsightCount}
+          </p>
+          <div className={styles.rows} aria-label="Evidenze documentali">
             {isWorkspaceLoading ? (
-              <p className={styles.panelSubtitle}>Caricamento documenti del paziente.</p>
-            ) : documentNames.length ? documentNames.map((name) => (
-              <div key={name} className={styles.compositeCard}>
-                <header className={styles.panelHeader}>
-                  <FileText size={14} color="var(--ink-muted)" />
-                  <span className={styles.evidenceTitle}>{name}</span>
-                  <PillBadge variant="warning">da leggere</PillBadge>
-                </header>
-              </div>
-            )) : (
-              <p className={styles.panelSubtitle}>Nessun documento recente agganciato al paziente selezionato.</p>
+              <p className={styles.empty}>Caricamento delle evidenze locali.</p>
+            ) : (
+              <>
+                {documentNames.map((name) => (
+                  <div key={name} className={styles.row}>
+                    <div className={styles.rowMain}>
+                      <FileText size={14} aria-hidden="true" />
+                      <span className={styles.rowTitle}>{name}</span>
+                    </div>
+                    <span className={styles.status}>Da leggere</span>
+                  </div>
+                ))}
+                {documentInsightCount > 0 ? (
+                  <div className={styles.row}>
+                    <div className={styles.rowMain}>
+                      <Sparkles size={14} aria-hidden="true" />
+                      <span className={styles.rowTitle}>
+                        {documentInsightCount} sintesi documentali persistite
+                      </span>
+                    </div>
+                    <span className={styles.status}>Da verificare</span>
+                  </div>
+                ) : null}
+                {documentNames.length === 0 && documentInsightCount === 0 ? (
+                  <p className={styles.empty}>Nessuna evidenza documentale agganciata al caso.</p>
+                ) : null}
+              </>
             )}
           </div>
-        </section>
+        </div>
 
-        <section className={styles.panelInset}>
-          <header className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>Suggerimenti AI</h2>
-            <PillBadge variant={codingHints.length ? 'warning' : 'success'}>
-              {codingHints.length ? 'review' : 'ok'}
-            </PillBadge>
-          </header>
-          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-            {isWorkspaceLoading ? (
-              <p className={styles.panelSubtitle}>Caricamento suggerimenti e codifiche.</p>
-            ) : codingHints.length ? codingHints.map((hint) => (
-              <div key={hint} className={styles.evidenceItem}>
-                <Sparkles size={14} color="var(--lume-ink-muted)" />
-                <span>
-                  <span className={styles.evidenceTitle}>{hint}</span>
-                </span>
-              </div>
-            )) : (
-              <p className={styles.panelSubtitle}>Nessun suggerimento in primo piano per il paziente selezionato.</p>
-            )}
-          </div>
-          <div className={patientStyles.caseLensActions} style={{ marginTop: 12 }}>
-            <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('repertori')}>
-              <Database size={12} />
+        <div className={styles.section}>
+          <p className={styles.sectionLabel}>Decisione</p>
+          <h3 className={styles.sectionHeading}>
+            {codingHints.length ? 'Richiami di codifica da verificare' : 'Nessun richiamo di codifica aperto'}
+          </h3>
+          <p className={styles.sectionCopy}>{reason}</p>
+          {codingHints.length ? (
+            <div className={styles.rows} aria-label="Richiami di codifica da verificare">
+              {codingHints.map((hint) => (
+                <div key={hint} className={styles.row}>
+                  <div className={styles.rowMain}>
+                    <Sparkles size={14} aria-hidden="true" />
+                    <span className={styles.rowTitle}>{hint}</span>
+                  </div>
+                  <span className={styles.status}>Promemoria</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className={styles.section}>
+          <p className={styles.sectionLabel}>Prossimo passo</p>
+          <dl className={styles.decisionGrid}>
+            <div>
+              <dt className={styles.decisionTerm}>Proprietario</dt>
+              <dd className={styles.decisionValue}>Medico responsabile del caso</dd>
+            </div>
+            <div>
+              <dt className={styles.decisionTerm}>Motivo</dt>
+              <dd className={styles.decisionValue}>{reason}</dd>
+            </div>
+          </dl>
+          <div className={styles.actions}>
+            <button type="button" className={styles.quietAction} onClick={() => onOpenArea('repertori')}>
+              <Database size={12} aria-hidden="true" />
               Repertori
             </button>
-            <button type="button" className={styles.ghostBtnSm} onClick={() => onOpenArea('scheda')}>
-              <UserSquare2 size={12} />
-              Torna al quadro
-            </button>
+            {patient ? (
+              <button type="button" className={styles.quietAction} onClick={() => onOpenArea('scheda')}>
+                <UserSquare2 size={12} aria-hidden="true" />
+                Torna al quadro
+              </button>
+            ) : null}
+            {patient ? (
+              <Link
+                href={`${patient.modulesHref}#documenti`}
+                className={styles.primaryAction}
+                data-lume-primary="true"
+              >
+                <ArrowUpRight size={13} aria-hidden="true" />
+                Apri documenti
+              </Link>
+            ) : (
+              <button
+                type="button"
+                className={styles.primaryAction}
+                data-lume-primary="true"
+                onClick={() => onOpenArea('incarico')}
+              >
+                <Inbox size={13} aria-hidden="true" />
+                Scegli paziente
+              </button>
+            )}
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </div>
   );
 }

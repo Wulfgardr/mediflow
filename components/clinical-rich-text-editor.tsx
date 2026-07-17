@@ -120,14 +120,24 @@ export function ClinicalRichTextEditor({
     };
 
     return (
-        <div className={cn('space-y-4', className)}>
+        <div
+            data-lume-editor-work-in-progress="true"
+            data-testid="lume-clinical-editor"
+            className={cn(
+                'min-w-0 max-w-full overflow-hidden rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-focal)] transition-[border-color,box-shadow] duration-[var(--lume-dur-riga)] ease-[var(--lume-ease)]',
+                isFocused
+                    ? 'border-[color:var(--lume-accent)] shadow-none'
+                    : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] shadow-none',
+                className,
+            )}
+        >
             {/* @Codex #75 */}
             <div
                 role="group"
                 aria-controls={editorId}
                 aria-label="Strumenti del resoconto clinico"
                 data-lume-editor-surface="toolbar"
-                className="flex min-w-0 max-w-full flex-wrap items-center gap-2 rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-2"
+                className="flex min-w-0 max-w-full flex-wrap items-center gap-2 border-b border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-2"
             >
                 {BLOCK_ACTIONS.map(({ command, icon: Icon, label, value: actionValue }) => (
                     <button
@@ -185,10 +195,8 @@ export function ClinicalRichTextEditor({
             <div
                 data-lume-editor-surface="canvas"
                 className={cn(
-                    'min-w-0 max-w-full rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-focal)] px-5 py-4 transition-[border-color] duration-[var(--lume-dur-riga)] ease-[var(--lume-ease)]',
-                    isFocused
-                        ? 'border-[color:var(--lume-accent)] shadow-[var(--lume-focus-ring)]'
-                        : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] shadow-none',
+                    'min-w-0 max-w-full bg-[color:var(--lume-surface-focal)] px-5 py-4',
+                    isFocused ? 'shadow-[var(--lume-focus-ring)]' : 'shadow-none',
                 )}
             >
                 <div
