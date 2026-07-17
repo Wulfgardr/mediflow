@@ -8,8 +8,11 @@ import {
     fetchDrugAutocomplete,
 } from './drug-autocomplete-search';
 
-function jsonResponse(body: unknown): Response {
-    return new Response(JSON.stringify(body), { status: 200 });
+function jsonResponse(body: unknown, catalogState = 'ready'): Response {
+    return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'X-MediFlow-Aifa-Catalog': catalogState },
+    });
 }
 
 test('production helper notifies auth failures without exposing the query or notifying on 5xx', async (t) => {
@@ -48,9 +51,20 @@ test('production helper sends the full query, preserves payloads, and caps resul
 
     const results = await fetchDrugAutocomplete('  Farmaco principio 500  ', new AbortController().signal, fetchImpl);
 
-    assert.equal(requestedUrl, '/api/drugs?q=Farmaco%20principio%20500');
-    assert.equal(results.length, 30);
-    assert.deepEqual(results[0], candidates[0]);
+    assert.equal(requestedUrl, '/api/drugs?q=Farmaco%20principio%20500&limit=30');
+    assert.equal(results.items.length, 30);
+    assert.deepEqual(results.items[0], candidates[0]);
+    assert.equal(results.catalogState, 'ready');
+});
+
+test('production helper exposes an honest not-imported state for an empty catalog', async () => {
+    const result = await fetchDrugAutocomplete(
+        'Farmaco',
+        new AbortController().signal,
+        async () => jsonResponse([], 'not-imported'),
+    );
+
+    assert.deepEqual(result, { items: [], catalogState: 'not-imported' });
 });
 
 test('coordinator aborts the prior request and suppresses its stale response', async () => {
@@ -69,7 +83,10 @@ test('coordinator aborts the prior request and suppresses its stale response', a
     const second = search.run('Secondo farmaco');
 
     pending[1].resolve(jsonResponse([{ aic: '2', name: 'Secondo farmaco' }]));
-    assert.deepEqual(await second, [{ aic: '2', name: 'Secondo farmaco' }]);
+    assert.deepEqual(await second, {
+        items: [{ aic: '2', name: 'Secondo farmaco' }],
+        catalogState: 'ready',
+    });
 
     pending[0].resolve(jsonResponse([{ aic: '1', name: 'Primo farmaco' }]));
     let newerLoading = true;
