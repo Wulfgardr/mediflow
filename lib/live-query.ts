@@ -1,46 +1,29 @@
 'use client';
 
 import { DependencyList, useEffect, useRef, useState } from 'react';
-/* STREAM B: pure predicate lives in its own React-free module for unit testing. */
-import { shouldReactToChange } from './live-query-scope';
+import { createDbChangeBus } from './live-query-scope';
+import type { DbChangeScope } from './live-query-scope';
 
 /* @Codex */
-// STREAM B: scoped invalidation. A listener may declare the tables it cares about;
-// a notification carries the table that changed. Unscoped on either side means
-// "match everything" so the pre-existing broadcast behaviour is preserved.
-type DbChangeListener = (table?: string) => void;
+const dbChangeBus = createDbChangeBus();
 
 /* @Codex */
-const dbChangeListeners = new Set<DbChangeListener>();
+export const subscribeDbChanges = dbChangeBus.subscribe;
 
 /* @Codex */
-function subscribeDbChanges(listener: DbChangeListener) {
-    dbChangeListeners.add(listener);
-    return () => {
-        dbChangeListeners.delete(listener);
-    };
-}
-
-/* @Codex */
-// notifyDbChange() with no arg keeps the original semantics (notify everyone).
-// notifyDbChange('entries') only wakes listeners scoped to 'entries' (or unscoped).
-export function notifyDbChange(table?: string) {
-    dbChangeListeners.forEach((listener) => listener(table));
-}
-
+export const notifyDbChange = dbChangeBus.notify;
 
 /* @Codex */
 export function useLiveQuery<T, TDefault = undefined>(
     querier: () => Promise<T> | T,
     deps?: DependencyList,
     defaultResult?: TDefault,
-    /* STREAM B: optional table scope; when set, only matching notifications re-run. */
-    tables?: readonly string[],
+    tables?: DbChangeScope,
 ): T | TDefault | undefined {
     const querierRef = useRef(querier);
     const [result, setResult] = useState<T | TDefault | undefined>(defaultResult);
     const [revision, setRevision] = useState(0);
-    /* @Codex STREAM B: keep latest scope without re-subscribing on every render. */
+    /* @Codex */
     const tablesRef = useRef(tables);
     tablesRef.current = tables;
 
@@ -48,10 +31,9 @@ export function useLiveQuery<T, TDefault = undefined>(
         querierRef.current = querier;
     }, [querier]);
 
-    useEffect(() => subscribeDbChanges((changedTable) => {
-        if (!shouldReactToChange(tablesRef.current, changedTable)) return;
+    useEffect(() => dbChangeBus.subscribeWithScopeResolver(() => {
         setRevision((previous) => previous + 1);
-    }), []);
+    }, () => tablesRef.current), []);
 
     useEffect(() => {
         let cancelled = false;
@@ -90,15 +72,14 @@ export function useLiveQueryState<T, TDefault = undefined>(
     querier: () => Promise<T> | T,
     deps?: DependencyList,
     defaultResult?: TDefault,
-    /* STREAM B: optional table scope; when set, only matching notifications re-run. */
-    tables?: readonly string[],
+    tables?: DbChangeScope,
 ): LiveQueryState<T, TDefault> {
     const querierRef = useRef(querier);
     const [data, setData] = useState<T | TDefault | undefined>(defaultResult);
     const [error, setError] = useState<unknown>(null);
     const [loading, setLoading] = useState(true);
     const [revision, setRevision] = useState(0);
-    /* @Codex STREAM B: keep latest scope without re-subscribing on every render. */
+    /* @Codex */
     const tablesRef = useRef(tables);
     tablesRef.current = tables;
 
@@ -106,10 +87,9 @@ export function useLiveQueryState<T, TDefault = undefined>(
         querierRef.current = querier;
     }, [querier]);
 
-    useEffect(() => subscribeDbChanges((changedTable) => {
-        if (!shouldReactToChange(tablesRef.current, changedTable)) return;
+    useEffect(() => dbChangeBus.subscribeWithScopeResolver(() => {
         setRevision((previous) => previous + 1);
-    }), []);
+    }, () => tablesRef.current), []);
 
     useEffect(() => {
         let cancelled = false;
