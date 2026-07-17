@@ -3,6 +3,13 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 
 type SchedaCase = { register: 'giorno' | 'grafite'; viewport: 'wide' | 'narrow'; width: number; height: number };
+type ElevatedSurface = {
+  background: string;
+  expected: boolean;
+  shadow: string;
+  tag: string;
+  testId: string | null;
+};
 const CASES: SchedaCase[] = [
   { register: 'giorno', viewport: 'wide', width: 1440, height: 960 },
   { register: 'grafite', viewport: 'wide', width: 1440, height: 960 },
@@ -43,6 +50,54 @@ async function setRegister(page: Page, register: SchedaCase['register']): Promis
     document.documentElement.classList.remove('light', 'dark');
     document.documentElement.classList.add(theme);
   }, register);
+}
+
+async function prepareStableInsightHydration(page: Page): Promise<{ loaded: Promise<void> }> {
+  await page.evaluate(async () => {
+    for (const key of ['aiDocumentSynthesisKillSwitch', 'aiPatientInsightKillSwitch']) {
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value: 'enabled' }),
+      });
+      if (!response.ok) throw new Error(`Fixture impostazione ${key}: HTTP ${response.status}`);
+    }
+  });
+
+  /* Riproduce deterministicamente la gara osservata nella suite completa: la
+     sintesi documentale risponde prima di Patient Insight. Il prodotto deve
+     attendere entrambe prima di decidere se aprire Archivio documenti. */
+  await page.route('**/api/settings/aiPatientInsightKillSwitch', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    await route.continue();
+  });
+  const patientInsightLoaded = page.waitForResponse((response) =>
+    response.request().method() === 'GET'
+      && response.url().endsWith('/api/settings/aiPatientInsightKillSwitch'));
+  return { loaded: patientInsightLoaded.then(() => undefined) };
+}
+
+async function readElevatedSurfaces(scroll: Locator): Promise<ElevatedSurface[]> {
+  return scroll.evaluate((context) => {
+    const expected = context.querySelector('[data-testid="lume-scheda-surface"]');
+    return [context, ...context.querySelectorAll<HTMLElement>('*')]
+      .filter((element) => {
+        const style = getComputedStyle(element);
+        const hasSurfaceBackground = style.backgroundColor !== 'rgba(0, 0, 0, 0)'
+          && style.backgroundColor !== 'transparent';
+        return style.boxShadow !== 'none' && hasSurfaceBackground;
+      })
+      .map((element) => {
+        const style = getComputedStyle(element);
+        return {
+          background: style.backgroundColor,
+          expected: element === expected,
+          shadow: style.boxShadow,
+          tag: element.tagName.toLowerCase(),
+          testId: element.getAttribute('data-testid'),
+        };
+      });
+  });
 }
 
 async function expectInViewport(locator: Locator): Promise<void> {
@@ -91,7 +146,9 @@ for (const schedaCase of CASES) {
     await page.setViewportSize({ width: schedaCase.width, height: schedaCase.height });
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const patient = await createFixture(page);
+    const insightHydration = await prepareStableInsightHydration(page);
     await page.goto(`/patients/${patient.id}/modules`);
+    await insightHydration.loaded;
     await setRegister(page, schedaCase.register);
     await expect(page.locator('html')).toHaveClass(schedaCase.register === 'grafite' ? /dark/ : /light/);
 
@@ -99,6 +156,8 @@ for (const schedaCase of CASES) {
     const header = page.getByTestId('lume-scheda-header');
     const surface = page.getByTestId('lume-scheda-surface');
     await expect(header.getByRole('heading', { name: patient.name, level: 1 })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Archivio documenti ed evidenze/ }))
+      .toHaveAttribute('aria-expanded', 'false');
     await expectInViewport(header);
     expect(await scroll.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
     await scroll.evaluate((element) => element.scrollTo(0, element.scrollHeight));
@@ -106,26 +165,11 @@ for (const schedaCase of CASES) {
 
     await expect(page.locator('[data-lume-elevation]')).toHaveCount(1);
     await expect(surface).toHaveAttribute('data-lume-elevation', 'focal');
-    const elevatedSurfaces = await scroll.evaluate((context) => {
-      const expected = context.querySelector('[data-testid="lume-scheda-surface"]');
-      return [context, ...context.querySelectorAll<HTMLElement>('*')]
-        .filter((element) => {
-          const style = getComputedStyle(element);
-          const hasSurfaceBackground = style.backgroundColor !== 'rgba(0, 0, 0, 0)'
-            && style.backgroundColor !== 'transparent';
-          return style.boxShadow !== 'none' && hasSurfaceBackground;
-        })
-        .map((element) => {
-          const style = getComputedStyle(element);
-          return {
-            background: style.backgroundColor,
-            expected: element === expected,
-            shadow: style.boxShadow,
-            tag: element.tagName.toLowerCase(),
-            testId: element.getAttribute('data-testid'),
-          };
-        });
-    });
+    await expect.poll(
+      async () => (await readElevatedSurfaces(scroll)).length,
+      { message: 'la Scheda stabilizzata espone una sola ombra computata', timeout: 1_500 },
+    ).toBe(1);
+    const elevatedSurfaces = await readElevatedSurfaces(scroll);
     expect(elevatedSurfaces).toHaveLength(1);
     expect(elevatedSurfaces[0]).toMatchObject({
       expected: true,

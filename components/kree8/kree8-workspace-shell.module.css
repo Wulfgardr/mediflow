@@ -254,6 +254,12 @@
 .clinicalShell .clinicalSurface :global(.evidence-stack-tile) { background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; backdrop-filter: none !important; }
 .clinicalShell .clinicalSurface :global(.patient-identity-lens) { min-height: 0 !important; padding: 0 !important; }
 .clinicalShell .clinicalSurface :global(.patient-identity-lens::after) { display: none !important; }
+/* @Codex LUME-104/68: gli stati vuoto/disabilitato dell'insight contengono un
+   ornamento e una CTA con vecchie ombre esplicite, non governate dal token
+   neutralizzato sulla Scheda. Nessuno dei due e una superficie elevata. */
+.clinicalShell .clinicalSurface :global(.patient-ai-insight-panel > div > :first-child),
+.clinicalShell .clinicalSurface :global(.patient-ai-insight-panel > div > a),
+.clinicalShell .clinicalSurface :global(.patient-ai-insight-panel > div > button) { box-shadow: none !important; }
 .clinicalShell .clinicalSurface :global(.patient-quick-context-card),
 .clinicalShell .clinicalSurface :global(.patient-diagnosis-card),
 .clinicalShell .clinicalSurface :global(.identity-lens-pane),

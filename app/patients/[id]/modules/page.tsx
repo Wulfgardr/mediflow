@@ -214,7 +214,13 @@ export default function PatientDetailPage() {
         () => db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY),
         [],
     );
-    const patientInsightKillSwitch = useLiveQuery(() => db.settings.get(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY), []);
+    /* @Codex LUME-104/68: non derivare lo stato fail-closed del pannello mentre
+       la preferenza e ancora in caricamento: aprirebbe la sezione per un falso
+       "bloccato" e CollapsibleSection, correttamente, non la richiuderebbe. */
+    const { data: patientInsightKillSwitch, loading: patientInsightKillSwitchLoading } = useLiveQueryState(
+        () => db.settings.get(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY),
+        [],
+    );
     const smartImportKillSwitch = useLiveQuery(() => db.settings.get(AI_SMART_IMPORT_KILL_SWITCH_KEY), []);
     /* @Codex */
     const exemptionCodes = Array.isArray(patient?.exemptions) ? patient.exemptions : [];
@@ -784,6 +790,7 @@ export default function PatientDetailPage() {
                     summary={attachmentItems.length > 0 ? 'Apri evidenze, insight e archivio.' : 'Nessun documento ancora caricato.'}
                     surfaceClassName={workspaceStyles.clinicalSection}
                     defaultOpen={!documentSynthesisKillSwitchLoading
+                        && !patientInsightKillSwitchLoading
                         && (!documentSynthesisKillSwitch || isAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch.value))
                         && (Boolean(patient.aiSummary?.trim())
                             || smartImportSourceCount > 0
