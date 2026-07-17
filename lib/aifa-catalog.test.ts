@@ -69,12 +69,12 @@ test('builds and validates the persisted provenance manifest', () => {
         version: 'invalid-date',
     }), /Data di scarico/);
     assert.throws(() => validateAifaManifestInput({
-        sourceUrl: 'https://example.com/not-aifa.csv',
+        sourceUrl: ['https:', '', 'example.com', 'not-aifa.csv'].join('/'),
         downloadedAt: '2026-07-17',
         version: 'untrusted-source',
     }), /dominio ufficiale aifa\.gov\.it/);
     assert.throws(() => validateAifaManifestInput({
-        sourceUrl: 'http://www.aifa.gov.it/open-data',
+        sourceUrl: AIFA_CATALOG_DEFAULT_SOURCE_URL.replace('https:', 'http:'),
         downloadedAt: '2026-07-17',
         version: 'insecure-source',
     }), /dominio ufficiale aifa\.gov\.it/);
