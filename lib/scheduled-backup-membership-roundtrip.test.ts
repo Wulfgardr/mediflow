@@ -5,12 +5,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { parseBackupArtifact } from './backup-artifact';
 import { derivePatientAmbulatoryLinks } from './backup-patient-ambulatory-links';
 
+const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
 test('scheduled backup roundtrip restores both ambulatory memberships for one patient', async () => {
-    const root = process.cwd();
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-scheduled-membership-'));
     const sourceDataDir = path.join(workDir, 'source');
     const targetDataDir = path.join(workDir, 'target');
@@ -19,8 +21,8 @@ test('scheduled backup roundtrip restores both ambulatory memberships for one pa
     try {
         for (const dataDir of [sourceDataDir, targetDataDir]) {
             execFileSync(process.execPath, ['scripts/prepare-e2e-db.mjs'], {
-                cwd: root,
-                env: { ...process.env, MEDIFLOW_E2E_DATA_DIR: dataDir },
+                cwd: ROOT_DIR,
+                env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir },
                 stdio: 'pipe',
             });
         }
@@ -43,7 +45,7 @@ test('scheduled backup roundtrip restores both ambulatory memberships for one pa
 
         fs.mkdirSync(backupDir, { recursive: true });
         const runnerResult = JSON.parse(execFileSync(process.execPath, ['scripts/run-scheduled-backup.mjs'], {
-            cwd: root,
+            cwd: ROOT_DIR,
             env: {
                 ...process.env,
                 MEDIFLOW_DATA_DIR: sourceDataDir,
