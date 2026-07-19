@@ -2,14 +2,15 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
 import { BACKUP_COLLECTIONS, parseBackupArtifact } from './backup-artifact';
 import { decryptData, encryptData, generateMasterKey } from './security/security';
 
-const ROOT = process.cwd();
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LOADER = path.join(ROOT, 'scripts/register-strip-types-loader.mjs');
 const MEMBERSHIP_TABLE = 'patients_to_ambulatories';
 const NON_BACKUP_TABLES = new Set(['audit_events', 'settings', 'users']);
@@ -42,7 +43,7 @@ function runNode(args: string[], env: Record<string, string> = {}): string {
 }
 
 function prepareDatabase(dataDir: string): void {
-    runNode(['scripts/prepare-e2e-db.mjs'], { MEDIFLOW_E2E_DATA_DIR: dataDir });
+    runNode(['scripts/prepare-e2e-db.mjs'], { MEDIFLOW_DATA_DIR: dataDir });
     const dbServerUrl = pathToFileURL(path.join(ROOT, 'lib/db-server.ts')).href;
     runNode(
         ['--experimental-strip-types', '--import', LOADER, '--input-type=module', '--eval', `await import(${JSON.stringify(dbServerUrl)});`],
@@ -196,7 +197,7 @@ function restoreArtifact(targetDataDir: string, artifactPath: string): void {
 }
 
 test('scheduled backup restores every clinical table and preserves ciphertext bytes', async () => {
-    const workDir = fs.mkdtempSync(path.join(ROOT, 'tmp-backup-roundtrip-'));
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-roundtrip-'));
     const sourceDataDir = path.join(workDir, 'source');
     const targetDataDir = path.join(workDir, 'target');
     const backupDir = path.join(workDir, 'backups');
