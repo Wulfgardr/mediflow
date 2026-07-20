@@ -30,6 +30,7 @@ export default function EditPatientPage() {
     const { showToast } = useToast();
     const confirm = useConfirm();
 
+    /* @Codex */
     const patient = useLiveQuery(async () => {
         const p = await db.patients.get(id);
         if (!p) return null;
@@ -37,7 +38,7 @@ export default function EditPatientPage() {
         // Fetch relations
         const checkups = await db.checkups.filter((c: any) => c.patientId === id).toArray();
         return { ...p, checkups };
-    }, [id]);
+    }, [id], undefined, ['patients', 'checkups']);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const onSubmit = async (data: any) => {

@@ -168,9 +168,10 @@ function SectionHeading({ label, title, description }: { label: string; title: s
 }
 
 export default function AnalyticsPage() {
+    /* @Codex */
     const patients = useLiveQuery(async () => db.patients
         .filter((patient) => !patient.isArchived)
-        .toArray());
+        .toArray(), [], undefined, ['patients', 'patients_to_ambulatories']);
     const [ageRange, setAgeRange] = useState<[number, number]>([0, 120]);
     const [auditDays, setAuditDays] = useState(30);
     const [auditSummary, setAuditSummary] = useState<AuditSummary | null>(null);

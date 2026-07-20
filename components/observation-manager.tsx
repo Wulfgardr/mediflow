@@ -147,12 +147,15 @@ export default function ObservationManager({
     const italianLoincLabel = (analyteCode: string, fallback: string) =>
         loincOptions.find((item) => item.code === analyteCode)?.displayIt ?? fallback;
 
+    /* @Codex */
     const observations = useLiveQuery(
         async () => {
             const items = await db.observations.filter((o) => o.patientId === patientId).toArray();
             return items.sort((a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime());
         },
         [patientId],
+        undefined,
+        ['observations'],
     );
 
     type Observation = NonNullable<typeof observations>[number];

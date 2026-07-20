@@ -61,9 +61,16 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return items.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         },
-        [patientId]
+        [patientId],
+        undefined,
+        ['attachments'],
     );
-    const documentSynthesisKillSwitch = useLiveQuery(() => db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY), []);
+    const documentSynthesisKillSwitch = useLiveQuery(
+        () => db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY),
+        [],
+        undefined,
+        ['settings'],
+    );
     const documentSynthesisEnabled = isAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
 
 
@@ -293,7 +300,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
             await db.attachments.update(file.id, { ocrQueueState: 'ocr_failed' }).catch(() => undefined);
         } finally {
             setReplayingId(null);
-            notifyDbChange();
+            notifyDbChange('attachments');
         }
     };
 

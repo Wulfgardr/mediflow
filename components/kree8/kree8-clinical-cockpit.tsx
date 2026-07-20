@@ -230,7 +230,7 @@ export function Kree8ClinicalCockpit({
     async () => (isReview ? [] : db.patients.toArray()),
     [isReview],
     undefined,
-    ['patients'],
+    ['patients', 'patients_to_ambulatories'],
   );
 
   /* @Codex */
@@ -287,7 +287,7 @@ export function Kree8ClinicalCockpit({
     },
     [isReview, selectedPatient?.id],
     undefined,
-    ['entries', 'therapies', 'checkups', 'observations', 'attachments'],
+    ['patients', 'entries', 'therapies', 'checkups', 'observations', 'attachments'],
   );
 
   useEffect(() => {
