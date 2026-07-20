@@ -70,6 +70,14 @@ test('import persists the provenance manifest and enables bounded prefix search'
     assert.equal(search.rows.length, 1);
     assert.equal(search.rows[0].name, 'ACIDO SINTETICO');
 
+    const crossFieldSearch = await catalog.searchAifaCatalog('acido orale', 1);
+    assert.equal(crossFieldSearch.rows.length, 1);
+    assert.equal(crossFieldSearch.rows[0].aic, '000000101');
+
+    const accentFoldedSearch = await catalog.searchAifaCatalog('citta 500', 1);
+    assert.equal(accentFoldedSearch.rows.length, 1);
+    assert.equal(accentFoldedSearch.rows[0].aic, '000000102');
+
     catalog.clearAifaCatalog();
     assert.deepEqual(await catalog.getAifaCatalogStatus(), {
         count: 0,
@@ -124,4 +132,29 @@ test('legacy replacement removes AIFA rows without changing price scale or prefi
         price: 250,
         atc: 'A00AA00',
     }]);
+});
+
+test('runtime search applies cross-field tokens before the result cap', async () => {
+    const catalog = await loadCatalogModules();
+    catalog.replaceUnverifiedDrugCatalog([
+        ...Array.from({ length: 300 }, (_, index) => ({
+            aic: `DECOY-${index}`,
+            name: `ALFA ${String(index).padStart(3, '0')}`,
+            packaging: 'Compresse',
+            aicSearch: `decoy ${index}`,
+            nameSearch: `alfa ${String(index).padStart(3, '0')}`,
+            activePrincipleSearch: '',
+        })),
+        {
+            aic: 'TARGET',
+            name: 'ZETA ALFA',
+            packaging: 'Beta soluzione',
+            aicSearch: 'target',
+            nameSearch: 'zeta alfa',
+            activePrincipleSearch: '',
+        },
+    ]);
+
+    const search = await catalog.searchAifaCatalog('alfa beta', 1);
+    assert.deepEqual(search.rows.map((row) => row.aic), ['TARGET']);
 });

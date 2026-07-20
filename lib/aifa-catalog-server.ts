@@ -5,6 +5,7 @@ import { asc, eq, sql } from 'drizzle-orm';
 import {
     AIFA_CATALOG_MANIFEST_SETTING_KEY,
     buildAifaCatalogManifest,
+    normalizeAifaSearchText,
     parseAifaCsv,
     parseStoredAifaCatalogManifest,
     validateAifaManifestInput,
@@ -15,6 +16,7 @@ import { dbServer } from './db-server';
 import {
     buildDrugPrefixSearchOrder,
     buildDrugPrefixSearchPredicate,
+    buildDrugSearchPredicate,
     normalizeDrugSearchQuery,
 } from './drug-search-query';
 import { drugs, settings } from './schema';
@@ -102,10 +104,15 @@ export function clearAifaCatalog(): void {
 export function replaceUnverifiedDrugCatalog(items: readonly (typeof drugs.$inferInsert)[]): void {
     if (items.length === 0) throw new Error('Catalogo farmaci legacy vuoto');
 
+    const normalizedItems = items.map((item) => ({
+        ...item,
+        packagingSearch: item.packagingSearch ?? normalizeAifaSearchText(item.packaging || ''),
+    }));
+
     dbServer.transaction((transaction) => {
         transaction.delete(drugs).run();
-        for (let offset = 0; offset < items.length; offset += INSERT_BATCH_SIZE) {
-            transaction.insert(drugs).values(items.slice(offset, offset + INSERT_BATCH_SIZE)).run();
+        for (let offset = 0; offset < normalizedItems.length; offset += INSERT_BATCH_SIZE) {
+            transaction.insert(drugs).values(normalizedItems.slice(offset, offset + INSERT_BATCH_SIZE)).run();
         }
         transaction.delete(settings)
             .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY))
@@ -120,10 +127,18 @@ export async function searchAifaCatalog(
     const normalized = normalizeDrugSearchQuery(query);
     const status = await getAifaCatalogStatus();
     if (!normalized) return { rows: [], status };
+
+    const isMultiToken = normalized.includes(' ');
     const rows = await dbServer.select()
         .from(drugs)
-        .where(buildDrugPrefixSearchPredicate(normalized))
-        .orderBy(buildDrugPrefixSearchOrder(normalized), asc(drugs.name), asc(drugs.packaging))
+        .where(isMultiToken
+            ? buildDrugSearchPredicate(normalized)
+            : buildDrugPrefixSearchPredicate(normalized))
+        .orderBy(
+            ...(isMultiToken ? [] : [buildDrugPrefixSearchOrder(normalized)]),
+            asc(drugs.name),
+            asc(drugs.packaging),
+        )
         .limit(limit);
     return { rows, status };
 }
