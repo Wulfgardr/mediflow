@@ -18,6 +18,9 @@ test('persists metadata-only checks for the exact clean branch and SHA', (t) => 
   assert.match(undeclared.stdout, /Decision: needs_codex \(medium\)/);
   assert.match(undeclared.stdout, /changed=1/);
 
+  const failed = runMonitor(fixture, '--check=focused=fail');
+  assert.match(failed.stdout, /Decision: blocked \(high\)/);
+
   const declared = runMonitor(fixture, '--check=focused=pass', '--persist-checks');
   assert.equal(declared.status, 0, declared.stderr);
   assert.match(declared.stdout, /Decision: continue \(low\)/);
@@ -52,16 +55,17 @@ test('rejects dirty persistence and withholds protected path names', (t) => {
   assert.equal(persist.status, 1);
   assert.match(persist.stderr, /dirty worktree/);
 
-  git(fixture.repo, ['checkout', 'main']);
-  fs.writeFileSync(path.join(fixture.repo, 'medical.db'), 'synthetic marker only\n');
-  git(fixture.repo, ['add', 'medical.db']);
-  git(fixture.repo, ['commit', '-m', 'protected path']);
-  git(fixture.repo, ['checkout', '-b', 'codex/protected']);
-  fs.writeFileSync(path.join(fixture.repo, 'medical.db'), 'synthetic marker changed\n');
-  git(fixture.repo, ['commit', '-am', 'protected delta']);
-  const protectedResult = runMonitor(fixture);
-  assert.match(protectedResult.stdout, /Decision: blocked \(high\)/);
-  assert.doesNotMatch(protectedResult.stdout, /medical\.db/);
+  for (const protectedPath of ['Downloads/export.txt', 'config/secrets/prod.pem', 'data/medical.db-journal', 'fse']) {
+    const protectedFixture = createFixture(t);
+    const protectedFile = path.join(protectedFixture.repo, protectedPath);
+    fs.mkdirSync(path.dirname(protectedFile), { recursive: true });
+    fs.writeFileSync(protectedFile, 'synthetic marker only\n');
+    git(protectedFixture.repo, ['add', protectedPath]);
+    git(protectedFixture.repo, ['commit', '-m', 'protected delta']);
+    const protectedResult = runMonitor(protectedFixture);
+    assert.match(protectedResult.stdout, /Decision: blocked \(high\)/);
+    assert.doesNotMatch(protectedResult.stdout, /Downloads|secrets|medical\.db|fse/);
+  }
 });
 
 test('reports a clean main that is behind origin/main metadata', (t) => {
@@ -77,6 +81,16 @@ test('reports a clean main that is behind origin/main metadata', (t) => {
   const result = runMonitor(fixture);
   assert.match(result.stdout, /ahead=0 behind=1/);
   assert.match(result.stdout, /Decision: needs_codex \(medium\)/);
+});
+
+test('requires review when no main base ref exists', (t) => {
+  const fixture = createFixture(t);
+  git(fixture.repo, ['update-ref', '-d', 'refs/remotes/origin/main']);
+  git(fixture.repo, ['branch', '-D', 'main']);
+
+  const result = runMonitor(fixture);
+  assert.match(result.stdout, /Decision: needs_codex \(medium\)/);
+  assert.match(result.stdout, /No main base ref is available/);
 });
 
 function createFixture(t) {

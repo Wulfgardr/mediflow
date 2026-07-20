@@ -56,9 +56,13 @@ const failedChecks = checks.filter((check) => check.status === 'fail').length;
 const skippedChecks = checks.filter((check) => check.status === 'skip').length;
 let decision = 'continue';
 let risk = 'low';
-let reason = changedPaths.length === 0 ? 'No committed branch delta.' : 'Declared checks cover the committed branch delta.';
+let reason = changedPaths.length === 0 ? 'No committed branch delta.' : 'Declared check statuses contain no failure or skip.';
 
-if (hardStopCount > 0) {
+if (!baseRef) {
+  decision = 'needs_codex';
+  risk = 'medium';
+  reason = 'No main base ref is available; committed branch delta cannot be assessed.';
+} else if (hardStopCount > 0) {
   decision = 'blocked';
   risk = 'high';
   reason = 'A changed path crosses a protected boundary; path names are withheld.';
@@ -131,9 +135,9 @@ function resolveBaseRef(root) {
 
 function isHardStopPath(file) {
   return /(^|\/)(Downloads|mail|calendar|vault)(\/|$)/i.test(file)
-    || /(^|\/)(medical\.db|[^/]+\.(?:db|sqlite|sqlite3)(?:-(?:wal|shm))?)$/i.test(file)
-    || /(^|\/)(?:\.env(?:\..+)?|credentials?[^/]*|secrets?[^/]*)$/i.test(file)
-    || /(^|\/)(?:siss|fse)(?:\/|[-_.])/i.test(file);
+    || /(^|\/)(medical\.db|[^/]+\.(?:db|sqlite|sqlite3)(?:-(?:wal|shm|journal))?)$/i.test(file)
+    || /(^|\/)(?:\.env(?:\..+)?|credentials?[^/]*|secrets?[^/]*)(?:\/|$)/i.test(file)
+    || /(^|\/)(?:siss|fse)(?:\/|[-_.]|$)/i.test(file);
 }
 
 function gitLines(gitArgs, cwd) {
