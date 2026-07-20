@@ -8,9 +8,6 @@ import type { DbChangeScope } from './live-query-scope';
 const dbChangeBus = createDbChangeBus();
 
 /* @Codex */
-export const subscribeDbChanges = dbChangeBus.subscribe;
-
-/* @Codex */
 export const notifyDbChange = dbChangeBus.notify;
 
 /* @Codex */

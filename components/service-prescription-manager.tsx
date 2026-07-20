@@ -22,7 +22,7 @@ import {
     type ServicePrescriptionPriority,
     type ServicePrescriptionStatus,
 } from '@/lib/db';
-import { useLiveQuery } from '@/lib/live-query';
+import { notifyDbChange, useLiveQuery } from '@/lib/live-query';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { DocumentReferenceChip } from '@/components/document-reference-chip';
 import { Badge } from '@/components/ui/badge';
@@ -391,9 +391,15 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
             tone: 'danger'
         });
         if (!confirmed) return;
-        const children = itemsByPrescription.get(item.id) ?? [];
-        await Promise.all(children.map((child) => db.servicePrescriptionItems.delete(child.id, { suppressNotify: true, version: child.version })));
-        await db.servicePrescriptions.delete(item.id, { version: item.version });
+        try {
+            await db.servicePrescriptions.delete(item.id, { version: item.version });
+        } catch (error) {
+            notifyDbChange('service_prescriptions');
+            throw error;
+        } finally {
+            // @Codex: il delete atomico del parent rimuove anche i figli lato server.
+            notifyDbChange('service_prescription_items');
+        }
     };
 
     const headerActions = (
