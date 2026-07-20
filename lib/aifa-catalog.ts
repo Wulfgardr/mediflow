@@ -34,6 +34,7 @@ export type ParsedAifaDrug = {
     aicSearch: string;
     nameSearch: string;
     activePrincipleSearch: string;
+    packagingSearch: string;
 };
 
 export type AifaCsvParseResult = {
@@ -167,6 +168,7 @@ export function parseAifaCsv(text: string): AifaCsvParseResult {
             aicSearch: normalizeAifaSearchText(aic),
             nameSearch: normalizeAifaSearchText(name),
             activePrincipleSearch: normalizeAifaSearchText(activePrinciple || ''),
+            packagingSearch: normalizeAifaSearchText(readColumn(record, columns.packaging) || ''),
         });
     }
 

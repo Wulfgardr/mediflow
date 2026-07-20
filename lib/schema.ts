@@ -419,6 +419,8 @@ export const drugs = sqliteTable('drugs', {
     nameSearch: text('name_search'),
     /* @Codex */
     activePrincipleSearch: text('active_principle_search'),
+    /* @Codex */
+    packagingSearch: text('packaging_search'),
 }, (t) => ({
     /* @Codex: aic is already indexed by the primary key; these cover accent-folded prefix search. */
     aicSearchIdx: index('drugs_aic_search_idx').on(t.aicSearch),

@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 /* @Codex */
 import fs from 'fs';
 import path from 'path';
+import { normalizeAifaSearchText } from '@/lib/aifa-catalog';
 import { ensureAuditSqliteSchema } from '@/lib/security/audit-db';
 import { resolveDataPath } from '@/lib/data-dir';
 import { copySqliteDatabaseSync, replaceSqliteDatabase } from '@/lib/sqlite-repair';
@@ -189,6 +190,26 @@ function applySchemaGuards() {
         ensureColumn('drugs', 'aic_search', 'aic_search TEXT');
         ensureColumn('drugs', 'name_search', 'name_search TEXT');
         ensureColumn('drugs', 'active_principle_search', 'active_principle_search TEXT');
+        ensureColumn('drugs', 'packaging_search', 'packaging_search TEXT');
+        const selectPendingPackagingSearchRows = sqlite.prepare(`
+            SELECT aic, packaging
+            FROM drugs
+            WHERE packaging_search IS NULL
+            LIMIT 1000
+        `);
+        const updatePackagingSearch = sqlite.prepare(`
+            UPDATE drugs SET packaging_search = ? WHERE aic = ?
+        `);
+        while (true) {
+            const rows = selectPendingPackagingSearchRows.all() as Array<{
+                aic: string;
+                packaging: string | null;
+            }>;
+            if (rows.length === 0) break;
+            for (const row of rows) {
+                updatePackagingSearch.run(normalizeAifaSearchText(row.packaging || ''), row.aic);
+            }
+        }
         sqlite.prepare('CREATE INDEX IF NOT EXISTS drugs_aic_search_idx ON drugs(aic_search)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS drugs_name_search_idx ON drugs(name_search)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS drugs_active_principle_search_idx ON drugs(active_principle_search)').run();
