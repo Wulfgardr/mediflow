@@ -5,7 +5,9 @@ import { NextResponse } from 'next/server';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
-import { normalizeId, normalizeIdList } from '@/lib/patient-bulk-validation';
+import { patientUnassignSchema } from '@/lib/api-schemas/patient-bulk';
+/* @Codex */
+import { parseApiBody } from '@/lib/api-schemas/parse';
 // WUL-306 (ADR 0066): bulk reads treat soft-deleted patients as missing
 import { activePatients } from '@/lib/patient-lifecycle';
 
@@ -15,13 +17,9 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const body = await request.json() as Record<string, unknown>;
-        const patientIds = normalizeIdList(body.patientIds);
-        const ambulatoryId = normalizeId(body.ambulatoryId);
-
-        if (patientIds.length === 0 || !ambulatoryId) {
-            return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
-        }
+        const parsedBody = parseApiBody(patientUnassignSchema, await request.json());
+        if (!parsedBody.ok) return parsedBody.response;
+        const { patientIds, ambulatoryId } = parsedBody.data;
 
         const target = await dbServer
             .select({ id: ambulatories.id })
