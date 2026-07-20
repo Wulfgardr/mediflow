@@ -1,83 +1,63 @@
 import { useState, useCallback } from 'react';
 import { notifyDbChange } from '@/lib/live-query';
+/* @Codex */
+import {
+    executePatientClipboardPaste,
+    type ClipboardOperation,
+    type PatientClipboardState,
+} from '@/lib/patient-clipboard';
 // import { toast } from '@/components/ui/use-toast'; // Assuming toast exists, or use console for now
 
-export type ClipboardOperation = 'copy' | 'cut';
-
-export interface ClipboardState {
-    patientIds: string[];
-    operation: ClipboardOperation | null;
-    sourceAmbulatoryId: string | null;
-}
+export type { ClipboardOperation };
+export type ClipboardState = PatientClipboardState;
 
 export function usePatientClipboard() {
     const [clipboard, setClipboard] = useState<ClipboardState>({
         patientIds: [],
+        patientVersions: {},
         operation: null,
         sourceAmbulatoryId: null
     });
 
     const copy = useCallback((patientIds: string[], sourceAmbulatoryId: string) => {
-        setClipboard({ patientIds, operation: 'copy', sourceAmbulatoryId });
+        setClipboard({ patientIds: [...patientIds], patientVersions: {}, operation: 'copy', sourceAmbulatoryId });
         console.log(`Copied ${patientIds.length} patients`);
     }, []);
 
-    const cut = useCallback((patientIds: string[], sourceAmbulatoryId: string) => {
-        setClipboard({ patientIds, operation: 'cut', sourceAmbulatoryId });
+    /* @Codex */
+    const cut = useCallback((
+        patientIds: string[],
+        sourceAmbulatoryId: string,
+        patientVersions: Record<string, number>,
+    ) => {
+        setClipboard({
+            patientIds: [...patientIds],
+            patientVersions: { ...patientVersions },
+            operation: 'cut',
+            sourceAmbulatoryId,
+        });
         console.log(`Cut ${patientIds.length} patients`);
     }, []);
 
     const clear = useCallback(() => {
-        setClipboard({ patientIds: [], operation: null, sourceAmbulatoryId: null });
+        setClipboard({ patientIds: [], patientVersions: {}, operation: null, sourceAmbulatoryId: null });
     }, []);
 
     const paste = useCallback(async (targetAmbulatoryId: string, isTestEnvironment: boolean) => {
-        if (!clipboard.patientIds.length || !clipboard.operation) return;
+        if (!clipboard.patientIds.length || !clipboard.operation) return false;
 
         try {
-            // Logic:
-            // 1. If Target is Test -> ALWAYS CLONE (Duplicate API)
-            // 2. If Target is Live:
-            //    a. If Operation is COPY -> LINK (Assign API)
-            //    b. If Operation is CUT -> LINK (Assign API) + UNLINK OLD (Unassign API)
-
-            let endpoint = '';
-            const body = { patientIds: clipboard.patientIds, targetAmbulatoryId };
-
-            if (isTestEnvironment) {
-                // CLONE
-                endpoint = '/api/patients/duplicate';
-            } else {
-                // LINK
-                endpoint = '/api/patients/assign';
-            }
-
-            // Execute Primary Action
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-
-            if (!res.ok) throw new Error("Paste action failed");
-
-            // Execute Secondary Action (for CUT in Live environment)
-            if (!isTestEnvironment && clipboard.operation === 'cut' && clipboard.sourceAmbulatoryId) {
-                await fetch('/api/patients/unassign', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        patientIds: clipboard.patientIds,
-                        ambulatoryId: clipboard.sourceAmbulatoryId
-                    })
-                });
-            }
-
-            // Success
-            // toast({ title: "Incollato con successo", description: `${clipboard.patientIds.length} pazienti processati.` });
-            notifyDbChange(); // @Codex
-            clear();
-            return true;
+            return await executePatientClipboardPaste(
+                clipboard,
+                targetAmbulatoryId,
+                isTestEnvironment,
+                {
+                    onSuccess: () => {
+                        notifyDbChange();
+                        clear();
+                    },
+                },
+            );
         } catch (error) {
             console.error("Paste error", error);
             // toast({ title: "Errore", description: "Impossibile incollare i pazienti.", variant: "destructive" });

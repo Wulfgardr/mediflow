@@ -47,6 +47,7 @@
     "test:api-v1-put-negative-routes": "bash scripts/api-v1-put-negative-routes-test.sh",
     "test:legacy-clinical-writes": "bash scripts/legacy-clinical-writes-test.sh",
     "test:api-schemas": "node scripts/run-strip-types.mjs --test lib/api-schemas/api-schemas.test.ts",
+    "test:patient-clipboard": "node scripts/run-strip-types.mjs --test lib/patient-clipboard.test.ts",
     "test:document-input-normalization": "node scripts/run-strip-types.mjs --test lib/domain/documents/document-input-normalization.test.ts",
     "test:ocr-service:date": "node scripts/run-strip-types.mjs --test lib/domain/documents/ocr-service-date.test.ts",
     "test:ollama-pull-stream": "node scripts/run-strip-types.mjs --test lib/ollama-pull-stream.test.ts",
