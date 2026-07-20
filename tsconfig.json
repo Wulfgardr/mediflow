@@ -50,7 +50,9 @@
     ".next-api-v1-put-negative/types/**/*.ts",
     ".next-api-v1-put-negative/dev/types/**/*.ts",
     ".next-legacy-clinical-writes/types/**/*.ts",
-    ".next-legacy-clinical-writes/dev/types/**/*.ts"
+    ".next-legacy-clinical-writes/dev/types/**/*.ts",
+    ".next-patient-concurrency/types/**/*.ts",
+    ".next-patient-concurrency/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
