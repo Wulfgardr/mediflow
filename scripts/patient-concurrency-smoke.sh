@@ -5,7 +5,15 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-DATA_DIR="${MEDIFLOW_CONCURRENCY_DATA_DIR:-$ROOT_DIR/tmp-concurrency-data}"
+DATA_DIR="${MEDIFLOW_CONCURRENCY_DATA_DIR:-}"
+if [[ -z "$DATA_DIR" ]]; then
+  DATA_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mediflow-patient-concurrency.XXXXXX")"
+elif [[ -e "$DATA_DIR" ]]; then
+  if [[ ! -d "$DATA_DIR" ]] || [[ -n "$(find "$DATA_DIR" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+    echo "Refusing to use a non-empty concurrency data directory: $DATA_DIR"
+    exit 1
+  fi
+fi
 LOG_DIR="$DATA_DIR/logs"
 DEV_LOG="$LOG_DIR/next-dev.log"
 BASE_URL="${E2E_BASE_URL:-http://127.0.0.1:3100}"
@@ -15,7 +23,6 @@ PORT="$(node -e "const u=new URL(process.env.E2E_BASE_URL || 'http://127.0.0.1:3
 DIST_DIR="$ROOT_DIR/.next-patient-concurrency"
 
 mkdir -p "$DATA_DIR" "$LOG_DIR"
-rm -f "$DATA_DIR/medical.db"
 rm -rf "$DIST_DIR"
 
 export MEDIFLOW_DATA_DIR="$DATA_DIR"
