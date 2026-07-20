@@ -186,6 +186,17 @@ function applySchemaGuards() {
     }
     /* @Codex */
     try {
+        ensureColumn('drugs', 'aic_search', 'aic_search TEXT');
+        ensureColumn('drugs', 'name_search', 'name_search TEXT');
+        ensureColumn('drugs', 'active_principle_search', 'active_principle_search TEXT');
+        sqlite.prepare('CREATE INDEX IF NOT EXISTS drugs_aic_search_idx ON drugs(aic_search)').run();
+        sqlite.prepare('CREATE INDEX IF NOT EXISTS drugs_name_search_idx ON drugs(name_search)').run();
+        sqlite.prepare('CREATE INDEX IF NOT EXISTS drugs_active_principle_search_idx ON drugs(active_principle_search)').run();
+    } catch (error) {
+        console.warn('[MediFlow] Drugs schema check skipped:', error);
+    }
+    /* @Codex */
+    try {
         ensureColumn('conversations', 'is_deleted', 'is_deleted INTEGER NOT NULL DEFAULT 0');
     } catch (error) {
         console.warn('[MediFlow] Conversations schema check skipped:', error);

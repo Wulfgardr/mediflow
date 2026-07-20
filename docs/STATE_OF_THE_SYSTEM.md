@@ -528,6 +528,11 @@ Fuori scope:
 
 Disponibile:
 
+- catalogo farmaci AIFA locale importabile da CSV nella web UI, con manifest
+  persistito, hash SHA-256, indici SQLite e ricerca server-side limitata per
+  prefisso su nome, principio attivo e AIC;
+- autocomplete terapie web e Apple alimentati dallo stesso catalogo locale,
+  senza full-fetch nel browser o nel client paired;
 - macOS come fronte nativo piu maturo: shell Apple/home-base, workspace
   paziente, runtime panel e store locale verificabile;
 - adozione Lume progressiva: ADR 0078 e `Accepted`, con prime superfici web e
@@ -577,6 +582,8 @@ Disponibile:
   vecchie ancore legacy;
 - toggle Privacy Mode persistente nell'header dell'app;
 - ricerca rapida delle impostazioni via CMD+K;
+- import AIFA locale con fonte, URL, data di scarico, versione e stato di
+  provenienza visibili; nessun dataset AIFA e incluso nel repository;
 - restore e reset richiedono conferma con parola chiave digitata
   (`RIPRISTINA` / `RESET`) sulle superfici di avvertimento.
 

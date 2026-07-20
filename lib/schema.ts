@@ -413,7 +413,18 @@ export const drugs = sqliteTable('drugs', {
     class: text('class'),
     price: integer('price'), // stored as cents or float? using integer for simplicity or check import logic
     atc: text('atc'),
-});
+    /* @Codex */
+    aicSearch: text('aic_search'),
+    /* @Codex */
+    nameSearch: text('name_search'),
+    /* @Codex */
+    activePrincipleSearch: text('active_principle_search'),
+}, (t) => ({
+    /* @Codex: aic is already indexed by the primary key; these cover accent-folded prefix search. */
+    aicSearchIdx: index('drugs_aic_search_idx').on(t.aicSearch),
+    nameSearchIdx: index('drugs_name_search_idx').on(t.nameSearch),
+    activePrincipleSearchIdx: index('drugs_active_principle_search_idx').on(t.activePrincipleSearch),
+}));
 
 /* @Codex */
 export const exemptions = sqliteTable('exemptions', {

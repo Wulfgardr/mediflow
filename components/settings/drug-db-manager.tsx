@@ -1,36 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Database, Upload, Trash2, RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
 import { importAifaCsv, getDrugStats, clearDrugDatabase } from '@/lib/aifa-importer';
+import { AIFA_CATALOG_DEFAULT_SOURCE_URL } from '@/lib/aifa-catalog';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-
-function ProgressBar({ progress, total }: { progress: number; total: number }) {
-    const barRef = useRef<HTMLDivElement>(null);
-    const percentage = Math.round((progress / total) * 100) || 0;
-
-    useEffect(() => {
-        if (barRef.current) {
-            barRef.current.style.width = `${percentage}%`;
-        }
-    }, [percentage]);
-
-    return (
-        <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <div
-                ref={barRef}
-                className="h-full bg-indigo-500 transition-[width] duration-300 ease-out"
-            />
-        </div>
-    );
-}
 
 export default function DrugDbManager() {
     const confirm = useConfirm();
     const [stats, setStats] = useState<number | null>(null);
     const [isImporting, setIsImporting] = useState(false);
-    const [progress, setProgress] = useState(0);
-    const [total, setTotal] = useState(0);
+    const [sourceUrl, setSourceUrl] = useState(AIFA_CATALOG_DEFAULT_SOURCE_URL);
+    const [downloadedAt, setDownloadedAt] = useState('');
+    const [datasetVersion, setDatasetVersion] = useState('');
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     const refreshStats = async () => {
@@ -53,14 +35,14 @@ export default function DrugDbManager() {
 
         setIsImporting(true);
         setMessage(null);
-        setProgress(0);
 
         try {
-            const count = await importAifaCsv(file, (p, t) => {
-                setProgress(p);
-                setTotal(t);
+            const result = await importAifaCsv(file, {
+                sourceUrl,
+                downloadedAt,
+                version: datasetVersion,
             });
-            setMessage({ type: 'success', text: `Importazione completata! Aggiunti ${count} farmaci.` });
+            setMessage({ type: 'success', text: `Importazione completata. Indicizzati ${result.count} farmaci.` });
             refreshStats();
         } catch (error) {
             console.error(error);
@@ -104,6 +86,21 @@ export default function DrugDbManager() {
                 </div>
             </div>
 
+            <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-xs text-gray-600 dark:text-gray-300">
+                    Versione dataset
+                    <input className="mf-input mt-1 w-full" value={datasetVersion} onChange={(event) => setDatasetVersion(event.target.value)} disabled={isImporting} />
+                </label>
+                <label className="text-xs text-gray-600 dark:text-gray-300">
+                    Data di scarico
+                    <input className="mf-input mt-1 w-full" type="date" value={downloadedAt} onChange={(event) => setDownloadedAt(event.target.value)} disabled={isImporting} />
+                </label>
+                <label className="text-xs text-gray-600 dark:text-gray-300 sm:col-span-2">
+                    URL fonte
+                    <input className="mf-input mt-1 w-full" type="url" value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} disabled={isImporting} />
+                </label>
+            </div>
+
             <div className="bg-gray-50 dark:bg-white/5 rounded-xl p-4 border border-dashed border-gray-200 dark:border-white/10">
                 {!isImporting ? (
                     <div className="flex flex-col items-center justify-center space-y-3 py-4">
@@ -115,7 +112,7 @@ export default function DrugDbManager() {
                             <p className="text-xs text-gray-400 max-w-sm mx-auto mt-1">
                                 Carica il file <strong>confezioni.csv</strong> dal dataset Open Data AIFA.
                                 <br />
-                                <a href="https://www.aifa.gov.it/dati-aperti" target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:underline">
+                                <a href={AIFA_CATALOG_DEFAULT_SOURCE_URL} target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:underline">
                                     Vai ai Dati Aperti AIFA
                                 </a>
                             </p>
@@ -126,31 +123,16 @@ export default function DrugDbManager() {
                                 type="file"
                                 accept=".csv"
                                 onChange={handleFileUpload}
+                                disabled={!datasetVersion.trim() || !downloadedAt || !sourceUrl.trim()}
                                 className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/30 dark:file:text-indigo-300 transition-colors cursor-pointer"
                             />
                         </label>
                     </div>
                 ) : (
-                    (() => {
-                        const loadingStyle = { width: `${(progress / total) * 100}%` };
-                        return (
-                            <div className="space-y-3 py-6">
-                                <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
-                                    <span>Importazione in corso...</span>
-                                    <span>{Math.round((progress / total) * 100) || 0}%</span>
-                                </div>
-                                <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-indigo-500 transition-[width] duration-300 ease-out progress-bar-fill"
-                                        data-progress={Math.round((progress / total) * 100) || 0}
-                                    />
-                                </div>
-                                <p className="text-xs text-center text-gray-400">
-                                    Elaborati {progress.toLocaleString()} di {total.toLocaleString()} record...
-                                </p>
-                            </div>
-                        );
-                    })()
+                    <div role="status" className="space-y-2 py-6 text-center">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Validazione e indicizzazione in corso</p>
+                        <p className="text-xs text-gray-400">Il catalogo precedente resta disponibile fino al completamento.</p>
+                    </div>
                 )}
             </div>
 
