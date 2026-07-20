@@ -51,6 +51,12 @@
       "sha256": "473303108b5607aad7b910581739e8bbf3e61a625ed9e739c66e0ca597d4aefe"
     },
     {
+      "name": "hl7.fhir.r5.core",
+      "version": "5.0.0",
+      "url": "https://packages2.fhir.org/packages/hl7.fhir.r5.core/5.0.0",
+      "sha256": "74b27cd1bfce9e80eaceac431edf230b0945a443564fbf5512f82e5fa50a80d4"
+    },
+    {
       "name": "hl7.fhir.uv.extensions.r5",
       "version": "5.2.0",
       "url": "https://packages2.fhir.org/packages/hl7.fhir.uv.extensions.r5/5.2.0",
