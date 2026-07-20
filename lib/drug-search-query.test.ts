@@ -35,15 +35,19 @@ function createSyntheticCatalog(rows: SyntheticDrug[]) {
             atc TEXT,
             aic_search TEXT,
             name_search TEXT,
-            active_principle_search TEXT
+            active_principle_search TEXT,
+            packaging_search TEXT
         );
         CREATE INDEX drugs_aic_search_idx ON drugs(aic_search);
         CREATE INDEX drugs_name_search_idx ON drugs(name_search);
         CREATE INDEX drugs_active_principle_search_idx ON drugs(active_principle_search);
     `);
     const insert = sqlite.prepare(`
-        INSERT INTO drugs (aic, name, active_principle, packaging, aic_search, name_search, active_principle_search)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO drugs (
+            aic, name, active_principle, packaging,
+            aic_search, name_search, active_principle_search, packaging_search
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertAll = sqlite.transaction(() => {
         for (const row of rows) {
@@ -55,6 +59,7 @@ function createSyntheticCatalog(rows: SyntheticDrug[]) {
                 normalizeAifaSearchText(row.aic),
                 normalizeAifaSearchText(row.name),
                 normalizeAifaSearchText(row.activePrinciple || ''),
+                normalizeAifaSearchText(row.packaging || ''),
             );
         }
     });
@@ -137,6 +142,15 @@ test('production drug predicate handles nullable columns and literal LIKE metach
     ]);
 
     assert.deepEqual(catalog.search('100% Flacone_1\\speciale'), ['LITERAL']);
+    catalog.close();
+});
+
+test('production drug predicate folds accents in packaging tokens', () => {
+    const catalog = createSyntheticCatalog([
+        { aic: 'ACCENTED', name: 'Farmaco sintetico', packaging: 'Confezione unità orale' },
+    ]);
+
+    assert.deepEqual(catalog.search('unita orale'), ['ACCENTED']);
     catalog.close();
 });
 
