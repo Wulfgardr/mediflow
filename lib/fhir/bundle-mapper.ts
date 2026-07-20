@@ -1,4 +1,5 @@
 import { Bundle } from 'fhir/r4';
+import { toFhirFullUrl } from './id';
 import { toFhirPatient } from './patient-adapter';
 import {
     toFhirCondition,
@@ -9,51 +10,48 @@ import {
 } from './clinical-adapter';
 import type { FhirBundleInput } from './types';
 
+type BundleResource = NonNullable<NonNullable<Bundle['entry']>[number]['resource']>;
+
+/* @Codex */
 export function buildFhirBundleFromRecords(input: FhirBundleInput): Bundle {
-    const patientId = input.patient.id;
+    const patientResource = toFhirPatient(input.patient, input.generatedAt);
+    const patientReference = toFhirFullUrl(patientResource.resourceType, patientResource.id!);
     const bundle: Bundle = {
         resourceType: "Bundle",
         type: "collection",
         entry: []
     };
 
-    bundle.entry?.push({
-        resource: toFhirPatient(input.patient, input.generatedAt)
+    const append = (resource: BundleResource) => bundle.entry?.push({
+        fullUrl: toFhirFullUrl(resource.resourceType, resource.id!),
+        resource,
     });
 
+    append(patientResource);
+
     if (input.patient.diagnoses) {
-        input.patient.diagnoses.forEach(diagnosis => {
-            bundle.entry?.push({
-                resource: toFhirCondition(diagnosis, patientId)
-            });
+        input.patient.diagnoses.forEach((diagnosis, index) => {
+            append(toFhirCondition(diagnosis, patientReference, index + 1));
         });
     }
 
     input.entries.forEach(entry => {
         if (entry.deletedAt) return;
 
-        bundle.entry?.push({
-            resource: toFhirEncounter(entry, patientId)
-        });
+        append(toFhirEncounter(entry, patientReference));
 
-        const observation = toFhirObservation(entry, patientId);
+        const observation = toFhirObservation(entry, patientReference);
         if (observation) {
-            bundle.entry?.push({
-                resource: observation
-            });
+            append(observation);
         }
     });
 
     input.therapies.forEach(therapy => {
-        bundle.entry?.push({
-            resource: toFhirMedicationStatement(therapy, patientId)
-        });
+        append(toFhirMedicationStatement(therapy, patientReference));
     });
 
     input.observations.forEach(observation => {
-        bundle.entry?.push({
-            resource: toFhirStructuredObservation(observation, patientId)
-        });
+        append(toFhirStructuredObservation(observation, patientReference));
     });
 
     return bundle;
