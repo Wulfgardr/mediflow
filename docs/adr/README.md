@@ -6,7 +6,7 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
-- [0080-serialize-sqlite-schema-guards-at-bootstrap.md](./0080-serialize-sqlite-schema-guards-at-bootstrap.md): propone di serializzare le schema guard SQLite al bootstrap per eliminare le scritture concorrenti durante build e avvio multiprocesso.
+- [0081-fhir-r4-export-v0-contract.md](./0081-fhir-r4-export-v0-contract.md): accetta il contratto verificabile per copertura, parità e validazione locale dell'export FHIR R4 v0.
 
 ---
 
