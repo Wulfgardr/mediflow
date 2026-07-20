@@ -1,11 +1,25 @@
 import { Condition, Encounter, MedicationStatement, Observation } from 'fhir/r4';
+import { toFhirDerivedId, toFhirId } from './id';
 import type { FhirClinicalEntryInput, FhirDiagnosisInput, FhirObservationInput, FhirTherapyInput } from './types';
 
-export function toFhirCondition(diagnosis: FhirDiagnosisInput, patientId: string): Condition {
+/* @Codex */
+export function toFhirCondition(
+    diagnosis: FhirDiagnosisInput,
+    patientReference: string,
+    orderedPosition: number,
+): Condition {
+    const diagnosisDate = new Date(diagnosis.date).toISOString();
     return {
         resourceType: "Condition",
-        id: diagnosis.id ?? crypto.randomUUID(), // DB doesn't have IDs for diagnoses nested items, generating one or hash
-        subject: { reference: `Patient/${patientId}` },
+        id: diagnosis.id
+            ? toFhirId(diagnosis.id, 'condition')
+            : toFhirDerivedId('condition', [
+                diagnosis.system.trim(),
+                diagnosis.code.trim(),
+                diagnosisDate,
+                diagnosis.description.trim(),
+            ], orderedPosition),
+        subject: { reference: patientReference },
         clinicalStatus: {
             coding: [{ system: "http://terminology.hl7.org/CodeSystem/condition-clinical", code: "active" }]
         },
@@ -18,21 +32,22 @@ export function toFhirCondition(diagnosis: FhirDiagnosisInput, patientId: string
             }],
             text: diagnosis.description
         },
-        onsetDateTime: new Date(diagnosis.date).toISOString()
+        onsetDateTime: diagnosisDate
     };
 }
 
-export function toFhirEncounter(entry: FhirClinicalEntryInput, patientId: string): Encounter {
+/* @Codex */
+export function toFhirEncounter(entry: FhirClinicalEntryInput, patientReference: string): Encounter {
     return {
         resourceType: "Encounter",
-        id: entry.id,
+        id: toFhirId(entry.id, 'encounter'),
         status: "finished",
         class: {
             system: "http://terminology.hl7.org/CodeSystem/v3-ActCode",
             code: entry.setting === 'home' ? "HH" : "AMB",
             display: entry.setting === 'home' ? "home health" : "ambulatory"
         },
-        subject: { reference: `Patient/${patientId}` },
+        subject: { reference: patientReference },
         period: {
             start: new Date(entry.date).toISOString(),
             end: new Date(entry.date).toISOString()
@@ -45,17 +60,18 @@ export function toFhirEncounter(entry: FhirClinicalEntryInput, patientId: string
     };
 }
 
-export function toFhirObservation(entry: FhirClinicalEntryInput, patientId: string): Observation | null {
+/* @Codex */
+export function toFhirObservation(entry: FhirClinicalEntryInput, patientReference: string): Observation | null {
     if (entry.type !== 'scale' || !entry.metadata?.score) return null;
 
     return {
         resourceType: "Observation",
-        id: `obs-${entry.id}`,
+        id: toFhirId(`obs-${entry.id}`, 'observation'),
         status: "final",
         code: {
             text: entry.metadata.title as string
         },
-        subject: { reference: `Patient/${patientId}` },
+        subject: { reference: patientReference },
         effectiveDateTime: new Date(entry.date).toISOString(),
         valueInteger: Number(entry.metadata.score),
         interpretation: [{ text: entry.metadata.interpretation as string }],
@@ -63,15 +79,16 @@ export function toFhirObservation(entry: FhirClinicalEntryInput, patientId: stri
     };
 }
 
-export function toFhirMedicationStatement(therapy: FhirTherapyInput, patientId: string): MedicationStatement {
+/* @Codex */
+export function toFhirMedicationStatement(therapy: FhirTherapyInput, patientReference: string): MedicationStatement {
     return {
         resourceType: "MedicationStatement",
-        id: therapy.id,
+        id: toFhirId(therapy.id, 'medication-statement'),
         status: therapy.status === 'active' ? 'active' : (therapy.status === 'suspended' ? 'on-hold' : 'completed'),
         medicationCodeableConcept: {
             text: therapy.drugName
         },
-        subject: { reference: `Patient/${patientId}` },
+        subject: { reference: patientReference },
         effectivePeriod: {
             start: new Date(therapy.startDate).toISOString(),
             end: therapy.endDate ? new Date(therapy.endDate).toISOString() : undefined
@@ -84,13 +101,13 @@ export function toFhirMedicationStatement(therapy: FhirTherapyInput, patientId: 
 }
 
 /* @Codex */
-export function toFhirStructuredObservation(observation: FhirObservationInput, patientId: string): Observation {
+export function toFhirStructuredObservation(observation: FhirObservationInput, patientReference: string): Observation {
     const numericValue = Number(observation.value);
     const isNumeric = Number.isFinite(numericValue);
 
     return {
         resourceType: "Observation",
-        id: `obs-structured-${observation.id}`,
+        id: toFhirId(`obs-structured-${observation.id}`, 'observation'),
         status: "final",
         code: {
             coding: [
@@ -102,7 +119,7 @@ export function toFhirStructuredObservation(observation: FhirObservationInput, p
             ],
             text: observation.display,
         },
-        subject: { reference: `Patient/${patientId}` },
+        subject: { reference: patientReference },
         effectiveDateTime: new Date(observation.observedAt).toISOString(),
         valueQuantity: isNumeric
             ? {

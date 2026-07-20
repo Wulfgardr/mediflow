@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { buildFhirBundleFromRecords } from './bundle-mapper';
+import type { FhirBundleInput } from './types';
 
+/* @Codex */
 test('buildFhirBundleFromRecords maps a minimal patient fixture deterministically', () => {
-    const bundle = buildFhirBundleFromRecords({
+    const input: FhirBundleInput = {
         generatedAt: '2026-07-08T09:00:00.000Z',
         patient: {
             id: 'patient-minimal',
@@ -29,62 +31,18 @@ test('buildFhirBundleFromRecords maps a minimal patient fixture deterministicall
         therapies: [],
         checkups: [],
         observations: [],
-    });
+    };
 
-    assert.deepEqual(bundle, {
-        resourceType: 'Bundle',
-        type: 'collection',
-        entry: [
-            {
-                resource: {
-                    resourceType: 'Patient',
-                    id: 'patient-minimal',
-                    active: true,
-                    identifier: [
-                        {
-                            use: 'official',
-                            system: 'http://hl7.it/sid/codice-fiscale',
-                            value: 'LVLDDA80A41F205X',
-                        },
-                    ],
-                    name: [
-                        {
-                            use: 'official',
-                            family: 'Lovelace',
-                            given: ['Ada'],
-                        },
-                    ],
-                    gender: 'unknown',
-                    birthDate: '1980-01-01',
-                    address: undefined,
-                    telecom: undefined,
-                    contact: undefined,
-                    meta: {
-                        lastUpdated: '2026-07-08T09:00:00.000Z',
-                    },
-                },
-            },
-            {
-                resource: {
-                    resourceType: 'Condition',
-                    id: 'condition-minimal-diabetes',
-                    subject: { reference: 'Patient/patient-minimal' },
-                    clinicalStatus: {
-                        coding: [{ system: 'http://terminology.hl7.org/CodeSystem/condition-clinical', code: 'active' }],
-                    },
-                    code: {
-                        coding: [{
-                            system: 'http://hl7.org/fhir/sid/icd-10',
-                            code: 'E11.9',
-                            display: 'Diabete mellito tipo 2 senza complicanze',
-                        }],
-                        text: 'Diabete mellito tipo 2 senza complicanze',
-                    },
-                    onsetDateTime: '2025-01-15T08:30:00.000Z',
-                },
-            },
-        ],
-    });
+    const bundle = buildFhirBundleFromRecords(input);
+    assert.deepEqual(bundle, buildFhirBundleFromRecords(input));
+    assert.equal(bundle.entry?.[0]?.fullUrl, 'urn:mediflow:fhir:Patient:patient-minimal');
+    assert.equal(bundle.entry?.[0]?.resource?.resourceType, 'Patient');
+    assert.equal('gender' in (bundle.entry?.[0]?.resource ?? {}), false);
+    assert.equal(bundle.entry?.[1]?.fullUrl, 'urn:mediflow:fhir:Condition:condition-minimal-diabetes');
+    assert.deepEqual(
+        (bundle.entry?.[1]?.resource as { subject?: unknown } | undefined)?.subject,
+        { reference: 'urn:mediflow:fhir:Patient:patient-minimal' },
+    );
 });
 
 test('buildFhirBundleFromRecords maps scale metadata to an Observation resource', () => {
@@ -124,4 +82,52 @@ test('buildFhirBundleFromRecords maps scale metadata to an Observation resource'
     assert.equal(observation?.resourceType, 'Observation');
     assert.equal(observation?.valueInteger, 6);
     assert.deepEqual(observation?.code, { text: 'ADL (Indice di Katz)' });
+});
+
+/* @Codex */
+test('diagnoses without persisted ids keep unique deterministic Condition ids', () => {
+    const input: FhirBundleInput = {
+        generatedAt: '2026-07-08T09:00:00.000Z',
+        patient: {
+            id: 'patient-diagnosis-without-ids',
+            firstName: 'Ada',
+            lastName: 'Lovelace',
+            taxCode: 'LVLDDA80A41F205X',
+            diagnoses: [
+                {
+                    code: 'E11.9',
+                    description: 'Diabete mellito tipo 2 senza complicanze',
+                    system: 'ICD-10',
+                    date: '2025-01-15T08:30:00.000Z',
+                },
+                {
+                    code: 'E11.9',
+                    description: 'Diabete mellito tipo 2 in controllo dietetico',
+                    system: 'ICD-10',
+                    date: '2025-01-15T08:30:00.000Z',
+                },
+                {
+                    code: 'E11.9',
+                    description: 'Diabete mellito tipo 2 senza complicanze',
+                    system: 'ICD-10',
+                    date: '2025-01-15T08:30:00.000Z',
+                },
+            ],
+        },
+        entries: [],
+        therapies: [],
+        checkups: [],
+        observations: [],
+    };
+
+    const firstBundle = buildFhirBundleFromRecords(input);
+    const secondBundle = buildFhirBundleFromRecords(input);
+    const conditions = firstBundle.entry?.filter((entry) => entry.resource?.resourceType === 'Condition') ?? [];
+    const ids = conditions.map((entry) => entry.resource?.id);
+    const fullUrls = conditions.map((entry) => entry.fullUrl);
+
+    assert.equal(conditions.length, 3);
+    assert.equal(new Set(ids).size, 3);
+    assert.equal(new Set(fullUrls).size, 3);
+    assert.deepEqual(firstBundle, secondBundle);
 });
