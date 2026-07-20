@@ -142,6 +142,7 @@ function buildLiveCatalogState(drugCount: number, exemptionCount: number): Kree8
 
 function RepertoriArea({ isReview }: { isReview: boolean }) {
   const [selectedCatalogId, setSelectedCatalogId] = useState(REVIEW_CATALOGS[0]?.id ?? '');
+  /* @Codex */
   const catalogState = useLiveQuery<Kree8CatalogClientState, Kree8CatalogClientState>(
     async () => {
       if (isReview) return REVIEW_CATALOG_STATE;
@@ -166,6 +167,7 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
       rows: [],
       indexedCount: 0,
     },
+    ['drugs', 'exemptions'],
   );
 
   const catalogs = catalogState?.rows ?? [];

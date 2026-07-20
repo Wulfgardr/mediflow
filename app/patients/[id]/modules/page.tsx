@@ -213,6 +213,8 @@ export default function PatientDetailPage() {
     const { data: documentSynthesisKillSwitch, loading: documentSynthesisKillSwitchLoading } = useLiveQueryState(
         () => db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY),
         [],
+        undefined,
+        ['settings'],
     );
     /* @Codex LUME-104/68: non derivare lo stato fail-closed del pannello mentre
        la preferenza e ancora in caricamento: aprirebbe la sezione per un falso
@@ -220,8 +222,15 @@ export default function PatientDetailPage() {
     const { data: patientInsightKillSwitch, loading: patientInsightKillSwitchLoading } = useLiveQueryState(
         () => db.settings.get(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY),
         [],
+        undefined,
+        ['settings'],
     );
-    const smartImportKillSwitch = useLiveQuery(() => db.settings.get(AI_SMART_IMPORT_KILL_SWITCH_KEY), []);
+    const smartImportKillSwitch = useLiveQuery(
+        () => db.settings.get(AI_SMART_IMPORT_KILL_SWITCH_KEY),
+        [],
+        undefined,
+        ['settings'],
+    );
     /* @Codex */
     const exemptionCodes = Array.isArray(patient?.exemptions) ? patient.exemptions : [];
     /* @Codex */
@@ -254,6 +263,8 @@ export default function PatientDetailPage() {
             }));
         },
         [exemptionCodes.join('|')],
+        undefined,
+        ['exemptions'],
     );
 
     /* @Codex WUL-UIUX Fase 7: stessa pipeline del Quadro (lib/patient-workspace).

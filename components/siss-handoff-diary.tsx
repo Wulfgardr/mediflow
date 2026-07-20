@@ -78,6 +78,7 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
     const [closureNextAction, setClosureNextAction] = useState('');
     const [closureOutcome, setClosureOutcome] = useState<SissHandoffOutcome>('completed');
 
+    /* @Codex */
     const handoffs = useLiveQuery(
         async () => {
             const items = await db.sissHandoffs
@@ -86,6 +87,8 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
             return items.sort((left, right) => new Date(right.startedAt).getTime() - new Date(left.startedAt).getTime());
         },
         [patientId],
+        undefined,
+        ['siss_handoff_events'],
     );
 
     const pendingHandoff = useMemo(

@@ -22,7 +22,8 @@ export default function ScaleRunnerPage() {
     const scaleId = params.scaleId as string;
     const [setting, setSetting] = useState<'ambulatory' | 'home'>('ambulatory');
 
-    const patient = useLiveQuery(() => db.patients.get(patientId), [patientId]);
+    /* @Codex */
+    const patient = useLiveQuery(() => db.patients.get(patientId), [patientId], undefined, ['patients']);
     const scaleDef = SCALES[scaleId];
 
     const handleComplete = async (result: { score: number; answers: Record<string, string | number>; interpretation: string }) => {
