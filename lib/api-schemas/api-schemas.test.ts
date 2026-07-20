@@ -7,6 +7,12 @@ import { authSetupSchema } from './auth';
 import { checkupCreateSchema, therapyUpdateSchema } from './clinical-writes';
 import { conversationCreateSchema } from './conversations';
 import { INVALID_API_PAYLOAD_ERROR, parseApiBody } from './parse';
+import {
+    patientAssignSchema,
+    patientDuplicateSchema,
+    patientMoveSchema,
+    patientUnassignSchema,
+} from './patient-bulk';
 import { servicePrescriptionCreateSchema } from './prescriptions';
 import { sissHandoffCreateSchema } from './siss-handoffs';
 
@@ -138,3 +144,64 @@ test('service prescription and SISS schemas validate enum/date boundaries with 4
     });
 });
 
+/* @Codex */
+test('patient bulk schemas normalize IDs and reject malformed payloads', async () => {
+    assert.deepEqual(await expectValid(patientAssignSchema, {
+        patientIds: [' patient-1 ', 'patient-1', 'patient-2'],
+        targetAmbulatoryId: ' ambulatory-1 ',
+    }), {
+        patientIds: ['patient-1', 'patient-2'],
+        targetAmbulatoryId: 'ambulatory-1',
+    });
+    await expectValid(patientDuplicateSchema, {
+        patientIds: ['patient-1'],
+        targetAmbulatoryId: 'ambulatory-2',
+    });
+    await expectValid(patientUnassignSchema, {
+        patientIds: ['patient-1'],
+        ambulatoryId: 'ambulatory-1',
+    });
+    await expectInvalid400(patientAssignSchema, {
+        patientIds: [],
+        targetAmbulatoryId: 'ambulatory-1',
+    });
+    await expectInvalid400(patientUnassignSchema, {
+        patientIds: ['patient-1'],
+        ambulatoryId: 42,
+    });
+});
+
+/* @Codex */
+test('patient move requires one positive expected version per requested patient', async () => {
+    assert.deepEqual(await expectValid(patientMoveSchema, {
+        patientIds: [' patient-1 ', 'patient-2'],
+        targetAmbulatoryId: ' ambulatory-2 ',
+        sourceAmbulatoryId: null,
+        patientVersions: { 'patient-1': 3, 'patient-2': 7 },
+    }), {
+        patientIds: ['patient-1', 'patient-2'],
+        targetAmbulatoryId: 'ambulatory-2',
+        sourceAmbulatoryId: undefined,
+        patientVersions: { 'patient-1': 3, 'patient-2': 7 },
+    });
+    await expectInvalid400(patientMoveSchema, {
+        patientIds: ['patient-1', 'patient-2'],
+        targetAmbulatoryId: 'ambulatory-2',
+        patientVersions: { 'patient-1': 3 },
+    });
+    await expectInvalid400(patientMoveSchema, {
+        patientIds: ['patient-1'],
+        targetAmbulatoryId: 'ambulatory-2',
+        patientVersions: { 'patient-1': 0 },
+    });
+    await expectInvalid400(patientMoveSchema, {
+        patientIds: ['patient-1'],
+        targetAmbulatoryId: 'ambulatory-2',
+        patientVersions: { 'patient-1': 3, 'patient-2': 7 },
+    });
+    await expectInvalid400(patientMoveSchema, {
+        patientIds: ['constructor'],
+        targetAmbulatoryId: 'ambulatory-2',
+        patientVersions: {},
+    });
+});
