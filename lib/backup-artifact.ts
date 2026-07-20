@@ -151,6 +151,17 @@ function parseAssignedAmbulatoryIds(value: unknown): string[] {
     ));
 }
 
+/* @Codex */
+function parseAssignedAmbulatoryMemberships(value: unknown): Array<{ ambulatoryId: string; assignedAt: unknown }> {
+    if (!Array.isArray(value)) return [];
+    return value.flatMap((item) => {
+        if (!item || typeof item !== 'object') return [];
+        const membership = item as Record<string, unknown>;
+        if (typeof membership.ambulatoryId !== 'string' || membership.ambulatoryId.trim().length === 0) return [];
+        return [{ ambulatoryId: membership.ambulatoryId, assignedAt: membership.assignedAt }];
+    });
+}
+
 function assertCollectionReferences(payload: BackupDataset): void {
     const ambulatoryIds = new Set(
         payload.ambulatories
@@ -182,6 +193,28 @@ function assertCollectionReferences(payload: BackupDataset): void {
                     'invalid-manifest',
                     `Patient ${patient.id ?? '<unknown>'} references an unknown assigned ambulatory.`,
                 );
+            }
+        }
+
+        for (const membership of parseAssignedAmbulatoryMemberships(patient.assignedAmbulatoryMemberships)) {
+            if (!ambulatoryIds.has(membership.ambulatoryId)) {
+                throw new BackupArtifactError(
+                    'invalid-manifest',
+                    `Patient ${patient.id ?? '<unknown>'} references an unknown ambulatory membership.`,
+                );
+            }
+            if (membership.assignedAt !== null && membership.assignedAt !== undefined) {
+                const assignedAt = membership.assignedAt instanceof Date
+                    ? membership.assignedAt
+                    : new Date(typeof membership.assignedAt === 'number' && Math.abs(membership.assignedAt) < 1_000_000_000_000
+                        ? membership.assignedAt * 1000
+                        : membership.assignedAt as string | number);
+                if (Number.isNaN(assignedAt.getTime())) {
+                    throw new BackupArtifactError(
+                        'invalid-manifest',
+                        `Patient ${patient.id ?? '<unknown>'} has an invalid ambulatory membership timestamp.`,
+                    );
+                }
             }
         }
     }
