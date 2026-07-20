@@ -6,6 +6,7 @@ import {
     buildDocumentSynthesisExtractionPrompt,
     buildPatientInsightExtractionPrompt,
     buildSmartImportExtractionPrompt,
+    extractJsonObject,
     parseDocumentSynthesisExtractionResponse,
     parsePatientInsightExtractionResponse,
     parseSmartImportExtractionResponse,
@@ -722,4 +723,130 @@ test('document synthesis extraction repairs truncated envelope when only closing
     assert.equal(parsed.value.data.medications[0], 'Humalog 4 U ai pasti principali');
     assert.equal(parsed.value.data.problemStatements[0].label, 'Diabete mellito tipo 2');
     assert.equal(parsed.value.data.therapyCandidates[0].drugMention, 'Humalog');
+});
+
+test('extractJsonObject repairs truncation inside JSON strings', () => {
+    const cases = [
+        '{"a":"cut',
+        '{"a":"cut}',
+        '{"a":"cut\\',
+        '```json\n{"a":"cut\n```',
+    ];
+
+    for (const truncated of cases) {
+        const extraction = extractJsonObject(truncated);
+
+        assert.ok(extraction);
+        assert.equal(extraction.repairedTruncation, true);
+        assert.doesNotThrow(() => JSON.parse(extraction.rawJson));
+    }
+});
+
+test('extractJsonObject preserves punctuation inside a truncated string', () => {
+    const extraction = extractJsonObject('{"note":"febbre, ');
+
+    assert.ok(extraction);
+    assert.equal(extraction.repairedTruncation, true);
+    assert.equal(JSON.parse(extraction.rawJson).note, 'febbre,');
+});
+
+test('extractJsonObject falls back to the last complete member', () => {
+    const cases = [
+        '{"a":1,"b":',
+        '{"a":1,"partialKey',
+        '{"a":1,"b":{"c":',
+        '{"a":1,"b":"caf\\u00e',
+        '{"a":1,"b":tru',
+    ];
+
+    for (const truncated of cases) {
+        const extraction = extractJsonObject(truncated);
+
+        assert.ok(extraction);
+        assert.equal(extraction.repairedTruncation, true);
+        assert.deepEqual(JSON.parse(extraction.rawJson), { a: 1 });
+    }
+});
+
+test('extractJsonObject rejects an unrepairable first member', () => {
+    const extraction = extractJsonObject('{"only":');
+
+    assert.equal(extraction, null);
+});
+
+test('extractJsonObject does not reduce an array root to its first object', () => {
+    const extraction = extractJsonObject('```json\n[{"a":1},{"b":2}]\n```\nTesto finale');
+
+    assert.ok(extraction);
+    assert.equal(extraction.repairedTruncation, false);
+    assert.deepEqual(JSON.parse(extraction.rawJson), [{ a: 1 }, { b: 2 }]);
+});
+
+test('extractJsonObject ignores bracketed prose before an object', () => {
+    const cases = [
+        'Ecco l\'analisi [S1]:\n{"a":1,"b":',
+        '[S1]:\n{"a":1,"b":',
+    ];
+
+    for (const response of cases) {
+        const extraction = extractJsonObject(response);
+
+        assert.ok(extraction);
+        assert.equal(extraction.repairedTruncation, true);
+        assert.deepEqual(JSON.parse(extraction.rawJson), { a: 1 });
+    }
+});
+
+test('extractJsonObject preserves or rejects an array after bracketed prose', () => {
+    const complete = extractJsonObject('[S1]: [{"a":1},{"b":2}]');
+    const truncated = extractJsonObject('[S1]: [{"a":1},{"b":');
+
+    assert.ok(complete);
+    assert.equal(complete.repairedTruncation, false);
+    assert.deepEqual(JSON.parse(complete.rawJson), [{ a: 1 }, { b: 2 }]);
+    assert.equal(truncated, null);
+});
+
+test('document synthesis keeps a bare object opener invalid', () => {
+    const parsed = parseDocumentSynthesisExtractionResponse('{', 'testo OCR');
+
+    assert.equal(parsed.validJson, false);
+    assert.equal(parsed.validTask, false);
+    assert.equal(parsed.repairedTruncation, false);
+    assert.equal(parsed.value.data.qualityReason, 'JSON del modello non valido');
+});
+
+test('extractJsonObject keeps malformed balanced JSON distinct from truncation', () => {
+    const extraction = extractJsonObject('{"a": }');
+
+    assert.ok(extraction);
+    assert.equal(extraction.repairedTruncation, false);
+    assert.throws(() => JSON.parse(extraction.rawJson));
+});
+
+test('document synthesis preserves earlier fields after truncation inside a string', () => {
+    const truncated = `{
+  "schemaVersion": "mediflow.ai.extract.v1",
+  "task": "document_synthesis",
+  "summary": "Referto con terapia esplicita",
+  "data": {
+    "qualityLevel": "green",
+    "medications": ["Farmaco A"],
+    "diagnoses": [
+      {
+        "code": "J44.9",
+        "description": "Broncopneumopatia cronica ostruttiva",
+        "system": "ICD-10"
+      }
+    ],
+    "problemStatements": [{"label": "Diagnosi interrotta`;
+
+    const parsed = parseDocumentSynthesisExtractionResponse(truncated, 'testo OCR');
+
+    assert.equal(parsed.validJson, true);
+    assert.equal(parsed.validTask, true);
+    assert.equal(parsed.repairedTruncation, true);
+    assert.deepEqual(parsed.value.data.medications, ['Farmaco A']);
+    assert.equal(parsed.value.data.diagnoses[0].code, 'J44.9');
+    assert.equal(parsed.value.data.problemStatements.length, 0);
 });

@@ -577,25 +577,115 @@ export interface ExtractedJsonObject {
     repairedTruncation: boolean;
 }
 
-export function extractJsonObject(response: string): ExtractedJsonObject | null {
-    const clean = stripModelArtifacts(response);
-    const fenced = clean.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (fenced?.[1]) {
-        return { rawJson: fenced[1].trim(), repairedTruncation: false };
-    }
+interface JsonContainer {
+    opener: '{' | '[';
+    parent: JsonContainer | null;
+}
 
-    const firstBrace = clean.indexOf('{');
-    const lastBrace = clean.lastIndexOf('}');
-    if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
-        return null;
+// @Codex: chiude solo i contenitori osservati nello stesso prefisso JSON.
+function closeJsonContainers(fragment: string, container: JsonContainer | null): string {
+    let closed = fragment;
+    for (let current = container; current; current = current.parent) {
+        closed += current.opener === '{' ? '}' : ']';
     }
+    return closed;
+}
 
-    const fragment = clean.slice(firstBrace, lastBrace + 1).trim();
-    const stack: string[] = [];
+// @Codex: delimita una radice completa senza interpretarne ancora il contenuto.
+function extractBalancedJsonValue(candidate: string, rootStart: number): string | null {
+    let container: JsonContainer | null = null;
     let inString = false;
     let escaping = false;
 
-    for (const char of fragment) {
+    for (let index = rootStart; index < candidate.length; index += 1) {
+        const char = candidate[index];
+        if (inString) {
+            if (escaping) {
+                escaping = false;
+                continue;
+            }
+            if (char === '\\') {
+                escaping = true;
+                continue;
+            }
+            if (char === '"') inString = false;
+            continue;
+        }
+
+        if (char === '"') {
+            inString = true;
+            continue;
+        }
+        if (char === '{' || char === '[') {
+            container = { opener: char, parent: container };
+            continue;
+        }
+        if (char === '}' || char === ']') {
+            const expected = char === '}' ? '{' : '[';
+            if (container?.opener !== expected) return null;
+            container = container.parent;
+            if (!container) return candidate.slice(rootStart, index + 1);
+        }
+    }
+
+    return null;
+}
+
+// @Codex: una riparazione dichiarata deve essere un oggetto JSON parsabile.
+function isParsableJsonObject(value: string, requireMember = false): boolean {
+    try {
+        const parsed = JSON.parse(value) as unknown;
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+        return !requireMember || Object.keys(parsed).length > 0;
+    } catch {
+        return false;
+    }
+}
+
+export function extractJsonObject(response: string): ExtractedJsonObject | null {
+    const clean = stripModelArtifacts(response);
+    const fenced = clean.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    // @Codex: usa lo stesso scanner per risposte libere e blocchi JSON recintati.
+    const fencedCandidate = fenced?.[1]?.trim();
+    const candidate = fencedCandidate && /[\[{]/.test(fencedCandidate)
+        ? fencedCandidate
+        : clean;
+    let rootStart = -1;
+    let searchStart = 0;
+
+    while (searchStart < candidate.length) {
+        const nextBrace = candidate.indexOf('{', searchStart);
+        const nextBracket = candidate.indexOf('[', searchStart);
+        if (nextBrace === -1 && nextBracket === -1) return null;
+
+        if (nextBrace !== -1 && (nextBracket === -1 || nextBrace < nextBracket)) {
+            rootStart = nextBrace;
+            break;
+        }
+
+        const arrayCandidate = extractBalancedJsonValue(candidate, nextBracket);
+        if (!arrayCandidate) return null;
+        try {
+            if (Array.isArray(JSON.parse(arrayCandidate))) {
+                return { rawJson: arrayCandidate, repairedTruncation: false };
+            }
+        } catch {
+            // Un blocco bilanciato ma non JSON puo essere un marcatore come [S1].
+        }
+        searchStart = nextBracket + arrayCandidate.length;
+    }
+
+    if (rootStart === -1) return null;
+
+    const fragment = candidate.slice(rootStart).trim();
+    let container: JsonContainer | null = null;
+    let lastCommaCheckpoint: { endIndex: number; container: JsonContainer } | null = null;
+    let inString = false;
+    let escaping = false;
+    let mismatchedClosing = false;
+
+    for (let index = 0; index < fragment.length; index += 1) {
+        const char = fragment[index];
         if (inString) {
             if (escaping) {
                 escaping = false;
@@ -616,31 +706,61 @@ export function extractJsonObject(response: string): ExtractedJsonObject | null 
             continue;
         }
         if (char === '{' || char === '[') {
-            stack.push(char);
+            container = { opener: char, parent: container };
             continue;
         }
         if (char === '}' || char === ']') {
             const expected = char === '}' ? '{' : '[';
-            if (stack[stack.length - 1] === expected) {
-                stack.pop();
+            if (container?.opener === expected) {
+                container = container.parent;
+                if (!container) {
+                    return {
+                        rawJson: fragment.slice(0, index + 1),
+                        repairedTruncation: false,
+                    };
+                }
+            } else {
+                mismatchedClosing = true;
             }
+            continue;
+        }
+        if (char === ',' && container) {
+            lastCommaCheckpoint = { endIndex: index, container };
         }
     }
 
+    if (mismatchedClosing || !container) return null;
+
+    let repairablePrefix = inString
+        ? fragment
+        : fragment.replace(/,\s*$/g, '');
     if (inString) {
-        return { rawJson: fragment, repairedTruncation: false };
+        if (escaping) repairablePrefix = repairablePrefix.slice(0, -1);
+        repairablePrefix += '"';
     }
 
-    let repaired = fragment.replace(/,\s*$/g, '');
-    while (stack.length > 0) {
-        const opener = stack.pop();
-        repaired += opener === '{' ? '}' : ']';
+    const repaired = closeJsonContainers(repairablePrefix, container);
+    if (isParsableJsonObject(repaired, true)) {
+        return {
+            rawJson: repaired,
+            repairedTruncation: true,
+        };
     }
 
-    return {
-        rawJson: repaired,
-        repairedTruncation: repaired !== fragment,
-    };
+    if (lastCommaCheckpoint) {
+        const completePrefix = fragment
+            .slice(0, lastCommaCheckpoint.endIndex)
+            .trimEnd();
+        const fallback = closeJsonContainers(completePrefix, lastCommaCheckpoint.container);
+        if (isParsableJsonObject(fallback, true)) {
+            return {
+                rawJson: fallback,
+                repairedTruncation: true,
+            };
+        }
+    }
+
+    return null;
 }
 
 export function parsePatientInsightExtractionResponse(response: string): AITaskParseResult<PatientInsightExtraction> {
