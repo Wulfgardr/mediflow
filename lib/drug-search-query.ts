@@ -57,7 +57,11 @@ export function buildDrugSearchPredicate(value: string): SQL {
             SELECT 1
             FROM json_each(${escapedTokens}) AS search_token
             WHERE NOT (
-                coalesce(${drugs.name}, '') LIKE '%' || search_token.value || '%' ESCAPE ${'\\'}
+                coalesce(${drugs.nameSearch}, '') LIKE '%' || search_token.value || '%' ESCAPE ${'\\'}
+                OR coalesce(${drugs.activePrincipleSearch}, '') LIKE '%' || search_token.value || '%' ESCAPE ${'\\'}
+                OR coalesce(${drugs.packagingSearch}, '') LIKE '%' || search_token.value || '%' ESCAPE ${'\\'}
+                OR coalesce(${drugs.aicSearch}, '') LIKE '%' || search_token.value || '%' ESCAPE ${'\\'}
+                OR coalesce(${drugs.name}, '') LIKE '%' || search_token.value || '%' ESCAPE ${'\\'}
                 OR coalesce(${drugs.activePrinciple}, '') LIKE '%' || search_token.value || '%' ESCAPE ${'\\'}
                 OR coalesce(${drugs.packaging}, '') LIKE '%' || search_token.value || '%' ESCAPE ${'\\'}
                 OR coalesce(${drugs.aic}, '') LIKE '%' || search_token.value || '%' ESCAPE ${'\\'}

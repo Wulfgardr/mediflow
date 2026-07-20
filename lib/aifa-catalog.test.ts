@@ -35,6 +35,7 @@ test('parses the synthetic fixture with the real AIFA confezioni headers', () =>
         aicSearch: '000000101',
         nameSearch: 'acido sintetico',
         activePrincipleSearch: 'acido acetilsalicilico',
+        packagingSearch: '20 compresse da 100 mg uso orale',
     });
     assert.equal(parsed.drugs[1].nameSearch, 'farmaco citta');
     assert.equal(parsed.drugs[2].name, 'SOLUZIONE TEST');
