@@ -2,6 +2,7 @@
 /* @Codex */
 
 import assert from 'node:assert/strict';
+import Database from 'better-sqlite3';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,6 +10,8 @@ import { after, test } from 'node:test';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3100';
 const LOCAL_API_TOKEN = process.env.MEDIFLOW_LOCAL_API_TOKEN || 'mediflow-e2e-local-token';
+const USERNAME = process.env.E2E_USERNAME || 'admin';
+const PIN = process.env.E2E_PIN || '1234';
 const REPORT_PATH = resolveReportPath();
 
 const scenarioResults = [];
@@ -122,6 +125,130 @@ test('native update wins over web stale delete', async () => {
     });
 });
 
+test('bulk move waits for a concurrent writer and preserves unrelated memberships', async () => {
+    const context = await authContextPromise;
+    const dataDir = process.env.MEDIFLOW_DATA_DIR || process.env.MEDIFLOW_E2E_DATA_DIR;
+    assert.ok(dataDir, 'patient concurrency test requires a dedicated data directory');
+
+    const sourceAmbulatoryId = crypto.randomUUID();
+    const targetAmbulatoryId = crypto.randomUUID();
+    const preservedAmbulatoryId = crypto.randomUUID();
+    const ambulatoryIds = [sourceAmbulatoryId, targetAmbulatoryId, preservedAmbulatoryId];
+    const writer = new Database(path.join(dataDir, 'medical.db'));
+    writer.pragma('busy_timeout = 5000');
+    writer.pragma('foreign_keys = ON');
+
+    let patientId = null;
+    let transactionOpen = false;
+    let movePromise = null;
+    try {
+        const insertAmbulatory = writer.prepare(`
+            INSERT INTO ambulatories (id, name, type, is_default, version, created_at)
+            VALUES (?, ?, 'live', 0, 1, ?)
+        `);
+        const createdAt = Math.floor(Date.now() / 1000);
+        for (const [index, ambulatoryId] of ambulatoryIds.entries()) {
+            insertAmbulatory.run(ambulatoryId, `Bulk move ${index + 1}`, createdAt);
+        }
+
+        patientId = await context.web.createPatient({
+            ...buildPatientPayload('bulk move concurrency'),
+            ambulatoryId: sourceAmbulatoryId,
+        });
+        writer.prepare('UPDATE patients SET ambulatory_id = ? WHERE id = ?')
+            .run(sourceAmbulatoryId, patientId);
+        writer.prepare('DELETE FROM patients_to_ambulatories WHERE patient_id = ?')
+            .run(patientId);
+        const insertMembership = writer.prepare(`
+            INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id, assigned_at)
+            VALUES (?, ?, ?)
+        `);
+        insertMembership.run(patientId, sourceAmbulatoryId, createdAt);
+        insertMembership.run(patientId, preservedAmbulatoryId, createdAt);
+
+        const invalid = await context.web.request('POST', '/move', {
+            patientIds: [patientId],
+            targetAmbulatoryId,
+        });
+        assert.equal(invalid.response.status, 400, 'move should require the exact version map');
+
+        writer.exec('BEGIN IMMEDIATE');
+        transactionOpen = true;
+        const competingWrite = writer.prepare(
+            'UPDATE patients SET version = version + 1 WHERE id = ?',
+        ).run(patientId);
+        assert.equal(competingWrite.changes, 1);
+
+        let requestSettled = false;
+        movePromise = context.web.request('POST', '/move', {
+            patientIds: [patientId],
+            patientVersions: { [patientId]: 1 },
+            targetAmbulatoryId,
+            sourceAmbulatoryId,
+        }).finally(() => {
+            requestSettled = true;
+        });
+
+        await delay(500);
+        assert.equal(requestSettled, false, 'move should wait before taking its read snapshot');
+
+        writer.exec('COMMIT');
+        transactionOpen = false;
+
+        const conflict = await movePromise;
+        assert.equal(conflict.response.status, 409);
+        assert.equal(conflict.json?.code, 'VERSION_CONFLICT');
+        assert.equal(conflict.json?.recordId, patientId);
+        assert.equal(conflict.json?.expectedVersion, 1);
+        assert.equal(conflict.json?.currentVersion, 2);
+
+        assert.deepEqual(readPatient(writer, patientId), {
+            ambulatoryId: sourceAmbulatoryId,
+            version: 2,
+        });
+        assert.deepEqual(
+            readMemberships(writer, patientId),
+            [preservedAmbulatoryId, sourceAmbulatoryId].sort(),
+        );
+
+        const retry = await context.web.request('POST', '/move', {
+            patientIds: [patientId],
+            patientVersions: { [patientId]: 2 },
+            targetAmbulatoryId,
+            sourceAmbulatoryId,
+        });
+        assert.equal(retry.response.status, 200);
+        assert.equal(retry.json?.patientVersions?.[patientId], 3);
+        assert.deepEqual(readPatient(writer, patientId), {
+            ambulatoryId: targetAmbulatoryId,
+            version: 3,
+        });
+        assert.deepEqual(
+            readMemberships(writer, patientId),
+            [preservedAmbulatoryId, targetAmbulatoryId].sort(),
+        );
+
+        scenarioResults.push({
+            name: 'bulk move waits for a concurrent writer',
+            winner: 'concurrent-writer',
+            loser: 'bulk-move',
+            loserOperation: 'move',
+            conflictStatus: conflict.response.status,
+            currentVersion: conflict.json?.currentVersion,
+        });
+    } finally {
+        if (transactionOpen) writer.exec('ROLLBACK');
+        if (movePromise) await movePromise.catch(() => undefined);
+        if (patientId) {
+            writer.prepare('DELETE FROM patients_to_ambulatories WHERE patient_id = ?').run(patientId);
+            writer.prepare('DELETE FROM patients WHERE id = ?').run(patientId);
+        }
+        const deleteAmbulatory = writer.prepare('DELETE FROM ambulatories WHERE id = ?');
+        for (const ambulatoryId of ambulatoryIds) deleteAmbulatory.run(ambulatoryId);
+        writer.close();
+    }
+});
+
 async function runConflictScenario({ name, winnerLane, loserLane, loserOperation }) {
     const context = await authContextPromise;
     const winner = context[winnerLane];
@@ -188,19 +315,37 @@ async function runConflictScenario({ name, winnerLane, loserLane, loserOperation
 
 async function createAuthContext() {
     await assertServerReady();
-    const authHeaders = {
+    const nativeAuthHeaders = {
         Authorization: `Bearer ${LOCAL_API_TOKEN}`
     };
+    const sessionCookie = await login();
 
     const nativeLane = new LaneClient('native-v1', '/api/v1/patients', {
-        ...authHeaders
+        ...nativeAuthHeaders
     });
 
     return {
-        web: new LaneClient('web', '/api/patients', authHeaders),
+        web: new LaneClient('web', '/api/patients', { Cookie: sessionCookie }),
         'native-v1': nativeLane,
         native: nativeLane
     };
+}
+
+async function login() {
+    const response = await fetch(new URL('/api/auth/login', BASE_URL), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: USERNAME, password: PIN }),
+    });
+    assert.equal(response.status, 200, 'web concurrency lane should authenticate');
+
+    const setCookies = typeof response.headers.getSetCookie === 'function'
+        ? response.headers.getSetCookie()
+        : [];
+    const cookieSource = setCookies.find((cookie) => cookie.startsWith('mediflow_session='))
+        ?? response.headers.get('set-cookie');
+    assert.ok(cookieSource, 'login should return the mediflow_session cookie');
+    return cookieSource.split(';')[0];
 }
 
 async function cleanupPatient(nativeLane, patientId) {
@@ -209,6 +354,25 @@ async function cleanupPatient(nativeLane, patientId) {
 
     const result = await nativeLane.deletePatient(patientId, latest.version);
     assert.equal(result.response.status, 200, `Cleanup delete should succeed for ${patientId}`);
+}
+
+function readPatient(database, patientId) {
+    return database.prepare(
+        'SELECT ambulatory_id AS ambulatoryId, version FROM patients WHERE id = ?',
+    ).get(patientId);
+}
+
+function readMemberships(database, patientId) {
+    return database.prepare(`
+        SELECT ambulatory_id AS ambulatoryId
+        FROM patients_to_ambulatories
+        WHERE patient_id = ?
+        ORDER BY ambulatory_id
+    `).all(patientId).map((row) => row.ambulatoryId);
+}
+
+async function delay(milliseconds) {
+    await new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 async function assertServerReady() {
