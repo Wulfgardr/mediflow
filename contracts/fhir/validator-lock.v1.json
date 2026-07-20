@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "fhirVersion": "4.0.1",
+  "javaMajor": 17,
+  "validator": {
+    "version": "6.9.12",
+    "url": "https://github.com/hapifhir/org.hl7.fhir.core/releases/download/6.9.12/validator_cli.jar",
+    "sha256": "0e53ab1d1a6f1e35f505255c0b8ce10a35fcf27e6e96b503640f784cd07e5ad6"
+  },
+  "packages": [
+    {
+      "name": "hl7.fhir.r4.core",
+      "version": "4.0.1",
+      "url": "https://packages2.fhir.org/packages/hl7.fhir.r4.core/4.0.1",
+      "sha256": "b090bf929e1f665cf2c91583720849695bc38d2892a7c5037c56cb00817fb091"
+    },
+    {
+      "name": "hl7.fhir.xver-extensions",
+      "version": "0.1.0",
+      "url": "https://packages2.fhir.org/packages/hl7.fhir.xver-extensions/0.1.0",
+      "sha256": "f3bb9fa2083402e88a02b41f433655274e8a1cca563211c8f7ba6fd0badf537a"
+    },
+    {
+      "name": "hl7.terminology.r4",
+      "version": "6.2.0",
+      "url": "https://packages2.fhir.org/packages/hl7.terminology.r4/6.2.0",
+      "sha256": "79404c9cc95491fc0155627cd039c401a6eb4748175328131e91b709a41300e2"
+    },
+    {
+      "name": "hl7.fhir.uv.extensions.r4",
+      "version": "5.2.0",
+      "url": "https://packages2.fhir.org/packages/hl7.fhir.uv.extensions.r4/5.2.0",
+      "sha256": "b406e75575f05676559d0759770c5939d023ee72fb2ef38e0b3259328487720a"
+    },
+    {
+      "name": "hl7.terminology",
+      "version": "7.2.0",
+      "url": "https://packages2.fhir.org/packages/hl7.terminology/7.2.0",
+      "sha256": "5ff301c596b18e1a1ad9b05b9bc3bda2626ea6d70fa65c018020fd9635ab3c3d"
+    },
+    {
+      "name": "hl7.fhir.uv.extensions",
+      "version": "5.3.0",
+      "url": "https://packages2.fhir.org/packages/hl7.fhir.uv.extensions/5.3.0",
+      "sha256": "6e3a3f9929e05d2b813a3f98fa1ad2f5122fb6b2819fa73e6c5520002fb2c5b0"
+    },
+    {
+      "name": "hl7.terminology.r5",
+      "version": "7.1.0",
+      "url": "https://packages2.fhir.org/packages/hl7.terminology.r5/7.1.0",
+      "sha256": "473303108b5607aad7b910581739e8bbf3e61a625ed9e739c66e0ca597d4aefe"
+    },
+    {
+      "name": "hl7.fhir.uv.extensions.r5",
+      "version": "5.2.0",
+      "url": "https://packages2.fhir.org/packages/hl7.fhir.uv.extensions.r5/5.2.0",
+      "sha256": "e02fc6eff0f37c1611a35aa93ef9aaa3b55ab7371a5c96f4d2a5834106a13170"
+    },
+    {
+      "name": "hl7.fhir.uv.extensions.r5",
+      "version": "5.3.0",
+      "url": "https://packages2.fhir.org/packages/hl7.fhir.uv.extensions.r5/5.3.0",
+      "sha256": "f1039cac888d79ebd29878d7debe5e647ffe7ed962a9033da095258a03a06105"
+    }
+  ],
+  "settings": {
+    "prohibitNetworkAccess": true,
+    "ignoreDefaultPackageServers": true,
+    "servers": []
+  },
+  "validation": {
+    "terminologyServer": "n/a",
+    "terminologyCache": "n/a",
+    "jurisdiction": "global",
+    "locale": "en-US",
+    "minimumLevel": "warnings",
+    "showMessageIds": true
+  }
+}
