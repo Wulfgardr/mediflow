@@ -120,6 +120,28 @@ codifica ICD obbligatoria), ancorati all'ADR 0065:
 npm run check:claims
 ```
 
+### Monitor del workflow
+
+Il monitor valuta i metadati Git e le verifiche dichiarate per la branch corrente.
+
+```bash
+npm run workflow-monitor -- --check=focused=pass --persist-checks
+npm run workflow-monitor
+npm run workflow-monitor -- clear-checks
+```
+
+Il primo comando salva le verifiche per la branch e lo SHA esatti. Il sidecar resta fuori da Git in `~/.codex/state/mediflow-workflow-monitor/checks.json`.
+
+Il monitor riusa il sidecar solo con worktree pulito, branch invariata e SHA invariato. Usa `--no-persisted-checks` per ignorare il sidecar.
+
+Il monitor registra gli esiti dichiarati, ma non esegue i check. Conserva gli output dei check come prova separata.
+
+Il monitor non stampa il diff o i percorsi modificati. Restituisce `blocked` quando il diff contiene un percorso protetto.
+
+Il monitor non esegue `git fetch`. Aggiorna `origin/main` prima di usare il conteggio `behind` come evidenza corrente.
+
+La CI e il controller restano le autorita per il merge.
+
 ### Test concorrenza pazienti
 
 Per verificare i conflitti cross-client su `patients.version`:
