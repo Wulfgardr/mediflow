@@ -5,8 +5,10 @@ import type { AifaDrug } from '@/lib/db';
 import {
     commitDrugAutocompleteQueryChange,
     createDrugAutocompleteSearch,
+    type DrugAutocompleteCatalogState,
 } from '@/lib/drug-autocomplete-search';
 import { Search, X, Pill, Database, Activity } from 'lucide-react';
+import Link from 'next/link';
 
 interface DrugAutocompleteProps {
     onSelect: (drug: AifaDrug) => void;
@@ -24,6 +26,8 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
     const [results, setResults] = useState<AifaDrug[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [catalogState, setCatalogState] = useState<DrugAutocompleteCatalogState>('ready');
+    const [searchFailed, setSearchFailed] = useState(false);
     /* @Codex WUL-UIUX (Fase 5): pattern combobox ARIA + navigazione da tastiera. */
     const [activeIndex, setActiveIndex] = useState(-1);
     const listboxId = useId();
@@ -45,14 +49,20 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
             if (tokens.length > 0 && tokens[0].length > 2) {
                 setIsLoading(true);
                 try {
-                    const matches = await drugSearch.run(query.trim()); // @Codex WUL-488
-                    if (matches === null) return;
-                    setResults(matches);
+                    const result = await drugSearch.run(query.trim()); // @Codex WUL-488
+                    if (result === null) return;
+                    setResults(result.items);
+                    setCatalogState(result.catalogState);
+                    setSearchFailed(false);
                     setActiveIndex(-1);
                     setIsOpen(true);
                     setIsLoading(false);
                 } catch (e) {
                     console.error("Drug search error", e);
+                    setCatalogState('ready');
+                    setSearchFailed(true);
+                    setResults([]);
+                    setIsOpen(true);
                     setIsLoading(false);
                 }
             } else if (tokens.length === 0) {
@@ -122,7 +132,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                 <input
                     type="text"
                     role="combobox"
-                    aria-expanded={isOpen && results.length > 0}
+                    aria-expanded={isOpen}
                     aria-controls={listboxId}
                     aria-autocomplete="list"
                     aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
@@ -161,7 +171,10 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                 <div className={drugPopoverClassName} role="listbox" id={listboxId} aria-label="Risultati catalogo farmaci">
                     <div role="presentation" className="mb-1 flex items-center justify-between gap-3 border-b border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">
                         <span>Risultati catalogo ({results.length})</span>
-                        <span className="flex items-center gap-1"><Database className="w-3 h-3" /> AIFA locale</span>
+                        <span className="flex items-center gap-1">
+                            <Database className="w-3 h-3" />
+                            {catalogState === 'ready' ? 'AIFA locale' : 'Catalogo locale'}
+                        </span>
                     </div>
 
                     {results.map((drug, index) => (
@@ -205,8 +218,28 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
             {isOpen && query.length > 2 && results.length === 0 && !isLoading && (
                 <div className={`${drugPopoverClassName} p-5 text-center`}>
                     <Pill className="mx-auto mb-2 h-7 w-7 text-[color:var(--lume-ink-muted)]" />
-                    <p className="text-sm font-semibold text-[color:var(--lume-ink)]">Nessun farmaco trovato nel catalogo locale.</p>
-                    <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">Prova nome commerciale o principio attivo, oppure usa “Farmaco manuale o galenico”.</p>
+                    {catalogState === 'not-imported' ? (
+                        <>
+                            <p className="text-sm font-semibold text-[color:var(--lume-ink)]">Catalogo farmaci non importato.</p>
+                            <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
+                                Importa il file AIFA in{' '}
+                                <Link href="/settings/repertori" className="font-semibold text-[color:var(--lume-accent)] underline-offset-2 hover:underline">
+                                    Impostazioni, Repertori
+                                </Link>
+                                , poi ripeti la ricerca.
+                            </p>
+                        </>
+                    ) : searchFailed ? (
+                        <>
+                            <p className="text-sm font-semibold text-[color:var(--lume-ink)]">Catalogo farmaci non leggibile.</p>
+                            <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">Riprova oppure inserisci il farmaco manualmente.</p>
+                        </>
+                    ) : (
+                        <>
+                            <p className="text-sm font-semibold text-[color:var(--lume-ink)]">Nessun farmaco trovato nel catalogo locale.</p>
+                            <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">Prova nome commerciale, principio attivo o AIC, oppure usa “Farmaco manuale o galenico”.</p>
+                        </>
+                    )}
                 </div>
             )}
         </div>

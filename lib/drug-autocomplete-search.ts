@@ -4,13 +4,19 @@ import { isApiTableAuthUnavailableStatus, notifyApiAuthUnavailable } from '@/lib
 const RESULT_LIMIT = 30;
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
+export type DrugAutocompleteCatalogState = 'ready' | 'unverified' | 'not-imported';
+export type DrugAutocompleteResult = {
+    items: AifaDrug[];
+    catalogState: DrugAutocompleteCatalogState;
+};
+
 /* @Codex WUL-488 */
 export async function fetchDrugAutocomplete(
     query: string,
     signal: AbortSignal,
     fetchImpl: FetchLike = fetch,
-): Promise<AifaDrug[]> {
-    const response = await fetchImpl(`/api/drugs?q=${encodeURIComponent(query.trim())}`, { signal });
+): Promise<DrugAutocompleteResult> {
+    const response = await fetchImpl(`/api/drugs?q=${encodeURIComponent(query.trim())}&limit=${RESULT_LIMIT}`, { signal });
     if (!response.ok) {
         if (isApiTableAuthUnavailableStatus(response.status)) notifyApiAuthUnavailable(response.status);
         throw new Error(`Drug search failed with status ${response.status}`);
@@ -18,7 +24,11 @@ export async function fetchDrugAutocomplete(
 
     const payload: unknown = await response.json();
     if (!Array.isArray(payload)) throw new Error('Drug search returned an invalid payload');
-    return (payload as AifaDrug[]).slice(0, RESULT_LIMIT);
+    const header = response.headers.get('x-mediflow-aifa-catalog');
+    const catalogState: DrugAutocompleteCatalogState = header === 'ready' || header === 'unverified'
+        ? header
+        : 'not-imported';
+    return { items: (payload as AifaDrug[]).slice(0, RESULT_LIMIT), catalogState };
 }
 
 /* @Codex WUL-488 */
@@ -27,7 +37,7 @@ export function createDrugAutocompleteSearch(fetchImpl: FetchLike = fetch) {
     let activeController: AbortController | null = null;
 
     return {
-        async run(query: string): Promise<AifaDrug[] | null> {
+        async run(query: string): Promise<DrugAutocompleteResult | null> {
             const currentRevision = ++revision;
             activeController?.abort();
             const controller = new AbortController();

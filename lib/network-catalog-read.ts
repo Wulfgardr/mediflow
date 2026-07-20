@@ -21,6 +21,8 @@ import {
     searchStaticTerminology,
     type TerminologyItem,
 } from './terminology';
+/* @Codex */
+import { getAifaCatalogStatus, searchAifaCatalog } from './aifa-catalog-server';
 
 /* @Codex */
 export const NETWORK_CATALOG_READ_CAPABILITY = 'network.catalogs.readonly';
@@ -31,7 +33,7 @@ export type CatalogJsonResult = {
     status?: number;
 };
 
-function toDrugSummary(item: typeof drugs.$inferSelect): DrugSummary {
+function toDrugSummary(item: typeof drugs.$inferSelect, priceStoredAsCents = false): DrugSummary {
     return {
         aic: item.aic,
         name: item.name,
@@ -39,7 +41,7 @@ function toDrugSummary(item: typeof drugs.$inferSelect): DrugSummary {
         company: item.company ?? null,
         packaging: item.packaging ?? null,
         class: item.class ?? null,
-        price: item.price ?? null,
+        price: item.price === null ? null : priceStoredAsCents ? item.price / 100 : item.price,
         atc: item.atc ?? null
     };
 }
@@ -63,7 +65,7 @@ function toExemptionSummary(item: typeof exemptions.$inferSelect): ExemptionSumm
 export async function readDrugCatalog(searchParams: URLSearchParams): Promise<CatalogJsonResult> {
     const q = searchParams.get('q')?.trim();
     const countOnly = searchParams.get('count') === '1';
-    const limit = parseApiV1Limit(searchParams.get('limit'), q ? 60 : 200, 500);
+    const limit = parseApiV1Limit(searchParams.get('limit'), q ? 30 : 200, q ? 50 : 500);
 
     if (countOnly) {
         const row = await dbServer
@@ -74,14 +76,8 @@ export async function readDrugCatalog(searchParams: URLSearchParams): Promise<Ca
     }
 
     if (q) {
-        const pattern = `%${q}%`;
-        const rows = await dbServer
-            .select()
-            .from(drugs)
-            .where(sql`${drugs.name} LIKE ${pattern} OR ${drugs.activePrinciple} LIKE ${pattern} OR ${drugs.aic} LIKE ${pattern}`)
-            .orderBy(asc(drugs.name))
-            .limit(limit);
-        return { body: rows.map(toDrugSummary) };
+        const { rows, status } = await searchAifaCatalog(q, limit);
+        return { body: rows.map((row) => toDrugSummary(row, status.state === 'ready')) };
     }
 
     const rows = await dbServer
@@ -90,7 +86,8 @@ export async function readDrugCatalog(searchParams: URLSearchParams): Promise<Ca
         .orderBy(asc(drugs.name))
         .limit(limit);
 
-    return { body: rows.map(toDrugSummary) };
+    const status = await getAifaCatalogStatus();
+    return { body: rows.map((row) => toDrugSummary(row, status.state === 'ready')) };
 }
 
 /* @Codex */

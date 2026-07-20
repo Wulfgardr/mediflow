@@ -1,95 +1,50 @@
-import { db, AifaDrug } from './db';
+import {
+    type AifaCatalogManifest,
+    type AifaCatalogManifestInput,
+} from './aifa-catalog';
 
-/**
- * Parses a standard AIFA Open Data CSV line.
- * Assumed Format (Common AIFA Layout):
- * AIC;Denominazione;Ditta;Principio Attivo;Prezzo;Tipo;Gruppo Equivalenza;Fascia
- * 
- * Note: Real AIFA CSVs can vary. This parser supports the "Lista Farmaci Classe A/H" standard layout.
- */
-export async function importAifaCsv(file: File, onProgress?: (count: number, total: number) => void): Promise<number> {
-    const text = await file.text();
-    const lines = text.split('\n');
-    const batchSize = 2000; // Optimal batch size for IndexedDB
-    let processed = 0;
-    const total = lines.length;
+export type AifaCatalogClientStatus = {
+    count: number;
+    manifest: AifaCatalogManifest | null;
+    state: 'ready' | 'unverified' | 'not-imported';
+};
 
-    // Detect header to map columns dynamically (Simple implementation checks for known headers)
-    // For this MVP we assume a standard layout or try to detect position
-    const header = lines[0].toLowerCase();
-    const isSemicolon = header.includes(';');
-    const separator = isSemicolon ? ';' : ',';
+export type AifaImportClientResult = AifaCatalogClientStatus & {
+    rejectedRecords: number;
+    totalRecords: number;
+};
 
-    const drugsBuffer: AifaDrug[] = [];
-
-    // Skip header
-    for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-
-        const cols = line.split(separator).map(c => c.replace(/^"|"$/g, '').trim()); // Remove quotes
-
-        // confezioni.csv mapping:
-        // 0: codice_aic
-        // 3: denominazione
-        // 4: descrizione (packaging)
-        // 6: ragione_sociale
-        // 10: codice_atc
-        // 11: pa_associati
-
-        if (cols.length < 12) continue; // Basic length check for this file format
-
-        const aic = cols[0]?.trim();
-        const name = cols[3]?.trim();
-        const packaging = cols[4]?.trim();
-        const company = cols[6]?.trim();
-        const atc = cols[10]?.trim();
-        const activePrinciple = cols[11]?.trim();
-
-        if (!aic || aic.length < 6 || !name) continue;
-
-        try {
-            const drug: AifaDrug = {
-                aic,
-                name,
-                company: company || '',
-                activePrinciple: activePrinciple || '',
-                packaging: packaging || '',
-                atc: atc || '',
-                updatedAt: new Date()
-            };
-
-            drugsBuffer.push(drug);
-        } catch (e) {
-            console.warn("Skipping invalid line", i, line, e);
-        }
-
-        if (drugsBuffer.length >= batchSize) {
-            await db.drugs.bulkPut(drugsBuffer);
-            processed += drugsBuffer.length;
-            drugsBuffer.length = 0; // Clear buffer
-            if (onProgress) onProgress(processed, total);
-        }
+/* @Codex */
+export async function importAifaCsv(
+    file: File,
+    manifest: AifaCatalogManifestInput,
+): Promise<AifaImportClientResult> {
+    const form = new FormData();
+    form.set('file', file);
+    form.set('sourceUrl', manifest.sourceUrl);
+    form.set('downloadedAt', manifest.downloadedAt);
+    form.set('version', manifest.version);
+    const response = await fetch('/api/drugs', { method: 'POST', body: form });
+    const payload = await response.json().catch(() => null) as AifaImportClientResult | { error?: string } | null;
+    if (!response.ok) {
+        throw new Error(payload && 'error' in payload && payload.error
+            ? payload.error
+            : 'Importazione AIFA non riuscita');
     }
-
-    // Flush remaining
-    if (drugsBuffer.length > 0) {
-        await db.drugs.bulkPut(drugsBuffer);
-        processed += drugsBuffer.length;
-        if (onProgress) onProgress(processed, total);
-    }
-
-    return processed;
+    return payload as AifaImportClientResult;
 }
 
-export async function clearDrugDatabase() {
-    return await db.drugs.clear();
+export async function clearDrugDatabase(): Promise<void> {
+    const response = await fetch('/api/drugs', { method: 'DELETE' });
+    if (!response.ok) throw new Error('Svuotamento catalogo AIFA non riuscito');
 }
 
-export async function getDrugStats() {
-    /* @Codex */
-    const response = await fetch('/api/drugs?count=1');
-    if (!response.ok) throw new Error('Failed to fetch drug stats');
-    const payload = await response.json();
-    return Number(payload.count || 0);
+export async function getDrugCatalogStatus(): Promise<AifaCatalogClientStatus> {
+    const response = await fetch('/api/drugs?count=1', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Lettura stato catalogo AIFA non riuscita');
+    return response.json() as Promise<AifaCatalogClientStatus>;
+}
+
+export async function getDrugStats(): Promise<number> {
+    return (await getDrugCatalogStatus()).count;
 }

@@ -1,7 +1,7 @@
 // Codex: created 2026-02-06
 import { NextResponse } from 'next/server';
-import { sql } from 'drizzle-orm';
-import { dbServer } from '@/lib/db-server';
+import { normalizeAifaSearchText } from '@/lib/aifa-catalog';
+import { clearAifaCatalog, replaceUnverifiedDrugCatalog } from '@/lib/aifa-catalog-server';
 import { drugs } from '@/lib/schema';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { readDrugCatalog } from '@/lib/network-catalog-read';
@@ -34,7 +34,10 @@ function normalizeDrug(item: DrugPayload): typeof drugs.$inferInsert | null {
         packaging: item.packaging?.trim() || null,
         class: item.class?.trim() || null,
         price: numericPrice,
-        atc: item.atc?.trim() || null
+        atc: item.atc?.trim() || null,
+        aicSearch: normalizeAifaSearchText(aic),
+        nameSearch: normalizeAifaSearchText(name),
+        activePrincipleSearch: normalizeAifaSearchText(item.activePrinciple || ''),
     };
 }
 
@@ -67,18 +70,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'No valid drugs payload' }, { status: 400 });
         }
 
-        await dbServer.insert(drugs).values(items).onConflictDoUpdate({
-            target: drugs.aic,
-            set: {
-                name: sql`excluded.name`,
-                activePrinciple: sql`excluded.active_principle`,
-                company: sql`excluded.company`,
-                packaging: sql`excluded.packaging`,
-                class: sql`excluded.class`,
-                price: sql`excluded.price`,
-                atc: sql`excluded.atc`
-            }
-        });
+        // This compatibility endpoint receives no source artifact or hash. Treat each
+        // request as a complete atomic replacement so AIFA cents and legacy prices
+        // can never coexist under one catalog-wide provenance state.
+        replaceUnverifiedDrugCatalog(items);
 
         return NextResponse.json({ success: true, count: items.length });
     } catch (error) {
@@ -92,7 +87,7 @@ export async function DELETE(request: Request) {
     if (authError) return authError;
 
     try {
-        await dbServer.delete(drugs);
+        clearAifaCatalog();
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('API DELETE /api/v1/drugs error:', error);
