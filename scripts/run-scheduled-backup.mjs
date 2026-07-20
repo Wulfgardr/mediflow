@@ -362,6 +362,21 @@ function buildAssignedAmbulatoryIds(patient, rows) {
   return Array.from(ids).sort((left, right) => left.localeCompare(right));
 }
 
+/* @Codex */
+function buildAssignedAmbulatoryMemberships(patient, rows) {
+  const memberships = new Map();
+  for (const row of rows) {
+    if (row.patientId === patient.id && typeof row.ambulatoryId === 'string' && row.ambulatoryId.trim().length > 0) {
+      memberships.set(row.ambulatoryId, row.assignedAt ?? null);
+    }
+  }
+  if (typeof patient.ambulatoryId === 'string' && patient.ambulatoryId.trim().length > 0 && !memberships.has(patient.ambulatoryId)) {
+    memberships.set(patient.ambulatoryId, patient.updatedAt ?? patient.createdAt ?? null);
+  }
+  return Array.from(memberships, ([ambulatoryId, assignedAt]) => ({ ambulatoryId, assignedAt }))
+    .sort((left, right) => left.ambulatoryId.localeCompare(right.ambulatoryId));
+}
+
 function buildDataset(db, backupCollections) {
   return db.transaction(() => {
     const dataset = Object.fromEntries(
@@ -373,11 +388,14 @@ function buildDataset(db, backupCollections) {
       ]),
     );
     const patientAmbulatoryRows = hasTable(db, PATIENT_AMBULATORY_TABLE)
-      ? db.prepare(`SELECT * FROM ${PATIENT_AMBULATORY_TABLE}`).all().map((row) => normalizeRowKeys(row))
+      ? db.prepare(`SELECT * FROM ${PATIENT_AMBULATORY_TABLE}`).all().map((row) => normalizeRowDates(normalizeRowKeys(row)))
       : [];
     dataset.patients = dataset.patients.map((patient) => {
       const assignedAmbulatoryIds = buildAssignedAmbulatoryIds(patient, patientAmbulatoryRows);
-      return assignedAmbulatoryIds.length > 0 ? { ...patient, assignedAmbulatoryIds } : patient;
+      const assignedAmbulatoryMemberships = buildAssignedAmbulatoryMemberships(patient, patientAmbulatoryRows);
+      return assignedAmbulatoryIds.length > 0
+        ? { ...patient, assignedAmbulatoryIds, assignedAmbulatoryMemberships }
+        : patient;
     });
 
     const patientIds = new Set(dataset.patients.map((row) => row.id).filter((value) => typeof value === 'string' && value.length > 0));
