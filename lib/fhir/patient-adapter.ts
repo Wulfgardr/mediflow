@@ -1,12 +1,14 @@
 import { Patient as FhirPatient } from 'fhir/r4';
+import { toFhirId } from './id';
 import type { FhirPatientInput } from './types';
 
 export const CODICE_FISCALE_SYSTEM = "http://hl7.it/sid/codice-fiscale";
 
+/* @Codex */
 export function toFhirPatient(patient: FhirPatientInput, generatedAt: Date | string = new Date()): FhirPatient {
     return {
         resourceType: "Patient",
-        id: patient.id,
+        id: toFhirId(patient.id, 'patient'),
         active: !patient.isArchived,
         identifier: [
             {
@@ -22,7 +24,6 @@ export function toFhirPatient(patient: FhirPatientInput, generatedAt: Date | str
                 given: [patient.firstName]
             }
         ],
-        gender: "unknown", // Logic to extract from tax code could go here
         birthDate: patient.birthDate
             ? new Date(patient.birthDate).toISOString().split('T')[0]
             : undefined,
