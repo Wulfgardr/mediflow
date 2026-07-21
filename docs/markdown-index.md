@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-07-20
+Ultimo aggiornamento: 2026-07-21
 
 ## 📚 Come usare questo indice
 
@@ -165,6 +165,7 @@ Ultimo aggiornamento: 2026-07-20
 | [docs/adr/0079-local-open-loops-and-result-link.md](./adr/0079-local-open-loops-and-result-link.md) | Accetta le attese locali deterministiche: prima slice web consegnata, salvataggio esplicito e nessuna estensione paired. |
 | [docs/adr/0080-serialize-sqlite-schema-guards-at-bootstrap.md](./adr/0080-serialize-sqlite-schema-guards-at-bootstrap.md) | Propone di serializzare le schema guard SQLite al bootstrap per rendere deterministici build e avvii multiprocesso. |
 | [docs/adr/0081-fhir-r4-export-v0-contract.md](./adr/0081-fhir-r4-export-v0-contract.md) | Decisione `Accepted`: fissa copertura, parità web/native, validazione locale e nessun claim FSE per l'export FHIR R4 v0. |
+| [docs/adr/0082-persistent-expectations-register-v0.md](./adr/0082-persistent-expectations-register-v0.md) | Decisione `Accepted`: definisce un registro persistente host-only delle attese con provenienza univoca, matching fail-closed e conferma esplicita della chiusura. |
 | [docs/adr/0050-functional-preview-profiles-retired-on-mainline.md](./adr/0050-functional-preview-profiles-retired-on-mainline.md) | Fissa `WUL-199`: i preview profiles funzionali vengono ritirati da `main`, con AI e Smart Import gia live e il contesto paziente SISS promosso a parte stabile della scheda paziente. |
 | [docs/adr/0048-apple-shared-client-architecture-and-home-base-runtime.md](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md) | Formalizza `WUL-188`: family Apple ricostruita con core Swift condiviso, shell distinte per macOS/iPhone/iPad, Mac packaged come `home-base` autorevole e mobile paired senza accesso diretto a SQLite. |
 | [docs/adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md](./adr/0049-siss-fse-document-corpus-and-local-mcp-layer.md) | Formalizza `WUL-176`: corpus documentale locale SISS/FSE con manifest versionato, fetch/sync fuori Git e futuro MCP ammesso solo sopra un corpus approvato. |

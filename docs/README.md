@@ -9,7 +9,7 @@ read_when:
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-07-20
+Ultimo aggiornamento: 2026-07-21
 
 ## 📚 Policy di consultazione (agent)
 
@@ -40,6 +40,7 @@ Approfondimenti utili:
 - Integrazione ATHENA-style treatment reasoning: [docs/treatment-reasoning-athena-integration.md](./treatment-reasoning-athena-integration.md), [docs/adr/0073-treatment-reasoning-athena-boundary.md](./adr/0073-treatment-reasoning-athena-boundary.md)
 - Astrazione provider AI e boundary egress: [ADR 0077](./adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md)
 - Contratto export FHIR R4 v0: [ADR 0081](./adr/0081-fhir-r4-export-v0-contract.md)
+- Registro persistente delle attese v0: [ADR 0082](./adr/0082-persistent-expectations-register-v0.md)
 - Closeout secondario dello stack intelligente: [docs/analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md](./analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md)
 - Triage audit esterno V2: [docs/analysis/2026-07-05-audit-esterno-v2-triage.md](./analysis/2026-07-05-audit-esterno-v2-triage.md)
 
@@ -133,8 +134,9 @@ Approfondimenti utili:
 | ADR treatment reasoning ATHENA-style | [docs/adr/0073-treatment-reasoning-athena-boundary.md](./adr/0073-treatment-reasoning-athena-boundary.md) | `CANONICAL` | Fissa la lane `mediflow.treatment_reasoning.v1` separata da Smart Import: runtime locale ATHENA/MLX review-only con kill switch fail-closed, trace/report ATHENA-style e zero auto-write clinici. |
 | ADR astrazione provider AI e boundary egress | [docs/adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md](./adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md) | `CANONICAL` | Decisione accettata: adapter Ollama e gate fail-closed consegnati; registry, provider alternativi e apertura egress restano pendenti. |
 | ADR Lume lingua di design di destinazione | [docs/adr/0078-lume-lingua-di-design-di-destinazione.md](./adr/0078-lume-lingua-di-design-di-destinazione.md) | `CANONICAL` | Decisione `Accepted`: Lume e il canone di destinazione; l'adozione su web e native e progressiva e non equivale alla chiusura L0-L6. |
-| ADR attese locali e collegamento prestazione-risultato | [docs/adr/0079-local-open-loops-and-result-link.md](./adr/0079-local-open-loops-and-result-link.md) | `CANONICAL` | Decisione accettata e prima slice web locale consegnata; paired e registro generale restano fuori scope. |
+| ADR attese locali e collegamento prestazione-risultato | [docs/adr/0079-local-open-loops-and-result-link.md](./adr/0079-local-open-loops-and-result-link.md) | `CANONICAL` | Decisione accettata e prima slice web locale consegnata; il registro persistente resta una decisione distinta. |
 | ADR contratto export FHIR R4 v0 | [docs/adr/0081-fhir-r4-export-v0-contract.md](./adr/0081-fhir-r4-export-v0-contract.md) | `CANONICAL` | Decisione `Accepted`: fissa matrice di copertura, parità web/native e gate locale esterno per l'export-only v0. Non introduce claim FSE. |
+| ADR registro persistente delle attese v0 | [docs/adr/0082-persistent-expectations-register-v0.md](./adr/0082-persistent-expectations-register-v0.md) | `CANONICAL` | Decisione `Accepted`: definisce un registro host-only con provenienza univoca, matching fail-closed e chiusura confermata. Non dichiara runtime consegnato. |
 | Closeout evoluzione stack intelligente | [docs/analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md](./analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md) | `SECONDARY` | Riallinea provider scaffold, control-flow, attese locali e roadmap alla verita di `main`; non prevale sugli ADR. |
 | ADR ritiro preview profiles funzionali su `main` | [docs/adr/0050-functional-preview-profiles-retired-on-mainline.md](./adr/0050-functional-preview-profiles-retired-on-mainline.md) | `CANONICAL` | Fissa `WUL-199`: il workbench ufficiale non espone piu preview profiles runtime; AI e Smart Import restano live e il contesto paziente SISS diventa stabile nella scheda paziente. |
 | ADR architettura shared Apple client e runtime `home-base` packaged | [docs/adr/0048-apple-shared-client-architecture-and-home-base-runtime.md](./adr/0048-apple-shared-client-architecture-and-home-base-runtime.md) | `CANONICAL` | Governa `WUL-188`: core Apple condiviso, shell distinte per macOS/iPhone/iPad, Mac packaged come nodo `home-base` autorevole, client mobili paired senza accesso diretto a SQLite e parity non-AI estesa via `/api/v1/network/*`. |
