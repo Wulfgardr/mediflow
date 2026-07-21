@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "systems": [
+    "ATC",
+    "LOINC",
+    "UCUM"
+  ],
+  "registry": [
+    {
+      "system": "ATC",
+      "display": "ATC",
+      "version": null,
+      "source": "Derived from local AIFA catalog",
+      "status": "active",
+      "updatedAt": null
+    },
+    {
+      "system": "LOINC",
+      "display": "LOINC",
+      "version": "2.78",
+      "source": "Pilot local subset",
+      "status": "active",
+      "updatedAt": null,
+      "notes": "Vital signs pilot subset"
+    },
+    {
+      "system": "UCUM",
+      "display": "UCUM",
+      "version": "2.1",
+      "source": "Pilot local subset",
+      "status": "active",
+      "updatedAt": null,
+      "notes": "Unit-of-measure pilot subset"
+    }
+  ],
+  "searchQueries": {
+    "ATC": "J01",
+    "LOINC": "emoglobina",
+    "UCUM": "g/dL"
+  },
+  "items": [
+    {
+      "system": "ATC",
+      "code": "J01CA04",
+      "display": "Amoxicillina",
+      "version": null,
+      "source": "local-aifa-drug-catalog"
+    },
+    {
+      "system": "LOINC",
+      "code": "718-7",
+      "display": "Hemoglobin [Mass/volume] in Blood",
+      "displayIt": "Emoglobina (Hb)",
+      "defaultUnit": "g/dL",
+      "version": "2.78",
+      "source": "local-pilot-catalog"
+    },
+    {
+      "system": "UCUM",
+      "code": "g/dL",
+      "display": "gram per deciliter",
+      "displayIt": "g/dL",
+      "version": "2.1",
+      "source": "local-pilot-catalog"
+    }
+  ],
+  "webDrug": {
+    "aic": "000000019",
+    "name": "Amoxicillina sintetica",
+    "activePrinciple": "Amoxicillina",
+    "company": "MediFlow Test",
+    "packaging": "12 compresse",
+    "class": "A",
+    "price": 123,
+    "atc": "J01CA04"
+  }
+}

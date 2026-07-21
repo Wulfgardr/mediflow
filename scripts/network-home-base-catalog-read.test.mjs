@@ -12,6 +12,10 @@ const USERNAME = process.env.E2E_USERNAME || 'admin';
 const PIN = process.env.E2E_PIN || '1234';
 const CATALOG_READ_CAPABILITY = 'network.catalogs.readonly';
 const REPORT_PATH = resolveReportPath();
+const TERMINOLOGY_PARITY = JSON.parse(fs.readFileSync(
+    new URL('../native/contracts/terminology-parity.v1.json', import.meta.url),
+    'utf8',
+));
 
 const scenarioResults = [];
 
@@ -75,6 +79,7 @@ test('home-base catalog read is paired, capability-gated and response-compatible
     assert.equal(drugsNetwork.response.status, 200);
     assert.deepEqual(drugsNetwork.json, drugsHost.json);
     assert.ok(Array.isArray(drugsNetwork.json));
+    assert.deepEqual(drugsNetwork.json[0], TERMINOLOGY_PARITY.webDrug);
     assertDrugSummary(drugsNetwork.json[0]);
 
     const exemptionsHost = await request('GET', '/api/v1/exemptions?q=E01&limit=10', {
@@ -89,28 +94,42 @@ test('home-base catalog read is paired, capability-gated and response-compatible
     assert.ok(Array.isArray(exemptionsNetwork.json));
     assertExemptionSummary(exemptionsNetwork.json[0]);
 
-    const terminologySearchHost = await request('GET', '/api/v1/terminology/search?system=ATC&q=J01&limit=10', {
-        headers: localApiHeaders(),
-    });
-    const terminologySearchNetwork = await request('GET', '/api/v1/network/terminology/search?system=ATC&q=J01&limit=10', {
-        headers: authenticatedHeaders,
-    });
-    assert.equal(terminologySearchHost.response.status, 200);
-    assert.equal(terminologySearchNetwork.response.status, 200);
-    assert.deepEqual(terminologySearchNetwork.json, terminologySearchHost.json);
-    assert.ok(Array.isArray(terminologySearchNetwork.json));
-    assertTerminologyItem(terminologySearchNetwork.json[0]);
+    const terminologyCounts = {};
+    for (const expected of TERMINOLOGY_PARITY.items) {
+        const searchParams = new URLSearchParams({
+            system: expected.system,
+            q: TERMINOLOGY_PARITY.searchQueries[expected.system],
+            limit: '10',
+        });
+        const searchPath = `/terminology/search?${searchParams}`;
+        const terminologySearchHost = await request('GET', `/api/v1${searchPath}`, {
+            headers: localApiHeaders(),
+        });
+        const terminologySearchNetwork = await request('GET', `/api/v1/network${searchPath}`, {
+            headers: authenticatedHeaders,
+        });
+        assert.equal(terminologySearchHost.response.status, 200);
+        assert.equal(terminologySearchNetwork.response.status, 200);
+        assert.deepEqual(terminologySearchNetwork.json, terminologySearchHost.json);
+        assert.ok(Array.isArray(terminologySearchNetwork.json));
+        const matched = terminologySearchNetwork.json.find((item) => item.code === expected.code);
+        assert.deepEqual(matched, expected);
+        assertTerminologyItem(matched);
+        terminologyCounts[expected.system] = terminologySearchNetwork.json.length;
 
-    const terminologyResolveHost = await request('GET', '/api/v1/terminology/resolve?system=ATC&code=J01CA04', {
-        headers: localApiHeaders(),
-    });
-    const terminologyResolveNetwork = await request('GET', '/api/v1/network/terminology/resolve?system=ATC&code=J01CA04', {
-        headers: authenticatedHeaders,
-    });
-    assert.equal(terminologyResolveHost.response.status, 200);
-    assert.equal(terminologyResolveNetwork.response.status, 200);
-    assert.deepEqual(terminologyResolveNetwork.json, terminologyResolveHost.json);
-    assertTerminologyItem(terminologyResolveNetwork.json);
+        const resolveParams = new URLSearchParams({ system: expected.system, code: expected.code });
+        const resolvePath = `/terminology/resolve?${resolveParams}`;
+        const terminologyResolveHost = await request('GET', `/api/v1${resolvePath}`, {
+            headers: localApiHeaders(),
+        });
+        const terminologyResolveNetwork = await request('GET', `/api/v1/network${resolvePath}`, {
+            headers: authenticatedHeaders,
+        });
+        assert.equal(terminologyResolveHost.response.status, 200);
+        assert.equal(terminologyResolveNetwork.response.status, 200);
+        assert.deepEqual(terminologyResolveNetwork.json, terminologyResolveHost.json);
+        assert.deepEqual(terminologyResolveNetwork.json, expected);
+    }
 
     const terminologySystemsHost = await request('GET', '/api/v1/terminology/systems', {
         headers: localApiHeaders(),
@@ -122,7 +141,9 @@ test('home-base catalog read is paired, capability-gated and response-compatible
     assert.equal(terminologySystemsNetwork.response.status, 200);
     assert.deepEqual(terminologySystemsNetwork.json, terminologySystemsHost.json);
     assert.ok(Array.isArray(terminologySystemsNetwork.json));
-    assert.ok(terminologySystemsNetwork.json.some((item) => item.system === 'ATC'));
+    const focusedSystems = terminologySystemsNetwork.json
+        .filter((item) => TERMINOLOGY_PARITY.systems.includes(item.system));
+    assert.deepEqual(focusedSystems, TERMINOLOGY_PARITY.registry);
 
     const resolveMissing = await request('GET', '/api/v1/network/terminology/resolve?system=ATC&code=J99ZZ99', {
         headers: authenticatedHeaders,
@@ -137,7 +158,8 @@ test('home-base catalog read is paired, capability-gated and response-compatible
         missingCapabilityStatus: missingCapability.response.status,
         drugsCount: drugsNetwork.json.length,
         exemptionsCount: exemptionsNetwork.json.length,
-        terminologyCount: terminologySearchNetwork.json.length,
+        terminologyCount: terminologyCounts.ATC,
+        terminologyCounts,
     });
 });
 
@@ -165,18 +187,7 @@ async function enableHomeBaseMode() {
 async function seedCatalogs() {
     const drugs = await request('POST', '/api/v1/drugs', {
         headers: localApiHeaders(),
-        body: [
-            {
-                aic: '000000019',
-                name: 'Amoxicillina catalog smoke',
-                activePrinciple: 'Amoxicillina',
-                company: 'MediFlow Test',
-                packaging: '12 compresse',
-                class: 'A',
-                price: 123,
-                atc: 'J01CA04',
-            },
-        ],
+        body: [TERMINOLOGY_PARITY.webDrug],
     });
     assert.equal(drugs.response.status, 200);
     assert.equal(drugs.json?.success, true);
