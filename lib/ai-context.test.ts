@@ -789,3 +789,100 @@ test('coerceInsightToReadable renders a valid envelope embedded in a provider wr
         restore();
     }
 });
+
+/* @Codex */
+test('coerceInsightToReadable rejects a case-variant envelope with a mismatched task', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            SchemaVersion: 'mediflow.ai.extract.v1',
+            Task: 'smart_import',
+            summary: 'Chiavi con case variante',
+            data: {},
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('coerceInsightToReadable rejects a mismatched envelope nested as object in a wrapper', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            message: {
+                content: {
+                    schemaVersion: 'mediflow.ai.extract.v1',
+                    task: 'smart_import',
+                    summary: 'Envelope annidato come oggetto',
+                    data: {},
+                },
+            },
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('document analysis rejects an envelope with a mismatched task', async () => {
+    const restoreHarness = await withHarness();
+    const { AIService } = await import('./ai-service');
+    const { db } = await import('./db');
+    const { analyzeDocumentContent } = await import('./domain/documents/document-synthesis-service');
+    const original = { getSetting: db.settings.get, createAi: AIService.create };
+
+    db.settings.get = (async () => ({ value: 'enabled' })) as typeof db.settings.get;
+    AIService.create = (async () => ({
+        getModelInfo: () => ({ provider: 'local', model: 'synthetic', baseUrl: 'http://127.0.0.1' }),
+        generate: async () => JSON.stringify({
+            schemaVersion: 'mediflow.ai.extract.v1',
+            task: 'smart_import',
+            summary: 'Task errato per la sintesi',
+            data: {},
+        }),
+    })) as unknown as typeof AIService.create;
+
+    try {
+        await assert.rejects(
+            analyzeDocumentContent('Referto sintetico di prova'),
+            /risposta non valida per l'analisi del documento/i,
+        );
+    } finally {
+        db.settings.get = original.getSetting;
+        AIService.create = original.createAi;
+        restoreHarness();
+    }
+});
+
+/* @Codex */
+test('coerceInsightToReadable rejects a broken declared envelope that embeds markdown', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(
+            '{"schemaVersion":"mediflow.ai.extract.v1","task":"smart_import",\n**Riassunto clinico**: sintesi sintetica non valida',
+        );
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('coerceInsightToReadable keeps mixed markdown with plain json readable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(
+            '**Riassunto clinico**: paziente stabile.\n```json\n{"note":"dato sintetico"}\n```',
+        );
+        assert.equal(readable.kind, 'structured');
+    } finally {
+        restore();
+    }
+});

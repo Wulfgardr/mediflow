@@ -220,7 +220,7 @@ test('document synthesis does not persist or autofill when the envelope task is 
     try {
         await assert.rejects(
             synthesizeDocument('Referto sintetico.', '2026-07-02__referto__synthetic.pdf', 'patient-contract-gate'),
-            /risposta non valida per la sintesi/i,
+            /risposta non valida/i,
         );
         assert.equal(updates, 0);
     } finally {

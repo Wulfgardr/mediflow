@@ -11,17 +11,23 @@
 
 import { parsePatientInsight } from '@/lib/ai-summary-service';
 import { splitInsightDiagnostics } from '@/lib/patient-insight';
-import { extractJsonObject, isEnvelopeUsable, parsePatientInsightExtractionResponse } from '@/lib/ai-task-contracts';
+import { declaresModernEnvelope, extractJsonObject, isEnvelopeUsable, parsePatientInsightExtractionResponse } from '@/lib/ai-task-contracts';
 
-/* @Codex */
+/* @Codex: shim di parsing sul rilevatore canonico ricorsivo e case-insensitive */
 function declaresTaskEnvelope(rawJson: string | null): boolean {
     if (!rawJson) return false;
     try {
-        const parsed = JSON.parse(rawJson) as Record<string, unknown> | null;
-        return Boolean(parsed && typeof parsed === 'object' && ('schemaVersion' in parsed || 'task' in parsed));
+        return declaresModernEnvelope(JSON.parse(rawJson));
     } catch {
         return false;
     }
+}
+
+/* @Codex: rilevazione fail-closed dell'envelope anche quando il JSON dichiarato non e parseabile */
+function contentDeclaresEnvelope(content: string): boolean {
+    const rawJson = extractJsonObject(content)?.rawJson ?? null;
+    if (rawJson && declaresTaskEnvelope(rawJson)) return true;
+    return /"(schemaversion|task)"\s*:/i.test(rawJson ?? content);
 }
 
 export type ReadableInsight =
@@ -100,6 +106,7 @@ export function coerceInsightToReadable(rawSummary: string): ReadableInsight {
     const content = (rawSummary || '').trim();
     if (!content) return { kind: 'unreadable', reason: 'empty' };
 
+    const looksJson = looksLikeJsonOrEnvelope(content);
     const fromMarkdown = parsePatientInsight(content);
     const diagnostics = splitInsightDiagnostics(content);
     const hasStructured = Boolean(
@@ -109,7 +116,8 @@ export function coerceInsightToReadable(rawSummary: string): ReadableInsight {
         fromMarkdown.gaps.length,
     );
 
-    if (hasStructured) {
+    // @Codex: un contenuto JSON-like passa sempre prima dal gate contrattuale
+    if (hasStructured && !looksJson) {
         return asStructured(
             fromMarkdown.summary,
             fromMarkdown.alerts,
@@ -119,7 +127,7 @@ export function coerceInsightToReadable(rawSummary: string): ReadableInsight {
         );
     }
 
-    if (!looksLikeJsonOrEnvelope(content)) {
+    if (!looksJson) {
         const mainMarkdown = diagnostics.mainMarkdown || fromMarkdown.fallbackMarkdown;
         if (mainMarkdown.trim().length === 0) {
             return { kind: 'unreadable', reason: 'empty' };
@@ -229,6 +237,16 @@ export function coerceInsightToReadable(rawSummary: string): ReadableInsight {
         // payload was JSON-like but not valid JSON
     }
 
+    // @Codex: contenuto misto gia strutturato senza envelope dichiarato resta leggibile
+    if (hasStructured && !contentDeclaresEnvelope(content)) {
+        return asStructured(
+            fromMarkdown.summary,
+            fromMarkdown.alerts,
+            fromMarkdown.nextSteps,
+            fromMarkdown.gaps,
+            diagnostics,
+        );
+    }
     return { kind: 'unreadable', reason: 'json-envelope' };
 }
 

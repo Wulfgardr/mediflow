@@ -145,7 +145,12 @@ export async function analyzeDocumentContent(rawMarkdown: string): Promise<Docum
     const normalized = normalizeDocumentInput(rawMarkdown);
     const sliced = buildDocumentExcerpt(normalized.normalizedText, MAX_SYNTHESIS_CHARS);
     const content = await ai.generate(buildDocumentSynthesisExtractionPrompt(sliced), undefined, 1400);
-    return parseStructuredAnalysisResponse(content, normalized.normalizedText);
+    const analysis = parseStructuredAnalysisResponse(content, normalized.normalizedText);
+    // @Codex
+    if (!isEnvelopeUsable(analysis)) {
+        throw new Error("L'AI ha generato una risposta non valida per l'analisi del documento.");
+    }
+    return analysis;
 }
 
 /**
