@@ -54,6 +54,14 @@ test('document synthesis autofill does not apply low confidence diagnoses', () =
     assert.equal(plan.decision.writePlan.forbiddenActions[0]?.blockedReason, 'confidence_too_low_for_auto_apply');
 });
 
+/* @Codex */
+test('document synthesis autofill does not apply diagnoses without confidence', () => {
+    const plan = buildPlan([{ ...baseSuggestion, confidence: undefined }]);
+
+    assert.deepEqual(plan.appliedCodes, []);
+    assert.equal(plan.decision.writePlan.forbiddenActions[0]?.blockedReason, 'confidence_too_low_for_auto_apply');
+});
+
 test('document synthesis autofill does not reapply duplicate diagnoses', () => {
     const existing: Diagnosis[] = [{
         code: 'I10',

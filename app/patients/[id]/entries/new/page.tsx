@@ -308,9 +308,14 @@ export default function NewEntryPage() {
             });
 
             setUploadProgress('Aggiornamento riepilogo paziente...');
-            const summaryRefresh = await refreshPatientSummaryIfEnabled(id);
-            if (summaryRefresh.status === 'skipped' && summaryRefresh.reason === 'disabled') {
-                console.info('[NewEntryPage] AI Patient Insight refresh skipped: kill switch disabled');
+            // @Codex: la voce e gia salvata; un refresh fallito non deve bloccare la navigazione
+            try {
+                const summaryRefresh = await refreshPatientSummaryIfEnabled(id);
+                if (summaryRefresh.status === 'skipped' && summaryRefresh.reason === 'disabled') {
+                    console.info('[NewEntryPage] AI Patient Insight refresh skipped: kill switch disabled');
+                }
+            } catch (refreshError) {
+                console.error('[NewEntryPage] AI Patient Insight refresh failed:', refreshError);
             }
 
             router.push(`/patients/${id}/modules`);

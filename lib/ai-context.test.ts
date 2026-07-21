@@ -669,3 +669,81 @@ test('buildPatientInsightContext normalizes CDA-like recovered attachment text b
         restore();
     }
 });
+
+/* @Codex */
+test('patient insight does not persist when the envelope task is invalid', async () => {
+    const restoreHarness = await withHarness();
+    const { AIService } = await import('./ai-service');
+    const { regeneratePatientSummary } = await import('./ai-summary-service');
+    const { db } = await import('./db');
+    const original = {
+        getSetting: db.settings.get,
+        getPatient: db.patients.get,
+        updatePatient: db.patients.update,
+        createAi: AIService.create,
+    };
+    let updates = 0;
+
+    db.settings.get = (async () => ({ value: 'enabled' })) as typeof db.settings.get;
+    db.patients.get = (async (id: string) => {
+        const patient = await original.getPatient(id);
+        return patient ? { ...patient, version: 1 } : undefined;
+    }) as typeof db.patients.get;
+    db.patients.update = (async () => {
+        updates += 1;
+    }) as typeof db.patients.update;
+    AIService.create = (async () => ({
+        getModelInfo: () => ({ provider: 'local', model: 'synthetic', baseUrl: 'http://127.0.0.1' }),
+        generate: async () => JSON.stringify({
+            schemaVersion: 'mediflow.ai.extract.v1',
+            task: 'smart_import',
+            summary: 'Risposta con task errato',
+            data: {},
+        }),
+    })) as unknown as typeof AIService.create;
+
+    try {
+        await assert.rejects(
+            regeneratePatientSummary('patient-1'),
+            /risposta non valida per il Patient Insight/i,
+        );
+        assert.equal(updates, 0);
+    } finally {
+        db.settings.get = original.getSetting;
+        db.patients.get = original.getPatient;
+        db.patients.update = original.updatePatient;
+        AIService.create = original.createAi;
+        restoreHarness();
+    }
+});
+
+/* @Codex */
+test('coerceInsightToReadable keeps recovering historical provider wrappers', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            message: { content: '## Sintesi clinica\nFollow-up post-dimissione.' },
+        }));
+        assert.notEqual(readable.kind, 'unreadable');
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('coerceInsightToReadable marks an invalid declared envelope as unreadable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            schemaVersion: 'mediflow.ai.extract.v1',
+            task: 'smart_import',
+            summary: 'Task errato',
+            data: {},
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});

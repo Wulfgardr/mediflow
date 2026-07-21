@@ -9,7 +9,7 @@ import type {
 } from '../../db';
 import { db } from '../../db';
 import { v4 as uuid } from 'uuid';
-import { buildDocumentSynthesisExtractionPrompt } from '../../ai-task-contracts';
+import { buildDocumentSynthesisExtractionPrompt, isEnvelopeUsable } from '../../ai-task-contracts';
 import {
     parseStructuredAnalysisResponse,
     type DocumentStructuredAnalysis,
@@ -185,6 +185,10 @@ export async function synthesizeDocument(
     }
     if (typeof patient.version !== 'number') {
         throw new Error('Missing patient version for document synthesis.');
+    }
+    // @Codex
+    if (!routerDecision.useDeterministicSynthesis && !isEnvelopeUsable(analysis)) {
+        throw new Error("L'AI ha generato una risposta non valida per la sintesi del documento.");
     }
 
     const existingInsights = parseExistingInsights(patient.documentInsights);
