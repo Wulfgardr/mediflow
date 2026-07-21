@@ -11,7 +11,7 @@
 
 import { parsePatientInsight } from '@/lib/ai-summary-service';
 import { splitInsightDiagnostics } from '@/lib/patient-insight';
-import { isEnvelopeUsable, parsePatientInsightExtractionResponse } from '@/lib/ai-task-contracts';
+import { extractJsonObject, isEnvelopeUsable, parsePatientInsightExtractionResponse } from '@/lib/ai-task-contracts';
 
 /* @Codex */
 function declaresTaskEnvelope(rawJson: string | null): boolean {
@@ -169,6 +169,35 @@ export function coerceInsightToReadable(rawSummary: string): ReadableInsight {
         const parsed = JSON.parse(content) as unknown;
         const inner = deepFindReadableString(parsed, ['content', 'text', 'summary', 'output', 'value', 'markdown']);
         if (inner) {
+            // @Codex: un envelope dichiarato dentro un wrapper segue le stesse regole del livello esterno
+            const innerRaw = extractJsonObject(inner);
+            if (innerRaw && declaresTaskEnvelope(innerRaw.rawJson)) {
+                const innerExtraction = parsePatientInsightExtractionResponse(inner);
+                if (!isEnvelopeUsable(innerExtraction)) {
+                    return { kind: 'unreadable', reason: 'json-envelope' };
+                }
+                const innerData = innerExtraction.value.data;
+                const innerDiagnostics = splitInsightDiagnostics(inner);
+                const innerHasExtraction = Boolean(
+                    innerData.currentState.length ||
+                    innerData.alerts.length ||
+                    innerData.nextSteps.length ||
+                    innerData.gaps.length,
+                );
+                if (innerHasExtraction) {
+                    return asStructured(
+                        innerData.currentState.join(' '),
+                        innerData.alerts,
+                        innerData.nextSteps,
+                        innerData.gaps,
+                        innerDiagnostics,
+                    );
+                }
+                if (innerExtraction.value.summary) {
+                    return asStructured(innerExtraction.value.summary, [], [], [], innerDiagnostics);
+                }
+                return { kind: 'unreadable', reason: 'empty' };
+            }
             const innerStructured = parsePatientInsight(inner);
             const innerDiagnostics = splitInsightDiagnostics(inner);
             const innerHas = Boolean(
