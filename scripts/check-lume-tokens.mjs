@@ -29,7 +29,6 @@ const FUNCTION_COLOR = /\b(?:rgba?|hsla?)\((?:[^()]*)\)/gi;
 // letterali legacy e le loro ripetizioni. La baseline deve combaciare
 // esattamente: una voce che copre meno letterali di quelli dichiarati fallisce.
 export const PALETTE_ALLOWLIST = [
-  {"path":"app/globals.css","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":92,"fingerprint":"e34bda72190924e5384ab827ff61dde3f189c62b13c49278ba65ec7354bc27c0"},
   {"path":"app/mockups/scheda/page.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":10,"fingerprint":"0b532d8493c010f98eba790c6cca032e0c871be43eccd5bb743d13b514892219"},
   {"path":"app/patients/[id]/edit/page.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":2,"fingerprint":"c465f2f78534069d2c5091795196bb3c49d4428b0c2aaa3a488617f7bc16d9a4"},
   {"path":"app/patients/[id]/scales/[scaleId]/page.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":8,"fingerprint":"2aa3c828cc9648c78578de11157a552e6a94dd15d7437c7e8b86d847a1024582"},
