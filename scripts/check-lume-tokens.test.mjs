@@ -13,10 +13,13 @@ import {
   formatReport,
   loadTokens,
   loadCssMirror,
+  loadGlobalStyles,
   parseCssBlocks,
   expectedMirror,
   verifyCssMirror,
+  verifyGlobalStyles,
   ACTIVE_ALIASES,
+  PALETTE_ALLOWLIST,
   paletteFingerprint,
   scanPalette,
   scanPaletteSource,
@@ -150,6 +153,116 @@ test('a mirror missing the :root (giorno) active alias fails closed', () => {
 test('a mirror whose .dark alias points at the wrong register fails closed', () => {
   const css = loadCssMirror().replace('--lume-ink: var(--lume-grafite-ink-primary);', '--lume-ink: var(--lume-giorno-ink-primary);');
   assert.throws(() => verifyCssMirror(loadTokens(), css), /alias --lume-ink in \.dark\/grafite/);
+});
+
+// @Codex WUL-515
+test('committed global CSS pins the listed semantic, scrim and shadow source recipes', () => {
+  const summary = verifyGlobalStyles(loadGlobalStyles());
+  assert.deepEqual(summary, { recipes: 11, semanticRecipes: 7, scrimRecipes: 2, shadowRecipes: 2 });
+  assert.equal(PALETTE_ALLOWLIST.some((entry) => entry.path === 'app/globals.css'), false);
+  const palette = scanPaletteSource({
+    relativePath: 'app/globals.css',
+    source: loadGlobalStyles(),
+    tokens: loadTokens(),
+  });
+  assert.deepEqual(palette.violations, []);
+  assert.deepEqual(palette.allowlistIssues, []);
+});
+
+test('global CSS rejects raw warning text instead of the measured 60% recipe', () => {
+  const css = loadGlobalStyles().replace(
+    'color: color-mix(in srgb, var(--lume-signal-warning) 60%, var(--lume-ink));',
+    'color: var(--lume-signal-warning);',
+  );
+  assert.throws(() => verifyGlobalStyles(css), /global CSS \.graphite-chip-tone-warning color is var\(--lume-signal-warning\)/);
+});
+
+test('global CSS fails closed when a required selector or declaration is missing', () => {
+  const missingSelector = loadGlobalStyles().replace('.mf-alert-critical {', '.mf-alert-critical-missing {');
+  assert.throws(() => verifyGlobalStyles(missingSelector), /global CSS requires exactly one \.mf-alert-critical rule/);
+
+  const missingDeclaration = loadGlobalStyles().replace(
+    '.mf-alert-success {\n  border-color: color-mix(in srgb, var(--lume-signal-success) 30%, transparent);\n',
+    '.mf-alert-success {\n',
+  );
+  assert.throws(() => verifyGlobalStyles(missingDeclaration), /global CSS \.mf-alert-success missing border-color/);
+});
+
+test('global CSS rejects conditional recipes, override selectors and cascade shorthands', () => {
+  const conditional = loadGlobalStyles().replace(
+    /(\.mf-alert-critical \{[^}]+\})/,
+    '@media print { $1 }',
+  );
+  assert.throws(() => verifyGlobalStyles(conditional), /global CSS \.mf-alert-critical must not be conditional/);
+
+  const override = `${loadGlobalStyles()}\n.dark .mf-alert-warning { color: var(--lume-ink) !important; }\n`;
+  assert.throws(() => verifyGlobalStyles(override), /global CSS \.mf-alert-warning has a non-canonical override selector/);
+
+  const shorthand = loadGlobalStyles().replace(
+    '.mf-alert-success {',
+    '.mf-alert-success {\n  background: transparent;',
+  );
+  assert.throws(() => verifyGlobalStyles(shorthand), /global CSS \.mf-alert-success has an interfering background shorthand/);
+});
+
+test('global CSS protects scrim and shadow selectors from conditional or non-canonical overrides', () => {
+  const conditionalScrim = loadGlobalStyles().replace(
+    /(\.mf-modal-backdrop \{[^}]+\})/,
+    '@media print { $1 }',
+  );
+  assert.throws(() => verifyGlobalStyles(conditionalScrim), /global CSS \.mf-modal-backdrop must not be conditional/);
+
+  const shadowOverride = `${loadGlobalStyles()}\n.dark .mf-popover { box-shadow: none; }\n`;
+  assert.throws(() => verifyGlobalStyles(shadowOverride), /global CSS \.mf-popover has a non-canonical override selector/);
+});
+
+test('global CSS rejects destructive shorthands only on governed selectors', () => {
+  const borderShorthand = loadGlobalStyles().replace(
+    '.mf-alert-success {',
+    '.mf-alert-success {\n  border: none;',
+  );
+  assert.throws(() => verifyGlobalStyles(borderShorthand), /global CSS \.mf-alert-success has an interfering border shorthand/);
+
+  const sideBorderShorthand = loadGlobalStyles().replace(
+    '.mf-alert-success {',
+    '.mf-alert-success {\n  border-top: none;',
+  );
+  assert.throws(() => verifyGlobalStyles(sideBorderShorthand), /global CSS \.mf-alert-success has an interfering border shorthand/);
+
+  const uppercaseColor = loadGlobalStyles().replace(
+    '.mf-alert-success {',
+    '.mf-alert-success {\n  COLOR: var(--lume-signal-critical);',
+  );
+  assert.throws(() => verifyGlobalStyles(uppercaseColor), /global CSS \.mf-alert-success has duplicate declarations/);
+
+  const uppercaseBorder = loadGlobalStyles().replace(
+    '.mf-alert-success {',
+    '.mf-alert-success {\n  BORDER: none;',
+  );
+  assert.throws(() => verifyGlobalStyles(uppercaseBorder), /global CSS \.mf-alert-success has an interfering border shorthand/);
+
+  const allShorthand = loadGlobalStyles().replace(
+    '.mf-alert-success {',
+    '.mf-alert-success {\n  ALL: unset;',
+  );
+  assert.throws(() => verifyGlobalStyles(allShorthand), /global CSS \.mf-alert-success has an interfering all shorthand/);
+
+  const unrelatedFallback = `${loadGlobalStyles()}\n.unrelated { color: var(--lume-ink); color: inherit; }\n`;
+  assert.doesNotThrow(() => verifyGlobalStyles(unrelatedFallback));
+});
+
+test('global CSS rejects a light Grafite scrim or an unmeasured warning recipe', () => {
+  const lightScrim = loadGlobalStyles().replace(
+    'var(--lume-guardia-surface-chrome) 78%',
+    'var(--lume-giorno-ink-primary) 78%',
+  );
+  assert.throws(() => verifyGlobalStyles(lightScrim), /global CSS :root\.dark \.mf-modal-backdrop background/);
+
+  const unmeasuredWarning = loadGlobalStyles().replace(
+    'var(--lume-signal-warning) 60%, var(--lume-ink)',
+    'var(--lume-signal-warning) 70%, var(--lume-ink)',
+  );
+  assert.throws(() => verifyGlobalStyles(unmeasuredWarning), /global CSS \.graphite-chip-tone-warning color/);
 });
 
 test('palette guard catches an out-of-contract hex literal', () => {
