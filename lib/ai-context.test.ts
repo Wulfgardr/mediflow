@@ -747,3 +747,45 @@ test('coerceInsightToReadable marks an invalid declared envelope as unreadable',
         restore();
     }
 });
+
+/* @Codex */
+test('coerceInsightToReadable rejects an invalid envelope embedded in a provider wrapper', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            message: {
+                content: JSON.stringify({
+                    schemaVersion: 'mediflow.ai.extract.v1',
+                    task: 'smart_import',
+                    summary: 'Task errato incapsulato',
+                    data: {},
+                }),
+            },
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('coerceInsightToReadable renders a valid envelope embedded in a provider wrapper as structured', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            message: {
+                content: JSON.stringify({
+                    schemaVersion: 'mediflow.ai.extract.v1',
+                    task: 'patient_insight',
+                    summary: 'Sintesi clinica sintetica',
+                    data: { currentState: ['Paziente stabile.'], alerts: [], nextSteps: [], gaps: [] },
+                }),
+            },
+        }));
+        assert.equal(readable.kind, 'structured');
+    } finally {
+        restore();
+    }
+});
