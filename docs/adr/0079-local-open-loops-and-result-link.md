@@ -9,8 +9,9 @@ Related: [ADR 0057](./0057-local-evidence-absorption-layer.md), [ADR 0062](./006
 
 La prima slice web locale e su `main`: colonna e migrazione, proiezione pura,
 righe nella Scheda e precompilazione del form osservazioni. Il salvataggio resta
-esplicito. Parity paired, registro generale delle attese e reminder persistenti
-restano fuori da questa decisione consegnata.
+esplicito. Parity paired e reminder persistenti restano fuori da questa
+decisione consegnata. Il distinto registro persistente v0 è definito da
+[ADR 0082](./0082-persistent-expectations-register-v0.md).
 
 ## Problema
 
