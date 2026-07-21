@@ -28,7 +28,25 @@ export interface AITaskParseResult<T> {
     rawJson: string | null;
     validJson: boolean;
     validTask: boolean;
+    legacyContract: boolean;
     repairedTruncation: boolean;
+}
+
+/* @Codex */
+export function isEnvelopeUsable(envelope: { validJson?: unknown; validTask?: unknown }): boolean {
+    return envelope.validJson === true && envelope.validTask === true;
+}
+
+/* @Codex: un payload che dichiara l'envelope moderno, anche annidato o con case diverso, non e mai legacy */
+function declaresModernEnvelope(value: unknown, depth = 0): boolean {
+    if (!value || typeof value !== 'object' || depth > 3) return false;
+    const record = value as Record<string, unknown>;
+    const hasEnvelopeKey = Object.keys(record).some((key) => {
+        const normalized = key.toLowerCase();
+        return normalized === 'schemaversion' || normalized === 'task';
+    });
+    if (hasEnvelopeKey) return true;
+    return Object.values(record).some((child) => declaresModernEnvelope(child, depth + 1));
 }
 
 /* @Codex */
@@ -188,7 +206,7 @@ function normalizeConfidence(value: unknown): SmartImportConfidence {
     if (normalized === 'high' || normalized === 'medium' || normalized === 'low') {
         return normalized;
     }
-    return 'medium';
+    return 'low';
 }
 
 function normalizeDiagnosisSystem(value: unknown): DocumentDiagnosisSuggestionContract['system'] | null {
@@ -236,6 +254,13 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
 
     try {
         const parsed = JSON.parse(rawJson) as Record<string, unknown>;
+        if (declaresModernEnvelope(parsed)) {
+            return null;
+        }
+        const hasLegacySummary = Boolean(normalizeCompactText(parsed.summary_markdown ?? parsed.summary, MAX_DOCUMENT_SUMMARY_CHARS));
+        const hasLegacyFields = ['quality', 'qualityLevel', 'medications', 'diagnoses', 'problemStatements', 'therapyCandidates', 'servicePrescriptions']
+            .some((key) => Object.prototype.hasOwnProperty.call(parsed, key));
+        if (!hasLegacySummary || !hasLegacyFields) return null;
         const quality = normalizeTaskData(parsed.quality);
         const medications = Array.isArray(parsed.medications)
             ? Array.from(
@@ -281,19 +306,7 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
             servicePrescriptions,
         };
     } catch {
-        return {
-            rawJson,
-            validJson: false,
-            repairedTruncation,
-            summary: '',
-            qualityLevel: 'yellow',
-            qualityReason: '',
-            medications: [],
-            diagnoses: [],
-            problemStatements: [],
-            therapyCandidates: [],
-            servicePrescriptions: [],
-        };
+        return null;
     }
 }
 
@@ -774,6 +787,7 @@ export function parsePatientInsightExtractionResponse(response: string): AITaskP
         rawJson: envelope.rawJson,
         validJson: envelope.validJson,
         validTask: envelope.validTask,
+        legacyContract: false,
         repairedTruncation: envelope.repairedTruncation,
         value: {
             schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
@@ -860,6 +874,7 @@ export function parseSmartImportExtractionResponse(response: string): AITaskPars
         rawJson: envelope.rawJson,
         validJson: envelope.validJson,
         validTask: envelope.validTask,
+        legacyContract: false,
         repairedTruncation: envelope.repairedTruncation,
         value: {
             schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
@@ -961,7 +976,8 @@ export function parseDocumentSynthesisExtractionResponse(
     return {
         rawJson: legacyPayload?.rawJson ?? envelope.rawJson,
         validJson: legacyPayload?.validJson ?? envelope.validJson,
-        validTask: legacyPayload ? true : envelope.validTask,
+        validTask: legacyPayload ? legacyPayload.validJson : envelope.validTask,
+        legacyContract: Boolean(legacyPayload),
         repairedTruncation: legacyPayload?.repairedTruncation ?? envelope.repairedTruncation,
         value: {
             schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,

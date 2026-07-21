@@ -16,6 +16,9 @@ export type DocumentDiagnosisSuggestion = DocumentDiagnosisSuggestionContract;
 
 /* @Codex */
 export type DocumentStructuredAnalysis = {
+    validJson?: boolean;
+    validTask?: boolean;
+    legacyContract?: boolean;
     summary: string;
     quality?: {
         level: DocumentQualityLevel;
@@ -40,9 +43,13 @@ export function normalizeDiagnosisSystem(value: unknown): DocumentDiagnosisSugge
 
 /* @Codex */
 export function parseStructuredAnalysisResponse(response: string, rawMarkdown: string): DocumentStructuredAnalysis {
-    const parsed = parseDocumentSynthesisExtractionResponse(response, rawMarkdown).value;
+    const result = parseDocumentSynthesisExtractionResponse(response, rawMarkdown);
+    const parsed = result.value;
 
     return {
+        validJson: result.validJson,
+        validTask: result.validTask,
+        legacyContract: result.legacyContract,
         summary: parsed.summary,
         quality: {
             level: parsed.data.qualityLevel,

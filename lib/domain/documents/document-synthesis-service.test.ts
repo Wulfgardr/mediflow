@@ -1,6 +1,8 @@
 /* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { AIService } from '../../ai-service';
+import { db } from '../../db';
 import { buildStoredDocumentExcerpt } from './document-excerpt';
 /* @Codex */
 import { routeDocumentClassForSynthesis } from './document-synthesis-routing';
@@ -9,9 +11,9 @@ import { rememberPdfDocumentMetadata } from '../../pdf-document-metadata';
 import { parseStructuredAnalysisResponse } from './document-synthesis-parser';
 import { parseDocumentIntelligenceCasePack } from './document-intelligence-case-pack';
 /* @Codex */
-import { decideDocumentRouterControlFlow } from './document-router-control-flow';
+import { decideDocumentRouterControlFlow, DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY } from './document-router-control-flow';
 /* @Codex */
-import { selectDocumentSynthesisAnalysis } from './document-synthesis-service';
+import { selectDocumentSynthesisAnalysis, synthesizeDocument } from './document-synthesis-service';
 import {
     buildDocumentParseEvidenceArtifact,
     evaluateDocumentParseEvidenceArtifact,
@@ -178,8 +180,55 @@ test('parses explicit medications from the model JSON payload', () => {
 test('falls back to empty medications when the model returns invalid JSON', () => {
     const analysis = parseStructuredAnalysisResponse('not-json', 'testo OCR rumoroso');
 
+    assert.equal(analysis.validJson, false);
+    assert.equal(analysis.validTask, false);
     assert.deepEqual(analysis.medications, []);
     assert.equal(analysis.quality?.level, 'yellow');
+});
+
+/* @Codex */
+test('document synthesis does not persist or autofill when the envelope task is invalid', async () => {
+    const original = {
+        getSetting: db.settings.get,
+        getPatient: db.patients.get,
+        updatePatient: db.patients.update,
+        createAi: AIService.create,
+    };
+    let updates = 0;
+
+    db.settings.get = (async (key: string) => ({
+        value: key === DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY ? 'off' : 'enabled',
+    })) as unknown as typeof db.settings.get;
+    db.patients.get = (async () => ({
+        id: 'patient-contract-gate',
+        version: 1,
+        documentInsights: [],
+        diagnoses: [],
+    })) as unknown as typeof db.patients.get;
+    db.patients.update = (async () => {
+        updates += 1;
+    }) as unknown as typeof db.patients.update;
+    AIService.create = (async () => ({
+        generate: async () => JSON.stringify({
+            schemaVersion: 'mediflow.ai.extract.v1',
+            task: 'smart_import',
+            summary: 'Risposta con task errato',
+            data: {},
+        }),
+    })) as unknown as typeof AIService.create;
+
+    try {
+        await assert.rejects(
+            synthesizeDocument('Referto sintetico.', '2026-07-02__referto__synthetic.pdf', 'patient-contract-gate'),
+            /risposta non valida per la sintesi/i,
+        );
+        assert.equal(updates, 0);
+    } finally {
+        db.settings.get = original.getSetting;
+        db.patients.get = original.getPatient;
+        db.patients.update = original.updatePatient;
+        AIService.create = original.createAi;
+    }
 });
 
 test('buildStoredDocumentExcerpt keeps high-signal sections in clinical order', () => {

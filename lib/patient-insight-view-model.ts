@@ -11,7 +11,18 @@
 
 import { parsePatientInsight } from '@/lib/ai-summary-service';
 import { splitInsightDiagnostics } from '@/lib/patient-insight';
-import { parsePatientInsightExtractionResponse } from '@/lib/ai-task-contracts';
+import { isEnvelopeUsable, parsePatientInsightExtractionResponse } from '@/lib/ai-task-contracts';
+
+/* @Codex */
+function declaresTaskEnvelope(rawJson: string | null): boolean {
+    if (!rawJson) return false;
+    try {
+        const parsed = JSON.parse(rawJson) as Record<string, unknown> | null;
+        return Boolean(parsed && typeof parsed === 'object' && ('schemaVersion' in parsed || 'task' in parsed));
+    } catch {
+        return false;
+    }
+}
 
 export type ReadableInsight =
     | {
@@ -123,26 +134,32 @@ export function coerceInsightToReadable(rawSummary: string): ReadableInsight {
 
     try {
         const extraction = parsePatientInsightExtractionResponse(content);
-        const data = extraction.value.data;
-        const hasExtraction = Boolean(
-            data.currentState.length ||
-            data.alerts.length ||
-            data.nextSteps.length ||
-            data.gaps.length,
-        );
-
-        if (hasExtraction) {
-            return asStructured(
-                data.currentState.join(' '),
-                data.alerts,
-                data.nextSteps,
-                data.gaps,
-                diagnostics,
+        // @Codex
+        if (isEnvelopeUsable(extraction)) {
+            const data = extraction.value.data;
+            const hasExtraction = Boolean(
+                data.currentState.length ||
+                data.alerts.length ||
+                data.nextSteps.length ||
+                data.gaps.length,
             );
-        }
 
-        if (extraction.value.summary) {
-            return asStructured(extraction.value.summary, [], [], [], diagnostics);
+            if (hasExtraction) {
+                return asStructured(
+                    data.currentState.join(' '),
+                    data.alerts,
+                    data.nextSteps,
+                    data.gaps,
+                    diagnostics,
+                );
+            }
+
+            if (extraction.value.summary) {
+                return asStructured(extraction.value.summary, [], [], [], diagnostics);
+            }
+        } else if (declaresTaskEnvelope(extraction.rawJson)) {
+            // @Codex: solo un envelope dichiarato e non valido e illeggibile; i wrapper storici proseguono nel recupero
+            return { kind: 'unreadable', reason: 'json-envelope' };
         }
     } catch {
         // fall through to free-text recovery

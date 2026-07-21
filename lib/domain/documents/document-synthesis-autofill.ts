@@ -107,7 +107,7 @@ function confidenceForAutofill(
     qualityLevel: DocumentQualityLevel | undefined,
 ): DocumentDecisionConfidence {
     if (qualityLevel === 'red') return 'blocked';
-    return suggestion.confidence ?? 'medium';
+    return suggestion.confidence ?? 'low';
 }
 
 /* @Codex */

@@ -7,6 +7,7 @@ import {
     buildPatientInsightExtractionPrompt,
     buildSmartImportExtractionPrompt,
     extractJsonObject,
+    isEnvelopeUsable,
     parseDocumentSynthesisExtractionResponse,
     parsePatientInsightExtractionResponse,
     parseSmartImportExtractionResponse,
@@ -114,6 +115,40 @@ test('smart import extraction keeps only valid structured suggestions', () => {
     assert.equal(parsed.value.data.therapies[0].drugMention, 'Metformina 500 mg');
 });
 
+/* @Codex */
+test('smart import extraction marks missing confidence as low', () => {
+    const parsed = parseSmartImportExtractionResponse(JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'smart_import',
+        summary: '',
+        data: {
+            diagnoses: [{
+                label: 'Ipertensione essenziale',
+                icdQuery: 'essential hypertension',
+                evidence: 'Diagnosi esplicita nel documento sintetico',
+            }],
+            therapies: [],
+            servicePrescriptions: [],
+        },
+    }));
+
+    assert.equal(parsed.value.data.diagnoses[0]?.confidence, 'low');
+});
+
+/* @Codex */
+test('envelope with a mismatched task is not usable even when its JSON is valid', () => {
+    const parsed = parseSmartImportExtractionResponse(JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'patient_insight',
+        summary: '',
+        data: { diagnoses: [], therapies: [], servicePrescriptions: [] },
+    }));
+
+    assert.equal(parsed.validJson, true);
+    assert.equal(parsed.validTask, false);
+    assert.equal(isEnvelopeUsable(parsed), false);
+});
+
 test('smart import extraction drops service prescriptions from therapy suggestions', () => {
     const parsed = parseSmartImportExtractionResponse(JSON.stringify({
         schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
@@ -143,6 +178,7 @@ test('smart import extraction drops service prescriptions from therapy suggestio
     }));
 
     assert.equal(parsed.validTask, true);
+    assert.equal(parsed.legacyContract, false);
     assert.equal(parsed.value.data.therapies.length, 1);
     assert.equal(parsed.value.data.therapies[0].drugMention, 'Amoxicillina 1 g');
     assert.equal(parsed.value.data.servicePrescriptions.length, 1);
@@ -627,6 +663,8 @@ test('document synthesis extraction accepts legacy payloads used by historical U
     }), 'testo OCR legacy');
 
     assert.equal(parsed.validTask, true);
+    assert.equal(parsed.legacyContract, true);
+    assert.equal(isEnvelopeUsable(parsed), true);
     assert.equal(parsed.value.data.qualityLevel, 'green');
     assert.equal(parsed.value.data.diagnoses.length, 1);
     assert.equal(parsed.value.data.problemStatements.length, 0);
@@ -849,4 +887,46 @@ test('document synthesis preserves earlier fields after truncation inside a stri
     assert.deepEqual(parsed.value.data.medications, ['Farmaco A']);
     assert.equal(parsed.value.data.diagnoses[0].code, 'J44.9');
     assert.equal(parsed.value.data.problemStatements.length, 0);
+});
+
+/* @Codex */
+test('document synthesis does not rescue a modern envelope with a mismatched task as legacy', () => {
+    const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'smart_import',
+        summary: 'Task moderno errato',
+        diagnoses: [],
+    }), 'testo OCR sintetico');
+
+    assert.equal(parsed.validJson, true);
+    assert.equal(parsed.validTask, false);
+    assert.equal(parsed.legacyContract, false);
+    assert.equal(isEnvelopeUsable(parsed), false);
+});
+
+/* @Codex */
+test('legacy rescue rejects case-variant modern envelope keys', () => {
+    const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
+        SchemaVersion: 'mediflow.ai.extract.v1',
+        Task: 'smart_import',
+        summary: 'Chiavi con case variante',
+        diagnoses: [],
+    }), 'testo OCR sintetico');
+
+    assert.equal(parsed.validTask, false);
+    assert.equal(parsed.legacyContract, false);
+    assert.equal(isEnvelopeUsable(parsed), false);
+});
+
+/* @Codex */
+test('legacy rescue rejects a nested modern envelope declaration', () => {
+    const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
+        summary: 'Envelope moderno annidato',
+        diagnoses: [],
+        provider: { schemaVersion: 'mediflow.ai.extract.v1', task: 'smart_import' },
+    }), 'testo OCR sintetico');
+
+    assert.equal(parsed.validTask, false);
+    assert.equal(parsed.legacyContract, false);
+    assert.equal(isEnvelopeUsable(parsed), false);
 });
