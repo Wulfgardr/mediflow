@@ -6,6 +6,7 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
+- [0082-persistent-expectations-register-v0.md](./0082-persistent-expectations-register-v0.md): accetta il registro persistente host-only delle attese v0 con provenienza univoca e chiusura confermata.
 - [0081-fhir-r4-export-v0-contract.md](./0081-fhir-r4-export-v0-contract.md): accetta il contratto verificabile per copertura, parità e validazione locale dell'export FHIR R4 v0.
 
 ---
