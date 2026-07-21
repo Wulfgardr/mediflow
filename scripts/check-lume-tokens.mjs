@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const DEFAULT_TOKENS_PATH = path.join(ROOT_DIR, 'docs/design/lume/tokens/lume.tokens.json');
 export const DEFAULT_CSS_MIRROR_PATH = path.join(ROOT_DIR, 'app/lume-tokens.css');
+export const DEFAULT_GLOBAL_CSS_PATH = path.join(ROOT_DIR, 'app/globals.css');
 
 // @Codex: fail-closed repository scan for literal colors outside Lume.
 const PALETTE_SOURCE_DIRS = ['app', 'components'];
@@ -438,6 +439,10 @@ export function loadCssMirror(cssPath = DEFAULT_CSS_MIRROR_PATH) {
   return readFileSync(cssPath, 'utf8');
 }
 
+export function loadGlobalStyles(cssPath = DEFAULT_GLOBAL_CSS_PATH) {
+  return readFileSync(cssPath, 'utf8');
+}
+
 // Active aliases resolve at runtime to a register-scoped variable.
 export const ACTIVE_ALIASES = [
   { alias: '--lume-surface-canvas', suffix: 'surface-canvas' },
@@ -484,6 +489,158 @@ export function parseCssBlocks(css) {
     blocks.push({ selector: rule[1].trim(), decls });
   }
   return blocks;
+}
+
+function cssWeight(weight) {
+  const percent = weight * 100;
+  if (!Number.isInteger(percent)) throw new Error(`CSS weight must be an integer percentage: ${weight}`);
+  return `${percent}%`;
+}
+
+// @Codex WUL-517: blocca le dichiarazioni sorgente per il sottoinsieme elencato.
+// evaluateContract misura testo e tinta; il bordo resta un peso sorgente
+// esplicito. Specificità, !important e override esterni non sono una prova della
+// cascade effettiva e restano contratti separati.
+export const GLOBAL_STYLE_RECIPES = [
+  ...['graphite-chip-tone', 'mf-alert'].flatMap((family) =>
+    ['success', 'warning', 'critical'].map((signal) => ({
+      selector: `.${family}-${signal}`,
+      declarations: {
+        'border-color': `color-mix(in srgb, var(--lume-signal-${signal}) 30%, transparent)`,
+        'background-color': `color-mix(in srgb, var(--lume-signal-${signal}) ${cssWeight(SIGNAL_TINT_WEIGHT)}, var(--lume-surface-field))`,
+        color: `color-mix(in srgb, var(--lume-signal-${signal}) ${cssWeight(SIGNAL_TEXT_WEIGHT)}, var(--lume-ink))`,
+      },
+      kind: 'semantic',
+    })),
+  ),
+  {
+    selector: '.siss-blocked-item-reason',
+    declarations: {
+      color: `color-mix(in srgb, var(--lume-signal-warning) ${cssWeight(SIGNAL_TEXT_WEIGHT)}, var(--lume-ink))`,
+    },
+    kind: 'semantic',
+  },
+  {
+    selector: '.mf-modal-backdrop',
+    declarations: { background: 'color-mix(in srgb, var(--lume-giorno-ink-primary) 62%, transparent)' },
+    kind: 'scrim',
+    target: '.mf-modal-backdrop',
+    allowedSelectors: ['.mf-modal-backdrop', ':root.dark .mf-modal-backdrop'],
+  },
+  {
+    selector: ':root.dark .mf-modal-backdrop',
+    declarations: { background: 'color-mix(in srgb, var(--lume-guardia-surface-chrome) 78%, transparent)' },
+    kind: 'scrim',
+    target: '.mf-modal-backdrop',
+    allowedSelectors: ['.mf-modal-backdrop', ':root.dark .mf-modal-backdrop'],
+  },
+  {
+    selector: '.mf-popover',
+    declarations: {
+      'box-shadow': '0 22px 44px color-mix(in srgb, var(--lume-giorno-ink-primary) 14%, transparent)',
+    },
+    kind: 'shadow',
+    target: '.mf-popover',
+    allowedSelectors: ['.mf-popover', ':root.dark .mf-popover'],
+  },
+  {
+    selector: ':root.dark .mf-popover',
+    declarations: {
+      'box-shadow': '0 26px 52px color-mix(in srgb, var(--lume-guardia-surface-chrome) 70%, transparent)',
+    },
+    kind: 'shadow',
+    target: '.mf-popover',
+    allowedSelectors: ['.mf-popover', ':root.dark .mf-popover'],
+  },
+];
+
+function braceDepthAt(css, end) {
+  let depth = 0;
+  for (let index = 0; index < end; index += 1) {
+    if (css[index] === '{') depth += 1;
+    if (css[index] === '}') depth -= 1;
+  }
+  return depth;
+}
+
+function parseStyleRules(css) {
+  const clean = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = [];
+  const ruleRe = /([^{}]+)\{([^{}]*)\}/g;
+  for (let rule = ruleRe.exec(clean); rule; rule = ruleRe.exec(clean)) {
+    const declarations = new Map();
+    const duplicateDeclarations = new Set();
+    const declarationRe = /(?:^|;)\s*([a-zA-Z-]+)\s*:\s*([^;]+?)(?=;|$)/g;
+    for (let declaration = declarationRe.exec(rule[2]); declaration; declaration = declarationRe.exec(rule[2])) {
+      const rawProperty = declaration[1].trim();
+      const property = rawProperty.startsWith('--') ? rawProperty : rawProperty.toLowerCase();
+      if (declarations.has(property)) duplicateDeclarations.add(property);
+      declarations.set(property, declaration[2].replace(/\s+/g, ' ').trim());
+    }
+    rules.push({
+      selectors: rule[1].split(',').map((selector) => selector.replace(/\s+/g, ' ').trim()),
+      declarations,
+      duplicateDeclarations,
+      depth: braceDepthAt(clean, rule.index),
+    });
+  }
+  return rules;
+}
+
+function selectorTargetsRecipe(selector, recipeSelector) {
+  if (!recipeSelector.startsWith('.')) return false;
+  const className = recipeSelector.slice(1).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^a-zA-Z0-9_-])\\.${className}(?![a-zA-Z0-9_-])`).test(selector);
+}
+
+export function verifyGlobalStyles(css) {
+  const rules = parseStyleRules(css);
+  for (const recipe of GLOBAL_STYLE_RECIPES) {
+    const target = recipe.target ?? recipe.selector;
+    const allowedSelectors = recipe.allowedSelectors ?? [recipe.selector];
+    const targetedRules = rules.filter((rule) =>
+      rule.selectors.some((selector) => selectorTargetsRecipe(selector, target)));
+    if (targetedRules.some((rule) => rule.depth > 0)) {
+      throw new Error(`global CSS ${recipe.selector} must not be conditional`);
+    }
+    if (targetedRules.some((rule) => rule.selectors.some((selector) =>
+      selectorTargetsRecipe(selector, target) && !allowedSelectors.includes(selector)))) {
+      throw new Error(`global CSS ${recipe.selector} has a non-canonical override selector`);
+    }
+    const matches = rules.filter((rule) => rule.depth === 0 && rule.selectors.includes(recipe.selector));
+    if (matches.length !== 1) throw new Error(`global CSS requires exactly one ${recipe.selector} rule`);
+    if (matches[0].duplicateDeclarations.size > 0) {
+      throw new Error(`global CSS ${recipe.selector} has duplicate declarations`);
+    }
+    for (const [property, expected] of Object.entries(recipe.declarations)) {
+      const got = matches[0].declarations.get(property);
+      if (got === undefined) throw new Error(`global CSS ${recipe.selector} missing ${property}`);
+      if (got !== expected) throw new Error(`global CSS ${recipe.selector} ${property} is ${got}, expected ${expected}`);
+    }
+    if (Object.hasOwn(recipe.declarations, 'background-color') && matches[0].declarations.has('background')) {
+      throw new Error(`global CSS ${recipe.selector} has an interfering background shorthand`);
+    }
+    if (Object.hasOwn(recipe.declarations, 'background') && matches[0].declarations.has('background-color')) {
+      throw new Error(`global CSS ${recipe.selector} has an interfering background-color declaration`);
+    }
+    const interferingBorder = [...matches[0].declarations.keys()].find((property) =>
+      property === 'border'
+      || /^(?:border-(?:top|right|bottom|left|block|inline)(?:-(?:start|end))?)(?:-(?:color|style|width))?$/.test(property)
+      || /^border-(?:style|width)$/.test(property));
+    if (Object.keys(recipe.declarations).some((property) => property.startsWith('border-'))
+      && interferingBorder !== undefined) {
+      throw new Error(`global CSS ${recipe.selector} has an interfering border shorthand`);
+    }
+    if (matches[0].declarations.has('all')) {
+      throw new Error(`global CSS ${recipe.selector} has an interfering all shorthand`);
+    }
+  }
+  return {
+    recipes: GLOBAL_STYLE_RECIPES.length,
+    semanticRecipes: GLOBAL_STYLE_RECIPES.filter((recipe) => recipe.kind === 'semantic').length,
+    scrimRecipes: GLOBAL_STYLE_RECIPES.filter((recipe) => recipe.kind === 'scrim').length,
+    shadowRecipes: GLOBAL_STYLE_RECIPES.filter((recipe) => recipe.kind === 'shadow').length,
+  };
 }
 
 function normalizeHex(value) {
@@ -540,11 +697,13 @@ function assertAlias(decls, alias, expectedValue, where) {
 function main() {
   let result;
   let mirror;
+  let globalStyles;
   let palette;
   try {
     const tokens = loadTokens();
     result = evaluateContract(tokens);
     mirror = verifyCssMirror(tokens, loadCssMirror());
+    globalStyles = verifyGlobalStyles(loadGlobalStyles());
     palette = scanPalette({ tokens });
   } catch (error) {
     console.error(`lume token check failed: ${error.message}`);
@@ -553,6 +712,10 @@ function main() {
   }
   console.log(formatReport(result));
   console.log(`CSS mirror app/lume-tokens.css: ${mirror.tokens} namespaced tokens matched, ${mirror.aliases} active aliases per theme OK`);
+  console.log(
+    `CSS source app/globals.css: ${globalStyles.semanticRecipes} semantic, `
+    + `${globalStyles.scrimRecipes} scrim and ${globalStyles.shadowRecipes} shadow recipes matched`,
+  );
   console.log(formatPaletteReport(palette));
   process.exitCode = result.pass && palette.violations.length === 0 && palette.allowlistIssues.length === 0 ? 0 : 1;
 }
