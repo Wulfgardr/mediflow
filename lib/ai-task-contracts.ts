@@ -37,8 +37,8 @@ export function isEnvelopeUsable(envelope: { validJson?: unknown; validTask?: un
     return envelope.validJson === true && envelope.validTask === true;
 }
 
-/* @Codex: un payload che dichiara l'envelope moderno, anche annidato o con case diverso, non e mai legacy */
-function declaresModernEnvelope(value: unknown, depth = 0): boolean {
+/* @Codex: rilevazione canonica di un payload che dichiara l'envelope moderno, anche annidato o con case diverso */
+export function declaresModernEnvelope(value: unknown, depth = 0): boolean {
     if (!value || typeof value !== 'object' || depth > 3) return false;
     const record = value as Record<string, unknown>;
     const hasEnvelopeKey = Object.keys(record).some((key) => {
