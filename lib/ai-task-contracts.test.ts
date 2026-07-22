@@ -20,6 +20,27 @@ import {
     buildSmartImportExtractionPrompt as buildSmartImportPromptDirect,
 } from './ai-task-contract-prompts';
 
+/* @Codex WUL-362 R5: il contatore misura visite di caratteri, non tempo. */
+test('fragment scan bounds character visits for many unclosed openers', async () => {
+    const contracts = await import('./ai-task-contracts') as unknown as {
+        __testMeasureJsonFragmentScanWork?: (text: string) => {
+            characterVisits: number;
+            truncated: boolean;
+        };
+    };
+    const measure = contracts.__testMeasureJsonFragmentScanWork;
+    assert.equal(typeof measure, 'function');
+    if (!measure) return;
+
+    const openerCount = 4096;
+    const measured = measure('{'.repeat(openerCount));
+    assert.equal(measured.truncated, true);
+    assert.ok(
+        measured.characterVisits <= openerCount * 3,
+        `expected at most ${openerCount * 3} visits, got ${measured.characterVisits}`,
+    );
+});
+
 test('patient insight extraction renders local markdown sections from shared JSON contract', () => {
     const parsed = parsePatientInsightExtractionResponse(JSON.stringify({
         schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,

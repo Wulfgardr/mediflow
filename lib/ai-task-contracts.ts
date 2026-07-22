@@ -64,6 +64,7 @@ const ENVELOPE_SNIFF_SUPPORT_PATTERN = /["'](schemaversion|data|summary)["']\s*:
 /* @Codex */
 type EnvelopeScanBudget = {
     chars: number;
+    fragmentCharacterVisits: number;
     nodes: number;
     stringParses: number;
     truncated: boolean;
@@ -71,7 +72,7 @@ type EnvelopeScanBudget = {
 
 /* @Codex */
 function createEnvelopeScanBudget(): EnvelopeScanBudget {
-    return { chars: 0, nodes: 0, stringParses: 0, truncated: false };
+    return { chars: 0, fragmentCharacterVisits: 0, nodes: 0, stringParses: 0, truncated: false };
 }
 
 /* @Codex */
@@ -353,11 +354,16 @@ function scanJsonDocumentKeyEvidence(rawJson: string): JsonDocumentKeyEvidence {
 }
 
 /* @Codex */
-function findBalancedJsonEnd(text: string, start: number): number {
+function findBalancedJsonEnd(
+    text: string,
+    start: number,
+    visitCharacter: () => boolean,
+): number | null {
     let depth = 0;
     let inString = false;
     let escaped = false;
     for (let index = start; index < text.length; index += 1) {
+        if (!visitCharacter()) return null;
         const char = text[index];
         if (inString) {
             if (escaped) {
@@ -385,6 +391,20 @@ function findBalancedJsonEnd(text: string, start: number): number {
     return -1;
 }
 
+/* @Codex */
+function findNextJsonOpener(
+    text: string,
+    start: number,
+    visitCharacter: () => boolean,
+): number | null {
+    for (let index = start; index < text.length; index += 1) {
+        if (!visitCharacter()) return null;
+        const char = text[index];
+        if (char === '{' || char === '[') return index;
+    }
+    return -1;
+}
+
 /* @Codex WUL-362 F2: segmenti top-level non sovrapposti di un testo libero. Un
    gruppo bilanciato non e da solo una prova di candidatura JSON: la
    classificazione (parse o sniff) resta al chiamante, che conta nel budget solo
@@ -395,29 +415,57 @@ type JsonFragmentSegment =
     | { kind: 'balanced'; text: string }
     | { kind: 'unparsed'; text: string };
 
-function* iterateJsonFragmentSegments(text: string): Generator<JsonFragmentSegment> {
+function* iterateJsonFragmentSegments(
+    text: string,
+    budget: EnvelopeScanBudget,
+): Generator<JsonFragmentSegment> {
+    const initialVisits = budget.fragmentCharacterVisits;
+    const maxVisits = text.length * 3;
+    const visitCharacter = (): boolean => {
+        if (budget.fragmentCharacterVisits - initialVisits >= maxVisits) {
+            budget.truncated = true;
+            return false;
+        }
+        budget.fragmentCharacterVisits += 1;
+        return consumeScanChars(budget, 1);
+    };
+
     let index = 0;
     while (index < text.length) {
+        if (!visitCharacter()) return;
         const char = text[index];
         if (char !== '{' && char !== '[') {
             index += 1;
             continue;
         }
-        const end = findBalancedJsonEnd(text, index);
+        const end = findBalancedJsonEnd(text, index, visitCharacter);
+        if (end === null) return;
         if (end !== -1) {
             yield { kind: 'balanced', text: text.slice(index, end + 1) };
             index = end + 1;
             continue;
         }
-        const nextObject = text.indexOf('{', index + 1);
-        const nextArray = text.indexOf('[', index + 1);
-        const nextOpener = nextObject === -1
-            ? nextArray
-            : (nextArray === -1 ? nextObject : Math.min(nextObject, nextArray));
+        const nextOpener = findNextJsonOpener(text, index + 1, visitCharacter);
+        if (nextOpener === null) return;
         yield { kind: 'unparsed', text: nextOpener === -1 ? text.slice(index) : text.slice(index, nextOpener) };
         if (nextOpener === -1) return;
         index = nextOpener;
     }
+}
+
+/* @Codex: hook deterministico e limitato alla regressione del costo di scansione. */
+export function __testMeasureJsonFragmentScanWork(text: string): {
+    characterVisits: number;
+    truncated: boolean;
+} {
+    const budget = createEnvelopeScanBudget();
+    for (const _segment of iterateJsonFragmentSegments(text, budget)) {
+        // Il consumo completo del generatore misura il percorso reale.
+    }
+    return {
+        characterVisits: budget.fragmentCharacterVisits,
+        truncated: budget.truncated,
+    };
 }
 
 /* @Codex */
@@ -444,13 +492,19 @@ function walkEnvelopeTree(
             budget.truncated = true;
             return;
         }
-        if (budget.stringParses >= ENVELOPE_SCAN_MAX_STRING_PARSES) {
-            budget.truncated = true;
-            return;
-        }
-        budget.stringParses += 1;
         if (!consumeScanChars(budget, node.length)) return;
-        scanTextForEnvelopes(text, path, budget, onRecord, onSniffDeclared);
+        let chargedCandidateString = false;
+        const admitCandidate = (): boolean => {
+            if (chargedCandidateString) return true;
+            if (budget.stringParses >= ENVELOPE_SCAN_MAX_STRING_PARSES) {
+                budget.truncated = true;
+                return false;
+            }
+            budget.stringParses += 1;
+            chargedCandidateString = true;
+            return true;
+        };
+        scanTextForEnvelopes(text, path, budget, onRecord, onSniffDeclared, admitCandidate);
         return;
     }
     if (typeof node !== 'object') return;
@@ -485,6 +539,7 @@ function scanTextForEnvelopes(
     budget: EnvelopeScanBudget,
     onRecord: EnvelopeRecordVisitor,
     onSniffDeclared: () => void,
+    admitCandidate: () => boolean = () => true,
 ): void {
     const scanParsedDocument = (rawJson: string, root: unknown, path: ReadonlyArray<string | number>) => {
         let documentDeclares = false;
@@ -515,6 +570,7 @@ function scanTextForEnvelopes(
     };
     try {
         const root = JSON.parse(text) as unknown;
+        if (!admitCandidate()) return;
         scanParsedDocument(text, root, basePath);
         return;
     } catch {
@@ -535,7 +591,7 @@ function scanTextForEnvelopes(
         countedCandidates += 1;
         return true;
     };
-    for (const segment of iterateJsonFragmentSegments(text)) {
+    for (const segment of iterateJsonFragmentSegments(text, budget)) {
         if (segment.kind === 'balanced') {
             let root: unknown;
             let parsedFragment = false;
@@ -546,6 +602,7 @@ function scanTextForEnvelopes(
                 // gruppo bilanciato non-JSON: resta solo materiale da sniffare
             }
             if (parsedFragment) {
+                if (!admitCandidate()) return;
                 if (!consumeFragmentBudget()) return;
                 scanParsedDocument(segment.text, root, [...basePath, `#${parsedFragmentOrdinal}`]);
                 parsedFragmentOrdinal += 1;
@@ -553,6 +610,7 @@ function scanTextForEnvelopes(
             }
         }
         if (sniffDeclaresModernEnvelope(segment.text)) {
+            if (!admitCandidate()) return;
             if (!consumeFragmentBudget()) return;
             onSniffDeclared();
         }
