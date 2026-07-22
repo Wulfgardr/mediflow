@@ -231,6 +231,55 @@ test('document synthesis does not persist or autofill when the envelope task is 
     }
 });
 
+/* WUL-362 F1: una risposta avvelenata con chiave task duplicata (evidenza
+   moderna oscurata dal last-wins) non deve mai attraversare il rescue legacy:
+   il service rifiuta, non scrive e non applica alcun autofill ICD. */
+test('document synthesis rejects a last-wins poisoned response with zero writes and zero autofill', async () => {
+    const original = {
+        getSetting: db.settings.get,
+        getPatient: db.patients.get,
+        updatePatient: db.patients.update,
+        createAi: AIService.create,
+    };
+    let updates = 0;
+    const updatePayloads: unknown[] = [];
+
+    db.settings.get = (async (key: string) => ({
+        value: key === DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY ? 'off' : 'enabled',
+    })) as unknown as typeof db.settings.get;
+    db.patients.get = (async () => ({
+        id: 'patient-poisoned-gate',
+        version: 1,
+        documentInsights: [],
+        diagnoses: [],
+    })) as unknown as typeof db.patients.get;
+    db.patients.update = (async (_id: string, payload: unknown) => {
+        updates += 1;
+        updatePayloads.push(payload);
+    }) as unknown as typeof db.patients.update;
+    AIService.create = (async () => ({
+        generate: async () => '{"task":"document_synthesis","task":"Nota storica libera",'
+            + '"summary_markdown":"**Riassunto clinico:** testo storico sintetico",'
+            + '"quality":{"level":"green","reason":"Documento chiaro"},'
+            + '"medications":["Sintetizina 10 mg 1 cp al mattino"],'
+            + '"diagnoses":[{"code":"I10","description":"Ipertensione essenziale","system":"ICD-10","confidence":"high","evidence":"testo sintetico"}]}',
+    })) as unknown as typeof AIService.create;
+
+    try {
+        await assert.rejects(
+            synthesizeDocument('Referto sintetico.', '2026-07-22__referto__synthetic.pdf', 'patient-poisoned-gate'),
+            /risposta non valida/i,
+        );
+        assert.equal(updates, 0);
+        assert.deepEqual(updatePayloads, []);
+    } finally {
+        db.settings.get = original.getSetting;
+        db.patients.get = original.getPatient;
+        db.patients.update = original.updatePatient;
+        AIService.create = original.createAi;
+    }
+});
+
 test('buildStoredDocumentExcerpt keeps high-signal sections in clinical order', () => {
     const excerpt = buildStoredDocumentExcerpt([
         'Intestazione amministrativa ripetuta',

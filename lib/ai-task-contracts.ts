@@ -37,6 +37,169 @@ export function isEnvelopeUsable(envelope: { validJson?: unknown; validTask?: un
     return envelope.validJson === true && envelope.validTask === true;
 }
 
+const ENVELOPE_SCHEMA_PREFIX = 'mediflow.ai.extract';
+const KNOWN_AI_TASK_IDS = new Set(['patient_insight', 'smart_import', 'document_synthesis']);
+
+/* @Codex: contratto WUL-362 F1 - evidenza aggregata delle chiavi RAW di un
+   documento JSON, letta prima della riduzione last-wins di JSON.parse. La
+   primitive decodifica internamente le chiavi e i soli valori stringa necessari
+   (task, schemaVersion) e restituisce esclusivamente booleani aggregati: nessuna
+   lista raw, nessun contenuto di data o summary conservato o loggato.
+   Duplice chiave: uguaglianza esatta case-sensitive dopo il decoding JSON.
+   Collisione di chiave riservata: confronto ASCII case-insensitive dopo il
+   decoding. La scansione e lineare sul documento (gia dentro il budget caratteri
+   del chiamante); un errore di decodifica o uno scope non chiuso degrada a
+   unknown, mai a un esito permissivo. */
+type JsonDocumentKeyEvidence =
+    | {
+        status: 'complete';
+        hasAmbiguousKeys: boolean;
+        declaresModernEnvelope: boolean;
+    }
+    | { status: 'unknown' };
+
+const RESERVED_ENVELOPE_KEY_NAMES = new Set(['schemaversion', 'task', 'data', 'summary']);
+
+// Solo A-Z: nessuna normalizzazione Unicode oltre la decodifica JSON.
+function asciiLowerCase(value: string): string {
+    return value.replace(/[A-Z]/g, (char) => String.fromCharCode(char.charCodeAt(0) + 32));
+}
+
+function isModernSchemaVersionValue(value: string): boolean {
+    const normalized = asciiLowerCase(value.trim());
+    // Prefisso esatto o dotted: mediflow.ai.extractor non e una dichiarazione.
+    return normalized === ENVELOPE_SCHEMA_PREFIX || normalized.startsWith(`${ENVELOPE_SCHEMA_PREFIX}.`);
+}
+
+function isKnownTaskValue(value: string): boolean {
+    return KNOWN_AI_TASK_IDS.has(asciiLowerCase(value.trim()));
+}
+
+/* @Codex */
+type RawObjectScope = {
+    kind: 'object';
+    exactKeys: Set<string>;
+    reservedLower: Set<string>;
+    taskCollision: boolean;
+    taskKnown: boolean;
+    schemaModern: boolean;
+    supportSeen: boolean;
+};
+
+/* @Codex: uno scope oggetto dichiara evidenza moderna se, sulle sole chiavi e
+   valori RAW dello stesso scope, vale almeno uno dei tre casi del contratto:
+   schemaVersion MediFlow valida; task noto con chiave di supporto; duplicazione
+   o collisione di task con almeno un valore task noto. Scope, elementi di array
+   e frammenti distinti non vengono mai combinati. */
+function scanJsonDocumentKeyEvidence(rawJson: string): JsonDocumentKeyEvidence {
+    const scopes: Array<{ kind: 'array' } | RawObjectScope> = [];
+    let hasAmbiguousKeys = false;
+    let declaresModernEnvelope = false;
+    let index = 0;
+
+    const closeScope = (scope: { kind: 'array' } | RawObjectScope | undefined): void => {
+        if (scope?.kind !== 'object') return;
+        if (scope.schemaModern
+            || (scope.taskKnown && scope.supportSeen)
+            || (scope.taskKnown && scope.taskCollision)) {
+            declaresModernEnvelope = true;
+        }
+    };
+
+    const readStringToken = (start: number): number => {
+        let cursor = start + 1;
+        let escaped = false;
+        while (cursor < rawJson.length) {
+            const tokenChar = rawJson[cursor];
+            cursor += 1;
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (tokenChar === '\\') {
+                escaped = true;
+                continue;
+            }
+            if (tokenChar === '"') break;
+        }
+        return cursor;
+    };
+
+    while (index < rawJson.length) {
+        const char = rawJson[index];
+        if (char === '{') {
+            scopes.push({
+                kind: 'object',
+                exactKeys: new Set<string>(),
+                reservedLower: new Set<string>(),
+                taskCollision: false,
+                taskKnown: false,
+                schemaModern: false,
+                supportSeen: false,
+            });
+            index += 1;
+            continue;
+        }
+        if (char === '[') {
+            scopes.push({ kind: 'array' });
+            index += 1;
+            continue;
+        }
+        if (char === '}' || char === ']') {
+            closeScope(scopes.pop());
+            index += 1;
+            continue;
+        }
+        if (char !== '"') {
+            index += 1;
+            continue;
+        }
+
+        const tokenStart = index;
+        index = readStringToken(index);
+
+        let next = index;
+        while (next < rawJson.length && /\s/.test(rawJson[next] ?? '')) next += 1;
+        const scope = scopes.at(-1);
+        if (scope?.kind !== 'object' || rawJson[next] !== ':') continue;
+
+        let key: string;
+        try {
+            key = JSON.parse(rawJson.slice(tokenStart, index)) as string;
+        } catch {
+            return { status: 'unknown' };
+        }
+        if (scope.exactKeys.has(key)) hasAmbiguousKeys = true;
+        scope.exactKeys.add(key);
+
+        const lowerKey = asciiLowerCase(key);
+        if (!RESERVED_ENVELOPE_KEY_NAMES.has(lowerKey)) continue;
+        if (scope.reservedLower.has(lowerKey)) {
+            hasAmbiguousKeys = true;
+            if (lowerKey === 'task') scope.taskCollision = true;
+        }
+        scope.reservedLower.add(lowerKey);
+        if (lowerKey !== 'task') scope.supportSeen = true;
+        if (lowerKey !== 'task' && lowerKey !== 'schemaversion') continue;
+
+        let valueStart = next + 1;
+        while (valueStart < rawJson.length && /\s/.test(rawJson[valueStart] ?? '')) valueStart += 1;
+        if (rawJson[valueStart] !== '"') continue;
+        const valueEnd = readStringToken(valueStart);
+        let value: string;
+        try {
+            value = JSON.parse(rawJson.slice(valueStart, valueEnd)) as string;
+        } catch {
+            return { status: 'unknown' };
+        }
+        if (lowerKey === 'task' && isKnownTaskValue(value)) scope.taskKnown = true;
+        if (lowerKey === 'schemaversion' && isModernSchemaVersionValue(value)) scope.schemaModern = true;
+    }
+
+    if (scopes.length > 0) return { status: 'unknown' };
+    return { status: 'complete', hasAmbiguousKeys, declaresModernEnvelope };
+}
+
 /* @Codex: rilevazione canonica di un payload che dichiara l'envelope moderno, anche annidato o con case diverso */
 export function declaresModernEnvelope(value: unknown, depth = 0): boolean {
     if (!value || typeof value !== 'object' || depth > 3) return false;
@@ -254,6 +417,10 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
 
     try {
         const parsed = JSON.parse(rawJson) as Record<string, unknown>;
+        const keyEvidence = scanJsonDocumentKeyEvidence(rawJson);
+        if (keyEvidence.status === 'unknown' || keyEvidence.hasAmbiguousKeys) {
+        return null;
+        }
         if (declaresModernEnvelope(parsed)) {
             return null;
         }
@@ -337,6 +504,20 @@ function parseEnvelope(
 
     try {
         const parsed = JSON.parse(rawJson) as Record<string, unknown>;
+        // @Codex WUL-362 F1: duplicati esatti e collisioni ASCII case-insensitive
+        // delle chiavi riservate invalidano l'envelope; un esito unknown della
+        // primitive resta fail-closed, mai un envelope valido.
+        const keyEvidence = scanJsonDocumentKeyEvidence(rawJson);
+        if (keyEvidence.status === 'unknown' || keyEvidence.hasAmbiguousKeys) {
+            return {
+                rawJson,
+                validJson: true,
+                validTask: false,
+                repairedTruncation,
+                summary: '',
+                data: {},
+            };
+        }
         const schemaVersion = parsed?.schemaVersion === AI_TASK_EXTRACTION_SCHEMA_VERSION;
         const taskMatches = parsed?.task === expectedTask;
         const data = normalizeTaskData(parsed?.data);
