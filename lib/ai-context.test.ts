@@ -1433,6 +1433,32 @@ test('resolver: canonical insight markdown with more than eight citations stays 
     }
 });
 
+/* @Codex WUL-362 R5: summary + otto claim citati sono il massimo valido. */
+test('resolver: valid patient insight with citations across all allowed strings stays structured', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            schemaVersion: 'mediflow.ai.extract.v1',
+            task: 'patient_insight',
+            summary: 'Sintesi clinica sintetica [S1]',
+            data: {
+                currentState: ['Quadro sintetico uno [S2]', 'Quadro sintetico due [S3]'],
+                alerts: ['Attenzione sintetica uno [S4]', 'Attenzione sintetica due [S5]'],
+                nextSteps: [
+                    'Passo sintetico uno [S6]',
+                    'Passo sintetico due [S7]',
+                    'Passo sintetico tre [S8]',
+                ],
+                gaps: ['Gap sintetico [S9]'],
+            },
+        }));
+        assert.equal(readable.kind, 'structured');
+    } finally {
+        restore();
+    }
+});
+
 test('detection: canonical citation markers beyond the fragment budget stay absent', async () => {
     const { detectModernEnvelopeEvidence } = await import('./ai-task-contracts');
     assert.equal(detectModernEnvelopeEvidence(CANONICAL_INSIGHT_WITH_CITATIONS), 'absent');
