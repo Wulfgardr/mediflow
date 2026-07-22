@@ -149,6 +149,106 @@ test('envelope with a mismatched task is not usable even when its JSON is valid'
     assert.equal(isEnvelopeUsable(parsed), false);
 });
 
+/* @Codex: WUL-362 duplicate-key JSON fail-closed contract */
+test('duplicate ASCII task keys reject both last-wins task orders', () => {
+    const smartImportLast = parseSmartImportExtractionResponse(
+        '{"schemaVersion":"mediflow.ai.extract.v1","task":"patient_insight","task":"smart_import","summary":"Non usare","data":{"diagnoses":[],"therapies":[],"servicePrescriptions":[]}}',
+    );
+    const patientInsightLast = parsePatientInsightExtractionResponse(
+        '{"schemaVersion":"mediflow.ai.extract.v1","task":"smart_import","task":"patient_insight","summary":"Non usare","data":{"currentState":[],"alerts":[],"nextSteps":[],"gaps":[]}}',
+    );
+
+    for (const parsed of [smartImportLast, patientInsightLast]) {
+        assert.equal(parsed.validJson, true);
+        assert.equal(parsed.validTask, false);
+        assert.equal(isEnvelopeUsable(parsed), false);
+        assert.equal(parsed.value.summary, '');
+    }
+    assert.deepEqual(smartImportLast.value.data, { diagnoses: [], therapies: [], servicePrescriptions: [] });
+    assert.deepEqual(patientInsightLast.value.data, { currentState: [], alerts: [], nextSteps: [], gaps: [] });
+});
+
+/* @Codex */
+test('duplicate Unicode-escaped task and schemaVersion keys reject the envelope', () => {
+    const duplicateTask = parsePatientInsightExtractionResponse(
+        '{"schemaVersion":"mediflow.ai.extract.v1","ta\\u0073k":"smart_import","task":"patient_insight","summary":"Non usare","data":{"currentState":[],"alerts":[],"nextSteps":[],"gaps":[]}}',
+    );
+    const duplicateSchema = parsePatientInsightExtractionResponse(
+        '{"schema\\u0056ersion":"mediflow.ai.extract.v2","schemaVersion":"mediflow.ai.extract.v1","task":"patient_insight","summary":"Non usare","data":{"currentState":[],"alerts":[],"nextSteps":[],"gaps":[]}}',
+    );
+
+    for (const parsed of [duplicateTask, duplicateSchema]) {
+        assert.equal(parsed.validJson, true);
+        assert.equal(parsed.validTask, false);
+        assert.equal(isEnvelopeUsable(parsed), false);
+        assert.equal(parsed.value.summary, '');
+    }
+});
+
+/* @Codex */
+test('duplicate keys reject equal values and duplicates inside data', () => {
+    const equalTask = parsePatientInsightExtractionResponse(
+        '{"schemaVersion":"mediflow.ai.extract.v1","task":"patient_insight","task":"patient_insight","summary":"Non usare","data":{"currentState":[],"alerts":[],"nextSteps":[],"gaps":[]}}',
+    );
+    const nestedData = parsePatientInsightExtractionResponse(
+        '{"schemaVersion":"mediflow.ai.extract.v1","task":"patient_insight","summary":"Non usare","data":{"currentState":[],"currentState":[],"alerts":[],"nextSteps":[],"gaps":[]}}',
+    );
+
+    for (const parsed of [equalTask, nestedData]) {
+        assert.equal(parsed.validJson, true);
+        assert.equal(parsed.validTask, false);
+        assert.equal(isEnvelopeUsable(parsed), false);
+        assert.equal(parsed.value.summary, '');
+        assert.deepEqual(parsed.value.data, { currentState: [], alerts: [], nextSteps: [], gaps: [] });
+    }
+});
+
+/* @Codex */
+test('same keys in parent, child, sibling objects, and array objects remain usable', () => {
+    const parentChild = parsePatientInsightExtractionResponse(
+        '{"schemaVersion":"mediflow.ai.extract.v1","task":"patient_insight","summary":"x","data":{"summary":"y","currentState":[],"alerts":[],"nextSteps":[],"gaps":[]}}',
+    );
+    const separateScopes = parsePatientInsightExtractionResponse(
+        '{"schemaVersion":"mediflow.ai.extract.v1","task":"patient_insight","summary":"x","data":{"currentState":[],"alerts":[],"nextSteps":[],"gaps":[]},"first":{"summary":"a"},"second":{"summary":"b"},"items":[{"summary":"c"},{"summary":"d"}]}',
+    );
+
+    assert.equal(isEnvelopeUsable(parentChild), true);
+    assert.equal(isEnvelopeUsable(separateScopes), true);
+});
+
+/* @Codex */
+test('all task parsers reject a duplicate task key for their own envelope', () => {
+    const patientInsight = parsePatientInsightExtractionResponse(
+        '{"schemaVersion":"mediflow.ai.extract.v1","task":"patient_insight","task":"patient_insight","summary":"Non usare","data":{"currentState":[],"alerts":[],"nextSteps":[],"gaps":[]}}',
+    );
+    const smartImport = parseSmartImportExtractionResponse(
+        '{"schemaVersion":"mediflow.ai.extract.v1","task":"smart_import","task":"smart_import","summary":"Non usare","data":{"diagnoses":[],"therapies":[],"servicePrescriptions":[]}}',
+    );
+    const documentSynthesis = parseDocumentSynthesisExtractionResponse(
+        '{"schemaVersion":"mediflow.ai.extract.v1","task":"document_synthesis","task":"document_synthesis","summary":"Non usare","data":{"qualityLevel":"green","medications":[],"diagnoses":[],"problemStatements":[],"therapyCandidates":[]}}',
+        'testo OCR sintetico',
+    );
+
+    for (const parsed of [patientInsight, smartImport, documentSynthesis]) {
+        assert.equal(parsed.validJson, true);
+        assert.equal(parsed.validTask, false);
+        assert.equal(isEnvelopeUsable(parsed), false);
+    }
+});
+
+/* @Codex */
+test('a modern duplicate envelope never recovers through the document legacy contract', () => {
+    const parsed = parseDocumentSynthesisExtractionResponse(
+        '{"schemaVersion":"mediflow.ai.extract.v1","task":"document_synthesis","task":"document_synthesis","summary_markdown":"Storico","quality":{"level":"green"},"diagnoses":[]}',
+        'testo OCR sintetico',
+    );
+
+    assert.equal(parsed.validJson, true);
+    assert.equal(parsed.validTask, false);
+    assert.equal(parsed.legacyContract, false);
+    assert.equal(isEnvelopeUsable(parsed), false);
+});
+
 test('smart import extraction drops service prescriptions from therapy suggestions', () => {
     const parsed = parseSmartImportExtractionResponse(JSON.stringify({
         schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
@@ -928,5 +1028,15 @@ test('legacy rescue rejects a nested modern envelope declaration', () => {
 
     assert.equal(parsed.validTask, false);
     assert.equal(parsed.legacyContract, false);
+    assert.equal(isEnvelopeUsable(parsed), false);
+});
+
+test('parser rejects a reserved-key case collision on an otherwise valid envelope', () => {
+    const parsed = parsePatientInsightExtractionResponse(
+        '{"schemaVersion":"mediflow.ai.extract.v1","Task":"smart_import","task":"patient_insight","summary":"Non usare","data":{"currentState":[],"alerts":[],"nextSteps":[],"gaps":[]}}',
+    );
+
+    assert.equal(parsed.validJson, true);
+    assert.equal(parsed.validTask, false);
     assert.equal(isEnvelopeUsable(parsed), false);
 });

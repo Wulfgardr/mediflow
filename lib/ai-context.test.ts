@@ -671,7 +671,7 @@ test('buildPatientInsightContext normalizes CDA-like recovered attachment text b
 });
 
 /* @Codex */
-test('patient insight does not persist when the envelope task is invalid', async () => {
+test('patient insight does not persist when the envelope task is duplicated', async () => {
     const restoreHarness = await withHarness();
     const { AIService } = await import('./ai-service');
     const { regeneratePatientSummary } = await import('./ai-summary-service');
@@ -694,12 +694,7 @@ test('patient insight does not persist when the envelope task is invalid', async
     }) as typeof db.patients.update;
     AIService.create = (async () => ({
         getModelInfo: () => ({ provider: 'local', model: 'synthetic', baseUrl: 'http://127.0.0.1' }),
-        generate: async () => JSON.stringify({
-            schemaVersion: 'mediflow.ai.extract.v1',
-            task: 'smart_import',
-            summary: 'Risposta con task errato',
-            data: {},
-        }),
+        generate: async () => '{"schemaVersion":"mediflow.ai.extract.v1","task":"smart_import","task":"patient_insight","summary":"Risposta duplicata","data":{"currentState":[],"alerts":[],"nextSteps":[],"gaps":[]}}',
     })) as unknown as typeof AIService.create;
 
     try {
