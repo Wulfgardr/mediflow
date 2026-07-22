@@ -6,6 +6,7 @@ import {
     buildDocumentSynthesisExtractionPrompt,
     buildPatientInsightExtractionPrompt,
     buildSmartImportExtractionPrompt,
+    detectModernEnvelopeEvidence,
     extractJsonObject,
     isEnvelopeUsable,
     parseDocumentSynthesisExtractionResponse,
@@ -1031,6 +1032,280 @@ test('legacy rescue rejects a nested modern envelope declaration', () => {
     assert.equal(isEnvelopeUsable(parsed), false);
 });
 
+/* @Codex */
+test('legacy rescue rejects a deeply nested modern envelope declaration', () => {
+    const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
+        summary: 'Envelope dichiarato in profondita',
+        diagnoses: [],
+        provider: { a: { b: { c: { schemaVersion: 'mediflow.ai.extract.v1', task: 'smart_import' } } } },
+    }), 'testo OCR sintetico');
+
+    assert.equal(parsed.validTask, false);
+    assert.equal(parsed.legacyContract, false);
+    assert.equal(isEnvelopeUsable(parsed), false);
+});
+
+/* @Codex: tri-state del rescue legacy - solo absent consente il recupero */
+test('legacy rescue is blocked by a modern envelope in a later fragment', () => {
+    const response = '```json\n{"summary_markdown":"**Riassunto clinico:** testo storico","quality":{"level":"green"},"diagnoses":[]}\n```\n```json\n'
+        + JSON.stringify({ schemaVersion: 'mediflow.ai.extract.v1', task: 'smart_import', summary: 'wrong task', data: {} })
+        + '\n```';
+    const parsed = parseDocumentSynthesisExtractionResponse(response, 'testo OCR sintetico');
+
+    assert.equal(parsed.validTask, false);
+    assert.equal(parsed.legacyContract, false);
+    assert.equal(isEnvelopeUsable(parsed), false);
+});
+
+/* @Codex */
+test('legacy rescue is blocked when depth truncation makes evidence unknown', () => {
+    let nested: unknown = { schemaVersion: 'mediflow.ai.extract.v1', task: 'smart_import' };
+    for (let index = 0; index < 8; index += 1) nested = { layer: nested };
+    const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
+        summary_markdown: '**Riassunto clinico:** testo storico',
+        quality: { level: 'green' },
+        diagnoses: [],
+        embedded: nested,
+    }), 'testo OCR sintetico');
+
+    assert.equal(parsed.validTask, false);
+    assert.equal(parsed.legacyContract, false);
+});
+
+/* @Codex */
+test('legacy rescue is blocked by present evidence at the exact depth limit', () => {
+    let nested: unknown = { schemaVersion: 'mediflow.ai.extract.v1', task: 'smart_import' };
+    for (let index = 0; index < 7; index += 1) nested = { layer: nested };
+    const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
+        summary_markdown: '**Riassunto clinico:** testo storico',
+        quality: { level: 'green' },
+        diagnoses: [],
+        embedded: nested,
+    }), 'testo OCR sintetico');
+
+    assert.equal(parsed.validTask, false);
+    assert.equal(parsed.legacyContract, false);
+});
+
+/* @Codex */
+test('legacy rescue is blocked by a single-quoted pseudo envelope in a string field', () => {
+    const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
+        summary_markdown: '**Riassunto clinico:** storico',
+        quality: { level: 'green' },
+        diagnoses: [],
+        content: "{'schemaVersion':'mediflow.ai.extract.v1','task':'smart_import','summary':'errato'}",
+    }), 'testo OCR sintetico');
+
+    assert.equal(parsed.validTask, false);
+    assert.equal(parsed.legacyContract, false);
+});
+
+/* @Codex: lo sniff pseudo-JSON deve riconoscere una chiave task con escape. */
+test('legacy rescue is blocked by an escaped task key in a single-quoted pseudo envelope', () => {
+    const response = JSON.stringify({
+        summary_markdown: '**Riassunto clinico:** testo storico sintetico',
+        quality: { level: 'green' },
+        diagnoses: [{
+            code: 'I10',
+            description: 'Ipertensione essenziale',
+            system: 'ICD-10',
+            confidence: 'high',
+            evidence: 'testo sintetico',
+        }],
+        content: "{'ta\\u0073k':'document_synthesis','summary':'modern'}",
+    });
+
+    const parsed = parseDocumentSynthesisExtractionResponse(response, 'testo OCR sintetico');
+    assert.deepEqual({
+        evidence: detectModernEnvelopeEvidence(response),
+        validTask: parsed.validTask,
+        legacyContract: parsed.legacyContract,
+        diagnosisCount: parsed.value.data.diagnoses.length,
+    }, {
+        evidence: 'present',
+        validTask: false,
+        legacyContract: false,
+        diagnosisCount: 0,
+    });
+});
+
+/* @Codex: anche schemaVersion escaped dichiara un envelope moderno. */
+test('legacy rescue is blocked by an escaped schemaVersion key in a single-quoted pseudo envelope', () => {
+    const response = JSON.stringify({
+        summary_markdown: '**Riassunto clinico:** testo storico sintetico',
+        quality: { level: 'green' },
+        diagnoses: [],
+        content: "{'schemaVer\\u0073ion':'mediflow.ai.extract.v1','summary':'modern'}",
+    });
+
+    const parsed = parseDocumentSynthesisExtractionResponse(response, 'testo OCR sintetico');
+    assert.deepEqual({
+        evidence: detectModernEnvelopeEvidence(response),
+        validTask: parsed.validTask,
+        legacyContract: parsed.legacyContract,
+    }, {
+        evidence: 'present',
+        validTask: false,
+        legacyContract: false,
+    });
+});
+
+/* @Codex: un escape senza dichiarazione moderna non deve bloccare il legacy. */
+test('single-quoted pseudo JSON with escapes but no modern declaration stays absent', () => {
+    const response = JSON.stringify({
+        summary_markdown: '**Riassunto clinico:** testo storico sintetico',
+        quality: { level: 'green' },
+        diagnoses: [],
+        content: "{'ta\\u0073k':'nota_storica','summary':'legacy'}",
+    });
+
+    assert.equal(detectModernEnvelopeEvidence(response), 'absent');
+});
+
+/* @Codex: una sola passata copre gli escape JS ammessi senza trasformare gli
+   escape di controllo nelle lettere che li nominano. */
+test('single-quoted pseudo envelope sniff decodes JS escapes once', () => {
+    for (const content of [
+        "{'ta\\x73k':'document_synthesis','summary':'modern'}",
+        "{'ta\\u{73}k':'document_synthesis','summary':'modern'}",
+        "{'ta\\sk':'document_synthesis','summary':'modern'}",
+    ]) {
+        assert.equal(
+            detectModernEnvelopeEvidence(JSON.stringify({ content })),
+            'present',
+        );
+    }
+
+    assert.equal(
+        detectModernEnvelopeEvidence(JSON.stringify({
+            content: "{'\\task':'document_synthesis','summary':'modern'}",
+        })),
+        'absent',
+    );
+});
+
+/* @Codex: extractor non appartiene al prefisso esatto o dotted del contratto. */
+test('legacy rescue accepts schemaVersion mediflow.ai.extractor as non-modern', () => {
+    const response = JSON.stringify({
+        schemaVersion: 'mediflow.ai.extractor',
+        summary_markdown: '**Riassunto clinico:** testo storico sintetico',
+        quality: { level: 'green' },
+        diagnoses: [],
+    });
+    const parsed = parseDocumentSynthesisExtractionResponse(response, 'testo OCR sintetico');
+
+    assert.deepEqual({
+        evidence: detectModernEnvelopeEvidence(response),
+        legacyContract: parsed.legacyContract,
+    }, {
+        evidence: 'absent',
+        legacyContract: true,
+    });
+});
+
+/* @Codex: il ramo pseudo-JSON usa lo stesso contratto ASCII exact-or-dotted. */
+test('legacy rescue accepts pseudo-JSON schemaVersion mediflow.ai.extractor as non-modern', () => {
+    const response = JSON.stringify({
+        summary_markdown: '**Riassunto clinico:** testo storico sintetico',
+        quality: { level: 'green' },
+        diagnoses: [],
+        content: "{'schemaVersion':'mediflow.ai.extractor'}",
+    });
+    const parsed = parseDocumentSynthesisExtractionResponse(response, 'testo OCR sintetico');
+
+    assert.deepEqual({
+        evidence: detectModernEnvelopeEvidence(response),
+        legacyContract: parsed.legacyContract,
+    }, {
+        evidence: 'absent',
+        legacyContract: true,
+    });
+});
+
+/* @Codex: lo schema esatto e le sole estensioni dotted restano moderne. */
+test('exact and dotted schemaVersion values remain present without support keys', () => {
+    for (const schemaVersion of [
+        'mediflow.ai.extract',
+        'mediflow.ai.extract.v1',
+        'MEDIFLOW.AI.EXTRACT.V1',
+    ]) {
+        assert.equal(
+            detectModernEnvelopeEvidence(JSON.stringify({ schemaVersion })),
+            'present',
+        );
+    }
+});
+
+/* @Codex: schemaVersion resta una chiave di supporto anche con valore non moderno. */
+test('known task with extractor schemaVersion support remains present', () => {
+    assert.equal(detectModernEnvelopeEvidence(JSON.stringify({
+        task: 'document_synthesis',
+        schemaVersion: 'mediflow.ai.extractor',
+    })), 'present');
+});
+
+/* @Codex */
+test('tri-state precedence: collected evidence wins over fragment truncation', () => {
+    const text = [
+        JSON.stringify({
+            schemaVersion: 'mediflow.ai.extract.v1',
+            task: 'smart_import',
+            summary: 'Envelope in testa',
+            data: { diagnoses: [], therapies: [], servicePrescriptions: [] },
+        }),
+        ...Array.from({ length: 8 }, (_, index) => JSON.stringify({ i: index })),
+    ].join(' testo ');
+
+    assert.equal(detectModernEnvelopeEvidence(text), 'present');
+});
+
+/* WUL-362 F1: l'evidenza moderna vive nelle chiavi RAW, prima della riduzione
+   last-wins di JSON.parse. Una chiave riservata duplicata o in collisione di
+   case non deve nascondere la dichiarazione moderna al rescue legacy. */
+
+const LEGACY_TAIL = '"summary_markdown":"**Riassunto clinico:** testo storico","quality":{"level":"green"},"diagnoses":[]';
+
+test('last-wins: modern task first, junk last stays present and never rescues as legacy', () => {
+    const response = `{"task":"document_synthesis","task":"Nota storica libera",${LEGACY_TAIL}}`;
+
+    assert.equal(detectModernEnvelopeEvidence(response), 'present');
+    const parsed = parseDocumentSynthesisExtractionResponse(response, 'testo OCR sintetico');
+    assert.equal(parsed.validTask, false);
+    assert.equal(parsed.legacyContract, false);
+    assert.equal(isEnvelopeUsable(parsed), false);
+});
+
+test('last-wins: junk task first, modern task last stays present and never rescues as legacy', () => {
+    const response = `{"task":"Nota storica libera","task":"document_synthesis",${LEGACY_TAIL}}`;
+
+    assert.equal(detectModernEnvelopeEvidence(response), 'present');
+    const parsed = parseDocumentSynthesisExtractionResponse(response, 'testo OCR sintetico');
+    assert.equal(parsed.validTask, false);
+    assert.equal(parsed.legacyContract, false);
+    assert.equal(isEnvelopeUsable(parsed), false);
+});
+
+test('escaped duplicate task key cannot hide the modern declaration', () => {
+    const response = `{"ta\\u0073k":"document_synthesis","task":"Nota storica",${LEGACY_TAIL}}`;
+
+    assert.equal(detectModernEnvelopeEvidence(response), 'present');
+    const parsed = parseDocumentSynthesisExtractionResponse(response, 'testo OCR sintetico');
+    assert.equal(parsed.validTask, false);
+    assert.equal(parsed.legacyContract, false);
+});
+
+test('reserved-key case collision cannot hide the modern declaration in either order', () => {
+    for (const response of [
+        `{"Task":"document_synthesis","task":"Nota storica",${LEGACY_TAIL}}`,
+        `{"task":"Nota storica","Task":"document_synthesis",${LEGACY_TAIL}}`,
+    ]) {
+        assert.equal(detectModernEnvelopeEvidence(response), 'present');
+        const parsed = parseDocumentSynthesisExtractionResponse(response, 'testo OCR sintetico');
+        assert.equal(parsed.validTask, false);
+        assert.equal(parsed.legacyContract, false);
+    }
+});
+
 test('parser rejects a reserved-key case collision on an otherwise valid envelope', () => {
     const parsed = parsePatientInsightExtractionResponse(
         '{"schemaVersion":"mediflow.ai.extract.v1","Task":"smart_import","task":"patient_insight","summary":"Non usare","data":{"currentState":[],"alerts":[],"nextSteps":[],"gaps":[]}}',
@@ -1039,4 +1314,48 @@ test('parser rejects a reserved-key case collision on an otherwise valid envelop
     assert.equal(parsed.validJson, true);
     assert.equal(parsed.validTask, false);
     assert.equal(isEnvelopeUsable(parsed), false);
+});
+
+test('duplicate task key inside an array element object blocks the legacy rescue', () => {
+    const response = `{"items":[{"task":"document_synthesis","task":"Nota storica"}],${LEGACY_TAIL}}`;
+
+    assert.equal(detectModernEnvelopeEvidence(response), 'present');
+    const parsed = parseDocumentSynthesisExtractionResponse(response, 'testo OCR sintetico');
+    assert.equal(parsed.validTask, false);
+    assert.equal(parsed.legacyContract, false);
+});
+
+test('last-wins shadowing inside a stringified layer stays present', () => {
+    const response = JSON.stringify({
+        summary_markdown: '**Riassunto clinico:** testo storico',
+        quality: { level: 'green' },
+        diagnoses: [],
+        content: '{"task":"document_synthesis","task":"Nota storica"}',
+    });
+
+    assert.equal(detectModernEnvelopeEvidence(response), 'present');
+    const parsed = parseDocumentSynthesisExtractionResponse(response, 'testo OCR sintetico');
+    assert.equal(parsed.validTask, false);
+    assert.equal(parsed.legacyContract, false);
+});
+
+test('same task keys in distinct objects raise no false conflict', () => {
+    assert.equal(
+        detectModernEnvelopeEvidence('{"a":{"task":"nota uno"},"b":{"task":"nota due"}}'),
+        'absent',
+    );
+});
+
+test('task and support key in separate fragments are never paired', () => {
+    assert.equal(
+        detectModernEnvelopeEvidence('{"task":"document_synthesis"} testo {"summary":"solo testo"}'),
+        'absent',
+    );
+});
+
+test('no evidence with exhausted depth budget stays unknown, never absent', () => {
+    let nested: unknown = { nota: 'testo storico senza envelope' };
+    for (let index = 0; index < 9; index += 1) nested = { layer: nested };
+
+    assert.equal(detectModernEnvelopeEvidence(JSON.stringify(nested)), 'unknown');
 });
