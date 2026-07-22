@@ -11,24 +11,7 @@
 
 import { parsePatientInsight } from '@/lib/ai-summary-service';
 import { splitInsightDiagnostics } from '@/lib/patient-insight';
-import { declaresModernEnvelope, extractJsonObject, isEnvelopeUsable, parsePatientInsightExtractionResponse } from '@/lib/ai-task-contracts';
-
-/* @Codex: shim di parsing sul rilevatore canonico ricorsivo e case-insensitive */
-function declaresTaskEnvelope(rawJson: string | null): boolean {
-    if (!rawJson) return false;
-    try {
-        return declaresModernEnvelope(JSON.parse(rawJson));
-    } catch {
-        return false;
-    }
-}
-
-/* @Codex: rilevazione fail-closed dell'envelope anche quando il JSON dichiarato non e parseabile */
-function contentDeclaresEnvelope(content: string): boolean {
-    const rawJson = extractJsonObject(content)?.rawJson ?? null;
-    if (rawJson && declaresTaskEnvelope(rawJson)) return true;
-    return /"(schemaversion|task)"\s*:/i.test(rawJson ?? content);
-}
+import { resolveInsightEnvelope } from '@/lib/ai-task-contracts';
 
 export type ReadableInsight =
     | {
@@ -103,12 +86,43 @@ function asStructured(
 }
 
 export function coerceInsightToReadable(rawSummary: string): ReadableInsight {
-    const content = (rawSummary || '').trim();
+    const raw = rawSummary || '';
+    const content = raw.trim();
     if (!content) return { kind: 'unreadable', reason: 'empty' };
 
-    const looksJson = looksLikeJsonOrEnvelope(content);
-    const fromMarkdown = parsePatientInsight(content);
+    // @Codex: il resolver canonico riceve il contenuto grezzo, non trimmato,
+    // cosi i suoi budget contano anche il whitespace analizzato
+    const resolution = resolveInsightEnvelope(raw);
+    if (resolution.status === 'declared-invalid' || resolution.status === 'ambiguous') {
+        return { kind: 'unreadable', reason: 'json-envelope' };
+    }
+
     const diagnostics = splitInsightDiagnostics(content);
+    if (resolution.status === 'usable') {
+        const data = resolution.envelope.value.data;
+        const hasExtraction = Boolean(
+            data.currentState.length ||
+            data.alerts.length ||
+            data.nextSteps.length ||
+            data.gaps.length,
+        );
+        if (hasExtraction) {
+            return asStructured(
+                data.currentState.join(' '),
+                data.alerts,
+                data.nextSteps,
+                data.gaps,
+                diagnostics,
+            );
+        }
+        if (resolution.envelope.value.summary) {
+            return asStructured(resolution.envelope.value.summary, [], [], [], diagnostics);
+        }
+        return { kind: 'unreadable', reason: 'empty' };
+    }
+
+    // @Codex: legacy-text, nessun envelope dichiarato raggiungibile: solo recupero storico
+    const fromMarkdown = parsePatientInsight(content);
     const hasStructured = Boolean(
         fromMarkdown.summary ||
         fromMarkdown.alerts.length ||
@@ -116,8 +130,7 @@ export function coerceInsightToReadable(rawSummary: string): ReadableInsight {
         fromMarkdown.gaps.length,
     );
 
-    // @Codex: un contenuto JSON-like passa sempre prima dal gate contrattuale
-    if (hasStructured && !looksJson) {
+    if (hasStructured) {
         return asStructured(
             fromMarkdown.summary,
             fromMarkdown.alerts,
@@ -127,7 +140,7 @@ export function coerceInsightToReadable(rawSummary: string): ReadableInsight {
         );
     }
 
-    if (!looksJson) {
+    if (!looksLikeJsonOrEnvelope(content)) {
         const mainMarkdown = diagnostics.mainMarkdown || fromMarkdown.fallbackMarkdown;
         if (mainMarkdown.trim().length === 0) {
             return { kind: 'unreadable', reason: 'empty' };
@@ -141,71 +154,9 @@ export function coerceInsightToReadable(rawSummary: string): ReadableInsight {
     }
 
     try {
-        const extraction = parsePatientInsightExtractionResponse(content);
-        // @Codex
-        if (isEnvelopeUsable(extraction)) {
-            const data = extraction.value.data;
-            const hasExtraction = Boolean(
-                data.currentState.length ||
-                data.alerts.length ||
-                data.nextSteps.length ||
-                data.gaps.length,
-            );
-
-            if (hasExtraction) {
-                return asStructured(
-                    data.currentState.join(' '),
-                    data.alerts,
-                    data.nextSteps,
-                    data.gaps,
-                    diagnostics,
-                );
-            }
-
-            if (extraction.value.summary) {
-                return asStructured(extraction.value.summary, [], [], [], diagnostics);
-            }
-        } else if (declaresTaskEnvelope(extraction.rawJson)) {
-            // @Codex: solo un envelope dichiarato e non valido e illeggibile; i wrapper storici proseguono nel recupero
-            return { kind: 'unreadable', reason: 'json-envelope' };
-        }
-    } catch {
-        // fall through to free-text recovery
-    }
-
-    try {
         const parsed = JSON.parse(content) as unknown;
         const inner = deepFindReadableString(parsed, ['content', 'text', 'summary', 'output', 'value', 'markdown']);
         if (inner) {
-            // @Codex: un envelope dichiarato dentro un wrapper segue le stesse regole del livello esterno
-            const innerRaw = extractJsonObject(inner);
-            if (innerRaw && declaresTaskEnvelope(innerRaw.rawJson)) {
-                const innerExtraction = parsePatientInsightExtractionResponse(inner);
-                if (!isEnvelopeUsable(innerExtraction)) {
-                    return { kind: 'unreadable', reason: 'json-envelope' };
-                }
-                const innerData = innerExtraction.value.data;
-                const innerDiagnostics = splitInsightDiagnostics(inner);
-                const innerHasExtraction = Boolean(
-                    innerData.currentState.length ||
-                    innerData.alerts.length ||
-                    innerData.nextSteps.length ||
-                    innerData.gaps.length,
-                );
-                if (innerHasExtraction) {
-                    return asStructured(
-                        innerData.currentState.join(' '),
-                        innerData.alerts,
-                        innerData.nextSteps,
-                        innerData.gaps,
-                        innerDiagnostics,
-                    );
-                }
-                if (innerExtraction.value.summary) {
-                    return asStructured(innerExtraction.value.summary, [], [], [], innerDiagnostics);
-                }
-                return { kind: 'unreadable', reason: 'empty' };
-            }
             const innerStructured = parsePatientInsight(inner);
             const innerDiagnostics = splitInsightDiagnostics(inner);
             const innerHas = Boolean(
@@ -237,16 +188,6 @@ export function coerceInsightToReadable(rawSummary: string): ReadableInsight {
         // payload was JSON-like but not valid JSON
     }
 
-    // @Codex: contenuto misto gia strutturato senza envelope dichiarato resta leggibile
-    if (hasStructured && !contentDeclaresEnvelope(content)) {
-        return asStructured(
-            fromMarkdown.summary,
-            fromMarkdown.alerts,
-            fromMarkdown.nextSteps,
-            fromMarkdown.gaps,
-            diagnostics,
-        );
-    }
     return { kind: 'unreadable', reason: 'json-envelope' };
 }
 

@@ -37,8 +37,160 @@ export function isEnvelopeUsable(envelope: { validJson?: unknown; validTask?: un
     return envelope.validJson === true && envelope.validTask === true;
 }
 
+/* @Codex: contratto WUL-362 - rilevazione e risoluzione canonica degli envelope moderni.
+   Evidenza minima bilanciata: schemaVersion col prefisso mediflow.ai.extract, oppure
+   task noto accompagnato da almeno uno tra schemaVersion, data e summary. La sola
+   chiave task non basta: uno snippet dimostrativo storico resta leggibile. */
+export type ModernEnvelopeEvidence = 'present' | 'absent' | 'unknown';
+
 const ENVELOPE_SCHEMA_PREFIX = 'mediflow.ai.extract';
 const KNOWN_AI_TASK_IDS = new Set(['patient_insight', 'smart_import', 'document_synthesis']);
+
+// Budget espliciti e condivisi della scansione: superarne uno degrada fail-closed
+// (ambiguous nel resolver, unknown nel rilevatore tri-state), mai a legacy-text.
+const ENVELOPE_SCAN_MAX_CHARS = 400000;
+const ENVELOPE_SCAN_MAX_DEPTH = 8;
+const ENVELOPE_SCAN_MAX_NODES = 256;
+const ENVELOPE_SCAN_MAX_STRING_PARSES = 8;
+const ENVELOPE_SCAN_MAX_FRAGMENTS = 8;
+const ENVELOPE_SCAN_MAX_STRING_LENGTH = 100000;
+
+// Gli sniff accettano sia doppi che singoli apici: i frammenti pseudo-JSON non
+// parseabili restano dichiarazioni moderne.
+const ENVELOPE_SNIFF_SCHEMA_PATTERN = /["']schemaversion["']\s*:\s*["']mediflow\.ai\.extract(?:\.|["'])/i;
+const ENVELOPE_SNIFF_TASK_PATTERN = /["']task["']\s*:\s*["'](patient_insight|smart_import|document_synthesis)["']/i;
+const ENVELOPE_SNIFF_SUPPORT_PATTERN = /["'](schemaversion|data|summary)["']\s*:/i;
+
+/* @Codex */
+type EnvelopeScanBudget = {
+    chars: number;
+    nodes: number;
+    stringParses: number;
+    truncated: boolean;
+};
+
+/* @Codex */
+function createEnvelopeScanBudget(): EnvelopeScanBudget {
+    return { chars: 0, nodes: 0, stringParses: 0, truncated: false };
+}
+
+/* @Codex */
+function consumeScanChars(budget: EnvelopeScanBudget, amount: number): boolean {
+    budget.chars += amount;
+    if (budget.chars > ENVELOPE_SCAN_MAX_CHARS) {
+        budget.truncated = true;
+        return false;
+    }
+    return true;
+}
+
+/* @Codex */
+function readEnvelopeKey(record: Record<string, unknown>, lowerCaseName: string): unknown {
+    for (const key of Object.keys(record)) {
+        if (key.toLowerCase() === lowerCaseName) return record[key];
+    }
+    return undefined;
+}
+
+/* @Codex: evidenza minima bilanciata (contratto punto 4) */
+function declaresModernEnvelopeRecord(record: Record<string, unknown>): boolean {
+    const schemaValue = readEnvelopeKey(record, 'schemaversion');
+    if (typeof schemaValue === 'string' && isModernSchemaVersionValue(schemaValue)) {
+        return true;
+    }
+    const taskValue = readEnvelopeKey(record, 'task');
+    const taskId = typeof taskValue === 'string' ? taskValue.trim().toLowerCase() : null;
+    if (taskId === null || !KNOWN_AI_TASK_IDS.has(taskId)) return false;
+    return readEnvelopeKey(record, 'schemaversion') !== undefined
+        || readEnvelopeKey(record, 'data') !== undefined
+        || readEnvelopeKey(record, 'summary') !== undefined;
+}
+
+/* @Codex: applica una sola decodifica degli escape JavaScript al segmento.
+   Gli escape di controllo restano caratteri di controllo; gli escape di
+   identita rimuovono solo il backslash. Le sequenze Unicode o esadecimali non
+   valide restano letterali, cosi non producono lettere sintetiche. */
+function decodeJavascriptStyleEscapesOnce(text: string): string {
+    let decoded = '';
+    for (let index = 0; index < text.length; index += 1) {
+        const char = text[index];
+        if (char !== '\\' || index + 1 >= text.length) {
+            decoded += char;
+            continue;
+        }
+
+        const escapeStart = index;
+        const escaped = text[index + 1];
+        index += 1;
+        switch (escaped) {
+            case 'b': decoded += '\b'; continue;
+            case 'f': decoded += '\f'; continue;
+            case 'n': decoded += '\n'; continue;
+            case 'r': decoded += '\r'; continue;
+            case 't': decoded += '\t'; continue;
+            case 'v': decoded += '\v'; continue;
+            case '0': decoded += '\0'; continue;
+        }
+        if (escaped === '\n') continue;
+        if (escaped === '\r') {
+            if (text[index + 1] === '\n') index += 1;
+            continue;
+        }
+        if (escaped === 'x') {
+            const hex = text.slice(index + 1, index + 3);
+            if (/^[0-9a-fA-F]{2}$/.test(hex)) {
+                decoded += String.fromCharCode(Number.parseInt(hex, 16));
+                index += 2;
+            } else {
+                decoded += text.slice(escapeStart, index + 1);
+            }
+            continue;
+        }
+        if (escaped === 'u') {
+            if (text[index + 1] === '{') {
+                let cursor = index + 2;
+                while (cursor < text.length
+                    && cursor < index + 8
+                    && /^[0-9a-fA-F]$/.test(text[cursor])) {
+                    cursor += 1;
+                }
+                const hex = text.slice(index + 2, cursor);
+                const codePoint = hex.length > 0 ? Number.parseInt(hex, 16) : -1;
+                if (text[cursor] === '}' && codePoint >= 0 && codePoint <= 0x10FFFF) {
+                    decoded += String.fromCodePoint(codePoint);
+                    index = cursor;
+                } else {
+                    decoded += text.slice(escapeStart, index + 1);
+                }
+                continue;
+            }
+            const hex = text.slice(index + 1, index + 5);
+            if (/^[0-9a-fA-F]{4}$/.test(hex)) {
+                decoded += String.fromCharCode(Number.parseInt(hex, 16));
+                index += 4;
+            } else {
+                decoded += text.slice(escapeStart, index + 1);
+            }
+            continue;
+        }
+        decoded += escaped;
+    }
+    return decoded;
+}
+
+/* @Codex: sniff allineato all'evidenza minima, per frammenti dichiarati non parseabili */
+function sniffMatchesModernEnvelope(text: string): boolean {
+    return ENVELOPE_SNIFF_SCHEMA_PATTERN.test(text)
+        || (ENVELOPE_SNIFF_TASK_PATTERN.test(text) && ENVELOPE_SNIFF_SUPPORT_PATTERN.test(text));
+}
+
+/* @Codex: il match usa il segmento grezzo oppure la sua singola decodifica.
+   I layer stringificati successivi restano responsabilita del walk JSON. */
+function sniffDeclaresModernEnvelope(text: string): boolean {
+    if (sniffMatchesModernEnvelope(text)) return true;
+    if (!text.includes('\\')) return false;
+    return sniffMatchesModernEnvelope(decodeJavascriptStyleEscapesOnce(text));
+}
 
 /* @Codex: contratto WUL-362 F1 - evidenza aggregata delle chiavi RAW di un
    documento JSON, letta prima della riduzione last-wins di JSON.parse. La
@@ -200,16 +352,332 @@ function scanJsonDocumentKeyEvidence(rawJson: string): JsonDocumentKeyEvidence {
     return { status: 'complete', hasAmbiguousKeys, declaresModernEnvelope };
 }
 
-/* @Codex: rilevazione canonica di un payload che dichiara l'envelope moderno, anche annidato o con case diverso */
-export function declaresModernEnvelope(value: unknown, depth = 0): boolean {
-    if (!value || typeof value !== 'object' || depth > 3) return false;
-    const record = value as Record<string, unknown>;
-    const hasEnvelopeKey = Object.keys(record).some((key) => {
-        const normalized = key.toLowerCase();
-        return normalized === 'schemaversion' || normalized === 'task';
+/* @Codex */
+function findBalancedJsonEnd(text: string, start: number): number {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = start; index < text.length; index += 1) {
+        const char = text[index];
+        if (inString) {
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (char === '\\') {
+                escaped = true;
+                continue;
+            }
+            if (char === '"') inString = false;
+            continue;
+        }
+        if (char === '"') {
+            inString = true;
+            continue;
+        }
+        if (char === '{' || char === '[') depth += 1;
+        else if (char === '}' || char === ']') {
+            depth -= 1;
+            if (depth === 0) return index;
+            if (depth < 0) return -1;
+        }
+    }
+    return -1;
+}
+
+/* @Codex WUL-362 F2: segmenti top-level non sovrapposti di un testo libero. Un
+   gruppo bilanciato non e da solo una prova di candidatura JSON: la
+   classificazione (parse o sniff) resta al chiamante, che conta nel budget solo
+   i candidati reali. Un opener senza chiusura non inghiotte il resto: il tratto
+   fino al prossimo opener resta una regione da sniffare e la scansione riprende,
+   cosi un frammento valido successivo viene comunque visitato. */
+type JsonFragmentSegment =
+    | { kind: 'balanced'; text: string }
+    | { kind: 'unparsed'; text: string };
+
+function* iterateJsonFragmentSegments(text: string): Generator<JsonFragmentSegment> {
+    let index = 0;
+    while (index < text.length) {
+        const char = text[index];
+        if (char !== '{' && char !== '[') {
+            index += 1;
+            continue;
+        }
+        const end = findBalancedJsonEnd(text, index);
+        if (end !== -1) {
+            yield { kind: 'balanced', text: text.slice(index, end + 1) };
+            index = end + 1;
+            continue;
+        }
+        const nextObject = text.indexOf('{', index + 1);
+        const nextArray = text.indexOf('[', index + 1);
+        const nextOpener = nextObject === -1
+            ? nextArray
+            : (nextArray === -1 ? nextObject : Math.min(nextObject, nextArray));
+        yield { kind: 'unparsed', text: nextOpener === -1 ? text.slice(index) : text.slice(index, nextOpener) };
+        if (nextOpener === -1) return;
+        index = nextOpener;
+    }
+}
+
+/* @Codex */
+type EnvelopeRecordVisitor = (record: Record<string, unknown>, path: ReadonlyArray<string | number>) => void;
+
+/* @Codex: attraversamento bounded condiviso di oggetti, array e stringhe annidate.
+   I percorsi attraversano anche i layer stringificati, cosi la parentela dei
+   candidati resta un confronto di prefissi. */
+function walkEnvelopeTree(
+    node: unknown,
+    path: ReadonlyArray<string | number>,
+    depth: number,
+    budget: EnvelopeScanBudget,
+    onRecord: EnvelopeRecordVisitor,
+    onSniffDeclared: () => void,
+): void {
+    if (budget.truncated) return;
+    if (node === null || node === undefined) return;
+    if (typeof node === 'string') {
+        const text = node.trim();
+        if (!text.includes('{') && !text.includes('[')) return;
+        // Le lunghezze si misurano sulla stringa grezza: il whitespace analizzato conta.
+        if (node.length > ENVELOPE_SCAN_MAX_STRING_LENGTH) {
+            budget.truncated = true;
+            return;
+        }
+        if (budget.stringParses >= ENVELOPE_SCAN_MAX_STRING_PARSES) {
+            budget.truncated = true;
+            return;
+        }
+        budget.stringParses += 1;
+        if (!consumeScanChars(budget, node.length)) return;
+        scanTextForEnvelopes(text, path, budget, onRecord, onSniffDeclared);
+        return;
+    }
+    if (typeof node !== 'object') return;
+    if (depth > ENVELOPE_SCAN_MAX_DEPTH) {
+        budget.truncated = true;
+        return;
+    }
+    if (budget.nodes >= ENVELOPE_SCAN_MAX_NODES) {
+        budget.truncated = true;
+        return;
+    }
+    budget.nodes += 1;
+    if (Array.isArray(node)) {
+        for (let index = 0; index < node.length; index += 1) {
+            walkEnvelopeTree(node[index], [...path, index], depth + 1, budget, onRecord, onSniffDeclared);
+        }
+        return;
+    }
+    const record = node as Record<string, unknown>;
+    if (declaresModernEnvelopeRecord(record)) onRecord(record, path);
+    for (const key of Object.keys(record)) {
+        walkEnvelopeTree(record[key], [...path, key], depth + 1, budget, onRecord, onSniffDeclared);
+    }
+}
+
+/* @Codex: prima il parse diretto (contenuti persistiti JSON puri), poi TUTTI i
+   frammenti non sovrapposti; un frammento dichiarato ma non parseabile passa
+   dallo sniff fail-closed. */
+function scanTextForEnvelopes(
+    text: string,
+    basePath: ReadonlyArray<string | number>,
+    budget: EnvelopeScanBudget,
+    onRecord: EnvelopeRecordVisitor,
+    onSniffDeclared: () => void,
+): void {
+    const scanParsedDocument = (rawJson: string, root: unknown, path: ReadonlyArray<string | number>) => {
+        let documentDeclares = false;
+        const onDocumentRecord: EnvelopeRecordVisitor = (record, recordPath) => {
+            documentDeclares = true;
+            onRecord(record, recordPath);
+        };
+        const onDocumentSniffDeclared = () => {
+            documentDeclares = true;
+            onSniffDeclared();
+        };
+
+        walkEnvelopeTree(root, path, 0, budget, onDocumentRecord, onDocumentSniffDeclared);
+        // @Codex WUL-362 F1: l'evidenza si legge sulle chiavi RAW, prima della
+        // riduzione last-wins di JSON.parse. Una dichiarazione moderna visibile
+        // solo nelle chiavi raw (oscurata da duplicati o collisioni) e una
+        // chiave ambigua in un documento che dichiara degradano entrambe
+        // fail-closed; un esito unknown della primitive tronca la scansione.
+        const keyEvidence = scanJsonDocumentKeyEvidence(rawJson);
+        if (keyEvidence.status === 'unknown') {
+            budget.truncated = true;
+            return;
+        }
+        if (keyEvidence.declaresModernEnvelope && !documentDeclares) onSniffDeclared();
+        if (keyEvidence.hasAmbiguousKeys && (documentDeclares || keyEvidence.declaresModernEnvelope)) {
+            onSniffDeclared();
+        }
+    };
+    try {
+        const root = JSON.parse(text) as unknown;
+        scanParsedDocument(text, root, basePath);
+        return;
+    } catch {
+        // non era JSON puro: scansione multi-frammento
+    }
+    // @Codex WUL-362 F2: nel budget frammenti contano solo i candidati reali,
+    // cioe i gruppi JSON parseabili e i segmenti con sniff moderno. Un marcatore
+    // canonico [Sx] o una parentesi bilanciata di prosa non consumano nulla. Il
+    // nono candidato reale tronca fail-closed senza essere classificato:
+    // l'evidenza gia raccolta precede il troncamento, che non diventa mai absent.
+    let countedCandidates = 0;
+    let parsedFragmentOrdinal = 0;
+    const consumeFragmentBudget = (): boolean => {
+        if (countedCandidates >= ENVELOPE_SCAN_MAX_FRAGMENTS) {
+            budget.truncated = true;
+            return false;
+        }
+        countedCandidates += 1;
+        return true;
+    };
+    for (const segment of iterateJsonFragmentSegments(text)) {
+        if (segment.kind === 'balanced') {
+            let root: unknown;
+            let parsedFragment = false;
+            try {
+                root = JSON.parse(segment.text) as unknown;
+                parsedFragment = true;
+            } catch {
+                // gruppo bilanciato non-JSON: resta solo materiale da sniffare
+            }
+            if (parsedFragment) {
+                if (!consumeFragmentBudget()) return;
+                scanParsedDocument(segment.text, root, [...basePath, `#${parsedFragmentOrdinal}`]);
+                parsedFragmentOrdinal += 1;
+                continue;
+            }
+        }
+        if (sniffDeclaresModernEnvelope(segment.text)) {
+            if (!consumeFragmentBudget()) return;
+            onSniffDeclared();
+        }
+    }
+}
+
+/* @Codex: rilevazione tri-state per il rescue legacy (contratto punto 3).
+   present blocca, unknown (limite raggiunto) blocca, solo absent consente. */
+export function detectModernEnvelopeEvidence(text: string): ModernEnvelopeEvidence {
+    const raw = text || '';
+    const trimmed = raw.trim();
+    if (!trimmed) return 'absent';
+    if (!trimmed.includes('{') && !trimmed.includes('[')) return 'absent';
+    const budget = createEnvelopeScanBudget();
+    // Lunghezza grezza, prima del parse: il whitespace analizzato conta nel budget.
+    if (!consumeScanChars(budget, raw.length)) return 'unknown';
+    let present = false;
+    scanTextForEnvelopes(trimmed, [], budget, () => {
+        present = true;
+    }, () => {
+        present = true;
     });
-    if (hasEnvelopeKey) return true;
-    return Object.values(record).some((child) => declaresModernEnvelope(child, depth + 1));
+    if (present) return 'present';
+    if (budget.truncated) return 'unknown';
+    return 'absent';
+}
+
+/* @Codex: risoluzione canonica dell'envelope per il read-path del Patient Insight.
+   Il recupero testuale a valle gira solo sullo stato legacy-text; ogni esaurimento
+   dei budget degrada fail-closed ad ambiguous. */
+export type InsightEnvelopeResolution =
+    | { status: 'usable'; envelope: AITaskParseResult<PatientInsightExtraction> }
+    | { status: 'declared-invalid' }
+    | { status: 'ambiguous' }
+    | { status: 'legacy-text' };
+
+/* @Codex */
+type InsightCandidateClass =
+    | { kind: 'usable'; envelope: AITaskParseResult<PatientInsightExtraction>; canonical: string }
+    | { kind: 'other-task-valid' }
+    | { kind: 'declared-invalid'; tolerableAncestor: boolean };
+
+/* @Codex: la serializzazione del candidato e conteggiata nel budget caratteri */
+function classifyInsightCandidate(
+    record: Record<string, unknown>,
+    budget: EnvelopeScanBudget,
+): InsightCandidateClass | null {
+    const serialized = JSON.stringify(record);
+    if (!consumeScanChars(budget, serialized.length)) return null;
+    const asInsight = parsePatientInsightExtractionResponse(serialized);
+    if (isEnvelopeUsable(asInsight)) {
+        return { kind: 'usable', envelope: asInsight, canonical: JSON.stringify(asInsight.value) };
+    }
+    const taskValue = readEnvelopeKey(record, 'task');
+    const taskId = typeof taskValue === 'string' ? taskValue.trim().toLowerCase() : null;
+    if (taskId === 'smart_import' && isEnvelopeUsable(parseSmartImportExtractionResponse(serialized))) {
+        return { kind: 'other-task-valid' };
+    }
+    if (taskId === 'document_synthesis' && isEnvelopeUsable(parseDocumentSynthesisExtractionResponse(serialized, ''))) {
+        return { kind: 'other-task-valid' };
+    }
+    // Tollerabile come antenato solo se parziale e compatibile: nessun task noto
+    // diverso da patient_insight e nessuna schemaVersion diversa da quella supportata.
+    const schemaValue = readEnvelopeKey(record, 'schemaversion');
+    const compatibleSchema = schemaValue === undefined || schemaValue === AI_TASK_EXTRACTION_SCHEMA_VERSION;
+    const compatibleTask = taskId === null || taskId === 'patient_insight';
+    return { kind: 'declared-invalid', tolerableAncestor: compatibleSchema && compatibleTask };
+}
+
+/* @Codex */
+function isStrictPathPrefix(prefix: ReadonlyArray<string | number>, path: ReadonlyArray<string | number>): boolean {
+    if (prefix.length >= path.length) return false;
+    return prefix.every((segment, index) => segment === path[index]);
+}
+
+/* @Codex */
+export function resolveInsightEnvelope(content: string): InsightEnvelopeResolution {
+    const raw = content || '';
+    const trimmed = raw.trim();
+    if (!trimmed) return { status: 'legacy-text' };
+    if (!trimmed.includes('{') && !trimmed.includes('[')) return { status: 'legacy-text' };
+
+    const budget = createEnvelopeScanBudget();
+    // Limite applicato prima del parse del root, sulla lunghezza grezza (punto 5).
+    if (!consumeScanChars(budget, raw.length)) return { status: 'ambiguous' };
+
+    const usable = new Map<string, {
+        envelope: AITaskParseResult<PatientInsightExtraction>;
+        paths: Array<ReadonlyArray<string | number>>;
+    }>();
+    const otherTaskValidPaths: Array<ReadonlyArray<string | number>> = [];
+    const declaredInvalid: Array<{ path: ReadonlyArray<string | number>; tolerableAncestor: boolean }> = [];
+    let sniffDeclared = false;
+
+    scanTextForEnvelopes(trimmed, [], budget, (record, path) => {
+        const classified = classifyInsightCandidate(record, budget);
+        if (!classified) return;
+        if (classified.kind === 'usable') {
+            const existing = usable.get(classified.canonical);
+            if (existing) existing.paths.push(path);
+            else usable.set(classified.canonical, { envelope: classified.envelope, paths: [path] });
+        } else if (classified.kind === 'other-task-valid') {
+            otherTaskValidPaths.push(path);
+        } else {
+            declaredInvalid.push({ path, tolerableAncestor: classified.tolerableAncestor });
+        }
+    }, () => {
+        sniffDeclared = true;
+    });
+
+    if (budget.truncated) return { status: 'ambiguous' };
+    if (usable.size > 1) return { status: 'ambiguous' };
+    if (usable.size === 1) {
+        if (otherTaskValidPaths.length > 0 || sniffDeclared) return { status: 'ambiguous' };
+        const single = Array.from(usable.values())[0];
+        if (!single) return { status: 'ambiguous' };
+        const tolerated = declaredInvalid.every((candidate) =>
+            candidate.tolerableAncestor
+            && single.paths.some((usablePath) => isStrictPathPrefix(candidate.path, usablePath)));
+        return tolerated ? { status: 'usable', envelope: single.envelope } : { status: 'ambiguous' };
+    }
+    if (otherTaskValidPaths.length > 0 || declaredInvalid.length > 0 || sniffDeclared) {
+        return { status: 'declared-invalid' };
+    }
+    return { status: 'legacy-text' };
 }
 
 /* @Codex */
@@ -411,19 +879,15 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
     therapyCandidates: SmartImportTherapyExtraction[];
     servicePrescriptions: SmartImportServicePrescriptionExtraction[];
 } | null {
+    // @Codex: rescue consentito solo con evidenza moderna assente (tri-state);
+    // present e unknown (scansione interrotta da un limite) bloccano entrambi.
+    if (detectModernEnvelopeEvidence(response) !== 'absent') return null;
     const extraction = extractJsonObject(response);
     if (!extraction) return null;
     const { rawJson, repairedTruncation } = extraction;
 
     try {
         const parsed = JSON.parse(rawJson) as Record<string, unknown>;
-        const keyEvidence = scanJsonDocumentKeyEvidence(rawJson);
-        if (keyEvidence.status === 'unknown' || keyEvidence.hasAmbiguousKeys) {
-        return null;
-        }
-        if (declaresModernEnvelope(parsed)) {
-            return null;
-        }
         const hasLegacySummary = Boolean(normalizeCompactText(parsed.summary_markdown ?? parsed.summary, MAX_DOCUMENT_SUMMARY_CHARS));
         const hasLegacyFields = ['quality', 'qualityLevel', 'medications', 'diagnoses', 'problemStatements', 'therapyCandidates', 'servicePrescriptions']
             .some((key) => Object.prototype.hasOwnProperty.call(parsed, key));
