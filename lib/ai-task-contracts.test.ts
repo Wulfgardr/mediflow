@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
+    __testMeasureJsonFragmentScanWork,
     AI_TASK_EXTRACTION_SCHEMA_VERSION,
     buildDocumentSynthesisExtractionPrompt,
     buildPatientInsightExtractionPrompt,
@@ -21,24 +22,26 @@ import {
 } from './ai-task-contract-prompts';
 
 /* @Codex WUL-362 R5: il contatore misura visite di caratteri, non tempo. */
-test('fragment scan bounds character visits for many unclosed openers', async () => {
-    const contracts = await import('./ai-task-contracts') as unknown as {
-        __testMeasureJsonFragmentScanWork?: (text: string) => {
-            characterVisits: number;
-            truncated: boolean;
-        };
-    };
-    const measure = contracts.__testMeasureJsonFragmentScanWork;
-    assert.equal(typeof measure, 'function');
-    if (!measure) return;
-
-    const openerCount = 4096;
-    const measured = measure('{'.repeat(openerCount));
+function assertFragmentScanWorkBound(text: string): void {
+    const measured = __testMeasureJsonFragmentScanWork(text);
     assert.equal(measured.truncated, true);
     assert.ok(
-        measured.characterVisits <= openerCount * 3,
-        `expected at most ${openerCount * 3} visits, got ${measured.characterVisits}`,
+        measured.characterVisits <= text.length * 3,
+        `expected at most ${text.length * 3} visits, got ${measured.characterVisits}`,
     );
+}
+
+test('fragment scan bounds character visits for many unclosed openers', () => {
+    assertFragmentScanWorkBound('{'.repeat(4096));
+});
+
+/* @Codex WUL-362 R5b: invarianti verdi per due famiglie avverse della review. */
+test('fragment scan bounds character visits for alternating openers', () => {
+    assertFragmentScanWorkBound('{['.repeat(2048));
+});
+
+test('fragment scan bounds character visits for openers inside an unclosed JSON string', () => {
+    assertFragmentScanWorkBound('{"' + '{'.repeat(4096) + 'text');
 });
 
 test('patient insight extraction renders local markdown sections from shared JSON contract', () => {
@@ -1379,4 +1382,31 @@ test('no evidence with exhausted depth budget stays unknown, never absent', () =
     for (let index = 0; index < 9; index += 1) nested = { layer: nested };
 
     assert.equal(detectModernEnvelopeEvidence(JSON.stringify(nested)), 'unknown');
+});
+
+/* @Codex WUL-362 R5b: nove candidati reali su otto stringhe devono bloccare
+   il rescue documentale legacy anche quando le citazioni non consumano budget. */
+test('legacy document rescue rejects nine candidates distributed over eight cited strings', () => {
+    const citations = Object.fromEntries(
+        Array.from({ length: 9 }, (_, index) => [`c${index}`, `[S${index + 1}]`]),
+    );
+    const candidates = Object.fromEntries(
+        Array.from({ length: 8 }, (_, index) => [
+            `s${index}`,
+            index === 7
+                ? `${JSON.stringify({ i: index })} text ${JSON.stringify({ i: 8 })}`
+                : JSON.stringify({ i: index }),
+        ]),
+    );
+    const response = JSON.stringify({
+        summary_markdown: '**Riassunto clinico:** storico',
+        quality: { level: 'green' },
+        diagnoses: [],
+        ...citations,
+        ...candidates,
+    });
+
+    const parsed = parseDocumentSynthesisExtractionResponse(response, 'testo OCR sintetico');
+    assert.equal(parsed.legacyContract, false);
+    assert.equal(parsed.validTask, false);
 });

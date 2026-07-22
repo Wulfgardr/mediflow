@@ -1420,6 +1420,22 @@ const CANONICAL_INSIGHT_WITH_CITATIONS = [
     '- Esami ematochimici di controllo [S9] [S10]',
 ].join('\n');
 
+/* @Codex WUL-362 R5b: fixture fedele alla distribuzione avversa della review. */
+const DISTRIBUTED_CANDIDATE_INSIGHT = JSON.stringify({
+    content: '**Riassunto clinico**: testo storico sintetico leggibile.',
+    ...Object.fromEntries(
+        Array.from({ length: 9 }, (_, index) => [`c${index}`, `[S${index + 1}]`]),
+    ),
+    ...Object.fromEntries(
+        Array.from({ length: 8 }, (_, index) => [
+            `s${index}`,
+            index === 7
+                ? `${JSON.stringify({ i: index })} text ${JSON.stringify({ i: 8 })}`
+                : JSON.stringify({ i: index }),
+        ]),
+    ),
+});
+
 test('resolver: canonical insight markdown with more than eight citations stays readable', async () => {
     const restore = await withHarness();
     try {
@@ -1481,6 +1497,26 @@ test('detection: nine real JSON candidates without evidence stay unknown', async
     const { detectModernEnvelopeEvidence } = await import('./ai-task-contracts');
     const text = Array.from({ length: 9 }, (_, index) => `{"i":${index}}`).join(' testo ');
     assert.equal(detectModernEnvelopeEvidence(text), 'unknown');
+});
+
+test('detection: cited strings share one global real-candidate budget', async () => {
+    const { detectModernEnvelopeEvidence } = await import('./ai-task-contracts');
+    assert.notEqual(detectModernEnvelopeEvidence(DISTRIBUTED_CANDIDATE_INSIGHT), 'absent');
+});
+
+test('resolver: cited strings share one global real-candidate budget', async () => {
+    const { resolveInsightEnvelope } = await import('./ai-task-contracts');
+    assert.notEqual(resolveInsightEnvelope(DISTRIBUTED_CANDIDATE_INSIGHT).status, 'legacy-text');
+});
+
+test('resolver: distributed candidate budget exhaustion never becomes structured legacy text', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        assert.notEqual(coerceInsightToReadable(DISTRIBUTED_CANDIDATE_INSIGHT).kind, 'structured');
+    } finally {
+        restore();
+    }
 });
 
 /* @Codex */

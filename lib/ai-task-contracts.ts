@@ -65,6 +65,7 @@ const ENVELOPE_SNIFF_SUPPORT_PATTERN = /["'](schemaversion|data|summary)["']\s*:
 type EnvelopeScanBudget = {
     chars: number;
     fragmentCharacterVisits: number;
+    realFragments: number;
     nodes: number;
     stringParses: number;
     truncated: boolean;
@@ -72,7 +73,14 @@ type EnvelopeScanBudget = {
 
 /* @Codex */
 function createEnvelopeScanBudget(): EnvelopeScanBudget {
-    return { chars: 0, fragmentCharacterVisits: 0, nodes: 0, stringParses: 0, truncated: false };
+    return {
+        chars: 0,
+        fragmentCharacterVisits: 0,
+        realFragments: 0,
+        nodes: 0,
+        stringParses: 0,
+        truncated: false,
+    };
 }
 
 /* @Codex */
@@ -82,6 +90,17 @@ function consumeScanChars(budget: EnvelopeScanBudget, amount: number): boolean {
         budget.truncated = true;
         return false;
     }
+    return true;
+}
+
+/* @Codex WUL-362 R5b: il limite dei candidati reali appartiene all'intera
+   scansione, non alla singola stringa o al singolo layer. */
+function consumeRealFragment(budget: EnvelopeScanBudget): boolean {
+    if (budget.realFragments >= ENVELOPE_SCAN_MAX_FRAGMENTS) {
+        budget.truncated = true;
+        return false;
+    }
+    budget.realFragments += 1;
     return true;
 }
 
@@ -504,7 +523,7 @@ function walkEnvelopeTree(
             chargedCandidateString = true;
             return true;
         };
-        scanTextForEnvelopes(text, path, budget, onRecord, onSniffDeclared, admitCandidate);
+        scanTextForEnvelopes(text, path, budget, onRecord, onSniffDeclared, admitCandidate, true);
         return;
     }
     if (typeof node !== 'object') return;
@@ -540,6 +559,7 @@ function scanTextForEnvelopes(
     onRecord: EnvelopeRecordVisitor,
     onSniffDeclared: () => void,
     admitCandidate: () => boolean = () => true,
+    chargeParsedText: boolean = false,
 ): void {
     const scanParsedDocument = (rawJson: string, root: unknown, path: ReadonlyArray<string | number>) => {
         let documentDeclares = false;
@@ -571,6 +591,7 @@ function scanTextForEnvelopes(
     try {
         const root = JSON.parse(text) as unknown;
         if (!admitCandidate()) return;
+        if (chargeParsedText && !consumeRealFragment(budget)) return;
         scanParsedDocument(text, root, basePath);
         return;
     } catch {
@@ -581,16 +602,7 @@ function scanTextForEnvelopes(
     // canonico [Sx] o una parentesi bilanciata di prosa non consumano nulla. Il
     // nono candidato reale tronca fail-closed senza essere classificato:
     // l'evidenza gia raccolta precede il troncamento, che non diventa mai absent.
-    let countedCandidates = 0;
     let parsedFragmentOrdinal = 0;
-    const consumeFragmentBudget = (): boolean => {
-        if (countedCandidates >= ENVELOPE_SCAN_MAX_FRAGMENTS) {
-            budget.truncated = true;
-            return false;
-        }
-        countedCandidates += 1;
-        return true;
-    };
     for (const segment of iterateJsonFragmentSegments(text, budget)) {
         if (segment.kind === 'balanced') {
             let root: unknown;
@@ -603,7 +615,7 @@ function scanTextForEnvelopes(
             }
             if (parsedFragment) {
                 if (!admitCandidate()) return;
-                if (!consumeFragmentBudget()) return;
+                if (!consumeRealFragment(budget)) return;
                 scanParsedDocument(segment.text, root, [...basePath, `#${parsedFragmentOrdinal}`]);
                 parsedFragmentOrdinal += 1;
                 continue;
@@ -611,7 +623,7 @@ function scanTextForEnvelopes(
         }
         if (sniffDeclaresModernEnvelope(segment.text)) {
             if (!admitCandidate()) return;
-            if (!consumeFragmentBudget()) return;
+            if (!consumeRealFragment(budget)) return;
             onSniffDeclared();
         }
     }
