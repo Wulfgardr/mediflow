@@ -285,6 +285,11 @@ test('parsePatientData recognizes birthplace dates without promoting partial or 
         parsePatientData('Mario Rossi, nato a Milano il 23/02/1932').birthDate?.toISOString().slice(0, 10),
         '1932-02-23',
     );
+    assert.equal(
+        parsePatientData('nata a L’Aquila il 29-2-2024').birthDate?.toISOString().slice(0, 10),
+        '2024-02-29',
+    );
+    assert.equal(parsePatientData('nata a Milano il referto è stato emesso il 05/03/2024').birthDate, undefined);
     assert.equal(parsePatientData('La paziente e rinata il 12/03/1990').birthDate, undefined);
     assert.equal(parsePatientData('nata12/03/1990').birthDate, undefined);
     assert.equal(parsePatientData('Referto del 05/03/2024').birthDate, undefined);
