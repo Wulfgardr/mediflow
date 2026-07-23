@@ -17,6 +17,15 @@ import path from 'path';
 
 const dataDir = process.env.DATA_DIR;
 const db = new Database(path.join(dataDir, 'medical.db'));
+// @Codex: pin scheduled-backup normalization of legacy unix-second dates.
+db.prepare(`
+  INSERT INTO ambulatories (id, name, type, is_default, created_at)
+  VALUES (?, ?, 'test', 0, ?)
+`).run(
+  'wul-331-legacy-date-ambulatory',
+  'Ambulatorio sintetico WUL-331',
+  946684800,
+);
 db.prepare(`
   INSERT INTO settings (key, value) VALUES (?, ?)
   ON CONFLICT(key) DO UPDATE SET value = excluded.value
@@ -82,6 +91,17 @@ if (artifact.format !== 'mediflow-backup' || artifact.version !== 1) {
 }
 if (!artifact.manifest || !artifact.payload) {
   throw new Error('Backup artifact is missing manifest or payload sections.');
+}
+
+// @Codex: this fails if buildDataset stops calling normalizeRowDates.
+const legacyDateRow = artifact.payload.ambulatories.find(
+  (row) => row.id === 'wul-331-legacy-date-ambulatory',
+);
+if (!legacyDateRow) {
+  throw new Error('Synthetic legacy-date ambulatory is missing from the backup artifact.');
+}
+if (legacyDateRow.createdAt !== '2000-01-01T00:00:00.000Z') {
+  throw new Error(`Legacy unix-second date was not normalized: ${JSON.stringify(legacyDateRow.createdAt)}`);
 }
 NODE
 
