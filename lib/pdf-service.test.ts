@@ -290,6 +290,8 @@ test('parsePatientData recognizes birthplace dates without promoting partial or 
         '2024-02-29',
     );
     assert.equal(parsePatientData('nata a Milano il referto è stato emesso il 05/03/2024').birthDate, undefined);
+    assert.equal(parsePatientData('nata a Milano il il 05/03/2024').birthDate, undefined);
+    assert.equal(parsePatientData('nata a Milano il controllo è avvenuto il 05/03/2024').birthDate, undefined);
     assert.equal(parsePatientData('La paziente e rinata il 12/03/1990').birthDate, undefined);
     assert.equal(parsePatientData('nata12/03/1990').birthDate, undefined);
     assert.equal(parsePatientData('Referto del 05/03/2024').birthDate, undefined);
