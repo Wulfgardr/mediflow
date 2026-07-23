@@ -862,7 +862,7 @@ export function parsePatientData(text: string): ExtractedPatientData {
     // Only keyword-anchored dates qualify: an unanchored fallback would promote the first
     // date in the document (visit/print/report date) to birth date, which is clinically
     // worse than leaving birthDate empty.
-    const dateKeywords = /\b(?:nato|nata|nascita)\b(?:\s+a\s+(?:(?!\bil\b)[A-Za-zÀ-ÖØ-öø-ÿ'\u2019 -]){2,80}?\s+il)?(?:\s+il)?\s*[:\.]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/i;
+    const dateKeywords = /\b(?:nato|nata|nascita)\b(?:\s+a\s+(?:(?!\bil\b)[A-Za-zÀ-ÖØ-öø-ÿ'\u2019 -]){2,80}?\s+il|\s+il)?\s*[:\.]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/i;
     const dateMatch = cleanText.match(dateKeywords);
     if (dateMatch) {
         const [, dateStr] = dateMatch;
