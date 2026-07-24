@@ -12,10 +12,18 @@ final class MediFlowMobileAppUITests: XCTestCase {
     }
 
     /* @Codex */
-    private func launch(seedPatients: Bool = false, lockedPatientFields: Bool = false, section: String? = nil) {
+    private func launch(
+        seedPatients: Bool = false,
+        lockedPatientFields: Bool = false,
+        section: String? = nil,
+        dynamicTypeSize: String? = nil
+    ) {
         if seedPatients { app.launchEnvironment["MEDIFLOW_APPLE_UITEST_PATIENTS"] = "1" }
         if lockedPatientFields { app.launchEnvironment["MEDIFLOW_APPLE_UITEST_LOCKED_PATIENT_FIELDS"] = "1" }
         if let section { app.launchEnvironment["MEDIFLOW_APPLE_INITIAL_SECTION"] = section }
+        if let dynamicTypeSize {
+            app.launchEnvironment["MEDIFLOW_APPLE_UITEST_DYNAMIC_TYPE_SIZE"] = dynamicTypeSize
+        }
         app.launch()
     }
 
@@ -56,6 +64,94 @@ final class MediFlowMobileAppUITests: XCTestCase {
                 backButton.tap()
             }
         }
+    }
+
+    // @Codex #142: the outer project sidebar must overlay the iPad patient workspace.
+    func testProjectSidebarPreservesPatientWorkspaceWidthOnIPad() {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            XCTFail("This layout contract must run on iPad.")
+            return
+        }
+
+        launch(seedPatients: true, section: "modules")
+        let patientWorkspace = sectionView("clinical-workspace-patients-view")
+        XCTAssertTrue(patientWorkspace.waitForExistence(timeout: 20))
+        let workspaceFrameBeforeOverlay = patientWorkspace.frame
+
+        let navigationButtons = app.navigationBars.buttons
+        XCTAssertGreaterThan(navigationButtons.count, 0, "iPad should expose the system sidebar control")
+        navigationButtons.element(boundBy: 0).tap()
+
+        let projectSidebar = sectionView("clinical-workspace-project-sidebar")
+        XCTAssertTrue(projectSidebar.waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            sectionView("clinical-workspace-patients-view").exists,
+            "Opening the project sidebar must preserve the patient workspace behind the overlay"
+        )
+        let workspaceFrameWithOverlay = patientWorkspace.frame
+        XCTAssertEqual(
+            workspaceFrameWithOverlay.minX,
+            workspaceFrameBeforeOverlay.minX,
+            accuracy: 2,
+            "Opening the overlay must not shift the patient workspace"
+        )
+        XCTAssertEqual(
+            workspaceFrameWithOverlay.width,
+            workspaceFrameBeforeOverlay.width,
+            accuracy: 2,
+            "Opening the overlay must not compress the patient workspace"
+        )
+        let overlayEvidence = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        overlayEvidence.name = "issue-142-project-sidebar-overlay"
+        overlayEvidence.lifetime = .keepAlways
+        add(overlayEvidence)
+
+        app.buttons["Agenda"].firstMatch.tap()
+        XCTAssertTrue(sectionView("clinical-workspace-agenda-view").waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            projectSidebar.waitForNonExistence(timeout: 5),
+            "Selecting a destination should dismiss the project sidebar"
+        )
+    }
+
+    // @Codex #142: AX Dynamic Type must select the existing single-column path.
+    func testAccessibilityDynamicTypeUsesSinglePatientColumnOnIPad() {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            XCTFail("This layout contract must run on iPad.")
+            return
+        }
+
+        launch(
+            seedPatients: true,
+            section: "modules",
+            dynamicTypeSize: "accessibility5"
+        )
+        let initialEvidence = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        initialEvidence.name = "issue-142-ax5-initial-layout"
+        initialEvidence.lifetime = .keepAlways
+        add(initialEvidence)
+
+        let patientWorkspace = sectionView("clinical-workspace-patients-view")
+        XCTAssertTrue(patientWorkspace.waitForExistence(timeout: 20))
+        let patient = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(patient.waitForExistence(timeout: 10))
+        XCTAssertGreaterThan(
+            patient.frame.width,
+            patientWorkspace.frame.width * 0.75,
+            "AX5 must give the patient list one full content column, not a fixed split column"
+        )
+        XCTAssertGreaterThan(
+            patient.frame.height,
+            100,
+            "The deterministic AX5 override must produce the accessibility row geometry"
+        )
+        patient.tap()
+        XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 10))
+
+        let detailEvidence = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        detailEvidence.name = "issue-142-ax5-single-layer-detail"
+        detailEvidence.lifetime = .keepAlways
+        add(detailEvidence)
     }
 
     func testTabBarNavigatesBetweenSections() {

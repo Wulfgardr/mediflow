@@ -192,7 +192,9 @@ struct PairedPatientsWorkspaceView: View {
         #if os(macOS)
         return true
         #else
-        return horizontalSizeClass == .regular
+        // @Codex #142: AX Dynamic Type needs the single-layer patient path;
+        // a fixed-width list beside detail would otherwise create two compressed columns.
+        return horizontalSizeClass == .regular && !dynamicTypeSize.isAccessibilitySize
         #endif
     }
 
