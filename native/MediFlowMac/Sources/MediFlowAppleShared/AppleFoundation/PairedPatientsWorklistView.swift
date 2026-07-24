@@ -233,6 +233,7 @@ struct PairedPatientsWorklistView: View {
                         }
                         .buttonStyle(.plain)
                         .modifier(LumeRigaListaModifier(isSelected: model.selectedPatient?.id == patient.id))
+                        .accessibilityAddTraits(model.selectedPatient?.id == patient.id ? .isSelected : [])
                         .accessibilityIdentifier("patient-cell-\(patient.id)")
                         #endif
                     }
@@ -337,11 +338,6 @@ struct PairedPatientsWorklistView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("patient-cell-updated-\(patient.id)")
             }
-            if model.selectedPatient?.id == patient.id {
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tint)
-            }
         }
     }
 
@@ -375,26 +371,44 @@ struct PairedPatientsWorklistView: View {
                     .accessibilityIdentifier("patient-search-clear")
                 }
             }
-            HStack(spacing: 10) {
-                Picker("Stato", selection: $patientViewMode) {
-                    Text("Attivi").tag(PatientListViewMode.active)
-                    Text("Archiviati").tag(PatientListViewMode.archived)
-                    Text("Cestino").tag(PatientListViewMode.trash)
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 8) {
+                    patientViewModePicker
+                    patientSortMenu
                 }
-                .pickerStyle(.segmented)
-                .accessibilityIdentifier("patient-view-mode")
-                Menu {
-                    Picker("Ordina", selection: $patientSortMode) {
-                        Text("Recenti").tag(PatientListSortMode.recent)
-                        Text("Alfabetico").tag(PatientListSortMode.alpha)
-                    }
-                } label: {
-                    Image(systemName: "arrow.up.arrow.down")
-                        .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                HStack(spacing: 10) {
+                    patientViewModePicker
+                    patientSortMenu
                 }
-                .accessibilityIdentifier("patient-sort-menu")
             }
         }
+    }
+
+    /* @Codex */
+    private var patientViewModePicker: some View {
+        Picker("Stato", selection: $patientViewMode) {
+            Text("Attivi").tag(PatientListViewMode.active)
+            Text("Archiviati").tag(PatientListViewMode.archived)
+            Text("Cestino").tag(PatientListViewMode.trash)
+        }
+        .pickerStyle(.segmented)
+        .accessibilityIdentifier("patient-view-mode")
+    }
+
+    /* @Codex */
+    private var patientSortMenu: some View {
+        Menu {
+            Picker("Ordina", selection: $patientSortMode) {
+                Text("Recenti").tag(PatientListSortMode.recent)
+                Text("Alfabetico").tag(PatientListSortMode.alpha)
+            }
+        } label: {
+            Label("Ordina", systemImage: "arrow.up.arrow.down")
+        }
+        .accessibilityLabel("Ordina pazienti")
+        .accessibilityIdentifier("patient-sort-menu")
     }
 
     @ViewBuilder
