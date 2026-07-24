@@ -905,6 +905,267 @@ test('extractJsonObject repairs truncation inside JSON strings', () => {
     }
 });
 
+test('document synthesis rejects a second complete JSON envelope', () => {
+    const primary = JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'document_synthesis',
+        summary: 'Primo envelope valido',
+        data: {
+            qualityLevel: 'green',
+            medications: [],
+            diagnoses: [{
+                code: 'I10',
+                description: 'Ipertensione essenziale',
+                system: 'ICD-10',
+                confidence: 'high',
+                evidence: 'Diagnosi esplicita nel documento',
+            }],
+            problemStatements: [],
+            therapyCandidates: [],
+            servicePrescriptions: [],
+        },
+    });
+    const conflicting = JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'smart_import',
+        summary: 'Secondo envelope conflittuale',
+        data: {},
+    });
+
+    const parsed = parseDocumentSynthesisExtractionResponse(`${primary}\n${conflicting}`, 'testo OCR');
+
+    assert.equal(parsed.validJson, true);
+    assert.equal(parsed.validTask, false);
+    assert.equal(isEnvelopeUsable(parsed), false);
+});
+
+test('document synthesis rejects every trailing JSON root or incomplete root prefix', () => {
+    const primary = JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'document_synthesis',
+        summary: 'Primo envelope valido',
+        data: {
+            qualityLevel: 'green',
+            medications: [],
+            diagnoses: [],
+            problemStatements: [],
+            therapyCandidates: [],
+            servicePrescriptions: [],
+        },
+    });
+    const trailingValues = [
+        '[1,2,3]',
+        '"nota JSON separata"',
+        '42',
+        'true',
+        'tru',
+        'nu',
+        '-',
+        '[tru',
+        '[nu',
+        '{"task":',
+        '```json\n{"schemaVersion":"mediflow.ai.extract.v1","task":"smart_import","data":{}}\n```',
+    ];
+
+    for (const trailing of trailingValues) {
+        const parsed = parseDocumentSynthesisExtractionResponse(`${primary}\n${trailing}`, 'testo OCR');
+
+        assert.equal(parsed.validTask, false, trailing);
+        assert.equal(isEnvelopeUsable(parsed), false, trailing);
+    }
+});
+
+test('document synthesis rejects JSON roots outside a completed JSON fence', () => {
+    const fencedPrimary = `\`\`\`json
+${JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'document_synthesis',
+        summary: 'Primo envelope recintato',
+        data: {
+            qualityLevel: 'green',
+            medications: [],
+            diagnoses: [],
+            problemStatements: [],
+            therapyCandidates: [],
+            servicePrescriptions: [],
+        },
+    })}
+\`\`\``;
+    const trailingValues = [
+        JSON.stringify({ schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION, task: 'smart_import', data: {} }),
+        JSON.stringify({ schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION, task: 'document_synthesis', data: {} }),
+        '[1,2,3]',
+        '{"task":',
+    ];
+
+    for (const trailing of trailingValues) {
+        const parsed = parseDocumentSynthesisExtractionResponse(`${fencedPrimary}\n${trailing}`, 'testo OCR');
+
+        assert.equal(parsed.validTask, false, trailing);
+        assert.equal(isEnvelopeUsable(parsed), false, trailing);
+    }
+});
+
+test('document synthesis rejects roots before and inside successive JSON fences', () => {
+    const envelope = JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'document_synthesis',
+        summary: 'Envelope sintetico',
+        data: {
+            qualityLevel: 'green',
+            medications: [],
+            diagnoses: [],
+            problemStatements: [],
+            therapyCandidates: [],
+            servicePrescriptions: [],
+        },
+    });
+    const cases = [
+        `${envelope}\n\`\`\`json\n${envelope}\n\`\`\``,
+        `\`\`\`json\n${envelope}\n\`\`\`\n\`\`\`json\n${envelope}\n\`\`\``,
+    ];
+
+    for (const response of cases) {
+        const parsed = parseDocumentSynthesisExtractionResponse(response, 'testo OCR');
+
+        assert.equal(parsed.validTask, false);
+        assert.equal(isEnvelopeUsable(parsed), false);
+    }
+});
+
+test('document synthesis rejects primitive JSON roots and prefixes before a fence', () => {
+    const envelope = JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'document_synthesis',
+        summary: 'Envelope sintetico',
+        data: {
+            qualityLevel: 'green',
+            medications: [],
+            diagnoses: [],
+            problemStatements: [],
+            therapyCandidates: [],
+            servicePrescriptions: [],
+        },
+    });
+    const fence = `\`\`\`json\n${envelope}\n\`\`\``;
+    const prefixes = ['"nota"', '42', 'true', 'null', 'tru', 'nu', 'truo', '-'];
+
+    for (const prefix of prefixes) {
+        const parsed = parseDocumentSynthesisExtractionResponse(`${prefix}\n${fence}`, 'testo OCR');
+
+        assert.equal(parsed.validTask, false, prefix);
+        assert.equal(isEnvelopeUsable(parsed), false, prefix);
+    }
+});
+
+test('document synthesis rejects primitive JSON roots and prefixes in a prior fence', () => {
+    const envelope = JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'document_synthesis',
+        summary: 'Envelope sintetico',
+        data: {
+            qualityLevel: 'green',
+            medications: [],
+            diagnoses: [],
+            problemStatements: [],
+            therapyCandidates: [],
+            servicePrescriptions: [],
+        },
+    });
+    const prefixes = ['"nota"', '42', 'true', 'null', 'truo', 'nu', '-'];
+
+    for (const prefix of prefixes) {
+        const response = `\`\`\`json\n${prefix}\n\`\`\`\n\`\`\`json\n${envelope}\n\`\`\``;
+        const parsed = parseDocumentSynthesisExtractionResponse(response, 'testo OCR');
+
+        assert.equal(parsed.validTask, false, prefix);
+        assert.equal(isEnvelopeUsable(parsed), false, prefix);
+    }
+});
+
+test('document synthesis rejects primitive JSON prefixes in a second fence', () => {
+    const envelope = JSON.stringify({
+        schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+        task: 'document_synthesis',
+        summary: 'Envelope sintetico',
+        data: {
+            qualityLevel: 'green',
+            medications: [],
+            diagnoses: [],
+            problemStatements: [],
+            therapyCandidates: [],
+            servicePrescriptions: [],
+        },
+    });
+    const prefixes = ['tru', 'nu', 'truo', '-'];
+
+    for (const prefix of prefixes) {
+        const response = `\`\`\`json\n${envelope}\n\`\`\`\n\`\`\`json\n${prefix}\n\`\`\``;
+        const parsed = parseDocumentSynthesisExtractionResponse(response, 'testo OCR');
+
+        assert.equal(parsed.validTask, false, prefix);
+        assert.equal(isEnvelopeUsable(parsed), false, prefix);
+    }
+});
+
+test('all task parsers reject a suffix after a repaired first JSON fence', () => {
+    const envelopes = [
+        {
+            parse: (response: string) => parsePatientInsightExtractionResponse(response),
+            envelope: {
+                schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+                task: 'patient_insight',
+                summary: 'Envelope sintetico',
+                data: { currentState: [], alerts: [], nextSteps: [], gaps: [] },
+            },
+        },
+        {
+            parse: (response: string) => parseSmartImportExtractionResponse(response),
+            envelope: {
+                schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+                task: 'smart_import',
+                summary: 'Envelope sintetico',
+                data: { diagnoses: [], therapies: [], servicePrescriptions: [] },
+            },
+        },
+        {
+            parse: (response: string) => parseDocumentSynthesisExtractionResponse(response, 'testo OCR'),
+            envelope: {
+                schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
+                task: 'document_synthesis',
+                summary: 'Envelope sintetico',
+                data: {
+                    qualityLevel: 'green',
+                    medications: [],
+                    diagnoses: [],
+                    problemStatements: [],
+                    therapyCandidates: [],
+                    servicePrescriptions: [],
+                },
+            },
+        },
+    ];
+    const suffixes = ['{}', '[tru', '[nu', '"nota"', '42', 'true', 'null', 'tru', 'nu', 'truo', '-'];
+
+    for (const { parse, envelope } of envelopes) {
+        const truncated = JSON.stringify(envelope).slice(0, -1);
+        const firstFence = `\`\`\`json\n${truncated}\n\`\`\``;
+        assert.equal(isEnvelopeUsable(parse(firstFence)), true);
+
+        for (const suffix of suffixes) {
+            for (const response of [
+                `${firstFence}\n${suffix}`,
+                `${firstFence}\n\`\`\`json\n${suffix}\n\`\`\``,
+                `${firstFence}\n\`\`\`json\n${suffix}\n\`\`\`\nNota finale`,
+            ]) {
+                const parsed = parse(response);
+                assert.equal(parsed.validTask, false, `${envelope.task}: ${suffix}`);
+                assert.equal(isEnvelopeUsable(parsed), false, `${envelope.task}: ${suffix}`);
+            }
+        }
+    }
+});
+
 test('extractJsonObject preserves punctuation inside a truncated string', () => {
     const extraction = extractJsonObject('{"note":"febbre, ');
 

@@ -737,6 +737,12 @@ export function resolveInsightEnvelope(content: string): InsightEnvelopeResoluti
     if (usable.size > 1) return { status: 'ambiguous' };
     if (usable.size === 1) {
         if (otherTaskValidPaths.length > 0 || sniffDeclared) return { status: 'ambiguous' };
+        const root = extractJsonObject(trimmed);
+        if (root?.hasAmbiguousLeadingJsonRoot
+            || hasAmbiguousTrailingJsonRoot(root?.trailingContent)
+            || hasAmbiguousIncompleteArrayPrefix(trimmed)) {
+            return { status: 'ambiguous' };
+        }
         const single = Array.from(usable.values())[0];
         if (!single) return { status: 'ambiguous' };
         const tolerated = declaredInvalid.every((candidate) =>
@@ -955,6 +961,7 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
     const extraction = extractJsonObject(response);
     if (!extraction) return null;
     const { rawJson, repairedTruncation } = extraction;
+    if (extraction.hasAmbiguousLeadingJsonRoot || hasAmbiguousTrailingJsonRoot(extraction.trailingContent)) return null;
 
     try {
         const parsed = JSON.parse(rawJson) as Record<string, unknown>;
@@ -1035,6 +1042,19 @@ function parseEnvelope(
     }
 
     const { rawJson, repairedTruncation } = extraction;
+
+    // @Codex: un secondo root JSON rende la risposta ambigua. Non scegliere il
+    // primo envelope quando il modello ha prodotto una seconda risposta.
+    if (extraction.hasAmbiguousLeadingJsonRoot || hasAmbiguousTrailingJsonRoot(extraction.trailingContent)) {
+        return {
+            rawJson,
+            validJson: true,
+            validTask: false,
+            repairedTruncation,
+            summary: '',
+            data: {},
+        };
+    }
 
     try {
         const parsed = JSON.parse(rawJson) as Record<string, unknown>;
@@ -1303,6 +1323,54 @@ function normalizeSmartImportTherapy(value: unknown): SmartImportTherapyExtracti
 export interface ExtractedJsonObject {
     rawJson: string;
     repairedTruncation: boolean;
+    trailingContent?: string;
+    hasAmbiguousLeadingJsonRoot?: boolean;
+}
+
+// @Codex: dopo un envelope completo, un altro valore JSON o il suo prefisso
+// incompleto e ambiguo. Il parser non sceglie mai arbitrariamente il primo.
+function hasAmbiguousTrailingJsonRoot(trailingContent: string | undefined): boolean {
+    if (!trailingContent?.trim()) return false;
+    if (extractJsonObject(trailingContent)) return true;
+
+    for (const fence of trailingContent.matchAll(/```(?:json)?\s*([\s\S]*?)```/ig)) {
+        if (hasAmbiguousJsonRootStart(fence[1])) return true;
+    }
+
+    return hasAmbiguousJsonRootStart(trailingContent);
+}
+
+function hasAmbiguousJsonRootStart(content: string): boolean {
+    const unfenced = content
+        .trim()
+        .replace(/^```(?:json)?\s*/i, '')
+        .trimStart();
+    if (!unfenced) return false;
+    if (unfenced.startsWith('{')) return true;
+
+    if (unfenced.startsWith('[')) {
+        const arrayBody = unfenced.slice(1).trimStart();
+        return arrayBody.length === 0
+            || arrayBody.startsWith(']')
+            || /^[\[{"\d-]/.test(arrayBody)
+            || /^(?:true\b|false\b|null\b|t(?:r(?:u(?:e)?)?)?|f(?:a(?:l(?:s(?:e)?)?)?)?|n(?:u(?:l(?:l)?)?)?)/.test(arrayBody);
+    }
+
+    return /^(?:"|-?\d|true(?:\s|$)|false(?:\s|$)|null(?:\s|$)|t(?:r(?:u|uo)?)?$|f(?:a(?:l(?:s)?)?)?$|n(?:u)?$|-$)/.test(unfenced);
+}
+
+function hasAmbiguousJsonBeforeRoot(content: string): boolean {
+    if (hasAmbiguousTrailingJsonRoot(content)) return true;
+
+    for (const fence of content.matchAll(/```(?:json)?\s*([\s\S]*?)```/ig)) {
+        if (hasAmbiguousTrailingJsonRoot(fence[1])) return true;
+    }
+
+    return false;
+}
+
+function hasAmbiguousIncompleteArrayPrefix(content: string): boolean {
+    return /(?:^|```(?:json)?\s*)\s*\[(?:tru|truo|nu|-)(?=\s|```|\{|$)/im.test(content);
 }
 
 interface JsonContainer {
@@ -1373,11 +1441,17 @@ function isParsableJsonObject(value: string, requireMember = false): boolean {
 export function extractJsonObject(response: string): ExtractedJsonObject | null {
     const clean = stripModelArtifacts(response);
     const fenced = clean.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    // @Codex: usa lo stesso scanner per risposte libere e blocchi JSON recintati.
     const fencedCandidate = fenced?.[1]?.trim();
-    const candidate = fencedCandidate && /[\[{]/.test(fencedCandidate)
-        ? fencedCandidate
-        : clean;
+    const fenceStart = fenced?.index ?? -1;
+    const hasRootBeforeFence = fenceStart >= 0
+        && hasAmbiguousTrailingJsonRoot(clean.slice(0, fenceStart));
+    // @Codex: un fence puo isolare una riparazione di troncamento, ma non puo
+    // nascondere un root precedente o il testo dopo la chiusura del fence.
+    const usesFencedCandidate = Boolean(fencedCandidate && /[\[{]/.test(fencedCandidate) && !hasRootBeforeFence);
+    const candidate = usesFencedCandidate ? fencedCandidate! : clean;
+    const trailingAfterCandidate = usesFencedCandidate && fenced
+        ? clean.slice((fenced.index ?? 0) + fenced[0].length)
+        : '';
     let rootStart = -1;
     let searchStart = 0;
 
@@ -1392,10 +1466,23 @@ export function extractJsonObject(response: string): ExtractedJsonObject | null 
         }
 
         const arrayCandidate = extractBalancedJsonValue(candidate, nextBracket);
-        if (!arrayCandidate) return null;
+        if (!arrayCandidate) {
+            const arrayPrefix = candidate.slice(nextBracket + 1).trimStart();
+            if (!/^(?:tru|truo|nu|-)(?=\s|```|\{|$)/.test(arrayPrefix)) return null;
+            const nextObject = candidate.indexOf('{', nextBracket + 1);
+            if (nextObject === -1) return null;
+            rootStart = nextObject;
+            break;
+        }
         try {
             if (Array.isArray(JSON.parse(arrayCandidate))) {
-                return { rawJson: arrayCandidate, repairedTruncation: false };
+                return {
+                    rawJson: arrayCandidate,
+                    repairedTruncation: false,
+                    trailingContent: `${candidate.slice(nextBracket + arrayCandidate.length)}${trailingAfterCandidate}`,
+                    hasAmbiguousLeadingJsonRoot: hasRootBeforeFence
+                        || hasAmbiguousJsonBeforeRoot(candidate.slice(0, nextBracket)),
+                };
             }
         } catch {
             // Un blocco bilanciato ma non JSON puo essere un marcatore come [S1].
@@ -1445,6 +1532,9 @@ export function extractJsonObject(response: string): ExtractedJsonObject | null 
                     return {
                         rawJson: fragment.slice(0, index + 1),
                         repairedTruncation: false,
+                        trailingContent: `${fragment.slice(index + 1)}${trailingAfterCandidate}`,
+                        hasAmbiguousLeadingJsonRoot: hasRootBeforeFence
+                            || hasAmbiguousJsonBeforeRoot(candidate.slice(0, rootStart)),
                     };
                 }
             } else {
@@ -1472,6 +1562,9 @@ export function extractJsonObject(response: string): ExtractedJsonObject | null 
         return {
             rawJson: repaired,
             repairedTruncation: true,
+            trailingContent: trailingAfterCandidate,
+            hasAmbiguousLeadingJsonRoot: hasRootBeforeFence
+                || hasAmbiguousJsonBeforeRoot(candidate.slice(0, rootStart)),
         };
     }
 
@@ -1484,6 +1577,9 @@ export function extractJsonObject(response: string): ExtractedJsonObject | null 
             return {
                 rawJson: fallback,
                 repairedTruncation: true,
+                trailingContent: trailingAfterCandidate,
+                hasAmbiguousLeadingJsonRoot: hasRootBeforeFence
+                    || hasAmbiguousJsonBeforeRoot(candidate.slice(0, rootStart)),
             };
         }
     }

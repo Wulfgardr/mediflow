@@ -154,7 +154,7 @@ export async function analyzeDocumentContent(rawMarkdown: string): Promise<Docum
 }
 
 /**
- * Synthesize a document, persist the insight and auto-merge explicit ICD diagnoses.
+ * Synthesize a document and persist review material without writing diagnoses.
  */
 export async function synthesizeDocument(
     rawMarkdown: string,
@@ -208,7 +208,7 @@ export async function synthesizeDocument(
         existingDiagnoses: existingDiagnoses.diagnoses,
         existingDiagnosesRaw: patient.diagnoses,
     });
-    const { diagnoses, appliedCodes } = autofillPlan;
+    const { appliedCodes } = autofillPlan;
 
     const insight: DocumentInsight = {
         id: uuid(),
@@ -256,7 +256,6 @@ export async function synthesizeDocument(
 
     await db.patients.update(patientId, {
         documentInsights: nextInsights,
-        diagnoses: appliedCodes.length > 0 ? diagnoses : undefined,
         version: patient.version,
         updatedAt: new Date()
     });
