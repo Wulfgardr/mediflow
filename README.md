@@ -40,6 +40,12 @@ configurato. Se la funzione è abilitata, l'AI può aggiornare una sintesi local
 Non aggiunge diagnosi, terapie o altri dati clinici strutturati senza una
 conferma esplicita.
 
+Il contratto proposto dello scaffold separa sei passaggi: pipeline locale,
+proposta strutturata, chiarimento, anteprima, autorizzazione contestuale ed
+eventuale scrittura auditata. I primi passaggi non richiedono un servizio
+esterno. L'ultimo resta una funzione applicativa specifica, non un accesso
+diretto del modello al database.
+
 Nel contesto territoriale italiano questo significa soprattutto togliere
 attrito: aprire la scheda, capire dove si è, ritrovare una fonte, distinguere una
 terapia da una prestazione prescritta e preparare il passaggio successivo senza
@@ -156,6 +162,12 @@ Il controllo dell'invio esterno resta oggi chiuso. Nessun plug-in esterno accede
 direttamente al database. Il flusso separa proposta, chiarimento e scrittura
 autorizzata; la scrittura diretta tramite modello non è consegnata.
 
+L'[ADR 0086](./docs/adr/0086-intelligent-scaffold-and-graded-automation-boundary.md)
+propone il contratto comune per Document Ops, riconciliazione anagrafica, sunto
+clinico, Atena e provider. Distingue le funzioni presenti dalla roadmap. La
+futura inbox conversazionale e l'automazione graduata non sono funzioni live
+della 0.8.
+
 ## Confini dichiarati
 
 MediFlow non racconta più di quanto possa dimostrare.
@@ -175,6 +187,8 @@ MediFlow non racconta più di quanto possa dimostrare.
   prescrittivo diretto.
 - **L'AI resta review-first.** Può aiutare a leggere e organizzare, non
   sostituisce revisione, giudizio clinico o responsabilità professionale.
+- **La inbox intelligente non è consegnata.** Le route conversazionali di base
+  non costituiscono un flusso di chiarimento o conversione in record clinici.
 
 Delle 43 capability per cui la parity è un obiettivo, 30 sono complete e 13
 parziali; altre 21 restano intenzionalmente host-only. La matrice fa fede sui
