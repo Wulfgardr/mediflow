@@ -185,13 +185,89 @@ final class MediFlowMobileAppUITests: XCTestCase {
         )
     }
 
-    func testPatientsSectionShowsConsultationState() {
+    /* @Codex */
+    func testPatientsSectionKeepsConnectionFormBehindSetupSheet() {
         launch()
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 10))
+
         XCTAssertTrue(
-            sectionView("homebase-connection-state").waitForExistence(timeout: 10),
-            "The clinical workspace should show the home-base connection state"
+            sectionView("homebase-connection-banner").waitForExistence(timeout: 10),
+            "A blocking connection state should use a concise recovery banner"
         )
+        XCTAssertFalse(
+            app.textFields["homebase-server-url-field"].exists,
+            "Connection credentials must not occupy the initial patient viewport"
+        )
+        attachScreenshot(named: "issue-143-blocked-banner")
+
+        let setup = app.buttons["homebase-configuration-button"]
+        XCTAssertTrue(setup.waitForExistence(timeout: 10))
+        setup.tap()
+
+        XCTAssertTrue(
+            sectionView("homebase-configuration-sheet").waitForExistence(timeout: 10),
+            "The setup action should open the system sheet"
+        )
+        XCTAssertTrue(app.textFields["homebase-server-url-field"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.secureTextFields["homebase-password-field"].exists)
+        attachScreenshot(named: "issue-143-connection-sheet")
+
+        let dissociate = app.buttons["homebase-clear-pairing-button"]
+        for _ in 0..<8 where !dissociate.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(
+            dissociate.isHittable,
+            "Long setup content should remain reachable by scrolling, including at accessibility text sizes"
+        )
+        attachScreenshot(named: "issue-143-connection-sheet-bottom")
+
+        let close = app.buttons["homebase-configuration-close-button"]
+        XCTAssertTrue(close.waitForExistence(timeout: 10), "The setup sheet needs an accessible close action")
+        close.tap()
+        XCTAssertTrue(
+            app.textFields["homebase-server-url-field"].waitForNonExistence(timeout: 5),
+            "Closing setup should return to the patient home without leaving the form visible"
+        )
+    }
+
+    /* @Codex */
+    func testUsablePatientHomeShowsWorklistBeforeConnectionSetup() {
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
+
+        XCTAssertTrue(app.buttons["new-patient-button"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.textFields["patient-search-field"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["patient-cell-uitest-1"].waitForExistence(timeout: 10))
+        XCTAssertTrue(sectionView("patient-view-mode").exists)
+        XCTAssertFalse(
+            sectionView("homebase-connection-banner").exists,
+            "A usable worklist should not show a technical connection banner"
+        )
+        XCTAssertFalse(
+            app.textFields["homebase-server-url-field"].exists,
+            "The credentials form should remain absent until setup is requested"
+        )
+        XCTAssertFalse(
+            app.buttons["homebase-configuration-button"].exists,
+            "A usable patient home should not add a connection action to the navigation bar"
+        )
+        attachScreenshot(named: "issue-143-usable-patient-home")
+
+        let visibleTabs = app.tabBars.firstMatch.buttons.allElementsBoundByIndex
+        XCTAssertEqual(visibleTabs.count, 5, "Compact navigation should expose four sections and system overflow")
+        visibleTabs[4].tap()
+
+        let overflowDestinations = app.tables.firstMatch.cells
+        XCTAssertEqual(overflowDestinations.count, 2, "Compact overflow should contain Scale and Settings")
+        overflowDestinations.element(boundBy: 1).tap()
+        XCTAssertTrue(sectionView("clinical-workspace-settings-view").waitForExistence(timeout: 10))
+
+        let connection = app.buttons["settings-mediflow-connection-button"]
+        XCTAssertTrue(connection.waitForExistence(timeout: 10))
+        attachScreenshot(named: "issue-143-settings-entry")
+        connection.tap()
+        XCTAssertTrue(app.textFields["homebase-server-url-field"].waitForExistence(timeout: 10))
     }
 
     func testPatientSearchFiltersTheList() {
@@ -232,6 +308,16 @@ final class MediFlowMobileAppUITests: XCTestCase {
             "The selected patient row should expose its state without a decorative chevron"
         )
         attachScreenshot(named: "issue-145-selected-patient")
+
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            let disclosure = app.buttons["Espandi dati paziente"]
+            XCTAssertTrue(disclosure.waitForExistence(timeout: 5))
+            XCTAssertEqual(disclosure.value as? String, "Compresso")
+            disclosure.tap()
+            let expandedDisclosure = app.buttons["Comprimi dati paziente"]
+            XCTAssertTrue(expandedDisclosure.waitForExistence(timeout: 5))
+            XCTAssertEqual(expandedDisclosure.value as? String, "Espanso")
+        }
 
         // Detail renders the name and the decoded exemptions (ExemptionCodesCodec).
         XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 10),
