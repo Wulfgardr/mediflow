@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
   distDir,
   output: "standalone",
   /* @Codex */
+  outputFileTracingIncludes: {
+    "/*": [
+      "./node_modules/sharp/**/*",
+      "./node_modules/@img/**/*",
+    ],
+  },
+  /* @Codex */
   outputFileTracingExcludes: {
     "/*": [
       "./*.db",
