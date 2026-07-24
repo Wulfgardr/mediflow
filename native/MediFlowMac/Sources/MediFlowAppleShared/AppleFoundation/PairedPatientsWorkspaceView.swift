@@ -11,6 +11,7 @@ struct PairedPatientsWorkspaceView: View {
     // guidance before a data-plane call can fail with 403.
     @ObservedObject private var capabilities: ClinicalWorkspaceCapabilitiesStore
     @State private var confirmsClearingPairing = false
+    @State private var showsConnectionSetup = false // @Codex
     @State private var entryDeletionCandidate: HomeBaseEntrySummary?
     @State private var confirmsDeletingTherapy = false
     @State private var therapyDeletionCandidateId: String?
@@ -71,6 +72,13 @@ struct PairedPatientsWorkspaceView: View {
                     presentingScale = nil
                 },
                 onCancel: { presentingScale = nil }
+            )
+        }
+        /* @Codex */
+        .sheet(isPresented: $showsConnectionSetup) {
+            PairedHomeBaseCredentialsSheet(
+                model: model,
+                confirmsClearingPairing: $confirmsClearingPairing
             )
         }
         .sheet(isPresented: $model.isCreatingPatient) {
@@ -209,7 +217,7 @@ struct PairedPatientsWorkspaceView: View {
             HStack(spacing: 0) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
-                        credentialsCard
+                        connectionSetupBanner
                         patientsListContent
                             .padding(16)
                             .lumeSurface(zone: .field)
@@ -243,11 +251,11 @@ struct PairedPatientsWorkspaceView: View {
                         selectedPatientSections(detail)
                             .compactContainerWidth(inset: 40)
                     } else {
-                        credentialsCard
+                        connectionSetupBanner
                         patientsCard
                     }
                     #else
-                    credentialsCard
+                    connectionSetupBanner
                     patientsCard
                     #endif
                 }
@@ -268,13 +276,9 @@ struct PairedPatientsWorkspaceView: View {
     private var macOSWorkspace: some View {
         NavigationSplitView(columnVisibility: $patientWorkspaceColumnVisibility) {
             VStack(alignment: .leading, spacing: 0) {
-                ScrollView {
-                    credentialsCard
-                        .padding(16)
-                }
-                .frame(minHeight: 180, idealHeight: 260, maxHeight: 300)
-
-                Divider()
+                connectionSetupBanner
+                    .padding(.horizontal, 12)
+                    .padding(.top, 12)
 
                 patientsListContent
                     .padding(.horizontal, 12)
@@ -435,11 +439,63 @@ struct PairedPatientsWorkspaceView: View {
     }
     #endif
 
-    private var credentialsCard: some View {
-        PairedHomeBaseCredentialsView(
-            model: model,
-            confirmsClearingPairing: $confirmsClearingPairing
-        )
+    /* @Codex */
+    @ViewBuilder
+    private var connectionSetupBanner: some View {
+        if let message = connectionSetupMessage {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Collegamento richiesto", systemImage: "exclamationmark.triangle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(LumePalette.warning)
+                Text(message)
+                    .font(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Configura collegamento") {
+                    showsConnectionSetup = true
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityHint("Apre le impostazioni necessarie per caricare i pazienti.")
+                .accessibilityIdentifier("homebase-configuration-button")
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.orange.opacity(0.4)))
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("homebase-connection-banner")
+        }
+    }
+
+    /* @Codex */
+    private var isPatientWorklistUsable: Bool {
+        switch model.connectionState {
+        case .pairedOnline:
+            return true
+        case .cached, .pairedOfflineDegraded, .notLoaded:
+            return !model.patients.isEmpty
+        case .sessionExpired:
+            return false
+        }
+    }
+
+    /* @Codex */
+    private var connectionSetupMessage: String? {
+        guard !isPatientWorklistUsable else { return nil }
+        if model.errorMessage != nil {
+            return "Non è possibile caricare i pazienti. Controlla il collegamento e riprova."
+        }
+        switch model.connectionState {
+        case .sessionExpired:
+            return "La sessione è scaduta. Accedi di nuovo per continuare."
+        case .pairedOfflineDegraded:
+            return "Il collegamento non è disponibile. Configuralo per ricaricare i pazienti."
+        case .cached:
+            return "L'elenco locale non è disponibile. Configura il collegamento per caricare i pazienti."
+        case .notLoaded:
+            return "Configura il collegamento per caricare l'elenco pazienti."
+        case .pairedOnline:
+            return nil
+        }
     }
 
     private var patientsListContent: some View {
@@ -537,6 +593,10 @@ struct PairedPatientsWorkspaceView: View {
             .lumeSurface(zone: .focal, cornerRadius: 0)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(isCompactPatientHeaderExpanded ? "Comprimi dati paziente" : "Espandi dati paziente")
+        .accessibilityValue(isCompactPatientHeaderExpanded ? "Espanso" : "Compresso")
+        .accessibilityHint("Mostra o nasconde data di nascita e codice fiscale mascherato.")
+        .accessibilityIdentifier("patient-compact-header-disclosure")
         .compactContainerWidth()
     }
 

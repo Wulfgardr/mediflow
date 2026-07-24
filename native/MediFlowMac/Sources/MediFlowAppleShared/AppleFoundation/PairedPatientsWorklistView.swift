@@ -2,17 +2,32 @@ import SwiftUI
 
 /* @Codex */
 struct PairedHomeBaseCredentialsView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var model: PairedPatientsWorkspaceModel
     @Binding var confirmsClearingPairing: Bool
-    private let actionColumns = [GridItem(.adaptive(minimum: 150), spacing: 8)]
+
+    private var actionColumns: [GridItem] {
+        // @Codex #143: keep setup actions as readable rows at accessibility sizes.
+        dynamicTypeSize.isAccessibilitySize
+            ? [GridItem(.flexible())]
+            : [GridItem(.adaptive(minimum: 150), spacing: 8)]
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Home-base paired")
+            Text("Collegamento MediFlow")
                 .font(.headline)
-            Text("Usa credenziali paired generate dal Mac e una login operatore separata.")
+            Text("Configura il collegamento al computer MediFlow e accedi con il PIN operatore.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+            Label(model.connectionState.title, systemImage: model.connectionState.symbolName)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(model.connectionState.tintColor)
+                .accessibilityIdentifier("homebase-connection-state")
+            Text(model.reconciliationLine)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("homebase-reconciliation-state")
             TextField("Server HTTPS", text: $model.serverURL)
                 .accessibilityIdentifier("homebase-server-url-field")
             TextField("Fingerprint SHA256 (opzionale)", text: $model.tlsPin)
@@ -100,6 +115,8 @@ struct PairedHomeBaseCredentialsView: View {
         }
         .padding(16)
         .lumeSurface(zone: .field)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("homebase-configuration-form")
         .confirmationDialog(
             "Dissociare questo dispositivo?",
             isPresented: $confirmsClearingPairing,
@@ -124,6 +141,43 @@ struct PairedHomeBaseCredentialsView: View {
 }
 
 /* @Codex */
+struct PairedHomeBaseCredentialsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var model: PairedPatientsWorkspaceModel
+    @Binding var confirmsClearingPairing: Bool
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                PairedHomeBaseCredentialsView(
+                    model: model,
+                    confirmsClearingPairing: $confirmsClearingPairing
+                )
+                .padding(20)
+            }
+            .navigationTitle("Collegamento MediFlow")
+            #if os(iOS)
+            // @Codex #143: keep the setup title readable on compact screens.
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Chiudi") {
+                        dismiss()
+                    }
+                    .accessibilityLabel("Chiudi configurazione collegamento")
+                    .accessibilityIdentifier("homebase-configuration-close-button")
+                }
+            }
+            .accessibilityIdentifier("homebase-configuration-sheet")
+        }
+        #if os(macOS)
+        .frame(minWidth: 520, minHeight: 600)
+        #endif
+    }
+}
+
+/* @Codex */
 struct PairedPatientsWorklistView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var model: PairedPatientsWorkspaceModel
@@ -133,25 +187,9 @@ struct PairedPatientsWorklistView: View {
 
     @ViewBuilder
     var body: some View {
-        /* @Codex */
-        if dynamicTypeSize >= .accessibility1 {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Consultazione mobile")
-                    .font(.headline)
-                connectionStateLabel
-            }
-        } else {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text("Consultazione mobile")
-                    .font(.headline)
-                Spacer(minLength: 8)
-                connectionStateLabel
-            }
-        }
-        Text(model.reconciliationLine)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .accessibilityIdentifier("homebase-reconciliation-state")
+        Text("Pazienti")
+            .font(.headline)
+            .accessibilityHeading(.h2)
         if let presentation = model.conflictPresentation {
             conflictBanner(presentation)
         }
@@ -268,14 +306,6 @@ struct PairedPatientsWorklistView: View {
                 Task { await model.loadPatient(patient) }
             }
         )
-    }
-
-    private var connectionStateLabel: some View {
-        Label(model.connectionState.title, systemImage: model.connectionState.symbolName)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(model.connectionState.tintColor)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityIdentifier("homebase-connection-state")
     }
 
     @ViewBuilder
