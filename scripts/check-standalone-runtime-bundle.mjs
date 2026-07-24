@@ -65,28 +65,44 @@ function sharpPlatformArch() {
 
 function sharpRuntimePackages() {
   const platformArch = sharpPlatformArch();
-  const bindingPackage = {
-    'darwin-arm64': '@img/sharp-darwin-arm64',
-    'darwin-x64': '@img/sharp-darwin-x64',
-    'linux-arm': '@img/sharp-linux-arm',
-    'linux-arm64': '@img/sharp-linux-arm64',
-    'linux-ppc64': '@img/sharp-linux-ppc64',
-    'linux-riscv64': '@img/sharp-linux-riscv64',
-    'linux-s390x': '@img/sharp-linux-s390x',
-    'linux-x64': '@img/sharp-linux-x64',
-    'linuxmusl-arm64': '@img/sharp-linuxmusl-arm64',
-    'linuxmusl-x64': '@img/sharp-linuxmusl-x64',
-    'win32-arm64': '@img/sharp-win32-arm64',
-    'win32-ia32': '@img/sharp-win32-ia32',
-    'win32-x64': '@img/sharp-win32-x64',
-  }[platformArch];
-  const libvipsPackage = bindingPackage ? `@img/sharp-libvips-${platformArch}` : undefined;
+  const sharpPackageDir = path.dirname(path.dirname(sharpEntry));
+  const sharpManifest = JSON.parse(fs.readFileSync(path.join(sharpPackageDir, 'package.json'), 'utf8'));
+  const optionalDependencies = sharpManifest.optionalDependencies ?? {};
+  const bindingPackage = `@img/sharp-${platformArch}`;
+  const libvipsPackage = `@img/sharp-libvips-${platformArch}`;
 
-  if (!bindingPackage || !libvipsPackage) {
-    fail(`Standalone runtime has no supported sharp package mapping for ${platformArch}.`);
+  if (!optionalDependencies[bindingPackage]) {
+    fail(`Standalone runtime sharp package does not declare a native binding for ${platformArch}.`);
   }
 
-  return { bindingPackage, libvipsPackage };
+  return {
+    bindingPackage,
+    libvipsPackage: optionalDependencies[libvipsPackage] ? libvipsPackage : undefined,
+  };
+}
+
+function nativeArtifacts(packageDir, label, matcher) {
+  const artifacts = [];
+
+  function collect(directory) {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const candidatePath = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        collect(candidatePath);
+      } else if ((entry.isFile() || entry.isSymbolicLink()) && matcher(entry.name)) {
+        artifacts.push(candidatePath);
+      }
+    }
+  }
+
+  collect(packageDir);
+  if (artifacts.length === 0) {
+    fail(`Standalone runtime does not contain ${label}.`);
+  }
+
+  for (const artifact of artifacts) {
+    assertRealpathInsideStandalone(artifact, label);
+  }
 }
 
 let databaseEntry;
@@ -111,12 +127,17 @@ try {
 assertRealpathInsideStandalone(sharpEntry, 'sharp entrypoint');
 
 const { bindingPackage, libvipsPackage } = sharpRuntimePackages();
-const sharpBinding = requireFromStandalone.resolve(`${bindingPackage}/sharp.node`);
-const libvipsPackageManifest = requireFromStandalone.resolve(`${libvipsPackage}/package`);
-const libvipsBinary = requireFromStandalone.resolve(`${libvipsPackage}/binary`);
-assertRealpathInsideStandalone(sharpBinding, `${bindingPackage} binding`);
-assertRealpathInsideStandalone(libvipsPackageManifest, `${libvipsPackage} package`);
-assertRealpathInsideStandalone(libvipsBinary, `${libvipsPackage} binary`);
+const bindingPackageManifest = requireFromStandalone.resolve(`${bindingPackage}/package`);
+const bindingPackageDir = path.dirname(assertRealpathInsideStandalone(bindingPackageManifest, `${bindingPackage} package`));
+nativeArtifacts(bindingPackageDir, `${bindingPackage} native binding`, (name) => name.endsWith('.node'));
+
+if (libvipsPackage) {
+  const libvipsPackageManifest = requireFromStandalone.resolve(`${libvipsPackage}/package`);
+  const libvipsPackageDir = path.dirname(assertRealpathInsideStandalone(libvipsPackageManifest, `${libvipsPackage} package`));
+  nativeArtifacts(libvipsPackageDir, `${libvipsPackage} native library`, (name) => /^libvips(?:-cpp)?[.\d-]*\.(?:dylib|so(?:\.\d+)*)$/i.test(name));
+} else {
+  nativeArtifacts(bindingPackageDir, `${bindingPackage} bundled libvips native library`, (name) => /^libvips(?:-cpp)?[.\d-]*\.dll$/i.test(name));
+}
 
 const Sharp = requireFromStandalone(sharpEntry);
 const syntheticImage = await Sharp({
