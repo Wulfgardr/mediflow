@@ -7,9 +7,10 @@ Status: Accepted
 
 ## Problema
 
-MediFlow ha gia una pipeline OCR-first che puo autofillare in modo prudente le
-diagnosi ICD esplicite nei documenti (ADR 0011), ma nel profilo paziente manca
-ancora un percorso unico e reviewable per trasformare in dati strutturati:
+MediFlow ha gia una pipeline OCR-first che produce insight e proposte
+diagnostiche da revisionare. La sintesi documentale non scrive diagnosi nella
+scheda, come stabilito da ADR 0084. Nel profilo paziente manca ancora un
+percorso unico e revisionabile per trasformare in dati strutturati:
 
 - patologie citate in testo libero nelle note paziente o nel diario clinico
 - terapie menzionate per farmaco, principio attivo o posologia
@@ -25,8 +26,8 @@ ristretti, ma non aiuta l'operatore a popolare in modo sicuro diagnosi e terapie
 - ADR 0006 richiede un uso coerente delle terminologie e dei cataloghi locali.
 - ADR 0010 governa `/api/v1` con processo spec-first, ma questa slice non ha
   bisogno di estendere subito il contratto stabile shared.
-- ADR 0011 resta vincolante: l'autofill automatico da documenti resta limitato
-  ai soli codici ICD espliciti e non si estende al mapping aggressivo da free text.
+- ADR 0084 sostituisce l'autofill diagnostico da documento con proposte
+  review-only. Nessun codice, anche se esplicito, viene scritto dalla sintesi.
 
 ## Opzioni
 
@@ -68,8 +69,9 @@ Regole operative:
 - le terapie possono essere proposte come match catalogato (AIFA/ATC) oppure
   come inserimento manuale reviewable quando il catalogo non risolve
   in modo affidabile
-- ADR 0011 non cambia: l'autofill automatico dei documenti resta limitato ai
-  soli ICD espliciti gia presenti nella fonte
+- ADR 0084 resta vincolante: la sintesi documentale produce solo proposte da
+  revisionare; l'eventuale scrittura avviene in Smart Import dopo selezione e
+  conferma esplicite
 - nessun nuovo endpoint `/api/v1` in questa first thin slice; eventuale
   estensione shared web/macOS richiedera update spec/ADR successivo
 

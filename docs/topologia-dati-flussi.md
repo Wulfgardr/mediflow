@@ -308,9 +308,9 @@ sequenceDiagram
     OCR-->>API: OCR markdown
     API->>Synth: Analisi clinica strutturata
     Synth->>LLM: Prompt Qwen text-only
-    LLM-->>Synth: Summary + quality + ICD espliciti
-    Synth-->>API: Insight + autofill prudente + parse/evidence artifact
-    API->>DB: Salva summary/parse-evidence sugli attachments + aggiorna documentInsights e diagnosi
+    LLM-->>Synth: Summary + quality + proposte ICD
+    Synth-->>API: Insight + proposte review-only + parse/evidence artifact
+    API->>DB: Salva summary/parse-evidence sugli attachments + aggiorna documentInsights
     API-->>UI: Esito + dati
 ```
 
@@ -325,6 +325,8 @@ La filiera OCR certificata corrente e platform-aware:
 - Il fallback OCR cambia solo la recognition: Smart Import, nuova anagrafica da
   documento e Patient Insight restano reviewable e non scrivono dati clinici
   strutturati senza conferma.
+- La sintesi documentale non aggiorna `patients.diagnoses`. Le proposte
+  diagnostiche restano in `documentInsights` fino alla revisione.
 - I documenti senza testo finiscono nella `Coda OCR` (WUL-237) con stati e motivi
   in italiano e riprocesso idempotente; nessuna proposta clinica parte finche il
   testo non basta.
@@ -366,9 +368,10 @@ sequenceDiagram
     UI->>DB: Aggiorna diagnoses + therapies con dedupe
 ```
 
-Nota operativa: questo flusso non sostituisce ADR 0011. L'autofill automatico
-resta limitato ai soli ICD espliciti nei documenti; diagnosi free-text e terapie
-richiedono sempre conferma umana in questa thin slice.
+Nota operativa: ADR 0084 vieta la scrittura diagnostica dalla sintesi
+documentale. Solo Smart Import puo applicare i suggerimenti selezionati, dopo
+una conferma umana esplicita. Diagnosi e terapie non selezionate restano
+proposte.
 
 Nota aggiuntiva: se una fonte e solo referral/follow-up senza novita clinica e
 una diagnosi o terapia e gia presente, il suggerimento viene soppresso per

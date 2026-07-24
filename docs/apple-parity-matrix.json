@@ -1,6 +1,43 @@
 {
   "generated": "2026-07-08",
   "source": "WUL-479 reconciliation of the 2026-07-08 capability map against Wulfgardr/mediflow public/main",
+  "release08Gate": {
+    "asOf": "2026-07-24",
+    "status": "open",
+    "scope": [
+      "iPhone/iPad",
+      "macOS",
+      "localhost/web"
+    ],
+    "commonContract": {
+      "language": "Lume",
+      "appleMaterial": "Liquid Glass solo come declinazione nativa Apple",
+      "parity": "capacità, semantica, gerarchia, stati, sicurezza e riconoscibilità",
+      "platformSpecific": "navigazione, densità, controlli e input"
+    },
+    "packets": [
+      {
+        "surface": "iPhone/iPad",
+        "owner": "Chief UI",
+        "status": "handoff-pending",
+        "requiredEvidence": "hash approvato, build, iPhone, iPad regular/compact, multitasking, resize, Dynamic Type, accessibilità, screenshot sintetici e verifier"
+      },
+      {
+        "surface": "macOS",
+        "owner": "Chief UI",
+        "status": "p1-open",
+        "requiredEvidence": "nuovo worktree, regressione crash, finestre strette/larghe, resize, tastiera/focus, accessibilità, screenshot sintetici e verifier"
+      },
+      {
+        "surface": "localhost/web",
+        "owner": "Chief UI",
+        "status": "handoff-pending",
+        "requiredEvidence": "hash approvato, responsive, tastiera/focus, accessibilità, screenshot sintetici e verifier"
+      }
+    ],
+    "blockingRule": "Un P1 confermato su una delle tre superfici blocca il gate UI 0.8.",
+    "note": "Questo oggetto registra il gate 0.8. Non modifica i conteggi delle 64 capability."
+  },
   "rows": [
     {
       "area": "pazienti",
