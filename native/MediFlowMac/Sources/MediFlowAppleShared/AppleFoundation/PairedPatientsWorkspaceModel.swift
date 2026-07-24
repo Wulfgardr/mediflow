@@ -474,13 +474,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         }
         let base = Date(timeIntervalSince1970: 1_750_000_000)
         return [
+            /* @Codex */
             HomeBasePatientSummary(id: "uitest-1", firstName: "Mario", lastName: "Rossi",
                                    birthDate: nil, taxCode: "RSSMRA80A01H501U",
-                                   isAdi: false, isArchived: false, version: 1, updatedAt: base),
+                                   isAdi: false, isArchived: false, version: 1, updatedAt: base,
+                                   diagnoses: "[{\"code\":\"E11.9\",\"description\":\"Diabete tipo 2\"},{\"code\":\"I10\",\"description\":\"Ipertensione\"}]"),
             HomeBasePatientSummary(id: "uitest-2", firstName: "Anna", lastName: "Bianchi",
                                    birthDate: nil, taxCode: "BNCNNA85M41F205X",
                                    isAdi: false, isArchived: false, version: 1,
-                                   updatedAt: base.addingTimeInterval(-3600)),
+                                   updatedAt: base.addingTimeInterval(-3600),
+                                   diagnoses: "not-json"),
             HomeBasePatientSummary(id: "uitest-3", firstName: "Luigi", lastName: "Verdi",
                                    birthDate: nil, taxCode: "VRDLGU70T10L219Z",
                                    isAdi: false, isArchived: true, version: 1,
@@ -771,12 +774,23 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         let selectionBeforeRefresh = selectedPatientID
         await runTask {
             do {
-                self.patients = try await self.makeClient().fetchPatients(
-                    credentials: credentials,
-                    sessionCookie: sessionCookie,
-                    ambulatoryId: self.ambulatoryId.trimmedOrNil,
-                    includeDeleted: includeDeleted
-                )
+                /* @Codex */
+                let summaries = if includeDeleted {
+                    try await self.makeClient().fetchPatients(
+                        credentials: credentials,
+                        sessionCookie: sessionCookie,
+                        ambulatoryId: self.ambulatoryId.trimmedOrNil,
+                        includeDeleted: true
+                    )
+                } else {
+                    try await self.makeClient().fetchPatients(
+                        credentials: credentials,
+                        sessionCookie: sessionCookie,
+                        ambulatoryId: self.ambulatoryId.trimmedOrNil,
+                        includeDiagnoses: true
+                    )
+                }
+                self.patients = summaries
                 .map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
             } catch {
                 if self.restoreCachedPatientList(markOffline: true) {
@@ -1261,9 +1275,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 payload: payload, credentials: credentials, sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil)
             self.isCreatingPatient = false
+            /* @Codex */
             self.patients = try await self.makeClient().fetchPatients(
                 credentials: credentials, sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+                ambulatoryId: self.ambulatoryId.trimmedOrNil, includeDiagnoses: true)
+            .map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
             self.statusMessage = "Paziente creato sull'home-base (id \(created.id))."
         }
     }
@@ -1498,7 +1514,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             self.patients = try await self.makeClient().fetchPatients(
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: self.ambulatoryId.trimmedOrNil,
+                includeDiagnoses: true
             )
             .map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
             self.statusMessage = isArchived
@@ -3875,7 +3892,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             credentials: context.credentials,
             sessionCookie: context.sessionCookie,
             ambulatoryId: context.ambulatoryID,
-            includeDeleted: false
+            includeDiagnoses: true
         )
         .map { PatientFieldCrypto.decryptSummary($0, masterKey: context.masterKey) }
         guard Self.reconciledPatientSelectionID(context.patientID, in: refreshedPatients) != nil else {

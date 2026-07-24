@@ -314,6 +314,7 @@ struct PairedPatientsWorklistView: View {
             VStack(alignment: .leading, spacing: 6) {
                 patientIdentity(patient)
                 patientMetadata(patient)
+                patientDiagnosis(patient)
                 patientUpdate(patient, alignment: .leading)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -323,6 +324,7 @@ struct PairedPatientsWorklistView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     patientIdentity(patient)
                     patientMetadata(patient)
+                    patientDiagnosis(patient)
                 }
                 Spacer(minLength: 8)
                 patientUpdate(patient, alignment: .trailing)
@@ -355,6 +357,26 @@ struct PairedPatientsWorklistView: View {
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("patient-cell-age-\(patient.id)")
             }
+        }
+    }
+
+    /* @Codex */
+    @ViewBuilder
+    private func patientDiagnosis(_ patient: HomeBasePatientSummary) -> some View {
+        if let summary = PatientWorklistDiagnosisSummary(rawDiagnoses: patient.diagnoses) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(summary.displayText)
+                    .lineLimit(dynamicTypeSize >= .accessibility1 ? 2 : 1)
+                if summary.additionalCount > 0 {
+                    Text("+\(summary.additionalCount)")
+                        .fontWeight(.medium)
+                        .fixedSize()
+                        .accessibilityLabel(summary.additionalAccessibilityLabel)
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("patient-cell-diagnosis-\(patient.id)")
         }
     }
 
@@ -474,6 +496,25 @@ struct PairedPatientsWorklistView: View {
     }
 
     // Plain tinted capsule (no glass): glass inside the glass card would nest.
+}
+
+/* @Codex */
+struct PatientWorklistDiagnosisSummary: Equatable {
+    let displayText: String
+    let additionalCount: Int
+
+    init?(rawDiagnoses: String?) {
+        let diagnoses = DiagnosesCodec.decode(rawDiagnoses)
+        guard let first = diagnoses.first, !first.displayText.isEmpty else { return nil }
+        displayText = first.displayText
+        additionalCount = max(0, diagnoses.count - 1)
+    }
+
+    var additionalAccessibilityLabel: String {
+        additionalCount == 1
+            ? "Un'altra diagnosi registrata"
+            : "Altre \(additionalCount) diagnosi registrate"
+    }
 }
 
 /* @Codex */

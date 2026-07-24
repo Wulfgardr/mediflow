@@ -130,9 +130,9 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
     public func fetchPatients(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?, includeDiagnoses: Bool
     ) async throws -> [HomeBasePatientSummary] {
-        try await fallback.fetchPatients(
-            credentials: credentials, sessionCookie: sessionCookie,
-            ambulatoryId: ambulatoryId, includeDiagnoses: includeDiagnoses)
+        try patientStore.listPatients(
+            scopeAmbulatoryId: ambulatoryId?.isEmpty == false ? ambulatoryId : nil,
+            includeDiagnoses: includeDiagnoses)
     }
 
     /* @Codex */

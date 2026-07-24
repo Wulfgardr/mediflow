@@ -67,11 +67,15 @@ public struct SQLitePatientStore {
         self.path = path
     }
 
-    /// Active (non-soft-deleted) patient summaries. No decryption needed: summary
-    /// columns are plaintext. `scopeAmbulatoryId` (when provided) filters via the
-    /// patients_to_ambulatories membership join (1:1 with the web's listNetworkScopedPatients,
-    /// the same scope model every store read/write uses); unscoped lists every active patient.
-    public func listPatients(scopeAmbulatoryId: String? = nil, includeDeleted: Bool = false) throws -> [HomeBasePatientSummary] {
+    /// Patient summaries. The encrypted diagnoses projection is opt-in and only
+    /// available for the active list; default and trash reads stay minimal.
+    /// `scopeAmbulatoryId` (when provided) filters via the membership join.
+    /* @Codex */
+    public func listPatients(
+        scopeAmbulatoryId: String? = nil,
+        includeDeleted: Bool = false,
+        includeDiagnoses: Bool = false
+    ) throws -> [HomeBasePatientSummary] {
         let db = try SQLiteConnection(readOnlyPath: path)
         try db.assertSchema(table: "patients", requiredColumns: Self.patientRequiredColumns)
         // Scope via the patients_to_ambulatories membership join (1:1 with the web,
@@ -81,8 +85,10 @@ public struct SQLitePatientStore {
         let scopeJoin = scopeAmbulatoryId == nil ? "" :
             "JOIN patients_to_ambulatories pa ON p.id = pa.patient_id AND pa.ambulatory_id = ? "
         let deletedFilter = includeDeleted ? "" : "WHERE p.deleted_at IS NULL "
+        let projectsDiagnoses = includeDiagnoses && !includeDeleted
+        let diagnosesProjection = projectsDiagnoses ? ", p.diagnoses" : ""
         let sql = """
-        SELECT p.id, p.first_name, p.last_name, p.tax_code, p.birth_date, p.is_adi, p.is_archived, p.version, p.updated_at, p.deleted_at, p.deletion_reason
+        SELECT p.id, p.first_name, p.last_name, p.tax_code, p.birth_date, p.is_adi, p.is_archived, p.version, p.updated_at, p.deleted_at, p.deletion_reason\(diagnosesProjection)
         FROM patients p \(scopeJoin)\(deletedFilter)ORDER BY p.updated_at DESC
         """
         let binds: [SQLiteBind] = scopeAmbulatoryId.map { [.text($0)] } ?? []
@@ -98,7 +104,8 @@ public struct SQLitePatientStore {
                 version: row.int(7) ?? 1,
                 updatedAt: row.date(8),
                 deletedAt: row.date(9),
-                deletionReason: row.text(10))
+                deletionReason: row.text(10),
+                diagnoses: projectsDiagnoses ? row.text(11) : nil)
         }
     }
 
