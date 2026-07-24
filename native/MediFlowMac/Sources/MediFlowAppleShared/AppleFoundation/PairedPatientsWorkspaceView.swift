@@ -196,15 +196,18 @@ struct PairedPatientsWorkspaceView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
 
-    private var usesSplitLayout: Bool {
-        #if os(macOS)
-        return true
-        #else
-        // @Codex #142: AX Dynamic Type needs the single-layer patient path;
-        // a fixed-width list beside detail would otherwise create two compressed columns.
-        return horizontalSizeClass == .regular && !dynamicTypeSize.isAccessibilitySize
-        #endif
+    #if !os(macOS)
+    /// Whether the container that was actually handed to the workspace can host
+    /// list and chart side by side. The size class is not consulted: it reports
+    /// "not a phone", not how much width this workspace received, and on iPad the
+    /// same app is resized continuously.
+    private func usesSplitLayout(containerWidth: CGFloat) -> Bool {
+        PatientsWorkspaceLayout.usesSideBySide(
+            containerWidth: containerWidth,
+            isAccessibilitySize: dynamicTypeSize.isAccessibilitySize
+        )
     }
+    #endif
 
     // Compact (iPhone): one column, list and selected-patient detail stacked.
     // Regular (iPad/macOS): true master-detail, patient list beside the open patient.
@@ -213,7 +216,16 @@ struct PairedPatientsWorkspaceView: View {
         #if os(macOS)
         macOSWorkspace
         #else
-        if usesSplitLayout {
+        GeometryReader { proxy in
+            mobileWorkspace(containerWidth: proxy.size.width)
+        }
+        #endif
+    }
+
+    #if !os(macOS)
+    @ViewBuilder
+    private func mobileWorkspace(containerWidth: CGFloat) -> some View {
+        if usesSplitLayout(containerWidth: containerWidth) {
             HStack(spacing: 0) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
@@ -224,7 +236,7 @@ struct PairedPatientsWorkspaceView: View {
                     }
                     .padding(20)
                 }
-                .frame(width: 360)
+                .frame(width: PatientsWorkspaceLayout.listWidth(forContainerWidth: containerWidth))
 
                 Divider()
 
@@ -242,6 +254,13 @@ struct PairedPatientsWorkspaceView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity)
+                // The open chart keeps its identity in the split arrangement too,
+                // not only when the columns collapse.
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    if let detail = model.selectedPatient {
+                        compactPatientHeader(detail)
+                    }
+                }
             }
         } else {
             ScrollView {
@@ -268,8 +287,8 @@ struct PairedPatientsWorkspaceView: View {
                 }
             }
         }
-        #endif
     }
+    #endif
 
     #if os(macOS)
     /* @Codex */
@@ -593,11 +612,25 @@ struct PairedPatientsWorkspaceView: View {
             .lumeSurface(zone: .focal, cornerRadius: 0)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(isCompactPatientHeaderExpanded ? "Comprimi dati paziente" : "Espandi dati paziente")
+        // The label must name the open patient: an explicit label on the button
+        // replaces everything its children composed, so labelling it with the
+        // disclosure verb alone erased the patient's identity from VoiceOver.
+        // The expanded/collapsed state stays on the value, where it belongs.
+        .accessibilityLabel(compactPatientHeaderAccessibilityLabel(detail))
         .accessibilityValue(isCompactPatientHeaderExpanded ? "Espanso" : "Compresso")
         .accessibilityHint("Mostra o nasconde data di nascita e codice fiscale mascherato.")
+        .accessibilityAddTraits(.isHeader)
         .accessibilityIdentifier("patient-compact-header-disclosure")
         .compactContainerWidth()
+    }
+
+    private func compactPatientHeaderAccessibilityLabel(_ detail: HomeBasePatientDetail) -> String {
+        var atoms = ["\(detail.lastName) \(detail.firstName)"]
+        if let birthYear = PairedPatientsWorkspaceSupport.birthYearText(from: detail.birthDate) {
+            atoms.append(birthYear)
+        }
+        atoms.append("Dati paziente")
+        return atoms.joined(separator: ". ")
     }
 
     private var compactHeaderChevron: some View {
