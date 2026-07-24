@@ -7,28 +7,94 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ## [Unreleased]
 
-### Sicurezza
+> Candidata `0.8.0`: contenuti in consolidamento. La versione del pacchetto
+> resta `0.7.3` finché contenuti, documentazione e verifica finale non sono
+> chiusi.
 
-- Aggiorna Next.js, Sharp e PostCSS alle versioni fissate dal lockfile. L'audit
-  di produzione non rileva vulnerabilita. L'audit globale conserva sei rilievi
-  limitati alle dipendenze di sviluppo.
+### Uso del prodotto
 
-### Migliorato
+#### Revisione degli output AI
 
-- **Contratti AI ed envelope**: Patient Insight, Smart Import e sintesi
-  documentale accettano solo envelope compatibili con la lane richiesta. Gli
-  envelope ambigui, multipli, incompleti o con chiavi riservate duplicate non
-  attivano il recupero legacy né una scrittura clinica.
-- **Housekeeping AI**: rimosso il parser file non usato dopo una verifica degli
-  importer. La route MLX mantiene il boundary di autenticazione esistente.
+- **Modifica**: Patient Insight, Smart Import e sintesi documentale accettano
+  solo contenitori JSON (`envelope`) compatibili con il contratto dell'attività
+  richiesta.
+  **Stato**: integrata in `main` con la PR #139.
+  **Limite**: il controllo del modello esterno resta
+  `BLOCKED_EXTERNAL_MODEL`; non è un risultato `PASS`.
+- **Modifica**: i contenitori ambigui, multipli, incompleti o con chiavi
+  riservate duplicate vengono rifiutati.
+  **Stato**: integrata e coperta da test deterministici e casi avversari.
+  **Limite**: la verifica non sostituisce la validazione di un modello in
+  esecuzione.
+- **Modifica**: le diagnosi estratte dai documenti restano materiale di
+  revisione.
+  **Stato**: la scrittura automatica nella scheda è rimossa.
+  **Limite**: una futura applicazione richiede un contratto e una conferma
+  espliciti.
 
-### Confini
+### Esecuzione e manutenzione
 
-- Le diagnosi estratte da documento restano materiale di revisione e non sono
-  aggiunte automaticamente alla scheda. Una futura applicazione richiede una
-  decisione contrattuale separata.
-- Codex Operator personale non entra in questa tranche. Richiede correzioni e
-  decisioni esplicite sui confini di egress, autenticazione e packaging.
+#### Dipendenze e pacchetto autonomo
+
+- **Modifica**: Next.js, Sharp e PostCSS usano le versioni fissate dal
+  file `package-lock.json`.
+  **Stato**: integrata in `main` con la PR #138.
+  **Limite**: `npm audit` rileva sei rilievi nelle dipendenze di sviluppo. Il
+  controllo delle sole dipendenze di produzione non rileva vulnerabilità.
+- **Modifica**: il controllo del pacchetto autonomo (`standalone`) convalida
+  gli artefatti nativi Sharp caricati. Rifiuta collegamenti simbolici o
+  ripieghi che si risolvono fuori dal pacchetto.
+  **Stato**: integrata e verificata su macOS, Linux e Windows.
+  **Limite**: il controllo copre i pacchetti dichiarati da
+  `package-lock.json`.
+
+#### Pulizia del codice AI
+
+- **Modifica**: il parser di file non usato è stato rimosso dopo la verifica
+  dei riferimenti di importazione.
+  **Stato**: integrata con la PR #139.
+  **Limite**: l'endpoint MLX mantiene il confine di autenticazione esistente.
+
+### Confini non consegnati
+
+- Codex Operator personale resta escluso. Richiede un nuovo piano di lavoro
+  senza invio di testo clinico, con autenticazione e pacchetto verificati.
+- Ollama resta l'unico fornitore AI operativo. I plug-in locali, LAN o cloud
+  non sono consegnati.
+- Il controllo dell'invio esterno resta chiuso. Una futura attivazione richiede
+  regole organizzative, scelta esplicita, minimizzazione, controlli verificati,
+  registrazione e ripiego locale.
+- Il cloud può offrire capacità o tempi di elaborazione diversi. Non è un
+  requisito e non implica una promessa clinica.
+
+### Sviluppo assistito
+
+Il perimetro comprende il lavoro che ha portato alle PR #138 e #139 e il
+relativo consolidamento. Non comprende la verifica UI, le prove di capacità o
+altri filoni senza modifiche promosse.
+
+| Fornitore (provider) e modello | Flusso (lane) | Ruolo o operazione | Token misurati | Fonte del conteggio |
+| --- | --- | --- | --- | --- |
+| OpenAI `gpt-5.6-terra/high` | Responsabile del programma | Inventario, controlli e consolidamento iniziale | 51.253.005 | `token_count`, record Codex del programma |
+| OpenAI `gpt-5.6-sol/max` | Responsabile del programma | Decisioni, integrazione, promozione e documentazione | 37.508.514 | `token_count`, record Codex del programma |
+| OpenAI `gpt-5.6-sol/max` | Verifiche indipendenti | Casi avversari, modifiche e controlli di confine | 112.514.880 | `token_count`, 11 sessioni figlie |
+| OpenAI `gpt-5.6-sol` (modalità Ultra; livello non registrato) | Revisione in sola lettura | Contratti AI, Codex Operator e selezione dei candidati | 19.106.786 | `token_count`, 3 sessioni figlie |
+| OpenAI `gpt-5.6-terra/high` | Verifica ordinaria | Controlli deterministici e supporto alla candidata | 3.340.670 | `token_count`, 1 sessione figlia |
+| Anthropic `claude-fable-5` | Coordinamento precedente | Strategia, impronta del candidato e acquisizione dei report A e B | 3.687.032 | Artefatto di provenienza del 22 luglio |
+| Anthropic `claude-opus-4-8` | Sintesi precedente | Sintesi dopo il ripiego automatico del fornitore | 319.743 | Artefatto di provenienza del 22 luglio |
+| OpenAI `gpt-5.6-terra/high` | Report A | Analisi dei flussi | 217.090 | Artefatto di provenienza del 22 luglio |
+| OpenAI `gpt-5.6-sol/high` | Report B | Analisi del nucleo contrattuale | 299.822 | Artefatto di provenienza del 22 luglio |
+| OpenAI `gpt-5.6-sol/high` | Report C | Analisi delle integrazioni e dell'esecuzione | 579.240 | Artefatto di provenienza del 22 luglio |
+| Anthropic `claude-opus-4-8/max` | Revisione a riga di comando | Critica avversaria dei contratti AI in sola lettura | 68.978 | Campo `usage` del risultato CLI |
+
+Il record Codex comprende 16 sessioni collegate. La fotografia è stata acquisita
+il 24 luglio 2026 alle 12:00 CEST e misura 223.723.855 token totali. Il contatore
+include ingresso e uscita; i token letti dalla memoria cache sono una parte
+dell'ingresso.
+
+L'artefatto del 22 luglio riporta i cinque valori indicati, ma non documenta la
+formula di somma o l'esclusività contabile. Per questo motivo tali valori non
+formano un totale aggregato.
 
 ## [0.7.3] - 2026-07-13
 

@@ -7,7 +7,7 @@ read_when:
 
 # Repository Topology: MediFlow
 
-Ultimo aggiornamento: 2026-07-09 (`WUL-477`)
+Ultimo aggiornamento: 2026-07-24
 
 Mappa concisa delle aree top-level del repository, pensata per orientare agent e
 contributor: distingue il **runtime clinico** (codice che gira con dati paziente)
@@ -50,6 +50,30 @@ runtime artifact e fonti riservate restano fuori da Git secondo
 | `tmp/` | tooling effimero | Scratchpad locale. |
 | `Farmaci/` | dati di riferimento | Dataset farmaceutici di riferimento. |
 | `certs/` | dev tooling | Certificati TLS locali per dev. |
+
+## Confine AI e integrazioni opzionali
+
+La topologia AI implementata resta locale:
+
+- `lib/ai-service.ts` è la facciata usata dalle funzioni applicative;
+- `lib/ai-providers/` contiene il connettore operativo Ollama;
+- `lib/ai-egress-gate.ts` e `lib/ai-egress-audit.ts` applicano una chiusura
+  sicura in caso di errore (`fail-closed`) e scrivono un registro locale privo
+  di contenuto clinico.
+
+Non esistono fornitori cloud operativi, registri esterni o una superficie di
+consenso per l'invio esterno. Il controllo resta
+`closed_pending_redaction_lane`.
+
+Un futuro plug-in non può accedere direttamente al database. Può ricevere solo
+il contenuto minimo dopo regole, attivazione esplicita, controlli verificati e
+registrazione. La redazione o pseudonimizzazione deve essere dimostrata per il
+flusso specifico. MediFlow non dichiara anonimizzazione garantita.
+
+Le funzioni deterministiche restano disponibili senza plug-in. Il percorso AI
+locale richiede Ollama configurato. L'output esterno resta una proposta:
+chiarimento interattivo e scrittura autorizzata sono fasi separate. Questa
+regola descrive il confine, non una funzione cloud già consegnata.
 
 ## ⚠️ Regole operative
 
