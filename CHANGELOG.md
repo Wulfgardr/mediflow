@@ -13,6 +13,23 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   di produzione non rileva vulnerabilita. L'audit globale conserva sei rilievi
   limitati alle dipendenze di sviluppo.
 
+### Migliorato
+
+- **Contratti AI ed envelope**: Patient Insight, Smart Import e sintesi
+  documentale accettano solo envelope compatibili con la lane richiesta. Gli
+  envelope ambigui, multipli, incompleti o con chiavi riservate duplicate non
+  attivano il recupero legacy né una scrittura clinica.
+- **Housekeeping AI**: rimosso il parser file non usato dopo una verifica degli
+  importer. La route MLX mantiene il boundary di autenticazione esistente.
+
+### Confini
+
+- Le diagnosi estratte da documento restano materiale di revisione e non sono
+  aggiunte automaticamente alla scheda. Una futura applicazione richiede una
+  decisione contrattuale separata.
+- Codex Operator personale non entra in questa tranche. Richiede correzioni e
+  decisioni esplicite sui confini di egress, autenticazione e packaging.
+
 ## [0.7.3] - 2026-07-13
 
 > Nota release: la `0.7.3` consolida la linea local-first con un'adozione

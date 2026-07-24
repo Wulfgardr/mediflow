@@ -1116,7 +1116,7 @@ test('resolver: innocuous fragment followed by wrong-task envelope stays unreada
 });
 
 /* @Codex */
-test('resolver: innocuous fragment followed by valid patient insight renders structured', async () => {
+test('resolver: an innocuous fragment before patient insight is ambiguous', async () => {
     const restore = await withHarness();
     try {
         const { coerceInsightToReadable } = await import('./patient-insight-view-model');
@@ -1124,7 +1124,29 @@ test('resolver: innocuous fragment followed by valid patient insight renders str
             'Nota introduttiva.\n```json\n{"note":"example"}\n```\n```json\n'
             + JSON.stringify(VALID_INSIGHT_ENVELOPE) + '\n```',
         );
-        assert.equal(readable.kind, 'structured');
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: JSON arrays and prefixes before patient insight are ambiguous', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const fence = `\`\`\`json\n${JSON.stringify(VALID_INSIGHT_ENVELOPE)}\n\`\`\``;
+
+        for (const prefix of ['[1,2]', '[]', '[tru', '[nu']) {
+            for (const response of [
+                `${prefix}\n${fence}`,
+                `\`\`\`json\n${prefix}\n\`\`\`\n${fence}`,
+                `\`\`\`json\n${prefix}\n${JSON.stringify(VALID_INSIGHT_ENVELOPE)}\n\`\`\``,
+            ]) {
+                const readable = coerceInsightToReadable(response);
+                assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' }, prefix);
+            }
+        }
     } finally {
         restore();
     }

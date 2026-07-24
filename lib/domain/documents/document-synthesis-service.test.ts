@@ -231,6 +231,70 @@ test('document synthesis does not persist or autofill when the envelope task is 
     }
 });
 
+test('document synthesis stores high confidence diagnoses as review material only', async () => {
+    const original = {
+        getSetting: db.settings.get,
+        getPatient: db.patients.get,
+        updatePatient: db.patients.update,
+        createAi: AIService.create,
+    };
+    const updatePayloads: unknown[] = [];
+
+    db.settings.get = (async (key: string) => ({
+        value: key === DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY ? 'off' : 'enabled',
+    })) as unknown as typeof db.settings.get;
+    db.patients.get = (async () => ({
+        id: 'patient-review-only',
+        version: 1,
+        documentInsights: [],
+        diagnoses: [],
+    })) as unknown as typeof db.patients.get;
+    db.patients.update = (async (_id: string, payload: unknown) => {
+        updatePayloads.push(payload);
+    }) as unknown as typeof db.patients.update;
+    AIService.create = (async () => ({
+        generate: async () => JSON.stringify({
+            schemaVersion: 'mediflow.ai.extract.v1',
+            task: 'document_synthesis',
+            summary: 'Diagnosi proposta per revisione',
+            data: {
+                qualityLevel: 'green',
+                medications: [],
+                diagnoses: [{
+                    code: 'I10',
+                    description: 'Ipertensione essenziale',
+                    system: 'ICD-10',
+                    confidence: 'high',
+                    evidence: 'Diagnosi esplicita nel documento sintetico',
+                }],
+                problemStatements: [],
+                therapyCandidates: [],
+                servicePrescriptions: [],
+            },
+        }),
+    })) as unknown as typeof AIService.create;
+
+    try {
+        const result = await synthesizeDocument(
+            'Referto sintetico con diagnosi esplicita.',
+            '2026-07-24__referto__synthetic.pdf',
+            'patient-review-only',
+        );
+        const payload = updatePayloads[0] as { diagnoses?: unknown; documentInsights?: unknown[] };
+
+        assert.equal(updatePayloads.length, 1);
+        assert.equal(result.insight.autofill, undefined);
+        assert.equal(payload.diagnoses, undefined);
+        assert.equal(Object.hasOwn(payload, 'diagnoses'), false);
+        assert.equal(Array.isArray(payload.documentInsights), true);
+    } finally {
+        db.settings.get = original.getSetting;
+        db.patients.get = original.getPatient;
+        db.patients.update = original.updatePatient;
+        AIService.create = original.createAi;
+    }
+});
+
 /* WUL-362 F1: una risposta avvelenata con chiave task duplicata (evidenza
    moderna oscurata dal last-wins) non deve mai attraversare il rescue legacy:
    il service rifiuta, non scrive e non applica alcun autofill ICD. */
