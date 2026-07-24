@@ -190,9 +190,13 @@ public struct AppleCapabilityLaneCard: View {
 public struct AppleFoundationMobileRootView: View {
     public let snapshot: AppleFoundationSnapshot
     @ObservedObject private var appearance: AppleAppearanceStore
+    @Environment(\.dynamicTypeSize) private var inheritedDynamicTypeSize
+    private let dynamicTypeSizeOverride: DynamicTypeSize?
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /* @Codex #142: keep the project sidebar out of the iPad patient split. */
+    @State private var projectColumnVisibility: NavigationSplitViewVisibility = .detailOnly
     #endif
     @State private var section: ClinicalWorkspaceSection
     @State private var showsProjectSurfaces = false
@@ -203,12 +207,14 @@ public struct AppleFoundationMobileRootView: View {
         self.snapshot = snapshot
         _appearance = ObservedObject(wrappedValue: appearance)
         let launchOverrides = AppleFoundationLaunchOverrides.load()
+        dynamicTypeSizeOverride = launchOverrides.dynamicTypeSizeOverride
         _section = State(initialValue: launchOverrides.initialSection.map(ClinicalWorkspaceSection.init(legacy:)) ?? .patients)
     }
 
     public var body: some View {
         Group {
             if usesSplitLayout {
+                #if os(macOS)
                 NavigationSplitView {
                     List {
                         Section("Clinica") { ForEach(ClinicalWorkspaceSection.clinicalSections) { sidebarButton($0) } }
@@ -220,6 +226,23 @@ public struct AppleFoundationMobileRootView: View {
                     detailView(for: section)
                         .navigationTitle(section.title)
                 }
+                #else
+                // @Codex #142: the project sidebar overlays iPad detail instead of
+                // creating a third simultaneous column beside the patient workspace.
+                NavigationSplitView(columnVisibility: $projectColumnVisibility) {
+                    List {
+                        Section("Clinica") { ForEach(ClinicalWorkspaceSection.clinicalSections) { sidebarButton($0) } }
+                        Section("Impostazioni") { ForEach(ClinicalWorkspaceSection.settingsSections) { sidebarButton($0) } }
+                        Section("Progetto") { ForEach(ClinicalWorkspaceSection.projectSections) { sidebarButton($0) } }
+                    }
+                    .navigationTitle("MediFlow")
+                    .accessibilityIdentifier("clinical-workspace-project-sidebar")
+                } detail: {
+                    detailView(for: section)
+                        .navigationTitle(section.title)
+                }
+                .navigationSplitViewStyle(.prominentDetail)
+                #endif
             } else {
                 TabView(selection: $section) {
                     ForEach(ClinicalWorkspaceSection.clinicalSections + ClinicalWorkspaceSection.settingsSections) { item in
@@ -245,12 +268,19 @@ public struct AppleFoundationMobileRootView: View {
         }
         .sheet(isPresented: $showsProjectSurfaces) { projectSurfaceSheet }
         .environment(\.appleReduceMotionOverride, appearance.reduceMotionOverride)
+        .environment(\.dynamicTypeSize, dynamicTypeSizeOverride ?? inheritedDynamicTypeSize)
         .respectsAppleMotionPreference()
         .privacyShield(appearance: appearance)
     }
 
     private func sidebarButton(_ item: ClinicalWorkspaceSection) -> some View {
-        Button { section = item } label: {
+        Button {
+            section = item
+            #if os(iOS)
+            // @Codex #142: preserve the patient list/detail width after a destination change.
+            projectColumnVisibility = .detailOnly
+            #endif
+        } label: {
             HStack {
                 Label(item.title, systemImage: item.symbolName)
                 Spacer(minLength: 12)
