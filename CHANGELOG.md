@@ -7,6 +7,11 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ## [Unreleased]
 
+### Sicurezza
+
+- Aggiorna Next.js e Sharp alle versioni fissate dal lockfile per rimuovere le
+  vulnerabilita di produzione rilevate dall'audit delle dipendenze.
+
 ## [0.7.3] - 2026-07-13
 
 > Nota release: la `0.7.3` consolida la linea local-first con un'adozione
