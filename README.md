@@ -34,9 +34,11 @@ clinici, terapie, note e documenti in una scheda che resti leggibile anche
 quando il percorso si allunga e le fonti si moltiplicano.
 
 Il principio è semplice: il dato resta vicino a chi lo produce e lo usa. Il Mac
-ospita la base autorevole; il cloud non è un requisito per lavorare. L'AI, quando
-c'è, gira in locale e propone materiale da rivedere. Non prende decisioni e non
-scrive dati clinici in autonomia.
+ospita la base autorevole; il cloud non è un requisito per lavorare. Le funzioni
+deterministiche restano locali. Il percorso AI locale usa Ollama quando è
+configurato. Se la funzione è abilitata, l'AI può aggiornare una sintesi locale.
+Non aggiunge diagnosi, terapie o altri dati clinici strutturati senza una
+conferma esplicita.
 
 Nel contesto territoriale italiano questo significa soprattutto togliere
 attrito: aprire la scheda, capire dove si è, ritrovare una fonte, distinguere una
@@ -110,24 +112,49 @@ modulare lo stack AI locale e rafforza backup, cifratura dei campi clinici,
 packaging e controlli sui claim pubblici.
 
 Restano aperti la parity dei client paired, gli snapshot di confronto completi,
-la verifica VoiceOver e il collaudo manuale P6 sul bundle macOS. Il gate verso
-provider AI esterni resta chiuso e non è consegnato alcun percorso di consenso
-o invio.
+la verifica VoiceOver e il collaudo manuale P6 sul bundle macOS. Il controllo
+per i fornitori AI esterni resta chiuso. Non è consegnato alcun percorso di
+consenso o invio.
 
-### Aggiornamenti in verifica
+### Aggiornamenti integrati
 
-La prossima tranche rafforza i contratti degli envelope AI. Un output AI deve
-rispettare la lane prevista prima di diventare materiale di revisione. Un
-envelope ambiguo, incompleto, multiplo o con chiavi riservate duplicate non può
-attivare il recupero legacy né una scrittura clinica.
+La tranche integrata rafforza i contratti dei contenitori JSON (`envelope`) AI.
+Un output AI deve rispettare il contratto dell'attività richiesta prima di
+diventare materiale di revisione. Un contenitore ambiguo, incompleto, multiplo o
+con chiavi riservate duplicate non può attivare il recupero legacy né essere
+usato.
 
 Le diagnosi estratte da documento restano materiale di revisione: la sintesi
 non le aggiunge automaticamente alla scheda. Codex Operator personale non è
-incluso: il relativo boundary richiede decisioni e correzioni separate.
+incluso: i relativi limiti di sicurezza richiedono decisioni e correzioni
+separate.
 
 Il dettaglio è nel [CHANGELOG](./CHANGELOG.md). La fotografia completa vive in
 [`docs/STATE_OF_THE_SYSTEM.md`](./docs/STATE_OF_THE_SYSTEM.md); la parity
 versionata in [`docs/parity-matrix.md`](./docs/parity-matrix.md).
+
+### Modelli e servizi opzionali
+
+Le funzioni deterministiche restano disponibili senza un modello. Il percorso
+AI locale usa Ollama ed è disponibile quando Ollama è configurato.
+L'architettura separa il servizio applicativo dal connettore del modello. Oggi
+è operativo soltanto il connettore Ollama.
+
+Una futura modifica può aggiungere plug-in opzionali per modelli locali, LAN o
+cloud. Le regole dell'organizzazione e la scelta esplicita dell'utente devono
+consentire ogni attivazione.
+
+Un fornitore esterno può offrire più capacità o ridurre alcuni tempi di
+elaborazione. Non è un requisito e non implica una promessa clinica.
+
+Prima di ogni invio servono minimizzazione, controlli verificati, registrazione
+locale e abilitazione esplicita. La redazione o pseudonimizzazione deve essere
+dimostrata per il flusso specifico. MediFlow non dichiara anonimizzazione
+garantita.
+
+Il controllo dell'invio esterno resta oggi chiuso. Nessun plug-in esterno accede
+direttamente al database. Il flusso separa proposta, chiarimento e scrittura
+autorizzata; la scrittura diretta tramite modello non è consegnata.
 
 ## Confini dichiarati
 
@@ -135,6 +162,8 @@ MediFlow non racconta più di quanto possa dimostrare.
 
 - **Il default è locale.** Nessun cloud obbligatorio, nessuna telemetria o
   uscita dati attiva per impostazione iniziale.
+- **I fornitori esterni non sono operativi.** L'estensione a plug-in richiede
+  attivazione esplicita, registrazione locale e controlli sull'invio esterno.
 - **iPhone e iPad non sono app complete.** Il perimetro operativo è
   `home-base + client paired`; cache offline e alcune superfici derivate dai
   documenti restano parziali o disponibili solo sull'host.
