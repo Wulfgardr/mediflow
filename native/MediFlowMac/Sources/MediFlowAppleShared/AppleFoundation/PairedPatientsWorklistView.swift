@@ -177,6 +177,22 @@ struct PairedHomeBaseCredentialsSheet: View {
     }
 }
 
+/// Worklist actions are real controls, not caption-sized text. 44pt is the HIG
+/// touch-target minimum, not a device metric, and the label still grows past it
+/// with Dynamic Type. macOS keeps its existing compact presentation.
+private struct WorklistPrimaryActionStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        #if os(macOS)
+        content.font(.caption)
+        #else
+        content
+            .buttonStyle(.bordered)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        #endif
+    }
+}
+
 /* @Codex */
 struct PairedPatientsWorklistView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -187,9 +203,33 @@ struct PairedPatientsWorklistView: View {
 
     @ViewBuilder
     var body: some View {
+        #if os(macOS)
+        // Unchanged: the macOS sidebar composes these elements into its own
+        // container and owns the List selection chrome.
+        worklistContent
+        #else
+        // One container, so a surface applied by the caller wraps the whole
+        // worklist. As a bare ViewBuilder sequence every top-level element
+        // received the caller's padding and background separately, which drew
+        // the list as a stack of loose cards instead of one list.
+        VStack(alignment: .leading, spacing: 10) {
+            worklistContent
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Elenco pazienti")
+        #endif
+    }
+
+    @ViewBuilder
+    private var worklistContent: some View {
+        #if os(macOS)
+        // The macOS sidebar has no navigation title of its own, so it keeps the
+        // section heading. On iOS the navigation bar already says "Pazienti".
         Text("Pazienti")
             .font(.headline)
             .accessibilityHeading(.h2)
+        #endif
         if let presentation = model.conflictPresentation {
             conflictBanner(presentation)
         }
@@ -198,7 +238,7 @@ struct PairedPatientsWorklistView: View {
         } label: {
             Label("Nuovo paziente", systemImage: "person.badge.plus")
         }
-        .font(.caption)
+        .modifier(WorklistPrimaryActionStyle())
         .disabled(model.isWorking)
         .accessibilityIdentifier("new-patient-button")
         if model.isWorking && model.patients.isEmpty {
@@ -364,9 +404,17 @@ struct PairedPatientsWorklistView: View {
     @ViewBuilder
     private func patientDiagnosis(_ patient: HomeBasePatientSummary) -> some View {
         if let summary = PatientWorklistDiagnosisSummary(rawDiagnoses: patient.diagnoses) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            // At accessibility sizes the wrapped diagnosis and a trailing "+N"
+            // drift apart across lines, so the count moves under the text.
+            let layout = dynamicTypeSize >= .accessibility1
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 6))
+            layout {
                 Text(summary.displayText)
-                    .lineLimit(dynamicTypeSize >= .accessibility1 ? 2 : 1)
+                    // Clinical text wraps before it truncates: a single line lost
+                    // the diagnosis in a narrow list column.
+                    .lineLimit(dynamicTypeSize >= .accessibility1 ? 3 : 2)
+                    .fixedSize(horizontal: false, vertical: true)
                 if summary.additionalCount > 0 {
                     Text("+\(summary.additionalCount)")
                         .fontWeight(.medium)
@@ -405,61 +453,103 @@ struct PairedPatientsWorklistView: View {
 
     private var patientSearchControls: some View {
         VStack(spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("Cerca per nome o codice fiscale", text: $patientQuery)
-                    .textFieldStyle(.plain)
-                    .autocorrectionDisabled()
-                    .accessibilityIdentifier("patient-search-field")
-                if !patientQuery.isEmpty {
-                    Button {
-                        patientQuery = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("patient-search-clear")
-                }
-            }
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 8) {
-                    patientViewModePicker
-                    patientSortMenu
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
+            searchField
+            filterControls
+        }
+    }
+
+    /// The scope filter and the sort control share a row only while both fit.
+    /// A segmented control divides its width equally and truncates rather than
+    /// wrapping, so in a narrow list column the row has to stack instead.
+    @ViewBuilder
+    private var filterControls: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            stackedFilterControls
+        } else {
+            ViewThatFits(in: .horizontal) {
                 HStack(spacing: 10) {
                     patientViewModePicker
                     patientSortMenu
                 }
+                stackedFilterControls
             }
         }
     }
 
+    private var stackedFilterControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            patientViewModePicker
+            patientSortMenu
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            TextField("Cerca per nome o codice fiscale", text: $patientQuery)
+                .textFieldStyle(.plain)
+                .autocorrectionDisabled()
+                .accessibilityIdentifier("patient-search-field")
+            if !patientQuery.isEmpty {
+                Button {
+                    patientQuery = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Cancella ricerca")
+                .accessibilityIdentifier("patient-search-clear")
+            }
+        }
+        #if !os(macOS)
+        // Without a container the field was an unbounded hairline of text: the
+        // tappable area was the glyph, not a control-sized row.
+        .padding(.horizontal, 10)
+        .frame(minHeight: 44)
+        .background(PlatformColors.groupedBackground, in: RoundedRectangle(cornerRadius: 10))
+        .contentShape(Rectangle())
+        #endif
+    }
+
     /* @Codex */
+    @ViewBuilder
     private var patientViewModePicker: some View {
-        Picker("Stato", selection: $patientViewMode) {
+        // A segmented control divides its width equally and truncates; it never
+        // wraps. At accessibility sizes the same Picker becomes a menu so the
+        // scope label reflows instead of clipping.
+        let picker = Picker("Stato", selection: $patientViewMode) {
             Text("Attivi").tag(PatientListViewMode.active)
             Text("Archiviati").tag(PatientListViewMode.archived)
             Text("Cestino").tag(PatientListViewMode.trash)
         }
-        .pickerStyle(.segmented)
-        .accessibilityIdentifier("patient-view-mode")
+        if dynamicTypeSize.isAccessibilitySize {
+            picker
+                .pickerStyle(.menu)
+                .accessibilityIdentifier("patient-view-mode")
+        } else {
+            picker
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("patient-view-mode")
+        }
     }
 
     /* @Codex */
     private var patientSortMenu: some View {
-        Menu {
-            Picker("Ordina", selection: $patientSortMode) {
-                Text("Recenti").tag(PatientListSortMode.recent)
-                Text("Alfabetico").tag(PatientListSortMode.alpha)
-            }
-        } label: {
-            Label("Ordina", systemImage: "arrow.up.arrow.down")
+        // A menu-style Picker states the active order on its own face. The
+        // previous Menu showed a bare pair of arrows: the current sort was only
+        // discoverable by opening it, and VoiceOver announced no value.
+        Picker("Ordina", selection: $patientSortMode) {
+            Text("Recenti").tag(PatientListSortMode.recent)
+            Text("Alfabetico").tag(PatientListSortMode.alpha)
         }
-        .accessibilityLabel("Ordina pazienti")
+        .pickerStyle(.menu)
+        .accessibilityValue(patientSortMode == .recent ? "Recenti" : "Alfabetico")
         .accessibilityIdentifier("patient-sort-menu")
     }
 
