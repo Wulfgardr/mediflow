@@ -333,9 +333,18 @@ struct PairedPatientDocumentsSection: View {
                     Spacer(minLength: 8)
                     Image(systemName: expandedInsightId == insight.id ? "chevron.up" : "chevron.down")
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                 }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            // The chevron was the only thing describing this control: nothing in
+            // the accessibility tree said the row expanded, or whether it was open.
+            .accessibilityLabel("\(insight.fileName). Dettagli documento")
+            .accessibilityValue(expandedInsightId == insight.id ? "Espanso" : "Compresso")
+            .accessibilityHint("Mostra o nasconde diagnosi e terapie estratte dal documento.")
+            .accessibilityIdentifier("document-insight-disclosure-\(insight.id)")
 
             if expandedInsightId == insight.id {
                 VStack(alignment: .leading, spacing: 4) {
