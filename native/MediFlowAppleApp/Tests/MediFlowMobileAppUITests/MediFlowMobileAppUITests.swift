@@ -33,6 +33,14 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
     }
 
+    /* @Codex */
+    private func attachScreenshot(named name: String) {
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     private func tab(_ label: String) -> XCUIElement {
         let inTabBar = app.tabBars.buttons[label]
         return inTabBar.exists ? inTabBar : app.buttons[label]
@@ -219,6 +227,11 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let rossi = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(rossi.waitForExistence(timeout: 10))
         rossi.tap()
+        XCTAssertTrue(
+            rossi.isSelected,
+            "The selected patient row should expose its state without a decorative chevron"
+        )
+        attachScreenshot(named: "issue-145-selected-patient")
 
         // Detail renders the name and the decoded exemptions (ExemptionCodesCodec).
         XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 10),
@@ -229,6 +242,37 @@ final class MediFlowMobileAppUITests: XCTestCase {
                       "Detail should show decoded diagnoses")
         XCTAssertTrue(sectionView("patient-detail-ai-summary").waitForExistence(timeout: 10),
                       "Detail should show the AI insight summary when present")
+    }
+
+    /* @Codex */
+    func testPatientSortMenuUsesReadableLabelAndChangesOrder() {
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
+
+        let sortMenu = app.buttons["patient-sort-menu"]
+        XCTAssertTrue(sortMenu.waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            sortMenu.label.localizedCaseInsensitiveContains("Ordina"),
+            "The sort menu should describe its purpose instead of exposing only an icon"
+        )
+
+        let rossi = app.buttons["patient-cell-uitest-1"]
+        let bianchi = app.buttons["patient-cell-uitest-2"]
+        XCTAssertTrue(rossi.waitForExistence(timeout: 10))
+        XCTAssertTrue(bianchi.exists)
+        XCTAssertLessThan(rossi.frame.minY, bianchi.frame.minY)
+
+        sortMenu.tap()
+        let alphabetical = app.buttons["Alfabetico"]
+        XCTAssertTrue(alphabetical.waitForExistence(timeout: 5))
+        alphabetical.tap()
+
+        XCTAssertLessThan(
+            bianchi.frame.minY,
+            rossi.frame.minY,
+            "Alphabetical sorting should move Bianchi before Rossi"
+        )
+        attachScreenshot(named: "issue-145-alphabetical-sort")
     }
 
     func testTherapyStatusFilterNarrowsList() {
