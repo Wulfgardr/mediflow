@@ -8,7 +8,7 @@ read_when:
 # 🧭 Roadmap MediFlow
 
 > **Dove siamo e dove vogliamo andare.**
-> v0.7.3 e la linea corrente, senza dichiarare parity UI completa. Ultimo aggiornamento: 2026-07-13.
+> v0.7.3 e la linea corrente, senza dichiarare parity UI completa. Ultimo aggiornamento: 2026-07-24.
 > Fonte roadmap prodotto canonica (vedi anche [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) per la lettura completa corrente e [docs/README.md](./README.md) per mappa completa documenti).
 
 > [!NOTE]
@@ -181,8 +181,19 @@ verbale manuale di `WUL-481` restano lavoro successivo, non claim di release.
   `closed_pending_redaction_lane`.
 * **Boundary ancora chiuso**: registry, provider alternativi, redaction lane e
   consenso cloud non sono consegnati; Ollama resta l'unico provider operativo.
+* **Scaffold model-agnostic proposto**: `WUL-499` e ADR 0086 separano pipeline
+  locale, proposta, chiarimento, anteprima, autorizzazione ed eventuale
+  scrittura applicativa auditata. Il packet e documentale e non apre nuovi
+  runtime.
 * **Attese locali**: la prima slice web collega prestazione attesa e risultato;
   non estende il workflow ai client paired e non introduce scritture autonome.
+* **Automazione graduata futura**: proposta, anteprima, finestra di
+  annullamento, rollback e pannello audit richiedono packet e policy dedicati.
+  Diagnosi, prescrizioni e identita paziente non sono auto-applicabili per
+  default.
+* **Inbox conversazionale fuori dalla 0.8**: le route conversazionali esistenti
+  non equivalgono a una inbox intelligente. Chiarimento guidato, buffer locale
+  temporaneo e conversione confermata restano roadmap.
 
 ### Esperienza nativa
 
