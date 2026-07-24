@@ -7,6 +7,12 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ## [Unreleased]
 
+### Sicurezza
+
+- Aggiorna Next.js, Sharp e PostCSS alle versioni fissate dal lockfile. L'audit
+  di produzione non rileva vulnerabilita. L'audit globale conserva sei rilievi
+  limitati alle dipendenze di sviluppo.
+
 ## [0.7.3] - 2026-07-13
 
 > Nota release: la `0.7.3` consolida la linea local-first con un'adozione
