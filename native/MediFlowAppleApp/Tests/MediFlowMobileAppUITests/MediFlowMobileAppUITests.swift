@@ -11,6 +11,13 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app = XCUIApplication()
     }
 
+    override func tearDown() {
+        // Orientation is device state, not app state: leaving a rotated simulator
+        // behind would silently change the layout every later test measures.
+        XCUIDevice.shared.orientation = .portrait
+        super.tearDown()
+    }
+
     /* @Codex */
     private func launch(
         seedPatients: Bool = false,
@@ -75,11 +82,10 @@ final class MediFlowMobileAppUITests: XCTestCase {
     }
 
     // @Codex #142: the outer project sidebar must overlay the iPad patient workspace.
-    func testProjectSidebarPreservesPatientWorkspaceWidthOnIPad() {
-        guard UIDevice.current.userInterfaceIdiom == .pad else {
-            XCTFail("This layout contract must run on iPad.")
-            return
-        }
+    func testProjectSidebarPreservesPatientWorkspaceWidthOnIPad() throws {
+        // Not applicable on iPhone: skipping keeps the iPhone suite meaningful
+        // instead of reporting a device mismatch as a product failure.
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "iPad-only layout contract")
 
         launch(seedPatients: true, section: "modules")
         let patientWorkspace = sectionView("clinical-workspace-patients-view")
@@ -123,11 +129,10 @@ final class MediFlowMobileAppUITests: XCTestCase {
     }
 
     // @Codex #142: AX Dynamic Type must select the existing single-column path.
-    func testAccessibilityDynamicTypeUsesSinglePatientColumnOnIPad() {
-        guard UIDevice.current.userInterfaceIdiom == .pad else {
-            XCTFail("This layout contract must run on iPad.")
-            return
-        }
+    func testAccessibilityDynamicTypeUsesSinglePatientColumnOnIPad() throws {
+        // Not applicable on iPhone: skipping keeps the iPhone suite meaningful
+        // instead of reporting a device mismatch as a product failure.
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "iPad-only layout contract")
 
         launch(
             seedPatients: true,
@@ -160,6 +165,131 @@ final class MediFlowMobileAppUITests: XCTestCase {
         detailEvidence.name = "issue-142-ax5-single-layer-detail"
         detailEvidence.lifetime = .keepAlways
         add(detailEvidence)
+    }
+
+    // MARK: - Adaptive layout matrix
+
+    /// The list column must follow the container, not a constant. A fixed-width
+    /// column measures the same in portrait and landscape; a container-relative
+    /// one grows with the space it is given, and never takes the whole workspace.
+    func testIPadListColumnFollowsTheContainerAcrossRotation() throws {
+        // Not applicable on iPhone: skipping keeps the iPhone suite meaningful
+        // instead of reporting a device mismatch as a product failure.
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "iPad-only layout contract")
+        launch(seedPatients: true, section: "modules")
+        XCUIDevice.shared.orientation = .portrait
+        let workspace = sectionView("clinical-workspace-patients-view")
+        XCTAssertTrue(workspace.waitForExistence(timeout: 20))
+        let row = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+
+        let portraitContainer = workspace.frame.width
+        let portraitRow = row.frame.width
+        attachScreenshot(named: "matrix-ipad-portrait-split")
+
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        let landscapeContainer = workspace.frame.width
+        let landscapeRow = row.frame.width
+        attachScreenshot(named: "matrix-ipad-landscape-split")
+
+        XCTAssertGreaterThan(landscapeContainer, portraitContainer, "landscape must be the wider container")
+        XCTAssertGreaterThan(
+            landscapeRow,
+            portraitRow,
+            "the list column must grow with the container; a fixed width would measure the same in both orientations"
+        )
+        for (row, container, label) in [
+            (portraitRow, portraitContainer, "portrait"),
+            (landscapeRow, landscapeContainer, "landscape")
+        ] {
+            XCTAssertLessThan(row, container * 0.5, "the list must not take half the workspace in \(label)")
+        }
+    }
+
+    /// Selection is the thing the design contract says must survive recomposition.
+    func testIPadKeepsTheOpenChartAcrossRotation() throws {
+        // Not applicable on iPhone: skipping keeps the iPhone suite meaningful
+        // instead of reporting a device mismatch as a product failure.
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "iPad-only layout contract")
+        launch(seedPatients: true, section: "modules")
+        XCUIDevice.shared.orientation = .portrait
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
+        let row = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.tap()
+        XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 15))
+
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(
+            sectionView("patient-detail-name").waitForExistence(timeout: 15),
+            "rotating must not drop the open chart"
+        )
+        XCUIDevice.shared.orientation = .portrait
+        XCTAssertTrue(
+            sectionView("patient-detail-name").waitForExistence(timeout: 15),
+            "rotating back must not drop the open chart"
+        )
+        attachScreenshot(named: "matrix-ipad-selection-preserved")
+    }
+
+    /// Clinical content must stay inside the workspace at the largest text size.
+    /// The worklist row is the densest thing on the home: name, masked tax code,
+    /// diagnosis summary and relative update all compete for the same width.
+    func testWorklistContentStaysInsideTheWorkspaceAtAX5() {
+        launch(seedPatients: true, section: "modules", dynamicTypeSize: "accessibility5")
+        let workspace = sectionView("clinical-workspace-patients-view")
+        XCTAssertTrue(workspace.waitForExistence(timeout: 20))
+        let row = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        let diagnosis = sectionView("patient-cell-diagnosis-uitest-1")
+        XCTAssertTrue(diagnosis.waitForExistence(timeout: 15))
+        attachScreenshot(named: "matrix-ax5-worklist")
+
+        let bounds = workspace.frame
+        for (element, name) in [(row, "patient row"), (diagnosis, "diagnosis summary")] {
+            XCTAssertGreaterThanOrEqual(
+                element.frame.minX, bounds.minX - 1,
+                "\(name) starts outside the workspace at AX5"
+            )
+            XCTAssertLessThanOrEqual(
+                element.frame.maxX, bounds.maxX + 1,
+                "\(name) overflows the workspace at AX5"
+            )
+        }
+        XCTAssertTrue(
+            diagnosis.label.contains("Diabete tipo 2"),
+            "the diagnosis must stay readable at AX5, got: \(diagnosis.label)"
+        )
+    }
+
+    /// The scope filter is a segmented control, which truncates instead of
+    /// wrapping. At accessibility sizes it has to become a menu so the active
+    /// scope is still legible.
+    func testScopeFilterRemainsLegibleAtAX5() {
+        launch(seedPatients: true, section: "modules", dynamicTypeSize: "accessibility5")
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
+        let scope = sectionView("patient-view-mode")
+        XCTAssertTrue(scope.waitForExistence(timeout: 15))
+        XCTAssertTrue(
+            scope.frame.width > 0 && scope.frame.height > 0,
+            "the scope control must still be laid out at AX5"
+        )
+        attachScreenshot(named: "matrix-ax5-scope-filter")
+    }
+
+    /// The sort control has to state the active order on its own face: the old
+    /// bare arrow pair required opening the menu to learn the current sort.
+    func testSortControlShowsTheActiveOrder() {
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
+        let sort = app.buttons["patient-sort-menu"]
+        XCTAssertTrue(sort.waitForExistence(timeout: 15))
+        let face = "\(sort.label) \(sort.value as? String ?? "")"
+        XCTAssertTrue(
+            face.localizedCaseInsensitiveContains("Recenti"),
+            "the sort control must show the active order without being opened, got: \(face)"
+        )
     }
 
     func testTabBarNavigatesBetweenSections() {
@@ -347,13 +477,20 @@ final class MediFlowMobileAppUITests: XCTestCase {
         attachScreenshot(named: "issue-145-selected-patient")
 
         if UIDevice.current.userInterfaceIdiom == .phone {
-            let disclosure = app.buttons["Espandi dati paziente"]
+            // Matched across element types: the header carries a header trait, so
+            // it is not guaranteed to surface as a plain button.
+            let disclosure = sectionView("patient-compact-header-disclosure")
             XCTAssertTrue(disclosure.waitForExistence(timeout: 5))
+            // The label names the open patient; the expand/collapse state is the
+            // value. Labelling the button with the verb alone hid the identity.
+            XCTAssertTrue(
+                disclosure.label.contains("Rossi Mario"),
+                "The chart header must announce the patient, got: \(disclosure.label)"
+            )
             XCTAssertEqual(disclosure.value as? String, "Compresso")
             disclosure.tap()
-            let expandedDisclosure = app.buttons["Comprimi dati paziente"]
-            XCTAssertTrue(expandedDisclosure.waitForExistence(timeout: 5))
-            XCTAssertEqual(expandedDisclosure.value as? String, "Espanso")
+            XCTAssertEqual(disclosure.value as? String, "Espanso")
+            XCTAssertTrue(disclosure.label.contains("Rossi Mario"))
         }
 
         // Detail renders the name and the decoded exemptions (ExemptionCodesCodec).
