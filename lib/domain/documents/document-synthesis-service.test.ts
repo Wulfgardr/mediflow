@@ -1,6 +1,8 @@
 /* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { AIService } from '../../ai-service';
+import { db } from '../../db';
 import { buildStoredDocumentExcerpt } from './document-excerpt';
 /* @Codex */
 import { routeDocumentClassForSynthesis } from './document-synthesis-routing';
@@ -9,9 +11,9 @@ import { rememberPdfDocumentMetadata } from '../../pdf-document-metadata';
 import { parseStructuredAnalysisResponse } from './document-synthesis-parser';
 import { parseDocumentIntelligenceCasePack } from './document-intelligence-case-pack';
 /* @Codex */
-import { decideDocumentRouterControlFlow } from './document-router-control-flow';
+import { decideDocumentRouterControlFlow, DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY } from './document-router-control-flow';
 /* @Codex */
-import { selectDocumentSynthesisAnalysis } from './document-synthesis-service';
+import { selectDocumentSynthesisAnalysis, synthesizeDocument } from './document-synthesis-service';
 import {
     buildDocumentParseEvidenceArtifact,
     evaluateDocumentParseEvidenceArtifact,
@@ -178,8 +180,168 @@ test('parses explicit medications from the model JSON payload', () => {
 test('falls back to empty medications when the model returns invalid JSON', () => {
     const analysis = parseStructuredAnalysisResponse('not-json', 'testo OCR rumoroso');
 
+    assert.equal(analysis.validJson, false);
+    assert.equal(analysis.validTask, false);
     assert.deepEqual(analysis.medications, []);
     assert.equal(analysis.quality?.level, 'yellow');
+});
+
+/* @Codex */
+test('document synthesis does not persist or autofill when the envelope task is invalid', async () => {
+    const original = {
+        getSetting: db.settings.get,
+        getPatient: db.patients.get,
+        updatePatient: db.patients.update,
+        createAi: AIService.create,
+    };
+    let updates = 0;
+
+    db.settings.get = (async (key: string) => ({
+        value: key === DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY ? 'off' : 'enabled',
+    })) as unknown as typeof db.settings.get;
+    db.patients.get = (async () => ({
+        id: 'patient-contract-gate',
+        version: 1,
+        documentInsights: [],
+        diagnoses: [],
+    })) as unknown as typeof db.patients.get;
+    db.patients.update = (async () => {
+        updates += 1;
+    }) as unknown as typeof db.patients.update;
+    AIService.create = (async () => ({
+        generate: async () => JSON.stringify({
+            schemaVersion: 'mediflow.ai.extract.v1',
+            task: 'smart_import',
+            summary: 'Risposta con task errato',
+            data: {},
+        }),
+    })) as unknown as typeof AIService.create;
+
+    try {
+        await assert.rejects(
+            synthesizeDocument('Referto sintetico.', '2026-07-02__referto__synthetic.pdf', 'patient-contract-gate'),
+            /risposta non valida/i,
+        );
+        assert.equal(updates, 0);
+    } finally {
+        db.settings.get = original.getSetting;
+        db.patients.get = original.getPatient;
+        db.patients.update = original.updatePatient;
+        AIService.create = original.createAi;
+    }
+});
+
+test('document synthesis stores high confidence diagnoses as review material only', async () => {
+    const original = {
+        getSetting: db.settings.get,
+        getPatient: db.patients.get,
+        updatePatient: db.patients.update,
+        createAi: AIService.create,
+    };
+    const updatePayloads: unknown[] = [];
+
+    db.settings.get = (async (key: string) => ({
+        value: key === DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY ? 'off' : 'enabled',
+    })) as unknown as typeof db.settings.get;
+    db.patients.get = (async () => ({
+        id: 'patient-review-only',
+        version: 1,
+        documentInsights: [],
+        diagnoses: [],
+    })) as unknown as typeof db.patients.get;
+    db.patients.update = (async (_id: string, payload: unknown) => {
+        updatePayloads.push(payload);
+    }) as unknown as typeof db.patients.update;
+    AIService.create = (async () => ({
+        generate: async () => JSON.stringify({
+            schemaVersion: 'mediflow.ai.extract.v1',
+            task: 'document_synthesis',
+            summary: 'Diagnosi proposta per revisione',
+            data: {
+                qualityLevel: 'green',
+                medications: [],
+                diagnoses: [{
+                    code: 'I10',
+                    description: 'Ipertensione essenziale',
+                    system: 'ICD-10',
+                    confidence: 'high',
+                    evidence: 'Diagnosi esplicita nel documento sintetico',
+                }],
+                problemStatements: [],
+                therapyCandidates: [],
+                servicePrescriptions: [],
+            },
+        }),
+    })) as unknown as typeof AIService.create;
+
+    try {
+        const result = await synthesizeDocument(
+            'Referto sintetico con diagnosi esplicita.',
+            '2026-07-24__referto__synthetic.pdf',
+            'patient-review-only',
+        );
+        const payload = updatePayloads[0] as { diagnoses?: unknown; documentInsights?: unknown[] };
+
+        assert.equal(updatePayloads.length, 1);
+        assert.equal(result.insight.autofill, undefined);
+        assert.equal(payload.diagnoses, undefined);
+        assert.equal(Object.hasOwn(payload, 'diagnoses'), false);
+        assert.equal(Array.isArray(payload.documentInsights), true);
+    } finally {
+        db.settings.get = original.getSetting;
+        db.patients.get = original.getPatient;
+        db.patients.update = original.updatePatient;
+        AIService.create = original.createAi;
+    }
+});
+
+/* WUL-362 F1: una risposta avvelenata con chiave task duplicata (evidenza
+   moderna oscurata dal last-wins) non deve mai attraversare il rescue legacy:
+   il service rifiuta, non scrive e non applica alcun autofill ICD. */
+test('document synthesis rejects a last-wins poisoned response with zero writes and zero autofill', async () => {
+    const original = {
+        getSetting: db.settings.get,
+        getPatient: db.patients.get,
+        updatePatient: db.patients.update,
+        createAi: AIService.create,
+    };
+    let updates = 0;
+    const updatePayloads: unknown[] = [];
+
+    db.settings.get = (async (key: string) => ({
+        value: key === DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY ? 'off' : 'enabled',
+    })) as unknown as typeof db.settings.get;
+    db.patients.get = (async () => ({
+        id: 'patient-poisoned-gate',
+        version: 1,
+        documentInsights: [],
+        diagnoses: [],
+    })) as unknown as typeof db.patients.get;
+    db.patients.update = (async (_id: string, payload: unknown) => {
+        updates += 1;
+        updatePayloads.push(payload);
+    }) as unknown as typeof db.patients.update;
+    AIService.create = (async () => ({
+        generate: async () => '{"task":"document_synthesis","task":"Nota storica libera",'
+            + '"summary_markdown":"**Riassunto clinico:** testo storico sintetico",'
+            + '"quality":{"level":"green","reason":"Documento chiaro"},'
+            + '"medications":["Sintetizina 10 mg 1 cp al mattino"],'
+            + '"diagnoses":[{"code":"I10","description":"Ipertensione essenziale","system":"ICD-10","confidence":"high","evidence":"testo sintetico"}]}',
+    })) as unknown as typeof AIService.create;
+
+    try {
+        await assert.rejects(
+            synthesizeDocument('Referto sintetico.', '2026-07-22__referto__synthetic.pdf', 'patient-poisoned-gate'),
+            /risposta non valida/i,
+        );
+        assert.equal(updates, 0);
+        assert.deepEqual(updatePayloads, []);
+    } finally {
+        db.settings.get = original.getSetting;
+        db.patients.get = original.getPatient;
+        db.patients.update = original.updatePatient;
+        AIService.create = original.createAi;
+    }
 });
 
 test('buildStoredDocumentExcerpt keeps high-signal sections in clinical order', () => {

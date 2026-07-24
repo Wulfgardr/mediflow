@@ -669,3 +669,935 @@ test('buildPatientInsightContext normalizes CDA-like recovered attachment text b
         restore();
     }
 });
+
+/* @Codex */
+test('patient insight does not persist when the envelope task is duplicated', async () => {
+    const restoreHarness = await withHarness();
+    const { AIService } = await import('./ai-service');
+    const { regeneratePatientSummary } = await import('./ai-summary-service');
+    const { db } = await import('./db');
+    const original = {
+        getSetting: db.settings.get,
+        getPatient: db.patients.get,
+        updatePatient: db.patients.update,
+        createAi: AIService.create,
+    };
+    let updates = 0;
+
+    db.settings.get = (async () => ({ value: 'enabled' })) as typeof db.settings.get;
+    db.patients.get = (async (id: string) => {
+        const patient = await original.getPatient(id);
+        return patient ? { ...patient, version: 1 } : undefined;
+    }) as typeof db.patients.get;
+    db.patients.update = (async () => {
+        updates += 1;
+    }) as typeof db.patients.update;
+    AIService.create = (async () => ({
+        getModelInfo: () => ({ provider: 'local', model: 'synthetic', baseUrl: 'http://127.0.0.1' }),
+        generate: async () => '{"schemaVersion":"mediflow.ai.extract.v1","task":"smart_import","task":"patient_insight","summary":"Risposta duplicata","data":{"currentState":[],"alerts":[],"nextSteps":[],"gaps":[]}}',
+    })) as unknown as typeof AIService.create;
+
+    try {
+        await assert.rejects(
+            regeneratePatientSummary('patient-1'),
+            /risposta non valida per il Patient Insight/i,
+        );
+        assert.equal(updates, 0);
+    } finally {
+        db.settings.get = original.getSetting;
+        db.patients.get = original.getPatient;
+        db.patients.update = original.updatePatient;
+        AIService.create = original.createAi;
+        restoreHarness();
+    }
+});
+
+/* @Codex */
+test('coerceInsightToReadable keeps recovering historical provider wrappers', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            message: { content: '## Sintesi clinica\nFollow-up post-dimissione.' },
+        }));
+        assert.notEqual(readable.kind, 'unreadable');
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('coerceInsightToReadable marks an invalid declared envelope as unreadable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            schemaVersion: 'mediflow.ai.extract.v1',
+            task: 'smart_import',
+            summary: 'Task errato',
+            data: {},
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('coerceInsightToReadable rejects an invalid envelope embedded in a provider wrapper', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            message: {
+                content: JSON.stringify({
+                    schemaVersion: 'mediflow.ai.extract.v1',
+                    task: 'smart_import',
+                    summary: 'Task errato incapsulato',
+                    data: {},
+                }),
+            },
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('coerceInsightToReadable renders a valid envelope embedded in a provider wrapper as structured', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            message: {
+                content: JSON.stringify({
+                    schemaVersion: 'mediflow.ai.extract.v1',
+                    task: 'patient_insight',
+                    summary: 'Sintesi clinica sintetica',
+                    data: { currentState: ['Paziente stabile.'], alerts: [], nextSteps: [], gaps: [] },
+                }),
+            },
+        }));
+        assert.equal(readable.kind, 'structured');
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('coerceInsightToReadable rejects a case-variant envelope with a mismatched task', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            SchemaVersion: 'mediflow.ai.extract.v1',
+            Task: 'smart_import',
+            summary: 'Chiavi con case variante',
+            data: {},
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('coerceInsightToReadable rejects a mismatched envelope nested as object in a wrapper', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            message: {
+                content: {
+                    schemaVersion: 'mediflow.ai.extract.v1',
+                    task: 'smart_import',
+                    summary: 'Envelope annidato come oggetto',
+                    data: {},
+                },
+            },
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('document analysis rejects an envelope with a mismatched task', async () => {
+    const restoreHarness = await withHarness();
+    const { AIService } = await import('./ai-service');
+    const { db } = await import('./db');
+    const { analyzeDocumentContent } = await import('./domain/documents/document-synthesis-service');
+    const original = { getSetting: db.settings.get, createAi: AIService.create };
+
+    db.settings.get = (async () => ({ value: 'enabled' })) as typeof db.settings.get;
+    AIService.create = (async () => ({
+        getModelInfo: () => ({ provider: 'local', model: 'synthetic', baseUrl: 'http://127.0.0.1' }),
+        generate: async () => JSON.stringify({
+            schemaVersion: 'mediflow.ai.extract.v1',
+            task: 'smart_import',
+            summary: 'Task errato per la sintesi',
+            data: {},
+        }),
+    })) as unknown as typeof AIService.create;
+
+    try {
+        await assert.rejects(
+            analyzeDocumentContent('Referto sintetico di prova'),
+            /risposta non valida per l'analisi del documento/i,
+        );
+    } finally {
+        db.settings.get = original.getSetting;
+        AIService.create = original.createAi;
+        restoreHarness();
+    }
+});
+
+/* @Codex */
+test('coerceInsightToReadable rejects a broken declared envelope that embeds markdown', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(
+            '{"schemaVersion":"mediflow.ai.extract.v1","task":"smart_import",\n**Riassunto clinico**: sintesi sintetica non valida',
+        );
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('coerceInsightToReadable keeps mixed markdown with plain json readable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(
+            '**Riassunto clinico**: paziente stabile.\n```json\n{"note":"dato sintetico"}\n```',
+        );
+        assert.equal(readable.kind, 'structured');
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex: matrice resolver envelope (WUL-362) */
+const VALID_INSIGHT_ENVELOPE = {
+    schemaVersion: 'mediflow.ai.extract.v1',
+    task: 'patient_insight',
+    summary: 'Sintesi clinica sintetica',
+    data: { currentState: ['Paziente stabile.'], alerts: [], nextSteps: [], gaps: [] },
+};
+
+/* @Codex */
+test('resolver: direct valid patient insight envelope renders structured', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify(VALID_INSIGHT_ENVELOPE));
+        assert.equal(readable.kind, 'structured');
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: valid envelope nested as object renders structured', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            message: { content: VALID_INSIGHT_ENVELOPE },
+        }));
+        assert.equal(readable.kind, 'structured');
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: provider metadata keys around a valid inner envelope render structured', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            schemaVersion: 'provider.response.v2',
+            task: 'chat.completion',
+            output: VALID_INSIGHT_ENVELOPE,
+        }));
+        assert.equal(readable.kind, 'structured');
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: partial mediflow wrapper does not shadow a complete inner envelope', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            schemaVersion: 'mediflow.ai.extract.v1',
+            response: VALID_INSIGHT_ENVELOPE,
+        }));
+        assert.equal(readable.kind, 'structured');
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: deeply nested smart import envelope stays unreadable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            choices: [{
+                message: {
+                    content: {
+                        schemaVersion: 'mediflow.ai.extract.v1',
+                        task: 'smart_import',
+                        summary: 'Import annidato in profondita',
+                        data: { diagnoses: [], therapies: [], servicePrescriptions: [] },
+                    },
+                },
+            }],
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: unsupported schema version with summary stays unreadable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            schemaVersion: 'mediflow.ai.extract.v2',
+            task: 'patient_insight',
+            summary: 'Schema non supportato',
+            data: { currentState: ['Testo.'], alerts: [], nextSteps: [], gaps: [] },
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: incompatible sibling envelopes stay unreadable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            first: VALID_INSIGHT_ENVELOPE,
+            second: {
+                schemaVersion: 'mediflow.ai.extract.v1',
+                task: 'smart_import',
+                summary: 'Envelope concorrente',
+                data: { diagnoses: [], therapies: [], servicePrescriptions: [] },
+            },
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+const VALID_SMART_IMPORT_ENVELOPE = {
+    schemaVersion: 'mediflow.ai.extract.v1',
+    task: 'smart_import',
+    summary: 'Import sintetico',
+    data: { diagnoses: [], therapies: [], servicePrescriptions: [] },
+};
+
+/* @Codex */
+test('resolver: broken declared envelope inside a nested string stays unreadable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            message: {
+                content: '{"schemaVersion":"mediflow.ai.extract.v1","task":"smart_import",\n**Riassunto clinico**: testo del bypass',
+            },
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: fenced smart import envelope inside a wrapper string stays unreadable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            message: {
+                content: '```json\n' + JSON.stringify(VALID_SMART_IMPORT_ENVELOPE) + '\n```',
+            },
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: node budget exhaustion resolves fail-closed, not readable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            noise: Array.from({ length: 260 }, () => ({})),
+            payload: {
+                schemaVersion: 'mediflow.ai.extract.v1',
+                task: 'smart_import',
+                content: 'testo del bypass 256 nodi',
+                data: { diagnoses: [], therapies: [], servicePrescriptions: [] },
+            },
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: string parse budget exhaustion resolves fail-closed, not readable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            noise0: '{}', noise1: '{}', noise2: '{}', noise3: '{}',
+            noise4: '{}', noise5: '{}', noise6: '{}', noise7: '{}',
+            content: JSON.stringify(VALID_SMART_IMPORT_ENVELOPE),
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: oversized nested string resolves fail-closed, not readable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            content: JSON.stringify({
+                ...VALID_SMART_IMPORT_ENVELOPE,
+                padding: 'x'.repeat(100001),
+            }),
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex: matrice contratto normativo WUL-362 (multi-frammento, parentela, soglie) */
+test('resolver: innocuous fragment followed by wrong-task envelope stays unreadable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(
+            '**Riassunto clinico**: paziente stabile.\n```json\n{"note":"example"}\n```\n```json\n'
+            + JSON.stringify(VALID_SMART_IMPORT_ENVELOPE) + '\n```',
+        );
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: an innocuous fragment before patient insight is ambiguous', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(
+            'Nota introduttiva.\n```json\n{"note":"example"}\n```\n```json\n'
+            + JSON.stringify(VALID_INSIGHT_ENVELOPE) + '\n```',
+        );
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: JSON arrays and prefixes before patient insight are ambiguous', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const fence = `\`\`\`json\n${JSON.stringify(VALID_INSIGHT_ENVELOPE)}\n\`\`\``;
+
+        for (const prefix of ['[1,2]', '[]', '[tru', '[nu']) {
+            for (const response of [
+                `${prefix}\n${fence}`,
+                `\`\`\`json\n${prefix}\n\`\`\`\n${fence}`,
+                `\`\`\`json\n${prefix}\n${JSON.stringify(VALID_INSIGHT_ENVELOPE)}\n\`\`\``,
+            ]) {
+                const readable = coerceInsightToReadable(response);
+                assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' }, prefix);
+            }
+        }
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: sibling declared-invalid envelope beside a valid one stays unreadable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            first: VALID_INSIGHT_ENVELOPE,
+            second: {
+                schemaVersion: 'mediflow.ai.extract.v2',
+                task: 'patient_insight',
+                summary: 'Unsupported',
+                data: { currentState: ['Poison'], alerts: [], nextSteps: [], gaps: [] },
+            },
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: descendant declared-invalid inside a valid envelope stays unreadable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            ...VALID_INSIGHT_ENVELOPE,
+            data: {
+                ...VALID_INSIGHT_ENVELOPE.data,
+                embedded: { schemaVersion: 'mediflow.ai.extract.v2', task: 'patient_insight' },
+            },
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: valid envelope deeper than the depth budget resolves fail-closed', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        let nested: unknown = VALID_INSIGHT_ENVELOPE;
+        for (let index = 0; index < 9; index += 1) nested = { layer: nested };
+        const readable = coerceInsightToReadable(JSON.stringify(nested));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: fragment budget boundary is exact', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const fragments = (count: number) => Array.from({ length: count }, (_, i) => `{"i":${i}}`).join(' testo ');
+        const within = coerceInsightToReadable('Testo iniziale ' + fragments(8));
+        assert.notEqual(within.kind, 'unreadable');
+        const beyond = coerceInsightToReadable('Testo iniziale ' + fragments(9));
+        assert.deepEqual(beyond, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: char budget boundary is exact and checked before root parse', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const basePayload = { content: '## Nota storica sintetica.', pad: '' };
+        const baseLength = JSON.stringify(basePayload).length;
+        const exact = JSON.stringify({ ...basePayload, pad: 'x'.repeat(400000 - baseLength) });
+        assert.equal(exact.length, 400000);
+        const within = coerceInsightToReadable(exact);
+        assert.notEqual(within.kind, 'unreadable');
+        const beyond = coerceInsightToReadable(JSON.stringify({ ...basePayload, pad: 'x'.repeat(400001 - baseLength) }));
+        assert.deepEqual(beyond, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: node budget boundary is exact', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const noise = (count: number) => ({
+            content: '## Nota storica sintetica.',
+            noise: Array.from({ length: count }, () => ({})),
+        });
+        const within = coerceInsightToReadable(JSON.stringify(noise(254)));
+        assert.notEqual(within.kind, 'unreadable');
+        const beyond = coerceInsightToReadable(JSON.stringify(noise(255)));
+        assert.deepEqual(beyond, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: nested string at the exact length limit is classified, not truncated', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const basePayload = {
+            schemaVersion: 'mediflow.ai.extract.v1',
+            task: 'smart_import',
+            summary: 'soglia',
+            data: { diagnoses: [], therapies: [], servicePrescriptions: [] },
+            padding: '',
+        };
+        const baseLength = JSON.stringify(basePayload).length;
+        const exact = JSON.stringify({ ...basePayload, padding: 'p'.repeat(100000 - baseLength) });
+        assert.equal(exact.length, 100000);
+        const readable = coerceInsightToReadable(JSON.stringify({ content: exact }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: eighth nested string is still parsed before the budget trips', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            noise0: '{"j":0}', noise1: '{"j":1}', noise2: '{"j":2}', noise3: '{"j":3}',
+            noise4: '{"j":4}', noise5: '{"j":5}', noise6: '{"j":6}',
+            content: JSON.stringify(VALID_SMART_IMPORT_ENVELOPE),
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: bare known task in a historical demo snippet stays readable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(
+            '**Riassunto clinico**: paziente stabile.\n\nEsempio tecnico:\n```json\n{"task":"smart_import","example":true}\n```',
+        );
+        assert.equal(readable.kind, 'structured');
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: known task with summary is a modern declaration and fails closed', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable('{"task":"smart_import","summary":"solo accompagnamento"}');
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: compatible schemaVersion alone is a modern declaration and fails closed', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable('{"schemaVersion":"mediflow.ai.extract.v1","note":"solo schema"}');
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex: controesempi della review di conformita (ciclo fix) */
+test('resolver: single-quoted pseudo envelope in a nested string stays unreadable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            content: "{'schemaVersion':'mediflow.ai.extract.v1','task':'smart_import','summary':'errato'}\n**Riassunto clinico**: bypass leggibile",
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: duplicate conflicting task keys stay unreadable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(
+            '{"schemaVersion":"mediflow.ai.extract.v1","task":"smart_import","task":"patient_insight","summary":"Conflitto","data":{"currentState":["Accettato"],"alerts":[],"nextSteps":[],"gaps":[]}}',
+        );
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: duplicate modern envelope in a stringified layer stays unreadable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            content: '{"schemaVersion":"mediflow.ai.extract.v1","task":"smart_import","task":"patient_insight","summary":"Conflitto","data":{"currentState":[],"alerts":[],"nextSteps":[],"gaps":[]}}',
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: separate historical task fragments remain readable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(
+            '**Riassunto clinico**: paziente stabile.\n```json\n{"task":"smart_import","example":true}\n```\n'
+            + '```json\n{"task":"patient_insight","example":true}\n```',
+        );
+        assert.equal(readable.kind, 'structured');
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: whitespace padding cannot bypass the root char budget', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(' '.repeat(400001) + JSON.stringify(VALID_INSIGHT_ENVELOPE));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: whitespace padding cannot bypass the nested string limit', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            content: ' '.repeat(100001) + '**Riassunto clinico**: oltre limite {nota}',
+        }));
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('resolver: an unclosed opener does not hide a later valid envelope', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable('prefisso { non chiuso ' + JSON.stringify(VALID_INSIGHT_ENVELOPE));
+        assert.equal(readable.kind, 'structured');
+    } finally {
+        restore();
+    }
+});
+
+/* WUL-362 F2: un marcatore canonico [Sx] non e un candidato JSON e non consuma
+   il budget frammenti; le parentesi bilanciate da sole non provano una
+   candidatura JSON. Nove candidati JSON reali restano fail-closed. */
+
+const CANONICAL_INSIGHT_WITH_CITATIONS = [
+    '**Quadro attuale:** paziente stabile in follow-up territoriale [S1] [S2] [S3].',
+    '',
+    '**Attenzioni:**',
+    '- Controllo pressorio domiciliare da proseguire [S4] [S5]',
+    '- Aderenza terapeutica da confermare al prossimo accesso [S6]',
+    '',
+    '**Prossimi passi:**',
+    '- Rivalutazione ambulatoriale programmata [S7] [S8]',
+    '- Esami ematochimici di controllo [S9] [S10]',
+].join('\n');
+
+/* @Codex WUL-362 R5b: fixture fedele alla distribuzione avversa della review. */
+const DISTRIBUTED_CANDIDATE_INSIGHT = JSON.stringify({
+    content: '**Riassunto clinico**: testo storico sintetico leggibile.',
+    ...Object.fromEntries(
+        Array.from({ length: 9 }, (_, index) => [`c${index}`, `[S${index + 1}]`]),
+    ),
+    ...Object.fromEntries(
+        Array.from({ length: 8 }, (_, index) => [
+            `s${index}`,
+            index === 7
+                ? `${JSON.stringify({ i: index })} text ${JSON.stringify({ i: 8 })}`
+                : JSON.stringify({ i: index }),
+        ]),
+    ),
+});
+
+test('resolver: canonical insight markdown with more than eight citations stays readable', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(CANONICAL_INSIGHT_WITH_CITATIONS);
+        // Leggibile in entrambe le forme (structured o markdown): il contratto
+        // F2 vieta solo l'esito unreadable da esaurimento budget citazioni.
+        assert.notEqual(readable.kind, 'unreadable');
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex WUL-362 R5: summary + otto claim citati sono il massimo valido. */
+test('resolver: valid patient insight with citations across all allowed strings stays structured', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(JSON.stringify({
+            schemaVersion: 'mediflow.ai.extract.v1',
+            task: 'patient_insight',
+            summary: 'Sintesi clinica sintetica [S1]',
+            data: {
+                currentState: ['Quadro sintetico uno [S2]', 'Quadro sintetico due [S3]'],
+                alerts: ['Attenzione sintetica uno [S4]', 'Attenzione sintetica due [S5]'],
+                nextSteps: [
+                    'Passo sintetico uno [S6]',
+                    'Passo sintetico due [S7]',
+                    'Passo sintetico tre [S8]',
+                ],
+                gaps: ['Gap sintetico [S9]'],
+            },
+        }));
+        assert.equal(readable.kind, 'structured');
+    } finally {
+        restore();
+    }
+});
+
+test('detection: canonical citation markers beyond the fragment budget stay absent', async () => {
+    const { detectModernEnvelopeEvidence } = await import('./ai-task-contracts');
+    assert.equal(detectModernEnvelopeEvidence(CANONICAL_INSIGHT_WITH_CITATIONS), 'absent');
+});
+
+test('resolver: citations never launder a wrong-task envelope into readability', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        const readable = coerceInsightToReadable(
+            `${CANONICAL_INSIGHT_WITH_CITATIONS}\n\n\`\`\`json\n${JSON.stringify(VALID_SMART_IMPORT_ENVELOPE)}\n\`\`\``,
+        );
+        assert.deepEqual(readable, { kind: 'unreadable', reason: 'json-envelope' });
+    } finally {
+        restore();
+    }
+});
+
+test('detection: nine real JSON candidates without evidence stay unknown', async () => {
+    const { detectModernEnvelopeEvidence } = await import('./ai-task-contracts');
+    const text = Array.from({ length: 9 }, (_, index) => `{"i":${index}}`).join(' testo ');
+    assert.equal(detectModernEnvelopeEvidence(text), 'unknown');
+});
+
+test('detection: cited strings share one global real-candidate budget', async () => {
+    const { detectModernEnvelopeEvidence } = await import('./ai-task-contracts');
+    assert.notEqual(detectModernEnvelopeEvidence(DISTRIBUTED_CANDIDATE_INSIGHT), 'absent');
+});
+
+test('resolver: cited strings share one global real-candidate budget', async () => {
+    const { resolveInsightEnvelope } = await import('./ai-task-contracts');
+    assert.notEqual(resolveInsightEnvelope(DISTRIBUTED_CANDIDATE_INSIGHT).status, 'legacy-text');
+});
+
+test('resolver: distributed candidate budget exhaustion never becomes structured legacy text', async () => {
+    const restore = await withHarness();
+    try {
+        const { coerceInsightToReadable } = await import('./patient-insight-view-model');
+        assert.notEqual(coerceInsightToReadable(DISTRIBUTED_CANDIDATE_INSIGHT).kind, 'structured');
+    } finally {
+        restore();
+    }
+});
+
+/* @Codex */
+test('smart import generation rejects an envelope with a mismatched task', async () => {
+    const restoreHarness = await withHarness();
+    const { AIService } = await import('./ai-service');
+    const { db } = await import('./db');
+    const { generatePatientSmartImportAnalysis } = await import('./domain/documents/patient-smart-import-service');
+    const original = {
+        getSetting: db.settings.get,
+        getPatient: db.patients.get,
+        filterEntries: db.entries.filter,
+        filterAttachments: db.attachments.filter,
+        filterTherapies: db.therapies.filter,
+        createAi: AIService.create,
+    };
+
+    db.settings.get = (async () => ({ value: 'enabled' })) as typeof db.settings.get;
+    db.patients.get = (async () => ({
+        id: 'patient-1',
+        firstName: 'Paziente',
+        lastName: 'Sintetico',
+        diagnoses: [],
+        version: 1,
+    })) as unknown as typeof db.patients.get;
+    db.entries.filter = (() => ({
+        toArray: async () => [{
+            id: 'entry-1',
+            patientId: 'patient-1',
+            type: 'note',
+            title: 'Nota clinica',
+            content: 'Contenuto clinico sintetico sufficiente come sorgente smart import.',
+            date: new Date('2026-01-01T10:00:00Z'),
+        }],
+    })) as unknown as typeof db.entries.filter;
+    db.attachments.filter = (() => ({ toArray: async () => [] })) as unknown as typeof db.attachments.filter;
+    db.therapies.filter = (() => ({ toArray: async () => [] })) as unknown as typeof db.therapies.filter;
+    AIService.create = (async () => ({
+        getModelInfo: () => ({ provider: 'local', model: 'synthetic', baseUrl: 'http://127.0.0.1' }),
+        generate: async () => JSON.stringify({
+            schemaVersion: 'mediflow.ai.extract.v1',
+            task: 'patient_insight',
+            summary: 'Task errato per lo smart import',
+            data: {},
+        }),
+    })) as unknown as typeof AIService.create;
+
+    try {
+        await assert.rejects(
+            generatePatientSmartImportAnalysis('patient-1'),
+            /risposta non valida per lo smart import/i,
+        );
+    } finally {
+        db.settings.get = original.getSetting;
+        db.patients.get = original.getPatient;
+        db.entries.filter = original.filterEntries;
+        db.attachments.filter = original.filterAttachments;
+        db.therapies.filter = original.filterTherapies;
+        AIService.create = original.createAi;
+        restoreHarness();
+    }
+});

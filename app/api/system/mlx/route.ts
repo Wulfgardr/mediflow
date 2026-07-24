@@ -5,10 +5,6 @@ import { requireSession, requireSessionOrLocalToken, unauthorizedResponse, forbi
 /* @Codex */
 import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 
-
-// Note: Robust auth check should be added here using sessions.
-// For now relying on API route protection if any.
-
 /* @Codex */
 // MLX (mlx_lm) and the PM2-managed inference server run only on macOS Apple Silicon.
 // On Windows/Linux return a structured 501 instead of letting PM2 throw a cryptic 500.
@@ -43,10 +39,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST() {
-    // Security Check
-    // TODO: Add robust auth check here.
-    // For now, we rely on middleware if present, or just proceed.
-    // The user requested security.
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();

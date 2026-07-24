@@ -11,7 +11,7 @@
 
 import { parsePatientInsight } from '@/lib/ai-summary-service';
 import { splitInsightDiagnostics } from '@/lib/patient-insight';
-import { parsePatientInsightExtractionResponse } from '@/lib/ai-task-contracts';
+import { resolveInsightEnvelope } from '@/lib/ai-task-contracts';
 
 export type ReadableInsight =
     | {
@@ -86,11 +86,43 @@ function asStructured(
 }
 
 export function coerceInsightToReadable(rawSummary: string): ReadableInsight {
-    const content = (rawSummary || '').trim();
+    const raw = rawSummary || '';
+    const content = raw.trim();
     if (!content) return { kind: 'unreadable', reason: 'empty' };
 
-    const fromMarkdown = parsePatientInsight(content);
+    // @Codex: il resolver canonico riceve il contenuto grezzo, non trimmato,
+    // cosi i suoi budget contano anche il whitespace analizzato
+    const resolution = resolveInsightEnvelope(raw);
+    if (resolution.status === 'declared-invalid' || resolution.status === 'ambiguous') {
+        return { kind: 'unreadable', reason: 'json-envelope' };
+    }
+
     const diagnostics = splitInsightDiagnostics(content);
+    if (resolution.status === 'usable') {
+        const data = resolution.envelope.value.data;
+        const hasExtraction = Boolean(
+            data.currentState.length ||
+            data.alerts.length ||
+            data.nextSteps.length ||
+            data.gaps.length,
+        );
+        if (hasExtraction) {
+            return asStructured(
+                data.currentState.join(' '),
+                data.alerts,
+                data.nextSteps,
+                data.gaps,
+                diagnostics,
+            );
+        }
+        if (resolution.envelope.value.summary) {
+            return asStructured(resolution.envelope.value.summary, [], [], [], diagnostics);
+        }
+        return { kind: 'unreadable', reason: 'empty' };
+    }
+
+    // @Codex: legacy-text, nessun envelope dichiarato raggiungibile: solo recupero storico
+    const fromMarkdown = parsePatientInsight(content);
     const hasStructured = Boolean(
         fromMarkdown.summary ||
         fromMarkdown.alerts.length ||
@@ -119,33 +151,6 @@ export function coerceInsightToReadable(rawSummary: string): ReadableInsight {
             sourcesMarkdown: diagnostics.sourcesMarkdown,
             limitsMarkdown: diagnostics.limitsMarkdown,
         };
-    }
-
-    try {
-        const extraction = parsePatientInsightExtractionResponse(content);
-        const data = extraction.value.data;
-        const hasExtraction = Boolean(
-            data.currentState.length ||
-            data.alerts.length ||
-            data.nextSteps.length ||
-            data.gaps.length,
-        );
-
-        if (hasExtraction) {
-            return asStructured(
-                data.currentState.join(' '),
-                data.alerts,
-                data.nextSteps,
-                data.gaps,
-                diagnostics,
-            );
-        }
-
-        if (extraction.value.summary) {
-            return asStructured(extraction.value.summary, [], [], [], diagnostics);
-        }
-    } catch {
-        // fall through to free-text recovery
     }
 
     try {

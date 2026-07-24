@@ -46,6 +46,7 @@ test('smart import apply does not duplicate a therapy matching operator-reviewed
     };
     const analysis: PatientSmartImportAnalysis = {
         generatedAt: '2026-07-01T00:00:00Z',
+        contract: { validJson: true, validTask: true, legacyContract: false },
         model: { provider: 'local', model: 'test' },
         sourceSummary: { notes: 0, entries: 0, documentInsights: 0, attachmentSummaries: 0 },
         diagnoses: [],
@@ -98,6 +99,35 @@ test('smart import apply does not duplicate a therapy matching operator-reviewed
         db.patients.get = original.getPatient;
         db.therapies.filter = original.filterTherapies;
         db.therapies.add = original.addTherapy;
+    }
+});
+
+/* @Codex */
+test('smart import refuses an analysis whose JSON is valid but task contract is invalid', async () => {
+    const original = {
+        getSetting: db.settings.get,
+        getPatient: db.patients.get,
+    };
+    const analysis: PatientSmartImportAnalysis = {
+        generatedAt: '2026-07-01T00:00:00Z',
+        contract: { validJson: true, validTask: false, legacyContract: false },
+        model: { provider: 'local', model: 'test' },
+        sourceSummary: { notes: 0, entries: 0, documentInsights: 0, attachmentSummaries: 0 },
+        diagnoses: [],
+        therapies: [],
+    };
+
+    db.settings.get = (async () => ({ value: 'enabled' })) as typeof db.settings.get;
+    db.patients.get = (async () => ({ id: 'patient-1', version: 1 } as unknown as Patient)) as typeof db.patients.get;
+
+    try {
+        await assert.rejects(
+            applyPatientSmartImportSelection('patient-1', analysis, { diagnosisIds: [], therapyIds: [] }),
+            /analisi AI non e valida/i,
+        );
+    } finally {
+        db.settings.get = original.getSetting;
+        db.patients.get = original.getPatient;
     }
 });
 

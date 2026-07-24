@@ -9,7 +9,7 @@ read_when:
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-07-21
+Ultimo aggiornamento: 2026-07-24
 
 ## 📚 Policy di consultazione (agent)
 
@@ -41,6 +41,7 @@ Approfondimenti utili:
 - Astrazione provider AI e boundary egress: [ADR 0077](./adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md)
 - Contratto export FHIR R4 v0: [ADR 0081](./adr/0081-fhir-r4-export-v0-contract.md)
 - Registro persistente delle attese v0: [ADR 0082](./adr/0082-persistent-expectations-register-v0.md)
+- Diagnosi da documento review-only: [ADR 0084](./adr/0084-document-diagnoses-review-only.md)
 - Closeout secondario dello stack intelligente: [docs/analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md](./analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md)
 - Triage audit esterno V2: [docs/analysis/2026-07-05-audit-esterno-v2-triage.md](./analysis/2026-07-05-audit-esterno-v2-triage.md)
 

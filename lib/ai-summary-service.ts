@@ -3,6 +3,7 @@
 
 import {
     buildPatientInsightExtractionPrompt,
+    isEnvelopeUsable,
     parsePatientInsightExtractionResponse,
     renderPatientInsightMarkdown,
     toPatientInsightRenderContract,
@@ -119,13 +120,6 @@ export function parsePatientInsight(content: string): ParsedPatientInsight {
     };
 }
 
-function hasInsightContractContent(content: ReturnType<typeof parsePatientInsightExtractionResponse>): boolean {
-    return content.value.data.currentState.length > 0
-        || content.value.data.alerts.length > 0
-        || content.value.data.nextSteps.length > 0
-        || content.value.data.gaps.length > 0;
-}
-
 /* @Codex */
 export { sanitizeInsightMarkdown } from '@/lib/patient-insight';
 
@@ -192,9 +186,10 @@ export async function regeneratePatientSummary(
         options.onStage?.('generate', info);
         const content = await ai.generate(prompt, options.signal, contextData.outputMaxTokens);
         const extracted = parsePatientInsightExtractionResponse(content);
-        const draftMarkdown = hasInsightContractContent(extracted)
-            ? renderPatientInsightMarkdown(toPatientInsightRenderContract(extracted.value))
-            : sanitizeInsightMarkdown(content);
+        if (!isEnvelopeUsable(extracted)) {
+            throw new Error("L'AI ha generato una risposta non valida per il Patient Insight.");
+        }
+        const draftMarkdown = renderPatientInsightMarkdown(toPatientInsightRenderContract(extracted.value));
 
         const cleaned = finalizePatientInsight({
             content: draftMarkdown,

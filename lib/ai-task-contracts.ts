@@ -28,7 +28,732 @@ export interface AITaskParseResult<T> {
     rawJson: string | null;
     validJson: boolean;
     validTask: boolean;
+    legacyContract: boolean;
     repairedTruncation: boolean;
+}
+
+/* @Codex */
+export function isEnvelopeUsable(envelope: { validJson?: unknown; validTask?: unknown }): boolean {
+    return envelope.validJson === true && envelope.validTask === true;
+}
+
+/* @Codex: contratto WUL-362 - rilevazione e risoluzione canonica degli envelope moderni.
+   Evidenza minima bilanciata: schemaVersion col prefisso mediflow.ai.extract, oppure
+   task noto accompagnato da almeno uno tra schemaVersion, data e summary. La sola
+   chiave task non basta: uno snippet dimostrativo storico resta leggibile. */
+export type ModernEnvelopeEvidence = 'present' | 'absent' | 'unknown';
+
+const ENVELOPE_SCHEMA_PREFIX = 'mediflow.ai.extract';
+const KNOWN_AI_TASK_IDS = new Set(['patient_insight', 'smart_import', 'document_synthesis']);
+
+// Budget espliciti e condivisi della scansione: superarne uno degrada fail-closed
+// (ambiguous nel resolver, unknown nel rilevatore tri-state), mai a legacy-text.
+const ENVELOPE_SCAN_MAX_CHARS = 400000;
+const ENVELOPE_SCAN_MAX_DEPTH = 8;
+const ENVELOPE_SCAN_MAX_NODES = 256;
+const ENVELOPE_SCAN_MAX_STRING_PARSES = 8;
+const ENVELOPE_SCAN_MAX_FRAGMENTS = 8;
+const ENVELOPE_SCAN_MAX_STRING_LENGTH = 100000;
+
+// Gli sniff accettano sia doppi che singoli apici: i frammenti pseudo-JSON non
+// parseabili restano dichiarazioni moderne.
+const ENVELOPE_SNIFF_SCHEMA_PATTERN = /["']schemaversion["']\s*:\s*["']mediflow\.ai\.extract(?:\.|["'])/i;
+const ENVELOPE_SNIFF_TASK_PATTERN = /["']task["']\s*:\s*["'](patient_insight|smart_import|document_synthesis)["']/i;
+const ENVELOPE_SNIFF_SUPPORT_PATTERN = /["'](schemaversion|data|summary)["']\s*:/i;
+
+/* @Codex */
+type EnvelopeScanBudget = {
+    chars: number;
+    fragmentCharacterVisits: number;
+    realFragments: number;
+    nodes: number;
+    stringParses: number;
+    truncated: boolean;
+};
+
+/* @Codex */
+function createEnvelopeScanBudget(): EnvelopeScanBudget {
+    return {
+        chars: 0,
+        fragmentCharacterVisits: 0,
+        realFragments: 0,
+        nodes: 0,
+        stringParses: 0,
+        truncated: false,
+    };
+}
+
+/* @Codex */
+function consumeScanChars(budget: EnvelopeScanBudget, amount: number): boolean {
+    budget.chars += amount;
+    if (budget.chars > ENVELOPE_SCAN_MAX_CHARS) {
+        budget.truncated = true;
+        return false;
+    }
+    return true;
+}
+
+/* @Codex WUL-362 R5b: il limite dei candidati reali appartiene all'intera
+   scansione, non alla singola stringa o al singolo layer. */
+function consumeRealFragment(budget: EnvelopeScanBudget): boolean {
+    if (budget.realFragments >= ENVELOPE_SCAN_MAX_FRAGMENTS) {
+        budget.truncated = true;
+        return false;
+    }
+    budget.realFragments += 1;
+    return true;
+}
+
+/* @Codex */
+function readEnvelopeKey(record: Record<string, unknown>, lowerCaseName: string): unknown {
+    for (const key of Object.keys(record)) {
+        if (key.toLowerCase() === lowerCaseName) return record[key];
+    }
+    return undefined;
+}
+
+/* @Codex: evidenza minima bilanciata (contratto punto 4) */
+function declaresModernEnvelopeRecord(record: Record<string, unknown>): boolean {
+    const schemaValue = readEnvelopeKey(record, 'schemaversion');
+    if (typeof schemaValue === 'string' && isModernSchemaVersionValue(schemaValue)) {
+        return true;
+    }
+    const taskValue = readEnvelopeKey(record, 'task');
+    const taskId = typeof taskValue === 'string' ? taskValue.trim().toLowerCase() : null;
+    if (taskId === null || !KNOWN_AI_TASK_IDS.has(taskId)) return false;
+    return readEnvelopeKey(record, 'schemaversion') !== undefined
+        || readEnvelopeKey(record, 'data') !== undefined
+        || readEnvelopeKey(record, 'summary') !== undefined;
+}
+
+/* @Codex: applica una sola decodifica degli escape JavaScript al segmento.
+   Gli escape di controllo restano caratteri di controllo; gli escape di
+   identita rimuovono solo il backslash. Le sequenze Unicode o esadecimali non
+   valide restano letterali, cosi non producono lettere sintetiche. */
+function decodeJavascriptStyleEscapesOnce(text: string): string {
+    let decoded = '';
+    for (let index = 0; index < text.length; index += 1) {
+        const char = text[index];
+        if (char !== '\\' || index + 1 >= text.length) {
+            decoded += char;
+            continue;
+        }
+
+        const escapeStart = index;
+        const escaped = text[index + 1];
+        index += 1;
+        switch (escaped) {
+            case 'b': decoded += '\b'; continue;
+            case 'f': decoded += '\f'; continue;
+            case 'n': decoded += '\n'; continue;
+            case 'r': decoded += '\r'; continue;
+            case 't': decoded += '\t'; continue;
+            case 'v': decoded += '\v'; continue;
+            case '0': decoded += '\0'; continue;
+        }
+        if (escaped === '\n') continue;
+        if (escaped === '\r') {
+            if (text[index + 1] === '\n') index += 1;
+            continue;
+        }
+        if (escaped === 'x') {
+            const hex = text.slice(index + 1, index + 3);
+            if (/^[0-9a-fA-F]{2}$/.test(hex)) {
+                decoded += String.fromCharCode(Number.parseInt(hex, 16));
+                index += 2;
+            } else {
+                decoded += text.slice(escapeStart, index + 1);
+            }
+            continue;
+        }
+        if (escaped === 'u') {
+            if (text[index + 1] === '{') {
+                let cursor = index + 2;
+                while (cursor < text.length
+                    && cursor < index + 8
+                    && /^[0-9a-fA-F]$/.test(text[cursor])) {
+                    cursor += 1;
+                }
+                const hex = text.slice(index + 2, cursor);
+                const codePoint = hex.length > 0 ? Number.parseInt(hex, 16) : -1;
+                if (text[cursor] === '}' && codePoint >= 0 && codePoint <= 0x10FFFF) {
+                    decoded += String.fromCodePoint(codePoint);
+                    index = cursor;
+                } else {
+                    decoded += text.slice(escapeStart, index + 1);
+                }
+                continue;
+            }
+            const hex = text.slice(index + 1, index + 5);
+            if (/^[0-9a-fA-F]{4}$/.test(hex)) {
+                decoded += String.fromCharCode(Number.parseInt(hex, 16));
+                index += 4;
+            } else {
+                decoded += text.slice(escapeStart, index + 1);
+            }
+            continue;
+        }
+        decoded += escaped;
+    }
+    return decoded;
+}
+
+/* @Codex: sniff allineato all'evidenza minima, per frammenti dichiarati non parseabili */
+function sniffMatchesModernEnvelope(text: string): boolean {
+    return ENVELOPE_SNIFF_SCHEMA_PATTERN.test(text)
+        || (ENVELOPE_SNIFF_TASK_PATTERN.test(text) && ENVELOPE_SNIFF_SUPPORT_PATTERN.test(text));
+}
+
+/* @Codex: il match usa il segmento grezzo oppure la sua singola decodifica.
+   I layer stringificati successivi restano responsabilita del walk JSON. */
+function sniffDeclaresModernEnvelope(text: string): boolean {
+    if (sniffMatchesModernEnvelope(text)) return true;
+    if (!text.includes('\\')) return false;
+    return sniffMatchesModernEnvelope(decodeJavascriptStyleEscapesOnce(text));
+}
+
+/* @Codex: contratto WUL-362 F1 - evidenza aggregata delle chiavi RAW di un
+   documento JSON, letta prima della riduzione last-wins di JSON.parse. La
+   primitive decodifica internamente le chiavi e i soli valori stringa necessari
+   (task, schemaVersion) e restituisce esclusivamente booleani aggregati: nessuna
+   lista raw, nessun contenuto di data o summary conservato o loggato.
+   Duplice chiave: uguaglianza esatta case-sensitive dopo il decoding JSON.
+   Collisione di chiave riservata: confronto ASCII case-insensitive dopo il
+   decoding. La scansione e lineare sul documento (gia dentro il budget caratteri
+   del chiamante); un errore di decodifica o uno scope non chiuso degrada a
+   unknown, mai a un esito permissivo. */
+type JsonDocumentKeyEvidence =
+    | {
+        status: 'complete';
+        hasAmbiguousKeys: boolean;
+        declaresModernEnvelope: boolean;
+    }
+    | { status: 'unknown' };
+
+const RESERVED_ENVELOPE_KEY_NAMES = new Set(['schemaversion', 'task', 'data', 'summary']);
+
+// Solo A-Z: nessuna normalizzazione Unicode oltre la decodifica JSON.
+function asciiLowerCase(value: string): string {
+    return value.replace(/[A-Z]/g, (char) => String.fromCharCode(char.charCodeAt(0) + 32));
+}
+
+function isModernSchemaVersionValue(value: string): boolean {
+    const normalized = asciiLowerCase(value.trim());
+    // Prefisso esatto o dotted: mediflow.ai.extractor non e una dichiarazione.
+    return normalized === ENVELOPE_SCHEMA_PREFIX || normalized.startsWith(`${ENVELOPE_SCHEMA_PREFIX}.`);
+}
+
+function isKnownTaskValue(value: string): boolean {
+    return KNOWN_AI_TASK_IDS.has(asciiLowerCase(value.trim()));
+}
+
+/* @Codex */
+type RawObjectScope = {
+    kind: 'object';
+    exactKeys: Set<string>;
+    reservedLower: Set<string>;
+    taskCollision: boolean;
+    taskKnown: boolean;
+    schemaModern: boolean;
+    supportSeen: boolean;
+};
+
+/* @Codex: uno scope oggetto dichiara evidenza moderna se, sulle sole chiavi e
+   valori RAW dello stesso scope, vale almeno uno dei tre casi del contratto:
+   schemaVersion MediFlow valida; task noto con chiave di supporto; duplicazione
+   o collisione di task con almeno un valore task noto. Scope, elementi di array
+   e frammenti distinti non vengono mai combinati. */
+function scanJsonDocumentKeyEvidence(rawJson: string): JsonDocumentKeyEvidence {
+    const scopes: Array<{ kind: 'array' } | RawObjectScope> = [];
+    let hasAmbiguousKeys = false;
+    let declaresModernEnvelope = false;
+    let index = 0;
+
+    const closeScope = (scope: { kind: 'array' } | RawObjectScope | undefined): void => {
+        if (scope?.kind !== 'object') return;
+        if (scope.schemaModern
+            || (scope.taskKnown && scope.supportSeen)
+            || (scope.taskKnown && scope.taskCollision)) {
+            declaresModernEnvelope = true;
+        }
+    };
+
+    const readStringToken = (start: number): number => {
+        let cursor = start + 1;
+        let escaped = false;
+        while (cursor < rawJson.length) {
+            const tokenChar = rawJson[cursor];
+            cursor += 1;
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (tokenChar === '\\') {
+                escaped = true;
+                continue;
+            }
+            if (tokenChar === '"') break;
+        }
+        return cursor;
+    };
+
+    while (index < rawJson.length) {
+        const char = rawJson[index];
+        if (char === '{') {
+            scopes.push({
+                kind: 'object',
+                exactKeys: new Set<string>(),
+                reservedLower: new Set<string>(),
+                taskCollision: false,
+                taskKnown: false,
+                schemaModern: false,
+                supportSeen: false,
+            });
+            index += 1;
+            continue;
+        }
+        if (char === '[') {
+            scopes.push({ kind: 'array' });
+            index += 1;
+            continue;
+        }
+        if (char === '}' || char === ']') {
+            closeScope(scopes.pop());
+            index += 1;
+            continue;
+        }
+        if (char !== '"') {
+            index += 1;
+            continue;
+        }
+
+        const tokenStart = index;
+        index = readStringToken(index);
+
+        let next = index;
+        while (next < rawJson.length && /\s/.test(rawJson[next] ?? '')) next += 1;
+        const scope = scopes.at(-1);
+        if (scope?.kind !== 'object' || rawJson[next] !== ':') continue;
+
+        let key: string;
+        try {
+            key = JSON.parse(rawJson.slice(tokenStart, index)) as string;
+        } catch {
+            return { status: 'unknown' };
+        }
+        if (scope.exactKeys.has(key)) hasAmbiguousKeys = true;
+        scope.exactKeys.add(key);
+
+        const lowerKey = asciiLowerCase(key);
+        if (!RESERVED_ENVELOPE_KEY_NAMES.has(lowerKey)) continue;
+        if (scope.reservedLower.has(lowerKey)) {
+            hasAmbiguousKeys = true;
+            if (lowerKey === 'task') scope.taskCollision = true;
+        }
+        scope.reservedLower.add(lowerKey);
+        if (lowerKey !== 'task') scope.supportSeen = true;
+        if (lowerKey !== 'task' && lowerKey !== 'schemaversion') continue;
+
+        let valueStart = next + 1;
+        while (valueStart < rawJson.length && /\s/.test(rawJson[valueStart] ?? '')) valueStart += 1;
+        if (rawJson[valueStart] !== '"') continue;
+        const valueEnd = readStringToken(valueStart);
+        let value: string;
+        try {
+            value = JSON.parse(rawJson.slice(valueStart, valueEnd)) as string;
+        } catch {
+            return { status: 'unknown' };
+        }
+        if (lowerKey === 'task' && isKnownTaskValue(value)) scope.taskKnown = true;
+        if (lowerKey === 'schemaversion' && isModernSchemaVersionValue(value)) scope.schemaModern = true;
+    }
+
+    if (scopes.length > 0) return { status: 'unknown' };
+    return { status: 'complete', hasAmbiguousKeys, declaresModernEnvelope };
+}
+
+/* @Codex */
+function findBalancedJsonEnd(
+    text: string,
+    start: number,
+    visitCharacter: () => boolean,
+): number | null {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = start; index < text.length; index += 1) {
+        if (!visitCharacter()) return null;
+        const char = text[index];
+        if (inString) {
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (char === '\\') {
+                escaped = true;
+                continue;
+            }
+            if (char === '"') inString = false;
+            continue;
+        }
+        if (char === '"') {
+            inString = true;
+            continue;
+        }
+        if (char === '{' || char === '[') depth += 1;
+        else if (char === '}' || char === ']') {
+            depth -= 1;
+            if (depth === 0) return index;
+            if (depth < 0) return -1;
+        }
+    }
+    return -1;
+}
+
+/* @Codex */
+function findNextJsonOpener(
+    text: string,
+    start: number,
+    visitCharacter: () => boolean,
+): number | null {
+    for (let index = start; index < text.length; index += 1) {
+        if (!visitCharacter()) return null;
+        const char = text[index];
+        if (char === '{' || char === '[') return index;
+    }
+    return -1;
+}
+
+/* @Codex WUL-362 F2: segmenti top-level non sovrapposti di un testo libero. Un
+   gruppo bilanciato non e da solo una prova di candidatura JSON: la
+   classificazione (parse o sniff) resta al chiamante, che conta nel budget solo
+   i candidati reali. Un opener senza chiusura non inghiotte il resto: il tratto
+   fino al prossimo opener resta una regione da sniffare e la scansione riprende,
+   cosi un frammento valido successivo viene comunque visitato. */
+type JsonFragmentSegment =
+    | { kind: 'balanced'; text: string }
+    | { kind: 'unparsed'; text: string };
+
+function* iterateJsonFragmentSegments(
+    text: string,
+    budget: EnvelopeScanBudget,
+): Generator<JsonFragmentSegment> {
+    const initialVisits = budget.fragmentCharacterVisits;
+    const maxVisits = text.length * 3;
+    const visitCharacter = (): boolean => {
+        if (budget.fragmentCharacterVisits - initialVisits >= maxVisits) {
+            budget.truncated = true;
+            return false;
+        }
+        budget.fragmentCharacterVisits += 1;
+        return consumeScanChars(budget, 1);
+    };
+
+    let index = 0;
+    while (index < text.length) {
+        if (!visitCharacter()) return;
+        const char = text[index];
+        if (char !== '{' && char !== '[') {
+            index += 1;
+            continue;
+        }
+        const end = findBalancedJsonEnd(text, index, visitCharacter);
+        if (end === null) return;
+        if (end !== -1) {
+            yield { kind: 'balanced', text: text.slice(index, end + 1) };
+            index = end + 1;
+            continue;
+        }
+        const nextOpener = findNextJsonOpener(text, index + 1, visitCharacter);
+        if (nextOpener === null) return;
+        yield { kind: 'unparsed', text: nextOpener === -1 ? text.slice(index) : text.slice(index, nextOpener) };
+        if (nextOpener === -1) return;
+        index = nextOpener;
+    }
+}
+
+/* @Codex: hook deterministico e limitato alla regressione del costo di scansione. */
+export function __testMeasureJsonFragmentScanWork(text: string): {
+    characterVisits: number;
+    truncated: boolean;
+} {
+    const budget = createEnvelopeScanBudget();
+    for (const _segment of iterateJsonFragmentSegments(text, budget)) {
+        // Il consumo completo del generatore misura il percorso reale.
+    }
+    return {
+        characterVisits: budget.fragmentCharacterVisits,
+        truncated: budget.truncated,
+    };
+}
+
+/* @Codex */
+type EnvelopeRecordVisitor = (record: Record<string, unknown>, path: ReadonlyArray<string | number>) => void;
+
+/* @Codex: attraversamento bounded condiviso di oggetti, array e stringhe annidate.
+   I percorsi attraversano anche i layer stringificati, cosi la parentela dei
+   candidati resta un confronto di prefissi. */
+function walkEnvelopeTree(
+    node: unknown,
+    path: ReadonlyArray<string | number>,
+    depth: number,
+    budget: EnvelopeScanBudget,
+    onRecord: EnvelopeRecordVisitor,
+    onSniffDeclared: () => void,
+): void {
+    if (budget.truncated) return;
+    if (node === null || node === undefined) return;
+    if (typeof node === 'string') {
+        const text = node.trim();
+        if (!text.includes('{') && !text.includes('[')) return;
+        // Le lunghezze si misurano sulla stringa grezza: il whitespace analizzato conta.
+        if (node.length > ENVELOPE_SCAN_MAX_STRING_LENGTH) {
+            budget.truncated = true;
+            return;
+        }
+        if (!consumeScanChars(budget, node.length)) return;
+        let chargedCandidateString = false;
+        const admitCandidate = (): boolean => {
+            if (chargedCandidateString) return true;
+            if (budget.stringParses >= ENVELOPE_SCAN_MAX_STRING_PARSES) {
+                budget.truncated = true;
+                return false;
+            }
+            budget.stringParses += 1;
+            chargedCandidateString = true;
+            return true;
+        };
+        scanTextForEnvelopes(text, path, budget, onRecord, onSniffDeclared, admitCandidate, true);
+        return;
+    }
+    if (typeof node !== 'object') return;
+    if (depth > ENVELOPE_SCAN_MAX_DEPTH) {
+        budget.truncated = true;
+        return;
+    }
+    if (budget.nodes >= ENVELOPE_SCAN_MAX_NODES) {
+        budget.truncated = true;
+        return;
+    }
+    budget.nodes += 1;
+    if (Array.isArray(node)) {
+        for (let index = 0; index < node.length; index += 1) {
+            walkEnvelopeTree(node[index], [...path, index], depth + 1, budget, onRecord, onSniffDeclared);
+        }
+        return;
+    }
+    const record = node as Record<string, unknown>;
+    if (declaresModernEnvelopeRecord(record)) onRecord(record, path);
+    for (const key of Object.keys(record)) {
+        walkEnvelopeTree(record[key], [...path, key], depth + 1, budget, onRecord, onSniffDeclared);
+    }
+}
+
+/* @Codex: prima il parse diretto (contenuti persistiti JSON puri), poi TUTTI i
+   frammenti non sovrapposti; un frammento dichiarato ma non parseabile passa
+   dallo sniff fail-closed. */
+function scanTextForEnvelopes(
+    text: string,
+    basePath: ReadonlyArray<string | number>,
+    budget: EnvelopeScanBudget,
+    onRecord: EnvelopeRecordVisitor,
+    onSniffDeclared: () => void,
+    admitCandidate: () => boolean = () => true,
+    chargeParsedText: boolean = false,
+): void {
+    const scanParsedDocument = (rawJson: string, root: unknown, path: ReadonlyArray<string | number>) => {
+        let documentDeclares = false;
+        const onDocumentRecord: EnvelopeRecordVisitor = (record, recordPath) => {
+            documentDeclares = true;
+            onRecord(record, recordPath);
+        };
+        const onDocumentSniffDeclared = () => {
+            documentDeclares = true;
+            onSniffDeclared();
+        };
+
+        walkEnvelopeTree(root, path, 0, budget, onDocumentRecord, onDocumentSniffDeclared);
+        // @Codex WUL-362 F1: l'evidenza si legge sulle chiavi RAW, prima della
+        // riduzione last-wins di JSON.parse. Una dichiarazione moderna visibile
+        // solo nelle chiavi raw (oscurata da duplicati o collisioni) e una
+        // chiave ambigua in un documento che dichiara degradano entrambe
+        // fail-closed; un esito unknown della primitive tronca la scansione.
+        const keyEvidence = scanJsonDocumentKeyEvidence(rawJson);
+        if (keyEvidence.status === 'unknown') {
+            budget.truncated = true;
+            return;
+        }
+        if (keyEvidence.declaresModernEnvelope && !documentDeclares) onSniffDeclared();
+        if (keyEvidence.hasAmbiguousKeys && (documentDeclares || keyEvidence.declaresModernEnvelope)) {
+            onSniffDeclared();
+        }
+    };
+    try {
+        const root = JSON.parse(text) as unknown;
+        if (!admitCandidate()) return;
+        if (chargeParsedText && !consumeRealFragment(budget)) return;
+        scanParsedDocument(text, root, basePath);
+        return;
+    } catch {
+        // non era JSON puro: scansione multi-frammento
+    }
+    // @Codex WUL-362 F2: nel budget frammenti contano solo i candidati reali,
+    // cioe i gruppi JSON parseabili e i segmenti con sniff moderno. Un marcatore
+    // canonico [Sx] o una parentesi bilanciata di prosa non consumano nulla. Il
+    // nono candidato reale tronca fail-closed senza essere classificato:
+    // l'evidenza gia raccolta precede il troncamento, che non diventa mai absent.
+    let parsedFragmentOrdinal = 0;
+    for (const segment of iterateJsonFragmentSegments(text, budget)) {
+        if (segment.kind === 'balanced') {
+            let root: unknown;
+            let parsedFragment = false;
+            try {
+                root = JSON.parse(segment.text) as unknown;
+                parsedFragment = true;
+            } catch {
+                // gruppo bilanciato non-JSON: resta solo materiale da sniffare
+            }
+            if (parsedFragment) {
+                if (!admitCandidate()) return;
+                if (!consumeRealFragment(budget)) return;
+                scanParsedDocument(segment.text, root, [...basePath, `#${parsedFragmentOrdinal}`]);
+                parsedFragmentOrdinal += 1;
+                continue;
+            }
+        }
+        if (sniffDeclaresModernEnvelope(segment.text)) {
+            if (!admitCandidate()) return;
+            if (!consumeRealFragment(budget)) return;
+            onSniffDeclared();
+        }
+    }
+}
+
+/* @Codex: rilevazione tri-state per il rescue legacy (contratto punto 3).
+   present blocca, unknown (limite raggiunto) blocca, solo absent consente. */
+export function detectModernEnvelopeEvidence(text: string): ModernEnvelopeEvidence {
+    const raw = text || '';
+    const trimmed = raw.trim();
+    if (!trimmed) return 'absent';
+    if (!trimmed.includes('{') && !trimmed.includes('[')) return 'absent';
+    const budget = createEnvelopeScanBudget();
+    // Lunghezza grezza, prima del parse: il whitespace analizzato conta nel budget.
+    if (!consumeScanChars(budget, raw.length)) return 'unknown';
+    let present = false;
+    scanTextForEnvelopes(trimmed, [], budget, () => {
+        present = true;
+    }, () => {
+        present = true;
+    });
+    if (present) return 'present';
+    if (budget.truncated) return 'unknown';
+    return 'absent';
+}
+
+/* @Codex: risoluzione canonica dell'envelope per il read-path del Patient Insight.
+   Il recupero testuale a valle gira solo sullo stato legacy-text; ogni esaurimento
+   dei budget degrada fail-closed ad ambiguous. */
+export type InsightEnvelopeResolution =
+    | { status: 'usable'; envelope: AITaskParseResult<PatientInsightExtraction> }
+    | { status: 'declared-invalid' }
+    | { status: 'ambiguous' }
+    | { status: 'legacy-text' };
+
+/* @Codex */
+type InsightCandidateClass =
+    | { kind: 'usable'; envelope: AITaskParseResult<PatientInsightExtraction>; canonical: string }
+    | { kind: 'other-task-valid' }
+    | { kind: 'declared-invalid'; tolerableAncestor: boolean };
+
+/* @Codex: la serializzazione del candidato e conteggiata nel budget caratteri */
+function classifyInsightCandidate(
+    record: Record<string, unknown>,
+    budget: EnvelopeScanBudget,
+): InsightCandidateClass | null {
+    const serialized = JSON.stringify(record);
+    if (!consumeScanChars(budget, serialized.length)) return null;
+    const asInsight = parsePatientInsightExtractionResponse(serialized);
+    if (isEnvelopeUsable(asInsight)) {
+        return { kind: 'usable', envelope: asInsight, canonical: JSON.stringify(asInsight.value) };
+    }
+    const taskValue = readEnvelopeKey(record, 'task');
+    const taskId = typeof taskValue === 'string' ? taskValue.trim().toLowerCase() : null;
+    if (taskId === 'smart_import' && isEnvelopeUsable(parseSmartImportExtractionResponse(serialized))) {
+        return { kind: 'other-task-valid' };
+    }
+    if (taskId === 'document_synthesis' && isEnvelopeUsable(parseDocumentSynthesisExtractionResponse(serialized, ''))) {
+        return { kind: 'other-task-valid' };
+    }
+    // Tollerabile come antenato solo se parziale e compatibile: nessun task noto
+    // diverso da patient_insight e nessuna schemaVersion diversa da quella supportata.
+    const schemaValue = readEnvelopeKey(record, 'schemaversion');
+    const compatibleSchema = schemaValue === undefined || schemaValue === AI_TASK_EXTRACTION_SCHEMA_VERSION;
+    const compatibleTask = taskId === null || taskId === 'patient_insight';
+    return { kind: 'declared-invalid', tolerableAncestor: compatibleSchema && compatibleTask };
+}
+
+/* @Codex */
+function isStrictPathPrefix(prefix: ReadonlyArray<string | number>, path: ReadonlyArray<string | number>): boolean {
+    if (prefix.length >= path.length) return false;
+    return prefix.every((segment, index) => segment === path[index]);
+}
+
+/* @Codex */
+export function resolveInsightEnvelope(content: string): InsightEnvelopeResolution {
+    const raw = content || '';
+    const trimmed = raw.trim();
+    if (!trimmed) return { status: 'legacy-text' };
+    if (!trimmed.includes('{') && !trimmed.includes('[')) return { status: 'legacy-text' };
+
+    const budget = createEnvelopeScanBudget();
+    // Limite applicato prima del parse del root, sulla lunghezza grezza (punto 5).
+    if (!consumeScanChars(budget, raw.length)) return { status: 'ambiguous' };
+
+    const usable = new Map<string, {
+        envelope: AITaskParseResult<PatientInsightExtraction>;
+        paths: Array<ReadonlyArray<string | number>>;
+    }>();
+    const otherTaskValidPaths: Array<ReadonlyArray<string | number>> = [];
+    const declaredInvalid: Array<{ path: ReadonlyArray<string | number>; tolerableAncestor: boolean }> = [];
+    let sniffDeclared = false;
+
+    scanTextForEnvelopes(trimmed, [], budget, (record, path) => {
+        const classified = classifyInsightCandidate(record, budget);
+        if (!classified) return;
+        if (classified.kind === 'usable') {
+            const existing = usable.get(classified.canonical);
+            if (existing) existing.paths.push(path);
+            else usable.set(classified.canonical, { envelope: classified.envelope, paths: [path] });
+        } else if (classified.kind === 'other-task-valid') {
+            otherTaskValidPaths.push(path);
+        } else {
+            declaredInvalid.push({ path, tolerableAncestor: classified.tolerableAncestor });
+        }
+    }, () => {
+        sniffDeclared = true;
+    });
+
+    if (budget.truncated) return { status: 'ambiguous' };
+    if (usable.size > 1) return { status: 'ambiguous' };
+    if (usable.size === 1) {
+        if (otherTaskValidPaths.length > 0 || sniffDeclared) return { status: 'ambiguous' };
+        const root = extractJsonObject(trimmed);
+        if (root?.hasAmbiguousLeadingJsonRoot
+            || hasAmbiguousTrailingJsonRoot(root?.trailingContent)
+            || hasAmbiguousIncompleteArrayPrefix(trimmed)) {
+            return { status: 'ambiguous' };
+        }
+        const single = Array.from(usable.values())[0];
+        if (!single) return { status: 'ambiguous' };
+        const tolerated = declaredInvalid.every((candidate) =>
+            candidate.tolerableAncestor
+            && single.paths.some((usablePath) => isStrictPathPrefix(candidate.path, usablePath)));
+        return tolerated ? { status: 'usable', envelope: single.envelope } : { status: 'ambiguous' };
+    }
+    if (otherTaskValidPaths.length > 0 || declaredInvalid.length > 0 || sniffDeclared) {
+        return { status: 'declared-invalid' };
+    }
+    return { status: 'legacy-text' };
 }
 
 /* @Codex */
@@ -188,7 +913,7 @@ function normalizeConfidence(value: unknown): SmartImportConfidence {
     if (normalized === 'high' || normalized === 'medium' || normalized === 'low') {
         return normalized;
     }
-    return 'medium';
+    return 'low';
 }
 
 function normalizeDiagnosisSystem(value: unknown): DocumentDiagnosisSuggestionContract['system'] | null {
@@ -230,12 +955,20 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
     therapyCandidates: SmartImportTherapyExtraction[];
     servicePrescriptions: SmartImportServicePrescriptionExtraction[];
 } | null {
+    // @Codex: rescue consentito solo con evidenza moderna assente (tri-state);
+    // present e unknown (scansione interrotta da un limite) bloccano entrambi.
+    if (detectModernEnvelopeEvidence(response) !== 'absent') return null;
     const extraction = extractJsonObject(response);
     if (!extraction) return null;
     const { rawJson, repairedTruncation } = extraction;
+    if (extraction.hasAmbiguousLeadingJsonRoot || hasAmbiguousTrailingJsonRoot(extraction.trailingContent)) return null;
 
     try {
         const parsed = JSON.parse(rawJson) as Record<string, unknown>;
+        const hasLegacySummary = Boolean(normalizeCompactText(parsed.summary_markdown ?? parsed.summary, MAX_DOCUMENT_SUMMARY_CHARS));
+        const hasLegacyFields = ['quality', 'qualityLevel', 'medications', 'diagnoses', 'problemStatements', 'therapyCandidates', 'servicePrescriptions']
+            .some((key) => Object.prototype.hasOwnProperty.call(parsed, key));
+        if (!hasLegacySummary || !hasLegacyFields) return null;
         const quality = normalizeTaskData(parsed.quality);
         const medications = Array.isArray(parsed.medications)
             ? Array.from(
@@ -281,19 +1014,7 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
             servicePrescriptions,
         };
     } catch {
-        return {
-            rawJson,
-            validJson: false,
-            repairedTruncation,
-            summary: '',
-            qualityLevel: 'yellow',
-            qualityReason: '',
-            medications: [],
-            diagnoses: [],
-            problemStatements: [],
-            therapyCandidates: [],
-            servicePrescriptions: [],
-        };
+        return null;
     }
 }
 
@@ -322,8 +1043,35 @@ function parseEnvelope(
 
     const { rawJson, repairedTruncation } = extraction;
 
+    // @Codex: un secondo root JSON rende la risposta ambigua. Non scegliere il
+    // primo envelope quando il modello ha prodotto una seconda risposta.
+    if (extraction.hasAmbiguousLeadingJsonRoot || hasAmbiguousTrailingJsonRoot(extraction.trailingContent)) {
+        return {
+            rawJson,
+            validJson: true,
+            validTask: false,
+            repairedTruncation,
+            summary: '',
+            data: {},
+        };
+    }
+
     try {
         const parsed = JSON.parse(rawJson) as Record<string, unknown>;
+        // @Codex WUL-362 F1: duplicati esatti e collisioni ASCII case-insensitive
+        // delle chiavi riservate invalidano l'envelope; un esito unknown della
+        // primitive resta fail-closed, mai un envelope valido.
+        const keyEvidence = scanJsonDocumentKeyEvidence(rawJson);
+        if (keyEvidence.status === 'unknown' || keyEvidence.hasAmbiguousKeys) {
+            return {
+                rawJson,
+                validJson: true,
+                validTask: false,
+                repairedTruncation,
+                summary: '',
+                data: {},
+            };
+        }
         const schemaVersion = parsed?.schemaVersion === AI_TASK_EXTRACTION_SCHEMA_VERSION;
         const taskMatches = parsed?.task === expectedTask;
         const data = normalizeTaskData(parsed?.data);
@@ -575,6 +1323,54 @@ function normalizeSmartImportTherapy(value: unknown): SmartImportTherapyExtracti
 export interface ExtractedJsonObject {
     rawJson: string;
     repairedTruncation: boolean;
+    trailingContent?: string;
+    hasAmbiguousLeadingJsonRoot?: boolean;
+}
+
+// @Codex: dopo un envelope completo, un altro valore JSON o il suo prefisso
+// incompleto e ambiguo. Il parser non sceglie mai arbitrariamente il primo.
+function hasAmbiguousTrailingJsonRoot(trailingContent: string | undefined): boolean {
+    if (!trailingContent?.trim()) return false;
+    if (extractJsonObject(trailingContent)) return true;
+
+    for (const fence of trailingContent.matchAll(/```(?:json)?\s*([\s\S]*?)```/ig)) {
+        if (hasAmbiguousJsonRootStart(fence[1])) return true;
+    }
+
+    return hasAmbiguousJsonRootStart(trailingContent);
+}
+
+function hasAmbiguousJsonRootStart(content: string): boolean {
+    const unfenced = content
+        .trim()
+        .replace(/^```(?:json)?\s*/i, '')
+        .trimStart();
+    if (!unfenced) return false;
+    if (unfenced.startsWith('{')) return true;
+
+    if (unfenced.startsWith('[')) {
+        const arrayBody = unfenced.slice(1).trimStart();
+        return arrayBody.length === 0
+            || arrayBody.startsWith(']')
+            || /^[\[{"\d-]/.test(arrayBody)
+            || /^(?:true\b|false\b|null\b|t(?:r(?:u(?:e)?)?)?|f(?:a(?:l(?:s(?:e)?)?)?)?|n(?:u(?:l(?:l)?)?)?)/.test(arrayBody);
+    }
+
+    return /^(?:"|-?\d|true(?:\s|$)|false(?:\s|$)|null(?:\s|$)|t(?:r(?:u|uo)?)?$|f(?:a(?:l(?:s)?)?)?$|n(?:u)?$|-$)/.test(unfenced);
+}
+
+function hasAmbiguousJsonBeforeRoot(content: string): boolean {
+    if (hasAmbiguousTrailingJsonRoot(content)) return true;
+
+    for (const fence of content.matchAll(/```(?:json)?\s*([\s\S]*?)```/ig)) {
+        if (hasAmbiguousTrailingJsonRoot(fence[1])) return true;
+    }
+
+    return false;
+}
+
+function hasAmbiguousIncompleteArrayPrefix(content: string): boolean {
+    return /(?:^|```(?:json)?\s*)\s*\[(?:tru|truo|nu|-)(?=\s|```|\{|$)/im.test(content);
 }
 
 interface JsonContainer {
@@ -645,11 +1441,17 @@ function isParsableJsonObject(value: string, requireMember = false): boolean {
 export function extractJsonObject(response: string): ExtractedJsonObject | null {
     const clean = stripModelArtifacts(response);
     const fenced = clean.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    // @Codex: usa lo stesso scanner per risposte libere e blocchi JSON recintati.
     const fencedCandidate = fenced?.[1]?.trim();
-    const candidate = fencedCandidate && /[\[{]/.test(fencedCandidate)
-        ? fencedCandidate
-        : clean;
+    const fenceStart = fenced?.index ?? -1;
+    const hasRootBeforeFence = fenceStart >= 0
+        && hasAmbiguousTrailingJsonRoot(clean.slice(0, fenceStart));
+    // @Codex: un fence puo isolare una riparazione di troncamento, ma non puo
+    // nascondere un root precedente o il testo dopo la chiusura del fence.
+    const usesFencedCandidate = Boolean(fencedCandidate && /[\[{]/.test(fencedCandidate) && !hasRootBeforeFence);
+    const candidate = usesFencedCandidate ? fencedCandidate! : clean;
+    const trailingAfterCandidate = usesFencedCandidate && fenced
+        ? clean.slice((fenced.index ?? 0) + fenced[0].length)
+        : '';
     let rootStart = -1;
     let searchStart = 0;
 
@@ -664,10 +1466,23 @@ export function extractJsonObject(response: string): ExtractedJsonObject | null 
         }
 
         const arrayCandidate = extractBalancedJsonValue(candidate, nextBracket);
-        if (!arrayCandidate) return null;
+        if (!arrayCandidate) {
+            const arrayPrefix = candidate.slice(nextBracket + 1).trimStart();
+            if (!/^(?:tru|truo|nu|-)(?=\s|```|\{|$)/.test(arrayPrefix)) return null;
+            const nextObject = candidate.indexOf('{', nextBracket + 1);
+            if (nextObject === -1) return null;
+            rootStart = nextObject;
+            break;
+        }
         try {
             if (Array.isArray(JSON.parse(arrayCandidate))) {
-                return { rawJson: arrayCandidate, repairedTruncation: false };
+                return {
+                    rawJson: arrayCandidate,
+                    repairedTruncation: false,
+                    trailingContent: `${candidate.slice(nextBracket + arrayCandidate.length)}${trailingAfterCandidate}`,
+                    hasAmbiguousLeadingJsonRoot: hasRootBeforeFence
+                        || hasAmbiguousJsonBeforeRoot(candidate.slice(0, nextBracket)),
+                };
             }
         } catch {
             // Un blocco bilanciato ma non JSON puo essere un marcatore come [S1].
@@ -717,6 +1532,9 @@ export function extractJsonObject(response: string): ExtractedJsonObject | null 
                     return {
                         rawJson: fragment.slice(0, index + 1),
                         repairedTruncation: false,
+                        trailingContent: `${fragment.slice(index + 1)}${trailingAfterCandidate}`,
+                        hasAmbiguousLeadingJsonRoot: hasRootBeforeFence
+                            || hasAmbiguousJsonBeforeRoot(candidate.slice(0, rootStart)),
                     };
                 }
             } else {
@@ -744,6 +1562,9 @@ export function extractJsonObject(response: string): ExtractedJsonObject | null 
         return {
             rawJson: repaired,
             repairedTruncation: true,
+            trailingContent: trailingAfterCandidate,
+            hasAmbiguousLeadingJsonRoot: hasRootBeforeFence
+                || hasAmbiguousJsonBeforeRoot(candidate.slice(0, rootStart)),
         };
     }
 
@@ -756,6 +1577,9 @@ export function extractJsonObject(response: string): ExtractedJsonObject | null 
             return {
                 rawJson: fallback,
                 repairedTruncation: true,
+                trailingContent: trailingAfterCandidate,
+                hasAmbiguousLeadingJsonRoot: hasRootBeforeFence
+                    || hasAmbiguousJsonBeforeRoot(candidate.slice(0, rootStart)),
             };
         }
     }
@@ -774,6 +1598,7 @@ export function parsePatientInsightExtractionResponse(response: string): AITaskP
         rawJson: envelope.rawJson,
         validJson: envelope.validJson,
         validTask: envelope.validTask,
+        legacyContract: false,
         repairedTruncation: envelope.repairedTruncation,
         value: {
             schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
@@ -860,6 +1685,7 @@ export function parseSmartImportExtractionResponse(response: string): AITaskPars
         rawJson: envelope.rawJson,
         validJson: envelope.validJson,
         validTask: envelope.validTask,
+        legacyContract: false,
         repairedTruncation: envelope.repairedTruncation,
         value: {
             schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
@@ -961,7 +1787,8 @@ export function parseDocumentSynthesisExtractionResponse(
     return {
         rawJson: legacyPayload?.rawJson ?? envelope.rawJson,
         validJson: legacyPayload?.validJson ?? envelope.validJson,
-        validTask: legacyPayload ? true : envelope.validTask,
+        validTask: legacyPayload ? legacyPayload.validJson : envelope.validTask,
+        legacyContract: Boolean(legacyPayload),
         repairedTruncation: legacyPayload?.repairedTruncation ?? envelope.repairedTruncation,
         value: {
             schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,

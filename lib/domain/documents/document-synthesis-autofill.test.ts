@@ -35,11 +35,11 @@ function buildPlan(
     });
 }
 
-test('document synthesis autofill applies high confidence explicit diagnoses', () => {
+test('document synthesis keeps high confidence explicit diagnoses review-only', () => {
     const plan = buildPlan([baseSuggestion]);
 
-    assert.deepEqual(plan.appliedCodes, ['ICD-10:I10']);
-    assert.equal(plan.diagnoses.length, 1);
+    assert.deepEqual(plan.appliedCodes, []);
+    assert.equal(plan.diagnoses.length, 0);
     assert.equal(plan.decision.writePlan.allowedActions.length, 1);
     assert.equal(plan.decision.writePlan.mode, 'review_required');
     assert.deepEqual(plan.decision.writePlan.forbiddenActions, []);
@@ -51,6 +51,14 @@ test('document synthesis autofill does not apply low confidence diagnoses', () =
     assert.deepEqual(plan.appliedCodes, []);
     assert.deepEqual(plan.diagnoses, []);
     assert.equal(plan.decision.writePlan.allowedActions.length, 0);
+    assert.equal(plan.decision.writePlan.forbiddenActions[0]?.blockedReason, 'confidence_too_low_for_auto_apply');
+});
+
+/* @Codex */
+test('document synthesis autofill does not apply diagnoses without confidence', () => {
+    const plan = buildPlan([{ ...baseSuggestion, confidence: undefined }]);
+
+    assert.deepEqual(plan.appliedCodes, []);
     assert.equal(plan.decision.writePlan.forbiddenActions[0]?.blockedReason, 'confidence_too_low_for_auto_apply');
 });
 

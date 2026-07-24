@@ -114,6 +114,17 @@ la verifica VoiceOver e il collaudo manuale P6 sul bundle macOS. Il gate verso
 provider AI esterni resta chiuso e non è consegnato alcun percorso di consenso
 o invio.
 
+### Aggiornamenti in verifica
+
+La prossima tranche rafforza i contratti degli envelope AI. Un output AI deve
+rispettare la lane prevista prima di diventare materiale di revisione. Un
+envelope ambiguo, incompleto, multiplo o con chiavi riservate duplicate non può
+attivare il recupero legacy né una scrittura clinica.
+
+Le diagnosi estratte da documento restano materiale di revisione: la sintesi
+non le aggiunge automaticamente alla scheda. Codex Operator personale non è
+incluso: il relativo boundary richiede decisioni e correzioni separate.
+
 Il dettaglio è nel [CHANGELOG](./CHANGELOG.md). La fotografia completa vive in
 [`docs/STATE_OF_THE_SYSTEM.md`](./docs/STATE_OF_THE_SYSTEM.md); la parity
 versionata in [`docs/parity-matrix.md`](./docs/parity-matrix.md).
