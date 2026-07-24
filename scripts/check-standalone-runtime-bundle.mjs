@@ -53,6 +53,35 @@ const probe = new Database(':memory:');
 probe.prepare('select 1').get();
 probe.close();
 
+// @Codex: Native image optimization must not silently fall back to the source file.
+let sharpEntry;
+try {
+  sharpEntry = requireFromStandalone.resolve('sharp');
+} catch (error) {
+  console.error(`Standalone runtime does not contain sharp: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+}
+const relativeSharpEntry = path.relative(standaloneDir, sharpEntry);
+if (relativeSharpEntry.startsWith('..') || path.isAbsolute(relativeSharpEntry)) {
+  console.error(`Standalone runtime resolved sharp outside the bundle: ${sharpEntry}`);
+  process.exit(1);
+}
+const Sharp = requireFromStandalone(sharpEntry);
+const syntheticImage = await Sharp({
+  create: {
+    width: 64,
+    height: 48,
+    channels: 3,
+    background: { r: 12, g: 92, b: 180 },
+  },
+}).png().toBuffer();
+const transformedImage = await Sharp(syntheticImage).resize({ width: 32 }).png().toBuffer();
+const transformedMetadata = await Sharp(transformedImage).metadata();
+if (transformedMetadata.width !== 32 || transformedMetadata.height !== 24 || transformedImage.equals(syntheticImage)) {
+  console.error('Standalone runtime sharp transform did not produce the expected 32x24 derivative.');
+  process.exit(1);
+}
+
 const violations = [];
 
 function walk(directory) {
