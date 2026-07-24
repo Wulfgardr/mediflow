@@ -30,5 +30,7 @@
 	<string>MediFlow cerca il tuo home-base sulla rete locale per collegarsi in modo paired e cifrato.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UILaunchScreen</key>
+	<dict/>
 </dict>
 </plist>
