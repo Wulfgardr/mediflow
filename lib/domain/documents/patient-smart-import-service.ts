@@ -2,10 +2,10 @@ import { refreshPatientSummaryIfEnabled } from '../../ai-summary-service';
 import { AIService } from '../../ai-service';
 import {
     buildSmartImportExtractionPrompt,
+    isEnvelopeUsable,
     parseSmartImportExtractionResponse,
     type SmartImportConfidence,
     type SmartImportDiagnosisExtraction as ParsedAiDiagnosis,
-    type SmartImportExtractionData as ParsedAiPayload,
     type SmartImportTherapyExtraction as ParsedAiTherapy,
     type TherapySuggestionState,
 } from '../../ai-task-contracts';
@@ -125,6 +125,12 @@ type TherapySuggestionMatchType = TherapySmartImportSuggestion['matchType'];
 
 export interface PatientSmartImportAnalysis {
     generatedAt: string;
+    // @Codex
+    contract: {
+        validJson: boolean;
+        validTask: boolean;
+        legacyContract: boolean;
+    };
     model: {
         provider: string;
         model: string;
@@ -458,8 +464,13 @@ function buildStructuredPrompt(
     return buildSmartImportExtractionPrompt(payload);
 }
 
-function parseAiPayload(response: string): ParsedAiPayload {
-    return parseSmartImportExtractionResponse(response).value.data;
+/* @Codex */
+function parseAiPayload(response: string): ReturnType<typeof parseSmartImportExtractionResponse> {
+    const parsed = parseSmartImportExtractionResponse(response);
+    if (!isEnvelopeUsable(parsed)) {
+        throw new Error("L'AI ha generato una risposta non valida per lo smart import.");
+    }
+    return parsed;
 }
 
 async function resolveDiagnosisSuggestion(
@@ -832,6 +843,7 @@ export async function generatePatientSmartImportAnalysis(patientId: string): Pro
     const prompt = buildStructuredPrompt(patient, currentDiagnoses, currentTherapies, sourceRecords);
     const response = await ai.generate(prompt, undefined, SMART_IMPORT_OUTPUT_MAX_TOKENS);
     const parsed = parseAiPayload(response);
+    const parsedData = parsed.value.data;
     const sourceMap = new Map(sourceRecords.map((source) => [source.id, source]));
     const diagnosisSearchCache = new Map<string, Promise<ICDSearchResult[]>>();
     const drugSearchCache = new Map<string, Promise<AifaDrug[]>>();
@@ -851,8 +863,8 @@ export async function generatePatientSmartImportAnalysis(patientId: string): Pro
     };
 
     const [resolvedDiagnoses, resolvedTherapies] = await Promise.all([
-        Promise.all(parsed.diagnoses.map((diagnosis) => resolveDiagnosisSuggestion(diagnosis, sourceMap, diagnosisSearch))),
-        Promise.all(parsed.therapies.map((therapy) => resolveTherapySuggestion(therapy, sourceMap, drugCatalogSearch))),
+        Promise.all(parsedData.diagnoses.map((diagnosis) => resolveDiagnosisSuggestion(diagnosis, sourceMap, diagnosisSearch))),
+        Promise.all(parsedData.therapies.map((therapy) => resolveTherapySuggestion(therapy, sourceMap, drugCatalogSearch))),
     ]);
 
     const diagnoses = resolvedDiagnoses.map((diagnosis) => {
@@ -909,6 +921,12 @@ export async function generatePatientSmartImportAnalysis(patientId: string): Pro
 
     return {
         generatedAt: new Date().toISOString(),
+        // @Codex
+        contract: {
+            validJson: parsed.validJson,
+            validTask: parsed.validTask,
+            legacyContract: parsed.legacyContract,
+        },
         model: {
             provider: ai.getModelInfo().provider,
             model: ai.getModelInfo().model,
@@ -980,6 +998,10 @@ export async function applyPatientSmartImportSelection(
     if (!patient) throw new Error('Paziente non trovato');
     if (typeof patient.version !== 'number') {
         throw new Error('Missing patient version for smart import apply.');
+    }
+    // @Codex
+    if (!isEnvelopeUsable(analysis.contract)) {
+        throw new Error("L'analisi AI non e valida per l'applicazione dello smart import.");
     }
 
     const selectedDiagnoses = analysis.diagnoses.filter((diagnosis) => selection.diagnosisIds.includes(diagnosis.id));

@@ -1,9 +1,9 @@
 # ADR 0011: OCR-first con Qwen text-only e autofill prudente ICD da documenti
 
 Date: 2026-03-16  
-Status: Accepted
+Status: Superseded
 
-Update: la scelta del default text-only e stata aggiornata da `docs/adr/0013-qwen35-default-text-only-medgemma-specialist.md`; la pipeline OCR-first e l'autofill prudente ICD restano validi. La filiera OCR e stata poi precisata da [ADR 0059](./0059-macos-apple-vision-ocr-fallback.md): DeepSeek/Ollama resta OCR primario locale, con fallback Apple Vision certificato solo su macOS quando l'output primario e blank/low-signal.
+Update: la scelta del default text-only e stata aggiornata da `docs/adr/0013-qwen35-default-text-only-medgemma-specialist.md`. La pipeline OCR-first resta valida. [ADR 0084](./0084-document-diagnoses-review-only.md) sostituisce l'autofill ICD con proposte review-only. La filiera OCR e stata poi precisata da [ADR 0059](./0059-macos-apple-vision-ocr-fallback.md): DeepSeek/Ollama resta OCR primario locale, con fallback Apple Vision certificato solo su macOS quando l'output primario e blank/low-signal.
 
 ---
 

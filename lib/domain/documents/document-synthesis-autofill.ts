@@ -107,7 +107,7 @@ function confidenceForAutofill(
     qualityLevel: DocumentQualityLevel | undefined,
 ): DocumentDecisionConfidence {
     if (qualityLevel === 'red') return 'blocked';
-    return suggestion.confidence ?? 'medium';
+    return suggestion.confidence ?? 'low';
 }
 
 /* @Codex */
@@ -194,8 +194,10 @@ export function buildDocumentSynthesisAutofillPlan(
         },
     }));
 
-    const allowedTargets = new Set(decision.writePlan.allowedActions.map((action) => action.target));
-    const appliedSuggestions = input.diagnoses.filter((suggestion) => allowedTargets.has(diagnosisKey(suggestion)));
+    // @Codex: anche una proposta ad alta confidenza resta review-only. Il
+    // servizio conserva l'evidenza, ma non aggiorna diagnosi senza un gesto
+    // esplicito dell'operatore in una lane contrattuale separata.
+    const appliedSuggestions: DocumentDiagnosisSuggestion[] = [];
     const diagnoses = [...input.existingDiagnoses];
     const appliedCodes: string[] = [];
 

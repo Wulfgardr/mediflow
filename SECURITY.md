@@ -182,8 +182,9 @@ devono rispettare queste regole aggiuntive:
 - trattare `summarySnapshot` e `parseEvidenceArtifactSnapshot` degli allegati
   come artifact clinici locali, non come payload innocui di debug
 
-L'autofill automatico resta ammesso solo nei casi già documentati e prudenti
-(es. codici ICD espliciti in fonte documentale, vedi ADR 0011).
+Le diagnosi estratte da documenti restano review-only, anche quando il codice
+ICD e esplicito. Il payload automatico della sintesi non include
+`patients.diagnoses` (vedi ADR 0084).
 
 > [!IMPORTANT]
 > I flussi AI clinici sono dietro safety gate con kill-switch (patient-insight,

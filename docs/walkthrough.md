@@ -528,9 +528,9 @@ Il flusso:
    terapia e gia presente, il suggerimento viene soppresso invece di essere
    riproposto come rumore operativo
 
-Vincolo: l'autofill automatico dei documenti non cambia e resta limitato ai soli
-ICD espliciti previsti da ADR 0011; patologie free-text e terapie richiedono sempre
-review umana in questa slice.
+Vincolo: le diagnosi estratte dai documenti restano proposte review-only. La
+sintesi non aggiorna automaticamente `patients.diagnoses`; patologie free-text,
+codici ICD e terapie richiedono sempre review umana in questa slice (ADR 0084).
 
 ### Guard revisione shell web
 

@@ -9,7 +9,7 @@ import type {
 } from '../../db';
 import { db } from '../../db';
 import { v4 as uuid } from 'uuid';
-import { buildDocumentSynthesisExtractionPrompt } from '../../ai-task-contracts';
+import { buildDocumentSynthesisExtractionPrompt, isEnvelopeUsable } from '../../ai-task-contracts';
 import {
     parseStructuredAnalysisResponse,
     type DocumentStructuredAnalysis,
@@ -145,11 +145,16 @@ export async function analyzeDocumentContent(rawMarkdown: string): Promise<Docum
     const normalized = normalizeDocumentInput(rawMarkdown);
     const sliced = buildDocumentExcerpt(normalized.normalizedText, MAX_SYNTHESIS_CHARS);
     const content = await ai.generate(buildDocumentSynthesisExtractionPrompt(sliced), undefined, 1400);
-    return parseStructuredAnalysisResponse(content, normalized.normalizedText);
+    const analysis = parseStructuredAnalysisResponse(content, normalized.normalizedText);
+    // @Codex
+    if (!isEnvelopeUsable(analysis)) {
+        throw new Error("L'AI ha generato una risposta non valida per l'analisi del documento.");
+    }
+    return analysis;
 }
 
 /**
- * Synthesize a document, persist the insight and auto-merge explicit ICD diagnoses.
+ * Synthesize a document and persist review material without writing diagnoses.
  */
 export async function synthesizeDocument(
     rawMarkdown: string,
@@ -186,6 +191,10 @@ export async function synthesizeDocument(
     if (typeof patient.version !== 'number') {
         throw new Error('Missing patient version for document synthesis.');
     }
+    // @Codex
+    if (!routerDecision.useDeterministicSynthesis && !isEnvelopeUsable(analysis)) {
+        throw new Error("L'AI ha generato una risposta non valida per la sintesi del documento.");
+    }
 
     const existingInsights = parseExistingInsights(patient.documentInsights);
     const existingDiagnoses = parseExistingDocumentSynthesisDiagnoses(patient.diagnoses);
@@ -199,7 +208,7 @@ export async function synthesizeDocument(
         existingDiagnoses: existingDiagnoses.diagnoses,
         existingDiagnosesRaw: patient.diagnoses,
     });
-    const { diagnoses, appliedCodes } = autofillPlan;
+    const { appliedCodes } = autofillPlan;
 
     const insight: DocumentInsight = {
         id: uuid(),
@@ -247,7 +256,6 @@ export async function synthesizeDocument(
 
     await db.patients.update(patientId, {
         documentInsights: nextInsights,
-        diagnoses: appliedCodes.length > 0 ? diagnoses : undefined,
         version: patient.version,
         updatedAt: new Date()
     });

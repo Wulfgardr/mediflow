@@ -32,6 +32,8 @@ import {
   type Kree8PatientSource,
   type PillVariant,
 } from '@/lib/patient-workspace';
+/* @Codex WUL-362 C1: il candidato AI passa dal view-model canonico condiviso. */
+import { coerceInsightToReadable } from '@/lib/patient-insight-view-model';
 import styles from './kree8-clinical-cockpit-foundation.module.css';
 import shellStyles from './kree8-clinical-cockpit-shell.module.css';
 
@@ -500,19 +502,34 @@ function compactPatientPreviewText(value: string): string | null {
   return plain.length > 230 ? `${plain.slice(0, 227).trim()}…` : plain;
 }
 
+/* @Codex WUL-362 C1: aiSummary non viene piu scavato con l'estrazione ricorsiva
+   generica: il candidato AI passa dal view-model canonico del Patient Insight.
+   Wrong-task, envelope invalidi e risultati unknown/unreadable non producono
+   testo e lasciano il posto ai fallback non-AI. */
+function buildInsightPreviewText(aiSummary: unknown): string | null {
+  if (typeof aiSummary !== 'string' || !aiSummary.trim()) return null;
+  const readable = coerceInsightToReadable(aiSummary);
+  if (readable.kind === 'structured') {
+    for (const candidate of [readable.summary, ...readable.alerts, ...readable.nextSteps]) {
+      const compact = compactPatientPreviewText(candidate);
+      if (compact) return compact;
+    }
+    return null;
+  }
+  if (readable.kind === 'markdown') return compactPatientPreviewText(readable.markdown);
+  return null;
+}
+
 /* @Codex */
-function buildPatientPreviewSummary(
+export function buildPatientPreviewSummary(
   patient: Kree8PatientSource,
   isArchived: boolean,
   isAdi: boolean,
 ): string {
-  const candidates: unknown[] = [
-    patient.aiSummary,
-    patient.notes,
-    patient.statusReason,
-  ];
+  const insightPreview = buildInsightPreviewText(patient.aiSummary);
+  if (insightPreview) return insightPreview;
 
-  for (const candidate of candidates) {
+  for (const candidate of [patient.notes, patient.statusReason]) {
     const extracted = extractReadableClinicalText(candidate);
     const compact = extracted ? compactPatientPreviewText(extracted) : null;
     if (compact) return compact;
