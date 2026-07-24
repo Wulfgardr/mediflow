@@ -9,8 +9,9 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ### Sicurezza
 
-- Aggiorna Next.js e Sharp alle versioni fissate dal lockfile per rimuovere le
-  vulnerabilita di produzione rilevate dall'audit delle dipendenze.
+- Aggiorna Next.js, Sharp e PostCSS alle versioni fissate dal lockfile. L'audit
+  di produzione non rileva vulnerabilita. L'audit globale conserva sei rilievi
+  limitati alle dipendenze di sviluppo.
 
 ## [0.7.3] - 2026-07-13
 

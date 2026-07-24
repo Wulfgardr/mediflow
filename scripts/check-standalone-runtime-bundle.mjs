@@ -36,36 +36,88 @@ if (runtimeContract.node?.moduleVersion !== currentRuntime.moduleVersion ||
 }
 
 const requireFromStandalone = createRequire(serverPath);
+
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+
+function assertRealpathInsideStandalone(candidatePath, label) {
+  let resolvedPath;
+  try {
+    resolvedPath = fs.realpathSync(candidatePath);
+  } catch (error) {
+    fail(`Standalone runtime cannot resolve ${label}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  const relativePath = path.relative(standaloneDir, resolvedPath);
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    fail(`Standalone runtime resolved ${label} outside the bundle: ${resolvedPath}`);
+  }
+
+  return resolvedPath;
+}
+
+function sharpPlatformArch() {
+  const isMuslLinux = process.platform === 'linux' && !process.report?.getReport().header.glibcVersionRuntime;
+  return `${process.platform}${isMuslLinux ? 'musl' : ''}-${process.arch}`;
+}
+
+function sharpRuntimePackages() {
+  const platformArch = sharpPlatformArch();
+  const bindingPackage = {
+    'darwin-arm64': '@img/sharp-darwin-arm64',
+    'darwin-x64': '@img/sharp-darwin-x64',
+    'linux-arm': '@img/sharp-linux-arm',
+    'linux-arm64': '@img/sharp-linux-arm64',
+    'linux-ppc64': '@img/sharp-linux-ppc64',
+    'linux-riscv64': '@img/sharp-linux-riscv64',
+    'linux-s390x': '@img/sharp-linux-s390x',
+    'linux-x64': '@img/sharp-linux-x64',
+    'linuxmusl-arm64': '@img/sharp-linuxmusl-arm64',
+    'linuxmusl-x64': '@img/sharp-linuxmusl-x64',
+    'win32-arm64': '@img/sharp-win32-arm64',
+    'win32-ia32': '@img/sharp-win32-ia32',
+    'win32-x64': '@img/sharp-win32-x64',
+  }[platformArch];
+  const libvipsPackage = bindingPackage ? `@img/sharp-libvips-${platformArch}` : undefined;
+
+  if (!bindingPackage || !libvipsPackage) {
+    fail(`Standalone runtime has no supported sharp package mapping for ${platformArch}.`);
+  }
+
+  return { bindingPackage, libvipsPackage };
+}
+
 let databaseEntry;
 try {
   databaseEntry = requireFromStandalone.resolve('better-sqlite3');
 } catch {
-  console.error('Standalone runtime does not contain better-sqlite3. Rebuild before packaging.');
-  process.exit(1);
+  fail('Standalone runtime does not contain better-sqlite3. Rebuild before packaging.');
 }
-const relativeDatabaseEntry = path.relative(standaloneDir, databaseEntry);
-if (relativeDatabaseEntry.startsWith('..') || path.isAbsolute(relativeDatabaseEntry)) {
-  console.error(`Standalone runtime resolved better-sqlite3 outside the bundle: ${databaseEntry}`);
-  process.exit(1);
-}
+assertRealpathInsideStandalone(databaseEntry, 'better-sqlite3');
 const Database = requireFromStandalone(databaseEntry);
 const probe = new Database(':memory:');
 probe.prepare('select 1').get();
 probe.close();
 
-// @Codex: Native image optimization must not silently fall back to the source file.
+// @Codex: Native image optimization must not resolve through source node_modules.
 let sharpEntry;
 try {
   sharpEntry = requireFromStandalone.resolve('sharp');
 } catch (error) {
-  console.error(`Standalone runtime does not contain sharp: ${error instanceof Error ? error.message : String(error)}`);
-  process.exit(1);
+  fail(`Standalone runtime does not contain sharp: ${error instanceof Error ? error.message : String(error)}`);
 }
-const relativeSharpEntry = path.relative(standaloneDir, sharpEntry);
-if (relativeSharpEntry.startsWith('..') || path.isAbsolute(relativeSharpEntry)) {
-  console.error(`Standalone runtime resolved sharp outside the bundle: ${sharpEntry}`);
-  process.exit(1);
-}
+assertRealpathInsideStandalone(sharpEntry, 'sharp entrypoint');
+
+const { bindingPackage, libvipsPackage } = sharpRuntimePackages();
+const sharpBinding = requireFromStandalone.resolve(`${bindingPackage}/sharp.node`);
+const libvipsPackageManifest = requireFromStandalone.resolve(`${libvipsPackage}/package`);
+const libvipsBinary = requireFromStandalone.resolve(`${libvipsPackage}/binary`);
+assertRealpathInsideStandalone(sharpBinding, `${bindingPackage} binding`);
+assertRealpathInsideStandalone(libvipsPackageManifest, `${libvipsPackage} package`);
+assertRealpathInsideStandalone(libvipsBinary, `${libvipsPackage} binary`);
+
 const Sharp = requireFromStandalone(sharpEntry);
 const syntheticImage = await Sharp({
   create: {
@@ -75,11 +127,16 @@ const syntheticImage = await Sharp({
     background: { r: 12, g: 92, b: 180 },
   },
 }).png().toBuffer();
-const transformedImage = await Sharp(syntheticImage).resize({ width: 32 }).png().toBuffer();
-const transformedMetadata = await Sharp(transformedImage).metadata();
-if (transformedMetadata.width !== 32 || transformedMetadata.height !== 24 || transformedImage.equals(syntheticImage)) {
-  console.error('Standalone runtime sharp transform did not produce the expected 32x24 derivative.');
-  process.exit(1);
+const { imageOptimizer } = requireFromStandalone('next/dist/server/image-optimizer');
+const optimizedImage = await imageOptimizer(
+  { buffer: syntheticImage, cacheControl: 'public, max-age=0', etag: 'synthetic-image' },
+  { href: '/synthetic-image.png', mimeType: 'image/png', quality: 75, width: 32 },
+  { experimental: {}, images: { minimumCacheTTL: 0 } },
+  { isDev: false, silent: true },
+);
+const transformedMetadata = await Sharp(optimizedImage.buffer).metadata();
+if (transformedMetadata.width !== 32 || transformedMetadata.height !== 24 || optimizedImage.buffer.equals(syntheticImage)) {
+  fail('Standalone runtime Next image optimizer did not produce the expected 32x24 derivative.');
 }
 
 const violations = [];
