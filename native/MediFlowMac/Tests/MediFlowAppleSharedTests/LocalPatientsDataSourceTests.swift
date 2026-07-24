@@ -49,17 +49,24 @@ final class LocalPatientsDataSourceTests: XCTestCase {
     }
 
     /* @Codex */
+    func testDiagnosisProjectionIsServedLocallyWithoutHTTPFallback() async throws {
+        let source = makeSource()
+        let projected = try await source.fetchPatients(
+            credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1", includeDiagnoses: true)
+        let raw = try XCTUnwrap(projected.first?.diagnoses)
+        XCTAssertTrue(raw.hasPrefix(CryptoService.encPrefix))
+        XCTAssertEqual(
+            DiagnosesCodec.decode(PatientFieldCrypto.decryptStructuredField(raw, masterKey: masterKey)).first?.code,
+            "E11.9")
+
+        let minimal = try await source.fetchPatients(
+            credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1", includeDiagnoses: false)
+        XCTAssertNil(minimal.first?.diagnoses)
+    }
+
+    /* @Codex */
     func testNewDataPlaneMethodsDelegateToHTTPFallback() async throws {
         let source = makeSource()
-
-        do {
-            _ = try await source.fetchPatients(
-                credentials: credentials, sessionCookie: "", ambulatoryId: nil, includeDiagnoses: true)
-            XCTFail("expected the HTTP fallback to be used")
-        } catch let HomeBaseClientError.transport(issue) {
-            XCTAssertEqual(issue, .unreachable)
-        }
-
         do {
             _ = try await source.fetchScopedCheckups(
                 dateFrom: nil, dateTo: nil, status: [], limit: nil,

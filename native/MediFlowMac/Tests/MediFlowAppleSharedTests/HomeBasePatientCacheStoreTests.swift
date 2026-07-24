@@ -26,7 +26,11 @@ final class HomeBasePatientCacheStoreTests: XCTestCase {
 
     func testSaveAndLoadPatientListUsesEncryptedFile() throws {
         let store = makeStore(now: Date(timeIntervalSince1970: 1_775_000_000))
-        let patient = makePatient(id: "patient-1", firstName: "Mario", lastName: "Rossi", taxCode: "RSSMRA70A01H501U")
+        /* @Codex */
+        let diagnoses = #"[{"code":"E11.9","description":"Diabete tipo 2"},{"code":"I10","description":"Ipertensione"}]"#
+        let patient = makePatient(
+            id: "patient-1", firstName: "Mario", lastName: "Rossi",
+            taxCode: "RSSMRA70A01H501U", diagnoses: diagnoses)
 
         try store.savePatientList(
             [patient],
@@ -37,11 +41,13 @@ final class HomeBasePatientCacheStoreTests: XCTestCase {
         let cacheFile = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: temporaryDirectory, includingPropertiesForKeys: nil).first)
         let raw = try Data(contentsOf: cacheFile)
         XCTAssertNil(String(data: raw, encoding: .utf8)?.range(of: "RSSMRA70A01H501U"))
+        XCTAssertNil(String(data: raw, encoding: .utf8)?.range(of: "Diabete tipo 2"))
 
         let snapshot = try XCTUnwrap(store.loadPatientList(serverURL: "https://localhost:3443", ambulatoryId: "amb-42"))
         XCTAssertEqual(snapshot.patients, [patient])
         XCTAssertEqual(snapshot.ambulatoryId, "amb-42")
         XCTAssertEqual(snapshot.cachedAt, Date(timeIntervalSince1970: 1_775_000_000))
+        XCTAssertEqual(snapshot.patients.first?.diagnoses, diagnoses)
     }
 
     func testLoadPatientListIgnoresDifferentScope() throws {
@@ -100,7 +106,8 @@ final class HomeBasePatientCacheStoreTests: XCTestCase {
         id: String,
         firstName: String,
         lastName: String,
-        taxCode: String
+        taxCode: String,
+        diagnoses: String? = nil
     ) -> HomeBasePatientSummary {
         HomeBasePatientSummary(
             id: id,
@@ -111,7 +118,8 @@ final class HomeBasePatientCacheStoreTests: XCTestCase {
             isAdi: false,
             isArchived: false,
             version: 3,
-            updatedAt: Date(timeIntervalSince1970: 1_775_000_000)
+            updatedAt: Date(timeIntervalSince1970: 1_775_000_000),
+            diagnoses: diagnoses
         )
     }
 }

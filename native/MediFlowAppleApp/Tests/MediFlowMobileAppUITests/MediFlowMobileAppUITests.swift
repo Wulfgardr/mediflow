@@ -296,6 +296,43 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(bianchi.waitForNonExistence(timeout: 3), "Search should filter out non-matching patients")
     }
 
+    /* @Codex */
+    func testActivePatientRowShowsSourceOrderedDiagnosisSummaryAndOmitsMalformedData() {
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
+
+        let diagnosis = sectionView("patient-cell-diagnosis-uitest-1")
+        XCTAssertTrue(diagnosis.waitForExistence(timeout: 10))
+        for _ in 0..<12 where !diagnosis.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(diagnosis.isHittable, "The diagnosis summary should be visible in the worklist")
+        let tabBar = app.tabBars.firstMatch
+        if tabBar.exists, diagnosis.frame.maxY > tabBar.frame.minY {
+            let dragStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.72))
+            let dragEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55))
+            dragStart.press(forDuration: 0.1, thenDragTo: dragEnd)
+        }
+        if tabBar.exists {
+            XCTAssertLessThanOrEqual(
+                diagnosis.frame.maxY,
+                tabBar.frame.minY,
+                "The diagnosis summary should remain fully above the floating tab bar at AX5"
+            )
+        }
+        XCTAssertTrue(diagnosis.label.contains("E11.9 - Diabete tipo 2"))
+        let patientRow = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(
+            patientRow.label.contains("Un'altra diagnosi registrata"),
+            "Unexpected patient-row accessibility label: \(patientRow.label)"
+        )
+        XCTAssertFalse(sectionView("patient-cell-diagnosis-uitest-2").exists)
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "active-patient-diagnosis-summary"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     func testSelectingPatientShowsEnrichedDetail() {
         launch(seedPatients: true, section: "modules")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
