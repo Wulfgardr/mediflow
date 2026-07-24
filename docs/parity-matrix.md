@@ -8,7 +8,27 @@ read_when:
 # Matrice parity localhost ↔ client Apple
 
 Stato documento: `CANONICAL`
-Ultimo aggiornamento: 2026-07-13 (`WUL-479`, gate residuo `WUL-481`)
+Ultimo aggiornamento: 2026-07-24 (`WUL-479`, gate residuo `WUL-481`)
+
+## Gate MediFlow 0.8
+
+Il gate 0.8 usa tre packet separati:
+
+1. iPhone/iPad;
+2. macOS;
+3. localhost/web.
+
+Lo stato corrente è `OPEN`: per ogni packet manca un hash approvato con prove
+di build e interazione, screenshot sintetici, accessibilità e verifier
+indipendente. I 64 record di capacità sotto restano la baseline tecnica; non
+provano da soli il gate UI 0.8.
+
+Lume è il linguaggio comune. Liquid Glass è una declinazione nativa Apple e non
+viene copiata come identità CSS. La parity riguarda capacità, semantica,
+gerarchia, stati, sicurezza e riconoscibilità. Navigazione, densità, controlli e
+input restano specifici della piattaforma.
+
+Un P1 confermato su una delle tre superfici blocca il gate UI 0.8.
 
 ## Perimetro
 
