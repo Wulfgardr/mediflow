@@ -136,6 +136,10 @@
 /* ───────────── side rail ───────────── */
 
 .rail {
+  /* @Codex */
+  /* Geometria condivisa con lo spread esterno di --lume-focus-ring. */
+  --k8-rail-focus-outset: 4px;
+
   background: var(--rail-bg);
   border: 1px solid var(--k8-hairline-soft);
   border-radius: var(--radius-panel);
@@ -155,7 +159,6 @@
     overflow-y: hidden;
     align-items: center;
     gap: 6px;
-    scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
   }
   .rail::-webkit-scrollbar { display: none; }
@@ -255,8 +258,11 @@
   .navItem {
     flex: 0 0 auto;
     width: auto;
-    scroll-snap-align: start;
     padding: 8px 12px;
+  }
+
+  .navItem:last-of-type {
+    margin-inline-end: var(--k8-rail-focus-outset);
   }
 }
 
