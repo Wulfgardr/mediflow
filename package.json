@@ -42,7 +42,7 @@
     "test:run-strip-types": "node --test scripts/run-strip-types.test.mjs",
     "test:node-runtime-contract": "node --test scripts/node-runtime-contract.test.mjs",
     "test:installability-v0": "node --test scripts/installability-v0-macos.test.mjs",
-    "test:unit": "node scripts/run-strip-types.mjs --test --glob \"lib/**/*.test.ts\" --glob \"components/**/*.test.ts\" scripts/check-schema-drift.test.ts scripts/run-native-probe.test.mjs",
+    "test:unit": "node scripts/run-strip-types.mjs --test --glob \"lib/**/*.test.ts\" --glob \"components/**/*.test.ts\" scripts/check-schema-drift.test.ts scripts/run-native-probe.test.mjs scripts/audit-quality-gate.test.mjs",
     "test:api-v1-contract-negative": "bash scripts/api-v1-contract-negative-test.sh",
     "test:api-v1-put-negative-routes": "bash scripts/api-v1-put-negative-routes-test.sh",
     "test:legacy-clinical-writes": "bash scripts/legacy-clinical-writes-test.sh",
