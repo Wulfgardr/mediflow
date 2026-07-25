@@ -13,7 +13,14 @@ const DEFAULT_OUT = 'tmp-audit-quality-gate-report.json';
 const REQUIRED_ROUTE_AUDIT = [
     { route: 'app/api/auth/login/route.ts', events: ['auth.login.failed', 'auth.login.succeeded'], reason: 'auth login success/failure must stay auditable' },
     { route: 'app/api/auth/logout/route.ts', events: ['auth.logout'], reason: 'auth logout must stay auditable' },
-    { route: 'app/api/auth/change-pin/route.ts', events: ['settings.updated'], reason: 'PIN rotation is an administrative settings mutation' },
+    {
+        route: 'app/api/auth/change-pin/route.ts', events: ['settings.updated'], reason: 'PIN rotation is an administrative settings mutation',
+        writerContracts: [{
+            target: 'change-pin', ownerFile: 'lib/security/pin-change-service.ts', ownerName: 'changePin',
+            writerModule: '@/lib/security/audit', writerExport: 'writeAuditEvent', eventType: 'settings.updated',
+            dependencyFallback: { parameter: 'dependencies', property: 'writeAuditEvent' },
+        }],
+    },
     { route: 'app/api/settings/route.ts', events: ['settings.updated'], reason: 'bulk settings mutations must stay auditable' },
     { route: 'app/api/settings/[key]/route.ts', events: ['settings.updated'], reason: 'single-key settings mutations must stay auditable' },
     { route: 'app/api/patients/route.ts', events: ['patient.created'], reason: 'patient creation is a sensitive CRUD path' },
@@ -40,8 +47,32 @@ const REQUIRED_ROUTE_AUDIT = [
     { route: 'app/api/v1/patients/[id]/observations/route.ts', events: ['observation.created'], reason: 'native/shared observation creation is sensitive CRUD' },
     { route: 'app/api/v1/patients/[id]/observations/[observationId]/route.ts', events: ['observation.updated', 'observation.deleted'], reason: 'native/shared observation update/delete are sensitive CRUD' },
     { route: 'lib/network-observation-write.ts', events: ['observation.created', 'observation.updated', 'observation.deleted'], reason: 'paired observation writes must stay PHI-safe auditable' },
-    { route: 'app/api/prosthetic-prescriptions/route.ts', events: ['prosthetic.prescription.created'], reason: 'prosthetic prescription creation is sensitive CRUD' },
-    { route: 'app/api/prosthetic-prescriptions/[id]/route.ts', events: ['prosthetic.prescription.updated', 'prosthetic.prescription.deleted'], reason: 'prosthetic prescription update/delete are sensitive CRUD' },
+    {
+        route: 'app/api/prosthetic-prescriptions/route.ts', events: ['prosthetic.prescription.created'], reason: 'prosthetic prescription creation is sensitive CRUD',
+        writerContracts: [{
+            target: 'prosthetic-prescription.create', ownerFile: 'lib/prosthetic-prescription-write.ts',
+            ownerName: 'createHostProstheticPrescription', writerModule: './security/audit',
+            writerExport: 'safeWriteAuditEventFromRequest', writerArgumentIndex: 2,
+            eventType: 'prosthetic.prescription.created',
+        }],
+    },
+    {
+        route: 'app/api/prosthetic-prescriptions/[id]/route.ts', events: ['prosthetic.prescription.updated', 'prosthetic.prescription.deleted'], reason: 'prosthetic prescription update/delete are sensitive CRUD',
+        writerContracts: [
+            {
+                target: 'prosthetic-prescription.update', ownerFile: 'lib/prosthetic-prescription-write.ts',
+                ownerName: 'updateProstheticPrescription', writerModule: './security/audit',
+                writerExport: 'safeWriteAuditEventFromRequest', writerArgumentIndex: 2,
+                eventType: 'prosthetic.prescription.updated',
+            },
+            {
+                target: 'prosthetic-prescription.delete', ownerFile: 'lib/prosthetic-prescription-write.ts',
+                ownerName: 'deleteHostProstheticPrescription', writerModule: './security/audit',
+                writerExport: 'safeWriteAuditEventFromRequest', writerArgumentIndex: 2,
+                eventType: 'prosthetic.prescription.deleted',
+            },
+        ],
+    },
     { route: 'app/api/siss-handoffs/route.ts', events: ['siss.handoff.created'], reason: 'SISS handoff creation must stay PHI-safe auditable' },
     { route: 'app/api/siss-handoffs/[id]/route.ts', events: ['siss.handoff.updated', 'siss.handoff.deleted'], reason: 'SISS handoff update/delete must stay PHI-safe auditable' },
     { route: 'app/api/siss/context/route.ts', events: ['patient.siss.prescription.launch'], reason: 'prescription handoff launch must stay PHI-safe auditable' },
@@ -230,6 +261,7 @@ function isReachableStandaloneCall(call, owner) {
 export function validateAuditWriterControlFlow({
     source,
     fileName = 'fixture.ts',
+    sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS),
     ownerName,
     writerModule,
     writerExport,
@@ -237,7 +269,6 @@ export function validateAuditWriterControlFlow({
     writerArgumentIndex = 0,
     dependencyFallback = null,
 }) {
-    const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
     const problems = sourceFile.parseDiagnostics.length > 0 ? [`${fileName} has parser diagnostics`] : [];
     const binding = importedName(sourceFile, writerModule, writerExport);
     const owners = sourceFile.statements.filter((statement) =>
@@ -265,6 +296,35 @@ export function validateAuditWriterControlFlow({
         if (!isReachableStandaloneCall(calls.direct[0], owner)) problems.push('writer call is unreachable or uses unsupported control flow');
     }
     return problems;
+}
+
+function checkAuditWriterControlFlow(findings) {
+    const contracts = REQUIRED_ROUTE_AUDIT.flatMap((entry) =>
+        (entry.writerContracts ?? []).map((contract) => ({ ...contract, route: entry.route })));
+    const parsedFiles = new Map();
+    for (const contract of contracts) {
+        if (!parsedFiles.has(contract.ownerFile)) {
+            const source = read(contract.ownerFile);
+            parsedFiles.set(contract.ownerFile, {
+                source,
+                sourceFile: ts.createSourceFile(contract.ownerFile, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS),
+            });
+        }
+        const parsed = parsedFiles.get(contract.ownerFile);
+        for (const problem of validateAuditWriterControlFlow({
+            ...contract,
+            ...parsed,
+            fileName: contract.ownerFile,
+        })) {
+            addFinding(findings, 'AUDIT_CONTROL_FLOW', problem, {
+                route: contract.route,
+                target: contract.target,
+                owner: contract.ownerName,
+                eventType: contract.eventType,
+            });
+        }
+    }
+    return { targets: contracts.length, files: parsedFiles.size };
 }
 
 function checkAppendOnly(findings) {
@@ -297,7 +357,7 @@ function checkAuditCatalog(findings) {
 }
 
 function checkRouteCoverage(findings) {
-    for (const entry of REQUIRED_ROUTE_AUDIT) {
+    for (const { writerContracts: _, ...entry } of REQUIRED_ROUTE_AUDIT) {
         if (!exists(entry.route)) {
             addFinding(findings, 'AUDIT_ROUTE_MISSING', `Required audited route is missing: ${entry.route}`, entry);
             continue;
@@ -372,6 +432,7 @@ function main() {
     checkAppendOnly(findings);
     checkAuditCatalog(findings);
     checkRouteCoverage(findings);
+    const auditControlFlow = checkAuditWriterControlFlow(findings);
     checkPhiSafeMetadata(findings);
 
     const report = {
@@ -381,6 +442,8 @@ function main() {
         checked: {
             routes: REQUIRED_ROUTE_AUDIT.length,
             requiredEvents: REQUIRED_EVENT_TYPES.size,
+            auditControlFlowTargets: auditControlFlow.targets,
+            auditControlFlowFiles: auditControlFlow.files,
             metadataKeys: METADATA_KEYS,
             forbiddenMetadataKeys: FORBIDDEN_METADATA_KEYS,
         },

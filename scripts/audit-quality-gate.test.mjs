@@ -1,5 +1,9 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import ts from 'typescript';
 
@@ -62,4 +66,71 @@ test('rejects parse-valid unreachable, nested, shadowed, duplicate, and wrong-ev
         call('writeAudit', 'record.wrong'),
     ];
     for (const body of negatives) assert.notDeepEqual(validate(body), [], body);
+    assert.notDeepEqual(validateAuditWriterControlFlow({
+        ...base, source: `export async function performWrite() { ${call()} }`,
+    }), []);
+});
+
+test('main checks the four real writer contracts and rejects a mutated service', () => {
+    const root = process.cwd();
+    const gatePath = path.join(root, 'scripts/audit-quality-gate.mjs');
+    const gateSource = fs.readFileSync(gatePath, 'utf8');
+    const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-audit-wiring-'));
+    const requiredFiles = [
+        ...gateSource.matchAll(/\broute:\s*'([^']+)'/g).map((match) => match[1]),
+        'lib/security/audit-db.ts',
+        'lib/security/audit.ts',
+        'lib/siss-audit.ts',
+        'lib/security/pin-change-service.ts',
+        'lib/prosthetic-prescription-write.ts',
+    ];
+
+    try {
+        for (const relativePath of new Set(requiredFiles)) {
+            const destination = path.join(fixtureRoot, relativePath);
+            fs.mkdirSync(path.dirname(destination), { recursive: true });
+            fs.copyFileSync(path.join(root, relativePath), destination);
+        }
+        const cleanResult = spawnSync(process.execPath, [gatePath, '--out', 'tmp/g3a-wiring-clean.json'], { cwd: fixtureRoot });
+        const cleanReport = JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'tmp/g3a-wiring-clean.json'), 'utf8'));
+        assert.equal(cleanResult.status, 1);
+        assert.equal(cleanReport.findings.length, 7);
+        assert.equal(cleanReport.findings.filter((finding) => finding.code === 'AUDIT_CONTROL_FLOW').length, 0); assert.equal(cleanReport.findings.some((finding) => 'writerContracts' in finding), false);
+        assert.deepEqual([cleanReport.checked.auditControlFlowTargets, cleanReport.checked.auditControlFlowFiles], [4, 2]);
+
+        const pinService = path.join(fixtureRoot, 'lib/security/pin-change-service.ts');
+        const original = fs.readFileSync(pinService, 'utf8');
+        const mutated = original.replace(
+            "eventType: 'settings.updated'",
+            "eventType: 'auth.logout'",
+        );
+        assert.notEqual(mutated, original);
+        fs.writeFileSync(pinService, mutated);
+        const config = ts.parseJsonConfigFileContent(ts.readConfigFile(path.join(root, 'tsconfig.typecheck.json'), ts.sys.readFile).config, ts.sys, root);
+        const compileMutation = (auditSource = fs.readFileSync(path.join(root, 'lib/security/audit.ts'), 'utf8')) => { const host = ts.createCompilerHost(config.options); const readFile = host.readFile; host.readFile = (file) => path.resolve(file) === path.join(root, 'lib/security/pin-change-service.ts') ? mutated : path.resolve(file) === path.join(root, 'lib/security/audit.ts') ? auditSource : readFile(file); return ts.getPreEmitDiagnostics(ts.createProgram(config.fileNames, config.options, host)).filter((diagnostic) => diagnostic.file && path.resolve(diagnostic.file.fileName) === path.join(root, 'lib/security/pin-change-service.ts')); };
+        assert.deepEqual(compileMutation(), []);
+        assert.notDeepEqual(compileMutation(fs.readFileSync(path.join(root, 'lib/security/audit.ts'), 'utf8').replace("    'auth.logout',", "    // 'auth.logout',")), []);
+
+        const result = spawnSync(process.execPath, [gatePath, '--out', 'tmp/g3a-wiring-test.json'], {
+            cwd: fixtureRoot,
+            encoding: 'utf8',
+        });
+        assert.equal(result.status, 1);
+        const report = JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'tmp/g3a-wiring-test.json'), 'utf8'));
+        assert.equal(report.checked.auditControlFlowTargets, 4);
+        assert.equal(report.checked.auditControlFlowFiles, 2);
+        assert.deepEqual(
+            report.findings.filter((finding) => finding.code === 'AUDIT_CONTROL_FLOW'),
+            [{
+                code: 'AUDIT_CONTROL_FLOW',
+                message: 'writer event literal is missing or incorrect',
+                route: 'app/api/auth/change-pin/route.ts',
+                target: 'change-pin',
+                owner: 'changePin',
+                eventType: 'settings.updated',
+            }],
+        );
+    } finally {
+        fs.rmSync(fixtureRoot, { recursive: true, force: true });
+    }
 });
