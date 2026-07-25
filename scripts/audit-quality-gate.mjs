@@ -16,6 +16,7 @@ const REQUIRED_ROUTE_AUDIT = [
     {
         route: 'app/api/auth/change-pin/route.ts', events: ['settings.updated'], reason: 'PIN rotation is an administrative settings mutation',
         writerContracts: [{
+            handler: 'POST', serviceModule: '@/lib/security/pin-change-service', serviceExport: 'changePin',
             target: 'change-pin', ownerFile: 'lib/security/pin-change-service.ts', ownerName: 'changePin',
             writerModule: '@/lib/security/audit', writerExport: 'writeAuditEvent', eventType: 'settings.updated',
             dependencyFallback: { parameter: 'dependencies', property: 'writeAuditEvent' },
@@ -50,6 +51,8 @@ const REQUIRED_ROUTE_AUDIT = [
     {
         route: 'app/api/prosthetic-prescriptions/route.ts', events: ['prosthetic.prescription.created'], reason: 'prosthetic prescription creation is sensitive CRUD',
         writerContracts: [{
+            handler: 'POST', serviceModule: '@/lib/prosthetic-prescription-write',
+            serviceExport: 'createHostProstheticPrescription',
             target: 'prosthetic-prescription.create', ownerFile: 'lib/prosthetic-prescription-write.ts',
             ownerName: 'createHostProstheticPrescription', writerModule: './security/audit',
             writerExport: 'safeWriteAuditEventFromRequest', writerArgumentIndex: 2,
@@ -60,12 +63,17 @@ const REQUIRED_ROUTE_AUDIT = [
         route: 'app/api/prosthetic-prescriptions/[id]/route.ts', events: ['prosthetic.prescription.updated', 'prosthetic.prescription.deleted'], reason: 'prosthetic prescription update/delete are sensitive CRUD',
         writerContracts: [
             {
+                handler: 'PUT', serviceModule: '@/lib/prosthetic-prescription-write',
+                serviceExport: 'updateHostProstheticPrescription',
+                hop: { target: 'updateProstheticPrescription', argumentIndex: 2, literal: 'host' },
                 target: 'prosthetic-prescription.update', ownerFile: 'lib/prosthetic-prescription-write.ts',
                 ownerName: 'updateProstheticPrescription', writerModule: './security/audit',
                 writerExport: 'safeWriteAuditEventFromRequest', writerArgumentIndex: 2,
                 eventType: 'prosthetic.prescription.updated',
             },
             {
+                handler: 'DELETE', serviceModule: '@/lib/prosthetic-prescription-write',
+                serviceExport: 'deleteHostProstheticPrescription',
                 target: 'prosthetic-prescription.delete', ownerFile: 'lib/prosthetic-prescription-write.ts',
                 ownerName: 'deleteHostProstheticPrescription', writerModule: './security/audit',
                 writerExport: 'safeWriteAuditEventFromRequest', writerArgumentIndex: 2,
@@ -214,6 +222,7 @@ function constantBoolean(expression) {
     const value = unwrap(expression);
     if (value.kind === ts.SyntaxKind.TrueKeyword) return true;
     if (value.kind === ts.SyntaxKind.FalseKeyword) return false;
+    if (ts.isNumericLiteral(value)) return Number(value.text) !== 0;
     if (ts.isPrefixUnaryExpression(value) && value.operator === ts.SyntaxKind.ExclamationToken) { const operand = constantBoolean(value.operand); return operand === null ? null : !operand; }
     return null;
 }
@@ -231,12 +240,11 @@ function alwaysTerminates(statement) {
         && alwaysTerminates(statement.elseStatement));
 }
 
-function isReachableStandaloneCall(call, owner) {
-    let current = call;
-    while (ts.isAwaitExpression(current.parent) || ts.isParenthesizedExpression(current.parent)) current = current.parent;
-    if (!ts.isExpressionStatement(current.parent)) return false;
-    let child = current.parent;
+function isReachableCall(call, owner) {
+    let child = call;
     for (let parent = child.parent; parent && parent !== owner; child = parent, parent = parent.parent) {
+        if (ts.isFunctionLike(parent)) return false;
+        if (ts.isBinaryExpression(parent) || ts.isConditionalExpression(parent)) return false;
         if (ts.isIfStatement(parent)) {
             const constant = constantBoolean(parent.expression);
             if ((constant === false && parent.thenStatement === child)
@@ -255,6 +263,12 @@ function isReachableStandaloneCall(call, owner) {
         if (ts.isIterationStatement(parent, false) || ts.isSwitchStatement(parent) || ts.isLabeledStatement(parent)) return false;
     }
     return true;
+}
+
+function isReachableStandaloneCall(call, owner) {
+    let current = call;
+    while (ts.isAwaitExpression(current.parent) || ts.isParenthesizedExpression(current.parent)) current = current.parent;
+    return ts.isExpressionStatement(current.parent) && isReachableCall(call, owner);
 }
 
 /* @Codex */
@@ -294,6 +308,103 @@ export function validateAuditWriterControlFlow({
         if (hasUnsafeProperty || events.length !== 1 || !ts.isStringLiteral(events[0].initializer)
             || events[0].initializer.text !== eventType) problems.push('writer event literal is missing or incorrect');
         if (!isReachableStandaloneCall(calls.direct[0], owner)) problems.push('writer call is unreachable or uses unsupported control flow');
+    }
+    return problems;
+}
+
+function namedFunction(sourceFile, name, requireExport = false) {
+    const matches = sourceFile.statements.filter((statement) => ts.isFunctionDeclaration(statement)
+        && statement.name?.text === name
+        && (!requireExport || ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)));
+    return matches.length === 1 ? matches[0] : null;
+}
+
+function checkedSource(fileName, source) {
+    const options = { noLib: true, target: ts.ScriptTarget.Latest, module: ts.ModuleKind.ESNext };
+    const host = {
+        ...ts.createCompilerHost(options),
+        fileExists: (name) => name === fileName,
+        readFile: (name) => name === fileName ? source : undefined,
+        getSourceFile: (name, language) => name === fileName
+            ? ts.createSourceFile(name, source, language, true, ts.ScriptKind.TS)
+            : undefined,
+    };
+    const program = ts.createProgram([fileName], options, host);
+    return { sourceFile: program.getSourceFile(fileName), checker: program.getTypeChecker() };
+}
+
+function importedBinding(sourceFile, checker, moduleName, exportName) {
+    const matches = sourceFile.statements.flatMap((statement) => {
+        if (!ts.isImportDeclaration(statement)
+            || !ts.isStringLiteral(statement.moduleSpecifier)
+            || statement.moduleSpecifier.text !== moduleName
+            || statement.importClause?.isTypeOnly
+            || !statement.importClause?.namedBindings
+            || !ts.isNamedImports(statement.importClause.namedBindings)) return [];
+        return statement.importClause.namedBindings.elements.filter((element) =>
+            !element.isTypeOnly && (element.propertyName?.text ?? element.name.text) === exportName);
+    });
+    if (matches.length !== 1) return null;
+    return { symbol: checker.getSymbolAtLocation(matches[0].name) };
+}
+
+function resolvesToBinding(checker, symbol, target, seen = new Set()) {
+    if (!symbol || !target || seen.has(symbol)) return false;
+    if (symbol === target) return true;
+    seen.add(symbol);
+    const declarations = symbol.declarations ?? [];
+    if (declarations.length !== 1 || !ts.isVariableDeclaration(declarations[0])
+        || !ts.isVariableDeclarationList(declarations[0].parent)
+        || !(declarations[0].parent.flags & ts.NodeFlags.Const)) return false;
+    const initializer = declarations[0].initializer && unwrap(declarations[0].initializer);
+    return Boolean(initializer && ts.isIdentifier(initializer))
+        && resolvesToBinding(checker, checker.getSymbolAtLocation(initializer), target, seen);
+}
+
+function bindingCalls(root, checker, target) {
+    const calls = [];
+    const visit = (node) => {
+        const callee = ts.isCallExpression(node) ? unwrap(node.expression) : null;
+        if (callee && ts.isIdentifier(callee)
+            && resolvesToBinding(checker, checker.getSymbolAtLocation(callee), target)) calls.push(node);
+        ts.forEachChild(node, visit);
+    };
+    visit(root);
+    return calls;
+}
+
+/* @Codex */
+export function validateDelegatedRouteAudit({ spec, routeSource, serviceSource }) {
+    const problems = [];
+    const route = checkedSource('route.ts', routeSource);
+    const service = checkedSource('service.ts', serviceSource);
+    if (route.sourceFile.parseDiagnostics.length > 0) problems.push('route has parser diagnostics');
+    if (service.sourceFile.parseDiagnostics.length > 0) problems.push('service has parser diagnostics');
+    const delegate = importedBinding(route.sourceFile, route.checker, spec.serviceModule, spec.serviceExport);
+    const handler = namedFunction(route.sourceFile, spec.handler, true);
+    if (!delegate) problems.push('approved service import is missing or ambiguous');
+    if (!handler) problems.push(`exported ${spec.handler} handler is missing or ambiguous`);
+    if (delegate && handler) {
+        const allCalls = bindingCalls(route.sourceFile, route.checker, delegate.symbol);
+        const handlerCalls = bindingCalls(handler, route.checker, delegate.symbol);
+        if (allCalls.length !== 1 || handlerCalls.length !== 1 || !isReachableCall(handlerCalls[0], handler)) {
+            problems.push('handler must make exactly one reachable approved service call');
+        }
+    }
+
+    const serviceEntry = namedFunction(service.sourceFile, spec.serviceExport, true);
+    if (!serviceEntry) problems.push('configured service export is missing or ambiguous');
+    if (serviceEntry && spec.hop) {
+        const owner = namedFunction(service.sourceFile, spec.ownerName);
+        const target = owner?.name && service.checker.getSymbolAtLocation(owner.name);
+        const calls = bindingCalls(serviceEntry, service.checker, target);
+        const literal = calls[0]?.arguments[spec.hop.argumentIndex];
+        if (!owner || calls.length !== 1 || !isReachableCall(calls[0], serviceEntry)
+            || !ts.isStringLiteral(literal) || literal.text !== spec.hop.literal) {
+            problems.push('service export must make exactly one reachable configured hop with the exact literal');
+        }
+    } else if (serviceEntry && spec.ownerName !== spec.serviceExport) {
+        problems.push('owner mismatch requires one configured hop');
     }
     return problems;
 }
@@ -357,13 +468,29 @@ function checkAuditCatalog(findings) {
 }
 
 function checkRouteCoverage(findings) {
-    for (const { writerContracts: _, ...entry } of REQUIRED_ROUTE_AUDIT) {
+    for (const entry of REQUIRED_ROUTE_AUDIT) {
         if (!exists(entry.route)) {
             addFinding(findings, 'AUDIT_ROUTE_MISSING', `Required audited route is missing: ${entry.route}`, entry);
             continue;
         }
 
         const source = read(entry.route);
+        if (entry.writerContracts) {
+            for (const contract of entry.writerContracts) {
+                for (const problem of validateDelegatedRouteAudit({
+                    spec: contract,
+                    routeSource: source,
+                    serviceSource: read(contract.ownerFile),
+                })) {
+                    addFinding(findings, 'AUDIT_ROUTE_DELEGATION', `${entry.route}: ${problem}`, {
+                        route: entry.route,
+                        target: contract.target,
+                        eventType: contract.eventType,
+                    });
+                }
+            }
+            continue;
+        }
         const hasWriter = source.includes('writeAuditEvent') || source.includes('safeWriteAuditEventFromRequest');
         if (!hasWriter) {
             addFinding(findings, 'AUDIT_ROUTE_WRITER', `Route lacks an audit writer call: ${entry.route}`, entry);

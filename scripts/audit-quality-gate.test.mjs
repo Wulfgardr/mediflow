@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import ts from 'typescript';
 
-import { validateAuditWriterControlFlow } from './audit-quality-gate.mjs';
+import { validateAuditWriterControlFlow, validateDelegatedRouteAudit } from './audit-quality-gate.mjs';
 
 const EVENT = 'record.changed';
 const base = {
@@ -93,8 +93,8 @@ test('main checks the four real writer contracts and rejects a mutated service',
         }
         const cleanResult = spawnSync(process.execPath, [gatePath, '--out', 'tmp/g3a-wiring-clean.json'], { cwd: fixtureRoot });
         const cleanReport = JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'tmp/g3a-wiring-clean.json'), 'utf8'));
-        assert.equal(cleanResult.status, 1);
-        assert.equal(cleanReport.findings.length, 7);
+        assert.equal(cleanResult.status, 0);
+        assert.equal(cleanReport.findings.length, 0);
         assert.equal(cleanReport.findings.filter((finding) => finding.code === 'AUDIT_CONTROL_FLOW').length, 0); assert.equal(cleanReport.findings.some((finding) => 'writerContracts' in finding), false);
         assert.deepEqual([cleanReport.checked.auditControlFlowTargets, cleanReport.checked.auditControlFlowFiles], [4, 2]);
 
@@ -133,4 +133,109 @@ test('main checks the four real writer contracts and rejects a mutated service',
     } finally {
         fs.rmSync(fixtureRoot, { recursive: true, force: true });
     }
+});
+
+const routeSource = (body) => `import { perform as delegate } from './service';
+export async function POST(): Promise<void> { ${body} }`;
+const serviceSource = (body = 'return;') => `
+export async function perform(): Promise<void> { ${body} }
+async function owner(a: unknown, b: unknown, surface: string): Promise<void> {
+    void a; void b; void surface;
+}`;
+const delegatedSpec = (overrides = {}) => ({
+    handler: 'POST',
+    serviceModule: './service',
+    serviceExport: 'perform',
+    ownerName: 'perform',
+    ...overrides,
+});
+
+function assertSemanticClean(route, service) {
+    const sources = new Map([
+        ['/fixture/route.ts', route],
+        ['/fixture/service.ts', service],
+    ]);
+    const options = {
+        strict: true,
+        noEmit: true,
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.CommonJS,
+        moduleResolution: ts.ModuleResolutionKind.Node10,
+    };
+    const host = ts.createCompilerHost(options);
+    const fileExists = host.fileExists.bind(host);
+    const readFile = host.readFile.bind(host);
+    const getSourceFile = host.getSourceFile.bind(host);
+    host.fileExists = (file) => sources.has(file) || fileExists(file);
+    host.directoryExists = (directory) => directory === '/fixture' || ts.sys.directoryExists(directory);
+    host.readFile = (file) => sources.get(file) ?? readFile(file);
+    host.getSourceFile = (file, language, onError, fresh) => sources.has(file)
+        ? ts.createSourceFile(file, sources.get(file), language, true, ts.ScriptKind.TS)
+        : getSourceFile(file, language, onError, fresh);
+    const program = ts.createProgram([...sources.keys()], options, host);
+    assert.deepEqual(ts.getPreEmitDiagnostics(program).map((diagnostic) =>
+        ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')), []);
+}
+
+function validateDelegation(route, service, spec = delegatedSpec()) {
+    assertSemanticClean(route, service);
+    return validateDelegatedRouteAudit({ spec, routeSource: route, serviceSource: service });
+}
+
+test('accepts TypeScript-valid aliases for route delegates and the configured update hop', () => {
+    const route = routeSource('const alias = delegate; await alias();');
+    const service = serviceSource("const alias = owner; await alias(null, null, 'host');");
+    assert.deepEqual(validateDelegation(route, service), []);
+    assert.deepEqual(validateDelegation(route, service, delegatedSpec({
+        ownerName: 'owner',
+        hop: { target: 'owner', argumentIndex: 2, literal: 'host' },
+    })), []);
+});
+
+test('rejects TypeScript-valid route and hop false-green mutations', () => {
+    const direct = routeSource('await delegate();');
+    const service = serviceSource("await owner(null, null, 'host');");
+    const hop = delegatedSpec({
+        ownerName: 'owner',
+        hop: { target: 'owner', argumentIndex: 2, literal: 'host' },
+    });
+    const mutations = [
+        [routeSource("const text = 'delegate()'; void text;"), service, delegatedSpec()],
+        [routeSource('const alias = delegate; await delegate(); await alias();'), service, delegatedSpec()],
+        [routeSource('async function later() { await delegate(); } void later;'), service, delegatedSpec()],
+        [direct, serviceSource("const alias = owner; await owner(null, null, 'host'); await alias(null, null, 'host');"), hop],
+        [direct, serviceSource("async function later() { await owner(null, null, 'host'); } void later;"), hop],
+        [direct, serviceSource("const alias = owner; await alias(null, null, 'network');"), hop],
+    ];
+    for (const [route, owner, spec] of mutations) {
+        assert.notDeepEqual(validateDelegation(route, owner, spec), []);
+    }
+});
+
+test('rejects mutable aliases and numerically unreachable delegated calls', () => {
+    const direct = routeSource('await delegate();');
+    const service = serviceSource("await owner(null, null, 'host');");
+    const hop = delegatedSpec({
+        ownerName: 'owner',
+        hop: { target: 'owner', argumentIndex: 2, literal: 'host' },
+    });
+    const mutations = [
+        ['route reassigned alias', routeSource(
+            'const wrong = async (): Promise<void> => {}; let alias = delegate; alias = wrong; await alias();',
+        ), service, delegatedSpec()],
+        ['hop reassigned alias', direct, serviceSource(
+            "const wrong = async (a: unknown, b: unknown, surface: string): Promise<void> => { void a; void b; void surface; }; let alias = owner; alias = wrong; await alias(null, null, 'host');",
+        ), hop],
+        ['route if zero', routeSource('if (0) await delegate();'), service, delegatedSpec()],
+        ['hop if zero', direct, serviceSource("if (0) await owner(null, null, 'host');"), hop],
+        ['route after certain return', routeSource('if (1) return; await delegate();'), service, delegatedSpec()],
+        ['hop after certain return', direct, serviceSource("if (1) return; await owner(null, null, 'host');"), hop],
+    ];
+    const accepted = mutations.flatMap(([name, route, owner, spec]) =>
+        validateDelegation(route, owner, spec).length === 0 ? [name] : []);
+    assert.deepEqual(accepted, []);
+    assert.deepEqual(validateDelegation(routeSource('if (1) await delegate();'), service), []);
+    assert.deepEqual(validateDelegation(
+        direct, serviceSource("if (0) return; await owner(null, null, 'host');"), hop,
+    ), []);
 });
