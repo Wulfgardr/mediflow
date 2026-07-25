@@ -48,6 +48,8 @@ const MAX_SYNTHESIS_CHARS = 12000;
 /* @Codex */
 export interface SynthesizeDocumentOptions extends DocumentSynthesisRoutingOptions {
     attachmentId?: string;
+    // @Codex
+    sourceBytes?: ArrayBuffer | Uint8Array;
 }
 
 /* @Codex */
@@ -163,7 +165,7 @@ export async function synthesizeDocument(
     assertAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
 
     const normalized = normalizeDocumentInput(rawMarkdown);
-    const routed = routeDocumentClassForSynthesis(rawMarkdown, fileName, options);
+    const routed = routeDocumentClassForSynthesis(rawMarkdown, fileName, { pdfMetadata: options.pdfMetadata });
     const routerControlFlow = await db.settings.get(DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY);
     const routerMode = parseDocumentRouterControlFlowMode(routerControlFlow?.value);
     const routerDecision = decideDocumentRouterControlFlow({

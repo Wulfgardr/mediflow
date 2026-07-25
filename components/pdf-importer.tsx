@@ -26,6 +26,15 @@ interface PdfImporterProps {
     patientId?: string; // Optional: if provided, enables archiving
 }
 
+/* @Codex */
+async function readSourceBytes(source: Blob): Promise<ArrayBuffer | undefined> {
+    try {
+        return await source.arrayBuffer();
+    } catch {
+        return undefined;
+    }
+}
+
 export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterProps) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [isSynthesizing, setIsSynthesizing] = useState(false);
@@ -115,7 +124,8 @@ export default function PdfImporter({ onDataExtracted, patientId }: PdfImporterP
                 /* @Codex */
                 setAiStage('Sintesi del documento...');
                 try {
-                    await synthesizeDocument(data.rawText, file.name, patientId);
+                    const sourceBytes = await readSourceBytes(file);
+                    await synthesizeDocument(data.rawText, file.name, patientId, { sourceBytes });
                     setArchiveSaved(true);
                     /* @Codex */
                     setAiStage("Aggiornamento sintesi paziente...");
