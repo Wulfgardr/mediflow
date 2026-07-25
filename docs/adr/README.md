@@ -6,6 +6,7 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
+- [0087-registro-proposte-diagnostiche-documentali.md](./0087-registro-proposte-diagnostiche-documentali.md): propone un registro locale separato dalle diagnosi cliniche, senza aggiungere runtime.
 - [0086-intelligent-scaffold-and-graded-automation-boundary.md](./0086-intelligent-scaffold-and-graded-automation-boundary.md): propone lo scaffold model-agnostic, il chiarimento fail-closed e l'automazione graduata senza aggiungere runtime.
 - [0084-document-diagnoses-review-only.md](./0084-document-diagnoses-review-only.md): sostituisce l'autofill ICD documentale con proposte review-only e rifiuta envelope ambigui.
 - [0082-persistent-expectations-register-v0.md](./0082-persistent-expectations-register-v0.md): accetta il registro persistente host-only delle attese v0 con provenienza univoca e chiusura confermata.
