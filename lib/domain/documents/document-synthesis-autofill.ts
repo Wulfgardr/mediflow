@@ -42,7 +42,14 @@ export interface BuildDocumentSynthesisAutofillPlanInput {
 // della diagnosi canonica richiede accettazione umana in una lane separata.
 export interface DocumentSynthesisAutofillPlan {
     decision: DocumentDecision;
+    diagnosisCandidateActions: DocumentSynthesisDiagnosisCandidateAction[];
     diagnosesFieldLocked: boolean;
+}
+
+/* @Codex */
+export interface DocumentSynthesisDiagnosisCandidateAction {
+    actionId: string;
+    candidate: DocumentDiagnosisSuggestion;
 }
 
 /* @Codex */
@@ -106,7 +113,9 @@ function confidenceForAutofill(
     qualityLevel: DocumentQualityLevel | undefined,
 ): DocumentDecisionConfidence {
     if (qualityLevel === 'red') return 'blocked';
-    return suggestion.confidence ?? 'low';
+    return suggestion.confidence === 'high' || suggestion.confidence === 'medium'
+        ? suggestion.confidence
+        : 'low';
 }
 
 /* @Codex */
@@ -153,17 +162,20 @@ export function buildDocumentSynthesisAutofillPlan(
         suggestion.evidence?.trim() || `${suggestion.system} ${suggestion.code}: ${suggestion.description}`,
         'document-synthesis-autofill',
     ));
-    const actions = input.diagnoses.map((suggestion, index) => {
-        const confidence = confidenceForAutofill(suggestion, input.qualityLevel);
-        return buildAutofillAction({
-            suggestion,
-            index,
-            confidence,
-            blockedReason: blockedReasonForAutofillCandidate({
-                diagnosesFieldLocked,
-                duplicate: existingKeys.has(diagnosisKey(suggestion)),
+    const diagnosisActions = input.diagnoses.map((candidate, index) => {
+        const confidence = confidenceForAutofill(candidate, input.qualityLevel);
+        return {
+            candidate,
+            action: buildAutofillAction({
+                suggestion: candidate,
+                index,
+                confidence,
+                blockedReason: blockedReasonForAutofillCandidate({
+                    diagnosesFieldLocked,
+                    duplicate: existingKeys.has(diagnosisKey(candidate)),
+                }),
             }),
-        });
+        };
     });
 
     const decision = applyDocumentDecisionGuardrails(buildDocumentDecision({
@@ -186,15 +198,24 @@ export function buildDocumentSynthesisAutofillPlan(
             evidenceRefs: evidenceRefs.map((ref) => ref.id),
         },
         evidenceRefs,
-        proposedActions: actions,
+        proposedActions: diagnosisActions.map(({ action }) => action),
         humanRequiredFor: ['clinical_write'],
         model: {
             recognitionMode: 'hybrid',
         },
     }));
+    const candidatesByActionId = new Map(
+        diagnosisActions.map(({ action, candidate }) => [action.id, candidate]),
+    );
 
     return {
         decision,
+        diagnosisCandidateActions: decision.writePlan.allowedActions
+            .filter((action) => action.kind === 'create_diagnosis_candidate')
+            .map((action) => ({
+                actionId: action.id,
+                candidate: candidatesByActionId.get(action.id)!,
+            })),
         diagnosesFieldLocked,
     };
 }
