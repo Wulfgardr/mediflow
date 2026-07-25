@@ -38,11 +38,10 @@ export interface BuildDocumentSynthesisAutofillPlanInput {
 }
 
 /* @Codex */
+// ADR 0084: il piano e review-only e non espone campi di apply; la scrittura
+// della diagnosi canonica richiede accettazione umana in una lane separata.
 export interface DocumentSynthesisAutofillPlan {
     decision: DocumentDecision;
-    diagnoses: Diagnosis[];
-    appliedCodes: string[];
-    appliedSuggestions: DocumentDiagnosisSuggestion[];
     diagnosesFieldLocked: boolean;
 }
 
@@ -138,7 +137,7 @@ function buildAutofillAction(input: {
             ? 'Campo diagnosi non leggibile: nessuna scrittura automatica.'
             : input.blockedReason === 'structured_fact_already_present'
                 ? 'Diagnosi gia presente in scheda.'
-                : 'Codice ICD esplicito dal documento candidato all autofill prudente.',
+                : 'Codice ICD esplicito dal documento, candidato alla revisione umana.',
         blockedReason: input.blockedReason,
     };
 }
@@ -183,7 +182,7 @@ export function buildDocumentSynthesisAutofillPlan(
                 : input.qualityLevel === 'red'
                     ? 'blocked'
                     : 'medium',
-            rationale: 'Autofill documentale derivato da sintesi con codici ICD espliciti.',
+            rationale: 'Candidati diagnosi review-only da sintesi documentale con codici ICD espliciti.',
             evidenceRefs: evidenceRefs.map((ref) => ref.id),
         },
         evidenceRefs,
@@ -194,31 +193,8 @@ export function buildDocumentSynthesisAutofillPlan(
         },
     }));
 
-    // @Codex: anche una proposta ad alta confidenza resta review-only. Il
-    // servizio conserva l'evidenza, ma non aggiorna diagnosi senza un gesto
-    // esplicito dell'operatore in una lane contrattuale separata.
-    const appliedSuggestions: DocumentDiagnosisSuggestion[] = [];
-    const diagnoses = [...input.existingDiagnoses];
-    const appliedCodes: string[] = [];
-
-    for (const suggestion of appliedSuggestions) {
-        const key = diagnosisKey(suggestion);
-        if (existingKeys.has(key)) continue;
-        diagnoses.push({
-            code: suggestion.code.trim().toUpperCase(),
-            description: suggestion.description,
-            system: suggestion.system,
-            date: new Date(),
-        });
-        existingKeys.add(key);
-        appliedCodes.push(key);
-    }
-
     return {
         decision,
-        diagnoses,
-        appliedCodes,
-        appliedSuggestions,
         diagnosesFieldLocked,
     };
 }

@@ -284,9 +284,11 @@ test('document synthesis stores high confidence diagnoses as review material onl
 
         assert.equal(updatePayloads.length, 1);
         assert.equal(result.insight.autofill, undefined);
+        assert.equal(Object.hasOwn(result.insight, 'autofill'), false);
         assert.equal(payload.diagnoses, undefined);
         assert.equal(Object.hasOwn(payload, 'diagnoses'), false);
         assert.equal(Array.isArray(payload.documentInsights), true);
+        assert.deepEqual(Object.keys(payload).sort(), ['documentInsights', 'updatedAt', 'version']);
     } finally {
         db.settings.get = original.getSetting;
         db.patients.get = original.getPatient;

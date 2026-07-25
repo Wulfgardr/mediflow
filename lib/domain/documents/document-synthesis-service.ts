@@ -1,6 +1,8 @@
 /**
  * Document Synthesis Service
- * OCR-first pipeline: DeepSeek OCR -> Qwen clinical analysis -> prudent ICD autofill
+ * OCR-first pipeline: DeepSeek OCR -> Qwen clinical analysis -> review-only insight
+ * ADR 0084: i suggerimenti restano materiale di revisione e non modificano
+ * patients.diagnoses.
  */
 
 import { AIService } from '../../ai-service';
@@ -32,11 +34,6 @@ import {
     AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
     assertAiDocumentSynthesisEnabledValue,
 } from '../../ai-document-synthesis-kill-switch';
-/* @Codex */
-import {
-    buildDocumentSynthesisAutofillPlan,
-    parseExistingDocumentSynthesisDiagnoses,
-} from './document-synthesis-autofill';
 /* @Codex */
 import {
     buildDeterministicDocumentSynthesisAnalysis,
@@ -197,18 +194,6 @@ export async function synthesizeDocument(
     }
 
     const existingInsights = parseExistingInsights(patient.documentInsights);
-    const existingDiagnoses = parseExistingDocumentSynthesisDiagnoses(patient.diagnoses);
-    const autofillPlan = buildDocumentSynthesisAutofillPlan({
-        documentId: options.attachmentId ?? `${patientId}:${fileName}`,
-        attachmentId: options.attachmentId,
-        fileName,
-        rawMarkdown: normalized.normalizedText,
-        qualityLevel: analysis.quality?.level,
-        diagnoses: analysis.diagnoses,
-        existingDiagnoses: existingDiagnoses.diagnoses,
-        existingDiagnosesRaw: patient.diagnoses,
-    });
-    const { appliedCodes } = autofillPlan;
 
     const insight: DocumentInsight = {
         id: uuid(),
@@ -223,9 +208,6 @@ export async function synthesizeDocument(
                 ...(analysis.diagnoses.length > 0 ? { diagnoses: analysis.diagnoses } : {}),
                 ...(analysis.medications.length > 0 ? { medications: analysis.medications } : {}),
             }
-            : undefined,
-        autofill: appliedCodes.length > 0
-            ? { appliedDiagnoses: appliedCodes }
             : undefined,
         routedClass: {
             classification: routed.classification,
