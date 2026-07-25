@@ -212,7 +212,7 @@ struct PairedPatientsWorklistView: View {
         // worklist. As a bare ViewBuilder sequence every top-level element
         // received the caller's padding and background separately, which drew
         // the list as a stack of loose cards instead of one list.
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Self.mobileStackSpacing) {
             worklistContent
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -220,6 +220,12 @@ struct PairedPatientsWorklistView: View {
         .accessibilityLabel("Elenco pazienti")
         #endif
     }
+
+    #if !os(macOS)
+    /// Spacing of the mobile worklist stack, shared by the outer stack and by
+    /// the patient rows so the two cannot drift apart.
+    private static let mobileStackSpacing: CGFloat = 10
+    #endif
 
     @ViewBuilder
     private var worklistContent: some View {
@@ -233,6 +239,8 @@ struct PairedPatientsWorklistView: View {
         if let presentation = model.conflictPresentation {
             conflictBanner(presentation)
         }
+        #if os(macOS)
+        // macOS keeps the inline action: its sidebar has no toolbar slot here.
         Button {
             model.startCreatingPatient()
         } label: {
@@ -241,6 +249,7 @@ struct PairedPatientsWorklistView: View {
         .modifier(WorklistPrimaryActionStyle())
         .disabled(model.isWorking)
         .accessibilityIdentifier("new-patient-button")
+        #endif
         if model.isWorking && model.patients.isEmpty {
             ProgressView()
         } else if model.patients.isEmpty {
@@ -325,7 +334,12 @@ struct PairedPatientsWorklistView: View {
                     )
                 )
                 #else
-                rows
+                // The rows own their own spacing, so row-to-row separation stays
+                // fixed regardless of what the outer worklist stack does with the
+                // controls above it.
+                VStack(alignment: .leading, spacing: Self.mobileStackSpacing) {
+                    rows
+                }
                 #endif
             }
         }
@@ -452,27 +466,32 @@ struct PairedPatientsWorklistView: View {
 
 
     private var patientSearchControls: some View {
+        #if os(macOS)
         VStack(spacing: 8) {
             searchField
             filterControls
         }
+        #else
+        // Mobile keeps only the scope control in the scrolling content. Search is
+        // a system search field in the navigation bar and sort is a toolbar menu,
+        // so neither spends height above the first patient.
+        patientViewModePicker
+            .frame(maxWidth: .infinity, alignment: .leading)
+        #endif
     }
 
+    #if os(macOS)
     /// The scope filter and the sort control share a row only while both fit.
     /// A segmented control divides its width equally and truncates rather than
     /// wrapping, so in a narrow list column the row has to stack instead.
     @ViewBuilder
     private var filterControls: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            stackedFilterControls
-        } else {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 10) {
-                    patientViewModePicker
-                    patientSortMenu
-                }
-                stackedFilterControls
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                patientViewModePicker
+                patientSortMenu
             }
+            stackedFilterControls
         }
     }
 
@@ -483,7 +502,9 @@ struct PairedPatientsWorklistView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+    #endif
 
+    #if os(macOS)
     private var searchField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
@@ -507,15 +528,8 @@ struct PairedPatientsWorklistView: View {
                 .accessibilityIdentifier("patient-search-clear")
             }
         }
-        #if !os(macOS)
-        // Without a container the field was an unbounded hairline of text: the
-        // tappable area was the glyph, not a control-sized row.
-        .padding(.horizontal, 10)
-        .frame(minHeight: 44)
-        .background(PlatformColors.groupedBackground, in: RoundedRectangle(cornerRadius: 10))
-        .contentShape(Rectangle())
-        #endif
     }
+    #endif
 
     /* @Codex */
     @ViewBuilder
@@ -539,6 +553,7 @@ struct PairedPatientsWorklistView: View {
         }
     }
 
+    #if os(macOS)
     /* @Codex */
     private var patientSortMenu: some View {
         // A menu-style Picker states the active order on its own face. The
@@ -552,6 +567,7 @@ struct PairedPatientsWorklistView: View {
         .accessibilityValue(patientSortMode == .recent ? "Recenti" : "Alfabetico")
         .accessibilityIdentifier("patient-sort-menu")
     }
+    #endif
 
     @ViewBuilder
 

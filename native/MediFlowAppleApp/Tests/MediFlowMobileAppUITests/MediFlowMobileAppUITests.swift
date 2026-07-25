@@ -53,6 +53,70 @@ final class MediFlowMobileAppUITests: XCTestCase {
         return inTabBar.exists ? inTabBar : app.buttons[label]
     }
 
+    // MARK: - Native search helpers
+
+    /// The affordance that leads to search, whatever stage it is in: the expanded
+    /// system field, or the collapsed toolbar control that expands into it.
+    /// Returned as a query so callers can require exactly one match.
+    private func nativeSearchAffordances() -> XCUIElementQuery {
+        if app.searchFields.count > 0 { return app.searchFields }
+        // The minimized trigger is a global button, not a navigation-bar
+        // descendant, and it carries its meaning in the label rather than an
+        // identifier. Matched on exact terms so a partial match cannot pull in
+        // some other control.
+        return app.buttons.matching(
+            NSPredicate(
+                format: "identifier ==[c] %@ OR identifier ==[c] %@ OR label ==[c] %@ OR label ==[c] %@",
+                "Search", "Cerca", "Search", "Cerca"
+            )
+        )
+    }
+
+    /// Opens the system search field and returns it, requiring exactly one match
+    /// at every stage so a stray element cannot satisfy the gate by accident.
+    @discardableResult
+    private func openNativeSearchField() -> XCUIElement {
+        if app.searchFields.count == 0 {
+            let triggers = nativeSearchAffordances()
+            XCTAssertEqual(
+                triggers.count, 1,
+                "expected exactly one native search trigger, got \(triggers.count)"
+            )
+            triggers.element.tap()
+        }
+        let fields = app.searchFields
+        let field = fields.element
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "the native search field should appear")
+        XCTAssertEqual(
+            fields.count, 1,
+            "expected exactly one native search field, got \(fields.count)"
+        )
+        XCTAssertEqual(
+            field.elementType, .searchField,
+            "the native search target must expose the SearchField role"
+        )
+        XCTAssertEqual(
+            field.placeholderValue, "Cerca per nome o codice fiscale",
+            "the native search field must expose the expected prompt"
+        )
+        return field
+    }
+
+    /// Sort now lives in the toolbar. Required unique so the locator cannot drift
+    /// onto some other menu.
+    private func sortControl() -> XCUIElement {
+        let query = app.buttons.matching(identifier: "patient-sort-menu")
+        XCTAssertTrue(
+            query.element.waitForExistence(timeout: 15),
+            "the sort control should exist in the toolbar"
+        )
+        XCTAssertEqual(
+            query.count, 1,
+            "patient-sort-menu must identify exactly one control, got \(query.count)"
+        )
+        return query.element
+    }
+
     func testProjectMenuOpensEverySurface() {
         launch()
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
@@ -169,35 +233,64 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     // MARK: - Adaptive layout matrix
 
-    /// The list column must follow the container, not a constant. A fixed-width
-    /// column measures the same in portrait and landscape; a container-relative
-    /// one grows with the space it is given, and never takes the whole workspace.
+    /// The list must remain usable as the container changes. It may keep the same
+    /// width after reaching its intentional cap; the detail then absorbs the
+    /// additional landscape space.
+    /* @Codex */
     func testIPadListColumnFollowsTheContainerAcrossRotation() throws {
         // Not applicable on iPhone: skipping keeps the iPhone suite meaningful
         // instead of reporting a device mismatch as a product failure.
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "iPad-only layout contract")
         launch(seedPatients: true, section: "modules")
         XCUIDevice.shared.orientation = .portrait
-        let workspace = sectionView("clinical-workspace-patients-view")
-        XCTAssertTrue(workspace.waitForExistence(timeout: 20))
-        let row = app.buttons["patient-cell-uitest-1"]
-        XCTAssertTrue(row.waitForExistence(timeout: 10))
 
-        let portraitContainer = workspace.frame.width
+        func requireUnique(
+            _ query: XCUIElementQuery,
+            named name: String,
+            timeout: TimeInterval
+        ) -> XCUIElement {
+            let element = query.element
+            XCTAssertTrue(element.waitForExistence(timeout: timeout), "\(name) should exist")
+            XCTAssertEqual(query.count, 1, "\(name) must resolve exactly once; got \(query.count)")
+            return element
+        }
+
+        let windows = app.windows.containing(
+            .any,
+            identifier: "clinical-workspace-patients-view"
+        )
+        let rows = app.buttons.matching(identifier: "patient-cell-uitest-1")
+        let window = requireUnique(windows, named: "application window", timeout: 20)
+        let row = requireUnique(rows, named: "first patient row", timeout: 10)
+        let portraitContainer = window.frame.width
         let portraitRow = row.frame.width
         attachScreenshot(named: "matrix-ipad-portrait-split")
 
         XCUIDevice.shared.orientation = .landscapeLeft
-        XCTAssertTrue(row.waitForExistence(timeout: 10))
-        let landscapeContainer = workspace.frame.width
-        let landscapeRow = row.frame.width
+        let rotationCompleted = XCTNSPredicateExpectation(
+            predicate: NSPredicate { object, _ in
+                guard let element = object as? XCUIElement else { return false }
+                return element.frame.width > portraitContainer
+            },
+            object: window
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [rotationCompleted], timeout: 10),
+            .completed,
+            "the window must complete the transition to a wider landscape container"
+        )
+
+        let landscapeWindow = requireUnique(windows, named: "landscape application window", timeout: 10)
+        let landscapePatientRow = requireUnique(rows, named: "landscape first patient row", timeout: 10)
+        let landscapeContainer = landscapeWindow.frame.width
+        let landscapeRow = landscapePatientRow.frame.width
         attachScreenshot(named: "matrix-ipad-landscape-split")
 
         XCTAssertGreaterThan(landscapeContainer, portraitContainer, "landscape must be the wider container")
-        XCTAssertGreaterThan(
+        XCTAssertGreaterThanOrEqual(
             landscapeRow,
             portraitRow,
-            "the list column must grow with the container; a fixed width would measure the same in both orientations"
+            "the list must not shrink when the container widens"
         )
         for (row, container, label) in [
             (portraitRow, portraitContainer, "portrait"),
@@ -205,6 +298,16 @@ final class MediFlowMobileAppUITests: XCTestCase {
         ] {
             XCTAssertLessThan(row, container * 0.5, "the list must not take half the workspace in \(label)")
         }
+
+        let portraitDetailSpace = portraitContainer - portraitRow
+        let landscapeDetailSpace = landscapeContainer - landscapeRow
+        XCTAssertGreaterThan(portraitDetailSpace, 0, "portrait must leave space for the detail")
+        XCTAssertGreaterThan(landscapeDetailSpace, 0, "landscape must leave space for the detail")
+        XCTAssertGreaterThan(
+            landscapeDetailSpace,
+            portraitDetailSpace,
+            "the detail must absorb the additional landscape width"
+        )
     }
 
     /// Selection is the thing the design contract says must survive recomposition.
@@ -246,20 +349,131 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(diagnosis.waitForExistence(timeout: 15))
         attachScreenshot(named: "matrix-ax5-worklist")
 
-        let bounds = workspace.frame
-        for (element, name) in [(row, "patient row"), (diagnosis, "diagnosis summary")] {
+        // Each element is checked against the box that actually owns it: the row
+        // against the window, the diagnosis against its own row.
+        for (element, bounds, name) in [
+            (row, app.windows.firstMatch.frame, "patient row"),
+            (diagnosis, row.frame, "diagnosis summary")
+        ] {
             XCTAssertGreaterThanOrEqual(
                 element.frame.minX, bounds.minX - 1,
-                "\(name) starts outside the workspace at AX5"
+                "\(name) starts outside its container at AX5"
             )
             XCTAssertLessThanOrEqual(
                 element.frame.maxX, bounds.maxX + 1,
-                "\(name) overflows the workspace at AX5"
+                "\(name) overflows its container at AX5"
             )
         }
         XCTAssertTrue(
             diagnosis.label.contains("Diabete tipo 2"),
             "the diagnosis must stay readable at AX5, got: \(diagnosis.label)"
+        )
+    }
+
+    /// The floating tab bar overlays the scroll view. Without a bottom safe-area
+    /// inset the last row can never be scrolled clear of it, so clinical text
+    /// stays physically occluded no matter how far the clinician scrolls.
+    ///
+    /// This asserts vertical occlusion, not horizontal overflow: XCUI clips
+    /// element frames to the visible region, so a horizontal-bounds check is
+    /// satisfied by the very clipping it is meant to catch.
+    func testWorklistLastRowClearsTheFloatingTabBarAtAX5() {
+        launch(seedPatients: true, section: "modules", dynamicTypeSize: "accessibility5")
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 10), "compact layout should present the tab bar")
+
+        // A visible anchor. Off-screen elements report clipped frames, which is
+        // how a bounds check can pass while the content it measures is in fact
+        // unreachable, so the anchor must be on screen to mean anything.
+        let anchor = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(anchor.waitForExistence(timeout: 15))
+        XCTAssertTrue(anchor.isHittable, "the anchor row must start visible")
+
+        // The final row must start out of reach, otherwise this gate proves
+        // nothing about scrolling.
+        let lastRow = app.buttons["patient-cell-uitest-2"]
+        XCTAssertTrue(lastRow.waitForExistence(timeout: 15))
+        XCTAssertFalse(
+            lastRow.isHittable && lastRow.frame.maxY <= tabBar.frame.minY,
+            "precondition: at AX5 the last row must require scrolling; if it is already clear, "
+                + "this gate cannot detect the defect"
+        )
+
+        let anchorBefore = anchor.frame
+        attachScreenshot(named: "ax5-worklist-at-rest")
+        app.swipeUp()
+        let anchorAfter = anchor.frame
+        attachScreenshot(named: "ax5-worklist-after-swipe")
+
+        let geometry = """
+        anchor patient-cell-uitest-1 before: \(anchorBefore)
+        anchor patient-cell-uitest-1 after:  \(anchorAfter)
+        tab bar: \(tabBar.frame)
+        """
+        let geometryEvidence = XCTAttachment(string: geometry)
+        geometryEvidence.name = "ax5-anchor-geometry"
+        geometryEvidence.lifetime = .keepAlways
+        add(geometryEvidence)
+
+        // The content must actually move. This is unconditional: a worklist that
+        // cannot scroll strands every row below the fold.
+        XCTAssertNotEqual(
+            anchorBefore.minY, anchorAfter.minY, accuracy: 0.5,
+            "the worklist did not scroll at AX5, so content below the fold can never be read. \(geometry)"
+        )
+
+        // And the final row must end up genuinely usable: hittable and wholly
+        // above the floating tab bar.
+        var previous = anchorAfter.minY
+        for _ in 0..<12 {
+            if lastRow.isHittable && lastRow.frame.maxY <= tabBar.frame.minY { break }
+            app.swipeUp()
+            let current = anchor.frame.minY
+            if abs(current - previous) < 0.5 { break }
+            previous = current
+        }
+        attachScreenshot(named: "ax5-worklist-at-end")
+        XCTAssertTrue(lastRow.isHittable, "the last patient row must become hittable at AX5")
+        XCTAssertLessThanOrEqual(
+            lastRow.frame.maxY,
+            tabBar.frame.minY,
+            "the last patient row must end wholly above the floating tab bar; "
+                + "row maxY \(lastRow.frame.maxY) vs tab bar minY \(tabBar.frame.minY)"
+        )
+    }
+
+    /// Patients-first has to hold at AX5 too, where header controls are largest.
+    /// The first patient must be reachable in the first viewport, above the
+    /// floating tab bar, without scrolling.
+    func testFirstPatientIsVisibleInTheFirstViewportAtAX5() {
+        launch(seedPatients: true, section: "modules", dynamicTypeSize: "accessibility5")
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 10))
+        let firstRow = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(firstRow.waitForExistence(timeout: 15))
+        attachScreenshot(named: "ax5-first-viewport")
+
+        XCTAssertTrue(firstRow.isHittable, "the first patient must be reachable without scrolling at AX5")
+
+        let geometry = """
+        first row: \(firstRow.frame)
+        tab bar:   \(tabBar.frame)
+        overlap:   \(firstRow.frame.maxY - tabBar.frame.minY)
+        """
+        let geometryEvidence = XCTAttachment(string: geometry)
+        geometryEvidence.name = "ax5-first-row-geometry"
+        geometryEvidence.lifetime = .keepAlways
+        add(geometryEvidence)
+
+        // The whole row, strictly: a minY check passes while the bottom of the
+        // row is still buried under the bar, and any tolerance here is slack for
+        // occluded clinical content.
+        XCTAssertLessThanOrEqual(
+            firstRow.frame.maxY,
+            tabBar.frame.minY,
+            "the entire first patient row must clear the floating tab bar at AX5. \(geometry)"
         )
     }
 
@@ -283,8 +497,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
     func testSortControlShowsTheActiveOrder() {
         launch(seedPatients: true, section: "modules")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
-        let sort = app.buttons["patient-sort-menu"]
-        XCTAssertTrue(sort.waitForExistence(timeout: 15))
+        let sort = sortControl()
         let face = "\(sort.label) \(sort.value as? String ?? "")"
         XCTAssertTrue(
             face.localizedCaseInsensitiveContains("Recenti"),
@@ -367,9 +580,14 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
 
         XCTAssertTrue(app.buttons["new-patient-button"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.textFields["patient-search-field"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["patient-cell-uitest-1"].waitForExistence(timeout: 10))
         XCTAssertTrue(sectionView("patient-view-mode").exists)
+        // Search moved to the navigation bar: it must stay reachable from home,
+        // and there must be exactly one way in.
+        XCTAssertEqual(
+            nativeSearchAffordances().count, 1,
+            "exactly one native search affordance must be reachable from the patient home"
+        )
         XCTAssertFalse(
             sectionView("homebase-connection-banner").exists,
             "A usable worklist should not show a technical connection banner"
@@ -405,9 +623,6 @@ final class MediFlowMobileAppUITests: XCTestCase {
         launch(seedPatients: true, section: "modules")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
 
-        let search = app.textFields["patient-search-field"]
-        XCTAssertTrue(search.waitForExistence(timeout: 10), "Search field should render with patients present")
-
         // Stable identifiers (not display text). Seed: 1=Rossi, 2=Bianchi, 3=Verdi(archived).
         let rossi = app.buttons["patient-cell-uitest-1"]
         let bianchi = app.buttons["patient-cell-uitest-2"]
@@ -418,12 +633,26 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(bianchi.exists)
         XCTAssertTrue(verdi.waitForNonExistence(timeout: 3), "Archived patient should be hidden by the active filter")
 
-        // Typing narrows the list; the clear button appearing is the sync point.
+        let search = openNativeSearchField()
         search.tap()
+        // Focus is proved by the system presenting the keyboard, not by assuming
+        // the tap landed.
+        XCTAssertTrue(
+            app.keyboards.element.waitForExistence(timeout: 5),
+            "focusing the native search field must present the keyboard"
+        )
+
         search.typeText("rossi")
-        XCTAssertTrue(app.buttons["patient-search-clear"].waitForExistence(timeout: 5))
-        XCTAssertTrue(rossi.exists)
-        XCTAssertTrue(bianchi.waitForNonExistence(timeout: 3), "Search should filter out non-matching patients")
+        XCTAssertTrue(rossi.waitForExistence(timeout: 5), "the matching patient must remain")
+        XCTAssertTrue(
+            bianchi.waitForNonExistence(timeout: 5),
+            "Search should filter out non-matching patients"
+        )
+
+        // Clearing by keyboard rather than by a localized button label.
+        search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 5))
+        XCTAssertTrue(rossi.waitForExistence(timeout: 5), "clearing the query must restore the list")
+        XCTAssertTrue(bianchi.waitForExistence(timeout: 5), "clearing the query must restore the list")
     }
 
     /* @Codex */
@@ -477,20 +706,68 @@ final class MediFlowMobileAppUITests: XCTestCase {
         attachScreenshot(named: "issue-145-selected-patient")
 
         if UIDevice.current.userInterfaceIdiom == .phone {
-            // Matched across element types: the header carries a header trait, so
-            // it is not guaranteed to surface as a plain button.
-            let disclosure = sectionView("patient-compact-header-disclosure")
-            XCTAssertTrue(disclosure.waitForExistence(timeout: 5))
-            // The label names the open patient; the expand/collapse state is the
-            // value. Labelling the button with the verb alone hid the identity.
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.name = "tree-after-selecting-patient"
+            tree.lifetime = .keepAlways
+            add(tree)
+
+            // Restricted to buttons on purpose: an earlier revision resolved this
+            // identifier to an inert StaticText, which let the test "pass" while
+            // tapping nothing. If the identifier ever lands on a non-interactive
+            // node again, this query finds nothing and the gate fails.
+            // Exact identifier, no predicate and no firstMatch: the query must
+            // resolve one element and only one. The workspace ancestor is now an
+            // accessibility container, so it no longer propagates its identifier
+            // onto this control.
+            let disclosureQuery = app.buttons.matching(identifier: "patient-compact-header-disclosure")
+            XCTAssertTrue(
+                disclosureQuery.element.waitForExistence(timeout: 5),
+                "the chart header must expose its disclosure as an interactive button"
+            )
+            XCTAssertEqual(
+                disclosureQuery.count, 1,
+                "patient-compact-header-disclosure must identify exactly one button, got \(disclosureQuery.count)"
+            )
+            let disclosure = disclosureQuery.element
+            XCTAssertEqual(disclosure.elementType, .button, "the locator must resolve the interactive control")
+            XCTAssertTrue(disclosure.isHittable, "the disclosure control must be hittable")
             XCTAssertTrue(
                 disclosure.label.contains("Rossi Mario"),
-                "The chart header must announce the patient, got: \(disclosure.label)"
+                "the disclosure must announce the open patient, got: \(disclosure.label)"
             )
-            XCTAssertEqual(disclosure.value as? String, "Compresso")
+
+            // Expansion is proved by the exact revealed child, again by identifier
+            // and again required to be unique.
+            let taxCodeQuery = app.staticTexts.matching(identifier: "patient-compact-header-taxcode")
+            XCTAssertEqual(taxCodeQuery.count, 0, "the identity block starts collapsed")
+
             disclosure.tap()
-            XCTAssertEqual(disclosure.value as? String, "Espanso")
-            XCTAssertTrue(disclosure.label.contains("Rossi Mario"))
+            let expandedTree = XCTAttachment(string: app.debugDescription)
+            expandedTree.name = "tree-after-expanding-disclosure"
+            expandedTree.lifetime = .keepAlways
+            add(expandedTree)
+            XCTAssertTrue(
+                taxCodeQuery.element.waitForExistence(timeout: 5),
+                "expanding must reveal the identity block"
+            )
+            XCTAssertEqual(
+                taxCodeQuery.count, 1,
+                "patient-compact-header-taxcode must identify exactly one element, got \(taxCodeQuery.count)"
+            )
+
+            disclosure.tap()
+            XCTAssertTrue(
+                taxCodeQuery.element.waitForNonExistence(timeout: 5),
+                "collapsing must hide it again"
+            )
+
+            // Continuity: operating the disclosure must not disturb the open
+            // chart or the list selection behind it.
+            XCTAssertTrue(rossi.isSelected, "the patient must stay selected across disclosure use")
+            XCTAssertTrue(
+                sectionView("patient-detail-name").exists,
+                "the open chart must survive expanding and collapsing the header"
+            )
         }
 
         // Detail renders the name and the decoded exemptions (ExemptionCodesCodec).
@@ -509,11 +786,14 @@ final class MediFlowMobileAppUITests: XCTestCase {
         launch(seedPatients: true, section: "modules")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
 
-        let sortMenu = app.buttons["patient-sort-menu"]
-        XCTAssertTrue(sortMenu.waitForExistence(timeout: 10))
+        let sortMenu = sortControl()
         XCTAssertTrue(
             sortMenu.label.localizedCaseInsensitiveContains("Ordina"),
             "The sort menu should describe its purpose instead of exposing only an icon"
+        )
+        XCTAssertEqual(
+            sortMenu.value as? String, "Recenti",
+            "the closed sort control must expose the active order as its value"
         )
 
         let rossi = app.buttons["patient-cell-uitest-1"]
