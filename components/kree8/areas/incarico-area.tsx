@@ -210,7 +210,8 @@ function IncaricoArea({
               {list === 'attivi' ? 'Pazienti in carico' : 'Archivio pazienti'}
             </h2>
             <span className={classNames(patientStyles.resultCount, 'lume-registro')}>
-              {visible.length} risultati
+              {/* @Codex */}
+              {visible.length} {visible.length === 1 ? 'risultato' : 'risultati'}
             </span>
             <span className={styles.panelActions}>
               <Link href="/patients/new" className={styles.ghostBtnSm} data-lume-action="quiet">
