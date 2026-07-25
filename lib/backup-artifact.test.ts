@@ -27,6 +27,20 @@ const basePayload = {
             createdAt: '2026-03-17T08:05:00.000Z',
         },
     ],
+    documentDiagnosisProposals: [
+        {
+            id: 'proposal-1',
+            patientId: 'pat-1',
+            sourceDocumentKey: 'source-hmac-1',
+            candidateKey: 'candidate-hmac-1',
+            payload: 'ENC:iv:cipher',
+            status: 'pending',
+            confidence: 'high',
+            version: 1,
+            createdAt: '2026-03-17T08:07:00.000Z',
+            updatedAt: '2026-03-17T08:07:00.000Z',
+        },
+    ],
     drugs: [],
     entries: [
         {
@@ -120,6 +134,50 @@ test('preserves patient assigned ambulatory ids inside the backup payload', asyn
 
     const parsed = await parseBackupArtifact(JSON.parse(serialized));
     assert.deepEqual(parsed.payload.patients[0].assignedAmbulatoryIds, ['amb-2', 'amb-1', 'amb-2']);
+});
+
+/* @Codex */
+async function legacyArtifact(): Promise<Record<string, any>> {
+    const artifact = JSON.parse(await serializeBackupArtifact(basePayload));
+    delete artifact.payload.documentDiagnosisProposals;
+    artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'documentDiagnosisProposals');
+    delete artifact.manifest.recordCounts.documentDiagnosisProposals;
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(stableStringify(artifact.payload)));
+    artifact.manifest.checksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    return artifact;
+}
+
+test('accepts an authentic legacy v1 artifact and normalizes its missing proposal snapshot', async () => {
+    const parsed = await parseBackupArtifact(await legacyArtifact());
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(stableStringify(parsed.payload)));
+    const normalizedChecksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+
+    assert.deepEqual(parsed.payload.documentDiagnosisProposals, []);
+    assert.equal(parsed.manifest.recordCounts.documentDiagnosisProposals, 0);
+    assert.deepEqual(parsed.manifest.collections, BACKUP_COLLECTIONS);
+    assert.equal(parsed.manifest.checksum, normalizedChecksum);
+});
+
+test('rejects almost-legacy and unknown backup collections', async () => {
+    const missingHistorical = await legacyArtifact();
+    delete missingHistorical.payload.therapies;
+    missingHistorical.manifest.collections = missingHistorical.manifest.collections.filter((collection: string) => collection !== 'therapies');
+    delete missingHistorical.manifest.recordCounts.therapies;
+
+    await assert.rejects(
+        () => parseBackupArtifact(missingHistorical),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'collection-mismatch',
+    );
+
+    const unknownCollection = JSON.parse(await serializeBackupArtifact(basePayload));
+    unknownCollection.payload.unexpected = [];
+    unknownCollection.manifest.collections.push('unexpected');
+    unknownCollection.manifest.recordCounts.unexpected = 0;
+
+    await assert.rejects(
+        () => parseBackupArtifact(unknownCollection),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'collection-mismatch',
+    );
 });
 
 test('rejects patient assigned ambulatory ids that reference missing ambulatories', async () => {

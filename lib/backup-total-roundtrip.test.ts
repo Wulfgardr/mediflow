@@ -18,6 +18,7 @@ const BACKUP_TABLES = {
     ambulatories: 'ambulatories',
     attachments: 'attachments',
     conversations: 'conversations',
+    documentDiagnosisProposals: 'document_diagnosis_proposals',
     drugs: 'drugs',
     entries: 'entries',
     exemptions: 'exemptions',
@@ -44,6 +45,10 @@ function runNode(args: string[], env: Record<string, string> = {}): string {
 
 function prepareDatabase(dataDir: string): void {
     runNode(['scripts/prepare-e2e-db.mjs'], { MEDIFLOW_DATA_DIR: dataDir });
+    bootstrapSchemaGuards(dataDir);
+}
+
+function bootstrapSchemaGuards(dataDir: string): void {
     const dbServerUrl = pathToFileURL(path.join(ROOT, 'lib/db-server.ts')).href;
     runNode(
         ['--experimental-strip-types', '--import', LOADER, '--input-type=module', '--eval', `await import(${JSON.stringify(dbServerUrl)});`],
@@ -151,18 +156,32 @@ async function populateSyntheticClinicalFixture(db: Database.Database): Promise<
         ...(await sealed('siss_handoff_events', ['reason', 'next_action', 'notes', 'correlation_id'])),
         started_at: now + 18, completed_at: now + 19, outcome: 'completed', created_at: now + 18, updated_at: now + 19,
     });
+    /* @Codex */
+    const proposal = {
+        id: 'w7-proposal', patient_id: 'w7-patient', source_document_key: 'source-hmac-w7', candidate_key: 'candidate-hmac-w7',
+        payload: await seal('document_diagnosis_proposals.payload'), status: 'accepted', confidence: 'high', decided_at: now + 20,
+        decision_actor_type: 'user', decision_actor_ref: 'actor-synthetic', decision_payload: await seal('document_diagnosis_proposals.decision_payload'),
+        version: 9, created_at: now + 20, updated_at: now + 21,
+    };
+    insertRow(db, 'document_diagnosis_proposals', proposal);
+    assert.throws(() => insertRow(db, 'document_diagnosis_proposals', { ...proposal, id: 'w7-proposal-duplicate' }), /UNIQUE/);
+    insertRow(db, 'document_diagnosis_proposals', {
+        ...proposal,
+        id: 'w7-proposal-other-source', source_document_key: 'source-hmac-w7-other', status: 'pending', decided_at: null,
+        decision_actor_type: null, decision_actor_ref: null, decision_payload: null,
+    });
     insertRow(db, 'attachments', {
         id: 'w7-attachment', patient_id: 'w7-patient', type: 'application/pdf', size: 128,
         ...(await sealed('attachments', ['name', 'path', 'data', 'summary_snapshot', 'parse_evidence_artifact_snapshot', 'ocr_replay_artifact_snapshot'])),
-        ocr_queue_state: 'ocr_done', ocr_queue_reason: 'synthetic', ocr_queue_updated_at: now + 20, created_at: now + 20,
+        ocr_queue_state: 'ocr_done', ocr_queue_reason: 'synthetic', ocr_queue_updated_at: now + 22, created_at: now + 22,
     });
-    insertRow(db, 'conversations', { id: 'w7-conversation', title: await seal('conversations.title'), updated_at: now + 21, is_archived: 1, is_deleted: 1, created_at: now + 21 });
+    insertRow(db, 'conversations', { id: 'w7-conversation', title: await seal('conversations.title'), updated_at: now + 23, is_archived: 1, is_deleted: 1, created_at: now + 23 });
     insertRow(db, 'messages', {
         id: 'w7-message', conversation_id: 'w7-conversation', role: 'user', content: await seal('messages.content'), metadata: await seal('messages.metadata'),
-        attachment_type: 'application/octet-stream', attachment_base64: await seal('messages.attachment_base64'), created_at: now + 22,
+        attachment_type: 'application/octet-stream', attachment_base64: await seal('messages.attachment_base64'), created_at: now + 24,
     });
     insertRow(db, 'drugs', { aic: 'W7AIC', name: 'Farmaco sintetico', active_principle: 'Principio sintetico', company: 'Azienda sintetica', packaging: 'Fixture', class: 'A', price: 123, atc: 'W7ATC' });
-    insertRow(db, 'exemptions', { code: 'W7EX', description: 'Esenzione sintetica', type: 'synthetic', source: 'fixture', start_date: now, end_date: now + 30, is_pharma: 1, is_specialist: 1, is_national: 0, updated_at: now + 23 });
+    insertRow(db, 'exemptions', { code: 'W7EX', description: 'Esenzione sintetica', type: 'synthetic', source: 'fixture', start_date: now, end_date: now + 30, is_pharma: 1, is_specialist: 1, is_national: 0, updated_at: now + 25 });
 }
 
 function primaryKeyColumns(db: Database.Database, table: string): string[] {
