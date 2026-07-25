@@ -4,6 +4,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const ROOT = process.cwd();
 const DEFAULT_OUT = 'tmp-audit-quality-gate-report.json';
@@ -106,6 +108,163 @@ function exists(relativePath) {
 
 function addFinding(findings, code, message, details = {}) {
     findings.push({ code, message, ...details });
+}
+
+function bindingNameContains(name, target) {
+    if (ts.isIdentifier(name)) return name.text === target;
+    return (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name))
+        && name.elements.some((item) => ts.isBindingElement(item) && bindingNameContains(item.name, target));
+}
+
+function importedName(sourceFile, moduleName, exportName) {
+    const names = sourceFile.statements.flatMap((statement) => {
+        if (!ts.isImportDeclaration(statement)
+            || !ts.isStringLiteral(statement.moduleSpecifier)
+            || statement.moduleSpecifier.text !== moduleName
+            || statement.importClause?.isTypeOnly
+            || !statement.importClause?.namedBindings
+            || !ts.isNamedImports(statement.importClause.namedBindings)) return [];
+        return statement.importClause.namedBindings.elements
+            .filter((item) => !item.isTypeOnly && (item.propertyName?.text ?? item.name.text) === exportName)
+            .map((item) => item.name.text);
+    });
+    return names.length === 1 ? names[0] : null;
+}
+
+function localBindingExists(owner, name, allowOwnerParameter = false) {
+    let found = !allowOwnerParameter && owner.parameters.some((parameter) => bindingNameContains(parameter.name, name));
+    const visit = (node) => {
+        if (found || (node !== owner && ts.isFunctionLike(node))) return;
+        if ((ts.isVariableDeclaration(node) || ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node))
+            && node.name && bindingNameContains(node.name, name)) found = true;
+        ts.forEachChild(node, visit);
+    };
+    if (owner.body) visit(owner.body);
+    return found;
+}
+
+function unwrap(expression) {
+    let current = expression;
+    while (ts.isParenthesizedExpression(current) || ts.isAsExpression(current)
+        || ts.isTypeAssertionExpression(current) || ts.isNonNullExpression(current)
+        || ts.isSatisfiesExpression(current)) current = current.expression;
+    return current;
+}
+
+function isWriterCall(call, binding, owner, fallback) {
+    const callee = unwrap(call.expression);
+    if (ts.isIdentifier(callee)) return callee.text === binding;
+    if (!fallback || !ts.isBinaryExpression(callee)
+        || callee.operatorToken.kind !== ts.SyntaxKind.QuestionQuestionToken
+        || !ts.isPropertyAccessExpression(callee.left)
+        || !ts.isIdentifier(callee.left.expression)
+        || callee.left.expression.text !== fallback.parameter
+        || callee.left.name.text !== fallback.property
+        || !ts.isIdentifier(callee.right)
+        || callee.right.text !== binding) return false;
+    return owner.parameters.some((parameter) => bindingNameContains(parameter.name, fallback.parameter));
+}
+
+function directWriterCalls(owner, binding, fallback) {
+    const calls = { direct: [], all: [] };
+    const visit = (node, nested = false) => {
+        const isNested = nested || (node !== owner && ts.isFunctionLike(node));
+        if (ts.isCallExpression(node) && isWriterCall(node, binding, owner, fallback)) {
+            calls.all.push(node);
+            if (!isNested) calls.direct.push(node);
+        }
+        ts.forEachChild(node, (child) => visit(child, isNested));
+    };
+    if (owner.body) visit(owner.body);
+    return calls;
+}
+
+function constantBoolean(expression) {
+    const value = unwrap(expression);
+    if (value.kind === ts.SyntaxKind.TrueKeyword) return true;
+    if (value.kind === ts.SyntaxKind.FalseKeyword) return false;
+    if (ts.isPrefixUnaryExpression(value) && value.operator === ts.SyntaxKind.ExclamationToken) { const operand = constantBoolean(value.operand); return operand === null ? null : !operand; }
+    return null;
+}
+
+function alwaysTerminates(statement) {
+    if (ts.isReturnStatement(statement) || ts.isThrowStatement(statement)) return true;
+    if (ts.isBlock(statement)) return statement.statements.some(alwaysTerminates);
+    if (!ts.isIfStatement(statement)) return false;
+    const constant = constantBoolean(statement.expression);
+    if (constant !== null) return constant
+        ? alwaysTerminates(statement.thenStatement)
+        : Boolean(statement.elseStatement && alwaysTerminates(statement.elseStatement));
+    return Boolean(statement.elseStatement
+        && alwaysTerminates(statement.thenStatement)
+        && alwaysTerminates(statement.elseStatement));
+}
+
+function isReachableStandaloneCall(call, owner) {
+    let current = call;
+    while (ts.isAwaitExpression(current.parent) || ts.isParenthesizedExpression(current.parent)) current = current.parent;
+    if (!ts.isExpressionStatement(current.parent)) return false;
+    let child = current.parent;
+    for (let parent = child.parent; parent && parent !== owner; child = parent, parent = parent.parent) {
+        if (ts.isIfStatement(parent)) {
+            const constant = constantBoolean(parent.expression);
+            if ((constant === false && parent.thenStatement === child)
+                || (constant === true && parent.elseStatement === child)) return false;
+        }
+        if (ts.isBlock(parent)) {
+            const index = parent.statements.indexOf(child);
+            if (index >= 0 && parent.statements.slice(0, index).some((statement) =>
+                alwaysTerminates(statement)
+                || ts.isIterationStatement(statement, false)
+                || ts.isSwitchStatement(statement)
+                || ts.isBreakStatement(statement)
+                || ts.isContinueStatement(statement)
+                || ts.isTryStatement(statement))) return false;
+        }
+        if (ts.isIterationStatement(parent, false) || ts.isSwitchStatement(parent) || ts.isLabeledStatement(parent)) return false;
+    }
+    return true;
+}
+
+/* @Codex */
+export function validateAuditWriterControlFlow({
+    source,
+    fileName = 'fixture.ts',
+    ownerName,
+    writerModule,
+    writerExport,
+    eventType,
+    writerArgumentIndex = 0,
+    dependencyFallback = null,
+}) {
+    const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const problems = sourceFile.parseDiagnostics.length > 0 ? [`${fileName} has parser diagnostics`] : [];
+    const binding = importedName(sourceFile, writerModule, writerExport);
+    const owners = sourceFile.statements.filter((statement) =>
+        ts.isFunctionDeclaration(statement) && statement.name?.text === ownerName);
+    if (!binding) problems.push('approved writer import is missing or ambiguous');
+    if (owners.length !== 1) problems.push('owner function is missing or ambiguous');
+    if (!binding || owners.length !== 1) return problems;
+    const owner = owners[0];
+    if (localBindingExists(owner, binding)) problems.push('approved writer import is shadowed');
+    if (dependencyFallback && localBindingExists(owner, dependencyFallback.parameter, true)) problems.push('dependency fallback binding is shadowed');
+    const calls = directWriterCalls(owner, binding, dependencyFallback);
+    if (calls.all.length !== 1 || calls.direct.length !== 1) problems.push('owner must contain exactly one direct approved writer call');
+    if (calls.all.length === 1 && calls.direct.length === 1) {
+        const input = calls.direct[0].arguments[writerArgumentIndex];
+        const events = input && ts.isObjectLiteralExpression(input)
+            ? input.properties.filter((property) => ts.isPropertyAssignment(property)
+                && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))
+                && property.name.text === 'eventType')
+            : [];
+        const hasUnsafeProperty = input && ts.isObjectLiteralExpression(input)
+            && input.properties.some((property) => ts.isSpreadAssignment(property)
+                || Boolean(property.name && ts.isComputedPropertyName(property.name)));
+        if (hasUnsafeProperty || events.length !== 1 || !ts.isStringLiteral(events[0].initializer)
+            || events[0].initializer.text !== eventType) problems.push('writer event literal is missing or incorrect');
+        if (!isReachableStandaloneCall(calls.direct[0], owner)) problems.push('writer call is unreachable or uses unsupported control flow');
+    }
+    return problems;
 }
 
 function checkAppendOnly(findings) {
@@ -244,4 +403,4 @@ function main() {
     process.exit(1);
 }
 
-main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
