@@ -25,7 +25,7 @@ import {
   type Kree8Patient,
   type Kree8PatientWorkspace,
 } from '@/lib/patient-workspace';
-import { useLiveQuery } from '@/lib/live-query';
+import { useLiveQuery, useLiveQueryState } from '@/lib/live-query';
 import { ThemeToggle } from '@/components/theme-toggle';
 // WUL-297: persistent privacy affordance in the app header.
 import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
@@ -252,7 +252,11 @@ export function Kree8ClinicalCockpit({
   );
 
   /* @Codex */
-  const livePatientRows = useLiveQuery<Patient[]>(
+  const {
+    data: livePatientRows,
+    error: livePatientError,
+    loading: livePatientLoading,
+  } = useLiveQueryState<Patient[]>(
     async () => (isReview ? [] : db.patients.toArray()),
     [isReview],
     undefined,
@@ -350,8 +354,14 @@ export function Kree8ClinicalCockpit({
   useEffect(() => {
     if (isReview) return;
 
-    if (!livePatientRows) {
+    if (livePatientLoading) {
       setPatientState({ status: 'loading', patients: [] });
+      setAgendaState({ status: 'loading', rows: [] });
+      return;
+    }
+
+    if (livePatientError) {
+      setPatientState({ status: 'error', patients: [] });
       setAgendaState({ status: 'loading', rows: [] });
       return;
     }
@@ -359,7 +369,7 @@ export function Kree8ClinicalCockpit({
     /* @Codex WUL-UIUX: ordina per aggiornamento piu recente (updatedAt, poi
        createdAt) cosi la lista pazienti non esce in ordine di inserimento
        IndexedDB e lo scanning "recenti" e possibile. */
-    const patients = [...livePatientRows]
+    const patients = [...(livePatientRows ?? [])]
       .sort((left, right) => {
         const leftTime = new Date(left.updatedAt ?? left.createdAt ?? 0).getTime();
         const rightTime = new Date(right.updatedAt ?? right.createdAt ?? 0).getTime();
@@ -379,7 +389,14 @@ export function Kree8ClinicalCockpit({
       if (initialPatientId) return initialPatientId;
       return patients[0]?.id;
     });
-  }, [initialPatientId, isReview, livePatientRows, liveCheckupRows]);
+  }, [
+    initialPatientId,
+    isReview,
+    livePatientError,
+    livePatientLoading,
+    livePatientRows,
+    liveCheckupRows,
+  ]);
 
   const patientNavMeta =
     isReview
