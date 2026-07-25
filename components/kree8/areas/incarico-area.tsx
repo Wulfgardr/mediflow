@@ -216,26 +216,22 @@ function IncaricoArea({
           </header>
 
           <div style={{ marginTop: 8 }}>
-            {patientStatus === 'loading' && (
-              <p className={styles.emptyState}>
+            {/* @Codex */}
+            {patientStatus === 'idle' || patientStatus === 'loading' ? (
+              <p className={styles.emptyState} role="status" aria-live="polite">
                 Caricamento pazienti…
               </p>
-            )}
-            {patientStatus === 'error' && (
-              <p className={styles.emptyState}>
+            ) : patientStatus === 'error' ? (
+              <p className={styles.emptyState} role="alert">
                 Lista pazienti non disponibile. Verifica sessione e servizi locali.
               </p>
-            )}
-            {visible.length === 0 && (
+            ) : visible.length === 0 ? (
               <p className={styles.emptyState}>
-                {patientStatus === 'ready' && normalizedQuery
+                {normalizedQuery
                   ? `Nessun risultato per “${query.trim()}”. Modifica la ricerca o cambia ambito.`
-                  : patientStatus === 'ready'
-                  ? 'Nessun paziente nell’ambito selezionato.'
-                  : 'In attesa dei dati paziente.'}
+                  : 'Nessun paziente nell’ambito selezionato.'}
               </p>
-            )}
-            {visible.length > 0 && (
+            ) : (
               <div
                 ref={patientListParentRef}
                 className={patientStyles.patientListViewport}
