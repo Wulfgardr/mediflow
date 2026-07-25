@@ -8,6 +8,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import {
     attachments,
     checkups,
+    documentDiagnosisProposals,
     entries,
     observations,
     patients,
@@ -25,6 +26,8 @@ export const PATIENT_CHILD_TABLES = [
     { name: 'servicePrescriptions', table: servicePrescriptions, patientId: servicePrescriptions.patientId },
     { name: 'prostheticPrescriptions', table: prostheticPrescriptions, patientId: prostheticPrescriptions.patientId },
     { name: 'sissHandoffEvents', table: sissHandoffEvents, patientId: sissHandoffEvents.patientId },
+    /* @Codex */
+    { name: 'documentDiagnosisProposals', table: documentDiagnosisProposals, patientId: documentDiagnosisProposals.patientId },
     { name: 'observations', table: observations, patientId: observations.patientId },
     { name: 'checkups', table: checkups, patientId: checkups.patientId },
     { name: 'therapies', table: therapies, patientId: therapies.patientId },

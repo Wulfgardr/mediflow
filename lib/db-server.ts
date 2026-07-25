@@ -494,6 +494,31 @@ function applySchemaGuards() {
     } catch (error) {
         console.warn('[MediFlow] SISS handoff events schema check skipped:', error);
     }
+    /* @Codex */
+    sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS document_diagnosis_proposals (
+            id TEXT PRIMARY KEY NOT NULL,
+            patient_id TEXT NOT NULL,
+            source_document_key TEXT NOT NULL,
+            attachment_id TEXT,
+            document_insight_id TEXT,
+            candidate_key TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            confidence TEXT NOT NULL,
+            decided_at INTEGER,
+            decision_actor_type TEXT,
+            decision_actor_ref TEXT,
+            decision_payload TEXT,
+            version INTEGER NOT NULL DEFAULT 1,
+            created_at INTEGER DEFAULT (unixepoch()),
+            updated_at INTEGER DEFAULT (unixepoch()),
+            FOREIGN KEY (patient_id) REFERENCES patients(id)
+        )
+    `).run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS document_diagnosis_proposals_patient_idx ON document_diagnosis_proposals(patient_id)').run();
+    sqlite.prepare('CREATE INDEX IF NOT EXISTS document_diagnosis_proposals_patient_status_idx ON document_diagnosis_proposals(patient_id, status)').run();
+    sqlite.prepare('CREATE UNIQUE INDEX IF NOT EXISTS document_diagnosis_proposals_source_candidate_unique ON document_diagnosis_proposals(patient_id, source_document_key, candidate_key)').run();
     // WUL-268 (STREAM A): core tables shipped without secondary indices, so
     // patient-scoped reads and lookups fell back to full table scans (verified
     // via EXPLAIN QUERY PLAN). Guards are the operative migration mechanism, so

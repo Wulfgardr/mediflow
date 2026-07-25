@@ -6,6 +6,7 @@ import {
     ambulatories,
     checkups,
     conversations,
+    documentDiagnosisProposals,
     drugs,
     entries,
     exemptions,
@@ -116,6 +117,7 @@ function buildBackupDataset(): BackupDataset {
         const ambulatoriesRows = tx.select().from(ambulatories).all();
         const attachmentsRows = tx.select().from(attachments).all();
         const conversationsRows = tx.select().from(conversations).all();
+        const documentDiagnosisProposalRows = tx.select().from(documentDiagnosisProposals).all();
         const drugsRows = tx.select().from(drugs).all();
         const entriesRows = tx.select().from(entries).all();
         const exemptionsRows = tx.select().from(exemptions).all();
@@ -154,6 +156,7 @@ function buildBackupDataset(): BackupDataset {
             ambulatories: sortBackupRows(ambulatoriesRows),
             attachments: sortBackupRows(filterRowsByReference(attachmentsRows, 'patientId', patientIds)),
             conversations: sortBackupRows(conversationsRows),
+            documentDiagnosisProposals: sortBackupRows(filterRowsByReference(documentDiagnosisProposalRows, 'patientId', patientIds)),
             drugs: sortBackupRows(drugsRows),
             entries: sortBackupRows(filterRowsByReference(entriesRows, 'patientId', patientIds)),
             exemptions: sortBackupRows(exemptionsRows),

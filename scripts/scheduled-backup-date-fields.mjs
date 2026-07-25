@@ -4,6 +4,7 @@ export const DATE_FIELDS = new Set([
   'assignedAt',
   'birthDate',
   'collaudoAt',
+  'decidedAt',
   'createdAt',
   'date',
   'endDate',

@@ -6,6 +6,7 @@ export const BACKUP_COLLECTIONS = [
     'ambulatories',
     'attachments',
     'conversations',
+    'documentDiagnosisProposals',
     'drugs',
     'entries',
     'exemptions',
@@ -24,6 +25,23 @@ export const BACKUP_COLLECTIONS = [
 export type BackupCollectionName = (typeof BACKUP_COLLECTIONS)[number];
 export type BackupRecord = Record<string, unknown>;
 export type BackupDataset = Record<BackupCollectionName, BackupRecord[]>;
+
+const LEGACY_OPTIONAL_COLLECTION = 'documentDiagnosisProposals' as const;
+const LEGACY_BACKUP_COLLECTIONS = BACKUP_COLLECTIONS.filter(
+    (collection): collection is Exclude<BackupCollectionName, typeof LEGACY_OPTIONAL_COLLECTION> => collection !== LEGACY_OPTIONAL_COLLECTION,
+);
+const PATIENT_DEPENDENT_COLLECTIONS: readonly BackupCollectionName[] = [
+    'attachments',
+    'checkups',
+    'documentDiagnosisProposals',
+    'entries',
+    'observations',
+    'prostheticPrescriptions',
+    'servicePrescriptionItems',
+    'servicePrescriptions',
+    'sissHandoffs',
+    'therapies',
+];
 
 export interface BackupArtifactManifest {
     scope: typeof BACKUP_ARTIFACT_SCOPE;
@@ -109,10 +127,15 @@ async function sha256Hex(value: string): Promise<string> {
     return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function assertCollectionSet(payload: BackupDataset): void {
+function hasCollectionSet(payload: Record<string, unknown>, collections: readonly string[]): boolean {
     const payloadCollections = Object.keys(payload).sort();
-    const expectedCollections = [...BACKUP_COLLECTIONS].sort();
-    if (payloadCollections.length !== expectedCollections.length || payloadCollections.some((collection, index) => collection !== expectedCollections[index])) {
+    const expectedCollections = [...collections].sort();
+    return payloadCollections.length === expectedCollections.length
+        && payloadCollections.every((collection, index) => collection === expectedCollections[index]);
+}
+
+function assertCollectionSet(payload: Record<string, unknown>, collections: readonly string[] = BACKUP_COLLECTIONS): void {
+    if (!hasCollectionSet(payload, collections)) {
         throw new BackupArtifactError(
             'collection-mismatch',
             'Backup payload collections do not match the v1 schema.',
@@ -120,9 +143,16 @@ function assertCollectionSet(payload: BackupDataset): void {
     }
 }
 
-function assertCollectionCounts(payload: BackupDataset, recordCounts: Record<BackupCollectionName, number>): void {
-    for (const collection of BACKUP_COLLECTIONS) {
-        const actualCount = payload[collection]?.length ?? 0;
+function assertCollectionCounts(
+    payload: Record<string, unknown>,
+    recordCounts: Record<string, unknown>,
+    collections: readonly string[] = BACKUP_COLLECTIONS,
+): void {
+    if (!hasCollectionSet(recordCounts, collections)) {
+        throw new BackupArtifactError('collection-mismatch', 'Backup manifest record counts do not match the v1 schema.');
+    }
+    for (const collection of collections) {
+        const actualCount = Array.isArray(payload[collection]) ? payload[collection].length : 0;
         if (actualCount !== recordCounts[collection]) {
             throw new BackupArtifactError(
                 'count-mismatch',
@@ -132,8 +162,8 @@ function assertCollectionCounts(payload: BackupDataset, recordCounts: Record<Bac
     }
 }
 
-function assertCollectionArrays(payload: BackupDataset): void {
-    for (const collection of BACKUP_COLLECTIONS) {
+function assertCollectionArrays(payload: Record<string, unknown>, collections: readonly string[] = BACKUP_COLLECTIONS): void {
+    for (const collection of collections) {
         if (!Array.isArray(payload[collection])) {
             throw new BackupArtifactError(
                 'invalid-manifest',
@@ -162,24 +192,27 @@ function parseAssignedAmbulatoryMemberships(value: unknown): Array<{ ambulatoryI
     });
 }
 
-function assertCollectionReferences(payload: BackupDataset): void {
+function assertCollectionReferences(
+    payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
+    patientDependentCollections: readonly BackupCollectionName[] = PATIENT_DEPENDENT_COLLECTIONS,
+): void {
     const ambulatoryIds = new Set(
-        payload.ambulatories
+        (payload.ambulatories ?? [])
             .map((item) => item.id)
             .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
     );
     const patientIds = new Set(
-        payload.patients
+        (payload.patients ?? [])
             .map((item) => item.id)
             .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
     );
     const conversationIds = new Set(
-        payload.conversations
+        (payload.conversations ?? [])
             .map((item) => item.id)
             .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
     );
 
-    for (const patient of payload.patients) {
+    for (const patient of payload.patients ?? []) {
         if (typeof patient.ambulatoryId === 'string' && patient.ambulatoryId.trim().length > 0 && !ambulatoryIds.has(patient.ambulatoryId)) {
             throw new BackupArtifactError(
                 'invalid-manifest',
@@ -219,9 +252,8 @@ function assertCollectionReferences(payload: BackupDataset): void {
         }
     }
 
-    const patientDependentCollections: BackupCollectionName[] = ['attachments', 'checkups', 'entries', 'observations', 'prostheticPrescriptions', 'servicePrescriptionItems', 'servicePrescriptions', 'sissHandoffs', 'therapies'];
     for (const collection of patientDependentCollections) {
-        for (const item of payload[collection]) {
+        for (const item of payload[collection] ?? []) {
             if (typeof item.patientId !== 'string' || !patientIds.has(item.patientId)) {
                 throw new BackupArtifactError(
                     'invalid-manifest',
@@ -231,7 +263,7 @@ function assertCollectionReferences(payload: BackupDataset): void {
         }
     }
 
-    for (const message of payload.messages) {
+    for (const message of payload.messages ?? []) {
         if (typeof message.conversationId !== 'string' || !conversationIds.has(message.conversationId)) {
             throw new BackupArtifactError(
                 'invalid-manifest',
@@ -278,7 +310,7 @@ export async function parseBackupArtifact(value: unknown): Promise<BackupArtifac
         throw new BackupArtifactError('invalid-json', 'Backup artifact must be a JSON object.');
     }
 
-    const artifact = value as Partial<BackupArtifact> & { manifest?: Partial<BackupArtifactManifest>; payload?: BackupDataset };
+    const artifact = value as Partial<BackupArtifact> & { manifest?: Partial<BackupArtifactManifest>; payload?: Record<string, unknown> };
 
     if (artifact.format !== BACKUP_ARTIFACT_FORMAT) {
         throw new BackupArtifactError('invalid-format', 'Unsupported backup artifact format.');
@@ -298,10 +330,16 @@ export async function parseBackupArtifact(value: unknown): Promise<BackupArtifac
         throw new BackupArtifactError('invalid-manifest', 'Backup payload is missing.');
     }
 
-    assertCollectionSet(payload);
-    assertCollectionArrays(payload);
+    const isLegacyV1 = hasCollectionSet(payload, LEGACY_BACKUP_COLLECTIONS);
+    const expectedCollections = isLegacyV1 ? LEGACY_BACKUP_COLLECTIONS : BACKUP_COLLECTIONS;
+    const expectedPatientDependentCollections = isLegacyV1
+        ? PATIENT_DEPENDENT_COLLECTIONS.filter((collection) => collection !== LEGACY_OPTIONAL_COLLECTION)
+        : PATIENT_DEPENDENT_COLLECTIONS;
 
-    if (!Array.isArray(manifest.collections) || manifest.collections.length !== BACKUP_COLLECTIONS.length || manifest.collections.some((collection, index) => collection !== BACKUP_COLLECTIONS[index])) {
+    assertCollectionSet(payload, expectedCollections);
+    assertCollectionArrays(payload, expectedCollections);
+
+    if (!Array.isArray(manifest.collections) || manifest.collections.length !== expectedCollections.length || manifest.collections.some((collection, index) => collection !== expectedCollections[index])) {
         throw new BackupArtifactError('collection-mismatch', 'Backup manifest collection list is invalid.');
     }
 
@@ -309,8 +347,8 @@ export async function parseBackupArtifact(value: unknown): Promise<BackupArtifac
         throw new BackupArtifactError('invalid-manifest', 'Backup manifest counts are missing.');
     }
 
-    assertCollectionCounts(payload, manifest.recordCounts as Record<BackupCollectionName, number>);
-    assertCollectionReferences(payload);
+    assertCollectionCounts(payload, manifest.recordCounts as Record<string, unknown>, expectedCollections);
+    assertCollectionReferences(payload as Partial<Record<BackupCollectionName, BackupRecord[]>>, expectedPatientDependentCollections);
 
     const createdAt = new Date(manifest.createdAt);
     if (Number.isNaN(createdAt.getTime())) {
@@ -322,6 +360,17 @@ export async function parseBackupArtifact(value: unknown): Promise<BackupArtifac
         throw new BackupArtifactError('checksum-mismatch', 'Backup checksum does not match the payload.');
     }
 
+    /* @Codex Legacy v1 artifacts are authenticated in their original form before this additive normalization. */
+    const normalizedPayload = isLegacyV1
+        ? { ...payload, [LEGACY_OPTIONAL_COLLECTION]: [] } as BackupDataset
+        : payload as BackupDataset;
+    const normalizedRecordCounts = isLegacyV1
+        ? { ...manifest.recordCounts, [LEGACY_OPTIONAL_COLLECTION]: 0 } as Record<BackupCollectionName, number>
+        : manifest.recordCounts as Record<BackupCollectionName, number>;
+    const normalizedChecksum = isLegacyV1
+        ? await sha256Hex(stableStringify(normalizeJson(normalizedPayload)))
+        : manifest.checksum;
+
     return {
         format: BACKUP_ARTIFACT_FORMAT,
         version: BACKUP_ARTIFACT_VERSION,
@@ -329,10 +378,10 @@ export async function parseBackupArtifact(value: unknown): Promise<BackupArtifac
             scope: BACKUP_ARTIFACT_SCOPE,
             createdAt: manifest.createdAt,
             checksumAlgorithm: 'sha256',
-            checksum: manifest.checksum,
+            checksum: normalizedChecksum,
             collections: [...BACKUP_COLLECTIONS],
-            recordCounts: manifest.recordCounts as Record<BackupCollectionName, number>,
+            recordCounts: normalizedRecordCounts,
         },
-        payload,
+        payload: normalizedPayload,
     };
 }
