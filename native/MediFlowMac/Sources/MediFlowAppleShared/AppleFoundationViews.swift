@@ -319,6 +319,11 @@ public struct AppleFoundationMobileRootView: View {
         switch section {
         case .patients:
             PairedPatientsWorkspaceView(model: workspaceModel, capabilities: capabilitiesStore)
+                // Container, so the identifier names this workspace only and is
+                // not propagated onto descendants. Without it the identifier was
+                // inherited by the safeAreaInset chart header, which made the
+                // header's own identifier unreachable from tests.
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("clinical-workspace-patients-view")
         case .agenda:
             AgendaWorkspaceView(capabilities: capabilitiesStore, workspaceModel: workspaceModel)

@@ -54,6 +54,44 @@ struct PairedPatientsWorkspaceView: View {
     var body: some View {
         layoutBody
         .background(PlatformColors.groupedBackground)
+        #if !os(macOS)
+        // Creating a patient is the home's primary action, so it belongs in the
+        // navigation bar. Inline it consumed the first viewport at accessibility
+        // text sizes and pushed the first patient off screen.
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    model.startCreatingPatient()
+                } label: {
+                    Label("Nuovo paziente", systemImage: "person.badge.plus")
+                }
+                .disabled(model.isWorking)
+                .accessibilityLabel("Nuovo paziente")
+                .accessibilityIdentifier("new-patient-button")
+            }
+            // Sort is a list-wide setting, not content: as a toolbar menu it
+            // states the active order on its own face and stops competing with
+            // the patients for first-viewport height.
+            ToolbarItem(placement: .primaryAction) {
+                Picker("Ordina", selection: $patientSortMode) {
+                    Text("Recenti").tag(PatientListSortMode.recent)
+                    Text("Alfabetico").tag(PatientListSortMode.alpha)
+                }
+                .pickerStyle(.menu)
+                .accessibilityLabel("Ordina pazienti")
+                .accessibilityValue(patientSortMode == .recent ? "Recenti" : "Alfabetico")
+                .accessibilityIdentifier("patient-sort-menu")
+            }
+        }
+        // The query stays owned by this view, so the field and the filtering read
+        // the same storage and recomposition does not swap it out.
+        .searchable(
+            text: $patientQuery,
+            placement: .toolbar,
+            prompt: "Cerca per nome o codice fiscale"
+        )
+        .modifier(MinimizedSearchToolbarBehavior())
+        #endif
         .task {
             await model.performAutomaticActionsIfNeeded()
             #if DEBUG
@@ -202,6 +240,8 @@ struct PairedPatientsWorkspaceView: View {
     /// "not a phone", not how much width this workspace received, and on iPad the
     /// same app is resized continuously.
     private func usesSplitLayout(containerWidth: CGFloat) -> Bool {
+        // Before the first measurement lands, stay in the single column: it is
+        // the arrangement that is correct at every width.
         PatientsWorkspaceLayout.usesSideBySide(
             containerWidth: containerWidth,
             isAccessibilitySize: dynamicTypeSize.isAccessibilitySize
@@ -555,89 +595,87 @@ struct PairedPatientsWorkspaceView: View {
         .frame(maxWidth: .infinity, minHeight: 320)
     }
 
+    /// Native disclosure for the open patient's identity.
+    ///
+    /// This was a plain Button whose only affordance was a bare chevron.
+    /// DisclosureGroup states expanded and collapsed natively, keeps the label
+    /// readable, exposes the revealed block as its own accessibility subtree,
+    /// and is operable from the keyboard without hand-written plumbing.
     private func compactPatientHeader(_ detail: HomeBasePatientDetail) -> some View {
-        Button {
-            isCompactPatientHeaderExpanded.toggle()
-        } label: {
-            VStack(alignment: .leading, spacing: 3) {
-                /* @Codex */
-                if dynamicTypeSize >= .accessibility1 {
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text("\(detail.lastName) \(detail.firstName)")
-                                .font(.subheadline.weight(.semibold))
-                                .fixedSize(horizontal: false, vertical: true)
-                            Spacer(minLength: 8)
-                            compactHeaderChevron
-                        }
-                        if let birthYear = PairedPatientsWorkspaceSupport.birthYearText(from: detail.birthDate) {
-                            Text(birthYear)
-                                .font(.caption)
-                                .registro()
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                } else {
-                    HStack(spacing: 8) {
-                        Text("\(detail.lastName) \(detail.firstName)")
-                            .font(.subheadline.weight(.semibold))
-                        if let birthYear = PairedPatientsWorkspaceSupport.birthYearText(from: detail.birthDate) {
-                            Text(birthYear)
-                                .font(.caption)
-                                .registro()
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 8)
-                        compactHeaderChevron
-                    }
+        DisclosureGroup(isExpanded: $isCompactPatientHeaderExpanded) {
+            VStack(alignment: .leading, spacing: 2) {
+                if let birthDate = detail.birthDate {
+                    Text("Data di nascita: \(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birthDate))")
+                        .font(.caption)
+                        .registro()
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                if isCompactPatientHeaderExpanded {
-                    VStack(alignment: .leading, spacing: 2) {
-                        if let birthDate = detail.birthDate {
-                            Text("Data di nascita: \(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birthDate))")
-                                .font(.caption)
-                                .registro()
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Text("Codice fiscale: \(PairedPatientsWorkspaceSupport.compactTaxCode(detail.taxCode))")
-                            .font(.caption)
-                            .registro()
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .foregroundStyle(.secondary)
-                }
+                Text("Codice fiscale: \(PairedPatientsWorkspaceSupport.compactTaxCode(detail.taxCode))")
+                    .font(.caption)
+                    .registro()
+                    .fixedSize(horizontal: false, vertical: true)
+                    // One uniquely identified revealed child, so a test can prove
+                    // the disclosure opened rather than inferring it.
+                    .accessibilityIdentifier("patient-compact-header-taxcode")
             }
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .padding(.horizontal, 16)
-            .lumeSurface(zone: .focal, cornerRadius: 0)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // Container for the revealed block only, so the group's identifier
+            // stops propagating onto these Text children and each keeps its own.
+            // Deliberately not on the DisclosureGroup or its label: that is what
+            // preserves the native button role and its expanded/collapsed state.
+            .accessibilityElement(children: .contain)
+        } label: {
+            compactPatientHeaderLabel(detail)
         }
-        .buttonStyle(.plain)
-        // The label must name the open patient: an explicit label on the button
-        // replaces everything its children composed, so labelling it with the
-        // disclosure verb alone erased the patient's identity from VoiceOver.
-        // The expanded/collapsed state stays on the value, where it belongs.
-        .accessibilityLabel(compactPatientHeaderAccessibilityLabel(detail))
-        .accessibilityValue(isCompactPatientHeaderExpanded ? "Espanso" : "Compresso")
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+        .lumeSurface(zone: .focal, cornerRadius: 0)
+        // No accessibility label override here on purpose: an explicit label on
+        // the group merges it into one element and hides the native disclosure
+        // control. DisclosureGroup already announces its label and its
+        // expanded/collapsed state; the label view carries the patient identity.
+        // The identifier goes on the control itself, so it is not the one the
+        // workspace ancestor propagates to unnamed descendants.
         .accessibilityHint("Mostra o nasconde data di nascita e codice fiscale mascherato.")
-        .accessibilityAddTraits(.isHeader)
         .accessibilityIdentifier("patient-compact-header-disclosure")
         .compactContainerWidth()
     }
 
-    private func compactPatientHeaderAccessibilityLabel(_ detail: HomeBasePatientDetail) -> String {
-        var atoms = ["\(detail.lastName) \(detail.firstName)"]
-        if let birthYear = PairedPatientsWorkspaceSupport.birthYearText(from: detail.birthDate) {
-            atoms.append(birthYear)
+    /// The disclosure's own label: patient identity plus heading semantics.
+    /// It carries no identifier and does not become its own accessibility
+    /// element, because collapsing it into one turned the label into an inert
+    /// static node and hid the native disclosure control underneath it.
+    @ViewBuilder
+    private func compactPatientHeaderLabel(_ detail: HomeBasePatientDetail) -> some View {
+        let name = Text("\(detail.lastName) \(detail.firstName)")
+            .font(.subheadline.weight(.semibold))
+        let birthYear = PairedPatientsWorkspaceSupport.birthYearText(from: detail.birthDate)
+        Group {
+            if dynamicTypeSize >= .accessibility1 {
+                VStack(alignment: .leading, spacing: 3) {
+                    name.fixedSize(horizontal: false, vertical: true)
+                    if let birthYear {
+                        Text(birthYear).font(.caption).registro().foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                HStack(spacing: 8) {
+                    name
+                    if let birthYear {
+                        Text(birthYear).font(.caption).registro().foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
+                }
+            }
         }
-        atoms.append("Dati paziente")
-        return atoms.joined(separator: ". ")
+        .frame(minHeight: 44)
+        .accessibilityAddTraits(.isHeader)
     }
 
-    private var compactHeaderChevron: some View {
-        Image(systemName: isCompactPatientHeaderExpanded ? "chevron.up" : "chevron.down")
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
-    }
+
 
     @ViewBuilder
     private func selectedPatientSections(_ detail: HomeBasePatientDetail) -> some View {
@@ -693,6 +731,22 @@ struct PairedPatientsWorkspaceView: View {
         }
     }
 }
+
+#if !os(macOS)
+/// Collapses the search field into a toolbar control where the system supports
+/// it. On iOS and iPadOS 17 to 25 the standard toolbar search field stays, which
+/// is the documented behaviour for those releases rather than a workaround.
+private struct MinimizedSearchToolbarBehavior: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.searchToolbarBehavior(.minimize)
+        } else {
+            content
+        }
+    }
+}
+#endif
 
 /* @Codex */
 private extension View {
