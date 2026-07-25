@@ -226,8 +226,12 @@ function TurnoArea({
             ))}
             {visibleAgenda.length === 0 && (
               <p className={styles.emptyState}>
+                {/* @Codex WUL-UIUX: distingue l'agenda davvero vuota dal filtro
+                    specifico che non trova appuntamenti. */}
                 {agendaState.status === 'ready'
-                  ? 'Nessun appuntamento per il filtro selezionato.'
+                  ? filter === 'all'
+                    ? 'Nessun appuntamento in agenda.'
+                    : 'Nessun appuntamento con questo filtro.'
                   : agendaState.status === 'error'
                     ? 'Agenda non disponibile.'
                     : 'Caricamento appuntamenti…'}
