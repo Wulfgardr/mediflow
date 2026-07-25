@@ -51,6 +51,11 @@ const AI_QUEUE: Kree8DecisionCard[] = [
   },
 ];
 
+/* @Codex */
+function formatCountLabel(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
 function TurnoArea({
   filter,
   agendaBridge,
@@ -78,7 +83,7 @@ function TurnoArea({
         : String(activePatientCount);
   const patientTrendLabel =
     patientState.status === 'ready'
-      ? `${patientState.patients.length} schede in carico`
+      ? `${formatCountLabel(patientState.patients.length, 'scheda', 'schede')} in carico`
       : patientState.status === 'error'
         ? 'pazienti non disponibili'
         : 'aggiornamento in corso';
@@ -94,7 +99,7 @@ function TurnoArea({
         : String(todayVisitCount);
   const visitSubLabel =
     agendaState.status === 'ready'
-      ? `${plannedVisitCount} passaggi pianificati`
+      ? formatCountLabel(plannedVisitCount, 'passaggio pianificato', 'passaggi pianificati')
       : agendaState.status === 'error'
         ? 'agenda non disponibile'
         : 'aggiornamento agenda';
@@ -112,7 +117,7 @@ function TurnoArea({
       {
         title: 'Pazienti in carico',
         body: patientState.status === 'ready'
-          ? `${patientState.patients.length} schede pronte nell’archivio locale.`
+          ? `${formatCountLabel(patientState.patients.length, 'scheda pronta', 'schede pronte')} nell’archivio locale.`
           : 'Preparazione della lista pazienti.',
         pill: patientState.status === 'error' ? 'Errore' : 'In carico',
         pillVariant: patientState.status === 'error' ? 'critical' : 'neutral',
@@ -147,7 +152,7 @@ function TurnoArea({
         <div>
           <p className={styles.areaCaption}>Oggi</p>
           <h1 className={styles.areaTitle}>
-            Agenda di oggi <em>{todayVisitCount} appuntamenti</em>
+            Agenda di oggi <em>{formatCountLabel(todayVisitCount, 'appuntamento', 'appuntamenti')}</em>
           </h1>
           <p className={styles.areaSubtitle}>
             {patientState.status === 'ready'
@@ -199,7 +204,9 @@ function TurnoArea({
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>Agenda di oggi</h2>
-            <PillBadge variant="neutral">{visibleAgenda.length} eventi</PillBadge>
+            <PillBadge variant="neutral">
+              {formatCountLabel(visibleAgenda.length, 'evento', 'eventi')}
+            </PillBadge>
             {agendaBridge.data?.stats.candidates ? (
               <PillBadge variant="neutral">
                 {agendaBridge.data.stats.candidates} esterni
