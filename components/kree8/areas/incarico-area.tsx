@@ -125,9 +125,10 @@ function IncaricoArea({
             <button
               type="button"
               className={classNames(patientStyles.scopeChip, scope === 'ambulatorio' && patientStyles.scopeChipActive)}
+              aria-pressed={scope === 'ambulatorio'}
               onClick={() => setScope('ambulatorio')}
             >
-              <MapPin size={12} />
+              <MapPin size={12} aria-hidden="true" />
               Ambulatorio locale
             </button>
             {/* @Codex WUL-UIUX: in live tutti i pazienti hanno scope 'ambulatorio':
@@ -138,17 +139,19 @@ function IncaricoArea({
                 <button
                   type="button"
                   className={classNames(patientStyles.scopeChip, scope === 'network' && patientStyles.scopeChipActive)}
+                  aria-pressed={scope === 'network'}
                   onClick={() => setScope('network')}
                 >
-                  <Cloud size={12} />
+                  <Cloud size={12} aria-hidden="true" />
                   Rete locale
                 </button>
                 <button
                   type="button"
                   className={classNames(patientStyles.scopeChip, scope === 'tutti' && patientStyles.scopeChipActive)}
+                  aria-pressed={scope === 'tutti'}
                   onClick={() => setScope('tutti')}
                 >
-                  <Users size={12} />
+                  <Users size={12} aria-hidden="true" />
                   Tutti gli ambulatori
                 </button>
               </>
@@ -158,17 +161,19 @@ function IncaricoArea({
               <button
                 type="button"
                 className={classNames(patientStyles.scopeChip, list === 'attivi' && patientStyles.scopeChipActive)}
+                aria-pressed={list === 'attivi'}
                 onClick={() => setList('attivi')}
               >
-                <Activity size={12} />
+                <Activity size={12} aria-hidden="true" />
                 Attivi
               </button>
               <button
                 type="button"
                 className={classNames(patientStyles.scopeChip, list === 'archivio' && patientStyles.scopeChipActive)}
+                aria-pressed={list === 'archivio'}
                 onClick={() => setList('archivio')}
               >
-                <Archive size={12} />
+                <Archive size={12} aria-hidden="true" />
                 Archivio
               </button>
             </span>
