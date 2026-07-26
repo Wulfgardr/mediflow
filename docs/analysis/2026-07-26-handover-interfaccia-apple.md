@@ -160,28 +160,37 @@ paziente). Quello che non era stato verificato e' il lato **web ↔ nativo**, e 
 i divari ci sono. Rilevati sulla scheda viva di un paziente sintetico su `:3101`,
 non dedotti dal codice.
 
-| azione sul paziente | nativo | web |
-|---|---|---|
-| Modifica | si | si |
-| Esporta FHIR | si | si, come **"Export FHIR"** |
-| Nuova voce | si | si |
-| **Archivia** | si | **assente** |
-| **Riattiva** | si | **assente** |
-| **Elimina paziente** | si | **assente** (c'e' "Elimina voce clinica") |
-| **Condividi FHIR** | si | **assente** |
-| Prescrittivo regionale | si | presente come **"SISS/FSE"** e "Contesto SISS" |
-| **Report PDF** | **assente** | si |
+> **Rettifica della prima stesura.** La versione precedente di questa tabella
+> dichiarava assenti dal web archiviazione, riattivazione ed eliminazione. Era
+> **sbagliato**: esistono, su `/patients/[id]/edit`, con `db.patients.update`
+> e `db.patients.delete`. Le avevo giudicate assenti guardando la sola scheda
+> `/modules` e cercando stringhe esatte. E' lo stesso errore di metodo che
+> questo documento rimprovera altrove: dedurre l'assenza da una vista parziale
+> invece di interrogare la superficie intera.
 
-Il caso dell'archiviazione e' il piu' netto e va nella direzione opposta a quella
-che l'handover discuteva. Il web **legge** lo stato: filtra per archivio, mostra
-"Archiviato", scrive "Percorso clinico chiuso. Consultabile in sola lettura."
-Ma non offre alcun controllo per archiviarlo o riattivarlo. Lo stato si puo'
-raggiungere solo da un client nativo.
+| azione sul paziente | nativo | web | nota |
+|---|---|---|---|
+| Modifica | si | si | |
+| Esporta FHIR | si | si | nomi diversi: **"Esporta FHIR"** contro **"Export FHIR"** |
+| Nuova voce | si | si | |
+| Archivia | si | si | sul nativo nella riga paziente, sul web un livello piu' in fondo, in `/edit` |
+| Riattiva | si | si | sul web si chiama **"Ripristina"** |
+| Elimina paziente | si | si | entrambi soft delete con motivazione |
+| Report PDF | si | si | `PatientReportDocument.swift` contro `lib/report-service` |
+| Prescrittivo regionale | si | si | sul web e' la famiglia **SISS handoff** |
+| **Condividi FHIR** | si | **assente** | unico divario di funzione verificato |
 
-Le due differenze di nome — "Esporta FHIR" contro "Export FHIR", "Prescrittivo
-regionale" contro "SISS/FSE" — non sono sinonimi innocui. La seconda in
-particolare: PRREG ha sostituito il prescrittivo SISS, quindi le due superfici
-nominano la stessa cosa con due generazioni diverse del vocabolario.
+Quindi il divario di **funzione** e' uno solo: Condividi FHIR. Il resto e' un
+divario di **collocazione e di nome**, che non e' meno reale per chi passa da una
+superficie all'altra:
+
+1. Sul nativo il ciclo di vita del paziente sta accanto al paziente; sul web
+   sta dietro "Modifica". Chi impara il gesto su iPhone non lo ritrova sul web
+   dove se lo aspetta.
+2. Tre azioni identiche hanno due nomi: "Esporta FHIR" / "Export FHIR",
+   "Riattiva" / "Ripristina", "Prescrittivo regionale" / "SISS". L'ultima e' la
+   piu' pesante, perche' PRREG ha sostituito il prescrittivo SISS: le due
+   superfici nominano la stessa cosa con due generazioni del vocabolario.
 
 ## Aperto dopo la ripresa: la rampa Lume su macOS, che chiede una tua decisione
 
