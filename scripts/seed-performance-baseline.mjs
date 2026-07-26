@@ -18,6 +18,51 @@ const FIXTURE_USER = {
 };
 const DEFAULT_COUNTS = { entries: 8, observations: 6, documents: 2 };
 
+// The salt the fixture user has always carried. Kept byte-identical so an
+// already-generated database stays comparable.
+const FIXTURE_SALT_B64 = 'AAECAwQFBgcICQoLDA0ODw==';
+
+/**
+ * Wraps FIXTURE_KEY with a KEK derived from the fixture PIN, exactly as the app
+ * does, and returns the "v2:<base64(iv||ct||tag)>" blob the login path expects.
+ *
+ * This column used to hold the string 'fixture-wrapped-master-key-not-for-runtime',
+ * which is not base64. The consequence was not a cosmetic one: the server
+ * accepted the PIN and answered 200, then the browser fed that placeholder to
+ * `atob`, which threw, and the generic catch in the security provider reported
+ * "Errore durante il login." — the same sentence a wrong PIN produces. The
+ * database therefore looked like it was rejecting a valid credential while
+ * `failed_login_attempts` stayed at 0, because nothing had actually failed the
+ * credential check.
+ *
+ * Mirrors lib/security/security.ts: PBKDF2-HMAC-SHA256 at the v2 work factor,
+ * AES-256-GCM, iv prepended to ciphertext-with-tag. Uses WebCrypto rather than
+ * node:crypto so it is the same API the app calls, not a re-implementation.
+ */
+async function wrapFixtureMasterKey() {
+  const KDF_ITERATIONS_V2 = 600_000;
+  const subtle = globalThis.crypto.subtle;
+  const salt = Buffer.from(FIXTURE_SALT_B64, 'base64');
+
+  const pinMaterial = await subtle.importKey('raw', Buffer.from(FIXTURE_USER.pin, 'utf-8'), 'PBKDF2', false, ['deriveKey']);
+  const kek = await subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: KDF_ITERATIONS_V2, hash: 'SHA-256' },
+    pinMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+
+  // Deterministic IV. Acceptable here and nowhere else: this is a fixture whose
+  // key, PIN and salt are all published in this file, so there is no secret for
+  // IV reuse to leak, and a stable blob keeps regenerated demo databases
+  // byte-comparable. Never copy this into a path that wraps a real key.
+  const iv = Buffer.from('000102030405060708090a0b', 'hex');
+  const ciphertext = await subtle.encrypt({ name: 'AES-GCM', iv }, kek, FIXTURE_KEY);
+
+  return `v2:${Buffer.concat([iv, Buffer.from(ciphertext)]).toString('base64')}`;
+}
+
 function parsePositiveInteger(value, flag) {
   const parsed = Number.parseInt(value ?? '', 10);
   if (!Number.isSafeInteger(parsed) || parsed < 0 || (flag === '--patients' && parsed < 1)) {
@@ -77,7 +122,7 @@ function patientId(index) {
   return `perf-patient-${String(index).padStart(6, '0')}`;
 }
 
-function seedRows(db, counts) {
+function seedRows(db, counts, wrappedMasterKey) {
   const insertPatient = db.prepare(`
     INSERT INTO patients (
       id, first_name, last_name, tax_code, birth_date, address, phone, caregiver,
@@ -106,6 +151,16 @@ function seedRows(db, counts) {
       @notes, @observedAt, 'manual', 1, @createdAt, @updatedAt
     )
   `);
+  // The agenda had nothing to show because this fixture had never seeded a
+  // single checkup: `SELECT count(*) FROM checkups` returned 0. That is not the
+  // same failure as an agenda that cannot read, and while the two were
+  // indistinguishable on screen the empty list was being read as a UI defect.
+  // Dates straddle the seeded "now" and statuses are mixed, so the agenda has
+  // something to classify rather than one uniform run.
+  const insertCheckup = db.prepare(`
+    INSERT INTO checkups (id, patient_id, date, title, status, notes, source, version, created_at, updated_at)
+    VALUES (@id, @patientId, @date, @title, @status, @notes, 'manual', 1, @createdAt, @createdAt)
+  `);
   const insertDocument = db.prepare(`
     INSERT INTO attachments (
       id, patient_id, name, type, size, path, data, summary_snapshot,
@@ -122,8 +177,8 @@ function seedRows(db, counts) {
         id, username, display_name, ambulatory_name, role, password_hash,
         encrypted_master_key, salt, failed_login_attempts, created_at
       ) VALUES (?, ?, 'Benchmark sintetico', 'Ambulatorio benchmark', 'admin', ?,
-        'fixture-wrapped-master-key-not-for-runtime', 'AAECAwQFBgcICQoLDA0ODw==', 0, ?)
-    `).run(FIXTURE_USER.id, FIXTURE_USER.username, FIXTURE_USER.passwordHash, FIXED_NOW_SECONDS);
+        ?, ?, 0, ?)
+    `).run(FIXTURE_USER.id, FIXTURE_USER.username, FIXTURE_USER.passwordHash, wrappedMasterKey, FIXTURE_SALT_B64, FIXED_NOW_SECONDS);
     db.prepare(`
       INSERT INTO ambulatories (id, name, type, is_default, version, created_at)
       VALUES ('performance-baseline-ambulatory', 'Ambulatorio benchmark sintetico', 'test', 1, 1, ?)
@@ -163,6 +218,22 @@ function seedRows(db, counts) {
           metadata: encryptedFixture({ source: 'performance-baseline', ordinal: index }, `${rowIdentity}:metadata`),
           createdAt,
           updatedAt: createdAt,
+        });
+      }
+
+      // Two checkups per patient: one already behind the seeded "now", one
+      // ahead of it, so both the "today" and the "planned" counters have
+      // something to count and the pill classifier sees more than one case.
+      for (let index = 0; index < 2; index += 1) {
+        const offsetDays = index === 0 ? -(patientIndex % 9) - 1 : (patientIndex % 21) + 1;
+        insertCheckup.run({
+          id: `${id}-checkup-${String(index).padStart(2, '0')}`,
+          patientId: id,
+          date: FIXED_NOW_SECONDS + offsetDays * 86400 + 9 * 3600,
+          title: index === 0 ? 'Controllo eseguito' : 'Controllo programmato',
+          status: index === 0 ? 'done' : ['pending', 'scheduled'][patientIndex % 2],
+          notes: encryptedFixture(`Nota di controllo sintetica ${index + 1}`, `${identity}:checkup:${index}:notes`),
+          createdAt,
         });
       }
 
@@ -223,7 +294,7 @@ export async function seedPerformanceDatabase(options) {
   try {
     db.pragma('journal_mode = WAL');
     db.pragma('synchronous = NORMAL');
-    seedRows(db, options);
+    seedRows(db, options, await wrapFixtureMasterKey());
     db.exec('ANALYZE');
     db.pragma('wal_checkpoint(TRUNCATE)');
     return {
