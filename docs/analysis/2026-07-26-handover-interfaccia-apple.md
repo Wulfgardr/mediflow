@@ -151,6 +151,42 @@ per gran parte della sessione come rumore di fondo. Non lo erano.
    > righe: le sue proprieta' `can*`, su cui poggiano quasi tutti i pulsanti,
    > verificavano sessione e connessione ma non il permesso.
 
+## Aperto dopo la ripresa: la rampa Lume su macOS, che chiede una tua decisione
+
+Cercando la prova del terreno unico ho misurato i colori di sistema contro una
+`NSWindow` reale, in entrambe le apparenze, su macOS 27:
+
+| colore di sistema | chiaro | scuro |
+|---|---|---|
+| `underPageBackgroundColor` | 246, 246, 246 | 40, 40, 40 |
+| `windowBackgroundColor` | 255, 255, 255 | 30, 30, 30 |
+| `textBackgroundColor` | 255, 255, 255 | 30, 30, 30 |
+| `controlBackgroundColor` | 255, 255, 255 | 30, 30, 30 |
+
+Ne discendono due cose. La prima l'ho corretta: `PlatformColors.groupedBackground`
+era `windowBackgroundColor`, cioe' esattamente il colore delle schede che
+dovevano posarci sopra, quindi il terreno non recedeva affatto. Ora e'
+`underPageBackgroundColor`, e `MacSingleGroundTests` lo fissa.
+
+La seconda **non** l'ho toccata, perche' e' una decisione sul linguaggio
+visivo e non e' mia. `LumeSurface.macOSSurface` mappa le quattro zone su
+`canvas → underPage`, `field → control`, `focal → text`, `chrome → window`, e
+il commento accanto promette "un gradino per zona, cosi' una sezione, un blocco
+annidato e il pannello attorno restano distinguibili". Misurato: **tre zone su
+quattro sono lo stesso colore.** La rampa ha due livelli, non quattro, e il
+sistema non offre un terzo livello fra quelli usati.
+
+Questo spiega anche il fallimento pre-esistente di
+`LumeKitTests.testLumePrimitivesRenderOpaqueInAllRegisters`, che va letto per
+quello che e': il test chiede che il registro **guardia** produca una superficie
+diversa dal grafite, ma su macOS `LumeSurface` usa deliberatamente i colori di
+sistema e **ignora la palette**, per la ragione scritta a `Lume.swift:247`
+("le superfici macOS sono materiali di sistema, non esadecimali fissi").
+Il test e la decisione di progetto si contraddicono a vicenda: o cade il test,
+o cade la scelta di ignorare la palette su macOS. Non e' un artefatto di
+misura, ed e' verificato: chiaro e scuro **differiscono** regolarmente, quindi
+la risoluzione dei colori funziona.
+
 ## Ambiente
 
 - Xcode-beta su sparsebundle esterno; `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`
