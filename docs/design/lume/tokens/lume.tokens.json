@@ -5,8 +5,8 @@
     "giorno": {
       "surface": {
         "canvas": { "$value": "#eef0f2" },
-        "field": { "$value": "#f5f5f4" },
-        "focal": { "$value": "#fbfaf7" },
+        "field": { "$value": "#f4f6f8" },
+        "focal": { "$value": "#fbfcfe" },
         "chrome": { "$value": "#e6e8eb" }
       },
       "ink": {

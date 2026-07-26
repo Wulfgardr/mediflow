@@ -75,8 +75,21 @@ struct PairedPatientsWorkspaceView: View {
         // Creating a patient is the home's primary action, so it belongs in the
         // navigation bar. Inline it consumed the first viewport at accessibility
         // text sizes and pushed the first patient off screen.
+        // Three related controls declared as one group rather than as three
+        // separate `ToolbarItem`s, which is what they are: a list-wide action
+        // and two list-wide settings.
+        //
+        // Stated honestly, because it was tried as a fix and was not one: on a
+        // 13-inch iPad the toolbar draws a capsule roughly a thousand points
+        // wide with the new-patient glyph pinned at its far left, the sort menu
+        // and the ambulatory picker at its far right, and empty glass between.
+        // Grouping the three changed nothing visible. Tapping the empty span
+        // does nothing either, so it is not the collapsed search field — search
+        // is the separate circle at the trailing edge. The cause is still
+        // unknown and the symptom is recorded in the handover rather than
+        // papered over.
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
                 Button {
                     model.startCreatingPatient()
                 } label: {
@@ -85,11 +98,10 @@ struct PairedPatientsWorkspaceView: View {
                 .disabled(model.isWorking)
                 .accessibilityLabel("Nuovo paziente")
                 .accessibilityIdentifier("new-patient-button")
-            }
-            // Sort is a list-wide setting, not content: as a toolbar menu it
-            // states the active order on its own face and stops competing with
-            // the patients for first-viewport height.
-            ToolbarItem(placement: .primaryAction) {
+
+                // Sort is a list-wide setting, not content: as a toolbar menu it
+                // states the active order on its own face and stops competing
+                // with the patients for first-viewport height.
                 Picker("Ordina", selection: $patientSortMode) {
                     Text("Recenti").tag(PatientListSortMode.recent)
                     Text("Alfabetico").tag(PatientListSortMode.alpha)
@@ -98,8 +110,24 @@ struct PairedPatientsWorkspaceView: View {
                 .accessibilityLabel("Ordina pazienti")
                 .accessibilityValue(patientSortMode == .recent ? "Recenti" : "Alfabetico")
                 .accessibilityIdentifier("patient-sort-menu")
+
+                // Renders only when the host has published ambulatories. Same
+                // identifier as before, because it is the same control.
+                if !model.availableAmbulatories.isEmpty {
+                    Menu {
+                        ForEach(model.availableAmbulatories) { ambulatory in
+                            Button(ambulatory.name) {
+                                model.selectAmbulatory(ambulatory.id)
+                            }
+                        }
+                    } label: {
+                        Label(activeAmbulatoryScopeLabel, systemImage: "building.2")
+                    }
+                    .accessibilityLabel("Ambulatorio attivo")
+                    .accessibilityValue(activeAmbulatoryScopeLabel)
+                    .accessibilityIdentifier("ambulatory-scope-picker")
+                }
             }
-            ambulatoryScopeToolbarItem
         }
         // The query stays owned by this view, so the field and the filtering read
         // the same storage and recomposition does not swap it out.
@@ -1061,16 +1089,24 @@ private extension View {
     /// nesting the two produced a card inside a card.
     /// A section card, on the platform's own content surface.
     ///
-    /// This used the Lume `field` register, `#f5f5f4` — very slightly warm. On
-    /// its own that is invisible; sitting on the system's grouped background,
-    /// which is slightly *blue*, the temperature difference is what made every
-    /// card read as cream, paper, bone. The colour was never the problem so much
-    /// as the pairing.
+    /// This used the Lume `field` register when that token was `#f5f5f4` — very
+    /// slightly warm. On its own that is invisible; sitting on the system's
+    /// grouped background, which is slightly *blue*, the temperature difference
+    /// is what made every card read as cream, paper, bone.
     ///
-    /// The semantic content background is the right answer rather than a new hex:
-    /// it is pure white in light mode and the system's raised dark grey at night,
-    /// it follows increased contrast and accessibility settings for free, and it
-    /// leaves the Lume token — which the web shares, under a parity test — alone.
+    /// The answer at the time was to leave the token alone, because the web
+    /// shares it under a parity test, and to reach for the semantic content
+    /// background here instead. That fixed the Mac and left the warmth on the
+    /// web, which is where it kept being seen.
+    ///
+    /// The token has since been corrected at the source: the giorno register was
+    /// the only one whose ramp changed temperature as it rose, from −5 and −4 at
+    /// chrome and canvas to +1 at field and +4 at focal, while both dark
+    /// registers stay cool throughout and grow cooler. `field` is now `#f4f6f8`
+    /// and `focal` `#fbfcfe`, so the whole ramp is cool and the workaround below
+    /// is no longer load-bearing. It is kept because the semantic colour still
+    /// buys Increase Contrast for free on iOS; moving it to Lume `field` is now
+    /// a free choice rather than a repair.
     func chartCard() -> some View {
         padding(ClinicalChartMetrics.cardPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
