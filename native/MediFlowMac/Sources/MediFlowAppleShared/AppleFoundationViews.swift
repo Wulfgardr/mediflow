@@ -265,6 +265,11 @@ public struct AppleFoundationMobileRootView: View {
         }
         .task(id: workspaceModel.clinicalWorkspaceConnection?.identity) {
             await capabilitiesStore.loadIfNeeded(using: workspaceModel.clinicalWorkspaceConnection)
+            // Hand the answer to the workspace model, which is the object every
+            // clinical section observes. Only some of them receive the store, so
+            // a gate hanging off the store alone would not redraw their buttons
+            // when the answer arrived.
+            workspaceModel.updateAvailableCapabilities(capabilitiesStore.settledCapabilityKeys)
         }
         .sheet(isPresented: $showsProjectSurfaces) { projectSurfaceSheet }
         .environment(\.appleReduceMotionOverride, appearance.reduceMotionOverride)

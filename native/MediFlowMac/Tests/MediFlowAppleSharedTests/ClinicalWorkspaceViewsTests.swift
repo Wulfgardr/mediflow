@@ -169,6 +169,59 @@ final class ClinicalWorkspaceViewsTests: XCTestCase {
         XCTAssertTrue(store.hasCapability("network.replica.readonly-documents"))
     }
 
+    // MARK: - Proactive capability gate
+
+    func testUnknownCapabilitiesPermitEveryActionInsteadOfDisablingTheApp() {
+        // The failure mode this rules out. The store answers false for a key it
+        // has not asked about yet, so wiring the buttons straight to it would
+        // disable every action while the capability request is in flight, and
+        // for good if that request failed. A network hiccup would turn the
+        // archive read-only with no explanation.
+        let unasked = ClinicalCapabilityGate()
+        XCTAssertNil(unasked.availableKeys)
+        XCTAssertTrue(unasked.permits(NetworkCapabilityKey.writePatientLifecycle))
+        XCTAssertTrue(unasked.permits("una.chiave.che.non.esiste"))
+    }
+
+    func testASettledAnswerDeniesExactlyTheAbsentCapability() {
+        let settled = ClinicalCapabilityGate(availableKeys: [
+            NetworkCapabilityKey.readonlyPatients, NetworkCapabilityKey.writePatientProfile
+        ])
+        XCTAssertTrue(settled.permits(NetworkCapabilityKey.writePatientProfile))
+        XCTAssertFalse(settled.permits(NetworkCapabilityKey.writePatientLifecycle))
+        XCTAssertFalse(settled.permits(NetworkCapabilityKey.writeClinicalDiary))
+
+        // An empty answer denies; it is not the same as no answer.
+        XCTAssertFalse(ClinicalCapabilityGate(availableKeys: []).permits(NetworkCapabilityKey.writePatientProfile))
+        // A disconnection returns the gate to "not asked", not to "denied".
+        XCTAssertTrue(ClinicalCapabilityGate(availableKeys: nil).permits(NetworkCapabilityKey.writePatientLifecycle))
+    }
+
+    func testStoreReportsSettledKeysOnlyOnceTheyMeanSomething() async {
+        let store = ClinicalWorkspaceCapabilitiesStore()
+        XCTAssertNil(store.settledCapabilityKeys, "In stato .idle la risposta non esiste ancora")
+        await store.loadIfNeeded(using: nil)
+        XCTAssertNil(store.settledCapabilityKeys, "Senza connessione la risposta resta sconosciuta, non vuota")
+    }
+
+    func testEveryCapabilityTheClientGatesOnIsOfferedByTheDemo() {
+        // The pact written beside `demoCapabilityKeys`: a key the client gates
+        // on but the demo does not list is a surface that is dead offline. The
+        // action gate added four keys, and this is what catches the fifth.
+        let gated = [
+            NetworkCapabilityKey.readonlyPatients, NetworkCapabilityKey.readonlyAgenda,
+            NetworkCapabilityKey.readonlyClinicalDiaryGlobal, NetworkCapabilityKey.readonlyDocuments,
+            NetworkCapabilityKey.writeDocuments, NetworkCapabilityKey.ambulatoriesWrite,
+            NetworkCapabilityKey.computeVisitDraft, NetworkCapabilityKey.writePatientProfile,
+            NetworkCapabilityKey.writePatientLifecycle, NetworkCapabilityKey.writeClinicalDiary,
+            NetworkCapabilityKey.fseValidate
+        ]
+        let demo = Set(ClinicalWorkspaceCapabilitiesStore.demoCapabilityKeys)
+        for key in gated {
+            XCTAssertTrue(demo.contains(key), "\(key) e sotto cancello ma manca alla modalita dimostrativa")
+        }
+    }
+
     // MARK: - An unread archive must never be described as an empty one
 
     func testUnreadStateIsNeverReportedAsAnEmptyResult() {
