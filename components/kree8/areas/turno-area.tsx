@@ -213,7 +213,7 @@ function TurnoArea({
           </header>
           <div>
             {visibleAgenda.map((row) => (
-              <div key={row.time + row.title} className={styles.row}>
+              <div key={row.id} className={styles.row}>
                 <span className={styles.rowTime}>{row.time}</span>
                 <span className={styles.rowMain}>
                   <span className={styles.rowTitle}>{row.title}</span>
