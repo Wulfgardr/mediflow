@@ -10,9 +10,25 @@ public typealias VetroTone = LumeTone
 public typealias VetroPalette = LumePalette
 
 enum PlatformColors {
+    /// The recessive ground that grouped content sits on.
+    ///
+    /// On macOS this was `windowBackgroundColor`, which is the wrong half of the
+    /// pair. Measured on macOS 27, `windowBackgroundColor`, `textBackgroundColor`
+    /// and `controlBackgroundColor` all resolve to the *same* value — pure white
+    /// in light, `(30, 30, 30)` at night — so the arrangement the chart is built
+    /// on, grey underneath and lighter surfaces on top, had no grey underneath.
+    /// Every clinical section was painted the exact colour of the ground it was
+    /// meant to be an island on, and the split view read as one undivided sheet.
+    ///
+    /// `underPageBackgroundColor` is the colour that still recedes:
+    /// `(246, 246, 246)` in light and `(40, 40, 40)` at night, against the card's
+    /// 255 and 30. It is also the honest counterpart of iOS's
+    /// `systemGroupedBackground`, which is what this token means on the other
+    /// platform. Verified against a real `NSWindow` under both appearances, not
+    /// deduced: `MacSingleGroundTests` pins it.
     static var groupedBackground: Color {
         #if os(macOS)
-        return Color(nsColor: .windowBackgroundColor)
+        return Color(nsColor: .underPageBackgroundColor)
         #else
         return Color(uiColor: .systemGroupedBackground)
         #endif
