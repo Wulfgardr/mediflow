@@ -27,8 +27,19 @@ Fuori perimetro (per istruzione): backend, schema, API, web. **Niente push.**
   > `testTabBarNavigatesBetweenSections`, `testProjectMenuOpensEverySurface`,
   > `testUsablePatientHomeShowsWorklistBeforeConnectionSetup`,
   > `testFirstPatientIsVisibleInTheFirstViewportAtAX5`,
-  > `testWorklistLastRowClearsTheFloatingTabBarAtAX5`. L'UDID iPad citato piu'
-  > sotto non esiste piu' tra i simulatori disponibili.
+  > `testWorklistLastRowClearsTheFloatingTabBarAtAX5`.
+  >
+  > **Rettifica di una rettifica, e conta piu' di quanto sembri.** Questa riga
+  > dichiarava che l'UDID iPad citato piu' sotto non esisteva piu'. Falso:
+  > `D2216CF2-6EA0-4EA4-861F-41E0DED1E5F8` esiste, e' disponibile ed e' il
+  > dispositivo giusto. Lo avevo cercato con un elenco troncato da `head -8`.
+  >
+  > La conseguenza non e' formale. Avendolo creduto sparito ne ho usato un
+  > altro, `B02B47BF-…`, che gira su **iOS 26.3**: tutte le misure iPad prese
+  > prima di accorgermene, comprese le cinque rotture e i pixel del registro
+  > scuro, non erano sul runtime di destinazione. **Il target e' iOS 27**, e
+  > `D2216CF2` e' l'unico iPad che lo monta. Le misure iPad valide sono solo
+  > quelle rifatte li'.
 - Unit: `ClinicalContrastTests` 5/5, `ClinicalFieldCryptoTests` 7/7.
   > **Rettifica.** Sono due classi, non la batteria. Il pacchetto SwiftPM
   > completo e' **396 test con 1 fallimento** gia' su `c0b1ee2a9`:
@@ -258,11 +269,36 @@ la risoluzione dei colori funziona.
 ## Ambiente
 
 - Xcode-beta su sparsebundle esterno; `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`
-- Simulatori iOS 27 creati: iPhone 17 Pro `97738497-…`, iPad Pro 13 M5 `D2216CF2-…`
+- **Simulatori di destinazione, iOS 27 e nient'altro.** iPhone 17 Pro
+  `97738497-D8C4-4ACB-94CB-93871F42D7DD` e iPad Pro 13 M5 (27)
+  `D2216CF2-6EA0-4EA4-861F-41E0DED1E5F8`. Sulla macchina esistono anche
+  dispositivi su iOS 26.3, fra cui un altro iPad Pro 13 M5
+  (`B02B47BF-…`): **non vanno usati**, il prodotto targetizza iOS 27.
+  Verificare sempre il runtime, non il solo nome del dispositivo, con
+  `xcrun simctl list devices | awk '/^-- /{rt=$0} /<udid>/{print rt}'`.
 - Demo: istanza Next su `:3100` con DB sintetico nello scratchpad (verificato
   col descrittore di file, **non** dedotto dalla cwd), proxy TLS `:3543`,
   `launch.sh` con auto-login.
 - **I pazienti reali di Leonardo sono su `:3000`.** `:3100` e' sintetica.
+
+## Nota di metodo, seconda parte: dedurre l'assenza da una vista parziale
+
+La sessione di ripresa ha ripetuto **tre volte** lo stesso errore, e vale la pena
+nominarlo perche' e' insidioso proprio quando si va di fretta.
+
+1. Ho dichiarato che il web non sapesse archiviare, riattivare o eliminare un
+   paziente. Esiste tutto, su `/patients/[id]/edit`: avevo guardato la sola
+   scheda `/modules`.
+2. Ho dichiarato che Report PDF esistesse solo sul web e il prescrittivo solo sul
+   nativo. Esistono su entrambi, con altri nomi.
+3. Ho dichiarato che un UDID di simulatore non esistesse piu'. Esiste: l'elenco
+   era troncato da `head -8`.
+
+Ogni volta il codice o il sistema avevano risposto correttamente a una domanda
+piu' stretta di quella che credevo di porre. La regola che ne segue e' gemella
+di quella qui sotto: **non concludere l'assenza da un comando che non ha
+guardato tutto.** Un `grep` su una stringa esatta, una sola schermata, un elenco
+troncato: nessuno dei tre puo' dimostrare che qualcosa non c'e'.
 
 ## Nota di metodo per chi riprende
 

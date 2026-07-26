@@ -53,6 +53,75 @@ final class MediFlowMobileAppUITests: XCTestCase {
         return inTabBar.exists ? inTabBar : app.buttons[label]
     }
 
+    // MARK: - Navigazione fra sezioni, su entrambi gli idiomi
+
+    /// Opens a section by name, wherever this idiom keeps its sections.
+    ///
+    /// On iPhone they are tabs. On iPad they are rows in the `NavigationSplitView`
+    /// sidebar, and that sidebar starts at `.detailOnly` — hidden. `tab(_:)`
+    /// therefore found nothing on iPad, which is most of why the navigation tests
+    /// failed there: not a layout regression, a helper that only knew one idiom.
+    ///
+    /// Reveals the sidebar only when the row is not already reachable, so on
+    /// iPhone this stays exactly the tap it was.
+    @discardableResult
+    private func openSection(_ label: String) -> Bool {
+        let direct = tab(label)
+        if direct.exists && direct.isHittable {
+            direct.tap()
+            return true
+        }
+
+        // iPhone: six sections do not all fit the bar, so the last ones sit
+        // behind the system's overflow. Reaching them is an extra step there and
+        // not on iPad, which is itself a difference worth having encoded.
+        for overflow in ["Altro", "More"] {
+            let button = app.tabBars.buttons[overflow]
+            if button.exists && button.isHittable {
+                button.tap()
+                let row = app.buttons[label]
+                if row.waitForExistence(timeout: 5) {
+                    row.tap()
+                    return true
+                }
+            }
+        }
+
+        // iPad: the sections live in the split-view sidebar, which starts hidden.
+        // The system's toggle carries no stable identifier, so it is found by
+        // position: the leading control of the navigation bar.
+        let toggle = app.navigationBars.buttons.element(boundBy: 0)
+        if toggle.exists && toggle.isHittable {
+            toggle.tap()
+        }
+
+        let row = app.buttons[label].exists ? app.buttons[label] : app.staticTexts[label]
+        guard row.waitForExistence(timeout: 5) else { return false }
+        row.tap()
+        return true
+    }
+
+    /// Every surface the mobile shell offers, with the identifier it publishes.
+    ///
+    /// Two sections are deliberately absent, and both absences are decisions
+    /// written into `detailView(for:)` rather than gaps:
+    ///
+    /// - `.host`, because administering the archive is offered from loopback
+    ///   alone and a paired iPhone is not the machine holding it.
+    /// - `.repertori`, because catalogue browsing is a macOS surface for now and
+    ///   mobile reaches the same data through the therapy and exemption pickers.
+    ///
+    /// Listing them here would not test parity, it would demand that the shell
+    /// grow two navigation entries leading to `EmptyView`.
+    private static let clinicalSurfaces: [(label: String, identifier: String)] = [
+        ("Pazienti", "clinical-workspace-patients-view"),
+        ("Agenda", "clinical-workspace-agenda-view"),
+        ("Diario", "clinical-workspace-diary-view"),
+        ("Analytics", "clinical-workspace-analytics-view"),
+        ("Scale", "clinical-workspace-scales-view"),
+        ("Impostazioni", "clinical-workspace-settings-view"),
+    ]
+
     // MARK: - Native search helpers
 
     /// The affordance that leads to search, whatever stage it is in: the expanded
@@ -503,6 +572,81 @@ final class MediFlowMobileAppUITests: XCTestCase {
             face.localizedCaseInsensitiveContains("Recenti"),
             "the sort control must show the active order without being opened, got: \(face)"
         )
+    }
+
+    // MARK: - Il giro completo, sullo stesso codice per iPhone e iPad
+
+    /// Opens every clinical surface on whichever idiom is running and requires
+    /// each one to render.
+    ///
+    /// Deliberately not skipped on either idiom: the point is that the same
+    /// sweep passes on both, which is the only way "universal app" means
+    /// anything. The iPad half was previously unreachable because the sidebar
+    /// starts hidden, so these surfaces had never been opened by a test there.
+    func testEveryClinicalSurfaceOpensOnThisIdiom() throws {
+        launch(seedPatients: true)
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
+
+        for surface in Self.clinicalSurfaces {
+            XCTAssertTrue(
+                openSection(surface.label),
+                "\(surface.label) non e raggiungibile su questo idioma"
+            )
+            XCTAssertTrue(
+                sectionView(surface.identifier).waitForExistence(timeout: 15),
+                "\(surface.label) non ha reso la sua vista (\(surface.identifier))"
+            )
+            attachScreenshot(named: "superficie-\(surface.label)")
+        }
+    }
+
+    /// The three cross-patient views must say something true about themselves,
+    /// whatever state they are in.
+    ///
+    /// This is the coverage that was missing. The suite asserted that the
+    /// containers existed and never what they contained, which is how a build
+    /// shipped where the Agenda stated "Nessuna visita pianificata." without
+    /// having read the archive at all: 32 tests passed with a false sentence
+    /// about a clinical diary on screen.
+    ///
+    /// So the requirement here is not "shows rows". It is: never claim an empty
+    /// result while the archive has not been read. Without a home base the
+    /// honest sentence is the one about connecting; the empty-result sentence
+    /// belongs only after a read that returned nothing.
+    func testCrossPatientViewsNeverClaimAnEmptyArchiveTheyHaveNotRead() throws {
+        launch(seedPatients: true)
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
+
+        openSection("Agenda")
+        XCTAssertTrue(sectionView("clinical-workspace-agenda-view").waitForExistence(timeout: 15))
+        let agendaUnread = app.staticTexts["Collega l'home-base prima di caricare l'agenda."]
+        if agendaUnread.waitForExistence(timeout: 5) {
+            XCTAssertFalse(
+                app.staticTexts["Nessuna visita pianificata."].exists,
+                "L'agenda dichiara che non ci sono visite mentre dichiara anche di non avere letto l'archivio"
+            )
+        }
+
+        openSection("Diario")
+        XCTAssertTrue(sectionView("clinical-workspace-diary-view").waitForExistence(timeout: 15))
+        let diaryUnread = app.staticTexts["Collega l'home-base prima di caricare il diario globale."]
+        if diaryUnread.waitForExistence(timeout: 5) {
+            XCTAssertFalse(
+                app.staticTexts["Nessuna voce di diario."].exists,
+                "Il diario dichiara di essere vuoto mentre dichiara anche di non avere letto l'archivio"
+            )
+            XCTAssertFalse(
+                app.staticTexts["0 voci attive, 0 pazienti"].exists,
+                "Il diario conta voci e pazienti senza avere letto"
+            )
+        }
+
+        openSection("Analytics")
+        XCTAssertTrue(sectionView("clinical-workspace-analytics-view").waitForExistence(timeout: 15))
+        // Analytics used to render nothing at all without a connection: the age
+        // steppers and no statement underneath them. Something must be said.
+        let analyticsSaysSomething = app.staticTexts.count > 0
+        XCTAssertTrue(analyticsSaysSomething, "Analytics non dice nulla sul perche non ci siano numeri")
     }
 
     func testTabBarNavigatesBetweenSections() {

@@ -40,7 +40,19 @@ enum PlatformColors {
             return NSColor(isDark ? LumePalette.grafite.canvas : LumePalette.giorno.canvas)
         })
         #else
-        return Color(uiColor: .systemGroupedBackground)
+        // Lume canvas here too, for the same reason and on harder evidence.
+        //
+        // This was `systemGroupedBackground`, which in dark is **pure black**.
+        // Sampled from an iPad Pro 13 in dark: the detail pane came out
+        // `rgb(0, 0, 0)` while the ground under the list was `rgb(25, 28, 33)`,
+        // two different grounds in one window, and neither is a Lume value —
+        // the darkest Lume declares is chrome at `(14, 16, 19)`. Worse, that
+        // `(25, 28, 33)` is Lume `field`, the *card* step, so the card and the
+        // ground it sits on were the exact same colour and the card had no edge
+        // at all.
+        return Color(uiColor: UIColor { traits in
+            UIColor(traits.userInterfaceStyle == .dark ? LumePalette.grafite.canvas : LumePalette.giorno.canvas)
+        })
         #endif
     }
 
@@ -75,7 +87,9 @@ enum PlatformColors {
             return NSColor(isDark ? LumePalette.grafite.field : LumePalette.giorno.field)
         })
         #else
-        return Color(uiColor: .secondarySystemGroupedBackground)
+        return Color(uiColor: UIColor { traits in
+            UIColor(traits.userInterfaceStyle == .dark ? LumePalette.grafite.field : LumePalette.giorno.field)
+        })
         #endif
     }
 
