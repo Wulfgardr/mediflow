@@ -15,6 +15,16 @@ struct ClinicalRichTextEditorView: View {
     @Binding var document: ClinicalRichTextEditorDocument
     let accessibilityPrefix: String
 
+    /// Which block the caret is in. Drives whether that block shows its
+    /// formatting controls.
+    ///
+    /// Every block used to carry the full row — kind menu, bold, italic,
+    /// underline, strikethrough, delete — at all times. A four-paragraph note
+    /// therefore stacked four identical toolbars, and the S/O/A/P template, whose
+    /// whole point is four short lines, produced more chrome than content. The
+    /// controls act on one block at a time, so only one block needs them.
+    @FocusState private var focusedBlockID: UUID?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if document.blocks.isEmpty {
@@ -79,29 +89,33 @@ struct ClinicalRichTextEditorView: View {
         kind: ClinicalRichTextEditorBlock.EditableKind,
         span: ClinicalRichTextTextRun
     ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                kindMenu(block: block, currentKind: kind)
-                Spacer(minLength: 8)
-                styleToggle(systemImage: "bold", isOn: span.isBold, identifier: "\(accessibilityPrefix)-bold-\(block.id.uuidString)") {
-                    document.toggleBold(id: block.id)
+        let isFocused = focusedBlockID == block.id
+        return VStack(alignment: .leading, spacing: 4) {
+            if isFocused {
+                HStack(spacing: 6) {
+                    kindMenu(block: block, currentKind: kind)
+                    Spacer(minLength: 8)
+                    styleToggle(systemImage: "bold", isOn: span.isBold, identifier: "\(accessibilityPrefix)-bold-\(block.id.uuidString)") {
+                        document.toggleBold(id: block.id)
+                    }
+                    styleToggle(systemImage: "italic", isOn: span.isItalic, identifier: "\(accessibilityPrefix)-italic-\(block.id.uuidString)") {
+                        document.toggleItalic(id: block.id)
+                    }
+                    styleToggle(systemImage: "underline", isOn: span.isUnderlined, identifier: "\(accessibilityPrefix)-underline-\(block.id.uuidString)") {
+                        document.toggleUnderline(id: block.id)
+                    }
+                    styleToggle(systemImage: "strikethrough", isOn: span.isStruckThrough, identifier: "\(accessibilityPrefix)-strikethrough-\(block.id.uuidString)") {
+                        document.toggleStrikethrough(id: block.id)
+                    }
+                    Button(role: .destructive) {
+                        document.removeBlock(id: block.id)
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("\(accessibilityPrefix)-remove-\(block.id.uuidString)")
                 }
-                styleToggle(systemImage: "italic", isOn: span.isItalic, identifier: "\(accessibilityPrefix)-italic-\(block.id.uuidString)") {
-                    document.toggleItalic(id: block.id)
-                }
-                styleToggle(systemImage: "underline", isOn: span.isUnderlined, identifier: "\(accessibilityPrefix)-underline-\(block.id.uuidString)") {
-                    document.toggleUnderline(id: block.id)
-                }
-                styleToggle(systemImage: "strikethrough", isOn: span.isStruckThrough, identifier: "\(accessibilityPrefix)-strikethrough-\(block.id.uuidString)") {
-                    document.toggleStrikethrough(id: block.id)
-                }
-                Button(role: .destructive) {
-                    document.removeBlock(id: block.id)
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("\(accessibilityPrefix)-remove-\(block.id.uuidString)")
+                .transition(.opacity)
             }
             TextEditor(text: Binding(
                 get: { span.text },
@@ -112,11 +126,24 @@ struct ClinicalRichTextEditorView: View {
             // the toggle buttons' highlighted state above (this editor styles a
             // whole block at once, not a text selection, see D11 fallback note).
             .font(font(forKind: kind, isBold: span.isBold, isItalic: span.isItalic))
+            .scrollContentBackground(.hidden)
             .frame(minHeight: 36)
+            .focused($focusedBlockID, equals: block.id)
             .accessibilityIdentifier("\(accessibilityPrefix)-text-\(block.id.uuidString)")
         }
-        .padding(6)
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(PlatformColors.separator, lineWidth: 1))
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: ClinicalChartMetrics.fieldRadius, style: .continuous)
+                .fill(PlatformColors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: ClinicalChartMetrics.fieldRadius, style: .continuous)
+                .stroke(
+                    isFocused ? Color.accentColor : PlatformColors.separator,
+                    lineWidth: isFocused ? 1.5 : 1
+                )
+        )
+        .animation(.easeInOut(duration: 0.15), value: isFocused)
         .accessibilityIdentifier("\(accessibilityPrefix)-block-\(block.id.uuidString)")
     }
 
@@ -143,14 +170,28 @@ struct ClinicalRichTextEditorView: View {
         .accessibilityIdentifier(identifier)
     }
 
+    /// Six labelled buttons in a row, on a canvas that fits about three.
+    ///
+    /// Squeezed into the available width they did not truncate or wrap by word:
+    /// each label collapsed to a single column of letters, so the bar read
+    /// "P a r a g r a f o". A formatting bar is a strip of tools, and a strip of
+    /// tools that does not fit scrolls — which is what iOS does with its own.
+    /// `.fixedSize` on the row is what makes the buttons keep their real width
+    /// inside the scroll view instead of compressing again.
     private var addBlockToolbar: some View {
-        HStack(spacing: 6) {
-            addBlockButton(kind: .paragraph, label: "Paragrafo", systemImage: "paragraphsign")
-            addBlockButton(kind: .heading2, label: "H2", systemImage: "textformat.size.larger")
-            addBlockButton(kind: .heading3, label: "H3", systemImage: "textformat.size")
-            addBlockButton(kind: .bulletItem, label: "Elenco", systemImage: "list.bullet")
-            addBlockButton(kind: .numberedItem, label: "Numerato", systemImage: "list.number")
-            addBlockButton(kind: .blockquote, label: "Citazione", systemImage: "quote.opening")
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                addBlockButton(kind: .paragraph, label: "Paragrafo", systemImage: "paragraphsign")
+                addBlockButton(kind: .heading2, label: "H2", systemImage: "textformat.size.larger")
+                addBlockButton(kind: .heading3, label: "H3", systemImage: "textformat.size")
+                addBlockButton(kind: .bulletItem, label: "Elenco", systemImage: "list.bullet")
+                addBlockButton(kind: .numberedItem, label: "Numerato", systemImage: "list.number")
+                addBlockButton(kind: .blockquote, label: "Citazione", systemImage: "quote.opening")
+            }
+            .fixedSize(horizontal: true, vertical: false)
+            // Room for the button's own focus ring and shadow, which a scroll
+            // view clips flush otherwise.
+            .padding(.vertical, 2)
         }
         .font(.caption2)
     }
@@ -160,6 +201,8 @@ struct ClinicalRichTextEditorView: View {
             document.appendNewBlock(kind: kind)
         } label: {
             Label(label, systemImage: systemImage)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
         .buttonStyle(.bordered)
         .accessibilityIdentifier("\(accessibilityPrefix)-add-\(Self.identifierSuffix(for: kind))")
@@ -262,8 +305,12 @@ struct VisitDraftComposerView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             TextEditor(text: $model.newEntryVisitTranscript)
+                .scrollContentBackground(.hidden)
                 .frame(minHeight: 70)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(PlatformColors.separator, lineWidth: 1))
+                // A TextEditor is not a TextField, so the style applied at the
+                // workspace root does not reach it: left alone it drew an
+                // 8-point rectangle beside inputs that are fully round.
+                .clinicalMultilineFieldShape()
                 .accessibilityIdentifier("visit-draft-transcript-field")
             HStack {
                 Text("\(model.newEntryVisitTranscript.count)/\(PairedPatientsWorkspaceModel.maxVisitDraftTranscriptChars)")

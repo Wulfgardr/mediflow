@@ -357,8 +357,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         // token or encrypted patient cache. It seeds the clinical list/detail
         // models in performAutomaticActionsIfNeeded(), so keep this launch path
         // fully isolated from Keychain and Application Support.
-        if ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENTS"] == "1" {
+        // Offline demo and the synthetic click-map share this path: neither may
+        // touch a developer's real paired token or encrypted patient cache, and
+        // neither needs to. Skipping loadSnapshot() is also what keeps the demo
+        // free of the Keychain authorization panel that macOS raises on every
+        // rebuild, since each ad-hoc signature is a new app to it.
+        if AppleFoundationDemoMode.skipsStoredPairing {
             applyLaunchOverrides(launchOverrides)
+            restoreCachedPatientList()
             return
         }
         #endif
@@ -469,6 +475,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /// patient list instead of hitting the network, so the search / filter UI can be
     /// exercised without a paired home-base. Debug-only, never compiled into release.
     static func uiTestSeededPatients() -> [HomeBasePatientSummary]? {
+        if AppleFoundationDemoMode.isDemoDataset {
+            return AppleFoundationDemoMode.patients()
+        }
         guard ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENTS"] == "1" else {
             return nil
         }
@@ -494,6 +503,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /// UI-test fixture detail for a seeded patient, so the patient-detail view can
     /// be exercised (exemptions, contacts, flags) without a paired home-base.
     static func uiTestSeededDetail(for patient: HomeBasePatientSummary) -> HomeBasePatientDetail? {
+        if AppleFoundationDemoMode.isDemoDataset {
+            return AppleFoundationDemoMode.detail(for: patient)
+        }
         guard ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENTS"] == "1" else {
             return nil
         }
@@ -809,11 +821,21 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             )) ?? self.availableAmbulatories
             do {
                 try self.persistPairing()
+                #if DEBUG
+                if !AppleFoundationDemoMode.skipsStoredPairing {
+                    try self.cacheStore.savePatientList(
+                        self.patients,
+                        serverURL: self.serverURL,
+                        ambulatoryId: self.ambulatoryId.trimmedOrNil
+                    )
+                }
+                #else
                 try self.cacheStore.savePatientList(
                     self.patients,
                     serverURL: self.serverURL,
                     ambulatoryId: self.ambulatoryId.trimmedOrNil
                 )
+                #endif
             } catch {
                 self.errorMessage = "Pazienti caricati, ma il salvataggio locale non e riuscito: \(error.localizedDescription)"
             }
@@ -3926,6 +3948,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     private func persistPairing() throws {
+        #if DEBUG
+        // A scratch pairing must not be written into the Keychain: it would
+        // overwrite a real one, and the write itself raises the authorization
+        // panel this mode exists to avoid. Skipping it is also honest — a demo
+        // pairing is not something to remember.
+        if AppleFoundationDemoMode.skipsStoredPairing { return }
+        #endif
         try pairedStore.save(
             settings: HomeBasePairedSettings(
                 serverURL: serverURL,
@@ -3940,6 +3969,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 
     @discardableResult
     private func restoreCachedPatientList(markOffline: Bool = false) -> Bool {
+        #if DEBUG
+        // The encrypted patient cache is a second Keychain item with its own
+        // authorization panel. A scratch session has nothing worth caching and no
+        // business reading a real one.
+        if AppleFoundationDemoMode.skipsStoredPairing { return false }
+        #endif
         do {
             guard let snapshot = try cacheStore.loadPatientList(
                 serverURL: serverURL,

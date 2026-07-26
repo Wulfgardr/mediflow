@@ -11,64 +11,26 @@ struct PairedPatientTherapiesSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Label("Terapie", systemImage: "pills")
-                        .font(.subheadline.weight(.semibold))
-                    Text("Ultime \(PairedPatientsWorkspaceSupport.clinicalPreviewCap) terapie")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+            // Five controls beside the title do not fit a phone. Left to compress
+            // they did not truncate, they hyphenated: "Ter-apie", "Aggior-na",
+            // "Es-porta". Same ladder the diary header uses, with one more rung,
+            // because this header can carry two share actions the diary cannot.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    therapiesHeaderTitle
+                    Spacer(minLength: 8)
+                    therapiesHeaderControls
                 }
-                Spacer(minLength: 8)
-                Button {
-                    Task { await model.loadSelectedPatientTherapies() }
-                } label: {
-                    Label("Aggiorna", systemImage: "arrow.clockwise")
+                VStack(alignment: .leading, spacing: 8) {
+                    therapiesHeaderTitle
+                    therapiesHeaderControls
                 }
-                .font(.caption)
-                .disabled(model.isWorking || model.selectedPatient == nil)
-                .accessibilityIdentifier("homebase-refresh-therapies-button")
-
-                Button {
-                    model.generatePatientReportPDF()
-                } label: {
-                    Label("Report PDF", systemImage: "doc.richtext")
-                        .font(.caption)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    therapiesHeaderTitle
+                    Spacer(minLength: 8)
+                    therapiesOverflowMenu
+                    therapiesStatusFilter
                 }
-                .disabled(model.selectedPatient == nil)
-                .accessibilityIdentifier("patient-report-pdf-button")
-
-                if let reportURL = model.patientReportURL {
-                    ShareLink(item: reportURL) {
-                        Label("Condividi", systemImage: "square.and.arrow.up")
-                            .font(.caption)
-                    }
-                    .accessibilityIdentifier("share-patient-report-pdf-button")
-                }
-
-                if !model.therapies.isEmpty {
-                    ShareLink(item: TherapyPlanDocument.plainText(
-                        patientName: model.selectedPatient.map { "\($0.firstName) \($0.lastName)" } ?? "Paziente",
-                        therapies: model.therapies,
-                        dateLabel: PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: Date())
-                    )) {
-                        Label("Esporta", systemImage: "square.and.arrow.up")
-                            .font(.caption)
-                    }
-                    .accessibilityIdentifier("export-therapy-plan-button")
-                }
-
-                Menu {
-                    Picker("Stato terapie", selection: $therapyStatusFilter) {
-                        ForEach(TherapyStatusFilter.allCases) { option in
-                            Text(option.title).tag(option)
-                        }
-                    }
-                } label: {
-                    Label(therapyStatusFilter.title, systemImage: "line.3.horizontal.decrease.circle")
-                        .font(.caption)
-                }
-                .accessibilityIdentifier("therapy-status-filter")
             }
 
             if model.therapies.isEmpty {
@@ -154,6 +116,98 @@ struct PairedPatientTherapiesSection: View {
         }
     }
 
+    /// Fixed at its ideal width: the title is what the section is called, and it
+    /// is never the thing that gives way to make room for a control.
+    private var therapiesHeaderTitle: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ClinicalSectionTitle("Terapie", systemImage: "pills", accent: .terapie)
+            Text("Ultime \(PairedPatientsWorkspaceSupport.clinicalPreviewCap) terapie")
+                .chartMetadata()
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private var therapiesHeaderControls: some View {
+        HStack(spacing: 8) {
+            therapyActions
+            therapiesStatusFilter
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    /// The actions, in the order they are reached: reload, produce a report,
+    /// share what was produced, export the plan itself.
+    @ViewBuilder
+    private var therapyActions: some View {
+        Button {
+            Task { await model.loadSelectedPatientTherapies() }
+        } label: {
+            Label("Aggiorna", systemImage: "arrow.clockwise")
+        }
+        .font(.caption)
+        .disabled(model.isWorking || model.selectedPatient == nil)
+        .accessibilityIdentifier("homebase-refresh-therapies-button")
+
+        Button {
+            model.generatePatientReportPDF()
+        } label: {
+            Label("Report PDF", systemImage: "doc.richtext")
+                .font(.caption)
+        }
+        .disabled(model.selectedPatient == nil)
+        .accessibilityIdentifier("patient-report-pdf-button")
+
+        if let reportURL = model.patientReportURL {
+            ShareLink(item: reportURL) {
+                Label("Condividi", systemImage: "square.and.arrow.up")
+                    .font(.caption)
+            }
+            .accessibilityIdentifier("share-patient-report-pdf-button")
+        }
+
+        if !model.therapies.isEmpty {
+            ShareLink(item: TherapyPlanDocument.plainText(
+                patientName: model.selectedPatient.map { "\($0.firstName) \($0.lastName)" } ?? "Paziente",
+                therapies: model.therapies,
+                dateLabel: PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: Date())
+            )) {
+                Label("Esporta", systemImage: "square.and.arrow.up")
+                    .font(.caption)
+            }
+            .accessibilityIdentifier("export-therapy-plan-button")
+        }
+    }
+
+    /// Last rung of the ladder. The same actions, with their labels at full
+    /// length inside the menu instead of squeezed into a header row.
+    private var therapiesOverflowMenu: some View {
+        Menu {
+            therapyActions
+        } label: {
+            Label("Azioni terapie", systemImage: "ellipsis.circle")
+                .font(.caption)
+        }
+        .labelStyle(.iconOnly)
+        .accessibilityLabel("Azioni terapie")
+        .accessibilityIdentifier("therapy-actions-overflow")
+    }
+
+    /// Stays visible at every width: it is not an action but the state of the
+    /// list below it, and its face states the active filter.
+    private var therapiesStatusFilter: some View {
+        Menu {
+            Picker("Stato terapie", selection: $therapyStatusFilter) {
+                ForEach(TherapyStatusFilter.allCases) { option in
+                    Text(option.title).tag(option)
+                }
+            }
+        } label: {
+            Label(therapyStatusFilter.title, systemImage: "line.3.horizontal.decrease.circle")
+                .font(.caption)
+        }
+        .accessibilityIdentifier("therapy-status-filter")
+    }
+
     // Semantic Lume status color, or attention if soft-deleted.
     // Kept as tinted text rather than a glass badge: Liquid Glass is for the
     // control/navigation layer, not every content row.
@@ -173,14 +227,17 @@ struct PairedPatientTherapiesSection: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
                 Text(therapy.drugName)
-                    .font(.caption.weight(.semibold))
+                    // The drug is what the row is about. At caption it was the
+                    // same size as its own AIC code, and smaller than the value
+                    // of an observation two sections below.
+                    .chartRowTitle()
                 Spacer(minLength: 8)
                 Text(PairedTherapyStatus(rawValue: therapy.status)?.title ?? therapy.status)
-                    .font(.caption2.weight(.semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(therapyStatusColor(therapy))
             }
             Text(therapy.dosage)
-                .font(.caption)
+                .font(.callout)
                 .registro()
                 .foregroundStyle(therapy.deletedAt == nil ? .primary : .secondary)
                 .lineLimit(2)
@@ -274,8 +331,11 @@ struct PairedPatientTherapiesSection: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(title, systemImage: "pills")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                // A form opens a group inside a card, so it takes the group
+                // heading register — the same one "DIAGNOSI" and "NOTE" use.
+                // Left at caption it was indistinguishable from the placeholder
+                // text of the fields it introduces.
+                .chartGroupHeading()
             TextField("Farmaco", text: drugName)
                 .accessibilityIdentifier("\(primaryIdentifier)-drug-name")
                 .onChange(of: drugName.wrappedValue) { _ in
@@ -373,32 +433,38 @@ struct PairedPatientTherapiesSection: View {
                     Button {
                         onSelect(drug)
                     } label: {
+                        // Same three registers as everywhere else, and the same
+                        // pill for the codes. The drug's name is what you are
+                        // choosing, so it is the size of a choice; AIC and ATC
+                        // are tokens you match, so they are tokens.
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: 4) {
                                 Text(drug.name)
-                                    .font(.caption.weight(.semibold))
+                                    .chartRowTitle()
                                     .lineLimit(2)
                                 if let principle = drug.activePrinciple?.trimmedOrNil {
                                     Text(principle)
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
+                                        .chartMetadata()
                                         .lineLimit(1)
                                 }
                                 HStack(spacing: 6) {
-                                    Text("AIC \(drug.aic)")
+                                    ClinicalCodePill("AIC \(drug.aic)")
                                     if let atc = drug.atc?.trimmedOrNil {
-                                        Text("ATC \(atc)")
+                                        ClinicalCodePill("ATC \(atc)")
                                     }
                                 }
-                                .font(.caption2.monospaced())
-                                .registro()
-                                .foregroundStyle(.secondary)
                             }
                             Spacer(minLength: 4)
                             Image(systemName: "checkmark.circle")
+                                .foregroundStyle(.tint)
                         }
+                        .padding(.vertical, 4)
+                        .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        "Scegli \(drug.name), AIC \(drug.aic)"
+                    )
                     .accessibilityIdentifier("\(primaryIdentifier)-drug-catalog-result-\(drug.aic)")
                 }
             }

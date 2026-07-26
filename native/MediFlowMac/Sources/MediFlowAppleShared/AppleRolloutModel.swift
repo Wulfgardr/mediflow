@@ -73,6 +73,11 @@ public enum AppleFoundationSection: String, CaseIterable, Identifiable, Sendable
 /* @Codex */
 public enum ClinicalWorkspaceSection: String, CaseIterable, Identifiable, Sendable {
     case patients, agenda, diary, analytics, scales, settings, runtime, overview, milestones
+    /// Administration of the machine that holds the archive. Offered only where
+    /// that machine is the one running the app, which today means macOS.
+    case host
+    /// Consultazione dei repertori clinici: farmaci, esenzioni, terminologia.
+    case repertori
 
     public var id: String { rawValue }
 
@@ -87,6 +92,8 @@ public enum ClinicalWorkspaceSection: String, CaseIterable, Identifiable, Sendab
         case .runtime: "Runtime"
         case .overview: "Panoramica"
         case .milestones: "Tappe"
+        case .host: "Host"
+        case .repertori: "Repertori"
         }
     }
 
@@ -101,10 +108,13 @@ public enum ClinicalWorkspaceSection: String, CaseIterable, Identifiable, Sendab
         case .runtime: "server.rack"
         case .overview: "square.grid.2x2"
         case .milestones: "flag.pattern.checkered"
+        case .host: "externaldrive.badge.checkmark"
+        case .repertori: "books.vertical"
         }
     }
 
     static var clinicalSections: [ClinicalWorkspaceSection] { [.patients, .agenda, .diary, .analytics, .scales] }
+    static var referenceSections: [ClinicalWorkspaceSection] { [.repertori] }
     static var settingsSections: [ClinicalWorkspaceSection] { [.settings] }
     static var projectSections: [ClinicalWorkspaceSection] { [.runtime, .overview, .milestones] }
 

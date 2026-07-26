@@ -50,7 +50,8 @@ struct PairedPatientDocumentsSection: View {
                 title: "Documenti",
                 subtitle: "Archivio allegati del paziente",
                 systemImage: "doc.text",
-                refreshIdentifier: "homebase-refresh-attachments-button"
+                refreshIdentifier: "homebase-refresh-attachments-button",
+                accent: .documenti
             ) {
                 Task { await model.loadSelectedPatientAttachments() }
             }
@@ -102,8 +103,7 @@ struct PairedPatientDocumentsSection: View {
     private var attachmentUploadControls: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Carica documento")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .chartGroupHeading()
             HStack(spacing: 10) {
                 Button {
                     isPickingAttachmentFile = true
@@ -192,7 +192,7 @@ struct PairedPatientDocumentsSection: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(attachment.name.isEmpty ? "Documento senza nome" : attachment.name)
-                        .font(.caption.weight(.semibold))
+                        .chartRowTitle()
                         .lineLimit(1)
                     Spacer(minLength: 8)
                     Text(Self.byteCountFormatter.string(fromByteCount: Int64(attachment.size)))
@@ -295,8 +295,7 @@ struct PairedPatientDocumentsSection: View {
             if !model.evidenceStackInsights.isEmpty {
                 Divider()
                 Text("Referti recenti")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .chartGroupHeading()
                 ForEach(model.evidenceStackInsights) { insight in
                     evidenceStackTile(insight)
                         .accessibilityIdentifier("evidence-stack-tile-\(insight.id)")
@@ -317,7 +316,7 @@ struct PairedPatientDocumentsSection: View {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(insight.fileName)
-                            .font(.caption.weight(.semibold))
+                            .chartRowTitle()
                             .lineLimit(1)
                         HStack(spacing: 6) {
                             if let dateLabel = Self.insightDateLabel(insight) {
@@ -382,7 +381,7 @@ struct PairedPatientDocumentsSection: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
                 Text(insight.fileName)
-                    .font(.caption.weight(.semibold))
+                    .chartRowTitle()
                     .lineLimit(1)
                 Spacer(minLength: 8)
                 if let quality = insight.qualityLevel {
@@ -416,8 +415,7 @@ struct PairedPatientDocumentsSection: View {
             if !model.followupSuggestions.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Trovati nei documenti, da valutare")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .chartGroupHeading()
                     ForEach(model.followupSuggestions) { suggestion in
                         followupSuggestionRow(suggestion)
                             .accessibilityIdentifier("followup-suggestion-row-\(suggestion.id)")
@@ -430,7 +428,7 @@ struct PairedPatientDocumentsSection: View {
     private func followupSuggestionRow(_ suggestion: FollowupSuggestion) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(suggestion.label)
-                .font(.caption.weight(.semibold))
+                .chartRowTitle()
             if !suggestion.excerpt.isEmpty {
                 Text(suggestion.excerpt)
                     .font(.caption2)
@@ -532,7 +530,7 @@ struct PairedPatientDocumentsSection: View {
                 Image(systemName: result.ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                     .foregroundStyle(result.ok ? .green : .orange)
                 Text(model.fseDocumentValidationTargetLabel ?? result.profile)
-                    .font(.caption.weight(.semibold))
+                    .chartRowTitle()
             }
             if result.errors.isEmpty && result.warnings.isEmpty {
                 Text("Nessun errore o avviso per il profilo \(result.profile).")

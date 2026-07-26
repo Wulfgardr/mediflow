@@ -41,10 +41,6 @@ struct PairedPatientsWorkspaceView: View {
     @State private var selectedFseObservationId: String?
     @State private var expandedInsightId: String?
     @State private var isCompactPatientHeaderExpanded = false
-    #if os(macOS)
-    /* @Codex */
-    @State private var patientWorkspaceColumnVisibility: NavigationSplitViewVisibility = .all
-    #endif
 
     init(model: PairedPatientsWorkspaceModel, capabilities: ClinicalWorkspaceCapabilitiesStore) {
         self.model = model
@@ -53,8 +49,29 @@ struct PairedPatientsWorkspaceView: View {
 
     var body: some View {
         layoutBody
+        // Applied once, at the root: a `TextFieldStyle` travels through the
+        // environment, so every field in every section of the chart takes the
+        // same pill shape and none of them can disagree. There are several dozen.
+        .clinicalFieldShape()
+        #if os(macOS)
+        // No window-wide background fill: the sidebar material, the toolbar and
+        // the scroll-edge effect are drawn by the system, and an opaque
+        // windowBackgroundColor painted over the whole workspace is exactly what
+        // suppresses them. Clinical content stays opaque through its own Lume
+        // surfaces, which is where opacity belongs.
+        .toolbar { macOSWorkspaceToolbar }
+        // The system search field, in the toolbar where macOS puts it, instead of
+        // the magnifying-glass-plus-TextField this column drew by hand. On macOS
+        // 26 it also collapses to a toolbar button until used, which gives the
+        // worklist back the vertical space the hand-drawn field occupied.
+        .searchable(
+            text: $patientQuery,
+            placement: .toolbar,
+            prompt: "Cerca per nome o codice fiscale"
+        )
+        .modifier(MinimizedSearchToolbarBehavior())
+        #else
         .background(PlatformColors.groupedBackground)
-        #if !os(macOS)
         // Creating a patient is the home's primary action, so it belongs in the
         // navigation bar. Inline it consumed the first viewport at accessibility
         // text sizes and pushed the first patient off screen.
@@ -82,6 +99,7 @@ struct PairedPatientsWorkspaceView: View {
                 .accessibilityValue(patientSortMode == .recent ? "Recenti" : "Alfabetico")
                 .accessibilityIdentifier("patient-sort-menu")
             }
+            ambulatoryScopeToolbarItem
         }
         // The query stays owned by this view, so the field and the filtering read
         // the same storage and recomposition does not swap it out.
@@ -270,6 +288,7 @@ struct PairedPatientsWorkspaceView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
                         connectionSetupBanner
+                        workspaceFeedbackLine
                         patientsListContent
                             .padding(16)
                             .lumeSurface(zone: .field)
@@ -283,22 +302,40 @@ struct PairedPatientsWorkspaceView: View {
                 ScrollView {
                     Group {
                         if let detail = model.selectedPatient {
+                            // No envelope around the sections. Each one is
+                            // already its own island on the field surface; a
+                            // focal wrapper behind them put a second card under
+                            // the cards and spread the warm focal ground across
+                            // a chart whose islands are cool — the corners went
+                            // round, then square, then round again down the
+                            // column. The ground is the ground now, and the only
+                            // surfaces on it are the sections.
                             selectedPatientSections(detail)
-                                .padding(16)
-                                .lumeSurface(zone: .focal)
                         } else {
                             emptyDetailState
                         }
                     }
                     .padding(20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    // The chart is sized to the column it was given, not to
+                    // `.infinity`. An unbounded proposal here let the chart claim
+                    // the whole window: on iPad it rendered a column-wide card
+                    // offset to the right and clipped at the screen edge, taking
+                    // the address, the FHIR action and the AI summary off screen.
+                    .frame(
+                        width: PatientsWorkspaceLayout.detailWidth(forContainerWidth: containerWidth),
+                        alignment: .topLeading
+                    )
                 }
-                .frame(maxWidth: .infinity)
+                .frame(width: PatientsWorkspaceLayout.detailWidth(forContainerWidth: containerWidth))
                 // The open chart keeps its identity in the split arrangement too,
                 // not only when the columns collapse.
                 .safeAreaInset(edge: .top, spacing: 0) {
                     if let detail = model.selectedPatient {
-                        compactPatientHeader(detail)
+                        compactPatientHeader(detail, matchesContainerWidth: false)
+                            .frame(
+                                width: PatientsWorkspaceLayout.detailWidth(forContainerWidth: containerWidth),
+                                alignment: .leading
+                            )
                     }
                 }
             }
@@ -311,10 +348,12 @@ struct PairedPatientsWorkspaceView: View {
                             .compactContainerWidth(inset: 40)
                     } else {
                         connectionSetupBanner
+                        workspaceFeedbackLine
                         patientsCard
                     }
                     #else
                     connectionSetupBanner
+                    workspaceFeedbackLine
                     patientsCard
                     #endif
                 }
@@ -332,37 +371,161 @@ struct PairedPatientsWorkspaceView: View {
 
     #if os(macOS)
     /* @Codex */
-    private var macOSWorkspace: some View {
-        NavigationSplitView(columnVisibility: $patientWorkspaceColumnVisibility) {
-            VStack(alignment: .leading, spacing: 0) {
-                connectionSetupBanner
-                    .padding(.horizontal, 12)
-                    .padding(.top, 12)
-
-                patientsListContent
-                    .padding(.horizontal, 12)
-                    .padding(.top, 12)
-                    .frame(maxHeight: .infinity)
+    /// Window toolbar for the patients workspace.
+    ///
+    /// The chart actions live here, not in a grid inside the chart: on macOS the
+    /// toolbar is the system's control surface, it adopts the platform material
+    /// on its own, and it leaves the chart to the clinical content. The
+    /// destructive action stays behind a menu rather than sitting one stray
+    /// click away from the edit button.
+    @ToolbarContentBuilder
+    private var macOSWorkspaceToolbar: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                model.startCreatingPatient()
+            } label: {
+                Label("Nuovo paziente", systemImage: "person.badge.plus")
             }
-            .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 460)
+            .disabled(!model.canCreatePatient || model.isWorking)
+            .help("Nuovo paziente")
+            .accessibilityIdentifier("new-patient-toolbar-button")
+        }
+
+        // Same control, same identifier, on both platforms: the scope belongs
+        // with the list it scopes wherever that list is shown.
+        ambulatoryScopeToolbarItem
+
+        // Separates "create" from "act on the open chart": on macOS 26 the
+        // toolbar renders each group as its own glass island, which is what makes
+        // the grouping read at a glance rather than as one undifferentiated row.
+        if #available(macOS 26.0, *), model.selectedPatient != nil {
+            ToolbarSpacer(.fixed)
+        }
+
+        if let detail = model.selectedPatient {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    model.startEditingPatient()
+                } label: {
+                    Label("Modifica", systemImage: "pencil")
+                }
+                .disabled(model.isEditingPatient)
+                .help("Modifica anagrafica")
+                .accessibilityIdentifier("edit-patient-toolbar-button")
+
+                Button {
+                    confirmsFHIRExport = true
+                } label: {
+                    Label("Esporta FHIR", systemImage: "doc.badge.arrow.up")
+                }
+                .disabled(!model.canPrepareFHIRExport)
+                .help("Valida ed esporta FHIR in locale")
+                .accessibilityIdentifier("patient-export-fhir-toolbar-button")
+
+                if let fhirURL = model.patientFHIRExportURL {
+                    ShareLink(item: fhirURL) {
+                        Label("Condividi FHIR", systemImage: "square.and.arrow.up")
+                    }
+                    .accessibilityIdentifier("patient-share-fhir-toolbar-button")
+                }
+
+                Menu {
+                    if detail.isArchived == true {
+                        Button {
+                            patientLifecycleSheet = .unarchive
+                        } label: {
+                            Label("Riattiva paziente", systemImage: "archivebox")
+                        }
+                        .disabled(!model.canUnarchivePatient)
+                        .accessibilityIdentifier("unarchive-patient-toolbar-button")
+                    } else {
+                        Button {
+                            patientLifecycleSheet = .archive
+                        } label: {
+                            Label("Archivia paziente", systemImage: "archivebox")
+                        }
+                        .disabled(!model.canArchivePatient)
+                        .accessibilityIdentifier("archive-patient-toolbar-button")
+                    }
+
+                    Button {
+                        Task { await model.openPrregHandoff() }
+                    } label: {
+                        Label("Prescrittivo regionale", systemImage: "arrow.up.forward.app")
+                    }
+                    .accessibilityIdentifier("patient-prreg-handoff-toolbar-button")
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        patientLifecycleSheet = .delete
+                    } label: {
+                        Label("Elimina paziente", systemImage: "trash")
+                    }
+                    .disabled(!model.canSoftDeletePatient)
+                    .accessibilityIdentifier("soft-delete-patient-toolbar-button")
+                } label: {
+                    Label("Altre azioni", systemImage: "ellipsis.circle")
+                }
+                .help("Altre azioni sulla scheda")
+                .accessibilityIdentifier("patient-actions-toolbar-menu")
+            }
+        }
+    }
+
+    // The workspace is the detail of the app's NavigationSplitView, so its own
+    // list/chart division is an HSplitView, not a second NavigationSplitView.
+    // Nested, the inner split never re-proposed a width when the window shrank:
+    // the chart kept the width it had been laid out at, overflowed the window
+    // edge and pushed the app sidebar out of view.
+    private var macOSWorkspace: some View {
+        HSplitView {
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 8) {
+                    connectionSetupBanner
+                    workspaceFeedbackLine
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 12)
+                .padding(.bottom, 10)
+
+                // The worklist owns its own padding and its own vertical
+                // distribution: applied here, every one of its top-level
+                // elements got the frame and spread across the column.
+                patientsListContent
+            }
+            .frame(minWidth: 260, idealWidth: 340, maxWidth: 480, maxHeight: .infinity)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("patient-workspace-sidebar")
-        } detail: {
+
             ScrollView {
                 macOSDetailContent
                     .padding(20)
+                    // A clinical chart is read, not scanned: past a comfortable
+                    // measure the label/value rows stretch into two disconnected
+                    // columns at opposite window edges.
+                    .frame(maxWidth: 1080, alignment: .leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            // One ground under both panes.
+            //
+            // The list drew the sidebar's grey and the chart drew the window's
+            // white, so the split read as two applications stitched together —
+            // and on white the section cards, which are themselves near-white,
+            // had nothing to stand out from. Giving both panes the same recessive
+            // ground is what turns the cards back into islands, and it is the
+            // same arrangement iOS uses: grey underneath, lighter surfaces on
+            // top.
+            .background(PlatformColors.groupedBackground)
             .safeAreaInset(edge: .top, spacing: 0) {
                 if let detail = model.selectedPatient {
                     patientWorkspaceHeader(detail)
                 }
             }
-            .frame(maxWidth: .infinity)
+            .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("patient-workspace-detail")
         }
-        .navigationSplitViewStyle(.balanced)
     }
 
     /* @Codex */
@@ -384,11 +547,20 @@ struct PairedPatientsWorkspaceView: View {
                 }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .lumeSurface(zone: .focal, cornerRadius: 0)
-        .overlay(alignment: .bottom) { Divider() }
+        // The same floating glass the phone and the tablet use.
+        //
+        // This was an opaque bar with square corners and a rule underneath,
+        // welded across the full width of the chart: a rectangle in an interface
+        // whose every other surface is a rounded island, and the one piece of
+        // chrome that hid the content passing beneath it instead of letting it
+        // show through. One header, three platforms, one shape.
+        .lumeGlass(in: .rect(cornerRadius: 22))
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(name). \(metadata)")
         .accessibilityHeading(.h1)
@@ -437,9 +609,13 @@ struct PairedPatientsWorkspaceView: View {
     @ViewBuilder
     private var macOSDetailContent: some View {
         if let detail = model.selectedPatient {
+            // No card around the cards. Every section below already draws its own
+            // surface, so wrapping the lot in one more produced a card inside a
+            // card: two nested rounded rectangles, two borders, and a hierarchy
+            // that says the whole chart is one object rather than a sequence of
+            // readable ones. The chart reads as a thread — you open a patient and
+            // scroll their sections — and a thread has no outer envelope.
             selectedPatientSections(detail)
-                .padding(16)
-                .lumeSurface(zone: .focal)
         } else if let patientID = model.selectedPatientID {
             pendingPatientDetail(patientID: patientID)
         } else {
@@ -566,17 +742,21 @@ struct PairedPatientsWorkspaceView: View {
         )
     }
 
+    /// The worklist and the open chart, as siblings.
+    ///
+    /// They used to share one surface with a Divider between them, which made
+    /// the whole column read as a single object: the chart's sections had no
+    /// boundary of their own, so a reader scanning for "Terapie" had nothing to
+    /// scan for. Each is now its own card, the same arrangement the Mac already
+    /// used, and the separation is done by the surface instead of by a rule.
     private var patientsCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: ClinicalChartMetrics.sectionSpacing) {
             patientsListContent
+                .chartCard()
             if let detail = model.selectedPatient {
-                Divider()
                 selectedPatientSections(detail)
-                    .compactContainerWidth(inset: 72)
             }
         }
-        .padding(16)
-        .lumeSurface(zone: .focal)
     }
 
     private var emptyDetailState: some View {
@@ -601,25 +781,40 @@ struct PairedPatientsWorkspaceView: View {
     /// DisclosureGroup states expanded and collapsed natively, keeps the label
     /// readable, exposes the revealed block as its own accessibility subtree,
     /// and is operable from the keyboard without hand-written plumbing.
-    private func compactPatientHeader(_ detail: HomeBasePatientDetail) -> some View {
+    private func compactPatientHeader(
+        _ detail: HomeBasePatientDetail,
+        matchesContainerWidth: Bool = true
+    ) -> some View {
         DisclosureGroup(isExpanded: $isCompactPatientHeaderExpanded) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: ClinicalChartMetrics.itemSpacing) {
                 if let birthDate = detail.birthDate {
-                    Text("Data di nascita: \(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birthDate))")
-                        .font(.caption)
-                        .registro()
-                        .fixedSize(horizontal: false, vertical: true)
+                    headerIdentityRow(
+                        "Nato il",
+                        PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birthDate)
+                    )
                 }
-                Text("Codice fiscale: \(PairedPatientsWorkspaceSupport.compactTaxCode(detail.taxCode))")
-                    .font(.caption)
-                    .registro()
-                    .fixedSize(horizontal: false, vertical: true)
-                    // One uniquely identified revealed child, so a test can prove
-                    // the disclosure opened rather than inferring it.
-                    .accessibilityIdentifier("patient-compact-header-taxcode")
+                headerIdentityRow(
+                    "Codice fiscale",
+                    PairedPatientsWorkspaceSupport.compactTaxCode(detail.taxCode)
+                )
+                // One uniquely identified revealed child, so a test can prove
+                // the disclosure opened rather than inferring it.
+                .accessibilityIdentifier("patient-compact-header-taxcode")
             }
-            .foregroundStyle(.secondary)
+            .padding(.top, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
+            // The whole header is one affordance: tap it anywhere to close it.
+            //
+            // A DisclosureGroup only toggles on its *label*, but its frame grows
+            // to include the block it reveals — so where a tap lands depends on
+            // how tall the revealed block happens to be. Setting the name at
+            // headline and giving the rows real spacing pushed the expanded
+            // frame's centre below the label, and the header opened and would
+            // not close again. Making the revealed block toggle too removes the
+            // dependency on that measurement instead of tuning it: a reader who
+            // taps the birth date to dismiss the block gets what they asked for.
+            .contentShape(.rect)
+            .onTapGesture { isCompactPatientHeaderExpanded = false }
             // Container for the revealed block only, so the group's identifier
             // stops propagating onto these Text children and each keeps its own.
             // Deliberately not on the DisclosureGroup or its label: that is what
@@ -628,10 +823,25 @@ struct PairedPatientsWorkspaceView: View {
         } label: {
             compactPatientHeaderLabel(detail)
         }
+        // A DisclosureGroup paints its whole label with the accent colour, so a
+        // `.foregroundStyle` on the name alone lost: the patient's name rendered
+        // blue, like a link to somewhere else. Setting the style on the group
+        // gives the label back to the content; `.tint` still drives the chevron,
+        // which is the part that really is a control.
+        .foregroundStyle(.primary)
+        .tint(.accentColor)
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .padding(.horizontal, 16)
-        .padding(.vertical, 6)
-        .lumeSurface(zone: .focal, cornerRadius: 0)
+        .padding(.vertical, 10)
+        // Liquid Glass, not an opaque band. The old header was a paper-coloured
+        // rectangle with square corners welded across the full width: it read as
+        // something stuck on top of the app rather than part of it, and it hid
+        // the content passing underneath instead of letting it show through.
+        // Floating and inset, the glass refracts the chart as it scrolls, which
+        // is what tells you the header is above the content and not in it.
+        .lumeGlass(in: .rect(cornerRadius: 22))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 6)
         // No accessibility label override here on purpose: an explicit label on
         // the group merges it into one element and hides the native disclosure
         // control. DisclosureGroup already announces its label and its
@@ -640,7 +850,11 @@ struct PairedPatientsWorkspaceView: View {
         // workspace ancestor propagates to unnamed descendants.
         .accessibilityHint("Mostra o nasconde data di nascita e codice fiscale mascherato.")
         .accessibilityIdentifier("patient-compact-header-disclosure")
-        .compactContainerWidth()
+        // `containerRelativeFrame` resolves against the nearest container, which
+        // for a safe-area inset is not the column the inset belongs to. In the
+        // two-column arrangement the header is already bounded by its column, so
+        // it asks for its column's width and nothing wider.
+        .modifier(CompactContainerWidth(isEnabled: matchesContainerWidth))
     }
 
     /// The disclosure's own label: patient identity plus heading semantics.
@@ -649,8 +863,13 @@ struct PairedPatientsWorkspaceView: View {
     /// static node and hid the native disclosure control underneath it.
     @ViewBuilder
     private func compactPatientHeaderLabel(_ detail: HomeBasePatientDetail) -> some View {
+        // Primary, not tinted. A DisclosureGroup paints its label with the accent
+        // colour, which turned the patient's name blue and made the one piece of
+        // content on screen look like a link to somewhere else. The chevron keeps
+        // the tint, because the chevron really is the control.
         let name = Text("\(detail.lastName) \(detail.firstName)")
-            .font(.subheadline.weight(.semibold))
+            .font(.headline)
+            .foregroundStyle(.primary)
         let birthYear = PairedPatientsWorkspaceSupport.birthYearText(from: detail.birthDate)
         Group {
             if dynamicTypeSize >= .accessibility1 {
@@ -675,11 +894,107 @@ struct PairedPatientsWorkspaceView: View {
         .accessibilityAddTraits(.isHeader)
     }
 
+    /// What the workspace has to say about its last action, said where the action
+    /// happened.
+    ///
+    /// `statusMessage` and `errorMessage` were rendered in exactly one place: the
+    /// pairing form. On iOS that form is a configuration sheet, so every outcome
+    /// the workspace produced — a scope switched, a load failed — was announced to
+    /// a screen the clinician was not looking at. Switching ambulatory gave no
+    /// confirmation anywhere, and an error from loading patients was invisible
+    /// unless you happened to open the connection settings.
+    ///
+    /// Errors take precedence over status: if something failed, saying what
+    /// succeeded first would bury it.
+    @ViewBuilder
+    private var workspaceFeedbackLine: some View {
+        if let error = model.errorMessage {
+            Label(error, systemImage: "exclamationmark.triangle.fill")
+                .chartMetadata()
+                .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("workspace-error-message")
+        } else if let status = model.statusMessage {
+            Text(status)
+                .chartMetadata()
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("workspace-status-message")
+        }
+    }
 
+    /// The active ambulatory, in the toolbar of the list it scopes.
+    ///
+    /// This control lived in the pairing form, so on iOS it was behind a
+    /// configuration sheet that is not even on the same screen as the worklist,
+    /// and on macOS it sat among server URLs and tokens. But the scope is not a
+    /// pairing setting: it is the ward or clinic a clinician is working in, and it
+    /// changes during a shift. It belongs beside the sort order, which is the
+    /// other thing that decides what this list shows.
+    ///
+    /// Same identifier as before, because it is the same control — moved, not
+    /// duplicated. It renders only when the host has published ambulatories.
+    @ToolbarContentBuilder
+    private var ambulatoryScopeToolbarItem: some ToolbarContent {
+        if !model.availableAmbulatories.isEmpty {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    ForEach(model.availableAmbulatories) { ambulatory in
+                        Button(ambulatory.name) {
+                            model.selectAmbulatory(ambulatory.id)
+                        }
+                    }
+                } label: {
+                    Label(activeAmbulatoryScopeLabel, systemImage: "building.2")
+                }
+                .accessibilityLabel("Ambulatorio attivo")
+                .accessibilityValue(activeAmbulatoryScopeLabel)
+                .accessibilityIdentifier("ambulatory-scope-picker")
+            }
+        }
+    }
+
+    private var activeAmbulatoryScopeLabel: String {
+        if let match = model.availableAmbulatories.first(where: { $0.id == model.ambulatoryId }) {
+            return match.name
+        }
+        return model.ambulatoryId.isEmpty ? "Tutti gli ambulatori" : model.ambulatoryId
+    }
+
+    /// A labelled identity fact, as a pair rather than a sentence.
+    ///
+    /// These were single strings — "Codice fiscale: …L0002X" — so the label and
+    /// the value shared one typographic register and the eye had to parse a
+    /// colon to tell them apart. Split, the label recedes and the value, which
+    /// is what gets read and compared, stands in the monospaced register the
+    /// rest of the chart uses for codes.
+    private func headerIdentityRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 104, alignment: .leading)
+            Text(value)
+                .font(.subheadline)
+                .registro()
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+
+
+    /// One rhythm for the whole thread. 10pt read as sections crowding each other
+    /// once each one became a card in its own right; the gap between cards has to
+    /// be large enough to say "new section" without needing a rule to say it.
+    private static var sectionSpacing: CGFloat { ClinicalChartMetrics.sectionSpacing }
 
     @ViewBuilder
     private func selectedPatientSections(_ detail: HomeBasePatientDetail) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Self.sectionSpacing) {
             PairedPatientDetailSection(
                 model: model,
                 detail: detail,
@@ -687,6 +1002,7 @@ struct PairedPatientsWorkspaceView: View {
                 icdQuery: $icdQuery,
                 confirmsFHIRExport: $confirmsFHIRExport
             )
+            .chartCard()
             PairedPatientDiarySection(
                 model: model,
                 capabilities: capabilities,
@@ -697,16 +1013,19 @@ struct PairedPatientsWorkspaceView: View {
                 presentingScale: $presentingScale,
                 attachmentDetailCandidate: $attachmentDetailCandidate
             )
+            .chartCard()
             PairedPatientScalesSection(
                 model: model,
                 presentingScale: $presentingScale
             )
+            .chartCard()
             PairedPatientTherapiesSection(
                 model: model,
                 therapyStatusFilter: $therapyStatusFilter,
                 confirmsDeletingTherapy: $confirmsDeletingTherapy,
                 therapyDeletionCandidateId: $therapyDeletionCandidateId
             )
+            .chartCard()
             PairedPatientClinicalSections(
                 model: model,
                 checkupStatusFilter: $checkupStatusFilter,
@@ -715,7 +1034,9 @@ struct PairedPatientsWorkspaceView: View {
                 confirmsDeletingObservation: $confirmsDeletingObservation,
                 observationDeletionCandidateId: $observationDeletionCandidateId
             )
+            .chartCard()
             PairedPatientPrescriptionSections(model: model)
+                .chartCard()
             PairedPatientDocumentsSection(
                 model: model,
                 capabilities: capabilities,
@@ -728,25 +1049,75 @@ struct PairedPatientsWorkspaceView: View {
                 selectedFseObservationId: $selectedFseObservationId,
                 expandedInsightId: $expandedInsightId
             )
+            .chartCard()
         }
     }
 }
 
-#if !os(macOS)
+private extension View {
+    /// One card per section of the chart, all with the same padding, the same
+    /// corner and the same surface. Applied per section rather than once around
+    /// the lot: a single envelope made the whole chart read as one object, and
+    /// nesting the two produced a card inside a card.
+    /// A section card, on the platform's own content surface.
+    ///
+    /// This used the Lume `field` register, `#f5f5f4` — very slightly warm. On
+    /// its own that is invisible; sitting on the system's grouped background,
+    /// which is slightly *blue*, the temperature difference is what made every
+    /// card read as cream, paper, bone. The colour was never the problem so much
+    /// as the pairing.
+    ///
+    /// The semantic content background is the right answer rather than a new hex:
+    /// it is pure white in light mode and the system's raised dark grey at night,
+    /// it follows increased contrast and accessibility settings for free, and it
+    /// leaves the Lume token — which the web shares, under a parity test — alone.
+    func chartCard() -> some View {
+        padding(ClinicalChartMetrics.cardPadding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                PlatformColors.chartCardSurface,
+                in: RoundedRectangle(
+                    cornerRadius: ClinicalChartMetrics.cardRadius,
+                    style: .continuous
+                )
+            )
+    }
+}
+
 /// Collapses the search field into a toolbar control where the system supports
-/// it. On iOS and iPadOS 17 to 25 the standard toolbar search field stays, which
-/// is the documented behaviour for those releases rather than a workaround.
+/// it. `.minimize` is an iOS behaviour and is unavailable on macOS, where the
+/// toolbar search field is already the native arrangement; on iOS before 26 the
+/// standard field stays, which is the documented behaviour for those releases.
 private struct MinimizedSearchToolbarBehavior: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
+        #if os(iOS)
         if #available(iOS 26.0, *) {
             content.searchToolbarBehavior(.minimize)
         } else {
             content
         }
+        #else
+        content
+        #endif
     }
 }
-#endif
+
+/// `compactContainerWidth` as a modifier, so a call site can decline it without
+/// duplicating the view it wraps.
+private struct CompactContainerWidth: ViewModifier {
+    var isEnabled: Bool
+    var inset: CGFloat = 0
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content.compactContainerWidth(inset: inset)
+        } else {
+            content
+        }
+    }
+}
 
 /* @Codex */
 private extension View {

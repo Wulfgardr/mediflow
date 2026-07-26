@@ -220,6 +220,19 @@ public struct LumeSurface: ViewModifier {
         self.cornerRadius = cornerRadius
     }
 
+    #if os(macOS)
+    /// One step per zone on the system's own scale, so a section, a nested block
+    /// and the surrounding pane stay distinguishable in both appearances.
+    private var macOSSurface: Color {
+        switch zone {
+        case .canvas: Color(nsColor: .underPageBackgroundColor)
+        case .field: Color(nsColor: .controlBackgroundColor)
+        case .focal: Color(nsColor: .textBackgroundColor)
+        case .chrome: Color(nsColor: .windowBackgroundColor)
+        }
+    }
+    #endif
+
     public func body(content: Content) -> some View {
         let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -230,6 +243,34 @@ public struct LumeSurface: ViewModifier {
 
         content
             .background {
+                #if os(macOS)
+                // macOS content surfaces are system materials, not fixed hexes.
+                //
+                // Two reasons. A hand-authored grey cannot track the window
+                // material the sidebar and toolbar are drawn from, so on Tahoe the
+                // sections read as arbitrary tones floating on a background that
+                // belongs to a different scale. And dark mode needs *more*
+                // separation between levels than light, not the same: the previous
+                // ramp moved about seven points of luminance per step
+                // (#121417 → #191c21 → #22252b), which is below what reads as a
+                // deliberate step. The system colours already carry that
+                // separation per appearance, and they follow Increase Contrast.
+                //
+                // The hairline is what makes a section read as a bounded object in
+                // dark, where a fill alone barely separates from its background.
+                ZStack {
+                    shape.fill(macOSSurface)
+                    shape.strokeBorder(
+                        Color(nsColor: .separatorColor).opacity(zone == .chrome ? 0 : 0.5),
+                        lineWidth: 0.5
+                    )
+                }
+                .shadow(
+                    color: .black.opacity(zone == .focal ? 0.16 : 0),
+                    radius: zone == .focal ? 6 : 0,
+                    y: zone == .focal ? 2 : 0
+                )
+                #else
                 ZStack {
                     shape.fill(palette.surface(for: zone))
                     shape
@@ -237,6 +278,7 @@ public struct LumeSurface: ViewModifier {
                         .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
                         .opacity(zone == .focal ? 1 : 0)
                 }
+                #endif
             }
             .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: zone)
     }

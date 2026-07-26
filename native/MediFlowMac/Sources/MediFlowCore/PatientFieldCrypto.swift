@@ -30,6 +30,19 @@ public enum PatientFieldCrypto {
         resolveField(value, masterKey: masterKey) { $0 }
     }
 
+    /// Whether a stored value is an ENC envelope this client cannot open.
+    ///
+    /// Hiding ciphertext is right; hiding the *fact* that there is ciphertext is
+    /// not. `decryptStringField` answers "what do I show" and deliberately
+    /// returns nil here; this answers "is something being withheld", so a caller
+    /// can tell an empty field apart from an unreadable one. It never returns the
+    /// ciphertext itself.
+    public static func isLocked(_ value: String?, masterKey: SymmetricKey?) -> Bool {
+        guard let value, value.hasPrefix(CryptoService.encPrefix) else { return false }
+        guard let masterKey else { return true }
+        return CryptoService.decryptField(value, masterKey: masterKey) == nil
+    }
+
     /// A plain string field: ENC -> decrypt -> JSON-unwrap; plaintext -> as-is;
     /// undecryptable ENC (no/wrong key) -> nil so ciphertext is never shown.
     public static func decryptStringField(_ value: String?, masterKey: SymmetricKey?) -> String? {

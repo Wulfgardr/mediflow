@@ -26,6 +26,23 @@ enum PlatformColors {
         #endif
     }
 
+    /// The surface a section card sits on: white in light mode, the system's
+    /// raised dark grey at night, on both platforms.
+    ///
+    /// Deliberately not `cardBackground`, which resolves to
+    /// `secondarySystemBackground` — a light *grey* in light mode. A card that is
+    /// grey on a grey ground has no edge, and the two greys are what made the
+    /// chart read as cream once a slightly warm Lume surface was mixed in. These
+    /// two are the grouped-content pair the system maintains for exactly this
+    /// arrangement, so contrast and accessibility settings come with them.
+    static var chartCardSurface: Color {
+        #if os(macOS)
+        return Color(nsColor: .textBackgroundColor)
+        #else
+        return Color(uiColor: .secondarySystemGroupedBackground)
+        #endif
+    }
+
     static var separator: Color {
         #if os(macOS)
         return Color(nsColor: .separatorColor)
@@ -92,10 +109,31 @@ public struct InfoRow: View {
     private let label: String
     private let value: String
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    #if !os(macOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
 
     public init(_ label: String, _ value: String) {
         self.label = label
         self.value = value
+    }
+
+    /// Whether the row has enough width to place the value in a column next to
+    /// its label instead of at the far edge.
+    ///
+    /// This used to be `#if os(macOS)`, which was the wrong question. The
+    /// problem is not the platform, it is the distance: pushed apart by a
+    /// Spacer, "Indirizzo" and its address sit at opposite ends of the row with
+    /// nothing between them, and the reader has to traverse empty space to
+    /// connect the two. On a phone that gap is small enough not to matter; on an
+    /// iPad chart column it is several hundred points, exactly as it was on the
+    /// Mac. So the question is the width.
+    private var usesLabelColumn: Bool {
+        #if os(macOS)
+        true
+        #else
+        horizontalSizeClass == .regular
+        #endif
     }
 
     public var body: some View {
@@ -106,6 +144,14 @@ public struct InfoRow: View {
                     labelText
                     valueText
                         .multilineTextAlignment(.leading)
+                }
+            } else if usesLabelColumn {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    labelText
+                        .frame(width: 132, alignment: .leading)
+                    valueText
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else {
                 HStack(alignment: .firstTextBaseline) {
@@ -127,7 +173,26 @@ public struct InfoRow: View {
     private var valueText: some View {
         Text(value)
             .font(.callout)
-            .registro()
+            .modifier(InfoRowValueTypeface(value: value))
             .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Monospace carries meaning here — codes, identifiers, doses — so it is applied
+/// to those and not to prose. Every value in the same face made "Figlia,
+/// convivente" look like a record locator.
+private struct InfoRowValueTypeface: ViewModifier {
+    let value: String
+
+    func body(content: Content) -> some View {
+        isCodeLike ? AnyView(content.registro()) : AnyView(content)
+    }
+
+    /// Code-like when the value carries no lowercase letters (`DEMODEL0002X`,
+    /// `AMB-DEMO`, `048 · C01`) or is essentially numeric.
+    private var isCodeLike: Bool {
+        let letters = value.filter(\.isLetter)
+        if letters.isEmpty { return true }
+        return !letters.contains(where: \.isLowercase)
     }
 }
