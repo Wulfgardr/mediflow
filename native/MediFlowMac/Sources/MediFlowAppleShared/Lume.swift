@@ -221,13 +221,32 @@ public struct LumeSurface: ViewModifier {
     }
 
     #if os(macOS)
-    /// One step per zone on the system's own scale, so a section, a nested block
-    /// and the surrounding pane stay distinguishable in both appearances.
-    private var macOSSurface: Color {
+    /// Content speaks Lume; chrome stays the system's.
+    ///
+    /// This used to map every zone onto a system colour, on the reasoning that
+    /// the system carries one step per zone per appearance. Measured against a
+    /// real `NSWindow` on macOS 27, it does not: `windowBackgroundColor`,
+    /// `textBackgroundColor` and `controlBackgroundColor` all resolve to the
+    /// same value — 255 in light, 30 at night — so three of the four zones were
+    /// one colour and a nested block was indistinguishable from the section
+    /// holding it.
+    ///
+    /// The other half of that reasoning was that Lume's dark ramp is too timid,
+    /// about seven points of luminance per step. Per step it is: 1.033 against
+    /// the system's 1.131. But the system has that step once, and Lume spends
+    /// 1.241 of total range across three of them. A chart that nests pane inside
+    /// section inside block needs three steps, and one larger step cannot be
+    /// spent three times.
+    ///
+    /// So the content zones take the register's own surfaces, the same values
+    /// iPhone and iPad already draw and the same hexes the web tokens declare.
+    /// `.chrome` stays `windowBackgroundColor`: the sidebar and toolbar are
+    /// where translucency, vibrancy and the scroll edge are platform behaviour
+    /// rather than colour, and a fixed hex there would suppress exactly the
+    /// thing that makes the window read as a Mac window.
+    private func macOSSurface(_ palette: LumeRegisterPalette) -> Color {
         switch zone {
-        case .canvas: Color(nsColor: .underPageBackgroundColor)
-        case .field: Color(nsColor: .controlBackgroundColor)
-        case .focal: Color(nsColor: .textBackgroundColor)
+        case .canvas, .field, .focal: palette.surface(for: zone)
         case .chrome: Color(nsColor: .windowBackgroundColor)
         }
     }
@@ -244,22 +263,12 @@ public struct LumeSurface: ViewModifier {
         content
             .background {
                 #if os(macOS)
-                // macOS content surfaces are system materials, not fixed hexes.
-                //
-                // Two reasons. A hand-authored grey cannot track the window
-                // material the sidebar and toolbar are drawn from, so on Tahoe the
-                // sections read as arbitrary tones floating on a background that
-                // belongs to a different scale. And dark mode needs *more*
-                // separation between levels than light, not the same: the previous
-                // ramp moved about seven points of luminance per step
-                // (#121417 → #191c21 → #22252b), which is below what reads as a
-                // deliberate step. The system colours already carry that
-                // separation per appearance, and they follow Increase Contrast.
-                //
                 // The hairline is what makes a section read as a bounded object in
                 // dark, where a fill alone barely separates from its background.
+                // Kept from the system-colour arrangement this replaced, along
+                // with the focal shadow: both earn their place at these steps.
                 ZStack {
-                    shape.fill(macOSSurface)
+                    shape.fill(macOSSurface(palette))
                     shape.strokeBorder(
                         Color(nsColor: .separatorColor).opacity(zone == .chrome ? 0 : 0.5),
                         lineWidth: 0.5

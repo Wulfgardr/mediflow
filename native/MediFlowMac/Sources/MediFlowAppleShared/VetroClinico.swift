@@ -12,23 +12,33 @@ public typealias VetroPalette = LumePalette
 enum PlatformColors {
     /// The recessive ground that grouped content sits on.
     ///
-    /// On macOS this was `windowBackgroundColor`, which is the wrong half of the
-    /// pair. Measured on macOS 27, `windowBackgroundColor`, `textBackgroundColor`
-    /// and `controlBackgroundColor` all resolve to the *same* value — pure white
-    /// in light, `(30, 30, 30)` at night — so the arrangement the chart is built
-    /// on, grey underneath and lighter surfaces on top, had no grey underneath.
-    /// Every clinical section was painted the exact colour of the ground it was
-    /// meant to be an island on, and the split view read as one undivided sheet.
+    /// On macOS this is Lume's own canvas, so the ground and the sections it
+    /// carries come from one ramp instead of two.
     ///
-    /// `underPageBackgroundColor` is the colour that still recedes:
-    /// `(246, 246, 246)` in light and `(40, 40, 40)` at night, against the card's
-    /// 255 and 30. It is also the honest counterpart of iOS's
-    /// `systemGroupedBackground`, which is what this token means on the other
-    /// platform. Verified against a real `NSWindow` under both appearances, not
-    /// deduced: `MacSingleGroundTests` pins it.
+    /// It was `windowBackgroundColor`, which measured against a real `NSWindow`
+    /// on macOS 27 is the *same* value as `textBackgroundColor` and
+    /// `controlBackgroundColor` — 255 in light, 30 at night. The arrangement the
+    /// chart is built on, a recessive ground with lighter surfaces on it, had no
+    /// recessive ground: every section was painted the exact colour it was meant
+    /// to be an island on. `underPageBackgroundColor` fixed that against system
+    /// cards, but once the sections became Lume `field` (#f5f5f4) its 246 sat one
+    /// point away from them and the two collided again in light.
+    ///
+    /// Lume canvas is 238,240,242 against field's 245,245,244, and the ramp is
+    /// then a single one shared with iPhone, iPad and the web tokens.
+    /// `MacSingleGroundTests` pins the separation in both registers.
+    ///
+    /// Declared as a dynamic `NSColor` rather than a flat hex so it still follows
+    /// the appearance. The guardia register is not reachable from here — it is an
+    /// environment flag, and this accessor has no environment — which is a real
+    /// limit of expressing a register as a static colour, recorded rather than
+    /// hidden.
     static var groupedBackground: Color {
         #if os(macOS)
-        return Color(nsColor: .underPageBackgroundColor)
+        return Color(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            return NSColor(isDark ? LumePalette.grafite.canvas : LumePalette.giorno.canvas)
+        })
         #else
         return Color(uiColor: .systemGroupedBackground)
         #endif
@@ -42,18 +52,28 @@ enum PlatformColors {
         #endif
     }
 
-    /// The surface a section card sits on: white in light mode, the system's
-    /// raised dark grey at night, on both platforms.
+    /// The surface a section card sits on, one step above the ground.
     ///
     /// Deliberately not `cardBackground`, which resolves to
     /// `secondarySystemBackground` — a light *grey* in light mode. A card that is
     /// grey on a grey ground has no edge, and the two greys are what made the
-    /// chart read as cream once a slightly warm Lume surface was mixed in. These
-    /// two are the grouped-content pair the system maintains for exactly this
-    /// arrangement, so contrast and accessibility settings come with them.
+    /// chart read as cream once a slightly warm Lume surface was mixed in.
+    ///
+    /// The two platforms reach that step differently, and the difference is
+    /// worth stating. On iOS these are the grouped-content pair the system
+    /// maintains, so Increase Contrast and the accessibility settings come with
+    /// them. On macOS the system pair collapsed to one value, so the step comes
+    /// from Lume instead — which costs that automatic adaptation and is the
+    /// price of having a second level at all.
     static var chartCardSurface: Color {
         #if os(macOS)
-        return Color(nsColor: .textBackgroundColor)
+        // Lume `field`, the same step `LumeSurface` fills a section with, so a
+        // card drawn through this accessor and one drawn through the modifier
+        // are the same surface rather than two near neighbours.
+        return Color(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            return NSColor(isDark ? LumePalette.grafite.field : LumePalette.giorno.field)
+        })
         #else
         return Color(uiColor: .secondarySystemGroupedBackground)
         #endif
