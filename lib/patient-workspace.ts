@@ -63,6 +63,14 @@ export type Kree8PatientWorkspace = {
 };
 
 export type Kree8AgendaRow = {
+  /* @Codex The checkup's own id, carried through so the list can be keyed by
+     identity. It used to be dropped here, and the agenda keyed its rows on
+     `time + title` instead — which is not unique. Two patients seen at 09:00,
+     both for a "Controllo", produce one key, and React's documented behaviour
+     for duplicate keys is that children may be duplicated or omitted. An
+     appointment quietly missing from a clinical agenda is not a rendering
+     detail. */
+  id: string;
   time: string;
   title: string;
   sub: string;
@@ -169,6 +177,7 @@ export function mapCheckupsForKree8(
       const patient = patientById.get(checkup.patientId);
       const pill = classifyCheckupPill(checkup);
       return {
+        id: checkup.id,
         time: formatCheckupTime(checkup.date),
         title: checkup.title || 'Appuntamento clinico',
         sub: patient
