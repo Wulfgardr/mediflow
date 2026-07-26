@@ -19,7 +19,22 @@ Fuori perimetro (per istruzione): backend, schema, API, web. **Niente push.**
 - **Batteria UI iOS: 32 test, 0 fallimenti** (iOS 27, iPhone 17 Pro).
   Questa e' la nuova linea di base: da qui, qualunque fallimento e' una
   regressione. Non esiste piu' una "coppia preesistente" da scusare.
+  > **Rettifica del 26 luglio, sessione successiva.** La cifra e' esatta ma
+  > incompleta: dei 32, **4 sono saltati** perche' sono contratti di layout
+  > solo-iPad che si auto-saltano altrove. Su iPhone la linea di base e'
+  > **28 passati, 4 saltati, 0 falliti**. Su iPad Pro 13 M5 i 4 contratti
+  > girano davvero e **passano**, mentre **5 test falliscono**:
+  > `testTabBarNavigatesBetweenSections`, `testProjectMenuOpensEverySurface`,
+  > `testUsablePatientHomeShowsWorklistBeforeConnectionSetup`,
+  > `testFirstPatientIsVisibleInTheFirstViewportAtAX5`,
+  > `testWorklistLastRowClearsTheFloatingTabBarAtAX5`. L'UDID iPad citato piu'
+  > sotto non esiste piu' tra i simulatori disponibili.
 - Unit: `ClinicalContrastTests` 5/5, `ClinicalFieldCryptoTests` 7/7.
+  > **Rettifica.** Sono due classi, non la batteria. Il pacchetto SwiftPM
+  > completo e' **396 test con 1 fallimento** gia' su `c0b1ee2a9`:
+  > `LumeKitTests.testLumePrimitivesRenderOpaqueInAllRegisters` asserisce che
+  > una primitiva Lume non coincida con lo sfondo e trova `[30, 30, 30]`
+  > uguale a `[30, 30, 30]`. Verificato mettendo da parte ogni modifica.
 - Nativo allineato al database sintetico: iPhone mostra "60 pazienti caricati in
   lettura", nomi `Sintetica…`, auto-login, nessun PIN.
 
@@ -94,6 +109,29 @@ per gran parte della sessione come rumore di fondo. Non lo erano.
    controllo. Ipotesi: la schermata di sblocco non trasmette lo username (mostra
    solo "PIN operatore"). **Prossimo passo: leggere cosa il form invia a
    `/api/auth/login`.**
+   > **Diagnosi chiusa, e l'ipotesi era sbagliata.** Lo username mancante non
+   > c'entra: `resolveLoginUsername` (`app/api/auth/login/route.ts:64`) ha un
+   > ripiego a utente unico e il DB sintetico ha **esattamente 1 utente**
+   > (verificato in sola lettura). La richiesta arriva al controllo, bcrypt
+   > passa, il server risponde **200** e azzera il contatore: `0` non significa
+   > "mai arrivata", significa "accesso riuscito".
+   >
+   > La catena si rompe **dopo**, nel client. Il seed
+   > (`scripts/seed-performance-baseline.mjs:121`) scrive
+   > `encrypted_master_key = 'fixture-wrapped-master-key-not-for-runtime'`, una
+   > stringa segnaposto. `security-provider.tsx:318` la passa a
+   > `unwrapMasterKeyVersioned`, che finisce in `atob` e lancia
+   > `DOMException Invalid character` (verificato eseguendolo). Il `catch`
+   > generico mostra "Errore durante il login." e la schermata resta chiusa.
+   > Il nativo supera lo stesso punto solo perche' `unwrapMasterKeyVersioned`
+   > restituisce un opzionale e la sessione prosegue dichiarando "Cifratura
+   > campi non disponibile": significa che i 60 pazienti erano probabilmente
+   > **letti con i campi clinici sigillati**, non decifrati.
+   >
+   > Causa radice nello strumento di demo, non nel web. Rimane da decidere se
+   > toccare `security-provider.tsx` perche' distingua "PIN sbagliato" da
+   > "chiave archiviata inutilizzabile": e' web, fuori dal perimetro dichiarato,
+   > e serve autorizzazione esplicita.
 2. **Agenda, Diario, Analytics** hanno preso i registri ma non sono stati
    rivisti a schermo dopo la modifica.
 3. **Dati finti per quelle tre viste**: `AgendaWorkspaceModel` passa dal livello
@@ -104,6 +142,14 @@ per gran parte della sessione come rumore di fondo. Non lo erano.
    verifica 7. Non e' un divario funzionale ma di gating — le superfici vecchie
    falliscono con 403 al momento dell'uso invece di avvisare prima. Il pattern
    corretto esiste gia' nella sezione Documenti.
+   > **Rettifica.** Le capability dichiarate sono **29**, non 30: concordano
+   > l'inventario di runtime (`lib/network-contract.ts:263`), il tipo
+   > `NetworkCapabilityKey` (`lib/api/v1/types.ts:471`), l'enum OpenAPI e il
+   > test contrattuale, che asserisce `capabilities.length === 29`. Di queste,
+   > 25 sono chiavi network attive. La causa strutturale del divario e' che
+   > `PairedPatientsWorkspaceModel` non nominava mai una capability in 4464
+   > righe: le sue proprieta' `can*`, su cui poggiano quasi tutti i pulsanti,
+   > verificavano sessione e connessione ma non il permesso.
 
 ## Ambiente
 
