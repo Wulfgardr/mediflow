@@ -36,6 +36,40 @@ enum ClinicalWorkspaceLoadState: Equatable {
     case failed(String)
 }
 
+/// What a list section should say, given the load state and whether the read
+/// came back with anything.
+///
+/// This exists because the three cross-patient views each wrote the decision
+/// inline as an `if` chain ending in `rows.isEmpty`, and that chain let `.idle`
+/// and `.unavailable` fall through to the empty-result sentence. The Agenda
+/// therefore stated "Nessuna visita pianificata." at moments when it had not
+/// read the archive at all — in demo mode, where the capability gate is forced
+/// open while the connection is nil, that was simply what the screen said. A
+/// false statement about a clinical archive is not a presentation defect.
+///
+/// Written inline it was also untestable: a suite of 32 UI tests passed with
+/// that sentence on screen. As a value, the mapping can be asserted directly,
+/// including the case that matters — an unread archive must never be described
+/// as an empty one.
+enum ClinicalWorkspaceSectionContent: Equatable {
+    case progress
+    case message(String)
+    case rows
+
+    init(state: ClinicalWorkspaceLoadState, isEmpty: Bool, idleMessage: String, emptyMessage: String) {
+        switch state {
+        case .loading:
+            self = .progress
+        case .failed(let message), .unavailable(let message):
+            self = .message(message)
+        case .idle:
+            self = .message(idleMessage)
+        case .loaded:
+            self = isEmpty ? .message(emptyMessage) : .rows
+        }
+    }
+}
+
 /* @Codex */
 @MainActor
 final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
@@ -208,6 +242,15 @@ struct GlobalDiaryWorkspaceRow: Identifiable, Equatable {
     let date: Date
     let type: String
     let attachmentCount: Int
+    /// Which fields this session could not open.
+    ///
+    /// `GlobalDiaryItem` is built from the decrypted strings, and an unreadable
+    /// field arrives there as `""` — at which point the presentation layer fills
+    /// the blank with "Voce diario" and "Voce senza testo clinico.". Those are
+    /// the words for an entry someone left empty, and they are read that way.
+    /// Carrying the lock alongside the item lets the row say the true thing
+    /// instead: the note exists on the host, this device cannot read it.
+    let lockedFields: LockedClinicalFields
     var id: String { item.id }
 }
 
@@ -259,7 +302,13 @@ final class GlobalDiaryWorkspaceModel: ObservableObject {
             let entryByID = Dictionary(entries.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             rows = presentation.entries.compactMap { item in
                 guard let entry = entryByID[item.id] else { return nil }
-                return GlobalDiaryWorkspaceRow(item: item, date: entry.date, type: entry.type, attachmentCount: Self.attachmentCount(entry.attachments))
+                return GlobalDiaryWorkspaceRow(
+                    item: item,
+                    date: entry.date,
+                    type: entry.type,
+                    attachmentCount: Self.attachmentCount(entry.attachments),
+                    lockedFields: entry.lockedFields
+                )
             }
             activeCount = presentation.activeCount
             patientCount = presentation.patientCount
@@ -453,21 +502,25 @@ struct AgendaWorkspaceView: View {
 
     private var content: some View {
         List {
-            Section {
-                HStack {
-                    agendaStatistic("Visite oggi", value: model.todayCount)
-                    agendaStatistic("Pianificate", value: model.plannedCount)
-                    agendaStatistic("Pazienti attivi", value: model.activePatientCount)
+            // Counts are stated only once a read has happened. Before that they
+            // are all zero, and three zeros presented as figures are a claim
+            // about the archive rather than an admission that it was not read.
+            if model.state == .loaded {
+                Section {
+                    HStack {
+                        agendaStatistic("Visite oggi", value: model.todayCount)
+                        agendaStatistic("Pianificate", value: model.plannedCount)
+                        agendaStatistic("Pazienti attivi", value: model.activePatientCount)
+                    }
                 }
             }
             Section("Prossime visite") {
-                if model.state == .loading {
+                switch sectionContent {
+                case .progress:
                     ProgressView()
-                } else if case .failed(let message) = model.state {
+                case .message(let message):
                     Text(message).foregroundStyle(.secondary)
-                } else if model.rows.isEmpty {
-                    Text("Nessuna visita pianificata.").foregroundStyle(.secondary)
-                } else {
+                case .rows:
                     ForEach(model.rows) { row in
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
@@ -485,6 +538,15 @@ struct AgendaWorkspaceView: View {
         }
         .navigationTitle("Agenda")
         .toolbar { Button("Aggiorna", systemImage: "arrow.clockwise") { Task { await model.load() } } }
+    }
+
+    var sectionContent: ClinicalWorkspaceSectionContent {
+        ClinicalWorkspaceSectionContent(
+            state: model.state,
+            isEmpty: model.rows.isEmpty,
+            idleMessage: "Agenda non ancora letta.",
+            emptyMessage: "Nessuna visita pianificata."
+        )
     }
 
     private func agendaStatistic(_ title: String, value: Int) -> some View {
@@ -520,22 +582,56 @@ struct GlobalDiaryWorkspaceView: View {
         }
     }
 
+    var sectionContent: ClinicalWorkspaceSectionContent {
+        ClinicalWorkspaceSectionContent(
+            state: model.state,
+            isEmpty: model.rows.isEmpty,
+            idleMessage: "Diario non ancora letto.",
+            emptyMessage: "Nessuna voce di diario."
+        )
+    }
+
     private var content: some View {
         List {
-            Section { Text("\(model.activeCount) voci attive, \(model.patientCount) pazienti").foregroundStyle(.secondary) }
+            // "0 voci attive, 0 pazienti" was printed whatever the state, so an
+            // unread archive announced itself as an empty one.
+            if model.state == .loaded {
+                Section { Text("\(model.activeCount) voci attive, \(model.patientCount) pazienti").foregroundStyle(.secondary) }
+            }
             Section("Voci recenti") {
-                if model.state == .loading { ProgressView() }
-                else if case .failed(let message) = model.state { Text(message).foregroundStyle(.secondary) }
-                else {
+                switch sectionContent {
+                case .progress:
+                    ProgressView()
+                case .message(let message):
+                    Text(message).foregroundStyle(.secondary)
+                case .rows:
                     ForEach(model.rows) { row in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack { Text(row.item.title).chartRowTitle(); Spacer(); if row.item.deleted { Text("Eliminata").chartMetadata().fontWeight(.semibold) } }
+                        VStack(alignment: .leading, spacing: ClinicalChartMetrics.itemSpacing / 2) {
+                            HStack {
+                                // Same language the per-patient diary already
+                                // uses, for the same reason: a sealed note and a
+                                // note nobody wrote must not look alike.
+                                if row.lockedFields.contains(.title) {
+                                    Label("Titolo non leggibile", systemImage: "lock").chartRowTitle().foregroundStyle(.secondary)
+                                } else {
+                                    Text(row.item.title).chartRowTitle()
+                                }
+                                Spacer()
+                                if row.item.deleted { Text("Eliminata").chartMetadata().fontWeight(.semibold) }
+                            }
                             Text("\(row.item.patientName) · \(row.item.patientCode)").chartMetadata()
-                            Text("\(row.type) · \(row.date, format: .dateTime.day().month().hour().minute())").font(.caption).foregroundStyle(.secondary)
-                            Text(row.item.preview).chartProse()
-                            if row.attachmentCount > 0 { Label("\(row.attachmentCount) allegati", systemImage: "paperclip").font(.caption).foregroundStyle(.secondary) }
+                            Text("\(row.type) · \(row.date, format: .dateTime.day().month().hour().minute())").chartMetadata()
+                            if row.lockedFields.contains(.content) {
+                                Text("Contenuto cifrato non leggibile con la chiave di questa sessione. La voce esiste sull'home-base.")
+                                    .chartMetadata()
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .accessibilityIdentifier("global-diary-content-locked-\(row.id)")
+                            } else {
+                                Text(row.item.preview).chartProse()
+                            }
+                            if row.attachmentCount > 0 { Label("\(row.attachmentCount) allegati", systemImage: "paperclip").chartMetadata() }
                         }
-                        .padding(.vertical, 3)
+                        .padding(.vertical, ClinicalChartMetrics.itemSpacing / 2)
                     }
                 }
             }
@@ -576,20 +672,72 @@ struct PopulationAnalyticsWorkspaceView: View {
                 Button("Applica intervallo") { Task { await model.load() } }
             }
             if let statistics = model.statistics {
-                Section { HStack { metric("Pazienti", statistics.totalInRange, statistics.totalInRange); metric("ADI", statistics.adiCount, statistics.totalInRange); metric("Con diagnosi", statistics.withDiagnoses, statistics.totalInRange); metric("Senza nascita", statistics.withoutBirthDate, statistics.withBirthDate + statistics.withoutBirthDate) } }
+                // Two counts and two percentages, not four percentages.
+                //
+                // "Pazienti" was `percent(totalInRange, total: totalInRange)`,
+                // which is 100 by construction — a tile that could only ever
+                // read 100%. And "Senza nascita" is a share of the whole cohort,
+                // because a patient with no birth date is excluded from the age
+                // range entirely: its base is genuinely not the base of the two
+                // beside it. Percentages side by side are read as comparable, so
+                // the two that do not share a base are stated as counts, and the
+                // base of the two that do is written under them.
+                Section {
+                    HStack {
+                        count("Pazienti in fascia", statistics.totalInRange)
+                        metric("ADI", statistics.adiCount, statistics.totalInRange)
+                        metric("Con diagnosi", statistics.withDiagnoses, statistics.totalInRange)
+                        count("Senza data di nascita", statistics.withoutBirthDate)
+                    }
+                } footer: {
+                    Text("Le percentuali sono sui \(statistics.totalInRange) pazienti in fascia. Chi non ha una data di nascita resta fuori dalla fascia e non entra in quel conteggio.")
+                }
                 Section("Distribuzione per età") { ForEach(PopulationAgeBucket.allCases, id: \.self) { bucket in distributionRow(bucket.rawValue, value: statistics.ageDistribution[bucket, default: 0], total: statistics.totalInRange) } }
                 Section("Diagnosi più frequenti") {
                     if statistics.topDiagnoses.isEmpty { Text("Nessuna diagnosi disponibile.").foregroundStyle(.secondary) }
                     ForEach(Array(statistics.topDiagnoses.enumerated()), id: \.element.key) { _, diagnosis in HStack { VStack(alignment: .leading) { Text(diagnosis.description).chartRowTitle(); ClinicalCodePill(diagnosis.code) }; Spacer(); Text("\(diagnosis.count)").font(.headline) } }
                 }
-            } else if model.state == .loading { Section { ProgressView() } }
-            else if case .failed(let message) = model.state { Section { Text(message).foregroundStyle(.secondary) } }
+            } else {
+                // Previously only `.loading` and `.failed` were handled, so with
+                // no connection the view rendered nothing at all: a screen with
+                // the age steppers and nothing under them, saying neither what
+                // the numbers are nor why they are missing.
+                switch sectionContent {
+                case .progress:
+                    Section { ProgressView() }
+                case .message(let message):
+                    Section { Text(message).foregroundStyle(.secondary) }
+                case .rows:
+                    EmptyView()
+                }
+            }
         }
         .navigationTitle("Analytics")
         .toolbar { Button("Aggiorna", systemImage: "arrow.clockwise") { Task { await model.load() } } }
     }
 
-    private func metric(_ label: String, _ value: Int, _ total: Int) -> some View { VStack(alignment: .leading, spacing: 3) { Text("\(PopulationAnalytics.percent(value, total: total))%").font(.title3.weight(.semibold)); Text(label).chartMetadata() }.frame(maxWidth: .infinity, alignment: .leading) }
+    var sectionContent: ClinicalWorkspaceSectionContent {
+        ClinicalWorkspaceSectionContent(
+            state: model.state,
+            isEmpty: model.statistics == nil,
+            idleMessage: "Statistiche non ancora calcolate.",
+            emptyMessage: "Nessun paziente nell'intervallo di età scelto."
+        )
+    }
+
+    private func metric(_ label: String, _ value: Int, _ total: Int) -> some View { tile(label, "\(PopulationAnalytics.percent(value, total: total))%") }
+
+    /// A plain number, for the quantities whose base is not the base of the
+    /// percentages next to them.
+    private func count(_ label: String, _ value: Int) -> some View { tile(label, "\(value)") }
+
+    private func tile(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: ClinicalChartMetrics.itemSpacing / 2) {
+            Text(value).font(.title3.weight(.semibold))
+            Text(label).chartMetadata()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
     private func distributionRow(_ label: String, value: Int, total: Int) -> some View { VStack(alignment: .leading, spacing: 4) { HStack { Text(label); Spacer(); Text("\(value)").foregroundStyle(.secondary) }; ProgressView(value: Double(value), total: Double(max(total, 1))) } }
 }
 
