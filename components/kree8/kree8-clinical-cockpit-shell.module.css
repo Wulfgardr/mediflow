@@ -409,6 +409,13 @@
 .toolbar {
   display: flex;
   align-items: center;
+  /* Wrap rather than crush. Without this the row keeps its single line at any
+     width and pays for it out of the one item that can shrink, which is the
+     search field: at around 900px it collapsed to its own padding, 28px wide,
+     with the magnifier and the label both squeezed to zero width. What was left
+     on screen was an empty capsule the reader cannot identify. A second row is
+     honest; a control with nothing in it is not. */
+  flex-wrap: wrap;
   gap: 8px;
   padding: 6px;
   /* Lume: la chrome strutturale del cockpit consuma la superficie chrome opaca. */
@@ -426,7 +433,10 @@
   border-radius: var(--radius-chip);
   padding: 8px 14px;
   flex: 1;
-  min-width: 0;
+  /* Was `min-width: 0`, which let this shrink past its own contents. It still
+     grows to fill the row, but it can no longer give away the glyph and the
+     label to buy room for its siblings: below this the row wraps instead. */
+  min-width: 14ch;
   box-shadow: 0 0 0 1px var(--control-border);
   color: var(--ink-subtle);
   font-size: 13px;
@@ -436,6 +446,11 @@
   cursor: pointer;
   transition: transform var(--lume-dur-riga) var(--lume-ease);
 }
+
+/* A glyph is not elastic. As a flex child it was shrinking with the row and
+   rendered 8px wide against its declared 14, which turns a magnifier into a
+   smudge. */
+.search > svg { flex: 0 0 auto; }
 
 .search:hover { transform: translateY(-1px); }
 
