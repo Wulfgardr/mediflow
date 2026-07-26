@@ -125,6 +125,7 @@ public struct MediFlowMacRootView: View {
         }
         .task(id: scene.workspaceModel?.clinicalWorkspaceConnection?.identity) {
             await scene.capabilities.loadIfNeeded(using: scene.workspaceModel?.clinicalWorkspaceConnection)
+            scene.workspaceModel?.updateAvailableCapabilities(scene.capabilities.settledCapabilityKeys)
         }
         .environment(\.appleReduceMotionOverride, appearance.reduceMotionOverride)
         .environment(\.dynamicTypeSize, scene.launchDynamicTypeSizeOverride ?? inheritedDynamicTypeSize)

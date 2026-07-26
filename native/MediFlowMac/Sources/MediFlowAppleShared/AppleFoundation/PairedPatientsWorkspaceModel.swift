@@ -338,6 +338,29 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     // pasteboard/browser.
     private let systemActions: SystemActionsPerforming
 
+    /// The proactive capability gate. See `ClinicalCapabilityGate` for why it
+    /// denies only what the host has actually reported as absent.
+    ///
+    /// It lives on this model, rather than being read from the capabilities
+    /// store at each call site, because every clinical section already observes
+    /// this model while only some of them are handed the store. A gate hanging
+    /// off an object a view does not observe does not re-evaluate when the
+    /// answer arrives, so those buttons would keep their stale enabled state
+    /// until something unrelated redrew them.
+    @Published private(set) var capabilityGate = ClinicalCapabilityGate()
+
+    func permitsCapability(_ key: String) -> Bool {
+        capabilityGate.permits(key)
+    }
+
+    /// Called when the capabilities store settles. `nil` returns the model to
+    /// "not yet known", which is what a disconnection means.
+    func updateAvailableCapabilities(_ keys: Set<String>?) {
+        let updated = ClinicalCapabilityGate(availableKeys: keys)
+        guard capabilityGate != updated else { return }
+        capabilityGate = updated
+    }
+
     init(
         pairedStore: HomeBasePairedStore = .shared,
         cacheStore: HomeBasePatientCacheStore = .shared,
@@ -1250,6 +1273,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         && !newPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         && !newPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         && !newPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        && permitsCapability(NetworkCapabilityKey.writePatientLifecycle)
     }
 
     func startCreatingPatient() {
@@ -1476,6 +1500,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !isWorking
+            && permitsCapability(NetworkCapabilityKey.writePatientProfile)
     }
 
     /* @Codex */
@@ -1487,6 +1512,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !isWorking
+            && permitsCapability(NetworkCapabilityKey.writePatientProfile)
     }
 
     /* @Codex */
@@ -1497,6 +1523,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !isWorking
+            && permitsCapability(NetworkCapabilityKey.writePatientLifecycle)
     }
 
     /* @Codex */
@@ -4200,6 +4227,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && connectionState == .pairedOnline
             && !newEntryEditorDocument.isEffectivelyEmpty
             && !isWorking
+            && permitsCapability(NetworkCapabilityKey.writeClinicalDiary)
     }
 
     /* @Codex */
@@ -4242,6 +4270,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && !editEntryTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !editEntryEditorDocument.isEffectivelyEmpty
             && !isWorking
+            && permitsCapability(NetworkCapabilityKey.writeClinicalDiary)
     }
 
     /* @Codex */
@@ -4316,6 +4345,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !isWorking
+            // The export validates against the FSE before it writes anything,
+            // so the capability it needs is the validation one.
+            && permitsCapability(NetworkCapabilityKey.fseValidate)
     }
 
     /* @Codex */
@@ -4341,6 +4373,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !isWorking
+            && permitsCapability(NetworkCapabilityKey.writeClinicalDiary)
     }
 
     /* @Codex */

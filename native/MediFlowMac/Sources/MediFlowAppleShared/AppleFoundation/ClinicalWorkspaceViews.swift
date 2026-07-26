@@ -70,6 +70,61 @@ enum ClinicalWorkspaceSectionContent: Equatable {
     }
 }
 
+/// The host's capability keys, as names rather than loose strings.
+///
+/// The gate travels on `String`, so a typo is not a compile error and lands as
+/// a permanently closed surface with a message about reading patients — the
+/// fallback arm of `unavailableMessage`. Naming the keys does not fix that on
+/// its own, but it removes the typo from every call site that uses these.
+///
+/// Mirrors `NetworkCapabilityKey` in lib/api/v1/types.ts. That contract declares
+/// 29 keys; these are the ones the Apple client gates on.
+/// The proactive gate, as a value.
+///
+/// A value rather than a method on the workspace model, because that model
+/// reads the shared paired store in its initialiser — and therefore the
+/// Keychain — so a test that builds one to ask a question about permissions
+/// sits on an authorization panel instead of answering in a millisecond. The
+/// rule being encoded is small and deserves to be testable on its own.
+struct ClinicalCapabilityGate: Equatable {
+    /// `nil` means the host has not answered yet, which is not the same as
+    /// answering "none".
+    private(set) var availableKeys: Set<String>?
+
+    init(availableKeys: Set<String>? = nil) {
+        self.availableKeys = availableKeys
+    }
+
+    /// Denies only what the host has actually reported as absent.
+    ///
+    /// Deliberately more permissive than the store's `hasCapability`, and the
+    /// difference is the point. That predicate answers "is this known to be
+    /// available", which is right for a section deciding whether to draw
+    /// itself: while the check is in flight the section says so and nothing is
+    /// lost. An action button is not the same. Answering "no" before the answer
+    /// is known would disable the app for the duration of the capability fetch,
+    /// and permanently if that fetch failed, turning a network hiccup into a
+    /// read-only archive.
+    func permits(_ key: String) -> Bool {
+        guard let availableKeys else { return true }
+        return availableKeys.contains(key)
+    }
+}
+
+enum NetworkCapabilityKey {
+    static let readonlyPatients = "network.replica.readonly-patients"
+    static let readonlyAgenda = "network.replica.readonly-agenda"
+    static let readonlyClinicalDiaryGlobal = "network.replica.readonly-clinical-diary-global"
+    static let readonlyDocuments = "network.replica.readonly-documents"
+    static let writeDocuments = "network.replica.write-documents"
+    static let writePatientProfile = "network.replica.write-patient-profile"
+    static let writePatientLifecycle = "network.replica.write-patient-lifecycle"
+    static let writeClinicalDiary = "network.replica.write-clinical-diary"
+    static let fseValidate = "network.fse.validate"
+    static let ambulatoriesWrite = "network.ambulatories.write"
+    static let computeVisitDraft = "network.compute.visit-draft"
+}
+
 /* @Codex */
 @MainActor
 final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
@@ -132,18 +187,37 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
     /// new gated capability that is not listed here shows up as a dead surface in
     /// the demo, rather than silently.
     static let demoCapabilityKeys = [
-        "network.ambulatories.write",
-        "network.compute.visit-draft",
-        "network.replica.readonly-agenda",
-        "network.replica.readonly-clinical-diary-global",
-        "network.replica.readonly-documents",
-        "network.replica.readonly-patients",
-        "network.replica.write-documents"
+        NetworkCapabilityKey.ambulatoriesWrite,
+        NetworkCapabilityKey.computeVisitDraft,
+        NetworkCapabilityKey.readonlyAgenda,
+        NetworkCapabilityKey.readonlyClinicalDiaryGlobal,
+        NetworkCapabilityKey.readonlyDocuments,
+        NetworkCapabilityKey.readonlyPatients,
+        NetworkCapabilityKey.writeDocuments,
+        // Added with the action gate in the workspace model. Without these the
+        // demo would offer a patient list it cannot edit: creating, archiving,
+        // deleting, writing a diary entry and exporting FHIR all became gated,
+        // and a gated key missing from this list is a dead surface.
+        NetworkCapabilityKey.writePatientProfile,
+        NetworkCapabilityKey.writePatientLifecycle,
+        NetworkCapabilityKey.writeClinicalDiary,
+        NetworkCapabilityKey.fseValidate
     ]
     #endif
 
     func hasCapability(_ key: String) -> Bool {
         availableKeys.contains(key)
+    }
+
+    /// The answer, or `nil` while there is not one yet.
+    ///
+    /// `hasCapability` collapses "absent" and "not asked yet" into `false`,
+    /// which is right for a section that draws a "verifying" placeholder and
+    /// wrong for an action button. Callers that disable controls need the two
+    /// apart, so they get the set only once it means something.
+    var settledCapabilityKeys: Set<String>? {
+        guard case .loaded = state else { return nil }
+        return availableKeys
     }
 
     func unavailableMessage(for key: String) -> String? {
