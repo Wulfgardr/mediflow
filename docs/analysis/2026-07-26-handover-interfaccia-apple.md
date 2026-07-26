@@ -151,6 +151,38 @@ per gran parte della sessione come rumore di fondo. Non lo erano.
    > righe: le sue proprieta' `can*`, su cui poggiano quasi tutti i pulsanti,
    > verificavano sessione e connessione ma non il permesso.
 
+## Parita' verificata su quattro superfici, non su due
+
+L'handover verificava la parita' **macOS ↔ iOS**, nove azioni su nove, e regge:
+le etichette native sono tutte presenti (Modifica, Archivia, Riattiva, Elimina,
+Esporta FHIR, Condividi FHIR, Prescrittivo regionale, Altre azioni, Nuovo
+paziente). Quello che non era stato verificato e' il lato **web ↔ nativo**, e li'
+i divari ci sono. Rilevati sulla scheda viva di un paziente sintetico su `:3101`,
+non dedotti dal codice.
+
+| azione sul paziente | nativo | web |
+|---|---|---|
+| Modifica | si | si |
+| Esporta FHIR | si | si, come **"Export FHIR"** |
+| Nuova voce | si | si |
+| **Archivia** | si | **assente** |
+| **Riattiva** | si | **assente** |
+| **Elimina paziente** | si | **assente** (c'e' "Elimina voce clinica") |
+| **Condividi FHIR** | si | **assente** |
+| Prescrittivo regionale | si | presente come **"SISS/FSE"** e "Contesto SISS" |
+| **Report PDF** | **assente** | si |
+
+Il caso dell'archiviazione e' il piu' netto e va nella direzione opposta a quella
+che l'handover discuteva. Il web **legge** lo stato: filtra per archivio, mostra
+"Archiviato", scrive "Percorso clinico chiuso. Consultabile in sola lettura."
+Ma non offre alcun controllo per archiviarlo o riattivarlo. Lo stato si puo'
+raggiungere solo da un client nativo.
+
+Le due differenze di nome — "Esporta FHIR" contro "Export FHIR", "Prescrittivo
+regionale" contro "SISS/FSE" — non sono sinonimi innocui. La seconda in
+particolare: PRREG ha sostituito il prescrittivo SISS, quindi le due superfici
+nominano la stessa cosa con due generazioni diverse del vocabolario.
+
 ## Aperto dopo la ripresa: la rampa Lume su macOS, che chiede una tua decisione
 
 Cercando la prova del terreno unico ho misurato i colori di sistema contro una
