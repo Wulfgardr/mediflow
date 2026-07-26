@@ -313,12 +313,23 @@
 
 /* ───────────── main canvas ───────────── */
 
+/* The ground, not a sheet resting on the ground.
+ *
+ * This drew a 20px corner and a hairline around a fill that is the same
+ * `--lume-surface-canvas` the page already paints. A level that is not a
+ * surface: it added an outline to the stack and nothing else, and it was the
+ * outermost of the five concentric corners between a card and the page.
+ *
+ * Apple's guidance for the material era puts it plainly: glass belongs to the
+ * navigation layer, and the content layer should not multiply sheets. Removing
+ * a frame that frames nothing is subtraction without loss.
+ *
+ * The padding stays: it is the margin the content needs, and it never depended
+ * on the border. */
 .canvas {
   --lume-surface-l: 0%;
   --lume-surface-temp: 0%;
   background: var(--lume-surface-canvas);
-  border: 1px solid var(--k8-hairline-soft);
-  border-radius: var(--radius-panel);
   padding: 14px;
   min-width: 0;
   overflow: auto;
