@@ -41,6 +41,48 @@ final class MacSingleGroundTests: XCTestCase {
         }
     }
 
+    /// The chart nests a pane inside a section inside a block, so it needs three
+    /// steps, and this asserts it has them.
+    ///
+    /// It did not. Every zone used to resolve to a system colour, and on macOS 27
+    /// `field`, `focal` and `chrome` are all the same value: four zones, two
+    /// levels. The measured trade is that a single system step is larger than a
+    /// single Lume step — 1.131 against 1.033 at night — but the system only has
+    /// that step once, while Lume spends 1.241 of total range over three. One
+    /// larger step cannot be spent three times.
+    func testTheFourContentZonesAreFourDistinctSurfaces() throws {
+        // Rendered through `lumeSurface(zone:)` itself, not by comparing the
+        // palette's hexes with each other. The palette was never the problem:
+        // it always held four distinct values, and the macOS branch of the
+        // modifier ignored them. Asserting on the modifier is what makes this
+        // test able to fail.
+        for scheme in [ColorScheme.light, .dark] {
+            let rendered = try LumeZone.allCases.map { zone in
+                try centerPixel(
+                    Color.clear.frame(width: 48, height: 24).lumeSurface(zone: zone),
+                    colorScheme: scheme
+                ).rgb
+            }
+            let distinct = Set(rendered.map { "\($0)" })
+            XCTAssertEqual(
+                distinct.count, LumeZone.allCases.count,
+                "Nel registro \(scheme) le zone Lume collassano: \(rendered)"
+            )
+        }
+    }
+
+    /// The guardia register has to reach the surface, or it is a declared
+    /// register that changes nothing.
+    func testGuardiaIsADistinctRegisterFromGrafite() throws {
+        let grafite = try centerPixel(swatch(LumePalette.grafite.field), colorScheme: .dark).rgb
+        let guardia = try centerPixel(swatch(LumePalette.guardia.field), colorScheme: .dark).rgb
+        XCTAssertNotEqual(grafite, guardia, "Il registro guardia non si distingue dal grafite")
+    }
+
+    private func zoneSurface(_ zone: LumeZone, scheme: ColorScheme) -> Color {
+        LumePalette.palette(for: scheme, isGuardia: false).surface(for: zone)
+    }
+
     /// The two panes take their ground from one expression, so the risk is not
     /// that they disagree today but that a later edit gives one of them its own
     /// fill. Rendering both and comparing pins the property rather than the
