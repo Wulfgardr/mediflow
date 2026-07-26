@@ -25,7 +25,8 @@ struct PairedPatientClinicalSections: View {
                 title: "Controlli",
                 subtitle: "Ultimi 20 controlli",
                 systemImage: "calendar.badge.clock",
-                refreshIdentifier: "homebase-refresh-checkups-button"
+                refreshIdentifier: "homebase-refresh-checkups-button",
+                accent: .controlli
             ) {
                 Task { await model.loadSelectedPatientCheckups() }
             }
@@ -108,7 +109,8 @@ struct PairedPatientClinicalSections: View {
                 title: "Osservazioni",
                 subtitle: "Ultime \(PairedPatientsWorkspaceSupport.clinicalPreviewCap) osservazioni",
                 systemImage: "waveform.path.ecg",
-                refreshIdentifier: "homebase-refresh-observations-button"
+                refreshIdentifier: "homebase-refresh-observations-button",
+                accent: .controlli
             ) {
                 Task { await model.loadSelectedPatientObservations() }
             }
@@ -200,10 +202,10 @@ struct PairedPatientClinicalSections: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
                 Text(checkup.title)
-                    .font(.caption.weight(.semibold))
+                    .chartRowTitle()
                 Spacer(minLength: 8)
                 Text(PairedCheckupStatus(rawValue: checkup.status)?.title ?? checkup.status)
-                    .font(.caption2.weight(.semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(checkupStatusColor(checkup))
             }
             Text(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: checkup.date))
@@ -247,39 +249,91 @@ struct PairedPatientClinicalSections: View {
     }
 
     /* @Codex */
+    /// "LOINC 29463-7 · 15/06/2025" instead of "http://loinc.org 29463-7 - ...".
+    ///
+    /// `codeSystem` carries the FHIR system URI, which identifies the coding
+    /// system to a machine and says nothing to a clinician. Printed verbatim it
+    /// spent the most readable line of the row on a namespace. Unknown systems
+    /// still show their raw URI: inventing a friendly name for a system we do not
+    /// recognise would be worse than showing what is actually recorded.
+    private func observationProvenance(_ observation: HomeBaseObservationSummary) -> String {
+        let date = PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: observation.observedAt)
+        let system = Self.codingSystemLabel(observation.codeSystem)
+        let code = observation.code.trimmingCharacters(in: .whitespacesAndNewlines)
+        let coding = [system, code].filter { !$0.isEmpty }.joined(separator: " ")
+        return coding.isEmpty ? date : "\(coding) · \(date)"
+    }
+
+    static func codingSystemLabel(_ system: String) -> String {
+        switch system.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "http://loinc.org", "https://loinc.org", "loinc": return "LOINC"
+        case "http://snomed.info/sct", "snomed": return "SNOMED CT"
+        case "http://unitsofmeasure.org", "ucum": return "UCUM"
+        case "http://hl7.org/fhir/sid/icd-10", "icd-10", "icd10": return "ICD-10"
+        case "http://hl7.org/fhir/sid/icd-9-cm", "icd-9-cm", "icd9": return "ICD-9-CM"
+        case "": return ""
+        default: return system
+        }
+    }
+
     private func observationRow(_ observation: HomeBaseObservationSummary, trend: ObservationTrend) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(observation.display)
-                    .font(.caption.weight(.semibold))
-                Spacer(minLength: 8)
-                if observation.deletedAt == nil, let glyph = Self.trendGlyph(trend) {
-                    Image(systemName: glyph.symbol)
-                        .font(.caption2.weight(.semibold))
+            // Centred, not baseline-aligned: the sparkline has no text baseline,
+            // so a baseline row shoved it to the top and it floated above the
+            // value it belongs to.
+            HStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(observation.display)
+                        // The name of the measure and its number are what this row
+                        // is for. Both sat at caption size, smaller than the note
+                        // beneath them.
+                        .chartRowTitle()
+                    Text(observationProvenance(observation))
+                        .font(.caption2)
+                        .registro()
                         .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("observation-trend-\(observation.id)")
-                        .accessibilityLabel(glyph.label)
                 }
-                Text("\(observation.value) \(observation.unitCode)")
-                    .font(.caption2.weight(.semibold))
-                    .registro()
-                    .foregroundStyle(observation.deletedAt == nil ? Color.primary : Color.secondary)
-            }
-            Text("\(observation.codeSystem) \(observation.code) - \(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: observation.observedAt))")
-                .font(.caption2)
-                .registro()
-                .foregroundStyle(.secondary)
-            let series = numericObservationSeries(forCode: observation.code)
-            if observation.deletedAt == nil, series.count >= 2 {
-                Chart(series) { point in
-                    LineMark(x: .value("Data", point.date), y: .value("Valore", point.value))
-                        .interpolationMethod(.monotone)
+
+                Spacer(minLength: 8)
+
+                // The sparkline belongs beside the number it summarises. Full
+                // width under the row it read as a stray blue rule, and the empty
+                // band it left made every observation twice as tall as its content.
+                let series = numericObservationSeries(forCode: observation.code)
+                if observation.deletedAt == nil, series.count >= 2 {
+                    Chart(series) { point in
+                        LineMark(x: .value("Data", point.date), y: .value("Valore", point.value))
+                            .interpolationMethod(.monotone)
+                            .foregroundStyle(.secondary)
+                    }
+                    .chartXAxis(.hidden)
+                    .chartYAxis(.hidden)
+                    .frame(width: 96, height: 22)
+                    .accessibilityIdentifier("observation-sparkline-\(observation.code)")
+                    .accessibilityLabel("Andamento \(observation.display): \(series.count) rilevazioni")
                 }
-                .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
-                .frame(height: 30)
-                .accessibilityIdentifier("observation-sparkline-\(observation.code)")
-                .accessibilityLabel("Andamento \(observation.display): \(series.count) rilevazioni")
+
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    if observation.deletedAt == nil, let glyph = Self.trendGlyph(trend) {
+                        Image(systemName: glyph.symbol)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("observation-trend-\(observation.id)")
+                            .accessibilityLabel(glyph.label)
+                    }
+                    Text(observation.value)
+                        #if os(macOS)
+                        .font(.title3.weight(.semibold))
+                        #else
+                        .font(.caption2.weight(.semibold))
+                        #endif
+                        .registro()
+                        .foregroundStyle(observation.deletedAt == nil ? Color.primary : Color.secondary)
+                    Text(observation.unitCode)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .fixedSize(horizontal: true, vertical: false)
             }
             if let notes = observation.notes, !notes.isEmpty {
                 Text(notes)
@@ -375,8 +429,11 @@ struct PairedPatientClinicalSections: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(title, systemImage: "calendar.badge.clock")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                // A form opens a group inside a card, so it takes the group
+                // heading register — the same one "DIAGNOSI" and "NOTE" use.
+                // Left at caption it was indistinguishable from the placeholder
+                // text of the fields it introduces.
+                .chartGroupHeading()
             TextField("Titolo", text: checkupTitle)
                 .accessibilityIdentifier("\(primaryIdentifier)-title")
             Picker("Stato", selection: status) {
@@ -425,8 +482,11 @@ struct PairedPatientClinicalSections: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(title, systemImage: "waveform.path.ecg")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                // A form opens a group inside a card, so it takes the group
+                // heading register — the same one "DIAGNOSI" and "NOTE" use.
+                // Left at caption it was indistinguishable from the placeholder
+                // text of the fields it introduces.
+                .chartGroupHeading()
             TextField("Parametro LOINC", text: display)
                 .accessibilityIdentifier("\(primaryIdentifier)-display")
             TextField("Codice LOINC", text: code)

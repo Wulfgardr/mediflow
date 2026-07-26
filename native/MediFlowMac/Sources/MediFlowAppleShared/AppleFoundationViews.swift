@@ -349,6 +349,15 @@ public struct AppleFoundationMobileRootView: View {
                 .padding(20)
                 .background(PlatformColors.groupedBackground)
                 .accessibilityIdentifier("apple-foundation-overview-view")
+        case .repertori:
+            // Catalogue browsing is a macOS surface for now; mobile reaches the
+            // same data through the therapy and exemption pickers.
+            EmptyView()
+        case .host:
+            // Host administration belongs to the machine that holds the archive.
+            // A paired iPhone is not that machine, so this section is never
+            // offered here; the case exists only to keep the switch exhaustive.
+            EmptyView()
         case .runtime:
             ScrollView {
                 HomeBaseRuntimeStatusView()

@@ -45,6 +45,18 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
     private var requestGeneration: UInt64 = 0
 
     func loadIfNeeded(using connection: ClinicalWorkspaceConnection?) async {
+        #if DEBUG
+        // Offline demo: there is no host to interrogate, so every capability the
+        // UI gates on is reported available. Without this the demo dataset loads
+        // but Agenda, Diario, Analytics and Scale all render "collega
+        // l'home-base" and cannot be worked on at all.
+        if AppleFoundationDemoMode.isActive {
+            availableKeys = Set(Self.demoCapabilityKeys)
+            loadedConnectionIdentity = connection?.identity
+            state = .loaded
+            return
+        }
+        #endif
         guard let connection else {
             requestGeneration &+= 1
             availableKeys.removeAll()
@@ -80,6 +92,21 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
             state = .failed("Non è stato possibile verificare le capability dell'host: \(error.localizedDescription)")
         }
     }
+
+    #if DEBUG
+    /// Every key the clinical surfaces gate on. Kept beside the gate itself so a
+    /// new gated capability that is not listed here shows up as a dead surface in
+    /// the demo, rather than silently.
+    static let demoCapabilityKeys = [
+        "network.ambulatories.write",
+        "network.compute.visit-draft",
+        "network.replica.readonly-agenda",
+        "network.replica.readonly-clinical-diary-global",
+        "network.replica.readonly-documents",
+        "network.replica.readonly-patients",
+        "network.replica.write-documents"
+    ]
+    #endif
 
     func hasCapability(_ key: String) -> Bool {
         availableKeys.contains(key)
@@ -444,9 +471,9 @@ struct AgendaWorkspaceView: View {
                     ForEach(model.rows) { row in
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(row.patientName).font(.headline)
+                                Text(row.patientName).chartRowTitle()
                                 Text(row.checkup.date, format: .dateTime.day().month().hour().minute())
-                                    .font(.subheadline).foregroundStyle(.secondary)
+                                    .chartMetadata()
                             }
                             Spacer()
                             Text(row.presentation.label).font(.caption.weight(.semibold)).padding(.horizontal, 8).padding(.vertical, 4)
@@ -461,7 +488,7 @@ struct AgendaWorkspaceView: View {
     }
 
     private func agendaStatistic(_ title: String, value: Int) -> some View {
-        VStack(alignment: .leading, spacing: 3) { Text("\(value)").font(.title3.weight(.semibold)); Text(title).font(.caption).foregroundStyle(.secondary) }
+        VStack(alignment: .leading, spacing: 3) { Text("\(value)").font(.title3.weight(.semibold)); Text(title).chartMetadata() }
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -502,10 +529,10 @@ struct GlobalDiaryWorkspaceView: View {
                 else {
                     ForEach(model.rows) { row in
                         VStack(alignment: .leading, spacing: 4) {
-                            HStack { Text(row.item.title).font(.headline); Spacer(); if row.item.deleted { Text("Eliminata").font(.caption.weight(.semibold)).foregroundStyle(.secondary) } }
-                            Text("\(row.item.patientName) · \(row.item.patientCode)").font(.subheadline).foregroundStyle(.secondary)
+                            HStack { Text(row.item.title).chartRowTitle(); Spacer(); if row.item.deleted { Text("Eliminata").chartMetadata().fontWeight(.semibold) } }
+                            Text("\(row.item.patientName) · \(row.item.patientCode)").chartMetadata()
                             Text("\(row.type) · \(row.date, format: .dateTime.day().month().hour().minute())").font(.caption).foregroundStyle(.secondary)
-                            Text(row.item.preview).font(.subheadline)
+                            Text(row.item.preview).chartProse()
                             if row.attachmentCount > 0 { Label("\(row.attachmentCount) allegati", systemImage: "paperclip").font(.caption).foregroundStyle(.secondary) }
                         }
                         .padding(.vertical, 3)
@@ -553,7 +580,7 @@ struct PopulationAnalyticsWorkspaceView: View {
                 Section("Distribuzione per età") { ForEach(PopulationAgeBucket.allCases, id: \.self) { bucket in distributionRow(bucket.rawValue, value: statistics.ageDistribution[bucket, default: 0], total: statistics.totalInRange) } }
                 Section("Diagnosi più frequenti") {
                     if statistics.topDiagnoses.isEmpty { Text("Nessuna diagnosi disponibile.").foregroundStyle(.secondary) }
-                    ForEach(Array(statistics.topDiagnoses.enumerated()), id: \.element.key) { _, diagnosis in HStack { VStack(alignment: .leading) { Text(diagnosis.description); Text("\(diagnosis.system) \(diagnosis.code)").font(.caption).foregroundStyle(.secondary) }; Spacer(); Text("\(diagnosis.count)").font(.headline) } }
+                    ForEach(Array(statistics.topDiagnoses.enumerated()), id: \.element.key) { _, diagnosis in HStack { VStack(alignment: .leading) { Text(diagnosis.description).chartRowTitle(); ClinicalCodePill(diagnosis.code) }; Spacer(); Text("\(diagnosis.count)").font(.headline) } }
                 }
             } else if model.state == .loading { Section { ProgressView() } }
             else if case .failed(let message) = model.state { Section { Text(message).foregroundStyle(.secondary) } }
@@ -562,7 +589,7 @@ struct PopulationAnalyticsWorkspaceView: View {
         .toolbar { Button("Aggiorna", systemImage: "arrow.clockwise") { Task { await model.load() } } }
     }
 
-    private func metric(_ label: String, _ value: Int, _ total: Int) -> some View { VStack(alignment: .leading, spacing: 3) { Text("\(PopulationAnalytics.percent(value, total: total))%").font(.title3.weight(.semibold)); Text(label).font(.caption).foregroundStyle(.secondary) }.frame(maxWidth: .infinity, alignment: .leading) }
+    private func metric(_ label: String, _ value: Int, _ total: Int) -> some View { VStack(alignment: .leading, spacing: 3) { Text("\(PopulationAnalytics.percent(value, total: total))%").font(.title3.weight(.semibold)); Text(label).chartMetadata() }.frame(maxWidth: .infinity, alignment: .leading) }
     private func distributionRow(_ label: String, value: Int, total: Int) -> some View { VStack(alignment: .leading, spacing: 4) { HStack { Text(label); Spacer(); Text("\(value)").foregroundStyle(.secondary) }; ProgressView(value: Double(value), total: Double(max(total, 1))) } }
 }
 
