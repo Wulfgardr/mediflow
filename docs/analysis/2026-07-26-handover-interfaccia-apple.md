@@ -192,6 +192,33 @@ superficie all'altra:
    piu' pesante, perche' PRREG ha sostituito il prescrittivo SISS: le due
    superfici nominano la stessa cosa con due generazioni del vocabolario.
 
+## Aperto: la barra strumenti dell'iPad, causa non trovata
+
+Guardato a schermo su iPad Pro 13 M5, iPadOS 27, modalita' dimostrativa con 20
+pazienti. La barra di navigazione disegna una capsula di vetro larga circa mille
+punti con il glifo "nuovo paziente" inchiodato al bordo sinistro, il menu di
+ordinamento e il selettore di ambulatorio al bordo destro, e circa ottocento
+punti di vetro vuoto in mezzo. Legge come un layout venuto meno, non come una
+barra composta. Su iPhone la barra e' troppo stretta perche' si veda.
+
+Cosa e' stato escluso, con prove:
+
+- **Non e' il campo di ricerca collassato.** Toccando lo spazio vuoto non
+  succede nulla; la ricerca e' il cerchio separato al bordo destro.
+- **Non e' il raggruppamento.** I tre controlli erano tre `ToolbarItem`
+  separati; riuniti in un solo `ToolbarItemGroup(placement: .primaryAction)` la
+  resa e' rimasta identica, verificata ricostruendo e reinstallando.
+
+Il raggruppamento e' stato tenuto, perche' quei tre controlli sono un gruppo,
+ma non risolve e il commento nel codice lo dichiara.
+
+Da provare a chi riprende: se la capsula sia la barra di ricerca **non**
+collassata che occupa il centro mentre `MinimizedSearchToolbarBehavior` e' un
+no-op su iPad; se `.primaryAction` in una colonna di `NavigationSplitView` su
+iPadOS 27 si distribuisca invece di raggrupparsi; e se `ToolbarSpacer`, che e'
+iOS 26, permetta di dichiarare esplicitamente il confine fra i gruppi con un
+`#available` sopra il target dichiarato iOS 17.
+
 ## Aperto dopo la ripresa: la rampa Lume su macOS, che chiede una tua decisione
 
 Cercando la prova del terreno unico ho misurato i colori di sistema contro una

@@ -8,8 +8,8 @@
 :root {
   /* register: giorno */
   --lume-giorno-surface-canvas: #eef0f2;
-  --lume-giorno-surface-field: #f5f5f4;
-  --lume-giorno-surface-focal: #fbfaf7;
+  --lume-giorno-surface-field: #f4f6f8;
+  --lume-giorno-surface-focal: #fbfcfe;
   --lume-giorno-surface-chrome: #e6e8eb;
   --lume-giorno-ink-primary: #1a1c1e;
   --lume-giorno-ink-muted: #5c6772;

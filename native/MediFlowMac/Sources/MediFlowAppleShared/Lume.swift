@@ -49,8 +49,8 @@ public struct LumeRegisterPalette: Equatable, Sendable {
 public enum LumePalette {
     public static let giorno = LumeRegisterPalette(
         canvasHex: "#eef0f2",
-        fieldHex: "#f5f5f4",
-        focalHex: "#fbfaf7",
+        fieldHex: "#f4f6f8",
+        focalHex: "#fbfcfe",
         chromeHex: "#e6e8eb",
         inkPrimaryHex: "#1a1c1e",
         inkMutedHex: "#5c6772",
