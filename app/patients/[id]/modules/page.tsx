@@ -571,7 +571,7 @@ export default function PatientDetailPage() {
                     className={workspaceStyles.quietAction}
                 >
                     <Download className="h-3.5 w-3.5" />
-                    Export FHIR
+                    Esporta FHIR
                 </button>
                 <button
                     type="button"

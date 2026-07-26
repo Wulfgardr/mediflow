@@ -198,10 +198,20 @@ superficie all'altra:
 1. Sul nativo il ciclo di vita del paziente sta accanto al paziente; sul web
    sta dietro "Modifica". Chi impara il gesto su iPhone non lo ritrova sul web
    dove se lo aspetta.
-2. Tre azioni identiche hanno due nomi: "Esporta FHIR" / "Export FHIR",
-   "Riattiva" / "Ripristina", "Prescrittivo regionale" / "SISS". L'ultima e' la
-   piu' pesante, perche' PRREG ha sostituito il prescrittivo SISS: le due
-   superfici nominano la stessa cosa con due generazioni del vocabolario.
+2. **Due** azioni identiche avevano due nomi, ora allineate al nativo:
+   "Export FHIR" e' diventato "Esporta FHIR", e il disarchiviare e' diventato
+   "Riattiva". Il secondo non era un sinonimo ma un'ambiguita': sul web
+   "Ripristina" indicava **quattro** operazioni diverse, disarchiviare un
+   paziente, recuperare una voce dal cestino, ripristinare il database e
+   ripristinare un backup. Il nativo distingue "Riattiva" dall'archivio e
+   "Ripristina" dal cestino, ed e' la distinzione corretta.
+
+   > **Il terzo caso non era un divario, e la mia matrice sbagliava.**
+   > "Prescrittivo regionale" e "SISS" non sono due nomi per la stessa cosa:
+   > il nativo apre `SissPortalURLs.prescrittivoRegionale`, quindi PRREG e' una
+   > **destinazione dentro** la famiglia SISS, e il web scrive gia'
+   > `'prescription.create': 'Prescrittivo Regionale (PRREG)'`. SISS e' il nome
+   > reale del portale e resta corretto come etichetta di famiglia.
 
 ## Aperto: la barra strumenti dell'iPad, causa non trovata
 
