@@ -588,12 +588,14 @@ struct AgendaWorkspaceView: View {
                     }
                 }
             }
-            Section("Prossime visite") {
+            Section {
                 switch sectionContent {
                 case .progress:
                     ProgressView()
                 case .message(let message):
-                    Text(message).foregroundStyle(.secondary)
+                    Text(message)
+                        // @Codex
+                        .lumeInchiostro(bozza: false)
                 case .rows:
                     ForEach(model.rows) { row in
                         HStack {
@@ -608,6 +610,10 @@ struct AgendaWorkspaceView: View {
                         }
                     }
                 }
+            } header: {
+                Text("Prossime visite")
+                    // @Codex
+                    .lumeInchiostro(bozza: false)
             }
         }
         .navigationTitle("Agenda")

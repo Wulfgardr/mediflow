@@ -505,7 +505,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             return nil
         }
         let base = Date(timeIntervalSince1970: 1_750_000_000)
-        return [
+        let patients = [
             /* @Codex */
             HomeBasePatientSummary(id: "uitest-1", firstName: "Mario", lastName: "Rossi",
                                    birthDate: nil, taxCode: "RSSMRA80A01H501U",
@@ -521,6 +521,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                                    isAdi: false, isArchived: true, version: 1,
                                    updatedAt: base.addingTimeInterval(-7200))
         ]
+        // @Codex
+        return ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_SINGLE_PATIENT"] == "1"
+            ? Array(patients.prefix(1))
+            : patients
     }
 
     /// UI-test fixture detail for a seeded patient, so the patient-detail view can
