@@ -29,6 +29,27 @@ Fuori perimetro (per istruzione): backend, schema, API, web. **Niente push.**
   > `testFirstPatientIsVisibleInTheFirstViewportAtAX5`,
   > `testWorklistLastRowClearsTheFloatingTabBarAtAX5`.
   >
+  > **Chiuso il 27 luglio.** Quei cinque non erano regressioni ne' divari di
+  > parita': sono contratti del cromo compatto, cioe' la tab bar mobile e il
+  > menu Progetto che vive solo nel ramo `TabView`. Su iPad quel cromo non
+  > esiste per scelta dichiarata (#142): li' la navigazione e' una
+  > `NavigationSplitView` con sidebar, e un test che pretende la tab bar su iPad
+  > asserisce l'opposto del progetto. I messaggi lo dicevano da soli, "compact
+  > layout should present the tab bar" e "Compact navigation should expose four
+  > sections". Ora si auto-saltano su iPad, come i quattro contratti solo-iPad
+  > gia' si auto-saltavano su iPhone: la matrice adattiva era a meta' ed e'
+  > diventata simmetrica.
+  >
+  > **Linea di base definitiva, app nativa su iOS 27:**
+  >
+  > | | eseguiti | falliti | saltati |
+  > |---|---|---|---|
+  > | iPhone 17 Pro | 34 | **0** | 4, solo-iPad |
+  > | iPad Pro 13 M5 | 34 | **0** | 5, solo-compatto |
+  >
+  > Nessuna copertura spenta, verificato nominalmente: i cinque contratti
+  > compatti risultano `passed` su iPhone, non `skipped`.
+  >
   > **Rettifica di una rettifica, e conta piu' di quanto sembri.** Questa riga
   > dichiarava che l'UDID iPad citato piu' sotto non esisteva piu'. Falso:
   > `D2216CF2-6EA0-4EA4-861F-41E0DED1E5F8` esiste, e' disponibile ed e' il
