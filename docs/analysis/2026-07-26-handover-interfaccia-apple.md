@@ -189,11 +189,20 @@ non dedotti dal codice.
 | Elimina paziente | si | si | entrambi soft delete con motivazione |
 | Report PDF | si | si | `PatientReportDocument.swift` contro `lib/report-service` |
 | Prescrittivo regionale | si | si | sul web e' la famiglia **SISS handoff** |
-| **Condividi FHIR** | si | **assente** | unico divario di funzione verificato |
+| Condividi FHIR | si | si | **chiuso il 27 luglio**, vedi sotto |
 
-Quindi il divario di **funzione** e' uno solo: Condividi FHIR. Il resto e' un
-divario di **collocazione e di nome**, che non e' meno reale per chi passa da una
-superficie all'altra:
+Il divario di **funzione** e' chiuso: era uno solo, Condividi FHIR, portato sul
+web il 27 luglio. Il nativo separa due tempi, `prepareFHIRExport` che valida
+contro FSE e scrive il file e `ShareLink` che lo consegna al sistema; il web
+faceva solo la prima meta' e finiva in cartella Download. Ora i due percorsi
+condividono la stessa preparazione, cosi' il controllo che blocca sugli errori
+FSE non ha due copie che possono divergere, e la consegna passa dalla Web Share
+API. Il pulsante si disegna **solo dove il browser sa davvero condividere un
+file**: su iPhone, iPad e Safari sul Mac si', in diversi browser desktop no, e
+li' un pulsante che non apre niente sarebbe peggio della sua assenza.
+
+Resta un divario di **collocazione e di nome**, che non e' meno reale per chi
+passa da una superficie all'altra:
 
 1. Sul nativo il ciclo di vita del paziente sta accanto al paziente; sul web
    sta dietro "Modifica". Chi impara il gesto su iPhone non lo ritrova sul web
