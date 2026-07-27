@@ -343,6 +343,25 @@
   color: var(--k8-subtle);
 }
 
+/* @Codex At 360 CSS pixels the clinical section links are a single hidden
+   horizontal strip. Reflow them into the scrollable workspace document so
+   each section remains visible and reachable without a hidden scrollbar. */
+@media (max-width: 480px) {
+  .sectionRail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    overflow: visible;
+    scroll-snap-type: none;
+  }
+
+  .sectionLink {
+    min-width: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
 /* @Codex WUL-UIUX: sezione attiva (scrollspy). Stile coerente con :hover ma
    piu marcato, cosi su una Scheda lunga si vede dove si e. */
 .sectionLink[aria-current='location'] {
