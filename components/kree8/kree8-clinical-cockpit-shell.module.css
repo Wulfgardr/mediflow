@@ -260,6 +260,27 @@
   }
 }
 
+/* @Codex The primary labels and their counters no longer fit a 360 CSS-pixel
+   viewport at browser zoom 400%. Keep every destination in the document flow
+   instead of depending on an undiscoverable horizontal scroll position. */
+@media (max-width: 480px) {
+  .rail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    overflow: visible;
+    scroll-snap-type: none;
+  }
+
+  .brand { grid-column: 1 / -1; }
+
+  .navItem {
+    min-width: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
 .navSelected {
   background: var(--surface);
   color: var(--ink);
