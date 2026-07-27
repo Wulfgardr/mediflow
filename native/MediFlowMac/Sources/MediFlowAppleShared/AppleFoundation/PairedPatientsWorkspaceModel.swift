@@ -208,8 +208,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published private(set) var isSearchingEditObservationUnitTerminology = false
     @Published var newServicePrescribedAt = Date()
     @Published var newServiceStatus: PairedServicePrescriptionStatus = .prescribed
-    @Published var newServiceCategory: PairedServicePrescriptionCategory = .specialistica
-    @Published var newServicePriority: PairedServicePrescriptionPriority = .p
+    @Published var newServiceCategory: PairedServicePrescriptionCategory = .visit
+    @Published var newServicePriority: PairedServicePrescriptionPriority = .routine
     @Published var newServiceCodeSystem = "NTR"
     @Published var newServiceCode = ""
     @Published var newServiceName = ""
@@ -229,7 +229,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var newServiceItemsText = ""
     @Published var newProstheticPrescribedAt = Date()
     @Published var newProstheticStatus: PairedProstheticPrescriptionStatus = .prescribed
-    @Published var newProstheticCategory: PairedProstheticPrescriptionCategory = .ausilio
+    @Published var newProstheticCategory: PairedProstheticPrescriptionCategory = .standard
     @Published var newProstheticISOCode = ""
     @Published var newProstheticDescription = ""
     @Published var newProstheticMeasures = ""
@@ -4175,8 +4175,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private func resetNewServicePrescriptionForm() {
         newServicePrescribedAt = Date()
         newServiceStatus = .prescribed
-        newServiceCategory = .specialistica
-        newServicePriority = .p
+        newServiceCategory = .visit
+        newServicePriority = .routine
         newServiceCodeSystem = "NTR"
         newServiceCode = ""
         newServiceName = ""
@@ -4200,7 +4200,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private func resetNewProstheticPrescriptionForm() {
         newProstheticPrescribedAt = Date()
         newProstheticStatus = .prescribed
-        newProstheticCategory = .ausilio
+        newProstheticCategory = .standard
         newProstheticISOCode = ""
         newProstheticDescription = ""
         newProstheticMeasures = ""

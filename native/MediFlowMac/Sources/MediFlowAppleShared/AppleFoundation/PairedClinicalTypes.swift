@@ -79,40 +79,48 @@ enum PairedServicePrescriptionStatus: String, CaseIterable, Identifiable {
 
 /* @Codex */
 enum PairedServicePrescriptionCategory: String, CaseIterable, Identifiable {
-    case specialistica
-    case laboratorio
-    case diagnostica
-    case riabilitazione
-    case altro
+    case lab
+    case imaging
+    case visit
+    case rehab
+    case screening
+    case procedure
+    case other
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .specialistica: "Specialistica"
-        case .laboratorio: "Laboratorio"
-        case .diagnostica: "Diagnostica"
-        case .riabilitazione: "Riabilitazione"
-        case .altro: "Altro"
+        case .lab: "Laboratorio"
+        case .imaging: "Imaging"
+        case .visit: "Visita"
+        case .rehab: "Riabilitazione"
+        case .screening: "Screening"
+        case .procedure: "Procedura"
+        case .other: "Altro"
         }
     }
 }
 
 /* @Codex */
 enum PairedServicePrescriptionPriority: String, CaseIterable, Identifiable {
-    case u
-    case b
-    case d
-    case p
+    case routine
+    case p = "P"
+    case d = "D"
+    case b = "B"
+    case u = "U"
+    case unknown
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .u: "U"
-        case .b: "B"
-        case .d: "D"
-        case .p: "P"
+        case .routine: "Routine"
+        case .p: "Programmata (P)"
+        case .d: "Differibile (D)"
+        case .b: "Breve (B)"
+        case .u: "Urgente (U)"
+        case .unknown: "Non indicata"
         }
     }
 }
@@ -120,16 +128,14 @@ enum PairedServicePrescriptionPriority: String, CaseIterable, Identifiable {
 /* @Codex */
 enum PairedPrescriptionSource: String, CaseIterable, Identifiable {
     case manual
-    case importato
-    case integrazione
+    case documentReview = "document_review"
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .manual: "Manuale"
-        case .importato: "Importato"
-        case .integrazione: "Integrazione"
+        case .documentReview: "Da documento revisionato"
         }
     }
 }
@@ -154,8 +160,10 @@ enum PairedFseDocumentValidationProfile: String, CaseIterable, Identifiable {
 
 /* @Codex */
 enum PairedProstheticPrescriptionStatus: String, CaseIterable, Identifiable {
+    case draft
     case prescribed
-    case ordered
+    case submitted
+    case authorized
     case delivered
     case tested
     case cancelled
@@ -164,8 +172,10 @@ enum PairedProstheticPrescriptionStatus: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .draft: "Bozza"
         case .prescribed: "Prescritta"
-        case .ordered: "Ordinata"
+        case .submitted: "Inviata"
+        case .authorized: "Autorizzata"
         case .delivered: "Consegnata"
         case .tested: "Collaudata"
         case .cancelled: "Annullata"
@@ -174,8 +184,10 @@ enum PairedProstheticPrescriptionStatus: String, CaseIterable, Identifiable {
 
     var tone: VetroTone {
         switch self {
+        case .draft: .neutral
         case .prescribed: .info
-        case .ordered: .attention
+        case .submitted: .attention
+        case .authorized: .positive
         case .delivered: .positive
         case .tested: .positive
         case .cancelled: .neutral
@@ -193,19 +205,23 @@ enum PairedProstheticPrescriptionStatus: String, CaseIterable, Identifiable {
 
 /* @Codex */
 enum PairedProstheticPrescriptionCategory: String, CaseIterable, Identifiable {
-    case protesi
-    case ortesi
-    case ausilio
-    case altro
+    case standard
+    case oxygen
+    case repair
+    case replacement
+    case trial
+    case other
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .protesi: "Protesi"
-        case .ortesi: "Ortesi"
-        case .ausilio: "Ausilio"
-        case .altro: "Altro"
+        case .standard: "Ausilio standard"
+        case .oxygen: "Ossigenoterapia"
+        case .repair: "Riparazione"
+        case .replacement: "Sostituzione"
+        case .trial: "Prova/valutazione"
+        case .other: "Altro"
         }
     }
 }
