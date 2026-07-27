@@ -21,11 +21,13 @@ final class MediFlowMobileAppUITests: XCTestCase {
     /* @Codex */
     private func launch(
         seedPatients: Bool = false,
+        singlePatient: Bool = false,
         lockedPatientFields: Bool = false,
         section: String? = nil,
         dynamicTypeSize: String? = nil
     ) {
         if seedPatients { app.launchEnvironment["MEDIFLOW_APPLE_UITEST_PATIENTS"] = "1" }
+        if singlePatient { app.launchEnvironment["MEDIFLOW_APPLE_UITEST_SINGLE_PATIENT"] = "1" }
         if lockedPatientFields { app.launchEnvironment["MEDIFLOW_APPLE_UITEST_LOCKED_PATIENT_FIELDS"] = "1" }
         if let section { app.launchEnvironment["MEDIFLOW_APPLE_INITIAL_SECTION"] = section }
         if let dynamicTypeSize {
@@ -625,6 +627,37 @@ final class MediFlowMobileAppUITests: XCTestCase {
             )
             attachScreenshot(named: "superficie-\(surface.label)")
         }
+    }
+
+    // @Codex
+    func testAccessibilityAuditCoversWorklistAndAgenda() throws {
+        // Let XCTest vary Dynamic Type during the accessibility audit. The
+        // debug AX5 override belongs to the dedicated layout tests; here it
+        // would make the audit's Dynamic Type result non-probative.
+        launch(seedPatients: true, singlePatient: true)
+        XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
+
+        let firstPatientRow = app.buttons["patient-cell-uitest-1"]
+        let secondPatientRow = app.buttons["patient-cell-uitest-2"]
+        XCTAssertTrue(firstPatientRow.waitForExistence(timeout: 15))
+        XCTAssertTrue(secondPatientRow.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(firstPatientRow.isHittable, "the seeded patient row must be operable before audit")
+
+        let status = sectionView("workspace-status-message")
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        XCTAssertTrue(status.isHittable, "the operational status must be visible before audit")
+        let window = app.windows.firstMatch
+        XCTAssertGreaterThanOrEqual(status.frame.minY, window.frame.minY)
+        XCTAssertLessThanOrEqual(status.frame.maxY, window.frame.maxY)
+
+        let ambulatoryScopePicker = app.buttons["ambulatory-scope-picker"]
+        XCTAssertTrue(ambulatoryScopePicker.waitForExistence(timeout: 5))
+        XCTAssertTrue(ambulatoryScopePicker.isHittable)
+        try app.performAccessibilityAudit()
+
+        XCTAssertTrue(openSection("Agenda"), "Agenda non e raggiungibile per l'audit accessibilita")
+        XCTAssertTrue(sectionView("clinical-workspace-agenda-view").waitForExistence(timeout: 15))
+        try app.performAccessibilityAudit()
     }
 
     /// The three cross-patient views must say something true about themselves,

@@ -478,18 +478,17 @@ struct PairedPatientsWorklistView: View {
                 Text("\(age) anni")
                     .font(.caption)
                     .registro()
-                    .foregroundStyle(.secondary)
                     .accessibilityIdentifier("patient-cell-age-\(patient.id)")
                 Text("·")
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
             }
             Text(PairedPatientsWorkspaceSupport.compactTaxCode(patient.taxCode))
                 .font(.caption)
                 .registro()
-                .foregroundStyle(.secondary)
         }
         .lineLimit(1)
+        // @Codex
+        .lumeInchiostro(bozza: true)
     }
 
     /* @Codex */
@@ -537,7 +536,8 @@ struct PairedPatientsWorklistView: View {
                 }
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            // @Codex
+            .lumeInchiostro(bozza: true)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(
                 summary.additionalCount > 0
@@ -572,7 +572,8 @@ struct PairedPatientsWorklistView: View {
                 Text(PairedPatientsWorkspaceSupport.relativeUpdated(updated))
                     .font(.caption2)
                     .registro()
-                    .foregroundStyle(.tertiary)
+                    // @Codex
+                    .lumeInchiostro(bozza: false)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("patient-cell-updated-\(patient.id)")
             }

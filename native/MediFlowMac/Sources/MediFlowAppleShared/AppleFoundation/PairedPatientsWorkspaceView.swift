@@ -126,6 +126,8 @@ struct PairedPatientsWorkspaceView: View {
                     .accessibilityLabel("Ambulatorio attivo")
                     .accessibilityValue(activeAmbulatoryScopeLabel)
                     .accessibilityIdentifier("ambulatory-scope-picker")
+                    // @Codex
+                    .contentShape(.interaction, Rectangle().inset(by: -4))
                 }
             }
         }
@@ -796,7 +798,8 @@ struct PairedPatientsWorkspaceView: View {
                 .font(.headline)
             Text("Scegli un paziente dall'elenco per vederne scheda, diario, terapie, controlli e osservazioni.")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                // @Codex
+                .lumeInchiostro(bozza: true)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: 420)
@@ -945,7 +948,9 @@ struct PairedPatientsWorkspaceView: View {
                 .accessibilityIdentifier("workspace-error-message")
         } else if let status = model.statusMessage {
             Text(status)
-                .chartMetadata()
+                // @Codex
+                .font(.caption)
+                .lumeInchiostro(bozza: false)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("workspace-status-message")
