@@ -524,7 +524,12 @@ struct PairedPatientsWorkspaceView: View {
                 // elements got the frame and spread across the column.
                 patientsListContent
             }
-            .frame(minWidth: 260, idealWidth: 340, maxWidth: 480, maxHeight: .infinity)
+            // @Codex: The outer NavigationSplitView needs room for its native
+            // sidebar at the documented 1100 pt window width. These are the
+            // actual lower bounds of the inner HSplitView, so keep their sum
+            // below the available detail width instead of letting AppKit shift
+            // the entire outer split left and clip its section headings.
+            .frame(minWidth: 220, idealWidth: 300, maxWidth: 440, maxHeight: .infinity)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("patient-workspace-sidebar")
 
@@ -552,7 +557,7 @@ struct PairedPatientsWorkspaceView: View {
                     patientWorkspaceHeader(detail)
                 }
             }
-            .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("patient-workspace-detail")
         }

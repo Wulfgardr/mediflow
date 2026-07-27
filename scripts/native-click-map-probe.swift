@@ -327,11 +327,16 @@ func selectedItemsContain(_ identifierName: String, list: AXUIElement) -> Bool {
 /* @Codex */
 func detailNameMatches(_ expected: String, app: NSRunningApplication) -> Bool {
     guard let window = try? appWindow(for: app),
-          let detailName = findElement(in: window, where: { identifier(of: $0) == "patient-detail-name" }) else {
+          // @Codex: `patient-detail-name` is intentionally iOS-only. macOS
+          // owns the title/toolbar chrome and exposes this persistent header as
+          // the canonical selected-patient AX surface.
+          let detailHeader = findElement(in: window, where: {
+              identifier(of: $0) == "patient-workspace-header"
+          }) else {
         return false
     }
-    return [descriptionValue(of: detailName), value(of: detailName), title(of: detailName)]
-        .contains(expected)
+    return [descriptionValue(of: detailHeader), value(of: detailHeader), title(of: detailHeader)]
+        .contains(where: { $0.contains(expected) })
 }
 
 /* @Codex */
@@ -399,11 +404,7 @@ func workspaceHeaderAXContract(
 ) -> WorkspaceHeaderAXContract? {
     guard let snapshot = workspaceHeader(exposing: expectedName, app: app),
           !CFEqual(snapshot.header, snapshot.detail),
-          children(of: snapshot.header).isEmpty,
-          let detailName = findElement(in: snapshot.detail, where: {
-              identifier(of: $0) == "patient-detail-name"
-          }),
-          !CFEqual(snapshot.header, detailName) else {
+          children(of: snapshot.header).isEmpty else {
         return nil
     }
 
