@@ -1,20 +1,24 @@
 /* @Codex #96, #68 */
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import {
+  assertKeyboardFocusProgresses,
+  assertNoHorizontalOverflow,
+  assertNotClippedInViewport,
+  bootstrapUnlockedSession,
+  REFLOW_PROXY_VIEWPORTS,
+  type ReflowProxyViewport,
+} from './utils';
 
 type WorklistCase = {
   register: 'giorno' | 'grafite';
-  viewport: 'wide' | 'narrow';
+  viewport: ReflowProxyViewport['viewport'];
   width: number;
   height: number;
 };
 
-const WORKLIST_CASES: WorklistCase[] = [
-  { register: 'giorno', viewport: 'wide', width: 1440, height: 960 },
-  { register: 'grafite', viewport: 'wide', width: 1440, height: 960 },
-  { register: 'giorno', viewport: 'narrow', width: 390, height: 844 },
-  { register: 'grafite', viewport: 'narrow', width: 390, height: 844 },
-];
+const WORKLIST_CASES: WorklistCase[] = (['giorno', 'grafite'] as const).flatMap((register) =>
+  REFLOW_PROXY_VIEWPORTS.map((viewport) => ({ register, ...viewport })),
+);
 
 async function setRegister(page: Page, register: WorklistCase['register']): Promise<void> {
   await page.evaluate((nextRegister) => {
@@ -138,33 +142,21 @@ async function assertWorklistContract(page: Page): Promise<void> {
   await expect(page.getByTestId('lume-patient-lens-empty')).toHaveCount(0);
 }
 
-async function assertNoHorizontalOverflow(page: Page): Promise<void> {
-  const overflow = await page.evaluate(() => {
-    const targets = [
-      ['documento', document.documentElement],
-      ['worklist', document.querySelector<HTMLElement>('[data-testid="lume-worklist"]')],
-      ['lista', document.querySelector<HTMLElement>('[data-testid="lume-patient-list"]')],
-      ['lente', document.querySelector<HTMLElement>('[data-testid="lume-patient-lens"]')],
-    ] as const;
-    return targets.map(([label, element]) => ({
-      label,
-      delta: element ? element.scrollWidth - element.clientWidth : Number.POSITIVE_INFINITY,
-    }));
-  });
-  for (const target of overflow) {
-    expect(target.delta, `Overflow orizzontale su ${target.label}`).toBeLessThanOrEqual(1);
-  }
-}
-
 for (const worklistCase of WORKLIST_CASES) {
   test(`worklist Lume ${worklistCase.register} ${worklistCase.viewport}`, async ({ page }) => {
     await openSyntheticWorklist(page, worklistCase);
     await expect(page.locator('html')).toHaveClass(worklistCase.register === 'grafite' ? /dark/ : /light/);
     await assertWorklistContract(page);
-    if (worklistCase.viewport === 'narrow') {
-      await assertNoHorizontalOverflow(page);
-      await page.getByTestId('lume-patient-lens').scrollIntoViewIfNeeded();
-    }
+    await assertNoHorizontalOverflow(page, [
+      { label: 'documento worklist', selector: 'document' },
+      { label: 'worklist', selector: '[data-testid="lume-worklist"]' },
+      { label: 'lista pazienti', selector: '[data-testid="lume-patient-list"]' },
+      { label: 'lente paziente', selector: '[data-testid="lume-patient-lens"]' },
+    ]);
+    const selectedRow = page.getByTestId('lume-patient-row').nth(1);
+    await assertNotClippedInViewport(selectedRow, 'riga paziente selezionata');
+    await assertKeyboardFocusProgresses(page, selectedRow, 'riga paziente selezionata');
+    await page.getByTestId('lume-patient-lens').scrollIntoViewIfNeeded();
     await page.screenshot({
       path: `/tmp/lume-worklist-${worklistCase.register}-${worklistCase.viewport}.png`,
       fullPage: true,

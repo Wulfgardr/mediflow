@@ -1,6 +1,55 @@
 /* @Codex */
 import { expect, Locator, Page } from '@playwright/test';
 
+/* @Codex The widths exercise responsive reflow only. They are intentionally
+   not labelled as browser zoom: Playwright does not provide a reliable
+   page-zoom primitive for layout assertions in this harness. */
+export const REFLOW_PROXY_VIEWPORTS = [
+  { viewport: 'reflow-proxy-400', width: 320, height: 760 },
+  { viewport: 'phone', width: 390, height: 844 },
+  { viewport: 'reflow-proxy-200', width: 768, height: 1024 },
+  { viewport: 'wide', width: 1440, height: 960 },
+] as const;
+
+export type ReflowProxyViewport = (typeof REFLOW_PROXY_VIEWPORTS)[number];
+
+type OverflowTarget = { label: string; selector: string };
+
+/* @Codex */
+export async function assertNoHorizontalOverflow(page: Page, targets: readonly OverflowTarget[]): Promise<void> {
+  const evidence = await page.evaluate((requestedTargets) => requestedTargets.map(({ label, selector }) => {
+    const element = selector === 'document' ? document.documentElement : document.querySelector<HTMLElement>(selector);
+    return {
+      label,
+      delta: element ? element.scrollWidth - element.clientWidth : Number.POSITIVE_INFINITY,
+    };
+  }), targets);
+
+  for (const target of evidence) {
+    expect(target.delta, `Overflow orizzontale su ${target.label}`).toBeLessThanOrEqual(1);
+  }
+}
+
+/* @Codex */
+export async function assertNotClippedInViewport(locator: Locator, label: string): Promise<void> {
+  const box = await locator.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, width: rect.width, viewportWidth: window.innerWidth };
+  });
+  expect(box.width, `${label}: larghezza osservabile`).toBeGreaterThan(0);
+  expect(box.left, `${label}: bordo sinistro fuori viewport`).toBeGreaterThanOrEqual(-1);
+  expect(box.right, `${label}: bordo destro fuori viewport`).toBeLessThanOrEqual(box.viewportWidth + 1);
+}
+
+/* @Codex */
+export async function assertKeyboardFocusProgresses(page: Page, origin: Locator, label: string): Promise<void> {
+  await origin.focus();
+  await expect(origin, `${label}: focus iniziale`).toBeFocused();
+  await page.keyboard.press('Tab');
+  expect(await origin.evaluate((element) => document.activeElement === element), `${label}: Tab deve uscire dal controllo`).toBe(false);
+  expect(await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement !== document.body), `${label}: Tab deve raggiungere un controllo`).toBe(true);
+}
+
 /* @Codex */
 export async function isVisible(locator: Locator, timeout = 1200): Promise<boolean> {
   try {
