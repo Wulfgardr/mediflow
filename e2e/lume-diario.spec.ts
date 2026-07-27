@@ -1,20 +1,24 @@
 /* @Codex issue 105, riferimento 68 */
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import {
+  assertKeyboardFocusProgresses,
+  assertNoHorizontalOverflow,
+  assertNotClippedInViewport,
+  bootstrapUnlockedSession,
+  REFLOW_PROXY_VIEWPORTS,
+  type ReflowProxyViewport,
+} from './utils';
 
 type DiaryCase = {
   register: 'giorno' | 'grafite';
-  viewport: 'wide' | 'narrow';
+  viewport: ReflowProxyViewport['viewport'];
   width: number;
   height: number;
 };
 
-const DIARY_CASES: DiaryCase[] = [
-  { register: 'giorno', viewport: 'wide', width: 1440, height: 960 },
-  { register: 'grafite', viewport: 'wide', width: 1440, height: 960 },
-  { register: 'giorno', viewport: 'narrow', width: 390, height: 844 },
-  { register: 'grafite', viewport: 'narrow', width: 390, height: 844 },
-];
+const DIARY_CASES: DiaryCase[] = (['giorno', 'grafite'] as const).flatMap((register) =>
+  REFLOW_PROXY_VIEWPORTS.map((viewport) => ({ register, ...viewport })),
+);
 
 const FIXTURE_PREFIX = 'Diario Filo sintetico';
 
@@ -222,18 +226,7 @@ async function assertContrastAndFocus(
   expect(shadows.slice(1).every((shadow) => shadow === 'none')).toBe(true);
 }
 
-async function assertNarrowLayout(page: Page, diary: Locator): Promise<void> {
-  const overflow = await page.evaluate(() => ({
-    document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    diary: document.querySelector<HTMLElement>('[data-testid="lume-diario"]')
-      ? document.querySelector<HTMLElement>('[data-testid="lume-diario"]')!.scrollWidth
-        - document.querySelector<HTMLElement>('[data-testid="lume-diario"]')!.clientWidth
-      : Number.POSITIVE_INFINITY,
-  }));
-  for (const [surface, delta] of Object.entries(overflow)) {
-    expect(delta, `Overflow orizzontale su ${surface}`).toBeLessThanOrEqual(1);
-  }
-
+async function assertReflowStack(diary: Locator): Promise<void> {
   const geometry = await diary.getByTestId('lume-diario-entry').evaluateAll((elements) => elements.map((element) => {
     const box = element.getBoundingClientRect();
     const date = element.querySelector<HTMLElement>('[data-lume-entry-part="date"]')!.getBoundingClientRect();
@@ -343,7 +336,14 @@ test.describe.serial('Diario globale Lume', () => {
       const entries = diary.getByTestId('lume-diario-entry');
       await assertNoSideStripe(diary, entries);
       await assertContrastAndFocus(page, entries, diaryCase.register);
-      if (diaryCase.viewport === 'narrow') await assertNarrowLayout(page, diary);
+      await assertNoHorizontalOverflow(page, [
+        { label: 'documento diario', selector: 'document' },
+        { label: 'diario', selector: '[data-testid="lume-diario"]' },
+      ]);
+      await assertReflowStack(diary);
+      const activeEntry = entries.filter({ hasText: `${FIXTURE_PREFIX} 3` });
+      await assertNotClippedInViewport(activeEntry, 'voce attiva del diario');
+      await assertKeyboardFocusProgresses(page, activeEntry.getByRole('button', { name: 'Apri quadro', exact: true }), 'azione Apri quadro');
       await diary.evaluate((element) => element.scrollIntoView({ block: 'start' }));
       await page.screenshot({
         path: `/tmp/lume-diario-${diaryCase.register}-${diaryCase.viewport}.png`,
