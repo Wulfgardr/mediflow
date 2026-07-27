@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
-import { Accessibility, Activity, Download, FileText, Pencil, Pill, Plus, ShieldCheck, Stethoscope } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Accessibility, Activity, Download, FileText, Pencil, Pill, Plus, Share2, ShieldCheck, Stethoscope } from 'lucide-react';
 
 import AIPatientInsight from '@/components/ai-patient-insight';
 import { ClinicalRiverTimeline } from '@/components/clinical-river-timeline';
@@ -49,6 +49,17 @@ export default function PatientDetailPage() {
     const params = useParams();
     const id = params.id as string;
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+    /* @Codex Whether this browser can actually hand a file to the system.
+       Probed rather than assumed: the Web Share API accepts files on iOS, iPadOS
+       and Safari on the Mac, and refuses them in several desktop browsers. A
+       button that opens nothing is worse than an absent one, so the control is
+       only drawn where the capability answers yes. */
+    const [canShareFhirFile, setCanShareFhirFile] = useState(false);
+    useEffect(() => {
+        if (typeof navigator === 'undefined' || typeof navigator.canShare !== 'function') return;
+        const probe = new File(['{}'], 'probe.json', { type: 'application/json' });
+        setCanShareFhirFile(navigator.canShare({ files: [probe] }));
+    }, []);
     const [isDocumentUploadOpen, setIsDocumentUploadOpen] = useState(false);
     const [observationPrefill, setObservationPrefill] = useState<ObservationPrefill | undefined>();
     /* WUL-262: mirror of the Smart Import review counts reported by the panel. */
@@ -499,42 +510,54 @@ export default function PatientDetailPage() {
         { href: '#follow-up', label: 'Follow-up', meta: workspace ? String(workspace.pendingCheckupsCount) : undefined },
     ];
 
+    /* @Codex Validates against the FSE and builds the bundle, or returns null
+       when the export must not proceed.
+       Extracted so downloading and sharing take the same road: the native
+       client already separates preparing the bundle from handing it over
+       (prepareFHIRExport writes the file, ShareLink passes it to the system),
+       and the check that blocks on FSE errors must not have two copies that can
+       drift apart. */
+    const prepareFhirExport = async (): Promise<{ file: File } | null> => {
+        const validationResponse = await fetch(`/api/fse/validate-patient?patientId=${encodeURIComponent(id)}`);
+        if (!validationResponse.ok) {
+            throw new Error('Validation pre-check failed');
+        }
+        const validation = await validationResponse.json() as ValidatePatientExportResponse;
+
+        if (validation.hasErrors) {
+            showToast({
+                tone: 'error',
+                title: 'Esportazione bloccata: risolvi gli errori di validazione FSE',
+                description: buildValidationMessage(validation),
+            });
+            return null;
+        }
+
+        if (validation.hasWarnings) {
+            const { confirmed } = await confirm({
+                title: 'Warning di validazione FSE',
+                message: `${buildValidationMessage(validation)}\n\nVuoi proseguire comunque con l'export?`,
+                confirmLabel: 'Esporta comunque',
+            });
+            if (!confirmed) return null;
+        }
+
+        const { generatePatientBundle } = await import('@/lib/fhir/bundle-generator');
+        const bundle = await generatePatientBundle(id);
+        const jsonString = JSON.stringify(bundle, null, 2);
+        const fileName = `patient-${patient.lastName}-${patient.firstName}-fhir.json`;
+        return { file: new File([jsonString], fileName, { type: 'application/json' }) };
+    };
+
     const handleExportConfirm = async () => {
         try {
-            const validationResponse = await fetch(`/api/fse/validate-patient?patientId=${encodeURIComponent(id)}`);
-            if (!validationResponse.ok) {
-                throw new Error('Validation pre-check failed');
-            }
-            const validation = await validationResponse.json() as ValidatePatientExportResponse;
+            const prepared = await prepareFhirExport();
+            if (!prepared) return;
 
-            if (validation.hasErrors) {
-                showToast({
-                    tone: 'error',
-                    title: 'Esportazione bloccata: risolvi gli errori di validazione FSE',
-                    description: buildValidationMessage(validation),
-                });
-                return;
-            }
-
-            if (validation.hasWarnings) {
-                const { confirmed } = await confirm({
-                    title: 'Warning di validazione FSE',
-                    message: `${buildValidationMessage(validation)}\n\nVuoi proseguire comunque con l'export?`,
-                    confirmLabel: 'Esporta comunque',
-                });
-                if (!confirmed) return;
-            }
-
-            const { generatePatientBundle } = await import('@/lib/fhir/bundle-generator');
-            const bundle = await generatePatientBundle(id);
-
-            const jsonString = JSON.stringify(bundle, null, 2);
-            const blob = new Blob([jsonString], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-
+            const url = URL.createObjectURL(prepared.file);
             const anchor = document.createElement('a');
             anchor.href = url;
-            anchor.download = `patient-${patient.lastName}-${patient.firstName}-fhir.json`;
+            anchor.download = prepared.file.name;
             document.body.appendChild(anchor);
             anchor.click();
             document.body.removeChild(anchor);
@@ -544,6 +567,27 @@ export default function PatientDetailPage() {
         } catch (error) {
             console.error('Export failed', error);
             showToast("Errore durante l'esportazione.", 'error');
+        }
+    };
+
+    /* @Codex The counterpart of the native ShareLink: hand the bundle to the
+       system so it can go to Mail, AirDrop or Files, instead of only landing in
+       the downloads folder. Same FSE gate as the export, because sharing a
+       bundle the validator rejected would be the same mistake with a wider
+       blast radius. */
+    const handleShareFhir = async () => {
+        try {
+            const prepared = await prepareFhirExport();
+            if (!prepared) return;
+            await navigator.share({
+                files: [prepared.file],
+                title: `FHIR ${patient.lastName} ${patient.firstName}`,
+            });
+        } catch (error) {
+            // Dismissing the system sheet is a decision, not a failure.
+            if (error instanceof DOMException && error.name === 'AbortError') return;
+            console.error('Share failed', error);
+            showToast('Errore durante la condivisione.', 'error');
         }
     };
 
@@ -573,6 +617,16 @@ export default function PatientDetailPage() {
                     <Download className="h-3.5 w-3.5" />
                     Esporta FHIR
                 </button>
+                {canShareFhirFile && (
+                    <button
+                        type="button"
+                        onClick={handleShareFhir}
+                        className={workspaceStyles.quietAction}
+                    >
+                        <Share2 className="h-3.5 w-3.5" />
+                        Condividi FHIR
+                    </button>
+                )}
                 <button
                     type="button"
                     onClick={async () => {
