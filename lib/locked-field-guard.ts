@@ -3,14 +3,35 @@
 // presentation-only artifact: the original ciphertext must survive any save,
 // otherwise a later re-encrypt overwrites the clinical data irreversibly.
 
-export const LOCKED_DATA_PLACEHOLDER = '[LOCKED DATA]';
+/**
+ * What the reader sees in place of a clinical field this session cannot open.
+ *
+ * It used to be `[LOCKED DATA]`: a technical token, in English, inside an
+ * Italian interface, and silent about what had happened. A clinician reading it
+ * cannot tell whether the datum is missing, corrupt, or simply sealed with a key
+ * this device does not hold — and those are three very different situations.
+ *
+ * The wording follows what the Apple client already says for the same case, so
+ * a field that cannot be read reads the same on every surface.
+ */
+export const LOCKED_DATA_PLACEHOLDER = 'Contenuto cifrato non leggibile con la chiave di questa sessione.';
+
+/**
+ * The token used before the sentence above.
+ *
+ * Still recognised, because this constant is not only what is shown: it is also
+ * the sentinel that refuses to persist the placeholder over the real ciphertext
+ * (see lib/db.ts). A record written by an older build must keep hitting that
+ * guard rather than slipping through and overwriting clinical data.
+ */
+export const LEGACY_LOCKED_DATA_PLACEHOLDER = '[LOCKED DATA]';
 
 // Enumerable side-channel key so the preserved ciphertext survives object
 // spreads ({ ...patient }) in UI flows; it is stripped before any write.
 export const LOCKED_CIPHERTEXT_KEY = '__lockedCiphertext';
 
 export function isLockedDataPlaceholder(value: unknown): value is typeof LOCKED_DATA_PLACEHOLDER {
-    return value === LOCKED_DATA_PLACEHOLDER;
+    return value === LOCKED_DATA_PLACEHOLDER || value === LEGACY_LOCKED_DATA_PLACEHOLDER;
 }
 
 export function isEncryptedFieldValue(value: unknown): value is string {
