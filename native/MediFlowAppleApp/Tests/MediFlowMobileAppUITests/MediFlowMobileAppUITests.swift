@@ -186,7 +186,16 @@ final class MediFlowMobileAppUITests: XCTestCase {
         return query.element
     }
 
-    func testProjectMenuOpensEverySurface() {
+    func testProjectMenuOpensEverySurface() throws {
+        /* La meta speculare della matrice adattiva. I quattro contratti solo-iPad
+           si auto-saltano su iPhone; questi cinque pretendono il cromo compatto,
+           cioe la tab bar mobile e il menu Progetto che vive solo nel ramo TabView,
+           e su iPad quel cromo non esiste per scelta dichiarata (#142): li la
+           navigazione e una NavigationSplitView con la sidebar. Un test che lo
+           pretende su iPad asserisce l opposto del progetto. La copertura iPad
+           equivalente esiste gia in testEveryClinicalSurfaceOpensOnThisIdiom, che
+           gira su entrambi gli idiomi. */
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "compact-only layout contract")
         launch()
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
         let projectButton = app.navigationBars.buttons["Progetto"].firstMatch
@@ -446,7 +455,16 @@ final class MediFlowMobileAppUITests: XCTestCase {
     /// This asserts vertical occlusion, not horizontal overflow: XCUI clips
     /// element frames to the visible region, so a horizontal-bounds check is
     /// satisfied by the very clipping it is meant to catch.
-    func testWorklistLastRowClearsTheFloatingTabBarAtAX5() {
+    func testWorklistLastRowClearsTheFloatingTabBarAtAX5() throws {
+        /* La meta speculare della matrice adattiva. I quattro contratti solo-iPad
+           si auto-saltano su iPhone; questi cinque pretendono il cromo compatto,
+           cioe la tab bar mobile e il menu Progetto che vive solo nel ramo TabView,
+           e su iPad quel cromo non esiste per scelta dichiarata (#142): li la
+           navigazione e una NavigationSplitView con la sidebar. Un test che lo
+           pretende su iPad asserisce l opposto del progetto. La copertura iPad
+           equivalente esiste gia in testEveryClinicalSurfaceOpensOnThisIdiom, che
+           gira su entrambi gli idiomi. */
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "compact-only layout contract")
         launch(seedPatients: true, section: "modules", dynamicTypeSize: "accessibility5")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
         let tabBar = app.tabBars.firstMatch
@@ -515,7 +533,16 @@ final class MediFlowMobileAppUITests: XCTestCase {
     /// Patients-first has to hold at AX5 too, where header controls are largest.
     /// The first patient must be reachable in the first viewport, above the
     /// floating tab bar, without scrolling.
-    func testFirstPatientIsVisibleInTheFirstViewportAtAX5() {
+    func testFirstPatientIsVisibleInTheFirstViewportAtAX5() throws {
+        /* La meta speculare della matrice adattiva. I quattro contratti solo-iPad
+           si auto-saltano su iPhone; questi cinque pretendono il cromo compatto,
+           cioe la tab bar mobile e il menu Progetto che vive solo nel ramo TabView,
+           e su iPad quel cromo non esiste per scelta dichiarata (#142): li la
+           navigazione e una NavigationSplitView con la sidebar. Un test che lo
+           pretende su iPad asserisce l opposto del progetto. La copertura iPad
+           equivalente esiste gia in testEveryClinicalSurfaceOpensOnThisIdiom, che
+           gira su entrambi gli idiomi. */
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "compact-only layout contract")
         launch(seedPatients: true, section: "modules", dynamicTypeSize: "accessibility5")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
         let tabBar = app.tabBars.firstMatch
@@ -649,7 +676,16 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(analyticsSaysSomething, "Analytics non dice nulla sul perche non ci siano numeri")
     }
 
-    func testTabBarNavigatesBetweenSections() {
+    func testTabBarNavigatesBetweenSections() throws {
+        /* La meta speculare della matrice adattiva. I quattro contratti solo-iPad
+           si auto-saltano su iPhone; questi cinque pretendono il cromo compatto,
+           cioe la tab bar mobile e il menu Progetto che vive solo nel ramo TabView,
+           e su iPad quel cromo non esiste per scelta dichiarata (#142): li la
+           navigazione e una NavigationSplitView con la sidebar. Un test che lo
+           pretende su iPad asserisce l opposto del progetto. La copertura iPad
+           equivalente esiste gia in testEveryClinicalSurfaceOpensOnThisIdiom, che
+           gira su entrambi gli idiomi. */
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "compact-only layout contract")
         launch()
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
 
@@ -719,7 +755,16 @@ final class MediFlowMobileAppUITests: XCTestCase {
     }
 
     /* @Codex */
-    func testUsablePatientHomeShowsWorklistBeforeConnectionSetup() {
+    func testUsablePatientHomeShowsWorklistBeforeConnectionSetup() throws {
+        /* La meta speculare della matrice adattiva. I quattro contratti solo-iPad
+           si auto-saltano su iPhone; questi cinque pretendono il cromo compatto,
+           cioe la tab bar mobile e il menu Progetto che vive solo nel ramo TabView,
+           e su iPad quel cromo non esiste per scelta dichiarata (#142): li la
+           navigazione e una NavigationSplitView con la sidebar. Un test che lo
+           pretende su iPad asserisce l opposto del progetto. La copertura iPad
+           equivalente esiste gia in testEveryClinicalSurfaceOpensOnThisIdiom, che
+           gira su entrambi gli idiomi. */
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "compact-only layout contract")
         launch(seedPatients: true, section: "modules")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
 
