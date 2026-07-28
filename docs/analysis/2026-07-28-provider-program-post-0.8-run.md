@@ -248,9 +248,9 @@ owner per wave.
 
 ## 13. Next permitted action
 
-Aprire un worktree dedicato WUL-418 dalla HEAD verificata di WUL-502.
-Aggiornare solo la matrice di governance `task × modello × runtime` e i serving
-gate. Non cambiare runtime, provider, credenziali, schema, UI o egress.
+Preparare un packet WUL-466 dalla HEAD verificata di WUL-418. Definire prima i
+profili degradati e il contratto di fallback OCR multipiattaforma. Non cambiare
+runtime, provider, credenziali, schema, UI o egress senza un packet separato.
 
 Stop immediato se la baseline finale 0.8 diverge nei file toccati, se il
 registry introduce fallback di rete o se una lane tenta di ereditare grant da
@@ -321,3 +321,58 @@ Packet WUL-502: `GO`.
 
 Programma complessivo: `PARTIAL / HOLD_IMPLEMENTATION` per provider remoti,
 consenso, capability specifiche del modello e UX multipiattaforma.
+
+## 15. Continuazione WUL-418
+
+### 15.1 Identità
+
+| Campo | Valore |
+| --- | --- |
+| Worktree | `/Users/leonardopegollo/.codex/worktrees/wul418-post08-runtime-matrix/medical-record-app` |
+| Branch | `codex/WUL-418-post-0.8-runtime-matrix` |
+| Base | `18088c008` |
+| Commit matrice | `cc6c036cd` |
+| Controller | GPT-5.6 Sol High |
+| Verificatore | RepoPrompt GPT-5.6 Sol XHigh, contesto fresco |
+| GPT-5.6 Pro | Non usato: riconciliazione documentale verificabile |
+
+### 15.2 Esito
+
+La matrice canonica post-0.8 separa:
+
+- stato operativo: `runtime`, `shadow`, `benchmark_only`, `hold`;
+- readiness WUL-418: `revalidation_required` o `blocked`;
+- fitting tecnico e serving promosso;
+- fallback e authority plane di ogni task.
+
+Le lane operative esistenti non sono state promosse. Restano utilizzabili sotto
+i boundary review-first già presenti, ma nessun cambio di modello, provider o
+claim è ammesso prima della ricertificazione completa.
+
+### 15.3 Evidenza
+
+- `git diff --check`: `PASS`;
+- indice Markdown completo: `PASS`;
+- claims guard: `PASS`;
+- ricerca Foundation Models nel tree: nessuna implementazione;
+- review indipendente iniziale: `HOLD_FIX`;
+- review indipendente dopo la separazione stato/readiness: `GO`.
+
+### 15.4 Decision audit
+
+| Decisione | Stato | Falsificatore |
+| --- | --- | --- |
+| Separare call path esistente e readiness WUL-418 | Corretta | `runtime` letto come ricertificazione completa |
+| Mantenere soglie qualità e risorse lane-specific | Accettata | Soglia universale senza benchmark |
+| Isolare fallback e grant per task | Accettata | Fallback OCR ereditato da un'altra lane |
+| Attestare capability specifiche del modello | Aperta | Capability dedotta dal nome |
+| Profili degradati multipiattaforma | Aperta | Claim parity senza fallback verificato |
+
+Le decisioni aperte bloccano nuove promozioni. Non bloccano la matrice di
+governance.
+
+### 15.5 Verdetto
+
+Packet WUL-418: `GO`.
+
+Programma complessivo: `PARTIAL / HOLD_IMPLEMENTATION`.
