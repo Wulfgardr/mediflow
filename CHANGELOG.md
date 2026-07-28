@@ -62,8 +62,12 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   accessibilità automatica e contratti wire per i flussi dichiarati.
   **Stato**: incluse nella candidata locale con fixture sintetiche e test
   mirati.
-  **Limite**: non dichiarano parity UI completa, VoiceOver reale, zoom reale o
-  collaudo manuale P6 sul bundle macOS.
+  **Evidenza manuale**: Chrome sulla build di produzione è stato verificato al
+  200% e al 400%; il bundle macOS già costruito è stato verificato con
+  VoiceOver, tastiera, click-map e resize a 1100, 1300 e 1600 punti.
+  **Limite**: non dichiarano parity UI completa. Restano non terminali
+  VoiceOver reale su iPhone e iPad, lo screen reader web e la nuova build Xcode
+  sul tree corrente.
 - **Modifica**: l'export FHIR mantiene un perimetro locale e manuale. La
   condivisione resta soggetta alle capability della piattaforma.
   **Stato**: il contratto v0 resta documentato in ADR 0081.
