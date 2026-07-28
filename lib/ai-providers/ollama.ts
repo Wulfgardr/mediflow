@@ -7,15 +7,12 @@ import {
 } from './provider';
 import { normalizeOllamaBaseUrl } from './base-url';
 import {
-    assertLocalOllamaModelReference,
     assertLocalOllamaResponse,
     attestLocalOllamaModel,
     isLocalOllamaModelDescriptor,
+    OLLAMA_LOCAL_KEEP_ALIVE,
     strictOllamaLoopbackBaseUrl,
 } from './ollama-locality';
-
-/* @Codex */
-const MODEL_KEEP_ALIVE = '30m';
 
 export interface OllamaProviderAdapterOptions {
     baseUrl: string;
@@ -72,7 +69,7 @@ export function buildOllamaChatPayload(
         messages: toOllamaMessages(messages),
         stream: false,
         ...(options?.responseFormat === 'json' ? { format: 'json' } : {}),
-        keep_alive: MODEL_KEEP_ALIVE,
+        keep_alive: OLLAMA_LOCAL_KEEP_ALIVE,
         options: {
             temperature: 0.4,
             num_predict: maxTokens || 4096,
@@ -88,7 +85,7 @@ export class OllamaProviderAdapter implements ProviderAdapter {
     public readonly capabilities = {
         vision: true,
         jsonMode: true,
-        pull: true,
+        pull: false,
         thinkingToggle: true,
     };
 
@@ -143,7 +140,7 @@ export class OllamaProviderAdapter implements ProviderAdapter {
                 method: 'POST',
                 headers,
                 body: JSON.stringify(buildOllamaChatPayload(
-                    this.model,
+                    attestation?.canonicalModel ?? this.model,
                     messages,
                     maxTokens,
                     options,
@@ -154,8 +151,7 @@ export class OllamaProviderAdapter implements ProviderAdapter {
             });
 
             if (!response.ok) {
-                const errText = await response.text();
-                throw new Error(`AI Provider Error (${response.status}): ${errText}`);
+                throw new Error(`AI Provider Error (${response.status})`);
             }
 
             const data = await response.json();
@@ -207,59 +203,4 @@ export class OllamaProviderAdapter implements ProviderAdapter {
         }
     }
 
-    async pullModel(modelName: string, onProgress?: (status: string, progress: number) => void): Promise<void> {
-        assertLocalOllamaModelReference(modelName);
-        const targetUrl = this.isBrowserRuntime()
-            ? this.baseUrl
-            : strictOllamaLoopbackBaseUrl(this.baseUrl);
-        const response = await fetch(this.isBrowserRuntime() ? '/api/ai/pull' : `${targetUrl}/api/pull`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(this.isBrowserRuntime() ? { 'x-target-url': targetUrl } : {}),
-            },
-            body: JSON.stringify({ model: modelName }),
-            redirect: 'error',
-        });
-
-        if (!response.ok || !response.body) {
-            throw new Error('Failed to start model pull');
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        try {
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-
-                for (const line of lines) {
-                    if (!line.trim()) continue;
-                    try {
-                        const data = JSON.parse(line);
-                        let percent = 0;
-                        if (data.total && data.completed) {
-                            percent = Math.round((data.completed / data.total) * 100);
-                        }
-
-                        if (onProgress) {
-                            onProgress(data.status, percent);
-                        }
-
-                        if (data.error) throw new Error(data.error);
-                    } catch (e) {
-                        console.warn('Parse error chunk', e);
-                    }
-                }
-            }
-        } finally {
-            reader.releaseLock();
-        }
-    }
 }

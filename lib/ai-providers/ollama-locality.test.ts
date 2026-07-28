@@ -43,6 +43,8 @@ test('attesta il modello locale senza inviare un prompt', async (t) => {
         if (url.endsWith('/api/version')) return Response.json({ version: '0.32.5' });
         if (url.endsWith('/api/tags')) return Response.json({ models: [LOCAL_MODEL] });
         if (url.endsWith('/api/show')) return Response.json({ details: LOCAL_MODEL.details });
+        if (url.endsWith('/api/generate')) return Response.json({ model: LOCAL_MODEL.model });
+        if (url.endsWith('/api/ps')) return Response.json({ models: [LOCAL_MODEL] });
         return new Response(null, { status: 404 });
     }) as typeof fetch;
     t.after(() => {
@@ -56,9 +58,10 @@ test('attesta il modello locale senza inviare un prompt', async (t) => {
 
     assert.equal(attestation.executionMode, 'local');
     assert.equal(attestation.canonicalModel, LOCAL_MODEL.name);
-    assert.equal(calls.length, 3);
-    assert.deepEqual(JSON.parse(String(calls[2]?.init?.body)), { model: 'qwen-local' });
+    assert.equal(calls.length, 5);
+    assert.deepEqual(JSON.parse(String(calls[2]?.init?.body)), { model: LOCAL_MODEL.model });
     assert.equal(calls.some(({ init }) => String(init?.body).includes('messages')), false);
+    assert.equal(calls.some(({ init }) => String(init?.body).includes('fixture')), false);
     assert.equal(calls.every(({ url }) => url.startsWith('http://127.0.0.1:11434/')), true);
     assert.equal(calls.every(({ init }) => init?.redirect === 'error'), true);
 });
@@ -88,9 +91,23 @@ test('rifiuta un modello remoto prima della chiamata show', async (t) => {
     assert.equal(urls.some((url) => url.endsWith('/api/show')), false);
 });
 
+test('richiede una versione Ollama qualificata per il contratto locality', async (t) => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => Response.json({ version: '0.33.0' })) as typeof fetch;
+    t.after(() => {
+        globalThis.fetch = originalFetch;
+    });
+
+    await assert.rejects(
+        () => attestLocalOllamaModel('http://127.0.0.1:11434', 'qwen-local'),
+        (error) => error instanceof OllamaLocalityError && error.code === 'provider_unready',
+    );
+});
+
 test('filtra descrittori remoti e rifiuta risposte non attestate', () => {
     assert.equal(isLocalOllamaModelDescriptor(LOCAL_MODEL), true);
     assert.equal(isLocalOllamaModelDescriptor({ ...LOCAL_MODEL, remote_model: 'remote' }), false);
+    assert.equal(isLocalOllamaModelDescriptor({ ...LOCAL_MODEL, remote_host: {} }), false);
     assert.throws(
         () => assertLocalOllamaResponse(
             { model: 'qwen-local:latest', remote_host: 'remote.invalid' },

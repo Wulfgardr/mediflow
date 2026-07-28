@@ -340,8 +340,8 @@ function runZeroKnowledgeChecks(runtimeFiles) {
         },
         {
             file: 'app/api/ai/pull/route.ts',
-            token: 'assertLocalOllamaModelReference(model)',
-            message: 'Ollama pull must reject cloud model references before fetching',
+            token: "new OllamaLocalityError('model_pull_disabled')",
+            message: 'Ollama model pull must remain disabled in the local-only clinical lane',
         },
     ];
 

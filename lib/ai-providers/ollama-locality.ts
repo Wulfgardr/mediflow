@@ -5,8 +5,12 @@ export type OllamaLocalityFailure =
     | 'endpoint_not_loopback'
     | 'model_cloud_reference'
     | 'model_not_local'
+    | 'model_pull_disabled'
     | 'provider_unready'
     | 'response_not_local';
+
+export const OLLAMA_LOCAL_KEEP_ALIVE = '30m';
+const SUPPORTED_OLLAMA_LOCALITY_VERSION = /^0\.32\.\d+(?:[-+].+)?$/;
 
 export class OllamaLocalityError extends Error {
     constructor(public readonly code: OllamaLocalityFailure) {
@@ -37,8 +41,8 @@ export interface OllamaLocalAttestation {
 }
 
 function hasRemoteMarker(value: OllamaModelDescriptor): boolean {
-    return typeof value.remote_host === 'string' && value.remote_host.length > 0
-        || typeof value.remote_model === 'string' && value.remote_model.length > 0;
+    const isPresent = (field: unknown) => field !== undefined && field !== null && field !== '';
+    return isPresent(value.remote_host) || isPresent(value.remote_model);
 }
 
 function modelName(value: OllamaModelDescriptor): string {
@@ -119,7 +123,7 @@ export async function attestLocalOllamaModel(
     const baseUrl = strictOllamaLoopbackBaseUrl(rawBaseUrl);
     const versionData = await fetchJson(`${baseUrl}/api/version`, { signal });
     const serverVersion = typeof versionData.version === 'string' ? versionData.version : '';
-    if (!/^\d+\.\d+\.\d+(?:[-+].+)?$/.test(serverVersion)) {
+    if (!SUPPORTED_OLLAMA_LOCALITY_VERSION.test(serverVersion)) {
         throw new OllamaLocalityError('provider_unready');
     }
 
@@ -131,15 +135,39 @@ export async function attestLocalOllamaModel(
     }) as OllamaModelDescriptor | undefined;
     if (!localModel) throw new OllamaLocalityError('model_not_local');
 
+    const canonicalModel = modelName(localModel);
     const showData = await fetchJson(`${baseUrl}/api/show`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: requestedModel }),
+        body: JSON.stringify({ model: canonicalModel }),
         signal,
     });
     if (hasRemoteMarker(showData) || !showData.details || typeof showData.details !== 'object') {
         throw new OllamaLocalityError('model_not_local');
     }
+
+    const preloadData = await fetchJson(`${baseUrl}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: canonicalModel,
+            keep_alive: OLLAMA_LOCAL_KEEP_ALIVE,
+        }),
+        signal,
+    });
+    if (hasRemoteMarker(preloadData) || !sameModel(modelName(preloadData), canonicalModel)) {
+        throw new OllamaLocalityError('model_not_local');
+    }
+
+    const runningData = await fetchJson(`${baseUrl}/api/ps`, { signal });
+    const runningModels = Array.isArray(runningData.models) ? runningData.models : [];
+    const loadedModel = runningModels.find((item) => {
+        if (!isLocalOllamaModelDescriptor(item)) return false;
+        const descriptor = item as OllamaModelDescriptor;
+        return sameModel(modelName(descriptor), canonicalModel)
+            && descriptor.digest === localModel.digest;
+    });
+    if (!loadedModel) throw new OllamaLocalityError('model_not_local');
 
     return {
         authorityPlane: 'clinical_application',
@@ -147,7 +175,7 @@ export async function attestLocalOllamaModel(
         executionMode: 'local',
         endpointClass: 'loopback',
         requestedModel,
-        canonicalModel: modelName(localModel),
+        canonicalModel,
         digest: localModel.digest as string,
         serverVersion,
         checkedAt: new Date().toISOString(),
