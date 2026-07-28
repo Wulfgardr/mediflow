@@ -82,7 +82,8 @@ La fotografia corrente e questa:
 - **AI**: runtime locale per default, `OllamaAdapter` e `AIService` come
   integrazioni presenti nel tree e gate egress ancora chiuso; benchmark e
   shadow lane restano separati dal prodotto clinico. Lo scaffold intelligente
-  di ADR 0086 resta una proposta e non apre una funzione nuova della v0.8.
+  di ADR 0086 e un contratto accettato per il programma post-0.8 e non apre una
+  funzione nuova della v0.8.
 - **Attese locali**: la prima slice web collega prestazioni attese e risultati;
   il salvataggio resta esplicito e il workflow non e esteso ai client paired.
 - **SISS/FSE**: handoff contestuale e flussi `webapp-assisted`; nessuna
