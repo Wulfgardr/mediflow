@@ -1,9 +1,9 @@
 {
-  "generated": "2026-07-08",
-  "source": "WUL-479 reconciliation of the 2026-07-08 capability map against Wulfgardr/mediflow public/main",
+  "generated": "2026-07-28",
+  "source": "MediFlow 0.8 parity closeout against the frozen local source candidate",
   "release08Gate": {
-    "asOf": "2026-07-24",
-    "status": "open",
+    "asOf": "2026-07-28",
+    "status": "source-candidate-ready-with-external-limitation",
     "scope": [
       "iPhone/iPad",
       "macOS",
@@ -17,26 +17,40 @@
     },
     "packets": [
       {
-        "surface": "iPhone/iPad",
-        "owner": "Chief UI",
-        "status": "handoff-pending",
-        "requiredEvidence": "hash approvato, build, iPhone, iPad regular/compact, multitasking, resize, Dynamic Type, accessibilità, screenshot sintetici e verifier"
+        "surface": "iPhone",
+        "owner": "CoS parity 0.8",
+        "status": "verified-with-external-voiceover-limitation",
+        "requiredEvidence": "XCUITest 2/2 sul candidato, identifier tab atomici, sei superfici, screenshot sintetici; VoiceOver reale mobile non provato"
+      },
+      {
+        "surface": "iPad",
+        "owner": "CoS parity 0.8",
+        "status": "verified-with-external-voiceover-limitation",
+        "requiredEvidence": "XCUITest 7/7 sul candidato, list-detail, AX5, rotazione, geometria, screenshot sintetici; VoiceOver reale mobile non provato"
       },
       {
         "surface": "macOS",
-        "owner": "Chief UI",
-        "status": "p1-open",
-        "requiredEvidence": "nuovo worktree, regressione crash, finestre strette/larghe, resize, tastiera/focus, accessibilità, screenshot sintetici e verifier"
+        "owner": "CoS parity 0.8",
+        "status": "verified",
+        "requiredEvidence": "build Xcode 27, resize, click-map, focus, Cmd-R contestuale e VoiceOver manuale"
       },
       {
         "surface": "localhost/web",
-        "owner": "Chief UI",
-        "status": "handoff-pending",
-        "requiredEvidence": "hash approvato, responsive, tastiera/focus, accessibilità, screenshot sintetici e verifier"
+        "owner": "CoS parity 0.8",
+        "status": "verified",
+        "requiredEvidence": "78/78, responsive 320/390/768/1440, tastiera/focus e zoom browser reale 200/400"
       }
     ],
-    "blockingRule": "Un P1 confermato su una delle tre superfici blocca il gate UI 0.8.",
-    "note": "Questo oggetto registra il gate 0.8. Non modifica i conteggi delle 64 capability."
+    "blockingRule": "Un P1 confermato blocca il gate. La sola deroga accettata è il limite esterno VoiceOver mobile della candidata sorgente GitHub 0.8.",
+    "note": "Il limite non equivale a PASS VoiceOver, conformance, prova device, App Store readiness o certificazione. Questo oggetto non modifica i conteggi delle 64 capability.",
+    "acceptedExternalLimitation": {
+      "surface": "iPhone/iPad",
+      "technology": "VoiceOver",
+      "environment": "Xcode 27 beta build 27A5194q, simulatore iOS 27",
+      "appleIssue": "173507341",
+      "evidence": "L'API pubblica XCUIDevice.shared.voiceOverService.enable() non ha raggiunto uno stato terminale; il risultato incompleto non è usato come prova positiva.",
+      "scope": "Solo candidata sorgente GitHub 0.8"
+    }
   },
   "rows": [
     {

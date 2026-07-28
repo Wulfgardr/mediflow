@@ -88,7 +88,9 @@ async function openDocumentSection(page: Page, patientId: string): Promise<void>
   await page.goto(`/patients/${patientId}/modules`);
   const toggle = page.getByRole('button', { name: /Archivio documenti ed evidenze/ });
   await expect(toggle).toBeVisible();
-  if (await toggle.getAttribute('aria-expanded') === 'false') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', /^(true|false)$/);
+  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 }
 
 test.describe.configure({ retries: 0 });
@@ -165,7 +167,9 @@ test('Evidence Stack web: loading ed empty hanno segnali distinti', async ({ pag
   await navigation;
 
   const toggle = page.getByRole('button', { name: /Archivio documenti ed evidenze/ });
-  if (await toggle.getAttribute('aria-expanded') === 'false') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', /^(true|false)$/);
+  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByText('Nessuna evidenza documentale in primo piano.', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Archivio Intelligente', exact: true })).toHaveCount(0);
 });

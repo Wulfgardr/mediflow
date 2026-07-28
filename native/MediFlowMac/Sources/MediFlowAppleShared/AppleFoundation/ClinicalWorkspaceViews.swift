@@ -561,6 +561,15 @@ struct AgendaWorkspaceView: View {
     }
 
     var body: some View {
+        #if os(macOS)
+        workspace
+            .focusedSceneValue(\.clinicalWorkspaceRefreshAction, refreshAction)
+        #else
+        workspace
+        #endif
+    }
+
+    private var workspace: some View {
         Group {
             if capabilities.hasCapability("network.replica.readonly-agenda") {
                 content
@@ -573,6 +582,21 @@ struct AgendaWorkspaceView: View {
             await model.load()
         }
     }
+
+    private var canRefresh: Bool {
+        capabilities.hasCapability("network.replica.readonly-agenda") && model.state != .loading
+    }
+
+    private func refresh() {
+        guard canRefresh else { return }
+        Task { await model.load() }
+    }
+
+    #if os(macOS)
+    private var refreshAction: ClinicalWorkspaceRefreshAction {
+        ClinicalWorkspaceRefreshAction(isEnabled: canRefresh, perform: refresh)
+    }
+    #endif
 
     private var content: some View {
         List {
@@ -617,7 +641,11 @@ struct AgendaWorkspaceView: View {
             }
         }
         .navigationTitle("Agenda")
-        .toolbar { Button("Aggiorna", systemImage: "arrow.clockwise") { Task { await model.load() } } }
+        .toolbar {
+            Button("Aggiorna", systemImage: "arrow.clockwise", action: refresh)
+                .disabled(!canRefresh)
+                .accessibilityIdentifier("clinical-workspace-agenda-refresh-button")
+        }
     }
 
     var sectionContent: ClinicalWorkspaceSectionContent {
@@ -652,6 +680,15 @@ struct GlobalDiaryWorkspaceView: View {
     }
 
     var body: some View {
+        #if os(macOS)
+        workspace
+            .focusedSceneValue(\.clinicalWorkspaceRefreshAction, refreshAction)
+        #else
+        workspace
+        #endif
+    }
+
+    private var workspace: some View {
         Group {
             if capabilities.hasCapability("network.replica.readonly-clinical-diary-global") { content }
             else { ClinicalCapabilityGateView(store: capabilities, capability: "network.replica.readonly-clinical-diary-global") }
@@ -661,6 +698,21 @@ struct GlobalDiaryWorkspaceView: View {
             await model.load()
         }
     }
+
+    private var canRefresh: Bool {
+        capabilities.hasCapability("network.replica.readonly-clinical-diary-global") && model.state != .loading
+    }
+
+    private func refresh() {
+        guard canRefresh else { return }
+        Task { await model.load() }
+    }
+
+    #if os(macOS)
+    private var refreshAction: ClinicalWorkspaceRefreshAction {
+        ClinicalWorkspaceRefreshAction(isEnabled: canRefresh, perform: refresh)
+    }
+    #endif
 
     var sectionContent: ClinicalWorkspaceSectionContent {
         ClinicalWorkspaceSectionContent(
@@ -717,7 +769,11 @@ struct GlobalDiaryWorkspaceView: View {
             }
         }
         .navigationTitle("Diario")
-        .toolbar { Button("Aggiorna", systemImage: "arrow.clockwise") { Task { await model.load() } } }
+        .toolbar {
+            Button("Aggiorna", systemImage: "arrow.clockwise", action: refresh)
+                .disabled(!canRefresh)
+                .accessibilityIdentifier("clinical-workspace-diary-refresh-button")
+        }
     }
 }
 
@@ -734,6 +790,15 @@ struct PopulationAnalyticsWorkspaceView: View {
     }
 
     var body: some View {
+        #if os(macOS)
+        workspace
+            .focusedSceneValue(\.clinicalWorkspaceRefreshAction, refreshAction)
+        #else
+        workspace
+        #endif
+    }
+
+    private var workspace: some View {
         Group {
             if capabilities.hasCapability("network.replica.readonly-patients") { content }
             else { ClinicalCapabilityGateView(store: capabilities, capability: "network.replica.readonly-patients") }
@@ -743,6 +808,21 @@ struct PopulationAnalyticsWorkspaceView: View {
             await model.load()
         }
     }
+
+    private var canRefresh: Bool {
+        capabilities.hasCapability("network.replica.readonly-patients") && model.state != .loading
+    }
+
+    private func refresh() {
+        guard canRefresh else { return }
+        Task { await model.load() }
+    }
+
+    #if os(macOS)
+    private var refreshAction: ClinicalWorkspaceRefreshAction {
+        ClinicalWorkspaceRefreshAction(isEnabled: canRefresh, perform: refresh)
+    }
+    #endif
 
     private var content: some View {
         List {
@@ -793,7 +873,11 @@ struct PopulationAnalyticsWorkspaceView: View {
             }
         }
         .navigationTitle("Analytics")
-        .toolbar { Button("Aggiorna", systemImage: "arrow.clockwise") { Task { await model.load() } } }
+        .toolbar {
+            Button("Aggiorna", systemImage: "arrow.clockwise", action: refresh)
+                .disabled(!canRefresh)
+                .accessibilityIdentifier("clinical-workspace-analytics-refresh-button")
+        }
     }
 
     var sectionContent: ClinicalWorkspaceSectionContent {

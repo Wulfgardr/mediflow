@@ -12,14 +12,19 @@ Ultimo aggiornamento: 2026-07-28 (`MediFlow 0.8`)
 
 ## Gate MediFlow 0.8
 
-Il candidato base è
-`9ee798887fbba93b50d644f223a9a14cd85fa71c`, tree
-`e4e5b69c7d034822dc7a311181e9dc08336e4ade`. Questo identificatore precede il
-packet documentale corrente e non è un hash auto-referenziale.
+La base congelata del packet parity è
+`2355a46a4dde63b1956a2298d99ef0b5c4208222`, tree
+`c46d739b026e509a3e1fae2348372a420c9a17aa`. Il commit finale della candidata è
+registrato nel run record dopo la verifica post-commit.
 
-Il verdetto resta `PARTIAL / HOLD_PROMOTION`. Web e macOS hanno prove reali
-nuove. Restano non terminali la build Xcode corrente e le prove assistive su
-iPhone, iPad e web.
+Il contratto funzionale resta `PARTIAL`: 13 capability sono parziali e 21 sono
+intenzionalmente host-only. Questo non impedisce la candidata sorgente 0.8.
+
+Il gate UI è chiuso con una deroga esterna documentata: i test automatici,
+macOS e localhost sono terminali; VoiceOver reale su iPhone e iPad non è
+provato perché l'API pubblica della beta Xcode 27 non raggiunge uno stato
+terminale nel simulatore. La deroga non trasforma questa prova in PASS e non
+autorizza claim App Store o di conformità.
 
 Lume è il linguaggio comune. Liquid Glass è una declinazione nativa Apple e non
 viene copiata come identità CSS. La parity riguarda capacità, semantica,
@@ -96,13 +101,12 @@ Il manifest Apple-wide verifica 24 acceptance record tecnici separati.
 | Classe | Superficie | Prova | Stato |
 | --- | --- | --- | --- |
 | `verified-automatic` | Web | Evidence Stack 2/2 con PIN sintetico `0000`; build 104 pagine e standalone | PASS |
-| `verified-real-interaction` | Web | Chrome produzione a zoom esatto 200% e 400%; controlli principali visibili; nessun badge dev | PASS |
-| `verified-automatic` | Apple universal | SwiftPM e audit iPhone/iPad già consolidati sul candidato | PASS, non equivale a VoiceOver |
-| `verified-real-interaction` | macOS | Bundle Xcode 27 a 1100/1300/1600; click-map, focus, freccia e VoiceOver attivo prima/dopo | PASS sul bundle costruito |
+| `verified-real-interaction` | Web | Chromium produzione a 320/390/768/1440 e zoom esatto 200%/400%; focus visibile e nessun overflow orizzontale | PASS |
+| `verified-automatic` | iPhone | XCUITest 2/2, tab identifier atomici e apertura delle sei superfici | PASS, non equivale a VoiceOver |
+| `verified-automatic` | iPad | XCUITest 7/7, list-detail, AX5, rotazione, geometria e audit AX | PASS, non equivale a VoiceOver |
+| `verified-real-interaction` | macOS | Build Xcode 27, click-map, focus, Cmd-R contestuale, resize e VoiceOver manuale | PASS |
 | `verified-automatic` | macOS probe | `typecheck` e 6/6 test del probe AX corretto e process-safe | PASS |
-| `blocked` | macOS | Nuova build e suite Xcode 27 | `disk5s1` non montabile; `fsck_apfs` `-69845` |
-| `blocked` | iPhone/iPad | VoiceOver reale | Non provato |
-| `partial` | Web | Screen reader reale | Run non terminale |
+| `accepted-external-limitation` | iPhone/iPad | VoiceOver reale | Non provato; Xcode 27 beta, issue Apple `173507341` |
 
 ## Stato per area
 
@@ -143,11 +147,8 @@ Wave 5 è una tranche consegnata, non la chiusura della parity complessiva.
 ### W6-A — convergenza UI macOS e click-map P6
 
 Il codice clipping e il probe AX corretto sono integrati. Il bundle Xcode 27
-costruito ha superato le prove reali a 1100, 1300 e 1600 punti.
-
-La nuova build resta `blocked`. Il volume `disk5s1` non è montabile e
-`fsck_apfs` termina con errore `-69845`. Il blocco infrastrutturale non annulla
-le prove già concluse e non autorizza un claim sulla build corrente.
+ha superato build, resize, click-map, focus e Cmd-R contestuale. Il precedente
+blocco del volume Xcode è superato e non descrive più lo stato corrente.
 
 ### W6-B — offline degradato onesto
 
@@ -212,10 +213,13 @@ Una capability può diventare `full-parity` solo con:
 4. workflow completabile end-to-end;
 5. test o runbook ripetibile;
 6. click-map manuale quando la promessa riguarda l’esperienza UI;
-7. nessuna violazione dei boundary local-first, zero-knowledge o review-first.
+7. nessuna violazione dei boundary local-first, cifratura dichiarata o
+   review-first.
 
 Un gate assistivo resta non terminale finché la tecnologia assistiva richiesta
-non è stata usata sulla piattaforma dichiarata.
+non è stata usata sulla piattaforma dichiarata. La sola eccezione della
+candidata sorgente 0.8 è il limite VoiceOver mobile registrato in
+[docs/known-limitations.md](./known-limitations.md).
 
 ## Verifica
 

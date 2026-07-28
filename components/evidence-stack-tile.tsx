@@ -50,7 +50,7 @@ export function EvidenceStackTile({ insight }: EvidenceStackTileProps) {
             <div className="relative mt-4 pl-5">
                 <LumeFilo variant="connettore" fill={100} className="absolute left-0 top-0 h-4 w-5" />
                 <p className="text-sm leading-6 text-[color:var(--lume-ink-muted)] line-clamp-3">
-                    {insight.summary || 'Documento acquisito e pronto per revisione contestuale.'}
+                    {insight.summary || 'Nessuna sintesi disponibile.'}
                 </p>
             </div>
 

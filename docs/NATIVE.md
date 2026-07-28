@@ -14,9 +14,9 @@ read_when:
 > attiva e oggi l'app universale descritta da ADR 0048/0071: bundle macOS
 > `home-base`, target iPhone/iPad paired e package condiviso
 > `MediFlowCore`/`MediFlowAppleShared`. La web app resta la superficie piu
-> completa. Nella candidata locale v0.8 la family include correzioni SwiftUI,
-> ma "family Apple attiva" non significa parity UI completa, build verificata o
-> promozione.
+> completa. Nella candidata sorgente v0.8 la family include correzioni SwiftUI,
+> build e test verificati. "Family Apple attiva" non significa parity completa,
+> certificazione o pubblicazione App Store.
 
 Riferimenti correlati:
 
@@ -50,8 +50,9 @@ La base corrente va letta cosi:
   accede direttamente al database del Mac.
 * **Parity**: la matrice post-Wave 5 e in [docs/parity-matrix.md](./parity-matrix.md).
   `WUL-401`/PR #21 hanno consegnato bundle, fixture, probe AX e runbook P6 di
-  base; `WUL-481` governa i prerequisiti operativi ancora bloccati e il verbale
-  manuale sul Mac sbloccato. La candidata v0.8 non chiude questi gate.
+  base. La candidata v0.8 chiude i gate UI sul candidato con iPhone 2/2, iPad
+  7/7 e prove macOS reali. VoiceOver reale su iPhone e iPad resta un limite
+  esterno documentato, non un PASS e non un claim di conformità.
   `WUL-403` resta la corsia per rendere visibili eta,
   TTL e staleness della cache e il degrado offline read-only.
 
@@ -191,6 +192,12 @@ toolbar, menu, sheet, popover e inspector usano i componenti di sistema. Liquid
 Glass e un enhancement del chrome su OS compatibili, non un materiale da
 applicare alle card cliniche. macOS, iPhone e iPad condividono semantica e
 primitive, non la stessa navigazione o densita.
+
+Gli audit XCTest e i test UI sono verdi su iPhone e iPad. VoiceOver è stato
+esercitato manualmente su macOS. La beta Xcode 27 non completa l'abilitazione
+VoiceOver nel simulatore mobile; il limite e la deroga della sola candidata
+sorgente 0.8 sono registrati in
+[docs/known-limitations.md](./known-limitations.md).
 
 ---
 

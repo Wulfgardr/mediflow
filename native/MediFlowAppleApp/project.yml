@@ -23,6 +23,7 @@ targets:
       path: Sources/MediFlowMobileApp/Info.plist
       properties:
         CFBundleDisplayName: MediFlow
+        CFBundleShortVersionString: 0.8.0
         LSApplicationCategoryType: public.app-category.medical
         UIApplicationSupportsIndirectInputEvents: true
         # Local-network discovery: required so Bonjour home-base discovery and
@@ -30,13 +31,23 @@ targets:
         NSLocalNetworkUsageDescription: "MediFlow cerca il tuo home-base sulla rete locale per collegarsi in modo paired e cifrato."
         NSBonjourServices:
           - _mediflow-homebase._tcp
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UILaunchScreen: {}
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         PRODUCT_BUNDLE_IDENTIFIER: com.mediflow.mobile
         PRODUCT_NAME: MediFlow
         TARGETED_DEVICE_FAMILY: "1,2"
-        MARKETING_VERSION: 0.1.0
+        MARKETING_VERSION: 0.8.0
         CURRENT_PROJECT_VERSION: 1
         SUPPORTS_MACCATALYST: NO
   MediFlowMacApp:
@@ -54,6 +65,7 @@ targets:
       path: Sources/MediFlowMacApp/Info.plist
       properties:
         CFBundleDisplayName: MediFlow
+        CFBundleShortVersionString: 0.8.0
         LSApplicationCategoryType: public.app-category.medical
         # Local-network discovery for the home-base Bonjour service. Guarded by
         # check-apple-network-entitlements.sh.
@@ -66,7 +78,7 @@ targets:
         # Same bundle id as iOS for a single universal-purchase app record.
         PRODUCT_BUNDLE_IDENTIFIER: com.mediflow.mobile
         PRODUCT_NAME: MediFlow
-        MARKETING_VERSION: 0.1.0
+        MARKETING_VERSION: 0.8.0
         CURRENT_PROJECT_VERSION: 1
   MediFlowMobileAppUITests:
     type: bundle.ui-testing
