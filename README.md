@@ -13,10 +13,10 @@
 
 _by Ordito & Concilio_
 
-**Cartella clinica territoriale local-first.**
+**Cartella clinica territoriale local-first, open source e libera da usare.**
 
-Per ritrovare informazioni, seguire terapie e tenere il filo del lavoro clinico,
-senza consegnare i dati a un cloud per poter lavorare.
+**Serve the right information at the right time.**<br>
+**Porta l'informazione giusta nel momento giusto.**
 
 [![Versione](https://img.shields.io/badge/versione-0.8.0%20candidata-1f6feb)](./CHANGELOG.md)
 [![Licenza](https://img.shields.io/badge/licenza-MIT-2ea043)](./LICENSE)
@@ -29,27 +29,29 @@ senza consegnare i dati a un cloud per poter lavorare.
 
 ## MediFlow, in breve
 
-MediFlow nasce dal lavoro reale con i pazienti. Serve a raccogliere dati
-clinici, terapie, note e documenti in una scheda che resti leggibile anche
-quando il percorso si allunga e le fonti si moltiplicano.
+MediFlow nasce dalle difficoltà operative reali dei medici. È un workspace
+clinico open source e libero da usare. Aiuta a trovare un paziente, leggere la
+sua storia, seguire terapie, controlli e documenti e preparare il passaggio
+successivo. Non promette una pratica clinica senza attrito. Riduce l'attrito
+evitabile senza nascondere complessità, provenienza, privacy e responsabilità
+professionale.
 
-Il principio è semplice: il dato resta vicino a chi lo produce e lo usa. Il Mac
-ospita la base autorevole; il cloud non è un requisito per lavorare. Le funzioni
-deterministiche restano locali. Il percorso AI locale usa Ollama quando è
-configurato. Se la funzione è abilitata, l'AI può aggiornare una sintesi locale.
-Non aggiunge diagnosi, terapie o altri dati clinici strutturati senza una
-conferma esplicita.
+Il prodotto è information-first, question-first e convenience-first. Non è
+AI-first. Dati clinici, terminologie, reference data, ricerca, navigazione e
+workflow deterministici restano funzioni di prima classe anche quando ogni
+provider AI è disabilitato.
 
-Il contratto proposto dello scaffold separa sei passaggi: pipeline locale,
-proposta strutturata, chiarimento, anteprima, autorizzazione contestuale ed
-eventuale scrittura auditata. I primi passaggi non richiedono un servizio
-esterno. L'ultimo resta una funzione applicativa specifica, non un accesso
-diretto del modello al database.
+Il Mac ospita la base autorevole. iPhone e iPad si collegano come client paired
+sulla rete locale. Il cloud non è un requisito per lavorare. Quando Ollama è
+configurato, alcune funzioni locali possono preparare materiale da rivedere.
+Nessun output AI aggiunge diagnosi, terapie o altri dati clinici strutturati
+senza un'azione esplicita del medico.
 
-Nel contesto territoriale italiano questo significa soprattutto togliere
-attrito: aprire la scheda, capire dove si è, ritrovare una fonte, distinguere una
-terapia da una prestazione prescritta e preparare il passaggio successivo senza
-confondere supporto operativo e integrazione istituzionale.
+Nel contesto territoriale italiano, MediFlow aiuta ad aprire la scheda giusta,
+ritrovare la fonte, distinguere una terapia da una prestazione prescritta e
+preparare la decisione successiva. Il medico verifica le evidenze e decide.
+MediFlow non prescrive, non formula diagnosi autonome e non sostituisce il
+giudizio clinico.
 
 MediFlow non sostituisce SISS, FSE o gli altri canali ufficiali. Sta accanto al
 lavoro clinico quotidiano, con confini dichiarati e verificabili.
@@ -62,6 +64,27 @@ sanitari, credenziali e altri artefatti locali restano fuori da Git secondo
 
 ## Come si presenta
 
+### iPhone
+
+<table>
+<tr>
+<td><img src="./screenshots/0.8/ios-iphone-worklist.png" alt="Lista di lavoro iPhone con pazienti sintetici, diagnosi codificate e indicatori di assistenza domiciliare" width="260" loading="lazy" decoding="async"/></td>
+<td><img src="./screenshots/0.8/ios-iphone-detail.png" alt="Scheda iPhone di un paziente sintetico con dati demografici, diagnosi codificate ed esenzioni" width="260" loading="lazy" decoding="async"/></td>
+<td><img src="./screenshots/0.8/ios-iphone-therapies.png" alt="Terapie su iPhone con stati attiva, sospesa e conclusa, dati sintetici" width="260" loading="lazy" decoding="async"/></td>
+</tr>
+</table>
+
+### iPad
+
+<table>
+<tr>
+<td><img src="./screenshots/0.8/ipados-workspace.png" alt="Workspace iPad in orizzontale con lista pazienti sintetici e pannello clinico in attesa di selezione" width="390" loading="lazy" decoding="async"/></td>
+<td><img src="./screenshots/0.8/ipados-detail.png" alt="Scheda iPad di un paziente sintetico con riepilogo clinico, diagnosi codificate e dati demografici" width="390" loading="lazy" decoding="async"/></td>
+</tr>
+</table>
+
+<p align="center"><img src="./screenshots/0.8/ipados-scale.png" alt="Modulo di una scala di valutazione aperto su iPad per un paziente sintetico" width="620" loading="lazy" decoding="async"/></p>
+
 ### App macOS
 
 <img src="./screenshots/macos-workspace.png" alt="Panoramica nativa di MediFlow per macOS con navigazione Lume e guardrail local-first" width="820" loading="lazy" decoding="async"/>
@@ -70,9 +93,10 @@ sanitari, credenziali e altri artefatti locali restano fuori da Git secondo
 
 <img src="./screenshots/01-worklist.png" alt="Cockpit Lume di MediFlow: lista di lavoro con pazienti dimostrativi sintetici" width="820" loading="lazy" decoding="async"/>
 
-_Catture reali dell'app macOS e della build web di produzione che adottano
-Lume, la lingua visiva di MediFlow. Le viste cliniche usano esclusivamente
-fixture dimostrative sintetiche. Nessun dato paziente reale._
+_Catture reali della candidata Apple e della build web di produzione. Le viste
+cliniche usano solo fixture dimostrative sintetiche e deterministiche. Nessun
+dato paziente reale. Il [manifest media 0.8](./screenshots/0.8/manifest.json)
+registra dispositivo, runtime, scena, commit sorgente e hash._
 
 <details>
 <summary><b>Altre schermate web</b>: scheda paziente, quadro clinico, revisione documentale e sicurezza</summary>
@@ -112,18 +136,23 @@ plane sono documentati in
 
 ## Candidata locale 0.8.0
 
-Questa checkout prepara localmente la versione `0.8.0`. Non dichiara una
-pubblicazione, un tag o una release completata. Lo stato resta `HOLD_PROMOTION`
-finché i gate assistivi e i verificatori finali non producono un verdetto
-terminale sullo stesso candidato.
+Questa linea prepara la candidata sorgente `0.8.0`. Non dichiara un tag, una
+GitHub Release, una pubblicazione App Store o una certificazione.
 
 La candidata consolida contratti AI review-first, hardening del pacchetto
-autonomo e miglioramenti alle superfici web e Apple. Le prove disponibili usano
-solo fixture sintetiche. Chrome sulla build di produzione è stato verificato al
-200% e al 400%; il bundle macOS già costruito è stato verificato con VoiceOver,
-tastiera e resize. Queste prove non dimostrano parity UI completa: restano da
-chiudere VoiceOver reale su iPhone e iPad, lo screen reader web e la nuova build
-Xcode sul tree corrente.
+autonomo e una UI clinico-semantica coerente su localhost, macOS, iPhone e iPad.
+Le prove usano solo fixture sintetiche:
+
+- iPhone: XCUITest 2/2 sul simulatore iOS 27;
+- iPad: XCUITest 7/7 sul simulatore iPadOS 27;
+- macOS: build, resize, focus, tastiera, Cmd-R contestuale e VoiceOver manuale;
+- localhost: 78/78 test, viewport 320/390/768/1440 e zoom reale 200%/400%.
+
+Queste prove non dichiarano parity completa o conformità accessibilità. Gli
+audit automatici su iPhone e iPad sono verdi, ma VoiceOver reale mobile non è
+provato. L'API assistiva pubblica della beta Xcode 27 non ha raggiunto uno stato
+terminale nel simulatore. Il limite è registrato in
+[`docs/known-limitations.md`](./docs/known-limitations.md).
 
 ### Aggiornamenti integrati
 
@@ -152,6 +181,12 @@ L'architettura separa il servizio applicativo dal connettore del modello. Oggi
 Una futura modifica può aggiungere plug-in opzionali per modelli locali, LAN o
 cloud. Le regole dell'organizzazione e la scelta esplicita dell'utente devono
 consentire ogni attivazione.
+
+La direzione post-0.8 prende il nome di **Intelligence Fabric**: una capability
+potrà usare logica deterministica, un modello on-device, un home-base paired, un
+modello locale o un provider cloud approvato. Il routing dovrà essere esplicito,
+osservabile, vincolato da policy e fail-closed. Questa direzione non è una
+funzione completa della 0.8.
 
 Un fornitore esterno può offrire più capacità o ridurre alcuni tempi di
 elaborazione. Non è un requisito e non implica una promessa clinica.

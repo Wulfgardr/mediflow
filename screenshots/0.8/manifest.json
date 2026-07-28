@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "release": "0.8.0",
+  "capturedAt": "2026-07-28T23:41:00+02:00",
+  "source": {
+    "branch": "codex/mediflow-0.8-release-candidate-local",
+    "head": "2355a46a4dde63b1956a2298d99ef0b5c4208222",
+    "tree": "c46d739b026e509a3e1fae2348372a420c9a17aa",
+    "state": "dirty release candidate before final commit",
+    "configuration": "Debug",
+    "fixtureMode": "MEDIFLOW_APPLE_DEMO=1",
+    "syntheticDataOnly": true
+  },
+  "toolchain": {
+    "xcode": "27.0 beta (27A5194q)",
+    "runtime": "iOS 27.0 (24A5355p)",
+    "capture": "xcrun simctl io screenshot",
+    "optimization": "sips -Z 1400"
+  },
+  "privacy": {
+    "realDatabaseAccessed": false,
+    "realCredentialsUsed": false,
+    "phiOrPiiIncluded": false,
+    "note": "Names, addresses, phone numbers, identifiers, diagnoses, medicines and clinical text are deterministic source-controlled demo data."
+  },
+  "assets": [
+    {
+      "scene": "iPhone patient worklist",
+      "device": "MediFlow 0.8 Audit iPhone 060a",
+      "orientation": "portrait",
+      "dynamicType": "default",
+      "original": {
+        "file": "original/ios-iphone-worklist.png",
+        "dimensions": "1206x2622",
+        "sha256": "a987607e52e4108e10a29d9f4a1f6ad377f27eeab4787e17ca2a257aa8a0c961"
+      },
+      "optimized": {
+        "file": "ios-iphone-worklist.png",
+        "dimensions": "644x1400",
+        "sha256": "ae27cc4b46b770e7913d1319acfece625345b09ec05720e70648b2098d3a5095"
+      },
+      "altText": "MediFlow on iPhone showing the synthetic patient worklist."
+    },
+    {
+      "scene": "iPhone clinical overview",
+      "device": "MediFlow 0.8 Audit iPhone 060a",
+      "orientation": "portrait",
+      "dynamicType": "default",
+      "original": {
+        "file": "original/ios-iphone-detail.png",
+        "dimensions": "1206x2622",
+        "sha256": "2f0fea3c60d450239b358ef145ad1e835192c16e82b705a235251d695dcd0058"
+      },
+      "optimized": {
+        "file": "ios-iphone-detail.png",
+        "dimensions": "644x1400",
+        "sha256": "cf780c7c42e05ed43195915162a60e22825a9392dd8176958a91a4716f9b3ed0"
+      },
+      "altText": "MediFlow on iPhone showing the overview of a synthetic patient."
+    },
+    {
+      "scene": "iPhone therapy workflow",
+      "device": "MediFlow 0.8 Audit iPhone 060a",
+      "orientation": "portrait",
+      "dynamicType": "default",
+      "original": {
+        "file": "original/ios-iphone-therapies.png",
+        "dimensions": "1206x2622",
+        "sha256": "3058fefa95072b3fd970fb40d9b27a2c61d1c109b28f53ebc9e33189e82c23c5"
+      },
+      "optimized": {
+        "file": "ios-iphone-therapies.png",
+        "dimensions": "644x1400",
+        "sha256": "0e912bf5c1a9b79c58c0d4d2780c3689d37e343050243bfe5a5c38808f0b66de"
+      },
+      "altText": "MediFlow on iPhone showing active, suspended and completed synthetic therapies."
+    },
+    {
+      "scene": "iPad field workspace",
+      "device": "MediFlow 0.8 Audit iPad 060a",
+      "orientation": "landscape",
+      "dynamicType": "default",
+      "transform": "lossless 90-degree orientation normalization",
+      "original": {
+        "file": "original/ipados-workspace.png",
+        "dimensions": "2752x2064",
+        "sha256": "d5a1e8914c0d396f0dcc5d37310ad1f3054bac939f42d431896da4614aba63c0"
+      },
+      "optimized": {
+        "file": "ipados-workspace.png",
+        "dimensions": "1400x1050",
+        "sha256": "d950c798954a3960e96d83abc06d94431d88efe2ef3bf325438a62c19565c697"
+      },
+      "altText": "MediFlow on iPad showing the synthetic patient worklist and the empty clinical detail pane."
+    },
+    {
+      "scene": "iPad clinical detail",
+      "device": "MediFlow 0.8 Audit iPad 060a",
+      "orientation": "landscape",
+      "dynamicType": "accessibility1",
+      "launchOverrides": [
+        "MEDIFLOW_APPLE_UITEST_OPEN_PATIENT_INDEX=2",
+        "MEDIFLOW_APPLE_UITEST_FOCUS_DETAIL=1"
+      ],
+      "transform": "lossless 90-degree orientation normalization",
+      "original": {
+        "file": "original/ipados-detail.png",
+        "dimensions": "2752x2064",
+        "sha256": "b80d6f2f44f12f1073ae9fda622260eb3fb7b61c173ae9c237a4235575f6c2a4"
+      },
+      "optimized": {
+        "file": "ipados-detail.png",
+        "dimensions": "1400x1050",
+        "sha256": "31cfcb5a7b8f755b53a0eea48c9596555e2c60a2f7c4910428fba4500cb4ff2e"
+      },
+      "altText": "MediFlow on iPad showing the structured overview of a synthetic patient at an accessibility text size."
+    },
+    {
+      "scene": "iPad ADL assessment",
+      "device": "MediFlow 0.8 Audit iPad 060a",
+      "orientation": "portrait",
+      "dynamicType": "accessibility1",
+      "launchOverrides": [
+        "MEDIFLOW_APPLE_UITEST_OPEN_PATIENT_INDEX=0",
+        "MEDIFLOW_APPLE_UITEST_FOCUS_DETAIL=1",
+        "MEDIFLOW_APPLE_UITEST_PRESENT_SCALE=adl"
+      ],
+      "transform": "lossless 180-degree orientation normalization",
+      "original": {
+        "file": "original/ipados-scale.png",
+        "dimensions": "2064x2752",
+        "sha256": "5f1341e359dc471639e688364da4dad6d854cf266cb60ff7b4637f80a6919fff"
+      },
+      "optimized": {
+        "file": "ipados-scale.png",
+        "dimensions": "1050x1400",
+        "sha256": "9f21c92e99e052ab09656d6fdb21531f1c6b7aa38bac486f7e9d4f5ffc7b5a42"
+      },
+      "altText": "MediFlow on iPad showing a synthetic ADL assessment at an accessibility text size."
+    }
+  ],
+  "notes": [
+    "The gallery files are resized copies of the lossless originals.",
+    "No mock device frame, compositing or generated interface was used.",
+    "The source commit field identifies the clean base; the final release-candidate commit is recorded in the publication packet after verification."
+  ]
+}

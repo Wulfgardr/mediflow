@@ -18,13 +18,13 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-07-28 (candidata locale v0.8; nessuna promozione o release dichiarata)
+Ultimo aggiornamento: 2026-07-28 (candidata sorgente v0.8; nessun tag o GitHub Release dichiarato)
 
 > [!NOTE]
-> La v0.8 descritta qui è una candidata locale al commit di lavoro corrente.
-> Il tree dimostra integrazioni candidate, non una release, un tag o una promozione.
-> Restano vincolanti i gate di parity, build, test e revisione manuale indicati
-> nei documenti canonici dell'area.
+> La v0.8 descritta qui è una candidata sorgente verificata localmente.
+> Il tree non equivale a un tag, una GitHub Release, una pubblicazione App Store
+> o una certificazione. I gate, la deroga VoiceOver mobile e il rischio residuo
+> restano registrati nei documenti canonici dell'area.
 
 ---
 
@@ -40,6 +40,9 @@ versionati e ogni integrazione esterna resta dentro boundary documentati.
 La fotografia corrente e questa:
 
 - **Superficie primaria**: web app Next.js locale, avviata sul Mac.
+- **Principio prodotto**: serve l'informazione giusta nel momento giusto.
+  MediFlow è information-first, question-first e convenience-first, non
+  AI-first. Resta utile quando ogni provider AI è disabilitato.
 - **Shell ufficiale**: il cockpit resta la root web live, senza selector o
   preview profiles persistiti. Lume e il suo contratto DTCG sono attivi nel
   tree della candidata; Vetro Clinico resta la baseline storica e transitoria.
@@ -68,6 +71,11 @@ La fotografia corrente e questa:
   `MediFlowCore` concentra logica portabile, cifratura, contratti, filtri,
   clinical scales e store SQLite locale; Linux e Windows oggi verificano la
   portabilita del core in CI, non una parity applicativa completa.
+- **Parity UI 0.8**: iPhone 2/2, iPad 7/7, build/probe macOS e localhost 78/78
+  sono verdi sul candidato. La parity resta clinico-semantica, non pixel.
+  VoiceOver reale mobile non è provato per il limite esterno della beta Xcode
+  27; la deroga vale solo per la candidata sorgente e non autorizza claim di
+  conformità.
 - **Document intelligence**: Smart Import, nuova anagrafica da documento e
   `AI Patient Insight` restano reviewable; gli allegati possono persistere
   artifact cifrati `parse/evidence` con prime ancore sezionali. Il fallback OCR
@@ -83,6 +91,8 @@ La fotografia corrente e questa:
   integrazioni presenti nel tree e gate egress ancora chiuso; benchmark e
   shadow lane restano separati dal prodotto clinico. Lo scaffold intelligente
   di ADR 0086 resta una proposta e non apre una funzione nuova della v0.8.
+  Intelligence Fabric è una direzione post-0.8, non una funzione completa del
+  prodotto corrente.
 - **Attese locali**: la prima slice web collega prestazioni attese e risultati;
   il salvataggio resta esplicito e il workflow non e esteso ai client paired.
 - **SISS/FSE**: handoff contestuale e flussi `webapp-assisted`; nessuna

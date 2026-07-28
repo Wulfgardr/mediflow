@@ -8,8 +8,9 @@ read_when:
 # 🧭 Roadmap MediFlow
 
 > **Dove siamo e dove vogliamo andare.**
-> La v0.7.3 resta la linea consolidata. La v0.8 è una candidata locale, senza
-> parity UI completa, promozione, tag o release. Ultimo aggiornamento: 2026-07-28.
+> La v0.8 è una candidata sorgente verificata localmente, senza tag, GitHub
+> Release, pubblicazione App Store o claim di parity completa. Ultimo
+> aggiornamento: 2026-07-28.
 > Fonte roadmap prodotto canonica (vedi anche [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) per la lettura completa corrente e [docs/README.md](./README.md) per mappa completa documenti).
 
 > [!NOTE]
@@ -160,7 +161,7 @@ control-flow documentale review-first, hardening di runtime e dati, il claims
 guard pubblico e il tooling P6 sintetico. La migrazione Lume completa e il
 verbale manuale di `WUL-481` restano lavoro successivo, non claim di release.
 
-## 🟡 Candidata locale v0.8: integrazioni e gate
+## 🟡 Candidata sorgente v0.8: integrazioni e gate
 
 La candidata riunisce hardening documentale, superfici web Lume e correzioni
 Apple già presenti nel tree locale. Non cambia l'intended purpose.
@@ -169,11 +170,12 @@ Apple già presenti nel tree locale. Non cambia l'intended purpose.
 | --- | --- | --- |
 | Lume | Token DTCG, mirror CSS e consumatori web sono attivi. | Parity estetica completa o redesign concluso. |
 | Documenti | Stati accessibili e registro separato delle proposte sono integrati. | Diagnosi auto-applicate o nuova inbox. |
-| Apple | Correzioni SwiftUI e test UI sono nel tree candidato. | Build, simulatori e verifica manuale sostitutivi dei gate. |
+| Apple | iPhone 2/2, iPad 7/7, build/probe macOS, Cmd-R e media sintetici sono sul candidato. | VoiceOver mobile provato, conformità o App Store readiness. |
 | AI | I boundary review-first e no-egress restano nel prodotto. | Nuovi provider, cloud o automazione graduata. |
 
-La promozione richiede i check di release applicabili e il verdetto corrente
-della matrice parity. Se un gate resta `HOLD`, la candidata non diventa release.
+La deroga esterna VoiceOver mobile vale solo per questa candidata sorgente. Gli
+audit AX e i test UI non sostituiscono VoiceOver reale. Ogni altro gate rosso o
+indeterminato resta bloccante.
 
 ### Modalita network home-base
 

@@ -7,6 +7,89 @@ import AppKit
 import UIKit
 #endif
 
+#if os(iOS)
+/* @Codex */
+private struct TabBarAccessibilityIdentifierBridge: UIViewRepresentable {
+    let identifiersByTitle: [String: String]
+    let selection: String
+
+    func makeUIView(context: Context) -> ResolverView {
+        ResolverView(identifiersByTitle: identifiersByTitle)
+    }
+
+    func updateUIView(_ uiView: ResolverView, context: Context) {
+        uiView.identifiersByTitle = identifiersByTitle
+        uiView.scheduleUpdate()
+    }
+
+    final class ResolverView: UIView {
+        var identifiersByTitle: [String: String]
+
+        init(identifiersByTitle: [String: String]) {
+            self.identifiersByTitle = identifiersByTitle
+            super.init(frame: .zero)
+            isAccessibilityElement = false
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            scheduleUpdate()
+        }
+
+        func scheduleUpdate() {
+            for delay in [0.0, 0.25, 1.0, 2.0] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    self?.updateTabItems()
+                }
+            }
+        }
+
+        private func updateTabItems() {
+            guard let window else { return }
+
+            let resolvedTabBars = tabBars(in: window)
+            for tabBar in resolvedTabBars {
+                for item in tabBar.items ?? [] {
+                    guard
+                        let title = item.title,
+                        let identifier = identifiersByTitle[title]
+                    else { continue }
+                    item.accessibilityIdentifier = identifier
+                }
+
+                let tabLabels = descendants(of: tabBar).compactMap { $0 as? UILabel }
+
+                for (title, identifier) in identifiersByTitle {
+                    // iOS 27 keeps a suppressed rendering copy behind the
+                    // interactive tab. UIKit subviews are ordered back-to-front,
+                    // so the last matching label belongs to the tappable surface.
+                    tabLabels.last { $0.text == title }?
+                        .superview?
+                        .accessibilityIdentifier = identifier
+                }
+            }
+        }
+
+        private func tabBars(in view: UIView) -> [UITabBar] {
+            var result = view is UITabBar ? [view as! UITabBar] : []
+            for subview in view.subviews {
+                result.append(contentsOf: tabBars(in: subview))
+            }
+            return result
+        }
+
+        private func descendants(of view: UIView) -> [UIView] {
+            view.subviews + view.subviews.flatMap(descendants(of:))
+        }
+    }
+}
+#endif
+
 public struct AppleFoundationWindowContent: View {
     public let snapshot: AppleFoundationSnapshot
 
@@ -253,14 +336,38 @@ public struct AppleFoundationMobileRootView: View {
                                     if item == .patients {
                                         ToolbarItem(placement: .automatic) {
                                             Button("Progetto", systemImage: "ellipsis.circle") { showsProjectSurfaces = true }
+                                                .accessibilityIdentifier("clinical-workspace-project-menu-button")
                                         }
                                     }
                                 }
                         }
                         .tag(item)
-                        .tabItem { Label(item.title, systemImage: item.symbolName) }
+                        .tabItem {
+                            Label(item.title, systemImage: item.symbolName)
+                        }
                     }
                 }
+                #if os(iOS)
+                .background(
+                    TabBarAccessibilityIdentifierBridge(
+                        identifiersByTitle: Dictionary(
+                            uniqueKeysWithValues:
+                                (
+                                    ClinicalWorkspaceSection.clinicalSections
+                                        + ClinicalWorkspaceSection.settingsSections
+                                ).map {
+                                    (
+                                        $0.title,
+                                        "clinical-workspace-section-\($0.rawValue)-button"
+                                    )
+                                }
+                        ),
+                        selection: section.rawValue
+                    )
+                    .frame(width: 0, height: 0)
+                    .accessibilityHidden(true)
+                )
+                #endif
             }
         }
         .task(id: workspaceModel.clinicalWorkspaceConnection?.identity) {
@@ -305,6 +412,7 @@ public struct AppleFoundationMobileRootView: View {
                 } label: {
                     Label(item.title, systemImage: item.symbolName)
                 }
+                .accessibilityIdentifier("clinical-workspace-section-\(item.rawValue)-button")
             }
             .navigationTitle("Progetto")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Chiudi") { showsProjectSurfaces = false } } }

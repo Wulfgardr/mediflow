@@ -1,6 +1,27 @@
 #if os(macOS)
 import SwiftUI
 
+/// The current detail section exposes its own refresh semantics to the menu
+/// bar. This keeps ⌘R aligned with the visible workspace instead of treating
+/// every section as the patient list.
+@MainActor
+struct ClinicalWorkspaceRefreshAction {
+    let isEnabled: Bool
+    let perform: () -> Void
+}
+
+struct ClinicalWorkspaceRefreshActionKey: FocusedValueKey {
+    typealias Value = ClinicalWorkspaceRefreshAction?
+    static var defaultValue: ClinicalWorkspaceRefreshAction? { nil }
+}
+
+extension FocusedValues {
+    var clinicalWorkspaceRefreshAction: ClinicalWorkspaceRefreshAction? {
+        get { self[ClinicalWorkspaceRefreshActionKey.self] ?? nil }
+        set { self[ClinicalWorkspaceRefreshActionKey.self] = newValue }
+    }
+}
+
 /// Scene-level state of the macOS app.
 ///
 /// The Mac window and the menu bar are two separate SwiftUI scenes: commands
@@ -51,12 +72,12 @@ public final class MediFlowMacSceneModel: ObservableObject {
     }
 
     public var canRefresh: Bool {
-        guard let workspaceModel else { return false }
+        guard section == .patients, let workspaceModel else { return false }
         return !workspaceModel.isWorking
     }
 
     public func refresh() {
-        guard canRefresh, let workspaceModel else { return }
+        guard section == .patients, canRefresh, let workspaceModel else { return }
         Task { await workspaceModel.loadPatients() }
     }
 
@@ -283,6 +304,7 @@ private struct MacDetailChrome<Content: View>: View {
 /// VoiceOver users navigate first.
 public struct MediFlowMacCommands: Commands {
     @ObservedObject private var scene: MediFlowMacSceneModel
+    @FocusedValue(\.clinicalWorkspaceRefreshAction) private var workspaceRefresh
 
     public init(scene: MediFlowMacSceneModel) {
         _scene = ObservedObject(wrappedValue: scene)
@@ -314,9 +336,15 @@ public struct MediFlowMacCommands: Commands {
                 Button(item.title) { scene.select(item) }
             }
             Divider()
-            Button("Aggiorna") { scene.refresh() }
+            Button("Aggiorna") {
+                if let workspaceRefresh {
+                    workspaceRefresh.perform()
+                } else {
+                    scene.refresh()
+                }
+            }
                 .keyboardShortcut("r", modifiers: .command)
-                .disabled(!scene.canRefresh)
+                .disabled(!(workspaceRefresh?.isEnabled ?? scene.canRefresh))
         }
     }
 

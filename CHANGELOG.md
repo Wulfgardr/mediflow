@@ -8,9 +8,8 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 ## [0.8.0] - Candidata locale
 
 > Questa voce prepara il candidato locale `0.8.0`. Non dichiara pubblicazione,
-> tag o release completata. Lo stato resta `HOLD_PROMOTION` finché i gate
-> assistivi e i verificatori finali non producono un verdetto terminale sullo
-> stesso candidato.
+> tag, GitHub Release o pubblicazione App Store. La promozione richiede un
+> verdetto sul commit esatto e la verifica del ref remoto.
 
 ### Uso del prodotto
 
@@ -59,15 +58,34 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 ### Interfacce e contratti locali
 
 - **Modifica**: le superfici web e Apple ricevono correzioni di layout,
-  accessibilità automatica e contratti wire per i flussi dichiarati.
+  accessibilità automatica, navigazione e contratti wire per i flussi
+  dichiarati.
   **Stato**: incluse nella candidata locale con fixture sintetiche e test
-  mirati.
-  **Evidenza manuale**: Chrome sulla build di produzione è stato verificato al
-  200% e al 400%; il bundle macOS già costruito è stato verificato con
-  VoiceOver, tastiera, click-map e resize a 1100, 1300 e 1600 punti.
-  **Limite**: non dichiarano parity UI completa. Restano non terminali
-  VoiceOver reale su iPhone e iPad, lo screen reader web e la nuova build Xcode
-  sul tree corrente.
+  mirati sullo stesso candidato.
+  **Evidenza**: iPhone 2/2 e iPad 7/7 su simulatori iOS 27; macOS con build,
+  Cmd-R contestuale, VoiceOver manuale, tastiera, click-map e resize; localhost
+  78/78, viewport 320/390/768/1440 e zoom browser reale 200%/400%.
+  **Limite**: non dichiarano parity completa o conformità accessibilità.
+  VoiceOver reale su iPhone e iPad non è provato perché l'API pubblica della
+  beta Xcode 27 non ha raggiunto uno stato terminale nel simulatore. La deroga
+  vale solo per la candidata sorgente GitHub 0.8.
+- **Modifica**: gli identifier delle tab compatte iPhone sono collegati ai
+  controlli UIKit pubblici e verificati con uno XCUITest atomico.
+  **Stato**: iPhone 2/2 e iPad 7/7.
+  **Limite**: è un workaround specifico della disponibilità iOS 27; una nuova
+  seed Xcode può richiedere una riverifica.
+- **Modifica**: Cmd-R su macOS aggiorna la superficie che possiede il focus,
+  con fallback dichiarato e stato disabilitato coerente.
+  **Stato**: probe contestuale PASS su Agenda e Analytics.
+- **Modifica**: Evidence Stack usa lo stato vuoto
+  `Nessuna sintesi disponibile.`.
+  **Stato**: fallback verificato sul runtime localhost.
+  **Limite**: OCR e curation documentale restano funzioni host secondo ADR
+  0076.
+- **Modifica**: i metadati app Apple e il progetto Xcode dichiarano la versione
+  `0.8.0`.
+  **Stato**: `CFBundleShortVersionString` e `MARKETING_VERSION` allineati;
+  `CURRENT_PROJECT_VERSION` resta `1`.
 - **Modifica**: l'export FHIR mantiene un perimetro locale e manuale. La
   condivisione resta soggetta alle capability della piattaforma.
   **Stato**: il contratto v0 resta documentato in ADR 0081.
@@ -86,6 +104,8 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   requisito e non implica una promessa clinica.
 - La candidata non dichiara parity UI completa. La matrice parity canonica e i
   gate assistivi restano le fonti per i limiti delle superfici.
+- Intelligence Fabric è una direzione post-0.8. Provider esterni, routing tra
+  venue e automazione graduata non sono funzioni complete della candidata.
 
 ### Sviluppo assistito
 

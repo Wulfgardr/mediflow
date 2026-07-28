@@ -605,6 +605,31 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     // MARK: - Il giro completo, sullo stesso codice per iPhone e iPad
 
+    /* @Codex */
+    func testCompactClinicalTabsExposeStableIdentifiers() throws {
+        launch(seedPatients: true)
+
+        let tabBar = app.tabBars.firstMatch
+        guard tabBar.waitForExistence(timeout: 10) else {
+            throw XCTSkip("Il layout regolare iPad usa la sidebar, non la tab bar compatta.")
+        }
+
+        let compactTabIdentifiers = [
+            "clinical-workspace-section-patients-button",
+            "clinical-workspace-section-agenda-button",
+            "clinical-workspace-section-diary-button",
+            "clinical-workspace-section-analytics-button",
+        ]
+        let identifierQuery = tabBar.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier IN %@", compactTabIdentifiers)
+        )
+        XCTAssertEqual(
+            identifierQuery.count,
+            compactTabIdentifiers.count,
+            "La snapshot AX deve esporre una sola tab per ciascun identifier clinico compatto."
+        )
+    }
+
     /// Opens every clinical surface on whichever idiom is running and requires
     /// each one to render.
     ///
