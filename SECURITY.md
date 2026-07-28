@@ -186,6 +186,37 @@ Le diagnosi estratte da documenti restano review-only, anche quando il codice
 ICD e esplicito. Il payload automatico della sintesi non include
 `patients.diagnoses` (vedi ADR 0084).
 
+### Readiness dei modelli Ollama
+
+[ADR 0088](./docs/adr/0088-limite-digest-bound-readiness-ai-locale.md) definisce
+l'annotazione `available_unqualified` per i percorsi Ollama correnti.
+
+L'annotazione riguarda readiness ed evidenza. Non è uno stato operativo e non
+sostituisce `runtime`.
+
+La località, il nome del modello e il digest non dimostrano una capability.
+
+Il digest pre/post è detection best-effort. Non impedisce lo swap ABA del
+modello durante l'inferenza.
+
+Nessuna receipt o dichiarazione di tipo autorizza un consumer. La qualified
+readiness resta bloccata.
+
+`clinical_application` e `engineering_operator` non condividono grant.
+
+Nello stato corrente, iPhone e iPad usano l'host paired e non invocano
+provider direttamente. Questo stato non vieta capability Apple on-device
+definite da un ADR successivo.
+
+Un endpoint loopback non dimostra `egress=none`. Un gate local-only futuro deve
+verificare modello locale, cloud disabilitato, strumenti, rete e processo.
+
+Le nuove API manterranno timeout e abort interni. Non accetteranno
+`AbortSignal` dal chiamante e scarteranno i completamenti tardivi.
+
+ADR 0088 non definisce il contratto Intelligence Fabric. Un ADR separato deve
+governare capability, venue, home-base, provider cloud e authority.
+
 > [!IMPORTANT]
 > I flussi AI clinici sono dietro safety gate con kill-switch (patient-insight,
 > smart-import, document-synthesis) e model governance delle decisioni

@@ -26,6 +26,31 @@ gate nuovi di questo documento.
 Nessun task eredita provider, credenziali, consenso, fallback o grant di un
 altro task. Nessuna riga autorizza egress o scrittura clinica automatica.
 
+### Limite della readiness locale
+
+ADR 0088 definisce l'annotazione `available_unqualified` per i percorsi Ollama
+correnti. L'annotazione riguarda readiness ed evidenza.
+
+L'annotazione non è uno stato operativo. Non sostituisce `runtime` e non
+modifica la tabella degli stati ammessi.
+
+Ollama 0.32.x espone il digest in `/api/tags` e `/api/ps`, non nella risposta
+di inferenza. Il controllo pre/post rileva alcuni cambi, ma non impedisce lo
+swap ABA `X → Y → X`.
+
+Un nuovo packet può proporre `digest_bracketed_best_effort`. A3 resta
+`observed_not_causal` e la qualified readiness resta `HOLD`.
+
+Nessuna receipt, tipo, località o identità del provider autorizza un consumer.
+[ADR 0088](./adr/0088-limite-digest-bound-readiness-ai-locale.md) documenta la
+decisione e il limite tecnico.
+
+Un endpoint loopback non dimostra `egress=none`. Un gate local-only futuro deve
+verificare modello locale, cloud disabilitato, strumenti, rete e processo.
+
+Lo stato mobile corrente non è un vincolo permanente. Capability Apple
+on-device e delega AI home-base richiedono un ADR separato.
+
 ## 2. Stati ammessi
 
 | Stato | Significato | Uso consentito |
@@ -130,6 +155,7 @@ Una regressione di località, qualità, privacy o kill switch riporta la lane a
 | --- | --- |
 | Registry locale | `lib/ai-providers/registry.ts` |
 | Locality Ollama | `lib/ai-providers/ollama-locality.ts` |
+| Limite digest-bound | `docs/adr/0088-limite-digest-bound-readiness-ai-locale.md` |
 | Binding task | `lib/ai-service.ts` |
 | Patient Insight | `lib/ai-summary-service.ts` |
 | Smart Import | `lib/domain/documents/patient-smart-import-service.ts` |
@@ -146,7 +172,10 @@ Una regressione di località, qualità, privacy o kill switch riporta la lane a
 
 ## 8. Decisioni aperte
 
-- definire l'attestazione delle capability specifiche del modello;
+- definire una prova causale adeguata prima di riesaminare la qualified
+  readiness in stato `HOLD`;
+- rimuovere A1/A2 nelle slice C0a, C0b e C0c autorizzate da ADR 0088;
+- definire il contratto Intelligence Fabric in un ADR separato;
 - fissare benchmark e budget lane-specific aggiornati;
 - decidere il profilo degradato OCR multipiattaforma in WUL-466;
 - verificare Apple Foundation Models in WUL-417 senza promozione implicita;
