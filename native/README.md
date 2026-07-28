@@ -1,7 +1,8 @@
 # MediFlow universal Apple app
 
 One universal SwiftUI app for iOS, iPadOS and macOS, sharing the home-base +
-`/api/v1` boundary with the web app. Style: Apple Liquid Glass ("Vetro Clinico").
+`/api/v1` boundary with the web app. Lume is the active design language. Vetro
+Clinico is historical and transitional. The local v0.8 candidate is not a release.
 No long dash in this repo's text by convention.
 
 ## Layout
@@ -15,7 +16,7 @@ No long dash in this repo's text by convention.
 - `MediFlowMac/`: the SwiftPM package. Library + tests only (no app executables):
   - `Sources/MediFlowAppleShared/`: the shared module: SwiftUI root + view models
     (`AppleFoundation/`), home-base networking / Bonjour / pairing / cache, the
-    `VetroClinico` Liquid Glass design kit, and the `/api/v1` contract primitives
+    the `Lume` design kit, optional Liquid Glass chrome, and the `/api/v1` contract primitives
     (`APIPatchValue`, `APIVersionConflict`).
   - `Tests/MediFlowAppleSharedTests/`: XCTest suite.
 

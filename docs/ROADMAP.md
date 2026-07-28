@@ -8,7 +8,8 @@ read_when:
 # 🧭 Roadmap MediFlow
 
 > **Dove siamo e dove vogliamo andare.**
-> v0.7.3 e la linea corrente, senza dichiarare parity UI completa. Ultimo aggiornamento: 2026-07-24.
+> La v0.7.3 resta la linea consolidata. La v0.8 è una candidata locale, senza
+> parity UI completa, promozione, tag o release. Ultimo aggiornamento: 2026-07-28.
 > Fonte roadmap prodotto canonica (vedi anche [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) per la lettura completa corrente e [docs/README.md](./README.md) per mappa completa documenti).
 
 > [!NOTE]
@@ -158,6 +159,21 @@ La linea consegna le prime superfici Lume, lo scaffold AI locale modulare, il
 control-flow documentale review-first, hardening di runtime e dati, il claims
 guard pubblico e il tooling P6 sintetico. La migrazione Lume completa e il
 verbale manuale di `WUL-481` restano lavoro successivo, non claim di release.
+
+## 🟡 Candidata locale v0.8: integrazioni e gate
+
+La candidata riunisce hardening documentale, superfici web Lume e correzioni
+Apple già presenti nel tree locale. Non cambia l'intended purpose.
+
+| Area | Evidenza locale | Non dichiarato |
+| --- | --- | --- |
+| Lume | Token DTCG, mirror CSS e consumatori web sono attivi. | Parity estetica completa o redesign concluso. |
+| Documenti | Stati accessibili e registro separato delle proposte sono integrati. | Diagnosi auto-applicate o nuova inbox. |
+| Apple | Correzioni SwiftUI e test UI sono nel tree candidato. | Build, simulatori e verifica manuale sostitutivi dei gate. |
+| AI | I boundary review-first e no-egress restano nel prodotto. | Nuovi provider, cloud o automazione graduata. |
+
+La promozione richiede i check di release applicabili e il verdetto corrente
+della matrice parity. Se un gate resta `HOLD`, la candidata non diventa release.
 
 ### Modalita network home-base
 
