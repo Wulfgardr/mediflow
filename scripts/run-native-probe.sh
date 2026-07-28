@@ -39,7 +39,6 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROBE_PATH="$SCRIPT_DIR/native-click-map-probe.swift"
 readonly APP_EXECUTABLE="$APP_PATH/Contents/MacOS/MediFlow"
 readonly PGREP_BIN="${MEDIFLOW_NATIVE_PROBE_PGREP_BIN:-/usr/bin/pgrep}"
-readonly PKILL_BIN="${MEDIFLOW_NATIVE_PROBE_PKILL_BIN:-/usr/bin/pkill}"
 readonly XCRUN_BIN="${MEDIFLOW_NATIVE_PROBE_XCRUN_BIN:-/usr/bin/xcrun}"
 
 if [[ ! -x "$APP_EXECUTABLE" ]]; then
@@ -52,16 +51,8 @@ if [[ ! -f "$PROBE_PATH" ]]; then
     exit 2
 fi
 
-"$PKILL_BIN" -x MediFlow >/dev/null 2>&1 || true
-for _ in {1..50}; do
-    if ! "$PGREP_BIN" -x MediFlow >/dev/null 2>&1; then
-        break
-    fi
-    sleep 0.1
-done
-
 if "$PGREP_BIN" -x MediFlow >/dev/null 2>&1; then
-    printf 'Unable to stop the previous MediFlow process.\n' >&2
+    printf 'A MediFlow process is already running; the native probe will not terminate an external session. Quit it before retrying.\n' >&2
     exit 1
 fi
 
