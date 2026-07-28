@@ -40,7 +40,7 @@ Principio: Lume non butta niente di ciò che vale. Il consolidamento di Vetro Cl
 | Fase | Contenuto | Gate |
 | --- | --- | --- |
 | L0 | Decisione di prodotto e canone: Lume lingua di destinazione, ADR 0078 e contratti di piattaforma | Completata per la direzione; font non-Apple e slice restano decisioni di delivery |
-| L1a (consegnata, PR #47) | Contratto token: registri giorno/grafite/guardia nel sorgente DTCG (`tokens/lume.tokens.json`) con misura strumentale dei contrasti (`scripts/check-lume-tokens.mjs`) | Tutte le coppie testo/superficie dichiarate misurate >= 4,5:1 |
+| L1a (attiva) | Contratto token: registri giorno/grafite/guardia nel sorgente DTCG (`tokens/lume.tokens.json`) con misura strumentale dei contrasti (`scripts/check-lume-tokens.mjs`) | Tutte le coppie testo/superficie dichiarate misurate >= 4,5:1 |
 | L1b (consegnata, PR #48) | Convivenza: mirror CSS `app/lume-tokens.css`, marker fisso `data-lume="true"` (temporaneo, non gate ne selettore utente), alias giorno su `:root` e grafite su `.dark`, con test di allineamento al sorgente; guardia non ancora tema attivo | Marker di migrazione isolato, ADR 0047 rispettato |
 | L2 (in corso) | Fuoco e chrome: modello focale nel cockpit (worklist/Quadro), rail e barre a chrome opaco, ritiro del vetro strutturale. Prime superfici atterrate: cockpit (PR #49), shell del workspace con fuoco focale e scrollspy (PR #52), lock screen (PR #53); le altre viste e i componenti interni restano da migrare | Smoke visivo 3 registri + 3 segnali di accessibilità |
 | L3 | Il filo: selezione focale, timeline diario, storia valori con banda personale | Leggibilità misurata; il tratteggio bozza copre i contenuti proposti |
@@ -50,7 +50,7 @@ Principio: Lume non butta niente di ciò che vale. Il consolidamento di Vetro Cl
 
 Le fasi L2-L5 atterrano in fette piccole per superficie (prima il cockpit, poi la Scheda, poi settings), con la disciplina già in uso.
 
-Stato al 2026-07-13: L0, L1a e L1b sono atterrate su main; L2 è in corso con le prime superfici (cockpit, shell del workspace, lock screen). Restano aperte L3-L5 (filo, due voci con tipografia bundle, overlay e motion) e L6 nativa oltre la thin slice della card clinica opaca. Il dettaglio verificabile, con le PR di riferimento e la distinzione tra tranche consegnate e aperte, è nel ledger di [ADR 0078](../../adr/0078-lume-lingua-di-design-di-destinazione.md).
+Stato al 2026-07-28: L0, L1a e L1b sono attive. L2 ha superfici nella candidata locale v0.8, ma resta aperta fino ai gate visuali correnti. Restano aperte L3-L5 (filo, due voci con tipografia bundle, overlay e motion) e L6 nativa oltre la thin slice della card clinica opaca. Il ledger di [ADR 0078](../../adr/0078-lume-lingua-di-design-di-destinazione.md) resta la fonte per tranche e gate.
 
 Aggiornamento mirato 2026-07-16, issue #71 e #75: il layer page-owned in `app/patients/[id]/entries/new/page.tsx` e l'editor condiviso `components/clinical-rich-text-editor.tsx` non contengono più occorrenze del vocabolario colore legacy; entrambe le voci sono state rimosse dall'allowlist, senza rigenerarne l'impronta. Sul tree della seconda slice, `check:lume-tokens` misura 258 occorrenze di debito clinico allowlisted, contro le 328 precedenti: 57 occorrenze appartenevano alla pagina e 13 all'editor. Il debito globale resta aperto e la condizione di uscita da `data-lume` definita in ADR 0078 non è ancora soddisfatta.
 

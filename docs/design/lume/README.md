@@ -7,7 +7,7 @@ read_when:
 
 # Lume: manifest degli artefatti visuali
 
-Lume è la lingua visiva di destinazione approvata in [ADR 0078](../../adr/0078-lume-lingua-di-design-di-destinazione.md). Le fondazioni tecniche sono presenti, ma la parità estetica con il canone non è consegnata. Le superfici web e macOS correnti sono composizioni con fondazioni Lume, non il target raggiunto.
+Lume è la lingua visiva attiva approvata in [ADR 0078](../../adr/0078-lume-lingua-di-design-di-destinazione.md). Il contratto DTCG e il mirror web sono attivi nella candidata locale v0.8. La parità estetica con il canone non è consegnata e la candidata non è una release.
 
 Questo manifest distingue il riferimento da applicare, gli studi, le prove dello stato corrente e il materiale storico. Uno studio o una cattura non sostituiscono il canone.
 
@@ -71,7 +71,9 @@ Gli studi in [mockups/](./mockups/) sono apribili nel browser e non hanno dipend
 
 ## CURRENT EVIDENCE: catture runtime
 
-Queste immagini sono evidenza dello stato corrente. Non dichiarano il target Lume raggiunto.
+Queste immagini sono evidenza dello stato acquisito. Non dichiarano il target
+Lume raggiunto né provano la candidata locale senza identità corrente di
+worktree, runtime e verifica associata.
 
 Snapshot web di produzione: 2026-07-17, registro Giorno, viewport 1440x900 a
 scala 2, fixture esclusivamente sintetiche. Si rigenera con:

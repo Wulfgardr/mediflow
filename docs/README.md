@@ -9,7 +9,7 @@ read_when:
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-07-25
+Ultimo aggiornamento: 2026-07-28
 
 ## 📚 Policy di consultazione (agent)
 
@@ -29,8 +29,8 @@ Approfondimenti utili:
 
 - Mappa completa markdown: [docs/markdown-index.md](./markdown-index.md)
 - Governance repository e topologia runtime/publication: [docs/repository-topology.md](./repository-topology.md)
-- Vetro Clinico, baseline storica e transitoria di design (canone operativo durante la migrazione): [docs/design/vetro-clinico/README.md](./design/vetro-clinico/README.md)
-- Lume, lingua di design di destinazione in adozione progressiva (ADR 0078 `Accepted`, prime superfici su `main`): [docs/design/lume/README.md](./design/lume/README.md)
+- Vetro Clinico, baseline storica e transitoria di design: [docs/design/vetro-clinico/README.md](./design/vetro-clinico/README.md)
+- Lume, lingua di design attiva con token DTCG nella candidata locale v0.8; i gate di parity restano separati: [docs/design/lume/README.md](./design/lume/README.md)
 - Lettura completa dello stato corrente: [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
 - FAQ pubbliche e stato sintetico del prodotto: [docs/FAQ.md](./FAQ.md)
 - Walkthrough operativo end-to-end: [docs/walkthrough.md](./walkthrough.md)
@@ -66,6 +66,7 @@ Approfondimenti utili:
 - `CANONICAL`: fonte di verità da aggiornare quando cambia un tema.
 - `SECONDARY`: approfondimento o sintesi; utile, ma non prevale se in conflitto.
 - `LEGACY`: materiale storico/visuale; consultabile, non decisionale.
+- `CANDIDATE LOCAL`: stato integrato nel tree locale; non prova release, tag o promozione.
 
 ## 📚 Fonte autorevole per tema
 
