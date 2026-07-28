@@ -38,6 +38,8 @@ export interface ProviderAdapter {
         pull: boolean;
         thinkingToggle: boolean;
     };
+    getBaseUrl(): string;
+    getModel(): string;
     chat(
         messages: ChatMessage[],
         signal?: AbortSignal,
