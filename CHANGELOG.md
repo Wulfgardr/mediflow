@@ -5,11 +5,12 @@ Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.0] - Candidata locale
 
-> Candidata `0.8.0`: contenuti in consolidamento. La versione del pacchetto
-> resta `0.7.3` finché contenuti, documentazione e verifica finale non sono
-> chiusi.
+> Questa voce prepara il candidato locale `0.8.0`. Non dichiara pubblicazione,
+> tag o release completata. Lo stato resta `HOLD_PROMOTION` finché i gate
+> assistivi e i verificatori finali non producono un verdetto terminale sullo
+> stesso candidato.
 
 ### Uso del prodotto
 
@@ -55,6 +56,19 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   **Stato**: integrata con la PR #139.
   **Limite**: l'endpoint MLX mantiene il confine di autenticazione esistente.
 
+### Interfacce e contratti locali
+
+- **Modifica**: le superfici web e Apple ricevono correzioni di layout,
+  accessibilità automatica e contratti wire per i flussi dichiarati.
+  **Stato**: incluse nella candidata locale con fixture sintetiche e test
+  mirati.
+  **Limite**: non dichiarano parity UI completa, VoiceOver reale, zoom reale o
+  collaudo manuale P6 sul bundle macOS.
+- **Modifica**: l'export FHIR mantiene un perimetro locale e manuale. La
+  condivisione resta soggetta alle capability della piattaforma.
+  **Stato**: il contratto v0 resta documentato in ADR 0081.
+  **Limite**: non dimostra conformità FSE o acquisizione da sistemi terzi.
+
 ### Confini non consegnati
 
 - Codex Operator personale resta escluso. Richiede un nuovo piano di lavoro
@@ -66,6 +80,8 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   registrazione e ripiego locale.
 - Il cloud può offrire capacità o tempi di elaborazione diversi. Non è un
   requisito e non implica una promessa clinica.
+- La candidata non dichiara parity UI completa. La matrice parity canonica e i
+  gate assistivi restano le fonti per i limiti delle superfici.
 
 ### Sviluppo assistito
 

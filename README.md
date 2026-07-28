@@ -18,12 +18,12 @@ _by Ordito & Concilio_
 Per ritrovare informazioni, seguire terapie e tenere il filo del lavoro clinico,
 senza consegnare i dati a un cloud per poter lavorare.
 
-[![Versione](https://img.shields.io/badge/versione-0.7.3-1f6feb)](./CHANGELOG.md)
+[![Versione](https://img.shields.io/badge/versione-0.8.0%20candidata-1f6feb)](./CHANGELOG.md)
 [![Licenza](https://img.shields.io/badge/licenza-MIT-2ea043)](./LICENSE)
 [![Local-first](https://img.shields.io/badge/dati-local--first-8957e5)](#confini-dichiarati)
-[![Core Swift](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#stato-073)
+[![Core Swift](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#candidata-locale-080)
 
-[In breve](#mediflow-in-breve) · [Schermate](#come-si-presenta) · [Architettura](#come-è-fatto) · [Stato](#stato-073) · [Avvio](#avvio-rapido) · [Sviluppo](#sviluppo-assistito)
+[In breve](#mediflow-in-breve) · [Schermate](#come-si-presenta) · [Architettura](#come-è-fatto) · [Stato](#candidata-locale-080) · [Avvio](#avvio-rapido) · [Sviluppo](#sviluppo-assistito)
 
 </div>
 
@@ -110,17 +110,17 @@ Il diagramma mostra il percorso locale. Trasporto, pairing e limiti del data
 plane sono documentati in
 [`docs/topologia-dati-flussi.md`](./docs/topologia-dati-flussi.md).
 
-## Stato 0.7.3
+## Candidata locale 0.8.0
 
-La 0.7.3 consolida il percorso local-first avviato dalla 0.7.2. Porta Lume
-sull'interfaccia web e sulle superfici dichiarate dell'app Apple, rende più
-modulare lo stack AI locale e rafforza backup, cifratura dei campi clinici,
-packaging e controlli sui claim pubblici.
+Questa checkout prepara localmente la versione `0.8.0`. Non dichiara una
+pubblicazione, un tag o una release completata. Lo stato resta `HOLD_PROMOTION`
+finché i gate assistivi e i verificatori finali non producono un verdetto
+terminale sullo stesso candidato.
 
-Restano aperti la parity dei client paired, gli snapshot di confronto completi,
-la verifica VoiceOver e il collaudo manuale P6 sul bundle macOS. Il controllo
-per i fornitori AI esterni resta chiuso. Non è consegnato alcun percorso di
-consenso o invio.
+La candidata consolida contratti AI review-first, hardening del pacchetto
+autonomo e miglioramenti alle superfici web e Apple. Le prove disponibili usano
+fixture sintetiche e controlli automatici dichiarati. Non dimostrano parity UI
+completa, VoiceOver reale, zoom reale o il collaudo manuale P6 sul bundle macOS.
 
 ### Aggiornamenti integrati
 
@@ -136,8 +136,8 @@ incluso: i relativi limiti di sicurezza richiedono decisioni e correzioni
 separate.
 
 Il dettaglio è nel [CHANGELOG](./CHANGELOG.md). La fotografia completa vive in
-[`docs/STATE_OF_THE_SYSTEM.md`](./docs/STATE_OF_THE_SYSTEM.md); la parity
-versionata in [`docs/parity-matrix.md`](./docs/parity-matrix.md).
+[`docs/STATE_OF_THE_SYSTEM.md`](./docs/STATE_OF_THE_SYSTEM.md); la matrice
+parity canonica vive in [`docs/parity-matrix.md`](./docs/parity-matrix.md).
 
 ### Modelli e servizi opzionali
 
@@ -179,7 +179,7 @@ MediFlow non racconta più di quanto possa dimostrare.
 - **iPhone e iPad non sono app complete.** Il perimetro operativo è
   `home-base + client paired`; cache offline e alcune superfici derivate dai
   documenti restano parziali o disponibili solo sull'host.
-- **Windows e Linux non hanno ancora parity applicativa.** La 0.7.3 verifica il
+- **Windows e Linux non hanno ancora parity applicativa.** La candidata verifica il
   core Swift condiviso e il runtime di base, non applicazioni complete su ogni
   piattaforma.
 - **SISS e FSE restano un handoff assistito.** MediFlow apre il contesto giusto,
