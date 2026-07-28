@@ -119,8 +119,11 @@ terminale sullo stesso candidato.
 
 La candidata consolida contratti AI review-first, hardening del pacchetto
 autonomo e miglioramenti alle superfici web e Apple. Le prove disponibili usano
-fixture sintetiche e controlli automatici dichiarati. Non dimostrano parity UI
-completa, VoiceOver reale, zoom reale o il collaudo manuale P6 sul bundle macOS.
+solo fixture sintetiche. Chrome sulla build di produzione è stato verificato al
+200% e al 400%; il bundle macOS già costruito è stato verificato con VoiceOver,
+tastiera e resize. Queste prove non dimostrano parity UI completa: restano da
+chiudere VoiceOver reale su iPhone e iPad, lo screen reader web e la nuova build
+Xcode sul tree corrente.
 
 ### Aggiornamenti integrati
 
