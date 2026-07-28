@@ -6,6 +6,13 @@ import {
     type ProviderAdapter,
 } from './provider';
 import { normalizeOllamaBaseUrl } from './base-url';
+import {
+    assertLocalOllamaModelReference,
+    assertLocalOllamaResponse,
+    attestLocalOllamaModel,
+    isLocalOllamaModelDescriptor,
+    strictOllamaLoopbackBaseUrl,
+} from './ollama-locality';
 
 /* @Codex */
 const MODEL_KEEP_ALIVE = '30m';
@@ -111,13 +118,17 @@ export class OllamaProviderAdapter implements ProviderAdapter {
 
     async chat(messages: ChatMessage[], signal?: AbortSignal, maxTokens?: number, options?: AIChatOptions): Promise<{ content: string; stats: AIStats }> {
         const start = Date.now();
-        const endpoint = this.isBrowserRuntime()
+        const browserRuntime = this.isBrowserRuntime();
+        const providerBaseUrl = browserRuntime
+            ? this.baseUrl
+            : strictOllamaLoopbackBaseUrl(this.baseUrl);
+        const endpoint = browserRuntime
             ? '/api/proxy/ollama/chat'
-            : `${this.baseUrl}/api/chat`;
+            : `${providerBaseUrl}/api/chat`;
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
         };
-        if (this.isBrowserRuntime()) {
+        if (browserRuntime) {
             headers['x-target-url'] = this.baseUrl;
         }
 
@@ -125,6 +136,9 @@ export class OllamaProviderAdapter implements ProviderAdapter {
         const effectiveSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
 
         try {
+            const attestation = browserRuntime
+                ? null
+                : await attestLocalOllamaModel(providerBaseUrl, this.model, effectiveSignal);
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers,
@@ -136,6 +150,7 @@ export class OllamaProviderAdapter implements ProviderAdapter {
                     this.disableThinking,
                 )),
                 signal: effectiveSignal,
+                redirect: 'error',
             });
 
             if (!response.ok) {
@@ -144,6 +159,7 @@ export class OllamaProviderAdapter implements ProviderAdapter {
             }
 
             const data = await response.json();
+            if (attestation) assertLocalOllamaResponse(data, attestation);
             const content = data.message?.content || data.choices?.[0]?.message?.content || '';
             const usage = data.usage || {};
             const tokensIn = data.prompt_eval_count || usage.prompt_tokens || 0;
@@ -168,17 +184,23 @@ export class OllamaProviderAdapter implements ProviderAdapter {
     }
 
     async listModels(): Promise<AIModel[]> {
-        const targetUrl = this.baseUrl;
+        const browserRuntime = this.isBrowserRuntime();
+        const targetUrl = browserRuntime
+            ? this.baseUrl
+            : strictOllamaLoopbackBaseUrl(this.baseUrl);
         try {
             const response = await fetch(
-                this.isBrowserRuntime() ? '/api/ai/models' : `${targetUrl}/api/tags`,
-                this.isBrowserRuntime()
-                    ? { headers: { 'x-target-url': targetUrl } }
-                    : undefined,
+                browserRuntime ? '/api/ai/models' : `${targetUrl}/api/tags`,
+                browserRuntime
+                    ? { headers: { 'x-target-url': targetUrl }, redirect: 'error' }
+                    : { redirect: 'error' },
             );
             if (!response.ok) throw new Error('Failed to fetch models');
             const data = await response.json();
-            return data.models || [];
+            const models = Array.isArray(data.models) ? data.models : [];
+            return browserRuntime
+                ? models
+                : models.filter(isLocalOllamaModelDescriptor);
         } catch (e) {
             console.error('List Models Error:', e);
             throw e;
@@ -186,7 +208,10 @@ export class OllamaProviderAdapter implements ProviderAdapter {
     }
 
     async pullModel(modelName: string, onProgress?: (status: string, progress: number) => void): Promise<void> {
-        const targetUrl = this.baseUrl;
+        assertLocalOllamaModelReference(modelName);
+        const targetUrl = this.isBrowserRuntime()
+            ? this.baseUrl
+            : strictOllamaLoopbackBaseUrl(this.baseUrl);
         const response = await fetch(this.isBrowserRuntime() ? '/api/ai/pull' : `${targetUrl}/api/pull`, {
             method: 'POST',
             headers: {
@@ -194,6 +219,7 @@ export class OllamaProviderAdapter implements ProviderAdapter {
                 ...(this.isBrowserRuntime() ? { 'x-target-url': targetUrl } : {}),
             },
             body: JSON.stringify({ model: modelName }),
+            redirect: 'error',
         });
 
         if (!response.ok || !response.body) {
