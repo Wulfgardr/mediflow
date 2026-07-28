@@ -1,7 +1,7 @@
 # ADR 0087: registro delle proposte diagnostiche documentali
 
 Date: 2026-07-25
-Status: Proposed
+Status: Accepted
 
 Issue: WUL-361
 
@@ -14,252 +14,155 @@ Related: [ADR 0015](./0015-audit-taxonomy-minimum-catalog.md),
 
 ---
 
-## Stato di questo packet
+## Stato attuale
 
-Questo ADR riapre il contratto come proposta, senza dichiarare un runtime
-attivo. Non aggiunge schema, migrazione, API, UI o scritture cliniche.
-`documentInsights` resta il contenitore operativo delle proposte da rivedere.
-ADR 0085 resta riservato a Codex Operator e non cambia.
+La foundation persistente è consegnata. La tabella
+`document_diagnosis_proposals` esiste nello schema Drizzle, nella migrazione
+`0024` e nel bootstrap idempotente del database.
+
+Il backup e il restore includono la raccolta
+`documentDiagnosisProposals`. La purge amministrata del paziente include la
+tabella come figlia. I test coprono il round-trip del backup, la compatibilità
+del backup legacy e il cascade del paziente.
+
+Non esiste un writer applicativo per il registro. Non esistono route dedicate,
+UI, transizioni di stato o applicazione in `patients.diagnoses`.
+
+ADR 0084 resta prevalente: le diagnosi estratte dai documenti sono
+review-only. Questa foundation non modifica tale confine.
 
 ## Problema
 
-La sintesi documentale può estrarre diagnosi candidate con fonte ed evidenza.
-ADR 0084 impone che queste diagnosi restino review-only.
+Una proposta diagnostica documentale richiede una sede persistente distinta
+dalle diagnosi cliniche. La sede deve poter seguire backup, restore e purge
+senza trasformare una proposta in un dato clinico applicato.
 
-Una futura revisione persistente richiede un oggetto distinto. Deve conservare
-la provenienza, evitare duplicati al replay e mantenere la decisione umana.
-Deve inoltre separare proposta e applicazione e fallire su ogni ambiguità.
-
-Senza un contratto dedicato, una proiezione documentale può sembrare un record
-clinico oppure diventare una scrittura implicita.
+Senza questa separazione, un record tecnico può sembrare una diagnosi
+confermata oppure suggerire un flusso di scrittura non consegnato.
 
 ## Contesto e precedenze
 
-- ADR 0084 è il confine corrente: la sintesi non aggiorna
-  `patients.diagnoses`.
-- ADR 0086 separa pipeline, proposta, chiarimento, anteprima, autorizzazione e
-  scrittura applicativa auditata.
-- SQLite resta autorevole e i campi clinici sensibili restano cifrati lato
-  client.
-- I test futuri usano solo fixture sintetiche.
+- ADR 0084 vieta l'aggiornamento automatico di `patients.diagnoses` dalla
+  sintesi documentale.
+- ADR 0086 separa proposta, chiarimento, anteprima, autorizzazione e scrittura
+  applicativa auditata.
+- ADR 0066 richiede che le tabelle figlie del paziente seguano il cascade
+  amministrato.
+- ADR 0080 richiede l'allineamento tra schema, migrazione e bootstrap.
 
-In caso di conflitto, ADR 0084 prevale sul comportamento corrente. Questo ADR
-non abilita la persistenza finché resta `Proposed`.
+In caso di conflitto, ADR 0084 prevale sul comportamento clinico.
 
 ## Opzioni
 
-1. Conservare ogni proposta solo dentro `documentInsights`.
-2. Definire un registro locale dedicato, distinto dalle diagnosi cliniche.
-3. Scrivere direttamente in `patients.diagnoses` quando la confidenza è alta.
+1. Conservare le proposte solo in `documentInsights`.
+2. Conservare una foundation locale separata dalle diagnosi cliniche.
+3. Aggiornare `patients.diagnoses` in base alla confidenza.
 
 ## Trade-off
 
-- L'opzione 1 è piccola, ma non conserva una revisione stabile e idempotente.
-- L'opzione 2 aggiunge controlli, ma separa evidenza, proposta e dato clinico.
-- L'opzione 3 viola il review-only e tratta la confidenza come autorizzazione.
+- L'opzione 1 non offre una raccolta persistente dedicata.
+- L'opzione 2 aggiunge una tabella, ma mantiene separati proposta e diagnosi.
+- L'opzione 3 viola il confine review-only di ADR 0084.
 
-## Decisione proposta
+## Decisione
 
-Proponiamo l'opzione 2.
+Accettiamo l'opzione 2 limitatamente alla foundation persistente già presente.
 
-Una futura implementazione può aggiungere un registro locale
-`document_diagnosis_proposals`. Il registro non è una diagnosi clinica e non
-autorizza una scrittura.
+Il registro locale `document_diagnosis_proposals` resta distinto da
+`patients.diagnoses`. Il suo inserimento nel database non costituisce una
+decisione clinica né autorizza una scrittura clinica.
 
-### Contratto minimo del record
+### Contratto persistente consegnato
 
-| Gruppo | Campi proposti | Regola |
-| --- | --- | --- |
-| Identità | `id`, `patientId` | Il paziente è obbligatorio e deve essere il target attivo della revisione. |
-| Fonte | `sourceDocumentKey`, `attachmentId`, `documentInsightId` | La chiave della fonte è stabile. Gli altri riferimenti sono interni e facoltativi. |
-| Candidato | `candidateKey`, `payload` | La chiave è deterministica. Il payload clinico è cifrato lato client. |
-| Revisione | `status`, `confidence`, `decisionPayload` | La confidenza ordina la revisione. Non autorizza una decisione. |
-| Concorrenza | `version`, `createdAt`, `updatedAt` | Ogni mutazione futura usa confronto di versione. |
-| Decisione | `decidedAt`, `actorRef` | I campi sono valorizzati solo da un'azione autenticata e auditata. |
+La tabella contiene i seguenti campi:
 
-Payload e decisione usano `ENC:<iv_b64>:<cipher_b64>`. Il testo in chiaro contiene
-solo identificatori interni, chiavi HMAC, enum, versione e timestamp. Non
-contiene descrizione, codice clinico, testo fonte o motivazione libera.
+| Gruppo | Campi presenti |
+| --- | --- |
+| Identità | `id`, `patientId`, `sourceDocumentKey`, `candidateKey` |
+| Riferimenti | `attachmentId`, `documentInsightId` |
+| Proposta | `payload`, `status`, `confidence` |
+| Decisione registrabile | `decidedAt`, `decisionActorType`, `decisionActorRef`, `decisionPayload` |
+| Concorrenza e date | `version`, `createdAt`, `updatedAt` |
 
-### Identità della fonte
+`patientId`, `sourceDocumentKey`, `candidateKey`, `payload` e `confidence`
+sono obbligatori nello schema. La tabella ha un riferimento a `patients.id`.
 
-La fonte usa `source_content_sha256`, calcolato sui byte originali del
-documento prima di OCR, parsing o normalizzazione.
+Un indice unico protegge la terna
+`patientId + sourceDocumentKey + candidateKey`. Gli indici aggiuntivi coprono
+`patientId` e `patientId + status`.
 
-La stessa sequenza di byte mantiene l'identità anche se cambiano nome file,
-MIME, intestazione Data URL, riferimenti interni, risultato OCR o replay.
+Lo schema non impone un vocabolario di `status`, una macchina a stati, la
+derivazione delle chiavi o il formato di `payload` e `decisionPayload`. I campi
+di decisione non dimostrano un'azione di decisione consegnata.
 
-Se i byte originali non sono disponibili, il sistema non crea una proposta
-persistente. Il candidato resta materiale review-only nella proiezione
-documentale corrente.
+### Integrazione con i dati locali
 
-Il digest grezzo non viene usato come chiave interrogabile. Il client deriva
-`sourceDocumentKey` con HMAC e una chiave di dominio derivata dalla master key.
+La raccolta entra nel backup locale e nel restore. Un artifact legacy senza
+`documentDiagnosisProposals` viene normalizzato con una raccolta vuota.
 
-### Identità del candidato
+La raccolta è inclusa nel clear e nell'insert del restore. È inclusa anche nel
+cascade di purge del paziente. Queste integrazioni conservano e rimuovono righe
+del registro; non eseguono review o applicazione clinica.
 
-`candidateKey` deriva con HMAC da `patientId`, sistema normalizzato e codice
-normalizzato.
+### Limite operativo
 
-La derivazione usa una chiave di dominio diversa dalla chiave della fonte.
-Il server non riceve la chiave HMAC.
+La foundation non contiene un writer applicativo. Il tree corrente non espone
+una route, una UI o una transizione per creare, rivedere, accettare, rifiutare
+o sostituire proposte.
 
-Un codice assente, invalido o ambiguo non produce una proposta persistente.
-La stessa regola vale per una confidenza bassa o per un campo clinico bloccato.
-L'evidenza resta disponibile per la revisione ordinaria.
+Il tree corrente non applica una proposta a `patients.diagnoses`. Non esiste
+auto-apply, neppure quando `confidence` contiene un valore alto.
 
-### Deduplica e replay
+## Workflow futuro
 
-La cardinalità è univoca per
-`patientId + sourceDocumentKey + candidateKey`.
+Un packet runtime separato deve definire e verificare il workflow prima di
+usare il registro applicativamente. Il packet deve rispettare ADR 0084 e non
+può dedurre un'autorizzazione dalla confidenza o dai campi già persistiti.
 
-Il comportamento futuro deve rispettare queste regole:
+Il packet deve dimostrare, per il suo contratto specifico:
 
-- lo stesso candidato dalla stessa fonte aggiorna solo una proposta `pending`;
-- due fonti diverse restano due proposte distinte;
-- una proposta terminale non torna `pending` durante un replay;
-- un replay non crea una diagnosi e non cambia una decisione;
-- un conflitto di identità fallisce senza scegliere un target alternativo.
+- writer e validazioni;
+- stati e transizioni consentite;
+- identità e provenienza della fonte;
+- protezione dei payload e dei metadati clinici;
+- gesto esplicito dell'operatore e anteprima esatta;
+- concorrenza, audit e rollback della eventuale scrittura;
+- test negativi per assenza di auto-apply e per l'isolamento da route paired.
 
-La deduplica riduce duplicati tecnici. Non unisce evidenze cliniche provenienti
-da documenti diversi.
-
-### Ciclo di vita
-
-Gli stati proposti sono:
-
-- `pending`: proposta da rivedere;
-- `accepted`: proposta confermata e applicata nella stessa transazione futura;
-- `rejected`: proposta respinta senza scrittura clinica;
-- `superseded`: proposta sostituita con motivo e provenienza tracciati.
-
-`accepted`, `rejected` e `superseded` sono terminali. Nessuna transizione è
-automatica.
-
-Questo packet definisce gli stati ma non implementa route o transizioni.
-
-### Creazione futura
-
-La creazione del registro, se autorizzata da un packet successivo, resta sul
-web locale dell'host.
-
-- Richiede una sessione web valida.
-- Non espone nuove route `/api/v1` o paired.
-- Non aggiorna `patients.diagnoses`.
-- Rivalida paziente, fonte, codice e stato nella stessa operazione.
-- Inserisce o aggiorna soltanto una proposta `pending`.
-- Restituisce conflitti tecnici senza testo clinico.
-
-La sintesi documentale resta utilizzabile anche quando il registro non è
-disponibile.
-
-### Decisione e applicazione future
-
-Una futura applicazione richiede:
-
-1. sessione valida e attore derivato dal server;
-2. paziente e proposta inequivocabili;
-3. anteprima esatta della diagnosi proposta;
-4. gesto esplicito dell'operatore;
-5. versione corrente della proposta e del target;
-6. validazione del sistema e del codice;
-7. una sola transazione SQLite;
-8. un audit PHI-safe nella stessa transazione.
-
-Solo `accepted` può accompagnare una scrittura in `patients.diagnoses`.
-L'aggiornamento della diagnosi, lo stato e l'audit riescono insieme oppure
-vengono annullati insieme.
-
-`rejected` non scrive diagnosi. Un errore o un conflitto non produce uno stato
-terminale e non applica dati parziali.
-
-Il provider AI non decide lo stato e non accede direttamente al database.
-
-### Audit, backup e cancellazione
-
-Una futura implementazione deve:
-
-- aggiungere eventi audit dedicati senza payload clinico o ciphertext;
-- includere il registro nel backup e nel relativo preflight;
-- includerlo nella cancellazione amministrata del paziente;
-- preservarlo durante soft-delete e restore del paziente;
-- aggiornare la lista canonica delle tabelle figlie;
-- verificare ordine e atomicità della purge.
-
-Questo ADR non modifica oggi audit, backup o cancellazione.
-
-### Migrazione e bootstrap
-
-Questo packet non crea e non riserva una migrazione.
-
-Un futuro packet runtime deve scegliere il primo numero libero sulla propria
-base. Deve allineare schema, migrazione e bootstrap idempotente. Deve anche
-rispettare la serializzazione definita da ADR 0080.
-
-Non è ammesso usare una migrazione SQL come unica prova del contratto runtime.
-
-## Test richiesti per un futuro runtime
-
-Il packet applicativo deve includere almeno:
-
-- identità stabile sugli stessi byte con metadati diversi;
-- identità diversa per byte, paziente, sistema o codice diversi;
-- rifiuto quando i byte originali non sono disponibili;
-- rifiuto di codice assente, invalido o ambiguo;
-- payload e decisione sempre in formato `ENC:`;
-- deduplica idempotente della stessa fonte e candidato;
-- separazione di fonti diverse;
-- impossibilità di riaprire uno stato terminale tramite replay;
-- nessuna modifica a `patients.diagnoses` durante la creazione;
-- autorizzazione, target e versioni rivalidati nella transazione;
-- rollback completo su conflitto o errore audit;
-- audit senza testo clinico, codice, ciphertext o digest grezzo;
-- backup, restore, soft-delete e purge con fixture sintetiche;
-- assenza di route paired o accesso diretto del provider.
-
-I test devono includere falsificatori validi. Un test che verifica solo il caso
-felice non dimostra il confine.
+Finché il packet non esiste, il registro resta una foundation dati. La review
+documentale continua a usare il flusso già governato da ADR 0084.
 
 ## Conseguenze
 
-- La proposta può avere un'identità stabile senza diventare una diagnosi.
-- Replay e decisioni umane restano separati.
-- Il futuro runtime richiede più componenti e verifiche prima dell'adozione.
-- La correlazione delle chiavi HMAC nel database resta un metadato osservabile
-  e deve essere limitata al necessario.
-- Finché l'ADR è `Proposed`, il comportamento operativo non cambia.
+- Backup, restore e purge conoscono la tabella del registro.
+- La foundation può conservare record separati dalle diagnosi cliniche.
+- Nessun comportamento utente aggiuntivo è consegnato.
+- La presenza di campi di proposta o decisione non prova review, audit o
+  applicazione clinica.
 
 ## Non-obiettivi
 
 Questo ADR non:
 
+- aggiunge un writer, una route, una UI o una macchina a stati;
 - modifica `documentInsights` o `patients.diagnoses`;
-- implementa schema, migrazione, API, UI o runtime;
-- abilita persistenza automatica ad alta confidenza;
+- abilita persistenza automatica, auto-apply o scrittura clinica;
+- definisce derivazione delle chiavi, cifratura dei payload o un audit di
+  decisione come comportamento runtime;
 - abilita Codex Operator o un provider esterno;
-- apre egress, sync, paired write o accesso diretto al database;
+- apre egress, sync, paired write o accesso diretto del provider;
 - definisce una inbox conversazionale;
-- autorizza diagnosi, prescrizioni o identità paziente automatiche;
 - modifica versione, release o dossier del programma 0.8.
-
-## First Thin Slice
-
-1. Registrare questo contratto con stato `Proposed`.
-2. Aggiornare solo gli indici documentali canonici.
-3. Richiedere una decisione separata prima di schema o migrazione.
-4. Aprire packet runtime piccoli solo dopo l'accettazione del contratto.
 
 ## Regole di arresto
 
-Fermare una futura implementazione se:
+Fermare un futuro packet se:
 
 - la confidenza viene trattata come autorizzazione;
 - una proposta modifica diagnosi senza gesto esplicito;
-- la fonte usa OCR, nome file o metadati al posto dei byte originali;
-- una chiave o un payload clinico viene persistito in chiaro;
-- un replay riapre o riscrive una decisione terminale;
+- il writer usa il registro senza contratto di stato e validazioni verificati;
+- payload o metadati clinici ricevono una protezione non dimostrata;
+- backup, restore o purge vengono estesi senza test sintetici;
 - una route paired o un provider accede al registro senza nuova decisione;
 - una transazione può lasciare diagnosi, stato e audit incoerenti;
-- il numero di migrazione è occupato sulla base del packet;
-- backup, restore o purge ignorano il nuovo record;
 - una decisione contrattuale resta aperta.
