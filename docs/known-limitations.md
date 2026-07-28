@@ -9,7 +9,7 @@ read_when:
 
 Stato documento: `CANONICAL`
 
-Ultimo aggiornamento: 2026-07-28
+Ultimo aggiornamento: 2026-07-29
 
 ## VoiceOver su iPhone e iPad
 
@@ -68,6 +68,31 @@ La continuità offline mobile è parziale e read-only dove documentata. La
 visibilità completa di età, TTL e staleness della cache e la riconciliazione
 restano lavoro successivo. Non esiste una coda di scrittura offline o un sync
 multi-master.
+
+## Tooling di sviluppo
+
+Con Node `v24.18.0`, l'audit delle sole dipendenze di produzione non rileva
+vulnerabilità. L'audit completo del 29 luglio 2026 rileva 21 rilievi nel
+tooling di sviluppo:
+
+- 1 low;
+- 5 moderate;
+- 15 high;
+- zero critical.
+
+Il rischio riguarda la toolchain dei contributor, non il grafo installato in
+produzione. Non è classificato come risolto.
+
+Un candidato di aggiornamento portava l'audit a zero, ma forzava versioni
+transitive fuori dai range dichiarati e falliva l'installazione
+`strict-peer-deps`. La candidata 0.8 non assorbe quel workaround.
+
+La chiusura richiede un packet dipendenze separato con:
+
+1. nessun override fuori range;
+2. installazione strict-peer verde;
+3. audit completo e production audit;
+4. lint, build, test e regressione E2E completi.
 
 ## Provider e funzioni future
 
