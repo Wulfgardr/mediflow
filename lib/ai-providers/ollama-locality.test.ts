@@ -72,7 +72,7 @@ test('rifiuta un modello remoto prima della chiamata show', async (t) => {
         if (url.endsWith('/api/version')) return Response.json({ version: '0.32.5' });
         if (url.endsWith('/api/tags')) {
             return Response.json({
-                models: [{ ...LOCAL_MODEL, remote_host: 'https://example.invalid' }],
+                models: [{ ...LOCAL_MODEL, remote_host: 'remote.invalid' }],
             });
         }
         throw new Error('unreachable');
@@ -93,7 +93,7 @@ test('filtra descrittori remoti e rifiuta risposte non attestate', () => {
     assert.equal(isLocalOllamaModelDescriptor({ ...LOCAL_MODEL, remote_model: 'remote' }), false);
     assert.throws(
         () => assertLocalOllamaResponse(
-            { model: 'qwen-local:latest', remote_host: 'https://example.invalid' },
+            { model: 'qwen-local:latest', remote_host: 'remote.invalid' },
             {
                 authorityPlane: 'clinical_application',
                 provider: 'ollama',

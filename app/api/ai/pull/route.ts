@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-import { validateLocalTarget } from '@/lib/local-target';
+import {
+    assertLocalOllamaModelReference,
+    strictOllamaLoopbackBaseUrl,
+} from '@/lib/ai-providers/ollama-locality';
+import { ollamaLocalityErrorResponse } from '@/lib/ai-providers/ollama-locality-response';
 
 export async function POST(req: NextRequest) {
     /* @Codex */
@@ -12,24 +16,16 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const { model } = body;
         const targetUrl = req.headers.get('x-target-url') || "http://127.0.0.1:11434";
-        /* @Codex */
-        const validation = validateLocalTarget(targetUrl);
-        if (!validation.ok) {
-            return NextResponse.json({ error: `Target not allowed: ${validation.reason}` }, { status: 400 });
-        }
-
-        if (!model) {
-            return NextResponse.json({ error: "Model name required" }, { status: 400 });
-        }
-
-        const baseUrl = validation.url.toString().replace(/\/v1\/?$/, '');
+        assertLocalOllamaModelReference(model);
+        const baseUrl = strictOllamaLoopbackBaseUrl(targetUrl);
         const apiUrl = `${baseUrl}/api/pull`;
 
         // We need to stream the response from Ollama back to the client
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model, stream: true }) // streaming enabled
+            body: JSON.stringify({ model, stream: true }),
+            redirect: 'error',
         });
 
         if (!response.ok || !response.body) {
@@ -41,6 +37,8 @@ export async function POST(req: NextRequest) {
         return new NextResponse(response.body);
 
     } catch (error) {
+        const localityResponse = ollamaLocalityErrorResponse(error);
+        if (localityResponse) return localityResponse;
         console.error("Pull Model Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
