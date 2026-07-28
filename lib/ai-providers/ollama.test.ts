@@ -62,6 +62,8 @@ test('attesta e invoca la chat sullo stesso loopback canonico', async (t) => {
         if (url.endsWith('/api/version')) return Response.json({ version: '0.32.5' });
         if (url.endsWith('/api/tags')) return Response.json({ models: [localModel] });
         if (url.endsWith('/api/show')) return Response.json({ details: { format: 'gguf' } });
+        if (url.endsWith('/api/generate')) return Response.json({ model: localModel.model });
+        if (url.endsWith('/api/ps')) return Response.json({ models: [localModel] });
         if (url.endsWith('/api/chat')) {
             return Response.json({
                 model: localModel.model,
@@ -82,30 +84,22 @@ test('attesta e invoca la chat sullo stesso loopback canonico', async (t) => {
     const result = await adapter.chat([{ role: 'user', content: 'fixture sintetica' }]);
 
     assert.equal(result.content, 'risposta sintetica');
-    assert.equal(calls.length, 4);
+    assert.equal(calls.length, 6);
     assert.equal(calls.every(({ url }) => url.startsWith('http://127.0.0.1:11434/')), true);
-    assert.equal(calls.slice(0, 3).some(({ init }) => String(init?.body).includes('messages')), false);
-    assert.equal(String(calls[3]?.init?.body).includes('fixture sintetica'), true);
+    assert.equal(calls.slice(0, 5).some(({ init }) => String(init?.body).includes('messages')), false);
+    assert.equal(JSON.parse(String(calls[5]?.init?.body)).model, localModel.model);
+    assert.equal(String(calls[5]?.init?.body).includes('fixture sintetica'), true);
 });
 
-test('rifiuta un pull cloud prima di contattare il provider', async (t) => {
-    const originalFetch = globalThis.fetch;
-    let called = false;
-    globalThis.fetch = (async () => {
-        called = true;
-        throw new Error('unreachable');
-    }) as typeof fetch;
-    t.after(() => {
-        globalThis.fetch = originalFetch;
-    });
+test('non espone il pull modelli nella lane local-only', () => {
     const adapter = new OllamaProviderAdapter({
         baseUrl: 'http://127.0.0.1:11434',
         model: 'qwen-local',
         chatTimeoutMs: 1000,
     });
 
-    await assert.rejects(() => adapter.pullModel('qwen:cloud'), /model_cloud_reference/);
-    assert.equal(called, false);
+    assert.equal(adapter.capabilities.pull, false);
+    assert.equal('pullModel' in adapter, false);
 });
 
 test('distingue il timeout dall annullamento utente', async (t) => {

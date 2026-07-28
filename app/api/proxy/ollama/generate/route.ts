@@ -28,7 +28,7 @@ export async function POST(req: Request) {
         const res = await fetch(`${baseUrl}/api/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            body: JSON.stringify({ ...body, model: attestation.canonicalModel }),
             signal: req.signal,
             redirect: 'error',
         });
