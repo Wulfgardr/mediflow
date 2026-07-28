@@ -166,10 +166,10 @@ direttamente al database. Il flusso separa proposta, chiarimento e scrittura
 autorizzata; la scrittura diretta tramite modello non è consegnata.
 
 L'[ADR 0086](./docs/adr/0086-intelligent-scaffold-and-graded-automation-boundary.md)
-propone il contratto comune per Document Ops, riconciliazione anagrafica, sunto
-clinico, Atena e provider. Distingue le funzioni presenti dalla roadmap. La
-futura inbox conversazionale e l'automazione graduata non sono funzioni live
-della 0.8.
+definisce il contratto comune post-0.8 per Document Ops, riconciliazione
+anagrafica, sunto clinico, Atena e provider. Distingue le funzioni presenti
+dalla roadmap e non modifica il candidato 0.8. La futura inbox conversazionale
+e l'automazione graduata non sono funzioni live della 0.8.
 
 ## Confini dichiarati
 
