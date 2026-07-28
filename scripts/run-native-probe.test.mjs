@@ -12,13 +12,14 @@ function writeExecutable(filePath, source) {
     fs.writeFileSync(filePath, source, { mode: 0o755 });
 }
 
-function createScenario({ waitForSignal = false, xcrunExit = 0 } = {}) {
+function createScenario({ waitForSignal = false, xcrunExit = 0, externalMediFlow = false } = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-native-probe-'));
     const bin = path.join(root, 'bin');
     const appPath = path.join(root, 'MediFlow.app');
     const appExecutable = path.join(appPath, 'Contents', 'MacOS', 'MediFlow');
     const appLogPath = path.join(root, 'app.log');
     const appPidPath = path.join(root, 'app.pid');
+    const pgrepLogPath = path.join(root, 'pgrep.log');
     const readyPath = path.join(root, 'xcrun-ready');
     fs.mkdirSync(bin, { recursive: true });
     fs.mkdirSync(path.dirname(appExecutable), { recursive: true });
@@ -29,8 +30,11 @@ printf 'uitest=%s\nsection=%s\n' "$MEDIFLOW_APPLE_UITEST_PATIENTS" "$MEDIFLOW_AP
 printf 'arg=%s\n' "$@" >> "$MOCK_APP_LOG"
 while :; do /bin/sleep 1; done
 `);
-    writeExecutable(path.join(bin, 'pgrep'), '#!/usr/bin/env bash\nexit 1\n');
-    writeExecutable(path.join(bin, 'pkill'), '#!/usr/bin/env bash\nexit 0\n');
+    writeExecutable(path.join(bin, 'pgrep'), `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\\n' "$@" >> "$MOCK_PGREP_LOG"
+exit "$MOCK_PGREP_EXIT"
+`);
     writeExecutable(path.join(bin, 'xcrun'), `#!/usr/bin/env bash
 set -euo pipefail
 for _ in {1..200}; do
@@ -53,17 +57,19 @@ exit "$MOCK_XCRUN_EXIT"
         appPath,
         appLogPath,
         appPidPath,
+        pgrepLogPath,
         readyPath,
         env: {
             ...process.env,
             MEDIFLOW_NATIVE_PROBE_PGREP_BIN: path.join(bin, 'pgrep'),
-            MEDIFLOW_NATIVE_PROBE_PKILL_BIN: path.join(bin, 'pkill'),
             MEDIFLOW_NATIVE_PROBE_XCRUN_BIN: path.join(bin, 'xcrun'),
             MOCK_APP_LOG: appLogPath,
             MOCK_APP_PID: appPidPath,
             MOCK_WAIT_FOR_SIGNAL: waitForSignal ? '1' : '0',
             MOCK_XCRUN_READY: readyPath,
             MOCK_XCRUN_EXIT: String(xcrunExit),
+            MOCK_PGREP_LOG: pgrepLogPath,
+            MOCK_PGREP_EXIT: externalMediFlow ? '0' : '1',
         },
     };
 }
@@ -107,9 +113,35 @@ test('launches the synthetic probe with volatile UI overrides and no defaults-do
         assertProcessStopped(readAppPid(scenario));
         const source = fs.readFileSync(scriptPath, 'utf8');
         assert.doesNotMatch(source, /DEFAULTS_DOMAIN|defaults\s+(?:delete|export|import)/);
+        assert.doesNotMatch(source, /\bpkill\b|\bkillall\b/);
     } finally {
         removeScenario(scenario.root);
     }
+});
+
+test('refuses an external MediFlow process without launching or terminating it', () => {
+    const scenario = createScenario({ externalMediFlow: true });
+    try {
+        const result = runScenario(scenario);
+        assert.equal(result.status, 1);
+        assert.match(result.stderr, /will not terminate an external session/);
+        assert.equal(fs.existsSync(scenario.appPidPath), false);
+        assert.deepEqual(fs.readFileSync(scenario.pgrepLogPath, 'utf8').trim().split('\n'), ['-x', 'MediFlow']);
+    } finally {
+        removeScenario(scenario.root);
+    }
+});
+
+test('probe contract binds each selected fixture row to its header and detail content across scroll', () => {
+    const source = fs.readFileSync(path.join(import.meta.dirname, 'native-click-map-probe.swift'), 'utf8');
+    assert.match(source, /func patientWorkspaceBinding\(/);
+    assert.match(source, /containsAXText\(patientBoundText, in: snapshot\.detail\)/);
+    assert.match(source, /patientBoundText: "RSSMRA80A01H501U"/);
+    assert.match(source, /patientBoundText: "BNCNNA85M41F205X"/);
+    assert.equal((source.match(/selectedItemsContain\("patient-cell-uitest-1", list: patientList\)/g) ?? []).length, 3);
+    assert.equal((source.match(/selectedItemsContain\("patient-cell-uitest-2", list: secondPatientList\)/g) ?? []).length, 3);
+    assert.match(source, /First patient row, header, and detail content remain bound after scroll/);
+    assert.match(source, /Second patient row, header, and detail content remain bound after scroll/);
 });
 
 test('stops the synthetic app when xcrun fails', () => {

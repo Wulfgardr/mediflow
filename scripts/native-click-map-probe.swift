@@ -377,6 +377,31 @@ func workspaceHeader(
 }
 
 /* @Codex */
+func containsAXText(_ expectedText: String, in element: AXUIElement) -> Bool {
+    findElement(in: element, where: { candidate in
+        [descriptionValue(of: candidate), value(of: candidate), title(of: candidate)]
+            .contains(where: { $0.contains(expectedText) })
+    }) != nil
+}
+
+/* @Codex
+ The selection contract must bind the selected list row to both the persistent
+ workspace header and a patient-specific value inside the same detail pane.
+ The patient-bound value is deliberately supplied by the synthetic fixture and
+ is not emitted in probe output.
+ */
+func patientWorkspaceBinding(
+    exposing expectedName: String,
+    patientBoundText: String,
+    app: NSRunningApplication
+) -> Bool {
+    guard let snapshot = workspaceHeader(exposing: expectedName, app: app) else {
+        return false
+    }
+    return containsAXText(patientBoundText, in: snapshot.detail)
+}
+
+/* @Codex */
 func dumpWorkspaceHeaderAX(exposing expectedName: String, app: NSRunningApplication) {
     guard let header = workspaceHeader(exposing: expectedName, app: app)?.header else {
         print("AX DUMP patient-workspace-header unavailable")
@@ -521,12 +546,17 @@ func runPatientWorkspaceHeaderProbe(app: NSRunningApplication, report: inout Pro
     report.pass("Selected first patient and opened matching detail")
 
     guard waitFor(condition: {
-        workspaceHeader(exposing: "Rossi Mario", app: app) != nil
+        selectedItemsContain("patient-cell-uitest-1", list: patientList)
+            && patientWorkspaceBinding(
+                exposing: "Rossi Mario",
+                patientBoundText: "RSSMRA80A01H501U",
+                app: app
+            )
     }) else {
-        report.fail("Patient workspace header did not expose Rossi Mario")
-        throw ProbeFailure(message: "Patient workspace header did not expose the selected patient name.")
+        report.fail("Patient workspace did not bind the selected row to header and patient-bound content")
+        throw ProbeFailure(message: "The first selected patient was not bound to the workspace header and detail content.")
     }
-    report.pass("Patient workspace header exposes Rossi Mario")
+    report.pass("First selected row binds header and patient-bound detail content")
 
     if CommandLine.arguments.contains("--dump-patient-header-ax") {
         dumpWorkspaceHeaderAX(exposing: "Rossi Mario", app: app)
@@ -549,12 +579,17 @@ func runPatientWorkspaceHeaderProbe(app: NSRunningApplication, report: inout Pro
     report.pass("Simulated patient detail scroll through AX")
 
     guard waitFor(condition: {
-        workspaceHeader(exposing: "Rossi Mario", app: app) != nil
+        selectedItemsContain("patient-cell-uitest-1", list: patientList)
+            && patientWorkspaceBinding(
+                exposing: "Rossi Mario",
+                patientBoundText: "RSSMRA80A01H501U",
+                app: app
+            )
     }) else {
-        report.fail("Patient workspace header disappeared after detail scroll")
-        throw ProbeFailure(message: "Patient workspace header disappeared after detail scroll.")
+        report.fail("First patient binding disappeared after detail scroll")
+        throw ProbeFailure(message: "The first selected patient was not still bound to header and detail content after scroll.")
     }
-    report.pass("Patient workspace header remains exposed after detail scroll")
+    report.pass("First patient row, header, and detail content remain bound after scroll")
 }
 
 func runClinicalShellProbe(app: NSRunningApplication, report: inout ProbeReport) throws {
@@ -604,6 +639,38 @@ func runClinicalShellProbe(app: NSRunningApplication, report: inout ProbeReport)
         throw ProbeFailure(message: "A -> B selection did not expose the matching detail.")
     }
     report.pass("Moved native selection A -> B with matching detail")
+
+    guard waitFor(condition: {
+        selectedItemsContain("patient-cell-uitest-2", list: secondPatientList)
+            && patientWorkspaceBinding(
+                exposing: "Bianchi Anna",
+                patientBoundText: "BNCNNA85M41F205X",
+                app: app
+            )
+    }) else {
+        report.fail("Second selected row did not bind to header and patient-bound detail content")
+        throw ProbeFailure(message: "The second selected patient was not bound to the workspace header and detail content.")
+    }
+    report.pass("Second selected row binds header and patient-bound detail content")
+
+    guard simulatePatientDetailScroll(app: app) else {
+        report.fail("Unable to simulate second patient detail scroll")
+        throw ProbeFailure(message: "Unable to simulate the second patient detail scroll through AX.")
+    }
+    report.pass("Simulated second patient detail scroll through AX")
+
+    guard waitFor(condition: {
+        selectedItemsContain("patient-cell-uitest-2", list: secondPatientList)
+            && patientWorkspaceBinding(
+                exposing: "Bianchi Anna",
+                patientBoundText: "BNCNNA85M41F205X",
+                app: app
+            )
+    }) else {
+        report.fail("Second patient binding disappeared after detail scroll")
+        throw ProbeFailure(message: "The second selected patient was not still bound to header and detail content after scroll.")
+    }
+    report.pass("Second patient row, header, and detail content remain bound after scroll")
 
     let moduleIdentifiers = [
         "patient-clinical-signals",
