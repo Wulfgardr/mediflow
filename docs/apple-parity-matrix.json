@@ -187,7 +187,7 @@
       "boundary": "partial nella riga aggregata: famiglia documenti network con create Classe A sigillata ENC; PUT/DELETE e OCR restano host per ADR 0076. Il boundary è platform-specific-documented",
       "gap": "partial",
       "wave": "W5-ai-avanzate",
-      "evidence": "PR #16 + PR #17; lib/network-attachment-{read,write}; smoke home-base-documents-write; Evidence Stack web E2E 2/2 su base 1560e783d con PIN sintetico 0000"
+      "evidence": "PR #16 + PR #17; lib/network-attachment-{read,write}; smoke home-base-documents-write; Evidence Stack web E2E 2/2 su base 9ee798887 con PIN sintetico 0000"
     },
     {
       "area": "documenti",
@@ -197,7 +197,7 @@
       "boundary": "partial nella riga aggregata: lettura insight dal dettaglio paziente; curation host-only per ADR 0076, non equivalenza mancante",
       "gap": "partial",
       "wave": "W5-ai-avanzate",
-      "evidence": "PR #16 + PR #17; DocumentInsightsCodec; PR #15; Evidence Stack web E2E 2/2 su base 1560e783d: popolato, curation, empty, loading ed errore conservativo"
+      "evidence": "PR #16 + PR #17; DocumentInsightsCodec; PR #15; Evidence Stack web E2E 2/2 su base 9ee798887: popolato, curation, empty, loading ed errore conservativo"
     },
     {
       "area": "documenti",
@@ -217,7 +217,7 @@
       "boundary": "full: nessun boundary aggiuntivo necessario (lettura da detail paziente esistente)",
       "gap": "full-parity",
       "wave": "W5-ai-avanzate",
-      "evidence": "PR #16 + PR #17; smoke documenti+diario; Evidence Stack web E2E 2/2 su base 1560e783d con PIN sintetico 0000"
+      "evidence": "PR #16 + PR #17; smoke documenti+diario; Evidence Stack web E2E 2/2 su base 9ee798887 con PIN sintetico 0000"
     },
     {
       "area": "insight",
@@ -685,8 +685,8 @@
     "version": 2,
     "updated": "2026-07-28",
     "candidateBase": {
-      "commit": "1560e783d384b7cae82752de9c59b7e6ff95ac92",
-      "tree": "18ad0b189013554d6006b14c83f27c7376fcc26a",
+      "commit": "9ee798887fbba93b50d644f223a9a14cd85fa71c",
+      "tree": "e4e5b69c7d034822dc7a311181e9dc08336e4ade",
       "note": "Code and documentation base before the parity closeout documentation packet. This is not a self-referential final packet hash.",
       "runRecord": "docs/analysis/2026-07-27-parity-0.8-recovery-run.md"
     },
@@ -724,7 +724,7 @@
       "webEvidenceStack": "2/2 E2E PASS with synthetic PIN 0000; populated, curation, empty, loading and conservative error states",
       "webProduction": "104 pages and standalone build PASS; Chrome production at exact 200% and 400% zoom, main controls visible, no dev badge",
       "macOS": "clipping code integrated; built Xcode 27 bundle PASS at 1100, 1300 and 1600 points; click-map, focus, arrow input and real VoiceOver active before and after",
-      "axProbe": "corrected to select native List rows and verify AXSelectedRows; typecheck and 4/4 tests PASS",
+      "axProbe": "corrected to select native List rows, bind patient-specific detail content and avoid terminating external MediFlow sessions; typecheck and 6/6 tests PASS",
       "offline": "WUL-403 remains open for visible TTL, stale state and explicit reconciliation"
     },
     "controlToActionReference": {
