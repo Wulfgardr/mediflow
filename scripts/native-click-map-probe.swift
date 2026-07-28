@@ -239,16 +239,30 @@ func openClinicalSection(
     report: inout ProbeReport
 ) throws {
     guard let window = try? appWindow(for: app),
-          let button = findElement(in: window, where: {
+          let sectionLabel = findElement(in: window, where: {
               identifier(of: $0) == "clinical-workspace-section-\(section)-button"
-          }) else {
+          }),
+          let sidebar = findElement(in: window, where: {
+              identifier(of: $0) == "clinical-workspace-project-sidebar"
+          }),
+          let sectionList = nativeList(in: sidebar) else {
         report.fail("Unable to open clinical section \(section)")
         throw ProbeFailure(message: "Unable to open clinical section \(section)")
     }
-    // @Codex: The clinical sidebar is action-driven; AXSelected does not invoke its Button.
-    guard press(button) else {
+
+    // @Codex: SwiftUI attaches this identifier to the AXStaticText inside the
+    // List row. AXPress reports success for that static text but does not move
+    // the List selection; select its owning AXRow through the AXOutline instead.
+    guard selectPatientRow(sectionLabel, within: sectionList) else {
         report.fail("Unable to open clinical section \(section)")
         throw ProbeFailure(message: "Unable to open clinical section \(section)")
+    }
+
+    guard waitFor(condition: {
+        selectedItemsContain("clinical-workspace-section-\(section)-button", list: sectionList)
+    }) else {
+        report.fail("Clinical section \(section) did not become selected")
+        throw ProbeFailure(message: "Clinical section \(section) did not become selected")
     }
 
     guard waitForIdentifier(expectedView, in: app) != nil else {
