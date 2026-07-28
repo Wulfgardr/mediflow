@@ -47,6 +47,67 @@ test('costruisce il payload con think:false solo per task testuali', () => {
     assert.equal('num_ctx' in ocrPayload.options, false);
 });
 
+test('attesta e invoca la chat sullo stesso loopback canonico', async (t) => {
+    const originalFetch = globalThis.fetch;
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const localModel = {
+        name: 'qwen-local:latest',
+        model: 'qwen-local:latest',
+        size: 1024,
+        digest: 'sha256:synthetic',
+    };
+    globalThis.fetch = (async (input, init) => {
+        const url = String(input);
+        calls.push({ url, init });
+        if (url.endsWith('/api/version')) return Response.json({ version: '0.32.5' });
+        if (url.endsWith('/api/tags')) return Response.json({ models: [localModel] });
+        if (url.endsWith('/api/show')) return Response.json({ details: { format: 'gguf' } });
+        if (url.endsWith('/api/chat')) {
+            return Response.json({
+                model: localModel.model,
+                message: { content: 'risposta sintetica' },
+            });
+        }
+        return new Response(null, { status: 404 });
+    }) as typeof fetch;
+    t.after(() => {
+        globalThis.fetch = originalFetch;
+    });
+
+    const adapter = new OllamaProviderAdapter({
+        baseUrl: 'http://localhost:11434/v1',
+        model: 'qwen-local',
+        chatTimeoutMs: 1000,
+    });
+    const result = await adapter.chat([{ role: 'user', content: 'fixture sintetica' }]);
+
+    assert.equal(result.content, 'risposta sintetica');
+    assert.equal(calls.length, 4);
+    assert.equal(calls.every(({ url }) => url.startsWith('http://127.0.0.1:11434/')), true);
+    assert.equal(calls.slice(0, 3).some(({ init }) => String(init?.body).includes('messages')), false);
+    assert.equal(String(calls[3]?.init?.body).includes('fixture sintetica'), true);
+});
+
+test('rifiuta un pull cloud prima di contattare il provider', async (t) => {
+    const originalFetch = globalThis.fetch;
+    let called = false;
+    globalThis.fetch = (async () => {
+        called = true;
+        throw new Error('unreachable');
+    }) as typeof fetch;
+    t.after(() => {
+        globalThis.fetch = originalFetch;
+    });
+    const adapter = new OllamaProviderAdapter({
+        baseUrl: 'http://127.0.0.1:11434',
+        model: 'qwen-local',
+        chatTimeoutMs: 1000,
+    });
+
+    await assert.rejects(() => adapter.pullModel('qwen:cloud'), /model_cloud_reference/);
+    assert.equal(called, false);
+});
+
 test('distingue il timeout dall annullamento utente', async (t) => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = ((_input, init) => new Promise((_resolve, reject) => {
