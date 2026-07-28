@@ -80,7 +80,7 @@
       "device": "MediFlow 0.8 Audit iPad 060a",
       "orientation": "landscape",
       "dynamicType": "default",
-      "transform": "pixel-lossless 270-degree orientation normalization",
+      "transform": "lossless 90-degree orientation normalization",
       "original": {
         "file": "original/ipados-workspace.png",
         "dimensions": "2752x2064",
@@ -102,7 +102,7 @@
         "MEDIFLOW_APPLE_UITEST_OPEN_PATIENT_INDEX=2",
         "MEDIFLOW_APPLE_UITEST_FOCUS_DETAIL=1"
       ],
-      "transform": "lossless 90-degree orientation normalization",
+      "transform": "pixel-lossless 270-degree orientation normalization",
       "original": {
         "file": "original/ipados-detail.png",
         "dimensions": "2752x2064",
