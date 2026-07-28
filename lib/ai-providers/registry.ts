@@ -1,24 +1,13 @@
 /* @Codex */
-import type {
-    CapabilityAttestation,
-    CapabilityAttestationFailure,
-} from './capability-attestation';
 import { OllamaProviderAdapter } from './ollama';
 import {
     assertLocalOllamaModelReference,
     strictOllamaLoopbackBaseUrl,
 } from './ollama-locality';
-import type { AiLane, AIProvider, ProviderAdapter } from './provider';
-import { assessAiLaneReadiness, type AiLaneReadiness } from './readiness';
+import type { AIProvider, ProviderAdapter } from './provider';
 
 export const AI_SERVICE_TASKS = ['clinical', 'reasoning', 'ocr'] as const;
 export type AIServiceTask = typeof AI_SERVICE_TASKS[number];
-export const AI_LANE_TASK_BINDINGS = Object.freeze({
-    patient_insight: 'clinical',
-    smart_import: 'clinical',
-    document_synthesis: 'reasoning',
-    ocr: 'ocr',
-} as const satisfies Partial<Record<AiLane, AIServiceTask>>);
 export interface ProviderCapabilityManifest {
     readonly provider: AIProvider;
     readonly authorityPlane: 'clinical_application';
@@ -65,46 +54,8 @@ export type LocalProviderBindingInput = {
     chatTimeoutMs: number;
 };
 
-export type LocalProviderLaneBindingInput = Omit<LocalProviderBindingInput, 'task'> & {
-    lane: string;
-    expectedModelDigest: string;
-    attestation?: CapabilityAttestation | null;
-    now?: Date;
-    locallyVerifiedEvidenceRefs?: ReadonlySet<string>;
-};
-interface AiLaneSelectionReceiptBase {
-    readonly schemaVersion: 'mediflow.ai.lane-selection.v1';
-    readonly lane: AiLane;
-    readonly task: AIServiceTask;
-    readonly provider: AIProvider;
-    readonly model: string;
-    readonly modelDigest: string;
-    readonly authorityPlane: 'clinical_application';
-    readonly execution: 'local';
-    readonly endpointClass: 'loopback';
-    readonly egress: 'none';
-    readonly fallbackCount: 0;
-}
-export type AiLaneSelectionReceipt =
-    | Readonly<AiLaneSelectionReceiptBase & { readonly readiness: 'ready' }>
-    | Readonly<AiLaneSelectionReceiptBase & {
-        readonly readiness: 'blocked'; readonly reason: CapabilityAttestationFailure;
-    }>;
-export type LocalProviderLaneResolution =
-    | Readonly<{
-        readiness: Extract<AiLaneReadiness, { status: 'ready' }>;
-        transport: LocalProviderResolution;
-        laneReceipt: Extract<AiLaneSelectionReceipt, { readiness: 'ready' }>;
-    }>
-    | Readonly<{
-        readiness: Extract<AiLaneReadiness, { status: 'blocked' }>;
-        laneReceipt: Extract<AiLaneSelectionReceipt, { readiness: 'blocked' }>;
-    }>;
 export type ProviderRegistryErrorCode =
     | 'invalid_task'
-    | 'invalid_lane'
-    | 'lane_not_registry_servable'
-    | 'invalid_model_digest'
     | 'provider_not_registered'
     | 'provider_not_local'
     | 'invalid_model'
@@ -123,10 +74,6 @@ const TASK_PROVIDER_BINDINGS: Readonly<Record<AIServiceTask, AIProvider>> = {
     ocr: 'ollama',
 };
 
-const AI_LANES: readonly AiLane[] = [
-    'patient_insight', 'smart_import', 'document_synthesis', 'ocr', 'treatment_reasoning',
-];
-const SHA256_PATTERN = /^sha256:[a-f0-9]{64}$/;
 const OLLAMA_MANIFEST_BASE: Omit<ProviderCapabilityManifest, 'capabilities'> = Object.freeze({
     provider: 'ollama',
     authorityPlane: 'clinical_application',
@@ -144,9 +91,6 @@ function isAIServiceTask(value: string): value is AIServiceTask {
     return AI_SERVICE_TASKS.includes(value as AIServiceTask);
 }
 
-function isAiLane(value: unknown): value is AiLane {
-    return typeof value === 'string' && AI_LANES.includes(value as AiLane);
-}
 function normalizeProvider(task: AIServiceTask, value?: string | null): AIProvider {
     const provider = value == null ? TASK_PROVIDER_BINDINGS[task] : value.trim();
     if (provider !== 'ollama') throw new ProviderRegistryError('provider_not_registered');
@@ -211,57 +155,6 @@ export class LocalProviderRegistry {
                 candidates: Object.freeze([] as const),
             }),
         };
-    }
-
-    resolveForLane(input: LocalProviderLaneBindingInput): LocalProviderLaneResolution {
-        if (!isAiLane(input.lane)) throw new ProviderRegistryError('invalid_lane');
-        if (input.lane === 'treatment_reasoning') {
-            throw new ProviderRegistryError('lane_not_registry_servable');
-        }
-        if (typeof input.expectedModelDigest !== 'string'
-            || !SHA256_PATTERN.test(input.expectedModelDigest)) {
-            throw new ProviderRegistryError('invalid_model_digest');
-        }
-
-        const task = AI_LANE_TASK_BINDINGS[input.lane];
-        const provider = normalizeProvider(task, input.provider);
-        const model = normalizeModel(input.models[task] ?? '');
-        normalizeEndpoint(input.endpoint);
-        const readiness = assessAiLaneReadiness({
-            binding: {
-                lane: input.lane,
-                modelDigest: input.expectedModelDigest,
-                authorityPlane: 'clinical_application',
-            },
-            attestation: input.attestation,
-            now: input.now,
-            locallyVerifiedEvidenceRefs: input.locallyVerifiedEvidenceRefs,
-        });
-        const receiptBase: AiLaneSelectionReceiptBase = {
-            schemaVersion: 'mediflow.ai.lane-selection.v1',
-            lane: input.lane,
-            task,
-            provider,
-            model,
-            modelDigest: input.expectedModelDigest,
-            authorityPlane: 'clinical_application',
-            execution: 'local',
-            endpointClass: 'loopback',
-            egress: 'none',
-            fallbackCount: 0,
-        };
-        if (readiness.status === 'blocked') {
-            const laneReceipt = Object.freeze({
-                ...receiptBase, readiness: 'blocked' as const, reason: readiness.reason,
-            });
-            return Object.freeze({ readiness, laneReceipt });
-        }
-        const transport = this.resolve({
-            task, provider, models: input.models, endpoint: input.endpoint,
-            disableThinking: input.disableThinking, chatTimeoutMs: input.chatTimeoutMs,
-        });
-        const laneReceipt = Object.freeze({ ...receiptBase, readiness: 'ready' as const });
-        return Object.freeze({ transport, readiness, laneReceipt });
     }
 }
 
