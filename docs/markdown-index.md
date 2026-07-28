@@ -79,6 +79,7 @@ Ultimo aggiornamento: 2026-07-28
 | [docs/siss-fse-docs-corpus.md](./siss-fse-docs-corpus.md) | Runbook canonico del corpus documentale locale SISS/FSE: manifest sorgenti, fetch/sync fuori Git, placeholder `manual-import` e report di freshness. | Quando si lavora su `WUL-176`, `WUL-179` o sulla base documentale delle integrazioni regionali. |
 | [docs/treatment-reasoning-athena-integration.md](./treatment-reasoning-athena-integration.md) | Mappa operativa per la lane `treatment_reasoning` ATHENA-style: ADR boundary, contratto, pannello review-only, ATHENA-R1 MLX locale, smoke live DB redatto, benchmark Q4/BF16 e crediti ATHENA. | Quando si valuta gestione trattamenti, ragionamento terapeutico su contesto paziente, runtime ATHENA locale o sidecar ATHENA/ToolUniverse senza promuovere prescrizione automatica. |
 | [docs/mlx-operational-parity.md](./mlx-operational-parity.md) | Matrice operativa `WUL-165` che rende MLX benchmark-visible e diagnosticabile senza promuoverlo a runtime clinico. | Quando serve distinguere parity di visibilita/guardrail MLX da promozione runtime o dal boundary OCR primario Ollama/DeepSeek con fallback Apple Vision solo macOS. |
+| [docs/ai-runtime-serving-matrix.md](./ai-runtime-serving-matrix.md) | Matrice canonica post-0.8 di task, modelli, runtime, stati e serving gate. | Quando si valuta un modello o provider e serve distinguere fitting, benchmark, shadow e serving. |
 | [docs/MANUALE.md](./MANUALE.md) | Manuale utente medico. | Per supporto operativo lato clinico. |
 
 ## 🧑‍💻 Tracciabilità agent e metadoc
