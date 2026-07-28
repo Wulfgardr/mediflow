@@ -13,8 +13,8 @@ Ultimo aggiornamento: 2026-07-28 (`MediFlow 0.8`)
 ## Gate MediFlow 0.8
 
 Il candidato base è
-`1560e783d384b7cae82752de9c59b7e6ff95ac92`, tree
-`18ad0b189013554d6006b14c83f27c7376fcc26a`. Questo identificatore precede il
+`9ee798887fbba93b50d644f223a9a14cd85fa71c`, tree
+`e4e5b69c7d034822dc7a311181e9dc08336e4ade`. Questo identificatore precede il
 packet documentale corrente e non è un hash auto-referenziale.
 
 Il verdetto resta `PARTIAL / HOLD_PROMOTION`. Web e macOS hanno prove reali
@@ -99,7 +99,7 @@ Il manifest Apple-wide verifica 24 acceptance record tecnici separati.
 | `verified-real-interaction` | Web | Chrome produzione a zoom esatto 200% e 400%; controlli principali visibili; nessun badge dev | PASS |
 | `verified-automatic` | Apple universal | SwiftPM e audit iPhone/iPad già consolidati sul candidato | PASS, non equivale a VoiceOver |
 | `verified-real-interaction` | macOS | Bundle Xcode 27 a 1100/1300/1600; click-map, focus, freccia e VoiceOver attivo prima/dopo | PASS sul bundle costruito |
-| `verified-automatic` | macOS probe | `typecheck` e 4/4 test del probe AX corretto | PASS |
+| `verified-automatic` | macOS probe | `typecheck` e 6/6 test del probe AX corretto e process-safe | PASS |
 | `blocked` | macOS | Nuova build e suite Xcode 27 | `disk5s1` non montabile; `fsck_apfs` `-69845` |
 | `blocked` | iPhone/iPad | VoiceOver reale | Non provato |
 | `partial` | Web | Screen reader reale | Run non terminale |
