@@ -186,7 +186,11 @@ export async function POST(request: NextRequest) {
         }
 
         /* @Codex */
-        const ai = AIService.fromOllama(validation.url.toString(), configuredModel);
+        const ai = AIService.fromLocalTaskConfig(
+            'ocr',
+            validation.url.toString(),
+            { ocr: configuredModel },
+        );
         /* @Codex */
         let result = await extractDocumentWithAI(image, mode, ai, { signal: request.signal });
         /* @Codex */
