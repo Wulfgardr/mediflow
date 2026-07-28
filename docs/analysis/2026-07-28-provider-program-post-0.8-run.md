@@ -248,10 +248,76 @@ owner per wave.
 
 ## 13. Next permitted action
 
-Aprire un worktree dedicato WUL-502 dalla HEAD verificata di questo run.
-Implementare solo registry locale, binding task-modello e manifest minimo per
-Ollama. Non aggiungere provider cloud, credenziali, schema, UI o egress.
+Aprire un worktree dedicato WUL-418 dalla HEAD verificata di WUL-502.
+Aggiornare solo la matrice di governance `task × modello × runtime` e i serving
+gate. Non cambiare runtime, provider, credenziali, schema, UI o egress.
 
 Stop immediato se la baseline finale 0.8 diverge nei file toccati, se il
 registry introduce fallback di rete o se una lane tenta di ereditare grant da
 un altro piano.
+
+## 14. Continuazione WUL-502
+
+### 14.1 Identità
+
+| Campo | Valore |
+| --- | --- |
+| Worktree | `/Users/leonardopegollo/.codex/worktrees/wul502-post08-provider-registry/medical-record-app` |
+| Branch | `codex/WUL-502-post-0.8-provider-registry` |
+| Base | `b09b538d8647760f1d5bfa94de8d84b19497712d` |
+| Commit contratto | `4e2bb68f5` |
+| Commit integrazione | `ac0322e43` |
+| Controller | GPT-5.6 Sol High |
+| Verificatore | RepoPrompt GPT-5.6 Sol XHigh, contesto fresco |
+| GPT-5.6 Pro | Non usato: nessuna decisione oltre il livello Fable-class |
+
+### 14.2 Esito
+
+Il registry locale seleziona provider e modello dalla configurazione indicizzata
+per task. I servizi applicativi non costruiscono più direttamente l'adapter
+Ollama. La prima fase accetta solo Ollama su loopback e non applica fallback.
+
+Il manifest distingue le capability di trasporto dalla capability del modello.
+La ricevuta contiene solo metadati di selezione. Non contiene endpoint, prompt,
+credenziali o dati clinici. La readiness del modello resta esplicitamente
+richiesta e non viene dichiarata per inferenza.
+
+### 14.3 Evidenza
+
+- 23 test mirati: `PASS`;
+- typecheck con Node 24.18.0: `PASS`;
+- ESLint mirato con zero warning: `PASS`;
+- `check-never-regress`: `PASS`;
+- ricerca dei costruttori diretti di `AIService`: nessun bypass;
+- review indipendente iniziale: `HOLD_FIX`;
+- review indipendente dopo le correzioni: `GO`.
+
+### 14.4 Decision audit
+
+| Decisione | Stato | Falsificatore |
+| --- | --- | --- |
+| Default provider solo quando il valore è assente | Accettata | Stringa vuota sostituita in silenzio |
+| Modello selezionato nel registry dalla mappa per task | Corretta | Factory pubblica accetta un modello libero |
+| Fallback `none` e ricevuta immutabile | Corretta | Consumer modifica la ricevuta o cambia provider |
+| Capability del modello non dedotta dal nome | Accettata | Manifest dichiara readiness senza attestazione |
+| Capability specifica del modello | Aperta | Task OCR promosso senza prova `vision` |
+| Provider remoti e consenso | Aperti | Qualunque egress prima dei gate dedicati |
+
+Le decisioni aperte bloccano la promozione di nuovi modelli e ogni provider
+remoto. Non bloccano il commit del registry locale.
+
+### 14.5 Error ledger
+
+| Evento | Contenimento |
+| --- | --- |
+| Tentativo iniziale con runner Vitest assente | Usato il runner `run-strip-types` canonico |
+| Toolchain non visibile nel worktree | Symlink temporanea al toolchain esistente, poi rimossa |
+| Primo comando aggregato senza `set -e` | Typecheck corretto e intera suite ripetuta con `set -e` |
+| Review `HOLD_FIX` | Centralizzato il modello; provider vuoto ora fallisce; receipt congelata |
+
+### 14.6 Verdetto
+
+Packet WUL-502: `GO`.
+
+Programma complessivo: `PARTIAL / HOLD_IMPLEMENTATION` per provider remoti,
+consenso, capability specifiche del modello e UX multipiattaforma.
