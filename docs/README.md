@@ -40,6 +40,7 @@ Approfondimenti utili:
 - Corpus documentale SISS/FSE 2.0: [docs/siss-fse-docs-corpus.md](./siss-fse-docs-corpus.md)
 - Integrazione ATHENA-style treatment reasoning: [docs/treatment-reasoning-athena-integration.md](./treatment-reasoning-athena-integration.md), [docs/adr/0073-treatment-reasoning-athena-boundary.md](./adr/0073-treatment-reasoning-athena-boundary.md)
 - Astrazione provider AI e boundary egress: [ADR 0077](./adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md)
+- Matrice task, modelli e serving gate post-0.8: [docs/ai-runtime-serving-matrix.md](./ai-runtime-serving-matrix.md)
 - Contratto export FHIR R4 v0: [ADR 0081](./adr/0081-fhir-r4-export-v0-contract.md)
 - Registro persistente delle attese v0: [ADR 0082](./adr/0082-persistent-expectations-register-v0.md)
 - Diagnosi da documento review-only: [ADR 0084](./adr/0084-document-diagnoses-review-only.md)
@@ -93,6 +94,7 @@ Approfondimenti utili:
 | Parity localhost/client Apple | [docs/parity-matrix.md](./parity-matrix.md) | `CANONICAL` | Fotografia corrente di 64 capability (30 full, 13 partial, 21 host-only), manifest QA e gate P6 residuo in `WUL-481`. |
 | Recovery UI/parity 0.8 | [docs/analysis/2026-07-27-parity-0.8-recovery-run.md](./analysis/2026-07-27-parity-0.8-recovery-run.md) | `SECONDARY / RUN RECORD` | Registra recovery Claude, candidata locale, ownership, prove eseguite e blocker. Non sostituisce la matrice canonica. |
 | Provider intelligenti post-0.8 | [docs/analysis/2026-07-28-provider-program-post-0.8-run.md](./analysis/2026-07-28-provider-program-post-0.8-run.md) | `SECONDARY / RUN RECORD` | Registra stato reale, trust boundary, locality Ollama, auth provider, DAG e gate del programma separato dalla release 0.8. |
+| Matrice runtime AI post-0.8 | [docs/ai-runtime-serving-matrix.md](./ai-runtime-serving-matrix.md) | `CANONICAL / POST-0.8 GOVERNANCE` | Separa fitting, benchmark, shadow e serving per task, modello e runtime. |
 | FAQ pubbliche | [docs/FAQ.md](./FAQ.md) | `SECONDARY` | Sintesi rapida per capire cosa fa oggi MediFlow, quali sono i boundary dichiarati e come orientarsi nel progetto. |
 | Roadmap terminologie/FSE | [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) | `CANONICAL` | Evoluzione codifiche cliniche e compliance documentale (coerente con ADR 0006). |
 | Matrice baseline ufficiale GTW/FSE | [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md) | `CANONICAL` | Gap analysis versionata tra artifact ministeriali `it-fse-support` e stato reale MediFlow. |

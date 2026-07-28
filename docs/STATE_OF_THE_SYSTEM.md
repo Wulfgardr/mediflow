@@ -324,10 +324,14 @@ Documenti/ADR principali:
 Il runtime AI operativo resta locale. Il default generativo protetto e trattato
 come baseline finche benchmark e governance non giustificano un cambio.
 
-`OllamaAdapter` e `AIService` separano il provider dal servizio applicativo, ma
-`AIProvider` espone oggi solo Ollama. Il gate egress applica il primo strato
-deterministico e resta `closed_pending_redaction_lane`: non esistono provider
-cloud, registry operativo o consenso egress consegnati.
+`OllamaAdapter` e `AIService` separano il provider dal servizio applicativo.
+Nel pacchetto post-0.8, `LocalProviderRegistry` centralizza il binding
+task-provider-modello per i task instradati tramite `AIService` e accetta solo
+Ollama su loopback, senza fallback. Non estende grant o fallback alle lane
+separate, come ATHENA MLX. Questo packet non appartiene alla candidata 0.8. Il
+gate egress resta
+`closed_pending_redaction_lane`: non esistono provider cloud o consenso egress
+consegnati.
 
 Le superfici operative includono:
 
@@ -386,6 +390,11 @@ Per promuovere una lane servono:
 - shadow mode quando applicabile;
 - rollback/fallback chiari;
 - aggiornamento docs/ADR se cambia un boundary.
+
+La classificazione completa per task, modello e runtime vive in
+[docs/ai-runtime-serving-matrix.md](./ai-runtime-serving-matrix.md). La matrice
+separa `runtime`, `shadow`, `benchmark_only` e `hold`; un modello installato non
+è automaticamente un modello serving.
 
 ### 5.3 Comparator cloud
 
