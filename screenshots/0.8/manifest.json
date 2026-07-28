@@ -80,7 +80,7 @@
       "device": "MediFlow 0.8 Audit iPad 060a",
       "orientation": "landscape",
       "dynamicType": "default",
-      "transform": "lossless 90-degree orientation normalization",
+      "transform": "pixel-lossless 270-degree orientation normalization",
       "original": {
         "file": "original/ipados-workspace.png",
         "dimensions": "2752x2064",
@@ -106,12 +106,12 @@
       "original": {
         "file": "original/ipados-detail.png",
         "dimensions": "2752x2064",
-        "sha256": "b80d6f2f44f12f1073ae9fda622260eb3fb7b61c173ae9c237a4235575f6c2a4"
+        "sha256": "bb27b666c3e3ec6889286b7f8b05f9cb3b3358ab00db6c1675774e72cf9145eb"
       },
       "optimized": {
         "file": "ipados-detail.png",
         "dimensions": "1400x1050",
-        "sha256": "31cfcb5a7b8f755b53a0eea48c9596555e2c60a2f7c4910428fba4500cb4ff2e"
+        "sha256": "feb15562c2568b6de952c1a585b6ed765a5fd47a46f7908d191ca3b46158df19"
       },
       "altText": "MediFlow on iPad showing the structured overview of a synthetic patient at an accessibility text size."
     },

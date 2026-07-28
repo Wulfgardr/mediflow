@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-07-28
+Ultimo aggiornamento: 2026-07-29
 
 ## 📚 Come usare questo indice
 
@@ -35,6 +35,7 @@ Ultimo aggiornamento: 2026-07-28
 | [docs/adr/0065-intended-purpose-and-claims-guard.md](./adr/0065-intended-purpose-and-claims-guard.md) | Intended purpose e guard `check:claims` contro overclaim su AI, SISS/FSE, cloud, diagnosi, triage, prescrizione e automazione. | Quando si tocca copy prodotto, UI/help, README, materiale pubblico o confini AI/SISS/FSE. |
 | [docs/adr/0072-voice-visit-capture-fluid-boundary.md](./adr/0072-voice-visit-capture-fluid-boundary.md) | Boundary proposto `WUL-419` per visite registrabili Fluid-style: no raw audio/schema/API/UI runtime nella prima slice, transcript/draft PHI e provider esterni solo tramite decisione opt-in. | Quando si lavora su visite registrabili, trascrizione visita, UI web recording-aware, benchmark transcript o sidecar macOS audio. |
 | [CHANGELOG.md](../CHANGELOG.md) | Storico release e cambiamenti rilevanti. | Al bisogno, per contesto versioni. |
+| [CREDITS.md](../CREDITS.md) | Attribuzioni per ispirazioni, modelli, librerie e runtime usati dal progetto. | Quando si verifica provenienza, licenze o uso corretto di contributi esterni. |
 
 ## 🧱 Architettura, flussi e parity
 
@@ -45,15 +46,19 @@ Ultimo aggiornamento: 2026-07-28
 | [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md) | Topologia dati, trust boundaries, cifratura e percorsi digitali, inclusi artifact documentali cifrati e boundary `network-home-base`. | Per analisi data flow e impatti sicurezza. |
 | [docs/repository-topology.md](./repository-topology.md) | Fonte canonica per repository operativa, confine Git/fuori-Git e aree top-level: runtime clinico, publication/site e tooling. | Quando devi scegliere repository, branch o collocazione di codice, asset e artefatti locali. |
 | [docs/parity-matrix.md](./parity-matrix.md) | Stato canonico corrente tra localhost e client Apple, 64 capability con conteggi 30/13/21 e gate P6 residuo in `WUL-481`. | Per steering parity, click-map P6 e release readiness Apple. |
-| [docs/known-limitations.md](./known-limitations.md) | Limiti noti della candidata sorgente 0.8, inclusa la deroga esterna VoiceOver mobile e i claim non autorizzati. | Per release readiness, note pubbliche e claim di accessibilità. |
+| [docs/known-limitations.md](./known-limitations.md) | Limiti noti della candidata sorgente 0.8, inclusi VoiceOver mobile, tooling di sviluppo e claim non autorizzati. | Per release readiness, note pubbliche, security posture e claim di accessibilità. |
 | [docs/ARCHITETTURA.md](./ARCHITETTURA.md) | Deep dive tecnico esteso dell'architettura MediFlow. | Per approfondimenti implementativi. |
 | [docs/system_architecture.md](./system_architecture.md) | Sintesi rapida dell'architettura operativa aggiornata al `main` corrente: Clinical Workbench unico, home-base, document intelligence, OCR platform boundary, SISS/FSE e guardrail locali. | Per overview veloce in onboarding/review. |
+| [drizzle/README.md](../drizzle/README.md) | Ruolo storico delle migrazioni Drizzle e relazione con le schema guard runtime. | Quando si modifica schema, indice o controllo di drift SQLite. |
 
 ## 🍎 Native, setup e testing
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [docs/NATIVE.md](./NATIVE.md) | Guida canonica della family Apple attiva: bundle macOS packaged/home-base, client iPhone/iPad paired e core Swift condiviso. | Per struttura, build, boundary di sicurezza/parity e verifiche native correnti. |
+| [native/README.md](../native/README.md) | Layout, toolchain e comandi della universal app Apple e del package Swift condiviso. | Per build, test e orientamento nel subtree `native/`. |
+| [native/contracts/README.md](../native/contracts/README.md) | Oracoli byte-exact del core cross-platform, inclusi i vettori crittografici congelati. | Quando si modifica crittografia, portabilità del core o test golden. |
+| [native/MediFlowMac/Sources/MediFlowSQLiteC/README.md](../native/MediFlowMac/Sources/MediFlowSQLiteC/README.md) | Provenienza e regole di aggiornamento della SQLite amalgamation inclusa nel package nativo. | Quando si aggiorna SQLite vendorizzata o la build C multipiattaforma. |
 | [docs/native-setup.md](./native-setup.md) | Setup automatico ambiente client nativo. | Prima di avviare sviluppo/test native. |
 | [docs/native-launch.md](./native-launch.md) | Avvio rapido app macOS via script/launcher. | Per esecuzione operativa locale. |
 | [docs/local-api-tls.md](./local-api-tls.md) | TLS proxy locale e trasporto sicuro per native API. | Per debug networking/certificate pinning. |
@@ -93,8 +98,13 @@ Ultimo aggiornamento: 2026-07-28
 | [docs/analysis/2026-07-05-audit-esterno-v2-triage.md](./analysis/2026-07-05-audit-esterno-v2-triage.md) | Triage secondario dell'audit esterno V2, collegato a `WUL-470` e figlie `WUL-471`..`WUL-475`, con separazione tra obiezioni misframed e residui azionabili su PIN, FHIR, MDR, sync futuro e drift ADR. | Quando si rivedono le issue nate dall'audit esterno V2 o serve recuperare il razionale completo dietro il tracker Linear. |
 | [docs/analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md](./analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md) | Closeout secondario di provider scaffold, control-flow, attese locali e roadmap dello stack intelligente, riallineato alla verita di `main`. | Quando si pianifica una nuova slice AI/euristica o si verifica cosa resta oltre le PR #39, #41, #42 e #43. |
 | [docs/analysis/2026-07-17-installabilita-v0-scope.md](./analysis/2026-07-17-installabilita-v0-scope.md) | Scope e proof macOS per WUL-455: confronto bundle Node, Tauri sidecar ed Electron, raccomandazione v0, build riproducibile e limiti non provati. | Quando si pianifica l'installabilita o si verifica la proof macOS avviabile senza Node installato sulla macchina di esecuzione. |
+| [docs/analysis/2026-07-26-apple-intelligence-dettatura-e-sintesi-on-device.md](./analysis/2026-07-26-apple-intelligence-dettatura-e-sintesi-on-device.md) | Mappa read-only delle API Apple on-device per dettatura e sintesi, senza decisione o funzione attivata. | Quando si valuta una futura capacità Apple Intelligence o il relativo confine privacy. |
+| [docs/analysis/2026-07-26-handover-interfaccia-apple.md](./analysis/2026-07-26-handover-interfaccia-apple.md) | Handover storico della prima armonizzazione UI Apple universale, con rettifiche e prove disponibili. | Quando si ricostruisce la provenienza del lavoro UI Apple precedente alla candidata 0.8. |
+| [docs/analysis/2026-07-27-parita-funzioni-quattro-superfici.md](./analysis/2026-07-27-parita-funzioni-quattro-superfici.md) | Inventario storico di 186 azioni e dei divari tra web, iPhone, iPad e macOS. | Quando si confronta la matrice canonica corrente con il rilevamento iniziale dei divari. |
 | [docs/markdown-index.md](./markdown-index.md) | Indice completo markdown con sintesi. | Per navigazione completa e controllo copertura doc. |
 | [docs/openapi/README.md](./openapi/README.md) | Runbook operativo per manutenzione della spec OpenAPI `/api/v1`. | Quando si cambia il contratto client-facing o si fa review di drift. |
+| [docs/design/2026-07-26-agenda-clinica-e-scadenze.md](./design/2026-07-26-agenda-clinica-e-scadenze.md) | Intento di prodotto post-0.8 per un'agenda centrata su scadenze cliniche e terapeutiche. | Quando si pianifica l'evoluzione dell'agenda senza confonderla con lo stato consegnato. |
+| [docs/design/2026-07-26-cosa-mutuare-analisi-esterna.md](./design/2026-07-26-cosa-mutuare-analisi-esterna.md) | Confronto critico con studi e prodotti esterni per ridurre attrito senza impoverire l'informazione clinica. | Quando si valutano scelte di gerarchia, carico cognitivo o consolidamento dei flussi. |
 | [docs/design/vetro-clinico/README.md](./design/vetro-clinico/README.md) | Ingresso della baseline storica e transitoria Vetro Clinico: glossario, ordine di lettura, regole redazionali e precedenza. | Quando serve riconciliare una superficie transitoria senza usarla come destinazione attiva. |
 | [docs/design/vetro-clinico/01-fondamenta.md](./design/vetro-clinico/01-fondamenta.md) | Principi, audit onesto della baseline Vetro Clinico e decisioni vincolanti di transizione. | Quando serve distinguere stato rilevato, debito e direzione di design separata. |
 | [docs/design/vetro-clinico/02-token.md](./design/vetro-clinico/02-token.md) | Architettura token a tre livelli, palette semantica, tipografia, geometria, motion e azioni di consolidamento. | Quando si valuta una modifica a colore, corpo testo, raggio, ombra, blur o durata. |
@@ -115,7 +125,10 @@ Ultimo aggiornamento: 2026-07-28
 | [docs/design/lume/04-perlustrazione.md](./design/lume/04-perlustrazione.md) | Perlustrazione EHR/provider dietro la grammatica dell'attenzione: tre lane GPT-5.6 (applicativi USA, gestionali GP, design system sanitari aperti), 12 integrazioni normative, rifiuti, spazio bianco competitivo. | Quando si raffina worklist, provenienza, sicurezza o si studia il mercato dei gestionali. |
 | [docs/design/lume/05-app-native.md](./design/lume/05-app-native.md) | Lume nelle app native: mappa SwiftUI, grammatica compatta iPhone e note tri-OS prospettiche, con macOS come priorita operativa. | Quando si implementa Lume sui client Apple; non apre una lane Windows/Linux. |
 | [docs/design/lume/06-macos-apple-contract.md](./design/lume/06-macos-apple-contract.md) | Contratto Lume per l'app macOS reale e la futura superficie nativa primaria: card clinica opaca consegnata, componenti interni e gate ancora parziali. | Prima di progettare o implementare una superficie Lume su macOS. |
+| [docs/design/lume/07-gesto-e-movimento.md](./design/lume/07-gesto-e-movimento.md) | Grammatica Lume per gesto, movimento, focus, stato e continuità, con reduced motion per costruzione. | Quando si implementano o verificano animazioni, transizioni e feedback di interazione. |
+| [docs/design/lume/08-matrice-viste.md](./design/lume/08-matrice-viste.md) | Matrice vista-per-vista, criteri golden e ordine di migrazione delle superfici Lume. | Quando si pianifica una slice Lume o si definiscono screenshot e contratti AX. |
 | [docs/design/lume/09-icona.md](./design/lume/09-icona.md) | Specifica dell'icona MediFlow per macOS, iOS e web, con asset approvati e criteri di integrazione. | Quando si cablano o si verificano le icone dell'app e del web. |
+| [docs/design/lume/10-superficie-e-materiale.md](./design/lume/10-superficie-e-materiale.md) | Proposta misurata per la convergenza tra superfici Lume e materiali Apple. | Quando si valuta materiale, contrasto o gerarchia delle superfici; non trattarla come canone adottato. |
 | [docs/design/wul-271-kree8-visual-translation.md](./design/wul-271-kree8-visual-translation.md) | Traduzione visiva Kree8 → MediFlow per PIN gate, root entry live `/`, first real-patient cockpit slice e alias review `/mockups/kree8` (WUL-271/WUL-272/WUL-273/WUL-274). | Quando si rivede la nuova linea visuale Kree8, si verifica la root live con dati reali o si pianifica la migrazione delle superfici legacy. |
 
 ## 🧱 ADR (decisioni architetturali)
@@ -162,6 +175,8 @@ Ultimo aggiornamento: 2026-07-28
 | [docs/adr/0065-intended-purpose-and-claims-guard.md](./adr/0065-intended-purpose-and-claims-guard.md) | Fissa `WUL-279`: intended purpose, claim consentiti/esclusi e guard repo-local `check:claims` contro overclaim clinico/regolatorio. |
 | [docs/adr/0066-patient-soft-delete-lifecycle.md](./adr/0066-patient-soft-delete-lifecycle.md) | Fissa `WUL-306`: DELETE paziente come tombstone soft-delete version-guarded, cascade canonica `PATIENT_CHILD_TABLES` con guardia anti-drift, purge admin audited (`patient.purged`) e clear test-container per membership (WUL-322). |
 | [docs/adr/0068-cross-platform-runtime-windows-linux.md](./adr/0068-cross-platform-runtime-windows-linux.md) | Fissa `WUL-375`: runtime cross-platform Windows/Linux con adapter scheduler backup, gating MLX/PM2 a macOS, launcher sottili per OS e contratto unico Node 24/ABI nativa per installazione, build e avvio. |
+| [docs/adr/0070-in-house-first-for-buildable-logic.md](./adr/0070-in-house-first-for-buildable-logic.md) | Fissa l'approccio in-house-first per logica integrabile, dati ICD e moduli locali senza dipendenze opzionali obbligatorie. |
+| [docs/adr/0071-tri-os-reversed-flow-shared-core.md](./adr/0071-tri-os-reversed-flow-shared-core.md) | Definisce la direzione tri-OS a flusso invertito e i gate per un core nativo condiviso; non descrive la runtime 0.8 corrente. |
 | [docs/adr/0072-voice-visit-capture-fluid-boundary.md](./adr/0072-voice-visit-capture-fluid-boundary.md) | Propone `WUL-419`: boundary local-first per visite registrabili Fluid-style, transcript/draft PHI, provider esterni solo tramite opt-in e no runtime audio nella prima slice. |
 | [docs/adr/0073-treatment-reasoning-athena-boundary.md](./adr/0073-treatment-reasoning-athena-boundary.md) | Fissa la boundary `mediflow.treatment_reasoning.v1`: runtime locale ATHENA/MLX review-only con kill switch fail-closed, report/trace ATHENA-style e suggested actions solo review/form-prefill senza auto-write clinici. |
 | [docs/adr/0074-network-cross-patient-read-boundary.md](./adr/0074-network-cross-patient-read-boundary.md) | Fissa le letture network cross-paziente: scope obbligatorio per membership, capability dedicate, filtri plaintext, ciphertext opaco e limit con cap. |

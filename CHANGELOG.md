@@ -39,8 +39,11 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - **Modifica**: Next.js, Sharp e PostCSS usano le versioni fissate dal
   file `package-lock.json`.
   **Stato**: integrata in `main` con la PR #138.
-  **Limite**: `npm audit` rileva sei rilievi nelle dipendenze di sviluppo. Il
-  controllo delle sole dipendenze di produzione non rileva vulnerabilità.
+  **Limite**: l'audit live del 29 luglio 2026 rileva 21 rilievi esclusivamente
+  nel tooling di sviluppo: 1 low, 5 moderate e 15 high. Il controllo delle sole
+  dipendenze di produzione non rileva vulnerabilità. Una remediation che
+  forza dipendenze fuori dai range dichiarati è stata rifiutata; serve un
+  packet separato con installazione strict-peer e regressione completa.
 - **Modifica**: il controllo del pacchetto autonomo (`standalone`) convalida
   gli artefatti nativi Sharp caricati. Rifiuta collegamenti simbolici o
   ripieghi che si risolvono fuori dal pacchetto.
