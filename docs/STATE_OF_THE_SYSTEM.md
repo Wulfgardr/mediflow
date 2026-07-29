@@ -90,9 +90,9 @@ La fotografia corrente e questa:
 - **AI**: runtime locale per default, `OllamaAdapter` e `AIService` come
   integrazioni presenti nel tree e gate egress ancora chiuso; benchmark e
   shadow lane restano separati dal prodotto clinico. Lo scaffold intelligente
-  di ADR 0086 resta una proposta e non apre una funzione nuova della v0.8.
-  Intelligence Fabric è una direzione post-0.8, non una funzione completa del
-  prodotto corrente.
+  di ADR 0086 e un contratto accettato per il programma post-0.8 e non apre una
+  funzione nuova della v0.8. Intelligence Fabric resta una linea post-0.8 in
+  costruzione, non una funzione completa del prodotto corrente.
 - **Attese locali**: la prima slice web collega prestazioni attese e risultati;
   il salvataggio resta esplicito e il workflow non e esteso ai client paired.
 - **SISS/FSE**: handoff contestuale e flussi `webapp-assisted`; nessuna
@@ -333,10 +333,14 @@ Documenti/ADR principali:
 Il runtime AI operativo resta locale. Il default generativo protetto e trattato
 come baseline finche benchmark e governance non giustificano un cambio.
 
-`OllamaAdapter` e `AIService` separano il provider dal servizio applicativo, ma
-`AIProvider` espone oggi solo Ollama. Il gate egress applica il primo strato
-deterministico e resta `closed_pending_redaction_lane`: non esistono provider
-cloud, registry operativo o consenso egress consegnati.
+`OllamaAdapter` e `AIService` separano il provider dal servizio applicativo.
+Nel pacchetto post-0.8, `LocalProviderRegistry` centralizza il binding
+task-provider-modello per i task instradati tramite `AIService` e accetta solo
+Ollama su loopback, senza fallback. Non estende grant o fallback alle lane
+separate, come ATHENA MLX. Questo packet non appartiene alla candidata 0.8. Il
+gate egress resta
+`closed_pending_redaction_lane`: non esistono provider cloud o consenso egress
+consegnati.
 
 Le superfici operative includono:
 
@@ -395,6 +399,11 @@ Per promuovere una lane servono:
 - shadow mode quando applicabile;
 - rollback/fallback chiari;
 - aggiornamento docs/ADR se cambia un boundary.
+
+La classificazione completa per task, modello e runtime vive in
+[docs/ai-runtime-serving-matrix.md](./ai-runtime-serving-matrix.md). La matrice
+separa `runtime`, `shadow`, `benchmark_only` e `hold`; un modello installato non
+è automaticamente un modello serving.
 
 ### 5.3 Comparator cloud
 

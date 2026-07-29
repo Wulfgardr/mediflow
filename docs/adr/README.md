@@ -6,6 +6,7 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
+- [0088-limite-digest-bound-readiness-ai-locale.md](./0088-limite-digest-bound-readiness-ai-locale.md): accetta un'annotazione distinta da `runtime`; il bracket resta detection best-effort.
 - [0087-registro-proposte-diagnostiche-documentali.md](./0087-registro-proposte-diagnostiche-documentali.md): accetta la foundation persistente locale, separata dalle diagnosi cliniche; writer, route, UI e applicazione restano assenti.
 - [0086-intelligent-scaffold-and-graded-automation-boundary.md](./0086-intelligent-scaffold-and-graded-automation-boundary.md): propone lo scaffold model-agnostic, il chiarimento fail-closed e l'automazione graduata senza aggiungere runtime.
 - [0084-document-diagnoses-review-only.md](./0084-document-diagnoses-review-only.md): sostituisce l'autofill ICD documentale con proposte review-only e rifiuta envelope ambigui.

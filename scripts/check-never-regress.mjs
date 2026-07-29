@@ -313,6 +313,36 @@ function runZeroKnowledgeChecks(runtimeFiles) {
             token: 'validateLocalTarget(baseUrl)',
             message: 'OCR availability probe must validate configured local endpoint before fetching',
         },
+        {
+            file: 'app/api/proxy/ollama/chat/route.ts',
+            token: 'attestLocalOllamaModel(baseUrl, body?.model, req.signal)',
+            message: 'Ollama chat proxy must attest the selected local model before forwarding',
+        },
+        {
+            file: 'app/api/proxy/ollama/chat/route.ts',
+            token: 'assertLocalOllamaResponse(data, attestation)',
+            message: 'Ollama chat proxy must reject responses that violate its local attestation',
+        },
+        {
+            file: 'app/api/proxy/ollama/generate/route.ts',
+            token: 'attestLocalOllamaModel(baseUrl, body?.model, req.signal)',
+            message: 'Ollama generate proxy must attest the selected local model before forwarding',
+        },
+        {
+            file: 'app/api/proxy/ollama/generate/route.ts',
+            token: 'assertLocalOllamaResponse(data, attestation)',
+            message: 'Ollama generate proxy must reject responses that violate its local attestation',
+        },
+        {
+            file: 'app/api/ai/models/route.ts',
+            token: '.filter(isLocalOllamaModelDescriptor)',
+            message: 'Ollama model discovery must exclude remote model descriptors',
+        },
+        {
+            file: 'app/api/ai/pull/route.ts',
+            token: "new OllamaLocalityError('model_pull_disabled')",
+            message: 'Ollama model pull must remain disabled in the local-only clinical lane',
+        },
     ];
 
     for (const check of localValidationChecks) {
