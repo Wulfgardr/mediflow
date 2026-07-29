@@ -11,6 +11,7 @@
     "predev": "node scripts/node-runtime-contract.mjs verify",
     "dev": "next dev --turbopack --hostname 127.0.0.1 --port 3000",
     "shots:readme": "node scripts/capture-readme-screenshots.mjs",
+    "build:usage-dashboard": "node scripts/build-usage-dashboard.mjs",
     "prebuild": "node scripts/node-runtime-contract.mjs verify",
     "build": "next build",
     "postbuild": "node scripts/node-runtime-contract.mjs write-standalone-manifest && node scripts/check-standalone-runtime-bundle.mjs",
