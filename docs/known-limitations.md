@@ -1,11 +1,11 @@
 ---
-summary: "Known limitations and accepted external evidence gaps for the MediFlow 0.8 source candidate."
+summary: "Known limitations and accepted external evidence gaps for the MediFlow 0.8 source release."
 read_when:
   - "Evaluating MediFlow 0.8 release readiness or accessibility claims."
   - "Preparing public notes, a tag, an App Store claim, or a conformance statement."
 ---
 
-# Limitazioni note della candidata MediFlow 0.8
+# Limitazioni note della release sorgente MediFlow 0.8
 
 Stato documento: `CANONICAL`
 
@@ -26,7 +26,7 @@ terminale. Il runtime ha riavviato in ciclo il servizio assistivo. Il test è
 stato interrotto e il risultato incompleto non è usato come prova positiva.
 
 Apple documenta il problema `173507341` nelle note di Xcode 27 beta. La deroga
-accettata riguarda solo la candidata sorgente GitHub 0.8.
+accettata riguarda solo la release sorgente GitHub 0.8.
 
 ### Cosa si può dichiarare
 
@@ -85,7 +85,7 @@ produzione. Non è classificato come risolto.
 
 Un candidato di aggiornamento portava l'audit a zero, ma forzava versioni
 transitive fuori dai range dichiarati e falliva l'installazione
-`strict-peer-deps`. La candidata 0.8 non assorbe quel workaround.
+`strict-peer-deps`. La release 0.8 non assorbe quel workaround.
 
 La chiusura richiede un packet dipendenze separato con:
 
@@ -99,4 +99,4 @@ La chiusura richiede un packet dipendenze separato con:
 Ollama è l'unico provider AI operativo. Intelligence Fabric, provider esterni,
 Windows/Linux applicativi, voce completa, inbox conversazionale e scaffold
 intelligente restano post-0.8 o esplorativi. Non sono funzioni consegnate dalla
-candidata.
+release.

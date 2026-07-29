@@ -18,13 +18,13 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-07-28 (candidata sorgente v0.8; nessun tag o GitHub Release dichiarato)
+Ultimo aggiornamento: 2026-07-29 (release sorgente v0.8)
 
 > [!NOTE]
-> La v0.8 descritta qui è una candidata sorgente verificata localmente.
-> Il tree non equivale a un tag, una GitHub Release, una pubblicazione App Store
-> o una certificazione. I gate, la deroga VoiceOver mobile e il rischio residuo
-> restano registrati nei documenti canonici dell'area.
+> La v0.8 descritta qui è una release sorgente verificata. Il tag e la GitHub
+> Release non equivalgono a una pubblicazione App Store o a una certificazione.
+> I gate, la deroga VoiceOver mobile e il rischio residuo restano registrati
+> nei documenti canonici dell'area.
 
 ---
 
@@ -45,7 +45,7 @@ La fotografia corrente e questa:
   AI-first. Resta utile quando ogni provider AI è disabilitato.
 - **Shell ufficiale**: il cockpit resta la root web live, senza selector o
   preview profiles persistiti. Lume e il suo contratto DTCG sono attivi nel
-  tree della candidata; Vetro Clinico resta la baseline storica e transitoria.
+  tree della release; Vetro Clinico resta la baseline storica e transitoria.
   La parity estetica completa non è dichiarata.
 - **Storage autorevole**: un solo file SQLite locale (`medical.db`), con accesso
   server via Drizzle e cifratura client-side dei campi clinici sensibili.
@@ -72,9 +72,9 @@ La fotografia corrente e questa:
   clinical scales e store SQLite locale; Linux e Windows oggi verificano la
   portabilita del core in CI, non una parity applicativa completa.
 - **Parity UI 0.8**: iPhone 2/2, iPad 7/7, build/probe macOS e localhost 78/78
-  sono verdi sul candidato. La parity resta clinico-semantica, non pixel.
+  sono verdi sul tree verificato. La parity resta clinico-semantica, non pixel.
   VoiceOver reale mobile non è provato per il limite esterno della beta Xcode
-  27; la deroga vale solo per la candidata sorgente e non autorizza claim di
+  27; la deroga vale solo per la release sorgente e non autorizza claim di
   conformità.
 - **Document intelligence**: Smart Import, nuova anagrafica da documento e
   `AI Patient Insight` restano reviewable; gli allegati possono persistere
@@ -354,11 +354,11 @@ Il router documentale usa `shadow` come default. La modalita `active` puo
 evitare il modello solo su route esplicitamente eleggibili ad alta confidenza;
   non promuove mai proposte cliniche senza review e salvataggio espliciti.
 
-### 5.1.1 Candidata locale v0.8: perimetro verificabile
+### 5.1.1 Release sorgente v0.8: perimetro verificabile
 
-Il tree della candidata contiene hardening delle superfici documentali, UI web
-Lume e aggiornamenti della family Apple. Queste integrazioni restano candidate
-finché i gate dichiarati non producono evidenza corrente.
+Il tree della release contiene hardening delle superfici documentali, UI web
+Lume e aggiornamenti della family Apple. Le integrazioni sono incluse solo
+entro i gate e i limiti dichiarati.
 
 - Il registro delle proposte diagnostiche resta separato dalle diagnosi
   cliniche. La promozione richiede review esplicita.

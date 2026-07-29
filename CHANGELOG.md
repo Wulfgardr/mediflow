@@ -5,11 +5,10 @@ Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.0] - Candidata locale
+## [0.8.0] - 2026-07-29
 
-> Questa voce prepara il candidato locale `0.8.0`. Non dichiara pubblicazione,
-> tag, GitHub Release o pubblicazione App Store. La promozione richiede un
-> verdetto sul commit esatto e la verifica del ref remoto.
+> Questa voce descrive la release sorgente `0.8.0`. Non dichiara una
+> pubblicazione App Store, una certificazione o conformità completa.
 
 ### Uso del prodotto
 
@@ -63,15 +62,15 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - **Modifica**: le superfici web e Apple ricevono correzioni di layout,
   accessibilità automatica, navigazione e contratti wire per i flussi
   dichiarati.
-  **Stato**: incluse nella candidata locale con fixture sintetiche e test
-  mirati sullo stesso candidato.
+  **Stato**: incluse nella release sorgente con fixture sintetiche e test
+  mirati sullo stesso tree.
   **Evidenza**: iPhone 2/2 e iPad 7/7 su simulatori iOS 27; macOS con build,
   Cmd-R contestuale, VoiceOver manuale, tastiera, click-map e resize; localhost
   78/78, viewport 320/390/768/1440 e zoom browser reale 200%/400%.
   **Limite**: non dichiarano parity completa o conformità accessibilità.
   VoiceOver reale su iPhone e iPad non è provato perché l'API pubblica della
   beta Xcode 27 non ha raggiunto uno stato terminale nel simulatore. La deroga
-  vale solo per la candidata sorgente GitHub 0.8.
+  vale solo per la release sorgente GitHub 0.8.
 - **Modifica**: gli identifier delle tab compatte iPhone sono collegati ai
   controlli UIKit pubblici e verificati con uno XCUITest atomico.
   **Stato**: iPhone 2/2 e iPad 7/7.
@@ -105,10 +104,10 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   registrazione e ripiego locale.
 - Il cloud può offrire capacità o tempi di elaborazione diversi. Non è un
   requisito e non implica una promessa clinica.
-- La candidata non dichiara parity UI completa. La matrice parity canonica e i
+- La release non dichiara parity UI completa. La matrice parity canonica e i
   gate assistivi restano le fonti per i limiti delle superfici.
 - Intelligence Fabric è una direzione post-0.8. Provider esterni, routing tra
-  venue e automazione graduata non sono funzioni complete della candidata.
+  venue e automazione graduata non sono funzioni complete della release.
 
 ### Sviluppo assistito
 
