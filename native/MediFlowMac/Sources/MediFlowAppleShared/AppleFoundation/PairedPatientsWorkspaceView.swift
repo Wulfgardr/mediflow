@@ -48,6 +48,10 @@ struct PairedPatientsWorkspaceView: View {
     }
 
     var body: some View {
+        deleteDialogWorkspace
+    }
+
+    private var platformWorkspace: some View {
         layoutBody
         // Applied once, at the root: a `TextFieldStyle` travels through the
         // environment, so every field in every section of the chart takes the
@@ -140,6 +144,10 @@ struct PairedPatientsWorkspaceView: View {
         )
         .modifier(MinimizedSearchToolbarBehavior())
         #endif
+    }
+
+    private var sheetWorkspace: some View {
+        platformWorkspace
         .task {
             await model.performAutomaticActionsIfNeeded()
             #if DEBUG
@@ -183,6 +191,10 @@ struct PairedPatientsWorkspaceView: View {
                 PairedPatientDeleteSheet(model: model)
             }
         }
+    }
+
+    private var eventWorkspace: some View {
+        sheetWorkspace
         .onChange(of: patientViewMode) { newValue in
             guard newValue == .trash else { return }
             Task { await model.loadPatientTrash() }
@@ -191,6 +203,10 @@ struct PairedPatientsWorkspaceView: View {
             guard newValue == .active else { return }
             Task { await model.checkNetworkRevisionOnForeground() }
         }
+    }
+
+    private var exportDialogWorkspace: some View {
+        eventWorkspace
         .confirmationDialog(
             "Esportare dati FHIR?",
             isPresented: $confirmsFHIRExport,
@@ -222,6 +238,10 @@ struct PairedPatientsWorkspaceView: View {
                 Text("\(validation.totalWarningCount) avvisi FSE. Errori: \(validation.totalErrorCount). Controlla terapie e osservazioni prima di condividere se non sei sicuro.")
             }
         }
+    }
+
+    private var entryDialogWorkspace: some View {
+        exportDialogWorkspace
         .confirmationDialog(
             "Sostituire il contenuto?",
             isPresented: $confirmsReplacingEntryTemplate,
@@ -234,6 +254,10 @@ struct PairedPatientsWorkspaceView: View {
         } message: {
             Text("Il campo contiene gia testo. Il template S/O/A/P sostituisce il contenuto corrente.")
         }
+    }
+
+    private var deleteDialogWorkspace: some View {
+        entryDialogWorkspace
         .confirmationDialog(
             "Annullare questa terapia?",
             isPresented: $confirmsDeletingTherapy,
