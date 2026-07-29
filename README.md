@@ -100,14 +100,6 @@ telefono o tablet restano evidenze di test e non fanno parte della galleria. Il
 [manifest media 0.8](./screenshots/0.8/manifest.json) registra dispositivo,
 runtime, scena, commit sorgente e hash._
 
-<details>
-<summary><b>Altre schermate web</b>: scheda paziente, quadro clinico, revisione documentale e sicurezza</summary>
-<p><img src="./screenshots/02-scheda.png" alt="Scheda paziente con moduli clinici" width="820" loading="lazy" decoding="async"/></p>
-<p><img src="./screenshots/03-quadro.png" alt="Quadro paziente nel cockpit" width="820" loading="lazy" decoding="async"/></p>
-<p><img src="./screenshots/04-review.png" alt="Revisione documenti e codifiche con evidenze sintetiche da confermare" width="820" loading="lazy" decoding="async"/></p>
-<p><img src="./screenshots/05-security.png" alt="Schermata di blocco locale con richiesta del PIN operatore" width="820" loading="lazy" decoding="async"/></p>
-</details>
-
 ## Come collaborano le app
 
 Il Mac è il nodo autorevole (`home-base`). Ospita il database, l'app nativa e il
