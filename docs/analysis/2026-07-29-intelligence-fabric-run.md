@@ -132,8 +132,8 @@ Aperta dopo il GO del nucleo. Contratto: ADR 0090 (`aac129164`). Nucleo ADR
 | S0 | Ricognizione R3 (pairing/trust) e R4 (incertezza/review) | 2x Luna high read-only | DONE |
 | S1 | ADR 0090: semantica, invarianti, falsificatori, DAG, ownership | manager (Fable) | DONE |
 | S2 | P1 trust+revoca, P2 onboarding, P3 routing osservabile, P4 interazione clinica | Sol/Terra/Sol/Sol high, worktree f1-f4 | DONE: tutte integrate (`a8b38d29a`) |
-| S3 | Integrazione + docs + battery | manager | IN CORSO |
-| S4 | Verifica terminale indipendente | lane fresca | Primo passaggio `HOLD_FIX` (3 P1, 1 P2, 2 P3); correzioni applicate; secondo passaggio in corso |
+| S3 | Integrazione + docs + battery | manager | DONE |
+| S4 | Verifica terminale indipendente | lane fresca | DONE: `GO` su `54040f2e8` |
 
 Primo passaggio S4 (Sol xhigh, contesto fresco) e correzioni del controller:
 
@@ -157,6 +157,20 @@ concorrente permanente deterministica in
 `lib/network-home-base-server.test.ts` (interferenza tra lettura e CAS,
 scenario resurrezione, percorso reale intent+conferma). Residui P2/P3
 documentali corretti (ledger, wording upsert, baseline README OpenAPI).
+
+Closeout S4 (Sol high, contesto fresco): `GO` su `54040f2e8`. Il verificatore
+ha confermato la CAS unificata e tutti i writer dello stato pairing. Le gare
+DELETE + conferma non hanno prodotto resurrezioni in 50/50 esecuzioni. La
+battery finale ha prodotto 17/17 test pairing e 974/974 test unitari. Sono
+passati anche typecheck, lint, claims, never-regress e OpenAPI drift.
+
+Il primo avvio della suite unitaria e' stato interrotto da un timeout
+artificiale di un secondo. L'esito e' stato scartato. La ripetizione completa
+ha prodotto 974/974 test verdi.
+
+Limiti del closeout: nessun client Apple, traffico LAN reale o build e' stato
+eseguito. Nessuna gara ha prodotto naturalmente un `409`; il verificatore ha
+controllato l'esaurimento deterministico della CAS e il mapping del codice.
 
 Ledger lane fase 2:
 
