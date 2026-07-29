@@ -74,7 +74,7 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 | W2a | F2 catalogo deterministico | Terra high, worktree `mediflow-if-f2-wt` | DONE (integrata via ff a `175b565cf`) |
 | W2b | F3 catalogo unificato + route stato `/api/ai/fabric/status` | Terra high, worktree `mediflow-if-f3-wt` | DONE (integrata via ff a `76225116c`) |
 | W3 | Docs di programma + battery completa su branch manager | manager | IN CORSO |
-| W4 | Verifica terminale indipendente | Sol xhigh, contesto fresco | TODO |
+| W4 | Verifica terminale indipendente | Sol xhigh, contesto fresco | Primo passaggio `HOLD_FIX` (2 P1, 2 P2, 1 P3); correzioni applicate; ri-verifica in corso |
 
 ## 5. Ledger lane
 
@@ -85,6 +85,7 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 | F1 resolver | Sol high | OK dopo sblocco | Implementazione completa e prove verdi (7/7, typecheck, lint, riverificate dal controller); la lane si e' fermata senza commit per un glob errato nella spec di prova del controller e ha rifiutato correttamente di modificare un quinto file; commit eseguito dal controller |
 | F2 catalogo deterministico | Terra high | OK | 5/5 test riverificati dal controller; deviazione dichiarata e accettata: entryPoint AIFA corretto a `lib/aifa-catalog.ts` dove vive lo schema letterale |
 | F3 catalogo unificato + stato | Terra high | OK | 17/17 test fabric riverificati dal controller; route sottile su `requireSessionOrLocalToken` come `/api/ai/models`; snapshot con allowlist congelata senza endpoint o impostazioni; edge dichiarato: nessun test HTTP di integrazione della route |
+| W4 verifica terminale | Sol xhigh, contesto fresco | HOLD_FIX al primo passaggio | Battery tutta verde (932/932); falsificatori contrattuali reali: descriptor fabbricato accettato (P1), ricevuta `treatment_reasoning` con provider discordante da `athena_mlx` (P1), etichette provenance non validate (P2), overclaim docs conseguente (P2), matrice con decisioni gia' chiuse (P3) |
 
 ## 6. Decision audit (aggiornato in corso d'opera)
 
@@ -96,6 +97,9 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 | Non registrare il registro attese ADR 0082 come capability (runtime assente) | Accettata | Una tabella `expectations` reale nel tree |
 | dataClass 'clinical' conservativa per tutte le capability correnti | Accettata | Una capability che tratti solo metadati modello |
 | Route stato fabric su `requireSessionOrLocalToken` come `/api/ai/models` | Accettata | Un consumer paired che richieda il data plane `network` |
+| Mappare `treatment_reasoning` sul registry Ollama task `reasoning` | Corretta dopo W4: la lane reale e' ATHENA MLX; ora capability autogestita con provider `athena_mlx` in ricevuta, senza binding registry | Un call-site che risolva treatment reasoning via registry |
+| Resolver che si fida del descriptor passato dal chiamante | Corretta dopo W4: enforcement di identita' canonica contro il catalogo unificato; un clone a valori identici viene respinto | Un descriptor non canonico che produca una ricevuta |
+| Etichette provenance come stringhe libere | Corretta dopo W4: pattern snake_case bounded (`FABRIC_PREPROCESSING_LABEL_PATTERN`), testo libero respinto con `provenance_label_invalid` | Un'etichetta con contenuto clinico che superi il pattern |
 | Nessuna modifica ai client nativi in questo programma | Accettata | Un requisito di parity che imponga adozione Swift immediata |
 | Meter Fable non esposto in sessione | Registrata `CAPACITY_UNKNOWN` solo per eventuali lane Fable aggiuntive; nessuna avviata | |
 

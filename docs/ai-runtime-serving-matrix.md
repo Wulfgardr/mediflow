@@ -182,12 +182,14 @@ Una regressione di località, qualità, privacy o kill switch riporta la lane a
 
 - definire una prova causale adeguata prima di riesaminare la qualified
   readiness in stato `HOLD`;
-- rimuovere A1/A2 nelle slice C0a, C0b e C0c autorizzate da ADR 0088;
-- definire il contratto Intelligence Fabric in un ADR separato;
 - fissare benchmark e budget lane-specific aggiornati;
 - decidere il profilo degradato OCR multipiattaforma in WUL-466;
 - verificare Apple Foundation Models in WUL-417 senza promozione implicita;
 - mantenere i provider remoti in `hold` fino ai gate egress completi.
+
+Decisioni gia chiuse sulla linea post-0.8: le slice C0a-C0c di ADR 0088 sono
+state eseguite (WUL-502) e il contratto Intelligence Fabric e' definito in
+[ADR 0089](./adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md).
 
 Queste decisioni non bloccano l'uso locale review-first già osservato come
 `runtime` sotto i boundary esistenti. Bloccano la ricertificazione WUL-418,
