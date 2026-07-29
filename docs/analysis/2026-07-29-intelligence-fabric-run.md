@@ -86,6 +86,7 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 | F2 catalogo deterministico | Terra high | OK | 5/5 test riverificati dal controller; deviazione dichiarata e accettata: entryPoint AIFA corretto a `lib/aifa-catalog.ts` dove vive lo schema letterale |
 | F3 catalogo unificato + stato | Terra high | OK | 17/17 test fabric riverificati dal controller; route sottile su `requireSessionOrLocalToken` come `/api/ai/models`; snapshot con allowlist congelata senza endpoint o impostazioni; edge dichiarato: nessun test HTTP di integrazione della route |
 | W4 verifica terminale | Sol xhigh, contesto fresco | HOLD_FIX al primo passaggio | Battery tutta verde (932/932); falsificatori contrattuali reali: descriptor fabbricato accettato (P1), ricevuta `treatment_reasoning` con provider discordante da `athena_mlx` (P1), etichette provenance non validate (P2), overclaim docs conseguente (P2), matrice con decisioni gia' chiuse (P3) |
+| W4 secondo passaggio | Sol xhigh, contesto fresco | HOLD_FIX | P1 confermati chiusi dai falsificatori; residui: policy non validata integralmente a runtime (P2: `retention`/`consentRef`/`allowedVenues`), pattern snake_case aggirabile con semantica clinica (P2: `diagnosi_diabete_tipo_2`), riga rischi stale (P3), eccezione ATHENA non documentata in ADR (P3) |
 
 ## 6. Decision audit (aggiornato in corso d'opera)
 
@@ -99,7 +100,8 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 | Route stato fabric su `requireSessionOrLocalToken` come `/api/ai/models` | Accettata | Un consumer paired che richieda il data plane `network` |
 | Mappare `treatment_reasoning` sul registry Ollama task `reasoning` | Corretta dopo W4: la lane reale e' ATHENA MLX; ora capability autogestita con provider `athena_mlx` in ricevuta, senza binding registry | Un call-site che risolva treatment reasoning via registry |
 | Resolver che si fida del descriptor passato dal chiamante | Corretta dopo W4: enforcement di identita' canonica contro il catalogo unificato; un clone a valori identici viene respinto | Un descriptor non canonico che produca una ricevuta |
-| Etichette provenance come stringhe libere | Corretta dopo W4: pattern snake_case bounded (`FABRIC_PREPROCESSING_LABEL_PATTERN`), testo libero respinto con `provenance_label_invalid` | Un'etichetta con contenuto clinico che superi il pattern |
+| Etichette provenance come stringhe libere | Corretta due volte: prima pattern snake_case (aggirabile con semantica clinica), poi vocabolario CHIUSO `FABRIC_PREPROCESSING_LABELS` nel contratto; ogni etichetta fuori vocabolario respinta | Un'etichetta fuori vocabolario che entri in un record |
+| Validazione policy delegata ai tipi TypeScript | Corretta dopo il secondo passaggio W4: `retention`, `consentRef` e `allowedVenues` convalidati a runtime (i tipi non sono enforcement) | Un valore runtime fuori contratto che produca una ricevuta |
 | Nessuna modifica ai client nativi in questo programma | Accettata | Un requisito di parity che imponga adozione Swift immediata |
 | Meter Fable non esposto in sessione | Registrata `CAPACITY_UNKNOWN` solo per eventuali lane Fable aggiuntive; nessuna avviata | |
 
@@ -110,7 +112,7 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 | Pipeline senza `pipefail` ha mascherato 69 fallimenti | Ripetuto con `set -o pipefail`; regola di metodo registrata |
 | Binding nativo assente nei worktree lane | Le prove lane usano test puri senza db; la battery completa gira sul branch manager |
 | Glob `fabric/*.test.ts` nella spec F1 non supportato dal runner (espande solo `/**/`) | Errore di spec del controller; la lane si e' fermata invece di deviare; forma corretta `fabric/**/*.test.ts` propagata alle spec successive |
-| Il resolver accetta il descriptor dal chiamante | Nessun descriptor artigianale puo' aprire egress o cloud (test avversariale dedicato); la fonte canonica dei descriptor diventa il catalogo unificato in W2b; una ricevuta non autorizza consumer per contratto |
+| Descriptor dal chiamante (rischio del primo passaggio W4) | CHIUSO: il resolver impone l'identita' canonica contro il catalogo unificato; un clone a valori identici viene respinto con `capability_unknown` (test dedicato) |
 | `never-regress` NR-EGRESS su fixture negativa `https://example.test` in `resolver.test.ts` | Trovato dalla battery W3; fixture ricostruita a pezzi con `join('')` come il pattern di `registry.test.ts`; guard e test fabric riverificati verdi |
 
 ## 8. Next permitted action

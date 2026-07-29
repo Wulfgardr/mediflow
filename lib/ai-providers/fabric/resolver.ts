@@ -3,11 +3,16 @@ import { isEgressGateOpen } from '../../ai-egress-gate';
 import { localProviderRegistry, type LocalProviderBindingInput, type LocalProviderResolution } from '../registry';
 import { FABRIC_CAPABILITY_DESCRIPTORS } from './catalog';
 import {
-    DETERMINISTIC_CAPABILITY_IDS, EGRESS_PROFILES, FABRIC_PREPROCESSING_LABEL_PATTERN,
-    GENERATIVE_CAPABILITY_IDS, FabricPolicyError,
-    type FabricCapabilityDescriptor, type FabricExecutionPolicy, type FabricProvenanceRecord,
+    DETERMINISTIC_CAPABILITY_IDS, EGRESS_PROFILES, FABRIC_PREPROCESSING_LABELS,
+    FABRIC_VENUES, GENERATIVE_CAPABILITY_IDS, FabricPolicyError,
+    type FabricCapabilityDescriptor, type FabricExecutionPolicy,
+    type FabricPreprocessingLabel, type FabricProvenanceRecord,
     type FabricResolutionReceipt, type FabricVenue, type GenerativeCapabilityId,
 } from './contract';
+
+const PREPROCESSING_VOCABULARY: ReadonlySet<string> = new Set(FABRIC_PREPROCESSING_LABELS);
+const VENUE_VALUES: ReadonlySet<string> = new Set(FABRIC_VENUES);
+const RETENTION_VALUES: ReadonlySet<string> = new Set(['not_persisted', 'local_only']);
 
 export interface FabricResolution {
     readonly receipt: FabricResolutionReceipt;
@@ -42,6 +47,8 @@ export function resolveFabricCapability(
     request: { descriptor: FabricCapabilityDescriptor; venue: FabricVenue; generative?: LocalProviderBindingInput },
 ): FabricResolution {
     const descriptor = request.descriptor;
+    // I tipi TypeScript non sono enforcement runtime: ogni campo della policy
+    // viene convalidato qui, anche quelli oggi sempre nulli o costanti.
     if (
         policy.schemaVersion !== 'mediflow.ai.execution-policy.v1'
         || policy.provenanceRequired !== true
@@ -49,6 +56,12 @@ export function resolveFabricCapability(
         || policy.authorityPlane !== 'clinical_application'
         || typeof policy.requestId !== 'string'
         || policy.requestId.trim().length === 0
+        || !RETENTION_VALUES.has(policy.retention)
+        || !(policy.consentRef === null
+            || (typeof policy.consentRef === 'string' && policy.consentRef.trim().length > 0))
+        || !Array.isArray(policy.allowedVenues)
+        || policy.allowedVenues.length === 0
+        || !policy.allowedVenues.every((venue) => VENUE_VALUES.has(venue))
     ) {
         throw new FabricPolicyError('policy_invalid');
     }
@@ -126,18 +139,21 @@ export function resolveFabricCapability(
 }
 
 export function buildProvenanceRecord(resolution: FabricResolution, preprocessing: readonly string[]): FabricProvenanceRecord {
+    // Solo il vocabolario chiuso del contratto: la forma sintattica non basta
+    // a escludere contenuto clinico normalizzato (es. una diagnosi snake_case).
     for (const label of preprocessing) {
-        if (!FABRIC_PREPROCESSING_LABEL_PATTERN.test(label)) {
+        if (!PREPROCESSING_VOCABULARY.has(label)) {
             throw new FabricPolicyError('provenance_label_invalid');
         }
     }
+    const labels = preprocessing as readonly FabricPreprocessingLabel[];
     return Object.freeze({
         schemaVersion: 'mediflow.ai.fabric-provenance.v1',
         capability: resolution.receipt.capability,
         venue: resolution.receipt.venue,
         provider: resolution.receipt.provider,
         model: resolution.receipt.model,
-        preprocessing: Object.freeze([...preprocessing]),
+        preprocessing: Object.freeze([...labels]),
         receipt: resolution.receipt,
     });
 }
