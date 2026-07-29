@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "release": "0.8.0",
   "capturedAt": "2026-07-28T23:41:00+02:00",
+  "updatedAt": "2026-07-29T11:40:00+02:00",
   "source": {
     "branch": "codex/mediflow-0.8-release-candidate-local",
     "head": "2355a46a4dde63b1956a2298d99ef0b5c4208222",
@@ -24,6 +25,39 @@
     "note": "Names, addresses, phone numbers, identifiers, diagnoses, medicines and clinical text are deterministic source-controlled demo data."
   },
   "assets": [
+    {
+      "scene": "macOS clinical home-base",
+      "device": "My Mac",
+      "orientation": "landscape",
+      "appearance": "light",
+      "dynamicType": "default",
+      "launchOverrides": [
+        "MEDIFLOW_APPLE_DEMO=1",
+        "MEDIFLOW_APPLE_UITEST_OPEN_PATIENT_INDEX=2"
+      ],
+      "source": {
+        "branch": "codex/mediflow-0.8-macos-media-tokens",
+        "baseHead": "0cef4f4ae41c2c04efd5e1343cf3049215f36c9e",
+        "state": "verified working tree before local commit"
+      },
+      "toolchain": {
+        "xcode": "27.0 beta (27A5194q)",
+        "destination": "macOS arm64",
+        "capture": "native app-window screencapture",
+        "optimization": "sips -Z 1600"
+      },
+      "original": {
+        "file": "original/macos-clinical-workspace.png",
+        "dimensions": "3200x1800",
+        "sha256": "edaaa0abe3bfff378b612c9b7a502d0c149c92dacb0dc830332193c5d47d9a12"
+      },
+      "optimized": {
+        "file": "macos-clinical-workspace.png",
+        "dimensions": "1600x900",
+        "sha256": "80bb20fdfdaed2c832e533a27acc27de7b1101c7095de820d1d1529c4954098d"
+      },
+      "altText": "MediFlow on macOS showing the native clinical home-base with a synthetic patient worklist and structured clinical detail."
+    },
     {
       "scene": "iPhone patient worklist",
       "device": "MediFlow 0.8 Audit iPhone 060a",
