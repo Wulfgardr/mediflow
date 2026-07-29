@@ -80,6 +80,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
+function snapshotCandidateRoutingInput(input: CandidateRoutingInput): CandidateRoutingInput {
+    if (!isRecord(input)) {
+        throw new FabricPolicyError('policy_invalid');
+    }
+    // Snapshot every top-level caller-owned value once. Admission and receipt
+    // checks must observe the same onboarding and lifecycle objects.
+    return Object.freeze({
+        policy: input.policy,
+        request: input.request,
+        observations: input.observations,
+        onboarding: input.onboarding,
+        lifecycle: input.lifecycle,
+        reconnection: input.reconnection,
+    });
+}
+
 function snapshotCandidateDecisionContext(input: CandidateRoutingInput): CandidateDecisionContext {
     // Copy each caller-owned input before inspecting it. This denies getters
     // that change identifiers after validation and keeps invalid values out of
@@ -177,14 +193,20 @@ function denied(
     });
 }
 
-function generativeAdmissionIsConsistent(input: CandidateRoutingInput): boolean {
-    if (!input.onboarding || !input.lifecycle) return false;
+function snapshotGenerativeAdmission(input: CandidateRoutingInput): ProviderLifecycleState | null {
+    if (!input.onboarding || !input.lifecycle) return null;
 
     const admitted = admitProvider(input.onboarding);
     const lifecycle = snapshotProviderLifecycle(input.lifecycle);
-    return lifecycle.provider === admitted.provider
-        && lifecycle.credentialClass === admitted.credentialClass
-        && lifecycle.status === 'available_unqualified';
+    if (
+        lifecycle.provider !== admitted.provider
+        || lifecycle.credentialClass !== admitted.credentialClass
+        || lifecycle.status !== 'available_unqualified'
+    ) {
+        return null;
+    }
+
+    return lifecycle;
 }
 
 /**
@@ -195,8 +217,9 @@ function generativeAdmissionIsConsistent(input: CandidateRoutingInput): boolean 
 export function routeCandidateCapability(
     input: CandidateRoutingInput,
 ): CandidateRoutingResult {
-    const context = snapshotCandidateDecisionContext(input);
-    const observations = observationsFor(context.requestedVenue, input.observations);
+    const inputSnapshot = snapshotCandidateRoutingInput(input);
+    const context = snapshotCandidateDecisionContext(inputSnapshot);
+    const observations = observationsFor(context.requestedVenue, inputSnapshot.observations);
     const requestedObservation = observations.find(
         (observation) => observation.venue === context.requestedVenue,
     );
@@ -215,13 +238,15 @@ export function routeCandidateCapability(
             break;
     }
 
-    if (context.requestedVenue === 'home_base' && input.reconnection !== 'trusted') {
+    if (context.requestedVenue === 'home_base' && inputSnapshot.reconnection !== 'trusted') {
         return denied(context, observations, 'paired_trust_denied');
     }
 
+    let admittedLifecycle: ProviderLifecycleState | null = null;
     if (context.descriptor.class === 'generative') {
         try {
-            if (!generativeAdmissionIsConsistent(input)) {
+            admittedLifecycle = snapshotGenerativeAdmission(inputSnapshot);
+            if (!admittedLifecycle) {
                 return denied(context, observations, 'provider_lifecycle_unavailable');
             }
         } catch (error) {
@@ -250,10 +275,11 @@ export function routeCandidateCapability(
     }
 
     if (context.descriptor.class === 'generative') {
-        const lifecycle = snapshotProviderLifecycle(input.lifecycle);
+        const lifecycle = admittedLifecycle;
         const receipt = routed.decision.receipt;
         if (
-            receipt.provider !== lifecycle.provider
+            !lifecycle
+            || receipt.provider !== lifecycle.provider
             || (receipt.providerReceipt !== null
                 && receipt.providerReceipt.provider !== lifecycle.provider)
         ) {
