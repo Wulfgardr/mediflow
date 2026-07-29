@@ -122,6 +122,8 @@ Aggiorna la spec:
 
 ## Baseline attuale
 
+Versione contratto: `1.23.0`.
+
 La baseline pubblicata oggi copre:
 
 - `GET /api/v1/patients`
@@ -219,9 +221,10 @@ Nota operativa per `WUL-150`:
   `network.replica.write-observations`, `observations.version`, `409` PHI-safe e
   soft delete via `deletedAt`; hard delete remoto e campi AI/document-derived
   restano fuori boundary
-- `network/ai-runtime` esplicita che `AI plane` e `data plane` restano separati
-  e dichiara solo `AI locale` vs `AI centralizzata disponibile/non disponibile`
-  piu fallback e rollout gate, senza introdurre ancora remote execution reale
+- `network/ai-runtime` esplicita che `AI plane` e `data plane` restano separati,
+  proietta lo stato Fabric PHI-safe con accesso `status_only`, esecuzione paired
+  `not_authorized`, egress chiuso e fallback automatico negato; la disponibilita
+  centrale descrive solo la configurazione host e non un grant AI paired
 - non introduce ancora catalog write remoto, sync record-level,
   cache offline, identity model completo o routing remoto operativo del runtime
   AI centralizzato

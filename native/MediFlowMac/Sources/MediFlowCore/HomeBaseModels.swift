@@ -399,6 +399,34 @@ public struct HomeBaseNetworkAiRuntimeSummary: Codable, Equatable, Sendable {
         public let capabilityStatus: String
         public let requiresPairing: Bool
         public let executionTarget: String
+        public let accessMode: String
+        public let executionAuthorized: Bool
+    }
+
+    /* @Codex */
+    public struct FabricProjection: Codable, Equatable, Sendable {
+        public struct Venues: Codable, Equatable, Sendable {
+            public let localProcess: String
+            public let homeBase: String
+            public let onDevice: String
+            public let cloud: String
+
+            private enum CodingKeys: String, CodingKey {
+                case localProcess = "local_process"
+                case homeBase = "home_base"
+                case onDevice = "on_device"
+                case cloud
+            }
+        }
+
+        public let schemaVersion: String
+        public let contractVersion: String
+        public let access: String
+        public let pairedExecution: String
+        public let egressGateOpen: Bool
+        public let readinessNote: String
+        public let fallback: String
+        public let venues: Venues
     }
 
     public struct KillSwitches: Codable, Equatable, Sendable {
@@ -412,6 +440,7 @@ public struct HomeBaseNetworkAiRuntimeSummary: Codable, Equatable, Sendable {
     public let mode: String
     public let localRuntime: LocalRuntime
     public let centralRuntime: CentralRuntime
+    public let fabric: FabricProjection
     public let fallbackPolicy: String
     public let rolloutGate: String
     public let surfaces: [String]

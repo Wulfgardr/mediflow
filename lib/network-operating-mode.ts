@@ -221,9 +221,9 @@ function pairingLabel(session: NetworkSessionSummary): string {
 function aiRuntimeLabel(aiRuntime: NetworkAiRuntimeSummary): string {
     switch (aiRuntime.mode) {
         case 'centralized-available':
-            return 'AI centralizzata disponibile';
+            return 'Stato AI host disponibile';
         case 'centralized-unavailable':
-            return 'AI centralizzata non disponibile';
+            return 'Stato AI host non disponibile';
         case 'local-ai':
         default:
             return 'AI locale';
@@ -233,9 +233,9 @@ function aiRuntimeLabel(aiRuntime: NetworkAiRuntimeSummary): string {
 function aiRuntimeDescription(aiRuntime: NetworkAiRuntimeSummary): string {
     switch (aiRuntime.mode) {
         case 'centralized-available':
-            return 'Il nodo puo esporre il proprio runtime AI locale ai dispositivi associati senza spostare i dati clinici.';
+            return 'Il nodo dichiara una configurazione AI locale. Lo stato non autorizza esecuzione AI dai dispositivi associati.';
         case 'centralized-unavailable':
-            return 'La modalita rete e attiva, ma il runtime locale del nodo non e pronto per i dispositivi associati.';
+            return 'La modalita rete e attiva, ma la configurazione AI locale del nodo non e pronta. Nessuna esecuzione paired e autorizzata.';
         case 'local-ai':
         default:
             return 'Il nodo usa il runtime AI solo in locale e non promette inferenza remota o pairing AI.';
@@ -254,11 +254,10 @@ function aiLocalRuntimeLabel(aiRuntime: NetworkAiRuntimeSummary): string {
 
 function aiFallbackLabel(aiRuntime: NetworkAiRuntimeSummary): string {
     switch (aiRuntime.fallbackPolicy) {
-        case 'client-local-runtime-else-ai-unavailable':
+        case 'ai-unavailable-no-automatic-fallback':
+            return 'Fallback automatico negato: se l AI non e disponibile, la richiesta fallisce';
         default:
-            return aiRuntime.localRuntime.state === 'configured'
-                ? 'Fallback: runtime locale del client se presente, altrimenti AI non disponibile'
-                : 'Fallback: AI non disponibile finche il runtime locale non torna valido';
+            return 'Fallback non riconosciuto: AI non disponibile';
     }
 }
 

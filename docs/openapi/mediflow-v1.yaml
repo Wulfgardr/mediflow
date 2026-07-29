@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.22.0
+  version: 1.23.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -24,7 +24,9 @@ info:
     snapshot mirror, deferred fallback, and manual review states. A dedicated
     identity summary distinguishes device pairing from operator login and
     declares the effective ambulatory scope. A dedicated AI runtime summary now
-    separates `AI plane` and `data plane`, while real replication, offline sync,
+    separates `AI plane` and `data plane` and projects PHI-safe Fabric status with
+    paired execution denied, egress closed, and no automatic fallback, while real
+    replication, offline sync,
     remote hard delete, remote attachment/document writes, remote inference
     routing, remote therapy/checkup/observation hard delete, and advanced
     identity scoping remain follow-up workstreams.
@@ -342,8 +344,9 @@ paths:
       description: |
         Returns the PHI-safe AI runtime posture declared by the current node.
         This summary keeps `AI plane` separate from the shared `data plane` and
-        only describes local-vs-centralized capability, fail-closed kill-switch
-        status, and fallback policy. It accepts either the local bearer token or
+        reports host configuration and a PHI-safe Fabric projection. Access is
+        status-only: paired execution is not authorized, egress is closed, and
+        automatic fallback is denied. It accepts either the local bearer token or
         a paired client while the node is in network-home-base mode.
       security:
         - bearerAuth: []
@@ -3980,6 +3983,8 @@ components:
         - capabilityStatus
         - requiresPairing
         - executionTarget
+        - accessMode
+        - executionAuthorized
       properties:
         state:
           type: string
@@ -3999,6 +4004,71 @@ components:
         executionTarget:
           type: string
           const: paired-home-base
+        accessMode:
+          type: string
+          const: status-only
+        executionAuthorized:
+          type: boolean
+          const: false
+    NetworkAiRuntimeFabricVenues:
+      type: object
+      additionalProperties: false
+      required:
+        - local_process
+        - home_base
+        - on_device
+        - cloud
+      properties:
+        local_process:
+          type: string
+          description: Host configuration state only; it does not prove a running daemon or an inference.
+          enum: [configured, misconfigured]
+        home_base:
+          type: string
+          description: Declarative host configuration state; it is not a paired AI grant.
+          enum: [host_configured, host_unavailable, disabled]
+        on_device:
+          type: string
+          const: not_implemented
+        cloud:
+          type: string
+          const: egress_profile_closed
+    NetworkAiRuntimeFabricProjection:
+      type: object
+      additionalProperties: false
+      required:
+        - schemaVersion
+        - contractVersion
+        - access
+        - pairedExecution
+        - egressGateOpen
+        - readinessNote
+        - fallback
+        - venues
+      properties:
+        schemaVersion:
+          type: string
+          const: mediflow.ai.network-fabric-status.v1
+        contractVersion:
+          type: string
+          const: mediflow.ai.fabric.v1
+        access:
+          type: string
+          const: status_only
+        pairedExecution:
+          type: string
+          const: not_authorized
+        egressGateOpen:
+          type: boolean
+          const: false
+        readinessNote:
+          type: string
+          const: available_unqualified
+        fallback:
+          type: string
+          const: denied_by_contract
+        venues:
+          $ref: '#/components/schemas/NetworkAiRuntimeFabricVenues'
     NetworkAiRuntimeSummary:
       type: object
       additionalProperties: false
@@ -4007,6 +4077,7 @@ components:
         - mode
         - localRuntime
         - centralRuntime
+        - fabric
         - fallbackPolicy
         - rolloutGate
         - surfaces
@@ -4026,9 +4097,11 @@ components:
           $ref: '#/components/schemas/NetworkAiRuntimeLocalRuntime'
         centralRuntime:
           $ref: '#/components/schemas/NetworkAiRuntimeCentralRuntime'
+        fabric:
+          $ref: '#/components/schemas/NetworkAiRuntimeFabricProjection'
         fallbackPolicy:
           type: string
-          const: client-local-runtime-else-ai-unavailable
+          const: ai-unavailable-no-automatic-fallback
         rolloutGate:
           type: string
           const: lane-benchmarks-and-rollout-governance-required
