@@ -4,14 +4,17 @@ import {
     DEFAULT_OLLAMA_BASE_URL,
     resolveOllamaBaseUrl,
 } from '@/lib/ai-providers/base-url';
-import { OllamaProviderAdapter } from '@/lib/ai-providers/ollama';
+import {
+    localProviderRegistry,
+    type AIServiceTask,
+    type LocalProviderResolution,
+} from '@/lib/ai-providers/registry';
 import type {
     AIChatOptions,
     AIModel,
     AIProvider,
     AIStats,
     ChatMessage,
-    ChatMessageContent,
     ProviderAdapter,
 } from '@/lib/ai-providers/provider';
 
@@ -34,23 +37,32 @@ export class AIService {
     private readonly adapter: ProviderAdapter;
     private readonly baseUrl: string;
     private readonly model: string;
+    private readonly resolution: LocalProviderResolution;
 
-    constructor(provider: AIProvider, baseUrl: string, model: string, disableThinking = false, chatTimeoutMs = TEXT_CHAT_TIMEOUT_MS) {
-        this.provider = provider;
-
-        const adapter = new OllamaProviderAdapter({
-            baseUrl,
-            model,
-            disableThinking,
-            chatTimeoutMs,
-        });
-        this.adapter = adapter;
-        this.baseUrl = adapter.getBaseUrl();
-        this.model = adapter.getModel();
+    private constructor(resolution: LocalProviderResolution) {
+        this.resolution = resolution;
+        this.provider = resolution.receipt.provider;
+        this.adapter = resolution.adapter;
+        this.baseUrl = resolution.adapter.getBaseUrl();
+        this.model = resolution.adapter.getModel();
     }
 
-    static fromOllama(baseUrl: string, model: string, disableThinking = false, chatTimeoutMs = TEXT_CHAT_TIMEOUT_MS): AIService {
-        return new AIService('ollama', baseUrl, model, disableThinking, chatTimeoutMs);
+    static fromLocalTaskConfig(
+        task: AIServiceTask,
+        endpoint: string,
+        models: Partial<Record<AIServiceTask, string>>,
+        provider?: string | null,
+        disableThinking = false,
+        chatTimeoutMs = TEXT_CHAT_TIMEOUT_MS,
+    ): AIService {
+        return new AIService(localProviderRegistry.resolve({
+            task,
+            provider,
+            endpoint,
+            models,
+            disableThinking,
+            chatTimeoutMs,
+        }));
     }
 
     getModelInfo() {
@@ -58,13 +70,16 @@ export class AIService {
             provider: this.provider,
             model: this.model,
             baseUrl: this.baseUrl,
+            readiness: this.resolution.receipt.runtimeReadiness,
+            fallback: this.resolution.fallback,
+            receipt: this.resolution.receipt,
         };
     }
 
-    static async create(task: 'clinical' | 'reasoning' | 'ocr' = 'clinical'): Promise<AIService> {
-        const provider: AIProvider = 'ollama';
+    static async create(task: AIServiceTask = 'clinical'): Promise<AIService> {
         await ensureTextModelDefaultsUpgraded();
 
+        const providerSetting = await db.settings.get('aiProvider');
         const genericUrl = await db.settings.get('aiUrl');
         const legacyUrl = await db.settings.get('ollamaUrl');
         const baseUrl = resolveOllamaBaseUrl(genericUrl?.value, legacyUrl?.value, DEFAULT_OLLAMA_BASE_URL);
@@ -74,20 +89,22 @@ export class AIService {
         const modelOcr = await db.settings.get('aiModel_ocr');
         const modelLegacy = await db.settings.get('aiModel');
 
-        let model = '';
-        if (task === 'clinical') {
-            model = resolveTextModel(modelClinical?.value, modelLegacy?.value);
-        } else if (task === 'ocr') {
-            model = modelOcr?.value || DEFAULT_OCR_MODEL;
-        } else {
-            model = resolveTextModel(modelReasoning?.value, modelLegacy?.value);
-        }
-
-        console.log(`[AIService] Initialized for task '${task}' with model: ${model} (${provider})`);
+        const models: Record<AIServiceTask, string> = {
+            clinical: resolveTextModel(modelClinical?.value, modelLegacy?.value),
+            reasoning: resolveTextModel(modelReasoning?.value, modelLegacy?.value),
+            ocr: modelOcr?.value || DEFAULT_OCR_MODEL,
+        };
 
         const disableThinking = task !== 'ocr';
         const chatTimeoutMs = task === 'ocr' ? OCR_CHAT_TIMEOUT_MS : TEXT_CHAT_TIMEOUT_MS;
-        return AIService.fromOllama(baseUrl, model, disableThinking, chatTimeoutMs);
+        return AIService.fromLocalTaskConfig(
+            task,
+            baseUrl,
+            models,
+            providerSetting?.value,
+            disableThinking,
+            chatTimeoutMs,
+        );
     }
 
     async chat(messages: ChatMessage[], signal?: AbortSignal, maxTokens?: number, options?: AIChatOptions): Promise<{ content: string; stats: AIStats }> {
@@ -119,7 +136,7 @@ export class AIService {
     }
 
     async pullModel(modelName: string, onProgress?: (status: string, progress: number) => void): Promise<void> {
-        if (!this.adapter.pullModel) throw new Error('Pulling models only supported for Ollama');
+        if (!this.adapter.pullModel) throw new Error('Model pull is disabled for this provider binding');
         return this.adapter.pullModel(modelName, onProgress);
     }
 }

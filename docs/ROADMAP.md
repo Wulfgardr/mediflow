@@ -198,10 +198,10 @@ indeterminato resta bloccante.
   `closed_pending_redaction_lane`.
 * **Boundary ancora chiuso**: registry, provider alternativi, redaction lane e
   consenso cloud non sono consegnati; Ollama resta l'unico provider operativo.
-* **Scaffold model-agnostic proposto**: `WUL-499` e ADR 0086 separano pipeline
+* **Scaffold model-agnostic post-0.8**: `WUL-499` e ADR 0086 separano pipeline
   locale, proposta, chiarimento, anteprima, autorizzazione ed eventuale
-  scrittura applicativa auditata. Il packet e documentale e non apre nuovi
-  runtime.
+  scrittura applicativa auditata. Il contratto e accettato per il programma
+  post-0.8, non modifica il candidato 0.8 e non apre nuovi runtime.
 * **Attese locali**: la prima slice web collega prestazione attesa e risultato;
   non estende il workflow ai client paired e non introduce scritture autonome.
 * **Automazione graduata futura**: proposta, anteprima, finestra di
