@@ -51,6 +51,14 @@ verificare modello locale, cloud disabilitato, strumenti, rete e processo.
 Lo stato mobile corrente non è un vincolo permanente. Capability Apple
 on-device e delega AI home-base richiedono un ADR separato.
 
+### Rapporto con il contratto Intelligence Fabric
+
+[ADR 0089](./adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md)
+definisce capability, venue esplicite, profili egress versionati e ricevute di
+risoluzione. Questa matrice resta l'autorita sugli stati di serving dei
+modelli: una capability registrata nella fabric non promuove alcuna lane, non
+cambia gli stati ammessi e non sostituisce i gate di questo documento.
+
 ## 2. Stati ammessi
 
 | Stato | Significato | Uso consentito |

@@ -5,6 +5,26 @@ Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Non rilasciato] - linea post-0.8
+
+> Voci della linea di sviluppo post-0.8. Nessuna e' parte della release 0.8.0.
+
+### Stack intelligente locale
+
+- **Modifica**: consolidato lo stack provider post-0.8 (WUL-269, WUL-418,
+  WUL-502): locality Ollama loopback, registry locale per task senza fallback,
+  matrice serving e limite digest-bound (ADR 0088).
+  **Stato**: integrato nella branch di programma WUL-522 e verificato in
+  locale (typecheck, lint, guard e suite unit complete).
+  **Limite**: il digest resta identita osservata, non prova causale
+  (`observed_not_causal`); la qualified readiness resta `HOLD`.
+- **Modifica**: contratto Intelligence Fabric (ADR 0089) con scaffold locale:
+  capability generative e deterministiche, venue esplicite, profili egress
+  versionati, resolver fail-closed e stato read-only.
+  **Stato**: scaffold locale con test dedicati; nessun provider nuovo.
+  **Limite**: il profilo cloud esiste ed e' chiuso per costruzione; nessun
+  egress, credenziale o consenso e' stato aggiunto.
+
 ## [0.8.0] - 2026-07-29
 
 > Questa voce descrive la release sorgente `0.8.0`. Non dichiara una

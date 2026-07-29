@@ -91,8 +91,13 @@ La fotografia corrente e questa:
   integrazioni presenti nel tree e gate egress ancora chiuso; benchmark e
   shadow lane restano separati dal prodotto clinico. Lo scaffold intelligente
   di ADR 0086 e un contratto accettato per il programma post-0.8 e non apre una
-  funzione nuova della v0.8. Intelligence Fabric resta una linea post-0.8 in
-  costruzione, non una funzione completa del prodotto corrente.
+  funzione nuova della v0.8. Sulla linea post-0.8 sono presenti il registry
+  provider locale per task (WUL-502) e lo scaffold Intelligence Fabric di ADR
+  0089: contratto congelato, cataloghi delle capability generative e
+  deterministiche, resolver fail-closed e stato read-only
+  `/api/ai/fabric/status`. Lo scaffold non aggiunge provider, egress o
+  automazione: Intelligence Fabric resta una linea in costruzione, non una
+  funzione completa del prodotto corrente.
 - **Attese locali**: la prima slice web collega prestazioni attese e risultati;
   il salvataggio resta esplicito e il workflow non e esteso ai client paired.
 - **SISS/FSE**: handoff contestuale e flussi `webapp-assisted`; nessuna
