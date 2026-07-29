@@ -107,6 +107,11 @@ export function classifyReconnection(input: PairingTrustInput): PairingReconnect
     return 'trusted';
 }
 
+// Semantica di clearsLockout: indica un azzeramento IN-PLACE dei contatori di
+// lockout per un utente che continua a esistere (come fa il cambio PIN).
+// admin_reset resta false: distrugge gli utenti e con essi lo stato di
+// lockout, ma non e' un azzeramento dei contatori di un account che
+// sopravvive.
 export const REVOCATION_EFFECTS: Readonly<Record<PairingRevocationEvent, PairingRevocationEffect>> =
     Object.freeze({
         logout: Object.freeze({

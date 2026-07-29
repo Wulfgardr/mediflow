@@ -132,7 +132,22 @@ Aperta dopo il GO del nucleo. Contratto: ADR 0090 (`aac129164`). Nucleo ADR
 | S1 | ADR 0090: semantica, invarianti, falsificatori, DAG, ownership | manager (Fable) | DONE |
 | S2 | P1 trust+revoca, P2 onboarding, P3 routing osservabile, P4 interazione clinica | Sol/Terra/Sol/Sol high, worktree f1-f4 | DONE: tutte integrate (`a8b38d29a`) |
 | S3 | Integrazione + docs + battery | manager | IN CORSO |
-| S4 | Verifica terminale indipendente | lane fresca | TODO |
+| S4 | Verifica terminale indipendente | lane fresca | Primo passaggio `HOLD_FIX` (3 P1, 1 P2, 2 P3); correzioni applicate; secondo passaggio in corso |
+
+Primo passaggio S4 (Sol xhigh, contesto fresco) e correzioni del controller:
+
+| Finding | Severita | Correzione |
+| --- | --- | --- |
+| Route observability rotta prima della sonda: usava il facade client `db.settings.get` (errore di spec del controller che indicava il pattern di `ai-service.ts`) | P1 | Lettura server-side diretta con `dbServer` + drizzle come `network-ai-runtime.ts` |
+| Revoca concorrente non atomica: due DELETE simultanee potevano lasciare autenticabile un token revocato | P1 | Compare-and-swap sul valore serializzato con retry bounded e 409 `PAIRING_STATE_CONFLICT` (pattern pin-change) |
+| DELETE non documentata nel contratto OpenAPI; guard DoD rosso (assente dalla battery del controller) | P1 | Voce `revokeNetworkPairedClient` in `mediflow-v1.yaml`, bump a 1.22.0; `check:openapi:drift` aggiunto alla battery di fase |
+| Overlap di completezza aggirabile con spazi attorno allo stesso campo | P2 | Normalizzazione trim prima di dedup e overlap; falsificatore nei test |
+| Semantica `clearsLockout` ambigua per `admin_reset` | P3 | Commento normativo: il campo indica azzeramento in-place per un utente che sopravvive |
+| Wording stale "revoca host-side assente" nel run record | P3 | Riformulato come fotografia pre-S2 |
+
+Edge dichiarato: la prova di concorrenza della revoca vive nel falsificatore
+della lane di verifica (harness sintetico su db), non in un test permanente
+della suite; un'estrazione testabile della CAS resta lavoro futuro ammesso.
 
 Ledger lane fase 2:
 
@@ -151,8 +166,9 @@ Decisioni di fase (aggiunte):
 | Ref di provenienza: stringa vuota respinta a creazione e accettazione | Corretta (hardening controller) | Un accept con ref di soli spazi |
 | Persistenza revoca via upsert locale alla route (helper di salvataggio privato, fuori ownership) | Accettata come workaround bounded | Una seconda via di scrittura dello stato pairing che diverga |
 
-Fatti chiave dalla ricognizione (dettaglio in ADR 0090): revoca host-side
-assente nel runtime attuale; 401 indistinto tra non autenticato e revocato;
+Fatti chiave dalla ricognizione pre-S2 (dettaglio in ADR 0090; la revoca
+host-side, allora assente, e' stata poi consegnata dalla lane P1): 401
+indistinto tra non autenticato e revocato;
 reset admin non elimina lo stato pairing; tabella ADR 0087 presente senza
 vocabolario di stati; confidence degradata a `low` non distinguibile da
 dichiarata; `[LOCKED DATA]` web e `lockedFields` nativo distinguono
