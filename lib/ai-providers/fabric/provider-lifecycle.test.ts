@@ -130,6 +130,6 @@ test('snapshot runtime rifiuta campi non contrattuali e non li propaga', () => {
     }));
     expectCode('snapshot_invalid', () => snapshotProviderLifecycle({
         ...lifecycle,
-        provider: 'https://provider.test',
+        provider: 'provider with space',
     }));
 });
