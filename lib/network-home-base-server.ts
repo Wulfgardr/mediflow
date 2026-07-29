@@ -251,7 +251,7 @@ export async function confirmNetworkPairingIntent(intentId: string): Promise<{
         };
     }
 
-    const persisted = await mutateNetworkPairingState((state) => {
+    const persisted = await mutateNetworkPairingState<ReturnType<typeof confirmPendingPairingIntent>>((state) => {
         const result = confirmPendingPairingIntent({ state, intentId });
         return result.ok
             ? { write: true, nextState: result.nextState, result }

@@ -118,6 +118,7 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 | Pipeline senza `pipefail` ha mascherato 69 fallimenti | Ripetuto con `set -o pipefail`; regola di metodo registrata |
 | Binding nativo assente nei worktree lane | Le prove lane usano test puri senza db; la battery completa gira sul branch manager |
 | Glob `fabric/*.test.ts` nella spec F1 non supportato dal runner (espande solo `/**/`) | Errore di spec del controller; la lane si e' fermata invece di deviare; forma corretta `fabric/**/*.test.ts` propagata alle spec successive |
+| Commit `49bf5b933` eseguito con typecheck rosso (TYPECHECK=2 non vincolava la catena di commit) | Errore di metodo del controller: la battery loggava l'esito senza bloccare; corretto nel commit successivo (generics espliciti sul mutator e unione codici errore ampliata con `PAIRING_CLIENT_NOT_FOUND`/`PAIRING_STATE_CONFLICT` in `lib/api/v1/types.ts`); regola: mai committare su esito loggato, solo su esito verificato |
 | Descriptor dal chiamante (rischio del primo passaggio W4) | CHIUSO: il resolver impone l'identita' canonica contro il catalogo unificato; un clone a valori identici viene respinto con `capability_unknown` (test dedicato) |
 | `never-regress` NR-EGRESS su fixture negativa `https://example.test` in `resolver.test.ts` | Trovato dalla battery W3; fixture ricostruita a pezzi con `join('')` come il pattern di `registry.test.ts`; guard e test fabric riverificati verdi |
 

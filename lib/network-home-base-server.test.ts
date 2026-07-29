@@ -9,7 +9,7 @@ import Database from 'better-sqlite3';
 import { eq } from 'drizzle-orm';
 
 import { settings } from './schema';
-import type { NetworkPairingState } from './network-pairing-model';
+import type { NetworkPairingState, RemovePairedClientResult } from './network-pairing-model';
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-network-home-base-'));
@@ -93,7 +93,7 @@ test('la primitiva CAS rilegge dopo una scrittura interferente e preserva entram
     });
 
     let mutatorCalls = 0;
-    const outcome = await mutateNetworkPairingState((state) => {
+    const outcome = await mutateNetworkPairingState<RemovePairedClientResult>((state) => {
         mutatorCalls += 1;
         if (mutatorCalls === 1) {
             // Writer concorrente: rimuove client-b tra la lettura e la CAS.
@@ -123,7 +123,7 @@ test('una scrittura interferente non resuscita un client revocato', async () => 
     });
 
     let mutatorCalls = 0;
-    const outcome = await mutateNetworkPairingState((state) => {
+    const outcome = await mutateNetworkPairingState<RemovePairedClientResult>((state) => {
         mutatorCalls += 1;
         if (mutatorCalls === 1) {
             // Writer concorrente in stile conferma: aggiunge client-c sopra
