@@ -785,3 +785,27 @@
     justify-self: start;
   }
 }
+
+/* @Codex Compact localhost titles preserve hierarchy without consuming the action row. */
+@media (max-width: 480px) {
+  .areaShell { gap: 8px; }
+
+  .areaHeader { padding: 0 4px; }
+
+  .areaCaption { margin-bottom: 2px; }
+
+  .areaTitle { font-size: 20px; }
+
+  .areaTitle em,
+  .areaSubtitle {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+}

@@ -38,7 +38,7 @@
         "surface": "localhost/web",
         "owner": "CoS parity 0.8",
         "status": "verified",
-        "requiredEvidence": "78/78, responsive 320/390/768/1440, tastiera/focus e zoom browser reale 200/400"
+        "requiredEvidence": "82/82, responsive 320/390/768/1440, tastiera/focus e zoom browser reale 200/400"
       }
     ],
     "blockingRule": "Un P1 confermato blocca il gate. La sola deroga accettata è il limite esterno VoiceOver mobile della candidata sorgente GitHub 0.8.",

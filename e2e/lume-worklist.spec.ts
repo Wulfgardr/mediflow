@@ -11,13 +11,19 @@ import {
 
 type WorklistCase = {
   register: 'giorno' | 'grafite';
-  viewport: ReflowProxyViewport['viewport'];
+  viewport: ReflowProxyViewport['viewport'] | 'compact-transition' | 'rail-boundary';
   width: number;
   height: number;
 };
 
+const WORKLIST_VIEWPORTS: Omit<WorklistCase, 'register'>[] = [
+  ...REFLOW_PROXY_VIEWPORTS,
+  { viewport: 'compact-transition', width: 600, height: 900 },
+  { viewport: 'rail-boundary', width: 701, height: 900 },
+];
+
 const WORKLIST_CASES: WorklistCase[] = (['giorno', 'grafite'] as const).flatMap((register) =>
-  REFLOW_PROXY_VIEWPORTS.map((viewport) => ({ register, ...viewport })),
+  WORKLIST_VIEWPORTS.map((viewport) => ({ register, ...viewport })),
 );
 
 async function setRegister(page: Page, register: WorklistCase['register']): Promise<void> {
@@ -142,11 +148,127 @@ async function assertWorklistContract(page: Page): Promise<void> {
   await expect(page.getByTestId('lume-patient-lens-empty')).toHaveCount(0);
 }
 
+/* @Codex The narrow worklist previously passed overflow checks while its
+   navigation, heading, and rows still collapsed into an unusable composition. */
+async function assertCompactWorklistGeometry(page: Page, width: number): Promise<void> {
+  if (width > 480) return;
+
+  const geometry = await page.evaluate(() => {
+    const rail = document.querySelector<HTMLElement>('[data-testid="lume-frame-rail"]');
+    const worklist = document.querySelector<HTMLElement>('[data-testid="lume-worklist"]');
+    const title = worklist?.querySelector<HTMLElement>('h2');
+    const count = worklist?.querySelector<HTMLElement>('.lume-registro');
+    const action = worklist?.querySelector<HTMLElement>('[data-lume-action="quiet"]');
+    const rows = [...document.querySelectorAll<HTMLElement>('[data-testid="lume-patient-row"]')];
+    const navItems = [...document.querySelectorAll<HTMLElement>('[data-lume-frame-nav="true"]')];
+
+    if (!rail || !worklist || !title || !count || !action || rows.length === 0 || navItems.length === 0) {
+      return null;
+    }
+
+    const railBox = rail.getBoundingClientRect();
+    const worklistStyle = getComputedStyle(worklist);
+    const titleBox = title.getBoundingClientRect();
+    const countBox = count.getBoundingClientRect();
+    const actionBox = action.getBoundingClientRect();
+    const navRows = new Set(navItems.map((item) => Math.round(item.getBoundingClientRect().top)));
+
+    return {
+      railHeight: railBox.height,
+      navRowCount: navRows.size,
+      worklistInnerWidth: worklist.clientWidth
+        - Number.parseFloat(worklistStyle.paddingLeft)
+        - Number.parseFloat(worklistStyle.paddingRight),
+      titleHeight: titleBox.height,
+      titleAndCountShareLine: Math.abs(
+        (titleBox.top + titleBox.height / 2) - (countBox.top + countBox.height / 2),
+      ) <= 2,
+      actionFollowsHeading: actionBox.top >= Math.max(titleBox.bottom, countBox.bottom),
+      actionHeight: actionBox.height,
+      rowHeights: rows.map((row) => row.getBoundingClientRect().height),
+    };
+  });
+
+  expect(geometry).not.toBeNull();
+  expect(geometry?.railHeight).toBeLessThanOrEqual(150);
+  expect(geometry?.navRowCount).toBeLessThanOrEqual(2);
+  expect(geometry?.worklistInnerWidth).toBeGreaterThanOrEqual(240);
+  expect(geometry?.titleHeight).toBeLessThanOrEqual(27);
+  expect(geometry?.titleAndCountShareLine).toBe(true);
+  expect(geometry?.actionFollowsHeading).toBe(true);
+  expect(geometry?.actionHeight).toBeGreaterThanOrEqual(44);
+  for (const rowHeight of geometry?.rowHeights ?? []) {
+    expect(rowHeight).toBeLessThanOrEqual(100);
+  }
+}
+
+async function assertCompactAriaStable(page: Page, worklistCase: WorklistCase): Promise<void> {
+  if (worklistCase.width !== 320) return;
+
+  const canvas = page.getByTestId('lume-frame-canvas');
+  const compactSnapshot = await canvas.ariaSnapshot();
+  await page.setViewportSize({ width: 481, height: worklistCase.height });
+  const expandedSnapshot = await canvas.ariaSnapshot();
+  expect(compactSnapshot).toBe(expandedSnapshot);
+  await page.setViewportSize({ width: worklistCase.width, height: worklistCase.height });
+}
+
+async function assertTopComposition(page: Page, width: number): Promise<void> {
+  const composition = await page.evaluate(() => {
+    const rail = document.querySelector<HTMLElement>('[data-testid="lume-frame-rail"]');
+    const title = document.querySelector<HTMLElement>('[data-testid="lume-worklist"] h2');
+    const action = document.querySelector<HTMLElement>(
+      '[data-testid="lume-worklist"] [data-lume-action="quiet"]',
+    );
+    const rows = [...document.querySelectorAll<HTMLElement>('[data-testid="lume-patient-row"]')];
+    const navItems = [...document.querySelectorAll<HTMLElement>('[data-lume-frame-nav="true"]')];
+    if (!rail || !title || !action || rows.length === 0 || navItems.length === 0) return null;
+
+    const railBox = rail.getBoundingClientRect();
+    const navBoxes = navItems.map((item) => item.getBoundingClientRect());
+    const isFullyVisible = (box: DOMRect) => box.top >= 0 && box.bottom <= window.innerHeight;
+    const firstRowBox = rows[0].getBoundingClientRect();
+    const firstRowVisibleHeight = Math.max(
+      0,
+      Math.min(firstRowBox.bottom, window.innerHeight) - Math.max(firstRowBox.top, 0),
+    );
+    return {
+      railHasNoHorizontalOverflow: rail.scrollWidth <= rail.clientWidth + 1,
+      everyNavItemVisible: navBoxes.every(
+        (box) => box.left >= railBox.left - 1 && box.right <= railBox.right + 1,
+      ),
+      headingVisible: isFullyVisible(title.getBoundingClientRect()),
+      actionVisible: isFullyVisible(action.getBoundingClientRect()),
+      completeRowsVisible: rows.filter((row) => isFullyVisible(row.getBoundingClientRect())).length,
+      firstRowBottomMiss: Math.max(0, firstRowBox.bottom - window.innerHeight),
+      firstRowVisibleFraction: firstRowVisibleHeight / firstRowBox.height,
+    };
+  });
+
+  expect(composition).not.toBeNull();
+  expect(composition?.railHasNoHorizontalOverflow).toBe(true);
+  expect(composition?.everyNavItemVisible).toBe(true);
+  if (width === 320) {
+    expect(composition?.headingVisible).toBe(true);
+    expect(composition?.actionVisible).toBe(true);
+    if ((composition?.completeRowsVisible ?? 0) < 1) {
+      /* @Codex Fable's pre-declared compact closure rule permits a boundary
+         miss only when it is <=24px and at least 60% of row one remains visible. */
+      expect(composition?.firstRowBottomMiss).toBeLessThanOrEqual(24);
+      expect(composition?.firstRowVisibleFraction).toBeGreaterThanOrEqual(0.6);
+    }
+  } else if (width === 390) {
+    expect(composition?.completeRowsVisible).toBeGreaterThanOrEqual(2);
+  }
+}
+
 for (const worklistCase of WORKLIST_CASES) {
   test(`worklist Lume ${worklistCase.register} ${worklistCase.viewport}`, async ({ page }) => {
     await openSyntheticWorklist(page, worklistCase);
     await expect(page.locator('html')).toHaveClass(worklistCase.register === 'grafite' ? /dark/ : /light/);
     await assertWorklistContract(page);
+    await assertCompactAriaStable(page, worklistCase);
+    await assertCompactWorklistGeometry(page, worklistCase.width);
     await assertNoHorizontalOverflow(page, [
       { label: 'documento worklist', selector: 'document' },
       { label: 'worklist', selector: '[data-testid="lume-worklist"]' },
@@ -156,6 +278,16 @@ for (const worklistCase of WORKLIST_CASES) {
     const selectedRow = page.getByTestId('lume-patient-row').nth(1);
     await assertNotClippedInViewport(selectedRow, 'riga paziente selezionata');
     await assertKeyboardFocusProgresses(page, selectedRow, 'riga paziente selezionata');
+    await page.evaluate(() => {
+      window.scrollTo(0, 0);
+      document.querySelector<HTMLElement>('[data-testid="lume-frame-canvas"]')?.scrollTo(0, 0);
+    });
+    await assertTopComposition(page, worklistCase.width);
+    await page.screenshot({
+      path: `/tmp/lume-worklist-${worklistCase.register}-${worklistCase.viewport}-top.png`,
+      fullPage: false,
+      animations: 'disabled',
+    });
     await page.getByTestId('lume-patient-lens').scrollIntoViewIfNeeded();
     await page.screenshot({
       path: `/tmp/lume-worklist-${worklistCase.register}-${worklistCase.viewport}.png`,
