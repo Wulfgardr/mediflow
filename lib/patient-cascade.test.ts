@@ -58,6 +58,10 @@ function insertPatientWithChildren(sqlite: Database.Database, patientId: string)
     sqlite.prepare(
         "INSERT INTO siss_handoff_events (id, patient_id, action, module_label, started_at) VALUES (?, ?, 'open', 'Test', 1)"
     ).run(`sh-${suffix}`, patientId);
+    /* @Codex */
+    sqlite.prepare(
+        "INSERT INTO document_diagnosis_proposals (id, patient_id, source_document_key, candidate_key, payload, status, confidence) VALUES (?, ?, ?, ?, 'ENC:fixture:cipher', 'pending', 'high')"
+    ).run(`dp-${suffix}`, patientId, `source-${suffix}`, `candidate-${suffix}`);
     sqlite.prepare(
         "INSERT INTO observations (id, patient_id, code_system, code, display, unit_system, unit_code, value, observed_at, service_prescription_item_id) VALUES (?, ?, 'loinc', '8867-4', 'Heart rate', 'ucum', '/min', '70', 1, ?)"
     ).run(`ob-${suffix}`, patientId, `spi-${suffix}`);

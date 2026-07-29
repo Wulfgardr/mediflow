@@ -22,7 +22,8 @@ struct PairedPatientPrescriptionSections: View {
                 title: "Prestazioni",
                 subtitle: "Prescrizioni ordinate per data",
                 systemImage: "cross.case",
-                refreshIdentifier: "homebase-refresh-services-button"
+                refreshIdentifier: "homebase-refresh-services-button",
+                accent: .prescrizioni
             ) {
                 Task { await model.loadSelectedPatientServicePrescriptions() }
             }
@@ -60,7 +61,8 @@ struct PairedPatientPrescriptionSections: View {
                 title: "Protesica",
                 subtitle: "Prescrizioni e collaudi",
                 systemImage: "figure.walk.motion",
-                refreshIdentifier: "homebase-refresh-prosthetics-button"
+                refreshIdentifier: "homebase-refresh-prosthetics-button",
+                accent: .prescrizioni
             ) {
                 Task { await model.loadSelectedPatientProstheticPrescriptions() }
             }
@@ -95,7 +97,7 @@ struct PairedPatientPrescriptionSections: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(prescription.serviceName)
-                        .font(.caption.weight(.semibold))
+                        .chartRowTitle()
                     Text(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: prescription.prescribedAt))
                         .font(.caption2)
                         .registro()
@@ -187,8 +189,7 @@ struct PairedPatientPrescriptionSections: View {
     private var servicePrescriptionForm: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Nuova prestazione", systemImage: "cross.case")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .chartGroupHeading()
             TextField("Prestazione principale", text: $model.newServiceName)
                 .accessibilityIdentifier("new-service-name")
             HStack(spacing: 8) {
@@ -276,7 +277,7 @@ struct PairedPatientPrescriptionSections: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(prescription.description)
-                        .font(.caption.weight(.semibold))
+                        .chartRowTitle()
                     Text(PairedPatientsWorkspaceSupport.entryDateFormatter.string(from: prescription.prescribedAt))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -340,8 +341,7 @@ struct PairedPatientPrescriptionSections: View {
     private var prostheticPrescriptionForm: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Nuova prescrizione protesica", systemImage: "figure.walk.motion")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .chartGroupHeading()
             TextField("Descrizione", text: $model.newProstheticDescription)
                 .accessibilityIdentifier("new-prosthetic-description")
             HStack(spacing: 8) {

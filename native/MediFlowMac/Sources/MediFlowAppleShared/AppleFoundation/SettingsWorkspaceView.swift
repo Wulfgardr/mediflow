@@ -383,6 +383,8 @@ struct SettingsWorkspaceView: View {
     @State private var pendingClear: NetworkAmbulatorySummary?
     @State private var showsDeletionConfirmation = false
     @State private var showsClearConfirmation = false
+    @State private var showsConnectionSetup = false // @Codex
+    @State private var confirmsClearingPairing = false // @Codex
 
     init(
         capabilities: ClinicalWorkspaceCapabilitiesStore,
@@ -410,6 +412,16 @@ struct SettingsWorkspaceView: View {
 
     var body: some View {
         List {
+            /* @Codex */
+            Section("Collegamento") {
+                Button {
+                    showsConnectionSetup = true
+                } label: {
+                    Label("Collegamento MediFlow", systemImage: "link")
+                }
+                .accessibilityHint("Apre la configurazione del collegamento al computer MediFlow.")
+                .accessibilityIdentifier("settings-mediflow-connection-button")
+            }
             Section("Accesso") { accessContent }
             Section("Profilo") { profileContent }
             Section("Ambulatori") { ambulatoryContent }
@@ -427,6 +439,13 @@ struct SettingsWorkspaceView: View {
         }
         .task(id: workspaceModel.connectionState) {
             await aiFunctionsModel.load()
+        }
+        /* @Codex */
+        .sheet(isPresented: $showsConnectionSetup) {
+            PairedHomeBaseCredentialsSheet(
+                model: workspaceModel,
+                confirmsClearingPairing: $confirmsClearingPairing
+            )
         }
         .confirmationDialog("Eliminare questo ambulatorio?", isPresented: $showsDeletionConfirmation, titleVisibility: .visible) {
             Button("Elimina", role: .destructive) {

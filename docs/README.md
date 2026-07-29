@@ -9,7 +9,7 @@ read_when:
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-07-24
+Ultimo aggiornamento: 2026-07-28
 
 ## 📚 Policy di consultazione (agent)
 
@@ -27,14 +27,18 @@ Per orientarti rapidamente:
 
 Approfondimenti utili:
 
+- Contratto prodotto: [PRODUCT.md](../PRODUCT.md)
+- Contratto design multipiattaforma: [DESIGN.md](../DESIGN.md)
 - Mappa completa markdown: [docs/markdown-index.md](./markdown-index.md)
 - Governance repository e topologia runtime/publication: [docs/repository-topology.md](./repository-topology.md)
-- Vetro Clinico, baseline storica e transitoria di design (canone operativo durante la migrazione): [docs/design/vetro-clinico/README.md](./design/vetro-clinico/README.md)
-- Lume, lingua di design di destinazione in adozione progressiva (ADR 0078 `Accepted`, prime superfici su `main`): [docs/design/lume/README.md](./design/lume/README.md)
+- Vetro Clinico, baseline storica e transitoria di design: [docs/design/vetro-clinico/README.md](./design/vetro-clinico/README.md)
+- Lume, lingua di design attiva con token DTCG nella release sorgente v0.8; i gate di parity restano separati: [docs/design/lume/README.md](./design/lume/README.md)
 - Lettura completa dello stato corrente: [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
 - FAQ pubbliche e stato sintetico del prodotto: [docs/FAQ.md](./FAQ.md)
 - Walkthrough operativo end-to-end: [docs/walkthrough.md](./walkthrough.md)
 - Parity localhost/Apple: [docs/parity-matrix.md](./parity-matrix.md), [docs/apple-parity-matrix.json](./apple-parity-matrix.json) e [docs/apple-wide-qa-manifest.json](./apple-wide-qa-manifest.json)
+- Limiti noti della release sorgente 0.8: [docs/known-limitations.md](./known-limitations.md)
+- Run record recovery UI/parity 0.8: [docs/analysis/2026-07-27-parity-0.8-recovery-run.md](./analysis/2026-07-27-parity-0.8-recovery-run.md)
 - Contratto OpenAPI `/api/v1`: [docs/openapi/mediflow-v1.yaml](./openapi/mediflow-v1.yaml), [docs/openapi/README.md](./openapi/README.md), [docs/adr/0010-openapi-spec-first-for-api-v1.md](./adr/0010-openapi-spec-first-for-api-v1.md), [docs/adr/0052-network-patient-profile-write-boundary.md](./adr/0052-network-patient-profile-write-boundary.md), [docs/adr/0053-network-diary-entry-write-boundary.md](./adr/0053-network-diary-entry-write-boundary.md), [docs/adr/0054-network-therapy-write-boundary.md](./adr/0054-network-therapy-write-boundary.md), [docs/adr/0055-network-checkup-write-boundary.md](./adr/0055-network-checkup-write-boundary.md), [docs/adr/0056-network-observation-write-boundary.md](./adr/0056-network-observation-write-boundary.md)
 - Corpus documentale SISS/FSE 2.0: [docs/siss-fse-docs-corpus.md](./siss-fse-docs-corpus.md)
 - Integrazione ATHENA-style treatment reasoning: [docs/treatment-reasoning-athena-integration.md](./treatment-reasoning-athena-integration.md), [docs/adr/0073-treatment-reasoning-athena-boundary.md](./adr/0073-treatment-reasoning-athena-boundary.md)
@@ -42,6 +46,8 @@ Approfondimenti utili:
 - Contratto export FHIR R4 v0: [ADR 0081](./adr/0081-fhir-r4-export-v0-contract.md)
 - Registro persistente delle attese v0: [ADR 0082](./adr/0082-persistent-expectations-register-v0.md)
 - Diagnosi da documento review-only: [ADR 0084](./adr/0084-document-diagnoses-review-only.md)
+- Scaffold intelligente e automazione graduata: [ADR 0086](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md)
+- Foundation persistente delle proposte diagnostiche documentali: [ADR 0087](./adr/0087-registro-proposte-diagnostiche-documentali.md)
 - Closeout secondario dello stack intelligente: [docs/analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md](./analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md)
 - Triage audit esterno V2: [docs/analysis/2026-07-05-audit-esterno-v2-triage.md](./analysis/2026-07-05-audit-esterno-v2-triage.md)
 
@@ -63,12 +69,15 @@ Approfondimenti utili:
 - `CANONICAL`: fonte di verità da aggiornare quando cambia un tema.
 - `SECONDARY`: approfondimento o sintesi; utile, ma non prevale se in conflitto.
 - `LEGACY`: materiale storico/visuale; consultabile, non decisionale.
+- `CANDIDATE LOCAL`: stato integrato nel tree locale; non prova release, tag o promozione.
 
 ## 📚 Fonte autorevole per tema
 
 | Tema | File canonico | Stato | Note |
 | --- | --- | --- | --- |
 | Onboarding progetto | [README.md](../README.md) | `CANONICAL` | Punto di ingresso generale. |
+| Contratto prodotto | [PRODUCT.md](../PRODUCT.md) | `CANONICAL` | Purpose, audience, task, ruoli piattaforma, confini, anti-goal e direzione post-0.8. |
+| Contratto design | [DESIGN.md](../DESIGN.md) | `CANONICAL` | Principi Lume condivisi, adattamenti per piattaforma, stati, accessibilità ed eccezioni intenzionali. |
 | Regole operative per agent | [AGENTS.md](../AGENTS.md) | `CANONICAL` | Boot sequence, repository canonica, privacy, disciplina di branch/worktree e verifica. |
 | Governance e topologia repository | [docs/repository-topology.md](./repository-topology.md) | `CANONICAL` | Fissa la repository pubblica come unica fonte operativa e separa runtime, publication/site e artefatti locali fuori Git. |
 | Stato completo del sistema | [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | `CANONICAL` | Lettura unificata corrente: prodotto, runtime, boundary, AI/document intelligence, Apple clients e governance della repository pubblica. |
@@ -87,6 +96,7 @@ Approfondimenti utili:
 | Write paired osservazioni | [docs/adr/0056-network-observation-write-boundary.md](./adr/0056-network-observation-write-boundary.md) | `CANONICAL` | Slice per read/create/update/soft-delete osservazioni su `/api/v1/network/patients/{id}/observations*` con `observations.version`, capability dedicate, audit PHI-safe e hard delete/AI/documenti fuori scope. |
 | Runbook manutenzione OpenAPI | [docs/openapi/README.md](./openapi/README.md) | `SECONDARY` | Workflow operativo per mantenere aggiornata la spec durante lo sviluppo. |
 | Parity localhost/client Apple | [docs/parity-matrix.md](./parity-matrix.md) | `CANONICAL` | Fotografia corrente di 64 capability (30 full, 13 partial, 21 host-only), manifest QA e gate P6 residuo in `WUL-481`. |
+| Recovery UI/parity 0.8 | [docs/analysis/2026-07-27-parity-0.8-recovery-run.md](./analysis/2026-07-27-parity-0.8-recovery-run.md) | `SECONDARY / RUN RECORD` | Registra recovery Claude, candidata locale, ownership, prove eseguite e blocker. Non sostituisce la matrice canonica. |
 | FAQ pubbliche | [docs/FAQ.md](./FAQ.md) | `SECONDARY` | Sintesi rapida per capire cosa fa oggi MediFlow, quali sono i boundary dichiarati e come orientarsi nel progetto. |
 | Roadmap terminologie/FSE | [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) | `CANONICAL` | Evoluzione codifiche cliniche e compliance documentale (coerente con ADR 0006). |
 | Matrice baseline ufficiale GTW/FSE | [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md) | `CANONICAL` | Gap analysis versionata tra artifact ministeriali `it-fse-support` e stato reale MediFlow. |
@@ -100,6 +110,7 @@ Approfondimenti utili:
 | Corpus documentale SISS/FSE | [docs/siss-fse-docs-corpus.md](./siss-fse-docs-corpus.md) | `CANONICAL` | Governa `WUL-176` e `WUL-179`: catalogo sorgenti, fetch/sync locale fuori Git, placeholder `manual-import` e report di freshness come base documentale delle integrazioni regionali. |
 | Integrazione ATHENA-style treatment reasoning | [docs/treatment-reasoning-athena-integration.md](./treatment-reasoning-athena-integration.md) | `SECONDARY / REVIEW-ONLY` | Mappa operativa per la lane `treatment_reasoning`: contratto, pannello review-only, ATHENA-R1 MLX locale, smoke live DB redatto, benchmark Q4/BF16, crediti ATHENA e stop-rules senza runtime prescrittivo. |
 | Parity operativa MLX benchmark-visible | [docs/mlx-operational-parity.md](./mlx-operational-parity.md) | `SECONDARY` | Fissa `WUL-165`: MLX e visibile in benchmark e diagnostica read-only, ma resta fuori dal runtime clinico; Ollama resta default generativo e OCR primario. |
+| Limitazioni note 0.8 | [docs/known-limitations.md](./known-limitations.md) | `CANONICAL` | Registra la deroga VoiceOver mobile, i limiti offline/parity e i claim non autorizzati della release sorgente. |
 | Walkthrough end-to-end | [docs/walkthrough.md](./walkthrough.md) | `CANONICAL` | Mappa operativa web + native + servizi locali, inclusi `home-base` read-only, document intelligence artifact-first e guard di revisione shell. |
 | Topologia dati e flussi | [docs/topologia-dati-flussi.md](./topologia-dati-flussi.md) | `CANONICAL` | Percorsi dati digitali end-to-end (cifratura, API, storage, trust boundaries), inclusi artifact documentali cifrati e boundary `network-home-base`. |
 | Indice completo Markdown repo | [docs/markdown-index.md](./markdown-index.md) | `CANONICAL` | Elenco navigabile e descrittivo di tutti i `.md` tracciati nel repository. |
@@ -134,6 +145,8 @@ Approfondimenti utili:
 | ADR voice visit capture Fluid-style | [docs/adr/0072-voice-visit-capture-fluid-boundary.md](./adr/0072-voice-visit-capture-fluid-boundary.md) | `CANONICAL / PROPOSED` | Propone `WUL-419`: stabilisce confine local-first per cattura visita, transcript/draft PHI, provider esterni solo tramite decisione opt-in e integrazione macOS/Fluid-style rinviata a slice separate. |
 | ADR treatment reasoning ATHENA-style | [docs/adr/0073-treatment-reasoning-athena-boundary.md](./adr/0073-treatment-reasoning-athena-boundary.md) | `CANONICAL` | Fissa la lane `mediflow.treatment_reasoning.v1` separata da Smart Import: runtime locale ATHENA/MLX review-only con kill switch fail-closed, trace/report ATHENA-style e zero auto-write clinici. |
 | ADR astrazione provider AI e boundary egress | [docs/adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md](./adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md) | `CANONICAL` | Decisione accettata: adapter Ollama e gate fail-closed consegnati; registry, provider alternativi e apertura egress restano pendenti. |
+| ADR scaffold intelligente e automazione graduata | [docs/adr/0086-intelligent-scaffold-and-graded-automation-boundary.md](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md) | `CANONICAL / PROPOSED` | Propone il contratto model-agnostic tra pipeline locale, proposta, chiarimento, anteprima, autorizzazione e scrittura applicativa auditata. Inbox conversazionale e automazione graduata restano roadmap. |
+| ADR registro delle proposte diagnostiche documentali | [docs/adr/0087-registro-proposte-diagnostiche-documentali.md](./adr/0087-registro-proposte-diagnostiche-documentali.md) | `CANONICAL` | Decisione `Accepted`: schema, migrazione, bootstrap, backup/restore e purge includono la foundation locale separata dalle diagnosi cliniche. Writer, route, UI, transizioni e applicazione restano assenti. |
 | ADR Lume lingua di design di destinazione | [docs/adr/0078-lume-lingua-di-design-di-destinazione.md](./adr/0078-lume-lingua-di-design-di-destinazione.md) | `CANONICAL` | Decisione `Accepted`: Lume e il canone di destinazione; l'adozione su web e native e progressiva e non equivale alla chiusura L0-L6. |
 | ADR attese locali e collegamento prestazione-risultato | [docs/adr/0079-local-open-loops-and-result-link.md](./adr/0079-local-open-loops-and-result-link.md) | `CANONICAL` | Decisione accettata e prima slice web locale consegnata; il registro persistente resta una decisione distinta. |
 | ADR contratto export FHIR R4 v0 | [docs/adr/0081-fhir-r4-export-v0-contract.md](./adr/0081-fhir-r4-export-v0-contract.md) | `CANONICAL` | Decisione `Accepted`: fissa matrice di copertura, parità web/native e gate locale esterno per l'export-only v0. Non introduce claim FSE. |

@@ -107,10 +107,34 @@ public struct HomeBasePatientDetail: Identifiable, Codable, Hashable, Sendable {
 }
 
 /* @Codex */
+/// Fields of a clinical record whose stored value was an ENC envelope the client
+/// could not open — no master key, or the wrong one.
+///
+/// Client-side annotation only: it is derived at decryption time, never sent or
+/// received, and it never carries the ciphertext. Its whole purpose is to let a
+/// surface say "this exists and I cannot read it" instead of drawing a blank that
+/// reads as "there is nothing here".
+public struct LockedClinicalFields: OptionSet, Hashable, Sendable {
+    public let rawValue: Int
+    public init(rawValue: Int) { self.rawValue = rawValue }
+
+    public static let title = LockedClinicalFields(rawValue: 1 << 0)
+    public static let content = LockedClinicalFields(rawValue: 1 << 1)
+}
+
 public struct HomeBaseEntrySummary: Identifiable, Codable, Hashable, Sendable {
-    public init(id: String, patientId: String, type: String, title: String, date: Date, content: String, setting: String?, metadata: String?, attachments: String?, deletedAt: Date?, deletionReason: String?, version: Int, createdAt: Date?, updatedAt: Date?) {
-        self.id = id; self.patientId = patientId; self.type = type; self.title = title; self.date = date; self.content = content; self.setting = setting; self.metadata = metadata; self.attachments = attachments; self.deletedAt = deletedAt; self.deletionReason = deletionReason; self.version = version; self.createdAt = createdAt; self.updatedAt = updatedAt
+    public init(id: String, patientId: String, type: String, title: String, date: Date, content: String, setting: String?, metadata: String?, attachments: String?, deletedAt: Date?, deletionReason: String?, version: Int, createdAt: Date?, updatedAt: Date?, lockedFields: LockedClinicalFields = []) {
+        self.id = id; self.patientId = patientId; self.type = type; self.title = title; self.date = date; self.content = content; self.setting = setting; self.metadata = metadata; self.attachments = attachments; self.deletedAt = deletedAt; self.deletionReason = deletionReason; self.version = version; self.createdAt = createdAt; self.updatedAt = updatedAt; self.lockedFields = lockedFields
     }
+
+    /// Excluded from the wire on purpose: the host neither sends nor understands
+    /// it, and encoding it back would invent a field the contract does not have.
+    private enum CodingKeys: String, CodingKey {
+        case id, patientId, type, title, date, content, setting, metadata
+        case attachments, deletedAt, deletionReason, version, createdAt, updatedAt
+    }
+
+    public var lockedFields: LockedClinicalFields = []
     public let id: String
     public let patientId: String
     public let type: String

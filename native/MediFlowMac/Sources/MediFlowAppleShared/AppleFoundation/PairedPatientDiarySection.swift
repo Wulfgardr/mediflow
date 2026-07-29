@@ -12,65 +12,159 @@ struct PairedPatientDiarySection: View {
     @Binding var presentingScale: ClinicalScaleDefinition?
     @Binding var attachmentDetailCandidate: HomeBaseAttachmentSummary?
 
+    /// Title on one line, controls on one line, and the two only share a row when
+    /// the column is actually wide enough. Forced into a single row the header had
+    /// to sacrifice something: first the title wrapped onto two lines, then
+    /// "Aggiorna" and "Valutazione" truncated to "Aggior..." and "Valuta...".
+    /// Neither is a decision worth taking on the reader's behalf.
+    @ViewBuilder
+    private var diaryHeader: some View {
+        if dynamicTypeSize >= .accessibility1 {
+            VStack(alignment: .leading, spacing: 8) {
+                diaryHeaderTitle
+                diaryHeaderControls
+            }
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    diaryHeaderTitle
+                    Spacer(minLength: 8)
+                    diaryHeaderControls
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    diaryHeaderTitle
+                    diaryHeaderControls
+                }
+                // Last rung, and the one a phone actually lands on. "Valutazione"
+                // stays in view with the filter: it is the diary's own way of
+                // adding a record, and the first arrangement of this rung hid it
+                // in the overflow — which the scale test caught immediately.
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    diaryHeaderTitle
+                    Spacer(minLength: 8)
+                    diaryScaleMenu
+                    diaryOverflowMenu
+                    diaryTypeFilter
+                }
+                // And a floor beneath it. `ViewThatFits` keeps its *last*
+                // candidate whatever the width, so the last one must be the one
+                // that cannot overflow — otherwise a rung that nearly fits takes
+                // the whole card off the screen with it, which is the failure
+                // this ladder exists to prevent.
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    diaryHeaderTitle
+                    Spacer(minLength: 8)
+                    diaryScaleMenu
+                        .labelStyle(.iconOnly)
+                    diaryOverflowMenu
+                    diaryTypeFilter
+                        .labelStyle(.iconOnly)
+                }
+            }
+        }
+    }
+
+    private var diaryHeaderTitle: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ClinicalSectionTitle("Diario clinico", systemImage: "list.bullet.clipboard", accent: .diario)
+            Text("Ultime \(PairedPatientsWorkspaceSupport.clinicalPreviewCap) voci")
+                .chartMetadata()
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    @ViewBuilder
+    private var diaryHeaderControls: some View {
+        HStack(spacing: 8) {
+            diaryRefreshButton
+            diaryScaleMenu
+            diaryTypeFilter
+            diaryDeletedToggle
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    /// Housekeeping, folded into one button. Reloading the list and revealing
+    /// deleted entries are things you do to the view; starting a scale writes a
+    /// clinical record, and an action that writes to the chart does not belong
+    /// behind an ellipsis.
+    ///
+    /// `.fixedSize` on the controls row above is what makes the ladder honest —
+    /// it stops the row compressing and reports its true width so `ViewThatFits`
+    /// can judge. But with four controls, one of them a labelled Toggle, that
+    /// width is about 430 points and no rung fitted a phone. `ViewThatFits` then
+    /// kept its last candidate at full width, the header widened the whole diary
+    /// card, and every row in it was clipped at the screen edge: dates lost their
+    /// minutes, the segmented control lost "Altro", the formatting bar ran off
+    /// into nothing.
+    private var diaryOverflowMenu: some View {
+        Menu {
+            diaryRefreshButton
+            diaryDeletedToggle
+        } label: {
+            Label("Azioni diario", systemImage: "ellipsis.circle")
+                .font(.caption)
+        }
+        .labelStyle(.iconOnly)
+        .accessibilityLabel("Azioni diario")
+        .accessibilityIdentifier("diary-actions-overflow")
+    }
+
+    private var diaryRefreshButton: some View {
+        Button {
+            Task { await model.loadSelectedPatientEntries() }
+        } label: {
+            Label("Aggiorna", systemImage: "arrow.clockwise")
+        }
+        .font(.caption)
+        .disabled(model.isWorking || model.selectedPatient == nil)
+        .accessibilityIdentifier("homebase-refresh-entries-button")
+    }
+
+    private var diaryScaleMenu: some View {
+        Menu {
+            ForEach(ClinicalScales.all) { scale in
+                Button {
+                    presentingScale = scale
+                } label: {
+                    Text("\(scale.title) (\(scale.questions.count) domande)")
+                }
+                .accessibilityIdentifier("new-scale-option-\(scale.id)")
+            }
+        } label: {
+            Label("Valutazione", systemImage: "checklist")
+                .font(.caption)
+        }
+        .disabled(model.selectedPatient == nil)
+        .accessibilityIdentifier("new-scale-button")
+    }
+
+    /// Stays visible at every width: it states which entries the list below is
+    /// showing, which is not something to hide behind a button.
+    private var diaryTypeFilter: some View {
+        Menu {
+            Picker("Tipo voce", selection: $entryTypeFilter) {
+                ForEach(EntryTypeFilter.allCases) { option in
+                    Text(option.title).tag(option)
+                }
+            }
+        } label: {
+            Label(entryTypeFilter.title, systemImage: "line.3.horizontal.decrease.circle")
+                .font(.caption)
+        }
+        .accessibilityIdentifier("entry-type-filter")
+    }
+
+    private var diaryDeletedToggle: some View {
+        Toggle("Mostra eliminate", isOn: $showsDeletedDiaryEntries)
+            .font(.caption)
+            .disabled(model.entries.allSatisfy { $0.deletedAt == nil })
+            .accessibilityIdentifier("show-deleted-entries-toggle")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            /* @Codex */
-            let headerLayout = dynamicTypeSize >= .accessibility1
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
-                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
-            headerLayout {
-                VStack(alignment: .leading, spacing: 2) {
-                    Label("Diario clinico", systemImage: "list.bullet.clipboard")
-                        .font(.subheadline.weight(.semibold))
-                    Text("Ultime \(PairedPatientsWorkspaceSupport.clinicalPreviewCap) voci")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                if dynamicTypeSize < .accessibility1 {
-                    Spacer(minLength: 8)
-                }
-                Button {
-                    Task { await model.loadSelectedPatientEntries() }
-                } label: {
-                    Label("Aggiorna", systemImage: "arrow.clockwise")
-                }
-                .font(.caption)
-                .disabled(model.isWorking || model.selectedPatient == nil)
-                .accessibilityIdentifier("homebase-refresh-entries-button")
-
-                Menu {
-                    ForEach(ClinicalScales.all) { scale in
-                        Button {
-                            presentingScale = scale
-                        } label: {
-                            Text("\(scale.title) (\(scale.questions.count) domande)")
-                        }
-                        .accessibilityIdentifier("new-scale-option-\(scale.id)")
-                    }
-                } label: {
-                    Label("Valutazione", systemImage: "checklist")
-                        .font(.caption)
-                }
-                .disabled(model.selectedPatient == nil)
-                .accessibilityIdentifier("new-scale-button")
-
-                Menu {
-                    Picker("Tipo voce", selection: $entryTypeFilter) {
-                        ForEach(EntryTypeFilter.allCases) { option in
-                            Text(option.title).tag(option)
-                        }
-                    }
-                } label: {
-                    Label(entryTypeFilter.title, systemImage: "line.3.horizontal.decrease.circle")
-                        .font(.caption)
-                }
-                .accessibilityIdentifier("entry-type-filter")
-
-                Toggle("Mostra eliminate", isOn: $showsDeletedDiaryEntries)
-                    .font(.caption)
-                    .disabled(model.entries.allSatisfy { $0.deletedAt == nil })
-                    .accessibilityIdentifier("show-deleted-entries-toggle")
-            }
+            diaryHeader
 
             if model.entries.isEmpty {
                 Text("Nessuna voce diario caricata.")
@@ -88,10 +182,16 @@ struct PairedPatientDiarySection: View {
                             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
                             : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 6))
                         rowHeaderLayout {
-                            Text(entry.title)
-                                .font(.caption.weight(.semibold))
-                                .strikethrough(entry.deletedAt != nil, color: .secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                            if entry.lockedFields.contains(.title) {
+                                Label("Titolo non leggibile", systemImage: "lock")
+                                    .chartRowTitle()
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text(entry.title)
+                                    .chartRowTitle()
+                                    .strikethrough(entry.deletedAt != nil, color: .secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                             if let type = PairedDiaryEntryType(rawValue: entry.type) {
                                 PairedPatientFlagChip(type.title, tone: .info)
                             }
@@ -106,11 +206,22 @@ struct PairedPatientDiarySection: View {
                                 .registro()
                                 .foregroundStyle(.secondary)
                         }
-                        Text(ClinicalContentRendering.attributedString(from: entry.content))
-                            .font(.caption)
-                            .foregroundStyle(entry.deletedAt == nil ? .primary : .secondary)
-                            .lineLimit(dynamicTypeSize >= .accessibility1 ? nil : 4)
-                            .fixedSize(horizontal: false, vertical: true)
+                        if entry.lockedFields.contains(.content) {
+                            // Says what is true: the note exists on the host, this
+                            // device cannot read it. A blank line here reads as a
+                            // visit with nothing written down.
+                            Text("Contenuto cifrato non leggibile con la chiave di questa sessione. La voce esiste sull'home-base.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("entry-content-locked-\(entry.id)")
+                        } else {
+                            Text(ClinicalContentRendering.attributedString(from: entry.content))
+                                .font(.caption)
+                                .foregroundStyle(entry.deletedAt == nil ? .primary : .secondary)
+                                .lineLimit(dynamicTypeSize >= .accessibility1 ? nil : 4)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                         // S7 (D4): resolves the entry's referenced attachment ids
                         // against the loaded patient attachment list (S6), same
                         // pairing as the web timeline-entry-card. An id that does
@@ -189,9 +300,14 @@ struct PairedPatientDiarySection: View {
                         }
                     }
                         .padding(.vertical, 6)
-                        .padding(.leading, 14)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .modifier(LumeRigaListaModifier(isSelected: false))
+                        // The leading inset goes *outside* the row surface, so the
+                        // Filo runs in a clear channel beside the entries. Inside
+                        // it, the row background painted across the thread and
+                        // left it showing only in the gaps — a continuous
+                        // connector rendered as a column of stubs.
+                        .padding(.leading, 14)
                         .accessibilityIdentifier("entry-row-\(entry.id)")
                     }
                 }
@@ -207,8 +323,7 @@ struct PairedPatientDiarySection: View {
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Modifica voce online", systemImage: "pencil")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .chartGroupHeading()
                     TextField("Titolo", text: $model.editEntryTitle)
                         .accessibilityIdentifier("homebase-edit-entry-title-field")
                     Picker("Tipo", selection: $model.editEntryType) {
@@ -256,8 +371,7 @@ struct PairedPatientDiarySection: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Label("Nuova voce online", systemImage: "square.and.pencil")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .chartGroupHeading()
                 TextField("Titolo (opzionale)", text: $model.newEntryTitle)
                     .accessibilityIdentifier("homebase-new-entry-title-field")
                 Picker("Tipo", selection: $model.newEntryType) {

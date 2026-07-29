@@ -7,6 +7,89 @@ import AppKit
 import UIKit
 #endif
 
+#if os(iOS)
+/* @Codex */
+private struct TabBarAccessibilityIdentifierBridge: UIViewRepresentable {
+    let identifiersByTitle: [String: String]
+    let selection: String
+
+    func makeUIView(context: Context) -> ResolverView {
+        ResolverView(identifiersByTitle: identifiersByTitle)
+    }
+
+    func updateUIView(_ uiView: ResolverView, context: Context) {
+        uiView.identifiersByTitle = identifiersByTitle
+        uiView.scheduleUpdate()
+    }
+
+    final class ResolverView: UIView {
+        var identifiersByTitle: [String: String]
+
+        init(identifiersByTitle: [String: String]) {
+            self.identifiersByTitle = identifiersByTitle
+            super.init(frame: .zero)
+            isAccessibilityElement = false
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            scheduleUpdate()
+        }
+
+        func scheduleUpdate() {
+            for delay in [0.0, 0.25, 1.0, 2.0] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    self?.updateTabItems()
+                }
+            }
+        }
+
+        private func updateTabItems() {
+            guard let window else { return }
+
+            let resolvedTabBars = tabBars(in: window)
+            for tabBar in resolvedTabBars {
+                for item in tabBar.items ?? [] {
+                    guard
+                        let title = item.title,
+                        let identifier = identifiersByTitle[title]
+                    else { continue }
+                    item.accessibilityIdentifier = identifier
+                }
+
+                let tabLabels = descendants(of: tabBar).compactMap { $0 as? UILabel }
+
+                for (title, identifier) in identifiersByTitle {
+                    // iOS 27 keeps a suppressed rendering copy behind the
+                    // interactive tab. UIKit subviews are ordered back-to-front,
+                    // so the last matching label belongs to the tappable surface.
+                    tabLabels.last { $0.text == title }?
+                        .superview?
+                        .accessibilityIdentifier = identifier
+                }
+            }
+        }
+
+        private func tabBars(in view: UIView) -> [UITabBar] {
+            var result = view is UITabBar ? [view as! UITabBar] : []
+            for subview in view.subviews {
+                result.append(contentsOf: tabBars(in: subview))
+            }
+            return result
+        }
+
+        private func descendants(of view: UIView) -> [UIView] {
+            view.subviews + view.subviews.flatMap(descendants(of:))
+        }
+    }
+}
+#endif
+
 public struct AppleFoundationWindowContent: View {
     public let snapshot: AppleFoundationSnapshot
 
@@ -190,9 +273,13 @@ public struct AppleCapabilityLaneCard: View {
 public struct AppleFoundationMobileRootView: View {
     public let snapshot: AppleFoundationSnapshot
     @ObservedObject private var appearance: AppleAppearanceStore
+    @Environment(\.dynamicTypeSize) private var inheritedDynamicTypeSize
+    private let dynamicTypeSizeOverride: DynamicTypeSize?
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /* @Codex #142: keep the project sidebar out of the iPad patient split. */
+    @State private var projectColumnVisibility: NavigationSplitViewVisibility = .detailOnly
     #endif
     @State private var section: ClinicalWorkspaceSection
     @State private var showsProjectSurfaces = false
@@ -203,12 +290,14 @@ public struct AppleFoundationMobileRootView: View {
         self.snapshot = snapshot
         _appearance = ObservedObject(wrappedValue: appearance)
         let launchOverrides = AppleFoundationLaunchOverrides.load()
+        dynamicTypeSizeOverride = launchOverrides.dynamicTypeSizeOverride
         _section = State(initialValue: launchOverrides.initialSection.map(ClinicalWorkspaceSection.init(legacy:)) ?? .patients)
     }
 
     public var body: some View {
         Group {
             if usesSplitLayout {
+                #if os(macOS)
                 NavigationSplitView {
                     List {
                         Section("Clinica") { ForEach(ClinicalWorkspaceSection.clinicalSections) { sidebarButton($0) } }
@@ -220,6 +309,23 @@ public struct AppleFoundationMobileRootView: View {
                     detailView(for: section)
                         .navigationTitle(section.title)
                 }
+                #else
+                // @Codex #142: the project sidebar overlays iPad detail instead of
+                // creating a third simultaneous column beside the patient workspace.
+                NavigationSplitView(columnVisibility: $projectColumnVisibility) {
+                    List {
+                        Section("Clinica") { ForEach(ClinicalWorkspaceSection.clinicalSections) { sidebarButton($0) } }
+                        Section("Impostazioni") { ForEach(ClinicalWorkspaceSection.settingsSections) { sidebarButton($0) } }
+                        Section("Progetto") { ForEach(ClinicalWorkspaceSection.projectSections) { sidebarButton($0) } }
+                    }
+                    .navigationTitle("MediFlow")
+                    .accessibilityIdentifier("clinical-workspace-project-sidebar")
+                } detail: {
+                    detailView(for: section)
+                        .navigationTitle(section.title)
+                }
+                .navigationSplitViewStyle(.prominentDetail)
+                #endif
             } else {
                 TabView(selection: $section) {
                     ForEach(ClinicalWorkspaceSection.clinicalSections + ClinicalWorkspaceSection.settingsSections) { item in
@@ -230,27 +336,63 @@ public struct AppleFoundationMobileRootView: View {
                                     if item == .patients {
                                         ToolbarItem(placement: .automatic) {
                                             Button("Progetto", systemImage: "ellipsis.circle") { showsProjectSurfaces = true }
+                                                .accessibilityIdentifier("clinical-workspace-project-menu-button")
                                         }
                                     }
                                 }
                         }
                         .tag(item)
-                        .tabItem { Label(item.title, systemImage: item.symbolName) }
+                        .tabItem {
+                            Label(item.title, systemImage: item.symbolName)
+                        }
                     }
                 }
+                #if os(iOS)
+                .background(
+                    TabBarAccessibilityIdentifierBridge(
+                        identifiersByTitle: Dictionary(
+                            uniqueKeysWithValues:
+                                (
+                                    ClinicalWorkspaceSection.clinicalSections
+                                        + ClinicalWorkspaceSection.settingsSections
+                                ).map {
+                                    (
+                                        $0.title,
+                                        "clinical-workspace-section-\($0.rawValue)-button"
+                                    )
+                                }
+                        ),
+                        selection: section.rawValue
+                    )
+                    .frame(width: 0, height: 0)
+                    .accessibilityHidden(true)
+                )
+                #endif
             }
         }
         .task(id: workspaceModel.clinicalWorkspaceConnection?.identity) {
             await capabilitiesStore.loadIfNeeded(using: workspaceModel.clinicalWorkspaceConnection)
+            // Hand the answer to the workspace model, which is the object every
+            // clinical section observes. Only some of them receive the store, so
+            // a gate hanging off the store alone would not redraw their buttons
+            // when the answer arrived.
+            workspaceModel.updateAvailableCapabilities(capabilitiesStore.settledCapabilityKeys)
         }
         .sheet(isPresented: $showsProjectSurfaces) { projectSurfaceSheet }
         .environment(\.appleReduceMotionOverride, appearance.reduceMotionOverride)
+        .environment(\.dynamicTypeSize, dynamicTypeSizeOverride ?? inheritedDynamicTypeSize)
         .respectsAppleMotionPreference()
         .privacyShield(appearance: appearance)
     }
 
     private func sidebarButton(_ item: ClinicalWorkspaceSection) -> some View {
-        Button { section = item } label: {
+        Button {
+            section = item
+            #if os(iOS)
+            // @Codex #142: preserve the patient list/detail width after a destination change.
+            projectColumnVisibility = .detailOnly
+            #endif
+        } label: {
             HStack {
                 Label(item.title, systemImage: item.symbolName)
                 Spacer(minLength: 12)
@@ -270,6 +412,7 @@ public struct AppleFoundationMobileRootView: View {
                 } label: {
                     Label(item.title, systemImage: item.symbolName)
                 }
+                .accessibilityIdentifier("clinical-workspace-section-\(item.rawValue)-button")
             }
             .navigationTitle("Progetto")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Chiudi") { showsProjectSurfaces = false } } }
@@ -289,6 +432,11 @@ public struct AppleFoundationMobileRootView: View {
         switch section {
         case .patients:
             PairedPatientsWorkspaceView(model: workspaceModel, capabilities: capabilitiesStore)
+                // Container, so the identifier names this workspace only and is
+                // not propagated onto descendants. Without it the identifier was
+                // inherited by the safeAreaInset chart header, which made the
+                // header's own identifier unreachable from tests.
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("clinical-workspace-patients-view")
         case .agenda:
             AgendaWorkspaceView(capabilities: capabilitiesStore, workspaceModel: workspaceModel)
@@ -314,6 +462,15 @@ public struct AppleFoundationMobileRootView: View {
                 .padding(20)
                 .background(PlatformColors.groupedBackground)
                 .accessibilityIdentifier("apple-foundation-overview-view")
+        case .repertori:
+            // Catalogue browsing is a macOS surface for now; mobile reaches the
+            // same data through the therapy and exemption pickers.
+            EmptyView()
+        case .host:
+            // Host administration belongs to the machine that holds the archive.
+            // A paired iPhone is not that machine, so this section is never
+            // offered here; the case exists only to keep the switch exhaustive.
+            EmptyView()
         case .runtime:
             ScrollView {
                 HomeBaseRuntimeStatusView()

@@ -136,6 +136,10 @@
 /* ───────────── side rail ───────────── */
 
 .rail {
+  /* @Codex */
+  /* Geometria condivisa con lo spread esterno di --lume-focus-ring. */
+  --k8-rail-focus-outset: 4px;
+
   background: var(--rail-bg);
   border: 1px solid var(--k8-hairline-soft);
   border-radius: var(--radius-panel);
@@ -155,7 +159,6 @@
     overflow-y: hidden;
     align-items: center;
     gap: 6px;
-    scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
   }
   .rail::-webkit-scrollbar { display: none; }
@@ -255,8 +258,32 @@
   .navItem {
     flex: 0 0 auto;
     width: auto;
-    scroll-snap-align: start;
     padding: 8px 12px;
+  }
+
+  .navItem:last-of-type {
+    margin-inline-end: var(--k8-rail-focus-outset);
+  }
+}
+
+/* @Codex The primary labels and their counters no longer fit a 360 CSS-pixel
+   viewport at browser zoom 400%. Keep every destination in the document flow
+   instead of depending on an undiscoverable horizontal scroll position. */
+@media (max-width: 480px) {
+  .rail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    overflow: visible;
+    scroll-snap-type: none;
+  }
+
+  .brand { grid-column: 1 / -1; }
+
+  .navItem {
+    min-width: 0;
+    width: 100%;
+    justify-content: space-between;
   }
 }
 
@@ -313,12 +340,23 @@
 
 /* ───────────── main canvas ───────────── */
 
+/* The ground, not a sheet resting on the ground.
+ *
+ * This drew a 20px corner and a hairline around a fill that is the same
+ * `--lume-surface-canvas` the page already paints. A level that is not a
+ * surface: it added an outline to the stack and nothing else, and it was the
+ * outermost of the five concentric corners between a card and the page.
+ *
+ * Apple's guidance for the material era puts it plainly: glass belongs to the
+ * navigation layer, and the content layer should not multiply sheets. Removing
+ * a frame that frames nothing is subtraction without loss.
+ *
+ * The padding stays: it is the margin the content needs, and it never depended
+ * on the border. */
 .canvas {
   --lume-surface-l: 0%;
   --lume-surface-temp: 0%;
   background: var(--lume-surface-canvas);
-  border: 1px solid var(--k8-hairline-soft);
-  border-radius: var(--radius-panel);
   padding: 14px;
   min-width: 0;
   overflow: auto;
@@ -409,6 +447,13 @@
 .toolbar {
   display: flex;
   align-items: center;
+  /* Wrap rather than crush. Without this the row keeps its single line at any
+     width and pays for it out of the one item that can shrink, which is the
+     search field: at around 900px it collapsed to its own padding, 28px wide,
+     with the magnifier and the label both squeezed to zero width. What was left
+     on screen was an empty capsule the reader cannot identify. A second row is
+     honest; a control with nothing in it is not. */
+  flex-wrap: wrap;
   gap: 8px;
   padding: 6px;
   /* Lume: la chrome strutturale del cockpit consuma la superficie chrome opaca. */
@@ -426,7 +471,10 @@
   border-radius: var(--radius-chip);
   padding: 8px 14px;
   flex: 1;
-  min-width: 0;
+  /* Was `min-width: 0`, which let this shrink past its own contents. It still
+     grows to fill the row, but it can no longer give away the glyph and the
+     label to buy room for its siblings: below this the row wraps instead. */
+  min-width: 14ch;
   box-shadow: 0 0 0 1px var(--control-border);
   color: var(--ink-subtle);
   font-size: 13px;
@@ -436,6 +484,11 @@
   cursor: pointer;
   transition: transform var(--lume-dur-riga) var(--lume-ease);
 }
+
+/* A glyph is not elastic. As a flex child it was shrinking with the row and
+   rendered 8px wide against its declared 14, which turns a magnifier into a
+   smudge. */
+.search > svg { flex: 0 0 auto; }
 
 .search:hover { transform: translateY(-1px); }
 

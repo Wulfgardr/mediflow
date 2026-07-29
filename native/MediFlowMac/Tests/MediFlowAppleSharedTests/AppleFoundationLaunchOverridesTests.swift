@@ -43,9 +43,11 @@ final class AppleFoundationLaunchOverridesTests: XCTestCase {
             "MEDIFLOW_HOMEBASE_AUTODISCOVER": "yes",
             "MEDIFLOW_HOMEBASE_AUTOLOGIN": "true",
             "MEDIFLOW_HOMEBASE_AUTOLOAD_PATIENTS": "1",
+            "MEDIFLOW_APPLE_UITEST_DYNAMIC_TYPE_SIZE": "accessibility5",
         ])
 
         XCTAssertEqual(overrides.initialSection, .modules)
+        XCTAssertEqual(overrides.dynamicTypeSizeOverride, .accessibility5)
         XCTAssertEqual(
             overrides.automaticActions,
             AppleFoundationLaunchOverrides.AutomaticActions(
@@ -77,6 +79,7 @@ final class AppleFoundationLaunchOverridesTests: XCTestCase {
         XCTAssertEqual(overrides.username, "doctor")
         XCTAssertEqual(overrides.password, "1992")
         XCTAssertEqual(overrides.ambulatoryId, "amb-42")
+        XCTAssertNil(overrides.dynamicTypeSizeOverride)
         XCTAssertFalse(overrides.automaticActions.autoDiscover)
         XCTAssertFalse(overrides.automaticActions.autoLogin)
         XCTAssertFalse(overrides.automaticActions.autoLoadPatients)

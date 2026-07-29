@@ -10,12 +10,12 @@ Questo piano non biforca la roadmap in 7 fasi della revisione UI/UX 2026-07-02: 
 
 ## Corsie
 
-### DS-0. Canone (completato per la direzione)
+### DS-0. Canone (storico e transitorio)
 
-- Vetro Clinico è la baseline operativa transitoria; Lume è la lingua di destinazione mantenuta nella lane separata. Questo folder conserva glossario, leggi cliniche, token e debito da consolidare.
-- Gate completato: decisione di Leonardo registrata. I gate successivi riguardano delivery e verifica, non una nuova scelta di direzione.
+- Vetro Clinico è la baseline storica e transitoria. Lume e i token DTCG Lume sono la direzione attiva della candidata locale v0.8.
+- Questo folder conserva glossario, leggi cliniche e debito storico. I suoi gate non promuovono una release né sostituiscono i gate Lume.
 
-### DS-1. Consolidamento token web (converge con fase 6 "unificazione semantici")
+### DS-1. Consolidamento token web (storico; sostituito dalla lane Lume)
 
 Le azioni di [02-token.md](./02-token.md) sezione 7: stile unico (`data-ui-style`), `card.tsx` sui token, ritiro `palette` legacy di `badge.tsx`, dark derivato, alias deprecati, ritiro 8-9px + `tabular-nums`, pulizia Geist, sorgente DTCG. Include il ritiro degli override blur sulle superfici cliniche e l'esposizione del controllo web Reduce Transparency.
 

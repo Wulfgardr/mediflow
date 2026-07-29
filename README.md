@@ -13,37 +13,45 @@
 
 _by Ordito & Concilio_
 
-**Cartella clinica territoriale local-first.**
+**Cartella clinica territoriale local-first, open source e libera da usare.**
 
-Per ritrovare informazioni, seguire terapie e tenere il filo del lavoro clinico,
-senza consegnare i dati a un cloud per poter lavorare.
+**Serve the right information at the right time.**<br>
+**Porta l'informazione giusta nel momento giusto.**
 
-[![Versione](https://img.shields.io/badge/versione-0.7.3-1f6feb)](./CHANGELOG.md)
+[![Versione](https://img.shields.io/badge/versione-0.8.0-1f6feb)](./CHANGELOG.md)
 [![Licenza](https://img.shields.io/badge/licenza-MIT-2ea043)](./LICENSE)
 [![Local-first](https://img.shields.io/badge/dati-local--first-8957e5)](#confini-dichiarati)
-[![Core Swift](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#stato-073)
+[![Core Swift](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#release-sorgente-080)
 
-[In breve](#mediflow-in-breve) · [Schermate](#come-si-presenta) · [Architettura](#come-è-fatto) · [Stato](#stato-073) · [Avvio](#avvio-rapido) · [Sviluppo](#sviluppo-assistito)
+[In breve](#mediflow-in-breve) · [Schermate](#come-si-presenta) · [Architettura](#come-è-fatto) · [Stato](#release-sorgente-080) · [Avvio](#avvio-rapido) · [Sviluppo](#sviluppo-assistito)
 
 </div>
 
 ## MediFlow, in breve
 
-MediFlow nasce dal lavoro reale con i pazienti. Serve a raccogliere dati
-clinici, terapie, note e documenti in una scheda che resti leggibile anche
-quando il percorso si allunga e le fonti si moltiplicano.
+MediFlow nasce dalle difficoltà operative reali dei medici. È un workspace
+clinico open source e libero da usare. Aiuta a trovare un paziente, leggere la
+sua storia, seguire terapie, controlli e documenti e preparare il passaggio
+successivo. Non promette una pratica clinica senza attrito. Riduce l'attrito
+evitabile senza nascondere complessità, provenienza, privacy e responsabilità
+professionale.
 
-Il principio è semplice: il dato resta vicino a chi lo produce e lo usa. Il Mac
-ospita la base autorevole; il cloud non è un requisito per lavorare. Le funzioni
-deterministiche restano locali. Il percorso AI locale usa Ollama quando è
-configurato. Se la funzione è abilitata, l'AI può aggiornare una sintesi locale.
-Non aggiunge diagnosi, terapie o altri dati clinici strutturati senza una
-conferma esplicita.
+Il prodotto è information-first, question-first e convenience-first. Non è
+AI-first. Dati clinici, terminologie, reference data, ricerca, navigazione e
+workflow deterministici restano funzioni di prima classe anche quando ogni
+provider AI è disabilitato.
 
-Nel contesto territoriale italiano questo significa soprattutto togliere
-attrito: aprire la scheda, capire dove si è, ritrovare una fonte, distinguere una
-terapia da una prestazione prescritta e preparare il passaggio successivo senza
-confondere supporto operativo e integrazione istituzionale.
+Il Mac ospita la base autorevole. iPhone e iPad si collegano come client paired
+sulla rete locale. Il cloud non è un requisito per lavorare. Quando Ollama è
+configurato, alcune funzioni locali possono preparare materiale da rivedere.
+Nessun output AI aggiunge diagnosi, terapie o altri dati clinici strutturati
+senza un'azione esplicita del medico.
+
+Nel contesto territoriale italiano, MediFlow aiuta ad aprire la scheda giusta,
+ritrovare la fonte, distinguere una terapia da una prestazione prescritta e
+preparare la decisione successiva. Il medico verifica le evidenze e decide.
+MediFlow non prescrive, non formula diagnosi autonome e non sostituisce il
+giudizio clinico.
 
 MediFlow non sostituisce SISS, FSE o gli altri canali ufficiali. Sta accanto al
 lavoro clinico quotidiano, con confini dichiarati e verificabili.
@@ -56,6 +64,27 @@ sanitari, credenziali e altri artefatti locali restano fuori da Git secondo
 
 ## Come si presenta
 
+### iPhone
+
+<table>
+<tr>
+<td><img src="./screenshots/0.8/ios-iphone-worklist.png" alt="Lista di lavoro iPhone con pazienti sintetici, diagnosi codificate e indicatori di assistenza domiciliare" width="260" loading="lazy" decoding="async"/></td>
+<td><img src="./screenshots/0.8/ios-iphone-detail.png" alt="Scheda iPhone di un paziente sintetico con dati demografici, diagnosi codificate ed esenzioni" width="260" loading="lazy" decoding="async"/></td>
+<td><img src="./screenshots/0.8/ios-iphone-therapies.png" alt="Terapie su iPhone con stati attiva, sospesa e conclusa, dati sintetici" width="260" loading="lazy" decoding="async"/></td>
+</tr>
+</table>
+
+### iPad
+
+<table>
+<tr>
+<td><img src="./screenshots/0.8/ipados-workspace.png" alt="Workspace iPad in orizzontale con lista pazienti sintetici e pannello clinico in attesa di selezione" width="390" loading="lazy" decoding="async"/></td>
+<td><img src="./screenshots/0.8/ipados-detail.png" alt="Scheda iPad di un paziente sintetico con riepilogo clinico, diagnosi codificate e dati demografici" width="390" loading="lazy" decoding="async"/></td>
+</tr>
+</table>
+
+<p align="center"><img src="./screenshots/0.8/ipados-scale.png" alt="Modulo di una scala di valutazione aperto su iPad per un paziente sintetico" width="620" loading="lazy" decoding="async"/></p>
+
 ### App macOS
 
 <img src="./screenshots/macos-workspace.png" alt="Panoramica nativa di MediFlow per macOS con navigazione Lume e guardrail local-first" width="820" loading="lazy" decoding="async"/>
@@ -64,9 +93,10 @@ sanitari, credenziali e altri artefatti locali restano fuori da Git secondo
 
 <img src="./screenshots/01-worklist.png" alt="Cockpit Lume di MediFlow: lista di lavoro con pazienti dimostrativi sintetici" width="820" loading="lazy" decoding="async"/>
 
-_Catture reali dell'app macOS e della build web di produzione che adottano
-Lume, la lingua visiva di MediFlow. Le viste cliniche usano esclusivamente
-fixture dimostrative sintetiche. Nessun dato paziente reale._
+_Catture reali della candidata Apple e della build web di produzione. Le viste
+cliniche usano solo fixture dimostrative sintetiche e deterministiche. Nessun
+dato paziente reale. Il [manifest media 0.8](./screenshots/0.8/manifest.json)
+registra dispositivo, runtime, scena, commit sorgente e hash._
 
 <details>
 <summary><b>Altre schermate web</b>: scheda paziente, quadro clinico, revisione documentale e sicurezza</summary>
@@ -104,17 +134,26 @@ Il diagramma mostra il percorso locale. Trasporto, pairing e limiti del data
 plane sono documentati in
 [`docs/topologia-dati-flussi.md`](./docs/topologia-dati-flussi.md).
 
-## Stato 0.7.3
+## Release sorgente 0.8.0
 
-La 0.7.3 consolida il percorso local-first avviato dalla 0.7.2. Porta Lume
-sull'interfaccia web e sulle superfici dichiarate dell'app Apple, rende più
-modulare lo stack AI locale e rafforza backup, cifratura dei campi clinici,
-packaging e controlli sui claim pubblici.
+La release `0.8.0` distribuisce il codice sorgente verificato. Non costituisce
+una pubblicazione App Store, una certificazione o una dichiarazione di
+conformità completa.
 
-Restano aperti la parity dei client paired, gli snapshot di confronto completi,
-la verifica VoiceOver e il collaudo manuale P6 sul bundle macOS. Il controllo
-per i fornitori AI esterni resta chiuso. Non è consegnato alcun percorso di
-consenso o invio.
+La release consolida contratti AI review-first, hardening del pacchetto
+autonomo e una UI clinico-semantica coerente su localhost, macOS, iPhone e iPad.
+Le prove usano solo fixture sintetiche:
+
+- iPhone: XCUITest 2/2 sul simulatore iOS 27;
+- iPad: XCUITest 7/7 sul simulatore iPadOS 27;
+- macOS: build, resize, focus, tastiera, Cmd-R contestuale e VoiceOver manuale;
+- localhost: 78/78 test, viewport 320/390/768/1440 e zoom reale 200%/400%.
+
+Queste prove non dichiarano parity completa o conformità accessibilità. Gli
+audit automatici su iPhone e iPad sono verdi, ma VoiceOver reale mobile non è
+provato. L'API assistiva pubblica della beta Xcode 27 non ha raggiunto uno stato
+terminale nel simulatore. Il limite è registrato in
+[`docs/known-limitations.md`](./docs/known-limitations.md).
 
 ### Aggiornamenti integrati
 
@@ -130,8 +169,8 @@ incluso: i relativi limiti di sicurezza richiedono decisioni e correzioni
 separate.
 
 Il dettaglio è nel [CHANGELOG](./CHANGELOG.md). La fotografia completa vive in
-[`docs/STATE_OF_THE_SYSTEM.md`](./docs/STATE_OF_THE_SYSTEM.md); la parity
-versionata in [`docs/parity-matrix.md`](./docs/parity-matrix.md).
+[`docs/STATE_OF_THE_SYSTEM.md`](./docs/STATE_OF_THE_SYSTEM.md); la matrice
+parity canonica vive in [`docs/parity-matrix.md`](./docs/parity-matrix.md).
 
 ### Modelli e servizi opzionali
 
@@ -143,6 +182,12 @@ L'architettura separa il servizio applicativo dal connettore del modello. Oggi
 Una futura modifica può aggiungere plug-in opzionali per modelli locali, LAN o
 cloud. Le regole dell'organizzazione e la scelta esplicita dell'utente devono
 consentire ogni attivazione.
+
+La direzione post-0.8 prende il nome di **Intelligence Fabric**: una capability
+potrà usare logica deterministica, un modello on-device, un home-base paired, un
+modello locale o un provider cloud approvato. Il routing dovrà essere esplicito,
+osservabile, vincolato da policy e fail-closed. Questa direzione non è una
+funzione completa della 0.8.
 
 Un fornitore esterno può offrire più capacità o ridurre alcuni tempi di
 elaborazione. Non è un requisito e non implica una promessa clinica.
@@ -156,6 +201,12 @@ Il controllo dell'invio esterno resta oggi chiuso. Nessun plug-in esterno accede
 direttamente al database. Il flusso separa proposta, chiarimento e scrittura
 autorizzata; la scrittura diretta tramite modello non è consegnata.
 
+L'[ADR 0086](./docs/adr/0086-intelligent-scaffold-and-graded-automation-boundary.md)
+propone il contratto comune per Document Ops, riconciliazione anagrafica, sunto
+clinico, Atena e provider. Distingue le funzioni presenti dalla roadmap. La
+futura inbox conversazionale e l'automazione graduata non sono funzioni live
+della 0.8.
+
 ## Confini dichiarati
 
 MediFlow non racconta più di quanto possa dimostrare.
@@ -167,7 +218,7 @@ MediFlow non racconta più di quanto possa dimostrare.
 - **iPhone e iPad non sono app complete.** Il perimetro operativo è
   `home-base + client paired`; cache offline e alcune superfici derivate dai
   documenti restano parziali o disponibili solo sull'host.
-- **Windows e Linux non hanno ancora parity applicativa.** La 0.7.3 verifica il
+- **Windows e Linux non hanno ancora parity applicativa.** La release verifica il
   core Swift condiviso e il runtime di base, non applicazioni complete su ogni
   piattaforma.
 - **SISS e FSE restano un handoff assistito.** MediFlow apre il contesto giusto,
@@ -175,6 +226,8 @@ MediFlow non racconta più di quanto possa dimostrare.
   prescrittivo diretto.
 - **L'AI resta review-first.** Può aiutare a leggere e organizzare, non
   sostituisce revisione, giudizio clinico o responsabilità professionale.
+- **La inbox intelligente non è consegnata.** Le route conversazionali di base
+  non costituiscono un flusso di chiarimento o conversione in record clinici.
 
 Delle 43 capability per cui la parity è un obiettivo, 30 sono complete e 13
 parziali; altre 21 restano intenzionalmente host-only. La matrice fa fede sui

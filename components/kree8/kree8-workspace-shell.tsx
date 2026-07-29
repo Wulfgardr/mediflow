@@ -113,12 +113,25 @@ export function Kree8WorkspaceShell({
         })
         .filter((entry): entry is { href: string; el: HTMLElement } => entry !== null);
 
+    const isInWorkspaceViewport = (el: HTMLElement) => {
+      const chromeBottom = root.querySelector('header')?.getBoundingClientRect().bottom ?? 0;
+      const rect = el.getBoundingClientRect();
+      return rect.bottom > chromeBottom && rect.top < window.innerHeight;
+    };
+
     /* Sezione attiva = quella piu in alto tra le visibili, cosi l'evidenziazione
        segue l'ordine visivo anche con le due colonne (DOM e rail divergono). */
     const pickActive = () => {
-      const seen = targets.filter((target) => visible.has(target.el));
-      if (seen.length === 0) return;
-      const topmost = seen.reduce((best, target) =>
+      const observed = targets.filter((target) => visible.has(target.el) && isInWorkspaceViewport(target.el));
+      /* @Codex The observer margin is intentionally narrower than the scrollable
+         workspace. If a responsive rail moves every target outside that margin,
+         or a scroll leaves a stale observer entry, use the same visible-document
+         rule without introducing another viewport threshold. */
+      const candidates = observed.length > 0
+        ? observed
+        : targets.filter((target) => isInWorkspaceViewport(target.el));
+      if (candidates.length === 0) return;
+      const topmost = candidates.reduce((best, target) =>
         target.el.getBoundingClientRect().top < best.el.getBoundingClientRect().top ? target : best,
       );
       commit(topmost.href, topmost.el);
@@ -156,10 +169,22 @@ export function Kree8WorkspaceShell({
       if (currentHref) {
         const live = next.find((entry) => entry.href === currentHref);
         commit(live ? live.href : null, live ? live.el : null);
+      } else if (next.length > 0 && visible.size === 0 && focusEl === null) {
+        /* @Codex The first observer delivery is asynchronous. A responsive
+           rail can move every section below its root margin, leaving the
+           workspace without a focal locus until the user scrolls. Seed the
+           first declared destination; a visible observer target still
+           replaces it through pickActive(). */
+        commit(next[0].href, next[0].el);
       }
     };
 
     bind();
+    /* Scroll does not always cross the observer's reduced root margin. Capture
+       the scroll phase so a section returned to the visible workspace can regain
+       the focal locus without a timeout or layout-specific threshold. */
+    const onScroll = () => pickActive();
+    window.addEventListener('scroll', onScroll, true);
     /* DOM-aware, senza polling: il MutationObserver ri-lega quando i bersagli
        compaiono/spariscono/vengono sostituiti (solo childList, cosi setAttribute
        del filo non lo ritriggera). */
@@ -169,6 +194,7 @@ export function Kree8WorkspaceShell({
     return () => {
       cancelled = true;
       mo.disconnect();
+      window.removeEventListener('scroll', onScroll, true);
       if (observer) observer.disconnect();
       if (focusEl) {
         focusEl.removeAttribute('data-lume-focus');

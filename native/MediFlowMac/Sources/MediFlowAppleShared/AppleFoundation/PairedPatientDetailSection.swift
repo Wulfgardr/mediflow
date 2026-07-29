@@ -10,28 +10,42 @@ struct PairedPatientDetailSection: View {
     @Binding var icdQuery: String
     @Binding var confirmsFHIRExport: Bool
 
+    /// Groups now carry their own internal rhythm through `ChartGroup`, so the
+    /// per-platform spacing constants this view used to keep are gone: 4 points
+    /// on iOS against 8 on macOS was itself part of why the phone read as
+    /// cramped.
+
     var body: some View {
         let exemptions = ExemptionCodesCodec.decode(detail.exemptions)
-        return VStack(alignment: .leading, spacing: 8) {
-            /* @Codex */
-            if dynamicTypeSize >= .accessibility1 || horizontalSizeClass == .compact {
-                VStack(alignment: .leading, spacing: 8) {
-                    patientHeaderTitle
-                    patientHeaderActions
-                }
-            } else {
-                HStack {
-                    patientHeaderTitle
-                    Spacer(minLength: 8)
-                    patientHeaderActions
-                }
+        let groupSpacing = ClinicalChartMetrics.groupSpacing
+        return VStack(alignment: .leading, spacing: groupSpacing) {
+            #if os(macOS)
+            // macOS states the patient in the window title bar and keeps the
+            // chart actions in the toolbar, so this card only needs its name.
+            patientHeaderTitle
+            #else
+            // On iOS the card is titled by the patient, and the actions sit on
+            // that line rather than above it.
+            //
+            // They used to be a five-cell grid stacked at the very top of the
+            // chart: roughly 330 points of secondary controls before the reader
+            // reached a single clinical fact. Editing is the one action taken
+            // often enough to stay in view; archive, delete, FHIR export and the
+            // regional handoff are occasional, and an occasional action belongs
+            // behind an overflow rather than in front of the record.
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text("\(detail.lastName) \(detail.firstName)")
+                    .chartCardTitle()
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(detail.lastName) \(detail.firstName)")
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("patient-detail-name")
+                Spacer(minLength: 8)
+                primaryEditAction
+                patientActionsOverflowMenu
             }
-            Text("\(detail.lastName) \(detail.firstName)")
-                .font(.title3.weight(.semibold))
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(detail.lastName) \(detail.firstName)")
-                .accessibilityIdentifier("patient-detail-name")
+            #endif
             if detail.isAdi == true || detail.isArchived == true {
                 HStack(spacing: 6) {
                     if detail.isAdi == true { PairedPatientFlagChip("ADI", tone: .info) }
@@ -39,66 +53,103 @@ struct PairedPatientDetailSection: View {
                 }
             }
             patientSignals(detail, exemptionsCount: exemptions.count)
-            VStack(alignment: .leading, spacing: 4) {
+
+            // Four groups, not one list of nine rows.
+            //
+            // Every identity field sat in a single stack four points apart, so
+            // "Codice fiscale" was as close to "Data di nascita" as "Indirizzo"
+            // was to "Ambulatorio" — and proximity therefore said nothing. These
+            // fields are not one thing: who the patient is, how to reach them,
+            // who is looking after them and what they are exempt from are four
+            // separate questions a clinician asks at four different moments.
+            // Grouping them is what lets the eye jump to the right one instead
+            // of reading the column.
+            ChartGroup("Identità") {
                 InfoRow("Codice fiscale", detail.taxCode)
                 if let birth = detail.birthDate {
                     InfoRow("Data di nascita", PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birth))
                 }
-                if let address = cleanedPatientWorkspaceValue(detail.address) { InfoRow("Indirizzo", address) }
-                if let phone = cleanedPatientWorkspaceValue(detail.phone) { InfoRow("Telefono", phone) }
-                if let caregiver = cleanedPatientWorkspaceValue(detail.caregiver) { InfoRow("Caregiver", caregiver) }
-                if let ambulatory = cleanedPatientWorkspaceValue(detail.ambulatoryId) { InfoRow("Ambulatorio", ambulatory) }
-                if let monitoring = cleanedPatientWorkspaceValue(detail.monitoringProfile) { InfoRow("Monitoraggio", monitoring) }
             }
+
+            let contacts: [(String, String)] = [
+                ("Indirizzo", cleanedPatientWorkspaceValue(detail.address)),
+                ("Telefono", cleanedPatientWorkspaceValue(detail.phone)),
+            ].compactMap { label, value in value.map { (label, $0) } }
+            if !contacts.isEmpty {
+                ChartGroup("Contatti") {
+                    ForEach(contacts, id: \.0) { InfoRow($0.0, $0.1) }
+                }
+            }
+
+            let care: [(String, String)] = [
+                ("Caregiver", cleanedPatientWorkspaceValue(detail.caregiver)),
+                ("Ambulatorio", cleanedPatientWorkspaceValue(detail.ambulatoryId)),
+                ("Monitoraggio", cleanedPatientWorkspaceValue(detail.monitoringProfile)),
+            ].compactMap { label, value in value.map { (label, $0) } }
+            if !care.isEmpty {
+                ChartGroup("Presa in carico") {
+                    ForEach(care, id: \.0) { InfoRow($0.0, $0.1) }
+                }
+            }
+
             if !exemptions.isEmpty {
-                InfoRow("Esenzioni", exemptions.joined(separator: " · "))
-                    .accessibilityIdentifier("patient-detail-exemptions")
+                ChartGroup("Esenzioni") {
+                    HStack(spacing: 6) {
+                        ForEach(exemptions, id: \.self) { ClinicalCodePill($0) }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Esenzioni: \(exemptions.joined(separator: ", "))")
+                }
+                .accessibilityIdentifier("patient-detail-exemptions")
             }
+            // From here down the two platforms share one treatment. They used to
+            // fork on every block — group heading and prose registers on macOS,
+            // `.caption`/`.callout` inline on iOS — which is how iOS ended up
+            // with headings that looked like field labels and prose that looked
+            // like everything else. The registers are cross-platform now, so the
+            // fork has nothing left to say.
             let diagnoses = DiagnosesCodec.decode(detail.diagnoses)
             if !diagnoses.isEmpty {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Diagnosi")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                // The diagnoses are the clinical statement of who this patient
+                // is. Set at callout, in the same face and size as an address,
+                // they were the least prominent thing on a card that exists to
+                // carry them. Code and description are separated because they
+                // are read differently: the code is matched, the description read.
+                ChartGroup("Diagnosi") {
                     ForEach(Array(diagnoses.enumerated()), id: \.offset) { _, diagnosis in
-                        Text(diagnosis.displayText)
-                            .font(.callout)
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            if !diagnosis.code.isEmpty {
+                                ClinicalCodePill(diagnosis.code)
+                            }
+                            Text(diagnosis.description)
+                                .font(.body)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(diagnosis.displayText)
                     }
                 }
                 .accessibilityIdentifier("patient-detail-diagnoses")
             }
             if let aiSummary = cleanedPatientWorkspaceValue(detail.aiSummary) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label("Sintesi AI", systemImage: "sparkles")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Text(aiSummary)
-                        .font(.callout)
+                ChartGroup("Sintesi AI", systemImage: "sparkles") {
+                    Text(aiSummary).chartProse()
                 }
                 .accessibilityIdentifier("patient-detail-ai-summary")
             }
             if let documentInsights = cleanedPatientWorkspaceValue(detail.documentInsights) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label("Analisi documenti", systemImage: "doc.text.magnifyingglass")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Text(documentInsights)
-                        .font(.callout)
+                ChartGroup("Analisi documenti", systemImage: "doc.text.magnifyingglass") {
+                    Text(documentInsights).chartProse()
                 }
                 .accessibilityIdentifier("patient-detail-document-insights")
             }
             if let statusReason = cleanedPatientWorkspaceValue(detail.statusReason) {
                 Text(statusReason)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .chartMetadata()
             }
             if let notes = cleanedPatientWorkspaceValue(detail.notes) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Note")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Text(notes)
-                        .font(.callout)
+                ChartGroup("Note") {
+                    Text(notes).chartProse()
                 }
             }
             if model.isEditingPatient {
@@ -109,13 +160,103 @@ struct PairedPatientDetailSection: View {
     }
 
     private var patientHeaderTitle: some View {
-        Label("Anagrafica", systemImage: "person.text.rectangle")
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
+        // Names the card. It used to share the row with the chart actions, which
+        // now live in the window toolbar, so it reads as the card's title and
+        // takes the heading register — leaving the field block below it
+        // unlabelled, because that block *is* the anagrafica this card is named
+        // for and a second "Dati anagrafici" only said it twice.
+        // Same treatment as "Diario clinico", "Controlli", "Terapie": these are
+        // peers, each the title of a card, so each carries the card-title
+        // register and its own section glyph. The platform fork that used to
+        // live here is gone: `ClinicalSectionTitle` resolves the register for
+        // both, which is the point of having named registers at all.
+        ClinicalSectionTitle("Anagrafica", systemImage: "person.text.rectangle", accent: .anagrafica)
     }
 
     @ViewBuilder
     private var patientHeaderActions: some View {
+        #if os(macOS)
+        // Nothing: on macOS these actions are window toolbar items. Duplicated
+        // inside the chart they formed a button grid that outweighed the
+        // clinical content it sat above.
+        EmptyView()
+        #else
+        patientHeaderActionsGrid
+        #endif
+    }
+
+    /// Editing stays in view. It is the action a clinician reaches for while
+    /// reading the card, and burying it would cost a tap on every correction.
+    private var primaryEditAction: some View {
+        Button {
+            model.startEditingPatient()
+        } label: {
+            Label("Modifica", systemImage: "pencil")
+        }
+        .font(.caption)
+        .labelStyle(.titleAndIcon)
+        .disabled(model.isEditingPatient)
+        .accessibilityIdentifier("edit-patient-button")
+    }
+
+    /// Everything a clinician does rarely: archive, delete, export, hand off.
+    /// Full-length labels inside the menu, where there is room for them.
+    private var patientActionsOverflowMenu: some View {
+        Menu {
+            if detail.isArchived == true {
+                Button {
+                    patientLifecycleSheet = .unarchive
+                } label: {
+                    Label("Riattiva", systemImage: "archivebox")
+                }
+                .disabled(!model.canUnarchivePatient)
+                .accessibilityIdentifier("unarchive-patient-button")
+            } else {
+                Button {
+                    patientLifecycleSheet = .archive
+                } label: {
+                    Label("Archivia", systemImage: "archivebox")
+                }
+                .disabled(!model.canArchivePatient)
+                .accessibilityIdentifier("archive-patient-button")
+            }
+            Button {
+                confirmsFHIRExport = true
+            } label: {
+                Label("Esporta FHIR", systemImage: "doc.badge.arrow.up")
+            }
+            .disabled(!model.canPrepareFHIRExport)
+            .accessibilityIdentifier("patient-export-fhir-button")
+            if let fhirURL = model.patientFHIRExportURL {
+                ShareLink(item: fhirURL) {
+                    Label("Condividi FHIR", systemImage: "square.and.arrow.up")
+                }
+                .accessibilityIdentifier("patient-share-fhir-button")
+            }
+            Button {
+                Task { await model.openPrregHandoff() }
+            } label: {
+                Label("Prescrittivo regionale", systemImage: "arrow.up.forward.app")
+            }
+            .accessibilityIdentifier("patient-prreg-handoff-button")
+            Divider()
+            Button(role: .destructive) {
+                patientLifecycleSheet = .delete
+            } label: {
+                Label("Elimina", systemImage: "trash")
+            }
+            .disabled(!model.canSoftDeletePatient)
+            .accessibilityIdentifier("soft-delete-patient-button")
+        } label: {
+            Label("Altre azioni", systemImage: "ellipsis.circle")
+                .font(.caption)
+        }
+        .labelStyle(.iconOnly)
+        .accessibilityLabel("Altre azioni sul paziente")
+        .accessibilityIdentifier("patient-actions-overflow")
+    }
+
+    private var patientHeaderActionsGrid: some View {
         LazyVGrid(
             columns: [GridItem(.adaptive(minimum: 132), spacing: 8, alignment: .leading)],
             alignment: .leading,
@@ -255,15 +396,29 @@ struct PairedPatientDetailSection: View {
                             model.addDiagnosis(code: icd.code, description: icd.description, system: icd.system)
                             icdQuery = ""
                         } label: {
-                            HStack(alignment: .firstTextBaseline) {
-                                Text("\(icd.code)  \(icd.description)")
-                                    .font(.caption)
-                                    .registro()
+                            // Set exactly like the diagnoses above: the same
+                            // pill, the same description register. A suggestion
+                            // should look like the thing it is about to become,
+                            // so you can see what you are adding before you add
+                            // it. As one monospaced string the code and the
+                            // description shared a face, and the description —
+                            // which is prose — was typeset as though it were a
+                            // code.
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                ClinicalCodePill(icd.code)
+                                Text(icd.description)
+                                    .font(.subheadline)
                                     .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
                                 Spacer(minLength: 4)
                                 Image(systemName: "plus.circle")
+                                    .foregroundStyle(.tint)
                             }
+                            .padding(.vertical, 4)
+                            .contentShape(.rect)
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Aggiungi \(icd.code), \(icd.description)")
                         .accessibilityIdentifier("icd-result-\(icd.code)")
                     }
                 }
@@ -393,10 +548,22 @@ struct PairedPatientDetailSection: View {
         return layout {
             Group {
                 Image(systemName: icon)
+                    #if os(macOS)
+                    // The icon names the measure; the number is the thing being
+                    // read. Same weight for both made the tile a uniform grey
+                    // block where nothing led.
+                    .font(.caption)
+                    .foregroundStyle(.tint)
+                    #else
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    #endif
                 Text(signal.displayText)
+                    #if os(macOS)
+                    .font(.title3.weight(.semibold))
+                    #else
                     .font(.callout.weight(.semibold))
+                    #endif
                     .registro()
             }
             Text(label)
@@ -408,12 +575,37 @@ struct PairedPatientDetailSection: View {
             }
         }
         .frame(maxWidth: .infinity)
+        #if os(macOS)
+        .padding(.vertical, 10)
+        // Concentric with the card that contains it: the card rounds at
+        // ClinicalChartMetrics.cardRadius and insets its content by
+        // cardPadding, so a tile flush with that inset rounds at the difference.
+        // Given the same radius as its parent, a nested box reads as pasted on
+        // rather than sitting inside.
+        .background(
+            Color.secondary.opacity(0.07),
+            in: RoundedRectangle(cornerRadius: ClinicalChartMetrics.innerRadius, style: .continuous)
+        )
+        #else
         .padding(.vertical, 6)
         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        #endif
     }
 
     // Quadro clinical-signals strip (parity with the web "segnali clinici"): counts
     // derived from the already-loaded collections + the next upcoming follow-up.
+    /// Six tiles, so three columns divide evenly into two full rows at any chart
+    /// width. The adaptive grid fitted five across and left "Esenzioni" alone on
+    /// a second row, which reads as a mistake rather than as a group.
+    private var signalTileColumns: [GridItem] {
+        if dynamicTypeSize >= .accessibility1 { return [GridItem(.flexible())] }
+        #if os(macOS)
+        return Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
+        #else
+        return [GridItem(.adaptive(minimum: 84), spacing: 8)]
+        #endif
+    }
+
     @ViewBuilder
     private func patientSignals(_ detail: HomeBasePatientDetail, exemptionsCount: Int) -> some View {
         let cap = PairedPatientsWorkspaceSupport.clinicalPreviewCap
@@ -427,9 +619,7 @@ struct PairedPatientDetailSection: View {
             .min(by: { $0.date < $1.date })
         VStack(alignment: .leading, spacing: 6) {
             LazyVGrid(
-                columns: dynamicTypeSize >= .accessibility1
-                    ? [GridItem(.flexible())]
-                    : [GridItem(.adaptive(minimum: 84), spacing: 8)],
+                columns: signalTileColumns,
                 spacing: 8
             ) {
                 signalTile("cross.case", .exact(problemi), "Problemi")

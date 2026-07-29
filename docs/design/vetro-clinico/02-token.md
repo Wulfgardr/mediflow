@@ -1,5 +1,5 @@
 ---
-summary: "Vetro Clinico token architecture: DTCG source of truth, consolidated palette, typography, geometry, motion, and the migration actions."
+summary: "Historical Vetro Clinico token architecture, migration context, and superseded DTCG proposal."
 read_when:
   - "Adding or changing any color, font size, radius, shadow, blur, or duration in MediFlow UI."
   - "Wiring design tokens to a new platform (web, SwiftUI, WinUI, GTK)."
@@ -18,7 +18,7 @@ Livello 3: piattaforma      CSS custom properties (web), enum/Asset catalog (Swi
 
 I componenti consumano SOLO il livello 2. Il livello 3 è generato o trascritto dal 2, mai inventato sul posto. Il materiale (vetro, Mica, flat) non è un token: è la resa che ogni piattaforma dà al token di superficie (vedi [03-materiali.md](./03-materiali.md)).
 
-**Formato sorgente proposto**: un file `docs/design/vetro-clinico/tokens/vetro-clinico.tokens.json` in formato W3C DTCG (specifica stabile 2025.10). Primo passo senza dipendenze: il JSON è la fonte di verità consultata a mano nei PR. Secondo passo, quando parte la lane tri-OS: build automatica (Style Dictionary o script in-house, coerente con ADR 0070) verso CSS/Swift/XAML/GTK. Esempio di forma:
+**Stato della sorgente**: questa proposta Vetro non è attiva. La fonte DTCG attiva è [Token Lume](../lume/tokens/lume.tokens.json). Una nuova piattaforma non deve riaprire la proposta Vetro senza una decisione esplicita. L'esempio seguente resta storico.
 
 ```json
 {
@@ -142,4 +142,4 @@ In ordine di resa:
 5. **Coppie duplicate**: `.input-field` e `.ui-btn-secondary` diventano alias deprecati con data di rimozione; i nuovi call-site usano solo `.mf-input`/`.mf-btn-secondary`.
 6. **Scala tipografica**: ritiro `3xs`/`micro` 8-9px; sostituzione dei `text-[8px]`/`text-[9px]` residui; adozione `tabular-nums` su parametri e laboratorio.
 7. **Pulizia `@theme`**: rimozione di `--font-geist-*` se nessun `next/font` li inietta.
-8. **Sorgente DTCG**: creazione di `tokens/vetro-clinico.tokens.json` con i valori di questo documento; da quel momento il JSON precede il CSS.
+8. **Sorgente DTCG**: proposta superata dai token Lume attivi. Non creare `tokens/vetro-clinico.tokens.json` nella candidata v0.8.

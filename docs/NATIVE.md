@@ -14,7 +14,9 @@ read_when:
 > attiva e oggi l'app universale descritta da ADR 0048/0071: bundle macOS
 > `home-base`, target iPhone/iPad paired e package condiviso
 > `MediFlowCore`/`MediFlowAppleShared`. La web app resta la superficie piu
-> completa; "family Apple attiva" non significa parity UI completa.
+> completa. Nella candidata sorgente v0.8 la family include correzioni SwiftUI,
+> build e test verificati. "Family Apple attiva" non significa parity completa,
+> certificazione o pubblicazione App Store.
 
 Riferimenti correlati:
 
@@ -24,7 +26,7 @@ Riferimenti correlati:
 - [docs/local-api-tls.md](./local-api-tls.md) (trasporto TLS locale)
 - [docs/native-testing.md](./native-testing.md) (strategia test ufficiale)
 - [docs/parity-matrix.md](./parity-matrix.md) (stato verificato delle capability)
-- [docs/design/lume/README.md](./design/lume/README.md) (lingua di design di destinazione)
+- [docs/design/lume/README.md](./design/lume/README.md) (lingua di design attiva)
 - [docs/design/lume/06-macos-apple-contract.md](./design/lume/06-macos-apple-contract.md) (contratto macOS)
 
 ---
@@ -48,8 +50,10 @@ La base corrente va letta cosi:
   accede direttamente al database del Mac.
 * **Parity**: la matrice post-Wave 5 e in [docs/parity-matrix.md](./parity-matrix.md).
   `WUL-401`/PR #21 hanno consegnato bundle, fixture, probe AX e runbook P6 di
-  base; `WUL-481` governa i prerequisiti operativi ancora bloccati e il verbale
-  manuale sul Mac sbloccato. `WUL-403` resta la corsia per rendere visibili eta,
+  base. La candidata v0.8 chiude i gate UI sul candidato con iPhone 2/2, iPad
+  7/7 e prove macOS reali. VoiceOver reale su iPhone e iPad resta un limite
+  esterno documentato, non un PASS e non un claim di conformità.
+  `WUL-403` resta la corsia per rendere visibili eta,
   TTL e staleness della cache e il degrado offline read-only.
 
 ---
@@ -181,13 +185,19 @@ restano host-only o review-only secondo
 
 ### 3. Design e accessibilita
 
-ADR 0078 e `Accepted`: Vetro Clinico resta il canone operativo transitorio e
-Lume la lingua di destinazione. La card clinica gia migrata resta opaca e
+ADR 0078 e `Accepted`: Lume e la lingua attiva della candidata locale e Vetro
+Clinico resta baseline storica e transitoria. La card clinica gia migrata resta opaca e
 leggibile; le altre superfici sono ancora in adozione progressiva. Sidebar,
 toolbar, menu, sheet, popover e inspector usano i componenti di sistema. Liquid
 Glass e un enhancement del chrome su OS compatibili, non un materiale da
 applicare alle card cliniche. macOS, iPhone e iPad condividono semantica e
 primitive, non la stessa navigazione o densita.
+
+Gli audit XCTest e i test UI sono verdi su iPhone e iPad. VoiceOver è stato
+esercitato manualmente su macOS. La beta Xcode 27 non completa l'abilitazione
+VoiceOver nel simulatore mobile; il limite e la deroga della sola candidata
+sorgente 0.8 sono registrati in
+[docs/known-limitations.md](./known-limitations.md).
 
 ---
 

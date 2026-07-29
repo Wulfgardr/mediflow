@@ -15,6 +15,10 @@ import { db, type Attachment, type ClinicalEntry } from '@/lib/db';
 import { isClinicalRichTextBlank, sanitizeClinicalRichTextHtml } from '@/lib/clinical-rich-text';
 import { serializeDocumentParseEvidenceArtifact } from '@/lib/domain/documents/document-parse-evidence-artifact';
 import { synthesizeDocument } from '@/lib/domain/documents/document-synthesis-service';
+import {
+    AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
+    isAiDocumentSynthesisEnabledValue,
+} from '@/lib/ai-document-synthesis-kill-switch';
 import { extractPatientDataSmart, extractDocumentTextForSummary, isImageDocumentInput, isPdfDocumentInput } from '@/lib/pdf-service';
 import { refreshPatientSummaryIfEnabled, getAiModelLabels } from '@/lib/ai-summary-service';
 import { useLiveQuery } from '@/lib/live-query';
@@ -59,6 +63,15 @@ function formatEntryDate(value: Date | string | number | null | undefined): stri
         month: 'short',
         year: 'numeric',
     }).format(date);
+}
+
+/* @Codex */
+async function readSourceBytes(source: Blob): Promise<ArrayBuffer | undefined> {
+    try {
+        return await source.arrayBuffer();
+    } catch {
+        return undefined;
+    }
 }
 
 /* @Codex WUL-421 */
@@ -231,6 +244,8 @@ export default function NewEntryPage() {
         try {
             const attachmentIds: string[] = [];
             const aiModels = await getAiModelLabels();
+            const documentSynthesisKillSwitch = await db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
+            const documentSynthesisEnabled = isAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
 
             for (const file of files) {
                 let summary = 'Allegato alla voce clinica';
@@ -249,9 +264,10 @@ export default function NewEntryPage() {
                             rawText = await extractDocumentTextForSummary(file);
                         }
 
-                        if (rawText) {
+                        if (rawText && documentSynthesisEnabled) {
                             setUploadProgress(`Sintesi documento (${aiModels.clinical})...`);
-                            const result = await synthesizeDocument(rawText, file.name, id, { attachmentId });
+                            const sourceBytes = await readSourceBytes(file);
+                            const result = await synthesizeDocument(rawText, file.name, id, { attachmentId, sourceBytes });
                             summary = result.insight.summary;
                             parseEvidenceArtifactSnapshot = serializeDocumentParseEvidenceArtifact(result.parseEvidenceArtifact);
                         } else if (extracted.notes && extracted.notes.length > 5) {

@@ -2,6 +2,7 @@ import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import {
+    LEGACY_LOCKED_DATA_PLACEHOLDER,
     LOCKED_CIPHERTEXT_KEY,
     LOCKED_DATA_PLACEHOLDER,
     getLockedFields,
@@ -38,6 +39,13 @@ describe('locked-field-guard helpers', () => {
     it('recognizes the placeholder and ENC values', () => {
         assert.equal(isLockedDataPlaceholder(LOCKED_DATA_PLACEHOLDER), true);
         assert.equal(isLockedDataPlaceholder('altro testo'), false);
+        /* Il segnaposto e anche la sentinella che impedisce di scrivere la
+           dicitura sopra il cifrato reale. Cambiandone il testo, un record
+           scritto da una build precedente deve continuare a colpire la stessa
+           guardia invece di passare e sovrascrivere un dato clinico. */
+        assert.equal(isLockedDataPlaceholder(LEGACY_LOCKED_DATA_PLACEHOLDER), true);
+        assert.equal(LEGACY_LOCKED_DATA_PLACEHOLDER, '[LOCKED DATA]');
+        assert.notEqual(LOCKED_DATA_PLACEHOLDER, LEGACY_LOCKED_DATA_PLACEHOLDER);
         assert.equal(isEncryptedFieldValue('ENC:iv:data'), true);
         assert.equal(isEncryptedFieldValue('testo in chiaro'), false);
         assert.equal(isEncryptedFieldValue(undefined), false);

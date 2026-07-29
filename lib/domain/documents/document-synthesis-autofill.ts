@@ -38,12 +38,18 @@ export interface BuildDocumentSynthesisAutofillPlanInput {
 }
 
 /* @Codex */
+// ADR 0084: il piano e review-only e non espone campi di apply; la scrittura
+// della diagnosi canonica richiede accettazione umana in una lane separata.
 export interface DocumentSynthesisAutofillPlan {
     decision: DocumentDecision;
-    diagnoses: Diagnosis[];
-    appliedCodes: string[];
-    appliedSuggestions: DocumentDiagnosisSuggestion[];
+    diagnosisCandidateActions: DocumentSynthesisDiagnosisCandidateAction[];
     diagnosesFieldLocked: boolean;
+}
+
+/* @Codex */
+export interface DocumentSynthesisDiagnosisCandidateAction {
+    actionId: string;
+    candidate: DocumentDiagnosisSuggestion;
 }
 
 /* @Codex */
@@ -107,7 +113,9 @@ function confidenceForAutofill(
     qualityLevel: DocumentQualityLevel | undefined,
 ): DocumentDecisionConfidence {
     if (qualityLevel === 'red') return 'blocked';
-    return suggestion.confidence ?? 'low';
+    return suggestion.confidence === 'high' || suggestion.confidence === 'medium'
+        ? suggestion.confidence
+        : 'low';
 }
 
 /* @Codex */
@@ -138,7 +146,7 @@ function buildAutofillAction(input: {
             ? 'Campo diagnosi non leggibile: nessuna scrittura automatica.'
             : input.blockedReason === 'structured_fact_already_present'
                 ? 'Diagnosi gia presente in scheda.'
-                : 'Codice ICD esplicito dal documento candidato all autofill prudente.',
+                : 'Codice ICD esplicito dal documento, candidato alla revisione umana.',
         blockedReason: input.blockedReason,
     };
 }
@@ -154,17 +162,20 @@ export function buildDocumentSynthesisAutofillPlan(
         suggestion.evidence?.trim() || `${suggestion.system} ${suggestion.code}: ${suggestion.description}`,
         'document-synthesis-autofill',
     ));
-    const actions = input.diagnoses.map((suggestion, index) => {
-        const confidence = confidenceForAutofill(suggestion, input.qualityLevel);
-        return buildAutofillAction({
-            suggestion,
-            index,
-            confidence,
-            blockedReason: blockedReasonForAutofillCandidate({
-                diagnosesFieldLocked,
-                duplicate: existingKeys.has(diagnosisKey(suggestion)),
+    const diagnosisActions = input.diagnoses.map((candidate, index) => {
+        const confidence = confidenceForAutofill(candidate, input.qualityLevel);
+        return {
+            candidate,
+            action: buildAutofillAction({
+                suggestion: candidate,
+                index,
+                confidence,
+                blockedReason: blockedReasonForAutofillCandidate({
+                    diagnosesFieldLocked,
+                    duplicate: existingKeys.has(diagnosisKey(candidate)),
+                }),
             }),
-        });
+        };
     });
 
     const decision = applyDocumentDecisionGuardrails(buildDocumentDecision({
@@ -183,42 +194,28 @@ export function buildDocumentSynthesisAutofillPlan(
                 : input.qualityLevel === 'red'
                     ? 'blocked'
                     : 'medium',
-            rationale: 'Autofill documentale derivato da sintesi con codici ICD espliciti.',
+            rationale: 'Candidati diagnosi review-only da sintesi documentale con codici ICD espliciti.',
             evidenceRefs: evidenceRefs.map((ref) => ref.id),
         },
         evidenceRefs,
-        proposedActions: actions,
+        proposedActions: diagnosisActions.map(({ action }) => action),
         humanRequiredFor: ['clinical_write'],
         model: {
             recognitionMode: 'hybrid',
         },
     }));
-
-    // @Codex: anche una proposta ad alta confidenza resta review-only. Il
-    // servizio conserva l'evidenza, ma non aggiorna diagnosi senza un gesto
-    // esplicito dell'operatore in una lane contrattuale separata.
-    const appliedSuggestions: DocumentDiagnosisSuggestion[] = [];
-    const diagnoses = [...input.existingDiagnoses];
-    const appliedCodes: string[] = [];
-
-    for (const suggestion of appliedSuggestions) {
-        const key = diagnosisKey(suggestion);
-        if (existingKeys.has(key)) continue;
-        diagnoses.push({
-            code: suggestion.code.trim().toUpperCase(),
-            description: suggestion.description,
-            system: suggestion.system,
-            date: new Date(),
-        });
-        existingKeys.add(key);
-        appliedCodes.push(key);
-    }
+    const candidatesByActionId = new Map(
+        diagnosisActions.map(({ action, candidate }) => [action.id, candidate]),
+    );
 
     return {
         decision,
-        diagnoses,
-        appliedCodes,
-        appliedSuggestions,
+        diagnosisCandidateActions: decision.writePlan.allowedActions
+            .filter((action) => action.kind === 'create_diagnosis_candidate')
+            .map((action) => ({
+                actionId: action.id,
+                candidate: candidatesByActionId.get(action.id)!,
+            })),
         diagnosesFieldLocked,
     };
 }

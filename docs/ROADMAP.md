@@ -8,7 +8,8 @@ read_when:
 # 🧭 Roadmap MediFlow
 
 > **Dove siamo e dove vogliamo andare.**
-> v0.7.3 e la linea corrente, senza dichiarare parity UI completa. Ultimo aggiornamento: 2026-07-13.
+> La v0.8 è una release sorgente verificata. Non è una pubblicazione App Store
+> e non dichiara parity completa. Ultimo aggiornamento: 2026-07-29.
 > Fonte roadmap prodotto canonica (vedi anche [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) per la lettura completa corrente e [docs/README.md](./README.md) per mappa completa documenti).
 
 > [!NOTE]
@@ -159,6 +160,22 @@ control-flow documentale review-first, hardening di runtime e dati, il claims
 guard pubblico e il tooling P6 sintetico. La migrazione Lume completa e il
 verbale manuale di `WUL-481` restano lavoro successivo, non claim di release.
 
+## ✅ Release sorgente v0.8: integrazioni e gate
+
+La release riunisce hardening documentale, superfici web Lume e correzioni
+Apple presenti nel tree verificato. Non cambia l'intended purpose.
+
+| Area | Evidenza locale | Non dichiarato |
+| --- | --- | --- |
+| Lume | Token DTCG, mirror CSS e consumatori web sono attivi. | Parity estetica completa o redesign concluso. |
+| Documenti | Stati accessibili e registro separato delle proposte sono integrati. | Diagnosi auto-applicate o nuova inbox. |
+| Apple | iPhone 2/2, iPad 7/7, build/probe macOS, Cmd-R e media sintetici sono sul tree verificato. | VoiceOver mobile provato, conformità o App Store readiness. |
+| AI | I boundary review-first e no-egress restano nel prodotto. | Nuovi provider, cloud o automazione graduata. |
+
+La deroga esterna VoiceOver mobile vale solo per questa release sorgente. Gli
+audit AX e i test UI non sostituiscono VoiceOver reale. Ogni altro gate rosso o
+indeterminato resta bloccante.
+
 ### Modalita network home-base
 
 * **Nodo centrale locale**: pairing esplicito, capability discovery, lifecycle paziente, moduli clinici non-AI, prestazioni/protesica, cataloghi read-only e create documentale manuale sono su `main`; restano da chiudere UX, offline e superfici policy-gated senza rompere il boundary.
@@ -181,8 +198,19 @@ verbale manuale di `WUL-481` restano lavoro successivo, non claim di release.
   `closed_pending_redaction_lane`.
 * **Boundary ancora chiuso**: registry, provider alternativi, redaction lane e
   consenso cloud non sono consegnati; Ollama resta l'unico provider operativo.
+* **Scaffold model-agnostic proposto**: `WUL-499` e ADR 0086 separano pipeline
+  locale, proposta, chiarimento, anteprima, autorizzazione ed eventuale
+  scrittura applicativa auditata. Il packet e documentale e non apre nuovi
+  runtime.
 * **Attese locali**: la prima slice web collega prestazione attesa e risultato;
   non estende il workflow ai client paired e non introduce scritture autonome.
+* **Automazione graduata futura**: proposta, anteprima, finestra di
+  annullamento, rollback e pannello audit richiedono packet e policy dedicati.
+  Diagnosi, prescrizioni e identita paziente non sono auto-applicabili per
+  default.
+* **Inbox conversazionale fuori dalla 0.8**: le route conversazionali esistenti
+  non equivalgono a una inbox intelligente. Chiarimento guidato, buffer locale
+  temporaneo e conversione confermata restano roadmap.
 
 ### Esperienza nativa
 

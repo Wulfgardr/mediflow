@@ -31,6 +31,38 @@ final class ClinicalFieldCryptoTests: XCTestCase {
         let result = ClinicalFieldCrypto.decryptEntry(entry, masterKey: nil)
         XCTAssertEqual(result.title, "", "ciphertext must not be shown")
         XCTAssertEqual(result.content, "")
+        XCTAssertEqual(
+            result.lockedFields, [.title, .content],
+            "an empty string alone cannot tell an empty entry from an unreadable one"
+        )
+    }
+
+    /// The diary reports "unreadable" only for fields it actually failed to read.
+    /// Without this the chart shows an encrypted note as an empty note, and an
+    /// empty note as an encrypted one.
+    func testDecryptEntryMarksOnlyTheFieldsItCouldNotRead() {
+        // A well-formed ciphertext from another key: nothing is malformed, this
+        // session simply holds the wrong key for it.
+        let otherKey = SymmetricKey(data: Data(repeating: 7, count: 32))
+        let foreignContent = CryptoService.encryptField(CryptoService.jsonEncode("Referto altrui")!, masterKey: otherKey)!
+        let readableTitle = CryptoService.encryptField(CryptoService.jsonEncode("Nota clinica")!, masterKey: key)!
+        let entry = HomeBaseEntrySummary(
+            id: "e1", patientId: "p1", type: "note", title: readableTitle, date: epoch,
+            content: foreignContent, setting: nil, metadata: nil, attachments: nil,
+            deletedAt: nil, deletionReason: nil, version: 1, createdAt: nil, updatedAt: nil
+        )
+        let result = ClinicalFieldCrypto.decryptEntry(entry, masterKey: key)
+        XCTAssertEqual(result.title, "Nota clinica")
+        XCTAssertEqual(result.content, "", "a field this key cannot open is never shown as ciphertext")
+        XCTAssertEqual(
+            result.lockedFields, [.content],
+            "the title opened with this key; only the foreign ciphertext stays locked"
+        )
+
+        // Swap the key and the verdict swaps with it: same entry, other field.
+        let mirrored = ClinicalFieldCrypto.decryptEntry(entry, masterKey: otherKey)
+        XCTAssertEqual(mirrored.content, "Referto altrui")
+        XCTAssertEqual(mirrored.lockedFields, [.title])
     }
 
     func testDecryptTherapyDecryptsMotivation() {
@@ -75,5 +107,6 @@ final class ClinicalFieldCryptoTests: XCTestCase {
         let result = ClinicalFieldCrypto.decryptEntry(entry, masterKey: nil)
         XCTAssertEqual(result.title, "Nota in chiaro")
         XCTAssertEqual(result.content, "Testo in chiaro")
+        XCTAssertTrue(result.lockedFields.isEmpty, "plaintext is never locked, key or no key")
     }
 }

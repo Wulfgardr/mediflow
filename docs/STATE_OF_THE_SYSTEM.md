@@ -18,7 +18,13 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-07-13 (linea v0.7.3; parity UI completa non dichiarata)
+Ultimo aggiornamento: 2026-07-29 (release sorgente v0.8)
+
+> [!NOTE]
+> La v0.8 descritta qui è una release sorgente verificata. Il tag e la GitHub
+> Release non equivalgono a una pubblicazione App Store o a una certificazione.
+> I gate, la deroga VoiceOver mobile e il rischio residuo restano registrati
+> nei documenti canonici dell'area.
 
 ---
 
@@ -34,10 +40,13 @@ versionati e ogni integrazione esterna resta dentro boundary documentati.
 La fotografia corrente e questa:
 
 - **Superficie primaria**: web app Next.js locale, avviata sul Mac.
-- **Shell ufficiale**: il cockpit resta la root web live su `main`, senza
-  selector o preview profiles persistiti. ADR 0078 adotta Lume e le prime
-  superfici sono consegnate; Kree8 resta ispirazione esterna e Vetro Clinico
-  il canone transitorio nelle aree non ancora migrate.
+- **Principio prodotto**: serve l'informazione giusta nel momento giusto.
+  MediFlow è information-first, question-first e convenience-first, non
+  AI-first. Resta utile quando ogni provider AI è disabilitato.
+- **Shell ufficiale**: il cockpit resta la root web live, senza selector o
+  preview profiles persistiti. Lume e il suo contratto DTCG sono attivi nel
+  tree della release; Vetro Clinico resta la baseline storica e transitoria.
+  La parity estetica completa non è dichiarata.
 - **Storage autorevole**: un solo file SQLite locale (`medical.db`), con accesso
   server via Drizzle e cifratura client-side dei campi clinici sensibili.
 - **Sicurezza di default**: local-only, campi clinici sensibili cifrati lato
@@ -62,6 +71,11 @@ La fotografia corrente e questa:
   `MediFlowCore` concentra logica portabile, cifratura, contratti, filtri,
   clinical scales e store SQLite locale; Linux e Windows oggi verificano la
   portabilita del core in CI, non una parity applicativa completa.
+- **Parity UI 0.8**: iPhone 2/2, iPad 7/7, build/probe macOS e localhost 78/78
+  sono verdi sul tree verificato. La parity resta clinico-semantica, non pixel.
+  VoiceOver reale mobile non è provato per il limite esterno della beta Xcode
+  27; la deroga vale solo per la release sorgente e non autorizza claim di
+  conformità.
 - **Document intelligence**: Smart Import, nuova anagrafica da documento e
   `AI Patient Insight` restano reviewable; gli allegati possono persistere
   artifact cifrati `parse/evidence` con prime ancore sezionali. Il fallback OCR
@@ -73,9 +87,12 @@ La fotografia corrente e questa:
 - **Prescrizioni di prestazione**: visite, esami, imaging, riabilitazione e
   screening sono separati dalle terapie farmacologiche; gli item figli e il
   catalog matching restano reviewable e non generano invii regionali.
-- **AI**: runtime locale per default, `OllamaAdapter` e `AIService` come scaffold
-  operativo e gate egress ancora chiuso; benchmark e shadow lane restano
-  separati dal prodotto clinico.
+- **AI**: runtime locale per default, `OllamaAdapter` e `AIService` come
+  integrazioni presenti nel tree e gate egress ancora chiuso; benchmark e
+  shadow lane restano separati dal prodotto clinico. Lo scaffold intelligente
+  di ADR 0086 resta una proposta e non apre una funzione nuova della v0.8.
+  Intelligence Fabric è una direzione post-0.8, non una funzione completa del
+  prodotto corrente.
 - **Attese locali**: la prima slice web collega prestazioni attese e risultati;
   il salvataggio resta esplicito e il workflow non e esteso ai client paired.
 - **SISS/FSE**: handoff contestuale e flussi `webapp-assisted`; nessuna
@@ -335,7 +352,20 @@ scrittura clinica autonoma: l'AI locale propone, il medico rivede.
 
 Il router documentale usa `shadow` come default. La modalita `active` puo
 evitare il modello solo su route esplicitamente eleggibili ad alta confidenza;
-non promuove mai proposte cliniche senza review e salvataggio espliciti.
+  non promuove mai proposte cliniche senza review e salvataggio espliciti.
+
+### 5.1.1 Release sorgente v0.8: perimetro verificabile
+
+Il tree della release contiene hardening delle superfici documentali, UI web
+Lume e aggiornamenti della family Apple. Le integrazioni sono incluse solo
+entro i gate e i limiti dichiarati.
+
+- Il registro delle proposte diagnostiche resta separato dalle diagnosi
+  cliniche. La promozione richiede review esplicita.
+- Le superfici web trattano gli stati documentali come stati accessibili.
+- La family Apple conserva i limiti paired, non-AI e local-first già dichiarati.
+- Nessuna voce aggiunge cloud, auto-write clinico, SISS/FSE nativo o una inbox
+  conversazionale.
 
 ### 5.2 Lane benchmark-only
 

@@ -5,11 +5,10 @@ Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.0] - 2026-07-29
 
-> Candidata `0.8.0`: contenuti in consolidamento. La versione del pacchetto
-> resta `0.7.3` finché contenuti, documentazione e verifica finale non sono
-> chiusi.
+> Questa voce descrive la release sorgente `0.8.0`. Non dichiara una
+> pubblicazione App Store, una certificazione o conformità completa.
 
 ### Uso del prodotto
 
@@ -39,8 +38,11 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - **Modifica**: Next.js, Sharp e PostCSS usano le versioni fissate dal
   file `package-lock.json`.
   **Stato**: integrata in `main` con la PR #138.
-  **Limite**: `npm audit` rileva sei rilievi nelle dipendenze di sviluppo. Il
-  controllo delle sole dipendenze di produzione non rileva vulnerabilità.
+  **Limite**: l'audit live del 29 luglio 2026 rileva 21 rilievi esclusivamente
+  nel tooling di sviluppo: 1 low, 5 moderate e 15 high. Il controllo delle sole
+  dipendenze di produzione non rileva vulnerabilità. Una remediation che
+  forza dipendenze fuori dai range dichiarati è stata rifiutata; serve un
+  packet separato con installazione strict-peer e regressione completa.
 - **Modifica**: il controllo del pacchetto autonomo (`standalone`) convalida
   gli artefatti nativi Sharp caricati. Rifiuta collegamenti simbolici o
   ripieghi che si risolvono fuori dal pacchetto.
@@ -55,6 +57,42 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   **Stato**: integrata con la PR #139.
   **Limite**: l'endpoint MLX mantiene il confine di autenticazione esistente.
 
+### Interfacce e contratti locali
+
+- **Modifica**: le superfici web e Apple ricevono correzioni di layout,
+  accessibilità automatica, navigazione e contratti wire per i flussi
+  dichiarati.
+  **Stato**: incluse nella release sorgente con fixture sintetiche e test
+  mirati sullo stesso tree.
+  **Evidenza**: iPhone 2/2 e iPad 7/7 su simulatori iOS 27; macOS con build,
+  Cmd-R contestuale, VoiceOver manuale, tastiera, click-map e resize; localhost
+  78/78, viewport 320/390/768/1440 e zoom browser reale 200%/400%.
+  **Limite**: non dichiarano parity completa o conformità accessibilità.
+  VoiceOver reale su iPhone e iPad non è provato perché l'API pubblica della
+  beta Xcode 27 non ha raggiunto uno stato terminale nel simulatore. La deroga
+  vale solo per la release sorgente GitHub 0.8.
+- **Modifica**: gli identifier delle tab compatte iPhone sono collegati ai
+  controlli UIKit pubblici e verificati con uno XCUITest atomico.
+  **Stato**: iPhone 2/2 e iPad 7/7.
+  **Limite**: è un workaround specifico della disponibilità iOS 27; una nuova
+  seed Xcode può richiedere una riverifica.
+- **Modifica**: Cmd-R su macOS aggiorna la superficie che possiede il focus,
+  con fallback dichiarato e stato disabilitato coerente.
+  **Stato**: probe contestuale PASS su Agenda e Analytics.
+- **Modifica**: Evidence Stack usa lo stato vuoto
+  `Nessuna sintesi disponibile.`.
+  **Stato**: fallback verificato sul runtime localhost.
+  **Limite**: OCR e curation documentale restano funzioni host secondo ADR
+  0076.
+- **Modifica**: i metadati app Apple e il progetto Xcode dichiarano la versione
+  `0.8.0`.
+  **Stato**: `CFBundleShortVersionString` e `MARKETING_VERSION` allineati;
+  `CURRENT_PROJECT_VERSION` resta `1`.
+- **Modifica**: l'export FHIR mantiene un perimetro locale e manuale. La
+  condivisione resta soggetta alle capability della piattaforma.
+  **Stato**: il contratto v0 resta documentato in ADR 0081.
+  **Limite**: non dimostra conformità FSE o acquisizione da sistemi terzi.
+
 ### Confini non consegnati
 
 - Codex Operator personale resta escluso. Richiede un nuovo piano di lavoro
@@ -66,6 +104,10 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   registrazione e ripiego locale.
 - Il cloud può offrire capacità o tempi di elaborazione diversi. Non è un
   requisito e non implica una promessa clinica.
+- La release non dichiara parity UI completa. La matrice parity canonica e i
+  gate assistivi restano le fonti per i limiti delle superfici.
+- Intelligence Fabric è una direzione post-0.8. Provider esterni, routing tra
+  venue e automazione graduata non sono funzioni complete della release.
 
 ### Sviluppo assistito
 

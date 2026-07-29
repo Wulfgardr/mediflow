@@ -31,6 +31,21 @@ final class SQLitePatientStoreTests: XCTestCase {
         XCTAssertEqual(p.taxCode, "RSSMRA80A01H501U")
         XCTAssertEqual(p.version, 1)
         XCTAssertEqual(p.isArchived, false)
+        XCTAssertNil(p.diagnoses, "the default list projection stays minimal")
+    }
+
+    /* @Codex */
+    func testListPatientsProjectsEncryptedDiagnosesOnlyForActiveOptIn() throws {
+        let store = SQLitePatientStore(path: fixturePath())
+        let active = try XCTUnwrap(try store.listPatients(includeDiagnoses: true).first)
+        XCTAssertTrue(active.diagnoses?.hasPrefix(CryptoService.encPrefix) == true)
+        let decoded = DiagnosesCodec.decode(
+            PatientFieldCrypto.decryptStructuredField(active.diagnoses, masterKey: masterKey))
+        XCTAssertEqual(decoded.first?.displayText, "E11.9 - Diabete tipo 2")
+
+        let trashProjection = try XCTUnwrap(
+            try store.listPatients(includeDeleted: true, includeDiagnoses: true).first)
+        XCTAssertNil(trashProjection.diagnoses, "trash reads must not retain the clinical projection")
     }
 
     func testLoadPatientDetailDecryptsEncryptedFields() throws {
