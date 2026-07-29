@@ -216,8 +216,10 @@ export interface FabricResolutionReceipt {
     readonly egressProfile: Readonly<Pick<EgressProfile, 'id' | 'version' | 'egress'>>;
     readonly provider: FabricProviderRef;
     readonly model: string | null;
-    // Ricevuta del registry provider per le capability generative; null per
-    // le deterministiche. La ricevuta non autorizza alcun consumer.
+    // Ricevuta del registry provider per le capability generative con binding
+    // registry; null per le deterministiche e per le lane generative
+    // autogestite fuori dal registry (oggi 'athena_mlx'). La ricevuta non
+    // autorizza alcun consumer.
     readonly providerReceipt: ProviderSelectionReceipt | null;
     readonly fallbackCount: 0;
 }
@@ -228,22 +230,36 @@ export interface FabricResolutionReceipt {
 
 // Record di provenienza allegabile agli output di lane: nomina provider,
 // preprocessing e venue senza contenere prompt, payload o dati clinici.
+// Vocabolario CHIUSO dei passi di preprocessing dichiarabili in provenienza.
+// Un'etichetta fuori vocabolario viene respinta: e' l'unico modo per impedire
+// che contenuto clinico normalizzato (es. una diagnosi in snake_case) entri
+// nel record attraverso il campo etichette. Aggiungere un passo richiede una
+// modifica esplicita a questo contratto.
+export const FABRIC_PREPROCESSING_LABELS = [
+    'layer1_redaction',
+    'context_minimization',
+    'ocr_normalization',
+    'normalize_dates',
+    'envelope_validation',
+] as const;
+
+export type FabricPreprocessingLabel = typeof FABRIC_PREPROCESSING_LABELS[number];
+
+// Vincolo di forma per ogni voce del vocabolario (verificato nei test):
+// nomi snake_case bounded, mai testo libero.
+export const FABRIC_PREPROCESSING_LABEL_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
+
 export interface FabricProvenanceRecord {
     readonly schemaVersion: 'mediflow.ai.fabric-provenance.v1';
     readonly capability: FabricCapabilityId;
     readonly venue: FabricVenue;
     readonly provider: FabricProviderRef;
     readonly model: string | null;
-    // Nomi dei passi di preprocessing applicati (es. 'layer1_redaction');
-    // solo etichette, mai contenuto.
-    readonly preprocessing: readonly string[];
+    // Passi di preprocessing applicati, dal vocabolario chiuso; solo
+    // etichette, mai contenuto.
+    readonly preprocessing: readonly FabricPreprocessingLabel[];
     readonly receipt: FabricResolutionReceipt;
 }
-
-// Le etichette di preprocessing sono nomi snake_case bounded: il pattern
-// impedisce che testo libero (e quindi contenuto clinico) entri nel record
-// di provenienza attraverso il campo etichette.
-export const FABRIC_PREPROCESSING_LABEL_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
 
 // ---------------------------------------------------------------------------
 // Errori fail-closed

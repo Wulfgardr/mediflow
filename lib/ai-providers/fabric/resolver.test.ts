@@ -2,7 +2,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ProviderRegistryError } from '../registry.ts';
-import { FabricPolicyError, type FabricCapabilityDescriptor, type FabricExecutionPolicy } from './contract.ts';
+import {
+    FABRIC_PREPROCESSING_LABELS, FABRIC_PREPROCESSING_LABEL_PATTERN,
+    FabricPolicyError, type FabricCapabilityDescriptor, type FabricExecutionPolicy,
+} from './contract.ts';
 import { DETERMINISTIC_CAPABILITY_DESCRIPTORS } from './deterministic-catalog.ts';
 import { GENERATIVE_CAPABILITY_DESCRIPTORS } from './generative-catalog.ts';
 import { buildProvenanceRecord, resolveFabricCapability } from './resolver.ts';
@@ -79,6 +82,20 @@ test('rifiuta ogni classe di errore Fabric raggiungibile', () => {
     expectCode('policy_invalid', () => resolveFabricCapability(
         { ...policyFor(deterministic), requestId: ' ' },
         { descriptor: deterministic, venue: 'local_process' }));
+    // I tipi non sono enforcement: valori runtime fuori contratto devono
+    // fallire anche quando TypeScript li vieterebbe staticamente.
+    expectCode('policy_invalid', () => resolveFabricCapability(
+        { ...policyFor(deterministic), retention: 'remote_forever' } as unknown as FabricExecutionPolicy,
+        { descriptor: deterministic, venue: 'local_process' }));
+    expectCode('policy_invalid', () => resolveFabricCapability(
+        { ...policyFor(deterministic), consentRef: { synthetic: true } } as unknown as FabricExecutionPolicy,
+        { descriptor: deterministic, venue: 'local_process' }));
+    expectCode('policy_invalid', () => resolveFabricCapability(
+        { ...policyFor(deterministic), allowedVenues: 'local_process' } as unknown as FabricExecutionPolicy,
+        { descriptor: deterministic, venue: 'local_process' }));
+    expectCode('policy_invalid', () => resolveFabricCapability(
+        { ...policyFor(deterministic), allowedVenues: ['local_process', 'everywhere'] } as unknown as FabricExecutionPolicy,
+        { descriptor: deterministic, venue: 'local_process' }));
     expectCode('capability_unknown', () => resolveFabricCapability(
         { ...policyFor(deterministic), capability: 'fhir_export' },
         { descriptor: deterministic, venue: 'local_process' }));
@@ -138,9 +155,14 @@ test('costruisce provenienza congelata con sole etichette', () => {
     assert.equal(Object.isFrozen(provenance.preprocessing), true);
     assert.deepEqual(provenance.preprocessing, ['normalize_dates', 'layer1_redaction']);
     assert.equal(JSON.stringify(provenance).includes('synthetic clinical content'), false);
+    // Coerenza del contratto: ogni voce del vocabolario chiuso rispetta il
+    // vincolo di forma dichiarato.
+    for (const label of FABRIC_PREPROCESSING_LABELS) {
+        assert.equal(FABRIC_PREPROCESSING_LABEL_PATTERN.test(label), true, label);
+    }
 });
 
-test('respinge etichette di preprocessing con testo libero', () => {
+test('respinge etichette di preprocessing fuori dal vocabolario chiuso', () => {
     const resolution = resolveFabricCapability(policyFor(deterministic), {
         descriptor: deterministic,
         venue: 'local_process',
@@ -149,4 +171,8 @@ test('respinge etichette di preprocessing con testo libero', () => {
         resolution, ['synthetic patient Mario Rossi; prompt=mal di testa']));
     expectCode('provenance_label_invalid', () => buildProvenanceRecord(resolution, ['Layer1']));
     expectCode('provenance_label_invalid', () => buildProvenanceRecord(resolution, ['']));
+    // Snake_case sintatticamente valido ma con semantica clinica: il pattern
+    // da solo non basta, il vocabolario chiuso deve respingerlo.
+    expectCode('provenance_label_invalid', () => buildProvenanceRecord(
+        resolution, ['diagnosi_diabete_tipo_2']));
 });

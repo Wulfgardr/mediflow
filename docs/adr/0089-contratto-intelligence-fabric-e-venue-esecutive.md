@@ -114,7 +114,11 @@ Il resolver fallisce prima dell'inferenza se capability, classe, venue o
 profilo non sono compatibili. La ricevuta di risoluzione riporta capability,
 classe, venue effettiva, profilo egress con versione, provider effettivo
 (`in_house` per le pipeline deterministiche), modello quando esiste e la
-ricevuta del registry provider per le capability generative. La ricevuta non
+ricevuta del registry provider per le capability generative con binding
+registry. Le lane generative autogestite fuori dal registry (oggi il
+treatment reasoning su runtime MLX, provider `athena_mlx`) dichiarano il
+provider effettivo nella ricevuta fabric senza ricevuta registry e senza
+modello statico: il modello resta risolto dalla lane. La ricevuta non
 autorizza alcun consumer e non contiene endpoint, prompt, credenziali o dati
 clinici.
 
