@@ -34,6 +34,15 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   /api/v1/network/pairing-clients/{clientId}`.
   **Limite**: nessuna UI nuova e nessuna adozione nativa in questa fase; la
   scrittura clinica resta un comando applicativo separato.
+- **Modifica**: candidato locale Fabric (ADR 0091) con lifecycle provider
+  dichiarativo, admissione e continuita fail-closed, proiezione paired
+  `status_only`, decode Swift condiviso e harness sintetico
+  receipt-provenance-review.
+  **Stato**: candidato locale sulla branch CoS post-0.8, senza credenziali o
+  servizi esterni.
+  **Limite**: il router non governa ancora tutti i call path AI; lifecycle
+  vendor, cloud, on-device, AI paired e persistenza della review restano
+  bloccati o fuori scope. Nessuna voce promuove la release 0.8.
 
 ## [0.8.0] - 2026-07-29
 
