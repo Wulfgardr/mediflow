@@ -88,10 +88,10 @@ node scripts/build-screenshots.mjs
 - [04-review.png](../../../screenshots/04-review.png)
 - [05-security.png](../../../screenshots/05-security.png)
 
-La cattura [macos-workspace.png](../../../screenshots/macos-workspace.png) è
-evidenza nativa separata, acquisita con sessione operatore e permessi TCC. Non
-appartiene alla pipeline web e non condivide necessariamente viewport o data
-dello snapshot precedente.
+La cattura
+[macos-clinical-workspace.png](../../../screenshots/0.8/macos-clinical-workspace.png)
+è evidenza nativa separata. Usa fixture sintetiche deterministiche e non
+appartiene alla pipeline web.
 
 ## LEGACY: riferimenti storici
 
