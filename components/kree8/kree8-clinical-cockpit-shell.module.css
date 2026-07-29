@@ -269,7 +269,7 @@
 /* @Codex The primary labels and their counters no longer fit compact and
    zoomed viewports. Keep every destination in the document flow instead of
    depending on an undiscoverable horizontal scroll position. */
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .rail {
     display: flex;
     flex-wrap: wrap;
