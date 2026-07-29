@@ -24,6 +24,16 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   **Stato**: scaffold locale con test dedicati; nessun provider nuovo.
   **Limite**: il profilo cloud esiste ed e' chiuso per costruzione; nessun
   egress, credenziale o consenso e' stato aggiunto.
+- **Modifica**: giunture fabric (ADR 0090): ciclo di vita del trust paired
+  con revoca host-side dei client, onboarding provider fail-closed per classe
+  di credenziale, decisioni di routing osservabili con fallback negato e
+  contratto di interazione clinica (incertezza con origine, campi illeggibili
+  distinti dagli assenti, revisione deny-by-default senza stato applicato).
+  **Stato**: contratti e runtime locali con test dedicati; route
+  `/api/ai/fabric/observability` e revoca `DELETE
+  /api/v1/network/pairing-clients/{clientId}`.
+  **Limite**: nessuna UI nuova e nessuna adozione nativa in questa fase; la
+  scrittura clinica resta un comando applicativo separato.
 
 ## [0.8.0] - 2026-07-29
 
