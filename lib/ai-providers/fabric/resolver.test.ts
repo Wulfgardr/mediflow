@@ -103,6 +103,13 @@ test('rifiuta ogni classe di errore Fabric raggiungibile', () => {
     expectCode('policy_invalid', () => resolveFabricCapability(
         { ...policyFor(deterministic), allowedVenues: sparseVenues } as unknown as FabricExecutionPolicy,
         { descriptor: deterministic, venue: 'local_process' }));
+    // TOCTOU: un includes ridefinito dal chiamante non deve ampliare le
+    // venue oltre quelle dichiarate (la membership usa lo snapshot interno).
+    const lyingVenues = ['local_process'] as string[] & { includes: (v: string) => boolean };
+    lyingVenues.includes = () => true;
+    expectCode('venue_not_allowed', () => resolveFabricCapability(
+        { ...policyFor(deterministic), allowedVenues: lyingVenues } as unknown as FabricExecutionPolicy,
+        { descriptor: deterministic, venue: 'home_base' }));
     expectCode('capability_unknown', () => resolveFabricCapability(
         { ...policyFor(deterministic), capability: 'fhir_export' },
         { descriptor: deterministic, venue: 'local_process' }));
@@ -194,4 +201,17 @@ test('respinge etichette di preprocessing fuori dal vocabolario chiuso', () => {
     // da solo non basta, il vocabolario chiuso deve respingerlo.
     expectCode('provenance_label_invalid', () => buildProvenanceRecord(
         resolution, ['diagnosi_diabete_tipo_2']));
+    // TOCTOU: un iteratore stateful che cambia valori tra la validazione e
+    // la materializzazione non deve inserire label vietate nel record: la
+    // stessa copia validata e' quella congelata.
+    let iterations = 0;
+    const statefulLabels = ['normalize_dates'];
+    Object.defineProperty(statefulLabels, Symbol.iterator, {
+        value: function* () {
+            iterations += 1;
+            yield iterations === 1 ? 'normalize_dates' : 'diagnosi_diabete_tipo_2';
+        },
+    });
+    const record = buildProvenanceRecord(resolution, statefulLabels);
+    assert.deepEqual([...record.preprocessing], ['normalize_dates']);
 });

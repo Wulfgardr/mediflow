@@ -88,6 +88,7 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 | W4 verifica terminale | Sol xhigh, contesto fresco | HOLD_FIX al primo passaggio | Battery tutta verde (932/932); falsificatori contrattuali reali: descriptor fabbricato accettato (P1), ricevuta `treatment_reasoning` con provider discordante da `athena_mlx` (P1), etichette provenance non validate (P2), overclaim docs conseguente (P2), matrice con decisioni gia' chiuse (P3) |
 | W4 secondo passaggio | Sol xhigh, contesto fresco | HOLD_FIX | P1 confermati chiusi dai falsificatori; residui: policy non validata integralmente a runtime (P2: `retention`/`consentRef`/`allowedVenues`), pattern snake_case aggirabile con semantica clinica (P2: `diagnosi_diabete_tipo_2`), riga rischi stale (P3), eccezione ATHENA non documentata in ADR (P3) |
 | W4 terzo passaggio | Sol high, contesto fresco, focalizzato | HOLD_FIX | Correzioni A-D confermate chiuse dai falsificatori; battery verde (935/935); nuovi P2 dalla caccia avversariale: vocabolario `as const` non congelato a runtime (mutabile prima del load del resolver) e array sparso che aggira `every()` su `allowedVenues` |
+| W4 quarto passaggio | Sol high, contesto fresco, focalizzato | HOLD_FIX | Congelamento e fix sparse-array confermati chiusi; battery verde (936/936); nuovi P2 classe TOCTOU: `includes` ridefinito dal chiamante amplia le venue; doppia iterazione della provenance permette a un iteratore stateful di cambiare valori tra check e uso |
 
 ## 6. Decision audit (aggiornato in corso d'opera)
 
@@ -105,6 +106,7 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 | Validazione policy delegata ai tipi TypeScript | Corretta dopo il secondo passaggio W4: `retention`, `consentRef` e `allowedVenues` convalidati a runtime (i tipi non sono enforcement) | Un valore runtime fuori contratto che produca una ricevuta |
 | Costanti array del contratto solo `as const` | Corretta dopo il terzo passaggio W4: `Object.freeze` su vocabolario, venue e id capability; test che la mutazione lancia `TypeError` | Una costante esportata mutabile che avveleni i `Set` derivati |
 | `every()` su array del chiamante | Corretta dopo il terzo passaggio W4: normalizzazione con `Array.from` (i buchi diventano `undefined` e falliscono la validazione) | Un array sparso che produca una ricevuta |
+| Metodi e iteratori del chiamante tra check e uso (TOCTOU) | Corretta dopo il quarto passaggio W4: pattern snapshot-unico; validazione e membership/materializzazione usano la STESSA copia reale interna, mai metodi o iteratori dell'oggetto originale | Un oggetto del chiamante che menta tra validazione e uso producendo ricevuta o record difformi |
 | Nessuna modifica ai client nativi in questo programma | Accettata | Un requisito di parity che imponga adozione Swift immediata |
 | Meter Fable non esposto in sessione | Registrata `CAPACITY_UNKNOWN` solo per eventuali lane Fable aggiuntive; nessuna avviata | |
 
