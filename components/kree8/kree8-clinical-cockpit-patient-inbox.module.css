@@ -418,17 +418,28 @@
 
   .patientSearchField { min-height: 44px; }
 
-  .worklistPanelHeader { row-gap: 6px; }
+  .worklistPanelHeader {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 8px;
+    row-gap: 6px;
+    align-items: center;
+  }
 
   .worklistPanelHeader > h2 {
+    min-width: 0;
     font-size: 17px;
     white-space: nowrap;
   }
 
-  .resultCount { margin-left: auto; }
+  .resultCount {
+    margin-left: 0;
+    white-space: nowrap;
+  }
 
   .worklistPanelHeader > span:last-child {
-    flex: 1 0 100%;
+    grid-column: 1 / -1;
+    width: 100%;
     margin-left: 0;
   }
 
