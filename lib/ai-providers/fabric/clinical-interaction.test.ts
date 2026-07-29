@@ -162,6 +162,31 @@ test('applica l ordine errori congelato per accept', () => {
     }));
 });
 
+test('indurimenti runtime: ref vuoto e attore fuori vocabolario', () => {
+    // Una stringa vuota o di soli spazi non e' un riferimento di provenienza.
+    expectCode('proposal_invalid', () => createClinicalProposal({
+        capability: 'document_synthesis',
+        provenanceRef: '   ',
+        uncertainty: declareUncertainty('low'),
+        completeness: { unreadableFields: [], missingFields: [] },
+        pendingWork: [],
+    }));
+    // Difesa in profondita all'accettazione: un ref svuotato a runtime oltre
+    // i tipi non supera il gate di provenienza.
+    const forged = { ...proposalAt('previewed'), provenanceRef: ' ' } as ReturnType<typeof proposalAt>;
+    expectCode('provenance_missing', () => advanceClinicalReview(forged, {
+        type: 'accept',
+        actor: 'physician',
+        uncertaintyAcknowledged: true,
+    }));
+    // Un attore runtime fuori vocabolario e' respinto anche dove la
+    // transizione non vincola l'attore.
+    expectCode('actor_forbidden', () => advanceClinicalReview(proposalAt('pending'), {
+        type: 'request_clarification',
+        actor: 'model',
+    } as unknown as Parameters<typeof advanceClinicalReview>[1]));
+});
+
 test('blocca ogni evento dagli stati terminali e non espone applied', () => {
     const terminal = [
         advanceClinicalReview(proposalAt('previewed'), {
