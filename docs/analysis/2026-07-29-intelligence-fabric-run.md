@@ -107,6 +107,7 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 | Binding nativo assente nei worktree lane | Le prove lane usano test puri senza db; la battery completa gira sul branch manager |
 | Glob `fabric/*.test.ts` nella spec F1 non supportato dal runner (espande solo `/**/`) | Errore di spec del controller; la lane si e' fermata invece di deviare; forma corretta `fabric/**/*.test.ts` propagata alle spec successive |
 | Il resolver accetta il descriptor dal chiamante | Nessun descriptor artigianale puo' aprire egress o cloud (test avversariale dedicato); la fonte canonica dei descriptor diventa il catalogo unificato in W2b; una ricevuta non autorizza consumer per contratto |
+| `never-regress` NR-EGRESS su fixture negativa `https://example.test` in `resolver.test.ts` | Trovato dalla battery W3; fixture ricostruita a pezzi con `join('')` come il pattern di `registry.test.ts`; guard e test fabric riverificati verdi |
 
 ## 8. Next permitted action
 
