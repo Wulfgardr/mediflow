@@ -49,6 +49,24 @@ type ConfirmPairingFailure = {
 /* @Codex */
 export type ConfirmPairingResult = ConfirmPairingSuccess | ConfirmPairingFailure;
 
+/* @Codex */
+type RemovePairedClientSuccess = {
+    ok: true;
+    status: 200;
+    value: { removedClientId: string };
+    nextState: NetworkPairingState;
+};
+
+/* @Codex */
+type RemovePairedClientFailure = {
+    ok: false;
+    status: 404;
+    value: Omit<NetworkErrorResponse, 'code'> & { code: 'PAIRING_CLIENT_NOT_FOUND' };
+};
+
+/* @Codex */
+export type RemovePairedClientResult = RemovePairedClientSuccess | RemovePairedClientFailure;
+
 const EMPTY_NETWORK_PAIRING_STATE: NetworkPairingState = {
     intents: [],
     clients: [],
@@ -265,5 +283,33 @@ export function confirmPendingPairingIntent(input: {
             pairedClientToken,
         }),
         nextState,
+    };
+}
+
+/* @Codex */
+export function removePairedClient(
+    state: NetworkPairingState,
+    clientId: string,
+): RemovePairedClientResult {
+    if (!state.clients.some((client) => client.clientId === clientId)) {
+        return {
+            ok: false,
+            status: 404,
+            value: {
+                error: 'Not Found',
+                code: 'PAIRING_CLIENT_NOT_FOUND',
+                message: 'Paired client not found.',
+            },
+        };
+    }
+
+    return {
+        ok: true,
+        status: 200,
+        value: { removedClientId: clientId },
+        nextState: {
+            intents: state.intents,
+            clients: state.clients.filter((client) => client.clientId !== clientId),
+        },
     };
 }
