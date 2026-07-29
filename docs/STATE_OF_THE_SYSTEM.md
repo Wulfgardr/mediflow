@@ -95,9 +95,12 @@ La fotografia corrente e questa:
   provider locale per task (WUL-502) e lo scaffold Intelligence Fabric di ADR
   0089: contratto congelato, cataloghi delle capability generative e
   deterministiche, resolver fail-closed e stato read-only
-  `/api/ai/fabric/status`. Lo scaffold non aggiunge provider, egress o
-  automazione: Intelligence Fabric resta una linea in costruzione, non una
-  funzione completa del prodotto corrente.
+  `/api/ai/fabric/status`. ADR 0090 e ADR 0091 aggiungono un candidato locale
+  limitato: lifecycle provider dichiarativo senza segreti, continuita
+  fail-closed, proiezione PHI-safe `status_only` per i client paired e harness
+  sintetico receipt-provenance-review. Il candidato non aggiunge provider,
+  egress, grant paired o automazione: Intelligence Fabric resta una linea in
+  costruzione, non una funzione completa del prodotto corrente.
 - **Attese locali**: la prima slice web collega prestazioni attese e risultati;
   il salvataggio resta esplicito e il workflow non e esteso ai client paired.
 - **SISS/FSE**: handoff contestuale e flussi `webapp-assisted`; nessuna
@@ -375,6 +378,27 @@ entro i gate e i limiti dichiarati.
 - La family Apple conserva i limiti paired, non-AI e local-first già dichiarati.
 - Nessuna voce aggiunge cloud, auto-write clinico, SISS/FSE nativo o una inbox
   conversazionale.
+
+### 5.1.2 Candidato locale Intelligence Fabric post-0.8
+
+Il branch di programma post-0.8 contiene un candidato tecnico locale regolato
+da ADR 0089, ADR 0090 e ADR 0091. Il candidato:
+
+- applica onboarding, degrado e revoca provider a snapshot dichiarativi che
+  non contengono credenziali;
+- nega venue offline, sconosciute o degradate e non cambia provider in
+  fallback;
+- espone su `/api/v1/network/ai-runtime` una proiezione PHI-safe decodificabile
+  dal core Swift condiviso;
+- lascia il client paired in `status_only`, con esecuzione AI non autorizzata;
+- collega in un harness sintetico receipt, provenance, proposta e revisione
+  del medico senza eseguire scritture cliniche;
+- mantiene il core deterministico non-AI disponibile senza provider.
+
+Il router candidato non governa ancora tutti i call path AI operativi. Il
+lifecycle provider non e persistito e non parla con API vendor. Cloud,
+on-device e invocazione AI paired restano in `hold`. Il risultato e quindi un
+candidato locale verificabile, non una promozione prodotto o remota.
 
 ### 5.2 Lane benchmark-only
 

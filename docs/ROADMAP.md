@@ -206,6 +206,12 @@ indeterminato resta bloccante.
   locale, proposta, chiarimento, anteprima, autorizzazione ed eventuale
   scrittura applicativa auditata. Il contratto e accettato per il programma
   post-0.8, non modifica il candidato 0.8 e non apre nuovi runtime.
+* **Candidato locale Intelligence Fabric**: ADR 0090 e ADR 0091 aggiungono
+  lifecycle provider dichiarativo, routing osservabile fail-closed, stato
+  paired `status_only`, decode nel core Swift condiviso e un harness sintetico
+  receipt-provenance-review senza scritture. Il candidato resta sulla branch
+  post-0.8: non autorizza AI paired, cloud, on-device, nuovi provider o
+  promozione remota.
 * **Attese locali**: la prima slice web collega prestazione attesa e risultato;
   non estende il workflow ai client paired e non introduce scritture autonome.
 * **Automazione graduata futura**: proposta, anteprima, finestra di

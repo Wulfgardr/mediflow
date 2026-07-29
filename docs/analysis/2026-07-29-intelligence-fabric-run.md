@@ -293,3 +293,66 @@ P2 status paired/Swift ─┘
 ADR 0091 congela il confine: host-local, fail-closed, paired solo status,
 nessuna scrittura clinica e nessun claim su cloud, on-device o readiness
 qualificata.
+
+## 11. Packet integrati e verifica del controller
+
+Stato del checkpoint: `CANDIDATE_BUILT / FRESH_VERIFIER_PENDING`.
+
+| Packet | Lane e worktree | Commit candidato | Commit integrati | Esito controller |
+| --- | --- | --- | --- | --- |
+| P1 admissione e continuita | Terra high, `if-p1-provider-admission` | `15dc671e4`, hardening `b6e4d5f7e` | `5937b71b9`, `5d5a729a7`, `925235463`, `951055a71`, `91ae0f481` | lifecycle, revoca, degrado, snapshot e routing fail-closed verificati |
+| P2 status paired e Swift | Sol xhigh, `if-p2-status-projection` | `0cebf7e2b` | `77bc69854` | proiezione PHI-safe, paired senza grant, OpenAPI e decode Swift condiviso |
+| P3 harness sintetico | controller | non applicabile | `d860e6103`, `22b8dd94e`, `0b8469753` | receipt, provenance, review medica, zero write e core non-AI verificati |
+| Hardening gate egress | controller | non applicabile | `7e5321bb3` | rimossa dalla fixture una URL remota; `never-regress` verde |
+
+I worktree packet restano disponibili e non sono stati cancellati.
+
+### Evidenza combinata
+
+- Node `24.18.0`, ABI `137`, `better-sqlite3` caricabile.
+- Test mirati Fabric, egress, pairing e network: `111/111` pass.
+- Suite unit completa: `992/992` pass.
+- Typecheck, lint, claims guard, never-regress, OpenAPI drift e schema drift:
+  pass.
+- Build production: pass con il comando canonico `npm run build`. Il primo
+  tentativo era stato bloccato da un link `node_modules` esterno al filesystem
+  root di Turbopack; il controller ha copiato le dipendenze nel proprio
+  worktree e ha ripetuto il comando invariato.
+- Parsing del modello Swift modificato: pass con `swiftc -parse`.
+- Suite SwiftPM: `BLOCKED_TOOLCHAIN`. CommandLineTools non inizializza XCBuild
+  (`Unknown error parsing property list`); il risultato non e sostituito da un
+  claim runtime Apple.
+- `git diff --check`: pass.
+
+### Decision audit prima del verifier
+
+| Decisione osservabile | Stato | Evidenza o limite |
+| --- | --- | --- |
+| Lifecycle provider dichiarativo, senza segreti e con revoca terminale | Accepted | test unit e snapshot runtime |
+| Venue unknown, degraded e offline negano prima del resolver | Accepted | falsificatori routing |
+| Pairing espone solo status e non concede esecuzione AI | Accepted | tipi, OpenAPI, modello Swift e test network |
+| Harness sintetico senza provider, rete o scritture | Accepted | report congelato e test zero-write |
+| Fixture con URL remota fittizia | Corrected | sostituita con identificatore non canonico privo di rete |
+| Getter stateful e identificatori non canonici nel packet P1 | Corrected | snapshot singolo e validazione |
+| Osservazioni venue duplicate | Corrected | rifiuto fail-closed |
+| Nome/versione della proiezione e copy fallback nel packet P2 | Corrected | schema `network-fabric-status.v1`, contratto canonico e fallback negato |
+| Test harness sensibile a sottostringhe e file oltre la soglia LOC | Corrected | chiavi vietate esplicite e modulo envelope separato |
+
+Non restano decisioni contrattuali aperte per il candidato locale di ADR 0091.
+Restano aperti per una promozione successiva: enforcement su tutti i call path
+AI reali, persistenza e broker vendor del lifecycle, provider o entitlement
+on-device/cloud, autorita per AI paired, persistenza della review e test Apple
+con una toolchain Xcode funzionante.
+
+### Indicatore di avanzamento
+
+- Base tecnica del programma: **82%**. Il punteggio considera contratti,
+  admissione, continuita, pairing, status condiviso, provenance/review,
+  no-egress e gate; riduce il risultato per call path non migrati, lifecycle
+  non persistito e venue esterne assenti.
+- Prodotto end-to-end: **54%**. Il core locale e l'harness sono verificati, ma
+  paired AI, on-device, cloud, consumer prodotto e persistenza review non sono
+  consegnati.
+
+Le percentuali sono indicatori di copertura tecnica, non readiness clinica,
+certificazione o autorita di promozione.

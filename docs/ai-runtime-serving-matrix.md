@@ -8,7 +8,7 @@ read_when:
 
 # Matrice task × modello × runtime
 
-Stato al 28 luglio 2026. Issue di riferimento: `WUL-418`.
+Stato al 29 luglio 2026. Issue di riferimento: `WUL-418`.
 
 Questo documento governa il pacchetto post-0.8. Non modifica né promuove la
 candidata 0.8.
@@ -58,6 +58,14 @@ definisce capability, venue esplicite, profili egress versionati e ricevute di
 risoluzione. Questa matrice resta l'autorita sugli stati di serving dei
 modelli: una capability registrata nella fabric non promuove alcuna lane, non
 cambia gli stati ammessi e non sostituisce i gate di questo documento.
+
+[ADR 0090](./adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md) definisce
+trust, onboarding, routing osservabile e review. [ADR
+0091](./adr/0091-candidato-locale-fabric-admissione-continuita-status.md)
+limita il candidato corrente a enforcement host-local, stato paired
+`status_only` e prove sintetiche. Il lifecycle provider non contiene segreti e
+non sostituisce un broker vendor. Il router candidato non governa ancora tutti
+i call path AI operativi.
 
 ## 2. Stati ammessi
 
@@ -176,7 +184,10 @@ Una regressione di località, qualità, privacy o kill switch riporta la lane a
 | Client Apple paired non-AI | `docs/parity-matrix.md`, `docs/apple-parity-matrix.json` |
 | Provider ed egress | `docs/adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md` |
 | Scaffold post-0.8 | `docs/adr/0086-intelligent-scaffold-and-graded-automation-boundary.md` |
-| Run record | `docs/analysis/2026-07-28-provider-program-post-0.8-run.md` |
+| Candidato locale Fabric | `docs/adr/0091-candidato-locale-fabric-admissione-continuita-status.md`, `lib/ai-providers/fabric/candidate-router.ts` |
+| Harness receipt-provenance-review | `lib/ai-providers/fabric/local-candidate-harness.ts` |
+| Stato paired `status_only` | `lib/network-ai-runtime-model.ts`, `native/MediFlowMac/Sources/MediFlowCore/HomeBaseModels.swift` |
+| Run record | `docs/analysis/2026-07-29-intelligence-fabric-run.md` |
 
 ## 8. Decisioni aperte
 
@@ -186,10 +197,16 @@ Una regressione di località, qualità, privacy o kill switch riporta la lane a
 - decidere il profilo degradato OCR multipiattaforma in WUL-466;
 - verificare Apple Foundation Models in WUL-417 senza promozione implicita;
 - mantenere i provider remoti in `hold` fino ai gate egress completi.
+- portare il router candidato sui call path AI reali solo con un packet
+  separato e falsificatori per ogni consumer;
+- definire persistenza e broker lifecycle provider prima di usare una revoca
+  vendor come stato operativo.
 
 Decisioni gia chiuse sulla linea post-0.8: le slice C0a-C0c di ADR 0088 sono
 state eseguite (WUL-502) e il contratto Intelligence Fabric e' definito in
 [ADR 0089](./adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md).
+ADR 0090 e ADR 0091 chiudono il confine del candidato locale: paired solo
+status, fallback negato, nessun egress e nessuna scrittura clinica autonoma.
 
 Queste decisioni non bloccano l'uso locale review-first già osservato come
 `runtime` sotto i boundary esistenti. Bloccano la ricertificazione WUL-418,
