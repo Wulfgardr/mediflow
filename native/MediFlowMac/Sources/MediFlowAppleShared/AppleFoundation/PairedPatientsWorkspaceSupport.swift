@@ -79,24 +79,100 @@ func cleanedPatientWorkspaceValue(_ value: String?) -> String? {
 struct PairedPatientFlagChip: View {
     let text: String
     let tone: VetroTone
+    /// Same reason as `ClinicalCodePill`: on a selected list row the system
+    /// repaints `.primary`-derived text, and a tinted chip on a tinted row loses
+    /// its contrast. The caller states it because the environment key that would
+    /// answer needs macOS 14.
+    let isOnProminentBackground: Bool
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.lumeGuardia) private var isGuardia
 
-    init(_ text: String, tone: VetroTone) {
+    init(_ text: String, tone: VetroTone, isOnProminentBackground: Bool = false) {
         self.text = text
         self.tone = tone
+        self.isOnProminentBackground = isOnProminentBackground
     }
 
     var body: some View {
         let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
         let toneColor = LumePalette.tint(for: tone, using: palette)
+        // A near-opaque chip on a selected row, so the tone colour it carries
+        // stays a tone colour instead of washing into the selection tint. The
+        // chip's job is to say "ADI" legibly; it cannot do that in pale ink on
+        // pale glass over blue.
         Text(text)
             .font(.caption2.weight(.semibold))
             .foregroundStyle(toneColor)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(palette.field, in: Capsule())
+            .background(
+                isOnProminentBackground ? Color.white.opacity(0.94) : palette.field,
+                in: Capsule()
+            )
             .overlay(Capsule().strokeBorder(toneColor.opacity(0.4), lineWidth: 0.5))
+    }
+}
+
+/// A clinical code — ICD, LOINC, ATC — set as a token rather than as words.
+///
+/// Codes were running into their descriptions behind a hyphen: "F03 - Demenza
+/// non specificata", the whole string in one register. But the two are read
+/// differently. A code is matched at a glance and compared down a column, which
+/// wants a monospaced face and a boundary; a description is read as language.
+/// Typeset identically, neither job is served, and the row becomes a single
+/// grey line the eye slides off.
+///
+/// Deliberately untinted. A tone would claim the diagnosis is good news or bad,
+/// which is not the pill's job: it separates a token from prose, nothing more.
+/// The tinted chip is `PairedPatientFlagChip`, and it means something.
+struct ClinicalCodePill: View {
+    let code: String
+    /// True when the pill sits on a tinted, prominent background — a selected
+    /// list row. Passed in rather than read from `\.backgroundProminence`, which
+    /// would answer this exactly but needs macOS 14 while the package still
+    /// targets 13; a caller inside a selectable list knows its own state anyway.
+    let isOnProminentBackground: Bool
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.lumeGuardia) private var isGuardia
+
+    init(_ code: String, isOnProminentBackground: Bool = false) {
+        self.code = code
+        self.isOnProminentBackground = isOnProminentBackground
+    }
+
+    var body: some View {
+        let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
+        let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
+        // Contrast first, and the same identity in both states.
+        //
+        // On a selected row the system resolves `.primary` to the selected
+        // content colour — white — while the pill kept painting its near-white
+        // field fill underneath. White on near-white: selecting a patient made
+        // their ICD code vanish into an empty rounded box. A translucent scrim
+        // was the first fix and it was not good enough either — a pale chip with
+        // pale text on a saturated blue is legible in a screenshot and not at a
+        // glance across a desk.
+        //
+        // So the pill stays a light chip with a dark code whether the row is
+        // selected or not: it keeps looking like the same object, and dark ink on
+        // a near-opaque chip is the highest contrast available in both states.
+        // Both colours are stated explicitly, because that is what stops the
+        // selection style from repainting the text out from under us.
+        let isProminent = isOnProminentBackground
+        Text(code)
+            .font(.caption2.weight(.semibold))
+            .registro()
+            .foregroundStyle(palette.inkPrimary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(shape.fill(isProminent ? Color.white.opacity(0.94) : palette.field))
+            .overlay(
+                shape.strokeBorder(
+                    palette.inkMuted.opacity(isProminent ? 0.15 : 0.25),
+                    lineWidth: 0.5
+                )
+            )
+            .fixedSize()
     }
 }
 
@@ -108,6 +184,9 @@ struct PairedPatientSectionHeader: View {
     let subtitle: String
     let systemImage: String
     let refreshIdentifier: String
+    /// Wayfinding hue for this section. See `ClinicalSectionAccent` for why it
+    /// tints the glyph and nothing else.
+    var accent: ClinicalSectionAccent = .anagrafica
     let action: () -> Void
 
     var body: some View {
@@ -130,11 +209,9 @@ struct PairedPatientSectionHeader: View {
 
     private var heading: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Label(title, systemImage: systemImage)
-                .font(.subheadline.weight(.semibold))
+            ClinicalSectionTitle(title, systemImage: systemImage, accent: accent)
             Text(subtitle)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .chartMetadata()
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

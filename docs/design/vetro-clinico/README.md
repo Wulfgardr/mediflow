@@ -7,18 +7,18 @@ read_when:
 
 # Vetro Clinico: baseline storica e transitoria
 
-Questo folder conserva la baseline storica e transitoria del design MediFlow: stato rilevato, regole, evoluzioni proposte e guida di implementazione per ogni piattaforma. Non è la destinazione attiva per nuove decisioni di design. Nasce dalla review completa del 2026-07-11 (ricognizione su codice web, codice nativo Apple, storia delle decisioni, linee guida ufficiali Apple/Microsoft/GNOME/KDE, panorama degli strumenti professionali).
+Questo folder conserva la baseline storica e transitoria del design MediFlow. Non è la destinazione attiva per nuove decisioni di design. La candidata locale v0.8 usa Lume e i relativi token DTCG come riferimento attivo. Questo folder resta utile per interpretare superfici non ancora migrate.
 
 ## Glossario dei nomi (da qui in avanti)
 
 | Nome | Cosa indica | Stato |
 | --- | --- | --- |
 | **Vetro Clinico** | La baseline storica e transitoria del linguaggio di design MediFlow, comune a tutte le piattaforme. | Storico / transitorio |
-| **Liquid Glass** | Il materiale di sistema Apple (WWDC25, iOS/macOS 26+). Vetro Clinico lo adotta dove è idiomatico e vi si aggancia con le API native. | Riferimento esterno |
+| **Liquid Glass** | Materiale di sistema Apple, usato solo dove disponibile e adatto al chrome. Non rende Vetro Clinico la direzione attiva. | Riferimento esterno |
 | **Kree8** | Codename storico della grammatica visiva del cockpit web (WUL-271, attribuzione esterna). È la prima implementazione web di Vetro Clinico, non un sistema concorrente. | Storico |
 | **Graphite** | Shell web precedente (ADR 0047), superata alla root da ADR 0060. | Storico |
 
-Nei documenti nuovi si usa "Vetro Clinico". "Kree8" resta valido solo nei riferimenti storici e nei nomi file esistenti.
+Nei documenti nuovi si usa "Lume" per la direzione attiva e "Vetro Clinico" per il contesto storico o transitorio. "Kree8" resta valido solo nei riferimenti storici e nei nomi file esistenti.
 
 ## Ordine di lettura
 

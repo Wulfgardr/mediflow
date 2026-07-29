@@ -1,20 +1,24 @@
 /* @Codex #98, #68 */
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import {
+  assertKeyboardFocusProgresses,
+  assertNoHorizontalOverflow,
+  assertNotClippedInViewport,
+  bootstrapUnlockedSession,
+  REFLOW_PROXY_VIEWPORTS,
+  type ReflowProxyViewport,
+} from './utils';
 
 type QuadroCase = {
   register: 'giorno' | 'grafite';
-  viewport: 'wide' | 'narrow';
+  viewport: ReflowProxyViewport['viewport'];
   width: number;
   height: number;
 };
 
-const QUADRO_CASES: QuadroCase[] = [
-  { register: 'giorno', viewport: 'wide', width: 1440, height: 960 },
-  { register: 'grafite', viewport: 'wide', width: 1440, height: 960 },
-  { register: 'giorno', viewport: 'narrow', width: 390, height: 844 },
-  { register: 'grafite', viewport: 'narrow', width: 390, height: 844 },
-];
+const QUADRO_CASES: QuadroCase[] = (['giorno', 'grafite'] as const).flatMap((register) =>
+  REFLOW_PROXY_VIEWPORTS.map((viewport) => ({ register, ...viewport })),
+);
 
 type LivePatientFixture = { id: string; name: string };
 
@@ -166,18 +170,7 @@ async function assertQuadroContract(page: Page, quadro: Locator): Promise<void> 
   await expect(quiet.first()).toBeFocused();
 }
 
-async function assertNarrowStack(page: Page, quadro: Locator): Promise<void> {
-  const overflow = await page.evaluate(() => ({
-    document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    quadro: document.querySelector<HTMLElement>('[data-testid="lume-quadro"]')
-      ? document.querySelector<HTMLElement>('[data-testid="lume-quadro"]')!.scrollWidth
-        - document.querySelector<HTMLElement>('[data-testid="lume-quadro"]')!.clientWidth
-      : Number.POSITIVE_INFINITY,
-  }));
-  for (const [surface, delta] of Object.entries(overflow)) {
-    expect(delta, `Overflow orizzontale su ${surface}`).toBeLessThanOrEqual(1);
-  }
-
+async function assertReflowStack(quadro: Locator): Promise<void> {
   const sections = await quadro.getByTestId('lume-quadro-section').evaluateAll((elements) =>
     elements.map((element) => {
       const box = element.getBoundingClientRect();
@@ -219,7 +212,14 @@ for (const quadroCase of QUADRO_CASES) {
     const quadro = await openSyntheticQuadro(page, quadroCase);
     await expect(page.locator('html')).toHaveClass(quadroCase.register === 'grafite' ? /dark/ : /light/);
     await assertQuadroContract(page, quadro);
-    if (quadroCase.viewport === 'narrow') await assertNarrowStack(page, quadro);
+    await assertNoHorizontalOverflow(page, [
+      { label: 'documento quadro', selector: 'document' },
+      { label: 'quadro', selector: '[data-testid="lume-quadro"]' },
+    ]);
+    if (quadroCase.width <= 390) await assertReflowStack(quadro);
+    const primary = quadro.locator('[data-lume-action="primary"]');
+    await assertNotClippedInViewport(primary, 'azione primaria quadro');
+    await assertKeyboardFocusProgresses(page, primary, 'azione primaria quadro');
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await quadro.evaluate((element) => element.scrollIntoView({ block: 'start' }));
     await page.screenshot({

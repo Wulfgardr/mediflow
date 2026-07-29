@@ -1,6 +1,8 @@
 /**
  * Document Synthesis Service
- * OCR-first pipeline: DeepSeek OCR -> Qwen clinical analysis -> prudent ICD autofill
+ * OCR-first pipeline: DeepSeek OCR -> Qwen clinical analysis -> review-only insight
+ * ADR 0084: i suggerimenti restano materiale di revisione e non modificano
+ * patients.diagnoses.
  */
 
 import { AIService } from '../../ai-service';
@@ -34,11 +36,6 @@ import {
 } from '../../ai-document-synthesis-kill-switch';
 /* @Codex */
 import {
-    buildDocumentSynthesisAutofillPlan,
-    parseExistingDocumentSynthesisDiagnoses,
-} from './document-synthesis-autofill';
-/* @Codex */
-import {
     buildDeterministicDocumentSynthesisAnalysis,
     decideDocumentRouterControlFlow,
     DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY,
@@ -51,6 +48,8 @@ const MAX_SYNTHESIS_CHARS = 12000;
 /* @Codex */
 export interface SynthesizeDocumentOptions extends DocumentSynthesisRoutingOptions {
     attachmentId?: string;
+    // @Codex
+    sourceBytes?: ArrayBuffer | Uint8Array;
 }
 
 /* @Codex */
@@ -166,7 +165,7 @@ export async function synthesizeDocument(
     assertAiDocumentSynthesisEnabledValue(documentSynthesisKillSwitch?.value);
 
     const normalized = normalizeDocumentInput(rawMarkdown);
-    const routed = routeDocumentClassForSynthesis(rawMarkdown, fileName, options);
+    const routed = routeDocumentClassForSynthesis(rawMarkdown, fileName, { pdfMetadata: options.pdfMetadata });
     const routerControlFlow = await db.settings.get(DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY);
     const routerMode = parseDocumentRouterControlFlowMode(routerControlFlow?.value);
     const routerDecision = decideDocumentRouterControlFlow({
@@ -197,18 +196,6 @@ export async function synthesizeDocument(
     }
 
     const existingInsights = parseExistingInsights(patient.documentInsights);
-    const existingDiagnoses = parseExistingDocumentSynthesisDiagnoses(patient.diagnoses);
-    const autofillPlan = buildDocumentSynthesisAutofillPlan({
-        documentId: options.attachmentId ?? `${patientId}:${fileName}`,
-        attachmentId: options.attachmentId,
-        fileName,
-        rawMarkdown: normalized.normalizedText,
-        qualityLevel: analysis.quality?.level,
-        diagnoses: analysis.diagnoses,
-        existingDiagnoses: existingDiagnoses.diagnoses,
-        existingDiagnosesRaw: patient.diagnoses,
-    });
-    const { appliedCodes } = autofillPlan;
 
     const insight: DocumentInsight = {
         id: uuid(),
@@ -223,9 +210,6 @@ export async function synthesizeDocument(
                 ...(analysis.diagnoses.length > 0 ? { diagnoses: analysis.diagnoses } : {}),
                 ...(analysis.medications.length > 0 ? { medications: analysis.medications } : {}),
             }
-            : undefined,
-        autofill: appliedCodes.length > 0
-            ? { appliedDiagnoses: appliedCodes }
             : undefined,
         routedClass: {
             classification: routed.classification,

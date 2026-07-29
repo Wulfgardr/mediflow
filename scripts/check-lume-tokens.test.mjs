@@ -74,7 +74,7 @@ test('committed token source passes the whole contract', () => {
   const warningTint = result.checks.find(
     (c) => c.register === 'giorno' && c.label === 'signal.warning text on 10% signal tint',
   );
-  assert.equal(warningTint.ratio.toFixed(3), '6.532');
+  assert.equal(warningTint.ratio.toFixed(3), '6.579');
   assert.ok(
     result.checks
       .filter((c) => c.signal)

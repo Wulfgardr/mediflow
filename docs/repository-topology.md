@@ -75,6 +75,12 @@ locale richiede Ollama configurato. L'output esterno resta una proposta:
 chiarimento interattivo e scrittura autorizzata sono fasi separate. Questa
 regola descrive il confine, non una funzione cloud già consegnata.
 
+L'[ADR 0086](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md)
+propone la sequenza comune
+`pipeline locale -> proposta -> chiarimento -> anteprima -> autorizzazione ->
+eventuale scrittura auditata`. Non aggiunge una nuova area runtime. La inbox
+conversazionale e l'automazione graduata restano roadmap.
+
 ## ⚠️ Regole operative
 
 - Modifiche a `whitepaper/` **non** richiedono test del runtime clinico né

@@ -201,9 +201,9 @@ export default function EditPatientPage() {
 
     const handleRestore = async () => {
         const { confirmed } = await confirm({
-            title: 'Ripristinare il paziente?',
+            title: 'Riattivare il paziente?',
             message: 'Il paziente tornerà tra quelli attivi.',
-            confirmLabel: 'Ripristina',
+            confirmLabel: 'Riattiva',
             cancelLabel: 'Annulla',
         });
         if (!confirmed) return;
@@ -263,7 +263,7 @@ export default function EditPatientPage() {
                         <div>
                             <h3 className="text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>Paziente archiviato</h3>
                             <p className="mt-1 text-sm font-medium leading-relaxed" style={{ color: 'var(--lume-ink-muted)' }}>
-                                Questa scheda è attualmente in sola lettura per l&apos;agenda corrente. Ripristina per tornare alle operazioni standard.
+                                Questa scheda è attualmente in sola lettura per l&apos;agenda corrente. Riattiva per tornare alle operazioni standard.
                             </p>
                             {patient.archiveReason && (
                                 <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>
@@ -280,7 +280,7 @@ export default function EditPatientPage() {
                                 className="mf-btn-secondary mt-4 !text-[color:var(--lume-signal-warning)]"
                             >
                                 <RotateCcw className="w-3.5 h-3.5" />
-                                Ripristina in elenco Attivi
+                                Riattiva in elenco Attivi
                             </button>
                         </div>
                     </div>
@@ -317,7 +317,7 @@ export default function EditPatientPage() {
                                 className="mf-btn-secondary flex-1 lg:flex-none"
                             >
                                 <Download className="w-4 h-4" />
-                                Export FHIR
+                                Esporta FHIR
                             </button>
 
                             {!patient.isArchived ? (
@@ -337,7 +337,7 @@ export default function EditPatientPage() {
                                     className="mf-btn-secondary flex-1 !text-[color:var(--lume-signal-success)] lg:flex-none"
                                 >
                                     <RotateCcw className="w-4 h-4" />
-                                    Ripristina
+                                    Riattiva
                                 </button>
                             )}
                             <button

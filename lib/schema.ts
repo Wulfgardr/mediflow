@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, primaryKey, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, primaryKey, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 // --- Users (Auth) ---
@@ -303,6 +303,34 @@ export const sissHandoffEvents = sqliteTable('siss_handoff_events', {
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
+
+/* @Codex */
+export const documentDiagnosisProposals = sqliteTable('document_diagnosis_proposals', {
+    id: text('id').primaryKey(),
+    patientId: text('patient_id').references(() => patients.id).notNull(),
+    sourceDocumentKey: text('source_document_key').notNull(),
+    attachmentId: text('attachment_id'),
+    documentInsightId: text('document_insight_id'),
+    candidateKey: text('candidate_key').notNull(),
+    payload: text('payload').notNull(),
+    status: text('status').notNull().default('pending'),
+    confidence: text('confidence').notNull(),
+    decidedAt: integer('decided_at', { mode: 'timestamp' }),
+    decisionActorType: text('decision_actor_type'),
+    decisionActorRef: text('decision_actor_ref'),
+    decisionPayload: text('decision_payload'),
+    version: integer('version').notNull().default(1),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+}, (t) => ({
+    patientIdx: index('document_diagnosis_proposals_patient_idx').on(t.patientId),
+    patientStatusIdx: index('document_diagnosis_proposals_patient_status_idx').on(t.patientId, t.status),
+    sourceCandidateUnique: uniqueIndex('document_diagnosis_proposals_source_candidate_unique').on(
+        t.patientId,
+        t.sourceDocumentKey,
+        t.candidateKey,
+    ),
+}));
 
 // --- Checkups / Appointments ---
 export const checkups = sqliteTable('checkups', {

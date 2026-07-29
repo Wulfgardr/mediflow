@@ -4,6 +4,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const ROOT = process.cwd();
 const DEFAULT_OUT = 'tmp-audit-quality-gate-report.json';
@@ -11,7 +13,15 @@ const DEFAULT_OUT = 'tmp-audit-quality-gate-report.json';
 const REQUIRED_ROUTE_AUDIT = [
     { route: 'app/api/auth/login/route.ts', events: ['auth.login.failed', 'auth.login.succeeded'], reason: 'auth login success/failure must stay auditable' },
     { route: 'app/api/auth/logout/route.ts', events: ['auth.logout'], reason: 'auth logout must stay auditable' },
-    { route: 'app/api/auth/change-pin/route.ts', events: ['settings.updated'], reason: 'PIN rotation is an administrative settings mutation' },
+    {
+        route: 'app/api/auth/change-pin/route.ts', events: ['settings.updated'], reason: 'PIN rotation is an administrative settings mutation',
+        writerContracts: [{
+            handler: 'POST', serviceModule: '@/lib/security/pin-change-service', serviceExport: 'changePin',
+            target: 'change-pin', ownerFile: 'lib/security/pin-change-service.ts', ownerName: 'changePin',
+            writerModule: '@/lib/security/audit', writerExport: 'writeAuditEvent', eventType: 'settings.updated',
+            dependencyFallback: { parameter: 'dependencies', property: 'writeAuditEvent' },
+        }],
+    },
     { route: 'app/api/settings/route.ts', events: ['settings.updated'], reason: 'bulk settings mutations must stay auditable' },
     { route: 'app/api/settings/[key]/route.ts', events: ['settings.updated'], reason: 'single-key settings mutations must stay auditable' },
     { route: 'app/api/patients/route.ts', events: ['patient.created'], reason: 'patient creation is a sensitive CRUD path' },
@@ -38,8 +48,39 @@ const REQUIRED_ROUTE_AUDIT = [
     { route: 'app/api/v1/patients/[id]/observations/route.ts', events: ['observation.created'], reason: 'native/shared observation creation is sensitive CRUD' },
     { route: 'app/api/v1/patients/[id]/observations/[observationId]/route.ts', events: ['observation.updated', 'observation.deleted'], reason: 'native/shared observation update/delete are sensitive CRUD' },
     { route: 'lib/network-observation-write.ts', events: ['observation.created', 'observation.updated', 'observation.deleted'], reason: 'paired observation writes must stay PHI-safe auditable' },
-    { route: 'app/api/prosthetic-prescriptions/route.ts', events: ['prosthetic.prescription.created'], reason: 'prosthetic prescription creation is sensitive CRUD' },
-    { route: 'app/api/prosthetic-prescriptions/[id]/route.ts', events: ['prosthetic.prescription.updated', 'prosthetic.prescription.deleted'], reason: 'prosthetic prescription update/delete are sensitive CRUD' },
+    {
+        route: 'app/api/prosthetic-prescriptions/route.ts', events: ['prosthetic.prescription.created'], reason: 'prosthetic prescription creation is sensitive CRUD',
+        writerContracts: [{
+            handler: 'POST', serviceModule: '@/lib/prosthetic-prescription-write',
+            serviceExport: 'createHostProstheticPrescription',
+            target: 'prosthetic-prescription.create', ownerFile: 'lib/prosthetic-prescription-write.ts',
+            ownerName: 'createHostProstheticPrescription', writerModule: './security/audit',
+            writerExport: 'safeWriteAuditEventFromRequest', writerArgumentIndex: 2,
+            eventType: 'prosthetic.prescription.created',
+        }],
+    },
+    {
+        route: 'app/api/prosthetic-prescriptions/[id]/route.ts', events: ['prosthetic.prescription.updated', 'prosthetic.prescription.deleted'], reason: 'prosthetic prescription update/delete are sensitive CRUD',
+        writerContracts: [
+            {
+                handler: 'PUT', serviceModule: '@/lib/prosthetic-prescription-write',
+                serviceExport: 'updateHostProstheticPrescription',
+                hop: { target: 'updateProstheticPrescription', argumentIndex: 2, literal: 'host' },
+                target: 'prosthetic-prescription.update', ownerFile: 'lib/prosthetic-prescription-write.ts',
+                ownerName: 'updateProstheticPrescription', writerModule: './security/audit',
+                writerExport: 'safeWriteAuditEventFromRequest', writerArgumentIndex: 2,
+                eventType: 'prosthetic.prescription.updated',
+            },
+            {
+                handler: 'DELETE', serviceModule: '@/lib/prosthetic-prescription-write',
+                serviceExport: 'deleteHostProstheticPrescription',
+                target: 'prosthetic-prescription.delete', ownerFile: 'lib/prosthetic-prescription-write.ts',
+                ownerName: 'deleteHostProstheticPrescription', writerModule: './security/audit',
+                writerExport: 'safeWriteAuditEventFromRequest', writerArgumentIndex: 2,
+                eventType: 'prosthetic.prescription.deleted',
+            },
+        ],
+    },
     { route: 'app/api/siss-handoffs/route.ts', events: ['siss.handoff.created'], reason: 'SISS handoff creation must stay PHI-safe auditable' },
     { route: 'app/api/siss-handoffs/[id]/route.ts', events: ['siss.handoff.updated', 'siss.handoff.deleted'], reason: 'SISS handoff update/delete must stay PHI-safe auditable' },
     { route: 'app/api/siss/context/route.ts', events: ['patient.siss.prescription.launch'], reason: 'prescription handoff launch must stay PHI-safe auditable' },
@@ -108,6 +149,295 @@ function addFinding(findings, code, message, details = {}) {
     findings.push({ code, message, ...details });
 }
 
+function bindingNameContains(name, target) {
+    if (ts.isIdentifier(name)) return name.text === target;
+    return (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name))
+        && name.elements.some((item) => ts.isBindingElement(item) && bindingNameContains(item.name, target));
+}
+
+function importedName(sourceFile, moduleName, exportName) {
+    const names = sourceFile.statements.flatMap((statement) => {
+        if (!ts.isImportDeclaration(statement)
+            || !ts.isStringLiteral(statement.moduleSpecifier)
+            || statement.moduleSpecifier.text !== moduleName
+            || statement.importClause?.isTypeOnly
+            || !statement.importClause?.namedBindings
+            || !ts.isNamedImports(statement.importClause.namedBindings)) return [];
+        return statement.importClause.namedBindings.elements
+            .filter((item) => !item.isTypeOnly && (item.propertyName?.text ?? item.name.text) === exportName)
+            .map((item) => item.name.text);
+    });
+    return names.length === 1 ? names[0] : null;
+}
+
+function localBindingExists(owner, name, allowOwnerParameter = false) {
+    let found = !allowOwnerParameter && owner.parameters.some((parameter) => bindingNameContains(parameter.name, name));
+    const visit = (node) => {
+        if (found || (node !== owner && ts.isFunctionLike(node))) return;
+        if ((ts.isVariableDeclaration(node) || ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node))
+            && node.name && bindingNameContains(node.name, name)) found = true;
+        ts.forEachChild(node, visit);
+    };
+    if (owner.body) visit(owner.body);
+    return found;
+}
+
+function unwrap(expression) {
+    let current = expression;
+    while (ts.isParenthesizedExpression(current) || ts.isAsExpression(current)
+        || ts.isTypeAssertionExpression(current) || ts.isNonNullExpression(current)
+        || ts.isSatisfiesExpression(current)) current = current.expression;
+    return current;
+}
+
+function isWriterCall(call, binding, owner, fallback) {
+    const callee = unwrap(call.expression);
+    if (ts.isIdentifier(callee)) return callee.text === binding;
+    if (!fallback || !ts.isBinaryExpression(callee)
+        || callee.operatorToken.kind !== ts.SyntaxKind.QuestionQuestionToken
+        || !ts.isPropertyAccessExpression(callee.left)
+        || !ts.isIdentifier(callee.left.expression)
+        || callee.left.expression.text !== fallback.parameter
+        || callee.left.name.text !== fallback.property
+        || !ts.isIdentifier(callee.right)
+        || callee.right.text !== binding) return false;
+    return owner.parameters.some((parameter) => bindingNameContains(parameter.name, fallback.parameter));
+}
+
+function directWriterCalls(owner, binding, fallback) {
+    const calls = { direct: [], all: [] };
+    const visit = (node, nested = false) => {
+        const isNested = nested || (node !== owner && ts.isFunctionLike(node));
+        if (ts.isCallExpression(node) && isWriterCall(node, binding, owner, fallback)) {
+            calls.all.push(node);
+            if (!isNested) calls.direct.push(node);
+        }
+        ts.forEachChild(node, (child) => visit(child, isNested));
+    };
+    if (owner.body) visit(owner.body);
+    return calls;
+}
+
+function constantBoolean(expression) {
+    const value = unwrap(expression);
+    if (value.kind === ts.SyntaxKind.TrueKeyword) return true;
+    if (value.kind === ts.SyntaxKind.FalseKeyword) return false;
+    if (ts.isNumericLiteral(value)) return Number(value.text) !== 0;
+    if (ts.isPrefixUnaryExpression(value) && value.operator === ts.SyntaxKind.ExclamationToken) { const operand = constantBoolean(value.operand); return operand === null ? null : !operand; }
+    return null;
+}
+
+function alwaysTerminates(statement) {
+    if (ts.isReturnStatement(statement) || ts.isThrowStatement(statement)) return true;
+    if (ts.isBlock(statement)) return statement.statements.some(alwaysTerminates);
+    if (!ts.isIfStatement(statement)) return false;
+    const constant = constantBoolean(statement.expression);
+    if (constant !== null) return constant
+        ? alwaysTerminates(statement.thenStatement)
+        : Boolean(statement.elseStatement && alwaysTerminates(statement.elseStatement));
+    return Boolean(statement.elseStatement
+        && alwaysTerminates(statement.thenStatement)
+        && alwaysTerminates(statement.elseStatement));
+}
+
+function isReachableCall(call, owner) {
+    let child = call;
+    for (let parent = child.parent; parent && parent !== owner; child = parent, parent = parent.parent) {
+        if (ts.isFunctionLike(parent)) return false;
+        if (ts.isBinaryExpression(parent) || ts.isConditionalExpression(parent)) return false;
+        if (ts.isIfStatement(parent)) {
+            const constant = constantBoolean(parent.expression);
+            if ((constant === false && parent.thenStatement === child)
+                || (constant === true && parent.elseStatement === child)) return false;
+        }
+        if (ts.isBlock(parent)) {
+            const index = parent.statements.indexOf(child);
+            if (index >= 0 && parent.statements.slice(0, index).some((statement) =>
+                alwaysTerminates(statement)
+                || ts.isIterationStatement(statement, false)
+                || ts.isSwitchStatement(statement)
+                || ts.isBreakStatement(statement)
+                || ts.isContinueStatement(statement)
+                || ts.isTryStatement(statement))) return false;
+        }
+        if (ts.isIterationStatement(parent, false) || ts.isSwitchStatement(parent) || ts.isLabeledStatement(parent)) return false;
+    }
+    return true;
+}
+
+function isReachableStandaloneCall(call, owner) {
+    let current = call;
+    while (ts.isAwaitExpression(current.parent) || ts.isParenthesizedExpression(current.parent)) current = current.parent;
+    return ts.isExpressionStatement(current.parent) && isReachableCall(call, owner);
+}
+
+/* @Codex */
+export function validateAuditWriterControlFlow({
+    source,
+    fileName = 'fixture.ts',
+    sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS),
+    ownerName,
+    writerModule,
+    writerExport,
+    eventType,
+    writerArgumentIndex = 0,
+    dependencyFallback = null,
+}) {
+    const problems = sourceFile.parseDiagnostics.length > 0 ? [`${fileName} has parser diagnostics`] : [];
+    const binding = importedName(sourceFile, writerModule, writerExport);
+    const owners = sourceFile.statements.filter((statement) =>
+        ts.isFunctionDeclaration(statement) && statement.name?.text === ownerName);
+    if (!binding) problems.push('approved writer import is missing or ambiguous');
+    if (owners.length !== 1) problems.push('owner function is missing or ambiguous');
+    if (!binding || owners.length !== 1) return problems;
+    const owner = owners[0];
+    if (localBindingExists(owner, binding)) problems.push('approved writer import is shadowed');
+    if (dependencyFallback && localBindingExists(owner, dependencyFallback.parameter, true)) problems.push('dependency fallback binding is shadowed');
+    const calls = directWriterCalls(owner, binding, dependencyFallback);
+    if (calls.all.length !== 1 || calls.direct.length !== 1) problems.push('owner must contain exactly one direct approved writer call');
+    if (calls.all.length === 1 && calls.direct.length === 1) {
+        const input = calls.direct[0].arguments[writerArgumentIndex];
+        const events = input && ts.isObjectLiteralExpression(input)
+            ? input.properties.filter((property) => ts.isPropertyAssignment(property)
+                && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))
+                && property.name.text === 'eventType')
+            : [];
+        const hasUnsafeProperty = input && ts.isObjectLiteralExpression(input)
+            && input.properties.some((property) => ts.isSpreadAssignment(property)
+                || Boolean(property.name && ts.isComputedPropertyName(property.name)));
+        if (hasUnsafeProperty || events.length !== 1 || !ts.isStringLiteral(events[0].initializer)
+            || events[0].initializer.text !== eventType) problems.push('writer event literal is missing or incorrect');
+        if (!isReachableStandaloneCall(calls.direct[0], owner)) problems.push('writer call is unreachable or uses unsupported control flow');
+    }
+    return problems;
+}
+
+function namedFunction(sourceFile, name, requireExport = false) {
+    const matches = sourceFile.statements.filter((statement) => ts.isFunctionDeclaration(statement)
+        && statement.name?.text === name
+        && (!requireExport || ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)));
+    return matches.length === 1 ? matches[0] : null;
+}
+
+function checkedSource(fileName, source) {
+    const options = { noLib: true, target: ts.ScriptTarget.Latest, module: ts.ModuleKind.ESNext };
+    const host = {
+        ...ts.createCompilerHost(options),
+        fileExists: (name) => name === fileName,
+        readFile: (name) => name === fileName ? source : undefined,
+        getSourceFile: (name, language) => name === fileName
+            ? ts.createSourceFile(name, source, language, true, ts.ScriptKind.TS)
+            : undefined,
+    };
+    const program = ts.createProgram([fileName], options, host);
+    return { sourceFile: program.getSourceFile(fileName), checker: program.getTypeChecker() };
+}
+
+function importedBinding(sourceFile, checker, moduleName, exportName) {
+    const matches = sourceFile.statements.flatMap((statement) => {
+        if (!ts.isImportDeclaration(statement)
+            || !ts.isStringLiteral(statement.moduleSpecifier)
+            || statement.moduleSpecifier.text !== moduleName
+            || statement.importClause?.isTypeOnly
+            || !statement.importClause?.namedBindings
+            || !ts.isNamedImports(statement.importClause.namedBindings)) return [];
+        return statement.importClause.namedBindings.elements.filter((element) =>
+            !element.isTypeOnly && (element.propertyName?.text ?? element.name.text) === exportName);
+    });
+    if (matches.length !== 1) return null;
+    return { symbol: checker.getSymbolAtLocation(matches[0].name) };
+}
+
+function resolvesToBinding(checker, symbol, target, seen = new Set()) {
+    if (!symbol || !target || seen.has(symbol)) return false;
+    if (symbol === target) return true;
+    seen.add(symbol);
+    const declarations = symbol.declarations ?? [];
+    if (declarations.length !== 1 || !ts.isVariableDeclaration(declarations[0])
+        || !ts.isVariableDeclarationList(declarations[0].parent)
+        || !(declarations[0].parent.flags & ts.NodeFlags.Const)) return false;
+    const initializer = declarations[0].initializer && unwrap(declarations[0].initializer);
+    return Boolean(initializer && ts.isIdentifier(initializer))
+        && resolvesToBinding(checker, checker.getSymbolAtLocation(initializer), target, seen);
+}
+
+function bindingCalls(root, checker, target) {
+    const calls = [];
+    const visit = (node) => {
+        const callee = ts.isCallExpression(node) ? unwrap(node.expression) : null;
+        if (callee && ts.isIdentifier(callee)
+            && resolvesToBinding(checker, checker.getSymbolAtLocation(callee), target)) calls.push(node);
+        ts.forEachChild(node, visit);
+    };
+    visit(root);
+    return calls;
+}
+
+/* @Codex */
+export function validateDelegatedRouteAudit({ spec, routeSource, serviceSource }) {
+    const problems = [];
+    const route = checkedSource('route.ts', routeSource);
+    const service = checkedSource('service.ts', serviceSource);
+    if (route.sourceFile.parseDiagnostics.length > 0) problems.push('route has parser diagnostics');
+    if (service.sourceFile.parseDiagnostics.length > 0) problems.push('service has parser diagnostics');
+    const delegate = importedBinding(route.sourceFile, route.checker, spec.serviceModule, spec.serviceExport);
+    const handler = namedFunction(route.sourceFile, spec.handler, true);
+    if (!delegate) problems.push('approved service import is missing or ambiguous');
+    if (!handler) problems.push(`exported ${spec.handler} handler is missing or ambiguous`);
+    if (delegate && handler) {
+        const allCalls = bindingCalls(route.sourceFile, route.checker, delegate.symbol);
+        const handlerCalls = bindingCalls(handler, route.checker, delegate.symbol);
+        if (allCalls.length !== 1 || handlerCalls.length !== 1 || !isReachableCall(handlerCalls[0], handler)) {
+            problems.push('handler must make exactly one reachable approved service call');
+        }
+    }
+
+    const serviceEntry = namedFunction(service.sourceFile, spec.serviceExport, true);
+    if (!serviceEntry) problems.push('configured service export is missing or ambiguous');
+    if (serviceEntry && spec.hop) {
+        const owner = namedFunction(service.sourceFile, spec.ownerName);
+        const target = owner?.name && service.checker.getSymbolAtLocation(owner.name);
+        const calls = bindingCalls(serviceEntry, service.checker, target);
+        const literal = calls[0]?.arguments[spec.hop.argumentIndex];
+        if (!owner || calls.length !== 1 || !isReachableCall(calls[0], serviceEntry)
+            || !ts.isStringLiteral(literal) || literal.text !== spec.hop.literal) {
+            problems.push('service export must make exactly one reachable configured hop with the exact literal');
+        }
+    } else if (serviceEntry && spec.ownerName !== spec.serviceExport) {
+        problems.push('owner mismatch requires one configured hop');
+    }
+    return problems;
+}
+
+function checkAuditWriterControlFlow(findings) {
+    const contracts = REQUIRED_ROUTE_AUDIT.flatMap((entry) =>
+        (entry.writerContracts ?? []).map((contract) => ({ ...contract, route: entry.route })));
+    const parsedFiles = new Map();
+    for (const contract of contracts) {
+        if (!parsedFiles.has(contract.ownerFile)) {
+            const source = read(contract.ownerFile);
+            parsedFiles.set(contract.ownerFile, {
+                source,
+                sourceFile: ts.createSourceFile(contract.ownerFile, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS),
+            });
+        }
+        const parsed = parsedFiles.get(contract.ownerFile);
+        for (const problem of validateAuditWriterControlFlow({
+            ...contract,
+            ...parsed,
+            fileName: contract.ownerFile,
+        })) {
+            addFinding(findings, 'AUDIT_CONTROL_FLOW', problem, {
+                route: contract.route,
+                target: contract.target,
+                owner: contract.ownerName,
+                eventType: contract.eventType,
+            });
+        }
+    }
+    return { targets: contracts.length, files: parsedFiles.size };
+}
+
 function checkAppendOnly(findings) {
     const source = read('lib/security/audit-db.ts');
     for (const token of [
@@ -145,6 +475,22 @@ function checkRouteCoverage(findings) {
         }
 
         const source = read(entry.route);
+        if (entry.writerContracts) {
+            for (const contract of entry.writerContracts) {
+                for (const problem of validateDelegatedRouteAudit({
+                    spec: contract,
+                    routeSource: source,
+                    serviceSource: read(contract.ownerFile),
+                })) {
+                    addFinding(findings, 'AUDIT_ROUTE_DELEGATION', `${entry.route}: ${problem}`, {
+                        route: entry.route,
+                        target: contract.target,
+                        eventType: contract.eventType,
+                    });
+                }
+            }
+            continue;
+        }
         const hasWriter = source.includes('writeAuditEvent') || source.includes('safeWriteAuditEventFromRequest');
         if (!hasWriter) {
             addFinding(findings, 'AUDIT_ROUTE_WRITER', `Route lacks an audit writer call: ${entry.route}`, entry);
@@ -213,6 +559,7 @@ function main() {
     checkAppendOnly(findings);
     checkAuditCatalog(findings);
     checkRouteCoverage(findings);
+    const auditControlFlow = checkAuditWriterControlFlow(findings);
     checkPhiSafeMetadata(findings);
 
     const report = {
@@ -222,6 +569,8 @@ function main() {
         checked: {
             routes: REQUIRED_ROUTE_AUDIT.length,
             requiredEvents: REQUIRED_EVENT_TYPES.size,
+            auditControlFlowTargets: auditControlFlow.targets,
+            auditControlFlowFiles: auditControlFlow.files,
             metadataKeys: METADATA_KEYS,
             forbiddenMetadataKeys: FORBIDDEN_METADATA_KEYS,
         },
@@ -244,4 +593,4 @@ function main() {
     process.exit(1);
 }
 
-main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

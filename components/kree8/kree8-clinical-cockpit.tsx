@@ -6,7 +6,7 @@
    /mockups/kree8 as a review alias. WUL-273 starts the real-data migration for
    live patients/checkups after PIN unlock; the review alias remains synthetic. */
 
-import { useEffect, useMemo, useState } from 'react';
+import { type FocusEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { X } from 'lucide-react';
 
@@ -25,7 +25,7 @@ import {
   type Kree8Patient,
   type Kree8PatientWorkspace,
 } from '@/lib/patient-workspace';
-import { useLiveQuery } from '@/lib/live-query';
+import { useLiveQuery, useLiveQueryState } from '@/lib/live-query';
 import { ThemeToggle } from '@/components/theme-toggle';
 // WUL-297: persistent privacy affordance in the app header.
 import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
@@ -67,6 +67,32 @@ import styles from './kree8-clinical-cockpit-shell.module.css';
 export { AREA_ID_VALUES };
 export type { AreaId };
 
+/* @Codex */
+function revealFocusedRailControl(event: FocusEvent<HTMLElement>): void {
+  const rail = event.currentTarget;
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+
+  const focusOutset =
+    Number.parseFloat(getComputedStyle(rail).getPropertyValue('--k8-rail-focus-outset')) || 0;
+  const horizontalDelta = () => {
+    const railRect = rail.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const scrollportLeft = railRect.left + rail.clientLeft;
+    const scrollportRight = scrollportLeft + rail.clientWidth;
+    const leftOverflow = targetRect.left - focusOutset - scrollportLeft;
+    if (leftOverflow < 0) return leftOverflow;
+    return Math.max(0, targetRect.right + focusOutset - scrollportRight);
+  };
+
+  if (horizontalDelta() === 0) return;
+  target.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+  const residualDelta = horizontalDelta();
+  if (residualDelta === 0) return;
+
+  const maxScrollLeft = Math.max(0, rail.scrollWidth - rail.clientWidth);
+  rail.scrollLeft = Math.min(maxScrollLeft, Math.max(0, rail.scrollLeft + residualDelta));
+}
 
 /* ───────────────────────── shell ───────────────────────── */
 
@@ -226,7 +252,11 @@ export function Kree8ClinicalCockpit({
   );
 
   /* @Codex */
-  const livePatientRows = useLiveQuery<Patient[]>(
+  const {
+    data: livePatientRows,
+    error: livePatientError,
+    loading: livePatientLoading,
+  } = useLiveQueryState<Patient[]>(
     async () => (isReview ? [] : db.patients.toArray()),
     [isReview],
     undefined,
@@ -324,8 +354,14 @@ export function Kree8ClinicalCockpit({
   useEffect(() => {
     if (isReview) return;
 
-    if (!livePatientRows) {
+    if (livePatientLoading) {
       setPatientState({ status: 'loading', patients: [] });
+      setAgendaState({ status: 'loading', rows: [] });
+      return;
+    }
+
+    if (livePatientError) {
+      setPatientState({ status: 'error', patients: [] });
       setAgendaState({ status: 'loading', rows: [] });
       return;
     }
@@ -333,7 +369,7 @@ export function Kree8ClinicalCockpit({
     /* @Codex WUL-UIUX: ordina per aggiornamento piu recente (updatedAt, poi
        createdAt) cosi la lista pazienti non esce in ordine di inserimento
        IndexedDB e lo scanning "recenti" e possibile. */
-    const patients = [...livePatientRows]
+    const patients = [...(livePatientRows ?? [])]
       .sort((left, right) => {
         const leftTime = new Date(left.updatedAt ?? left.createdAt ?? 0).getTime();
         const rightTime = new Date(right.updatedAt ?? right.createdAt ?? 0).getTime();
@@ -353,7 +389,14 @@ export function Kree8ClinicalCockpit({
       if (initialPatientId) return initialPatientId;
       return patients[0]?.id;
     });
-  }, [initialPatientId, isReview, livePatientRows, liveCheckupRows]);
+  }, [
+    initialPatientId,
+    isReview,
+    livePatientError,
+    livePatientLoading,
+    livePatientRows,
+    liveCheckupRows,
+  ]);
 
   const patientNavMeta =
     isReview
@@ -381,6 +424,7 @@ export function Kree8ClinicalCockpit({
         className={styles.rail}
         data-testid="lume-frame-rail"
         data-lume-frame-element="rail"
+        onFocusCapture={revealFocusedRailControl}
       >
         <div className={styles.brand}>
           <span className={styles.brandMark}>MF</span>

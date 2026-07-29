@@ -59,6 +59,10 @@ Introduciamo un layer dedicato `lib/ai-insight-settings.ts` che definisce:
 - risoluzione runtime in base a profilo hardware e complessita del caso
 - persistenza su `settings`
 
+Il nome tecnico `full_auto` riguarda solo la scelta automatica dei budget di
+contesto e generazione. Non autorizza diagnosi, prescrizioni o altre scritture
+cliniche automatiche.
+
 La UI web in `app/settings/page.tsx` espone i controlli dell'insight senza
 toccare pipeline OCR o upload.
 

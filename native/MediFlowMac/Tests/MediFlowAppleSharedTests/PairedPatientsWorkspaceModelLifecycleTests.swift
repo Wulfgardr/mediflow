@@ -23,6 +23,27 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         let vectors: Vectors
     }
 
+    /* @Codex */
+    func testActiveListLoadRequestsAndDecryptsDiagnosisProjection() async throws {
+        let raw = #"[{"code":"E11.9","description":"Diabete tipo 2"},{"code":"I10","description":"Ipertensione"}]"#
+        let sealed = try XCTUnwrap(CryptoService.encryptField(raw, masterKey: masterKey))
+        let source = LifecycleMockDataSource(
+            summaries: [summary(id: "p1", archived: false, version: 1, diagnoses: sealed)])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+
+        await model.loadPatients()
+
+        let projectedDiagnoses = await model.patients.first?.diagnoses
+        let diagnoses = DiagnosesCodec.decode(projectedDiagnoses)
+        XCTAssertEqual(diagnoses.map(\.displayText), [
+            "E11.9 - Diabete tipo 2",
+            "I10 - Ipertensione",
+        ])
+        let projectionRequests = await source.includeDiagnosesRequests
+        XCTAssertEqual(projectionRequests, [true])
+    }
+
     func testPatientArchiveUsesMinimalUpdatePayload() async throws {
         let active = detail(id: "p1", archived: false, version: 4)
         let source = LifecycleMockDataSource(details: ["p1": active])
@@ -39,6 +60,8 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(update?.payload.isArchived, true)
         let isArchived = await model.selectedPatient?.isArchived
         XCTAssertEqual(isArchived, true)
+        let projectionRequests = await source.includeDiagnosesRequests
+        XCTAssertEqual(projectionRequests, [true])
     }
 
     func testPatientUnarchiveGuardRequiresArchivedActivePatient() async {
@@ -127,6 +150,8 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
             let decryptedJSON = try XCTUnwrap(CryptoService.decryptField(sealed, masterKey: masterKey))
             XCTAssertEqual(CryptoService.jsonDecodeString(decryptedJSON), plaintext)
         }
+        let projectionRequests = await source.includeDiagnosesRequests
+        XCTAssertEqual(projectionRequests, [true])
     }
 
     /* @Codex */
@@ -605,7 +630,8 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         archived: Bool,
         version: Int,
         deleted: Bool = false,
-        reason: String? = nil
+        reason: String? = nil,
+        diagnoses: String? = nil
     ) -> HomeBasePatientSummary {
         HomeBasePatientSummary(
             id: id,
@@ -618,7 +644,8 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
             version: version,
             updatedAt: Date(timeIntervalSince1970: 1_750_000_000),
             deletedAt: deleted ? Date(timeIntervalSince1970: 1_750_000_100) : nil,
-            deletionReason: reason
+            deletionReason: reason,
+            diagnoses: diagnoses
         )
     }
 
@@ -732,6 +759,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     private(set) var lastSoftDelete: DeleteCall?
     private(set) var lastRestore: RestoreCall?
     private(set) var softDeleteCalls = 0
+    private(set) var includeDiagnosesRequests: [Bool] = []
     private(set) var pinChangeCalls: [PinChangeCall] = []
     private(set) var logoutCalls = 0
 
@@ -855,7 +883,8 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         ambulatoryId: String?,
         includeDiagnoses: Bool
     ) async throws -> [HomeBasePatientSummary] {
-        try await fetchPatients(
+        includeDiagnosesRequests.append(includeDiagnoses)
+        return try await fetchPatients(
             credentials: credentials, sessionCookie: sessionCookie,
             ambulatoryId: ambulatoryId, includeDeleted: false)
     }

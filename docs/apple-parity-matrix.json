@@ -1,6 +1,57 @@
 {
-  "generated": "2026-07-08",
-  "source": "WUL-479 reconciliation of the 2026-07-08 capability map against Wulfgardr/mediflow public/main",
+  "generated": "2026-07-28",
+  "source": "MediFlow 0.8 parity closeout against the frozen local source candidate",
+  "release08Gate": {
+    "asOf": "2026-07-28",
+    "status": "source-candidate-ready-with-external-limitation",
+    "scope": [
+      "iPhone/iPad",
+      "macOS",
+      "localhost/web"
+    ],
+    "commonContract": {
+      "language": "Lume",
+      "appleMaterial": "Liquid Glass solo come declinazione nativa Apple",
+      "parity": "capacità, semantica, gerarchia, stati, sicurezza e riconoscibilità",
+      "platformSpecific": "navigazione, densità, controlli e input"
+    },
+    "packets": [
+      {
+        "surface": "iPhone",
+        "owner": "CoS parity 0.8",
+        "status": "verified-with-external-voiceover-limitation",
+        "requiredEvidence": "XCUITest 2/2 sul candidato, identifier tab atomici, sei superfici, screenshot sintetici; VoiceOver reale mobile non provato"
+      },
+      {
+        "surface": "iPad",
+        "owner": "CoS parity 0.8",
+        "status": "verified-with-external-voiceover-limitation",
+        "requiredEvidence": "XCUITest 7/7 sul candidato, list-detail, AX5, rotazione, geometria, screenshot sintetici; VoiceOver reale mobile non provato"
+      },
+      {
+        "surface": "macOS",
+        "owner": "CoS parity 0.8",
+        "status": "verified",
+        "requiredEvidence": "build Xcode 27, resize, click-map, focus, Cmd-R contestuale e VoiceOver manuale"
+      },
+      {
+        "surface": "localhost/web",
+        "owner": "CoS parity 0.8",
+        "status": "verified",
+        "requiredEvidence": "78/78, responsive 320/390/768/1440, tastiera/focus e zoom browser reale 200/400"
+      }
+    ],
+    "blockingRule": "Un P1 confermato blocca il gate. La sola deroga accettata è il limite esterno VoiceOver mobile della candidata sorgente GitHub 0.8.",
+    "note": "Il limite non equivale a PASS VoiceOver, conformance, prova device, App Store readiness o certificazione. Questo oggetto non modifica i conteggi delle 64 capability.",
+    "acceptedExternalLimitation": {
+      "surface": "iPhone/iPad",
+      "technology": "VoiceOver",
+      "environment": "Xcode 27 beta build 27A5194q, simulatore iOS 27",
+      "appleIssue": "173507341",
+      "evidence": "L'API pubblica XCUIDevice.shared.voiceOverService.enable() non ha raggiunto uno stato terminale; il risultato incompleto non è usato come prova positiva.",
+      "scope": "Solo candidata sorgente GitHub 0.8"
+    }
+  },
   "rows": [
     {
       "area": "pazienti",
@@ -146,21 +197,21 @@
       "area": "documenti",
       "feature": "Upload documenti + OCR + sintesi clinica (Archivio documenti)",
       "web": "drag&drop multi-file, OCR automatico, sintesi, coda OCR-needed, riprova OCR, preview, delete (components/document-upload.tsx)",
-      "native": "partial: upload nativo (fileImporter + PhotosPicker) con sigillo ENC client-side e precheck dimensione wire onesto, archivio allegati con etichette coda OCR, dettaglio on-demand, preview in-memory PDFKit/immagini, condivisione. Residuo: OCR e sintesi clinica restano host/web (Classe C); gli upload paired entrano in coda pending con reason paired_upload",
-      "boundary": "partial: famiglia documenti network (capability readonly-documents/write-documents), create Classe A con name/path/data sigillati ENC e limite wire condiviso; PUT/DELETE e OCR restano host (ADR 0076 Classi A/C)",
+      "native": "partial nella riga aggregata: upload nativo (fileImporter + PhotosPicker) con sigillo ENC client-side, precheck dimensione wire, archivio, dettaglio on-demand, preview e condivisione. OCR e sintesi restano intenzionalmente host/web per ADR 0076 Classe C; questa divisione di ruolo non è una equivalenza UI mancante",
+      "boundary": "partial nella riga aggregata: famiglia documenti network con create Classe A sigillata ENC; PUT/DELETE e OCR restano host per ADR 0076. Il boundary è platform-specific-documented",
       "gap": "partial",
       "wave": "W5-ai-avanzate",
-      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; lib/network-attachment-{read,write} + smoke home-base-documents-write"
+      "evidence": "PR #16 + PR #17; lib/network-attachment-{read,write}; smoke home-base-documents-write; Evidence Stack web E2E 2/2 su base 9ee798887 con PIN sintetico 0000"
     },
     {
       "area": "documenti",
       "feature": "Archivio Intelligente / Document Insights (view estrazioni + delete)",
       "web": "view/expand diagnosi/terapie estratte, quality reason, sintesi markdown, delete/svuota (components/document-insights-panel.tsx)",
-      "native": "partial: Archivio Intelligente nativo completo in lettura (lista insight, expand diagnosi/terapie estratte, quality reason, sintesi). Residuo: delete/svuota resta web (ADR 0076 Classe C: curation document-derived host-only)",
-      "boundary": "partial: lettura insight via detail paziente esistente; curation (delete) resta host (Classe C)",
+      "native": "partial nella riga aggregata: Archivio Intelligente completo in lettura. Delete/svuota resta intenzionalmente web per ADR 0076 Classe C; la differenza è platform-specific-documented",
+      "boundary": "partial nella riga aggregata: lettura insight dal dettaglio paziente; curation host-only per ADR 0076, non equivalenza mancante",
       "gap": "partial",
       "wave": "W5-ai-avanzate",
-      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; DocumentInsightsCodec + fix web insights version (PR #15)"
+      "evidence": "PR #16 + PR #17; DocumentInsightsCodec; PR #15; Evidence Stack web E2E 2/2 su base 9ee798887: popolato, curation, empty, loading ed errore conservativo"
     },
     {
       "area": "documenti",
@@ -180,7 +231,7 @@
       "boundary": "full: nessun boundary aggiuntivo necessario (lettura da detail paziente esistente)",
       "gap": "full-parity",
       "wave": "W5-ai-avanzate",
-      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; smoke documenti+diario reali verdi"
+      "evidence": "PR #16 + PR #17; smoke documenti+diario; Evidence Stack web E2E 2/2 su base 9ee798887 con PIN sintetico 0000"
     },
     {
       "area": "insight",
@@ -644,8 +695,65 @@
     }
   ],
   "critique_residua": [],
-  "updated": "2026-07-11 WUL-480: utility PRREG nativa riconciliata dopo il closeout WUL-479; classificazione e conteggi invariati",
-  "version": 1,
+  "reconciliation": {
+    "version": 2,
+    "updated": "2026-07-28",
+    "candidateBase": {
+      "commit": "9ee798887fbba93b50d644f223a9a14cd85fa71c",
+      "tree": "e4e5b69c7d034822dc7a311181e9dc08336e4ade",
+      "note": "Code and documentation base before the parity closeout documentation packet. This is not a self-referential final packet hash.",
+      "runRecord": "docs/analysis/2026-07-27-parity-0.8-recovery-run.md"
+    },
+    "rowReference": "Each integer is the zero-based index in rows. Feature counts retain the guarded 30/13/21 contract. Interaction evidence is separate and non-exclusive.",
+    "featureParity": {
+      "fullParity": [1, 5, 6, 10, 12, 13, 17, 20, 21, 22, 23, 24, 25, 26, 27, 28, 32, 33, 36, 37, 38, 39, 40, 41, 50, 54, 55, 56, 60, 62],
+      "partial": [0, 2, 3, 4, 7, 9, 11, 14, 15, 19, 31, 35, 44],
+      "outOfScope": [8, 16, 18, 29, 30, 34, 42, 43, 45, 46, 47, 48, 49, 51, 52, 53, 57, 58, 59, 61, 63]
+    },
+    "interactionParity": {
+      "verifiedAutomatic": [0, 12, 13, 14, 15, 17, 20, 31, 32, 33],
+      "verifiedRealInteraction": [0, 31, 32],
+      "platformSpecificDocumented": [14, 15],
+      "partial": [2, 3, 4, 7, 9, 11, 19, 35, 44],
+      "blocked": [
+        {
+          "scope": "new macOS Xcode 27 build and suite",
+          "surfaces": ["macOS"],
+          "reason": "disk5s1 is not mountable and fsck_apfs exits with -69845. The existing built bundle passed at 1100, 1300 and 1600 points."
+        },
+        {
+          "scope": "real VoiceOver session",
+          "surfaces": ["iPhone", "iPad"],
+          "reason": "No real VoiceOver session is evidenced. XCTest accessibility audits do not replace this proof."
+        },
+        {
+          "scope": "real screen-reader session",
+          "surfaces": ["web"],
+          "reason": "The screen-reader run is non-terminal."
+        }
+      ]
+    },
+    "currentEvidence": {
+      "backend": "8083bc05 source integrated with audit-flow and delegated-writer gate fixes",
+      "webEvidenceStack": "2/2 E2E PASS with synthetic PIN 0000; populated, curation, empty, loading and conservative error states",
+      "webProduction": "104 pages and standalone build PASS; Chrome production at exact 200% and 400% zoom, main controls visible, no dev badge",
+      "macOS": "clipping code integrated; built Xcode 27 bundle PASS at 1100, 1300 and 1600 points; click-map, focus, arrow input and real VoiceOver active before and after",
+      "axProbe": "corrected to select native List rows, bind patient-specific detail content and avoid terminating external MediFlow sessions; typecheck and 6/6 tests PASS",
+      "offline": "WUL-403 remains open for visible TTL, stale state and explicit reconciliation"
+    },
+    "controlToActionReference": {
+      "canonicalDocument": "docs/parity-matrix.md#control-to-action-map",
+      "runRecordSection": "docs/analysis/2026-07-27-parity-0.8-recovery-run.md#8-control-to-action-map",
+      "axPress": {
+        "status": "corrected",
+        "scope": ["macOS agenda sidebar", "macOS patient selection"],
+        "reason": "The probe selects the native List row and verifies AXSelectedRows instead of pressing static row text."
+      }
+    },
+    "verdict": "PARTIAL / HOLD_PROMOTION"
+  },
+  "updated": "2026-07-28: reconciled the 64-row feature contract against current web, macOS and assistive-technology evidence; guarded counts remain 30/13/21",
+  "version": 2,
   "summary": {
     "total": 64,
     "fullParity": 30,

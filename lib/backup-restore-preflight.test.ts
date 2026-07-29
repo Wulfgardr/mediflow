@@ -13,6 +13,7 @@ const basePayload = {
     ],
     attachments: [],
     conversations: [],
+    documentDiagnosisProposals: [],
     drugs: [],
     entries: [],
     exemptions: [],

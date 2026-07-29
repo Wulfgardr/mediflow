@@ -1,20 +1,24 @@
 /* @Codex */
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import {
+  assertKeyboardFocusProgresses,
+  assertNoHorizontalOverflow,
+  assertNotClippedInViewport,
+  bootstrapUnlockedSession,
+  REFLOW_PROXY_VIEWPORTS,
+  type ReflowProxyViewport,
+} from './utils';
 
 type FrameCase = {
   register: 'giorno' | 'grafite';
-  viewport: 'wide' | 'narrow';
+  viewport: ReflowProxyViewport['viewport'];
   width: number;
   height: number;
 };
 
-const FRAME_CASES: FrameCase[] = [
-  { register: 'giorno', viewport: 'wide', width: 1440, height: 960 },
-  { register: 'grafite', viewport: 'wide', width: 1440, height: 960 },
-  { register: 'giorno', viewport: 'narrow', width: 390, height: 844 },
-  { register: 'grafite', viewport: 'narrow', width: 390, height: 844 },
-];
+const FRAME_CASES: FrameCase[] = (['giorno', 'grafite'] as const).flatMap((register) =>
+  REFLOW_PROXY_VIEWPORTS.map((viewport) => ({ register, ...viewport })),
+);
 
 async function setRegister(page: Page, register: FrameCase['register']): Promise<void> {
   await page.evaluate((nextRegister) => {
@@ -61,7 +65,8 @@ for (const frameCase of FRAME_CASES) {
     await openSyntheticFrame(page, frameCase.register);
 
     const patientsNav = page.getByRole('button', { name: /Pazienti/ });
-    await patientsNav.click();
+    await patientsNav.focus();
+    await page.keyboard.press('Enter');
     await expect(patientsNav).toHaveAttribute('aria-current', 'page');
 
     const rail = page.getByTestId('lume-frame-rail');
@@ -135,17 +140,14 @@ for (const frameCase of FRAME_CASES) {
     );
     expect(coloredSideBorders).toEqual([]);
 
-    if (frameCase.viewport === 'narrow') {
-      const overflow = {
-        document: await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
-        canvas: await canvas.evaluate((element) => element.scrollWidth - element.clientWidth),
-        panel: await panel.evaluate((element) => element.scrollWidth - element.clientWidth),
-        focus: await focus.evaluate((element) => element.scrollWidth - element.clientWidth),
-      };
-      for (const [surface, delta] of Object.entries(overflow)) {
-        expect(delta, `Overflow orizzontale del frame su ${surface}`).toBeLessThanOrEqual(1);
-      }
-    }
+    await assertNoHorizontalOverflow(page, [
+      { label: 'documento frame', selector: 'document' },
+      { label: 'canvas frame', selector: '[data-testid="lume-frame-canvas"]' },
+      { label: 'pannello frame', selector: '[data-testid="lume-frame-panel"]' },
+      { label: 'focus frame', selector: '[data-testid="lume-frame-focus"]' },
+    ]);
+    await assertNotClippedInViewport(patientsNav, 'navigazione Pazienti');
+    await assertKeyboardFocusProgresses(page, patientsNav, 'navigazione frame');
   });
 }
 

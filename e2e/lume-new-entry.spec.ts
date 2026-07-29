@@ -106,8 +106,22 @@ async function attachVisualProof(
     ];
 
     return {
+      viewportWidth: window.innerWidth,
       canvas: { clientWidth: canvas.clientWidth, scrollWidth: canvas.scrollWidth },
-      sectionRailOverflowX: getComputedStyle(sectionRail).overflowX,
+      sectionRail: {
+        display: getComputedStyle(sectionRail).display,
+        gridTemplateColumns: getComputedStyle(sectionRail).gridTemplateColumns,
+        overflowX: getComputedStyle(sectionRail).overflowX,
+      },
+      sectionLinks: Array.from(sectionRail.querySelectorAll<HTMLElement>('a')).map((element, index) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          label: element.textContent?.trim() || `section-link-${index}`,
+          clientWidth: element.clientWidth,
+          clippedLeft: rect.left < canvasLeft - 1,
+          clippedRight: rect.right > canvasRight + 1,
+        };
+      }),
       targets: targets.map(([label, element]) => {
         const rect = element.getBoundingClientRect();
         return {
@@ -120,7 +134,24 @@ async function attachVisualProof(
       }),
     };
   });
-  expect(['auto', 'scroll']).toContain(overflowProof.sectionRailOverflowX);
+  /* @Codex The reflow contract follows the actual CSS viewport, not the test name. */
+  if (overflowProof.viewportWidth <= 480) {
+    expect(overflowProof.sectionRail.display).toBe('grid');
+    const columns = overflowProof.sectionRail.gridTemplateColumns.split(/\s+/).filter(Boolean);
+    expect(columns).toHaveLength(2);
+    for (const column of columns) {
+      expect(Number.parseFloat(column), 'ogni colonna della rail deve avere larghezza non nulla').toBeGreaterThan(0);
+    }
+    expect(overflowProof.sectionRail.overflowX).toBe('visible');
+  } else {
+    expect(['auto', 'scroll']).toContain(overflowProof.sectionRail.overflowX);
+  }
+  expect(overflowProof.sectionLinks.length).toBeGreaterThan(0);
+  for (const sectionLink of overflowProof.sectionLinks) {
+    expect(sectionLink.clientWidth, `${sectionLink.label} deve avere larghezza non nulla`).toBeGreaterThan(0);
+    expect(sectionLink.clippedLeft, `${sectionLink.label} non deve essere tagliato a sinistra`).toBe(false);
+    expect(sectionLink.clippedRight, `${sectionLink.label} non deve essere tagliato a destra`).toBe(false);
+  }
   for (const target of overflowProof.targets) {
     expect(target.scrollWidth, `${target.label} non deve scorrere orizzontalmente`).toBeLessThanOrEqual(target.clientWidth + 1);
     expect(target.clippedLeft, `${target.label} non deve essere tagliato a sinistra`).toBe(false);

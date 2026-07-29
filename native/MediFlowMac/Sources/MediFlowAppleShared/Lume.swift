@@ -49,8 +49,8 @@ public struct LumeRegisterPalette: Equatable, Sendable {
 public enum LumePalette {
     public static let giorno = LumeRegisterPalette(
         canvasHex: "#eef0f2",
-        fieldHex: "#f5f5f4",
-        focalHex: "#fbfaf7",
+        fieldHex: "#f4f6f8",
+        focalHex: "#fbfcfe",
         chromeHex: "#e6e8eb",
         inkPrimaryHex: "#1a1c1e",
         inkMutedHex: "#5c6772",
@@ -220,6 +220,38 @@ public struct LumeSurface: ViewModifier {
         self.cornerRadius = cornerRadius
     }
 
+    #if os(macOS)
+    /// Content speaks Lume; chrome stays the system's.
+    ///
+    /// This used to map every zone onto a system colour, on the reasoning that
+    /// the system carries one step per zone per appearance. Measured against a
+    /// real `NSWindow` on macOS 27, it does not: `windowBackgroundColor`,
+    /// `textBackgroundColor` and `controlBackgroundColor` all resolve to the
+    /// same value — 255 in light, 30 at night — so three of the four zones were
+    /// one colour and a nested block was indistinguishable from the section
+    /// holding it.
+    ///
+    /// The other half of that reasoning was that Lume's dark ramp is too timid,
+    /// about seven points of luminance per step. Per step it is: 1.033 against
+    /// the system's 1.131. But the system has that step once, and Lume spends
+    /// 1.241 of total range across three of them. A chart that nests pane inside
+    /// section inside block needs three steps, and one larger step cannot be
+    /// spent three times.
+    ///
+    /// So the content zones take the register's own surfaces, the same values
+    /// iPhone and iPad already draw and the same hexes the web tokens declare.
+    /// `.chrome` stays `windowBackgroundColor`: the sidebar and toolbar are
+    /// where translucency, vibrancy and the scroll edge are platform behaviour
+    /// rather than colour, and a fixed hex there would suppress exactly the
+    /// thing that makes the window read as a Mac window.
+    private func macOSSurface(_ palette: LumeRegisterPalette) -> Color {
+        switch zone {
+        case .canvas, .field, .focal: palette.surface(for: zone)
+        case .chrome: Color(nsColor: .windowBackgroundColor)
+        }
+    }
+    #endif
+
     public func body(content: Content) -> some View {
         let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -230,6 +262,24 @@ public struct LumeSurface: ViewModifier {
 
         content
             .background {
+                #if os(macOS)
+                // The hairline is what makes a section read as a bounded object in
+                // dark, where a fill alone barely separates from its background.
+                // Kept from the system-colour arrangement this replaced, along
+                // with the focal shadow: both earn their place at these steps.
+                ZStack {
+                    shape.fill(macOSSurface(palette))
+                    shape.strokeBorder(
+                        Color(nsColor: .separatorColor).opacity(zone == .chrome ? 0 : 0.5),
+                        lineWidth: 0.5
+                    )
+                }
+                .shadow(
+                    color: .black.opacity(zone == .focal ? 0.16 : 0),
+                    radius: zone == .focal ? 6 : 0,
+                    y: zone == .focal ? 2 : 0
+                )
+                #else
                 ZStack {
                     shape.fill(palette.surface(for: zone))
                     shape
@@ -237,6 +287,7 @@ public struct LumeSurface: ViewModifier {
                         .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
                         .opacity(zone == .focal ? 1 : 0)
                 }
+                #endif
             }
             .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: zone)
     }

@@ -208,8 +208,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published private(set) var isSearchingEditObservationUnitTerminology = false
     @Published var newServicePrescribedAt = Date()
     @Published var newServiceStatus: PairedServicePrescriptionStatus = .prescribed
-    @Published var newServiceCategory: PairedServicePrescriptionCategory = .specialistica
-    @Published var newServicePriority: PairedServicePrescriptionPriority = .p
+    @Published var newServiceCategory: PairedServicePrescriptionCategory = .visit
+    @Published var newServicePriority: PairedServicePrescriptionPriority = .routine
     @Published var newServiceCodeSystem = "NTR"
     @Published var newServiceCode = ""
     @Published var newServiceName = ""
@@ -229,7 +229,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     @Published var newServiceItemsText = ""
     @Published var newProstheticPrescribedAt = Date()
     @Published var newProstheticStatus: PairedProstheticPrescriptionStatus = .prescribed
-    @Published var newProstheticCategory: PairedProstheticPrescriptionCategory = .ausilio
+    @Published var newProstheticCategory: PairedProstheticPrescriptionCategory = .standard
     @Published var newProstheticISOCode = ""
     @Published var newProstheticDescription = ""
     @Published var newProstheticMeasures = ""
@@ -338,6 +338,29 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     // pasteboard/browser.
     private let systemActions: SystemActionsPerforming
 
+    /// The proactive capability gate. See `ClinicalCapabilityGate` for why it
+    /// denies only what the host has actually reported as absent.
+    ///
+    /// It lives on this model, rather than being read from the capabilities
+    /// store at each call site, because every clinical section already observes
+    /// this model while only some of them are handed the store. A gate hanging
+    /// off an object a view does not observe does not re-evaluate when the
+    /// answer arrives, so those buttons would keep their stale enabled state
+    /// until something unrelated redrew them.
+    @Published private(set) var capabilityGate = ClinicalCapabilityGate()
+
+    func permitsCapability(_ key: String) -> Bool {
+        capabilityGate.permits(key)
+    }
+
+    /// Called when the capabilities store settles. `nil` returns the model to
+    /// "not yet known", which is what a disconnection means.
+    func updateAvailableCapabilities(_ keys: Set<String>?) {
+        let updated = ClinicalCapabilityGate(availableKeys: keys)
+        guard capabilityGate != updated else { return }
+        capabilityGate = updated
+    }
+
     init(
         pairedStore: HomeBasePairedStore = .shared,
         cacheStore: HomeBasePatientCacheStore = .shared,
@@ -357,8 +380,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         // token or encrypted patient cache. It seeds the clinical list/detail
         // models in performAutomaticActionsIfNeeded(), so keep this launch path
         // fully isolated from Keychain and Application Support.
-        if ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENTS"] == "1" {
+        // Offline demo and the synthetic click-map share this path: neither may
+        // touch a developer's real paired token or encrypted patient cache, and
+        // neither needs to. Skipping loadSnapshot() is also what keeps the demo
+        // free of the Keychain authorization panel that macOS raises on every
+        // rebuild, since each ad-hoc signature is a new app to it.
+        if AppleFoundationDemoMode.skipsStoredPairing {
             applyLaunchOverrides(launchOverrides)
+            restoreCachedPatientList()
             return
         }
         #endif
@@ -469,28 +498,41 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     /// patient list instead of hitting the network, so the search / filter UI can be
     /// exercised without a paired home-base. Debug-only, never compiled into release.
     static func uiTestSeededPatients() -> [HomeBasePatientSummary]? {
+        if AppleFoundationDemoMode.isDemoDataset {
+            return AppleFoundationDemoMode.patients()
+        }
         guard ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENTS"] == "1" else {
             return nil
         }
         let base = Date(timeIntervalSince1970: 1_750_000_000)
-        return [
+        let patients = [
+            /* @Codex */
             HomeBasePatientSummary(id: "uitest-1", firstName: "Mario", lastName: "Rossi",
                                    birthDate: nil, taxCode: "RSSMRA80A01H501U",
-                                   isAdi: false, isArchived: false, version: 1, updatedAt: base),
+                                   isAdi: false, isArchived: false, version: 1, updatedAt: base,
+                                   diagnoses: "[{\"code\":\"E11.9\",\"description\":\"Diabete tipo 2\"},{\"code\":\"I10\",\"description\":\"Ipertensione\"}]"),
             HomeBasePatientSummary(id: "uitest-2", firstName: "Anna", lastName: "Bianchi",
                                    birthDate: nil, taxCode: "BNCNNA85M41F205X",
                                    isAdi: false, isArchived: false, version: 1,
-                                   updatedAt: base.addingTimeInterval(-3600)),
+                                   updatedAt: base.addingTimeInterval(-3600),
+                                   diagnoses: "not-json"),
             HomeBasePatientSummary(id: "uitest-3", firstName: "Luigi", lastName: "Verdi",
                                    birthDate: nil, taxCode: "VRDLGU70T10L219Z",
                                    isAdi: false, isArchived: true, version: 1,
                                    updatedAt: base.addingTimeInterval(-7200))
         ]
+        // @Codex
+        return ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_SINGLE_PATIENT"] == "1"
+            ? Array(patients.prefix(1))
+            : patients
     }
 
     /// UI-test fixture detail for a seeded patient, so the patient-detail view can
     /// be exercised (exemptions, contacts, flags) without a paired home-base.
     static func uiTestSeededDetail(for patient: HomeBasePatientSummary) -> HomeBasePatientDetail? {
+        if AppleFoundationDemoMode.isDemoDataset {
+            return AppleFoundationDemoMode.detail(for: patient)
+        }
         guard ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENTS"] == "1" else {
             return nil
         }
@@ -771,12 +813,23 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         let selectionBeforeRefresh = selectedPatientID
         await runTask {
             do {
-                self.patients = try await self.makeClient().fetchPatients(
-                    credentials: credentials,
-                    sessionCookie: sessionCookie,
-                    ambulatoryId: self.ambulatoryId.trimmedOrNil,
-                    includeDeleted: includeDeleted
-                )
+                /* @Codex */
+                let summaries = if includeDeleted {
+                    try await self.makeClient().fetchPatients(
+                        credentials: credentials,
+                        sessionCookie: sessionCookie,
+                        ambulatoryId: self.ambulatoryId.trimmedOrNil,
+                        includeDeleted: true
+                    )
+                } else {
+                    try await self.makeClient().fetchPatients(
+                        credentials: credentials,
+                        sessionCookie: sessionCookie,
+                        ambulatoryId: self.ambulatoryId.trimmedOrNil,
+                        includeDiagnoses: true
+                    )
+                }
+                self.patients = summaries
                 .map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
             } catch {
                 if self.restoreCachedPatientList(markOffline: true) {
@@ -795,11 +848,21 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             )) ?? self.availableAmbulatories
             do {
                 try self.persistPairing()
+                #if DEBUG
+                if !AppleFoundationDemoMode.skipsStoredPairing {
+                    try self.cacheStore.savePatientList(
+                        self.patients,
+                        serverURL: self.serverURL,
+                        ambulatoryId: self.ambulatoryId.trimmedOrNil
+                    )
+                }
+                #else
                 try self.cacheStore.savePatientList(
                     self.patients,
                     serverURL: self.serverURL,
                     ambulatoryId: self.ambulatoryId.trimmedOrNil
                 )
+                #endif
             } catch {
                 self.errorMessage = "Pazienti caricati, ma il salvataggio locale non e riuscito: \(error.localizedDescription)"
             }
@@ -1214,6 +1277,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         && !newPatientFirstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         && !newPatientLastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         && !newPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        && permitsCapability(NetworkCapabilityKey.writePatientLifecycle)
     }
 
     func startCreatingPatient() {
@@ -1261,9 +1325,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                 payload: payload, credentials: credentials, sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil)
             self.isCreatingPatient = false
+            /* @Codex */
             self.patients = try await self.makeClient().fetchPatients(
                 credentials: credentials, sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil)
+                ambulatoryId: self.ambulatoryId.trimmedOrNil, includeDiagnoses: true)
+            .map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
             self.statusMessage = "Paziente creato sull'home-base (id \(created.id))."
         }
     }
@@ -1438,6 +1504,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !isWorking
+            && permitsCapability(NetworkCapabilityKey.writePatientProfile)
     }
 
     /* @Codex */
@@ -1449,6 +1516,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !isWorking
+            && permitsCapability(NetworkCapabilityKey.writePatientProfile)
     }
 
     /* @Codex */
@@ -1459,6 +1527,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !isWorking
+            && permitsCapability(NetworkCapabilityKey.writePatientLifecycle)
     }
 
     /* @Codex */
@@ -1498,7 +1567,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             self.patients = try await self.makeClient().fetchPatients(
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: self.ambulatoryId.trimmedOrNil,
+                includeDiagnoses: true
             )
             .map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
             self.statusMessage = isArchived
@@ -3875,7 +3945,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             credentials: context.credentials,
             sessionCookie: context.sessionCookie,
             ambulatoryId: context.ambulatoryID,
-            includeDeleted: false
+            includeDiagnoses: true
         )
         .map { PatientFieldCrypto.decryptSummary($0, masterKey: context.masterKey) }
         guard Self.reconciledPatientSelectionID(context.patientID, in: refreshedPatients) != nil else {
@@ -3909,6 +3979,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     private func persistPairing() throws {
+        #if DEBUG
+        // A scratch pairing must not be written into the Keychain: it would
+        // overwrite a real one, and the write itself raises the authorization
+        // panel this mode exists to avoid. Skipping it is also honest — a demo
+        // pairing is not something to remember.
+        if AppleFoundationDemoMode.skipsStoredPairing { return }
+        #endif
         try pairedStore.save(
             settings: HomeBasePairedSettings(
                 serverURL: serverURL,
@@ -3923,6 +4000,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 
     @discardableResult
     private func restoreCachedPatientList(markOffline: Bool = false) -> Bool {
+        #if DEBUG
+        // The encrypted patient cache is a second Keychain item with its own
+        // authorization panel. A scratch session has nothing worth caching and no
+        // business reading a real one.
+        if AppleFoundationDemoMode.skipsStoredPairing { return false }
+        #endif
         do {
             guard let snapshot = try cacheStore.loadPatientList(
                 serverURL: serverURL,
@@ -4096,8 +4179,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private func resetNewServicePrescriptionForm() {
         newServicePrescribedAt = Date()
         newServiceStatus = .prescribed
-        newServiceCategory = .specialistica
-        newServicePriority = .p
+        newServiceCategory = .visit
+        newServicePriority = .routine
         newServiceCodeSystem = "NTR"
         newServiceCode = ""
         newServiceName = ""
@@ -4121,7 +4204,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private func resetNewProstheticPrescriptionForm() {
         newProstheticPrescribedAt = Date()
         newProstheticStatus = .prescribed
-        newProstheticCategory = .ausilio
+        newProstheticCategory = .standard
         newProstheticISOCode = ""
         newProstheticDescription = ""
         newProstheticMeasures = ""
@@ -4148,6 +4231,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && connectionState == .pairedOnline
             && !newEntryEditorDocument.isEffectivelyEmpty
             && !isWorking
+            && permitsCapability(NetworkCapabilityKey.writeClinicalDiary)
     }
 
     /* @Codex */
@@ -4190,6 +4274,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && !editEntryTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !editEntryEditorDocument.isEffectivelyEmpty
             && !isWorking
+            && permitsCapability(NetworkCapabilityKey.writeClinicalDiary)
     }
 
     /* @Codex */
@@ -4264,6 +4349,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !isWorking
+            // The export validates against the FSE before it writes anything,
+            // so the capability it needs is the validation one.
+            && permitsCapability(NetworkCapabilityKey.fseValidate)
     }
 
     /* @Codex */
@@ -4289,6 +4377,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !isWorking
+            && permitsCapability(NetworkCapabilityKey.writeClinicalDiary)
     }
 
     /* @Codex */

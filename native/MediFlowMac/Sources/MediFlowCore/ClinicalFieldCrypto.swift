@@ -100,8 +100,17 @@ public enum ClinicalFieldCrypto {
         return sealed
     }
 
+    /// Undecryptable values still become empty strings — showing ciphertext to a
+    /// clinician helps nobody — but the entry now records *that* they were
+    /// withheld. Without that record an unreadable visit note was indistinguishable
+    /// from a visit with no note, which is a clinical difference the interface has
+    /// no right to erase.
     public static func decryptEntry(_ e: HomeBaseEntrySummary, masterKey: SymmetricKey?) -> HomeBaseEntrySummary {
-        HomeBaseEntrySummary(
+        var locked: LockedClinicalFields = []
+        if PatientFieldCrypto.isLocked(e.title, masterKey: masterKey) { locked.insert(.title) }
+        if PatientFieldCrypto.isLocked(e.content, masterKey: masterKey) { locked.insert(.content) }
+
+        return HomeBaseEntrySummary(
             id: e.id, patientId: e.patientId, type: e.type,
             title: string(e.title, masterKey) ?? "",
             date: e.date,
@@ -111,7 +120,8 @@ public enum ClinicalFieldCrypto {
             attachments: structured(e.attachments, masterKey),
             deletedAt: e.deletedAt,
             deletionReason: string(e.deletionReason, masterKey),
-            version: e.version, createdAt: e.createdAt, updatedAt: e.updatedAt
+            version: e.version, createdAt: e.createdAt, updatedAt: e.updatedAt,
+            lockedFields: locked
         )
     }
 

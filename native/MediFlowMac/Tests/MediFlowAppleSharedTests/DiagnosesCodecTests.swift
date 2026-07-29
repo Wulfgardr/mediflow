@@ -76,4 +76,24 @@ final class DiagnosesCodecTests: XCTestCase {
         XCTAssertNil(DiagnosesCodec.encode([], defaultDate: "x"))
         XCTAssertNil(DiagnosesCodec.encode([ClinicalDiagnosis(code: "", description: "", system: nil)], defaultDate: "x"))
     }
+
+    /* @Codex */
+    func testWorklistSummaryPreservesSourceOrderAndCountsAdditionalDiagnoses() {
+        let raw = """
+        [{"code":"E11.9","description":"Diabete tipo 2"},
+         {"code":"I10","description":"Ipertensione"}]
+        """
+        let summary = PatientWorklistDiagnosisSummary(rawDiagnoses: raw)
+        XCTAssertEqual(summary?.displayText, "E11.9 - Diabete tipo 2")
+        XCTAssertEqual(summary?.additionalCount, 1)
+        XCTAssertEqual(summary?.additionalAccessibilityLabel, "Un'altra diagnosi registrata")
+    }
+
+    /* @Codex */
+    func testWorklistSummaryOmitsMissingEmptyMalformedAndCiphertext() {
+        XCTAssertNil(PatientWorklistDiagnosisSummary(rawDiagnoses: nil))
+        XCTAssertNil(PatientWorklistDiagnosisSummary(rawDiagnoses: "[]"))
+        XCTAssertNil(PatientWorklistDiagnosisSummary(rawDiagnoses: "not json"))
+        XCTAssertNil(PatientWorklistDiagnosisSummary(rawDiagnoses: "ENC:undecryptable:value"))
+    }
 }

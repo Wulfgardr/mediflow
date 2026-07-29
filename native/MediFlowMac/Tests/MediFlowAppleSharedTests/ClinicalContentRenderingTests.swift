@@ -23,14 +23,27 @@ final class ClinicalContentRenderingTests: XCTestCase {
         XCTAssertEqual(String(rendered.characters), malformed)
     }
 
-    func testSOAPTemplateMatchesWebVisitDraftShape() {
+    /// The template inserts structure, never prose.
+    ///
+    /// This test used to pin the web's `VISIT_DRAFT_PLACEHOLDER` string, under
+    /// the name "matches web visit draft shape", and so certified an
+    /// equivalence that does not hold. On the web that text is the editor's
+    /// `placeholder`: grey, unsaved, gone the moment you type. Native loaded the
+    /// identical string as *document content*, so the app could write four lines
+    /// of clinical prose into a record that no clinician typed — including
+    /// "valutazione clinica da rivedere" sitting under A, where it reads as an
+    /// assessment. Same words, categorically different behaviour.
+    func testSOAPTemplateInsertsHeadingsAndNoAuthoredProse() {
         XCTAssertEqual(
             ClinicalSOAPTemplate.html,
-            "<p>S: motivo della visita, sintomi riferiti, contesto funzionale</p>" +
-            "<p>O: parametri, esame obiettivo, elementi documentali</p>" +
-            "<p>A: valutazione clinica da rivedere</p>" +
-            "<p>P: piano, follow-up, indicazioni condivise</p>"
+            "<p>S:</p><p>O:</p><p>A:</p><p>P:</p>"
         )
+        for gloss in ["motivo della visita", "da rivedere", "follow-up", "esame obiettivo"] {
+            XCTAssertFalse(
+                ClinicalSOAPTemplate.html.contains(gloss),
+                "the template must not author clinical content on the clinician's behalf"
+            )
+        }
     }
 
     // S7 (Wave 5, D11): the "Template S/O/A/P" button passes ClinicalSOAPTemplate

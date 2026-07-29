@@ -53,6 +53,34 @@ final class PairedPatientsWorkspaceModelS6Tests: XCTestCase {
         XCTAssertFalse(canExportOffline)
     }
 
+    /* @Codex */
+    func testCreatePayloadsUseWebDefaultWireValues() async {
+        let patient = detail(id: "p1")
+        let source = S6MockDataSource(details: ["p1": patient])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(selectedPatient: patient)
+        await MainActor.run {
+            model.newServiceName = "Prestazione sintetica"
+            model.newProstheticDescription = "Ausilio sintetico"
+        }
+
+        await model.createServicePrescriptionForSelectedPatient()
+        await model.createProstheticPrescriptionForSelectedPatient()
+
+        let servicePayload = await source.lastServiceCreatePayload
+        let itemPayload = await source.lastServiceItemCreatePayload
+        let prostheticPayload = await source.lastProstheticCreatePayload
+        XCTAssertEqual(servicePayload?.status, "prescribed")
+        XCTAssertEqual(servicePayload?.category, "visit")
+        XCTAssertEqual(servicePayload?.priority, "routine")
+        XCTAssertEqual(servicePayload?.source, "manual")
+        XCTAssertEqual(itemPayload?.status, "prescribed")
+        XCTAssertEqual(itemPayload?.category, "visit")
+        XCTAssertEqual(prostheticPayload?.status, "prescribed")
+        XCTAssertEqual(prostheticPayload?.category, "standard")
+        XCTAssertEqual(prostheticPayload?.source, "manual")
+    }
+
     func testFHIRExportValidationBranches() async throws {
         let patient = detail(id: "p1")
         let errorModel = await makeModel(source: S6MockDataSource(details: ["p1": patient], validation: Self.validation(errors: 2)))
@@ -156,6 +184,12 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
     private let aiRuntime: HomeBaseNetworkAiRuntimeSummary?
     private(set) var lastServiceUpdate: ServiceUpdate?
     private(set) var itemUpdates: [ItemUpdate] = []
+    /* @Codex */
+    private(set) var lastServiceCreatePayload: HomeBaseServicePrescriptionCreatePayload?
+    /* @Codex */
+    private(set) var lastServiceItemCreatePayload: HomeBaseServicePrescriptionItemCreatePayload?
+    /* @Codex */
+    private(set) var lastProstheticCreatePayload: HomeBaseProstheticPrescriptionCreatePayload?
     private(set) var fetchPatientCount = 0
     private(set) var fetchAmbulatoriesCount = 0
     private(set) var createAmbulatoryCount = 0
@@ -574,7 +608,8 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
         sessionCookie: String,
         ambulatoryId: String?
     ) async throws -> HomeBaseCreatedResource {
-        HomeBaseCreatedResource(id: "service", version: 1)
+        lastServiceCreatePayload = payload
+        return HomeBaseCreatedResource(id: "service", version: 1)
     }
 
     func updateServicePrescription(
@@ -604,7 +639,8 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
         sessionCookie: String,
         ambulatoryId: String?
     ) async throws -> HomeBaseCreatedResource {
-        HomeBaseCreatedResource(id: "service-item", version: 1)
+        lastServiceItemCreatePayload = payload
+        return HomeBaseCreatedResource(id: "service-item", version: 1)
     }
 
     func updateServicePrescriptionItem(
@@ -652,7 +688,8 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
         sessionCookie: String,
         ambulatoryId: String?
     ) async throws -> HomeBaseCreatedResource {
-        HomeBaseCreatedResource(id: "prosthetic", version: 1)
+        lastProstheticCreatePayload = payload
+        return HomeBaseCreatedResource(id: "prosthetic", version: 1)
     }
 
     func updateProstheticPrescription(
@@ -760,7 +797,7 @@ private func service(id: String, date: Date, status: String, version: Int) -> Ho
         patientId: "p1",
         prescribedAt: date,
         status: status,
-        category: "specialistica",
+        category: "visit",
         priority: nil,
         codeSystem: nil,
         serviceCode: nil,
@@ -814,7 +851,7 @@ private func prosthetic(id: String, status: String, version: Int) -> HomeBasePro
         patientId: "p1",
         prescribedAt: Date(timeIntervalSince1970: 1_750_000_000),
         status: status,
-        category: "ausilio",
+        category: "standard",
         isoCode: nil,
         description: "Ausilio",
         measures: nil,

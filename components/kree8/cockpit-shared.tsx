@@ -211,6 +211,7 @@ type Kree8CatalogClientState = {
 
 const REVIEW_AGENDA: Kree8AgendaRow[] = [
   {
+    id: 'review-agenda-0830',
     time: '08:30',
     title: 'Visita ambulatoriale · paziente AB-2026-014',
     sub: 'Controllo cronicità',
@@ -219,6 +220,7 @@ const REVIEW_AGENDA: Kree8AgendaRow[] = [
     filterCategory: 'manual',
   },
   {
+    id: 'review-agenda-0915',
     time: '09:15',
     title: 'Telefonata follow-up · paziente CD-2026-088',
     sub: 'Esito esami ematochimici',
@@ -227,6 +229,7 @@ const REVIEW_AGENDA: Kree8AgendaRow[] = [
     filterCategory: 'manual',
   },
   {
+    id: 'review-agenda-1000',
     time: '10:00',
     title: 'Domiciliare · paziente EF-2026-002',
     sub: 'Medicazione + vitali',
@@ -235,6 +238,7 @@ const REVIEW_AGENDA: Kree8AgendaRow[] = [
     filterCategory: 'urgent',
   },
   {
+    id: 'review-agenda-1130',
     time: '11:30',
     title: 'Riunione équipe distretto',
     sub: 'Discussione casi complessi',
@@ -243,6 +247,7 @@ const REVIEW_AGENDA: Kree8AgendaRow[] = [
     filterCategory: 'manual',
   },
   {
+    id: 'review-agenda-1500',
     time: '15:00',
     title: 'Revisione documenti firmati',
     sub: 'Coda decisioni AI · 7 casi',
@@ -251,6 +256,7 @@ const REVIEW_AGENDA: Kree8AgendaRow[] = [
     filterCategory: 'ai',
   },
   {
+    id: 'review-agenda-1745',
     time: '17:45',
     title: 'Prescrizione SISS',
     sub: 'Sessione consenso scaduta tra 6g',

@@ -46,11 +46,23 @@ public enum ClinicalContentRendering {
 }
 
 /* @Codex */
+/// The four S/O/A/P headings, and nothing else.
+///
+/// This used to insert a gloss beside each letter — "S: motivo della visita,
+/// sintomi riferiti, contesto funzionale" and three more like it. That is not a
+/// template, it is filler: the clinician has to delete four lines of prose
+/// before writing the first real word, and any line left undeleted is saved
+/// into the clinical record as though a clinician had written it. A note that
+/// says "valutazione clinica da rivedere" under A is worse than an empty A,
+/// because it looks like an assessment.
+///
+/// A template supplies structure. What goes under each heading is the
+/// clinician's to write, and the app has no business guessing it.
 public enum ClinicalSOAPTemplate {
     public static let html = [
-        "<p>S: motivo della visita, sintomi riferiti, contesto funzionale</p>",
-        "<p>O: parametri, esame obiettivo, elementi documentali</p>",
-        "<p>A: valutazione clinica da rivedere</p>",
-        "<p>P: piano, follow-up, indicazioni condivise</p>",
+        "<p>S:</p>",
+        "<p>O:</p>",
+        "<p>A:</p>",
+        "<p>P:</p>",
     ].joined()
 }

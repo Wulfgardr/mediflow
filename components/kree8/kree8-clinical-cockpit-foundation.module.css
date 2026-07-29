@@ -146,9 +146,23 @@
   .threeCol { grid-template-columns: 1fr; }
 }
 
+/* A card raised above the panel that holds it, which it was not.
+ *
+ * This drew `--surface` while its container `.panelInset` drew
+ * `--surface-soft`, and the shell aliases both to `--lume-surface-field`: two
+ * tokens meant to be two levels, resolving to one value. So the card was the
+ * exact colour of the panel underneath it and contributed nothing but a second
+ * rounded outline, inset 16px from the first. Nested a few deep that is what
+ * reads as layers of glass piling up at the edge — five concentric corners
+ * between this card and the page, three of them drawing a border.
+ *
+ * `--surface-focal` is the step that already existed for exactly this: the
+ * surface that comes forward. The radius follows the concentric rule the
+ * native side documents, outer minus the inset between them, so the inner
+ * corner sits inside the outer one instead of tracing it. */
 .compositeCard {
-  background: var(--surface);
-  border-radius: var(--radius-tile);
+  background: var(--surface-focal);
+  border-radius: max(calc(var(--radius-card) - 16px), 6px);
   padding: 12px 14px;
   box-shadow: var(--shadow-card);
   display: flex;
@@ -304,12 +318,20 @@
 
 .rowEnd { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; }
 
+/* A group inside the agenda panel, not a surface on top of it.
+ *
+ * This painted `--surface-soft`, the same value its container already paints,
+ * and then drew a corner and a hairline around it. The result is one more
+ * outline in a stack that was already several deep, for a block that is not
+ * raised above anything. The agenda is one container; what belongs to it is
+ * separated by space and a rule, not by another sheet of glass.
+ *
+ * The hairline above stays: it is what says "a different kind of thing starts
+ * here", and it does that without adding a level. */
 .agendaBridge {
   margin-top: 14px;
-  padding: 12px;
-  border-radius: var(--radius-tile);
-  background: var(--surface-soft);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  padding-top: 12px;
+  border-top: 1px solid var(--line-strong);
 }
 
 .agendaBridgeHeader {

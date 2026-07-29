@@ -224,6 +224,26 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'UCUM appears as a terminology system identifier in UI test seed data and does not initiate network access.',
         },
         {
+            path: 'native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientClinicalSections.swift',
+            pattern: 'https?://loinc\\.org(?=[",\\s])',
+            reason: 'LOINC is rendered as a coding-system identifier in the clinical UI and does not initiate network access.',
+        },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientClinicalSections.swift',
+            pattern: 'http://snomed\\.info/sct(?=[",\\s])',
+            reason: 'SNOMED CT is rendered as a coding-system identifier in the clinical UI and does not initiate network access.',
+        },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientClinicalSections.swift',
+            pattern: 'http://unitsofmeasure\\.org(?=[",\\s])',
+            reason: 'UCUM is rendered as a coding-system identifier in the clinical UI and does not initiate network access.',
+        },
+        {
+            path: 'native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientClinicalSections.swift',
+            pattern: 'http://hl7\\.org/fhir/sid/icd-(?:10|9-cm)(?=[",\\s])',
+            reason: 'ICD coding-system URIs are rendered as identifiers in the clinical UI and do not initiate network access.',
+        },
+        {
             path: 'native/MediFlowMac/Tests/MediFlowAppleSharedTests/ObservationTrendTests.swift',
             pattern: 'http://unitsofmeasure\\.org',
             reason: 'UCUM appears as a terminology system identifier in synthetic observation trend tests and does not initiate network access.',

@@ -18,6 +18,16 @@ final class PairedClinicalTypesTests: XCTestCase {
     }
 
     /* @Codex */
+    func testPrescriptionWireValueSetsMatchTheWebContract() {
+        XCTAssertEqual(PairedServicePrescriptionStatus.allCases.map(\.rawValue), ["prescribed", "booked", "performed", "report_received", "cancelled"])
+        XCTAssertEqual(PairedServicePrescriptionCategory.allCases.map(\.rawValue), ["lab", "imaging", "visit", "rehab", "screening", "procedure", "other"])
+        XCTAssertEqual(PairedServicePrescriptionPriority.allCases.map(\.rawValue), ["routine", "P", "D", "B", "U", "unknown"])
+        XCTAssertEqual(PairedPrescriptionSource.allCases.map(\.rawValue), ["manual", "document_review"])
+        XCTAssertEqual(PairedProstheticPrescriptionStatus.allCases.map(\.rawValue), ["draft", "prescribed", "submitted", "authorized", "delivered", "tested", "cancelled"])
+        XCTAssertEqual(PairedProstheticPrescriptionCategory.allCases.map(\.rawValue), ["standard", "oxygen", "repair", "replacement", "trial", "other"])
+    }
+
+    /* @Codex */
     func testClinicalSignalCountBelowLimitIsExact() {
         let signal = ClinicalSignalCount.fromLoadedList(count: 12, loadedCount: 12, limit: 100)
 

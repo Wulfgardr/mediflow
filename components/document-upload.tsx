@@ -43,6 +43,17 @@ async function sha256Hex(value: string): Promise<string> {
     return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+/* @Codex */
+async function readSourceBytes(source: Blob | undefined): Promise<ArrayBuffer | undefined> {
+    if (!source) return undefined;
+
+    try {
+        return await source.arrayBuffer();
+    } catch {
+        return undefined;
+    }
+}
+
 export default function DocumentUpload({ patientId }: DocumentUploadProps) {
     const { showToast } = useToast();
     const confirm = useConfirm();
@@ -136,7 +147,8 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                         } else if (rawText && documentSynthesisEnabled) {
                             setAiStage(`Sintesi documento (${aiModels?.clinical ?? 'qwen3.5:35b-a3b'})...`);
                             try {
-                                const result = await synthesizeDocument(rawText, file.name, patientId, { attachmentId });
+                                const sourceBytes = await readSourceBytes(file);
+                                const result = await synthesizeDocument(rawText, file.name, patientId, { attachmentId, sourceBytes });
                                 const insight = result.insight;
                                 summary = insight.summary;
                                 parseEvidenceArtifactSnapshot = serializeDocumentParseEvidenceArtifact(result.parseEvidenceArtifact);
@@ -248,8 +260,9 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
         try {
             await db.attachments.update(file.id, { ocrQueueState: 'processing' });
             let ocrText = '';
+            let blob: Blob | undefined;
             try {
-                const blob = await (await fetch(file.data)).blob();
+                blob = await (await fetch(file.data)).blob();
                 const replayFile = new File([blob], file.name, { type: file.type || blob.type });
                 ocrText = await extractDocumentTextForSummary(replayFile);
             } catch (ocrError) {
@@ -278,7 +291,8 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
             if (replay.outcome === 'applied' && replay.state === 'ocr_done' && replay.sufficientText) {
                 if (documentSynthesisEnabled) {
                     try {
-                        const result = await synthesizeDocument(ocrText, file.name, patientId, { attachmentId: file.id });
+                        const sourceBytes = await readSourceBytes(blob);
+                        const result = await synthesizeDocument(ocrText, file.name, patientId, { attachmentId: file.id, sourceBytes });
                         await db.attachments.update(file.id, {
                             summarySnapshot: result.insight.summary,
                             parseEvidenceArtifactSnapshot: serializeDocumentParseEvidenceArtifact(result.parseEvidenceArtifact),

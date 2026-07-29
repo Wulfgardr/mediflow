@@ -25,6 +25,7 @@ const BACKUP_TABLES = {
   ambulatories: 'ambulatories',
   attachments: 'attachments',
   conversations: 'conversations',
+  documentDiagnosisProposals: 'document_diagnosis_proposals',
   drugs: 'drugs',
   entries: 'entries',
   exemptions: 'exemptions',
@@ -402,6 +403,7 @@ function buildDataset(db, backupCollections) {
     const conversationIds = new Set(dataset.conversations.map((row) => row.id).filter((value) => typeof value === 'string' && value.length > 0));
 
     dataset.attachments = filterRowsByReference(dataset.attachments, 'patientId', patientIds);
+    dataset.documentDiagnosisProposals = filterRowsByReference(dataset.documentDiagnosisProposals, 'patientId', patientIds);
     dataset.entries = filterRowsByReference(dataset.entries, 'patientId', patientIds);
     dataset.observations = filterRowsByReference(dataset.observations, 'patientId', patientIds);
     dataset.checkups = filterRowsByReference(dataset.checkups, 'patientId', patientIds);
