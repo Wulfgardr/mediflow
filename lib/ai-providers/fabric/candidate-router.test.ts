@@ -122,6 +122,34 @@ test('una generativa richiede onboarding enabled, lifecycle disponibile e receip
     assert.equal(result.decision.fallback, 'denied_by_contract');
 });
 
+test('snapshotta onboarding e lifecycle una sola volta prima dell admissione', () => {
+    const onboarding = enabledLocal();
+    const available = availableLocal();
+    const revoked = transitionProviderLifecycle(available, 'revoke');
+    let onboardingReads = 0;
+    let lifecycleReads = 0;
+
+    const result = routeCandidateCapability({
+        policy: policyFor(generative),
+        request: { descriptor: generative, venue: 'local_process', generative: binding },
+        observations: [observeVenue('local_process', 'available', null)],
+        get onboarding() {
+            onboardingReads += 1;
+            return onboarding;
+        },
+        get lifecycle() {
+            lifecycleReads += 1;
+            return lifecycleReads === 1 ? revoked : available;
+        },
+    });
+
+    assert.equal(onboardingReads, 1);
+    assert.equal(lifecycleReads, 1);
+    assert.equal(result.decision.outcome, 'denied');
+    assert.equal(result.decision.denialCode, 'provider_lifecycle_unavailable');
+    assert.equal(result.decision.receipt, null);
+});
+
 test('revoca, degrado e mismatch onboarding/provider non producono receipt', () => {
     const available = availableLocal();
     const cases = [
