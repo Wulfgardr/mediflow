@@ -96,4 +96,3 @@ export function verifyLocalCandidateEnvelope(
         && envelope.proposal.review === 'accepted'
         && envelope.writesPerformed === 0;
 }
-
