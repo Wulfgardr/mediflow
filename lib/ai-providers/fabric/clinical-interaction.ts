@@ -124,19 +124,29 @@ export function buildInputCompleteness(input: unknown): InputCompleteness {
         return reject('completeness_invalid');
     }
 
-    const unreadableFields = Array.from(input.unreadableFields);
-    const missingFields = Array.from(input.missingFields);
+    // Normalizzazione trim prima di dedup e overlap: lo stesso campo logico
+    // circondato da spazi non puo' comparire in entrambe le liste.
+    const normalize = (raw: readonly unknown[]): string[] => {
+        const normalized: string[] = [];
+        for (const field of Array.from(raw)) {
+            if (!isNonEmptyString(field)) reject('completeness_invalid');
+            const trimmed = (field as string).trim();
+            if (trimmed.length === 0) reject('completeness_invalid');
+            normalized.push(trimmed);
+        }
+        return normalized;
+    };
+    const unreadableFields = normalize(input.unreadableFields);
+    const missingFields = normalize(input.missingFields);
     const unreadable = new Set<string>();
     const missing = new Set<string>();
 
-    for (let index = 0; index < unreadableFields.length; index += 1) {
-        const field = unreadableFields[index];
-        if (!isNonEmptyString(field) || unreadable.has(field)) reject('completeness_invalid');
+    for (const field of unreadableFields) {
+        if (unreadable.has(field)) reject('completeness_invalid');
         unreadable.add(field);
     }
-    for (let index = 0; index < missingFields.length; index += 1) {
-        const field = missingFields[index];
-        if (!isNonEmptyString(field) || missing.has(field) || unreadable.has(field)) {
+    for (const field of missingFields) {
+        if (missing.has(field) || unreadable.has(field)) {
             reject('completeness_invalid');
         }
         missing.add(field);

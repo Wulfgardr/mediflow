@@ -80,6 +80,17 @@ test('separa illeggibili e assenti e respinge overlap, duplicati e valori vuoti'
         unreadableFields: [],
         missingFields: [' '],
     }));
+    // Falsificatore S4: lo stesso campo logico circondato da spazi non deve
+    // aggirare il controllo di overlap; la normalizzazione trim lo pareggia.
+    expectCode('completeness_invalid', () => buildInputCompleteness({
+        unreadableFields: ['synthetic.same'],
+        missingFields: [' synthetic.same '],
+    }));
+    const trimmed = buildInputCompleteness({
+        unreadableFields: [' synthetic.padded '],
+        missingFields: [],
+    });
+    assert.deepEqual(trimmed.unreadableFields, ['synthetic.padded']);
 });
 
 test('crea sempre una proposta pending, valida il catalogo e congela in profondita', () => {

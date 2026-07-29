@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { inArray } from 'drizzle-orm';
 /* @Codex */
-import { db } from '@/lib/db';
+import { dbServer } from '@/lib/db-server';
+import { settings } from '@/lib/schema';
 import {
     DEFAULT_OLLAMA_BASE_URL,
     resolveOllamaBaseUrl,
@@ -44,18 +46,22 @@ export async function GET(req: NextRequest) {
     const session = await requireSessionOrLocalToken(req);
     if (!session) return unauthorizedResponse();
 
-    const [genericUrl, legacyUrl, networkMode] = await Promise.all([
-        db.settings.get('aiUrl'),
-        db.settings.get('ollamaUrl'),
-        db.settings.get(NETWORK_MODE_KEY),
-    ]);
+    // Lettura server-side diretta delle impostazioni (pattern di
+    // lib/network-ai-runtime.ts): il facade client di lib/db non e'
+    // utilizzabile nel runtime Node delle route.
+    const rows = await dbServer
+        .select({ key: settings.key, value: settings.value })
+        .from(settings)
+        .where(inArray(settings.key, ['aiUrl', 'ollamaUrl', NETWORK_MODE_KEY]));
+    const snapshot = new Map(rows.map((row) => [row.key, row.value]));
     const rawBaseUrl = resolveOllamaBaseUrl(
-        genericUrl?.value,
-        legacyUrl?.value,
+        snapshot.get('aiUrl'),
+        snapshot.get('ollamaUrl'),
         DEFAULT_OLLAMA_BASE_URL,
     );
+    const networkMode = snapshot.get(NETWORK_MODE_KEY);
     const localProcess = await observeLocalProcess(rawBaseUrl);
-    const homeBase = normalizeNetworkOperatingMode(networkMode?.value) === 'network-home-base'
+    const homeBase = normalizeNetworkOperatingMode(networkMode) === 'network-home-base'
         ? observeVenue('home_base', 'available', null)
         : observeVenue('home_base', 'offline', 'mode_disabled');
 

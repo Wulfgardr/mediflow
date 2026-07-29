@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.21.0
+  version: 1.22.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -519,6 +519,67 @@ paths:
                     error: Conflict
                     code: PAIRING_INTENT_EXPIRED
                     message: Pairing intent has expired and must be requested again.
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/pairing-clients/{clientId}:
+    delete:
+      tags:
+        - Network
+      operationId: revokeNetworkPairedClient
+      summary: Revoke a paired client on the home-base node
+      description: |
+        Removes the stored trust record of a single paired client. After the
+        revocation the client token no longer authenticates on discovery or
+        data-plane routes; other paired clients are unaffected. The write uses
+        a compare-and-swap on the persisted pairing state, so concurrent
+        revocations cannot overwrite each other.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          description: Paired client identifier to revoke.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paired client revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - removedClientId
+                properties:
+                  removedClientId:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Paired client not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkErrorResponse'
+              examples:
+                unknownClient:
+                  value:
+                    error: Not Found
+                    code: PAIRING_CLIENT_NOT_FOUND
+                    message: Paired client not found.
+        '409':
+          description: Pairing state changed concurrently; retry the revocation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkErrorResponse'
+              examples:
+                concurrentChange:
+                  value:
+                    error: Conflict
+                    code: PAIRING_STATE_CONFLICT
+                    message: Pairing state changed, retry.
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/ambulatories:
