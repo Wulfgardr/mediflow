@@ -15,7 +15,6 @@ _by Ordito & Concilio_
 
 **Cartella clinica territoriale local-first, open source e libera da usare.**
 
-**Serve the right information at the right time.**<br>
 **Porta l'informazione giusta nel momento giusto.**
 
 [![Versione](https://img.shields.io/badge/versione-0.8.0-1f6feb)](./CHANGELOG.md)
@@ -23,7 +22,7 @@ _by Ordito & Concilio_
 [![Local-first](https://img.shields.io/badge/dati-local--first-8957e5)](#confini-dichiarati)
 [![Core Swift](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#release-sorgente-080)
 
-[In breve](#mediflow-in-breve) · [Schermate](#come-si-presenta) · [Architettura](#come-collaborano-le-app) · [Stato](#release-sorgente-080) · [Avvio](#avvio-rapido) · [Sviluppo](#sviluppo-assistito)
+[In breve](#mediflow-in-breve) · [Uso attuale](#come-si-usa-oggi) · [Architettura](#come-collaborano-le-app) · [Schermate](#come-si-presenta) · [Stato](#release-sorgente-080) · [Avvio](#avvio-rapido) · [Sviluppo](#sviluppo-assistito)
 
 </div>
 
@@ -41,11 +40,10 @@ AI-first. Dati clinici, terminologie, reference data, ricerca, navigazione e
 workflow deterministici restano funzioni di prima classe anche quando ogni
 provider AI è disabilitato.
 
-Il Mac ospita la base autorevole. iPhone e iPad si collegano come client paired
-sulla rete locale. Il cloud non è un requisito per lavorare. Quando Ollama è
-configurato, alcune funzioni locali possono preparare materiale da rivedere.
-Nessun output AI aggiunge diagnosi, terapie o altri dati clinici strutturati
-senza un'azione esplicita del medico.
+Il cloud non è un requisito per lavorare. Quando Ollama è configurato, alcune
+funzioni locali possono preparare materiale da rivedere. Nessun output AI
+aggiunge diagnosi, terapie o altri dati clinici strutturati senza un'azione
+esplicita del medico.
 
 Nel contesto territoriale italiano, MediFlow aiuta ad aprire la scheda giusta,
 ritrovare la fonte, distinguere una terapia da una prestazione prescritta e
@@ -62,55 +60,29 @@ sanitari, credenziali e altri artefatti locali restano fuori da Git secondo
 [`SECURITY.md`](./SECURITY.md) e
 [`docs/repository-topology.md`](./docs/repository-topology.md).
 
-## Come si presenta
+## Come si usa oggi
 
-### Mac home-base
+La superficie operativa principale è il workspace web su localhost, avviato sul
+Mac home-base. Qui MediFlow offre i flussi più estesi per pazienti, diario,
+agenda, documenti, impostazioni e amministrazione locale. Il database resta sul
+Mac.
 
-<img src="./screenshots/0.8/macos-clinical-workspace.png" alt="Workspace nativo MediFlow per macOS con lista di lavoro e scheda clinica sintetica" width="820" loading="lazy" decoding="async"/>
-
-### Web locale sullo stesso Mac
-
-<img src="./screenshots/01-worklist.png" alt="Cockpit web locale MediFlow con lista di lavoro e pazienti dimostrativi sintetici" width="820" loading="lazy" decoding="async"/>
-
-### iPad paired
-
-<table>
-<tr>
-<td><img src="./screenshots/0.8/ipados-workspace.png" alt="Workspace iPad in orizzontale con lista pazienti sintetici e pannello clinico in attesa di selezione" width="390" loading="lazy" decoding="async"/></td>
-<td><img src="./screenshots/0.8/ipados-detail.png" alt="Scheda iPad di un paziente sintetico con riepilogo clinico, diagnosi codificate e dati demografici" width="390" loading="lazy" decoding="async"/></td>
-</tr>
-</table>
-
-<p align="center"><img src="./screenshots/0.8/ipados-scale.png" alt="Modulo di una scala di valutazione aperto su iPad per un paziente sintetico" width="620" loading="lazy" decoding="async"/></p>
-
-### iPhone paired
-
-<table>
-<tr>
-<td><img src="./screenshots/0.8/ios-iphone-worklist.png" alt="Lista di lavoro iPhone con pazienti sintetici, diagnosi codificate e indicatori di assistenza domiciliare" width="260" loading="lazy" decoding="async"/></td>
-<td><img src="./screenshots/0.8/ios-iphone-detail.png" alt="Scheda iPhone di un paziente sintetico con dati demografici, diagnosi codificate ed esenzioni" width="260" loading="lazy" decoding="async"/></td>
-<td><img src="./screenshots/0.8/ios-iphone-therapies.png" alt="Terapie su iPhone con stati attiva, sospesa e conclusa, dati sintetici" width="260" loading="lazy" decoding="async"/></td>
-</tr>
-</table>
-
-_Catture reali della candidata Apple e della build web di produzione. Le viste
-cliniche usano soltanto fixture sintetiche, deterministiche e versionate nel
-repository. Nessun dato paziente reale. Le viste web ristrette a dimensioni
-telefono o tablet restano evidenze di test e non fanno parte della galleria. Il
-[manifest media 0.8](./screenshots/0.8/manifest.json) registra dispositivo,
-runtime, scena, commit sorgente e hash._
+L'app nativa macOS appartiene allo stesso home-base e offre un accesso desktop
+coerente con il prodotto. iPhone e iPad sono client paired in sviluppo. Hanno
+già una base funzionale consolidata, ma richiedono ancora lavoro prima dell'uso
+operativo quotidiano.
 
 ## Come collaborano le app
 
 Il Mac è il nodo autorevole (`home-base`). Ospita il database, l'app nativa e il
 workspace web locale. iPhone e iPad usano l'API locale versionata dopo un
-pairing esplicito. iPhone privilegia consultazione e cattura rapide; iPad è il
-workspace sul campo. Localhost offre il workspace web completo sullo stesso
-home-base. I dispositivi paired non accedono direttamente a SQLite.
+pairing esplicito. Localhost è oggi la superficie operativa principale. iPhone
+privilegia consultazione e cattura rapide; iPad è progettato come workspace sul
+campo. I dispositivi paired non accedono direttamente a SQLite.
 
 ```mermaid
 flowchart LR
-    subgraph paired["Client paired"]
+    subgraph paired["Client paired · in sviluppo"]
         iphone["iPhone<br/>recupero e cattura"]
         ipad["iPad<br/>workspace sul campo"]
     end
@@ -152,6 +124,45 @@ flowchart LR
 Non esiste fallback silenzioso verso il cloud. MediFlow resta utile quando tutti
 i provider AI sono disabilitati. Provenienza, identità del paziente, sede di
 esecuzione, incertezza e revisione del medico dovranno restare visibili.
+
+## Come si presenta
+
+### Workspace operativo su localhost
+
+<img src="./screenshots/01-worklist.png" alt="Cockpit web locale MediFlow con lista di lavoro e pazienti dimostrativi sintetici" width="820" loading="lazy" decoding="async"/>
+
+### App nativa macOS
+
+<img src="./screenshots/0.8/macos-clinical-workspace.png" alt="Workspace nativo MediFlow per macOS con lista di lavoro e scheda clinica sintetica" width="820" loading="lazy" decoding="async"/>
+
+### Client iPad in sviluppo
+
+<table>
+<tr>
+<td><img src="./screenshots/0.8/ipados-workspace.png" alt="Workspace iPad in orizzontale con lista pazienti sintetici e pannello clinico in attesa di selezione" width="390" loading="lazy" decoding="async"/></td>
+<td><img src="./screenshots/0.8/ipados-detail.png" alt="Scheda iPad di un paziente sintetico con riepilogo clinico, diagnosi codificate e dati demografici" width="390" loading="lazy" decoding="async"/></td>
+</tr>
+</table>
+
+<p align="center"><img src="./screenshots/0.8/ipados-scale.png" alt="Modulo di una scala di valutazione aperto su iPad per un paziente sintetico" width="620" loading="lazy" decoding="async"/></p>
+
+### Client iPhone in sviluppo
+
+<table>
+<tr>
+<td><img src="./screenshots/0.8/ios-iphone-worklist.png" alt="Lista di lavoro iPhone con pazienti sintetici, diagnosi codificate e indicatori di assistenza domiciliare" width="260" loading="lazy" decoding="async"/></td>
+<td><img src="./screenshots/0.8/ios-iphone-detail.png" alt="Scheda iPhone di un paziente sintetico con dati demografici, diagnosi codificate ed esenzioni" width="260" loading="lazy" decoding="async"/></td>
+<td><img src="./screenshots/0.8/ios-iphone-therapies.png" alt="Terapie su iPhone con stati attiva, sospesa e conclusa, dati sintetici" width="260" loading="lazy" decoding="async"/></td>
+</tr>
+</table>
+
+_Catture reali della candidata Apple e della build web di produzione. La
+galleria presenta prima le superfici del Mac home-base e poi i client paired in
+sviluppo. Le viste cliniche usano soltanto fixture sintetiche, deterministiche
+e versionate nel repository. Nessun dato paziente reale. Le viste web ristrette
+a dimensioni telefono o tablet restano evidenze di test e non fanno parte
+della galleria. Il [manifest media 0.8](./screenshots/0.8/manifest.json)
+registra dispositivo, runtime, scena, commit sorgente e hash._
 
 ## Release sorgente 0.8.0
 
