@@ -196,8 +196,12 @@ indeterminato resta bloccante.
 * **Provider scaffold**: `OllamaAdapter` e `AIService` sono su `main`; il gate
   egress applica il primo strato deterministico e resta
   `closed_pending_redaction_lane`.
-* **Boundary ancora chiuso**: registry, provider alternativi, redaction lane e
-  consenso cloud non sono consegnati; Ollama resta l'unico provider operativo.
+* **Boundary ancora chiuso**: provider alternativi, redaction lane e consenso
+  cloud non sono consegnati; Ollama resta l'unico provider operativo. Sulla
+  linea post-0.8 il registry locale per task e' consolidato (WUL-502) e ADR
+  0089 aggiunge il contratto Intelligence Fabric: capability, venue esplicite,
+  profili egress versionati chiusi per costruzione e ricevute che non
+  autorizzano consumer.
 * **Scaffold model-agnostic post-0.8**: `WUL-499` e ADR 0086 separano pipeline
   locale, proposta, chiarimento, anteprima, autorizzazione ed eventuale
   scrittura applicativa auditata. Il contratto e accettato per il programma
