@@ -73,8 +73,8 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 | W2a | F1 resolver + catalogo generativo | Sol high, worktree `mediflow-if-f1-wt` | DONE (integrata in `e3ccf2514`) |
 | W2a | F2 catalogo deterministico | Terra high, worktree `mediflow-if-f2-wt` | DONE (integrata via ff a `175b565cf`) |
 | W2b | F3 catalogo unificato + route stato `/api/ai/fabric/status` | Terra high, worktree `mediflow-if-f3-wt` | DONE (integrata via ff a `76225116c`) |
-| W3 | Docs di programma + battery completa su branch manager | manager | IN CORSO |
-| W4 | Verifica terminale indipendente | Sol xhigh, contesto fresco | Primo passaggio `HOLD_FIX` (2 P1, 2 P2, 1 P3); correzioni applicate; ri-verifica in corso |
+| W3 | Docs di programma + battery completa su branch manager | manager | DONE |
+| W4 | Verifica terminale indipendente | Sol xhigh/high, 5 passaggi a contesto fresco | DONE: `GO` al quinto passaggio su `4f17232b8` |
 
 ## 5. Ledger lane
 
@@ -89,6 +89,7 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 | W4 secondo passaggio | Sol xhigh, contesto fresco | HOLD_FIX | P1 confermati chiusi dai falsificatori; residui: policy non validata integralmente a runtime (P2: `retention`/`consentRef`/`allowedVenues`), pattern snake_case aggirabile con semantica clinica (P2: `diagnosi_diabete_tipo_2`), riga rischi stale (P3), eccezione ATHENA non documentata in ADR (P3) |
 | W4 terzo passaggio | Sol high, contesto fresco, focalizzato | HOLD_FIX | Correzioni A-D confermate chiuse dai falsificatori; battery verde (935/935); nuovi P2 dalla caccia avversariale: vocabolario `as const` non congelato a runtime (mutabile prima del load del resolver) e array sparso che aggira `every()` su `allowedVenues` |
 | W4 quarto passaggio | Sol high, contesto fresco, focalizzato | HOLD_FIX | Congelamento e fix sparse-array confermati chiusi; battery verde (936/936); nuovi P2 classe TOCTOU: `includes` ridefinito dal chiamante amplia le venue; doppia iterazione della provenance permette a un iteratore stateful di cambiare valori tra check e uso |
+| W4 quinto passaggio | Sol high, contesto fresco, terminale | GO | Falsificatori TOCTOU chiusi (snapshot-unico confermato); 21/21 fabric, 936/936 unit, typecheck/claims/never-regress PASS; nessun P1/P2; 3 residui P3 fuori dal threat model dichiarato (getter stateful su `request.venue` e `resolution.receipt`, RegExp esportata non congelata usata solo nei test) |
 
 ## 6. Decision audit (aggiornato in corso d'opera)
 
@@ -120,6 +121,44 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 | Descriptor dal chiamante (rischio del primo passaggio W4) | CHIUSO: il resolver impone l'identita' canonica contro il catalogo unificato; un clone a valori identici viene respinto con `capability_unknown` (test dedicato) |
 | `never-regress` NR-EGRESS su fixture negativa `https://example.test` in `resolver.test.ts` | Trovato dalla battery W3; fixture ricostruita a pezzi con `join('')` come il pattern di `registry.test.ts`; guard e test fabric riverificati verdi |
 
-## 8. Next permitted action
+## 8. Verdetto terminale e promotion packet
 
-Aggiornato a fine run.
+Verdetto del programma: `LOCAL_IMPLEMENTATION_READY / HOLD_PROMOTION`.
+
+HEAD verificata dalla lane terminale: `4f17232b8` (il commit di closeout
+documentale successivo non tocca codice). Branch manager:
+`codex/WUL-522-intelligence-fabric`.
+
+### Contenuto consegnato
+
+- Stack provider post-0.8 consolidato (WUL-269/418/502) sulla baseline `v0.8.0`.
+- ADR 0089 accettato e scaffold Intelligence Fabric completo:
+  `lib/ai-providers/fabric/` (contratto, cataloghi generativo e
+  deterministico, catalogo unificato, resolver fail-closed, stato) piu la
+  route read-only `/api/ai/fabric/status`.
+- Audit OpenMinis assorbito; matrice serving, stato di sistema, roadmap,
+  changelog e indice allineati senza overclaim.
+
+### Rischi residui dichiarati
+
+- 3 P3 fuori dal threat model dichiarato (codice ostile same-process):
+  getter stateful su `request.venue` e su `resolution.receipt`; RegExp
+  esportata non congelata usata solo nei test.
+- Nessun test HTTP end-to-end della route di stato (auth verificata sul
+  call path sorgente; snapshot puro testato).
+- Adozione nativa Apple dello stato fabric non eseguita (nessun file
+  `native/` toccato, per ownership delle lane UI attive).
+- Registro attese persistente di ADR 0082 assente come runtime (fatto
+  preesistente, non regressione).
+- A3 resta `observed_not_causal`; qualified readiness `HOLD`.
+
+### Next permitted action
+
+Una sola azione permessa: push della branch
+`codex/WUL-522-intelligence-fabric` e apertura PR verso `main` su
+`Wulfgardr/mediflow` (autorita di Leonardo; questo run non esegue azioni
+remote). Dopo la promozione: pulizia dei worktree lane
+(`mediflow-if-f1-wt`, `-f2-wt`, `-f3-wt`, `-verify-wt`) e dei branch lane
+gia integrati; i packet successivi del DAG storico restano WUL-466
+(profili degradati OCR) e l'esposizione dello stato fabric sul data plane
+`network` per i client paired.
