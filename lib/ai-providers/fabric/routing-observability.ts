@@ -45,6 +45,7 @@ export type RoutingDecision = Readonly<{
         | FabricPolicyErrorCode
         | ProviderRegistryErrorCode
         | 'venue_offline'
+        | 'venue_unknown'
         | 'venue_degraded'
         | null;
     fallback: 'denied_by_contract';
@@ -103,11 +104,17 @@ function snapshotObservations(observations: readonly VenueObservation[]): VenueO
     }
 
     const snapshot = Array.from(observations);
+    const venues = new Set<FabricVenue>();
     return snapshot.map((observation) => {
         if (!observation || typeof observation !== 'object') {
             throw new FabricPolicyError('policy_invalid');
         }
-        return observeVenue(observation.venue, observation.state, observation.reason);
+        const normalized = observeVenue(observation.venue, observation.state, observation.reason);
+        if (venues.has(normalized.venue)) {
+            throw new FabricPolicyError('policy_invalid');
+        }
+        venues.add(normalized.venue);
+        return normalized;
     });
 }
 
@@ -166,7 +173,6 @@ export function observeAndResolve(
     policy: FabricExecutionPolicy,
     request: FabricResolutionRequest,
     observations: readonly VenueObservation[],
-    options: Readonly<{ denyOnDegraded?: boolean }> = Object.freeze({}),
 ): ObserveAndResolveResult {
     const observationSnapshot = snapshotObservations(observations);
     let requestedObservation = observationSnapshot.find(
@@ -177,6 +183,21 @@ export function observeAndResolve(
         observationSnapshot.push(requestedObservation);
     }
     const frozenObservations = Object.freeze(observationSnapshot);
+
+    // ADR 0091: una venue non osservata, offline o degradata non puo'
+    // raggiungere il resolver puro. Il routing candidato non sceglie mai una
+    // venue alternativa e conserva sempre quella richiesta.
+    if (requestedObservation.state === 'unknown') {
+        return Object.freeze({
+            decision: buildDecision(policy, request, frozenObservations, {
+                outcome: 'denied',
+                denialCode: 'venue_unknown',
+                receipt: null,
+            }),
+            resolution: null,
+            error: null,
+        });
+    }
 
     if (requestedObservation.state === 'offline') {
         return Object.freeze({
@@ -190,7 +211,7 @@ export function observeAndResolve(
         });
     }
 
-    if (requestedObservation.state === 'degraded' && options.denyOnDegraded === true) {
+    if (requestedObservation.state === 'degraded') {
         return Object.freeze({
             decision: buildDecision(policy, request, frozenObservations, {
                 outcome: 'denied',
