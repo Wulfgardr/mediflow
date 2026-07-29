@@ -18,12 +18,12 @@ _by Ordito & Concilio_
 **Serve the right information at the right time.**<br>
 **Porta l'informazione giusta nel momento giusto.**
 
-[![Versione](https://img.shields.io/badge/versione-0.8.0%20candidata-1f6feb)](./CHANGELOG.md)
+[![Versione](https://img.shields.io/badge/versione-0.8.0-1f6feb)](./CHANGELOG.md)
 [![Licenza](https://img.shields.io/badge/licenza-MIT-2ea043)](./LICENSE)
 [![Local-first](https://img.shields.io/badge/dati-local--first-8957e5)](#confini-dichiarati)
-[![Core Swift](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#candidata-locale-080)
+[![Core Swift](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#release-sorgente-080)
 
-[In breve](#mediflow-in-breve) · [Schermate](#come-si-presenta) · [Architettura](#come-è-fatto) · [Stato](#candidata-locale-080) · [Avvio](#avvio-rapido) · [Sviluppo](#sviluppo-assistito)
+[In breve](#mediflow-in-breve) · [Schermate](#come-si-presenta) · [Architettura](#come-è-fatto) · [Stato](#release-sorgente-080) · [Avvio](#avvio-rapido) · [Sviluppo](#sviluppo-assistito)
 
 </div>
 
@@ -134,12 +134,13 @@ Il diagramma mostra il percorso locale. Trasporto, pairing e limiti del data
 plane sono documentati in
 [`docs/topologia-dati-flussi.md`](./docs/topologia-dati-flussi.md).
 
-## Candidata locale 0.8.0
+## Release sorgente 0.8.0
 
-Questa linea prepara la candidata sorgente `0.8.0`. Non dichiara un tag, una
-GitHub Release, una pubblicazione App Store o una certificazione.
+La release `0.8.0` distribuisce il codice sorgente verificato. Non costituisce
+una pubblicazione App Store, una certificazione o una dichiarazione di
+conformità completa.
 
-La candidata consolida contratti AI review-first, hardening del pacchetto
+La release consolida contratti AI review-first, hardening del pacchetto
 autonomo e una UI clinico-semantica coerente su localhost, macOS, iPhone e iPad.
 Le prove usano solo fixture sintetiche:
 
@@ -217,7 +218,7 @@ MediFlow non racconta più di quanto possa dimostrare.
 - **iPhone e iPad non sono app complete.** Il perimetro operativo è
   `home-base + client paired`; cache offline e alcune superfici derivate dai
   documenti restano parziali o disponibili solo sull'host.
-- **Windows e Linux non hanno ancora parity applicativa.** La candidata verifica il
+- **Windows e Linux non hanno ancora parity applicativa.** La release verifica il
   core Swift condiviso e il runtime di base, non applicazioni complete su ogni
   piattaforma.
 - **SISS e FSE restano un handoff assistito.** MediFlow apre il contesto giusto,

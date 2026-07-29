@@ -8,9 +8,8 @@ read_when:
 # 🧭 Roadmap MediFlow
 
 > **Dove siamo e dove vogliamo andare.**
-> La v0.8 è una candidata sorgente verificata localmente, senza tag, GitHub
-> Release, pubblicazione App Store o claim di parity completa. Ultimo
-> aggiornamento: 2026-07-28.
+> La v0.8 è una release sorgente verificata. Non è una pubblicazione App Store
+> e non dichiara parity completa. Ultimo aggiornamento: 2026-07-29.
 > Fonte roadmap prodotto canonica (vedi anche [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) per la lettura completa corrente e [docs/README.md](./README.md) per mappa completa documenti).
 
 > [!NOTE]
@@ -161,19 +160,19 @@ control-flow documentale review-first, hardening di runtime e dati, il claims
 guard pubblico e il tooling P6 sintetico. La migrazione Lume completa e il
 verbale manuale di `WUL-481` restano lavoro successivo, non claim di release.
 
-## 🟡 Candidata sorgente v0.8: integrazioni e gate
+## ✅ Release sorgente v0.8: integrazioni e gate
 
-La candidata riunisce hardening documentale, superfici web Lume e correzioni
-Apple già presenti nel tree locale. Non cambia l'intended purpose.
+La release riunisce hardening documentale, superfici web Lume e correzioni
+Apple presenti nel tree verificato. Non cambia l'intended purpose.
 
 | Area | Evidenza locale | Non dichiarato |
 | --- | --- | --- |
 | Lume | Token DTCG, mirror CSS e consumatori web sono attivi. | Parity estetica completa o redesign concluso. |
 | Documenti | Stati accessibili e registro separato delle proposte sono integrati. | Diagnosi auto-applicate o nuova inbox. |
-| Apple | iPhone 2/2, iPad 7/7, build/probe macOS, Cmd-R e media sintetici sono sul candidato. | VoiceOver mobile provato, conformità o App Store readiness. |
+| Apple | iPhone 2/2, iPad 7/7, build/probe macOS, Cmd-R e media sintetici sono sul tree verificato. | VoiceOver mobile provato, conformità o App Store readiness. |
 | AI | I boundary review-first e no-egress restano nel prodotto. | Nuovi provider, cloud o automazione graduata. |
 
-La deroga esterna VoiceOver mobile vale solo per questa candidata sorgente. Gli
+La deroga esterna VoiceOver mobile vale solo per questa release sorgente. Gli
 audit AX e i test UI non sostituiscono VoiceOver reale. Ogni altro gate rosso o
 indeterminato resta bloccante.
 
