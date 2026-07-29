@@ -1,0 +1,55 @@
+/* @Codex */
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { FABRIC_CAPABILITY_DESCRIPTORS } from './catalog.ts';
+import { FABRIC_SCHEMA_VERSION } from './contract.ts';
+import { buildFabricStatusSnapshot } from './status.ts';
+
+const SNAPSHOT_KEYS = [
+    'capabilities',
+    'contractVersion',
+    'egressGateOpen',
+    'readinessNote',
+    'schemaVersion',
+];
+const CAPABILITY_KEYS = [
+    'class',
+    'contractSchema',
+    'egressProfile',
+    'id',
+    'killSwitch',
+    'operation',
+    'review',
+    'venues',
+];
+const EGRESS_PROFILE_KEYS = ['egress', 'id', 'version'];
+
+test('espone uno snapshot minimo, ordinato e congelato', () => {
+    const snapshot = buildFabricStatusSnapshot();
+
+    assert.deepEqual(Object.keys(snapshot).sort(), SNAPSHOT_KEYS);
+    assert.equal(snapshot.schemaVersion, 'mediflow.ai.fabric-status.v1');
+    assert.equal(snapshot.contractVersion, FABRIC_SCHEMA_VERSION);
+    assert.equal(snapshot.egressGateOpen, false);
+    assert.equal(snapshot.readinessNote, 'available_unqualified');
+    assert.equal(snapshot.capabilities.length, 16);
+    assert.deepEqual(
+        snapshot.capabilities.map((capability) => capability.id),
+        Object.keys(FABRIC_CAPABILITY_DESCRIPTORS).sort(),
+    );
+
+    assert.equal(Object.isFrozen(snapshot), true);
+    assert.equal(Object.isFrozen(snapshot.capabilities), true);
+    for (const capability of snapshot.capabilities) {
+        assert.deepEqual(Object.keys(capability).sort(), CAPABILITY_KEYS);
+        assert.deepEqual(Object.keys(capability.egressProfile).sort(), EGRESS_PROFILE_KEYS);
+        assert.equal(Object.isFrozen(capability), true);
+        assert.equal(Object.isFrozen(capability.venues), true);
+        assert.equal(Object.isFrozen(capability.egressProfile), true);
+        assert.equal(capability.killSwitch === null || typeof capability.killSwitch === 'string', true);
+    }
+});
+
+test('non serializza endpoint o altri URL', () => {
+    assert.equal(JSON.stringify(buildFabricStatusSnapshot()).toLowerCase().includes('http'), false);
+});
