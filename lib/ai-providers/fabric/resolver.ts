@@ -1,8 +1,10 @@
 /* @Codex */
 import { isEgressGateOpen } from '../../ai-egress-gate';
 import { localProviderRegistry, type LocalProviderBindingInput, type LocalProviderResolution } from '../registry';
+import { FABRIC_CAPABILITY_DESCRIPTORS } from './catalog';
 import {
-    DETERMINISTIC_CAPABILITY_IDS, EGRESS_PROFILES, GENERATIVE_CAPABILITY_IDS, FabricPolicyError,
+    DETERMINISTIC_CAPABILITY_IDS, EGRESS_PROFILES, FABRIC_PREPROCESSING_LABEL_PATTERN,
+    GENERATIVE_CAPABILITY_IDS, FabricPolicyError,
     type FabricCapabilityDescriptor, type FabricExecutionPolicy, type FabricProvenanceRecord,
     type FabricResolutionReceipt, type FabricVenue, type GenerativeCapabilityId,
 } from './contract';
@@ -13,12 +15,18 @@ export interface FabricResolution {
     readonly generative: LocalProviderResolution | null;
 }
 
-const GENERATIVE_TASKS: Readonly<Record<GenerativeCapabilityId, LocalProviderBindingInput['task']>> = {
+const GENERATIVE_TASKS: Readonly<Record<Exclude<GenerativeCapabilityId, 'treatment_reasoning'>, LocalProviderBindingInput['task']>> = {
     patient_insight: 'clinical',
     smart_import: 'clinical',
     document_synthesis: 'reasoning',
     ocr: 'ocr',
-    treatment_reasoning: 'reasoning',
+};
+
+// Lane generative con runtime autogestito fuori dal registry Ollama: la
+// ricevuta nomina il provider effettivo della lane, il modello resta risolto
+// dalla lane stessa (matrice serving: ATHENA MLX non eredita il registry).
+const SELF_MANAGED_GENERATIVE: Readonly<Partial<Record<GenerativeCapabilityId, 'athena_mlx'>>> = {
+    treatment_reasoning: 'athena_mlx',
 };
 
 function isGenerative(id: string): id is GenerativeCapabilityId {
@@ -51,9 +59,21 @@ export function resolveFabricCapability(
         throw new FabricPolicyError('capability_unknown');
     }
 
+    // Solo il descriptor canonico del catalogo e' autorevole: un oggetto
+    // fabbricato con lo stesso id ma venue, review o profili diversi viene
+    // respinto per identita' di riferimento (i descrittori sono singleton
+    // congelati).
+    if (FABRIC_CAPABILITY_DESCRIPTORS[descriptor.id] !== descriptor) {
+        throw new FabricPolicyError('capability_unknown');
+    }
+
+    const selfManagedProvider = generativeCapability
+        ? SELF_MANAGED_GENERATIVE[descriptor.id as GenerativeCapabilityId] ?? null
+        : null;
+    const requiresRegistryBinding = generativeCapability && selfManagedProvider === null;
     if (
         descriptor.class !== (generativeCapability ? 'generative' : 'deterministic')
-        || generativeCapability !== Boolean(request.generative)
+        || requiresRegistryBinding !== Boolean(request.generative)
     ) {
         throw new FabricPolicyError('class_mismatch');
     }
@@ -81,9 +101,9 @@ export function resolveFabricCapability(
         throw new FabricPolicyError('egress_profile_unsatisfied');
     }
 
-    const generative = generativeCapability ? localProviderRegistry.resolve({
+    const generative = requiresRegistryBinding ? localProviderRegistry.resolve({
         ...request.generative!,
-        task: GENERATIVE_TASKS[descriptor.id],
+        task: GENERATIVE_TASKS[descriptor.id as Exclude<GenerativeCapabilityId, 'treatment_reasoning'>],
     }) : null;
     const egressProfile = Object.freeze({
         id: profile.id,
@@ -96,7 +116,7 @@ export function resolveFabricCapability(
         class: descriptor.class,
         venue: request.venue,
         egressProfile,
-        provider: generative?.receipt.provider ?? 'in_house',
+        provider: generative?.receipt.provider ?? selfManagedProvider ?? 'in_house',
         model: generative?.receipt.model ?? null,
         providerReceipt: generative?.receipt ?? null,
         fallbackCount: 0,
@@ -106,6 +126,11 @@ export function resolveFabricCapability(
 }
 
 export function buildProvenanceRecord(resolution: FabricResolution, preprocessing: readonly string[]): FabricProvenanceRecord {
+    for (const label of preprocessing) {
+        if (!FABRIC_PREPROCESSING_LABEL_PATTERN.test(label)) {
+            throw new FabricPolicyError('provenance_label_invalid');
+        }
+    }
     return Object.freeze({
         schemaVersion: 'mediflow.ai.fabric-provenance.v1',
         capability: resolution.receipt.capability,

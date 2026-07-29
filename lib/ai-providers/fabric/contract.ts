@@ -203,14 +203,18 @@ export interface FabricExecutionPolicy {
 // Ricevuta di risoluzione
 // ---------------------------------------------------------------------------
 
+// 'in_house' identifica le pipeline deterministiche senza provider AI.
+// 'athena_mlx' identifica la lane MLX locale di treatment reasoning, che non
+// passa dal registry Ollama (matrice serving: lane separata, nessuna eredita).
+export type FabricProviderRef = AIProvider | 'athena_mlx' | 'in_house';
+
 export interface FabricResolutionReceipt {
     readonly schemaVersion: 'mediflow.ai.fabric-resolution.v1';
     readonly capability: FabricCapabilityId;
     readonly class: CapabilityClass;
     readonly venue: FabricVenue;
     readonly egressProfile: Readonly<Pick<EgressProfile, 'id' | 'version' | 'egress'>>;
-    // 'in_house' identifica le pipeline deterministiche senza provider AI.
-    readonly provider: AIProvider | 'in_house';
+    readonly provider: FabricProviderRef;
     readonly model: string | null;
     // Ricevuta del registry provider per le capability generative; null per
     // le deterministiche. La ricevuta non autorizza alcun consumer.
@@ -228,13 +232,18 @@ export interface FabricProvenanceRecord {
     readonly schemaVersion: 'mediflow.ai.fabric-provenance.v1';
     readonly capability: FabricCapabilityId;
     readonly venue: FabricVenue;
-    readonly provider: AIProvider | 'in_house';
+    readonly provider: FabricProviderRef;
     readonly model: string | null;
     // Nomi dei passi di preprocessing applicati (es. 'layer1_redaction');
     // solo etichette, mai contenuto.
     readonly preprocessing: readonly string[];
     readonly receipt: FabricResolutionReceipt;
 }
+
+// Le etichette di preprocessing sono nomi snake_case bounded: il pattern
+// impedisce che testo libero (e quindi contenuto clinico) entri nel record
+// di provenienza attraverso il campo etichette.
+export const FABRIC_PREPROCESSING_LABEL_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
 
 // ---------------------------------------------------------------------------
 // Errori fail-closed
@@ -247,6 +256,7 @@ export type FabricPolicyErrorCode =
     | 'egress_profile_unknown'
     | 'egress_profile_unsatisfied'
     | 'cloud_not_authorized'
+    | 'provenance_label_invalid'
     | 'policy_invalid';
 
 export class FabricPolicyError extends Error {

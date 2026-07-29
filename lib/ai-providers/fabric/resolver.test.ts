@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ProviderRegistryError } from '../registry.ts';
 import { FabricPolicyError, type FabricCapabilityDescriptor, type FabricExecutionPolicy } from './contract.ts';
+import { DETERMINISTIC_CAPABILITY_DESCRIPTORS } from './deterministic-catalog.ts';
 import { GENERATIVE_CAPABILITY_DESCRIPTORS } from './generative-catalog.ts';
 import { buildProvenanceRecord, resolveFabricCapability } from './resolver.ts';
 
@@ -12,14 +13,7 @@ const binding = {
     endpoint: 'http://127.0.0.1:11434',
     chatTimeoutMs: 1_000,
 };
-const deterministic: FabricCapabilityDescriptor = {
-    id: 'icd_lookup', class: 'deterministic', operation: 'lookup',
-    authorityPlane: 'clinical_application',
-    dataClass: 'clinical', venues: ['local_process', 'home_base'],
-    egressProfileId: 'local_only', review: 'informational',
-    killSwitch: null, contractSchema: null,
-    entryPoint: 'lib/icd-service.ts',
-};
+const deterministic = DETERMINISTIC_CAPABILITY_DESCRIPTORS.icd_lookup;
 
 function policyFor(descriptor: FabricCapabilityDescriptor): FabricExecutionPolicy {
     return {
@@ -62,6 +56,24 @@ test('risolve una deterministica in-house senza modello', () => {
     assert.equal(result.receipt.fallbackCount, 0);
 });
 
+test('treatment reasoning e autogestito: provider athena_mlx senza registry', () => {
+    const descriptor = GENERATIVE_CAPABILITY_DESCRIPTORS.treatment_reasoning;
+    const result = resolveFabricCapability(policyFor(descriptor), {
+        descriptor,
+        venue: 'local_process',
+    });
+    assert.equal(result.generative, null);
+    assert.equal(result.receipt.provider, 'athena_mlx');
+    assert.equal(result.receipt.model, null);
+    assert.equal(result.receipt.providerReceipt, null);
+    // Un binding registry per la lane autogestita e' un errore di classe.
+    expectCode('class_mismatch', () => resolveFabricCapability(policyFor(descriptor), {
+        descriptor,
+        venue: 'local_process',
+        generative: binding,
+    }));
+});
+
 test('rifiuta ogni classe di errore Fabric raggiungibile', () => {
     const generative = GENERATIVE_CAPABILITY_DESCRIPTORS.patient_insight;
     expectCode('policy_invalid', () => resolveFabricCapability(
@@ -76,13 +88,33 @@ test('rifiuta ogni classe di errore Fabric raggiungibile', () => {
         policyFor(deterministic), { descriptor: deterministic, venue: 'on_device' }));
     expectCode('cloud_not_authorized', () => resolveFabricCapability(
         policyFor(deterministic), { descriptor: deterministic, venue: 'cloud' }));
+});
 
-    const unknownProfile = { ...deterministic, egressProfileId: 'missing' } as unknown as FabricCapabilityDescriptor;
-    expectCode('egress_profile_unknown', () => resolveFabricCapability(
-        policyFor(unknownProfile), { descriptor: unknownProfile, venue: 'local_process' }));
-    const cloudProfile = { ...deterministic, egressProfileId: 'cloud_authorized_redacted' } as FabricCapabilityDescriptor;
-    expectCode('egress_profile_unsatisfied', () => resolveFabricCapability(
-        policyFor(cloudProfile), { descriptor: cloudProfile, venue: 'local_process' }));
+test('respinge ogni descriptor non canonico, anche a valori identici', () => {
+    // Clone campo per campo del descriptor canonico: stesso id, stessi
+    // valori, riferimento diverso. Deve fallire prima di ogni altro check.
+    const forgedClone = { ...deterministic } as FabricCapabilityDescriptor;
+    expectCode('capability_unknown', () => resolveFabricCapability(
+        policyFor(forgedClone), { descriptor: forgedClone, venue: 'local_process' }));
+
+    // Descriptor fabbricato con venue ampliata: il vettore del finding P1
+    // della verifica terminale. Non deve mai produrre una ricevuta.
+    const forgedVenue = {
+        ...deterministic,
+        venues: ['on_device'],
+    } as unknown as FabricCapabilityDescriptor;
+    expectCode('capability_unknown', () => resolveFabricCapability(
+        policyFor(forgedVenue), { descriptor: forgedVenue, venue: 'on_device' }));
+
+    // Descriptor fabbricato con profilo cloud: respinto come non canonico
+    // prima ancora del check di profilo (che resta come difesa in profondita';
+    // nessun descriptor canonico dichiara oggi il profilo cloud).
+    const forgedProfile = {
+        ...deterministic,
+        egressProfileId: 'cloud_authorized_redacted',
+    } as FabricCapabilityDescriptor;
+    expectCode('capability_unknown', () => resolveFabricCapability(
+        policyFor(forgedProfile), { descriptor: forgedProfile, venue: 'local_process' }));
 });
 
 test('propaga ProviderRegistryError senza conversione', () => {
@@ -106,4 +138,15 @@ test('costruisce provenienza congelata con sole etichette', () => {
     assert.equal(Object.isFrozen(provenance.preprocessing), true);
     assert.deepEqual(provenance.preprocessing, ['normalize_dates', 'layer1_redaction']);
     assert.equal(JSON.stringify(provenance).includes('synthetic clinical content'), false);
+});
+
+test('respinge etichette di preprocessing con testo libero', () => {
+    const resolution = resolveFabricCapability(policyFor(deterministic), {
+        descriptor: deterministic,
+        venue: 'local_process',
+    });
+    expectCode('provenance_label_invalid', () => buildProvenanceRecord(
+        resolution, ['synthetic patient Mario Rossi; prompt=mal di testa']));
+    expectCode('provenance_label_invalid', () => buildProvenanceRecord(resolution, ['Layer1']));
+    expectCode('provenance_label_invalid', () => buildProvenanceRecord(resolution, ['']));
 });
