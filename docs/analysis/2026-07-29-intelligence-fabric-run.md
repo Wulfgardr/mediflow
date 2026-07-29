@@ -230,11 +230,66 @@ documentale successivo non tocca codice). Branch manager:
 
 ### Next permitted action
 
-Una sola azione permessa: push della branch
-`codex/WUL-522-intelligence-fabric` e apertura PR verso `main` su
-`Wulfgardr/mediflow` (autorita di Leonardo; questo run non esegue azioni
-remote). Dopo la promozione: pulizia dei worktree lane
-(`mediflow-if-f1-wt`, `-f2-wt`, `-f3-wt`, `-verify-wt`) e dei branch lane
-gia integrati; i packet successivi del DAG storico restano WUL-466
-(profili degradati OCR) e l'esposizione dello stato fabric sul data plane
-`network` per i client paired.
+Questa indicazione e superata dalla fase 3 seguente. Nessuna azione remota e
+autorizzata durante il completamento tecnico.
+
+## 10. Fase 3: completamento tecnico del candidato locale
+
+Run ID: `MFP-IF-COS-20260729-02`
+
+Controller: Codex GPT-5.6 Sol Ultra. Fable resta sospeso e non viene
+modificato.
+
+Branch controller: `codex/WUL-522-intelligence-fabric-cos-local`.
+Base codice: `54040f2e8`. Closeout S4 documentale: `31c506c25`.
+
+### Riconciliazione sorgente
+
+- La checkout dichiarata `/Users/leonardopegollo/Antigravity/medical-record-app`
+  era su `main` a `2876c583`, quindi e stato registrato `SOURCE_DRIFT`.
+- Il worktree Fable sospeso era pulito e su `54040f2e8`, ma con processi
+  attivi. E rimasto invariato.
+- Il controller lavora in un worktree isolato, derivato da `54040f2e8`.
+- Ref sorgente e worktree Fable avevano ancestry `0/0`.
+
+### Lane read-only
+
+| Lane | Modello/effort | Prompt bounded | Esito |
+| --- | --- | --- | --- |
+| R1 inventario | Luna high | Classificare implementato, contrattuale, mock/shadow, assente e bloccato | DONE |
+| R2 architettura e sicurezza | Sol xhigh | Trovare gap, ADR richiesti, packet, falsificatori e stop-rule | DONE |
+| R3 harness e verifica | Terra high | Mappare test, client sintetici, toolchain e gate reali | DONE |
+
+Nessuna lane ha scritto file o avviato provider esterni.
+
+### Mappa prima dei writer
+
+| Area | Stato | Limite verificato |
+| --- | --- | --- |
+| Resolver, cataloghi, egress e ricevute | Implementato | Non governa ancora tutti i call site AI reali |
+| Classi credenziale e onboarding | Contrattuale/mock | Nessun broker, segreto o revoca vendor |
+| Revoca provider e stato degradato | Assente | Da consegnare come enforcement locale sintetico |
+| Pairing e revoca host | Implementato | CAS e token revocato verificati; nessun AI paired |
+| Continuita venue e fallback | Contrattuale/mock | `unknown` e degrado richiedono chiusura fail-closed |
+| Provenance e review medica | Contrattuale/mock | Nessun writer o binding persistente |
+| Client Apple | Stato AI legacy read-only | Nessun consumer Fabric e nessun runtime on-device |
+| Cloud e on-device | Bloccato esternamente | Egress chiuso, provider e entitlement assenti |
+| Core non-AI | Implementato | Deve restare indipendente dal Fabric |
+
+### DAG, ownership e falsificatori
+
+```text
+P1 provider admission ──┐
+                        ├── P3 harness end-to-end
+P2 status paired/Swift ─┘
+```
+
+| Packet | Writer | Ownership | Falsificatore terminale |
+| --- | --- | --- | --- |
+| P1 admissione e continuita | Terra high | moduli Fabric nuovi, routing osservabile e test | provider revocato/degradato o venue unknown produce una ricevuta |
+| P2 proiezione status | Sol xhigh | network AI, tipi API, OpenAPI, modello/test Swift | il paired ottiene grant AI, fallback locale o segreti |
+| P3 harness sintetico | controller | harness/test nuovi dopo P1+P2 | review senza medico/provenienza, fallback o blocco core non-AI |
+
+ADR 0091 congela il confine: host-local, fail-closed, paired solo status,
+nessuna scrittura clinica e nessun claim su cloud, on-device o readiness
+qualificata.
