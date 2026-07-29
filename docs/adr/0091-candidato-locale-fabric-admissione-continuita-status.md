@@ -158,4 +158,3 @@ Fermare il packet se:
 - concorrenza pairing;
 - falsificatori egress, fallback, revoca, degrado, provenance e review;
 - verifica indipendente a contesto fresco.
-
