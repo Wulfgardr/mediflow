@@ -121,7 +121,44 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 | Descriptor dal chiamante (rischio del primo passaggio W4) | CHIUSO: il resolver impone l'identita' canonica contro il catalogo unificato; un clone a valori identici viene respinto con `capability_unknown` (test dedicato) |
 | `never-regress` NR-EGRESS su fixture negativa `https://example.test` in `resolver.test.ts` | Trovato dalla battery W3; fixture ricostruita a pezzi con `join('')` come il pattern di `registry.test.ts`; guard e test fabric riverificati verdi |
 
-## 8. Verdetto terminale e promotion packet
+## 8. Fase 2: giunture cliniche e multipiattaforma (2026-07-29)
+
+Aperta dopo il GO del nucleo. Contratto: ADR 0090 (`aac129164`). Nucleo ADR
+0089 accettato e non ridisegnato.
+
+| Wave | Contenuto | Lane | Stato |
+| --- | --- | --- | --- |
+| S0 | Ricognizione R3 (pairing/trust) e R4 (incertezza/review) | 2x Luna high read-only | DONE |
+| S1 | ADR 0090: semantica, invarianti, falsificatori, DAG, ownership | manager (Fable) | DONE |
+| S2 | P1 trust+revoca, P2 onboarding, P3 routing osservabile, P4 interazione clinica | Sol/Terra/Sol/Sol high, worktree f1-f4 | DONE: tutte integrate (`a8b38d29a`) |
+| S3 | Integrazione + docs + battery | manager | IN CORSO |
+| S4 | Verifica terminale indipendente | lane fresca | TODO |
+
+Ledger lane fase 2:
+
+| Lane | Esito | Note |
+| --- | --- | --- |
+| P2 onboarding (Terra high) | OK | 28/28 riverificati dal controller; gate egress reale consultato a `attest_local` e `enable`; nessuna stringa `verified`/`ready`/`qualified` |
+| P4 interazione clinica (Sol high) | OK + hardening | 29/29 riverificati; gap auto-dichiarato (ref provenienza vuoto) chiuso dal controller in `f814a3204` insieme all'attore fuori vocabolario; deroga LOC dichiarata e accettata |
+| P3 routing osservabile (Sol high) | OK | 29/29 riverificati; sonda solo su base loopback validata con `redirect: 'error'` e timeout 1500ms; deroga LOC dichiarata e accettata |
+| P1 trust+revoca (Sol high) | OK con deviazione fattuale accettata | 30/30 riverificati; il gate di modalita si applica anche alla discovery (verificato dal controller su `network-discovery-auth.ts:52`); ADR 0090 corretto di conseguenza; revoca host-side con prova negativa post-revoca |
+
+Decisioni di fase (aggiunte):
+
+| Decisione | Stato | Falsificatore |
+| --- | --- | --- |
+| Accettare la deviazione discovery/mode-gate della lane P1 e correggere l'ADR invece del codice | Accettata | Un sorgente che mostri la discovery servita in modalita `local-only` |
+| Ref di provenienza: stringa vuota respinta a creazione e accettazione | Corretta (hardening controller) | Un accept con ref di soli spazi |
+| Persistenza revoca via upsert locale alla route (helper di salvataggio privato, fuori ownership) | Accettata come workaround bounded | Una seconda via di scrittura dello stato pairing che diverga |
+
+Fatti chiave dalla ricognizione (dettaglio in ADR 0090): revoca host-side
+assente nel runtime attuale; 401 indistinto tra non autenticato e revocato;
+reset admin non elimina lo stato pairing; tabella ADR 0087 presente senza
+vocabolario di stati; confidence degradata a `low` non distinguibile da
+dichiarata; `[LOCKED DATA]` web e `lockedFields` nativo distinguono
+l'illeggibile dal vuoto ma alcune vie secondarie degradano in silenzio.
+
+## 9. Verdetto terminale e promotion packet (fase nucleo)
 
 Verdetto del programma: `LOCAL_IMPLEMENTATION_READY / HOLD_PROMOTION`.
 

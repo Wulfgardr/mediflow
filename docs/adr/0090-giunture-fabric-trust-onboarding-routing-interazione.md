@@ -61,7 +61,9 @@ Modulo `lib/network-pairing-lifecycle.ts`, schema
   token valido, modalita, capability, stato sessione, lockout), allineata
   all'ordine dei gate del data plane osservato.
 - Il piano discovery e il piano dati sono derivazioni distinte: la discovery
-  richiede solo pairing; il data plane richiede tutti i gate.
+  richiede pairing e modalita attiva ma non la sessione operatore (il runtime
+  reale applica il gate di modalita anche alla discovery,
+  `lib/network-discovery-auth.ts`); il data plane richiede tutti i gate.
 - Classificazione della riconnessione: `trusted`, `re_login_required`,
   `re_pairing_required`, `wait_mode_enabled`, `locked_out_wait`. Fail-closed:
   input incoerenti degradano a `re_pairing_required`, mai a `trusted`.
