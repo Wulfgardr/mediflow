@@ -296,7 +296,7 @@ qualificata.
 
 ## 11. Packet integrati e verifica del controller
 
-Stato del checkpoint: `CANDIDATE_BUILT / FRESH_VERIFIER_PENDING`.
+Stato del checkpoint: `CANDIDATE_BUILT / V1_HOLD_FIX / CORRECTED`.
 
 | Packet | Lane e worktree | Commit candidato | Commit integrati | Esito controller |
 | --- | --- | --- | --- | --- |
@@ -304,14 +304,16 @@ Stato del checkpoint: `CANDIDATE_BUILT / FRESH_VERIFIER_PENDING`.
 | P2 status paired e Swift | Sol xhigh, `if-p2-status-projection` | `0cebf7e2b` | `77bc69854` | proiezione PHI-safe, paired senza grant, OpenAPI e decode Swift condiviso |
 | P3 harness sintetico | controller | non applicabile | `d860e6103`, `22b8dd94e`, `0b8469753` | receipt, provenance, review medica, zero write e core non-AI verificati |
 | Hardening gate egress | controller | non applicabile | `7e5321bb3` | rimossa dalla fixture una URL remota; `never-regress` verde |
+| Hardening V1 | controller | non applicabile | `3b3500be5`, `afacefcb9` | snapshot lifecycle unico e diff-check del range pulito |
 
 I worktree packet restano disponibili e non sono stati cancellati.
 
 ### Evidenza combinata
 
 - Node `24.18.0`, ABI `137`, `better-sqlite3` caricabile.
-- Test mirati Fabric, egress, pairing e network: `111/111` pass.
-- Suite unit completa: `992/992` pass.
+- Test mirati Fabric, egress, pairing e network: `111/111` pass nella verifica
+  V2.
+- Suite unit completa: `993/993` pass dopo la regressione TOCTOU.
 - Typecheck, lint, claims guard, never-regress, OpenAPI drift e schema drift:
   pass.
 - Build production: pass con il comando canonico `npm run build`. Il primo
@@ -333,7 +335,7 @@ I worktree packet restano disponibili e non sono stati cancellati.
 | Pairing espone solo status e non concede esecuzione AI | Accepted | tipi, OpenAPI, modello Swift e test network |
 | Harness sintetico senza provider, rete o scritture | Accepted | report congelato e test zero-write |
 | Fixture con URL remota fittizia | Corrected | sostituita con identificatore non canonico privo di rete |
-| Getter stateful e identificatori non canonici nel packet P1 | Corrected | snapshot singolo e validazione |
+| Getter stateful e identificatori non canonici nel packet P1 | Corrected dopo V1 | snapshot top-level singolo, lifecycle ammesso riusato e validazione |
 | Osservazioni venue duplicate | Corrected | rifiuto fail-closed |
 | Nome/versione della proiezione e copy fallback nel packet P2 | Corrected | schema `network-fabric-status.v1`, contratto canonico e fallback negato |
 | Test harness sensibile a sottostringhe e file oltre la soglia LOC | Corrected | chiavi vietate esplicite e modulo envelope separato |
@@ -356,3 +358,130 @@ con una toolchain Xcode funzionante.
 
 Le percentuali sono indicatori di copertura tecnica, non readiness clinica,
 certificazione o autorita di promozione.
+
+## 12. Verifica indipendente e closeout terminale
+
+### V1: finding riprodotti
+
+La lane Sol high a contesto fresco ha verificato `44595c6f5` e ha emesso
+`HOLD_FIX`.
+
+- P1: `routeCandidateCapability()` rileggeva il lifecycle tre volte. Un getter
+  stateful poteva cambiare lo stato in `revoked` e ottenere comunque una
+  receipt.
+- P2: il run record dichiarava lo snapshot singolo prima che il boundary
+  top-level lo garantisse.
+- P2: `git diff --check 54040f2e8..44595c6f5` trovava due righe vuote a EOF.
+- Gli altri gate erano verdi; SwiftPM era `BLOCKED_TOOLCHAIN`.
+
+Report V1: `/private/tmp/mediflow-if-cos-fresh-verifier.md`.
+SHA-256:
+`79530fdbaff3060683a5e2354c6ab5e0030eaf1559f0b24a5da6dc6c67a9b25a`.
+
+Il controller ha corretto il P1 in `3b3500be5`: tutti i valori top-level
+vengono letti una volta e lo stesso lifecycle ammesso viene riusato fino al
+controllo della receipt. La regressione parte da `revoked`, offre
+`available_unqualified` solo a una lettura successiva e verifica una sola
+lettura, esito negato e receipt assente. `afacefcb9` rimuove le due righe vuote
+a EOF.
+
+### V2: GO
+
+La stessa lane indipendente ha riverificato il nuovo snapshot in un worktree
+detached pulito.
+
+- HEAD verificata: `afacefcb9df9d3ed16ba706504dcdd563e54541a`.
+- Base: `54040f2e8`.
+- Diff: 28 file, 2.110 inserimenti e 61 rimozioni.
+- Patch SHA-256:
+  `df8f02078d70360299c6b9d7090d93373b0123e62915002ca667077e46f7cdec`.
+- Probe TOCTOU `revoked -> available`: una lettura, esito negato,
+  `provider_lifecycle_unavailable`, nessuna receipt.
+- Test mirati: `111/111` pass.
+- Suite unit: `993/993` pass.
+- Typecheck, lint, build, Node runtime, claims, never-regress, OpenAPI drift,
+  schema drift, parsing Swift e diff-check del range: pass.
+- SwiftPM: `BLOCKED_TOOLCHAIN` prima dei test con
+  `Unknown error parsing property list`.
+- P0, P1 e P2: nessuno.
+- Worktree finale: pulito.
+
+Report V2: `/private/tmp/mediflow-if-cos-fresh-verifier-v2.md`.
+SHA-256:
+`c1652387e226c62bb9a530470adbcdda55f1294dc626d90f9d73c7270fbc8f50`.
+
+### Ledger finale delle lane
+
+| Lane | Sessione | Modello/effort | Stato | Output promosso |
+| --- | --- | --- | --- | --- |
+| R1 inventario | `98E7DA8C-2872-4424-A584-B8B15F2E7973` | Luna high | DONE | mappa implementato/contrattuale/mock/assente/bloccato |
+| R2 architettura + P2 | `2164723C-C30E-46A9-A766-1BBFFA4FFF68` | Sol xhigh | DONE | confine status-only, OpenAPI e decode Swift |
+| R3 verifica + P1 | `19F25776-72C8-4BDA-8A3A-378FB4CC850D` | Terra high | DONE | lifecycle, admissione, continuita e test |
+| V1/V2 verifier | `/root/fresh_verifier` | Sol high | HOLD_FIX, poi GO | finding TOCTOU/EOF chiusi e battery terminale |
+
+P3 e le correzioni del controller non hanno aperto una quinta lane. Nessuna
+lane e fallita o e rimasta attiva.
+
+### Decision audit terminale
+
+Accepted:
+
+- candidato host-local senza segreti, provider esterni o egress;
+- revoca, degrado, offline e unknown fail-closed;
+- paired limitato a `status_only`, senza grant AI;
+- provenance e review medica obbligatorie nel harness;
+- core non-AI indipendente dal provider;
+- percentuali 82% e 54% come indicatori conservativi, non metriche di
+  readiness.
+
+Corrected:
+
+- stato S4 documentale obsoleto;
+- eventi lifecycle, identificatori, osservazioni duplicate e fixture URL;
+- naming/versione proiezione e copy fallback;
+- snapshot lifecycle top-level e riuso fino alla receipt;
+- due righe vuote a EOF rilevate dal diff-check V1.
+
+Open fuori dal contratto del candidato:
+
+- migrazione di tutti i call path AI sul router Fabric;
+- persistenza e broker vendor del lifecycle provider;
+- provider reali, credenziali, cloud e on-device;
+- autorita e threat model per invocazione AI paired;
+- persistenza applicativa della review;
+- test SwiftPM, device e LAN con una toolchain Xcode funzionante.
+
+Questi punti bloccano prodotto e promozione remota. Non bloccano il candidato
+locale limitato da ADR 0091.
+
+### Verdetto terminale
+
+`INTELLIGENCE_FABRIC_LOCAL_CANDIDATE_READY / HOLD_REMOTE_PROMOTION`
+
+Base tecnica del programma: **82%**.
+
+Prodotto end-to-end: **54%**.
+
+Il closeout documentale successivo a `afacefcb9` non modifica runtime,
+contratti o test. Non sono autorizzati push, PR, merge, tag, release o
+mutazioni Linear.
+
+### Packet per il checkpoint Fable
+
+- Run ID: `MFP-IF-COS-20260729-02`.
+- Branch locale:
+  `codex/WUL-522-intelligence-fabric-cos-local`.
+- Baseline immutabile: `54040f2e8`; release 0.8 invariata.
+- Snapshot candidato verificato: `afacefcb9`.
+- Contratto: ADR 0091.
+- Evidenza: questo run record e il report V2 con SHA-256 sopra.
+- Stato: candidato locale pronto; promozione remota in `HOLD`.
+- Limiti: nessun provider reale, cloud, on-device, AI paired, writer clinico o
+  test runtime Apple.
+- Autorita: sola valutazione del packet; nessuna mutazione o promozione.
+
+### Unica next permitted action
+
+Quando la quota Fable torna disponibile, eseguire un solo checkpoint di
+giudizio sul packet sopra, senza modificare il worktree sospeso e senza
+promozione remota.
