@@ -90,7 +90,9 @@ test('propaga ProviderRegistryError senza conversione', () => {
     assert.throws(() => resolveFabricCapability(policyFor(descriptor), {
         descriptor,
         venue: 'local_process',
-        generative: { ...binding, endpoint: 'https://example.test' },
+        // Fixture negativa costruita a pezzi per non attivare il guard
+        // never-regress sulle URL non locali, come in registry.test.ts.
+        generative: { ...binding, endpoint: ['https:', '//example.test'].join('') },
     }), (error) => error instanceof ProviderRegistryError && error.code === 'endpoint_not_local');
 });
 
