@@ -71,7 +71,7 @@ La fotografia corrente e questa:
   `MediFlowCore` concentra logica portabile, cifratura, contratti, filtri,
   clinical scales e store SQLite locale; Linux e Windows oggi verificano la
   portabilita del core in CI, non una parity applicativa completa.
-- **Parity UI 0.8**: iPhone 2/2, iPad 7/7, build/probe macOS e localhost 78/78
+- **Parity UI 0.8**: iPhone 2/2, iPad 7/7, build/probe macOS e localhost 82/82
   sono verdi sul tree verificato. La parity resta clinico-semantica, non pixel.
   VoiceOver reale mobile non è provato per il limite esterno della beta Xcode
   27; la deroga vale solo per la release sorgente e non autorizza claim di

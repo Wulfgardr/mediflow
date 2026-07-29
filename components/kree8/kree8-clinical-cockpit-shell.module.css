@@ -266,24 +266,30 @@
   }
 }
 
-/* @Codex The primary labels and their counters no longer fit a 360 CSS-pixel
-   viewport at browser zoom 400%. Keep every destination in the document flow
-   instead of depending on an undiscoverable horizontal scroll position. */
-@media (max-width: 480px) {
+/* @Codex The primary labels and their counters no longer fit compact and
+   zoomed viewports. Keep every destination in the document flow instead of
+   depending on an undiscoverable horizontal scroll position. */
+@media (max-width: 768px) {
   .rail {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: stretch;
+    display: flex;
+    flex-wrap: wrap;
+    padding: 5px 6px;
+    gap: 4px;
     overflow: visible;
     scroll-snap-type: none;
   }
 
-  .brand { grid-column: 1 / -1; }
+  .brand {
+    flex: 1 1 100%;
+    padding: 4px 6px;
+  }
 
   .navItem {
+    flex: 0 1 auto;
     min-width: 0;
-    width: 100%;
-    justify-content: space-between;
+    min-height: 44px;
+    width: auto;
+    padding: 8px 10px;
   }
 }
 
@@ -639,6 +645,32 @@
   .avatarPill {
     display: none;
   }
+}
+
+/* @Codex Compact localhost controls keep the clinical surface readable at 400% zoom. */
+@media (max-width: 480px) {
+  .canvas {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .toolbar { gap: 6px; }
+
+  .search { min-height: 44px; }
+
+  .toolChip {
+    min-height: 44px;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .framePanel {
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .focusSurface { padding: 8px; }
 }
 
 /* ───────────── escape hatch ───────────── */
