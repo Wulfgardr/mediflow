@@ -188,7 +188,10 @@ export function createClinicalProposal(input: ClinicalProposalInput): ClinicalPr
         || (input.schemaVersion !== undefined && input.schemaVersion !== CLINICAL_INTERACTION_SCHEMA_VERSION)
         || typeof input.capability !== 'string'
         || !CAPABILITY_IDS.has(input.capability)
-        || (input.provenanceRef !== null && typeof input.provenanceRef !== 'string')
+        // Un riferimento di provenienza e' null oppure una stringa reale:
+        // la stringa vuota non e' un riferimento.
+        || (input.provenanceRef !== null
+            && (typeof input.provenanceRef !== 'string' || input.provenanceRef.trim().length === 0))
         || (input.review !== undefined && input.review !== 'pending')) {
         return reject('proposal_invalid');
     }
@@ -234,6 +237,11 @@ export function advanceClinicalReview(
 ): ClinicalProposal {
     const transition = definedTransition(proposal.review, event.type);
     if (!transition) return reject('transition_invalid');
+    // L'attore deve appartenere al vocabolario anche dove la transizione non
+    // lo vincola: i tipi non sono enforcement runtime.
+    if (event.actor !== 'physician' && event.actor !== 'application') {
+        return reject('actor_forbidden');
+    }
     if (transition.actor !== null && event.actor !== transition.actor) {
         return reject('actor_forbidden');
     }
@@ -241,7 +249,9 @@ export function advanceClinicalReview(
         if (event.uncertaintyAcknowledged !== true) {
             return reject('uncertainty_not_acknowledged');
         }
-        if (proposal.provenanceRef === null) return reject('provenance_missing');
+        if (proposal.provenanceRef === null || proposal.provenanceRef.trim().length === 0) {
+            return reject('provenance_missing');
+        }
     }
     return Object.freeze({ ...proposal, review: transition.review });
 }
