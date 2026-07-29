@@ -623,6 +623,8 @@ export type NetworkErrorResponse = {
         | 'PAIRING_REQUEST_INVALID'
         | 'NETWORK_MODE_DISABLED'
         | 'PAIRING_INTENT_NOT_FOUND'
-        | 'PAIRING_INTENT_EXPIRED';
+        | 'PAIRING_INTENT_EXPIRED'
+        | 'PAIRING_CLIENT_NOT_FOUND'
+        | 'PAIRING_STATE_CONFLICT';
     message: string;
 };

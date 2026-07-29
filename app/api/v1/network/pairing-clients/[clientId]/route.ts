@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 
 import { mutateNetworkPairingState } from '@/lib/network-home-base-server';
-import { removePairedClient } from '@/lib/network-pairing-model';
+import { removePairedClient, type RemovePairedClientResult } from '@/lib/network-pairing-model';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 
 export async function DELETE(
@@ -18,7 +18,7 @@ export async function DELETE(
         // Tutte le mutazioni dello stato pairing passano dalla primitiva CAS
         // condivisa: una conferma concorrente non puo' resuscitare un client
         // appena revocato.
-        const persisted = await mutateNetworkPairingState((state) => {
+        const persisted = await mutateNetworkPairingState<RemovePairedClientResult>((state) => {
             const result = removePairedClient(state, clientId);
             return result.ok
                 ? { write: true, nextState: result.nextState, result }
