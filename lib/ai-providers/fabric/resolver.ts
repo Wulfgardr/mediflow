@@ -47,6 +47,14 @@ export function resolveFabricCapability(
     request: { descriptor: FabricCapabilityDescriptor; venue: FabricVenue; generative?: LocalProviderBindingInput },
 ): FabricResolution {
     const descriptor = request.descriptor;
+    // Snapshot unico e normale dell'array del chiamante: validazione e
+    // membership successiva usano SOLO questa copia reale, mai i metodi
+    // dell'oggetto originale (un includes ridefinito o un iteratore stateful
+    // non devono poter mentire tra check e uso). Array.from normalizza anche
+    // i buchi degli array sparsi in undefined, che falliscono la validazione.
+    const allowedVenues = Array.isArray(policy.allowedVenues)
+        ? Array.from(policy.allowedVenues)
+        : null;
     // I tipi TypeScript non sono enforcement runtime: ogni campo della policy
     // viene convalidato qui, anche quelli oggi sempre nulli o costanti.
     if (
@@ -59,11 +67,9 @@ export function resolveFabricCapability(
         || !RETENTION_VALUES.has(policy.retention)
         || !(policy.consentRef === null
             || (typeof policy.consentRef === 'string' && policy.consentRef.trim().length > 0))
-        || !Array.isArray(policy.allowedVenues)
-        || policy.allowedVenues.length === 0
-        // Array.from normalizza i buchi degli array sparsi in undefined:
-        // every() da solo li salterebbe e un array sparso passerebbe.
-        || !Array.from(policy.allowedVenues).every((venue) => VENUE_VALUES.has(venue))
+        || allowedVenues === null
+        || allowedVenues.length === 0
+        || !allowedVenues.every((venue) => VENUE_VALUES.has(venue))
     ) {
         throw new FabricPolicyError('policy_invalid');
     }
@@ -102,9 +108,11 @@ export function resolveFabricCapability(
     }
 
     if (request.venue === 'cloud') throw new FabricPolicyError('cloud_not_authorized');
+    // descriptor.venues e' il singleton canonico congelato (nostro);
+    // allowedVenues e' lo snapshot validato sopra, mai l'array del chiamante.
     if (
         !descriptor.venues.includes(request.venue)
-        || !policy.allowedVenues.includes(request.venue)
+        || !allowedVenues.includes(request.venue)
     ) {
         throw new FabricPolicyError('venue_not_allowed');
     }
@@ -143,22 +151,24 @@ export function resolveFabricCapability(
 export function buildProvenanceRecord(resolution: FabricResolution, preprocessing: readonly string[]): FabricProvenanceRecord {
     // Solo il vocabolario chiuso del contratto: la forma sintattica non basta
     // a escludere contenuto clinico normalizzato (es. una diagnosi snake_case).
+    // Una SOLA copia dell'input: validare e materializzare la stessa copia,
+    // cosi' un iteratore stateful non puo' cambiare valori tra check e uso.
     if (!Array.isArray(preprocessing)) {
         throw new FabricPolicyError('provenance_label_invalid');
     }
-    for (const label of Array.from(preprocessing)) {
+    const labels = Array.from(preprocessing) as FabricPreprocessingLabel[];
+    for (const label of labels) {
         if (!PREPROCESSING_VOCABULARY.has(label)) {
             throw new FabricPolicyError('provenance_label_invalid');
         }
     }
-    const labels = preprocessing as readonly FabricPreprocessingLabel[];
     return Object.freeze({
         schemaVersion: 'mediflow.ai.fabric-provenance.v1',
         capability: resolution.receipt.capability,
         venue: resolution.receipt.venue,
         provider: resolution.receipt.provider,
         model: resolution.receipt.model,
-        preprocessing: Object.freeze([...labels]),
+        preprocessing: Object.freeze(labels),
         receipt: resolution.receipt,
     });
 }
