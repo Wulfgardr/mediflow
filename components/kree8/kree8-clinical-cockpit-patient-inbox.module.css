@@ -393,6 +393,94 @@
 
 }
 
+/* @Codex Compact localhost worklist preserves scan order and 44px touch targets. */
+@media (max-width: 480px) {
+  .worklistPanel { padding: 10px; }
+
+  .inboxScope { gap: 6px; }
+
+  .patientSearchRow { margin-top: 8px; }
+
+  .scopeChip {
+    min-height: 44px;
+    gap: 5px;
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+
+  .patientScopeActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    margin-left: 0;
+    gap: 6px;
+  }
+
+  .patientSearchField { min-height: 44px; }
+
+  .worklistPanelHeader {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 8px;
+    row-gap: 6px;
+    align-items: center;
+  }
+
+  .worklistPanelHeader > h2 {
+    min-width: 0;
+    font-size: 17px;
+    white-space: nowrap;
+  }
+
+  .resultCount {
+    margin-left: 0;
+    white-space: nowrap;
+  }
+
+  .worklistPanelHeader > span:last-child {
+    grid-column: 1 / -1;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .worklistPanelHeader [data-lume-action='quiet'] {
+    display: inline-flex;
+    justify-content: center;
+    width: 100%;
+    min-height: 45px;
+    white-space: nowrap;
+  }
+
+  .patientRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+    padding: 5px 8px;
+  }
+
+  .patientRowContent { gap: 2px; }
+
+  .patientSubline {
+    column-gap: 5px;
+    row-gap: 0;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  .patientCode { font-size: 11px; }
+
+  .patientSide {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .patientWhen {
+    max-width: none;
+    text-align: left;
+    white-space: nowrap;
+  }
+}
+
 /* @Codex #98, #68: Quadro paziente, un solo fuoco e nessuna card elevata interna. */
 .quadroFocal {
   --lume-registro-family: "IBM Plex Mono", var(--font-registro), "SF Mono", monospace;

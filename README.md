@@ -147,7 +147,7 @@ Le prove usano solo fixture sintetiche:
 - iPhone: XCUITest 2/2 sul simulatore iOS 27;
 - iPad: XCUITest 7/7 sul simulatore iPadOS 27;
 - macOS: build, resize, focus, tastiera, Cmd-R contestuale e VoiceOver manuale;
-- localhost: 78/78 test, viewport 320/390/768/1440 e zoom reale 200%/400%.
+- localhost: 82/82 test, viewport 320/390/768/1440 e zoom reale 200%/400%.
 
 Queste prove non dichiarano parity completa o conformità accessibilità. Gli
 audit automatici su iPhone e iPad sono verdi, ma VoiceOver reale mobile non è

@@ -82,7 +82,16 @@ for (const frameCase of FRAME_CASES) {
 
     await expect(rail).toHaveCSS('background-color', expected.chrome);
     await expect(canvas).toHaveCSS('background-color', expected.canvas);
-    await expect(panel).toHaveCSS('background-color', expected.field);
+    if (frameCase.width <= 480) {
+      /* @Codex The compact frame deliberately removes one nested surface.
+         The focal surface still carries grouping while the outer panel
+         contributes no decorative border at reflow-proxy widths. */
+      await expect(panel).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(panel).toHaveCSS('border-top-width', '0px');
+    } else {
+      await expect(panel).toHaveCSS('background-color', expected.field);
+      await expect(panel).toHaveCSS('border-top-width', '1px');
+    }
     await expect(focus).toHaveCSS('background-color', expected.focal);
     await expect(focus).toHaveCSS('border-top-width', '1px');
     // Gli alias locali sono validati dal token checker e risolvono solo da
