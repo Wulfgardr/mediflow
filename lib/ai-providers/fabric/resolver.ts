@@ -61,7 +61,9 @@ export function resolveFabricCapability(
             || (typeof policy.consentRef === 'string' && policy.consentRef.trim().length > 0))
         || !Array.isArray(policy.allowedVenues)
         || policy.allowedVenues.length === 0
-        || !policy.allowedVenues.every((venue) => VENUE_VALUES.has(venue))
+        // Array.from normalizza i buchi degli array sparsi in undefined:
+        // every() da solo li salterebbe e un array sparso passerebbe.
+        || !Array.from(policy.allowedVenues).every((venue) => VENUE_VALUES.has(venue))
     ) {
         throw new FabricPolicyError('policy_invalid');
     }
@@ -141,7 +143,10 @@ export function resolveFabricCapability(
 export function buildProvenanceRecord(resolution: FabricResolution, preprocessing: readonly string[]): FabricProvenanceRecord {
     // Solo il vocabolario chiuso del contratto: la forma sintattica non basta
     // a escludere contenuto clinico normalizzato (es. una diagnosi snake_case).
-    for (const label of preprocessing) {
+    if (!Array.isArray(preprocessing)) {
+        throw new FabricPolicyError('provenance_label_invalid');
+    }
+    for (const label of Array.from(preprocessing)) {
         if (!PREPROCESSING_VOCABULARY.has(label)) {
             throw new FabricPolicyError('provenance_label_invalid');
         }

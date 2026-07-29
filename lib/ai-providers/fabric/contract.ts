@@ -23,15 +23,18 @@ export const FABRIC_SCHEMA_VERSION = 'mediflow.ai.fabric.v1' as const;
 // Capability
 // ---------------------------------------------------------------------------
 
-export const GENERATIVE_CAPABILITY_IDS = [
+// Ogni costante array esportata e' congelata a runtime: 'as const' vincola
+// solo il tipo TypeScript e non impedisce una mutazione prima che i moduli
+// consumatori costruiscano le loro strutture derivate.
+export const GENERATIVE_CAPABILITY_IDS = Object.freeze([
     'patient_insight',
     'smart_import',
     'document_synthesis',
     'ocr',
     'treatment_reasoning',
-] as const;
+] as const);
 
-export const DETERMINISTIC_CAPABILITY_IDS = [
+export const DETERMINISTIC_CAPABILITY_IDS = Object.freeze([
     'icd_lookup',
     'aifa_drug_search',
     'service_prescription_matching',
@@ -43,7 +46,7 @@ export const DETERMINISTIC_CAPABILITY_IDS = [
     'pii_redaction_layer1',
     'fse_document_validation',
     'observation_range_classification',
-] as const;
+] as const);
 
 export type GenerativeCapabilityId = typeof GENERATIVE_CAPABILITY_IDS[number];
 export type DeterministicCapabilityId = typeof DETERMINISTIC_CAPABILITY_IDS[number];
@@ -84,7 +87,7 @@ export type FabricReviewPolicy = 'review_first' | 'informational';
 // - home_base: nodo host che esegue per conto di un client paired;
 // - on_device: esecuzione locale del client (nessuna capability oggi);
 // - cloud: provider remoto esplicitamente autorizzato (nessuno oggi).
-export const FABRIC_VENUES = ['local_process', 'home_base', 'on_device', 'cloud'] as const;
+export const FABRIC_VENUES = Object.freeze(['local_process', 'home_base', 'on_device', 'cloud'] as const);
 export type FabricVenue = typeof FABRIC_VENUES[number];
 
 // ---------------------------------------------------------------------------
@@ -235,13 +238,13 @@ export interface FabricResolutionReceipt {
 // che contenuto clinico normalizzato (es. una diagnosi in snake_case) entri
 // nel record attraverso il campo etichette. Aggiungere un passo richiede una
 // modifica esplicita a questo contratto.
-export const FABRIC_PREPROCESSING_LABELS = [
+export const FABRIC_PREPROCESSING_LABELS = Object.freeze([
     'layer1_redaction',
     'context_minimization',
     'ocr_normalization',
     'normalize_dates',
     'envelope_validation',
-] as const;
+] as const);
 
 export type FabricPreprocessingLabel = typeof FABRIC_PREPROCESSING_LABELS[number];
 
