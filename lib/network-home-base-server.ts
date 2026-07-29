@@ -1,7 +1,7 @@
 /* @Codex */
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
 import type {
@@ -143,8 +143,53 @@ export async function loadNetworkPairingState(): Promise<NetworkPairingState> {
     return parseNetworkPairingState(rawValue);
 }
 
-async function saveNetworkPairingState(state: NetworkPairingState): Promise<void> {
-    await saveSetting(NETWORK_PAIRING_STATE_KEY, serializeNetworkPairingState(state));
+const PAIRING_STATE_CAS_ATTEMPTS = 5;
+
+export type PairingStateMutationOutcome<T> =
+    | { readonly write: true; readonly nextState: NetworkPairingState; readonly result: T }
+    | { readonly write: false; readonly result: T };
+
+// Unica primitiva di scrittura dello stato pairing, con compare-and-swap sul
+// valore serializzato. OGNI writer (creazione intent, conferma, revoca) DEVE
+// passare da qui: due sequenze load->modifica->save concorrenti si
+// sovrascrivono a vicenda e una conferma puo' resuscitare un client appena
+// revocato. Il perdente della gara rilegge lo stato aggiornato e riprova.
+export async function mutateNetworkPairingState<T>(
+    mutator: (state: NetworkPairingState) => PairingStateMutationOutcome<T>,
+): Promise<{ readonly conflict: false; readonly result: T } | { readonly conflict: true }> {
+    for (let attempt = 0; attempt < PAIRING_STATE_CAS_ATTEMPTS; attempt += 1) {
+        const rawValue = await loadSettingValue(NETWORK_PAIRING_STATE_KEY);
+        const state = parseNetworkPairingState(rawValue);
+        const outcome = mutator(state);
+        if (!outcome.write) {
+            return { conflict: false, result: outcome.result };
+        }
+
+        const serialized = serializeNetworkPairingState(outcome.nextState);
+        if (rawValue === null) {
+            const insertResult = dbServer
+                .insert(settings)
+                .values({ key: NETWORK_PAIRING_STATE_KEY, value: serialized })
+                .onConflictDoNothing()
+                .run();
+            if (insertResult.changes === 1) {
+                return { conflict: false, result: outcome.result };
+            }
+        } else {
+            const updateResult = dbServer
+                .update(settings)
+                .set({ value: serialized })
+                .where(and(
+                    eq(settings.key, NETWORK_PAIRING_STATE_KEY),
+                    eq(settings.value, rawValue),
+                ))
+                .run();
+            if (updateResult.changes === 1) {
+                return { conflict: false, result: outcome.result };
+            }
+        }
+    }
+    return { conflict: true };
 }
 
 export async function postNetworkPairingIntent(payload: unknown): Promise<PairingIntentDraftResult> {
@@ -162,8 +207,22 @@ export async function postNetworkPairingIntent(payload: unknown): Promise<Pairin
         payload,
     });
     if (result.ok) {
-        const pairingState = await loadNetworkPairingState();
-        await saveNetworkPairingState(addPendingPairingIntent(pairingState, result.value));
+        const persisted = await mutateNetworkPairingState((state) => ({
+            write: true,
+            nextState: addPendingPairingIntent(state, result.value),
+            result: null,
+        }));
+        if (persisted.conflict) {
+            return {
+                ok: false,
+                status: 409,
+                value: {
+                    error: 'Conflict',
+                    code: 'PAIRING_STATE_CONFLICT',
+                    message: 'Pairing state changed, retry.',
+                },
+            };
+        }
     }
 
     return result;
@@ -192,23 +251,26 @@ export async function confirmNetworkPairingIntent(intentId: string): Promise<{
         };
     }
 
-    const pairingState = await loadNetworkPairingState();
-    const result = confirmPendingPairingIntent({
-        state: pairingState,
-        intentId,
+    const persisted = await mutateNetworkPairingState((state) => {
+        const result = confirmPendingPairingIntent({ state, intentId });
+        return result.ok
+            ? { write: true, nextState: result.nextState, result }
+            : { write: false, result };
     });
-
-    if (!result.ok) {
+    if (persisted.conflict) {
         return {
-            status: result.status,
-            value: result.value,
+            status: 409,
+            value: {
+                error: 'Conflict',
+                code: 'PAIRING_STATE_CONFLICT',
+                message: 'Pairing state changed, retry.',
+            },
         };
     }
 
-    await saveNetworkPairingState(result.nextState);
     return {
-        status: result.status,
-        value: result.value,
+        status: persisted.result.status,
+        value: persisted.result.value,
     };
 }
 
