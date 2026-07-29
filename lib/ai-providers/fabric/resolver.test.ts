@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ProviderRegistryError } from '../registry.ts';
 import {
-    FABRIC_PREPROCESSING_LABELS, FABRIC_PREPROCESSING_LABEL_PATTERN,
+    DETERMINISTIC_CAPABILITY_IDS, FABRIC_PREPROCESSING_LABELS,
+    FABRIC_PREPROCESSING_LABEL_PATTERN, FABRIC_VENUES, GENERATIVE_CAPABILITY_IDS,
     FabricPolicyError, type FabricCapabilityDescriptor, type FabricExecutionPolicy,
 } from './contract.ts';
 import { DETERMINISTIC_CAPABILITY_DESCRIPTORS } from './deterministic-catalog.ts';
@@ -96,6 +97,12 @@ test('rifiuta ogni classe di errore Fabric raggiungibile', () => {
     expectCode('policy_invalid', () => resolveFabricCapability(
         { ...policyFor(deterministic), allowedVenues: ['local_process', 'everywhere'] } as unknown as FabricExecutionPolicy,
         { descriptor: deterministic, venue: 'local_process' }));
+    // Array sparso: every() salta i buchi, la validazione deve normalizzarli.
+    const sparseVenues = new Array(2);
+    sparseVenues[1] = 'local_process';
+    expectCode('policy_invalid', () => resolveFabricCapability(
+        { ...policyFor(deterministic), allowedVenues: sparseVenues } as unknown as FabricExecutionPolicy,
+        { descriptor: deterministic, venue: 'local_process' }));
     expectCode('capability_unknown', () => resolveFabricCapability(
         { ...policyFor(deterministic), capability: 'fhir_export' },
         { descriptor: deterministic, venue: 'local_process' }));
@@ -160,6 +167,18 @@ test('costruisce provenienza congelata con sole etichette', () => {
     for (const label of FABRIC_PREPROCESSING_LABELS) {
         assert.equal(FABRIC_PREPROCESSING_LABEL_PATTERN.test(label), true, label);
     }
+});
+
+test('le costanti array del contratto sono congelate a runtime', () => {
+    // 'as const' vincola solo il tipo: senza Object.freeze una mutazione
+    // prima del load del resolver avvelenerebbe i Set derivati.
+    assert.equal(Object.isFrozen(FABRIC_PREPROCESSING_LABELS), true);
+    assert.equal(Object.isFrozen(FABRIC_VENUES), true);
+    assert.equal(Object.isFrozen(GENERATIVE_CAPABILITY_IDS), true);
+    assert.equal(Object.isFrozen(DETERMINISTIC_CAPABILITY_IDS), true);
+    assert.throws(() => {
+        (FABRIC_PREPROCESSING_LABELS as unknown as string[]).push('diagnosi_diabete_tipo_2');
+    }, TypeError);
 });
 
 test('respinge etichette di preprocessing fuori dal vocabolario chiuso', () => {

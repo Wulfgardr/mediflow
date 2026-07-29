@@ -87,6 +87,7 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 | F3 catalogo unificato + stato | Terra high | OK | 17/17 test fabric riverificati dal controller; route sottile su `requireSessionOrLocalToken` come `/api/ai/models`; snapshot con allowlist congelata senza endpoint o impostazioni; edge dichiarato: nessun test HTTP di integrazione della route |
 | W4 verifica terminale | Sol xhigh, contesto fresco | HOLD_FIX al primo passaggio | Battery tutta verde (932/932); falsificatori contrattuali reali: descriptor fabbricato accettato (P1), ricevuta `treatment_reasoning` con provider discordante da `athena_mlx` (P1), etichette provenance non validate (P2), overclaim docs conseguente (P2), matrice con decisioni gia' chiuse (P3) |
 | W4 secondo passaggio | Sol xhigh, contesto fresco | HOLD_FIX | P1 confermati chiusi dai falsificatori; residui: policy non validata integralmente a runtime (P2: `retention`/`consentRef`/`allowedVenues`), pattern snake_case aggirabile con semantica clinica (P2: `diagnosi_diabete_tipo_2`), riga rischi stale (P3), eccezione ATHENA non documentata in ADR (P3) |
+| W4 terzo passaggio | Sol high, contesto fresco, focalizzato | HOLD_FIX | Correzioni A-D confermate chiuse dai falsificatori; battery verde (935/935); nuovi P2 dalla caccia avversariale: vocabolario `as const` non congelato a runtime (mutabile prima del load del resolver) e array sparso che aggira `every()` su `allowedVenues` |
 
 ## 6. Decision audit (aggiornato in corso d'opera)
 
@@ -102,6 +103,8 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 | Resolver che si fida del descriptor passato dal chiamante | Corretta dopo W4: enforcement di identita' canonica contro il catalogo unificato; un clone a valori identici viene respinto | Un descriptor non canonico che produca una ricevuta |
 | Etichette provenance come stringhe libere | Corretta due volte: prima pattern snake_case (aggirabile con semantica clinica), poi vocabolario CHIUSO `FABRIC_PREPROCESSING_LABELS` nel contratto; ogni etichetta fuori vocabolario respinta | Un'etichetta fuori vocabolario che entri in un record |
 | Validazione policy delegata ai tipi TypeScript | Corretta dopo il secondo passaggio W4: `retention`, `consentRef` e `allowedVenues` convalidati a runtime (i tipi non sono enforcement) | Un valore runtime fuori contratto che produca una ricevuta |
+| Costanti array del contratto solo `as const` | Corretta dopo il terzo passaggio W4: `Object.freeze` su vocabolario, venue e id capability; test che la mutazione lancia `TypeError` | Una costante esportata mutabile che avveleni i `Set` derivati |
+| `every()` su array del chiamante | Corretta dopo il terzo passaggio W4: normalizzazione con `Array.from` (i buchi diventano `undefined` e falliscono la validazione) | Un array sparso che produca una ricevuta |
 | Nessuna modifica ai client nativi in questo programma | Accettata | Un requisito di parity che imponga adozione Swift immediata |
 | Meter Fable non esposto in sessione | Registrata `CAPACITY_UNKNOWN` solo per eventuali lane Fable aggiuntive; nessuna avviata | |
 
