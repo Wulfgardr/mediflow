@@ -145,9 +145,17 @@ Primo passaggio S4 (Sol xhigh, contesto fresco) e correzioni del controller:
 | Semantica `clearsLockout` ambigua per `admin_reset` | P3 | Commento normativo: il campo indica azzeramento in-place per un utente che sopravvive |
 | Wording stale "revoca host-side assente" nel run record | P3 | Riformulato come fotografia pre-S2 |
 
-Edge dichiarato: la prova di concorrenza della revoca vive nel falsificatore
-della lane di verifica (harness sintetico su db), non in un test permanente
-della suite; un'estrazione testabile della CAS resta lavoro futuro ammesso.
+Secondo passaggio S4 (Sol high, contesto fresco): P1-1/P1-2/P1-3/P2-1
+confermati chiusi (30/30 gare DELETE senza violazioni); nuovo P1 dalla caccia:
+la conferma pairing concorrente, ancora load->modify->upsert, poteva
+resuscitare un client revocato (34/50 gare). Correzione del controller:
+primitiva CAS unica `mutateNetworkPairingState` in
+`lib/network-home-base-server.ts` usata da creazione intent, conferma e
+revoca; 409 `PAIRING_STATE_CONFLICT` a esaurimento retry; regressione
+concorrente permanente deterministica in
+`lib/network-home-base-server.test.ts` (interferenza tra lettura e CAS,
+scenario resurrezione, percorso reale intent+conferma). Residui P2/P3
+documentali corretti (ledger, wording upsert, baseline README OpenAPI).
 
 Ledger lane fase 2:
 
@@ -156,7 +164,7 @@ Ledger lane fase 2:
 | P2 onboarding (Terra high) | OK | 28/28 riverificati dal controller; gate egress reale consultato a `attest_local` e `enable`; nessuna stringa `verified`/`ready`/`qualified` |
 | P4 interazione clinica (Sol high) | OK + hardening | 29/29 riverificati; gap auto-dichiarato (ref provenienza vuoto) chiuso dal controller in `f814a3204` insieme all'attore fuori vocabolario; deroga LOC dichiarata e accettata |
 | P3 routing osservabile (Sol high) | OK | 29/29 riverificati; sonda solo su base loopback validata con `redirect: 'error'` e timeout 1500ms; deroga LOC dichiarata e accettata |
-| P1 trust+revoca (Sol high) | OK con deviazione fattuale accettata | 30/30 riverificati; il gate di modalita si applica anche alla discovery (verificato dal controller su `network-discovery-auth.ts:52`); ADR 0090 corretto di conseguenza; revoca host-side con prova negativa post-revoca |
+| P1 trust+revoca (Sol high) | OK dopo correzioni S4 | 30/30 riverificati; il gate di modalita si applica anche alla discovery (verificato dal controller su `network-discovery-auth.ts:52`); ADR 0090 corretto di conseguenza; la persistenza della revoca, prima upsert non atomico, e' stata portata dalla verifica S4 alla primitiva CAS condivisa |
 
 Decisioni di fase (aggiunte):
 
@@ -164,7 +172,7 @@ Decisioni di fase (aggiunte):
 | --- | --- | --- |
 | Accettare la deviazione discovery/mode-gate della lane P1 e correggere l'ADR invece del codice | Accettata | Un sorgente che mostri la discovery servita in modalita `local-only` |
 | Ref di provenienza: stringa vuota respinta a creazione e accettazione | Corretta (hardening controller) | Un accept con ref di soli spazi |
-| Persistenza revoca via upsert locale alla route (helper di salvataggio privato, fuori ownership) | Accettata come workaround bounded | Una seconda via di scrittura dello stato pairing che diverga |
+| Persistenza revoca via upsert locale alla route | SUPERATA dopo S4: TUTTI i writer dello stato pairing (creazione intent, conferma, revoca) passano dalla primitiva CAS condivisa `mutateNetworkPairingState`, con regressione concorrente permanente in `lib/network-home-base-server.test.ts` | Un writer dello stato pairing che non passi dalla primitiva |
 
 Fatti chiave dalla ricognizione pre-S2 (dettaglio in ADR 0090; la revoca
 host-side, allora assente, e' stata poi consegnata dalla lane P1): 401
