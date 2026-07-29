@@ -61,24 +61,15 @@ test('venue offline nega senza invocare il resolver', () => {
     assert.equal(result.error, null);
 });
 
-test('venue degraded rispetta denyOnDegraded', () => {
-    const observations = [observeVenue('local_process', 'degraded', 'daemon_unreachable')];
+test('venue degraded nega sempre prima del resolver', () => {
     const denied = observeAndResolve(
         policyFor(generative),
         { descriptor: generative, venue: 'local_process' },
-        observations,
-        { denyOnDegraded: true },
+        [observeVenue('local_process', 'degraded', 'daemon_unreachable')],
     );
     assert.equal(denied.decision.denialCode, 'venue_degraded');
+    assert.equal(denied.resolution, null);
     assert.equal(denied.error, null);
-
-    const attempted = observeAndResolve(
-        policyFor(generative),
-        { descriptor: generative, venue: 'local_process' },
-        observations,
-    );
-    assert.equal(attempted.decision.denialCode, 'class_mismatch');
-    assert.equal(attempted.error instanceof FabricPolicyError, true);
 });
 
 test('risolve una capability deterministica canonica', () => {
@@ -127,14 +118,16 @@ test('cattura FabricPolicyError e ProviderRegistryError con il codice originale'
     );
 });
 
-test('osservazione mancante diventa unknown/not_probed senza bloccare la risoluzione', () => {
+test('osservazione mancante diventa unknown/not_probed e nega la risoluzione', () => {
     const result = observeAndResolve(
         policyFor(deterministic),
         { descriptor: deterministic, venue: 'local_process' },
         [observeVenue('home_base', 'offline', 'mode_disabled')],
     );
 
-    assert.equal(result.decision.outcome, 'resolved');
+    assert.equal(result.decision.outcome, 'denied');
+    assert.equal(result.decision.denialCode, 'venue_unknown');
+    assert.equal(result.decision.receipt, null);
     assert.deepEqual(
         result.decision.observations.find(({ venue }) => venue === 'local_process'),
         { venue: 'local_process', state: 'unknown', reason: 'not_probed' },
@@ -170,6 +163,27 @@ test('observeVenue valida reason, congela gli oggetti e usa un solo snapshot', (
     );
     assert.equal(iterations, 1);
     assert.equal(result.decision.denialCode, 'venue_offline');
+});
+
+test('rifiuta osservazioni duplicate senza scegliere per ordine', () => {
+    assert.throws(
+        () => buildObservabilitySnapshot([
+            observeVenue('local_process', 'available', null),
+            observeVenue('local_process', 'offline', 'daemon_unreachable'),
+        ]),
+        (error) => error instanceof FabricPolicyError && error.code === 'policy_invalid',
+    );
+    assert.throws(
+        () => observeAndResolve(
+            policyFor(deterministic),
+            { descriptor: deterministic, venue: 'local_process' },
+            [
+                observeVenue('local_process', 'offline', 'daemon_unreachable'),
+                observeVenue('local_process', 'available', null),
+            ],
+        ),
+        (error) => error instanceof FabricPolicyError && error.code === 'policy_invalid',
+    );
 });
 
 test('snapshot osservabilita valida, ordina e congela le venue', () => {
