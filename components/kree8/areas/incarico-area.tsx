@@ -205,7 +205,7 @@ function IncaricoArea({
             ) : null}
           </div>
 
-          <header className={styles.panelHeader}>
+          <header className={classNames(styles.panelHeader, patientStyles.worklistPanelHeader)}>
             <h2 className={styles.panelTitle}>
               {list === 'attivi' ? 'Pazienti in carico' : 'Archivio pazienti'}
             </h2>
