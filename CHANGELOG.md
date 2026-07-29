@@ -5,6 +5,22 @@ Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Documentazione pubblica
+
+- La galleria usa una cattura reale dell'app macOS corrente con fixture
+  sintetiche. Rimuove lo screenshot della shell Apple precedente.
+- Il README distingue il rapporto operativo tra Mac home-base, localhost e
+  client paired dalla direzione futura Intelligence Fabric.
+- Il dashboard dei token usa gli aggregati locali CodexBar e dichiara il
+  periodo e l'ambiente di registrazione.
+
+### App native
+
+- La modalità demo Apple tratta il dataset sintetico come fixture UI. Il
+  caricamento documenti non mostra più un falso errore di sessione paired.
+
 ## [0.8.0] - 2026-07-29
 
 > Questa voce descrive la release sorgente `0.8.0`. Non dichiara una
