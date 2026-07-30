@@ -198,4 +198,30 @@ complessive.
 
 ## 13. Esito della wave
 
-Aggiornato al closeout.
+Wave H-W1 consegnata e verificata.
+
+- Commit wave: `be482b7d1` (4 file, +357/-15: adapter
+  `document-synthesis-fabric.ts`, seam nel servizio, test, fixture
+  ai-context). Sforamento LOC dichiarato: interamente nei test.
+- Battery del controller sul branch integrato: typecheck, lint, claims,
+  never-regress, OpenAPI drift, schema drift, `git diff --check
+  ee22399a4..HEAD` tutti PASS; suite unit `999/999`.
+- H-V1 (Sol high, contesto fresco): `GO`. Falsificatori a-j tutti chiusi con
+  prove live (lifecycle degraded/revoked, venue offline, receipt divergente,
+  getter stateful, metadato non enumerabile, review pending/zero write,
+  negazione senza update db e senza recupero deterministico, nessun nuovo IO,
+  contratti pubblici byte-identici via SHA-256).
+- Finding: nessun P0-P2. Un P3 residuo solo-ostile same-process: il confronto
+  receipt rilegge `receipt.provider`/`receipt.model` dall'oggetto originale
+  invece che da uno snapshot profondo; getter ostili producono comunque
+  negazione fail-closed e zero invocazioni. Registrato come hardening futuro
+  non bloccante.
+- Non eseguiti (fuori battery e fuori scope): build production in H-V1
+  (eseguita verde nelle fasi precedenti), SwiftPM (`BLOCKED_TOOLCHAIN`
+  invariato), prove su device/LAN/provider reali.
+
+Verdetto della sessione Horizon:
+`HORIZON_LOCAL_SLICE_READY / HOLD_REMOTE_PROMOTION`.
+
+Next permitted action: restituire il packet a Codex per verifica e closeout;
+nessun push, PR, merge remoto, tag, release o mutazione Linear.
