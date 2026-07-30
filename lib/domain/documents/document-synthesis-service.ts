@@ -41,6 +41,12 @@ import {
     DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY,
     parseDocumentRouterControlFlowMode,
 } from './document-router-control-flow';
+import {
+    admitDocumentSynthesisFabric,
+    DOCUMENT_SYNTHESIS_FABRIC_METADATA,
+    DocumentSynthesisFabricDeniedError,
+    getDocumentSynthesisFabricMetadata,
+} from './document-synthesis-fabric';
 
 /* @Codex */
 const MAX_SYNTHESIS_CHARS = 12000;
@@ -143,12 +149,25 @@ export async function analyzeDocumentContent(rawMarkdown: string): Promise<Docum
     const ai = await AIService.create('reasoning');
     const normalized = normalizeDocumentInput(rawMarkdown);
     const sliced = buildDocumentExcerpt(normalized.normalizedText, MAX_SYNTHESIS_CHARS);
+    const modelInfo = ai.getModelInfo();
+    let health: Awaited<ReturnType<typeof ai.getHealth>> | null = null;
+    try {
+        health = await ai.getHealth();
+    } catch {
+        health = null;
+    }
+    const admission = admitDocumentSynthesisFabric({ modelInfo, health });
+    if (!admission.admitted) throw new DocumentSynthesisFabricDeniedError(admission.denial);
     const content = await ai.generate(buildDocumentSynthesisExtractionPrompt(sliced), undefined, 1400);
     const analysis = parseStructuredAnalysisResponse(content, normalized.normalizedText);
     // @Codex
     if (!isEnvelopeUsable(analysis)) {
         throw new Error("L'AI ha generato una risposta non valida per l'analisi del documento.");
     }
+    Object.defineProperty(analysis, DOCUMENT_SYNTHESIS_FABRIC_METADATA, {
+        value: admission.metadata,
+        enumerable: false,
+    });
     return analysis;
 }
 
@@ -244,10 +263,18 @@ export async function synthesizeDocument(
         updatedAt: new Date()
     });
 
-    return {
+    const result = {
         insight,
         parseEvidenceArtifact,
     };
+    const metadata = getDocumentSynthesisFabricMetadata(analysis);
+    if (metadata) {
+        Object.defineProperty(result, DOCUMENT_SYNTHESIS_FABRIC_METADATA, {
+            value: metadata,
+            enumerable: false,
+        });
+    }
+    return result;
 }
 
 /**

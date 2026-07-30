@@ -833,7 +833,24 @@ test('document analysis rejects an envelope with a mismatched task', async () =>
 
     db.settings.get = (async () => ({ value: 'enabled' })) as typeof db.settings.get;
     AIService.create = (async () => ({
-        getModelInfo: () => ({ provider: 'local', model: 'synthetic', baseUrl: 'http://127.0.0.1' }),
+        getModelInfo: () => ({
+            provider: 'ollama',
+            model: 'synthetic',
+            baseUrl: 'http://127.0.0.1:11434',
+            receipt: {
+                schemaVersion: 'mediflow.ai.provider-selection.v1',
+                authorityPlane: 'clinical_application',
+                task: 'reasoning',
+                provider: 'ollama',
+                model: 'synthetic',
+                execution: 'local',
+                endpointClass: 'loopback',
+                egress: 'none',
+                runtimeReadiness: 'required',
+                fallbackCount: 0,
+            },
+        }),
+        getHealth: async () => ({ status: 'ok' as const, message: 'synthetic', models: [] }),
         generate: async () => JSON.stringify({
             schemaVersion: 'mediflow.ai.extract.v1',
             task: 'smart_import',

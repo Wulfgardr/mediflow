@@ -13,7 +13,17 @@ import { parseDocumentIntelligenceCasePack } from './document-intelligence-case-
 /* @Codex */
 import { decideDocumentRouterControlFlow, DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY } from './document-router-control-flow';
 /* @Codex */
-import { selectDocumentSynthesisAnalysis, synthesizeDocument } from './document-synthesis-service';
+import { analyzeDocumentContent, selectDocumentSynthesisAnalysis, synthesizeDocument } from './document-synthesis-service';
+import {
+    DOCUMENT_SYNTHESIS_FABRIC_METADATA,
+    DocumentSynthesisFabricDeniedError,
+    getDocumentSynthesisFabricMetadata,
+} from './document-synthesis-fabric';
+import { getFabricCapabilityDescriptor } from '../../ai-providers/fabric/catalog';
+import { routeCandidateCapability } from '../../ai-providers/fabric/candidate-router';
+import { advanceOnboarding, startOnboarding } from '../../ai-providers/fabric/onboarding';
+import { admitProvider, transitionProviderLifecycle } from '../../ai-providers/fabric/provider-lifecycle';
+import { observeVenue } from '../../ai-providers/fabric/routing-observability';
 import {
     buildDocumentParseEvidenceArtifact,
     evaluateDocumentParseEvidenceArtifact,
@@ -21,6 +31,49 @@ import {
     projectDocumentEvidencePack,
     serializeDocumentParseEvidenceArtifact,
 } from './document-parse-evidence-artifact';
+
+const SYNTHETIC_RECEIPT = Object.freeze({
+    schemaVersion: 'mediflow.ai.provider-selection.v1' as const,
+    authorityPlane: 'clinical_application' as const,
+    task: 'reasoning' as const,
+    provider: 'ollama' as const,
+    model: 'synthetic-local-model',
+    execution: 'local' as const,
+    endpointClass: 'loopback' as const,
+    egress: 'none' as const,
+    runtimeReadiness: 'required' as const,
+    fallbackCount: 0 as const,
+});
+
+function validSynthesisEnvelope() {
+    return JSON.stringify({
+        schemaVersion: 'mediflow.ai.extract.v1',
+        task: 'document_synthesis',
+        summary: 'Sintesi Fabric sintetica',
+        data: {
+            qualityLevel: 'green', medications: [], diagnoses: [], problemStatements: [], therapyCandidates: [], servicePrescriptions: [],
+        },
+    });
+}
+
+function syntheticAi(
+    generate: () => Promise<string>,
+    options: {
+        modelInfo?: unknown;
+        health?: { status: 'ok' | 'error'; message: string; models: string[] };
+    } = {},
+) {
+    return {
+        getModelInfo: () => options.modelInfo ?? ({
+            provider: 'ollama',
+            model: 'synthetic-local-model',
+            baseUrl: 'http://127.0.0.1:11434',
+            receipt: SYNTHETIC_RECEIPT,
+        }),
+        getHealth: async () => options.health ?? ({ status: 'ok' as const, message: 'synthetic', models: [] }),
+        generate,
+    };
+}
 
 test('shadow synthesis calls the model without waiting for a pending audit write', async () => {
     const rawMarkdown = 'Referto di laboratorio con determinazione risultato e intervalli di riferimento. '.repeat(2);
@@ -99,6 +152,22 @@ test('off synthesis preserves model output and never dispatches the shadow audit
 
     assert.equal(auditCalls, 0);
     assert.deepEqual(analysis, expected);
+});
+
+test('active deterministic routing never invokes generative admission or analysis', async () => {
+    const rawMarkdown = 'Referto di laboratorio: determinazione risultato e limiti di riferimento. '.repeat(3);
+    const routed = routeDocumentClassForSynthesis(rawMarkdown, '2026-07-12__laboratorio__synthetic.pdf');
+    const routerDecision = decideDocumentRouterControlFlow({
+        documentSynthesisKillSwitchValue: 'enabled', mode: 'active', routed, normalizedText: rawMarkdown,
+    });
+    let generativeCalls = 0;
+    const analysis = await selectDocumentSynthesisAnalysis({
+        rawMarkdown, normalizedText: rawMarkdown, routed, routerMode: 'active', routerDecision,
+        analyze: async () => { generativeCalls += 1; throw new Error('must not run'); },
+    });
+    assert.equal(routerDecision.useDeterministicSynthesis, true);
+    assert.equal(generativeCalls, 0);
+    assert.match(analysis.quality?.reason ?? '', /Sintesi deterministica/);
 });
 
 test('shadow synthesis absorbs a rejected audit write and preserves model output', async (context) => {
@@ -186,6 +255,147 @@ test('falls back to empty medications when the model returns invalid JSON', () =
     assert.equal(analysis.quality?.level, 'yellow');
 });
 
+test('document synthesis Fabric admits once, preserves receipt identity, and hides metadata', async () => {
+    const original = { getSetting: db.settings.get, createAi: AIService.create };
+    let modelInfoReads = 0;
+    let healthReads = 0;
+    let generateCalls = 0;
+    db.settings.get = (async () => ({ value: 'enabled' })) as typeof db.settings.get;
+    AIService.create = (async () => ({
+        getModelInfo: () => {
+            modelInfoReads += 1;
+            if (modelInfoReads > 1) throw new Error('stateful getModelInfo reread');
+            return { provider: 'ollama', model: 'synthetic-local-model', baseUrl: 'http://127.0.0.1:11434', receipt: SYNTHETIC_RECEIPT };
+        },
+        getHealth: async () => {
+            healthReads += 1;
+            if (healthReads > 1) throw new Error('stateful getHealth reread');
+            return { status: 'ok' as const, message: 'synthetic', models: [] };
+        },
+        generate: async () => { generateCalls += 1; return validSynthesisEnvelope(); },
+    })) as unknown as typeof AIService.create;
+
+    try {
+        const analysis = await analyzeDocumentContent('Referto sintetico con contenuto normalizzato.');
+        const metadata = getDocumentSynthesisFabricMetadata(analysis);
+        assert.equal(modelInfoReads, 1);
+        assert.equal(healthReads, 1);
+        assert.equal(generateCalls, 1);
+        assert.ok(metadata);
+        assert.equal(metadata?.routing.receipt, metadata?.provenance.receipt);
+        assert.equal(metadata?.proposal.review, 'pending');
+        assert.equal(metadata?.writesPerformed, 0);
+        assert.equal(Object.keys(analysis).includes(String(DOCUMENT_SYNTHESIS_FABRIC_METADATA)), false);
+        assert.doesNotMatch(JSON.stringify(analysis), /fabric-resolution|provenance|pending/);
+    } finally {
+        db.settings.get = original.getSetting;
+        AIService.create = original.createAi;
+    }
+});
+
+test('document synthesis Fabric denies offline and receipt-incoherent providers before generate', async () => {
+    const original = { getSetting: db.settings.get, createAi: AIService.create };
+    db.settings.get = (async () => ({ value: 'enabled' })) as typeof db.settings.get;
+    const scenarios = [
+        syntheticAi(async () => { throw new Error('generate must not run'); }, {
+            health: { status: 'error', message: 'offline', models: [] },
+        }),
+        syntheticAi(async () => { throw new Error('generate must not run'); }, {
+            modelInfo: {
+                provider: 'ollama', model: 'synthetic-local-model', baseUrl: 'http://127.0.0.1:11434',
+                receipt: { ...SYNTHETIC_RECEIPT, model: 'different-registry-model' },
+            },
+        }),
+        syntheticAi(async () => { throw new Error('generate must not run'); }, {
+            modelInfo: {
+                provider: 'ollama', model: 'synthetic-local-model', baseUrl: 'http://127.0.0.1:11434',
+                receipt: { ...SYNTHETIC_RECEIPT, provider: 'other-provider' },
+            },
+        }),
+    ];
+    try {
+        for (const ai of scenarios) {
+            AIService.create = (async () => ai) as unknown as typeof AIService.create;
+            await assert.rejects(
+                analyzeDocumentContent('Referto sintetico.'),
+                (error: unknown) => error instanceof DocumentSynthesisFabricDeniedError,
+            );
+        }
+    } finally {
+        db.settings.get = original.getSetting;
+        AIService.create = original.createAi;
+    }
+});
+
+test('document synthesis Fabric keeps lifecycle degraded or revoked before the generation boundary', () => {
+    const descriptor = getFabricCapabilityDescriptor('document_synthesis');
+    const declared = startOnboarding('ollama', 'local_model');
+    const configured = advanceOnboarding(declared, { type: 'configure' });
+    const credentialed = advanceOnboarding(configured, { type: 'credential_declared' });
+    const attested = advanceOnboarding(credentialed, { type: 'attest_local' });
+    const lifecycle = admitProvider(advanceOnboarding(attested, { type: 'enable' }));
+    let generateCalls = 0;
+    for (const state of [transitionProviderLifecycle(lifecycle, 'degrade'), transitionProviderLifecycle(lifecycle, 'revoke')]) {
+        const routed = routeCandidateCapability({
+            policy: {
+                schemaVersion: 'mediflow.ai.execution-policy.v1', requestId: `synthetic-${state.status}`,
+                capability: descriptor.id, authorityPlane: 'clinical_application', operation: descriptor.operation,
+                dataClass: descriptor.dataClass, allowedVenues: ['local_process'], egressProfileId: 'local_only',
+                consentRef: null, retention: 'not_persisted', review: 'review_first', provenanceRequired: true, fallback: 'none',
+            },
+            request: {
+                descriptor, venue: 'local_process',
+                generative: { task: 'reasoning', provider: 'ollama', models: { reasoning: 'synthetic-local-model' }, endpoint: 'http://127.0.0.1:11434', chatTimeoutMs: 1_000 },
+            },
+            observations: [observeVenue('local_process', 'available', null)],
+            onboarding: advanceOnboarding(attested, { type: 'enable' }), lifecycle: state,
+        });
+        if (routed.decision.outcome === 'resolved') generateCalls += 1;
+        assert.equal(routed.decision.outcome, 'denied');
+    }
+    assert.equal(generateCalls, 0);
+});
+
+test('synthesizeDocument neither persists nor enumerates Fabric metadata', async () => {
+    const original = { getSetting: db.settings.get, getPatient: db.patients.get, updatePatient: db.patients.update, createAi: AIService.create };
+    let persisted: unknown;
+    db.settings.get = (async (key: string) => ({ value: key === DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY ? 'off' : 'enabled' })) as unknown as typeof db.settings.get;
+    db.patients.get = (async () => ({ id: 'patient-fabric', version: 1, documentInsights: [] })) as unknown as typeof db.patients.get;
+    db.patients.update = (async (_id: string, payload: unknown) => { persisted = payload; }) as unknown as typeof db.patients.update;
+    AIService.create = (async () => syntheticAi(async () => validSynthesisEnvelope())) as unknown as typeof AIService.create;
+    try {
+        const result = await synthesizeDocument('Referto sintetico.', 'synthetic.pdf', 'patient-fabric');
+        const metadata = getDocumentSynthesisFabricMetadata(result);
+        assert.ok(metadata);
+        assert.equal(Object.keys(result).includes(String(DOCUMENT_SYNTHESIS_FABRIC_METADATA)), false);
+        assert.doesNotMatch(JSON.stringify(result), /fabric-resolution|provenance|pending/);
+        assert.doesNotMatch(JSON.stringify(persisted), /fabric-resolution|provenance|pending/);
+    } finally {
+        db.settings.get = original.getSetting;
+        db.patients.get = original.getPatient;
+        db.patients.update = original.updatePatient;
+        AIService.create = original.createAi;
+    }
+});
+
+test('Fabric denial reaches no patient update', async () => {
+    const original = { getSetting: db.settings.get, updatePatient: db.patients.update, createAi: AIService.create };
+    let updates = 0;
+    db.settings.get = (async (key: string) => ({ value: key === DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY ? 'off' : 'enabled' })) as unknown as typeof db.settings.get;
+    db.patients.update = (async () => { updates += 1; }) as unknown as typeof db.patients.update;
+    AIService.create = (async () => syntheticAi(async () => { throw new Error('generate must not run'); }, {
+        health: { status: 'error', message: 'offline', models: [] },
+    })) as unknown as typeof AIService.create;
+    try {
+        await assert.rejects(synthesizeDocument('Referto sintetico.', 'synthetic.pdf', 'patient-fabric'), DocumentSynthesisFabricDeniedError);
+        assert.equal(updates, 0);
+    } finally {
+        db.settings.get = original.getSetting;
+        db.patients.update = original.updatePatient;
+        AIService.create = original.createAi;
+    }
+});
+
 /* @Codex */
 test('document synthesis does not persist or autofill when the envelope task is invalid', async () => {
     const original = {
@@ -208,14 +418,12 @@ test('document synthesis does not persist or autofill when the envelope task is 
     db.patients.update = (async () => {
         updates += 1;
     }) as unknown as typeof db.patients.update;
-    AIService.create = (async () => ({
-        generate: async () => JSON.stringify({
+    AIService.create = (async () => syntheticAi(async () => JSON.stringify({
             schemaVersion: 'mediflow.ai.extract.v1',
             task: 'smart_import',
             summary: 'Risposta con task errato',
             data: {},
-        }),
-    })) as unknown as typeof AIService.create;
+        }))) as unknown as typeof AIService.create;
 
     try {
         await assert.rejects(
@@ -252,8 +460,7 @@ test('document synthesis stores high confidence diagnoses as review material onl
     db.patients.update = (async (_id: string, payload: unknown) => {
         updatePayloads.push(payload);
     }) as unknown as typeof db.patients.update;
-    AIService.create = (async () => ({
-        generate: async () => JSON.stringify({
+    AIService.create = (async () => syntheticAi(async () => JSON.stringify({
             schemaVersion: 'mediflow.ai.extract.v1',
             task: 'document_synthesis',
             summary: 'Diagnosi proposta per revisione',
@@ -271,8 +478,7 @@ test('document synthesis stores high confidence diagnoses as review material onl
                 therapyCandidates: [],
                 servicePrescriptions: [],
             },
-        }),
-    })) as unknown as typeof AIService.create;
+        }))) as unknown as typeof AIService.create;
 
     try {
         const result = await synthesizeDocument(
@@ -323,13 +529,11 @@ test('document synthesis rejects a last-wins poisoned response with zero writes 
         updates += 1;
         updatePayloads.push(payload);
     }) as unknown as typeof db.patients.update;
-    AIService.create = (async () => ({
-        generate: async () => '{"task":"document_synthesis","task":"Nota storica libera",'
+    AIService.create = (async () => syntheticAi(async () => '{"task":"document_synthesis","task":"Nota storica libera",'
             + '"summary_markdown":"**Riassunto clinico:** testo storico sintetico",'
             + '"quality":{"level":"green","reason":"Documento chiaro"},'
             + '"medications":["Sintetizina 10 mg 1 cp al mattino"],'
-            + '"diagnoses":[{"code":"I10","description":"Ipertensione essenziale","system":"ICD-10","confidence":"high","evidence":"testo sintetico"}]}',
-    })) as unknown as typeof AIService.create;
+            + '"diagnoses":[{"code":"I10","description":"Ipertensione essenziale","system":"ICD-10","confidence":"high","evidence":"testo sintetico"}]}')) as unknown as typeof AIService.create;
 
     try {
         await assert.rejects(
