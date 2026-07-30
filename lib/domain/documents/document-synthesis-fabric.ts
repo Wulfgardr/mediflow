@@ -8,7 +8,6 @@ import { advanceOnboarding, startOnboarding } from '../../ai-providers/fabric/on
 import { admitProvider } from '../../ai-providers/fabric/provider-lifecycle';
 import { observeVenue } from '../../ai-providers/fabric/routing-observability';
 import { buildProvenanceRecord } from '../../ai-providers/fabric/resolver';
-import type { ProviderSelectionReceipt } from '../../ai-providers/registry';
 
 export const DOCUMENT_SYNTHESIS_FABRIC_METADATA = Symbol('document-synthesis-fabric-metadata');
 export type DocumentSynthesisFabricMetadata = Readonly<{
@@ -33,7 +32,7 @@ function localOnboarding() {
 }
 
 function modelInfo(value: unknown): Readonly<{
-    provider: 'ollama'; model: string; baseUrl: string; receipt: ProviderSelectionReceipt;
+    provider: 'ollama'; model: string; baseUrl: string; receiptProvider: string; receiptModel: string;
 }> | null {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const { provider, model, baseUrl, receipt } = value as Record<string, unknown>;
@@ -41,7 +40,7 @@ function modelInfo(value: unknown): Readonly<{
     const { provider: receiptProvider, model: receiptModel } = receipt as Record<string, unknown>;
     return provider === 'ollama' && typeof model === 'string' && typeof baseUrl === 'string'
         && receiptProvider === provider && receiptModel === model
-        ? Object.freeze({ provider, model, baseUrl, receipt: receipt as ProviderSelectionReceipt }) : null;
+        ? Object.freeze({ provider, model, baseUrl, receiptProvider, receiptModel }) : null;
 }
 
 function denial(requestId: string, code: NonNullable<CandidateRoutingDecision['denialCode']>): DocumentSynthesisFabricAdmission {
@@ -76,8 +75,8 @@ export function admitDocumentSynthesisFabric(input: Readonly<{ modelInfo: unknow
     });
     if (!routing.resolution || !routing.decision.receipt) return Object.freeze({ admitted: false, denial: routing.decision });
     const receipt = routing.decision.receipt;
-    if (receipt.provider !== snapshot.receipt.provider || receipt.model !== snapshot.receipt.model
-        || receipt.providerReceipt?.provider !== snapshot.receipt.provider || receipt.providerReceipt?.model !== snapshot.receipt.model) {
+    if (receipt.provider !== snapshot.receiptProvider || receipt.model !== snapshot.receiptModel
+        || receipt.providerReceipt?.provider !== snapshot.receiptProvider || receipt.providerReceipt?.model !== snapshot.receiptModel) {
         return denial(requestId, 'provider_receipt_mismatch');
     }
     const provenance = buildProvenanceRecord(routing.resolution, ['context_minimization', 'ocr_normalization', 'envelope_validation']);
