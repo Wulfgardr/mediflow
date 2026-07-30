@@ -220,8 +220,33 @@ Wave H-W1 consegnata e verificata.
   (eseguita verde nelle fasi precedenti), SwiftPM (`BLOCKED_TOOLCHAIN`
   invariato), prove su device/LAN/provider reali.
 
-Verdetto della sessione Horizon:
+Verdetto intermedio della wave:
 `HORIZON_LOCAL_SLICE_READY / HOLD_REMOTE_PROMOTION`.
+
+## 14. Micro-wave di chiusura del P3
+
+Autorizzata dal controller umano dopo la verifica indipendente Codex del
+checkpoint (46/46, 60/60, 64/64, 999/999, build e standalone bundle verdi
+su `af0a4c303`). Condizioni rispettate: solo adapter + test, contratto
+Horizon invariato, nessun payload o dato persistito toccato, nessuna
+dipendenza nuova.
+
+- Writer H-W1b (Terra high, stesso worktree e ownership della wave): commit
+  `aa3de4c46`; lo snapshot di `modelInfo` conserva le copie primitive
+  `receiptProvider`/`receiptModel` catturate alla validazione e il confronto
+  usa solo quelle; regressione stateful dedicata nel test.
+- Battery del controller sul branch integrato: claims, never-regress, lint,
+  `git diff --check ee22399a4..HEAD`, suite unit `1000/1000`, build
+  production PASS.
+- H-V1b (Sol high, contesto fresco): `GO — VERIFIED`. Probe reali: una
+  lettura per proprieta, ammissione coerente con la prima lettura,
+  divergenza -> `provider_receipt_mismatch` e zero generazioni; diff limitato
+  ai due file autorizzati; sei simboli esportati identici; nessun finding.
+
+Il P3 della wave e' chiuso. Nessun residuo P0-P3 noto sul candidato Horizon.
+
+Verdetto terminale della sessione:
+`HORIZON_HARDENED_LOCAL_CANDIDATE_READY / HOLD_REMOTE_PROMOTION`.
 
 Next permitted action: restituire il packet a Codex per verifica e closeout;
 nessun push, PR, merge remoto, tag, release o mutazione Linear.
