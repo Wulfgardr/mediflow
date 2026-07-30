@@ -209,6 +209,8 @@ Ultimo aggiornamento: 2026-07-29
 
 ## ✅ Checklist manutenzione indice
 
+| [docs/analysis/2026-07-30-smart-import-clinical-series-run.md](./analysis/2026-07-30-smart-import-clinical-series-run.md) | Run record sintetico del contratto provider-neutral, serie temporali e collegamento prescrizioni per Smart Import. |
+
 1. Verifica inventario file: `rg --files -g '*.md' | sort`.
 2. Assicurati che ogni file appaia in questo indice con una descrizione.
 3. Aggiorna data "Ultimo aggiornamento".
