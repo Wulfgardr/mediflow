@@ -293,6 +293,44 @@ test('document synthesis Fabric admits once, preserves receipt identity, and hid
     }
 });
 
+test('document synthesis Fabric snapshots stateful receipt properties once for admission', async () => {
+    const original = { getSetting: db.settings.get, createAi: AIService.create };
+    let providerReads = 0;
+    let modelReads = 0;
+    let generateCalls = 0;
+    const receipt = {
+        ...SYNTHETIC_RECEIPT,
+        get provider() {
+            providerReads += 1;
+            return providerReads === 1 ? 'ollama' : 'other-provider';
+        },
+        get model() {
+            modelReads += 1;
+            return modelReads === 1 ? 'synthetic-local-model' : 'other-model';
+        },
+    };
+    db.settings.get = (async () => ({ value: 'enabled' })) as typeof db.settings.get;
+    AIService.create = (async () => syntheticAi(async () => {
+        generateCalls += 1;
+        return validSynthesisEnvelope();
+    }, {
+        modelInfo: {
+            provider: 'ollama', model: 'synthetic-local-model', baseUrl: 'http://127.0.0.1:11434', receipt,
+        },
+    })) as unknown as typeof AIService.create;
+
+    try {
+        const analysis = await analyzeDocumentContent('Referto sintetico con receipt stateful.');
+        assert.equal(providerReads, 1);
+        assert.equal(modelReads, 1);
+        assert.equal(generateCalls, 1);
+        assert.ok(getDocumentSynthesisFabricMetadata(analysis));
+    } finally {
+        db.settings.get = original.getSetting;
+        AIService.create = original.createAi;
+    }
+});
+
 test('document synthesis Fabric denies offline and receipt-incoherent providers before generate', async () => {
     const original = { getSetting: db.settings.get, createAi: AIService.create };
     db.settings.get = (async () => ({ value: 'enabled' })) as typeof db.settings.get;
