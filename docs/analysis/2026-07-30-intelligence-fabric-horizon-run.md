@@ -250,3 +250,145 @@ Verdetto terminale della sessione:
 
 Next permitted action: restituire il packet a Codex per verifica e closeout;
 nessun push, PR, merge remoto, tag, release o mutazione Linear.
+
+## 15. Handoff terminale Fable
+
+Stato controller: `FABLE_PACKET_RECEIVED`.
+
+Il 2026-07-30 il controller ha acquisito dalla sessione Fable il
+`FABLE_TERMINAL_HANDOFF_PACKET`. Il dato operativo riferito dall'utente resta
+`circa 6% remaining`: etichetta e direzione `remaining`, ora locale non
+fornita, nessuna conversione. Questo packet e' un giudizio terminale e un
+handoff di pianificazione. Non costituisce una nuova esecuzione dei gate
+runtime da parte del controller.
+
+### Verdetto Fable
+
+Fable conferma:
+
+`HORIZON_HARDENED_LOCAL_CANDIDATE_READY / HOLD_REMOTE_PROMOTION`
+
+Identita giudicata:
+
+- branch `codex/WUL-522-intelligence-fabric-horizon`;
+- HEAD runtime e documentale precedente
+  `d66de9159bcf90beabb2c9101bd1e2ec84267f55`;
+- P3 chiuso;
+- nessun P0-P3 Horizon noto.
+
+Base dichiarata: H-V1 `GO`, H-V1b `GO — VERIFIED`, verifica Codex
+indipendente, suite unitaria `1000/1000`, build production e standalone
+bundle verdi, guard verdi e probe stateful del P3. Fable non identifica
+ragioni tecniche concrete per riaprire i finding chiusi.
+
+### Assunzioni e limiti dichiarati
+
+- L'adozione Fabric e' reale sul solo call path `document_synthesis`.
+- Il core non-AI resta disponibile; routing e receipt sono fail-closed;
+  provenance e review `pending` sono provate con fixture sintetiche.
+- Non esiste una prova end-to-end con daemon Ollama reale.
+- Non e' stato eseguito uno smoke browser dei consumer.
+- Il runtime Apple resta `BLOCKED_TOOLCHAIN`.
+- Il lifecycle provider e' derivato per richiesta e non e' persistito.
+- Provider cloud, device fisici, on-device e paired AI reale restano fuori
+  dal candidato.
+- Cambierebbero il verdetto: un consumer che dipende da metadati
+  enumerabili; una divergenza con un daemon reale; un writer pairing esterno
+  alla primitiva CAS; un fallback deterministico attivato dopo una negazione
+  Fabric.
+
+### DAG residuo ordinato
+
+| Ordine | Elemento | Priorita | Dipendenza o ingresso |
+| --- | --- | --- | --- |
+| 1 | Migrazione patient insight | P0 | pattern adapter consegnato; preservare coalescing e auto-persistenza |
+| 2 | Migrazione Smart Import, solo analisi | P0 | preservare il confine con l'apply clinico |
+| 3 | Migrazione OCR | P1 | ADR sul fallback Apple Vision dichiarato o negato |
+| 4 | Migrazione treatment reasoning | P1 | ADR sul legame receipt-risposta ATHENA |
+| 5 | Lifecycle provider persistito | P1 | ADR, schema e semantica di revoca durabile |
+| 6 | Persistenza review | P1 | ADR e decisione prodotto sul writer e sulla superficie |
+| 7 | Toolchain e runtime Apple | P1 | Xcode funzionante; blocker esterno |
+| 8 | Paired oltre `status_only` | P2 | lifecycle e review persistiti; ADR delega home-base |
+| 9 | Provider reali | P2 | egress, consenso e broker autorizzati |
+| 10 | Device reali | P2 | toolchain Apple disponibile |
+| 11 | Cloud e on-device | P2 | provider reali, ADR e gate egress |
+
+Sono implementabili ora con fixture sintetiche i packet 1 e 2. I packet 3 e
+4 richiedono prima i rispettivi ADR. I packet 5 e 6 richiedono ADR e gate
+separati; il lifecycle persistito richiede anche una migrazione schema. Le
+prove sintetiche possono coprire ammissione, negazione, receipt, provenance,
+review `pending`, TOCTOU, CAS, invarianza del contratto e indipendenza del
+core non-AI. Non possono sostituire prove su daemon, Apple, device, cloud,
+provider o latenze reali.
+
+### Ownership e routing post-Fable
+
+| Packet | Ownership disgiunta | Esecuzione consigliata | Verifica |
+| --- | --- | --- | --- |
+| PK-1 patient insight | nuovo adapter, `lib/ai-summary-service.ts`, test relativi | Terra high | Sol high fresco |
+| PK-2 Smart Import | nuovo adapter, `patient-smart-import-service.ts`, test relativi | Terra high | Sol high fresco |
+| PK-3 OCR | ADR; route OCR, `ocr-service.ts`, test | Sol high per ADR; Terra high per meccanica | Sol high fresco |
+| PK-4 treatment reasoning | ADR; `treatment-reasoning-service.ts`, test | Sol high per ADR; Terra high per meccanica | Sol high fresco |
+| PK-5 lifecycle persistito | ADR; store, migrazione, test | Sol high per ADR e integrazione; Terra high per meccanica | Sol high fresco |
+| PK-6 review persistita | ADR; writer, route e test | Sol high per ADR e integrazione; Terra high per meccanica | Sol high fresco |
+
+Luna high e' ammessa solo per inventari read-only. Sol Ultra e' ammesso solo
+se il CoS successivo ha almeno tre filoni difficili e materialmente
+indipendenti. Nessun nesting. Ogni output worker resta candidato fino alla
+lettura del diff, ai gate reali e a una verifica fresca.
+
+### Stop-rule, falsificatori e confini
+
+Arrestare il packet se supera circa 300 LOC runtime, apre un secondo confine
+architetturale, richiede una decisione contrattuale non accettata, richiede
+credenziali o risorse esterne, modifica payload persistiti fuori contratto o
+non consente una verifica fresca.
+
+Falsificatori minimi per ogni adozione:
+
+- descriptor fabbricato accettato;
+- lifecycle revocato o degradato che genera;
+- venue offline che recupera in silenzio;
+- input stateful letto piu volte;
+- receipt incoerente;
+- provenance assente;
+- metadato Fabric serializzato o persistito;
+- negazione che blocca il core non-AI;
+- fallback implicito;
+- egress tentato;
+- proposta non `pending` o scrittura clinica automatica.
+
+Verifiche di confine richieste: never-regress e controllo IO solo loopback;
+test di negazione senza recupero; zero-write su negazione e proposta;
+lifecycle trust e CAS concorrente; identita receipt tra routing e
+provenance; contratto pubblico invariato; core non-AI completo con AI
+negata; OpenAPI drift, schema drift e claims.
+
+### Decision audit terminale
+
+Accepted:
+
+- confermare il verdetto corrente senza riaprire finding chiusi in assenza di
+  un falsificatore concreto;
+- ordinare patient insight e Smart Import come prime slice locali;
+- richiedere ADR prima di OCR, treatment reasoning, lifecycle persistito e
+  review persistita;
+- passare il residuo a un solo CoS Sol post-Fable, con worker disgiunti solo
+  quando giustificati.
+
+Corrected: nessuna decisione del checkpoint.
+
+Open: le decisioni ADR elencate sopra. Sono bloccanti per i rispettivi packet
+futuri, non per il candidato Horizon gia' verificato.
+
+### Azioni vietate e handoff
+
+Restano vietati: egress implicito; fallback silenzioso; scrittura clinica
+automatica; grant derivato dal pairing; simulazione di credenziali o provider
+reali; PHI/PII; claim Apple, device o cloud senza prova reale; espansione
+della release 0.8; modifiche estetiche arbitrarie; push, PR, merge remoto,
+tag, release, mutazioni Linear e promozione remota.
+
+`NEXT_PERMITTED_ACTION`: consegnare questo run record al CoS Sol post-Fable,
+che seleziona una sola prima slice tra PK-1 e PK-2, riconcilia l'ownership sul
+HEAD documentale corrente e mantiene `HOLD_REMOTE_PROMOTION`.
