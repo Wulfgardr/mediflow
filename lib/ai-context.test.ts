@@ -817,10 +817,12 @@ test('patient insight fabric snapshotta model info, receipt e health stateful un
     let healthReads = 0;
     const receipt = {
         schemaVersion: 'mediflow.ai.provider-selection.v1',
+        authorityPlane: 'clinical_application',
         task: 'clinical',
         execution: 'local',
         endpointClass: 'loopback',
         egress: 'none',
+        runtimeReadiness: 'required',
         fallbackCount: 0,
         get provider() {
             receiptProviderReads += 1;
@@ -866,7 +868,28 @@ test('patient insight fabric snapshotta model info, receipt e health stateful un
 });
 
 /* @Codex */
-test('patient insight fabric nega receipt Fabric falsificate su schema, venue o egress', async () => {
+test('patient insight fabric nega ogni campo non canonico della provider receipt', async () => {
+    const { admitPatientInsightFabric } = await import('./ai-summary-fabric');
+    const invalidReceipts = [
+        { field: 'authorityPlane', value: 'engineering_operator' },
+        { field: 'runtimeReadiness', value: 'qualified' },
+    ];
+
+    for (const { field, value } of invalidReceipts) {
+        const info = patientInsightFabricModelInfo();
+        const receipt = { ...info.receipt, [field]: value };
+        const admission = admitPatientInsightFabric({
+            modelInfo: { ...info, receipt }, health: { status: 'ok' },
+        });
+        assert.equal(admission.admitted, false, field);
+        if (!admission.admitted) {
+            assert.equal(admission.denial.denialCode, 'provider_receipt_mismatch');
+        }
+    }
+});
+
+/* @Codex */
+test('patient insight fabric nega receipt router falsificate anche se decisione e resolution coincidono', async () => {
     const { admitPatientInsightFabric } = await import('./ai-summary-fabric');
     const { routeCandidateCapability } = await import('./ai-providers/fabric/candidate-router');
     const mutations = [
@@ -876,6 +899,16 @@ test('patient insight fabric nega receipt Fabric falsificate su schema, venue o 
             ...receipt,
             egressProfile: { ...(receipt.egressProfile as Record<string, unknown>), egress: 'redacted_explicit_consent' },
         }),
+        (receipt: Record<string, unknown>) => ({ ...receipt, class: 'deterministic' }),
+        (receipt: Record<string, unknown>) => ({ ...receipt, fallbackCount: 1 }),
+        (receipt: Record<string, unknown>) => ({
+            ...receipt,
+            providerReceipt: { ...(receipt.providerReceipt as Record<string, unknown>), schemaVersion: 'registry.invalid.v1' },
+        }),
+        (receipt: Record<string, unknown>) => ({
+            ...receipt,
+            providerReceipt: { ...(receipt.providerReceipt as Record<string, unknown>), fallbackCount: 1 },
+        }),
     ];
 
     for (const mutate of mutations) {
@@ -884,10 +917,14 @@ test('patient insight fabric nega receipt Fabric falsificate su schema, venue o 
             (input) => {
                 const routing = routeCandidateCapability(input);
                 const receipt = routing.decision.receipt;
+                const resolution = routing.resolution;
                 assert.ok(receipt);
+                assert.ok(resolution);
+                const forged = mutate(receipt as unknown as Record<string, unknown>);
                 return {
                     ...routing,
-                    decision: { ...routing.decision, receipt: mutate(receipt as unknown as Record<string, unknown>) },
+                    decision: { ...routing.decision, receipt: forged },
+                    resolution: { ...resolution, receipt: forged },
                 } as typeof routing;
             },
         );
@@ -895,6 +932,29 @@ test('patient insight fabric nega receipt Fabric falsificate su schema, venue o 
         if (!admission.admitted) {
             assert.equal(admission.denial.denialCode, 'provider_receipt_mismatch');
         }
+    }
+});
+
+/* @Codex */
+test('patient insight fabric nega receipt diversa fra decisione e resolution', async () => {
+    const { admitPatientInsightFabric } = await import('./ai-summary-fabric');
+    const { routeCandidateCapability } = await import('./ai-providers/fabric/candidate-router');
+    const admission = admitPatientInsightFabric(
+        { modelInfo: patientInsightFabricModelInfo(), health: { status: 'ok' } },
+        (input) => {
+            const routing = routeCandidateCapability(input);
+            const receipt = routing.decision.receipt;
+            assert.ok(receipt);
+            return {
+                ...routing,
+                decision: { ...routing.decision, receipt: { ...receipt } },
+            } as typeof routing;
+        },
+    );
+
+    assert.equal(admission.admitted, false);
+    if (!admission.admitted) {
+        assert.equal(admission.denial.denialCode, 'provider_receipt_mismatch');
     }
 });
 

@@ -11,6 +11,7 @@ import { advanceOnboarding, startOnboarding } from './ai-providers/fabric/onboar
 import { admitProvider } from './ai-providers/fabric/provider-lifecycle';
 import { observeVenue } from './ai-providers/fabric/routing-observability';
 import { buildProvenanceRecord } from './ai-providers/fabric/resolver';
+import type { ProviderSelectionReceipt } from './ai-providers/registry';
 
 export const PATIENT_INSIGHT_FABRIC_METADATA = Symbol('patient-insight-fabric-metadata');
 
@@ -45,22 +46,76 @@ function localOnboarding() {
     );
 }
 
+function providerSelectionReceipt(value: unknown): ProviderSelectionReceipt | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    // The registry exports these literal values through ProviderSelectionReceipt;
+    // it has no runtime guard or constants to reuse at this boundary.
+    const {
+        schemaVersion,
+        authorityPlane,
+        task,
+        provider,
+        model,
+        execution,
+        endpointClass,
+        egress,
+        runtimeReadiness,
+        fallbackCount,
+    } = value as Record<string, unknown>;
+    if (
+        schemaVersion !== 'mediflow.ai.provider-selection.v1'
+        || authorityPlane !== 'clinical_application'
+        || task !== 'clinical'
+        || provider !== 'ollama'
+        || typeof model !== 'string'
+        || execution !== 'local'
+        || endpointClass !== 'loopback'
+        || egress !== 'none'
+        || runtimeReadiness !== 'required'
+        || fallbackCount !== 0
+    ) return null;
+
+    return Object.freeze({
+        schemaVersion,
+        authorityPlane,
+        task,
+        provider,
+        model,
+        execution,
+        endpointClass,
+        egress,
+        runtimeReadiness,
+        fallbackCount,
+    });
+}
+
+function sameProviderSelectionReceipt(
+    left: ProviderSelectionReceipt,
+    right: ProviderSelectionReceipt,
+): boolean {
+    return left.schemaVersion === right.schemaVersion
+        && left.authorityPlane === right.authorityPlane
+        && left.task === right.task
+        && left.provider === right.provider
+        && left.model === right.model
+        && left.execution === right.execution
+        && left.endpointClass === right.endpointClass
+        && left.egress === right.egress
+        && left.runtimeReadiness === right.runtimeReadiness
+        && left.fallbackCount === right.fallbackCount;
+}
+
 function modelInfo(value: unknown): Readonly<{
-    provider: 'ollama'; model: string; baseUrl: string; receiptProvider: string; receiptModel: string;
+    provider: 'ollama'; model: string; baseUrl: string; receipt: ProviderSelectionReceipt;
 }> | null {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const { provider, model, baseUrl, receipt } = value as Record<string, unknown>;
-    if (!receipt || typeof receipt !== 'object' || Array.isArray(receipt)) return null;
-    const { provider: receiptProvider, model: receiptModel } = receipt as Record<string, unknown>;
+    const receiptSnapshot = providerSelectionReceipt(receipt);
     return provider === 'ollama' && typeof model === 'string' && typeof baseUrl === 'string'
-        && receiptProvider === provider && receiptModel === model
-        && (receipt as Record<string, unknown>).schemaVersion === 'mediflow.ai.provider-selection.v1'
-        && (receipt as Record<string, unknown>).task === 'clinical'
-        && (receipt as Record<string, unknown>).execution === 'local'
-        && (receipt as Record<string, unknown>).endpointClass === 'loopback'
-        && (receipt as Record<string, unknown>).egress === 'none'
-        && (receipt as Record<string, unknown>).fallbackCount === 0
-        ? Object.freeze({ provider, model, baseUrl, receiptProvider, receiptModel }) : null;
+        && receiptSnapshot !== null
+        && receiptSnapshot.provider === provider
+        && receiptSnapshot.model === model
+        ? Object.freeze({ provider, model, baseUrl, receipt: receiptSnapshot }) : null;
 }
 
 function denial(
@@ -108,16 +163,26 @@ export function admitPatientInsightFabric(
         return Object.freeze({ admitted: false, denial: routing.decision });
     }
 
+    // Candidate routing preserves the resolver receipt by identity. Reject a
+    // wrapper that separates routing evidence from the resolution it names.
+    if (routing.decision.receipt !== routing.resolution.receipt) {
+        return denial(requestId, 'provider_receipt_mismatch');
+    }
+
     const receipt = routing.decision.receipt;
     const localOnly = EGRESS_PROFILES.local_only;
+    const nestedReceipt = providerSelectionReceipt(receipt.providerReceipt);
     if (receipt.schemaVersion !== 'mediflow.ai.fabric-resolution.v1'
         || receipt.capability !== 'patient_insight'
+        || receipt.class !== descriptor.class
         || receipt.venue !== 'local_process'
         || receipt.egressProfile.id !== localOnly.id
         || receipt.egressProfile.version !== localOnly.version
         || receipt.egressProfile.egress !== localOnly.egress
-        || receipt.provider !== snapshot.receiptProvider || receipt.model !== snapshot.receiptModel
-        || receipt.providerReceipt?.provider !== snapshot.receiptProvider || receipt.providerReceipt?.model !== snapshot.receiptModel) {
+        || receipt.provider !== snapshot.receipt.provider || receipt.model !== snapshot.receipt.model
+        || receipt.fallbackCount !== 0
+        || nestedReceipt === null
+        || !sameProviderSelectionReceipt(nestedReceipt, snapshot.receipt)) {
         return denial(requestId, 'provider_receipt_mismatch');
     }
 
