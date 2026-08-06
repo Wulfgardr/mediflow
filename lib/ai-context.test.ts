@@ -909,6 +909,9 @@ test('patient insight fabric nega receipt router falsificate anche se decisione 
             ...receipt,
             providerReceipt: { ...(receipt.providerReceipt as Record<string, unknown>), fallbackCount: 1 },
         }),
+        (receipt: Record<string, unknown>) => ({ ...receipt, egressProfile: null }),
+        (receipt: Record<string, unknown>) => ({ ...receipt, egressProfile: 'local_only' }),
+        (receipt: Record<string, unknown>) => ({ ...receipt, providerReceipt: null }),
     ];
 
     for (const mutate of mutations) {
@@ -948,6 +951,87 @@ test('patient insight fabric nega receipt diversa fra decisione e resolution', a
             return {
                 ...routing,
                 decision: { ...routing.decision, receipt: { ...receipt } },
+            } as typeof routing;
+        },
+    );
+
+    assert.equal(admission.admitted, false);
+    if (!admission.admitted) {
+        assert.equal(admission.denial.denialCode, 'provider_receipt_mismatch');
+    }
+});
+
+/* @Codex */
+test('patient insight fabric legge la receipt router una sola volta e il metadato usa lo snapshot congelato', async () => {
+    const { admitPatientInsightFabric } = await import('./ai-summary-fabric');
+    const { routeCandidateCapability } = await import('./ai-providers/fabric/candidate-router');
+    const reads: Record<string, number> = {};
+    let raw: unknown = null;
+    const admission = admitPatientInsightFabric(
+        { modelInfo: patientInsightFabricModelInfo(), health: { status: 'ok' } },
+        (input) => {
+            const routing = routeCandidateCapability(input);
+            const receipt = routing.decision.receipt;
+            const resolution = routing.resolution;
+            assert.ok(receipt);
+            assert.ok(resolution);
+            const counted: Record<string, unknown> = {};
+            for (const key of Object.keys(receipt)) {
+                Object.defineProperty(counted, key, {
+                    enumerable: true,
+                    get() {
+                        reads[key] = (reads[key] ?? 0) + 1;
+                        return (receipt as unknown as Record<string, unknown>)[key];
+                    },
+                });
+            }
+            raw = counted;
+            return {
+                ...routing,
+                decision: { ...routing.decision, receipt: counted },
+                resolution: { ...resolution, receipt: counted },
+            } as unknown as typeof routing;
+        },
+    );
+
+    assert.equal(admission.admitted, true);
+    for (const [key, count] of Object.entries(reads)) {
+        assert.equal(count, 1, `receipt.${key} letto ${count} volte`);
+    }
+    if (admission.admitted) {
+        const routingReceipt = admission.metadata.routing.receipt;
+        assert.ok(routingReceipt);
+        assert.equal(routingReceipt, admission.metadata.provenance.receipt);
+        assert.notEqual(routingReceipt as unknown, raw);
+        assert.ok(Object.isFrozen(routingReceipt));
+        assert.ok(Object.isFrozen(routingReceipt.egressProfile));
+    }
+});
+
+/* @Codex */
+test('patient insight fabric nega un getter stateful divergente sulla receipt router', async () => {
+    const { admitPatientInsightFabric } = await import('./ai-summary-fabric');
+    const { routeCandidateCapability } = await import('./ai-providers/fabric/candidate-router');
+    const admission = admitPatientInsightFabric(
+        { modelInfo: patientInsightFabricModelInfo(), health: { status: 'ok' } },
+        (input) => {
+            const routing = routeCandidateCapability(input);
+            const receipt = routing.decision.receipt;
+            const resolution = routing.resolution;
+            assert.ok(receipt);
+            assert.ok(resolution);
+            let providerReads = 0;
+            const hostile = {
+                ...receipt,
+                get provider() {
+                    providerReads += 1;
+                    return providerReads === 1 ? 'in_house' : receipt.provider;
+                },
+            };
+            return {
+                ...routing,
+                decision: { ...routing.decision, receipt: hostile },
+                resolution: { ...resolution, receipt: hostile },
             } as typeof routing;
         },
     );
