@@ -262,3 +262,45 @@ test('generatePatientReport renders explicit empty states when data is missing',
     assert.ok(doc.texts.includes('Nessuna valutazione recente disponibile.'));
 }
 );
+
+/* @Codex WUL-327: lo zero è un punteggio valido e non deve degradare a '-'. */
+test('generatePatientReport rende lo zero valido e conserva il segnaposto per i punteggi assenti', async () => {
+    FakeJsPDF.pageHeight = 220;
+
+    const patient = {
+        firstName: 'Anna',
+        lastName: 'Verdi',
+        taxCode: 'VRDNNA80A41H501X',
+        monitoringProfile: 'episodic',
+        diagnoses: [],
+    };
+
+    const scaleWith = (id: string, score: unknown) => ({
+        id,
+        patientId: 'patient-2',
+        date: new Date('2025-03-11T00:00:00Z'),
+        type: 'scale',
+        title: 'Scala',
+        content: 'Score',
+        metadata: { title: 'PPS', score, interpretation: 'Stabile' },
+        createdAt: new Date('2025-03-10T00:00:00Z'),
+        updatedAt: new Date('2025-03-10T00:00:00Z'),
+    });
+
+    const lastScales = [
+        scaleWith('scale-zero', 0),
+        scaleWith('scale-zero-string', '0'),
+        scaleWith('scale-nonzero', 28),
+        scaleWith('scale-text', '28/30'),
+        scaleWith('scale-nan', Number.NaN),
+        scaleWith('scale-missing', undefined),
+        scaleWith('scale-empty', ''),
+        scaleWith('scale-whitespace', '   '),
+    ];
+
+    const doc = await renderReport(patient, [], lastScales, [], []);
+
+    assert.equal(doc.autoTableCalls.length, 1);
+    const scores = doc.autoTableCalls[0].body.map((row) => row[2]);
+    assert.deepEqual(scores, [0, '0', 28, '28/30', '-', '-', '-', '   ']);
+});

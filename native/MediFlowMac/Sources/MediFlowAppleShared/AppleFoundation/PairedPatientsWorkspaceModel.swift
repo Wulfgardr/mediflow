@@ -1706,7 +1706,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 
     #if DEBUG
     static var isUITestSeeded: Bool {
-        ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENTS"] == "1"
+        AppleFoundationDemoMode.isDemoDataset
+            || ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENTS"] == "1"
     }
 
     private func editedPatientDetail(from current: HomeBasePatientDetail) -> HomeBasePatientDetail {
@@ -2908,6 +2909,21 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
 
     /* @Codex */
     func loadSelectedPatientAttachments() async {
+        #if DEBUG
+        // The deterministic demo has no document binary fixtures. Keep the
+        // selected patient bound to an explicit empty attachment set instead
+        // of treating the intentionally offline demo as a failed paired load.
+        if Self.isUITestSeeded {
+            guard let patientId = selectedPatient?.id else { return }
+            attachments = []
+            attachmentsPatientId = patientId
+            selectedAttachmentDetail = nil
+            attachmentShareURL = nil
+            errorMessage = nil
+            statusMessage = "Nessun documento caricato per questo paziente."
+            return
+        }
+        #endif
         guard let patientId = selectedPatient?.id, let sessionCookie, let credentials = pairedCredentials else {
             errorMessage = "Apri prima un paziente con sessione paired online."
             return
