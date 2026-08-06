@@ -21,6 +21,11 @@ import {
     AiPatientInsightDisabledError,
     assertAiPatientInsightEnabledValue,
 } from '@/lib/ai-patient-insight-kill-switch';
+import {
+    admitPatientInsightFabric,
+    attachPatientInsightFabricMetadata,
+    PatientInsightFabricDeniedError,
+} from '@/lib/ai-summary-fabric';
 
 export type SummaryStage = 'connect' | 'context' | 'generate' | 'save';
 
@@ -183,6 +188,16 @@ export async function regeneratePatientSummary(
 
         const prompt = buildPatientInsightExtractionPrompt(contextData.prompt);
 
+        // L'admissione Fabric osserva solo snapshot locali dopo la riduzione
+        // del contesto e prima di ogni invocazione generativa.
+        const admission = admitPatientInsightFabric({
+            modelInfo: info,
+            health: await ai.getHealth(),
+        });
+        if (!admission.admitted) {
+            throw new PatientInsightFabricDeniedError(admission.denial);
+        }
+
         options.onStage?.('generate', info);
         const content = await ai.generate(prompt, options.signal, contextData.outputMaxTokens);
         const extracted = parsePatientInsightExtractionResponse(content);
@@ -210,12 +225,19 @@ export async function regeneratePatientSummary(
             updatedAt: new Date()
         });
 
-        return info;
+        return attachPatientInsightFabricMetadata(info, admission.metadata);
     })();
 
     inflight.set(patientId, task);
     try {
         return await task;
+    } catch (error) {
+        if (error instanceof PatientInsightFabricDeniedError) {
+            // Una negazione e' terminale per il burst corrente: una nuova
+            // generazione richiede una nuova azione del chiamante.
+            pendingRerun.delete(patientId);
+        }
+        throw error;
     } finally {
         inflight.delete(patientId);
         if (pendingRerun.has(patientId)) {
