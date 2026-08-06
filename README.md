@@ -15,7 +15,6 @@ _by Ordito & Concilio_
 
 **Cartella clinica territoriale local-first, open source e libera da usare.**
 
-**Serve the right information at the right time.**<br>
 **Porta l'informazione giusta nel momento giusto.**
 
 [![Versione](https://img.shields.io/badge/versione-0.8.0-1f6feb)](./CHANGELOG.md)
@@ -23,7 +22,7 @@ _by Ordito & Concilio_
 [![Local-first](https://img.shields.io/badge/dati-local--first-8957e5)](#confini-dichiarati)
 [![Core Swift](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#release-sorgente-080)
 
-[In breve](#mediflow-in-breve) · [Schermate](#come-si-presenta) · [Architettura](#come-è-fatto) · [Stato](#release-sorgente-080) · [Avvio](#avvio-rapido) · [Sviluppo](#sviluppo-assistito)
+[In breve](#mediflow-in-breve) · [Uso attuale](#come-si-usa-oggi) · [Architettura](#come-collaborano-le-app) · [Schermate](#come-si-presenta) · [Stato](#release-sorgente-080) · [Avvio](#avvio-rapido) · [Sviluppo](#sviluppo-assistito)
 
 </div>
 
@@ -41,11 +40,10 @@ AI-first. Dati clinici, terminologie, reference data, ricerca, navigazione e
 workflow deterministici restano funzioni di prima classe anche quando ogni
 provider AI è disabilitato.
 
-Il Mac ospita la base autorevole. iPhone e iPad si collegano come client paired
-sulla rete locale. Il cloud non è un requisito per lavorare. Quando Ollama è
-configurato, alcune funzioni locali possono preparare materiale da rivedere.
-Nessun output AI aggiunge diagnosi, terapie o altri dati clinici strutturati
-senza un'azione esplicita del medico.
+Il cloud non è un requisito per lavorare. Quando Ollama è configurato, alcune
+funzioni locali possono preparare materiale da rivedere. Nessun output AI
+aggiunge diagnosi, terapie o altri dati clinici strutturati senza un'azione
+esplicita del medico.
 
 Nel contesto territoriale italiano, MediFlow aiuta ad aprire la scheda giusta,
 ritrovare la fonte, distinguere una terapia da una prestazione prescritta e
@@ -62,19 +60,82 @@ sanitari, credenziali e altri artefatti locali restano fuori da Git secondo
 [`SECURITY.md`](./SECURITY.md) e
 [`docs/repository-topology.md`](./docs/repository-topology.md).
 
+## Come si usa oggi
+
+La superficie operativa principale è il workspace web su localhost, avviato sul
+Mac home-base. Qui MediFlow offre i flussi più estesi per pazienti, diario,
+agenda, documenti, impostazioni e amministrazione locale. Il database resta sul
+Mac.
+
+L'app nativa macOS appartiene allo stesso home-base e offre un accesso desktop
+coerente con il prodotto. iPhone e iPad sono client paired in sviluppo. Hanno
+già una base funzionale consolidata, ma richiedono ancora lavoro prima dell'uso
+operativo quotidiano.
+
+## Come collaborano le app
+
+Il Mac è il nodo autorevole (`home-base`). Ospita il database, l'app nativa e il
+workspace web locale. iPhone e iPad usano l'API locale versionata dopo un
+pairing esplicito. Localhost è oggi la superficie operativa principale. iPhone
+privilegia consultazione e cattura rapide; iPad è progettato come workspace sul
+campo. I dispositivi paired non accedono direttamente a SQLite.
+
+```mermaid
+flowchart LR
+    subgraph paired["Client paired · in sviluppo"]
+        iphone["iPhone<br/>recupero e cattura"]
+        ipad["iPad<br/>workspace sul campo"]
+    end
+    subgraph mac["Mac home-base · autorevole"]
+        native["App nativa macOS"]
+        web["Workspace localhost"]
+        api["API locale versionata"]
+        db[("SQLite locale")]
+        native --> api
+        web --> api
+        api --> db
+    end
+    iphone -- "pairing esplicito · TLS locale" --> api
+    ipad -- "pairing esplicito · TLS locale" --> api
+```
+
+Le app condividono capacità e significato clinico, non la stessa disposizione
+pixel per pixel. Trasporto, pairing e limiti del data plane sono documentati in
+[`docs/topologia-dati-flussi.md`](./docs/topologia-dati-flussi.md).
+
+### Uno sguardo oltre la 0.8: Intelligence Fabric
+
+> **Direzione futura, non presente come funzione completa nella 0.8.**
+
+L'Intelligence Fabric potrà collegare una domanda o attività alla sede di
+esecuzione consentita dalla policy. Il routing dovrà essere esplicito,
+osservabile e `fail-closed`.
+
+```mermaid
+flowchart LR
+    task["Domanda o attività"] --> policy["Routing esplicito<br/>vincolato da policy"]
+    policy --> deterministic["Logica deterministica"]
+    policy -.-> device["Modello on-device"]
+    policy -.-> paired["Home-base paired"]
+    policy -.-> local["Modello locale"]
+    policy -. "solo se approvato" .-> cloud["Provider cloud"]
+```
+
+Non esiste fallback silenzioso verso il cloud. MediFlow resta utile quando tutti
+i provider AI sono disabilitati. Provenienza, identità del paziente, sede di
+esecuzione, incertezza e revisione del medico dovranno restare visibili.
+
 ## Come si presenta
 
-### iPhone
+### Workspace operativo su localhost
 
-<table>
-<tr>
-<td><img src="./screenshots/0.8/ios-iphone-worklist.png" alt="Lista di lavoro iPhone con pazienti sintetici, diagnosi codificate e indicatori di assistenza domiciliare" width="260" loading="lazy" decoding="async"/></td>
-<td><img src="./screenshots/0.8/ios-iphone-detail.png" alt="Scheda iPhone di un paziente sintetico con dati demografici, diagnosi codificate ed esenzioni" width="260" loading="lazy" decoding="async"/></td>
-<td><img src="./screenshots/0.8/ios-iphone-therapies.png" alt="Terapie su iPhone con stati attiva, sospesa e conclusa, dati sintetici" width="260" loading="lazy" decoding="async"/></td>
-</tr>
-</table>
+<img src="./screenshots/01-worklist.png" alt="Cockpit web locale MediFlow con lista di lavoro e pazienti dimostrativi sintetici" width="820" loading="lazy" decoding="async"/>
 
-### iPad
+### App nativa macOS
+
+<img src="./screenshots/0.8/macos-clinical-workspace.png" alt="Workspace nativo MediFlow per macOS con lista di lavoro e scheda clinica sintetica" width="820" loading="lazy" decoding="async"/>
+
+### Client iPad in sviluppo
 
 <table>
 <tr>
@@ -85,54 +146,23 @@ sanitari, credenziali e altri artefatti locali restano fuori da Git secondo
 
 <p align="center"><img src="./screenshots/0.8/ipados-scale.png" alt="Modulo di una scala di valutazione aperto su iPad per un paziente sintetico" width="620" loading="lazy" decoding="async"/></p>
 
-### App macOS
+### Client iPhone in sviluppo
 
-<img src="./screenshots/macos-workspace.png" alt="Panoramica nativa di MediFlow per macOS con navigazione Lume e guardrail local-first" width="820" loading="lazy" decoding="async"/>
+<table>
+<tr>
+<td><img src="./screenshots/0.8/ios-iphone-worklist.png" alt="Lista di lavoro iPhone con pazienti sintetici, diagnosi codificate e indicatori di assistenza domiciliare" width="260" loading="lazy" decoding="async"/></td>
+<td><img src="./screenshots/0.8/ios-iphone-detail.png" alt="Scheda iPhone di un paziente sintetico con dati demografici, diagnosi codificate ed esenzioni" width="260" loading="lazy" decoding="async"/></td>
+<td><img src="./screenshots/0.8/ios-iphone-therapies.png" alt="Terapie su iPhone con stati attiva, sospesa e conclusa, dati sintetici" width="260" loading="lazy" decoding="async"/></td>
+</tr>
+</table>
 
-### Web locale
-
-<img src="./screenshots/01-worklist.png" alt="Cockpit Lume di MediFlow: lista di lavoro con pazienti dimostrativi sintetici" width="820" loading="lazy" decoding="async"/>
-
-_Catture reali della candidata Apple e della build web di produzione. Le viste
-cliniche usano solo fixture dimostrative sintetiche e deterministiche. Nessun
-dato paziente reale. Il [manifest media 0.8](./screenshots/0.8/manifest.json)
+_Catture reali della candidata Apple e della build web di produzione. La
+galleria presenta prima le superfici del Mac home-base e poi i client paired in
+sviluppo. Le viste cliniche usano soltanto fixture sintetiche, deterministiche
+e versionate nel repository. Nessun dato paziente reale. Le viste web ristrette
+a dimensioni telefono o tablet restano evidenze di test e non fanno parte
+della galleria. Il [manifest media 0.8](./screenshots/0.8/manifest.json)
 registra dispositivo, runtime, scena, commit sorgente e hash._
-
-<details>
-<summary><b>Altre schermate web</b>: scheda paziente, quadro clinico, revisione documentale e sicurezza</summary>
-<p><img src="./screenshots/02-scheda.png" alt="Scheda paziente con moduli clinici" width="820" loading="lazy" decoding="async"/></p>
-<p><img src="./screenshots/03-quadro.png" alt="Quadro paziente nel cockpit" width="820" loading="lazy" decoding="async"/></p>
-<p><img src="./screenshots/04-review.png" alt="Revisione documenti e codifiche con evidenze sintetiche da confermare" width="820" loading="lazy" decoding="async"/></p>
-<p><img src="./screenshots/05-security.png" alt="Schermata di blocco locale con richiesta del PIN operatore" width="820" loading="lazy" decoding="async"/></p>
-</details>
-
-## Come è fatto
-
-Il Mac è il nodo autorevole (`home-base`): ospita database e web app. Gli altri
-dispositivi non parlano direttamente con SQLite, ma con l'API locale, dopo un
-pairing esplicito.
-
-```mermaid
-flowchart LR
-    subgraph mac["Mac (home-base)"]
-        web["Web app locale<br/>(Next.js)"]
-        api["API locale<br/>/api/v1"]
-        db[("SQLite locale<br/>campi clinici cifrati")]
-        ai["Ollama<br/>AI e OCR locali, opzionali"]
-        web --> api --> db
-        web -.-> ai
-        native["App nativa macOS<br/>sull'host"]
-        native -- "TLS locale" --> api
-    end
-    subgraph paired["Dispositivi paired"]
-        mobile["iPhone / iPad / Mac<br/>(read-first, cache cifrata)"]
-    end
-    mobile -- "pairing esplicito, TLS locale" --> api
-```
-
-Il diagramma mostra il percorso locale. Trasporto, pairing e limiti del data
-plane sono documentati in
-[`docs/topologia-dati-flussi.md`](./docs/topologia-dati-flussi.md).
 
 ## Release sorgente 0.8.0
 
@@ -295,17 +325,19 @@ controllare: test reali e guard automatici decidono se una modifica regge.
 
 <!-- usage-dashboard:start -->
 
-| Snapshot | Token di sessione | Ripartizione | Cache letta |
-| :-- | --: | :-- | --: |
-| **17 luglio 2026** | **22.185.794.772** | Codex 15.546.136.608 · Claude Code 6.639.658.164 | 20.917.134.403 (94,3%) |
+| Snapshot | Periodo dei log disponibili | Token di sessione | Ripartizione | Cache letta |
+| :-- | :-- | --: | :-- | --: |
+| **29 luglio 2026** | 2026-02-01 → 2026-07-29 | **34.887.730.402** | Codex 25.026.076.888 · Claude Code 9.861.653.514 | 32.999.582.699 (94,6%) |
 
-<img src="./screenshots/token-models.svg" alt="Snapshot 17 luglio 2026: 22,19 mld token di sessione, 15,55 mld in Codex e 6,64 mld in Claude Code; 20,92 mld da cache letta." width="720" loading="lazy"/>
+<img src="./screenshots/token-models.svg" alt="Snapshot 29 luglio 2026: 34,89 Mld token di sessione, 25,03 Mld in Codex e 9,86 Mld in Claude Code; 33 Mld da cache letta." width="720" loading="lazy"/>
 
-**Effort Codex:** xhigh 7.350.462.593 · non registrato / Ultra 4.395.761.468 · high 2.000.320.556 · medium 1.774.948.743 · low 24.643.248 · non registrato 0. Le sessioni senza effort registrato restano separate; possono includere fan-out `Ultra`, che non è un livello di ragionamento. Nei transcript Claude Code l'effort non è esposto in modo uniforme.
+La fonte è **CodexBar 0.45.2**, comando locale `cost --refresh`, con una finestra massima di 365 giorni. Il conteggio usa gli aggregati disponibili per Codex e Claude Code e non è filtrato per repository. CodexBar attribuisce ogni token al processo che lo registra. Un worker OpenAI avviato da Claude Code compare quindi nel totale Claude Code. Il grafico indica lo strumento che registra i token, non il fornitore del modello.
 
-Il conteggio usa i contatori di tutti i log locali dei due ambienti e non è filtrato per repository. Per Codex somma i delta dei totali cumulativi e conserva modello, effort e cache letta; per Claude Code deduplica le richieste e somma input diretto, cache creata, cache letta e output. Sono pubblicati soltanto aggregati: nessun prompt, contenuto di sessione o percorso locale entra nel README o nell'SVG.
+Rigenera il grafico con `npm run build:usage-dashboard`. Usa `CODEXBAR_BIN` per scegliere un eseguibile diverso e `USAGE_DASHBOARD_DAYS` per impostare una finestra da 1 a 365 giorni.
 
-Ogni colore corrisponde a un modello o a una famiglia vicina. Le due barre usano la stessa scala: mostrano il peso dei due ambienti e la composizione interna. Il dato misura contesto elaborato, non righe di codice, costo o qualità. [CodexBar](https://github.com/steipete/CodexBar) resta il pannello locale complementare per limiti e uso corrente.
+Le barre sono divise per modello e usano la stessa scala. La cache letta è una parte dell'input Codex, mentre CodexBar la espone come categoria separata per Claude Code: per questo il grafico non impila categorie di token con semantiche diverse. Sono pubblicati soltanto aggregati. Nessun prompt, contenuto di sessione, costo o percorso locale entra nel README o nell'SVG.
+
+Il dato misura contesto elaborato. Non misura righe di codice, costo o qualità.
 
 La responsabilità del progetto resta mia.
 

@@ -9,6 +9,20 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 > Voci della linea di sviluppo post-0.8. Nessuna e' parte della release 0.8.0.
 
+### Documentazione pubblica
+
+- La galleria usa una cattura reale dell'app macOS corrente con fixture
+  sintetiche. Rimuove lo screenshot della shell Apple precedente.
+- Il README distingue il rapporto operativo tra Mac home-base, localhost e
+  client paired dalla direzione futura Intelligence Fabric.
+- Il dashboard dei token usa gli aggregati locali CodexBar e dichiara il
+  periodo e l'ambiente di registrazione.
+
+### App native
+
+- La modalità demo Apple tratta il dataset sintetico come fixture UI. Il
+  caricamento documenti non mostra più un falso errore di sessione paired.
+
 ### Stack intelligente locale
 
 - **Modifica**: consolidato lo stack provider post-0.8 (WUL-269, WUL-418,
