@@ -1,5 +1,4 @@
 /* @Codex */
-import { randomUUID } from 'node:crypto';
 import { createClinicalProposal, declareUncertainty, type ClinicalProposal } from '../../ai-providers/fabric/clinical-interaction';
 import { getFabricCapabilityDescriptor } from '../../ai-providers/fabric/catalog';
 import { routeCandidateCapability, type CandidateRoutingDecision } from '../../ai-providers/fabric/candidate-router';
@@ -53,7 +52,8 @@ function denial(requestId: string, code: NonNullable<CandidateRoutingDecision['d
 
 /** Admission from caller-owned single snapshots; no provider call occurs here. */
 export function admitDocumentSynthesisFabric(input: Readonly<{ modelInfo: unknown; health: unknown }>): DocumentSynthesisFabricAdmission {
-    const requestId = randomUUID();
+    // Runtime isomorfo (browser + Node): niente node:crypto nel seam client.
+    const requestId = globalThis.crypto.randomUUID();
     const snapshot = modelInfo(input.modelInfo);
     if (!snapshot) return denial(requestId, 'provider_receipt_mismatch');
     const descriptor = getFabricCapabilityDescriptor('document_synthesis');
