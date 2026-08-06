@@ -816,6 +816,12 @@ test('patient insight fabric snapshotta model info, receipt e health stateful un
     let receiptModelReads = 0;
     let healthReads = 0;
     const receipt = {
+        schemaVersion: 'mediflow.ai.provider-selection.v1',
+        task: 'clinical',
+        execution: 'local',
+        endpointClass: 'loopback',
+        egress: 'none',
+        fallbackCount: 0,
         get provider() {
             receiptProviderReads += 1;
             return receiptProviderReads === 1 ? 'ollama' : 'other';
@@ -857,6 +863,78 @@ test('patient insight fabric snapshotta model info, receipt e health stateful un
         [modelProviderReads, modelReads, baseUrlReads, receiptReads, receiptProviderReads, receiptModelReads, healthReads],
         [1, 1, 1, 1, 1, 1, 1],
     );
+});
+
+/* @Codex */
+test('patient insight fabric nega receipt Fabric falsificate su schema, venue o egress', async () => {
+    const { admitPatientInsightFabric } = await import('./ai-summary-fabric');
+    const { routeCandidateCapability } = await import('./ai-providers/fabric/candidate-router');
+    const mutations = [
+        (receipt: Record<string, unknown>) => ({ ...receipt, schemaVersion: 'fabric.invalid.v1' }),
+        (receipt: Record<string, unknown>) => ({ ...receipt, venue: 'home_base' }),
+        (receipt: Record<string, unknown>) => ({
+            ...receipt,
+            egressProfile: { ...(receipt.egressProfile as Record<string, unknown>), egress: 'redacted_explicit_consent' },
+        }),
+    ];
+
+    for (const mutate of mutations) {
+        const admission = admitPatientInsightFabric(
+            { modelInfo: patientInsightFabricModelInfo(), health: { status: 'ok' } },
+            (input) => {
+                const routing = routeCandidateCapability(input);
+                const receipt = routing.decision.receipt;
+                assert.ok(receipt);
+                return {
+                    ...routing,
+                    decision: { ...routing.decision, receipt: mutate(receipt as unknown as Record<string, unknown>) },
+                } as typeof routing;
+            },
+        );
+        assert.equal(admission.admitted, false);
+        if (!admission.admitted) {
+            assert.equal(admission.denial.denialCode, 'provider_receipt_mismatch');
+        }
+    }
+});
+
+/* @Codex */
+test('patient insight lifecycle revoked e degraded non ricevono receipt dal router', async () => {
+    const { getFabricCapabilityDescriptor } = await import('./ai-providers/fabric/catalog');
+    const { routeCandidateCapability } = await import('./ai-providers/fabric/candidate-router');
+    const { advanceOnboarding, startOnboarding } = await import('./ai-providers/fabric/onboarding');
+    const { admitProvider, transitionProviderLifecycle } = await import('./ai-providers/fabric/provider-lifecycle');
+    const { observeVenue } = await import('./ai-providers/fabric/routing-observability');
+    const descriptor = getFabricCapabilityDescriptor('patient_insight');
+    const onboarding = ['configure', 'credential_declared', 'attest_local', 'enable'].reduce(
+        (state, type) => advanceOnboarding(state, { type } as Parameters<typeof advanceOnboarding>[1]),
+        startOnboarding('ollama', 'local_model'),
+    );
+    const available = admitProvider(onboarding);
+
+    for (const lifecycle of [
+        transitionProviderLifecycle(available, 'degrade'),
+        transitionProviderLifecycle(available, 'revoke'),
+    ]) {
+        const routing = routeCandidateCapability({
+            policy: {
+                schemaVersion: 'mediflow.ai.execution-policy.v1', requestId: 'patient-insight-lifecycle-test',
+                capability: descriptor.id, authorityPlane: 'clinical_application', operation: descriptor.operation,
+                dataClass: descriptor.dataClass, allowedVenues: ['local_process'], egressProfileId: 'local_only',
+                consentRef: null, retention: 'not_persisted', review: 'review_first', provenanceRequired: true, fallback: 'none',
+            },
+            request: { descriptor, venue: 'local_process', generative: {
+                task: 'clinical', provider: 'ollama', models: { clinical: 'synthetic' },
+                endpoint: 'http://127.0.0.1:11434', chatTimeoutMs: 1_000,
+            } },
+            observations: [observeVenue('local_process', 'available', null)],
+            onboarding,
+            lifecycle,
+        });
+        assert.equal(routing.decision.outcome, 'denied');
+        assert.equal(routing.decision.receipt, null);
+        assert.equal(routing.resolution, null);
+    }
 });
 
 /* @Codex */
@@ -907,7 +985,7 @@ test('patient insight fabric nega receipt incoerenti e health offline prima di g
 });
 
 /* @Codex */
-test('patient insight fabric denial clears the pending trailing rerun', async () => {
+test('patient insight fabric tratta getHealth che lancia come negazione senza rerun trailing', async () => {
     const restoreHarness = await withHarness();
     const { AIService } = await import('./ai-service');
     const { regeneratePatientSummary, isSummaryGenerationInFlight } = await import('./ai-summary-service');
@@ -916,12 +994,15 @@ test('patient insight fabric denial clears the pending trailing rerun', async ()
     const original = {
         getSetting: db.settings.get,
         getPatient: db.patients.get,
+        updatePatient: db.patients.update,
         createAi: AIService.create,
     };
-    let releaseHealth: ((value: { status: 'error'; message: string; models: string[] }) => void) | undefined;
+    let rejectHealth: ((reason?: unknown) => void) | undefined;
     let healthStarted: (() => void) | undefined;
+    let healthCalls = 0;
     let generateCalls = 0;
-    const health = new Promise<{ status: 'error'; message: string; models: string[] }>((resolve) => { releaseHealth = resolve; });
+    let updateCalls = 0;
+    const health = new Promise<never>((_resolve, reject) => { rejectHealth = reject; });
     const started = new Promise<void>((resolve) => { healthStarted = resolve; });
 
     db.settings.get = (async () => ({ value: 'enabled' })) as typeof db.settings.get;
@@ -929,9 +1010,10 @@ test('patient insight fabric denial clears the pending trailing rerun', async ()
         const patient = await original.getPatient(id);
         return patient ? { ...patient, version: 1 } : undefined;
     }) as typeof db.patients.get;
+    db.patients.update = (async () => { updateCalls += 1; }) as typeof db.patients.update;
     AIService.create = (async () => ({
         getModelInfo: () => patientInsightFabricModelInfo(),
-        getHealth: async () => { healthStarted?.(); return health; },
+        getHealth: async () => { healthCalls += 1; healthStarted?.(); return health; },
         generate: async () => { generateCalls += 1; return JSON.stringify(VALID_INSIGHT_ENVELOPE); },
     })) as unknown as typeof AIService.create;
 
@@ -939,15 +1021,59 @@ test('patient insight fabric denial clears the pending trailing rerun', async ()
         const first = regeneratePatientSummary('patient-1');
         await started;
         const joined = regeneratePatientSummary('patient-1');
-        releaseHealth?.({ status: 'error', message: 'offline', models: [] });
+        rejectHealth?.(new Error('health unavailable'));
         await assert.rejects(first, PatientInsightFabricDeniedError);
         await assert.rejects(joined, PatientInsightFabricDeniedError);
         await new Promise((resolve) => setTimeout(resolve, 0));
         assert.equal(isSummaryGenerationInFlight('patient-1'), false);
+        assert.equal(healthCalls, 1);
         assert.equal(generateCalls, 0);
+        assert.equal(updateCalls, 0);
     } finally {
         db.settings.get = original.getSetting;
         db.patients.get = original.getPatient;
+        db.patients.update = original.updatePatient;
+        AIService.create = original.createAi;
+        restoreHarness();
+    }
+});
+
+/* @Codex */
+test('patient insight fabric metadata non estendibile fallisce prima di generate o update', async () => {
+    const restoreHarness = await withHarness();
+    const { AIService } = await import('./ai-service');
+    const { regeneratePatientSummary } = await import('./ai-summary-service');
+    const { PatientInsightFabricMetadataAttachmentError } = await import('./ai-summary-fabric');
+    const { db } = await import('./db');
+    const original = {
+        getSetting: db.settings.get,
+        getPatient: db.patients.get,
+        updatePatient: db.patients.update,
+        createAi: AIService.create,
+    };
+    let generateCalls = 0;
+    let updateCalls = 0;
+
+    db.settings.get = (async () => ({ value: 'enabled' })) as typeof db.settings.get;
+    db.patients.get = (async (id: string) => {
+        const patient = await original.getPatient(id);
+        return patient ? { ...patient, version: 1 } : undefined;
+    }) as typeof db.patients.get;
+    db.patients.update = (async () => { updateCalls += 1; }) as typeof db.patients.update;
+    AIService.create = (async () => ({
+        getModelInfo: () => Object.freeze(patientInsightFabricModelInfo()),
+        getHealth: async () => ({ status: 'ok' as const, message: 'synthetic', models: [] }),
+        generate: async () => { generateCalls += 1; return JSON.stringify(VALID_INSIGHT_ENVELOPE); },
+    })) as unknown as typeof AIService.create;
+
+    try {
+        await assert.rejects(regeneratePatientSummary('patient-1'), PatientInsightFabricMetadataAttachmentError);
+        assert.equal(generateCalls, 0);
+        assert.equal(updateCalls, 0);
+    } finally {
+        db.settings.get = original.getSetting;
+        db.patients.get = original.getPatient;
+        db.patients.update = original.updatePatient;
         AIService.create = original.createAi;
         restoreHarness();
     }
