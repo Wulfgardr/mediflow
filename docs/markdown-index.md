@@ -211,6 +211,8 @@ Ultimo aggiornamento: 2026-07-29
 ## ✅ Checklist manutenzione indice
 
 | [docs/analysis/2026-07-30-smart-import-clinical-series-run.md](./analysis/2026-07-30-smart-import-clinical-series-run.md) | Run record sintetico del contratto provider-neutral, serie temporali e collegamento prescrizioni per Smart Import. |
+| [docs/analysis/2026-07-24-ai-envelope-codex-consolidation-run.md](./analysis/2026-07-24-ai-envelope-codex-consolidation-run.md) | Run record storico del consolidamento AI/envelope e Codex Operator di luglio 2026 (recuperato, percorsi sanificati). | Quando si ricostruisce la storia del consolidamento AI/envelope pre-0.8. |
+| [docs/analysis/2026-07-24-mediflow-0.8-release-program.md](./analysis/2026-07-24-mediflow-0.8-release-program.md) | Run record storico del programma release 0.8: packet, gate, hold e prove al 2026-07-24 (recuperato, percorsi sanificati). | Quando si ricostruisce la storia del programma release 0.8 o dei packet Operator. |
 
 1. Verifica inventario file: `rg --files -g '*.md' | sort`.
 2. Assicurati che ogni file appaia in questo indice con una descrizione.
