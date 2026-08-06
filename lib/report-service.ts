@@ -10,6 +10,16 @@ export interface JsPDFWithAutoTable extends jsPDF {
     lastAutoTable: { finalY: number };
 }
 
+/* @Codex WUL-327: lo zero è un punteggio valido e non deve degradare al
+   segnaposto. Solo i numeri non finiti diventano '-'; le stringhe conservano
+   il comportamento attuale e non vengono mai coerte a numero. */
+const formatScaleScore = (score: unknown): string | number => {
+    if (typeof score === 'number') {
+        return Number.isFinite(score) ? score : '-';
+    }
+    return (score as string | undefined) || '-';
+};
+
 export const generatePatientReport = (
     patient: Patient,
     entries: ClinicalEntry[],
@@ -316,7 +326,7 @@ export const generatePatientReport = (
         const scaleData = lastScales.map(s => [
             formatDate(s.date),
             s.metadata?.title || 'Scala',
-            s.metadata?.score || '-',
+            formatScaleScore(s.metadata?.score),
             s.metadata?.interpretation || '-'
         ]);
 

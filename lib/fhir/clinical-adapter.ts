@@ -60,21 +60,37 @@ export function toFhirEncounter(entry: FhirClinicalEntryInput, patientReference:
     };
 }
 
+/* @Codex WUL-327: un punteggio scala è presente solo se è un numero finito
+   (o una stringa non vuota che ne rappresenta uno). Lo zero è un valore
+   clinico valido; il vecchio guard per verità lo scartava, mentre una stringa
+   di soli spazi diventava silenziosamente `valueInteger: 0`. */
+function toFiniteScaleScore(score: unknown): number | null {
+    if (typeof score === 'number') {
+        return Number.isFinite(score) ? score : null;
+    }
+    if (typeof score === 'string' && score.trim() !== '') {
+        const parsed = Number(score);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+}
+
 /* @Codex */
 export function toFhirObservation(entry: FhirClinicalEntryInput, patientReference: string): Observation | null {
-    if (entry.type !== 'scale' || !entry.metadata?.score) return null;
+    const score = toFiniteScaleScore(entry.metadata?.score);
+    if (entry.type !== 'scale' || score === null) return null;
 
     return {
         resourceType: "Observation",
         id: toFhirId(`obs-${entry.id}`, 'observation'),
         status: "final",
         code: {
-            text: entry.metadata.title as string
+            text: entry.metadata?.title as string
         },
         subject: { reference: patientReference },
         effectiveDateTime: new Date(entry.date).toISOString(),
-        valueInteger: Number(entry.metadata.score),
-        interpretation: [{ text: entry.metadata.interpretation as string }],
+        valueInteger: score,
+        interpretation: [{ text: entry.metadata?.interpretation as string }],
         note: [{ text: entry.content }]
     };
 }
