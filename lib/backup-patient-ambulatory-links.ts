@@ -7,6 +7,60 @@ export type RestoredPatientAmbulatoryLink = {
     assignedAt: Date;
 };
 
+type BackupPatientAmbulatoryLinkRow = {
+    patientId: string;
+    ambulatoryId: string;
+    assignedAt: Date | null;
+};
+
+type BackupPatientAmbulatoryAssignments = {
+    assignedAmbulatoryIds?: string[];
+    assignedAmbulatoryMemberships?: Array<{ ambulatoryId: string; assignedAt: Date | null }>;
+};
+
+export function enrichBackupPatientsWithAmbulatoryLinks<T extends object>(
+    patients: T[],
+    rows: BackupPatientAmbulatoryLinkRow[],
+): Array<T & BackupPatientAmbulatoryAssignments> {
+    const rowsByPatientId = new Map<string, BackupPatientAmbulatoryLinkRow[]>();
+    for (const row of rows) {
+        const patientRows = rowsByPatientId.get(row.patientId);
+        if (patientRows) patientRows.push(row);
+        else rowsByPatientId.set(row.patientId, [row]);
+    }
+
+    return patients.map((patient) => {
+        const record = patient as Record<string, unknown>;
+        const fallbackAmbulatoryId = typeof record.ambulatoryId === 'string' && record.ambulatoryId.trim().length > 0
+            ? record.ambulatoryId
+            : null;
+        const fallbackAssignedAt = record.updatedAt instanceof Date
+            ? record.updatedAt
+            : record.createdAt instanceof Date
+                ? record.createdAt
+                : null;
+        const ids = new Set<string>(fallbackAmbulatoryId ? [fallbackAmbulatoryId] : []);
+        const memberships = new Map<string, Date | null>();
+
+        for (const row of typeof record.id === 'string' ? rowsByPatientId.get(record.id) ?? [] : []) {
+            if (row.ambulatoryId.trim().length === 0) continue;
+            ids.add(row.ambulatoryId);
+            memberships.set(row.ambulatoryId, row.assignedAt);
+        }
+        if (fallbackAmbulatoryId && !memberships.has(fallbackAmbulatoryId)) memberships.set(fallbackAmbulatoryId, fallbackAssignedAt);
+
+        const assignedAmbulatoryIds = Array.from(ids).sort((left, right) => left.localeCompare(right));
+        return assignedAmbulatoryIds.length > 0
+            ? {
+                ...patient,
+                assignedAmbulatoryIds,
+                assignedAmbulatoryMemberships: Array.from(memberships, ([ambulatoryId, assignedAt]) => ({ ambulatoryId, assignedAt }))
+                    .sort((left, right) => left.ambulatoryId.localeCompare(right.ambulatoryId)),
+            }
+            : patient;
+    });
+}
+
 function parseAssignedAmbulatoryIds(value: unknown): string[] {
     if (!Array.isArray(value)) return [];
     return Array.from(new Set(

@@ -8,6 +8,7 @@ const root = process.cwd();
 const standaloneDir = standaloneDirectory(root);
 const serverPath = path.join(standaloneDir, 'server.js');
 const runtimeContractPath = path.join(standaloneDir, 'mediflow-runtime-contract.json');
+const pdfInspectorWorkerPath = path.join(standaloneDir, 'scripts', 'pdf-inspector-worker.mjs');
 
 const forbiddenMatchers = [
   (relativePath) => /^medical\.db$/i.test(relativePath),
@@ -116,6 +117,47 @@ const Database = requireFromStandalone(databaseEntry);
 const probe = new Database(':memory:');
 probe.prepare('select 1').get();
 probe.close();
+
+// @Codex: The isolated PDF worker must resolve its native binding inside the bundle.
+if (!fs.existsSync(pdfInspectorWorkerPath)) {
+  fail('Standalone runtime does not contain the PDF inspector worker.');
+}
+assertRealpathInsideStandalone(pdfInspectorWorkerPath, 'PDF inspector worker');
+let pdfInspectorEntry;
+const usesIntelMacFallback = process.platform === 'darwin' && process.arch === 'x64';
+try {
+  pdfInspectorEntry = requireFromStandalone.resolve('@firecrawl/pdf-inspector');
+} catch {
+  fail('Standalone runtime does not contain @firecrawl/pdf-inspector.');
+}
+const pdfInspectorPath = assertRealpathInsideStandalone(pdfInspectorEntry, 'PDF inspector entrypoint');
+if (!usesIntelMacFallback) {
+  const pdfInspector = requireFromStandalone(pdfInspectorPath);
+  if (typeof pdfInspector.extractPagesMarkdown !== 'function') {
+    fail('Standalone runtime PDF inspector API is incomplete.');
+  }
+}
+const pdfInspectorPackageDir = path.dirname(requireFromStandalone.resolve('@firecrawl/pdf-inspector/package'));
+const pdfInspectorManifest = JSON.parse(fs.readFileSync(path.join(pdfInspectorPackageDir, 'package.json'), 'utf8'));
+const pdfInspectorBinding = Object.keys(pdfInspectorManifest.optionalDependencies ?? {}).find((name) => {
+  if (!name.startsWith('@firecrawl/pdf-inspector-')) return false;
+  const platform = name.includes(`-${process.platform}-`);
+  const arch = name.includes(`-${process.arch}`);
+  const libc = process.platform !== 'linux'
+    || (process.report?.getReport().header.glibcVersionRuntime ? name.endsWith('-gnu') : name.endsWith('-musl'));
+  return platform && arch && libc;
+});
+if (!pdfInspectorBinding && !usesIntelMacFallback) {
+  fail('PDF inspector does not declare a binding for the current platform.');
+}
+if (pdfInspectorBinding) {
+  const pdfInspectorBindingManifest = requireFromStandalone.resolve(`${pdfInspectorBinding}/package`);
+  const pdfInspectorBindingDir = path.dirname(assertRealpathInsideStandalone(pdfInspectorBindingManifest, `${pdfInspectorBinding} package`));
+  nativeArtifacts(pdfInspectorBindingDir, `${pdfInspectorBinding} native binding`, (name) => name.endsWith('.node'));
+} else {
+  const pdfJsEntry = requireFromStandalone.resolve('pdfjs-dist/legacy/build/pdf.mjs');
+  assertRealpathInsideStandalone(pdfJsEntry, 'Intel macOS PDF.js fallback');
+}
 
 // @Codex: Native image optimization must not resolve through source node_modules.
 let sharpEntry;

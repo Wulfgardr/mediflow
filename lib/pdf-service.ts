@@ -8,7 +8,9 @@ import type {
 } from './ai-task-contracts';
 /* @Codex */
 import { normalizeDocumentInput } from './domain/documents/document-input-normalization';
-import { looksLikeLowSignalOcrText } from './domain/documents/document-ocr-queue';
+import {
+    looksLikeLowSignalOcrText,
+} from './domain/documents/document-ocr-queue';
 /* @Codex */
 import {
     normalizePdfDocumentMetadata,
@@ -79,7 +81,11 @@ function looksLikeStructuredPayload(value: string): boolean {
     return trimmed.startsWith('{') || trimmed.startsWith('[') || trimmed.startsWith('```');
 }
 
-export type PdfTextLayerFailureReason = 'corrupted_pdf' | 'password_protected';
+export type PdfTextLayerFailureReason =
+    | 'corrupted_pdf'
+    | 'password_protected'
+    | 'parser_failed'
+    | 'resource_limit';
 
 export class PdfTextLayerUnreadableError extends Error {
     readonly reason: PdfTextLayerFailureReason;
@@ -102,6 +108,24 @@ export class DocumentTextUnavailableError extends Error {
 }
 
 /* @Codex */
+function inspectionFailure(error: unknown): DocumentTextUnavailableError {
+    if (error instanceof DocumentTextUnavailableError) return error;
+    if (error instanceof PdfTextLayerUnreadableError) {
+        return new DocumentTextUnavailableError(error.message, error.reason);
+    }
+    return new DocumentTextUnavailableError('Ispezione PDF locale non disponibile.', 'parser_failed');
+}
+
+/* @Codex */
+export interface PdfTextLayerResult {
+    text: string;
+    state: 'native' | 'mixed' | 'ocr_required';
+    pageCount: number;
+    pagesNeedingOcr: number[];
+    pages: Array<{ page: number; text: string; needsOcr: boolean }>;
+}
+
+/* @Codex */
 export function extractUsableOcrText(data: { rawMarkdown?: unknown; notes?: unknown } | null | undefined): string {
     const rawMarkdown = typeof data?.rawMarkdown === 'string' ? data.rawMarkdown.trim() : '';
     if (rawMarkdown && !looksLikeStructuredPayload(rawMarkdown) && !looksLikeLowSignalOcrText(rawMarkdown)) {
@@ -121,6 +145,7 @@ const OCR_PAGE_LIMIT = 6;
 /* @Codex */
 type RenderedPdfForOcr = {
     images: string[];
+    pageNumbers: number[];
     metadata?: PdfDocumentMetadata;
 };
 /* @Codex */
@@ -282,7 +307,7 @@ function extractClinicalValueAfterLabelLine(text: string): string | undefined {
 /**
  * Extract text from PDF (server-side via pdfjs)
  */
-export async function extractTextFromPdf(file: Blob): Promise<string> {
+export async function extractPdfTextLayer(file: Blob): Promise<PdfTextLayerResult> {
     const formData = new FormData();
     formData.append('file', file);
 
@@ -297,11 +322,72 @@ export async function extractTextFromPdf(file: Blob): Promise<string> {
         if (failureReason === 'corrupted_pdf' || failureReason === 'password_protected') {
             throw new PdfTextLayerUnreadableError(err.error || "Failed to extract text from PDF", failureReason);
         }
+        if (failureReason === 'resource_limit') {
+            throw new DocumentTextUnavailableError(
+                'Il PDF supera i limiti locali di ispezione.',
+                'resource_limit',
+            );
+        }
+        if (failureReason === 'parser_failed') {
+            throw new DocumentTextUnavailableError(
+                'Ispezione PDF locale non disponibile.',
+                'parser_failed',
+            );
+        }
         throw new Error(err.error || "Failed to extract text from PDF");
     }
 
     const data = await response.json();
-    return data.text || "";
+    const layer = data?.textLayer;
+    const pagesNeedingOcr = Array.isArray(layer?.pagesNeedingOcr)
+        ? layer.pagesNeedingOcr
+        : [];
+    const pages = Array.isArray(layer?.pages) ? layer.pages : [];
+    const validPages = pagesNeedingOcr.every((page: unknown, index: number) => (
+        Number.isInteger(page)
+        && Number(page) > 0
+        && Number(page) <= layer?.pageCount
+        && (index === 0 || Number(page) > Number(pagesNeedingOcr[index - 1]))
+    ));
+    const validState = layer?.state === 'native'
+        ? pagesNeedingOcr.length === 0
+        : layer?.state === 'ocr_required'
+            ? pagesNeedingOcr.length === layer?.pageCount
+            : layer?.state === 'mixed'
+                ? pagesNeedingOcr.length > 0 && pagesNeedingOcr.length < layer?.pageCount
+                : false;
+    const validPageSet = pages.length === layer?.pageCount && pages.every((page: any, index: number) => (
+        page?.page === index + 1
+        && typeof page?.text === 'string'
+        && typeof page?.needsOcr === 'boolean'
+        && page.needsOcr === pagesNeedingOcr.includes(index + 1)
+    ));
+    if (
+        !Number.isInteger(layer?.pageCount)
+        || layer.pageCount <= 0
+        || !validPages
+        || !validState
+        || !validPageSet
+    ) {
+        throw new Error('Invalid PDF inspection response');
+    }
+    return {
+        text: typeof data.text === 'string' ? data.text : '',
+        state: layer.state,
+        pageCount: layer.pageCount,
+        pagesNeedingOcr,
+        pages,
+    };
+}
+
+export async function extractTextFromPdf(file: Blob): Promise<string> {
+    const layer = await extractPdfTextLayer(file);
+    if (layer.state !== 'native') {
+        throw new DocumentTextUnavailableError(
+            'Il PDF richiede OCR selettivo prima di restituire testo completo.',
+        );
+    }
+    return layer.text;
 }
 
 /**
@@ -345,7 +431,11 @@ async function readPdfDocumentMetadata(pdf: any): Promise<PdfDocumentMetadata | 
 }
 
 /* @Codex */
-async function renderPdfToImages(file: Blob, maxPages = OCR_PAGE_LIMIT): Promise<RenderedPdfForOcr> {
+async function renderPdfToImages(
+    file: Blob,
+    maxPages = OCR_PAGE_LIMIT,
+    preferredPages?: readonly number[],
+): Promise<RenderedPdfForOcr> {
     const buffer = await file.arrayBuffer();
     try {
         if (!(globalThis as any).pdfjsWorker) {
@@ -371,7 +461,13 @@ async function renderPdfToImages(file: Blob, maxPages = OCR_PAGE_LIMIT): Promise
     });
     const pdf = await loadingTask.promise;
     const metadata = await readPdfDocumentMetadata(pdf);
-    const pagesToRender = await selectPdfPagesForOcr(pdf, maxPages);
+    const pagesToRender = maxPages === 0
+        ? []
+        : preferredPages?.length
+        ? Array.from(new Set(preferredPages))
+            .filter((page) => Number.isInteger(page) && page >= 1 && page <= pdf.numPages)
+            .slice(0, maxPages)
+        : await selectPdfPagesForOcr(pdf, maxPages);
 
     const images: string[] = [];
     for (const pageNumber of pagesToRender) {
@@ -391,7 +487,7 @@ async function renderPdfToImages(file: Blob, maxPages = OCR_PAGE_LIMIT): Promise
         images.push(canvas.toDataURL('image/png'));
     }
 
-    return { images, metadata };
+    return { images, pageNumbers: pagesToRender, metadata };
 }
 
 /* @Codex */
@@ -435,18 +531,34 @@ async function selectPdfPagesForOcr(pdf: any, maxPages: number): Promise<number[
 }
 
 /* @Codex */
-async function extractOcrFullTextFromImages(images: string[]): Promise<string> {
-    const chunks: string[] = [];
-    for (const image of images) {
+async function extractOcrTextByPage(rendered: RenderedPdfForOcr): Promise<Map<number, string>> {
+    const chunks = new Map<number, string>();
+    for (let index = 0; index < rendered.images.length; index += 1) {
         try {
-            const result = await callOcr(image, 'full');
+            const result = await callOcr(rendered.images[index], 'full');
             const raw = result?.rawMarkdown || "";
-            if (raw) chunks.push(raw);
+            if (raw) chunks.set(rendered.pageNumbers[index], raw);
         } catch (e) {
             console.warn('[PDF Service] OCR full failed for page', e);
         }
     }
-    return chunks.join('\n\n');
+    return chunks;
+}
+
+/* @Codex */
+export function mergePdfPageText(layer: PdfTextLayerResult, ocrByPage: Map<number, string>): string {
+    if (layer.pagesNeedingOcr.some((page) => {
+        const text = ocrByPage.get(page)?.trim() || '';
+        return !text || looksLikeLowSignalOcrText(text);
+    })) {
+        throw new DocumentTextUnavailableError(
+            'OCR selettivo incompleto: almeno una pagina non ha prodotto testo utile.',
+        );
+    }
+    return layer.pages
+        .map((page) => page.needsOcr ? ocrByPage.get(page.page) || '' : page.text)
+        .filter((text) => text.trim())
+        .join('\n\n');
 }
 
 /* @Codex */
@@ -511,10 +623,35 @@ export async function extractDocumentTextForSummary(file: File): Promise<string>
     }
 
     if (isPdf) {
-        const rendered = await renderPdfToImages(file, OCR_PAGE_LIMIT);
-        const { images } = rendered;
-        if (!images.length) return "";
-        const normalizedText = normalizeDocumentInput(await extractOcrFullTextFromImages(images), { sourceKind: 'ocr' }).normalizedText;
+        let layer: PdfTextLayerResult | undefined;
+        try {
+            layer = await extractPdfTextLayer(file);
+            if (layer.state === 'native' && layer.text.trim()) {
+                const metadata = (await renderPdfToImages(file, 0)).metadata;
+                rememberPdfDocumentMetadata(file.name, layer.text, metadata);
+                return layer.text;
+            }
+        } catch (error) {
+            throw inspectionFailure(error);
+        }
+        if (layer && layer.pagesNeedingOcr.length > OCR_PAGE_LIMIT) {
+            throw new DocumentTextUnavailableError(
+                'Il PDF supera il limite locale di pagine OCR selettive.',
+                'resource_limit',
+            );
+        }
+        const rendered = await renderPdfToImages(
+            file,
+            OCR_PAGE_LIMIT,
+            layer?.pagesNeedingOcr,
+        );
+        const ocrByPage = rendered.images.length
+            ? await extractOcrTextByPage(rendered)
+            : new Map<number, string>();
+        const normalizedText = normalizeDocumentInput(
+            layer ? mergePdfPageText(layer, ocrByPage) : Array.from(ocrByPage.values()).join('\n\n'),
+            { sourceKind: 'ocr' },
+        ).normalizedText;
         rememberPdfDocumentMetadata(file.name, normalizedText, rendered.metadata);
         return normalizedText;
     }
@@ -536,14 +673,32 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
         throw new Error("Formato non supportato. Usa un PDF o un'immagine comune elaborabile localmente.");
     }
 
+    let pdfLayer: PdfTextLayerResult | undefined;
+    if (isPdf) {
+        try {
+            pdfLayer = await extractPdfTextLayer(file);
+        } catch (error) {
+            throw inspectionFailure(error);
+        }
+    }
+    if (pdfLayer && pdfLayer.pagesNeedingOcr.length > OCR_PAGE_LIMIT) {
+        throw new DocumentTextUnavailableError(
+            'Il PDF supera il limite locale di pagine OCR selettive.',
+            'resource_limit',
+        );
+    }
+
     /* @Codex */
     // Try AI-OCR first (PDF: render to images, Image: direct)
     let aiResult: ExtractedPatientData | null = null;
     let ocrText = '';
+    let ocrByPage = new Map<number, string>();
 
     try {
         if (isPdf) {
-            const rendered = await renderPdfToImages(file, OCR_PAGE_LIMIT);
+            const rendered = pdfLayer?.state === 'native'
+                ? { images: [], pageNumbers: [] }
+                : await renderPdfToImages(file, OCR_PAGE_LIMIT, pdfLayer?.pagesNeedingOcr);
             const { images } = rendered;
             if (images.length) {
                 let patientData: any = null;
@@ -556,7 +711,8 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
                     console.warn('[PDF Service] OCR patient extraction failed', e);
                 }
 
-                ocrText = await extractOcrFullTextFromImages(images);
+                ocrByPage = await extractOcrTextByPage(rendered);
+                ocrText = Array.from(ocrByPage.values()).join('\n\n');
                 if (ocrText) {
                     ocrText = normalizeDocumentInput(ocrText, { sourceKind: 'ocr' }).normalizedText;
                 }
@@ -591,20 +747,11 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
     }
 
     // For PDFs, also extract text with pdfjs for regex validation
-    let pdfText = '';
-    let textLayerFailure: PdfTextLayerFailureReason | undefined;
-    if (isPdf) {
-        try {
-            pdfText = await extractTextFromPdf(file);
-        } catch (e) {
-            if (e instanceof PdfTextLayerUnreadableError) {
-                textLayerFailure = e.reason;
-            }
-            console.warn('[PDF Service] PDF text extraction failed', e);
-        }
-    }
+    const pdfText = pdfLayer?.text || '';
 
-    const combinedText = pdfText || ocrText;
+    const combinedText = pdfLayer
+        ? mergePdfPageText(pdfLayer, ocrByPage)
+        : [pdfText, ocrText].filter(Boolean).join('\n\n');
 
     // If AI gave good results, validate with regex
     if (aiResult && aiResult.confidence > 0.7) {
@@ -633,7 +780,6 @@ export async function extractPatientDataSmart(file: File): Promise<ExtractedPati
 
     throw new DocumentTextUnavailableError(
         'Nessun testo utile estratto localmente dal documento. Verifica OCR locale o prova un PDF/immagine piu leggibile.',
-        textLayerFailure,
     );
 }
 
@@ -644,6 +790,18 @@ function isValidCodiceFiscale(cf: string): boolean {
     // Omocodia replaces digits with L/M/N/P/Q/R/S/T/U/V; keep aligned with
     // ITALIAN_TAX_CODE_REGEX in document-identity-resolution.ts.
     return /^[A-Z]{6}[0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z]$/i.test(cf);
+}
+
+/* @Codex */
+function parseItalianBirthDate(value: string): Date | undefined {
+    const [day, month, year] = value.split(/[\/\-.]/).map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+
+    return date.getUTCFullYear() === year
+        && date.getUTCMonth() === month - 1
+        && date.getUTCDate() === day
+        ? date
+        : undefined;
 }
 
 /* @Codex */
@@ -696,7 +854,7 @@ export function parsePatientData(text: string): ExtractedPatientData {
     const cleanText = text.replace(/\s+/g, ' ');
 
     // 1. C.F.
-    const cfRegex = /[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]/i;
+    const cfRegex = /(?<![\p{L}\p{N}])[A-Za-z]{6}[0-9LMNPQRSTUVlmnpqrstuv]{2}[A-Za-z][0-9LMNPQRSTUVlmnpqrstuv]{2}[A-Za-z][0-9LMNPQRSTUVlmnpqrstuv]{3}[A-Za-z](?![\p{L}\p{N}])/u;
     const cfMatch = cleanText.match(cfRegex);
     if (cfMatch) data.taxCode = cfMatch[0].toUpperCase();
 
@@ -704,14 +862,11 @@ export function parsePatientData(text: string): ExtractedPatientData {
     // Only keyword-anchored dates qualify: an unanchored fallback would promote the first
     // date in the document (visit/print/report date) to birth date, which is clinically
     // worse than leaving birthDate empty.
-    const dateKeywords = /(?:nato|nata|nascita)(?:\s+(?:il|a))?\s*[:\.]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/i;
+    const dateKeywords = /\b(?:nato|nata|nascita)\b(?:\s+a\s+(?:(?!\bil\b)[A-Za-zÀ-ÖØ-öø-ÿ'\u2019 -]){2,80}?\s+il|\s+il)?\s*[:\.]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/i;
     const dateMatch = cleanText.match(dateKeywords);
     if (dateMatch) {
         const [, dateStr] = dateMatch;
-        const parts = dateStr.split(/[\/\-\.]/);
-        // Zero-pad so Date() always parses as UTC: '1980-1-1' parses as local midnight
-        // and shifts to the previous day on toISOString() in timezones ahead of UTC.
-        if (parts.length === 3) data.birthDate = new Date(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
+        data.birthDate = parseItalianBirthDate(dateStr);
     }
 
     // 3. NAME

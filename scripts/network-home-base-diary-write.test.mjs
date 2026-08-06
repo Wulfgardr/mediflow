@@ -63,6 +63,17 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         assert.equal(login.response.status, 200);
         const sessionCookie = extractSessionCookie(login.response);
 
+        await setNetworkMode('local-only');
+        const disabledDiaryRead = await request('GET', `/api/v1/network/patients/${patientId}/entries`, {
+            headers: {
+                ...pairedHeaders(diaryWriter),
+                Cookie: sessionCookie,
+            },
+        });
+        assert.equal(disabledDiaryRead.response.status, 403);
+        assert.equal(disabledDiaryRead.json?.code, 'NETWORK_MODE_DISABLED');
+        await setNetworkMode('network-home-base');
+
         const localAiRuntime = await request('GET', '/api/v1/network/ai-runtime', {
             headers: localApiHeaders(),
         });
@@ -399,6 +410,8 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
             missingSessionStatus: missingSession.response.status,
             localAiRuntimeStatus: localAiRuntime.response.status,
             pairedAiRuntimeStatus: pairedAiRuntime.response.status,
+            disabledDiaryReadStatus: disabledDiaryRead.response.status,
+            disabledDiaryReadCode: disabledDiaryRead.json?.code,
             patientScopedVisitDraftStatus: patientScopedVisitDraft.response.status,
             emptyVisitDraftStatus: emptyVisitDraft.response.status,
             tooLongVisitDraftStatus: tooLongVisitDraft.response.status,
@@ -458,17 +471,21 @@ async function resolveDefaultAmbulatoryId() {
 }
 
 async function enableHomeBaseMode() {
-    const networkMode = await request('PUT', '/api/settings/network.mode', {
-        headers: localApiHeaders(),
-        body: { value: 'network-home-base' },
-    });
-    assert.equal(networkMode.response.status, 200);
+    await setNetworkMode('network-home-base');
 
     const clinicName = await request('PUT', '/api/settings/clinicName', {
         headers: localApiHeaders(),
         body: { value: 'MediFlow Network Diary Write Smoke' },
     });
     assert.equal(clinicName.response.status, 200);
+}
+
+async function setNetworkMode(value) {
+    const networkMode = await request('PUT', '/api/settings/network.mode', {
+        headers: localApiHeaders(),
+        body: { value },
+    });
+    assert.equal(networkMode.response.status, 200);
 }
 
 async function pairClient(requestedCapabilities, deviceName) {

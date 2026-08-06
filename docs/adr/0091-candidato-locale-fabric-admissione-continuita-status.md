@@ -12,7 +12,7 @@ Baseline: branch `codex/WUL-522-intelligence-fabric-cos-local` a
 Related:
 [ADR 0048](./0048-apple-shared-client-architecture-and-home-base-runtime.md),
 [ADR 0086](./0086-intelligent-scaffold-and-graded-automation-boundary.md),
-[ADR 0088](./0088-limite-digest-bound-readiness-ai-locale.md),
+[ADR 0092](./0092-limite-digest-bound-readiness-ai-locale.md),
 [ADR 0089](./0089-contratto-intelligence-fabric-e-venue-esecutive.md),
 [ADR 0090](./0090-giunture-fabric-trust-onboarding-routing-interazione.md).
 
@@ -124,7 +124,7 @@ di P1 e P2.
 - Nessuna invocazione AI dal client paired.
 - Nessuna coda offline o riconciliazione di output AI.
 - Nessun writer, route applicativa o UI per una scrittura clinica.
-- Nessuna readiness qualificata: ADR 0088 resta `HOLD`.
+- Nessuna readiness qualificata: ADR 0092 resta `HOLD`.
 - Nessuna prova su device, LAN reale o entitlement Apple.
 
 ## Regole di arresto

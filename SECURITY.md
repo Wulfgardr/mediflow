@@ -188,7 +188,7 @@ ICD e esplicito. Il payload automatico della sintesi non include
 
 ### Readiness dei modelli Ollama
 
-[ADR 0088](./docs/adr/0088-limite-digest-bound-readiness-ai-locale.md) definisce
+[ADR 0092](./docs/adr/0092-limite-digest-bound-readiness-ai-locale.md) definisce
 l'annotazione `available_unqualified` per i percorsi Ollama correnti.
 
 L'annotazione riguarda readiness ed evidenza. Non è uno stato operativo e non
@@ -214,7 +214,7 @@ verificare modello locale, cloud disabilitato, strumenti, rete e processo.
 Le nuove API manterranno timeout e abort interni. Non accetteranno
 `AbortSignal` dal chiamante e scarteranno i completamenti tardivi.
 
-ADR 0088 non definisce il contratto Intelligence Fabric. Un ADR separato deve
+ADR 0092 non definisce il contratto Intelligence Fabric. Un ADR separato deve
 governare capability, venue, home-base, provider cloud e authority.
 
 > [!IMPORTANT]

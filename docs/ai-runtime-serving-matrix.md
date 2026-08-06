@@ -28,7 +28,7 @@ altro task. Nessuna riga autorizza egress o scrittura clinica automatica.
 
 ### Limite della readiness locale
 
-ADR 0088 definisce l'annotazione `available_unqualified` per i percorsi Ollama
+ADR 0092 definisce l'annotazione `available_unqualified` per i percorsi Ollama
 correnti. L'annotazione riguarda readiness ed evidenza.
 
 L'annotazione non è uno stato operativo. Non sostituisce `runtime` e non
@@ -42,7 +42,7 @@ Un nuovo packet può proporre `digest_bracketed_best_effort`. A3 resta
 `observed_not_causal` e la qualified readiness resta `HOLD`.
 
 Nessuna receipt, tipo, località o identità del provider autorizza un consumer.
-[ADR 0088](./adr/0088-limite-digest-bound-readiness-ai-locale.md) documenta la
+[ADR 0092](./adr/0092-limite-digest-bound-readiness-ai-locale.md) documenta la
 decisione e il limite tecnico.
 
 Un endpoint loopback non dimostra `egress=none`. Un gate local-only futuro deve
@@ -171,7 +171,7 @@ Una regressione di località, qualità, privacy o kill switch riporta la lane a
 | --- | --- |
 | Registry locale | `lib/ai-providers/registry.ts` |
 | Locality Ollama | `lib/ai-providers/ollama-locality.ts` |
-| Limite digest-bound | `docs/adr/0088-limite-digest-bound-readiness-ai-locale.md` |
+| Limite digest-bound | `docs/adr/0092-limite-digest-bound-readiness-ai-locale.md` |
 | Binding task | `lib/ai-service.ts` |
 | Patient Insight | `lib/ai-summary-service.ts` |
 | Smart Import | `lib/domain/documents/patient-smart-import-service.ts` |
@@ -202,7 +202,7 @@ Una regressione di località, qualità, privacy o kill switch riporta la lane a
 - definire persistenza e broker lifecycle provider prima di usare una revoca
   vendor come stato operativo.
 
-Decisioni gia chiuse sulla linea post-0.8: le slice C0a-C0c di ADR 0088 sono
+Decisioni gia chiuse sulla linea post-0.8: le slice C0a-C0c di ADR 0092 sono
 state eseguite (WUL-502) e il contratto Intelligence Fabric e' definito in
 [ADR 0089](./adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md).
 ADR 0090 e ADR 0091 chiudono il confine del candidato locale: paired solo

@@ -77,6 +77,17 @@ test('extraction failures map to corrupted_pdf and password_protected reasons', 
     );
 });
 
+test('inspection stop reasons remain explicit in the OCR queue', () => {
+    assert.deepEqual(
+        evaluateDocumentOcrQueueCandidate({ inputKind: 'pdf', extractedText: '', extractionFailure: 'parser_failed' }),
+        { queued: true, state: 'pending', reason: 'parser_failed' },
+    );
+    assert.deepEqual(
+        evaluateDocumentOcrQueueCandidate({ inputKind: 'pdf', extractedText: '', extractionFailure: 'resource_limit' }),
+        { queued: true, state: 'pending', reason: 'resource_limit' },
+    );
+});
+
 test('Italian UI vocabulary matches the agreed queue labels', () => {
     assert.equal(DOCUMENT_OCR_QUEUE_STATE_LABELS_IT.pending, 'in attesa');
     assert.equal(DOCUMENT_OCR_QUEUE_STATE_LABELS_IT.processing, 'in elaborazione');
