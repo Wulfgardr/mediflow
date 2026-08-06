@@ -3,7 +3,10 @@ import { randomUUID } from 'node:crypto';
 import { createClinicalProposal, declareUncertainty, type ClinicalProposal } from './ai-providers/fabric/clinical-interaction';
 import { getFabricCapabilityDescriptor } from './ai-providers/fabric/catalog';
 import { routeCandidateCapability, type CandidateRoutingDecision } from './ai-providers/fabric/candidate-router';
-import type { FabricProvenanceRecord } from './ai-providers/fabric/contract';
+import {
+    EGRESS_PROFILES,
+    type FabricProvenanceRecord,
+} from './ai-providers/fabric/contract';
 import { advanceOnboarding, startOnboarding } from './ai-providers/fabric/onboarding';
 import { admitProvider } from './ai-providers/fabric/provider-lifecycle';
 import { observeVenue } from './ai-providers/fabric/routing-observability';
@@ -28,6 +31,13 @@ export class PatientInsightFabricDeniedError extends Error {
     }
 }
 
+export class PatientInsightFabricMetadataAttachmentError extends Error {
+    constructor() {
+        super('Patient Insight Fabric metadata could not be attached to model info.');
+        this.name = 'PatientInsightFabricMetadataAttachmentError';
+    }
+}
+
 function localOnboarding() {
     return ['configure', 'credential_declared', 'attest_local', 'enable'].reduce(
         (state, type) => advanceOnboarding(state, { type } as Parameters<typeof advanceOnboarding>[1]),
@@ -44,6 +54,12 @@ function modelInfo(value: unknown): Readonly<{
     const { provider: receiptProvider, model: receiptModel } = receipt as Record<string, unknown>;
     return provider === 'ollama' && typeof model === 'string' && typeof baseUrl === 'string'
         && receiptProvider === provider && receiptModel === model
+        && (receipt as Record<string, unknown>).schemaVersion === 'mediflow.ai.provider-selection.v1'
+        && (receipt as Record<string, unknown>).task === 'clinical'
+        && (receipt as Record<string, unknown>).execution === 'local'
+        && (receipt as Record<string, unknown>).endpointClass === 'loopback'
+        && (receipt as Record<string, unknown>).egress === 'none'
+        && (receipt as Record<string, unknown>).fallbackCount === 0
         ? Object.freeze({ provider, model, baseUrl, receiptProvider, receiptModel }) : null;
 }
 
@@ -61,6 +77,7 @@ function denial(
 /** Admission from caller-owned single snapshots; it never invokes a provider. */
 export function admitPatientInsightFabric(
     input: Readonly<{ modelInfo: unknown; health: unknown }>,
+    routeCandidate: typeof routeCandidateCapability = routeCandidateCapability,
 ): PatientInsightFabricAdmission {
     const requestId = randomUUID();
     const snapshot = modelInfo(input.modelInfo);
@@ -75,7 +92,7 @@ export function admitPatientInsightFabric(
         healthStatus === 'ok' ? null : 'daemon_unreachable',
     );
     const onboarding = localOnboarding();
-    const routing = routeCandidateCapability({
+    const routing = routeCandidate({
         policy: Object.freeze({
             schemaVersion: 'mediflow.ai.execution-policy.v1', requestId, capability: descriptor.id,
             authorityPlane: 'clinical_application', operation: descriptor.operation, dataClass: descriptor.dataClass,
@@ -92,7 +109,14 @@ export function admitPatientInsightFabric(
     }
 
     const receipt = routing.decision.receipt;
-    if (receipt.provider !== snapshot.receiptProvider || receipt.model !== snapshot.receiptModel
+    const localOnly = EGRESS_PROFILES.local_only;
+    if (receipt.schemaVersion !== 'mediflow.ai.fabric-resolution.v1'
+        || receipt.capability !== 'patient_insight'
+        || receipt.venue !== 'local_process'
+        || receipt.egressProfile.id !== localOnly.id
+        || receipt.egressProfile.version !== localOnly.version
+        || receipt.egressProfile.egress !== localOnly.egress
+        || receipt.provider !== snapshot.receiptProvider || receipt.model !== snapshot.receiptModel
         || receipt.providerReceipt?.provider !== snapshot.receiptProvider || receipt.providerReceipt?.model !== snapshot.receiptModel) {
         return denial(requestId, 'provider_receipt_mismatch');
     }
@@ -118,10 +142,14 @@ export function attachPatientInsightFabricMetadata<T extends object>(
     result: T,
     metadata: PatientInsightFabricMetadata,
 ): T {
-    Object.defineProperty(result, PATIENT_INSIGHT_FABRIC_METADATA, {
-        value: metadata,
-        enumerable: false,
-    });
+    try {
+        Object.defineProperty(result, PATIENT_INSIGHT_FABRIC_METADATA, {
+            value: metadata,
+            enumerable: false,
+        });
+    } catch {
+        throw new PatientInsightFabricMetadataAttachmentError();
+    }
     return result;
 }
 
