@@ -18,7 +18,7 @@ import {
     canTransitionDocumentOcrQueueState,
     describeDocumentOcrQueueEntry,
     evaluateDocumentOcrQueueCandidate,
-    type DocumentOcrQueueReason,
+    type HostDocumentOcrQueueReason,
     type DocumentOcrQueueState,
 } from '@/lib/domain/documents/document-ocr-queue';
 /* @Codex */
@@ -114,7 +114,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                 // Auto-extract analysis on upload
                 let summary: string | undefined = "Nessuna informazione rilevante trovata.";
                 let parseEvidenceArtifactSnapshot: string | undefined;
-                let ocrQueue: { state: DocumentOcrQueueState; reason: DocumentOcrQueueReason } | undefined;
+                let ocrQueue: { state: DocumentOcrQueueState; reason: HostDocumentOcrQueueReason } | undefined;
                 const attachmentId = uuidv4();
                 const isPdf = isPdfDocumentInput(file);
                 const isImage = isImageDocumentInput(file);
