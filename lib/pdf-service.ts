@@ -793,6 +793,18 @@ function isValidCodiceFiscale(cf: string): boolean {
 }
 
 /* @Codex */
+function parseItalianBirthDate(value: string): Date | undefined {
+    const [day, month, year] = value.split(/[\/\-.]/).map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+
+    return date.getUTCFullYear() === year
+        && date.getUTCMonth() === month - 1
+        && date.getUTCDate() === day
+        ? date
+        : undefined;
+}
+
+/* @Codex */
 export function mergeExtractedPatientDataWithTextFallback(
     aiResult: ExtractedPatientData,
     fallbackText: string,
@@ -842,7 +854,7 @@ export function parsePatientData(text: string): ExtractedPatientData {
     const cleanText = text.replace(/\s+/g, ' ');
 
     // 1. C.F.
-    const cfRegex = /[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]/i;
+    const cfRegex = /(?<![\p{L}\p{N}])[A-Za-z]{6}[0-9LMNPQRSTUVlmnpqrstuv]{2}[A-Za-z][0-9LMNPQRSTUVlmnpqrstuv]{2}[A-Za-z][0-9LMNPQRSTUVlmnpqrstuv]{3}[A-Za-z](?![\p{L}\p{N}])/u;
     const cfMatch = cleanText.match(cfRegex);
     if (cfMatch) data.taxCode = cfMatch[0].toUpperCase();
 
@@ -850,14 +862,11 @@ export function parsePatientData(text: string): ExtractedPatientData {
     // Only keyword-anchored dates qualify: an unanchored fallback would promote the first
     // date in the document (visit/print/report date) to birth date, which is clinically
     // worse than leaving birthDate empty.
-    const dateKeywords = /(?:nato|nata|nascita)(?:\s+(?:il|a))?\s*[:\.]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/i;
+    const dateKeywords = /\b(?:nato|nata|nascita)\b(?:\s+a\s+(?:(?!\bil\b)[A-Za-zÀ-ÖØ-öø-ÿ'\u2019 -]){2,80}?\s+il|\s+il)?\s*[:\.]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/i;
     const dateMatch = cleanText.match(dateKeywords);
     if (dateMatch) {
         const [, dateStr] = dateMatch;
-        const parts = dateStr.split(/[\/\-\.]/);
-        // Zero-pad so Date() always parses as UTC: '1980-1-1' parses as local midnight
-        // and shifts to the previous day on toISOString() in timezones ahead of UTC.
-        if (parts.length === 3) data.birthDate = new Date(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
+        data.birthDate = parseItalianBirthDate(dateStr);
     }
 
     // 3. NAME
