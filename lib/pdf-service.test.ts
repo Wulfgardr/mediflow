@@ -6,10 +6,155 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     buildOcrFallbackResult,
+    extractPdfTextLayer,
+    extractDocumentTextForSummary,
+    extractTextFromPdf,
     extractUsableOcrText,
+    mergePdfPageText,
     mergeExtractedPatientDataWithTextFallback,
     parsePatientData,
 } from './pdf-service';
+
+test('extractPdfTextLayer preserves the 1-indexed selective OCR contract', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(JSON.stringify({
+        text: '<!-- Page 1 -->\nTesto nativo',
+        textLayer: {
+            state: 'mixed',
+            pageCount: 3,
+            pagesNeedingOcr: [2],
+            pages: [
+                { page: 1, text: 'Pagina uno', needsOcr: false },
+                { page: 2, text: '', needsOcr: true },
+                { page: 3, text: 'Pagina tre', needsOcr: false },
+            ],
+        },
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+    try {
+        const result = await extractPdfTextLayer(new Blob(['synthetic']));
+        assert.equal(result.state, 'mixed');
+        assert.deepEqual(result.pagesNeedingOcr, [2]);
+        assert.match(result.text, /Testo nativo/);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
+test('mergePdfPageText restores mixed PDF source order', () => {
+    const text = mergePdfPageText({
+        text: 'Pagina uno\n\nPagina tre',
+        state: 'mixed',
+        pageCount: 3,
+        pagesNeedingOcr: [2],
+        pages: [
+            { page: 1, text: 'Pagina uno', needsOcr: false },
+            { page: 2, text: '', needsOcr: true },
+            { page: 3, text: 'Pagina tre', needsOcr: false },
+        ],
+    }, new Map([[2, 'Pagina due OCR con contenuto clinico sufficientemente informativo.']]));
+    assert.equal(
+        text,
+        'Pagina uno\n\nPagina due OCR con contenuto clinico sufficientemente informativo.\n\nPagina tre',
+    );
+});
+
+test('mergePdfPageText fails closed when a selected OCR page is missing', () => {
+    assert.throws(() => mergePdfPageText({
+        text: 'Pagina uno',
+        state: 'mixed',
+        pageCount: 2,
+        pagesNeedingOcr: [2],
+        pages: [
+            { page: 1, text: 'Pagina uno', needsOcr: false },
+            { page: 2, text: '', needsOcr: true },
+        ],
+    }, new Map()), /OCR selettivo incompleto/);
+});
+
+test('mergePdfPageText accepts short but non-degenerate OCR text', () => {
+    const text = mergePdfPageText({
+        text: 'Pagina uno',
+        state: 'mixed',
+        pageCount: 2,
+        pagesNeedingOcr: [2],
+        pages: [
+            { page: 1, text: 'Pagina uno', needsOcr: false },
+            { page: 2, text: '', needsOcr: true },
+        ],
+    }, new Map([[2, 'Firma']]));
+    assert.equal(text, 'Pagina uno\n\nFirma');
+});
+
+test('extractTextFromPdf does not expose partial mixed-document text', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(JSON.stringify({
+        text: 'Pagina nativa sufficientemente lunga da sembrare completa al consumer.',
+        textLayer: {
+            state: 'mixed',
+            pageCount: 2,
+            pagesNeedingOcr: [2],
+            pages: [
+                { page: 1, text: 'Pagina nativa sufficientemente lunga.', needsOcr: false },
+                { page: 2, text: '', needsOcr: true },
+            ],
+        },
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+    try {
+        await assert.rejects(extractTextFromPdf(new Blob(['synthetic'])), /richiede OCR selettivo/);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
+test('extractPdfTextLayer preserves the resource-limit stop', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(JSON.stringify({
+        error: 'PDF inspection failed',
+        textLayer: { state: 'unreadable', reason: 'resource_limit' },
+    }), { status: 413, headers: { 'content-type': 'application/json' } });
+    try {
+        await assert.rejects(
+            extractPdfTextLayer(new Blob(['synthetic'])),
+            /supera i limiti locali/,
+        );
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
+test('summary extraction does not bypass an inspector failure', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(JSON.stringify({
+        error: 'PDF inspection failed',
+        textLayer: { state: 'unreadable', reason: 'parser_failed' },
+    }), { status: 500, headers: { 'content-type': 'application/json' } });
+    try {
+        await assert.rejects(
+            extractDocumentTextForSummary(new File(['%PDF-synthetic'], 'synthetic.pdf', {
+                type: 'application/pdf',
+            })),
+            /Ispezione PDF locale non disponibile/,
+        );
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
+test('extractPdfTextLayer rejects inconsistent routing metadata', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(JSON.stringify({
+        text: 'testo parziale',
+        textLayer: { state: 'native', pageCount: 2, pagesNeedingOcr: [2] },
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+    try {
+        await assert.rejects(
+            extractPdfTextLayer(new Blob(['synthetic'])),
+            /Invalid PDF inspection response/,
+        );
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
 
 test('extractUsableOcrText keeps markdown-like OCR text and ignores structured JSON payloads', () => {
     assert.equal(

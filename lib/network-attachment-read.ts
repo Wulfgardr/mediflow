@@ -5,11 +5,35 @@ import { buildAttachmentPath } from './attachment-path';
 /* @Codex */
 import { dbServer } from './db-server';
 /* @Codex */
-import type { AttachmentDetail, AttachmentSummary } from './api/v1/types';
+import type {
+    AttachmentDetail,
+    AttachmentSummary,
+} from './api/v1/types';
 /* @Codex */
-import { isDocumentOcrQueueReason, isDocumentOcrQueueState } from './domain/documents/document-ocr-queue';
+import {
+    isDocumentOcrQueueReason,
+    isDocumentOcrQueueState,
+    type DocumentOcrQueueReason,
+} from './domain/documents/document-ocr-queue';
 /* @Codex */
 import { attachments, patientsToAmbulatories } from './schema';
+
+/* @Codex */
+const NETWORK_DOCUMENT_OCR_QUEUE_REASONS: ReadonlySet<string> = new Set<DocumentOcrQueueReason>([
+    'text_layer_absent',
+    'text_too_short',
+    'image_or_scan',
+    'corrupted_pdf',
+    'password_protected',
+    'paired_upload',
+]);
+
+/* @Codex */
+export function toNetworkDocumentOcrQueueReason(value: unknown): AttachmentSummary['ocrQueueReason'] {
+    return typeof value === 'string' && NETWORK_DOCUMENT_OCR_QUEUE_REASONS.has(value)
+        ? value as AttachmentSummary['ocrQueueReason']
+        : null;
+}
 
 /* @Codex */
 export const NETWORK_ATTACHMENT_READ_CAPABILITY = 'network.replica.readonly-documents';
@@ -53,7 +77,9 @@ function toAttachmentSummary(row: AttachmentSummaryRow): AttachmentSummary {
         summarySnapshot: row.summarySnapshot ?? null,
         parseEvidenceArtifactSnapshot: row.parseEvidenceArtifactSnapshot ?? null,
         ocrQueueState: isDocumentOcrQueueState(row.ocrQueueState) ? row.ocrQueueState : null,
-        ocrQueueReason: isDocumentOcrQueueReason(row.ocrQueueReason) ? row.ocrQueueReason : null,
+        ocrQueueReason: isDocumentOcrQueueReason(row.ocrQueueReason)
+            ? toNetworkDocumentOcrQueueReason(row.ocrQueueReason)
+            : null,
         ocrQueueUpdatedAt: toIsoString(row.ocrQueueUpdatedAt),
         ocrReplayArtifactSnapshot: row.ocrReplayArtifactSnapshot ?? null,
         createdAt: toIsoString(row.createdAt),

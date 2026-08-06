@@ -41,6 +41,7 @@ const {
     NETWORK_ATTACHMENT_METADATA_COLUMNS,
     listNetworkScopedAttachments,
     getNetworkScopedAttachment,
+    toNetworkDocumentOcrQueueReason,
 } = await import('./network-attachment-read.ts');
 
 const SCOPE_AMBULATORY = 'amb-attachment-read-scope';
@@ -52,6 +53,12 @@ const OTHER_PATIENT_ATTACHMENT_ID = 'attachment-read-2';
 const SEALED_NAME = 'ENC:aXY=:bmFtZQ==';
 const SEALED_PATH = 'ENC:aXY=:cGF0aA==';
 const SEALED_DATA = 'ENC:aXY=:ZGF0YQ==';
+
+test('host-only PDF inspection reasons do not cross the paired API enum', () => {
+    assert.equal(toNetworkDocumentOcrQueueReason('paired_upload'), 'paired_upload');
+    assert.equal(toNetworkDocumentOcrQueueReason('parser_failed'), null);
+    assert.equal(toNetworkDocumentOcrQueueReason('resource_limit'), null);
+});
 
 function resetDatabase(): void {
     dbServer.delete(attachments).run();
