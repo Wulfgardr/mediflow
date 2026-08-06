@@ -1,5 +1,4 @@
 /* @Codex */
-import { randomUUID } from 'node:crypto';
 import { createClinicalProposal, declareUncertainty, type ClinicalProposal } from './ai-providers/fabric/clinical-interaction';
 import { getFabricCapabilityDescriptor } from './ai-providers/fabric/catalog';
 import { routeCandidateCapability, type CandidateRoutingDecision } from './ai-providers/fabric/candidate-router';
@@ -191,7 +190,8 @@ export function admitPatientInsightFabric(
     input: Readonly<{ modelInfo: unknown; health: unknown }>,
     routeCandidate: typeof routeCandidateCapability = routeCandidateCapability,
 ): PatientInsightFabricAdmission {
-    const requestId = randomUUID();
+    // Runtime isomorfo (browser + Node): niente node:crypto nel seam client.
+    const requestId = globalThis.crypto.randomUUID();
     const snapshot = modelInfo(input.modelInfo);
     if (!snapshot) return denial(requestId, 'provider_receipt_mismatch');
 

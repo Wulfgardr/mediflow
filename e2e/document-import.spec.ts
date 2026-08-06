@@ -79,6 +79,17 @@ test('document import review proposes extracted data and creates the scheda with
   });
 
   // document_synthesis contract: the prompt embeds the JSON envelope template with
+  // Fabric health probe: getHealth() -> listModels() -> /api/ai/models. Without
+  // this stub the admission outcome would depend on whether a local Ollama
+  // daemon happens to run on the host executing the suite.
+  await page.route('**/api/ai/models', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ models: [{ name: 'qwen3.5:35b-a3b' }] }),
+    });
+  });
+
   // "task": "document_synthesis"; the reply must carry the same envelope
   // (schemaVersion mediflow.ai.extract.v1) with data.{qualityLevel,qualityReason,
   // medications,diagnoses,problemStatements,therapyCandidates,servicePrescriptions}.
