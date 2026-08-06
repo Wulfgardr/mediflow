@@ -160,7 +160,7 @@ export interface FabricCapabilityDescriptor {
     readonly authorityPlane: 'clinical_application';
     readonly dataClass: FabricDataClass;
     // Venue ammesse per la capability. L'assenza di 'cloud' e 'on_device' e'
-    // lo stato corrente, non un vincolo permanente (ADR 0088).
+    // lo stato corrente, non un vincolo permanente (ADR 0092).
     readonly venues: readonly FabricVenue[];
     readonly egressProfileId: EgressProfileId;
     readonly review: FabricReviewPolicy;

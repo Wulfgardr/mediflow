@@ -15,7 +15,7 @@ Related:
 [ADR 0076](./0076-paired-document-domain-write-policy.md),
 [ADR 0086](./0086-intelligent-scaffold-and-graded-automation-boundary.md),
 [ADR 0087](./0087-registro-proposte-diagnostiche-documentali.md),
-[ADR 0088](./0088-limite-digest-bound-readiness-ai-locale.md),
+[ADR 0092](./0092-limite-digest-bound-readiness-ai-locale.md),
 [ADR 0089](./0089-contratto-intelligence-fabric-e-venue-esecutive.md).
 
 ## Problema
@@ -95,7 +95,7 @@ Modulo `lib/ai-providers/fabric/onboarding.ts`, schema
   grant API espliciti; `consumer_login` e `subscription` NON concedono accesso
   API e non possono superare `configured` per un uso API.
 - Oggi solo `local_model` su Ollama loopback puo raggiungere `enabled`, con
-  attestazione limitata a `available_unqualified` (ADR 0088: mai `verified`,
+  attestazione limitata a `available_unqualified` (ADR 0092: mai `verified`,
   `ready` o `qualified`). Ogni classe cloud si ferma prima di `enabled`
   finche il profilo egress resta insoddisfatto.
 - La fabric non custodisce segreti: lo stato di onboarding referenzia la

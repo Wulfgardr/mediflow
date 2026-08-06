@@ -157,10 +157,11 @@ Ultimo aggiornamento: 2026-07-29
 | [docs/adr/0084-document-diagnoses-review-only.md](./adr/0084-document-diagnoses-review-only.md) | Sostituisce l'autofill delle diagnosi da documento con proposte review-only e un gate fail-closed sugli envelope ambigui. |
 | [docs/adr/0086-intelligent-scaffold-and-graded-automation-boundary.md](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md) | Propone lo scaffold model-agnostic, il chiarimento fail-closed e l'automazione graduata; non aggiunge inbox conversazionale o runtime esterni alla 0.8. |
 | [docs/adr/0087-registro-proposte-diagnostiche-documentali.md](./adr/0087-registro-proposte-diagnostiche-documentali.md) | Foundation persistente locale delle proposte, separata dalle diagnosi cliniche; backup/restore e purge la includono, mentre writer, route, UI, transizioni e applicazione restano assenti. |
-| [docs/adr/0088-limite-digest-bound-readiness-ai-locale.md](./adr/0088-limite-digest-bound-readiness-ai-locale.md) | ADR accettato: annotazione distinta da `runtime`, bracket digest best-effort e qualified readiness bloccata. |
+| [docs/adr/0088-deterministic-pdf-page-router.md](./adr/0088-deterministic-pdf-page-router.md) | Router PDF locale per-pagina: text layer nativo completo e OCR selettivo in processo limitato, senza egress o auto-write clinici. |
 | [docs/adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md](./adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md) | Contratto fabric: routing per capability, venue esplicite, profili egress versionati, policy immutabile e ricevute che non autorizzano consumer. |
 | [docs/adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md](./adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md) | Giunture fabric: ciclo di vita trust paired con revoca host-side, onboarding provider fail-closed per classe di credenziale, decisioni di routing osservabili con fallback negato e contratto di interazione clinica. |
 | [docs/adr/0091-candidato-locale-fabric-admissione-continuita-status.md](./adr/0091-candidato-locale-fabric-admissione-continuita-status.md) | Candidato locale Fabric: admissione provider, continuita fail-closed, stato paired read-only e harness sintetico senza egress o scritture cliniche. |
+| [docs/adr/0092-limite-digest-bound-readiness-ai-locale.md](./adr/0092-limite-digest-bound-readiness-ai-locale.md) | ADR accettato: annotazione distinta da `runtime`, bracket digest best-effort e qualified readiness bloccata. |
 | [docs/adr/0012-operator-reviewed-smart-import-from-patient-context.md](./adr/0012-operator-reviewed-smart-import-from-patient-context.md) | Smart import reviewable da note, diario e documenti verso diagnosi ICD-11 e terapie nel profilo paziente. |
 | [docs/adr/0013-qwen35-default-text-only-medgemma-specialist.md](./adr/0013-qwen35-default-text-only-medgemma-specialist.md) | Aggiorna il default text-only a `qwen3.5:35b-a3b` e mantiene MedGemma come opzione specialistica non-default. |
 | [docs/adr/0014-native-token-bootstrap-secure-first.md](./adr/0014-native-token-bootstrap-secure-first.md) | Precedenza secure-first del token native (`Keychain -> config -> legacy`) e failure mode espliciti. |
@@ -218,6 +219,10 @@ Ultimo aggiornamento: 2026-07-29
 | [docs/adr/0059-macos-apple-vision-ocr-fallback.md](./adr/0059-macos-apple-vision-ocr-fallback.md) | Formalizza il fallback OCR Apple Vision solo macOS: DeepSeek/Ollama resta OCR primario locale, Windows/Linux non hanno fallback platform-specific equivalente dichiarato, Smart Import resta reviewable. |
 
 ## ✅ Checklist manutenzione indice
+
+| [docs/analysis/2026-07-30-smart-import-clinical-series-run.md](./analysis/2026-07-30-smart-import-clinical-series-run.md) | Run record sintetico del contratto provider-neutral, serie temporali e collegamento prescrizioni per Smart Import. |
+| [docs/analysis/2026-07-24-ai-envelope-codex-consolidation-run.md](./analysis/2026-07-24-ai-envelope-codex-consolidation-run.md) | Run record storico del consolidamento AI/envelope e Codex Operator di luglio 2026 (recuperato, percorsi sanificati). | Quando si ricostruisce la storia del consolidamento AI/envelope pre-0.8. |
+| [docs/analysis/2026-07-24-mediflow-0.8-release-program.md](./analysis/2026-07-24-mediflow-0.8-release-program.md) | Run record storico del programma release 0.8: packet, gate, hold e prove al 2026-07-24 (recuperato, percorsi sanificati). | Quando si ricostruisce la storia del programma release 0.8 o dei packet Operator. |
 
 1. Verifica inventario file: `rg --files -g '*.md' | sort`.
 2. Assicurati che ogni file appaia in questo indice con una descrizione.

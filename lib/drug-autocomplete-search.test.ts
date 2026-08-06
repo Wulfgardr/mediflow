@@ -1,5 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import type { AifaDrug } from './db';
 import {
@@ -7,6 +8,11 @@ import {
     createDrugAutocompleteSearch,
     fetchDrugAutocomplete,
 } from './drug-autocomplete-search';
+
+const { webDrug: parityDrug } = JSON.parse(readFileSync(
+    new URL('../native/contracts/terminology-parity.v1.json', import.meta.url),
+    'utf8',
+)) as { webDrug: AifaDrug };
 
 function jsonResponse(body: unknown, catalogState = 'ready'): Response {
     return new Response(JSON.stringify(body), {
@@ -65,6 +71,17 @@ test('production helper exposes an honest not-imported state for an empty catalo
     );
 
     assert.deepEqual(result, { items: [], catalogState: 'not-imported' });
+});
+
+test('production helper preserves ATC from the shared terminology fixture', async () => {
+    const result = await fetchDrugAutocomplete(
+        'Amoxicillina',
+        new AbortController().signal,
+        async () => jsonResponse([parityDrug]),
+    );
+
+    assert.equal(result.items[0]?.atc, parityDrug.atc);
+    assert.deepEqual(result.items[0], parityDrug);
 });
 
 test('coordinator aborts the prior request and suppresses its stale response', async () => {

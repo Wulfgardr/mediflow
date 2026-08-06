@@ -33,17 +33,12 @@ import {
     type BackupDataset,
     serializeBackupArtifact,
 } from '@/lib/backup-artifact';
+import { enrichBackupPatientsWithAmbulatoryLinks } from '@/lib/backup-patient-ambulatory-links';
 import { restoreBackupArtifact } from '@/lib/backup-restore-executor';
 import { runBackupRestorePreflight } from '@/lib/backup-restore-preflight';
 
 /* @Codex */
 export const dynamic = 'force-dynamic';
-
-type PatientAmbulatoryLinkRow = {
-    patientId: string;
-    ambulatoryId: string;
-    assignedAt: Date | null;
-};
 
 /* @Codex */
 function sortBackupRows<T extends Record<string, unknown>>(rows: T[]): T[] {
@@ -52,51 +47,6 @@ function sortBackupRows<T extends Record<string, unknown>>(rows: T[]): T[] {
         const rightKey = String(right.id ?? right.key ?? right.code ?? right.aic ?? right.patientId ?? right.conversationId ?? '');
         return leftKey.localeCompare(rightKey);
     });
-}
-
-/* @Codex */
-function buildAssignedAmbulatoryIds(
-    patient: Record<string, unknown>,
-    rows: PatientAmbulatoryLinkRow[]
-): string[] {
-    const ids = new Set<string>();
-
-    if (typeof patient.ambulatoryId === 'string' && patient.ambulatoryId.trim().length > 0) {
-        ids.add(patient.ambulatoryId);
-    }
-
-    for (const row of rows) {
-        if (row.patientId === patient.id && row.ambulatoryId.trim().length > 0) {
-            ids.add(row.ambulatoryId);
-        }
-    }
-
-    return Array.from(ids).sort((left, right) => left.localeCompare(right));
-}
-
-/* @Codex */
-function buildAssignedAmbulatoryMemberships(
-    patient: Record<string, unknown>,
-    rows: PatientAmbulatoryLinkRow[],
-): Array<{ ambulatoryId: string; assignedAt: Date | null }> {
-    const memberships = new Map<string, Date | null>();
-    for (const row of rows) {
-        if (row.patientId === patient.id && row.ambulatoryId.trim().length > 0) {
-            memberships.set(row.ambulatoryId, row.assignedAt);
-        }
-    }
-
-    if (typeof patient.ambulatoryId === 'string' && patient.ambulatoryId.trim().length > 0 && !memberships.has(patient.ambulatoryId)) {
-        const fallback = patient.updatedAt instanceof Date
-            ? patient.updatedAt
-            : patient.createdAt instanceof Date
-                ? patient.createdAt
-                : null;
-        memberships.set(patient.ambulatoryId, fallback);
-    }
-
-    return Array.from(memberships, ([ambulatoryId, assignedAt]) => ({ ambulatoryId, assignedAt }))
-        .sort((left, right) => left.ambulatoryId.localeCompare(right.ambulatoryId));
 }
 
 /* @Codex */
@@ -134,13 +84,7 @@ function buildBackupDataset(): BackupDataset {
         const patientAmbulatoryRows = tx.select().from(patientsToAmbulatories).all();
 
     const normalizedPatientAmbulatoryRows = sortBackupRows(patientAmbulatoryRows);
-    const enrichedPatients = patientsRows.map((patient) => {
-        const assignedAmbulatoryIds = buildAssignedAmbulatoryIds(patient, normalizedPatientAmbulatoryRows);
-        const assignedAmbulatoryMemberships = buildAssignedAmbulatoryMemberships(patient, normalizedPatientAmbulatoryRows);
-        return assignedAmbulatoryIds.length > 0
-            ? { ...patient, assignedAmbulatoryIds, assignedAmbulatoryMemberships }
-            : patient;
-    });
+    const enrichedPatients = enrichBackupPatientsWithAmbulatoryLinks(patientsRows, normalizedPatientAmbulatoryRows);
     const patientIds = new Set(
         enrichedPatients
             .map((patient) => patient.id)

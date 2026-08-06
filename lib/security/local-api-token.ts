@@ -21,5 +21,8 @@ export function getOrCreateLocalApiToken(): string {
 
     const token = crypto.randomBytes(32).toString('hex');
     fs.writeFileSync(TOKEN_FILE, token, { mode: 0o600 });
+    if (process.platform !== 'win32') {
+        fs.chmodSync(TOKEN_FILE, 0o600);
+    }
     return token;
 }

@@ -1,4 +1,4 @@
-# ADR 0088: Limite digest-bound della readiness AI locale
+# ADR 0092: Limite digest-bound della readiness AI locale
 
 Date: 2026-07-28
 Status: Accepted

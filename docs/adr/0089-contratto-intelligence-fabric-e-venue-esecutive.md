@@ -11,13 +11,13 @@ Baseline: `v0.8.0` piu lo stack provider consolidato WUL-269/418/502
 Related:
 [ADR 0077](./0077-ai-provider-abstraction-and-egress-anonymization-boundary.md),
 [ADR 0086](./0086-intelligent-scaffold-and-graded-automation-boundary.md),
-[ADR 0088](./0088-limite-digest-bound-readiness-ai-locale.md),
+[ADR 0092](./0092-limite-digest-bound-readiness-ai-locale.md),
 [Audit OpenMinis](../analysis/2026-07-26-openminis-intelligent-scaffold-audit.md) e
 [Matrice serving](../ai-runtime-serving-matrix.md).
 
 ## Problema
 
-ADR 0088 richiede un ADR distinto che definisca il contratto Intelligence
+ADR 0092 richiede un ADR distinto che definisca il contratto Intelligence
 Fabric. Dopo il consolidamento dello stack provider post-0.8 esistono:
 
 - un registry locale per task generativi, limitato a Ollama loopback;
@@ -60,7 +60,7 @@ accettato resta invariato.
 | Gate egress | `isEgressGateOpen()` restituisce sempre `false`; layer 1 deterministico con audit hash-only | `lib/ai-egress-gate.ts`, `lib/ai-egress-audit.ts` |
 | Capability deterministiche | Undici moduli in-house con test dedicati; il registro attese persistente di ADR 0082 non ha runtime | Inventario run WUL-522 |
 | Superfici | Web usa `requireSession()`/`requireSessionOrLocalToken()`; i client paired leggono `aiSummary` e `documentInsights` da `/api/v1/network/patients`; nessun adapter provider in `native/` | Route `app/api/ai/*`, `HomeBasePatientsClient.swift` |
-| Readiness | A3 resta `observed_not_causal`; qualified readiness `HOLD`; annotazione `available_unqualified` | ADR 0088 |
+| Readiness | A3 resta `observed_not_causal`; qualified readiness `HOLD`; annotazione `available_unqualified` | ADR 0092 |
 
 ## Decisione
 
@@ -85,7 +85,7 @@ Ogni risoluzione dichiara la venue effettiva:
   la dichiara.
 
 L'assenza di `on_device` e `cloud` descrive lo stato corrente, non un vincolo
-permanente: la loro apertura richiede ADR dedicati (ADR 0088).
+permanente: la loro apertura richiede ADR dedicati (ADR 0092).
 
 ### 3. Profili egress versionati
 
@@ -139,7 +139,7 @@ custodisce segreti; il broker credenziali resta un packet separato.
   ereditati; leggono proiezioni gia prodotte dall'home-base. L'esposizione
   dello stato fabric sul data plane `network` e un packet successivo.
 - `engineering_operator` resta fuori dalla fabric clinica: piani, credenziali
-  e grant disgiunti (ADR 0086, ADR 0088).
+  e grant disgiunti (ADR 0086, ADR 0092).
 
 ### 7. Provenienza
 
