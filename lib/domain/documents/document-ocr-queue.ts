@@ -14,13 +14,23 @@ export const DOCUMENT_OCR_QUEUE_REASONS = [
     'image_or_scan',
     'corrupted_pdf',
     'password_protected',
+    'parser_failed',
+    'resource_limit',
     /* @Codex: WUL-194 W5 S1, paired client upload entering the OCR queue. */
     'paired_upload',
 ] as const;
 
-export type DocumentOcrQueueReason = (typeof DOCUMENT_OCR_QUEUE_REASONS)[number];
+export type HostDocumentOcrQueueReason = (typeof DOCUMENT_OCR_QUEUE_REASONS)[number];
 
-export type DocumentOcrQueueFailureReason = Extract<DocumentOcrQueueReason, 'corrupted_pdf' | 'password_protected'>;
+export type DocumentOcrQueueReason = Exclude<
+    HostDocumentOcrQueueReason,
+    'parser_failed' | 'resource_limit'
+>;
+
+export type DocumentOcrQueueFailureReason = Extract<
+    HostDocumentOcrQueueReason,
+    'corrupted_pdf' | 'password_protected' | 'parser_failed' | 'resource_limit'
+>;
 
 /**
  * Allineato alla soglia low-signal della evidence queue (MIN_SIGNAL_CHARS in
@@ -37,12 +47,14 @@ export const DOCUMENT_OCR_QUEUE_STATE_LABELS_IT: Record<DocumentOcrQueueState, s
     manual_review: 'revisione manuale',
 };
 
-export const DOCUMENT_OCR_QUEUE_REASON_LABELS_IT: Record<DocumentOcrQueueReason, string> = {
+export const DOCUMENT_OCR_QUEUE_REASON_LABELS_IT: Record<HostDocumentOcrQueueReason, string> = {
     text_layer_absent: 'testo assente',
     text_too_short: 'testo insufficiente',
     image_or_scan: 'immagine/scansione',
     corrupted_pdf: 'PDF corrotto',
     password_protected: 'PDF protetto da password',
+    parser_failed: 'ispezione PDF fallita',
+    resource_limit: 'limite locale PDF superato',
     paired_upload: 'caricato da client di rete',
 };
 
@@ -50,7 +62,7 @@ export function isDocumentOcrQueueState(value: unknown): value is DocumentOcrQue
     return typeof value === 'string' && (DOCUMENT_OCR_QUEUE_STATES as readonly string[]).includes(value);
 }
 
-export function isDocumentOcrQueueReason(value: unknown): value is DocumentOcrQueueReason {
+export function isDocumentOcrQueueReason(value: unknown): value is HostDocumentOcrQueueReason {
     return typeof value === 'string' && (DOCUMENT_OCR_QUEUE_REASONS as readonly string[]).includes(value);
 }
 
@@ -94,7 +106,7 @@ export interface DocumentOcrQueueCandidateInput {
 
 export type DocumentOcrQueueCandidate =
     | { queued: false }
-    | { queued: true; state: 'pending'; reason: DocumentOcrQueueReason };
+    | { queued: true; state: 'pending'; reason: HostDocumentOcrQueueReason };
 
 export function evaluateDocumentOcrQueueCandidate(input: DocumentOcrQueueCandidateInput): DocumentOcrQueueCandidate {
     if (input.extractionFailure) {
