@@ -6,11 +6,12 @@ import { routeCandidateCapability, type CandidateRoutingDecision } from './ai-pr
 import {
     EGRESS_PROFILES,
     type FabricProvenanceRecord,
+    type FabricResolutionReceipt,
 } from './ai-providers/fabric/contract';
 import { advanceOnboarding, startOnboarding } from './ai-providers/fabric/onboarding';
 import { admitProvider } from './ai-providers/fabric/provider-lifecycle';
 import { observeVenue } from './ai-providers/fabric/routing-observability';
-import { buildProvenanceRecord } from './ai-providers/fabric/resolver';
+import { buildProvenanceRecord, type FabricResolution } from './ai-providers/fabric/resolver';
 import type { ProviderSelectionReceipt } from './ai-providers/registry';
 
 export const PATIENT_INSIGHT_FABRIC_METADATA = Symbol('patient-insight-fabric-metadata');
@@ -105,6 +106,62 @@ function sameProviderSelectionReceipt(
         && left.fallbackCount === right.fallbackCount;
 }
 
+// Snapshot strutturale unico della receipt di risoluzione Fabric: ogni campo
+// viene letto esattamente una volta e materializzato in una copia congelata,
+// cosi' un getter stateful non puo' cambiare esito tra ammissione, provenance
+// e metadato. Shape malformate (incluso egressProfile assente o non-oggetto)
+// diventano null, mai un'eccezione.
+function fabricResolutionReceipt(
+    value: unknown,
+    expected: Readonly<{ class: FabricResolutionReceipt['class']; providerReceipt: ProviderSelectionReceipt }>,
+): FabricResolutionReceipt | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const {
+        schemaVersion,
+        capability,
+        class: capabilityClass,
+        venue,
+        egressProfile,
+        provider,
+        model,
+        providerReceipt,
+        fallbackCount,
+    } = value as Record<string, unknown>;
+    if (!egressProfile || typeof egressProfile !== 'object' || Array.isArray(egressProfile)) return null;
+    const { id, version, egress } = egressProfile as Record<string, unknown>;
+    const localOnly = EGRESS_PROFILES.local_only;
+    const nested = providerSelectionReceipt(providerReceipt);
+    if (
+        schemaVersion !== 'mediflow.ai.fabric-resolution.v1'
+        || capability !== 'patient_insight'
+        || capabilityClass !== expected.class
+        || venue !== 'local_process'
+        || id !== localOnly.id
+        || version !== localOnly.version
+        || egress !== localOnly.egress
+        || provider !== expected.providerReceipt.provider
+        || model !== expected.providerReceipt.model
+        || fallbackCount !== 0
+        || nested === null
+        || !sameProviderSelectionReceipt(nested, expected.providerReceipt)
+    ) return null;
+
+    // I campi union-typed vengono materializzati dal lato canonico tipizzato:
+    // la validazione sopra ne ha gia' provato l'uguaglianza con la lettura
+    // singola del raw, quindi lo snapshot resta fedele alla prima lettura.
+    return Object.freeze({
+        schemaVersion,
+        capability,
+        class: expected.class,
+        venue,
+        egressProfile: Object.freeze({ id: localOnly.id, version: localOnly.version, egress: localOnly.egress }),
+        provider,
+        model,
+        providerReceipt: nested,
+        fallbackCount,
+    });
+}
+
 function modelInfo(value: unknown): Readonly<{
     provider: 'ollama'; model: string; baseUrl: string; receipt: ProviderSelectionReceipt;
 }> | null {
@@ -159,39 +216,55 @@ export function admitPatientInsightFabric(
         } },
         observations: [observation], onboarding, lifecycle: admitProvider(onboarding),
     });
-    if (!routing.resolution || !routing.decision.receipt) {
-        return Object.freeze({ admitted: false, denial: routing.decision });
+    const decision = routing.decision;
+    const resolution = routing.resolution;
+    if (!resolution) {
+        return Object.freeze({ admitted: false, denial: decision });
+    }
+    const decisionReceipt = decision.receipt;
+    if (!decisionReceipt) {
+        return Object.freeze({ admitted: false, denial: decision });
     }
 
     // Candidate routing preserves the resolver receipt by identity. Reject a
     // wrapper that separates routing evidence from the resolution it names.
-    if (routing.decision.receipt !== routing.resolution.receipt) {
+    if (decisionReceipt !== resolution.receipt) {
         return denial(requestId, 'provider_receipt_mismatch');
     }
 
-    const receipt = routing.decision.receipt;
-    const localOnly = EGRESS_PROFILES.local_only;
-    const nestedReceipt = providerSelectionReceipt(receipt.providerReceipt);
-    if (receipt.schemaVersion !== 'mediflow.ai.fabric-resolution.v1'
-        || receipt.capability !== 'patient_insight'
-        || receipt.class !== descriptor.class
-        || receipt.venue !== 'local_process'
-        || receipt.egressProfile.id !== localOnly.id
-        || receipt.egressProfile.version !== localOnly.version
-        || receipt.egressProfile.egress !== localOnly.egress
-        || receipt.provider !== snapshot.receipt.provider || receipt.model !== snapshot.receipt.model
-        || receipt.fallbackCount !== 0
-        || nestedReceipt === null
-        || !sameProviderSelectionReceipt(nestedReceipt, snapshot.receipt)) {
+    const receiptSnapshot = fabricResolutionReceipt(decisionReceipt, {
+        class: descriptor.class,
+        providerReceipt: snapshot.receipt,
+    });
+    if (!receiptSnapshot) {
         return denial(requestId, 'provider_receipt_mismatch');
     }
 
-    const provenance = buildProvenanceRecord(routing.resolution, [
+    // Decision, resolution e provenance vengono ricostruite attorno allo
+    // snapshot congelato: l'oggetto receipt fornito dal router non viene mai
+    // riletto ne' incorporato nel metadato.
+    const verifiedResolution: FabricResolution = Object.freeze({
+        receipt: receiptSnapshot,
+        descriptor: resolution.descriptor,
+        generative: resolution.generative,
+    });
+    const verifiedDecision: CandidateRoutingDecision = Object.freeze({
+        schemaVersion: decision.schemaVersion,
+        requestId: decision.requestId,
+        capability: decision.capability,
+        requestedVenue: decision.requestedVenue,
+        outcome: decision.outcome,
+        denialCode: decision.denialCode,
+        fallback: decision.fallback,
+        observations: decision.observations,
+        receipt: receiptSnapshot,
+    });
+    const provenance = buildProvenanceRecord(verifiedResolution, [
         'context_minimization',
         'envelope_validation',
     ]);
     return Object.freeze({ admitted: true, metadata: Object.freeze({
-        routing: routing.decision,
+        routing: verifiedDecision,
         provenance,
         proposal: createClinicalProposal({
             capability: 'patient_insight',
