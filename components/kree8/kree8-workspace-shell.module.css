@@ -102,6 +102,14 @@
   justify-content: space-between;
   gap: 8px;
 }
+.headerActionCluster { min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.headerActionsMenu { position: relative; }
+.headerPrimaryAction,
+.headerActionButton { min-height: 30px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--k8-control-border); border-radius: 10px; background: var(--k8-soft); color: var(--k8-ink); font: inherit; font-size: 11px; font-weight: 600; line-height: 1; text-decoration: none; cursor: pointer; }
+.headerPrimaryAction { border-color: var(--k8-ink); background: var(--k8-ink); color: var(--lume-surface-focal); }
+.headerPrimaryAction:focus-visible,
+.headerActionButton:focus-visible { outline: 2px solid var(--k8-focus); outline-offset: 2px; }
+.headerActionsPopover { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; min-width: 190px; }
 
 .hero {
   min-width: 0;
@@ -202,7 +210,7 @@
 .sectionTitle { margin: 3px 0 0; color: var(--lume-ink); font-size: 18px; font-weight: 620; line-height: 1.3; text-wrap: balance; }
 .sectionCopy,
 .mutedText { margin: 5px 0 0; color: var(--lume-ink-muted); font-size: 12px; line-height: 1.55; }
-.attentionContent { margin-top: 14px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(248px, 0.42fr); gap: 18px; }
+.attentionContent { margin-top: 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
 .attentionList { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .attentionGroup { min-width: 0; padding: 2px 0; }
 .attentionGroupHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 4px; border-bottom: 1px solid var(--k8-line-strong); }
@@ -219,18 +227,8 @@
 .attentionNote { display: block; margin: 2px 0 0; color: var(--lume-ink-muted); font-size: 11px; line-height: 1.45; }
 .attentionStatus { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; color: var(--lume-ink-muted); font-size: 11px; white-space: nowrap; }
 .attentionMore { display: inline-block; margin-top: 8px; color: var(--lume-ink-muted); font-size: 12px; font-weight: 560; text-decoration: none; }
-.attentionAction,
-.quietAction,
-.primaryAction { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 10px; font: inherit; font-size: 12px; font-weight: 570; text-decoration: none; cursor: pointer; transition: background-color var(--lume-dur-riga) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease); }
-.attentionAction,
-.quietAction { border: 1px solid var(--lume-ink-muted); background: var(--lume-surface-focal); color: var(--lume-ink); }
-.primaryAction { width: 100%; border: 1px solid var(--lume-ink); background: var(--lume-ink); color: var(--lume-surface-focal); }
-.attentionAction:active,
-.quietAction:active,
-.primaryAction:active { transform: scale(0.97); }
-.actionsDock { min-width: 0; align-self: start; }
-.quietActions { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
-.quietAction { flex: 1 1 92px; padding: 6px 10px; }
+.attentionAction { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--lume-ink-muted); border-radius: 10px; background: var(--lume-surface-focal); color: var(--lume-ink); font: inherit; font-size: 12px; font-weight: 570; text-decoration: none; cursor: pointer; transition: background-color var(--lume-dur-riga) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease); }
+.attentionAction:active { transform: scale(0.97); }
 .clinicalSection,
 .synoptic { padding: 18px 20px; border-top: 1px solid var(--k8-line-strong); }
 .clinicalSection > button { padding: 0 !important; }
@@ -630,7 +628,6 @@
   .attentionBand,
   .clinicalSection,
   .synoptic { padding: 16px; }
-  .attentionContent { grid-template-columns: minmax(0, 1fr); }
   .attentionRow { grid-template-columns: 9px minmax(0, 1fr); }
   .attentionGroupHead { align-items: flex-start; flex-direction: column; }
   .attentionStatus { grid-column: 2; justify-content: flex-start; }

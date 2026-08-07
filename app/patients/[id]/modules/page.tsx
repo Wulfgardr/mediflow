@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { Accessibility, Activity, ChevronRight, Download, FileText, Pencil, Pill, Plus, Share2, ShieldCheck, Stethoscope } from 'lucide-react';
+import { Accessibility, Activity, ChevronRight, FileText, Pill, Plus, ShieldCheck, Stethoscope } from 'lucide-react';
 
 import AIPatientInsight from '@/components/ai-patient-insight';
 import { AttentionGroup } from '@/components/attention-group';
@@ -17,6 +17,7 @@ import ObservationManager from '@/components/observation-manager';
 import type { ObservationPrefill } from '@/lib/observation-prefill';
 import PatientActionModal from '@/components/patient-action-modal';
 import { PatientIdentityLens } from '@/components/patient-identity-lens';
+import { PatientSheetActionsMenu } from '@/components/patient-sheet-actions-menu';
 import PatientReviewQueueSummaryPanel from '@/components/patient-review-queue-summary';
 import PatientSmartImportPanel, { countUsableSources } from '@/components/patient-smart-import-panel';
 import ProstheticPrescriptionManager from '@/components/prosthetic-prescription-manager';
@@ -600,58 +601,12 @@ export default function PatientDetailPage() {
         }
     };
 
-    const actionsDock = (
-        <div className={workspaceStyles.actionsDock}>
-            <Link
-                href={`/patients/${id}/entries/new`}
-                className={workspaceStyles.primaryAction}
-            >
-                <Plus className="h-4 w-4" />
-                Nuova voce
-            </Link>
-
-            <div className={workspaceStyles.quietActions}>
-                <Link
-                    href={`/patients/${id}/edit`}
-                    className={workspaceStyles.quietAction}
-                >
-                    <Pencil className="h-3.5 w-3.5" />
-                    Modifica
-                </Link>
-                <button
-                    type="button"
-                    onClick={() => setIsExportModalOpen(true)}
-                    className={workspaceStyles.quietAction}
-                >
-                    <Download className="h-3.5 w-3.5" />
-                    Esporta FHIR
-                </button>
-                {canShareFhirFile && (
-                    <button
-                        type="button"
-                        onClick={handleShareFhir}
-                        className={workspaceStyles.quietAction}
-                    >
-                        <Share2 className="h-3.5 w-3.5" />
-                        Condividi FHIR
-                    </button>
-                )}
-                <button
-                    type="button"
-                    onClick={async () => {
-                        const reportTherapies = await db.therapies.query({ patientId: id }).toArray();
-                        const reportObservations = await db.observations.query({ patientId: id }).toArray();
-                        const reportService = await import('@/lib/report-service');
-                        reportService.generatePatientReport(patient, nonScaleEntries, scaleEntries, reportTherapies, reportObservations);
-                    }}
-                    className={workspaceStyles.quietAction}
-                >
-                    <FileText className="h-3.5 w-3.5" />
-                    Report PDF
-                </button>
-            </div>
-        </div>
-    );
+    const handleReportPdf = async () => {
+        const reportTherapies = await db.therapies.query({ patientId: id }).toArray();
+        const reportObservations = await db.observations.query({ patientId: id }).toArray();
+        const reportService = await import('@/lib/report-service');
+        reportService.generatePatientReport(patient, nonScaleEntries, scaleEntries, reportTherapies, reportObservations);
+    };
 
     return (
         <Kree8WorkspaceShell
@@ -667,6 +622,16 @@ export default function PatientDetailPage() {
                 `Aggiornato ${updatedLabel}`,
             ]}
             navItems={workspaceNavItems}
+            primaryAction={{ href: `/patients/${id}/entries/new`, label: 'Nuova voce', icon: Plus }}
+            headerActions={(
+                <PatientSheetActionsMenu
+                    editHref={`/patients/${id}/edit`}
+                    canShareFhirFile={canShareFhirFile}
+                    onExportFhir={() => setIsExportModalOpen(true)}
+                    onShareFhir={handleShareFhir}
+                    onReportPdf={handleReportPdf}
+                />
+            )}
         >
             <div className={workspaceStyles.clinicalStack}>
                 <section id="attenzione" className={workspaceStyles.attentionBand} aria-labelledby="attention-title" data-testid="lume-scheda-attention">
@@ -725,7 +690,6 @@ export default function PatientDetailPage() {
                                 <p className={workspaceStyles.mutedText}>Nessuna decisione o attesa aperta al momento.</p>
                             ) : null}
                         </div>
-                        {actionsDock}
                     </div>
                 </section>
 
