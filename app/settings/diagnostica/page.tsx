@@ -12,7 +12,7 @@ export default function SettingsDiagnosticsPage() {
     return (
         <section className="space-y-4" data-testid="settings-diagnostics-section">
             <SettingsSectionIntro
-                kicker="Avanzate"
+                kicker="Sistema"
                 title="Diagnostica"
                 description="Stato dei servizi, architettura della postazione e aggiornamenti software."
             />

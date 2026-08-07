@@ -241,6 +241,9 @@
     background: var(--lume-surface-focal);
     box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
 }
+.quietShadow {
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--lume-ink) 4%, transparent);
+}
 .settingLayer {
     border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
     border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);

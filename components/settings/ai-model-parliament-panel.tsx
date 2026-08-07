@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, RefreshCw, Scale } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import styles from './settings-lume.module.css';
 
 type ParliamentLaneState =
     | 'competitive'
@@ -158,7 +159,7 @@ export default function AiModelParliamentPanel() {
             {state.status === 'ready' && parliament ? (
                 <div className="space-y-4">
                     <div className={cn(
-                        'rounded-[20px] border p-4 shadow-[0_10px_22px_rgba(15,23,42,0.04)]',
+                        `rounded-[20px] border p-4 ${styles.quietShadow}`,
                         readiness === 'prune_ready'
                             ? 'border-emerald-200/70 bg-emerald-50/75 dark:border-emerald-500/20 dark:bg-emerald-900/10'
                             : 'border-amber-200/70 bg-amber-50/75 dark:border-amber-500/20 dark:bg-amber-900/10'

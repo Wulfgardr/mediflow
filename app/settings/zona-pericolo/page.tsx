@@ -45,7 +45,7 @@ export default function SettingsDangerZonePage() {
     return (
         <section className="space-y-4" data-testid="settings-danger-zone-section">
             <SettingsSectionIntro
-                kicker="Avanzate"
+                kicker="Sistema"
                 title="Zona Pericolo"
                 description="Operazioni che riportano la postazione a uno stato precedente. Richiedono riconfigurazione."
             />

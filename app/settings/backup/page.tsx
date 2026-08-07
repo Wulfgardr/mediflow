@@ -10,9 +10,9 @@ export default function SettingsBackupPage() {
     return (
         <section className="space-y-4" data-testid="settings-backup-section">
             <SettingsSectionIntro
-                kicker="Backup"
-                title="Continuità e ripristino"
-                description="Schedulazione automatica e ripristino manuale degli archivi cifrati."
+                kicker="Dati e sicurezza"
+                title="Backup e ripristino"
+                description="Schedulazione e restore degli archivi cifrati locali."
             />
             <div className="space-y-6">
                 <BackupSchedulerUI />

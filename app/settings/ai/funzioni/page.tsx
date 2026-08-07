@@ -1,8 +1,8 @@
 'use client';
 
-// WUL-297 Funzioni e Sicurezza AI: moved from the monolithic settings page.
+// WUL-297 Funzioni cliniche AI: moved from the monolithic settings page.
 
-import { CheckCircle, ChevronDown, Save, Shield, Sparkles } from 'lucide-react';
+import { CheckCircle, Save, Shield, Sparkles } from 'lucide-react';
 import {
     AI_INSIGHT_MODE_OPTIONS,
 } from '@/lib/ai-insight-settings';
@@ -10,9 +10,6 @@ import { cn } from '@/lib/utils';
 /* @Codex */
 import { useAiSettingsController } from '@/lib/hooks/use-ai-settings-controller';
 /* @Codex */
-import AiModelParliamentPanel from '@/components/settings/ai-model-parliament-panel';
-/* @Codex */
-import AiRolloutReadinessPanel from '@/components/settings/ai-rollout-readiness-panel';
 import {
     SETTINGS_CARD_CLASS,
     SETTINGS_INPUT_CLASS,
@@ -47,9 +44,9 @@ export default function SettingsAiFunctionsPage() {
     return (
         <section className="space-y-4" data-testid="settings-ai-functions-section">
             <SettingsSectionIntro
-                kicker="AI locale"
-                title="Funzioni e Sicurezza"
-                description="Interruttori di sicurezza delle funzioni AI, budget insight e governance del rollout."
+                kicker="Intelligenza locale"
+                title="Funzioni cliniche"
+                description="Interruttori per funzione e budget insight."
             />
 
             <div className="space-y-6">
@@ -57,7 +54,7 @@ export default function SettingsAiFunctionsPage() {
                 <div className={SETTINGS_CARD_CLASS}>
                     {/* @Codex WUL-273: Patient Insight runtime settings stay neutral and role-led. */}
                     <div className="mb-5 flex items-start gap-3">
-                        <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--lume-ink)' }}>
+                        <div className="rounded-2xl p-2" style={{ background: 'color-mix(in srgb, var(--lume-ink) 6%, transparent)', color: 'var(--lume-ink)' }}>
                             <Sparkles className="h-4 w-4" />
                         </div>
                         <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
@@ -79,7 +76,7 @@ export default function SettingsAiFunctionsPage() {
                                     type="button"
                                     onClick={() => setAiInsightSettings((prev) => ({ ...prev, mode: option.value }))}
                                     className={cn('mf-option-card text-left !px-3 !py-3', selected && 'is-active')}
-                                    style={selected ? { borderColor: 'rgba(15, 23, 42, 0.22)', background: 'rgba(248, 250, 252, 0.9)' } : undefined}
+                                    style={selected ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 22%, transparent)', background: 'var(--lume-surface-field)' } : undefined}
                                 >
                                     <div className="flex items-center justify-between gap-2">
                                         <span className="text-xs font-bold" style={{ color: 'var(--lume-ink)' }}>{option.title}</span>
@@ -93,7 +90,7 @@ export default function SettingsAiFunctionsPage() {
 
                     <p
                         className="mt-3 rounded-[14px] border px-3 py-2 text-[11px] leading-5"
-                        style={{ borderColor: 'rgba(15, 23, 42, 0.12)', background: 'rgba(248, 250, 252, 0.85)', color: 'var(--lume-ink-muted)' }}
+                        style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 12%, transparent)', background: 'var(--lume-surface-field)', color: 'var(--lume-ink-muted)' }}
                     >
                         {aiInsightSettings.mode === 'full_auto'
                             ? 'MediFlow sceglie automaticamente quante fonti leggere in base al profilo della postazione e alla complessità del caso.'
@@ -167,7 +164,7 @@ export default function SettingsAiFunctionsPage() {
                 <div className={SETTINGS_CARD_CLASS}>
                     {/* @Codex WUL-273: active AI switches use neutral confirmation; red is reserved for off/blocked states. */}
                     <div className="mb-5 flex items-start gap-3">
-                        <div className="rounded-2xl p-2" style={{ background: 'rgba(192, 57, 43, 0.12)', color: 'var(--lume-signal-critical)' }}>
+                        <div className="rounded-2xl p-2" style={{ background: 'var(--lume-surface-field)', color: 'var(--lume-signal-critical)' }}>
                             <Shield className="h-4 w-4" />
                         </div>
                         <div className="min-w-0">
@@ -181,8 +178,8 @@ export default function SettingsAiFunctionsPage() {
                         <div
                             className="rounded-[18px] border p-4"
                             style={ocrEnabled
-                                ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(248, 250, 252, 0.85)' }
-                                : { borderColor: 'rgba(192, 57, 43, 0.28)', background: 'rgba(192, 57, 43, 0.08)' }}
+                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
+                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
                             data-testid="ocr-kill-switch-card"
                         >
                             <div className="flex items-start justify-between gap-3">
@@ -197,8 +194,8 @@ export default function SettingsAiFunctionsPage() {
                                         htmlFor="ocrKillSwitch"
                                         className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
                                         style={ocrEnabled
-                                            ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(255,255,255,0.85)', color: 'var(--lume-ink)' }
-                                            : { borderColor: 'rgba(192, 57, 43, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--lume-signal-critical)' }}
+                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
+                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
                                     >
                                         {ocrEnabled ? 'Attivo' : 'Spento'}
                                     </label>
@@ -209,8 +206,8 @@ export default function SettingsAiFunctionsPage() {
                                         aria-checked={ocrEnabled}
                                         aria-label="OCR documentale locale"
                                         onClick={() => setOcrEnabled(!ocrEnabled)}
-                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:rgba(15,23,42,0.24)]"
-                                        style={{ background: ocrEnabled ? 'var(--lume-ink)' : 'rgba(112,106,100,0.2)' }}
+                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
+                                        style={{ background: ocrEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
                                     >
                                         <span
                                             className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
@@ -223,7 +220,7 @@ export default function SettingsAiFunctionsPage() {
 
                         <div
                             className="rounded-[18px] border p-4"
-                            style={{ borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(248, 250, 252, 0.85)' }}
+                            style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }}
                             data-testid="document-router-control-flow-card"
                         >
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -247,7 +244,7 @@ export default function SettingsAiFunctionsPage() {
                                     </select>
                                 </label>
                             </div>
-                            <p className="mt-3 rounded-[14px] border px-3 py-2 text-[11px] leading-5" style={{ borderColor: 'rgba(15, 23, 42, 0.12)', background: 'rgba(255,255,255,0.72)', color: 'var(--lume-ink-muted)' }}>
+                            <p className="mt-3 rounded-[14px] border px-3 py-2 text-[11px] leading-5" style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 12%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink-muted)' }}>
                                 {documentRouterControlFlowMode === 'off'
                                     ? 'Spento: il modello analizza tutti i documenti.'
                                     : documentRouterControlFlowMode === 'shadow'
@@ -259,8 +256,8 @@ export default function SettingsAiFunctionsPage() {
                         <div
                             className="rounded-[18px] border p-4"
                             style={patientInsightEnabled
-                                ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(248, 250, 252, 0.85)' }
-                                : { borderColor: 'rgba(192, 57, 43, 0.28)', background: 'rgba(192, 57, 43, 0.08)' }}
+                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
+                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
                             data-testid="patient-insight-kill-switch-card"
                         >
                             <div className="flex items-start justify-between gap-3">
@@ -275,8 +272,8 @@ export default function SettingsAiFunctionsPage() {
                                         htmlFor="patientInsightKillSwitch"
                                         className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
                                         style={patientInsightEnabled
-                                            ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(255,255,255,0.85)', color: 'var(--lume-ink)' }
-                                            : { borderColor: 'rgba(192, 57, 43, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--lume-signal-critical)' }}
+                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
+                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
                                     >
                                         {patientInsightEnabled ? 'Attivo' : 'Spento'}
                                     </label>
@@ -287,8 +284,8 @@ export default function SettingsAiFunctionsPage() {
                                         aria-checked={patientInsightEnabled}
                                         aria-label="Patient Insight locale"
                                         onClick={() => setPatientInsightEnabled(!patientInsightEnabled)}
-                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:rgba(15,23,42,0.24)]"
-                                        style={{ background: patientInsightEnabled ? 'var(--lume-ink)' : 'rgba(112,106,100,0.2)' }}
+                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
+                                        style={{ background: patientInsightEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
                                     >
                                         <span
                                             className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
@@ -302,8 +299,8 @@ export default function SettingsAiFunctionsPage() {
                         <div
                             className="rounded-[18px] border p-4"
                             style={documentSynthesisEnabled
-                                ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(248, 250, 252, 0.85)' }
-                                : { borderColor: 'rgba(192, 57, 43, 0.28)', background: 'rgba(192, 57, 43, 0.08)' }}
+                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
+                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
                             data-testid="document-synthesis-kill-switch-card"
                         >
                             <div className="flex items-start justify-between gap-3">
@@ -318,8 +315,8 @@ export default function SettingsAiFunctionsPage() {
                                         htmlFor="documentSynthesisKillSwitch"
                                         className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
                                         style={documentSynthesisEnabled
-                                            ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(255,255,255,0.85)', color: 'var(--lume-ink)' }
-                                            : { borderColor: 'rgba(192, 57, 43, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--lume-signal-critical)' }}
+                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
+                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
                                     >
                                         {documentSynthesisEnabled ? 'Attivo' : 'Spento'}
                                     </label>
@@ -330,8 +327,8 @@ export default function SettingsAiFunctionsPage() {
                                         aria-checked={documentSynthesisEnabled}
                                         aria-label="Document Synthesis locale"
                                         onClick={() => setDocumentSynthesisEnabled(!documentSynthesisEnabled)}
-                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:rgba(15,23,42,0.24)]"
-                                        style={{ background: documentSynthesisEnabled ? 'var(--lume-ink)' : 'rgba(112,106,100,0.2)' }}
+                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
+                                        style={{ background: documentSynthesisEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
                                     >
                                         <span
                                             className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
@@ -345,8 +342,8 @@ export default function SettingsAiFunctionsPage() {
                         <div
                             className="rounded-[18px] border p-4"
                             style={smartImportEnabled
-                                ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(248, 250, 252, 0.85)' }
-                                : { borderColor: 'rgba(192, 57, 43, 0.28)', background: 'rgba(192, 57, 43, 0.08)' }}
+                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
+                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
                             data-testid="smart-import-kill-switch-card"
                         >
                             <div className="flex items-start justify-between gap-3">
@@ -361,8 +358,8 @@ export default function SettingsAiFunctionsPage() {
                                         htmlFor="smartImportKillSwitch"
                                         className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
                                         style={smartImportEnabled
-                                            ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(255,255,255,0.85)', color: 'var(--lume-ink)' }
-                                            : { borderColor: 'rgba(192, 57, 43, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--lume-signal-critical)' }}
+                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
+                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
                                     >
                                         {smartImportEnabled ? 'Attivo' : 'Spento'}
                                     </label>
@@ -373,8 +370,8 @@ export default function SettingsAiFunctionsPage() {
                                         aria-checked={smartImportEnabled}
                                         aria-label="Smart Import locale"
                                         onClick={() => setSmartImportEnabled(!smartImportEnabled)}
-                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:rgba(15,23,42,0.24)]"
-                                        style={{ background: smartImportEnabled ? 'var(--lume-ink)' : 'rgba(112,106,100,0.2)' }}
+                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
+                                        style={{ background: smartImportEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
                                     >
                                         <span
                                             className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
@@ -388,8 +385,8 @@ export default function SettingsAiFunctionsPage() {
                         <div
                             className="rounded-[18px] border p-4"
                             style={treatmentReasoningEnabled
-                                ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(248, 250, 252, 0.85)' }
-                                : { borderColor: 'rgba(192, 57, 43, 0.28)', background: 'rgba(192, 57, 43, 0.08)' }}
+                                ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }
+                                : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
                             data-testid="treatment-reasoning-kill-switch-card"
                         >
                             <div className="flex items-start justify-between gap-3">
@@ -404,8 +401,8 @@ export default function SettingsAiFunctionsPage() {
                                         htmlFor="treatmentReasoningKillSwitch"
                                         className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]"
                                         style={treatmentReasoningEnabled
-                                            ? { borderColor: 'rgba(15, 23, 42, 0.18)', background: 'rgba(255,255,255,0.85)', color: 'var(--lume-ink)' }
-                                            : { borderColor: 'rgba(192, 57, 43, 0.32)', background: 'rgba(255,255,255,0.85)', color: 'var(--lume-signal-critical)' }}
+                                            ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' }
+                                            : { borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}
                                     >
                                         {treatmentReasoningEnabled ? 'Attivo' : 'Spento'}
                                     </label>
@@ -416,8 +413,8 @@ export default function SettingsAiFunctionsPage() {
                                         aria-checked={treatmentReasoningEnabled}
                                         aria-label="Treatment Reasoning locale"
                                         onClick={() => setTreatmentReasoningEnabled(!treatmentReasoningEnabled)}
-                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:rgba(15,23,42,0.24)]"
-                                        style={{ background: treatmentReasoningEnabled ? 'var(--lume-ink)' : 'rgba(112,106,100,0.2)' }}
+                                        className="relative h-7 w-12 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--lume-accent)]"
+                                        style={{ background: treatmentReasoningEnabled ? 'var(--lume-ink)' : 'color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}
                                     >
                                         <span
                                             className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
@@ -447,21 +444,6 @@ export default function SettingsAiFunctionsPage() {
                     </div>
                 </div>
 
-                {/* Read-only governance */}
-                {/* WUL-297: expanded by default now that governance lives on a dedicated page. */}
-                <details open className="group rounded-[var(--lume-radius-panel)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)]">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
-                        <div>
-                            <p className="section-kicker">Governance</p>
-                            <h3 className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">Confronto modelli e prontezza al rilascio</h3>
-                        </div>
-                        <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
-                    </summary>
-                    <div className="space-y-4 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] px-5 py-5">
-                        <AiModelParliamentPanel />
-                        <AiRolloutReadinessPanel />
-                    </div>
-                </details>
             </div>
         </section>
     );

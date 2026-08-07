@@ -19,9 +19,9 @@ export default function SettingsAppearancePage() {
     return (
         <section data-testid="settings-appearance-section" className="space-y-4">
             <SettingsSectionIntro
-                kicker="Aspetto"
-                title="Lettura e accessibilità"
-                description="Controlli di lettura per chi preferisce meno movimento durante il lavoro clinico."
+                kicker="Generale"
+                title="Aspetto"
+                description="Tema, movimento e accessibilità per una lettura adatta al lavoro clinico."
             />
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">

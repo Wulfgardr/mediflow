@@ -139,7 +139,7 @@ export default function AmbulatoryManagerPage() {
                 aria-selected={node.isDefault}
                 className={cn(
                     "bg-[color:var(--lume-surface-focal)] dark:bg-white/6 border rounded-xl p-6 transition-[border-color,background-color,color] flex flex-col gap-5 shadow-sm relative md:flex-row md:items-center md:justify-between",
-                    node.isDefault ? "lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)]" : "border-[color:rgba(112,106,100,0.14)]",
+                    node.isDefault ? "lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)]" : "border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)]",
                     level > 0 && "ml-8"
                 )}
             >
@@ -152,10 +152,10 @@ export default function AmbulatoryManagerPage() {
                     <h3 className="flex flex-wrap items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)] dark:text-white">
                         <span className="min-w-0 truncate">{node.name}</span>
                         {node.isDefault && <span className="bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink)] text-xs px-2 py-0.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)]">Predefinita</span>}
-                        {node.type === 'test' && <span className="bg-[color:rgba(197,138,47,0.14)] text-[color:var(--lume-signal-warning)] text-xs px-2 py-0.5 rounded-full uppercase border border-[color:rgba(197,138,47,0.28)]">Test</span>}
+                        {node.type === 'test' && <span className="bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_14%,transparent)] text-[color:var(--lume-signal-warning)] text-xs px-2 py-0.5 rounded-full uppercase border border-[color:color-mix(in_srgb,var(--lume-signal-warning)_28%,transparent)]">Test</span>}
                     </h3>
                     <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[color:var(--lume-ink-muted)]">
-                        <span className="inline-flex items-center gap-1 rounded-full border border-[color:rgba(112,106,100,0.12)] bg-white/68 px-2.5 py-1 dark:bg-white/5">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] px-2.5 py-1">
                             <CornerDownRight className="h-3 w-3" />
                             {relationLabel}
                         </span>
@@ -180,7 +180,7 @@ export default function AmbulatoryManagerPage() {
                     <button
                         onClick={() => handleActivate(node.id)}
                         disabled={node.isDefault}
-                        className="px-3 py-1.5 bg-white/60 dark:bg-white/6 hover:bg-white/80 dark:hover:bg-white/10 border border-[color:rgba(112,106,100,0.14)] text-[color:var(--lume-ink)] rounded-lg text-sm font-medium transition-colors disabled:cursor-default disabled:opacity-60"
+                        className="px-3 py-1.5 bg-[color:var(--lume-surface-focal)] hover:bg-[color:var(--lume-surface-field)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] text-[color:var(--lume-ink)] rounded-lg text-sm font-medium transition-colors disabled:cursor-default disabled:opacity-60"
                     >
                         {node.isDefault ? 'Già predefinita' : 'Usa come predefinita'}
                     </button>
@@ -189,7 +189,7 @@ export default function AmbulatoryManagerPage() {
                             onClick={() => handleClear(node.id)}
                             title="Svuota ambiente di test"
                             aria-label="Svuota ambiente di test"
-                            className="px-3 py-1 border border-[color:rgba(163,58,47,0.28)] text-[color:var(--lume-signal-critical)] hover:bg-[color:rgba(163,58,47,0.08)] rounded-lg text-sm font-medium transition-colors"
+                            className="px-3 py-1 border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_28%,transparent)] text-[color:var(--lume-signal-critical)] hover:bg-[color:var(--lume-surface-field)] rounded-lg text-sm font-medium transition-colors"
                             disabled={isClearing}
                         >
                             Svuota
@@ -198,7 +198,7 @@ export default function AmbulatoryManagerPage() {
                     <button
                         onClick={() => handleDelete(node.id)}
                         aria-label="Elimina sede"
-                        className="p-2 hover:bg-[color:rgba(163,58,47,0.08)] rounded-lg text-[color:var(--lume-signal-critical)]/80 hover:text-[color:var(--lume-signal-critical)] transition-colors"
+                        className="p-2 hover:bg-[color:var(--lume-surface-field)] rounded-lg text-[color:var(--lume-signal-critical)]/80 hover:text-[color:var(--lume-signal-critical)] transition-colors"
                     >
                         <Trash2 className="w-5 h-5" />
                     </button>
@@ -260,17 +260,17 @@ export default function AmbulatoryManagerPage() {
         <div className="space-y-6" data-testid="settings-ambulatories-section">
             <SettingsSectionIntro
                 kicker="Generale"
-                title="Sedi e ambulatori"
-                description="Organizza sedi e reparti e scegli la sede predefinita per il lavoro quotidiano."
+                title="Ambulatori"
+                description="Sedi e contesti clinici per il lavoro quotidiano."
             />
             <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                 {isLoading ? 'Caricamento sedi...' : `${ambulatories.length} sedi configurate.`}
             </p>
             <section id="nuova-sede" className={cn(
                 'patient-detail-section mf-section p-6 md:p-8 transition-[border-color,background-color,color]',
-                newParentId ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)]' : 'border-[color:rgba(112,106,100,0.14)]',
+                newParentId ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)]' : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)]',
             )}>
-                <div className="mb-6 flex items-center gap-4 border-b border-[color:rgba(112,106,100,0.14)] pb-4">
+                <div className="mb-6 flex items-center gap-4 border-b border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] pb-4">
                     <div className="p-3 bg-[color:color-mix(in_srgb,var(--lume-accent)_8%,var(--lume-surface-field))] rounded-xl text-[color:var(--lume-accent)]">
                         <Building2 className="w-6 h-6" />
                     </div>
@@ -345,7 +345,7 @@ export default function AmbulatoryManagerPage() {
                 {isLoading ? (
                     <div className="text-center py-10 text-[color:var(--lume-ink-muted)]">Caricamento...</div>
                 ) : ambulatories.length === 0 ? (
-                    <div className="text-center py-10 bg-[color:rgba(255,249,240,0.5)] dark:bg-white/4 rounded-lg border border-dashed border-[color:rgba(112,106,100,0.2)] text-[color:var(--lume-ink-muted)]">
+                    <div className="text-center py-10 bg-[color:var(--lume-surface-field)] rounded-lg border border-dashed border-[color:color-mix(in_srgb,var(--lume-ink)_20%,transparent)] text-[color:var(--lume-ink-muted)]">
                         Nessun ambulatorio configurato.
                     </div>
                 ) : (
