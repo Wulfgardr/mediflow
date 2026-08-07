@@ -139,9 +139,13 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   CommandLineTools). Restano quindi non verificati i 4 file `native/` mergiati
   con la terminology parity. Il lavoro dipendente da Xcode è tracciato come
   backlog esplicito, bloccato dall'issue cappello sulla toolchain.
-- La CI GitHub Actions non era disponibile durante la convergenza precedente:
-  questa è la prima release che fa girare i workflow `cross-platform` e
-  `apple-native` sull'accumulato.
+- La CI ha eseguito su questa release quattro workflow su sei: `Web Core`,
+  `Repository Guards`, `E2E (Playwright)` e `Cross-platform (Win/Linux/macOS)`,
+  tutti verdi. `Apple Native` e `Core tri-OS gate` **non sono stati attivati**,
+  perché la release non tocca alcun file sotto `native/` e i filtri di percorso
+  non li hanno innescati. Il verde di questa release non è quindi un'evidenza
+  sul contenuto nativo: l'ultima esecuzione reale di `Apple Native`, sul commit
+  precedente, è `failure`.
 - Un censimento del debito cromatico e tipografico del runtime web ha contato
   848 occorrenze che bypassano i token del sistema visivo. Questa release ne
   chiude una parte nelle impostazioni; il resto è un programma di migrazione,
