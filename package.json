@@ -1,6 +1,6 @@
 {
   "name": "medical-record-app",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": false,
   "engines": {
     "node": ">=24 <25"
