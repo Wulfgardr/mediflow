@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-// WUL-297: /settings/ai defaults to the models surface.
+// @Codex WUL-522: the read-only Fabric registry is the AI settings entrypoint.
 export default function SettingsAiIndexPage() {
-    redirect('/settings/ai/modelli');
+    redirect('/settings/ai/fabric');
 }
