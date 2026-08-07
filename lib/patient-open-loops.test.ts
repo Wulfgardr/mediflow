@@ -1,7 +1,7 @@
 /* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveOpenLoops, MIN_TYPICAL_INTERVAL_DAYS } from './patient-open-loops';
+import { deriveOpenLoopProjection, deriveOpenLoops, MIN_TYPICAL_INTERVAL_DAYS } from './patient-open-loops';
 
 const now = new Date('2026-07-01T12:00:00.000Z');
 
@@ -20,6 +20,7 @@ function item(overrides: Record<string, unknown> = {}) {
     return {
         id: 'item-1',
         patientId: 'patient-1',
+        prescriptionId: 'prescription-1',
         status: 'prescribed',
         serviceName: 'Glicemia',
         createdAt: '2026-06-01T00:00:00.000Z',
@@ -33,6 +34,13 @@ test('signals a pending result after the waiting window', () => {
     assert.equal(loops[0].kind, 'results_pending');
     assert.equal(loops[0].suggestedAction, 'insert_results');
     assert.equal(loops[0].sourceRef.id, 'item-1');
+    assert.equal(loops[0].label, 'Glicemia');
+    assert.deepEqual(loops[0].status, {
+        sinceDate: new Date('2026-06-01T00:00:00.000Z'),
+        elapsedDays: 30,
+    });
+    assert.equal(loops[0].sourceRef.prescriptionId, 'prescription-1');
+    assert.equal(loops[0].sourceRef.serviceName, 'Glicemia');
 });
 
 test('closes a pending result with a linked observation or a received report', () => {
@@ -79,7 +87,12 @@ test('signals a stalled series from its observed cadence', () => {
     });
     assert.equal(loops.length, 1);
     assert.equal(loops[0].kind, 'series_stalled');
-    assert.match(loops[0].label, /ultima misura il 01\/03, intervallo tipico ~30 giorni/);
+    assert.equal(loops[0].label, 'Glicemia');
+    assert.deepEqual(loops[0].status, {
+        sinceDate: new Date('2026-03-01T00:00:00.000Z'),
+        elapsedDays: 122,
+        typicalIntervalDays: 29.5,
+    });
 });
 
 test('does not treat zero or sub-day median intervals as an observation cadence', () => {
@@ -153,5 +166,26 @@ test('orders open loops by the date on which the wait became open', () => {
         observations: [],
         now,
     });
-    assert.deepEqual(loops.map((loop) => loop.sourceRef.id), ['early', 'late']);
+    assert.deepEqual(
+        loops.map((loop) => loop.kind === 'results_pending' ? loop.sourceRef.id : null),
+        ['early', 'late'],
+    );
+});
+
+test('resolves a known LOINC display and groups pending results by prescription', () => {
+    const projection = deriveOpenLoopProjection({
+        items: [
+            item({ id: 'item-2', serviceName: 'Creatinine', codeSystem: 'LOINC', serviceCode: '2160-0' }),
+            item({ id: 'item-1', serviceName: 'Glicemia' }),
+        ],
+        prescriptions: [{ id: 'prescription-1', prescribedAt: '2026-05-30T00:00:00.000Z' }],
+        observations: [],
+        now,
+    });
+
+    assert.equal(projection.groups.length, 1);
+    assert.equal(projection.groups[0].prescriptionId, 'prescription-1');
+    assert.deepEqual(projection.groups[0].prescribedAt, new Date('2026-05-30T00:00:00.000Z'));
+    assert.deepEqual(projection.groups[0].loops.map((loop) => loop.label), ['Creatinina', 'Glicemia']);
+    assert.deepEqual(projection.standaloneLoops, []);
 });
