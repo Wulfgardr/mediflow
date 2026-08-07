@@ -54,8 +54,25 @@ function createOverview(overrides: Partial<NetworkOverviewPayload> = {}): Networ
                 capabilityStatus: 'disabled',
                 requiresPairing: true,
                 executionTarget: 'paired-home-base',
+                accessMode: 'status-only',
+                executionAuthorized: false,
             },
-            fallbackPolicy: 'client-local-runtime-else-ai-unavailable',
+            fabric: {
+                schemaVersion: 'mediflow.ai.network-fabric-status.v1',
+                contractVersion: 'mediflow.ai.fabric.v1',
+                access: 'status_only',
+                pairedExecution: 'not_authorized',
+                egressGateOpen: false,
+                readinessNote: 'available_unqualified',
+                fallback: 'denied_by_contract',
+                venues: {
+                    local_process: 'configured',
+                    home_base: 'disabled',
+                    on_device: 'not_implemented',
+                    cloud: 'egress_profile_closed',
+                },
+            },
+            fallbackPolicy: 'ai-unavailable-no-automatic-fallback',
             rolloutGate: 'lane-benchmarks-and-rollout-governance-required',
             surfaces: [
                 'patient-insight',
@@ -127,7 +144,7 @@ test('deriveNetworkOperatingModeViewModel maps local-only into the real local st
     assert.equal(viewModel.pairingLabel, 'Disabilitato');
     assert.equal(viewModel.aiRuntimeLabel, 'AI locale');
     assert.equal(viewModel.aiLocalRuntimeLabel, 'Ollama locale pronto, profilo medium');
-    assert.equal(viewModel.aiFallbackLabel, 'Fallback: runtime locale del client se presente, altrimenti AI non disponibile');
+    assert.equal(viewModel.aiFallbackLabel, 'Fallback automatico negato: se l AI non e disponibile, la richiesta fallisce');
     assert.equal(viewModel.currentReplicaState.code, 'local-only');
     assert.equal(viewModel.replicaPendingActionLabel, 'Nessuna');
     assert.equal(viewModel.backupBoundaryLabel, 'Il backup v1 resta separato dal mirror di rete');
@@ -189,8 +206,25 @@ test('deriveNetworkOperatingModeViewModel maps network-unpaired into the availab
                 capabilityStatus: 'available',
                 requiresPairing: true,
                 executionTarget: 'paired-home-base',
+                accessMode: 'status-only',
+                executionAuthorized: false,
             },
-            fallbackPolicy: 'client-local-runtime-else-ai-unavailable',
+            fabric: {
+                schemaVersion: 'mediflow.ai.network-fabric-status.v1',
+                contractVersion: 'mediflow.ai.fabric.v1',
+                access: 'status_only',
+                pairedExecution: 'not_authorized',
+                egressGateOpen: false,
+                readinessNote: 'available_unqualified',
+                fallback: 'denied_by_contract',
+                venues: {
+                    local_process: 'configured',
+                    home_base: 'host_configured',
+                    on_device: 'not_implemented',
+                    cloud: 'egress_profile_closed',
+                },
+            },
+            fallbackPolicy: 'ai-unavailable-no-automatic-fallback',
             rolloutGate: 'lane-benchmarks-and-rollout-governance-required',
             surfaces: [
                 'patient-insight',
@@ -247,7 +281,8 @@ test('deriveNetworkOperatingModeViewModel maps network-unpaired into the availab
     assert.equal(viewModel.nodeStatusLabel, 'Disponibile');
     assert.equal(viewModel.pairingLabel, 'Richiesto');
     assert.equal(viewModel.replicaPendingActionLabel, 'Serve pairing');
-    assert.equal(viewModel.aiRuntimeLabel, 'AI centralizzata disponibile');
+    assert.equal(viewModel.aiRuntimeLabel, 'Stato AI host disponibile');
+    assert.match(viewModel.aiRuntimeDescription, /non autorizza esecuzione AI/);
     assert.equal(viewModel.aiCapabilityStatus, 'available');
     assert.equal(viewModel.identityCredentialLabel, 'Sessione operatore attiva');
     assert.equal(viewModel.identityScopeSourceLabel, 'Contesto sessione');
@@ -295,8 +330,25 @@ test('deriveNetworkOperatingModeViewModel marks centralized AI unavailable when 
                 capabilityStatus: 'unavailable',
                 requiresPairing: true,
                 executionTarget: 'paired-home-base',
+                accessMode: 'status-only',
+                executionAuthorized: false,
             },
-            fallbackPolicy: 'client-local-runtime-else-ai-unavailable',
+            fabric: {
+                schemaVersion: 'mediflow.ai.network-fabric-status.v1',
+                contractVersion: 'mediflow.ai.fabric.v1',
+                access: 'status_only',
+                pairedExecution: 'not_authorized',
+                egressGateOpen: false,
+                readinessNote: 'available_unqualified',
+                fallback: 'denied_by_contract',
+                venues: {
+                    local_process: 'misconfigured',
+                    home_base: 'host_unavailable',
+                    on_device: 'not_implemented',
+                    cloud: 'egress_profile_closed',
+                },
+            },
+            fallbackPolicy: 'ai-unavailable-no-automatic-fallback',
             rolloutGate: 'lane-benchmarks-and-rollout-governance-required',
             surfaces: [
                 'patient-insight',
@@ -315,7 +367,7 @@ test('deriveNetworkOperatingModeViewModel marks centralized AI unavailable when 
         },
     }));
 
-    assert.equal(viewModel.aiRuntimeLabel, 'AI centralizzata non disponibile');
+    assert.equal(viewModel.aiRuntimeLabel, 'Stato AI host non disponibile');
     assert.equal(viewModel.aiCapabilityStatus, 'unavailable');
     assert.equal(viewModel.aiLocalRuntimeLabel, 'Ollama locale non valido, profilo custom');
     assert.equal(viewModel.aiRolloutGateLabel, 'Benchmark per area AI e governance prima dell attivazione reale');

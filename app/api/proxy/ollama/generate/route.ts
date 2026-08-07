@@ -2,7 +2,12 @@
 import { NextResponse } from 'next/server';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-import { validateLocalTarget } from '@/lib/local-target';
+import {
+    assertLocalOllamaResponse,
+    attestLocalOllamaModel,
+    strictOllamaLoopbackBaseUrl,
+} from '@/lib/ai-providers/ollama-locality';
+import { ollamaLocalityErrorResponse } from '@/lib/ai-providers/ollama-locality-response';
 
 /**
  * Proxy for Ollama Generate API
@@ -16,28 +21,16 @@ export async function POST(req: Request) {
     try {
         const body = await req.json();
         const targetUrl = req.headers.get('x-target-url') || process.env.OLLAMA_URL || 'http://localhost:11434';
-        /* @Codex */
-        const validation = validateLocalTarget(targetUrl);
-        if (!validation.ok) {
-            return NextResponse.json({ error: `Ollama URL not allowed: ${validation.reason}` }, { status: 400 });
-        }
-
-        const baseUrl = validation.url.toString()
-            .replace(/\/v1\/chat\/completions\/?$/, '')
-            .replace(/\/v1\/completions\/?$/, '')
-            .replace(/\/v1\/?$/, '')
-            .replace(/\/api\/chat\/?$/, '')
-            .replace(/\/api\/generate\/?$/, '')
-            .replace(/\/$/, '');
-
-        console.log(`[Proxy] Forwarding generate request to ${baseUrl}/api/generate`);
+        const baseUrl = strictOllamaLoopbackBaseUrl(targetUrl);
+        const attestation = await attestLocalOllamaModel(baseUrl, body?.model, req.signal);
 
         // Forward request to internal Ollama instance
         const res = await fetch(`${baseUrl}/api/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-            signal: req.signal // Propagate client abort to Ollama
+            body: JSON.stringify({ ...body, model: attestation.canonicalModel }),
+            signal: req.signal,
+            redirect: 'error',
         });
 
         if (!res.ok) {
@@ -46,10 +39,13 @@ export async function POST(req: Request) {
         }
 
         const data = await res.json();
+        assertLocalOllamaResponse(data, attestation);
         return NextResponse.json(data);
 
-    } catch (e: any) {
+    } catch (e: unknown) {
+        const localityResponse = ollamaLocalityErrorResponse(e);
+        if (localityResponse) return localityResponse;
         console.error("[Proxy] Generate Failed:", e);
-        return NextResponse.json({ error: "Proxy Error: " + e.message }, { status: 500 });
+        return NextResponse.json({ error: "Proxy Error" }, { status: 500 });
     }
 }

@@ -25,10 +25,10 @@ const NETWORK_AI_RUNTIME_SURFACES = [
 ] as const;
 
 const NETWORK_AI_RUNTIME_GUARDRAILS = [
-    'AI locale separata dai dati clinici.',
-    'Solo rete locale fidata con dispositivi associati: nessuna esposizione WAN o cloud.',
+    'Lo stato descrive la configurazione host e non prova un daemon attivo o una inferenza.',
+    'Il client paired legge solo lo stato e non riceve un grant di esecuzione AI.',
     'Nessun cloud o egress esterno di default.',
-    'Attivazione reale solo dopo benchmark per area AI e governance di rilascio.',
+    'Nessun fallback automatico tra venue.',
 ] as const;
 
 function normalizeHardwareProfile(value: string | null): NetworkAiRuntimeHardwareProfile {
@@ -73,8 +73,29 @@ export function deriveNetworkAiRuntimeSummary(input: NetworkAiRuntimeInput): Net
             capabilityStatus: centralRuntimeState,
             requiresPairing: true,
             executionTarget: 'paired-home-base',
+            accessMode: 'status-only',
+            executionAuthorized: false,
         },
-        fallbackPolicy: 'client-local-runtime-else-ai-unavailable',
+        fabric: {
+            schemaVersion: 'mediflow.ai.network-fabric-status.v1',
+            contractVersion: 'mediflow.ai.fabric.v1',
+            access: 'status_only',
+            pairedExecution: 'not_authorized',
+            egressGateOpen: false,
+            readinessNote: 'available_unqualified',
+            fallback: 'denied_by_contract',
+            venues: {
+                local_process: localRuntimeConfigured ? 'configured' : 'misconfigured',
+                home_base: input.operatingMode !== 'network-home-base'
+                    ? 'disabled'
+                    : localRuntimeConfigured
+                        ? 'host_configured'
+                        : 'host_unavailable',
+                on_device: 'not_implemented',
+                cloud: 'egress_profile_closed',
+            },
+        },
+        fallbackPolicy: 'ai-unavailable-no-automatic-fallback',
         rolloutGate: 'lane-benchmarks-and-rollout-governance-required',
         surfaces: [...NETWORK_AI_RUNTIME_SURFACES],
         killSwitches: input.killSwitches,

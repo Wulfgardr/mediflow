@@ -5,7 +5,9 @@ Questo file raccoglie i cambiamenti rilevanti di MediFlow.
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Non rilasciato] - linea post-0.8
+
+> Voci della linea di sviluppo post-0.8. Nessuna e' parte della release 0.8.0.
 
 ### Documentazione pubblica
 
@@ -20,6 +22,41 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 - La modalità demo Apple tratta il dataset sintetico come fixture UI. Il
   caricamento documenti non mostra più un falso errore di sessione paired.
+
+### Stack intelligente locale
+
+- **Modifica**: consolidato lo stack provider post-0.8 (WUL-269, WUL-418,
+  WUL-502): locality Ollama loopback, registry locale per task senza fallback,
+  matrice serving e limite digest-bound (ADR 0088).
+  **Stato**: integrato nella branch di programma WUL-522 e verificato in
+  locale (typecheck, lint, guard e suite unit complete).
+  **Limite**: il digest resta identita osservata, non prova causale
+  (`observed_not_causal`); la qualified readiness resta `HOLD`.
+- **Modifica**: contratto Intelligence Fabric (ADR 0089) con scaffold locale:
+  capability generative e deterministiche, venue esplicite, profili egress
+  versionati, resolver fail-closed e stato read-only.
+  **Stato**: scaffold locale con test dedicati; nessun provider nuovo.
+  **Limite**: il profilo cloud esiste ed e' chiuso per costruzione; nessun
+  egress, credenziale o consenso e' stato aggiunto.
+- **Modifica**: giunture fabric (ADR 0090): ciclo di vita del trust paired
+  con revoca host-side dei client, onboarding provider fail-closed per classe
+  di credenziale, decisioni di routing osservabili con fallback negato e
+  contratto di interazione clinica (incertezza con origine, campi illeggibili
+  distinti dagli assenti, revisione deny-by-default senza stato applicato).
+  **Stato**: contratti e runtime locali con test dedicati; route
+  `/api/ai/fabric/observability` e revoca `DELETE
+  /api/v1/network/pairing-clients/{clientId}`.
+  **Limite**: nessuna UI nuova e nessuna adozione nativa in questa fase; la
+  scrittura clinica resta un comando applicativo separato.
+- **Modifica**: candidato locale Fabric (ADR 0091) con lifecycle provider
+  dichiarativo, admissione e continuita fail-closed, proiezione paired
+  `status_only`, decode Swift condiviso e harness sintetico
+  receipt-provenance-review.
+  **Stato**: candidato locale sulla branch CoS post-0.8, senza credenziali o
+  servizi esterni.
+  **Limite**: il router non governa ancora tutti i call path AI; lifecycle
+  vendor, cloud, on-device, AI paired e persistenza della review restano
+  bloccati o fuori scope. Nessuna voce promuove la release 0.8.
 
 ## [0.8.0] - 2026-07-29
 
