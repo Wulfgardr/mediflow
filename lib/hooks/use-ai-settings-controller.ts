@@ -244,7 +244,12 @@ export function useAiSettingsController() {
         setAiHealth(null);
         try {
             const { AIService } = await import('@/lib/ai-service');
-            const service = new AIService('ollama', aiConfig.url, aiConfig.model_clinical);
+            const service = AIService.fromLocalTaskConfig(
+                'clinical',
+                aiConfig.url,
+                { clinical: aiConfig.model_clinical },
+                aiConfig.provider,
+            );
 
             const timeoutPromise = new Promise<{ status: string; message?: string; models?: unknown[] }>((_, reject) =>
                 setTimeout(() => reject(new Error('Timeout connessione (60s) - Il modello potrebbe richiedere tempo per caricarsi')), 60000),

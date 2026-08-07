@@ -2178,7 +2178,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
                 XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
                 XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), self.cookie)
                 XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
-                return (response, Data(#"{"plane":"ai-plane-separate-from-data-plane","mode":"centralized-available","localRuntime":{"provider":"ollama","state":"configured","targetPolicy":"loopback-only","hardwareProfile":"high","clinicalModel":null,"reasoningModel":null,"ocrModel":null},"centralRuntime":{"state":"available","capabilityStatus":"available","requiresPairing":true,"executionTarget":"paired-home-base"},"fallbackPolicy":"client-local-runtime-else-ai-unavailable","rolloutGate":"lane-benchmarks-and-rollout-governance-required","surfaces":["patient-insight","smart-import","document-synthesis","treatment-reasoning"],"killSwitches":{"patientInsight":"enabled","documentSynthesis":"disabled","smartImport":"enabled","treatmentReasoning":"disabled"},"guardrails":[]}"#.utf8))
+                return (response, Data(#"{"plane":"ai-plane-separate-from-data-plane","mode":"centralized-available","localRuntime":{"provider":"ollama","state":"configured","targetPolicy":"loopback-only","hardwareProfile":"high","clinicalModel":null,"reasoningModel":null,"ocrModel":null},"centralRuntime":{"state":"available","capabilityStatus":"available","requiresPairing":true,"executionTarget":"paired-home-base","accessMode":"status-only","executionAuthorized":false},"fabric":{"schemaVersion":"mediflow.ai.network-fabric-status.v1","contractVersion":"mediflow.ai.fabric.v1","access":"status_only","pairedExecution":"not_authorized","egressGateOpen":false,"readinessNote":"available_unqualified","fallback":"denied_by_contract","venues":{"local_process":"configured","home_base":"host_configured","on_device":"not_implemented","cloud":"egress_profile_closed"}},"fallbackPolicy":"ai-unavailable-no-automatic-fallback","rolloutGate":"lane-benchmarks-and-rollout-governance-required","surfaces":["patient-insight","smart-import","document-synthesis","treatment-reasoning"],"killSwitches":{"patientInsight":"enabled","documentSynthesis":"disabled","smartImport":"enabled","treatmentReasoning":"disabled"},"guardrails":[]}"#.utf8))
             case ("GET", "/api/v1/network/capabilities"):
                 return (response, Data(#"{"nodeId":"node-1","operatingMode":"network-home-base","protocolVersion":"1","capabilities":[]}"#.utf8))
             case ("GET", "/api/v1/network/identity"):
@@ -2244,6 +2244,18 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(draft.safety.writesPerformed, [])
         XCTAssertEqual(aiRuntime.killSwitches.treatmentReasoning, .disabled)
         XCTAssertTrue(aiRuntime.surfaces.contains("treatment-reasoning"))
+        XCTAssertEqual(aiRuntime.centralRuntime.accessMode, "status-only")
+        XCTAssertFalse(aiRuntime.centralRuntime.executionAuthorized)
+        XCTAssertEqual(aiRuntime.fabric.access, "status_only")
+        XCTAssertEqual(aiRuntime.fabric.pairedExecution, "not_authorized")
+        XCTAssertFalse(aiRuntime.fabric.egressGateOpen)
+        XCTAssertEqual(aiRuntime.fabric.readinessNote, "available_unqualified")
+        XCTAssertEqual(aiRuntime.fabric.fallback, "denied_by_contract")
+        XCTAssertEqual(aiRuntime.fabric.venues.localProcess, "configured")
+        XCTAssertEqual(aiRuntime.fabric.venues.homeBase, "host_configured")
+        XCTAssertEqual(aiRuntime.fabric.venues.onDevice, "not_implemented")
+        XCTAssertEqual(aiRuntime.fabric.venues.cloud, "egress_profile_closed")
+        XCTAssertEqual(aiRuntime.fallbackPolicy, "ai-unavailable-no-automatic-fallback")
 
         XCTAssertEqual(requests, [
             "POST https://localhost:3443/api/auth/change-pin",

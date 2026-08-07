@@ -90,9 +90,17 @@ La fotografia corrente e questa:
 - **AI**: runtime locale per default, `OllamaAdapter` e `AIService` come
   integrazioni presenti nel tree e gate egress ancora chiuso; benchmark e
   shadow lane restano separati dal prodotto clinico. Lo scaffold intelligente
-  di ADR 0086 resta una proposta e non apre una funzione nuova della v0.8.
-  Intelligence Fabric è una direzione post-0.8, non una funzione completa del
-  prodotto corrente.
+  di ADR 0086 e un contratto accettato per il programma post-0.8 e non apre una
+  funzione nuova della v0.8. Sulla linea post-0.8 sono presenti il registry
+  provider locale per task (WUL-502) e lo scaffold Intelligence Fabric di ADR
+  0089: contratto congelato, cataloghi delle capability generative e
+  deterministiche, resolver fail-closed e stato read-only
+  `/api/ai/fabric/status`. ADR 0090 e ADR 0091 aggiungono un candidato locale
+  limitato: lifecycle provider dichiarativo senza segreti, continuita
+  fail-closed, proiezione PHI-safe `status_only` per i client paired e harness
+  sintetico receipt-provenance-review. Il candidato non aggiunge provider,
+  egress, grant paired o automazione: Intelligence Fabric resta una linea in
+  costruzione, non una funzione completa del prodotto corrente.
 - **Attese locali**: la prima slice web collega prestazioni attese e risultati;
   il salvataggio resta esplicito e il workflow non e esteso ai client paired.
 - **SISS/FSE**: handoff contestuale e flussi `webapp-assisted`; nessuna
@@ -333,10 +341,14 @@ Documenti/ADR principali:
 Il runtime AI operativo resta locale. Il default generativo protetto e trattato
 come baseline finche benchmark e governance non giustificano un cambio.
 
-`OllamaAdapter` e `AIService` separano il provider dal servizio applicativo, ma
-`AIProvider` espone oggi solo Ollama. Il gate egress applica il primo strato
-deterministico e resta `closed_pending_redaction_lane`: non esistono provider
-cloud, registry operativo o consenso egress consegnati.
+`OllamaAdapter` e `AIService` separano il provider dal servizio applicativo.
+Nel pacchetto post-0.8, `LocalProviderRegistry` centralizza il binding
+task-provider-modello per i task instradati tramite `AIService` e accetta solo
+Ollama su loopback, senza fallback. Non estende grant o fallback alle lane
+separate, come ATHENA MLX. Questo packet non appartiene alla candidata 0.8. Il
+gate egress resta
+`closed_pending_redaction_lane`: non esistono provider cloud o consenso egress
+consegnati.
 
 Le superfici operative includono:
 
@@ -367,6 +379,27 @@ entro i gate e i limiti dichiarati.
 - Nessuna voce aggiunge cloud, auto-write clinico, SISS/FSE nativo o una inbox
   conversazionale.
 
+### 5.1.2 Candidato locale Intelligence Fabric post-0.8
+
+Il branch di programma post-0.8 contiene un candidato tecnico locale regolato
+da ADR 0089, ADR 0090 e ADR 0091. Il candidato:
+
+- applica onboarding, degrado e revoca provider a snapshot dichiarativi che
+  non contengono credenziali;
+- nega venue offline, sconosciute o degradate e non cambia provider in
+  fallback;
+- espone su `/api/v1/network/ai-runtime` una proiezione PHI-safe decodificabile
+  dal core Swift condiviso;
+- lascia il client paired in `status_only`, con esecuzione AI non autorizzata;
+- collega in un harness sintetico receipt, provenance, proposta e revisione
+  del medico senza eseguire scritture cliniche;
+- mantiene il core deterministico non-AI disponibile senza provider.
+
+Il router candidato non governa ancora tutti i call path AI operativi. Il
+lifecycle provider non e persistito e non parla con API vendor. Cloud,
+on-device e invocazione AI paired restano in `hold`. Il risultato e quindi un
+candidato locale verificabile, non una promozione prodotto o remota.
+
 ### 5.2 Lane benchmark-only
 
 > [!WARNING]
@@ -395,6 +428,11 @@ Per promuovere una lane servono:
 - shadow mode quando applicabile;
 - rollback/fallback chiari;
 - aggiornamento docs/ADR se cambia un boundary.
+
+La classificazione completa per task, modello e runtime vive in
+[docs/ai-runtime-serving-matrix.md](./ai-runtime-serving-matrix.md). La matrice
+separa `runtime`, `shadow`, `benchmark_only` e `hold`; un modello installato non
+è automaticamente un modello serving.
 
 ### 5.3 Comparator cloud
 

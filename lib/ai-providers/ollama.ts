@@ -6,9 +6,13 @@ import {
     type ProviderAdapter,
 } from './provider';
 import { normalizeOllamaBaseUrl } from './base-url';
-
-/* @Codex */
-const MODEL_KEEP_ALIVE = '30m';
+import {
+    assertLocalOllamaResponse,
+    attestLocalOllamaModel,
+    isLocalOllamaModelDescriptor,
+    OLLAMA_LOCAL_KEEP_ALIVE,
+    strictOllamaLoopbackBaseUrl,
+} from './ollama-locality';
 
 export interface OllamaProviderAdapterOptions {
     baseUrl: string;
@@ -65,7 +69,7 @@ export function buildOllamaChatPayload(
         messages: toOllamaMessages(messages),
         stream: false,
         ...(options?.responseFormat === 'json' ? { format: 'json' } : {}),
-        keep_alive: MODEL_KEEP_ALIVE,
+        keep_alive: OLLAMA_LOCAL_KEEP_ALIVE,
         options: {
             temperature: 0.4,
             num_predict: maxTokens || 4096,
@@ -81,7 +85,7 @@ export class OllamaProviderAdapter implements ProviderAdapter {
     public readonly capabilities = {
         vision: true,
         jsonMode: true,
-        pull: true,
+        pull: false,
         thinkingToggle: true,
     };
 
@@ -111,13 +115,17 @@ export class OllamaProviderAdapter implements ProviderAdapter {
 
     async chat(messages: ChatMessage[], signal?: AbortSignal, maxTokens?: number, options?: AIChatOptions): Promise<{ content: string; stats: AIStats }> {
         const start = Date.now();
-        const endpoint = this.isBrowserRuntime()
+        const browserRuntime = this.isBrowserRuntime();
+        const providerBaseUrl = browserRuntime
+            ? this.baseUrl
+            : strictOllamaLoopbackBaseUrl(this.baseUrl);
+        const endpoint = browserRuntime
             ? '/api/proxy/ollama/chat'
-            : `${this.baseUrl}/api/chat`;
+            : `${providerBaseUrl}/api/chat`;
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
         };
-        if (this.isBrowserRuntime()) {
+        if (browserRuntime) {
             headers['x-target-url'] = this.baseUrl;
         }
 
@@ -125,25 +133,29 @@ export class OllamaProviderAdapter implements ProviderAdapter {
         const effectiveSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
 
         try {
+            const attestation = browserRuntime
+                ? null
+                : await attestLocalOllamaModel(providerBaseUrl, this.model, effectiveSignal);
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify(buildOllamaChatPayload(
-                    this.model,
+                    attestation?.canonicalModel ?? this.model,
                     messages,
                     maxTokens,
                     options,
                     this.disableThinking,
                 )),
                 signal: effectiveSignal,
+                redirect: 'error',
             });
 
             if (!response.ok) {
-                const errText = await response.text();
-                throw new Error(`AI Provider Error (${response.status}): ${errText}`);
+                throw new Error(`AI Provider Error (${response.status})`);
             }
 
             const data = await response.json();
+            if (attestation) assertLocalOllamaResponse(data, attestation);
             const content = data.message?.content || data.choices?.[0]?.message?.content || '';
             const usage = data.usage || {};
             const tokensIn = data.prompt_eval_count || usage.prompt_tokens || 0;
@@ -168,72 +180,27 @@ export class OllamaProviderAdapter implements ProviderAdapter {
     }
 
     async listModels(): Promise<AIModel[]> {
-        const targetUrl = this.baseUrl;
+        const browserRuntime = this.isBrowserRuntime();
+        const targetUrl = browserRuntime
+            ? this.baseUrl
+            : strictOllamaLoopbackBaseUrl(this.baseUrl);
         try {
             const response = await fetch(
-                this.isBrowserRuntime() ? '/api/ai/models' : `${targetUrl}/api/tags`,
-                this.isBrowserRuntime()
-                    ? { headers: { 'x-target-url': targetUrl } }
-                    : undefined,
+                browserRuntime ? '/api/ai/models' : `${targetUrl}/api/tags`,
+                browserRuntime
+                    ? { headers: { 'x-target-url': targetUrl }, redirect: 'error' }
+                    : { redirect: 'error' },
             );
             if (!response.ok) throw new Error('Failed to fetch models');
             const data = await response.json();
-            return data.models || [];
+            const models = Array.isArray(data.models) ? data.models : [];
+            return browserRuntime
+                ? models
+                : models.filter(isLocalOllamaModelDescriptor);
         } catch (e) {
             console.error('List Models Error:', e);
             throw e;
         }
     }
 
-    async pullModel(modelName: string, onProgress?: (status: string, progress: number) => void): Promise<void> {
-        const targetUrl = this.baseUrl;
-        const response = await fetch(this.isBrowserRuntime() ? '/api/ai/pull' : `${targetUrl}/api/pull`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(this.isBrowserRuntime() ? { 'x-target-url': targetUrl } : {}),
-            },
-            body: JSON.stringify({ model: modelName }),
-        });
-
-        if (!response.ok || !response.body) {
-            throw new Error('Failed to start model pull');
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        try {
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-
-                for (const line of lines) {
-                    if (!line.trim()) continue;
-                    try {
-                        const data = JSON.parse(line);
-                        let percent = 0;
-                        if (data.total && data.completed) {
-                            percent = Math.round((data.completed / data.total) * 100);
-                        }
-
-                        if (onProgress) {
-                            onProgress(data.status, percent);
-                        }
-
-                        if (data.error) throw new Error(data.error);
-                    } catch (e) {
-                        console.warn('Parse error chunk', e);
-                    }
-                }
-            }
-        } finally {
-            reader.releaseLock();
-        }
-    }
 }

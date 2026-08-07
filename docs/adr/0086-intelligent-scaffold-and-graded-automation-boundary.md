@@ -1,9 +1,14 @@
 # ADR 0086: scaffolding intelligente e automazione graduata
 
 Date: 2026-07-24
-Status: Proposed
+Status: Accepted
 
 Issue: WUL-499
+
+Program line: post-0.8
+Baseline commit: `2355a46a4dde63b1956a2298d99ef0b5c4208222`
+Baseline status: candidato locale 0.8 provvisorio e immutabile per questo
+programma
 
 Related:
 [ADR 0012](./0012-operator-reviewed-smart-import-from-patient-context.md),
@@ -21,7 +26,7 @@ Queste funzioni non formano ancora un unico runtime conversazionale.
 
 Serve un contratto comune che distingua:
 
-- ciò che è operativo su `main`;
+- ciò che è operativo sulla baseline locale verificata;
 - il comportamento che resta obbligatorio per ogni futura integrazione;
 - le funzioni pianificate ma non consegnate;
 - le azioni che MediFlow non deve eseguire in modo automatico.
@@ -34,14 +39,15 @@ conversazioni può sembrare una inbox intelligente già operativa.
 
 - **Esito:** adottare un contratto provider-agnostic per lo scaffold, con
   pipeline locale indipendente dai provider opzionali.
-- **Ambito:** contratto e roadmap 0.8. Questo ADR non aggiunge un nuovo runtime.
-- **Orizzonte:** consolidamento 0.8 e packet successivi, separati per dominio.
+- **Ambito:** contratto e roadmap post-0.8. Questo ADR non aggiunge un nuovo
+  runtime e non modifica il candidato 0.8.
+- **Orizzonte:** integrazioni successive alla 0.8, separate per dominio.
 - **Vincoli:** local-first, dati sintetici nel repository, provenienza,
   revisione umana e arresto in caso di ambiguità.
 - **Stop immediato:** nessun egress implicito, accesso diretto del provider al
   database o applicazione automatica di diagnosi e prescrizioni.
 
-## Fatti verificati su `main`
+## Fatti verificati sulla baseline locale 0.8
 
 | Area | Stato implementato | Limite attuale |
 | --- | --- | --- |
@@ -314,8 +320,10 @@ Fermare il packet se una modifica:
 
 ## First Thin Slice
 
-1. Revisionare e accettare questo ADR senza modifiche runtime.
-2. Allineare README, topologia e roadmap distinguendo stato reale e futuro.
+1. Mantenere questo ADR accettato e distinto dalla release 0.8, senza modifiche
+   runtime nel packet documentale.
+2. Allineare README e roadmap e verificare la topologia, distinguendo stato
+   reale e futuro.
 3. Aggiornare WUL-499 senza creare una issue duplicata.
 4. Eseguire gate documentali e una verifica indipendente.
 5. Aprire packet separati solo per gap confermati, con owner, threat model,

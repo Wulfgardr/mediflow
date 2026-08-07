@@ -439,6 +439,23 @@ export type NetworkAiRuntimeKillSwitches = {
 };
 
 /* @Codex */
+export type NetworkAiRuntimeFabricProjection = {
+    schemaVersion: 'mediflow.ai.network-fabric-status.v1';
+    contractVersion: 'mediflow.ai.fabric.v1';
+    access: 'status_only';
+    pairedExecution: 'not_authorized';
+    egressGateOpen: false;
+    readinessNote: 'available_unqualified';
+    fallback: 'denied_by_contract';
+    venues: {
+        local_process: 'configured' | 'misconfigured';
+        home_base: 'host_configured' | 'host_unavailable' | 'disabled';
+        on_device: 'not_implemented';
+        cloud: 'egress_profile_closed';
+    };
+};
+
+/* @Codex */
 export type NetworkAiRuntimeSummary = {
     plane: 'ai-plane-separate-from-data-plane';
     mode: NetworkAiRuntimeMode;
@@ -456,8 +473,11 @@ export type NetworkAiRuntimeSummary = {
         capabilityStatus: NetworkCapabilityStatus;
         requiresPairing: true;
         executionTarget: 'paired-home-base';
+        accessMode: 'status-only';
+        executionAuthorized: false;
     };
-    fallbackPolicy: 'client-local-runtime-else-ai-unavailable';
+    fabric: NetworkAiRuntimeFabricProjection;
+    fallbackPolicy: 'ai-unavailable-no-automatic-fallback';
     rolloutGate: 'lane-benchmarks-and-rollout-governance-required';
     surfaces: NetworkAiRuntimeSurface[];
     killSwitches: NetworkAiRuntimeKillSwitches;
@@ -623,6 +643,8 @@ export type NetworkErrorResponse = {
         | 'PAIRING_REQUEST_INVALID'
         | 'NETWORK_MODE_DISABLED'
         | 'PAIRING_INTENT_NOT_FOUND'
-        | 'PAIRING_INTENT_EXPIRED';
+        | 'PAIRING_INTENT_EXPIRED'
+        | 'PAIRING_CLIENT_NOT_FOUND'
+        | 'PAIRING_STATE_CONFLICT';
     message: string;
 };

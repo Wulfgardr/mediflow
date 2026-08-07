@@ -1,6 +1,15 @@
 /* @Codex */
 export type AIProvider = 'ollama';
 
+export type AiLane =
+    | 'patient_insight'
+    | 'smart_import'
+    | 'document_synthesis'
+    | 'ocr'
+    | 'treatment_reasoning';
+
+export type AuthorityPlane = 'clinical_application' | 'engineering_operator';
+
 export interface AIStats {
     latency: number;
     tokensIn: number;
@@ -38,6 +47,8 @@ export interface ProviderAdapter {
         pull: boolean;
         thinkingToggle: boolean;
     };
+    getBaseUrl(): string;
+    getModel(): string;
     chat(
         messages: ChatMessage[],
         signal?: AbortSignal,

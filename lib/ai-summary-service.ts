@@ -21,6 +21,12 @@ import {
     AiPatientInsightDisabledError,
     assertAiPatientInsightEnabledValue,
 } from '@/lib/ai-patient-insight-kill-switch';
+import {
+    admitPatientInsightFabric,
+    attachPatientInsightFabricMetadata,
+    PatientInsightFabricDeniedError,
+    PatientInsightFabricMetadataAttachmentError,
+} from '@/lib/ai-summary-fabric';
 
 export type SummaryStage = 'connect' | 'context' | 'generate' | 'save';
 
@@ -183,7 +189,25 @@ export async function regeneratePatientSummary(
 
         const prompt = buildPatientInsightExtractionPrompt(contextData.prompt);
 
-        options.onStage?.('generate', info);
+        // L'admissione Fabric osserva solo snapshot locali dopo la riduzione
+        // del contesto e prima di ogni invocazione generativa.
+        let health: unknown = null;
+        try {
+            health = await ai.getHealth();
+        } catch {
+            // La sonda non puo' scavalcare l'admissione fail-closed.
+            health = null;
+        }
+        const admission = admitPatientInsightFabric({
+            modelInfo: info,
+            health,
+        });
+        if (!admission.admitted) {
+            throw new PatientInsightFabricDeniedError(admission.denial);
+        }
+        const admittedInfo = attachPatientInsightFabricMetadata(info, admission.metadata);
+
+        options.onStage?.('generate', admittedInfo);
         const content = await ai.generate(prompt, options.signal, contextData.outputMaxTokens);
         const extracted = parsePatientInsightExtractionResponse(content);
         if (!isEnvelopeUsable(extracted)) {
@@ -201,7 +225,7 @@ export async function regeneratePatientSummary(
             throw new Error("L'AI ha generato una risposta vuota o non valida.");
         }
 
-        options.onStage?.('save', info);
+        options.onStage?.('save', admittedInfo);
         await db.patients.update(patientId, {
             aiSummary: cleaned,
             aiSummaryGeneratedAt: new Date(),
@@ -210,12 +234,20 @@ export async function regeneratePatientSummary(
             updatedAt: new Date()
         });
 
-        return info;
+        return admittedInfo;
     })();
 
     inflight.set(patientId, task);
     try {
         return await task;
+    } catch (error) {
+        if (error instanceof PatientInsightFabricDeniedError
+            || error instanceof PatientInsightFabricMetadataAttachmentError) {
+            // Una negazione e' terminale per il burst corrente: una nuova
+            // generazione richiede una nuova azione del chiamante.
+            pendingRerun.delete(patientId);
+        }
+        throw error;
     } finally {
         inflight.delete(patientId);
         if (pendingRerun.has(patientId)) {

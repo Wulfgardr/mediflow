@@ -369,7 +369,9 @@ La first thin slice `network home-base` si attiva solo in modalita
 
 Surface attuale:
 
-- summary PHI-safe di nodo, sessione, capability, identita e AI runtime
+- summary PHI-safe di nodo, sessione, capability, identita e AI runtime;
+  `/api/v1/network/ai-runtime` include la proiezione Fabric
+  `mediflow.ai.network-fabric-status.v1`
 - pairing bootstrap/confirm
 - primo data plane remoto read-only su pazienti (`/api/v1/network/patients*`)
 - primo write remoto limitato a `PUT /api/v1/network/patients/{id}` per profilo/status paziente
@@ -394,6 +396,8 @@ Boundary attuale:
   `network.replica.write-checkups` e `checkups.version`
 - le osservazioni paired usano capability `network.replica.readonly-observations` /
   `network.replica.write-observations` e `observations.version`
+- la proiezione Fabric paired e `status_only`: mostra stato host e venue, ma
+  `executionAuthorized` resta `false`
 - hard delete remoto, PUT/DELETE paired degli allegati, sync record-level,
   invocazione AI, campi document-derived e fallback automatico restano fuori;
   cataloghi read-only e create manuale allegati sono disponibili
@@ -449,6 +453,10 @@ restano follow-up. Vedi anche [docs/adr/0016-backup-artifact-v1-manifest-preflig
   fact `page/section/snippet` e conflitti reviewable
 - `lib/openmed-redaction.ts` + `app/api/system/redaction/route.ts`: adapter
   locale shadow-only per la lane `redaction.v1`
+- `lib/ai-providers/fabric/candidate-router.ts`: admissione locale fail-closed
+  per snapshot provider e venue osservate, senza fallback
+- `lib/ai-providers/fabric/local-candidate-harness.ts`: prova sintetica che
+  collega receipt, provenance, proposta e review del medico senza persistenza
 
 > [!NOTE]
 > L'AI resta locale di default e review-first. I safety gate (WUL-358)
@@ -690,6 +698,10 @@ sequenceDiagram
   consegnato il tooling P6 di base, mentre `WUL-481` governa prerequisiti
   operativi e verbale manuale residuo sul Mac sbloccato. Offline degradato
   (`WUL-403`) e decisione documentale condizionata da ADR 0076 restano separati.
+- Il candidato Intelligence Fabric post-0.8 non governa ancora tutti i call
+  path AI reali. Il core Swift decodifica la proiezione `status_only`, ma il
+  client paired non esegue AI. Cloud, on-device, persistenza del lifecycle
+  provider e scrittura clinica dal Fabric restano fuori.
 
 ---
 
