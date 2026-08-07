@@ -14,11 +14,11 @@ const allowedStatuses = new Set(['covered', 'gap', 'blocked']);
 const allowedEvidenceTypes = new Set(['command', 'runbook', 'adr', 'issue', 'pr', 'manual']);
 const allowedParityGaps = new Set(['full-parity', 'partial', 'missing-both', 'host-only']);
 const expectedParitySummary = {
-  total: 64,
+  total: 66,
   fullParity: 30,
   partial: 13,
   missing: 0,
-  hostOnly: 21,
+  hostOnly: 23,
   openNonHost: 13,
 };
 const expectedManifestGaps = new Map([

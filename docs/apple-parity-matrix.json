@@ -545,13 +545,13 @@
     },
     {
       "area": "settings-host",
-      "feature": "Modelli AI: pull modello Ollama + profilo hardware + governance",
-      "web": "/api/ai/pull, applyHardwareProfile, AiModelParliamentPanel, AiRolloutReadinessPanel (app/settings/ai/modelli,funzioni)",
+      "feature": "Modelli AI: pull modello Ollama + profilo hardware",
+      "web": "/api/ai/pull, applyHardwareProfile (app/settings/ai/modelli/page.tsx)",
       "native": "host-only: hardware/RAM e runtime Ollama sono del nodo host; nessuna gestione client paired",
       "boundary": "host-only: configurazione runtime AI del nodo host",
       "gap": "host-only",
       "wave": "HOST-ONLY",
-      "evidence": "web-settings.ai/modelli(pull,hardware,parliament); codex-fetch-map./api/ai/pull,ai-parliament,ai-rollout-readiness"
+      "evidence": "2026-08-07: app/settings/ai/modelli/page.tsx; app/api/ai/pull/route.ts; lib/settings-navigation.ts"
     },
     {
       "area": "settings-host",
@@ -685,13 +685,33 @@
     },
     {
       "area": "Impostazioni AI",
-      "feature": "/settings/ai (hub) — in realtà un semplice redirect a /settings/ai/modelli, non una vista distinta",
-      "web": "app/settings/ai/page.tsx — 'export default function SettingsAiIndexPage() { redirect(\"/settings/ai/modelli\"); }' (commento: WUL-297, /settings/ai defaults to models surface); le viste reali sono /settings/ai/modelli e /settings/ai/funzioni",
-      "native": "n/a — redirect e configurazione del runtime AI restano superfici del nodo Mac autorevole, non un target di parity del client paired",
-      "boundary": "host-only: nessun boundary paired richiesto per un redirect verso impostazioni AI locali",
+      "feature": "/settings/ai (hub) — redirect al registro Fabric, vista reale in sola lettura",
+      "web": "app/settings/ai/page.tsx reindirizza a /settings/ai/fabric; il registro reale mostra capability, venue ed egress in sola lettura (app/settings/ai/fabric/page.tsx)",
+      "native": "n/a — il redirect porta a una superficie host-only del nodo Mac autorevole, non a un target di parity del client paired",
+      "boundary": "host-only: il redirect conduce al registro Fabric che descrive il calcolo dell'host; nessun boundary paired aggiuntivo",
       "gap": "host-only",
-      "wave": "HOST-ONLY",
-      "evidence": "app/settings/ai/page.tsx:1-5"
+      "wave": "W5-ai-avanzate",
+      "evidence": "2026-08-07: app/settings/ai/page.tsx; app/settings/ai/fabric/page.tsx; lib/settings-navigation.ts"
+    },
+    {
+      "area": "settings-host",
+      "feature": "Registro Intelligence Fabric: 16 capability, 4 venue osservate e profili egress",
+      "web": "Registro in sola lettura con FabricVenueSection, FabricEgressSection e FabricCapabilityRegistry (app/settings/ai/fabric/page.tsx)",
+      "native": "host-only: un client Apple mostrerebbe lo stato di una macchina che non e la propria; nessun registro Fabric equivalente sul client paired",
+      "boundary": "host-only: ADR 0076 esclude l'invocazione AI paired; il registro descrive il calcolo dell'host e non e un gap di parity. E una differenza architetturale voluta, della stessa famiglia di Bonjour e del supervisor/probe home-base.",
+      "gap": "host-only",
+      "wave": "W5-ai-avanzate",
+      "evidence": "2026-08-07: app/settings/ai/fabric/page.tsx; lib/settings-navigation.ts; docs/adr/0076-paired-document-domain-write-policy.md"
+    },
+    {
+      "area": "settings-host",
+      "feature": "Governance AI: parliament dei modelli e prontezza al rollout",
+      "web": "AiModelParliamentPanel e AiRolloutReadinessPanel in app/settings/ai/governance/page.tsx",
+      "native": "host-only: parliament e readiness descrivono il runtime e la postura di rilascio del nodo host, non del client paired",
+      "boundary": "host-only: ADR 0076 esclude l'invocazione AI paired; la governance osserva e governa il calcolo dell'host e non e un gap di parity del client Apple.",
+      "gap": "host-only",
+      "wave": "W5-ai-avanzate",
+      "evidence": "2026-08-07: app/settings/ai/governance/page.tsx; lib/settings-navigation.ts; docs/adr/0076-paired-document-domain-write-policy.md"
     }
   ],
   "critique_residua": [],
@@ -704,11 +724,11 @@
       "note": "Code and documentation base before the parity closeout documentation packet. This is not a self-referential final packet hash.",
       "runRecord": "docs/analysis/2026-07-27-parity-0.8-recovery-run.md"
     },
-    "rowReference": "Each integer is the zero-based index in rows. Feature counts retain the guarded 30/13/21 contract. Interaction evidence is separate and non-exclusive.",
+    "rowReference": "Each integer is the zero-based index in rows. Feature counts retain the guarded 30/13/23 contract. Interaction evidence is separate and non-exclusive.",
     "featureParity": {
       "fullParity": [1, 5, 6, 10, 12, 13, 17, 20, 21, 22, 23, 24, 25, 26, 27, 28, 32, 33, 36, 37, 38, 39, 40, 41, 50, 54, 55, 56, 60, 62],
       "partial": [0, 2, 3, 4, 7, 9, 11, 14, 15, 19, 31, 35, 44],
-      "outOfScope": [8, 16, 18, 29, 30, 34, 42, 43, 45, 46, 47, 48, 49, 51, 52, 53, 57, 58, 59, 61, 63]
+      "outOfScope": [8, 16, 18, 29, 30, 34, 42, 43, 45, 46, 47, 48, 49, 51, 52, 53, 57, 58, 59, 61, 63, 64, 65]
     },
     "interactionParity": {
       "verifiedAutomatic": [0, 12, 13, 14, 15, 17, 20, 31, 32, 33],
@@ -752,14 +772,14 @@
     },
     "verdict": "PARTIAL / HOLD_PROMOTION"
   },
-  "updated": "2026-07-28: reconciled the 64-row feature contract against current web, macOS and assistive-technology evidence; guarded counts remain 30/13/21",
+  "updated": "2026-08-07: aligned the 66-row feature contract with the 0.8.1 AI settings information architecture (Fabric registry and governance split); 2026-07-28: reconciled the 64-row feature contract against current web, macOS and assistive-technology evidence; guarded counts were 30/13/21",
   "version": 2,
   "summary": {
-    "total": 64,
+    "total": 66,
     "fullParity": 30,
     "partial": 13,
     "missing": 0,
-    "hostOnly": 21,
+    "hostOnly": 23,
     "openNonHost": 13
   }
 }
