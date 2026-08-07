@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, PauseCircle, RefreshCw, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import styles from './settings-lume.module.css';
 
 type RolloutStatus = 'hold' | 'shadow-ready' | 'rollback-required';
 type RolloutLane =
@@ -181,7 +182,7 @@ export default function AiRolloutReadinessPanel() {
                         <MetricCard label="Report mancanti" value={String(missingCount)} tone="missing" />
                     </div>
 
-                    <div className="rounded-[20px] border border-slate-200/70 bg-white/72 p-4 shadow-[0_10px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-white/5">
+                    <div className={`rounded-[20px] border border-slate-200/70 bg-white/72 p-4 dark:border-white/10 dark:bg-white/5 ${styles.quietShadow}`}>
                         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                             <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
@@ -264,7 +265,7 @@ function LaneCard({
 
     return (
         <div
-            className="rounded-[20px] border border-slate-200/70 bg-white/72 p-4 shadow-[0_10px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-white/5"
+            className={`rounded-[20px] border border-slate-200/70 bg-white/72 p-4 dark:border-white/10 dark:bg-white/5 ${styles.quietShadow}`}
             data-testid={`ai-rollout-lane-${entry.lane}`}
         >
             <div className="flex items-start justify-between gap-3">

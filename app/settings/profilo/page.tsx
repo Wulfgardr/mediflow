@@ -75,7 +75,7 @@ export default function SettingsProfilePage() {
             <div className={SETTINGS_CARD_CLASS}>
                 {/* @Codex WUL-229: header icon disc + ink copy mapped to MediFlow tokens */}
                 <div className="mb-5 flex items-start gap-3">
-                    <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--lume-ink)' }}>
+                    <div className="rounded-2xl p-2" style={{ background: 'color-mix(in srgb, var(--lume-ink) 6%, transparent)', color: 'var(--lume-ink)' }}>
                         <User className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">

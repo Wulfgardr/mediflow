@@ -36,7 +36,7 @@ export function SettingsSearchOverlay({
     const [query, setQuery] = useState('');
     const [activeIndex, setActiveIndex] = useState(0);
 
-    const matches = useMemo(() => searchSettingsNav(query), [query]);
+    const matches = useMemo(() => searchSettingsNav(query, 12), [query]);
 
     useEffect(() => {
         if (!open) return;

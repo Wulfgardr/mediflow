@@ -28,7 +28,7 @@ export default function SettingsDevelopmentPage() {
     return (
         <section className="space-y-4" data-testid="settings-development-section">
             <SettingsSectionIntro
-                kicker="Avanzate"
+                kicker="Sistema"
                 title="Sviluppo"
                 description="Strumenti per collaudo e manutenzione: dati dimostrativi e avvio della shell nativa."
             />

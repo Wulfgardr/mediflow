@@ -37,9 +37,9 @@ export default function SettingsAiModelsPage() {
     return (
         <section className="space-y-4" data-testid="settings-ai-models-section">
             <SettingsSectionIntro
-                kicker="AI locale"
-                title="Modelli e Hardware"
-                description="Provider locale, profilo hardware e modelli dedicati per ciascun ruolo clinico."
+                kicker="Intelligenza locale"
+                title="Modelli e hardware"
+                description="Profilo hardware, modelli e Ollama per ciascun ruolo clinico."
             />
 
             <div className="space-y-6">
@@ -47,7 +47,7 @@ export default function SettingsAiModelsPage() {
                 <div className={SETTINGS_CARD_CLASS}>
                     {/* @Codex WUL-229: hardware tier cards now ride mf-option-card with token-driven accents */}
                     <div className="mb-5 flex items-start gap-3">
-                        <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--lume-ink)' }}>
+                        <div className="rounded-2xl p-2" style={{ background: 'color-mix(in srgb, var(--lume-ink) 6%, transparent)', color: 'var(--lume-ink)' }}>
                             <Cpu className="h-4 w-4" />
                         </div>
                         <div className="min-w-0">
@@ -61,7 +61,7 @@ export default function SettingsAiModelsPage() {
                         <div
                             onClick={() => applyHardwareProfile('low')}
                             className={cn('mf-option-card !px-4 !py-4', hardwareProfile === 'low' && 'is-active')}
-                            style={hardwareProfile === 'low' ? { borderColor: 'rgba(15, 23, 42, 0.22)', background: 'rgba(248, 250, 252, 0.9)' } : undefined}
+                            style={hardwareProfile === 'low' ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 22%, transparent)', background: 'var(--lume-surface-field)' } : undefined}
                         >
                             <div className="mb-2 flex items-center justify-between gap-3">
                                 <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--lume-ink)' }}>Leggero</span>
@@ -74,7 +74,7 @@ export default function SettingsAiModelsPage() {
                         <div
                             onClick={() => applyHardwareProfile('medium')}
                             className={cn('mf-option-card !px-4 !py-4', hardwareProfile === 'medium' && 'is-active')}
-                            style={hardwareProfile === 'medium' ? { borderColor: 'rgba(15, 23, 42, 0.22)', background: 'rgba(248, 250, 252, 0.9)' } : undefined}
+                            style={hardwareProfile === 'medium' ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 22%, transparent)', background: 'var(--lume-surface-field)' } : undefined}
                         >
                             <div className="mb-2 flex items-center justify-between gap-3">
                                 <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--lume-ink)' }}>Bilanciato</span>
@@ -87,7 +87,7 @@ export default function SettingsAiModelsPage() {
                         <div
                             onClick={() => applyHardwareProfile('high')}
                             className={cn('mf-option-card !px-4 !py-4', hardwareProfile === 'high' && 'is-active')}
-                            style={hardwareProfile === 'high' ? { borderColor: 'rgba(15, 23, 42, 0.22)', background: 'rgba(248, 250, 252, 0.9)' } : undefined}
+                            style={hardwareProfile === 'high' ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 22%, transparent)', background: 'var(--lume-surface-field)' } : undefined}
                         >
                             <div className="mb-2 flex items-center justify-between gap-3">
                                 <span className="text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: 'var(--lume-ink)' }}>Avanzato</span>
@@ -103,7 +103,7 @@ export default function SettingsAiModelsPage() {
                 <div className={SETTINGS_CARD_CLASS}>
                     {/* @Codex WUL-273: AI roles header follows the neutral settings surface. */}
                     <div className="mb-5 flex items-start gap-3">
-                        <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--lume-ink)' }}>
+                        <div className="rounded-2xl p-2" style={{ background: 'color-mix(in srgb, var(--lume-ink) 6%, transparent)', color: 'var(--lume-ink)' }}>
                             <Stethoscope className="h-4 w-4" />
                         </div>
                         <div className="min-w-0">

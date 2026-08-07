@@ -51,7 +51,7 @@ export default function SettingsAccessPage() {
     return (
         <section className="space-y-4" data-testid="settings-access-section">
             <SettingsSectionIntro
-                kicker="Sicurezza e Dati"
+                kicker="Dati e sicurezza"
                 title="Accesso"
                 description="Rotazione del PIN di sblocco e controllo della sessione."
             />
@@ -60,7 +60,7 @@ export default function SettingsAccessPage() {
                 <div className={SETTINGS_CARD_CLASS}>
                     {/* @Codex WUL-229: security card icon switches to MediFlow warning tone */}
                     <div className="mb-5 flex items-start gap-3">
-                        <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--lume-ink)' }}>
+                        <div className="rounded-2xl p-2" style={{ background: 'color-mix(in srgb, var(--lume-ink) 6%, transparent)', color: 'var(--lume-ink)' }}>
                             <KeyRound className="h-4 w-4" />
                         </div>
                         <div className="min-w-0">
@@ -148,7 +148,7 @@ export default function SettingsAccessPage() {
                 {/* WUL-297: sessione locale corrente, con blocco immediato. */}
                 <div className={SETTINGS_CARD_CLASS}>
                     <div className="mb-5 flex items-start gap-3">
-                        <div className="rounded-2xl p-2" style={{ background: 'rgba(15, 23, 42, 0.06)', color: 'var(--lume-ink)' }}>
+                        <div className="rounded-2xl p-2" style={{ background: 'color-mix(in srgb, var(--lume-ink) 6%, transparent)', color: 'var(--lume-ink)' }}>
                             <Lock className="h-4 w-4" />
                         </div>
                         <div className="min-w-0">

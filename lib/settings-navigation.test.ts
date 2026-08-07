@@ -2,6 +2,8 @@
 // Run with: npm run test:settings-navigation
 
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { test } from 'node:test';
 
 import { SETTINGS_NAV_GROUPS, searchSettingsNav } from './settings-navigation';
@@ -19,6 +21,15 @@ test('every nav item lives under /settings and has searchable metadata', () => {
             assert.ok(!hrefs.has(item.href), `${item.href} href unique`);
             ids.add(item.id);
             hrefs.add(item.href);
+        }
+    }
+});
+
+test('every navigation href resolves to a settings route page', () => {
+    for (const group of SETTINGS_NAV_GROUPS) {
+        for (const item of group.items) {
+            const routePage = path.join(process.cwd(), 'app', ...item.href.split('/').filter(Boolean), 'page.tsx');
+            assert.ok(existsSync(routePage), `${item.href} resolves to ${routePage}`);
         }
     }
 });
@@ -62,5 +73,6 @@ test('fuzzy subsequence matching still finds kill switches', () => {
 
 test('empty query lists sections up to the limit, nonsense yields nothing', () => {
     assert.equal(searchSettingsNav('').length, 8);
+    assert.equal(searchSettingsNav('', 12).length, 12);
     assert.equal(searchSettingsNav('zzzqqqxxx').length, 0);
 });

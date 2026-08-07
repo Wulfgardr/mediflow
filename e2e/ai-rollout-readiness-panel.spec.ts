@@ -95,9 +95,9 @@ test('settings shows rollout readiness lanes, missing artifacts and markdown pre
     });
   });
 
-  // WUL-297: governance/readiness now lives on the AI functions sub-route.
-  await page.goto('/settings/ai/funzioni');
-  await expect(page).toHaveURL(/\/settings\/ai\/funzioni$/);
+  // Wave 0.8.1: governance/readiness has its own AI sub-route.
+  await page.goto('/settings/ai/governance');
+  await expect(page).toHaveURL(/\/settings\/ai\/governance$/);
 
   const panel = page.getByTestId('ai-rollout-readiness-panel');
   // WUL-297: the panel heading is now Italian ("Stato rilascio AI locale").
