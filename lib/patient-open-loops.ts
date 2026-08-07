@@ -1,5 +1,7 @@
 /* @Codex */
 
+import { resolveStaticTerminology } from './terminology';
+
 export const RESULTS_PENDING_AFTER_DAYS = 14;
 export const MIN_POINTS = 3;
 export const STALL_FACTOR = 1.5;
@@ -9,29 +11,73 @@ export const MAX_TYPICAL_INTERVAL_DAYS = 180;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export type OpenLoop = {
-    kind: 'results_pending' | 'series_stalled';
+export type OpenLoopStatus = {
+    sinceDate: Date;
+    elapsedDays: number;
+    typicalIntervalDays?: number;
+};
+
+export type ResultsPendingOpenLoop = {
+    kind: 'results_pending';
     patientId: string;
     label: string;
-    sinceDate: Date;
+    status: OpenLoopStatus;
     sourceRef: {
-        type: 'service_prescription_item' | 'observation_series';
-        id?: string;
-        code?: string;
-        codeSystem?: string;
-        serviceName?: string;
+        type: 'service_prescription_item';
+        id: string;
+        prescriptionId: string;
+        serviceName: string;
+        code?: never;
+        codeSystem?: never;
     };
-    suggestedAction: 'insert_results' | 'insert_measurement';
+    suggestedAction: 'insert_results';
+};
+
+export type SeriesStalledOpenLoop = {
+    kind: 'series_stalled';
+    patientId: string;
+    label: string;
+    status: OpenLoopStatus & { typicalIntervalDays: number };
+    sourceRef: {
+        type: 'observation_series';
+        code: string;
+        codeSystem: string;
+        id?: never;
+        prescriptionId?: never;
+        serviceName?: never;
+    };
+    suggestedAction: 'insert_measurement';
+};
+
+export type OpenLoop = ResultsPendingOpenLoop | SeriesStalledOpenLoop;
+
+export type OpenLoopGroup = {
+    prescriptionId: string;
+    prescribedAt: Date;
+    loops: ResultsPendingOpenLoop[];
+};
+
+export type OpenLoopProjection = {
+    groups: OpenLoopGroup[];
+    standaloneLoops: OpenLoop[];
 };
 
 export type OpenLoopServicePrescriptionItem = {
     id: string;
     patientId: string;
+    prescriptionId: string;
     status: string;
+    codeSystem?: string;
+    serviceCode?: string;
     scheduledAt?: Date | string | null;
     reportReceivedAt?: Date | string | null;
     createdAt?: Date | string | null;
     serviceName: string;
+};
+
+export type OpenLoopServicePrescription = {
+    id: string;
+    prescribedAt: Date | string;
 };
 
 export type OpenLoopObservation = {
@@ -48,10 +94,6 @@ function validDate(value: Date | string | null | undefined): Date | null {
     if (!value) return null;
     const date = value instanceof Date ? value : new Date(value);
     return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function dateLabel(date: Date): string {
-    return date.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
 }
 
 function median(values: number[]): number {
@@ -89,18 +131,23 @@ export function deriveOpenLoops(input: {
         if (validDate(item.reportReceivedAt) || linkedItemIds.has(item.id)) continue;
         const referenceDate = validDate(item.scheduledAt) ?? validDate(item.createdAt);
         if (!referenceDate) continue;
-        const sinceDate = new Date(referenceDate.getTime() + RESULTS_PENDING_AFTER_DAYS * DAY_MS);
-        if (input.now.getTime() < sinceDate.getTime()) continue;
+        const elapsedDays = Math.floor((input.now.getTime() - referenceDate.getTime()) / DAY_MS);
+        if (elapsedDays < RESULTS_PENDING_AFTER_DAYS) continue;
+        const terminology = item.codeSystem?.trim().toUpperCase() === 'LOINC' && item.serviceCode
+            ? resolveStaticTerminology('LOINC', item.serviceCode)
+            : null;
+        const serviceName = terminology?.displayIt ?? terminology?.display ?? item.serviceName;
 
         loops.push({
             kind: 'results_pending',
             patientId: item.patientId,
-            label: `Nessun risultato collegato dal ${dateLabel(referenceDate)}`,
-            sinceDate,
+            label: serviceName,
+            status: { sinceDate: referenceDate, elapsedDays },
             sourceRef: {
                 type: 'service_prescription_item',
                 id: item.id,
-                serviceName: item.serviceName,
+                prescriptionId: item.prescriptionId,
+                serviceName,
             },
             suggestedAction: 'insert_results',
         });
@@ -141,8 +188,12 @@ export function deriveOpenLoops(input: {
         loops.push({
             kind: 'series_stalled',
             patientId: latest.patientId,
-            label: `${latest.display}: ultima misura il ${dateLabel(latest.observedDate)}, intervallo tipico ~${Math.round(typicalIntervalDays)} giorni`,
-            sinceDate: new Date(latest.observedDate.getTime() + thresholdDays * DAY_MS),
+            label: latest.display,
+            status: {
+                sinceDate: latest.observedDate,
+                elapsedDays: Math.floor(elapsedDays),
+                typicalIntervalDays,
+            },
             sourceRef: {
                 type: 'observation_series',
                 codeSystem: latest.codeSystem,
@@ -152,5 +203,44 @@ export function deriveOpenLoops(input: {
         });
     }
 
-    return loops.sort((left, right) => left.sinceDate.getTime() - right.sinceDate.getTime());
+    return loops.sort((left, right) => left.status.sinceDate.getTime() - right.status.sinceDate.getTime());
+}
+
+/** Raggruppa le attese per il contenitore prescrizione senza mutare i record. */
+export function deriveOpenLoopProjection(input: {
+    items: OpenLoopServicePrescriptionItem[];
+    prescriptions: OpenLoopServicePrescription[];
+    observations: OpenLoopObservation[];
+    now: Date;
+}): OpenLoopProjection {
+    const loops = deriveOpenLoops(input);
+    const pendingByPrescription = new Map<string, ResultsPendingOpenLoop[]>();
+    const standaloneLoops: OpenLoop[] = [];
+
+    for (const loop of loops) {
+        if (loop.kind === 'series_stalled') {
+            standaloneLoops.push(loop);
+            continue;
+        }
+        const groupLoops = pendingByPrescription.get(loop.sourceRef.prescriptionId) ?? [];
+        groupLoops.push(loop);
+        pendingByPrescription.set(loop.sourceRef.prescriptionId, groupLoops);
+    }
+
+    const groups = input.prescriptions
+        .map((prescription): OpenLoopGroup | null => {
+            const prescribedAt = validDate(prescription.prescribedAt);
+            const groupLoops = pendingByPrescription.get(prescription.id);
+            if (!prescribedAt || !groupLoops?.length) return null;
+            pendingByPrescription.delete(prescription.id);
+            return { prescriptionId: prescription.id, prescribedAt, loops: groupLoops };
+        })
+        .filter((group): group is OpenLoopGroup => group !== null)
+        .sort((left, right) => left.prescribedAt.getTime() - right.prescribedAt.getTime());
+
+    for (const orphanedLoops of pendingByPrescription.values()) {
+        standaloneLoops.push(...orphanedLoops);
+    }
+
+    return { groups, standaloneLoops };
 }
