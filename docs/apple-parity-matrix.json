@@ -625,13 +625,13 @@
     },
     {
       "area": "AI conversazionale",
-      "feature": "POST /api/proxy/ai/chat (proxy invocazione modello AI per chat), distinto da /api/conversations e /api/messages (CRUD storico)",
-      "web": "app/api/proxy/ai/chat/route.ts — endpoint proxy che inoltra la richiesta di generazione al runtime AI configurato (Ollama/MLX/cloud); /api/conversations e /api/messages gestiscono solo persistenza CRUD dello storico, non l'invocazione del modello",
+      "feature": "POST /api/proxy/ollama/chat e POST /api/proxy/ollama/generate (proxy invocazione modello AI locale via Ollama), distinti da /api/conversations e /api/messages (CRUD storico)",
+      "web": "app/api/proxy/ollama/chat/route.ts e app/api/proxy/ollama/generate/route.ts — proxy session-auth verso il runtime Ollama locale (loopback stretto con attestazione modello via lib/ai-providers/ollama-locality.ts); /api/conversations e /api/messages gestiscono solo persistenza CRUD dello storico, non l'invocazione del modello",
       "native": "host-only per la policy corrente: il client Apple non invoca la generazione AI e puo al massimo leggere output gia persistiti nelle superfici consentite",
       "boundary": "host-only: il proxy AI chat non appartiene a /api/v1/network e ADR 0076 esclude l'invocazione AI paired",
       "gap": "host-only",
       "wave": "W5-ai-avanzate",
-      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; app/api/proxy/ai/chat/route.ts vs app/api/conversations/route.ts, app/api/messages/route.ts"
+      "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; app/api/proxy/ollama/chat/route.ts e app/api/proxy/ollama/generate/route.ts vs app/api/conversations/route.ts, app/api/messages/route.ts; path corretti 2026-08-07: la verifica L4 ha rilevato drift della matrice (il precedente app/api/proxy/ai/chat/route.ts non esiste nel checkout, cfr. inventario L3)"
     },
     {
       "area": "AI runtime locale",
@@ -772,7 +772,7 @@
     },
     "verdict": "PARTIAL / HOLD_PROMOTION"
   },
-  "updated": "2026-08-07: aligned the 66-row feature contract with the 0.8.1 AI settings information architecture (Fabric registry and governance split); 2026-07-28: reconciled the 64-row feature contract against current web, macOS and assistive-technology evidence; guarded counts were 30/13/21",
+  "updated": "2026-08-07 (0.8.1): aligned the 66-row feature contract with the AI settings information architecture (Fabric registry and governance split); 2026-08-07: fixed matrix drift in the 'AI conversazionale' row — the cited app/api/proxy/ai/chat/route.ts does not exist in the checkout; repointed to the real app/api/proxy/ollama/{chat,generate}/route.ts (L4 verification, host-only classification and guarded counts 30/13/21 unchanged). Previous: 2026-07-28 reconciled the 64-row feature contract against current web, macOS and assistive-technology evidence",
   "version": 2,
   "summary": {
     "total": 66,
