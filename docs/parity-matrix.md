@@ -8,7 +8,7 @@ read_when:
 # Matrice parity localhost ↔ client Apple
 
 Stato documento: `CANONICAL`
-Ultimo aggiornamento: 2026-07-28 (`MediFlow 0.8`)
+Ultimo aggiornamento: 2026-08-07 (`MediFlow 0.8.1`, allineamento IA impostazioni)
 
 ## Gate MediFlow 0.8
 
@@ -17,7 +17,7 @@ La base congelata del packet parity è
 `c46d739b026e509a3e1fae2348372a420c9a17aa`. Il commit finale della candidata è
 registrato nel run record dopo la verifica post-commit.
 
-Il contratto funzionale resta `PARTIAL`: 13 capability sono parziali e 21 sono
+Il contratto funzionale resta `PARTIAL`: 13 capability sono parziali e 23 sono
 intenzionalmente host-only. Questo non impedisce la candidata sorgente 0.8.
 
 Il gate UI è chiuso con una deroga esterna documentata: i test automatici,
@@ -83,14 +83,14 @@ XCTest non dimostrano VoiceOver reale su iPhone o iPad.
 | `full-parity` | 30 | Il workflow equivalente è disponibile sulle superfici target previste. |
 | `partial` | 13 | Esiste una superficie utile, ma manca equivalenza di funzione, campo, flessibilità o verifica manuale. |
 | `missing-both` | 0 | Nessuna capability resta priva sia di boundary sia di UI senza una decisione esplicita. |
-| `host-only` | 21 | La funzione resta sul Mac/localhost per autorità, filesystem, runtime AI o policy. |
-| **Totale** | **64** | Capability censite. |
+| `host-only` | 23 | La funzione resta sul Mac/localhost per autorità, filesystem, runtime AI o policy. |
+| **Totale** | **66** | Capability censite. |
 
-Escludendo le 21 righe intenzionalmente host-only, 30 capability su 43 sono
+Escludendo le 23 righe intenzionalmente host-only, 30 capability su 43 sono
 `full-parity` (**70%**); 13 su 43 restano parziali (**30%**). Sul totale
-grezzo, le righe full sono 30/64 (**47%**).
+grezzo, le righe full sono 30/66 (**45%**).
 
-Questi numeri descrivono il contratto funzionale 30/13/21. Non sono il
+Questi numeri descrivono il contratto funzionale 30/13/23. Non sono il
 conteggio delle prove correnti e non autorizzano il claim “parity completa”.
 
 La chiave `reconciliation` del JSON collega il contratto alle prove 0.8.
@@ -124,7 +124,7 @@ Il manifest Apple-wide verifica 24 acceptance record tecnici separati.
 | Viste globali | `MIXED` | agenda, diario globale, analytics e interazione macOS reale | shell/deep-link e cockpit sintetico restano partial |
 | Documenti | `PARTIAL` e policy-limited | upload cifrato, archivio, insight, follow-up, allegati e stati web verificati | OCR e curation restano host per ADR 0076; questa divisione intenzionale non è equivalenza mancante |
 | Offline mobile | `PARTIAL` | cache cifrata derivata e stato degradato read-only | TTL/freschezza visibili e riconciliazione onesta (`WUL-403`) |
-| AI generativa | `HOST-ONLY` | stato runtime/kill switch leggibile | nessuna invocazione AI paired per ADR 0076 |
+| AI generativa, Fabric e governance | `HOST-ONLY` | stato runtime/kill switch leggibile; registro Fabric read-only (16 capability, 4 venue, profili egress) e parliament/readiness del nodo host | ADR 0076 esclude l'invocazione AI paired; il registro e la governance descrivono il calcolo della macchina host, quindi non sono gap del client Apple |
 | Backup, diagnostica, repertori, update | `HOST-ONLY` | gestiti dal nodo Mac autorevole | non sono gap di parity client |
 
 ## Wave completate
@@ -171,7 +171,7 @@ Questa divisione è `platform-specific-documented`, non un gap implicito.
 ### Fuori Wave 6
 
 - chat/generazione AI paired;
-- gestione modelli, backup, diagnostica e import repertori dal client;
+- gestione modelli, registro Fabric, governance/rollout, backup, diagnostica e import repertori dal client;
 - hard delete remoto;
 - writeback SISS/FSE;
 - coda di scrittura offline o sync multi-master;
