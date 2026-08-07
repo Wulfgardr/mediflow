@@ -58,6 +58,96 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   vendor, cloud, on-device, AI paired e persistenza della review restano
   bloccati o fuori scope. Nessuna voce promuove la release 0.8.
 
+## [0.8.1] - 2026-08-07
+
+> Questa voce descrive la release sorgente `0.8.1`. Non dichiara una
+> pubblicazione App Store, una certificazione o conformità completa.
+> Nessun contenuto nativo Apple è stato compilato in questa release: vedi
+> "Limiti dichiarati" in fondo.
+
+### Impostazioni
+
+- **Modifica**: la Intelligence Fabric ha una superficie utente.
+  `/settings/ai/fabric` ("Capacità e connessioni") mostra il registro delle 16
+  capability, le 4 sedi di esecuzione con lo stato osservato, e i profili di
+  uscita dei dati. `/settings/ai` reindirizza qui invece che ai modelli.
+  **Stato**: integrata; contratto, stato e osservabilità esistevano dal
+  contratto Fabric (ADR 0089) ma nessuna superficie li consumava.
+  Copertura: test unitario sui mapping esaustivi e spec E2E dedicata.
+  **Limite**: è un registro in **sola lettura**. Non muta nulla: gli
+  interruttori restano in "Funzioni cliniche", che resta l'unica superficie di
+  scrittura. Gli stati runtime `egressGateOpen=true`, 401 e errore di rete
+  sono implementati e verificati dal type system, ma non iniettati nella spec
+  E2E.
+- **Modifica**: l'architettura dell'informazione delle impostazioni dice cosa
+  contiene. I gruppi diventano "Dati e sicurezza", "Intelligenza locale" e
+  "Sistema"; "Funzioni e Sicurezza" diventa "Funzioni cliniche".
+  **Stato**: integrata, con verifica automatica che ogni voce di navigazione
+  corrisponda a una route realmente presente nel repository.
+  **Limite**: nessun cambiamento di comportamento; è una riorganizzazione di
+  etichette e di collocazione.
+- **Modifica**: "Governance e rollout" (`/settings/ai/governance`) si separa da
+  "Funzioni cliniche", che teneva insieme quattro argomenti distinti.
+  **Stato**: integrata; i due pannelli spostati non dipendono dal controller
+  condiviso delle impostazioni AI, quindi lo scorporo non divide alcuno stato.
+  **Limite**: le spec E2E che raggiungevano i pannelli sono state ripuntate
+  alla nuova route.
+
+### Scheda clinica
+
+- **Modifica**: il blocco "Attenzione" ha per soggetto il fatto clinico. Le
+  attese di risultato sono raggruppate per prescrizione, il nome dell'esame è
+  in evidenza, il ritardo è in Registro, e ogni riga è per intero il controllo
+  con un bersaglio da 44px. Una sola azione esplicita per gruppo.
+  **Stato**: integrata. Il dominio (`deriveOpenLoops`) restituisce i gruppi:
+  la lingua vive nel componente, il dominio porta i fatti.
+  **Limite**: il percorso "+N altri esami" oltre le sei righe riusa il
+  precedente del Foglio sinottico ma non è verificato con più di sei righe.
+  Nessuna scrittura automatica: la lista si accorcia man mano che il medico
+  inserisce i risultati.
+- **Modifica**: le azioni che hanno per oggetto il paziente escono dal blocco
+  "Attenzione". "Nuova voce" sale nella testata sticky; modifica, export FHIR,
+  condivisione FHIR e Report PDF vanno in un menu "Azioni".
+  **Stato**: integrata. La spec del capability gate FHIR è stata aggiornata
+  nella stessa modifica perché apra il menu prima di verificare: senza questo,
+  il test sarebbe passato per il motivo sbagliato.
+  **Limite**: la condivisione reale via Web Share di Safari e l'attivazione del
+  download PDF non sono verificate end-to-end; è verificato il gate.
+- **Modifica**: rimossa la tinta calda del blocco "Attenzione".
+  **Stato**: integrata e misurata. Il fondo computato di `.attentionBand` passa
+  da `rgb(247,246,246)` (caldo) a trasparente; la banda resta distinguibile per
+  testata, spaziatura e il bordo già presente.
+  **Limite**: era un token **di segnale** (`--lume-signal-warning`) usato come
+  tinta di superficie su un pannello grande — un errore di categoria, non un
+  valore fuori posto. Non è stato introdotto un token di superficie sostitutivo:
+  quello avrebbe riprodotto lo stesso errore a livello di token.
+
+### Coerenza multipiattaforma
+
+- **Modifica**: la matrice di parity Apple registra le due superfici nuove e
+  corregge la riga su `/settings/ai`, che non è più un semplice redirect.
+  **Stato**: integrata; le nuove superfici sono classificate `host-only`.
+  **Limite**: il registro Fabric descrive il calcolo **dell'host**. Un client
+  Apple che lo mostrasse riporterebbe lo stato di una macchina che non è la
+  sua: è una differenza architetturale voluta (ADR 0076), non un gap da
+  colmare.
+
+### Limiti dichiarati della release
+
+- **Nessun contenuto nativo Apple è stato compilato o testato.** La toolchain
+  Xcode non è disponibile sulla postazione (`xcode-select -p` punta a
+  CommandLineTools). Restano quindi non verificati i 4 file `native/` mergiati
+  con la terminology parity. Il lavoro dipendente da Xcode è tracciato come
+  backlog esplicito, bloccato dall'issue cappello sulla toolchain.
+- La CI GitHub Actions non era disponibile durante la convergenza precedente:
+  questa è la prima release che fa girare i workflow `cross-platform` e
+  `apple-native` sull'accumulato.
+- Un censimento del debito cromatico e tipografico del runtime web ha contato
+  848 occorrenze che bypassano i token del sistema visivo. Questa release ne
+  chiude una parte nelle impostazioni; il resto è un programma di migrazione,
+  non una rifinitura, e il censimento non dichiara i propri limiti di
+  completezza — va trattato come pista, non come inventario verificato.
+
 ## [0.8.0] - 2026-07-29
 
 > Questa voce descrive la release sorgente `0.8.0`. Non dichiara una

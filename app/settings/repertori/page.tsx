@@ -100,9 +100,9 @@ export default function SettingsRepertoriPage() {
     return (
         <section className="space-y-4" data-testid="settings-repertori-section">
             <SettingsSectionIntro
-                kicker="Repertori"
-                title="Farmaci AIFA ed esenzioni"
-                description="Repertori per la cartella: farmaci AIFA ed esenzioni consultabili anche senza rete."
+                kicker="Dati e sicurezza"
+                title="Repertori"
+                description="AIFA ed esenzioni consultabili localmente anche senza rete."
             />
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">

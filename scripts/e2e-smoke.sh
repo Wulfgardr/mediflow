@@ -18,6 +18,16 @@ export MEDIFLOW_DATA_DIR="$E2E_DATA_DIR"
 export E2E_BASE_URL="$BASE_URL"
 export MEDIFLOW_NEXT_DIST_DIR="${MEDIFLOW_NEXT_DIST_DIR:-.next-e2e}"
 E2E_SPECS="${E2E_SPECS:-e2e/web-smoke.spec.ts e2e/document-import.spec.ts}"
+E2E_NEXT_BUNDLER="${E2E_NEXT_BUNDLER:-turbopack}"
+
+case "$E2E_NEXT_BUNDLER" in
+  turbopack) NEXT_BUNDLER_FLAG="--turbopack" ;;
+  webpack) NEXT_BUNDLER_FLAG="--webpack" ;;
+  *)
+    echo "Unsupported E2E_NEXT_BUNDLER: $E2E_NEXT_BUNDLER (expected turbopack or webpack)"
+    exit 1
+    ;;
+esac
 
 if ! node -e "require.resolve('@playwright/test/package.json')" >/dev/null 2>&1; then
   echo "Missing dependency: @playwright/test"
@@ -50,8 +60,8 @@ cleanup() {
 
 trap cleanup EXIT
 
-echo "Starting Next.js dev server on $BASE_URL ..."
-npx next dev --turbopack --hostname "$HOST" --port "$PORT" >"$DEV_LOG" 2>&1 &
+echo "Starting Next.js dev server on $BASE_URL with $E2E_NEXT_BUNDLER ..."
+npx next dev "$NEXT_BUNDLER_FLAG" --hostname "$HOST" --port "$PORT" >"$DEV_LOG" 2>&1 &
 DEV_PID=$!
 
 echo "Waiting for $BASE_URL ..."

@@ -1,6 +1,6 @@
 {
   "name": "medical-record-app",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": false,
   "engines": {
     "node": ">=24 <25"
@@ -163,6 +163,7 @@
     "test:openmed-redaction": "bash scripts/openmed-redaction-test.sh",
     "test:pin-change": "bash scripts/pin-change-test.sh",
     "test:settings-navigation": "bash scripts/settings-navigation-test.sh",
+    "test:fabric-settings-view": "bash scripts/fabric-settings-view-test.sh",
     "test:server-auth-policy": "bash scripts/server-auth-policy-test.sh",
     "test:admin-auth-boundary": "node --test scripts/admin-route-auth-boundary.test.mjs",
     "test:network:home-base-readonly": "bash scripts/network-home-base-readonly-smoke.sh",
@@ -187,6 +188,7 @@
     "e2e:web": "E2E_SPECS='e2e/web-smoke.spec.ts' bash scripts/e2e-smoke.sh",
     "e2e:ai-rollout-readiness": "E2E_SPECS='e2e/ai-rollout-readiness-panel.spec.ts e2e/ai-rollout-guard-settings.spec.ts' bash scripts/e2e-smoke.sh",
     "e2e:ai-rollout-governance": "E2E_SPECS='e2e/ai-rollout-readiness-panel.spec.ts e2e/ai-rollout-guard-settings.spec.ts e2e/patient-insight-kill-switch.spec.ts e2e/smart-import-kill-switch.spec.ts e2e/document-synthesis-kill-switch.spec.ts e2e/treatment-reasoning-kill-switch.spec.ts' bash scripts/e2e-smoke.sh",
+    "e2e:fabric-settings": "E2E_SPECS='e2e/settings-fabric.spec.ts' E2E_BASE_URL='http://127.0.0.1:3189' bash scripts/e2e-smoke.sh",
     "e2e:smoke": "bash scripts/e2e-smoke.sh"
   },
   "dependencies": {

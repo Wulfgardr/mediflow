@@ -1,6 +1,19 @@
 // WUL-297: information architecture for the settings sidebar and the
 // "Cerca impostazione" quick-jump. Pure data module: no React imports so it
 // stays testable with node --test.
+//
+// Wave 0.8.1 — razionalizzazione dell'IA (WUL-522 fabric visibility):
+// - "Sicurezza e Dati" -> "Dati e sicurezza": l'accesso viene prima dei dati
+//   che protegge, e i Repertori restano qui perche' sono corpus locale.
+// - "Intelligenza Artificiale" -> "Intelligenza locale": il gruppo dichiara la
+//   promessa del prodotto invece della tecnologia.
+// - Nuova voce `ai-fabric`: la Intelligence Fabric (ADR 0089/0090/0091) aveva
+//   contratto, status ed observability server-side ma nessuna superficie. E'
+//   la prima voce del gruppo perche' e' il registro che spiega tutte le altre.
+// - Nuova voce `ai-governance`: parliament + rollout readiness escono da
+//   "Funzioni e Sicurezza", che restava un contenitore di quattro argomenti.
+// - "Avanzate" -> "Sistema": le voci descrivono la postazione, non un livello
+//   di competenza dell'utente.
 
 export type SettingsNavItem = {
     id: string;
@@ -49,7 +62,7 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
     },
     {
         id: 'sicurezza-dati',
-        label: 'Sicurezza e Dati',
+        label: 'Dati e sicurezza',
         items: [
             {
                 id: 'accesso',
@@ -61,7 +74,7 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
             {
                 id: 'backup',
                 href: '/settings/backup',
-                label: 'Backup e Ripristino',
+                label: 'Backup e ripristino',
                 description: 'Schedulazione e restore',
                 keywords: ['backup', 'ripristino', 'restore', 'schedulazione backup', 'export dati', 'archivio cifrato'],
             },
@@ -76,27 +89,56 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
     },
     {
         id: 'ai',
-        label: 'Intelligenza Artificiale',
+        label: 'Intelligenza locale',
         items: [
+            {
+                id: 'ai-fabric',
+                href: '/settings/ai/fabric',
+                label: 'Capacità e connessioni',
+                description: 'Registro capability, dove gira il calcolo, egress',
+                keywords: [
+                    'fabric',
+                    'intelligence fabric',
+                    'capability',
+                    'capacità ai',
+                    'venue',
+                    'dove gira',
+                    'connettori',
+                    'connessioni',
+                    'egress',
+                    'uscita dati',
+                    'provenienza',
+                    'daemon locale',
+                    'home base',
+                    'registro capability',
+                ],
+            },
             {
                 id: 'ai-modelli',
                 href: '/settings/ai/modelli',
-                label: 'Modelli e Hardware',
+                label: 'Modelli e hardware',
                 description: 'Profilo hardware, modelli, Ollama',
                 keywords: ['modelli ai', 'ollama', 'profilo hardware', 'download modelli', 'url provider', 'docker', 'test connessione', 'ocr', 'reasoning'],
             },
             {
                 id: 'ai-funzioni',
                 href: '/settings/ai/funzioni',
-                label: 'Funzioni e Sicurezza',
-                description: 'Kill-switch, budget, governance',
-                keywords: ['kill switch', 'patient insight', 'document synthesis', 'smart import', 'budget insight', 'governance', 'parliament', 'rollout readiness'],
+                label: 'Funzioni cliniche',
+                description: 'Interruttori per funzione e budget insight',
+                keywords: ['kill switch', 'interruttore', 'patient insight', 'document synthesis', 'smart import', 'budget insight', 'treatment reasoning', 'ocr'],
+            },
+            {
+                id: 'ai-governance',
+                href: '/settings/ai/governance',
+                label: 'Governance e rollout',
+                description: 'Parliament dei modelli e prontezza al rilascio',
+                keywords: ['governance', 'parliament', 'rollout readiness', 'prontezza', 'rilascio', 'guard', 'controllo modelli'],
             },
         ],
     },
     {
         id: 'avanzate',
-        label: 'Avanzate',
+        label: 'Sistema',
         items: [
             {
                 id: 'diagnostica',

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle, Database, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { clearExemptionDatabase, getExemptionStats, importExemptionFiles } from '@/lib/exemption-importer';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import styles from './settings-lume.module.css';
 
 type MessageState = {
     type: 'success' | 'error';
@@ -202,7 +203,7 @@ export default function ExemptionDbManager() {
             <div className="pt-2 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
                 <button
                     onClick={refreshStats}
-                    className="inline-flex items-center gap-1 rounded-full bg-white/75 px-3 py-1.5 text-xs text-gray-500 shadow-[0_8px_18px_rgba(15,23,42,0.04)] hover:text-gray-700 dark:bg-white/5 dark:hover:text-gray-300"
+                    className={`inline-flex items-center gap-1 rounded-full bg-white/75 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:bg-white/5 dark:hover:text-gray-300 ${styles.quietShadow}`}
                 >
                     <RefreshCw className="w-3 h-3" />
                     Aggiorna conteggio
