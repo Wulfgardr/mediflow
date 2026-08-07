@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { Accessibility, Activity, Download, FileText, Pencil, Pill, Plus, Share2, ShieldCheck, Stethoscope } from 'lucide-react';
+import { Accessibility, Activity, ChevronRight, Download, FileText, Pencil, Pill, Plus, Share2, ShieldCheck, Stethoscope } from 'lucide-react';
 
 import AIPatientInsight from '@/components/ai-patient-insight';
+import { AttentionGroup } from '@/components/attention-group';
 import { ClinicalRiverTimeline } from '@/components/clinical-river-timeline';
 import { PatientSynopticSheet, type SynopticMeasure, type SynopticSignal, type SynopticTherapyLine } from '@/components/patient-synoptic-sheet';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
@@ -41,7 +42,7 @@ import { classifyInsightReadability } from '@/lib/patient-insight-view-model';
 import { classifyObservationRange, toNumericValue } from '@/lib/observation-range';
 import { resolveStaticTerminology } from '@/lib/terminology';
 import { projectFollowupSuggestions } from '@/lib/patient-followup-projection';
-import { deriveOpenLoops, type OpenLoop } from '@/lib/patient-open-loops';
+import { deriveOpenLoopProjection, type OpenLoop } from '@/lib/patient-open-loops';
 import FollowupSuggestions from '@/components/followup-suggestions';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
@@ -138,6 +139,12 @@ export default function PatientDetailPage() {
         undefined,
         ['service_prescription_items'],
     );
+    const servicePrescriptions = useLiveQuery(
+        async () => db.servicePrescriptions.query({ patientId: id }).toArray(),
+        [id],
+        undefined,
+        ['service_prescriptions'],
+    );
     const serviceCatalogItemIds = (servicePrescriptionItems ?? [])
         .map((item) => item.catalogEntryId)
         .filter((catalogEntryId): catalogEntryId is string => Boolean(catalogEntryId))
@@ -203,12 +210,7 @@ export default function PatientDetailPage() {
         ['observations'],
     );
     /* @Codex WUL-UIUX: conteggi leggeri per i chip delle sezioni collassabili. */
-    const prestazioniCount = useLiveQuery(
-        async () => db.servicePrescriptions.query({ patientId: id }).count(),
-        [id],
-        undefined,
-        ['service_prescriptions'],
-    );
+    const prestazioniCount = servicePrescriptions?.length;
     const protesicaCount = useLiveQuery(
         async () => db.prostheticPrescriptions.query({ patientId: id }).count(),
         [id],
@@ -288,11 +290,16 @@ export default function PatientDetailPage() {
             : undefined),
         [patient, entries, therapies, checkups, observations, attachments],
     );
-    const openLoops = useMemo(
-        () => servicePrescriptionItems && observations
-            ? deriveOpenLoops({ items: servicePrescriptionItems, observations, now: new Date() })
-            : [],
-        [observations, servicePrescriptionItems],
+    const openLoopProjection = useMemo(
+        () => servicePrescriptionItems && servicePrescriptions && observations
+            ? deriveOpenLoopProjection({
+                items: servicePrescriptionItems,
+                prescriptions: servicePrescriptions,
+                observations,
+                now: new Date(),
+            })
+            : { groups: [], standaloneLoops: [] },
+        [observations, servicePrescriptionItems, servicePrescriptions],
     );
     const serviceCatalogById = useMemo(
         () => new Map((linkedServiceCatalogEntries ?? []).map((entry) => [entry.id, entry])),
@@ -493,9 +500,11 @@ export default function PatientDetailPage() {
         month: '2-digit',
         year: 'numeric',
     });
+    const openLoopCount = openLoopProjection.groups.reduce((total, group) => total + group.loops.length, 0)
+        + openLoopProjection.standaloneLoops.length;
     /* @Codex LUME-104/68: il rail segue l'ordine clinico della superficie unica. */
     const workspaceNavItems: Kree8WorkspaceNavItem[] = [
-        { href: '#attenzione', label: 'Attenzione', meta: String(reviewQueueSummary.attentionCount + openLoops.length) },
+        { href: '#attenzione', label: 'Attenzione', meta: String(reviewQueueSummary.attentionCount + openLoopCount) },
         { href: '#quadro', label: 'Quadro' },
         { href: '#identita', label: 'Identità' },
         { href: '#timeline', label: 'Timeline', meta: String(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length) },
@@ -678,40 +687,41 @@ export default function PatientDetailPage() {
                                     />
                                 </div>
                             ) : null}
-                            {openLoops.map((loop) => {
-                                const provenance = loop.sourceRef.type === 'service_prescription_item'
-                                    ? (() => {
-                                        const item = servicePrescriptionItems?.find((candidate) => candidate.id === loop.sourceRef.id);
-                                        const date = item?.scheduledAt ?? item?.createdAt;
-                                        const dateLabel = date
-                                            ? new Date(date).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })
-                                            : 'data non disponibile';
-                                        return `Da prescrizione del ${dateLabel}: ${item?.serviceName ?? loop.sourceRef.serviceName ?? 'prestazione'}`;
-                                    })()
-                                    : (() => {
-                                        const latest = (observations ?? [])
-                                            .filter((observation) => observation.codeSystem === loop.sourceRef.codeSystem && observation.code === loop.sourceRef.code)
-                                            .sort((left, right) => new Date(right.observedAt).getTime() - new Date(left.observedAt).getTime())[0];
-                                        return `Serie ${resolveStaticTerminology('LOINC', loop.sourceRef.code ?? '')?.displayIt ?? latest?.display ?? loop.sourceRef.code ?? 'non disponibile'}`;
-                                    })();
+                            {openLoopProjection.groups.map((group) => (
+                                <AttentionGroup
+                                    key={group.prescriptionId}
+                                    group={group}
+                                    onInsertResult={openObservationForm}
+                                />
+                            ))}
+                            {openLoopProjection.standaloneLoops.map((loop) => {
+                                const status = loop.kind === 'series_stalled'
+                                    ? `ultima ${loop.status.sinceDate.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })} · tipica ~${Math.round(loop.status.typicalIntervalDays)} gg`
+                                    : `atteso da ${loop.status.elapsedDays} gg`;
                                 return (
-                                    <div
+                                    <button
                                         key={`${loop.kind}:${loop.sourceRef.id ?? `${loop.sourceRef.codeSystem}:${loop.sourceRef.code}`}`}
-                                        className={workspaceStyles.attentionRow}
+                                        type="button"
+                                        className={`${workspaceStyles.attentionRow} ${workspaceStyles.attentionRowButton}`}
+                                        aria-label={`${loop.label}: ${loop.kind === 'series_stalled' ? 'inserisci misura' : 'inserisci risultato'}`}
+                                        onClick={() => openObservationForm(loop)}
                                         data-lume-clinical-state="warning"
                                     >
                                         <span className={workspaceStyles.attentionMarker} aria-hidden="true" />
-                                        <div>
-                                            <p className={workspaceStyles.attentionTitle}>{loop.label}</p>
-                                            <p className={workspaceStyles.attentionNote}>{provenance}</p>
-                                        </div>
-                                        <button type="button" onClick={() => openObservationForm(loop)} className={workspaceStyles.attentionAction}>
-                                            {loop.suggestedAction === 'insert_results' ? 'Inserisci risultato' : 'Inserisci misura'}
-                                        </button>
-                                    </div>
+                                        <span>
+                                            <span className={workspaceStyles.attentionTitle}>{loop.label}</span>
+                                            {loop.kind === 'series_stalled' ? <span className={workspaceStyles.attentionNote}>serie interrotta</span> : null}
+                                        </span>
+                                        <span className={workspaceStyles.attentionStatus}>
+                                            <span className="lume-registro" data-testid="lume-register-value">{status}</span>
+                                            <ChevronRight size={14} aria-hidden="true" />
+                                        </span>
+                                    </button>
                                 );
                             })}
-                            {reviewQueueSummary.attentionCount === 0 && openLoops.length === 0 ? (
+                            {reviewQueueSummary.attentionCount === 0
+                                && openLoopProjection.groups.length === 0
+                                && openLoopProjection.standaloneLoops.length === 0 ? (
                                 <p className={workspaceStyles.mutedText}>Nessuna decisione o attesa aperta al momento.</p>
                             ) : null}
                         </div>
