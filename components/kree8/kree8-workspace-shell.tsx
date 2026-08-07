@@ -4,7 +4,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, FolderOpen } from 'lucide-react';
+import { ArrowLeft, FolderOpen, type LucideIcon } from 'lucide-react';
 
 // WUL-297: Privacy Mode is always reachable from the workspace header.
 import PrivacyBlur from '@/components/privacy-blur';
@@ -28,6 +28,8 @@ type Kree8WorkspaceShellProps = {
   patientAtoms?: string[];
   statusLabel?: string;
   navItems?: Kree8WorkspaceNavItem[];
+  primaryAction?: { href: string; label: string; icon: LucideIcon };
+  headerActions?: ReactNode;
   children: ReactNode;
 };
 
@@ -42,6 +44,8 @@ export function Kree8WorkspaceShell({
   patientAtoms = [],
   statusLabel,
   navItems = [],
+  primaryAction,
+  headerActions,
   children,
 }: Kree8WorkspaceShellProps) {
   const isClinical = variant === 'clinical';
@@ -54,6 +58,7 @@ export function Kree8WorkspaceShell({
   const activeHrefRef = useRef<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const navKey = navItems.map((item) => item.href).join('|');
+  const PrimaryActionIcon = primaryAction?.icon;
 
   /* Lume focal locus + scrollspy (WUL-55, F2c). Un solo effetto governa la vita
      dei bersagli: li scopre nel DOM dentro QUESTO guscio (querySelector sul ref,
@@ -215,8 +220,17 @@ export function Kree8WorkspaceShell({
               <ArrowLeft size={13} aria-hidden />
               <span className={styles.backButtonLabel}>{backLabel}</span>
             </Link>
-            {/* WUL-297: persistent privacy affordance in the app header */}
-            <PrivacyModeToggle showLabel />
+            <div className={styles.headerActionCluster}>
+              {/* WUL-297: persistent privacy affordance in the app header */}
+              <PrivacyModeToggle showLabel />
+              {primaryAction && PrimaryActionIcon ? (
+                <Link href={primaryAction.href} className={styles.headerPrimaryAction}>
+                  <PrimaryActionIcon size={14} aria-hidden="true" />
+                  {primaryAction.label}
+                </Link>
+              ) : null}
+              {headerActions}
+            </div>
           </div>
 
           {isClinical ? (

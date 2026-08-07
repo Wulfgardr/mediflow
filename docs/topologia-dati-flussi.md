@@ -446,7 +446,8 @@ completo, attachment remoti, cataloghi remoti, campi AI/documentali.
 | `/api/*` | Web UI | Session cookie server | HTTP localhost | CRUD web + proxy locali |
 | `/api/v1/*` | Client nativo macOS | `Authorization: Bearer <token>` | HTTPS locale via TLS proxy | Contratto stabile native |
 | `/api/v1/network/*` | Client paired trusted | Paired client credential + sessione operatore | HTTPS trusted LAN via TLS proxy | Home-base read-only-first + write versionati su ciclo di vita paziente, diario, terapie, checkup, osservazioni, prestazioni e protesica, piu export FHIR lato client, validazione FSE, revisione e discovery; cataloghi in sola lettura |
-| `/api/proxy/ai/*` | Web UI (tool native via backend) | Sessione/token + allowlist localhost | HTTP localhost | AI/OCR locale |
+| `/api/proxy/ollama/*` | Web UI (solo runtime browser; lato server il provider parla direttamente al loopback) | Sessione web (`requireSession`) | HTTP localhost | Proxy verso il runtime Ollama locale (`chat` e `generate`) su loopback stretto, con attestazione del modello |
+| `/api/ocr/extract`, `/api/pdf-extract` | Web UI | `/api/ocr/extract`: sessione web o token locale; `/api/pdf-extract`: sessione web | HTTP localhost | OCR locale (Apple Vision o modello vision su target locale validato) e ispezione/estrazione testo nativo dei PDF |
 | `/api/icd/proxy` | Web UI | Sessione + allowlist localhost | HTTP localhost | Lookup ICD-11 |
 
 Nota auth: il token locale non porta privilegi admin web. Le route di sistema

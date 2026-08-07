@@ -64,7 +64,10 @@ for (const outcome of ['success', 'abort', 'failure'] as const) {
     const patient = await createSyntheticPatient(page);
     await page.goto(`/patients/${patient.id}/modules`);
 
-    const share = page.getByRole('button', { name: 'Condividi FHIR', exact: true });
+    await page.getByRole('button', { name: 'Azioni', exact: true }).click();
+    const actionsMenu = page.getByRole('group', { name: 'Azioni scheda', exact: true });
+    await expect(actionsMenu).toBeVisible();
+    const share = actionsMenu.getByRole('button', { name: 'Condividi FHIR', exact: true });
     await expect(share).toBeVisible();
     await share.click();
 
@@ -95,5 +98,8 @@ test('Condividi FHIR resta assente quando il browser non accetta file', async ({
   const patient = await createSyntheticPatient(page);
   await page.goto(`/patients/${patient.id}/modules`);
 
-  await expect(page.getByRole('button', { name: 'Condividi FHIR', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Azioni', exact: true }).click();
+  const actionsMenu = page.getByRole('group', { name: 'Azioni scheda', exact: true });
+  await expect(actionsMenu).toBeVisible();
+  await expect(actionsMenu.getByRole('button', { name: 'Condividi FHIR', exact: true })).toHaveCount(0);
 });

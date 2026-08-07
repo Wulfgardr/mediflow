@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import styles from './settings-lume.module.css';
 import {
     collectAiRolloutLocalControlGuards,
     collectAiRolloutModelGuards,
@@ -50,7 +51,7 @@ export default function AiRolloutGuardNotice({
     return (
         <div
             className={cn(
-                'rounded-[22px] border p-4 shadow-[0_12px_26px_rgba(15,23,42,0.05)]',
+                `rounded-[22px] border p-4 ${styles.quietShadow}`,
                 tone === 'rollback'
                     ? 'border-red-200/70 bg-red-50/75 dark:border-red-500/20 dark:bg-red-900/10'
                     : 'border-amber-200/70 bg-amber-50/75 dark:border-amber-500/20 dark:bg-amber-900/10',
