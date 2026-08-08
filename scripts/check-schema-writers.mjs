@@ -4,11 +4,15 @@
 // Ogni tabella dichiarata in lib/schema.ts deve avere almeno un writer specifico:
 // un modulo non-infrastrutturale che esegue .insert/.update/.delete su quel simbolo.
 //
-// Una tabella senza writer è un'affermazione di architettura non verificata: lo schema
-// dichiara una struttura dati che nessun codice popola. Il caso che ha motivato questo
-// gate è `document_diagnosis_proposals` (ADR 0087), presente nello schema, inclusa in
-// backup/restore/cascade, ma mai scritta da nessuno: il writer con il suo audit è
-// rimasto su un branch non integrato.
+// Una tabella senza writer è, salvo decisione contraria e documentata, un'affermazione
+// di architettura non verificata: lo schema dichiara una struttura dati che nessun
+// codice popola. Il caso che ha motivato questo gate è `document_diagnosis_proposals`,
+// presente nello schema e inclusa in backup/restore/cascade ma mai scritta — dove però
+// l'assenza del writer è **deliberata** e messa a verbale da ADR 0087.
+//
+// È esattamente la distinzione che il gate serve a rendere visibile: un'assenza decisa
+// e un'assenza dimenticata hanno lo stesso aspetto nello schema, e si distinguono solo
+// leggendo un ADR. L'allowlist è il posto dove la decisione diventa leggibile in CI.
 //
 // I moduli infrastrutturali che enumerano *tutte* le tabelle (backup, restore, cascade,
 // scheduler) non contano come writer: farebbero risultare popolata qualunque tabella.
@@ -42,12 +46,15 @@ const infrastructure = new Set([
 ]);
 
 // Tabelle senza writer, accettate consapevolmente. Ogni voce richiede un motivo e un
-// riferimento. Una voce che non serve più fa fallire il gate: va rimossa.
+// riferimento a una decisione scritta. Una voce che non serve più fa fallire il gate:
+// va rimossa.
 const allowlist = [
   {
     table: 'document_diagnosis_proposals',
-    reason: 'foundation dati di ADR 0087 consegnata senza writer, route o UI; '
-      + 'l\'implementazione con audit è su codex/WUL-361-transplant-c3-writer-audit-0.8, non integrata',
+    reason: 'assenza deliberata, non dimenticanza: ADR 0087 (Accepted) consegna la sola '
+      + 'foundation persistente e rinvia writer, route, UI e transizioni a un packet '
+      + 'runtime separato, di cui elenca requisiti e regole di arresto. Integrare un '
+      + 'writer senza quel packet viola le regole di arresto dell\'ADR stesso.',
     reference: 'docs/adr/0087-registro-proposte-diagnostiche-documentali.md',
   },
 ];
