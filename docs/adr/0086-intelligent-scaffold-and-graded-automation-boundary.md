@@ -281,6 +281,20 @@ Diagnosi, prescrizioni, identità paziente e altre azioni cliniche ad alto
 rischio non sono auto-applicabili per impostazione iniziale. Un livello diverso
 richiede policy, ADR, threat model, test e ratifica separati.
 
+## Presidio
+
+- script: `scripts/check-ai-clinical-write-gate.mjs` (`npm run check:ai-clinical-writes`).
+
+Il gate rende eseguibili tre clausole di questo ADR: `aiSummary` resta una proiezione
+derivata che non modifica record clinici strutturati (§3); le write policy di Atena
+restano l'insieme chiuso `no_write` / `review_only` / `form_prefill_only` (§4); Smart
+Import resta l'unica lane che scrive dati clinici, con selezione esplicita dell'operatore
+e versione concorrente attesa, e non importa il percorso AI.
+
+Il gate non copre le clausole che non hanno ancora un runtime: inbox conversazionale,
+autorizzazione one-shot vincolata all'anteprima, rollback e finestra di annullamento
+restano affidati ai packet futuri.
+
 ## Conseguenze
 
 - La parte locale resta utilizzabile anche se nessun provider è disponibile.
