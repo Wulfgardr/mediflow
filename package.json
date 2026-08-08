@@ -28,6 +28,7 @@
     "check:openapi:drift": "node scripts/check-openapi-drift.mjs",
     "check:schema-drift": "node scripts/check-schema-drift.mjs",
     "check:schema-writers": "node scripts/check-schema-writers.mjs",
+    "check:ai-clinical-writes": "node scripts/check-ai-clinical-write-gate.mjs",
     "check:node-runtime": "node scripts/node-runtime-contract.mjs verify",
     "check:standalone-runtime-bundle": "node scripts/check-standalone-runtime-bundle.mjs",
     "check:mlx-operational-parity": "node scripts/check-mlx-operational-parity.mjs",

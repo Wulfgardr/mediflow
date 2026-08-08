@@ -33,6 +33,11 @@ jobs:
         run: |
           npm run check:schema-writers
           npm run check:schema-writers -- --self-test
+      - name: AI clinical write guard and self-test
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run check:ai-clinical-writes
+          npm run check:ai-clinical-writes -- --self-test
       - name: Never-regress guard
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run check:never-regress

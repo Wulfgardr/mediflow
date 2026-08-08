@@ -23,6 +23,13 @@ conferma.
 - Un futuro apply richiede una lane contrattuale separata, un gesto esplicito
   dell'operatore e nuovi test di persistenza.
 
+## Presidio
+
+- script: `scripts/check-ai-clinical-write-gate.mjs` (`npm run check:ai-clinical-writes`).
+
+Il gate verifica che `lib/domain/documents/document-synthesis-service.ts` scriva solo
+`documentInsights`: una scrittura su `patients.diagnoses` da quel modulo fallisce in CI.
+
 ## Conseguenze
 
 - La review clinica resta esplicita e verificabile.
