@@ -136,3 +136,34 @@ se ne accorge, perché guarda il ref e non l'albero. La contromisura per quel fa
 è di natura diversa — un gate che verifica la coerenza dell'albero, come
 `npm run check:schema-writers`, che rende visibile in CI la differenza fra un'assenza
 decisa e un'assenza dimenticata: nello schema hanno lo stesso aspetto.
+
+## Gate del confine AI → scrittura clinica
+
+`npm run check:ai-clinical-writes` (`scripts/check-ai-clinical-write-gate.mjs`) è la
+traduzione eseguibile di [ADR 0084](./adr/0084-document-diagnoses-review-only.md) e
+[ADR 0086](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md), fino a
+oggi affidate alla sola disciplina.
+
+MediFlow è local-first: i servizi AI sono invocati direttamente dai componenti, non
+dietro una route. Il punto di enforcement è quindi il **writer del servizio**, non la
+route — un gate route-based passerebbe a vuoto, ed è l'errore che questo gate evita.
+
+Il confine ha due lati e il gate controlla entrambi:
+
+1. **Il percorso AI scrive solo proiezioni derivate.** Ogni scrittura in uno dei 75 moduli
+   del percorso AI dev'essere dichiarata, e i campi scritti devono stare nell'allowlist
+   della lane: `documentInsights` per la sintesi documentale, `aiSummary` e i suoi
+   metadati per Patient Insight. L'allowlist è a sua volta verificata: ammettere
+   `diagnoses` fa fallire il gate, quindi non si aggira allargandola.
+2. **La lane che può scrivere dati clinici non importa il percorso AI.** È ciò che rende
+   la revisione umana una proprietà strutturale invece che una convenzione: proporre e
+   applicare restano due percorsi separati, e l'operatore che seleziona i candidati sta
+   in mezzo. Se `commitPatientSmartImport` potesse chiamare un modello per riempire
+   `diagnoses`, la selezione esplicita diventerebbe decorativa senza che nessun test se
+   ne accorga.
+
+Come `check:schema-writers`, l'allowlist è stale-sensitive nelle due direzioni: un
+contratto che non descrive più una scrittura reale fa fallire il gate tanto quanto una
+scrittura non dichiarata. `--self-test` verifica che il gate sappia distinguere le forme
+di scrittura dai casi leciti che gli somigliano — un `Map.delete` ha la stessa forma di
+`tx.delete(<table>)`, e il divieto di `auto_apply` non deve segnalare sé stesso.
