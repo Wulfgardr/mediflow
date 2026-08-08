@@ -7,7 +7,7 @@ read_when:
 
 # Repository Topology: MediFlow
 
-Ultimo aggiornamento: 2026-07-24
+Ultimo aggiornamento: 2026-08-07
 
 Mappa concisa delle aree top-level del repository, pensata per orientare agent e
 contributor: distingue il **runtime clinico** (codice che gira con dati paziente)
@@ -94,3 +94,44 @@ conversazionale e l'automazione graduata restano roadmap.
   per branch, push e release deve puntare alla repository pubblica canonica.
 - Per la lista completa dei `.md` tracciati, vedi
   [docs/markdown-index.md](./markdown-index.md).
+
+## Ciclo di vita dei branch — lease di promozione
+
+Regola adottata il 2026-08-07, dopo il collegio sul residuo `WUL-362`.
+
+> Ogni branch diverso da `main` deve essere **o** il branch attivo di un worktree
+> dedicato a un'issue aperta, **o** la head di esattamente una pull request aperta
+> verso `main`. Quando nessuna delle due condizioni vale, il branch è **senza lease**:
+> non può ricevere altri commit.
+
+Chiudere un branch richiede una **disposizione terminale esplicita**, registrata
+nell'issue o nel run record, e solo dopo si rimuove il ref:
+
+| disposizione | quando | cosa registrare |
+|---|---|---|
+| `merged` | il lavoro è entrato via PR | il numero di PR |
+| `superseded-by <PR o SHA>` | il lavoro è arrivato su `main` per altra via, o è stato reimplementato | la destinazione verificabile |
+| `abandoned` | il lavoro non serve più | il motivo |
+
+Il motivo della regola. Il residuo `codex/WUL-362-contract-gates` non era un branch
+d'integrazione: era un branch di lavoro ordinario creato da `main` il 21 luglio, a cui
+il 6 agosto è stato aggiunto un commit `wip: igiene di sessione` — la stessa spazzata
+applicata in contemporanea ad altri quattro branch. Quel commit ha reso il branch
+indistinguibile da uno con lavoro residuo, e ogni triage successivo ha dovuto
+ridimostrare da zero che non contenesse nulla. La lease impedisce esattamente questo:
+un branch senza lease non può essere contaminato da una spazzata.
+
+Due avvertenze che il collegio ha ritenuto vincolanti:
+
+- **`git cherry` è un segnale, non l'autorità di cancellazione.** Si fonda
+  sull'equivalenza di patch-id, quindi è cieco al lavoro reimplementato invece che
+  ricopiato; e se `main` applica una patch e poi la reverte, `git cherry` continua a
+  mostrarla come integrata. Usarlo nel closeout, mai come criterio automatico.
+- **Il confronto blob-per-blob non lo sostituisce**: fallisce su rename, refactor e
+  reimplementazioni semantiche.
+
+La lease governa il *ciclo di vita del ref*, non la *completezza del lavoro*. Un branch
+può scadere correttamente portandosi via lavoro mai promosso e mai notato — è successo
+con il writer di `document_diagnosis_proposals`, mentre la sua tabella era già su
+`main`. La contromisura per quel fallimento è di natura diversa: un gate che verifica
+la coerenza dell'albero, come `npm run check:schema-writers`.
