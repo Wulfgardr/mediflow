@@ -28,6 +28,11 @@ jobs:
         run: |
           npm run check:claims
           npm run check:claims -- --self-test
+      - name: Schema writer guard and self-test
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run check:schema-writers
+          npm run check:schema-writers -- --self-test
       - name: Never-regress guard
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run check:never-regress
