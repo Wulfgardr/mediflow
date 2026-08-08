@@ -130,8 +130,9 @@ Due avvertenze che il collegio ha ritenuto vincolanti:
 - **Il confronto blob-per-blob non lo sostituisce**: fallisce su rename, refactor e
   reimplementazioni semantiche.
 
-La lease governa il *ciclo di vita del ref*, non la *completezza del lavoro*. Un branch
-può scadere correttamente portandosi via lavoro mai promosso e mai notato — è successo
-con il writer di `document_diagnosis_proposals`, mentre la sua tabella era già su
-`main`. La contromisura per quel fallimento è di natura diversa: un gate che verifica
-la coerenza dell'albero, come `npm run check:schema-writers`.
+La lease governa il *ciclo di vita del ref*, non la *completezza del lavoro*: un branch
+può scadere correttamente portandosi via lavoro mai promosso e mai notato. La lease non
+se ne accorge, perché guarda il ref e non l'albero. La contromisura per quel fallimento
+è di natura diversa — un gate che verifica la coerenza dell'albero, come
+`npm run check:schema-writers`, che rende visibile in CI la differenza fra un'assenza
+decisa e un'assenza dimenticata: nello schema hanno lo stesso aspetto.
