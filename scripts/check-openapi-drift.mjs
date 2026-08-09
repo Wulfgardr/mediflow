@@ -209,31 +209,147 @@ function normalizeSpec(document) {
     return operations;
 }
 
-function schemaDiff(baseSchema, currentSchema, context, label) {
-    if (JSON.stringify(baseSchema) === JSON.stringify(currentSchema)) return { breaking: [], additive: [] };
-    if (!baseSchema || !currentSchema) return { breaking: [`${label} changed shape`] };
-    const baseProperties = baseSchema.properties ?? {};
-    const currentProperties = currentSchema.properties ?? {};
-    const removedProperties = Object.keys(baseProperties).filter((key) => !currentProperties[key]);
-    const addedProperties = Object.keys(currentProperties).filter((key) => !baseProperties[key]);
-    const breaking = removedProperties.map((key) => `${label}.${key} was removed`);
-    const additive = addedProperties
-        .filter((key) => !(context === 'request' && (currentSchema.required ?? []).includes(key)))
-        .map((key) => `${label}.${key} was added`);
-    if (context === 'request') {
-        for (const key of addedProperties) {
-            if ((currentSchema.required ?? []).includes(key)) {
-                breaking.push(`${label}.${key} became required`);
-            }
+// Un nodo `$ref` normalizzato porta la forma vera sotto `resolved`. Va srotolato
+// su ENTRAMBI i lati prima del confronto: senza, inlinare un `$ref` senza cambiare
+// nulla somiglia all'aggiunta simultanea di tutti i suoi `required`, e rinominare
+// uno schema a contenuto identico somiglia a un cambiamento.
+function unwrapRef(node) {
+    if (node && typeof node === 'object' && node.ref !== undefined && node.resolved !== undefined) {
+        return node.resolved;
+    }
+    return node;
+}
+
+// Sul wrapper del request body `required` è un **booleano**, non un elenco di
+// proprietà (normalizeRequestBody, riga 181). Senza questa guardia un confronto
+// per proprietà ci chiamerebbe sopra `.includes` e lancerebbe.
+function requiredSet(schema) {
+    return new Set(Array.isArray(schema?.required) ? schema.required : []);
+}
+
+// `oneOf`/`anyOf` con le stesse varianti in ordine diverso descrivono lo stesso
+// contratto: confrontarli per posizione segnalerebbe ogni variante spostata.
+function sameVariantSet(baseList, currentList) {
+    const fingerprint = (list) => JSON.stringify(list.map((item) => JSON.stringify(item)).sort());
+    return fingerprint(baseList) === fingerprint(currentList);
+}
+
+// Forma canonica di uno schema normalizzato: srotola ricorsivamente i `$ref` e
+// ordina le varianti dei composite. Serve per il confronto di uguaglianza in testa
+// a `schemaDiff`: senza, tre riscritture che non toccano il contratto sul filo —
+// inlinare un `$ref`, rinominare uno schema, riordinare un `oneOf` — arriverebbero
+// in fondo alla funzione e uscirebbero come `<label> changed`, cioè come breaking
+// da derogare a mano. L'identità di un `$ref` e l'ordine delle varianti non sono
+// visibili sul filo; quello che c'è dentro sì.
+function canonicalSchema(node) {
+    if (Array.isArray(node)) return node.map(canonicalSchema);
+    if (!node || typeof node !== 'object') return node;
+    const unwrapped = unwrapRef(node);
+    if (unwrapped !== node) return canonicalSchema(unwrapped);
+    const out = {};
+    for (const key of Object.keys(node).sort()) {
+        if ((key === 'oneOf' || key === 'anyOf' || key === 'allOf') && Array.isArray(node[key])) {
+            out[key] = node[key]
+                .map((item) => JSON.stringify(canonicalSchema(item)))
+                .sort()
+                .map((serialized) => JSON.parse(serialized));
+        } else {
+            out[key] = canonicalSchema(node[key]);
         }
     }
-    for (const key of Object.keys(baseProperties).filter((property) => currentProperties[property])) {
-        const nested = schemaDiff(baseProperties[key], currentProperties[key], context, `${label}.${key}`);
-        breaking.push(...(nested.breaking ?? []));
-        additive.push(...(nested.additive ?? []));
+    return out;
+}
+
+// I nodi che arrivano qui sono avvolti in strutture che non espongono `properties`:
+// `{content}` per le risposte, `{required, content}` per i request body,
+// `{ref, resolved}` per i `$ref`. Fino a WUL-545 questa funzione non le attraversava:
+// misurato sull'intera storia dello spec, 39 confronti con zero ricorsioni e zero
+// proprietà viste, quindi ogni cambiamento collassava nell'unico `<label> changed`
+// finale — ed è per questo che tutte le deroghe in contract-policy.json hanno la
+// forma grossolana `<operazione> response <codice> changed`. Il confronto per
+// proprietà, incluso il ramo `became required` già scritto per le richieste, non è
+// mai stato eseguito.
+function schemaDiff(rawBaseSchema, rawCurrentSchema, context, label) {
+    const baseSchema = unwrapRef(rawBaseSchema);
+    const currentSchema = unwrapRef(rawCurrentSchema);
+    if (JSON.stringify(canonicalSchema(baseSchema)) === JSON.stringify(canonicalSchema(currentSchema))) {
+        return { breaking: [], additive: [] };
     }
+    if (!baseSchema || !currentSchema) return { breaking: [`${label} changed shape`], additive: [] };
+
+    const breaking = [];
+    const additive = [];
+
+    // Il label non cambia scendendo per media type: le stringhe restano leggibili
+    // e stabili, e `compareOperations` deduplica comunque.
+    if (baseSchema.content || currentSchema.content) {
+        const mediaTypes = new Set([
+            ...Object.keys(baseSchema.content ?? {}),
+            ...Object.keys(currentSchema.content ?? {})
+        ]);
+        for (const mediaType of [...mediaTypes].sort()) {
+            const nested = schemaDiff(baseSchema.content?.[mediaType], currentSchema.content?.[mediaType], context, label);
+            breaking.push(...nested.breaking);
+            additive.push(...nested.additive);
+        }
+    }
+
+    if (baseSchema.items && currentSchema.items) {
+        const nested = schemaDiff(baseSchema.items, currentSchema.items, context, `${label}[]`);
+        breaking.push(...nested.breaking);
+        additive.push(...nested.additive);
+    }
+
+    for (const composite of ['oneOf', 'anyOf', 'allOf']) {
+        const baseList = baseSchema[composite];
+        const currentList = currentSchema[composite];
+        if (!baseList || !currentList || sameVariantSet(baseList, currentList)) continue;
+        if (baseList.length !== currentList.length) {
+            breaking.push(`${label} changed ${composite}`);
+            continue;
+        }
+        for (let index = 0; index < baseList.length; index += 1) {
+            const nested = schemaDiff(baseList[index], currentList[index], context, `${label}.${composite}[${index}]`);
+            breaking.push(...nested.breaking);
+            additive.push(...nested.additive);
+        }
+    }
+
+    if (baseSchema.properties || currentSchema.properties) {
+        const baseProperties = baseSchema.properties ?? {};
+        const currentProperties = currentSchema.properties ?? {};
+        const baseRequired = requiredSet(baseSchema);
+        const currentRequired = requiredSet(currentSchema);
+
+        for (const key of Object.keys(baseProperties).filter((property) => !currentProperties[property])) {
+            breaking.push(`${label}.${key} was removed`);
+        }
+        for (const key of Object.keys(currentProperties).filter((property) => !baseProperties[property])) {
+            // Una proprietà nuova e già obbligatoria è una rottura anche su una
+            // RISPOSTA, non solo su una richiesta: rompe ogni client che decodifica
+            // con un tipo non opzionale. Il client Apple lo è — 47 tipi rigidi, 225
+            // proprietà non opzionali, zero `decodeIfPresent` — ed è così che si è
+            // rotto con WUL-542.
+            if (currentRequired.has(key)) breaking.push(`${label}.${key} became required`);
+            else additive.push(`${label}.${key} was added`);
+        }
+        for (const key of Object.keys(baseProperties).filter((property) => currentProperties[property])) {
+            if (currentRequired.has(key) && !baseRequired.has(key)) {
+                breaking.push(`${label}.${key} became required`);
+            } else if (baseRequired.has(key) && !currentRequired.has(key)) {
+                additive.push(`${label}.${key} became optional`);
+            }
+            const nested = schemaDiff(baseProperties[key], currentProperties[key], context, `${label}.${key}`);
+            breaking.push(...nested.breaking);
+            additive.push(...nested.additive);
+        }
+    }
+
     if (breaking.length || additive.length) return { breaking, additive };
-    return { breaking: [`${label} changed`] };
+    // I due nodi differiscono ma nessuna regola sa dire in che modo (enum ristretto,
+    // `type` cambiato, media type aggiunto): resta il segnale grossolano di prima,
+    // che è conservativo e va derogato a mano.
+    return { breaking: [`${label} changed`], additive: [] };
 }
 
 function compareOperations(baseOperations, currentOperations) {
@@ -410,4 +526,146 @@ function main() {
     }
 }
 
-main();
+// Self-test del solo diff semantico. Non tocca il filesystem né git: costruisce
+// due documenti OpenAPI in memoria, li passa per lo stesso `normalizeSpec` +
+// `compareOperations` usati in produzione, e asserisce su quello che ne esce.
+//
+// Esiste perché fino a WUL-545 questo era l'unico dei guard di Repository Guards
+// senza self-test, ed è così che il confronto per proprietà è rimasto codice morto
+// senza che nessuno se ne accorgesse.
+function specWith(responseSchema, { requestSchema = null, extraSchemas = {} } = {}) {
+    const operation = {
+        responses: { '200': { content: { 'application/json': { schema: responseSchema } } } }
+    };
+    if (requestSchema) {
+        operation.requestBody = { required: true, content: { 'application/json': { schema: requestSchema } } };
+    }
+    return { paths: { '/probe': { get: operation } }, components: { schemas: extraSchemas } };
+}
+
+function diffOf(baseDocument, currentDocument) {
+    return compareOperations(normalizeSpec(baseDocument), normalizeSpec(currentDocument));
+}
+
+const OBJ = (properties, required) => ({ type: 'object', properties, ...(required ? { required } : {}) });
+const STR = { type: 'string' };
+
+function runSelfTest() {
+    const cases = [
+        {
+            name: 'campo di RISPOSTA nuovo e obbligatorio → breaking (la regressione WUL-542)',
+            run: () => diffOf(
+                specWith(OBJ({ centralRuntime: OBJ({ state: STR }, ['state']) }, ['centralRuntime'])),
+                specWith(OBJ({ centralRuntime: OBJ({ state: STR, accessMode: STR }, ['state', 'accessMode']) }, ['centralRuntime']))
+            ),
+            expect: (d) => d.breaking.some((c) => c.endsWith('.centralRuntime.accessMode became required'))
+        },
+        {
+            name: 'campo di risposta nuovo e opzionale → solo additive',
+            run: () => diffOf(
+                specWith(OBJ({ a: STR }, ['a'])),
+                specWith(OBJ({ a: STR, b: STR }, ['a']))
+            ),
+            expect: (d) => d.breaking.length === 0 && d.additive.some((c) => c.endsWith('.b was added'))
+        },
+        {
+            name: 'campo di risposta rimosso → breaking',
+            run: () => diffOf(specWith(OBJ({ a: STR, b: STR })), specWith(OBJ({ a: STR }))),
+            expect: (d) => d.breaking.some((c) => c.endsWith('.b was removed'))
+        },
+        {
+            name: 'campo preesistente che entra nei required → breaking',
+            run: () => diffOf(specWith(OBJ({ a: STR, b: STR }, ['a'])), specWith(OBJ({ a: STR, b: STR }, ['a', 'b']))),
+            expect: (d) => d.breaking.some((c) => c.endsWith('.b became required'))
+        },
+        {
+            name: 'campo che esce dai required → additive, mai breaking',
+            run: () => diffOf(specWith(OBJ({ a: STR, b: STR }, ['a', 'b'])), specWith(OBJ({ a: STR, b: STR }, ['a']))),
+            expect: (d) => d.breaking.length === 0 && d.additive.some((c) => c.endsWith('.b became optional'))
+        },
+        {
+            name: 'required nuovo dentro un array di risposta → breaking, con [] nel label',
+            run: () => diffOf(
+                specWith({ type: 'array', items: OBJ({ id: STR }, ['id']) }),
+                specWith({ type: 'array', items: OBJ({ id: STR, version: STR }, ['id', 'version']) })
+            ),
+            expect: (d) => d.breaking.some((c) => c.includes('[].version became required'))
+        },
+        {
+            name: '$ref inlinato senza cambiare nulla → nessun segnale',
+            run: () => {
+                const shape = OBJ({ a: STR, b: STR }, ['a', 'b']);
+                return diffOf(
+                    specWith({ $ref: '#/components/schemas/Shape' }, { extraSchemas: { Shape: shape } }),
+                    specWith(shape, { extraSchemas: { Shape: shape } })
+                );
+            },
+            expect: (d) => d.breaking.length === 0 && d.additive.length === 0
+        },
+        {
+            name: 'schema rinominato a contenuto identico → nessun segnale',
+            run: () => {
+                const shape = OBJ({ a: STR }, ['a']);
+                return diffOf(
+                    specWith({ $ref: '#/components/schemas/Vecchio' }, { extraSchemas: { Vecchio: shape } }),
+                    specWith({ $ref: '#/components/schemas/Nuovo' }, { extraSchemas: { Nuovo: shape } })
+                );
+            },
+            expect: (d) => d.breaking.length === 0 && d.additive.length === 0
+        },
+        {
+            name: 'varianti oneOf riordinate → nessun segnale',
+            run: () => {
+                const a = OBJ({ a: STR }, ['a']);
+                const b = { type: 'array', items: STR };
+                return diffOf(specWith({ oneOf: [a, b] }), specWith({ oneOf: [b, a] }));
+            },
+            expect: (d) => d.breaking.length === 0 && d.additive.length === 0
+        },
+        {
+            name: 'request body con `required` booleano → nessuna eccezione, e il campo obbligatorio è breaking',
+            run: () => diffOf(
+                specWith(OBJ({ a: STR }), { requestSchema: OBJ({ x: STR }, ['x']) }),
+                specWith(OBJ({ a: STR }), { requestSchema: OBJ({ x: STR, y: STR }, ['x', 'y']) })
+            ),
+            expect: (d) => d.breaking.some((c) => c.endsWith('.y became required'))
+        },
+        {
+            name: 'nessuna differenza → nessun segnale',
+            run: () => diffOf(specWith(OBJ({ a: STR }, ['a'])), specWith(OBJ({ a: STR }, ['a']))),
+            expect: (d) => d.breaking.length === 0 && d.additive.length === 0
+        }
+    ];
+
+    let falliti = 0;
+    for (const testCase of cases) {
+        let diff;
+        let thrown = null;
+        try {
+            diff = testCase.run();
+        } catch (error) {
+            thrown = error;
+        }
+        const passed = !thrown && testCase.expect(diff);
+        if (passed) {
+            console.log(`ok   ${testCase.name}`);
+        } else {
+            falliti += 1;
+            console.error(`FAIL ${testCase.name}`);
+            if (thrown) console.error(`     eccezione: ${thrown.message}`);
+            else console.error(`     ottenuto: ${JSON.stringify(diff)}`);
+        }
+    }
+
+    if (falliti > 0) {
+        console.error(`\nself-test: ${falliti} caso/i fallito/i su ${cases.length}`);
+        process.exit(1);
+    }
+    console.log(`\nself-test: ${cases.length}/${cases.length} casi passano`);
+}
+
+if (process.argv.includes('--self-test')) {
+    runSelfTest();
+} else {
+    main();
+}
