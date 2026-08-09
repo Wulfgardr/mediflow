@@ -201,9 +201,14 @@
 .indexLink:hover {
     background: var(--lume-surface-focal);
 }
+/* Il segnale critical e' register-independent: usato grezzo come colore di testo
+   resta il rosso tarato sulla carta chiara e su grafite scende a 2.81:1. L'idioma
+   gia' adottato altrove (globals.css:677, 841, 859, 1342) lo mescola con
+   --lume-ink, che invece segue il registro, e riporta il contrasto sopra 4.5:1 in
+   entrambi. */
 .indexLink[data-tone='danger'] strong,
 .navItemDanger .navItemLabel {
-    color: var(--lume-signal-critical);
+    color: color-mix(in srgb, var(--lume-signal-critical) 60%, var(--lume-ink));
 }
 .indexLink strong,
 .indexLink small {
