@@ -46,6 +46,20 @@ jobs:
       - name: Never-regress guard
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run check:never-regress
+
+      # Puro fs.readFileSync su cinque file: nessuna rete, nessun DB, nessuna
+      # toolchain, ~150 ms. È a contatori espliciti, quindi si romperà a ogni
+      # aggiunta legittima di una capability — è il comportamento voluto, come
+      # per check:lume-tokens, non un difetto da scoprire dopo.
+      - name: Apple wide QA manifest guard
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run check:apple-wide-qa
+
+      # Otto controlli di presenza che fissano il confine «MLX è benchmark-visible,
+      # non runtime clinico». Non richiede MLX, né Ollama, né socket: ~150 ms.
+      - name: MLX operational parity guard
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run check:mlx-operational-parity
       - name: OpenAPI contract guard
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run check:openapi:drift -- --base-ref origin/main

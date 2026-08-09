@@ -83,6 +83,15 @@ jobs:
       - name: Run Playwright suite
         run: npx playwright test --workers=1
 
+      # Seconda fase di `npm run check:terminology-parity`, l'unica che non
+      # girava da nessuna parte. Avvia un proprio Next dev su 127.0.0.1:3200 in
+      # un workspace effimero, quindi non tocca il server e2e sulla 3123. Sta
+      # qui e non in Repository Guards perché avviare un server è esattamente
+      # ciò che questo workflow fa già, e Repository Guards deve restare
+      # deterministico e veloce.
+      - name: Lettura catalogo home-base, smoke paired e capability-gated
+        run: npm run test:network:home-base-catalog-read
+
       - name: Stop Next.js dev server
         if: always()
         run: |
