@@ -10,6 +10,7 @@ import {
 } from '@/lib/ai-treatment-reasoning-kill-switch';
 import { generateWithAthenaMlx, resolveAthenaMlxMaxTokens } from '@/lib/athena-mlx-runtime';
 import { TREATMENT_REASONING_SCHEMA_VERSION } from '@/lib/treatment-reasoning-contract';
+import { apiInternalError } from '@/lib/api-error-response';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,7 +76,11 @@ export async function POST(request: Request) {
             quantizationBits: result.quantizationBits,
         });
     } catch (error) {
-        const message = error instanceof Error ? error.message : 'ATHENA MLX generation failed.';
-        return NextResponse.json({ error: message }, { status: 500 });
+        /* Il messaggio grezzo qui espone percorsi del modello e argomenti del
+           runtime MLX. */
+        return apiInternalError('ATHENA MLX generation', error, {
+            code: 'athena_mlx_generation_failed',
+            message: 'Generazione ATHENA MLX non riuscita.',
+        });
     }
 }

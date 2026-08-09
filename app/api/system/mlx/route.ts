@@ -4,6 +4,7 @@ import { PM2Manager } from '@/lib/pm2-manager';
 import { requireSession, requireSessionOrLocalToken, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import { isWebAdminSession } from '@/lib/security/server-auth-policy';
+import { apiInternalError } from '@/lib/api-error-response';
 
 /* @Codex */
 // MLX (mlx_lm) and the PM2-managed inference server run only on macOS Apple Silicon.
@@ -33,8 +34,8 @@ export async function GET(request: Request) {
     try {
         const status = await PM2Manager.withConnection(() => PM2Manager.getStatus());
         return NextResponse.json(status);
-    } catch (e: any) {
-        return NextResponse.json({ error: e.message }, { status: 500 });
+    } catch (error) {
+        return apiInternalError('GET /api/system/mlx', error);
     }
 }
 
@@ -49,8 +50,8 @@ export async function POST() {
     try {
         await PM2Manager.withConnection(() => PM2Manager.start());
         return NextResponse.json({ success: true, message: "Avvio PM2 richiesto; verifica lo stato locale." });
-    } catch (e: any) {
-        return NextResponse.json({ error: e.message }, { status: 500 });
+    } catch (error) {
+        return apiInternalError('POST /api/system/mlx', error);
     }
 }
 
@@ -65,7 +66,7 @@ export async function DELETE() {
     try {
         await PM2Manager.withConnection(() => PM2Manager.stop());
         return NextResponse.json({ success: true, message: "Stopped" });
-    } catch (e: any) {
-        return NextResponse.json({ error: e.message }, { status: 500 });
+    } catch (error) {
+        return apiInternalError('DELETE /api/system/mlx', error);
     }
 }

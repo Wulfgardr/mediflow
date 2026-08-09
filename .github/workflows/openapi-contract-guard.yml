@@ -38,6 +38,11 @@ jobs:
         run: |
           npm run check:ai-clinical-writes
           npm run check:ai-clinical-writes -- --self-test
+      - name: API error leak guard and self-test
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run check:api-error-leak
+          npm run check:api-error-leak -- --self-test
       - name: Never-regress guard
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run check:never-regress

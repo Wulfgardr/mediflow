@@ -16,6 +16,7 @@ import { therapyCreateSchema } from '@/lib/api-schemas/clinical-writes';
 /* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
 import { activePatients } from '@/lib/patient-lifecycle';
+import { apiInternalError } from '@/lib/api-error-response';
 
 // motivation is ENC:, so it is not sortable. Only plaintext columns here.
 const THERAPY_SORT_COLUMNS = {
@@ -141,7 +142,8 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ id: newId, version: 1 }, { status: 201 });
     } catch (error) {
-        console.error("API POST /therapies error:", error);
-        return NextResponse.json({ error: `Create Failed: ${error instanceof Error ? error.message : String(error)}` }, { status: 500 });
+        /* Il messaggio grezzo qui e' quello di drizzle/SQLite: nome di tabella,
+           vincolo violato, a volte il valore. Resta nei log. */
+        return apiInternalError('POST /api/therapies', error);
     }
 }

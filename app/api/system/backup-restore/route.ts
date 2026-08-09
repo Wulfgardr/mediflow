@@ -36,6 +36,7 @@ import {
 import { enrichBackupPatientsWithAmbulatoryLinks } from '@/lib/backup-patient-ambulatory-links';
 import { restoreBackupArtifact } from '@/lib/backup-restore-executor';
 import { runBackupRestorePreflight } from '@/lib/backup-restore-preflight';
+import { apiInternalError } from '@/lib/api-error-response';
 
 /* @Codex */
 export const dynamic = 'force-dynamic';
@@ -165,9 +166,17 @@ export async function POST(request: Request) {
             counts: artifact.manifest.recordCounts,
         });
     } catch (error) {
-        console.error('[MediFlow] Backup restore failed:', error);
-        const message = error instanceof Error ? error.message : 'Restore failed.';
-        const status = error instanceof SyntaxError ? 400 : 500;
-        return NextResponse.json({ success: false, error: message }, { status });
+        /* La distinzione 400/500 resta: un artefatto malformato e' colpa del
+           chiamante, il resto no. Cio' che non torna piu' e' il dettaglio, che
+           su un restore contiene percorsi e struttura del manifest. */
+        const malformato = error instanceof SyntaxError;
+        return apiInternalError('Backup restore failed', error, {
+            status: malformato ? 400 : 500,
+            code: malformato ? 'invalid_backup_artifact' : 'restore_failed',
+            message: malformato ? 'Artefatto di backup non valido.' : 'Ripristino non riuscito.',
+            /* La route espone `success` anche negli altri due rami d'errore
+               (righe 140 e 154): il campo resta per non spezzarne il contratto. */
+            extra: { success: false },
+        });
     }
 }
