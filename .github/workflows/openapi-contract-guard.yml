@@ -62,4 +62,6 @@ jobs:
         run: npm run check:mlx-operational-parity
       - name: OpenAPI contract guard
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: npm run check:openapi:drift -- --base-ref origin/main
+        run: |
+          npm run check:openapi:drift -- --base-ref origin/main
+          npm run check:openapi:drift -- --self-test
