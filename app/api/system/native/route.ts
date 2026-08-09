@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 /* @Codex */
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
+import { apiInternalError } from '@/lib/api-error-response';
 
 const execFileAsync = promisify(execFile);
 const APP_NAME = 'MediFlowMac';
@@ -35,8 +36,8 @@ export async function POST(request: Request) {
             await execFileAsync('open', ['-a', APP_NAME]);
         }
         return NextResponse.json({ success: true });
-    } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        return NextResponse.json({ error: message }, { status: 500 });
+    } catch (error) {
+        /* Il messaggio grezzo qui conterrebbe il percorso dell'applicazione. */
+        return apiInternalError('POST /api/system/native (open)', error);
     }
 }

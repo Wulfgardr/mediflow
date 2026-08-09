@@ -18,6 +18,7 @@ import {
 } from '@/lib/backup-scheduler';
 /* @Codex */
 import { buildBackupSchedulerStatus, getSchedulerAdapter } from '@/lib/backup-scheduler-adapter';
+import { apiInternalError } from '@/lib/api-error-response';
 
 export const dynamic = 'force-dynamic';
 
@@ -144,8 +145,10 @@ export async function POST(request: Request) {
 
         return NextResponse.json(buildBackupSchedulerStatus(JSON.stringify(nextState)));
     } catch (error) {
-        console.error('POST backup scheduler failed:', error);
-        const message = error instanceof Error ? error.message : 'Failed to save backup scheduler settings.';
-        return NextResponse.json({ error: message }, { status: 500 });
+        /* Il messaggio grezzo qui contiene la destinazione del backup. */
+        return apiInternalError('POST backup scheduler', error, {
+            code: 'backup_scheduler_save_failed',
+            message: 'Salvataggio delle impostazioni di backup non riuscito.',
+        });
     }
 }

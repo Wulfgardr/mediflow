@@ -23,6 +23,7 @@ import {
     AI_OCR_KILL_SWITCH_KEY,
     isAiOcrEnabledValue,
 } from '@/lib/ai-ocr-kill-switch';
+import { apiInternalError } from '@/lib/api-error-response';
 
 /* @Codex */
 const execFileAsync = promisify(execFile);
@@ -225,11 +226,12 @@ export async function POST(request: NextRequest) {
         });
 
     } catch (error) {
-        console.error('[API] OCR extraction error:', error);
-        return NextResponse.json(
-            { error: error instanceof Error ? error.message : 'OCR extraction failed' },
-            { status: 500 }
-        );
+        /* Il messaggio grezzo qui puo' contenere il percorso del file caricato e
+           dettagli del runtime OCR. */
+        return apiInternalError('OCR extraction', error, {
+            code: 'ocr_extraction_failed',
+            message: 'Estrazione OCR non riuscita.',
+        });
     }
 }
 
