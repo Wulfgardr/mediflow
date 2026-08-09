@@ -49,7 +49,18 @@ jobs:
       - name: Generate project + guards (structure + entitlements)
         run: scripts/generate-apple-xcodeproj.sh
       - name: SwiftPM tests
-        run: scripts/native-test.sh
+        run: |
+          set -o pipefail
+          scripts/native-test.sh 2>&1 | tee "${RUNNER_TEMP}/swiftpm-tests.log"
+
+      # Terza fase di `npm run check:terminology-parity`, sull'output della run
+      # appena fatta invece che su un secondo `swift test --filter`: su un runner
+      # macOS fatturato 10x la riesecuzione costerebbe due minuti per riasserire
+      # test già girati. Le altre due fasi del gate girano altrove — la prima in
+      # web-core.yml via test:unit, la seconda in e2e.yml.
+      - name: Terminology parity, i quattro test Apple sono passati per nome
+        if: ${{ !cancelled() }}
+        run: scripts/assert-apple-terminology-tests.sh "${RUNNER_TEMP}/swiftpm-tests.log"
       - name: Build macOS app
         run: |
           xcodebuild -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
