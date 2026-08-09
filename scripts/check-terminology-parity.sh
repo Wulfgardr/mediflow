@@ -15,19 +15,15 @@ node "$ROOT_DIR/scripts/run-strip-types.mjs" --test \
   "$ROOT_DIR/lib/drug-autocomplete-search.test.ts"
 bash "$ROOT_DIR/scripts/network-home-base-catalog-read-smoke.sh"
 
-if ! APPLE_TEST_OUTPUT="$(swift test --package-path "$ROOT_DIR/native/MediFlowMac" --filter Terminology 2>&1)"; then
-  printf '%s\n' "$APPLE_TEST_OUTPUT" >&2
+APPLE_TEST_LOG="$(mktemp -t mediflow-terminology-parity)"
+trap 'rm -f "$APPLE_TEST_LOG"' EXIT
+
+if ! swift test --package-path "$ROOT_DIR/native/MediFlowMac" --filter Terminology >"$APPLE_TEST_LOG" 2>&1; then
+  cat "$APPLE_TEST_LOG" >&2
   exit 1
 fi
-printf '%s\n' "$APPLE_TEST_OUTPUT"
-for expected in \
-  "HomeBasePatientsClientTests/testFetchTerminologySystemsUsesNetworkRouteAndTolerantDateDecode" \
-  "HomeBasePatientsClientTests/testResolveTerminologyUsesNetworkRouteAndDecodesOpenAPIShape" \
-  "HomeBasePatientsClientTests/testSearchTerminologyUsesNetworkRouteQueryAndDecodesOpenAPIShape" \
-  "TerminologyParityContractTests/testSharedFixtureDecodesCanonicalTerminologyContract"; do
-  test_case="${expected%%/*} ${expected#*/}]' passed"
-  if ! grep -Fq "$test_case" <<<"$APPLE_TEST_OUTPUT"; then
-    printf 'Required Apple terminology test did not pass: %s\n' "$expected" >&2
-    exit 1
-  fi
-done
+cat "$APPLE_TEST_LOG"
+
+# L'elenco dei quattro test vive in un solo posto: la CI riusa lo stesso script
+# sull'output della run completa, invece di rieseguire `swift test --filter`.
+bash "$ROOT_DIR/scripts/assert-apple-terminology-tests.sh" "$APPLE_TEST_LOG"
