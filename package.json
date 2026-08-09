@@ -191,7 +191,9 @@
     "e2e:ai-rollout-readiness": "E2E_SPECS='e2e/ai-rollout-readiness-panel.spec.ts e2e/ai-rollout-guard-settings.spec.ts' bash scripts/e2e-smoke.sh",
     "e2e:ai-rollout-governance": "E2E_SPECS='e2e/ai-rollout-readiness-panel.spec.ts e2e/ai-rollout-guard-settings.spec.ts e2e/patient-insight-kill-switch.spec.ts e2e/smart-import-kill-switch.spec.ts e2e/document-synthesis-kill-switch.spec.ts e2e/treatment-reasoning-kill-switch.spec.ts' bash scripts/e2e-smoke.sh",
     "e2e:fabric-settings": "E2E_SPECS='e2e/settings-fabric.spec.ts' E2E_BASE_URL='http://127.0.0.1:3189' bash scripts/e2e-smoke.sh",
-    "e2e:smoke": "bash scripts/e2e-smoke.sh"
+    "e2e:smoke": "bash scripts/e2e-smoke.sh",
+    "check:api-error-leak": "node scripts/check-api-error-leak.mjs",
+    "test:api-error-leak": "node scripts/check-api-error-leak.mjs --self-test"
   },
   "dependencies": {
     "@firecrawl/pdf-inspector": "1.12.0",
