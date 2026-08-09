@@ -54,14 +54,46 @@ const checks = [
     // Fase 0 (76fb55ab6) deleted the dead Swift AISettingsResolver; the native
     // macOS app now ships the bundled WebRuntime, so the explicit fallback and
     // OCR pinning it guarded live in lib/ai-service.ts.
+    //
+    // ac0322e43 ("instrada i servizi nel provider registry") then moved the
+    // provider pinning itself out of this file: the literal
+    // `const provider: AIProvider = 'ollama'` became a registry resolution
+    // (`this.provider = resolution.receipt.provider`). What stays here is the
+    // loopback fallback for stale MLX URLs and the OCR default; the pinning is
+    // asserted by registry-provider-binding-fail-closed below, where it now
+    // lives. The check was relocated, not relaxed.
     file: 'lib/ai-service.ts',
     mustContain: [
-      "const provider: AIProvider = 'ollama'",
       'resolveOllamaBaseUrl(genericUrl?.value, legacyUrl?.value, DEFAULT_OLLAMA_BASE_URL)',
       "task === 'ocr'",
       'DEFAULT_OCR_MODEL',
     ],
-    parity: 'The runtime bundled in the native app keeps the provider pinned to Ollama with an explicit loopback fallback for stale MLX URLs, and OCR stays on the Ollama OCR default.',
+    parity: 'The runtime bundled in the native app keeps an explicit loopback fallback for stale MLX URLs, and OCR stays on the Ollama OCR default.',
+  },
+  {
+    id: 'registry-provider-binding-fail-closed',
+    // Successore di native-runtime-fallback-explicit per la parte di pinning.
+    // Asserisce il rifiuto, non solo il default: un default puo' essere
+    // scavalcato da un setting, un throw no. Le tre bindings per task devono
+    // restare esplicite, perche' un task nuovo senza binding cadrebbe altrimenti
+    // su undefined invece che su ollama.
+    //
+    // Non asserisce i valori `execution: 'local'` ed `egress: 'none'`: sono
+    // dichiarati come tipi letterali (`readonly egress: 'none'`, righe 14-16 e
+    // 31-33), quindi li difende gia' `tsc` — verificato per falsificazione,
+    // cambiarli produce TS2322. Cercarli qui come stringhe sarebbe per giunta
+    // inefficace, perche' ricorrono quattro volte nel file e una sola modifica
+    // lascerebbe il guard verde. Cio' che il tipo NON puo' difendere, e che
+    // percio' si asserisce qui, e' che il controllo a runtime esista.
+    file: 'lib/ai-providers/registry.ts',
+    mustContain: [
+      "if (provider !== 'ollama') throw new ProviderRegistryError('provider_not_registered')",
+      "clinical: 'ollama'",
+      "reasoning: 'ollama'",
+      "ocr: 'ollama'",
+      "if (OLLAMA_MANIFEST_BASE.execution !== 'local' || OLLAMA_MANIFEST_BASE.egress !== 'none')",
+    ],
+    parity: 'Provider resolution is fail-closed to the local Ollama adapter: every task binds to ollama and any other value is rejected instead of defaulted.',
   },
   {
     id: 'homebase-optional-mlx-readonly',
