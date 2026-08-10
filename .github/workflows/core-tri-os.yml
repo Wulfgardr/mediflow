@@ -8,33 +8,127 @@ name: Core tri-OS gate
 # reconsider a Rust core (the golden vectors are language-neutral and already in
 # hand). On non-Apple OSes the package manifest excludes the SwiftUI targets, so
 # only MediFlowCore + MediFlowCoreTests compile here.
+#
+# WUL-544 — path filter spostato da `on:` ai job, stessa ragione di
+# apple-native.yml: un workflow non partito lascia il check ASSENTE (PR bloccata
+# in "Expected"), un job skippato emette un check run che vale come passato.
+# Il check da rendere required è `core-tri-os` (job `gate`), non `linux`/`windows`.
 
 on:
   pull_request:
-    paths:
-      - 'native/MediFlowMac/Sources/MediFlowCore/**'
-      - 'native/MediFlowMac/Tests/MediFlowCoreTests/**'
-      - 'native/MediFlowMac/Package.swift'
-      - 'native/contracts/**'
-      - '.github/workflows/core-tri-os.yml'
   push:
     branches:
       - main
-    paths:
-      - 'native/MediFlowMac/Sources/MediFlowCore/**'
-      - 'native/contracts/**'
   workflow_dispatch:
 
 concurrency:
   group: core-tri-os-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pull-requests: read
+
 defaults:
   run:
     shell: bash
 
 jobs:
+  changes:
+    # Nome distinto da quello di apple-native.yml: due check run omonimi sullo
+    # stesso commit sono ambigui, e lo diventerebbero in branch protection.
+    name: core-tri-os-changes
+    runs-on: ubuntu-latest
+    outputs:
+      core: ${{ steps.filter.outputs.core }}
+    steps:
+      - name: Quali percorsi tocca questo evento
+        id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+
+          rc=0
+          : > changed.txt
+          case "$EVENT" in
+            pull_request | pull_request_target)
+              gh api --paginate "repos/$REPO/pulls/$PR/files" \
+                --jq '.[].filename' > changed.txt || rc=1
+              # Simmetrico alla guardia sui 300 del ramo push: anche questo endpoint
+              # ha un tetto (3000 file), e una lista troncata in silenzio produrrebbe
+              # un `core=false` per non aver visto.
+              if [ "$rc" -eq 0 ] && [ "$(wc -l < changed.txt)" -ge 3000 ]; then
+                echo "elenco file della PR potenzialmente troncato ($(wc -l < changed.txt))"
+                rc=1
+              fi
+              ;;
+            push)
+              case "$BEFORE" in
+                '' | 0000000000000000000000000000000000000000)
+                  echo "push senza commit precedente utilizzabile (BEFORE=$BEFORE)"
+                  rc=1
+                  ;;
+                *)
+                  if gh api "repos/$REPO/compare/$BEFORE...$AFTER" > cmp.json; then
+                    n="$(jq '.files | length' cmp.json)"
+                    if [ "$n" -ge 300 ]; then
+                      echo "diff troncato dall'API ($n file)"
+                      rc=1
+                    else
+                      jq -r '.files[].filename' cmp.json > changed.txt
+                    fi
+                  else
+                    echo "compare fallito (force-push? commit irraggiungibile?)"
+                    rc=1
+                  fi
+                  ;;
+              esac
+              ;;
+            *)
+              echo "evento '$EVENT': eseguo tutto"
+              rc=1
+              ;;
+          esac
+
+          if [ "$rc" -ne 0 ]; then
+            echo "core=true" >> "$GITHUB_OUTPUT"
+            echo "VERDETTO core=true (fail-open)"
+            exit 0
+          fi
+
+          echo "--- file cambiati ($(wc -l < changed.txt)) ---"
+          cat changed.txt
+
+          # Anche qui il blocco `on: push:` era più stretto di `on: pull_request:`
+          # (solo MediFlowCore/** e contracts/**). Asimmetria preservata.
+          core=false
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            case "$f" in
+              native/MediFlowMac/Sources/MediFlowCore/*) core=true; continue ;;
+              native/contracts/*)                        core=true; continue ;;
+            esac
+            if [ "$EVENT" != push ]; then
+              case "$f" in
+                native/MediFlowMac/Tests/MediFlowCoreTests/*) core=true ;;
+                native/MediFlowMac/Package.swift)             core=true ;;
+                .github/workflows/core-tri-os.yml)            core=true ;;
+              esac
+            fi
+          done < changed.txt
+
+          echo "core=$core" >> "$GITHUB_OUTPUT"
+          echo "VERDETTO core=$core"
+
   linux:
+    needs: changes
+    if: ${{ needs.changes.outputs.core == 'true' }}
     runs-on: ubuntu-latest
     container: swift:6.0-noble
     steps:
@@ -47,6 +141,8 @@ jobs:
         run: swift test --package-path native/MediFlowMac --filter CryptoGoldenVectorsTests
 
   windows:
+    needs: changes
+    if: ${{ needs.changes.outputs.core == 'true' }}
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v5
@@ -68,3 +164,44 @@ jobs:
       - name: Golden-vector gate (MediFlowCoreTests)
         run: swift test --package-path native/MediFlowMac --filter CryptoGoldenVectorsTests
         shell: pwsh
+
+  # Contesto da rendere required: `core-tri-os`.
+  gate:
+    name: core-tri-os
+    needs: [changes, linux, windows]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verdetto
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -uo pipefail
+
+          if [ -z "${NEEDS:-}" ] || [ "$NEEDS" = "null" ] || [ "$NEEDS" = "{}" ]; then
+            echo "FAIL: contesto needs vuoto — il gate non sta osservando nulla."
+            exit 1
+          fi
+
+          fail=0
+          n=0
+          while IFS='=' read -r name res; do
+            n=$((n + 1))
+            case "$res" in
+              success | skipped)
+                printf 'OK    %-22s %s\n' "$name" "$res"
+                ;;
+              *)
+                printf 'FAIL  %-22s %s\n' "$name" "${res:-<vuoto>}"
+                fail=1
+                ;;
+            esac
+          done < <(echo "$NEEDS" | jq -r 'to_entries[] | "\(.key)=\(.value.result // "")"')
+
+          if [ "$n" -eq 0 ]; then
+            echo "FAIL: nessun job osservato."
+            exit 1
+          fi
+
+          echo "--- $n job osservati, esito gate: $([ $fail -eq 0 ] && echo success || echo failure)"
+          exit $fail
