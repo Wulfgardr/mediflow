@@ -52,8 +52,18 @@ const AI_PATH_GLOBS = [
     { dir: 'lib', prefix: 'patient-insight' },
     { dir: 'lib', prefix: 'patient-smart-import' },
     { dir: 'lib', prefix: 'treatment-reasoning' },
-    { dir: 'lib/ai-providers', prefix: '' },
-    { dir: 'lib/domain/documents', prefix: '' },
+    /* WUL-547. Queste due voci non filtrano per nome: dichiarano «questa directory È il
+       percorso AI». La discesa deve quindi essere ricorsiva. Non lo era, e i 13 moduli
+       non-test di `lib/ai-providers/fabric` restavano fuori: il gate stampava «75 file
+       sul percorso AI» su un insieme che è di 88. Oggi lì non ci sono scritture su tabelle
+       cliniche, solo `Set.add`, quindi nessun finding era sfuggito — ma un perimetro
+       dichiarato più grande di quello ispezionato è verde per il motivo sbagliato, ed è
+       la forma esatta di WUL-542.
+
+       Le voci con `prefix` restano piatte di proposito: il prefisso filtra il basename, e
+       ricorrere su tutto `lib/` (276 file in radice) tirerebbe dentro omonimi estranei. */
+    { dir: 'lib/ai-providers', prefix: '', ricorsiva: true },
+    { dir: 'lib/domain/documents', prefix: '', ricorsiva: true },
 ];
 
 // I soli campi di `patients` che il percorso AI può scrivere: proiezioni derivate e
@@ -156,14 +166,22 @@ function parse(relativePath, source) {
 
 function aiPathFiles() {
     const files = [];
-    for (const { dir, prefix } of AI_PATH_GLOBS) {
+    for (const { dir, prefix, ricorsiva } of AI_PATH_GLOBS) {
         const absolute = path.join(ROOT, dir);
         if (!fs.existsSync(absolute)) continue;
-        for (const name of fs.readdirSync(absolute)) {
+        const voci = fs.readdirSync(absolute, {
+            recursive: Boolean(ricorsiva),
+            withFileTypes: true,
+        });
+        for (const voce of voci) {
+            if (!voce.isFile()) continue;
+            const { name } = voce;
             if (!name.endsWith('.ts') && !name.endsWith('.tsx')) continue;
             if (name.includes('.test.') || name.includes('.fixtures.')) continue;
             if (!name.startsWith(prefix)) continue;
-            files.push(path.posix.join(dir, name));
+            /* Con `recursive` il file puo' stare in una sottodirectory: `parentPath` la porta. */
+            const relativa = path.relative(absolute, path.join(voce.parentPath ?? absolute, name));
+            files.push(path.posix.join(dir, relativa.split(path.sep).join('/')));
         }
     }
     return [...new Set(files)].sort();

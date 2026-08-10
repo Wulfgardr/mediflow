@@ -65,3 +65,17 @@ jobs:
         run: |
           npm run check:openapi:drift -- --base-ref origin/main
           npm run check:openapi:drift -- --self-test
+
+      # WUL-547. Questi due gate non giravano in nessun workflow, e l'orfanità era
+      # invisibile per una ragione precisa: entrambi hanno un unit test che invoca il
+      # gate REALE (`check-schema-drift.test.ts:15` via spawnSync,
+      # `audit-quality-gate.test.mjs:94` su fixture), quindi risultavano coperti a
+      # chiunque contasse «il gate compare in test:unit». Ma quei test asseriscono il
+      # comportamento del gate su fixture, non lo stato di QUESTO repo: sono due
+      # domande diverse, e solo la seconda intercetta una deriva reale.
+      - name: Schema drift guard
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run check:schema-drift
+      - name: Audit quality gate
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run check:audit-quality-gate
