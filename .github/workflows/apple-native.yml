@@ -129,18 +129,26 @@ jobs:
           # Stessi glob dei vecchi blocchi `paths:`. In un `case` di bash `*`
           # attraversa le `/`, quindi `native/*` ≡ `native/**`.
           #
-          # ATTENZIONE all'asimmetria, che è deliberata e va preservata: il
+          # L'asimmetria storica resta per i guard e gli script generali: il
           # blocco `on: push:` filtrava SOLO su `native/**`, il blocco
           # `on: pull_request:` anche su scripts/ e sul workflow stesso.
           # Misurato: la PR #172 tocca 5 file, nessuno sotto native/ — Apple
           # Native è partita sulla PR (match su .github/workflows/apple-native.yml)
           # e NON è partita sul push del merge 5f4ed3bcd. Unificare i due set
           # allargherebbe la copertura su main: è una decisione separata da WUL-544.
+          # Due eccezioni sono necessarie: il workflow e il guard iPad devono
+          # attivare sul push la gamba UI, che sulle PR è sempre saltata.
           apple=false
           while IFS= read -r f; do
             [ -n "$f" ] || continue
             case "$f" in
               native/*) apple=true; continue ;;
+              # @Codex: la gamba UI gira solo fuori dalle PR. Il merge che introduce o
+              # corregge quella gamba deve quindi attivarla sul push a main.
+              .github/workflows/apple-native.yml | scripts/assert-ipad-ui-contracts.sh)
+                apple=true
+                continue
+                ;;
             esac
             if [ "$EVENT" != push ]; then
               case "$f" in
