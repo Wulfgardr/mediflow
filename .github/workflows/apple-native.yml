@@ -4,29 +4,175 @@ name: Apple Native
 # code uses .glassEffect under an iOS 26 / macOS 26 availability guard, so the
 # macOS job needs an Xcode with the 26 (or newer) SDK; it selects the latest
 # stable Xcode on the runner.
+#
+# WUL-544 — il path filter è stato spostato da `on:` ai singoli job.
+# Motivo: un workflow filtrato a livello di `on:` NON PARTE su una PR che non
+# tocca quei percorsi, e il check risulta ASSENTE, non "skipped". Un required
+# check assente lascia la PR in "Expected — Waiting for status to be reported",
+# bloccata per sempre. Con il filtro sui job, invece, il job condizionale viene
+# SKIPPATO: GitHub emette comunque un check run, e uno skip conta come passato
+# per la branch protection. Il costo resta zero — un job skippato non alloca
+# runner (misurato: `ui-tests` su run 31337348910, started == completed).
+#
+# Il check da rendere required è `apple-native` (il job `gate` in fondo), non
+# `native-build-test`: solo il gate riporta su OGNI PR.
 
 on:
   pull_request:
-    paths:
-      - 'native/**'
-      - 'scripts/check-apple-*.sh'
-      - 'scripts/generate-apple-xcodeproj.sh'
-      - 'scripts/native-test.sh'
-      - '.github/workflows/apple-native.yml'
   push:
     branches:
       - main
-    paths:
-      - 'native/**'
   workflow_dispatch:
 
-# macOS runner minutes are billed at 10x. Cancel superseded runs on the same ref
-# so a burst of pushes does not pile up parallel macOS runs.
+# WUL-544 — rettifica di una premessa che compariva tre volte in questo file e ha
+# guidato decisioni di progetto: «macOS runner minutes are billed at 10x» qui NON
+# è vero. Il repo è pubblico, e sui runner standard di un repo pubblico GitHub non
+# fattura nulla. Misurato sul run 31337348910:
+#   gh api repos/:owner/:repo/actions/runs/31337348910/timing
+#   -> billable.MACOS.total_ms = 0   (2 job macOS), billable.UBUNTU.total_ms = 0
+# Il moltiplicatore 10x è probabilmente un residuo di quando il repo era privato
+# (il remote `archived-private` esiste ancora).
+#
+# Il costo che resta è reale ma è un altro: il TEMPO DI ATTESA. native-build-test
+# misura 5m16s e ui-tests 18m52s. Le scelte di questo file restano quindi valide —
+# saltare il lavoro inutile e cancellare le run superate — ma per la latenza, non
+# per la fattura. Chi le rivede sappia su quale grandezza sta ottimizzando.
 concurrency:
   group: apple-native-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
+  # Ubuntu, ~10 s, nessun checkout: enumera i file dell'evento via API REST e
+  # applica gli stessi glob che stavano sotto `on: pull_request: paths:`.
+  # Niente `actions/checkout`: il .git di questo repo pesa 5 GB, e per decidere
+  # "quali file cambiano" non serve l'albero.
+  changes:
+    # Nome distinto da quello di core-tri-os.yml: due check run omonimi sullo stesso
+    # commit sono ambigui nella UI, e lo diventerebbero in branch protection se un
+    # domani si rendesse required anche questo.
+    name: apple-native-changes
+    runs-on: ubuntu-latest
+    outputs:
+      apple: ${{ steps.filter.outputs.apple }}
+    steps:
+      - name: Quali percorsi tocca questo evento
+        id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+
+          # rc != 0 => non so enumerare i file => fail-open: eseguo tutto.
+          # Meglio pagare un runner macOS che dichiarare verde ciò che non ho visto.
+          rc=0
+          : > changed.txt
+          case "$EVENT" in
+            pull_request | pull_request_target)
+              gh api --paginate "repos/$REPO/pulls/$PR/files" \
+                --jq '.[].filename' > changed.txt || rc=1
+              # Simmetrico alla guardia sui 300 del ramo push: anche questo endpoint
+              # ha un tetto (3000 file), e una lista troncata in silenzio produrrebbe
+              # un `apple=false` per non aver visto, che è il modo esatto in cui un
+              # job `changes` fa danno.
+              if [ "$rc" -eq 0 ] && [ "$(wc -l < changed.txt)" -ge 3000 ]; then
+                echo "elenco file della PR potenzialmente troncato ($(wc -l < changed.txt))"
+                rc=1
+              fi
+              ;;
+            push)
+              case "$BEFORE" in
+                '' | 0000000000000000000000000000000000000000)
+                  echo "push senza commit precedente utilizzabile (BEFORE=$BEFORE)"
+                  rc=1
+                  ;;
+                *)
+                  if gh api "repos/$REPO/compare/$BEFORE...$AFTER" > cmp.json; then
+                    n="$(jq '.files | length' cmp.json)"
+                    # L'endpoint compare tronca a 300 file e non pagina i file.
+                    if [ "$n" -ge 300 ]; then
+                      echo "diff troncato dall'API ($n file)"
+                      rc=1
+                    else
+                      jq -r '.files[].filename' cmp.json > changed.txt
+                    fi
+                  else
+                    echo "compare fallito (force-push? commit irraggiungibile?)"
+                    rc=1
+                  fi
+                  ;;
+              esac
+              ;;
+            *)
+              echo "evento '$EVENT' (workflow_dispatch o altro): eseguo tutto"
+              rc=1
+              ;;
+          esac
+
+          if [ "$rc" -ne 0 ]; then
+            echo "apple=true" >> "$GITHUB_OUTPUT"
+            echo "VERDETTO apple=true (fail-open)"
+            exit 0
+          fi
+
+          echo "--- file cambiati ($(wc -l < changed.txt)) ---"
+          cat changed.txt
+
+          # Stessi glob dei vecchi blocchi `paths:`. In un `case` di bash `*`
+          # attraversa le `/`, quindi `native/*` ≡ `native/**`.
+          #
+          # L'asimmetria storica resta per i guard e gli script generali: il
+          # blocco `on: push:` filtrava SOLO su `native/**`, il blocco
+          # `on: pull_request:` anche su scripts/ e sul workflow stesso.
+          # Misurato: la PR #172 tocca 5 file, nessuno sotto native/ — Apple
+          # Native è partita sulla PR (match su .github/workflows/apple-native.yml)
+          # e NON è partita sul push del merge 5f4ed3bcd. Unificare i due set
+          # allargherebbe la copertura su main: è una decisione separata da WUL-544.
+          # Due eccezioni sono necessarie: il workflow e il guard iPad devono
+          # attivare sul push la gamba UI, che sulle PR è sempre saltata.
+          apple=false
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            case "$f" in
+              native/*) apple=true; continue ;;
+              # @Codex: la gamba UI gira solo fuori dalle PR. Il merge che introduce o
+              # corregge quella gamba deve quindi attivarla sul push a main.
+              .github/workflows/apple-native.yml | scripts/assert-ipad-ui-contracts.sh)
+                apple=true
+                continue
+                ;;
+            esac
+            if [ "$EVENT" != push ]; then
+              case "$f" in
+                scripts/check-apple-*.sh)            apple=true ;;
+                # WUL-547: `scripts/assert-apple-terminology-tests.sh` non era coperto
+                # da NESSUN filtro, né push né pull_request — il glob era
+                # `scripts/check-apple-*.sh` e quel file inizia per `assert-`. È il
+                # guard invocato più sotto in questo stesso workflow: una PR che
+                # toccasse solo lui non lo avrebbe mai eseguito. Un guard il cui
+                # trigger non copre se stesso. Spostare il filtro senza correggere
+                # l'insieme avrebbe conservato il buco.
+                scripts/assert-apple-*.sh)           apple=true ;;
+                scripts/generate-apple-xcodeproj.sh) apple=true ;;
+                scripts/native-test.sh)              apple=true ;;
+                .github/workflows/apple-native.yml)  apple=true ;;
+              esac
+            fi
+          done < changed.txt
+
+          echo "apple=$apple" >> "$GITHUB_OUTPUT"
+          echo "VERDETTO apple=$apple"
+
+  # Incondizionato: ubuntu, 5 secondi misurati. Filtrarlo costerebbe più
+  # coverage di quanto risparmi.
   structure-guard:
     runs-on: ubuntu-latest
     steps:
@@ -35,6 +181,8 @@ jobs:
         run: scripts/check-apple-structure.sh
 
   native-build-test:
+    needs: changes
+    if: ${{ needs.changes.outputs.apple == 'true' }}
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v5
@@ -55,29 +203,48 @@ jobs:
 
       # Terza fase di `npm run check:terminology-parity`, sull'output della run
       # appena fatta invece che su un secondo `swift test --filter`: su un runner
-      # macOS fatturato 10x la riesecuzione costerebbe due minuti per riasserire
+      # macOS la riesecuzione costerebbe due minuti di attesa per riasserire
       # test già girati. Le altre due fasi del gate girano altrove — la prima in
       # web-core.yml via test:unit, la seconda in e2e.yml.
       - name: Terminology parity, i quattro test Apple sono passati per nome
         if: ${{ !cancelled() }}
         run: scripts/assert-apple-terminology-tests.sh "${RUNNER_TEMP}/swiftpm-tests.log"
+      # WUL-544. Questi due erano gli unici step di `native-build-test` senza
+      # `if: ${{ !cancelled() }}`, e la conseguenza è stata misurata: sul run
+      # 31158672548 il fallimento di `SwiftPM tests` li ha resi `skipped`, e in
+      # 6751 righe di log non compare una sola invocazione di xcodebuild per lo
+      # scheme macOS. Nessun altro workflow compila `MediFlowMacApp`
+      # (`core-tri-os.yml` fa solo `swift build --target MediFlowCore`), quindi la
+      # copertura macOS spariva in silenzio proprio quando i test erano rossi —
+      # cioè quando serviva di più. Oggi lo step gira di nuovo, ma il meccanismo
+      # che l'aveva spento è ancora lì finché non si mette questa condizione.
       - name: Build macOS app
+        if: ${{ !cancelled() }}
         run: |
           xcodebuild -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
             -scheme MediFlowMacApp -destination 'platform=macOS' \
             build CODE_SIGNING_ALLOWED=NO
       - name: Build iOS app
+        if: ${{ !cancelled() }}
         run: |
           xcodebuild -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
             -scheme MediFlowMobileApp -destination 'generic/platform=iOS Simulator' \
             build CODE_SIGNING_ALLOWED=NO
 
   ui-tests:
-    # Expensive (~10 min of macOS runner time, billed at 10x). Run only on merge
-    # to main or on demand (workflow_dispatch), not on every PR push - the XCUITest
-    # suite is run locally on each change.
-    if: github.event_name != 'pull_request'
+    # Costoso in ATTESA, non in fattura (vedi la rettifica in testa al file):
+    # 18m52s misurati. Gira solo sul merge in main o su richiesta, non a ogni push
+    # di PR - la suite XCUITest si esegue in locale a ogni cambiamento.
+    needs: changes
+    if: ${{ needs.changes.outputs.apple == 'true' && github.event_name != 'pull_request' }}
+    name: ui-tests (${{ matrix.idiom }})
     runs-on: macos-15
+    # @Codex: la gamba iPad esegue solo i quattro contratti che su iPhone si
+    # auto-saltano; la suite completa resta sulla gamba iPhone.
+    strategy:
+      fail-fast: false
+      matrix:
+        idiom: [iPhone, iPad]
     steps:
       - uses: actions/checkout@v5
       - name: Select latest stable Xcode
@@ -86,21 +253,102 @@ jobs:
         run: brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
       - name: Generate project
         run: scripts/generate-apple-xcodeproj.sh
-      - name: Pick an available iPhone simulator
+      - name: Pick an available ${{ matrix.idiom }} simulator
         id: sim
+        env:
+          IDIOM: ${{ matrix.idiom }}
         run: |
-          NAME=$(xcrun simctl list devices available --json | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next((x['name'] for rt in sorted(d) for x in d[rt] if x['name'].startswith('iPhone')), ''))")
-          [ -n "$NAME" ] || { echo "No iPhone simulator available" >&2; exit 1; }
+          SELECTION=$(xcrun simctl list devices available --json | python3 -c '
+          import json, os, sys
+          by_runtime = json.load(sys.stdin)["devices"]
+          prefixes = ("iPad Pro 13-inch", "iPad Pro 11-inch", "iPad") if os.environ["IDIOM"] == "iPad" else ("iPhone",)
+          selected = next((
+              device
+              for runtime in sorted(by_runtime, reverse=True)
+              for prefix in prefixes
+              for device in by_runtime[runtime]
+              if device["name"].startswith(prefix)
+          ), None)
+          print(f"{selected['name']}\t{selected['udid']}" if selected else "")
+          ')
+          IFS=$'\t' read -r NAME UDID <<< "$SELECTION"
+          [ -n "$NAME" ] && [ -n "$UDID" ] || { echo "No $IDIOM simulator available" >&2; exit 1; }
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
-          echo "Using simulator: $NAME"
+          echo "id=$UDID" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: $NAME ($UDID)"
       - name: Run XCUITest interaction tests
         run: |
+          set -o pipefail
+          only_testing=()
+          if [[ "${{ matrix.idiom }}" == "iPad" ]]; then
+            only_testing=(
+              -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testProjectSidebarPreservesPatientWorkspaceWidthOnIPad
+              -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testAccessibilityDynamicTypeUsesSinglePatientColumnOnIPad
+              -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testIPadListColumnFollowsTheContainerAcrossRotation
+              -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testIPadKeepsTheOpenChartAcrossRotation
+            )
+          fi
           # -retry-tests-on-failure absorbs transient runner flakes (e.g. the
           # "Timed out while acquiring background assertion" launch flake) without
           # masking real failures: a test must pass within the retries.
           xcodebuild test \
             -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
             -scheme MediFlowMobileApp \
-            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.id }}" \
+            "${only_testing[@]}" \
             -retry-tests-on-failure -test-iterations 2 \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee "${RUNNER_TEMP}/xcuitest-${{ matrix.idiom }}.log"
+      - name: Verify the four iPad contracts ran without skips
+        if: ${{ !cancelled() && matrix.idiom == 'iPad' }}
+        run: scripts/assert-ipad-ui-contracts.sh "${RUNNER_TEMP}/xcuitest-iPad.log"
+
+  # QUESTO è il job da mettere in branch protection, con contesto `apple-native`.
+  # Riporta su ogni PR, anche quando i job macOS sono skippati.
+  #
+  # Due trappole, entrambe evitate qui:
+  #  1. senza un `if:` con funzione di stato, un job che `needs:` un job skippato
+  #     viene skippato a sua volta => il gate non riporterebbe mai. Da cui `always()`.
+  #  2. mettere la valutazione degli esiti nell'`if:` del job (es.
+  #     `if: !contains(needs.*.result, 'failure')`) è il bug classico: quando un
+  #     need FALLISCE il gate viene SKIPPATO, e uno skip conta come PASSATO.
+  #     Falso verde. Per questo la valutazione sta in uno STEP che gira sempre.
+  gate:
+    name: apple-native
+    needs: [changes, structure-guard, native-build-test, ui-tests]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verdetto
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -uo pipefail
+
+          if [ -z "${NEEDS:-}" ] || [ "$NEEDS" = "null" ] || [ "$NEEDS" = "{}" ]; then
+            echo "FAIL: contesto needs vuoto — il gate non sta osservando nulla."
+            exit 1
+          fi
+
+          fail=0
+          n=0
+          while IFS='=' read -r name res; do
+            n=$((n + 1))
+            case "$res" in
+              success | skipped)
+                printf 'OK    %-22s %s\n' "$name" "$res"
+                ;;
+              *)
+                printf 'FAIL  %-22s %s\n' "$name" "${res:-<vuoto>}"
+                fail=1
+                ;;
+            esac
+          done < <(echo "$NEEDS" | jq -r 'to_entries[] | "\(.key)=\(.value.result // "")"')
+
+          if [ "$n" -eq 0 ]; then
+            echo "FAIL: nessun job osservato."
+            exit 1
+          fi
+
+          echo "--- $n job osservati, esito gate: $([ $fail -eq 0 ] && echo success || echo failure)"
+          exit $fail
