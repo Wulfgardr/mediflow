@@ -269,7 +269,8 @@ jobs:
               for device in by_runtime[runtime]
               if device["name"].startswith(prefix)
           ), None)
-          print(f"{selected['name']}\t{selected['udid']}" if selected else "")
+          # @Codex: this Python program is shell-quoted with single quotes.
+          print(selected["name"] + "\t" + selected["udid"] if selected else "")
           ')
           IFS=$'\t' read -r NAME UDID <<< "$SELECTION"
           [ -n "$NAME" ] && [ -n "$UDID" ] || { echo "No $IDIOM simulator available" >&2; exit 1; }
