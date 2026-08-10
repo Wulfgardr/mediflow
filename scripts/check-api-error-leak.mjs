@@ -26,6 +26,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
@@ -145,6 +146,67 @@ function normalizza(testo, binding) {
         .replace(new RegExp(`\\b${b}\\s*\\?\\s*\\.`, 'g'), `${binding}.`);
 }
 
+/* @Codex: determina se un'assegnazione senza declarator risolve a un binding
+   lessicale del catch. L'AST distingue gli scope annidati e ignora testo che
+   sembra codice dentro commenti o stringhe. */
+function usaBindingLocaleCatch(corpo, nome, posizione) {
+    const prefisso = 'try {} catch (__errore) ';
+    const sorgente = ts.createSourceFile(
+        'catch-scope.ts',
+        `${prefisso}${corpo}`,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+    );
+    const clausola = sorgente.statements.find(ts.isTryStatement)?.catchClause;
+    if (!clausola) return false;
+
+    const punto = prefisso.length + posizione;
+    let nodoPiuProfondo = clausola.block;
+    const trovaNodo = (nodo) => {
+        if (nodo.pos <= punto && punto < nodo.end) {
+            nodoPiuProfondo = nodo;
+            ts.forEachChild(nodo, trovaNodo);
+        }
+    };
+    trovaNodo(clausola.block);
+
+    const scopeAttivi = new Set();
+    for (let nodo = nodoPiuProfondo; nodo; nodo = nodo.parent) {
+        if (
+            ts.isBlock(nodo)
+            || ts.isForStatement(nodo)
+            || ts.isForInStatement(nodo)
+            || ts.isForOfStatement(nodo)
+        ) scopeAttivi.add(nodo);
+        if (nodo === clausola.block) break;
+    }
+
+    let locale = false;
+    const visita = (nodo) => {
+        if (locale) return;
+        if (ts.isVariableDeclaration(nodo) && ts.isIdentifier(nodo.name) && nodo.name.text === nome) {
+            const lista = nodo.parent;
+            const lessicale = ts.isVariableDeclarationList(lista)
+                && (lista.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const)) !== 0;
+            if (lessicale) {
+                let scope = lista.parent;
+                while (
+                    scope
+                    && !ts.isBlock(scope)
+                    && !ts.isForStatement(scope)
+                    && !ts.isForInStatement(scope)
+                    && !ts.isForOfStatement(scope)
+                ) scope = scope.parent;
+                if (scope && scopeAttivi.has(scope)) locale = true;
+            }
+        }
+        ts.forEachChild(nodo, visita);
+    };
+    visita(clausola.block);
+    return locale;
+}
+
 /* Blocchi catch, con il loro binding e il corpo bilanciato. */
 function blocchiCatch(testo) {
     const blocchi = [];
@@ -177,23 +239,33 @@ function analizza(file) {
            facoltativo: `dbHealthError = error.message`, su una variabile dichiarata
            fuori dal catch, e' la forma che sfuggiva. */
         const derivate = new Set();
+        /* @Codex: separa i binding che sopravvivono alla chiusura del catch. */
+        const derivateVisibiliInCoda = new Set();
         const reDerivata = new RegExp(
-            `(?:(?:const|let|var)\\s+)?([A-Za-z_$][\\w$]*)\\s*=[^;=]*\\b${binding}\\s*\\.\\s*message`,
+            `(?:(const|let|var)\\s+)?([A-Za-z_$][\\w$]*)\\s*=[^;=]*\\b${binding}\\s*\\.\\s*message`,
             'g',
         );
         let d;
-        while ((d = reDerivata.exec(corpo)) !== null) derivate.add(d[1]);
+        while ((d = reDerivata.exec(corpo)) !== null) {
+            const nome = d[2];
+            derivate.add(nome);
+            /* Solo un'assegnazione a un binding non dichiarato nel catch puo'
+               sopravvivere alla chiusura del blocco. */
+            const dichiarataQui = d[1] === 'const' || d[1] === 'let';
+            const localeCatch = !d[1] && usaBindingLocaleCatch(corpo, nome, d.index);
+            if (!dichiarataQui && !localeCatch) derivateVisibiliInCoda.add(nome);
+        }
 
         const contenitore = handler.find((h) => inizio >= h.inizio && fine <= h.fine);
         const coda = contenitore ? normalizza(testo.slice(fine, contenitore.fine), binding) : '';
 
-        const cerca = (regione, ammettiDiretto) => {
+        const cerca = (regione, ammettiDiretto, nomiDerivati) => {
             const re = new RegExp(RISPOSTA.source, 'g');
             while (re.exec(regione) !== null) {
                 const arg = argomento(regione, re.lastIndex - 1);
                 const diretto = ammettiDiretto
                     && new RegExp(`\\b${binding}\\s*\\.\\s*message\\b`).test(arg);
-                const indiretta = [...derivate].find((v) => new RegExp(`\\b${v}\\b`).test(arg));
+                const indiretta = [...nomiDerivati].find((v) => new RegExp(`\\b${v}\\b`).test(arg));
                 if (diretto || indiretta) {
                     reperti.push({
                         file: relativo,
@@ -206,9 +278,9 @@ function analizza(file) {
             }
         };
 
-        cerca(corpo, true);
+        cerca(corpo, true, derivate);
         /* Fuori dal catch il binding non e' piu' in scope: solo le derivate. */
-        cerca(coda, false);
+        cerca(coda, false, derivateVisibiliInCoda);
     }
     return reperti;
 }
@@ -240,6 +312,11 @@ if (selfTest) {
         /* Confine della ricerca oltre il catch: una variabile omonima in un ALTRO
            handler dello stesso file non deve essere attribuita a questo catch. */
         { nome: 'variabile omonima in un altro handler', codice: "export async function GET(){try{}catch(error){const msg = error.message; console.error(msg)}}\nexport async function POST(){const msg = 'Richiesta non valida.'; return NextResponse.json({error:msg},{status:400})}", atteso: false },
+        /* @Codex: falsificatori per lo scope lessicale della ricerca in coda. */
+        { nome: 'variabile locale al catch ombreggiata nella coda', codice: "export async function GET(){try{}catch(error){const message = error.message; console.error(message)} const message = 'Errore interno.'; return NextResponse.json({error:message},{status:500})}", atteso: false },
+        { nome: 'assegnazione a locale dichiarata prima nel catch', codice: "export async function GET(){try{}catch(error){let message; message = error.message; console.error(message)} const message = 'Errore interno.'; return NextResponse.json({error:message},{status:500})}", atteso: false },
+        { nome: 'binding annidato non nasconde assegnazione esterna', codice: "export async function GET(){let message; try{}catch(error){message = error.message; if (debug) { const message = 'solo log'; console.error(message) }} return NextResponse.json({error:message},{status:500})}", atteso: true },
+        { nome: 'commenti e stringhe non dichiarano binding', codice: "export async function GET(){let message; try{}catch(error){message = error.message; console.error('const message = sicuro'); /* let message */} return NextResponse.json({error:message},{status:500})}", atteso: true },
     ];
     let falliti = 0;
     const tmp = path.join(repoRoot, '.tmp-api-error-leak-selftest.ts');
