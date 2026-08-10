@@ -83,6 +83,68 @@ function argomento(testo, start) {
     return testo.slice(start);
 }
 
+/* Indice della graffa che chiude quella aperta in `apertura`. */
+function fineBlocco(testo, apertura) {
+    let profondita = 0;
+    for (let i = apertura; i < testo.length; i += 1) {
+        if (testo[i] === '{') profondita += 1;
+        else if (testo[i] === '}') {
+            profondita -= 1;
+            if (profondita === 0) return i;
+        }
+    }
+    return testo.length;
+}
+
+/* Indice della parentesi che chiude quella aperta in `start`. */
+function chiusuraParen(testo, start) {
+    let profondita = 0;
+    for (let i = start; i < testo.length; i += 1) {
+        if (testo[i] === '(') profondita += 1;
+        else if (testo[i] === ')') {
+            profondita -= 1;
+            if (profondita === 0) return i;
+        }
+    }
+    return testo.length;
+}
+
+/* WUL-547. Estensione della regione di ricerca oltre il corpo del catch: una
+   variabile dichiarata fuori e assegnata dentro sopravvive al blocco, e la
+   risposta che la espone puo' stare dopo — e' la forma di
+   `app/api/auth/check/route.ts`, invisibile finche' si guardava il solo corpo.
+
+   La ricerca si ferma pero' alla fine dell'handler che contiene il catch. Senza
+   quel confine una variabile omonima in un altro handler dello stesso file
+   diventerebbe un falso positivo, e `msg`/`message` sono nomi comuni. */
+function handlerSpans(testo) {
+    const spans = [];
+    const re = /\bexport\s+(?:async\s+)?function\s+[A-Za-z_$][\w$]*\s*\(/g;
+    while (re.exec(testo) !== null) {
+        /* La lista parametri puo' contenere `{` (destructuring): si salta alla sua
+           parentesi di chiusura prima di cercare la graffa del corpo. */
+        const apertura = testo.indexOf('{', chiusuraParen(testo, re.lastIndex - 1));
+        if (apertura === -1) continue;
+        spans.push({ inizio: apertura, fine: fineBlocco(testo, apertura) });
+    }
+    return spans;
+}
+
+/* WUL-547. Fra il binding e `.message` possono stare un cast, un `!` di non-null
+   assertion e un `?.`: tre forme che non cambiano il valore letto ma spezzavano
+   il match, ed erano vive in `app/api/settings/route.ts`.
+
+   La normalizzazione e' ancorata al binding, quindi non tocca
+   `classification.message` ne' `result.message`, che non sono l'eccezione grezza
+   e non devono diventare falsi positivi. */
+function normalizza(testo, binding) {
+    const b = binding.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return testo
+        .replace(new RegExp(`\\(\\s*${b}\\s+as\\s+[^()]*\\)`, 'g'), binding)
+        .replace(new RegExp(`\\b${b}\\s*!`, 'g'), binding)
+        .replace(new RegExp(`\\b${b}\\s*\\?\\s*\\.`, 'g'), `${binding}.`);
+}
+
 /* Blocchi catch, con il loro binding e il corpo bilanciato. */
 function blocchiCatch(testo) {
     const blocchi = [];
@@ -90,18 +152,10 @@ function blocchiCatch(testo) {
     let m;
     while ((m = re.exec(testo)) !== null) {
         const apertura = testo.indexOf('{', m.index + m[0].length - 1);
-        let profondita = 0;
-        let fine = testo.length;
-        for (let i = apertura; i < testo.length; i += 1) {
-            if (testo[i] === '{') profondita += 1;
-            else if (testo[i] === '}') {
-                profondita -= 1;
-                if (profondita === 0) { fine = i; break; }
-            }
-        }
         blocchi.push({
             binding: m[1],
-            corpo: testo.slice(apertura, fine),
+            inizio: apertura,
+            fine: fineBlocco(testo, apertura),
             riga: testo.slice(0, m.index).split('\n').length,
         });
     }
@@ -113,32 +167,48 @@ function analizza(file) {
     const testo = fs.readFileSync(file, 'utf8');
     const reperti = [];
 
-    for (const blocco of blocchiCatch(testo)) {
-        const { binding, corpo } = blocco;
+    const handler = handlerSpans(testo);
 
-        /* Variabili che ereditano il messaggio dell'eccezione. */
+    for (const blocco of blocchiCatch(testo)) {
+        const { binding, inizio, fine } = blocco;
+        const corpo = normalizza(testo.slice(inizio, fine), binding);
+
+        /* Variabili che ereditano il messaggio dell'eccezione. Il declarator e'
+           facoltativo: `dbHealthError = error.message`, su una variabile dichiarata
+           fuori dal catch, e' la forma che sfuggiva. */
         const derivate = new Set();
         const reDerivata = new RegExp(
-            `(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=[^;]*\\b${binding}\\s*\\.\\s*message`,
+            `(?:(?:const|let|var)\\s+)?([A-Za-z_$][\\w$]*)\\s*=[^;=]*\\b${binding}\\s*\\.\\s*message`,
             'g',
         );
         let d;
         while ((d = reDerivata.exec(corpo)) !== null) derivate.add(d[1]);
 
-        RISPOSTA.lastIndex = 0;
-        let r;
-        while ((r = RISPOSTA.exec(corpo)) !== null) {
-            const arg = argomento(corpo, RISPOSTA.lastIndex - 1);
-            const diretto = new RegExp(`\\b${binding}\\s*\\.\\s*message\\b`).test(arg);
-            const indiretta = [...derivate].find((v) => new RegExp(`\\b${v}\\b`).test(arg));
-            if (diretto || indiretta) {
-                reperti.push({
-                    file: relativo,
-                    riga: blocco.riga,
-                    via: diretto ? `${binding}.message` : `variabile «${indiretta}» derivata da ${binding}.message`,
-                });
+        const contenitore = handler.find((h) => inizio >= h.inizio && fine <= h.fine);
+        const coda = contenitore ? normalizza(testo.slice(fine, contenitore.fine), binding) : '';
+
+        const cerca = (regione, ammettiDiretto) => {
+            const re = new RegExp(RISPOSTA.source, 'g');
+            while (re.exec(regione) !== null) {
+                const arg = argomento(regione, re.lastIndex - 1);
+                const diretto = ammettiDiretto
+                    && new RegExp(`\\b${binding}\\s*\\.\\s*message\\b`).test(arg);
+                const indiretta = [...derivate].find((v) => new RegExp(`\\b${v}\\b`).test(arg));
+                if (diretto || indiretta) {
+                    reperti.push({
+                        file: relativo,
+                        riga: blocco.riga,
+                        via: diretto
+                            ? `${binding}.message`
+                            : `variabile «${indiretta}» derivata da ${binding}.message`,
+                    });
+                }
             }
-        }
+        };
+
+        cerca(corpo, true);
+        /* Fuori dal catch il binding non e' piu' in scope: solo le derivate. */
+        cerca(coda, false);
     }
     return reperti;
 }
@@ -153,6 +223,23 @@ if (selfTest) {
         { nome: 'solo log server', codice: "export async function GET(){try{}catch(error){console.error('x', error.message); return NextResponse.json({error:'Errore interno.'},{status:500})}}", atteso: false },
         { nome: 'messaggio letterale', codice: "export async function GET(){try{}catch(error){return NextResponse.json({error:'Errore interno.',code:'internal_error'},{status:500})}}", atteso: false },
         { nome: 'helper', codice: "export async function GET(){try{}catch(error){return apiInternalError('GET /x', error)}}", atteso: false },
+
+        /* WUL-547. I tre casi che seguono sono le forme che il guard non vedeva:
+           erano vive in `app/api/settings/route.ts` e `app/api/auth/check/route.ts`
+           mentre il gate era verde. */
+        { nome: 'cast e optional chaining fra binding e .message', codice: "export async function POST(){try{}catch(error){const msg = (error as any)?.message || String(error); return NextResponse.json({error:`Fallito: ${msg}`},{status:500})}}", atteso: true },
+        { nome: 'assegnazione senza declarator, risposta fuori dal catch', codice: "export async function GET(){let dbHealthError = null; try{}catch(error){dbHealthError = error instanceof Error ? error.message : 'Unknown error'}; return NextResponse.json({error:{message: dbHealthError || 'Data directory unavailable.'}},{status:500})}", atteso: true },
+        { nome: 'non-null assertion', codice: "export async function GET(){try{}catch(error){return NextResponse.json({error:error!.message},{status:500})}}", atteso: true },
+
+        /* Controprova dell'allargamento: `.message` di un oggetto che NON e'
+           l'eccezione grezza deve restare pulito. Senza questi due casi, la
+           correzione di sopra si comprerebbe con dei falsi positivi. */
+        { nome: 'message di un errore di dominio classificato', codice: "export async function GET(){try{}catch(error){const classification = classifyAuthHealthError(error); return NextResponse.json({error:classification.message},{status:400})}}", atteso: false },
+        { nome: 'message di un risultato calcolato nel catch', codice: "export async function POST(){try{}catch(error){console.error(error); const result = buildFallback(); return NextResponse.json({error:result.message},{status:500})}}", atteso: false },
+
+        /* Confine della ricerca oltre il catch: una variabile omonima in un ALTRO
+           handler dello stesso file non deve essere attribuita a questo catch. */
+        { nome: 'variabile omonima in un altro handler', codice: "export async function GET(){try{}catch(error){const msg = error.message; console.error(msg)}}\nexport async function POST(){const msg = 'Richiesta non valida.'; return NextResponse.json({error:msg},{status:400})}", atteso: false },
     ];
     let falliti = 0;
     const tmp = path.join(repoRoot, '.tmp-api-error-leak-selftest.ts');
