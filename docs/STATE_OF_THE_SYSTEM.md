@@ -18,11 +18,12 @@ read_when:
 > prevalgono [AGENTS.md](../AGENTS.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento: 2026-08-10 (preparazione release sorgente v0.8.2)
+Ultimo aggiornamento: 2026-08-11 (release sorgente v0.8.2)
 
 > [!NOTE]
-> La candidata v0.8.2 non è ancora pubblicata. Il tag remoto più recente resta
-> `v0.8.0`. Tag, GitHub Release e merge richiedono un'autorizzazione separata.
+> Questo documento prepara la release sorgente per il tag `v0.8.2`. Il tag e
+> la GitHub Release devono essere verificati sul repository remoto prima di
+> usarli come prova di pubblicazione. Non dichiara una pubblicazione App Store.
 > La deroga VoiceOver mobile e i rischi residui restano documentati.
 
 ---
@@ -75,9 +76,9 @@ La fotografia corrente e questa:
   VoiceOver reale mobile non è provato per il limite esterno della beta Xcode
   27; la deroga vale solo per la release sorgente e non autorizza claim di
   conformità.
-- **Checkpoint 0.8.2**: le PR 163-173 sono su `main`. Le PR 174 e 175 restano
-  aperte. I due commit finali hanno review DeepSeek pulita e verifica Sol.
-  La prova iPad registra 4/4 contratti UI passati senza skip su iPadOS 27.
+- **Checkpoint 0.8.2**: le PR 163-176 sono su `main`. I commit finali hanno
+  review DeepSeek e Sol pulite. Sul push a `main`, Apple Native ha superato
+  build, suite iPhone e 4/4 contratti iPad senza skip.
 - **Document intelligence**: Smart Import, nuova anagrafica da documento e
   `AI Patient Insight` restano reviewable; gli allegati possono persistere
   artifact cifrati `parse/evidence` con prime ancore sezionali. Il fallback OCR

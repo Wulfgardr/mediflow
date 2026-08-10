@@ -1,42 +1,42 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 720" width="920" height="720" role="img" aria-label="Dashboard token di sessione del 10 agosto 2026: totale 34.402.274.768, Codex 26.627.582.540, Claude Code 7.774.692.228.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 720" width="920" height="720" role="img" aria-label="Dashboard token di sessione del 11 agosto 2026: totale 35.977.536.317, Codex 28.202.844.089, Claude Code 7.774.692.228.">
   <style>
     .frame{fill:#fbfaf7;stroke:#d9d7d1}.panel,.track{fill:#f0eee8}.rule{stroke:#e1ded8}.ink{fill:#181a1d}.muted{fill:#66707b}.body{fill:#31363d}.guide{stroke:#c9c6bf}
   </style>
   <defs><clipPath id="codex-bar"><rect x="48" y="168" width="824" height="38" rx="19"/></clipPath><clipPath id="claude-bar"><rect x="48" y="407" width="824" height="38" rx="19"/></clipPath></defs>
   <rect class="frame" x="6" y="6" width="908" height="708" rx="28" stroke-width="1.5"/>
   <text class="ink" x="48" y="62" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="25" font-weight="720">Il lavoro assistito per ambiente</text>
-  <text class="muted" x="48" y="92" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="13">CodexBar 0.48.1 · log 2026-04-20–2026-08-10 · snapshot 10 agosto 2026</text>
-  <rect class="panel" x="692" y="40" width="180" height="64" rx="16"/><text class="muted" x="712" y="62" font-family="Inter,sans-serif" font-size="10.5" font-weight="700" letter-spacing="0.8">TOTALE</text><text class="ink" x="712" y="90" font-family="Inter,sans-serif" font-size="23" font-weight="760">34,4 Mld</text>
+  <text class="muted" x="48" y="92" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="13">CodexBar 0.48.1 · log 2026-04-20–2026-08-11 · snapshot 11 agosto 2026</text>
+  <rect class="panel" x="692" y="40" width="180" height="64" rx="16"/><text class="muted" x="712" y="62" font-family="Inter,sans-serif" font-size="10.5" font-weight="700" letter-spacing="0.8">TOTALE</text><text class="ink" x="712" y="90" font-family="Inter,sans-serif" font-size="23" font-weight="760">35,98 Mld</text>
   <line class="rule" x1="48" y1="126" x2="872" y2="126"/>
-  <text class="ink" x="48" y="153" font-family="Inter,sans-serif" font-size="15" font-weight="700">Codex</text><text x="872" y="153" text-anchor="end" font-family="IBM Plex Mono,ui-monospace,monospace" font-size="15" font-weight="650" fill="#7568c7">26,63 Mld</text>
-  <rect class="track" x="48" y="168" width="824" height="38" rx="19"/><g clip-path="url(#codex-bar)"><rect x="48.00" y="168" width="682.02" height="38" fill="#5f50b7"/>
-    <rect x="730.02" y="168" width="74.52" height="38" fill="#312968"/>
-    <rect x="804.53" y="168" width="58.42" height="38" fill="#887bcf"/>
-    <rect x="862.95" y="168" width="5.72" height="38" fill="#a99fdd"/>
-    <rect x="868.67" y="168" width="1.59" height="38" fill="#b8b1d8"/>
-    <rect x="870.26" y="168" width="1.49" height="38" fill="#cbc5e7"/>
-    <rect x="871.75" y="168" width="0.23" height="38" fill="#ddd9ec"/>
-    <rect x="871.98" y="168" width="0.01" height="38" fill="#4b3f97"/>
+  <text class="ink" x="48" y="153" font-family="Inter,sans-serif" font-size="15" font-weight="700">Codex</text><text x="872" y="153" text-anchor="end" font-family="IBM Plex Mono,ui-monospace,monospace" font-size="15" font-weight="650" fill="#7568c7">28,2 Mld</text>
+  <rect class="track" x="48" y="168" width="824" height="38" rx="19"/><g clip-path="url(#codex-bar)"><rect x="48.00" y="168" width="652.40" height="38" fill="#5f50b7"/>
+    <rect x="700.40" y="168" width="107.01" height="38" fill="#312968"/>
+    <rect x="807.40" y="168" width="56.01" height="38" fill="#887bcf"/>
+    <rect x="863.41" y="168" width="5.40" height="38" fill="#a99fdd"/>
+    <rect x="868.81" y="168" width="1.50" height="38" fill="#b8b1d8"/>
+    <rect x="870.32" y="168" width="1.42" height="38" fill="#cbc5e7"/>
+    <rect x="871.73" y="168" width="0.23" height="38" fill="#ddd9ec"/>
+    <rect x="871.97" y="168" width="0.03" height="38" fill="#4b3f97"/>
     <rect x="872.00" y="168" width="0.00" height="38" fill="#9b90d3"/></g>
-  <g font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="10.5"><rect x="48" y="228" width="10" height="10" rx="3" fill="#5f50b7"/><text class="body" x="65" y="237">GPT-5.6 Sol · 22,04 Mld</text>
-    <rect x="460" y="228" width="10" height="10" rx="3" fill="#312968"/><text class="body" x="477" y="237">GPT-5.5 storico · 2,41 Mld</text>
-    <rect x="48" y="253" width="10" height="10" rx="3" fill="#887bcf"/><text class="body" x="65" y="262">GPT-5.6 Terra · 1,89 Mld</text>
+  <g font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="10.5"><rect x="48" y="228" width="10" height="10" rx="3" fill="#5f50b7"/><text class="body" x="65" y="237">GPT-5.6 Sol · 22,33 Mld</text>
+    <rect x="460" y="228" width="10" height="10" rx="3" fill="#312968"/><text class="body" x="477" y="237">GPT-5.5 storico · 3,66 Mld</text>
+    <rect x="48" y="253" width="10" height="10" rx="3" fill="#887bcf"/><text class="body" x="65" y="262">GPT-5.6 Terra · 1,92 Mld</text>
     <rect x="460" y="253" width="10" height="10" rx="3" fill="#a99fdd"/><text class="body" x="477" y="262">GPT-5.6 Luna · 184,8 Mln</text>
     <rect x="48" y="278" width="10" height="10" rx="3" fill="#b8b1d8"/><text class="body" x="65" y="287">Modello non registrato · 51,41 Mln</text>
-    <rect x="460" y="278" width="10" height="10" rx="3" fill="#cbc5e7"/><text class="body" x="477" y="287">Codex Auto Review · 48,2 Mln</text>
-    <rect x="48" y="303" width="10" height="10" rx="3" fill="#ddd9ec"/><text class="body" x="65" y="312">Altri modelli Codex · 7,4 Mln</text>
-    <rect x="460" y="303" width="10" height="10" rx="3" fill="#4b3f97"/><text class="body" x="477" y="312">GPT-5.4 + mini · 452,9K</text>
+    <rect x="460" y="278" width="10" height="10" rx="3" fill="#cbc5e7"/><text class="body" x="477" y="287">Codex Auto Review · 48,47 Mln</text>
+    <rect x="48" y="303" width="10" height="10" rx="3" fill="#ddd9ec"/><text class="body" x="65" y="312">Altri modelli Codex · 8,01 Mln</text>
+    <rect x="460" y="303" width="10" height="10" rx="3" fill="#4b3f97"/><text class="body" x="477" y="312">GPT-5.4 + mini · 1,06 Mln</text>
     <rect x="48" y="328" width="10" height="10" rx="3" fill="#9b90d3"/><text class="body" x="65" y="337">GPT-5.3 Codex + Spark · 114,32K</text></g>
   <line class="rule" x1="48" y1="365" x2="872" y2="365"/>
   <text class="ink" x="48" y="392" font-family="Inter,sans-serif" font-size="15" font-weight="700">Claude Code</text><text x="872" y="392" text-anchor="end" font-family="IBM Plex Mono,ui-monospace,monospace" font-size="15" font-weight="650" fill="#cf7450">7,77 Mld</text>
-  <rect class="track" x="48" y="407" width="824" height="38" rx="19"/><g clip-path="url(#claude-bar)"><rect x="48.00" y="407" width="67.38" height="38" fill="#b95f3e"/>
-    <rect x="115.38" y="407" width="52.04" height="38" fill="#9f4b31"/>
-    <rect x="167.42" y="407" width="49.87" height="38" fill="#cf7450"/>
-    <rect x="217.29" y="407" width="41.55" height="38" fill="#8d412d"/>
-    <rect x="258.84" y="407" width="16.41" height="38" fill="#7568c7"/>
-    <rect x="275.26" y="407" width="13.21" height="38" fill="#e5a17e"/>
-    <rect x="288.47" y="407" width="0.12" height="38" fill="#edb99f"/>
-    <rect x="288.59" y="407" width="0.00" height="38" fill="#f2d2c2"/></g><line class="guide" x1="872" y1="164" x2="872" y2="449" stroke-dasharray="3 5"/>
+  <rect class="track" x="48" y="407" width="824" height="38" rx="19"/><g clip-path="url(#claude-bar)"><rect x="48.00" y="407" width="63.62" height="38" fill="#b95f3e"/>
+    <rect x="111.62" y="407" width="49.13" height="38" fill="#9f4b31"/>
+    <rect x="160.75" y="407" width="47.09" height="38" fill="#cf7450"/>
+    <rect x="207.84" y="407" width="39.23" height="38" fill="#8d412d"/>
+    <rect x="247.07" y="407" width="15.50" height="38" fill="#7568c7"/>
+    <rect x="262.56" y="407" width="12.47" height="38" fill="#e5a17e"/>
+    <rect x="275.04" y="407" width="0.11" height="38" fill="#edb99f"/>
+    <rect x="275.15" y="407" width="0.00" height="38" fill="#f2d2c2"/></g><line class="guide" x1="872" y1="164" x2="872" y2="449" stroke-dasharray="3 5"/>
   <g font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="10.5"><rect x="48" y="467" width="10" height="10" rx="3" fill="#b95f3e"/><text class="body" x="65" y="476">Opus 5 · 2,18 Mld</text>
     <rect x="460" y="467" width="10" height="10" rx="3" fill="#9f4b31"/><text class="body" x="477" y="476">Opus 4.8 · 1,68 Mld</text>
     <rect x="48" y="492" width="10" height="10" rx="3" fill="#cf7450"/><text class="body" x="65" y="501">Fable 5 · 1,61 Mld</text>
@@ -45,6 +45,6 @@
     <rect x="460" y="517" width="10" height="10" rx="3" fill="#e5a17e"/><text class="body" x="477" y="526">Sonnet 5 · 426,96 Mln</text>
     <rect x="48" y="542" width="10" height="10" rx="3" fill="#edb99f"/><text class="body" x="65" y="551">Haiku storico · 3,87 Mln</text>
     <rect x="460" y="542" width="10" height="10" rx="3" fill="#f2d2c2"/><text class="body" x="477" y="551">Modelli locali e residui · 48,6K</text></g>
-  <rect class="panel" x="48" y="594" width="824" height="60" rx="18"/><text class="muted" x="68" y="617" font-family="Inter,sans-serif" font-size="11" font-weight="700" letter-spacing="0.45">LETTURA DEL DATO</text><text class="ink" x="68" y="641" font-family="IBM Plex Mono,ui-monospace,monospace" font-size="13" font-weight="600">Cache letta: 32,82 Mld token (95,4% del contesto).</text>
+  <rect class="panel" x="48" y="594" width="824" height="60" rx="18"/><text class="muted" x="68" y="617" font-family="Inter,sans-serif" font-size="11" font-weight="700" letter-spacing="0.45">LETTURA DEL DATO</text><text class="ink" x="68" y="641" font-family="IBM Plex Mono,ui-monospace,monospace" font-size="13" font-weight="600">Cache letta: 34,31 Mld token (95,4% del contesto).</text>
   <text class="muted" x="48" y="691" font-family="Inter,sans-serif" font-size="10">Copertura: Codex UNKNOWN · Claude Code attestata</text><text class="muted" x="872" y="691" text-anchor="end" font-family="Inter,sans-serif" font-size="10">Stessa scala per entrambe le barre · valori arrotondati</text>
 </svg>
