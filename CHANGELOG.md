@@ -58,6 +58,71 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   vendor, cloud, on-device, AI paired e persistenza della review restano
   bloccati o fuori scope. Nessuna voce promuove la release 0.8.
 
+## [0.8.2] - NON PUBBLICATA
+
+> Candidata preparata il 2026-08-10. Questa voce descrive il delta previsto,
+> non il solo contenuto della branch di metadati. Le correzioni WUL-547 e
+> WUL-544 diventano parte della release soltanto dopo la pubblicazione delle
+> teste revisionate nelle PR 174 e 175, la nuova CI verde e l'integrazione in
+> `main`. Non dichiara una pubblicazione App Store, una certificazione o
+> conformità completa.
+
+### Sicurezza e privacy
+
+- Le proposte AI non possono scrivere dati clinici senza revisione umana
+  esplicita. Il gate copre il percorso applicativo e i relativi test.
+- La UI locale invia gli header HTTP di sicurezza previsti dal progetto.
+- Dopo l'integrazione di WUL-547, le route API non restituiranno il messaggio
+  grezzo di un'eccezione.
+- Il candidato WUL-547 estende il guard degli errori a cast, optional chaining
+  e assegnazioni che restano visibili dopo un blocco `catch`.
+- Nessun nuovo cloud, egress, segreto o dato clinico reale entra nella release.
+
+### Affidabilità dei contratti
+
+- Ogni tabella dello schema deve avere un writer autorizzato oppure
+  un'eccezione documentata.
+- La classificazione delle prescrizioni usa il confine reale del codice.
+  La release rimuove una coda morta e rende il contratto verificabile.
+- Il controllo OpenAPI confronta anche le proprietà annidate.
+- Tre guard prima scollegati sono ora eseguiti dalla CI.
+- I guard di release rilevano anche prove live non valide e permessi troppo
+  ampi.
+
+### Interfaccia e coerenza Apple
+
+- Il segnale «Zona Pericolo» rispetta il contrasto previsto nel tema grafite.
+- Il controllo MLX usa il registry corrente e non un pinning rimosso.
+- La fixture Apple del runtime AI usa lo stesso contratto dell'host.
+- Dopo l'integrazione di WUL-544, il workflow Apple deciderà i job dai file
+  modificati. I job required potranno terminare senza saltare l'intero
+  workflow.
+- Il candidato WUL-544 aggiunge una gamba iPad con quattro contratti UI su
+  iPadOS 27. La prova conservata registra 4 test passati, nessun fallimento e
+  nessuno skip.
+
+### Provenienza e verifica
+
+- Le PR 163-175 includono almeno un commit con attribuzione Claude.
+- Codex ha corretto i due finding finali sui guard WUL-547 e WUL-544.
+- DeepSeek V4 Flash ha restituito una review JSON valida e pulita sui due
+  commit finali.
+- Codex Sol ha verificato il codice reale e i test focalizzati.
+
+### Migrazioni
+
+- La release non introduce migrazioni del database.
+- Il runtime Node supportato resta `24.x`.
+- Le versioni web e Apple sono allineate a `0.8.2` nei metadati di build.
+
+### Limiti dichiarati
+
+- La compatibilità tra un client Apple aggiornato e un host precedente resta
+  aperta in WUL-546.
+- I token non sono attribuibili alla sola MediFlow o alla sola release.
+- I check GitHub devono rieseguire sulle teste pubblicate delle PR 174 e 175.
+- Il tag e la GitHub Release richiedono un'autorizzazione separata.
+
 ## [0.8.1] - 2026-08-07
 
 > Questa voce descrive la release sorgente `0.8.1`. Non dichiara una

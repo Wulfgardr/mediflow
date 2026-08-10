@@ -77,6 +77,7 @@ console.log(`Totale ${formatInteger(total.totalTokens)} token`);
 console.log(`Codex ${formatInteger(codex.totalTokens)} token`);
 console.log(`Claude Code ${formatInteger(claude.totalTokens)} token`);
 console.log(`Cache letta ${formatInteger(total.cacheReadTokens)} token (${formatPct(total.cacheReadTokens, total.totalTokens)})`);
+console.log(`Copertura Codex ${coverageLabel(codex)}, Claude Code ${coverageLabel(claude)}`);
 console.log(`Fonte ${version}, finestra richiesta ${HISTORY_DAYS} giorni`);
 
 function readCodexBarVersion() {
@@ -181,10 +182,14 @@ function readProvider(provider) {
   if (!Number.isFinite(updatedAt)) {
     throw new Error(`Timestamp CodexBar non interpretabile per ${provider}.`);
   }
+  if (typeof record.historyCoverageIsEstablished !== 'boolean') {
+    throw new Error(`Copertura storica CodexBar non dichiarata per ${provider}.`);
+  }
 
   return {
     provider,
     updatedAt,
+    historyCoverageIsEstablished: record.historyCoverageIsEstablished,
     totalTokens,
     cacheReadTokens,
     models,
@@ -232,11 +237,12 @@ function groupFamilies(models, definitions, expectedTotal) {
 function buildReadmeBlock({ codex, claude, total, snapshot, period, version }) {
   const alt = `Snapshot ${snapshot.label}: ${formatCompact(total.totalTokens)} token di sessione, ${formatCompact(codex.totalTokens)} in Codex e ${formatCompact(claude.totalTokens)} in Claude Code; ${formatCompact(total.cacheReadTokens)} da cache letta.`;
   return `${START}\n\n` +
-    `| Snapshot | Periodo dei log disponibili | Token di sessione | Ripartizione | Cache letta |\n` +
-    `| :-- | :-- | --: | :-- | --: |\n` +
-    `| **${snapshot.label}** | ${period.first} → ${period.last} | **${formatInteger(total.totalTokens)}** | Codex ${formatInteger(codex.totalTokens)} · Claude Code ${formatInteger(claude.totalTokens)} | ${formatInteger(total.cacheReadTokens)} (${formatPct(total.cacheReadTokens, total.totalTokens)}) |\n\n` +
+    `| Snapshot | Periodo dei log disponibili | Token di sessione | Ripartizione | Cache letta | Copertura storica |\n` +
+    `| :-- | :-- | --: | :-- | --: | :-- |\n` +
+    `| **${snapshot.label}** | ${period.first} → ${period.last} | **${formatInteger(total.totalTokens)}** | Codex ${formatInteger(codex.totalTokens)} · Claude Code ${formatInteger(claude.totalTokens)} | ${formatInteger(total.cacheReadTokens)} (${formatPct(total.cacheReadTokens, total.totalTokens)}) | Codex ${coverageLabel(codex)} · Claude Code ${coverageLabel(claude)} |\n\n` +
     `<img src="./screenshots/token-models.svg" alt="${alt}" width="720" loading="lazy"/>\n\n` +
     `La fonte è **${version}**, comando locale \`cost --refresh\`, con una finestra massima di ${HISTORY_DAYS} giorni. Il conteggio usa gli aggregati disponibili per Codex e Claude Code e non è filtrato per repository. CodexBar attribuisce ogni token al processo che lo registra. Un worker OpenAI avviato da Claude Code compare quindi nel totale Claude Code. Il grafico indica lo strumento che registra i token, non il fornitore del modello.\n\n` +
+    `**ATTESTATO:** i valori sono le somme esatte dei log disponibili nel periodo indicato. **STIMATO:** nessun valore. **UNKNOWN:** la completezza storica resta sconosciuta quando CodexBar non la attesta. L'attribuzione a MediFlow, a una release, a una PR o a un commit è sempre sconosciuta.\n\n` +
     `Rigenera il grafico con \`npm run build:usage-dashboard\`. Usa \`CODEXBAR_BIN\` per scegliere un eseguibile diverso e \`USAGE_DASHBOARD_DAYS\` per impostare una finestra da 1 a 365 giorni.\n\n` +
     `Le barre sono divise per modello e usano la stessa scala. La cache letta è una parte dell'input Codex, mentre CodexBar la espone come categoria separata per Claude Code: per questo il grafico non impila categorie di token con semantiche diverse. Sono pubblicati soltanto aggregati. Nessun prompt, contenuto di sessione, costo o percorso locale entra nel README o nell'SVG.\n\n` +
     `Il dato misura contesto elaborato. Non misura righe di codice, costo o qualità.\n\n` +
@@ -278,7 +284,7 @@ function buildSvg({ codex, claude, total, snapshot, period, version, families })
   <rect class="track" x="48" y="407" width="824" height="38" rx="19"/><g clip-path="url(#claude-bar)">${segments(families.claude, 407)}</g><line class="guide" x1="872" y1="164" x2="872" y2="449" stroke-dasharray="3 5"/>
   <g font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="10.5">${legend(families.claude, 476, 2)}</g>
   <rect class="panel" x="48" y="594" width="824" height="60" rx="18"/><text class="muted" x="68" y="617" font-family="Inter,sans-serif" font-size="11" font-weight="700" letter-spacing="0.45">LETTURA DEL DATO</text><text class="ink" x="68" y="641" font-family="IBM Plex Mono,ui-monospace,monospace" font-size="13" font-weight="600">Cache letta: ${formatCompact(total.cacheReadTokens)} token (${formatPct(total.cacheReadTokens, total.totalTokens)} del contesto).</text>
-  <text class="muted" x="872" y="691" text-anchor="end" font-family="Inter,sans-serif" font-size="10">Stessa scala per entrambe le barre · valori arrotondati</text>
+  <text class="muted" x="48" y="691" font-family="Inter,sans-serif" font-size="10">Copertura: Codex ${coverageLabel(codex)} · Claude Code ${coverageLabel(claude)}</text><text class="muted" x="872" y="691" text-anchor="end" font-family="Inter,sans-serif" font-size="10">Stessa scala per entrambe le barre · valori arrotondati</text>
 </svg>\n`;
 }
 
@@ -315,6 +321,10 @@ function formatCompact(value) {
 function formatPct(part, whole) {
   if (!whole) return '0%';
   return `${new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(part * 100 / whole)}%`;
+}
+
+function coverageLabel(provider) {
+  return provider.historyCoverageIsEstablished ? 'attestata' : 'UNKNOWN';
 }
 
 function tokenInteger(value, label) {

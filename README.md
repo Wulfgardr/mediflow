@@ -17,12 +17,12 @@ _by Ordito & Concilio_
 
 **Porta l'informazione giusta nel momento giusto.**
 
-[![Versione](https://img.shields.io/badge/versione-0.8.0-1f6feb)](./CHANGELOG.md)
+[![Versione](https://img.shields.io/badge/candidata-0.8.2-1f6feb)](./CHANGELOG.md)
 [![Licenza](https://img.shields.io/badge/licenza-MIT-2ea043)](./LICENSE)
 [![Local-first](https://img.shields.io/badge/dati-local--first-8957e5)](#confini-dichiarati)
-[![Core Swift](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#release-sorgente-080)
+[![Core Swift](https://img.shields.io/badge/core%20Swift-macOS%20%7C%20Linux%20%7C%20Windows-6e7681)](#candidata-sorgente-082)
 
-[In breve](#mediflow-in-breve) · [Uso attuale](#come-si-usa-oggi) · [Architettura](#come-collaborano-le-app) · [Schermate](#come-si-presenta) · [Stato](#release-sorgente-080) · [Avvio](#avvio-rapido) · [Sviluppo](#sviluppo-assistito)
+[In breve](#mediflow-in-breve) · [Uso attuale](#come-si-usa-oggi) · [Architettura](#come-collaborano-le-app) · [Schermate](#come-si-presenta) · [Stato](#candidata-sorgente-082) · [Avvio](#avvio-rapido) · [Sviluppo](#sviluppo-assistito)
 
 </div>
 
@@ -164,39 +164,38 @@ a dimensioni telefono o tablet restano evidenze di test e non fanno parte
 della galleria. Il [manifest media 0.8](./screenshots/0.8/manifest.json)
 registra dispositivo, runtime, scena, commit sorgente e hash._
 
-## Release sorgente 0.8.0
+## Candidata sorgente 0.8.2
 
-La release `0.8.0` distribuisce il codice sorgente verificato. Non costituisce
-una pubblicazione App Store, una certificazione o una dichiarazione di
-conformità completa.
+`0.8.2` è il prossimo progressivo sorgente. Questa branch prepara i metadati e
+le note, ma non è una release pubblicata e non contiene ancora i commit finali
+delle PR 174 e 175. Tag, GitHub Release e merge richiedono un'autorizzazione
+separata.
 
-La release consolida contratti AI review-first, hardening del pacchetto
-autonomo e una UI clinico-semantica coerente su localhost, macOS, iPhone e iPad.
-Le prove usano solo fixture sintetiche:
+Il delta previsto rafforza i confini di scrittura clinica, i messaggi delle API
+e i controlli di CI. Allinea anche le fixture Apple ai contratti dell'host.
 
-- iPhone: XCUITest 2/2 sul simulatore iOS 27;
-- iPad: XCUITest 7/7 sul simulatore iPadOS 27;
-- macOS: build, resize, focus, tastiera, Cmd-R contestuale e VoiceOver manuale;
-- localhost: 82/82 test, viewport 320/390/768/1440 e zoom reale 200%/400%.
+La prova iPad aggiunge quattro contratti UI su Xcode 27 e iPadOS 27. I quattro
+test sono passati senza fallimenti e senza skip. Le prove usano solo fixture
+sintetiche.
 
-Queste prove non dichiarano parity completa o conformità accessibilità. Gli
-audit automatici su iPhone e iPad sono verdi, ma VoiceOver reale mobile non è
-provato. L'API assistiva pubblica della beta Xcode 27 non ha raggiunto uno stato
-terminale nel simulatore. Il limite è registrato in
+Queste prove non dichiarano parity completa o conformità accessibilità. Il
+limite VoiceOver mobile resta registrato in
 [`docs/known-limitations.md`](./docs/known-limitations.md).
 
-### Aggiornamenti integrati
+### Stato del delta
 
-La tranche integrata rafforza i contratti dei contenitori JSON (`envelope`) AI.
-Un output AI deve rispettare il contratto dell'attività richiesta prima di
-diventare materiale di revisione. Un contenitore ambiguo, incompleto, multiplo o
-con chiavi riservate duplicate non può attivare il recupero legacy né essere
-usato.
+Le modifiche già presenti su `main` richiedono una revisione umana prima di
+ogni scrittura clinica proposta dall'AI. Il candidato WUL-547 impedisce alle
+API di esporre messaggi grezzi delle eccezioni; resta fuori da questa branch
+finché la testa revisionata non viene pubblicata e integrata tramite PR 174.
 
-Le diagnosi estratte da documento restano materiale di revisione: la sintesi
-non le aggiunge automaticamente alla scheda. Codex Operator personale non è
-incluso: i relativi limiti di sicurezza richiedono decisioni e correzioni
-separate.
+I controlli dello schema e OpenAPI sono già collegati ai workflow pertinenti.
+Il candidato WUL-544 completa il percorso Apple e iPad; resta fuori da questa
+branch finché la testa revisionata non viene pubblicata e integrata tramite PR
+175.
+
+La compatibilità tra un client Apple aggiornato e un host precedente resta
+aperta. WUL-546 conserva il limite e la decisione di contratto.
 
 Il dettaglio è nel [CHANGELOG](./CHANGELOG.md). La fotografia completa vive in
 [`docs/STATE_OF_THE_SYSTEM.md`](./docs/STATE_OF_THE_SYSTEM.md); la matrice
@@ -325,13 +324,15 @@ controllare: test reali e guard automatici decidono se una modifica regge.
 
 <!-- usage-dashboard:start -->
 
-| Snapshot | Periodo dei log disponibili | Token di sessione | Ripartizione | Cache letta |
-| :-- | :-- | --: | :-- | --: |
-| **29 luglio 2026** | 2026-02-01 → 2026-07-29 | **34.887.730.402** | Codex 25.026.076.888 · Claude Code 9.861.653.514 | 32.999.582.699 (94,6%) |
+| Snapshot | Periodo dei log disponibili | Token di sessione | Ripartizione | Cache letta | Copertura storica |
+| :-- | :-- | --: | :-- | --: | :-- |
+| **10 agosto 2026** | 2026-04-20 → 2026-08-10 | **34.402.274.768** | Codex 26.627.582.540 · Claude Code 7.774.692.228 | 32.815.994.682 (95,4%) | Codex UNKNOWN · Claude Code attestata |
 
-<img src="./screenshots/token-models.svg" alt="Snapshot 29 luglio 2026: 34,89 Mld token di sessione, 25,03 Mld in Codex e 9,86 Mld in Claude Code; 33 Mld da cache letta." width="720" loading="lazy"/>
+<img src="./screenshots/token-models.svg" alt="Snapshot 10 agosto 2026: 34,4 Mld token di sessione, 26,63 Mld in Codex e 7,77 Mld in Claude Code; 32,82 Mld da cache letta." width="720" loading="lazy"/>
 
-La fonte è **CodexBar 0.45.2**, comando locale `cost --refresh`, con una finestra massima di 365 giorni. Il conteggio usa gli aggregati disponibili per Codex e Claude Code e non è filtrato per repository. CodexBar attribuisce ogni token al processo che lo registra. Un worker OpenAI avviato da Claude Code compare quindi nel totale Claude Code. Il grafico indica lo strumento che registra i token, non il fornitore del modello.
+La fonte è **CodexBar 0.48.1**, comando locale `cost --refresh`, con una finestra massima di 365 giorni. Il conteggio usa gli aggregati disponibili per Codex e Claude Code e non è filtrato per repository. CodexBar attribuisce ogni token al processo che lo registra. Un worker OpenAI avviato da Claude Code compare quindi nel totale Claude Code. Il grafico indica lo strumento che registra i token, non il fornitore del modello.
+
+**ATTESTATO:** i valori sono le somme esatte dei log disponibili nel periodo indicato. **STIMATO:** nessun valore. **UNKNOWN:** la completezza storica resta sconosciuta quando CodexBar non la attesta. L'attribuzione a MediFlow, a una release, a una PR o a un commit è sempre sconosciuta.
 
 Rigenera il grafico con `npm run build:usage-dashboard`. Usa `CODEXBAR_BIN` per scegliere un eseguibile diverso e `USAGE_DASHBOARD_DAYS` per impostare una finestra da 1 a 365 giorni.
 
