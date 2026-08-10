@@ -229,7 +229,14 @@ jobs:
     # di PR - la suite XCUITest si esegue in locale a ogni cambiamento.
     needs: changes
     if: ${{ needs.changes.outputs.apple == 'true' && github.event_name != 'pull_request' }}
+    name: ui-tests (${{ matrix.idiom }})
     runs-on: macos-15
+    # @Codex: la gamba iPad esegue solo i quattro contratti che su iPhone si
+    # auto-saltano; la suite completa resta sulla gamba iPhone.
+    strategy:
+      fail-fast: false
+      matrix:
+        idiom: [iPhone, iPad]
     steps:
       - uses: actions/checkout@v5
       - name: Select latest stable Xcode
@@ -238,24 +245,55 @@ jobs:
         run: brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
       - name: Generate project
         run: scripts/generate-apple-xcodeproj.sh
-      - name: Pick an available iPhone simulator
+      - name: Pick an available ${{ matrix.idiom }} simulator
         id: sim
+        env:
+          IDIOM: ${{ matrix.idiom }}
         run: |
-          NAME=$(xcrun simctl list devices available --json | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next((x['name'] for rt in sorted(d) for x in d[rt] if x['name'].startswith('iPhone')), ''))")
-          [ -n "$NAME" ] || { echo "No iPhone simulator available" >&2; exit 1; }
+          SELECTION=$(xcrun simctl list devices available --json | python3 -c '
+          import json, os, sys
+          by_runtime = json.load(sys.stdin)["devices"]
+          prefixes = ("iPad Pro 13-inch", "iPad Pro 11-inch", "iPad") if os.environ["IDIOM"] == "iPad" else ("iPhone",)
+          selected = next((
+              device
+              for runtime in sorted(by_runtime, reverse=True)
+              for prefix in prefixes
+              for device in by_runtime[runtime]
+              if device["name"].startswith(prefix)
+          ), None)
+          print(f"{selected['name']}\t{selected['udid']}" if selected else "")
+          ')
+          IFS=$'\t' read -r NAME UDID <<< "$SELECTION"
+          [ -n "$NAME" ] && [ -n "$UDID" ] || { echo "No $IDIOM simulator available" >&2; exit 1; }
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
-          echo "Using simulator: $NAME"
+          echo "id=$UDID" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: $NAME ($UDID)"
       - name: Run XCUITest interaction tests
         run: |
+          set -o pipefail
+          only_testing=()
+          if [[ "${{ matrix.idiom }}" == "iPad" ]]; then
+            only_testing=(
+              -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testProjectSidebarPreservesPatientWorkspaceWidthOnIPad
+              -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testAccessibilityDynamicTypeUsesSinglePatientColumnOnIPad
+              -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testIPadListColumnFollowsTheContainerAcrossRotation
+              -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testIPadKeepsTheOpenChartAcrossRotation
+            )
+          fi
           # -retry-tests-on-failure absorbs transient runner flakes (e.g. the
           # "Timed out while acquiring background assertion" launch flake) without
           # masking real failures: a test must pass within the retries.
           xcodebuild test \
             -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
             -scheme MediFlowMobileApp \
-            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.id }}" \
+            "${only_testing[@]}" \
             -retry-tests-on-failure -test-iterations 2 \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee "${RUNNER_TEMP}/xcuitest-${{ matrix.idiom }}.log"
+      - name: Verify the four iPad contracts ran without skips
+        if: ${{ !cancelled() && matrix.idiom == 'iPad' }}
+        run: scripts/assert-ipad-ui-contracts.sh "${RUNNER_TEMP}/xcuitest-iPad.log"
 
   # QUESTO è il job da mettere in branch protection, con contesto `apple-native`.
   # Riporta su ogni PR, anche quando i job macOS sono skippati.
