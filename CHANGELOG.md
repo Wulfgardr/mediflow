@@ -58,6 +58,67 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   vendor, cloud, on-device, AI paired e persistenza della review restano
   bloccati o fuori scope. Nessuna voce promuove la release 0.8.
 
+## [0.8.2] - 2026-08-11
+
+> Questa voce descrive la release sorgente `0.8.2`. Non dichiara una
+> pubblicazione App Store, una certificazione o conformità completa.
+
+### Sicurezza e privacy
+
+- Le proposte AI non possono scrivere dati clinici senza revisione umana
+  esplicita. Il gate copre il percorso applicativo e i relativi test.
+- La UI locale invia gli header HTTP di sicurezza previsti dal progetto.
+- Le route API non restituiscono il messaggio grezzo di un'eccezione.
+- Il guard degli errori riconosce cast, optional chaining e assegnazioni che
+  restano visibili dopo un blocco `catch`.
+- Nessun nuovo cloud, egress, segreto o dato clinico reale entra nella release.
+
+### Affidabilità dei contratti
+
+- Ogni tabella dello schema deve avere un writer autorizzato oppure
+  un'eccezione documentata.
+- La classificazione delle prescrizioni usa il confine reale del codice.
+  La release rimuove una coda morta e rende il contratto verificabile.
+- Il controllo OpenAPI confronta anche le proprietà annidate.
+- Tre guard prima scollegati sono ora eseguiti dalla CI.
+- I guard di release rilevano anche prove live non valide e permessi troppo
+  ampi.
+
+### Interfaccia e coerenza Apple
+
+- Il segnale «Zona Pericolo» rispetta il contrasto previsto nel tema grafite.
+- Il controllo MLX usa il registry corrente e non un pinning rimosso.
+- La fixture Apple del runtime AI usa lo stesso contratto dell'host.
+- Il workflow Apple decide i job dai file modificati. I job required possono
+  terminare senza saltare l'intero workflow.
+- La gamba iPad esegue quattro contratti UI su iPadOS 27. Il push verificato su
+  `main` registra 4 test passati, nessun fallimento e nessuno skip.
+- Il selettore dei simulatori conserva correttamente le chiavi Python anche
+  dentro lo script shell del workflow.
+
+### Provenienza e verifica
+
+- Le PR 163-175 includono almeno un commit con attribuzione Claude.
+- Codex ha corretto i due finding finali sui guard WUL-547 e WUL-544.
+- Codex ha corretto e verificato il selettore simulatori nella PR 176.
+- DeepSeek V4 Flash ha restituito una review JSON valida e pulita sui due
+  commit finali.
+- Codex Sol ha verificato il codice reale e i test focalizzati.
+
+### Migrazioni
+
+- La release non introduce migrazioni del database.
+- Il runtime Node supportato resta `24.x`.
+- Le versioni web e Apple sono allineate a `0.8.2` nei metadati di build.
+
+### Limiti dichiarati
+
+- La compatibilità tra un client Apple aggiornato e un host precedente resta
+  aperta in WUL-546.
+- I token non sono attribuibili alla sola MediFlow o alla sola release.
+- La suite iPhone passa con quattro skip previsti: sono i contratti eseguiti
+  separatamente dalla gamba iPad.
+
 ## [0.8.1] - 2026-08-07
 
 > Questa voce descrive la release sorgente `0.8.1`. Non dichiara una
