@@ -147,7 +147,13 @@ function normalizeSchema(schema, document, seen = new Set()) {
     }
 
     const normalized = {};
-    for (const key of ['type', 'format', 'nullable', 'additionalProperties']) {
+    // WUL-547. `const` era assente da questo elenco, e non e' un dettaglio: lo spec
+    // la usa 65 volte per i valori fissi che stanno sul filo — nomi di header di
+    // auth, cookie, codici d'errore, porta TLS, `schemaVersion`. Non copiandola, due
+    // schemi che differiscono SOLO per quel valore normalizzavano identici, l'uguaglianza
+    // in testa a `schemaDiff` scattava, e il cambiamento usciva senza un solo segnale.
+    // Un client che fa match su quel valore si sarebbe rotto sotto un gate verde.
+    for (const key of ['type', 'format', 'nullable', 'additionalProperties', 'const']) {
         if (schema[key] !== undefined) normalized[key] = stable(schema[key]);
     }
     if (schema.enum) normalized.enum = [...schema.enum];
@@ -633,6 +639,26 @@ function runSelfTest() {
         {
             name: 'nessuna differenza → nessun segnale',
             run: () => diffOf(specWith(OBJ({ a: STR }, ['a'])), specWith(OBJ({ a: STR }, ['a']))),
+            expect: (d) => d.breaking.length === 0 && d.additive.length === 0
+        },
+        /* WUL-547. Il valore fisso di una proprieta' e' sul filo tanto quanto il suo
+           tipo: un client che fa match su `code: 'internal_error'` si rompe se quel
+           valore cambia. Prima che `const` entrasse in normalizeSchema questo caso
+           usciva con zero segnali — lo spec la usa 65 volte. */
+        {
+            name: 'valore fisso `const` cambiato → segnalato',
+            run: () => diffOf(
+                specWith(OBJ({ code: { type: 'string', const: 'internal_error' } }, ['code'])),
+                specWith(OBJ({ code: { type: 'string', const: 'internal_failure' } }, ['code']))
+            ),
+            expect: (d) => d.breaking.length + d.additive.length > 0
+        },
+        {
+            name: 'valore fisso `const` invariato → nessun segnale',
+            run: () => {
+                const shape = OBJ({ code: { type: 'string', const: 'internal_error' } }, ['code']);
+                return diffOf(specWith(shape), specWith(shape));
+            },
             expect: (d) => d.breaking.length === 0 && d.additive.length === 0
         }
     ];

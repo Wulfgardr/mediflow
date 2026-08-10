@@ -42,11 +42,16 @@ async function safeRequireSession(): Promise<boolean> {
 export async function GET() {
     /* @Codex */
     let dbHealth: ReturnType<typeof getDbHealth> | null = null;
-    let dbHealthError: string | null = null;
+    /* WUL-547. Qui passava `error.message` grezzo: percorsi del filesystem e
+       internals SQLite finivano nella risposta. Il ramo generico piu' sotto usava
+       gia' il classificatore; questo no, ed era l'unico che non lo faceva.
+       Il dettaglio resta nel log, al client va il messaggio autoriale. */
+    let dbHealthClassification: ReturnType<typeof classifyAuthHealthError> | null = null;
     try {
         dbHealth = getDbHealth();
     } catch (error) {
-        dbHealthError = error instanceof Error ? error.message : 'Unknown error';
+        dbHealthClassification = classifyAuthHealthError(error);
+        console.error('[auth-check]', dbHealthClassification.code, dbHealthClassification.message);
     }
     /* @Codex */
     const hasSession = await safeRequireSession();
@@ -56,10 +61,13 @@ export async function GET() {
             status: 'error',
             isSetup: false,
             hasSession,
+            /* `code`, `category` e `dbState` restano i valori stabili di prima: il
+               client Apple decodifica questa risposta con tipi non opzionali, e la
+               correzione del leak non e' il posto per cambiare il contratto. */
             error: {
                 code: 'DATA_DIR_UNAVAILABLE',
                 category: 'data-dir-unavailable',
-                message: dbHealthError || 'Data directory unavailable.',
+                message: dbHealthClassification?.message ?? 'Data directory unavailable.',
                 nextAction: 'Verify that the data directory exists and is writable, then retry.'
             },
             db: buildPublicDbState('unavailable')

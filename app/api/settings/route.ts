@@ -10,6 +10,7 @@ import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withA
 import { normalizeSettingValue } from '@/lib/settings-value';
 /* @Codex */
 import { evaluateSettingsWrite } from '@/lib/security/settings-write-policy';
+import { apiInternalError } from '@/lib/api-error-response';
 
 export async function POST(request: Request) {
     /* @Codex */
@@ -64,9 +65,10 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ success: true, key, value: persistedValue });
     } catch (error) {
-        console.error("POST Setting Error:", error);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const msg = (error as any)?.message || String(error);
-        return NextResponse.json({ error: `Failed to save setting: ${msg}` }, { status: 500 });
+        /* WUL-547. Qui il `message` grezzo dell'eccezione usciva verso il client
+           dentro un template literal, e il guard non lo vedeva perche' il cast
+           `(error as any)?` spezzava il match. apiInternalError() logga il
+           dettaglio e restituisce un messaggio stabile con un codice. */
+        return apiInternalError('POST /api/settings', error);
     }
 }
