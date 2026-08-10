@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
+import { apiInternalError } from '@/lib/api-error-response';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,8 +61,11 @@ export async function POST() {
             defaultAmbulatoryId
         });
 
-    } catch (e) {
-        console.error("Migration failed:", e);
-        return NextResponse.json({ success: false, error: String(e) }, { status: 500 });
+    } catch (error) {
+        /* @Codex: preserva il contratto `success: false`, ma il dettaglio
+           dell'eccezione resta solo nel log server. */
+        return apiInternalError('POST /api/system/migrate', error, {
+            extra: { success: false },
+        });
     }
 }

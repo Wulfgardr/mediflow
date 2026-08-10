@@ -14,8 +14,8 @@
        return NextResponse.json({ error: message }, { status: 500 });
 
    Il guard lavora quindi per blocco `catch`: dentro ogni catch traccia le
-   variabili che derivano da `<binding>.message` e segnala se una di quelle, o
-   `.message` direttamente, finisce dentro una risposta.
+   variabili che derivano da `<binding>.message` o `String(<binding>)` e segnala
+   se una di quelle, o la fonte direttamente, finisce dentro una risposta.
 
    Cosa NON e' un leak: un messaggio di dominio scelto da chi scrive la route e
    destinato all'operatore (per esempio il rifiuto di un import AIFA malformato).
@@ -242,7 +242,7 @@ function analizza(file) {
         /* @Codex: separa i binding che sopravvivono alla chiusura del catch. */
         const derivateVisibiliInCoda = new Set();
         const reDerivata = new RegExp(
-            `(?:(const|let|var)\\s+)?([A-Za-z_$][\\w$]*)\\s*=[^;=]*\\b${binding}\\s*\\.\\s*message`,
+            `(?:(const|let|var)\\s+)?([A-Za-z_$][\\w$]*)\\s*=[^;=]*(?:\\b${binding}\\s*\\.\\s*message\\b|\\bString\\s*\\(\\s*${binding}\\s*\\))`,
             'g',
         );
         let d;
@@ -264,15 +264,17 @@ function analizza(file) {
             while (re.exec(regione) !== null) {
                 const arg = argomento(regione, re.lastIndex - 1);
                 const diretto = ammettiDiretto
-                    && new RegExp(`\\b${binding}\\s*\\.\\s*message\\b`).test(arg);
+                    && new RegExp(
+                        `(?:\\b${binding}\\s*\\.\\s*message\\b|\\bString\\s*\\(\\s*${binding}\\s*\\))`,
+                    ).test(arg);
                 const indiretta = [...nomiDerivati].find((v) => new RegExp(`\\b${v}\\b`).test(arg));
                 if (diretto || indiretta) {
                     reperti.push({
                         file: relativo,
                         riga: blocco.riga,
                         via: diretto
-                            ? `${binding}.message`
-                            : `variabile «${indiretta}» derivata da ${binding}.message`,
+                            ? `eccezione «${binding}» esposta direttamente`
+                            : `variabile «${indiretta}» derivata dall'eccezione «${binding}»`,
                     });
                 }
             }
@@ -292,6 +294,8 @@ if (selfTest) {
         { nome: 'diretto', codice: "export async function GET(){try{}catch(e){return NextResponse.json({error:e.message},{status:500})}}", atteso: true },
         { nome: 'indiretto via const', codice: "export async function GET(){try{}catch(error){const message = error instanceof Error ? error.message : 'x'; return NextResponse.json({error:message},{status:500})}}", atteso: true },
         { nome: 'template literal', codice: "export async function GET(){try{}catch(error){return NextResponse.json({error:`Fallito: ${error.message}`},{status:500})}}", atteso: true },
+        { nome: 'String diretto', codice: "export async function GET(){try{}catch(error){return NextResponse.json({error:String(error)},{status:500})}}", atteso: true },
+        { nome: 'String indiretto', codice: "export async function GET(){try{}catch(error){const detail = String(error); return NextResponse.json({error:detail},{status:500})}}", atteso: true },
         { nome: 'solo log server', codice: "export async function GET(){try{}catch(error){console.error('x', error.message); return NextResponse.json({error:'Errore interno.'},{status:500})}}", atteso: false },
         { nome: 'messaggio letterale', codice: "export async function GET(){try{}catch(error){return NextResponse.json({error:'Errore interno.',code:'internal_error'},{status:500})}}", atteso: false },
         { nome: 'helper', codice: "export async function GET(){try{}catch(error){return apiInternalError('GET /x', error)}}", atteso: false },
@@ -347,7 +351,7 @@ if (selfTest) {
     }, null, 2));
 
     if (violazioni.length > 0) {
-        console.error('\nLeak di error.message verso il client:');
+        console.error('\nLeak di eccezioni grezze verso il client:');
         for (const v of violazioni) console.error(`- ${v.file}:${v.riga} — ${v.via}`);
         console.error('\nUsare apiInternalError() da lib/api-error-response.ts: logga il dettaglio e restituisce un messaggio stabile.');
         process.exitCode = 1;
