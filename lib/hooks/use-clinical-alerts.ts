@@ -10,6 +10,25 @@ export interface ClinicalAlert {
     severity: 'high' | 'medium';
 }
 
+export const MAX_CLINICAL_ALERTS = 5;
+
+const SEVERITY_WEIGHT: Record<ClinicalAlert['severity'], number> = {
+    high: 2,
+    medium: 1,
+};
+
+/**
+ * Sort by descending severity, then keep the first MAX_CLINICAL_ALERTS.
+ * Array sort is stable, so alerts of equal severity keep the order in which
+ * they were generated. A high alert can never be dropped in favour of a
+ * medium one.
+ */
+export function selectMostUrgentAlerts(alerts: readonly ClinicalAlert[]): ClinicalAlert[] {
+    return [...alerts]
+        .sort((a, b) => SEVERITY_WEIGHT[b.severity] - SEVERITY_WEIGHT[a.severity])
+        .slice(0, MAX_CLINICAL_ALERTS);
+}
+
 export function useClinicalAlerts() {
     /* @Codex */
     return useLiveQuery(async () => {
@@ -90,6 +109,6 @@ export function useClinicalAlerts() {
         }
 
         // Return top 5 most urgent
-        return alerts.sort((a, _b) => (a.severity === 'high' ? -1 : 1)).slice(0, 5);
+        return selectMostUrgentAlerts(alerts);
     }, [], undefined, ['patients', 'patients_to_ambulatories', 'entries']);
 }
