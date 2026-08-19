@@ -69,8 +69,12 @@ export const AGENT_INTERFACE_MANIFEST: readonly AgentInterfaceCapability[] = Obj
 
 export function validateAgentInterfaceManifest(manifest: readonly AgentInterfaceCapability[]): string[] {
     const errors: string[] = [];
+    const capabilityIds = new Set<string>();
     for (const capability of manifest) {
+        if (capabilityIds.has(capability.id)) errors.push(`${capability.id}: duplicated capability id`);
+        capabilityIds.add(capability.id);
         if (!capability.id || !capability.schemaVersion || !capability.maximumStage || !capability.headlessDisposition) errors.push(`${capability.id}: required declaration is missing`);
+        if (capability.schemaVersion !== AGENT_INTERFACE_MANIFEST_SCHEMA) errors.push(`${capability.id}: schemaVersion must be ${AGENT_INTERFACE_MANIFEST_SCHEMA}`);
         if (capability.headlessDisposition !== 'available' && !capability.reason) errors.push(`${capability.id}: reason is required for ${capability.headlessDisposition}`);
         if (!Object.values(capability.sources).some((identifiers) => identifiers?.length)) errors.push(`${capability.id}: at least one source classification is required`);
     }
