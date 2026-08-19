@@ -1,0 +1,33 @@
+.page {
+    background: radial-gradient(circle at 14% 8%, color-mix(in srgb, var(--lume-accent) 9%, transparent), transparent 32rem), var(--lume-surface-canvas);
+}
+
+.panel { min-width: 0; border: 1px solid var(--lume-border-color); border-radius: 22px; background: color-mix(in srgb, var(--lume-surface-field) 92%, transparent); }
+.flowPanel { background: var(--lume-surface-focal); }
+.rail { position: relative; margin-top: 9px; padding: 0 5px 4px; }
+.railTrack, .railProgress { position: absolute; top: 20px; right: 10%; left: 10%; height: 2px; border-radius: 999px; }
+.railTrack { background: color-mix(in srgb, var(--lume-ink) 12%, transparent); }
+.railProgress { right: auto; width: 80%; transform-origin: left center; background: var(--lume-accent); transition: transform var(--lume-dur-firma) var(--lume-ease); }
+.stage { display: grid; justify-items: center; gap: 10px; min-width: 0; padding: 0; border: 0; color: var(--lume-ink-muted); background: transparent; cursor: pointer; text-align: center; }
+.stage:focus-visible { outline: none; }
+.stage:focus-visible .node { box-shadow: var(--lume-focus-ring); }
+.node { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid var(--lume-border-color); border-radius: 50%; background: var(--lume-surface-focal); transition: transform var(--lume-dur-firma) var(--lume-ease), color var(--lume-dur-riga) var(--lume-ease), background-color var(--lume-dur-riga) var(--lume-ease), border-color var(--lume-dur-riga) var(--lume-ease); }
+.node svg { width: 17px; height: 17px; }
+.stage_active .node { color: var(--lume-surface-focal); border-color: var(--lume-ink); background: var(--lume-ink); transform: translateY(-2px); }
+.stage_complete .node { color: var(--lume-surface-focal); border-color: var(--lume-accent); background: var(--lume-accent); }
+.stage_active strong, .stage_active small { color: var(--lume-ink); }
+.detail { animation: detail-in 250ms var(--lume-ease) both; }
+.log { display: grid; grid-template-columns: 58px 1fr auto; gap: 9px; align-items: baseline; padding: 5px 0; color: color-mix(in srgb, var(--lume-ink-muted) 55%, transparent); opacity: .46; transition: color var(--lume-dur-riga) var(--lume-ease), opacity var(--lume-dur-riga) var(--lume-ease); }
+.log strong, .log span, .log small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-registro), monospace; font-size: .61rem; }
+.log strong { color: var(--lume-ink); }
+.log small { color: var(--lume-ink-muted); font-size: .58rem; }
+.logVisible { color: var(--lume-ink-muted); opacity: 1; }
+.status { border: 1px solid var(--lume-border-color); border-radius: 999px; padding: 5px 8px; font-family: var(--font-registro), monospace; font-size: .65rem; color: var(--lume-ink-muted); }
+.statusReady { border-color: color-mix(in srgb, var(--lume-signal-success) 32%, transparent); background: color-mix(in srgb, var(--lume-signal-success) 10%, transparent); color: var(--lume-signal-success); }
+.output { display: grid; min-height: 230px; place-items: center; border: 1px dashed var(--lume-border-color); border-radius: 14px; background: color-mix(in srgb, var(--lume-surface-canvas) 36%, transparent); transition: border-color var(--lume-dur-firma) var(--lume-ease), background-color var(--lume-dur-firma) var(--lume-ease); }
+.outputReady { border-style: solid; border-color: color-mix(in srgb, var(--lume-signal-success) 35%, transparent); background: color-mix(in srgb, var(--lume-signal-success) 5%, var(--lume-surface-field)); }
+.receipt { opacity: .55; transition: border-color var(--lume-dur-firma) var(--lume-ease), opacity var(--lume-dur-firma) var(--lume-ease), background-color var(--lume-dur-firma) var(--lume-ease); }
+.receiptReady { border-color: color-mix(in srgb, var(--lume-signal-success) 35%, transparent); background: color-mix(in srgb, var(--lume-signal-success) 5%, transparent); opacity: 1; }
+@keyframes detail-in { from { opacity: .72; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 520px) { .node { width: 36px; height: 36px; } .log { grid-template-columns: 54px minmax(0, 1fr); } .log small { display: none; } }
+@media (prefers-reduced-motion: reduce) { .detail { animation: none; } .railProgress, .node, .log, .output, .receipt { transition-duration: .01ms; } }

@@ -14,7 +14,7 @@ import { UIStyleProvider } from '@/components/ui-style-provider';
 import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 import { ToastProvider } from '@/components/ui/toast-provider';
 
-const MOCKUP_ROUTE_ALLOWLIST = new Set(['/mockups/kree8', '/mockups/scheda']);
+const MOCKUP_ROUTE_ALLOWLIST = new Set(['/mockups/kree8', '/mockups/scheda', '/mockups/agent-interface']);
 
 export function RootRuntimeShell({
   children,
