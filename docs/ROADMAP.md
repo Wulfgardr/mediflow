@@ -221,6 +221,12 @@ indeterminato resta bloccante.
 * **Inbox conversazionale fuori dalla 0.8**: le route conversazionali esistenti
   non equivalgono a una inbox intelligente. Chiarimento guidato, buffer locale
   temporaneo e conversione confermata restano roadmap.
+* **Agent Interface Plane proposto**: `WUL-518` e ADR 0093 definiscono una
+  superficie headless completa per copertura dichiarata, con un solo contratto
+  di capability e adapter REST, MCP o CLI sottili. Sessione agentica dedicata,
+  context lease selezionato dal medico e scritture review-first restano gate
+  obbligatori. Non e una feature runtime consegnata e non apre accesso diretto,
+  cloud o scritture autonome.
 
 ### Esperienza nativa
 

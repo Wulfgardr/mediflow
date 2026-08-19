@@ -125,6 +125,14 @@ There is no silent cloud fallback. Each clinical output must preserve patient
 identity boundaries, provenance, uncertainty, execution venue, and physician
 review.
 
+The proposed **Agent Interface Plane** extends this direction to headless use.
+It would expose one versioned capability contract through thin REST, MCP, or CLI
+adapters while preserving physician-selected context and application-owned
+authority. Complete headless coverage means that every product capability has
+an honest machine-readable status; it does not grant agents unrestricted data
+access or autonomous clinical writes. This is a post-0.8 proposal, not a
+delivered runtime feature.
+
 Windows and Linux applications, broader offline continuity, voice completeness,
 the intelligent scaffold, and conversational workflows remain post-0.8 or
 exploratory until separate decisions and evidence promote them.
