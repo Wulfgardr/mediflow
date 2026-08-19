@@ -26,3 +26,19 @@ test('rifiuta una capability senza una classificazione sorgente esplicita', () =
         `${first.id}: at least one source classification is required`,
     ]);
 });
+
+test('rifiuta ID capability duplicati', () => {
+    const [first] = AGENT_INTERFACE_MANIFEST;
+    assert.ok(first);
+    assert.deepEqual(validateAgentInterfaceManifest([first, { ...first }]), [
+        `${first.id}: duplicated capability id`,
+    ]);
+});
+
+test('rifiuta una versione schema diversa dal contratto', () => {
+    const [first] = AGENT_INTERFACE_MANIFEST;
+    assert.ok(first);
+    assert.deepEqual(validateAgentInterfaceManifest([{ ...first, schemaVersion: 'mediflow.agent-interface.manifest.v2' as never }]), [
+        `${first.id}: schemaVersion must be mediflow.agent-interface.manifest.v1`,
+    ]);
+});
