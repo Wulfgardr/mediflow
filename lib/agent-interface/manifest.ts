@@ -1,22 +1,27 @@
 /* @Codex */
 
-export const AGENT_INTERFACE_MANIFEST_SCHEMA = 'mediflow.agent-interface.manifest.v1' as const;
+export const AGENT_INTERFACE_MANIFEST_SCHEMA = 'mediflow.agent-interface.manifest.v2' as const;
+export const AGENT_INTERFACE_CAPABILITY_SCHEMA = 'mediflow.agent-interface.capability.v1' as const;
 
-type SourceKind = 'openApi' | 'paired' | 'fabric';
-type SourceClassifications = Partial<Record<SourceKind, readonly string[]>>;
-type HeadlessDisposition = 'available' | 'proposal_only' | 'manual_only' | 'unavailable';
+export type AgentInterfaceStage = 'observe' | 'read' | 'compute' | 'propose' | 'preview' | 'apply';
+export type AgentInterfaceHeadlessDisposition = 'available' | 'proposal_only' | 'manual_only' | 'unavailable';
+export type AgentInterfaceAuthorityProfile = 'agent_session_context_lease' | 'not_grantable';
+export type AgentInterfaceSourceKind = 'openApi' | 'paired' | 'fabric';
+export type AgentInterfaceSourceClassifications = Readonly<Partial<Record<AgentInterfaceSourceKind, readonly string[]>>>;
 
 export interface AgentInterfaceCapability {
     readonly id: string;
     readonly schemaVersion: typeof AGENT_INTERFACE_MANIFEST_SCHEMA;
-    readonly maximumStage: 'observe' | 'read' | 'compute' | 'propose' | 'preview' | 'apply';
-    readonly headlessDisposition: HeadlessDisposition;
+    readonly capabilitySchemaVersion: typeof AGENT_INTERFACE_CAPABILITY_SCHEMA;
+    readonly maximumStage: AgentInterfaceStage;
+    readonly headlessDisposition: AgentInterfaceHeadlessDisposition;
+    readonly authorityProfile: AgentInterfaceAuthorityProfile;
     readonly requiredContext: readonly string[];
     readonly venue: readonly string[];
     readonly egress: 'none';
     readonly fallback: 'denied_by_contract';
     readonly reason: string | null;
-    readonly sources: SourceClassifications;
+    readonly sources: AgentInterfaceSourceClassifications;
 }
 
 const OPENAPI_OPERATIONS = [
@@ -46,12 +51,14 @@ const FABRIC_CAPABILITIES = [
 
 const MANUAL_REASON = 'ADR 0093 remains Proposed: no agent session, context lease, or adapter authorizes this capability.';
 
-function classified(kind: SourceKind, identifiers: readonly string[]): AgentInterfaceCapability[] {
+function classified(kind: AgentInterfaceSourceKind, identifiers: readonly string[]): AgentInterfaceCapability[] {
     return identifiers.map((identifier) => Object.freeze({
         id: `agent.interface.${kind}.${identifier.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase()}.v1`,
         schemaVersion: AGENT_INTERFACE_MANIFEST_SCHEMA,
+        capabilitySchemaVersion: AGENT_INTERFACE_CAPABILITY_SCHEMA,
         maximumStage: 'observe',
         headlessDisposition: 'manual_only',
+        authorityProfile: 'not_grantable',
         requiredContext: Object.freeze([]),
         venue: Object.freeze(['local_process']),
         egress: 'none',
@@ -67,16 +74,63 @@ export const AGENT_INTERFACE_MANIFEST: readonly AgentInterfaceCapability[] = Obj
     ...classified('fabric', FABRIC_CAPABILITIES),
 ]);
 
-export function validateAgentInterfaceManifest(manifest: readonly AgentInterfaceCapability[]): string[] {
-    const errors: string[] = [];
-    const capabilityIds = new Set<string>();
-    for (const capability of manifest) {
-        if (capabilityIds.has(capability.id)) errors.push(`${capability.id}: duplicated capability id`);
-        capabilityIds.add(capability.id);
-        if (!capability.id || !capability.schemaVersion || !capability.maximumStage || !capability.headlessDisposition) errors.push(`${capability.id}: required declaration is missing`);
-        if (capability.schemaVersion !== AGENT_INTERFACE_MANIFEST_SCHEMA) errors.push(`${capability.id}: schemaVersion must be ${AGENT_INTERFACE_MANIFEST_SCHEMA}`);
-        if (capability.headlessDisposition !== 'available' && !capability.reason) errors.push(`${capability.id}: reason is required for ${capability.headlessDisposition}`);
-        if (!Object.values(capability.sources).some((identifiers) => identifiers?.length)) errors.push(`${capability.id}: at least one source classification is required`);
+const STAGES = new Set<AgentInterfaceStage>(['observe', 'read', 'compute', 'propose', 'preview', 'apply']);
+const DISPOSITIONS = new Set<AgentInterfaceHeadlessDisposition>(['available', 'proposal_only', 'manual_only', 'unavailable']);
+const SOURCE_KINDS = new Set<AgentInterfaceSourceKind>(['openApi', 'paired', 'fabric']);
+const CAPABILITY_KEYS = new Set(['id', 'schemaVersion', 'capabilitySchemaVersion', 'maximumStage', 'headlessDisposition', 'authorityProfile', 'requiredContext', 'venue', 'egress', 'fallback', 'reason', 'sources']);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isText(value: unknown): value is string {
+    return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isTextArray(value: unknown, allowEmpty: boolean): value is readonly string[] {
+    return Array.isArray(value) && Object.keys(value).length === value.length && Object.keys(value).every((key, index) => key === String(index)) && (allowEmpty || value.length > 0)
+        && value.every(isText) && new Set(value).size === value.length;
+}
+
+function isSources(value: unknown): value is AgentInterfaceSourceClassifications {
+    if (!isRecord(value)) return false;
+    const entries = Object.entries(value);
+    return entries.length > 0 && entries.every(([kind, identifiers]) =>
+        SOURCE_KINDS.has(kind as AgentInterfaceSourceKind) && isTextArray(identifiers, false));
+}
+
+// @Codex: validates untrusted manifest data before any grant resolution or copy.
+export function validateAgentInterfaceManifest(manifest: unknown): string[] {
+    try {
+        if (!Array.isArray(manifest)) return ['manifest: must be an array'];
+        const errors: string[] = [];
+        const capabilityIds = new Set<string>();
+        for (const [index, value] of manifest.entries()) {
+            const label = isRecord(value) && isText(value.id) ? value.id : `manifest[${index}]`;
+            if (!isRecord(value)) { errors.push(`${label}: capability must be an object`); continue; }
+            if (Object.keys(value).some((key) => !CAPABILITY_KEYS.has(key))) errors.push(`${label}: unknown capability field`);
+            if (!isText(value.id)) errors.push(`${label}: id must be non-empty text`);
+            else if (capabilityIds.has(value.id)) errors.push(`${label}: duplicated capability id`);
+            else capabilityIds.add(value.id);
+            if (value.schemaVersion !== AGENT_INTERFACE_MANIFEST_SCHEMA) errors.push(`${label}: schemaVersion must be ${AGENT_INTERFACE_MANIFEST_SCHEMA}`);
+            if (value.capabilitySchemaVersion !== AGENT_INTERFACE_CAPABILITY_SCHEMA) errors.push(`${label}: capabilitySchemaVersion must be ${AGENT_INTERFACE_CAPABILITY_SCHEMA}`);
+            if (!STAGES.has(value.maximumStage as AgentInterfaceStage)) errors.push(`${label}: maximumStage is invalid`);
+            if (!DISPOSITIONS.has(value.headlessDisposition as AgentInterfaceHeadlessDisposition)) errors.push(`${label}: headlessDisposition is invalid`);
+            if (value.authorityProfile !== 'agent_session_context_lease' && value.authorityProfile !== 'not_grantable') errors.push(`${label}: authorityProfile is invalid`);
+            if (value.headlessDisposition === 'available' && value.authorityProfile !== 'agent_session_context_lease') errors.push(`${label}: available requires agent_session_context_lease`);
+            if (value.headlessDisposition !== 'available' && DISPOSITIONS.has(value.headlessDisposition as AgentInterfaceHeadlessDisposition) && value.authorityProfile !== 'not_grantable') errors.push(`${label}: ${value.headlessDisposition} must remain not_grantable`);
+            if (value.headlessDisposition === 'available' && value.maximumStage === 'apply') errors.push(`${label}: apply cannot be granted by ADR 0093`);
+            if (!isTextArray(value.requiredContext, true)) errors.push(`${label}: requiredContext must be a unique text array`);
+            if (!isTextArray(value.venue, false)) errors.push(`${label}: venue must be a non-empty unique text array`);
+            if (value.egress !== 'none') errors.push(`${label}: egress must be none`);
+            if (value.fallback !== 'denied_by_contract') errors.push(`${label}: fallback must be denied_by_contract`);
+            if (value.reason !== null && !isText(value.reason)) errors.push(`${label}: reason must be null or non-empty text`);
+            if (value.headlessDisposition === 'available' && value.reason !== null) errors.push(`${label}: reason must be null for available`);
+            if (value.headlessDisposition !== 'available' && DISPOSITIONS.has(value.headlessDisposition as AgentInterfaceHeadlessDisposition) && !isText(value.reason)) errors.push(`${label}: reason is required for ${value.headlessDisposition}`);
+            if (!isSources(value.sources)) errors.push(`${label}: sources must use known kinds and non-empty unique text arrays`);
+        }
+        return errors;
+    } catch {
+        return ['manifest: invalid'];
     }
-    return errors;
 }
