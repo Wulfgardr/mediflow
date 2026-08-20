@@ -6,6 +6,7 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
+- [0093-agent-interface-plane-headless-capability-contract.md](./0093-agent-interface-plane-headless-capability-contract.md): propone una superficie agentica locale completa e versionata, con context lease minimo e autorita applicativa review-first.
 - [0092-limite-digest-bound-readiness-ai-locale.md](./0092-limite-digest-bound-readiness-ai-locale.md): accetta un'annotazione distinta da `runtime`; il bracket resta detection best-effort.
 - [0089-contratto-intelligence-fabric-e-venue-esecutive.md](./0089-contratto-intelligence-fabric-e-venue-esecutive.md): contratto fabric per capability, venue esplicite, profili egress versionati e ricevute di risoluzione fail-closed.
 - [0090-giunture-fabric-trust-onboarding-routing-interazione.md](./0090-giunture-fabric-trust-onboarding-routing-interazione.md): contratti di giuntura per trust paired con revoca host, onboarding provider per classe di credenziale, routing osservabile con fallback negato e interazione clinica review-first.

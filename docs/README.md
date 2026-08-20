@@ -51,6 +51,7 @@ Approfondimenti utili:
 - Foundation persistente delle proposte diagnostiche documentali: [ADR 0087](./adr/0087-registro-proposte-diagnostiche-documentali.md)
 - Routing PDF deterministico per pagina: [ADR 0088](./adr/0088-deterministic-pdf-page-router.md)
 - Limite digest-bound della readiness AI locale: [ADR 0092](./adr/0092-limite-digest-bound-readiness-ai-locale.md)
+- Agent Interface Plane headless: [ADR 0093](./adr/0093-agent-interface-plane-headless-capability-contract.md)
 - Closeout secondario dello stack intelligente: [docs/analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md](./analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md)
 - Triage audit esterno V2: [docs/analysis/2026-07-05-audit-esterno-v2-triage.md](./analysis/2026-07-05-audit-esterno-v2-triage.md)
 
@@ -104,6 +105,7 @@ Approfondimenti utili:
 | Intelligence Fabric post-0.8 | [docs/analysis/2026-07-29-intelligence-fabric-run.md](./analysis/2026-07-29-intelligence-fabric-run.md) | `SECONDARY / RUN RECORD` | Registra nucleo, giunture, prove, limiti, packet e stato del candidato locale WUL-522. |
 | Matrice runtime AI post-0.8 | [docs/ai-runtime-serving-matrix.md](./ai-runtime-serving-matrix.md) | `CANONICAL / POST-0.8 GOVERNANCE` | Separa fitting, benchmark, shadow e serving per task, modello e runtime. |
 | Limite digest-bound della readiness AI locale | [docs/adr/0092-limite-digest-bound-readiness-ai-locale.md](./adr/0092-limite-digest-bound-readiness-ai-locale.md) | `CANONICAL / ACCEPTED` | Mantiene bloccata la qualified readiness e classifica il bracket come detection best-effort. |
+| Agent Interface Plane headless | [docs/adr/0093-agent-interface-plane-headless-capability-contract.md](./adr/0093-agent-interface-plane-headless-capability-contract.md) | `CANONICAL / PROPOSED` | Propone una superficie agentica locale completa e versionata, con sessione dedicata, context lease minimo e scritture applicative review-first; non autorizza runtime. |
 | Contratto Intelligence Fabric | [docs/adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md](./adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md) | `CANONICAL / ACCEPTED` | Definisce capability, venue, profili egress, policy, ricevute e provenienza fail-closed. |
 | Giunture Intelligence Fabric | [docs/adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md](./adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md) | `CANONICAL / ACCEPTED` | Definisce trust paired, onboarding, routing osservabile e review clinica. |
 | Candidato locale Intelligence Fabric | [docs/adr/0091-candidato-locale-fabric-admissione-continuita-status.md](./adr/0091-candidato-locale-fabric-admissione-continuita-status.md) | `CANONICAL / ACCEPTED` | Limita admissione, continuita, stato paired e harness locale senza AI paired, cloud o scritture cliniche. |
