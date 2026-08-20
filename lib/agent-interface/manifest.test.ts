@@ -52,5 +52,6 @@ test('valida campi di sicurezza anche oltre i tipi statici', () => {
         { requiredContext: null }, { requiredContext: Object.assign(new Array(1), { extra: 'x' }) }, { venue: [null] }, { venue: Object.assign(new Array(1), { extra: 'x' }) }, { egress: 'cloud' },
         { fallback: 'allow' }, { reason: 7 }, { sources: { fabric: [null] } }, { admin: true },
     ]) assert.notDeepEqual(validateAgentInterfaceManifest([{ ...first, ...override }]), []);
-    assert.notDeepEqual(validateAgentInterfaceManifest(null), []);
+    let reads = 0; assert.notDeepEqual(validateAgentInterfaceManifest([{ ...first, get egress() { return reads++ === 0 ? 'none' : 'cloud'; } }]), []);
+    const hidden = { ...first }; Object.defineProperty(hidden, 'admin', { value: true }); const rooted = Object.assign([first], { self: first }); assert.notDeepEqual(validateAgentInterfaceManifest([hidden]), []); assert.notDeepEqual(validateAgentInterfaceManifest(rooted), []); assert.notDeepEqual(validateAgentInterfaceManifest(null), []);
 });

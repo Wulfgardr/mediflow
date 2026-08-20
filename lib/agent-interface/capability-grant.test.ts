@@ -12,7 +12,6 @@ const AVAILABLE: AgentInterfaceCapability = Object.freeze({
     sources: Object.freeze({ fabric: Object.freeze(['synthetic_context_describe']) }),
 });
 const MANIFEST = Object.freeze([AVAILABLE]);
-
 // @Codex: the only positive entry is synthetic, test-local, and read-only.
 test('resolves one immutable available-entry snapshot', () => {
     const result = resolveAgentCapabilityGrant(MANIFEST, { capabilityId: AVAILABLE.id, maximumStage: 'read' });
@@ -23,7 +22,6 @@ test('resolves one immutable available-entry snapshot', () => {
     assert.ok(Object.isFrozen(result.grant) && Object.isFrozen(result.grant.requiredContext)
         && Object.isFrozen(result.grant.sources) && Object.isFrozen(result.grant.sources.fabric));
 });
-
 test('keeps every frozen entry and proposal_only non-grantable', () => {
     for (const capability of AGENT_INTERFACE_MANIFEST) assert.deepEqual(resolveAgentCapabilityGrant(
         AGENT_INTERFACE_MANIFEST, { capabilityId: capability.id, maximumStage: 'observe' },
@@ -32,7 +30,6 @@ test('keeps every frozen entry and proposal_only non-grantable', () => {
     assert.deepEqual(resolveAgentCapabilityGrant([proposal], { capabilityId: proposal.id, maximumStage: 'read' }),
         { ok: false, reason: 'CAPABILITY_NOT_GRANTABLE' });
 });
-
 test('malformed security fields fail closed without throwing', () => {
     const cases = [
         { requiredContext: null }, { requiredContext: Object.assign(new Array(1), { extra: 'x' }) }, { venue: [null] }, { egress: 'cloud' }, { fallback: 'allow' },
@@ -41,19 +38,17 @@ test('malformed security fields fail closed without throwing', () => {
     for (const override of cases) assert.deepEqual(resolveAgentCapabilityGrant([{ ...AVAILABLE, ...override }],
         { capabilityId: AVAILABLE.id, maximumStage: 'read' }), { ok: false, reason: 'MANIFEST_INVALID' });
     let egressReads = 0; const stateful = { ...AVAILABLE, get egress() { return egressReads++ === 0 ? 'none' : 'cloud'; } };
-    const snapped = resolveAgentCapabilityGrant([stateful], { capabilityId: AVAILABLE.id, maximumStage: 'read' }); assert.equal(snapped.ok && snapped.grant.egress === 'none' && egressReads === 1, true);
+    assert.deepEqual(resolveAgentCapabilityGrant([stateful], { capabilityId: AVAILABLE.id, maximumStage: 'read' }), { ok: false, reason: 'MANIFEST_INVALID' }); assert.equal(egressReads, 0);
 });
-
 test('rejects malformed requests, apply, unknown ids, and stage escalation', () => {
     const cases: Array<[unknown, string]> = [
         [null, 'GRANT_REQUEST_INVALID'],
         [{ capabilityId: 'agent.synthetic.unknown.v1', maximumStage: 'read' }, 'CAPABILITY_NOT_FOUND'],
         [{ capabilityId: AVAILABLE.id, maximumStage: 'apply' }, 'STAGE_NOT_DELEGABLE'],
-        [{ capabilityId: AVAILABLE.id, maximumStage: 'compute' }, 'STAGE_EXCEEDS_MANIFEST'],
+        [{ capabilityId: AVAILABLE.id, maximumStage: 'compute' }, 'STAGE_EXCEEDS_MANIFEST'], [{ capabilityId: AVAILABLE.id, get maximumStage() { return 'read'; } }, 'GRANT_REQUEST_INVALID'],
     ];
     for (const [request, reason] of cases) assert.deepEqual(resolveAgentCapabilityGrant(MANIFEST, request), { ok: false, reason });
 });
-
 test('revalidation discards caller ownership and returns a fresh snapshot', () => {
     const issued = resolveAgentCapabilityGrant(MANIFEST, { capabilityId: AVAILABLE.id, maximumStage: 'read' });
     assert.equal(issued.ok, true);
@@ -64,5 +59,5 @@ test('revalidation discards caller ownership and returns a fresh snapshot', () =
     if (!current.ok) return;
     assert.notEqual(current.grant, candidate);
     candidate.requiredContext.push('all_records'); assert.deepEqual(revalidateAgentCapabilityGrant(MANIFEST, candidate), { ok: false, reason: 'GRANT_SNAPSHOT_MISMATCH' });
-    candidate.requiredContext = Object.assign(new Array(1), { extra: 'x' }); assert.deepEqual(revalidateAgentCapabilityGrant(MANIFEST, candidate), { ok: false, reason: 'GRANT_SNAPSHOT_MISMATCH' });
+    candidate.requiredContext = Object.assign(new Array(1), { extra: 'x' }); assert.deepEqual(revalidateAgentCapabilityGrant(MANIFEST, candidate), { ok: false, reason: 'GRANT_SNAPSHOT_INVALID' }); candidate.requiredContext = ['selected_patient']; Object.defineProperty(candidate, 'egress', { enumerable: true, get() { return 'none'; } }); assert.deepEqual(revalidateAgentCapabilityGrant(MANIFEST, candidate), { ok: false, reason: 'GRANT_SNAPSHOT_INVALID' });
 });

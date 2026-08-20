@@ -78,30 +78,37 @@ const STAGES = new Set<AgentInterfaceStage>(['observe', 'read', 'compute', 'prop
 const DISPOSITIONS = new Set<AgentInterfaceHeadlessDisposition>(['available', 'proposal_only', 'manual_only', 'unavailable']);
 const SOURCE_KINDS = new Set<AgentInterfaceSourceKind>(['openApi', 'paired', 'fabric']);
 const CAPABILITY_KEYS = new Set(['id', 'schemaVersion', 'capabilitySchemaVersion', 'maximumStage', 'headlessDisposition', 'authorityProfile', 'requiredContext', 'venue', 'egress', 'fallback', 'reason', 'sources']);
-
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-
 function isText(value: unknown): value is string {
     return typeof value === 'string' && value.trim().length > 0;
 }
-
 function isTextArray(value: unknown, allowEmpty: boolean): value is readonly string[] {
     return Array.isArray(value) && Object.keys(value).length === value.length && Object.keys(value).every((key, index) => key === String(index)) && (allowEmpty || value.length > 0)
         && value.every(isText) && new Set(value).size === value.length;
 }
-
 function isSources(value: unknown): value is AgentInterfaceSourceClassifications {
     if (!isRecord(value)) return false;
     const entries = Object.entries(value);
     return entries.length > 0 && entries.every(([kind, identifiers]) =>
         SOURCE_KINDS.has(kind as AgentInterfaceSourceKind) && isTextArray(identifiers, false));
 }
-
+export function hasUnsafeAgentInterfaceProperty(value: unknown, seen = new Set<object>()): boolean {
+    if (typeof value !== 'object' || value === null || seen.has(value)) return false;
+    seen.add(value);
+    return Reflect.ownKeys(value).some((key) => {
+        const descriptor = Object.getOwnPropertyDescriptor(value, key);
+        const invalidArrayKey = Array.isArray(value) && key !== 'length' && (typeof key !== 'string' || !/^(0|[1-9]\d*)$/.test(key) || Number(key) >= value.length);
+        const invalidDescriptor = !descriptor || !('value' in descriptor) || (!descriptor.enumerable && !(Array.isArray(value) && key === 'length'));
+        return typeof key === 'symbol' || invalidArrayKey || invalidDescriptor || hasUnsafeAgentInterfaceProperty(descriptor.value, seen);
+    });
+}
 // @Codex: validates untrusted manifest data before any grant resolution or copy.
 export function validateAgentInterfaceManifest(manifest: unknown): string[] {
     try {
+        if (hasUnsafeAgentInterfaceProperty(manifest)) return ['manifest: non-plain properties are not allowed'];
+        manifest = structuredClone(manifest);
         if (!Array.isArray(manifest)) return ['manifest: must be an array'];
         const errors: string[] = [];
         const capabilityIds = new Set<string>();

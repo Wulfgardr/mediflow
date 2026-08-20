@@ -6,13 +6,11 @@ import {
     type AgentInterfaceSourceClassifications,
     type AgentInterfaceSourceKind,
     type AgentInterfaceStage,
-    validateAgentInterfaceManifest,
-} from './manifest.ts';
-
+    hasUnsafeAgentInterfaceProperty, validateAgentInterfaceManifest,
+} from './manifest';
 export type AgentDelegableStage = Exclude<AgentInterfaceStage, 'apply'>;
 const DELEGABLE_STAGES = new Set<AgentDelegableStage>(['observe', 'read', 'compute', 'propose', 'preview']);
 const STAGE_RANK: Readonly<Record<AgentDelegableStage, number>> = Object.freeze({ observe: 0, read: 1, compute: 2, propose: 3, preview: 4 });
-
 /** Admission material only; broker-owned physician session and lease state remain mandatory. */
 export type ManifestResolvedCapabilityGrant = Readonly<{
     capabilityId: string;
@@ -28,13 +26,11 @@ export type ManifestResolvedCapabilityGrant = Readonly<{
     fallback: 'denied_by_contract';
     sources: AgentInterfaceSourceClassifications;
 }>;
-
 type FailureReason = 'MANIFEST_INVALID' | 'GRANT_REQUEST_INVALID' | 'CAPABILITY_NOT_FOUND'
     | 'CAPABILITY_NOT_GRANTABLE' | 'STAGE_NOT_DELEGABLE' | 'STAGE_EXCEEDS_MANIFEST'
     | 'GRANT_SNAPSHOT_INVALID' | 'GRANT_SNAPSHOT_MISMATCH';
 export type AgentCapabilityGrantResolution = Readonly<{ ok: true; grant: ManifestResolvedCapabilityGrant }>
     | Readonly<{ ok: false; reason: FailureReason }>;
-
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -54,16 +50,16 @@ function freezeSources(value: AgentInterfaceSourceClassifications): AgentInterfa
 // @Codex: malformed manifests fail before security-bound fields are copied.
 export function resolveAgentCapabilityGrant(manifest: unknown, request: unknown): AgentCapabilityGrantResolution {
     try {
+        if (validateAgentInterfaceManifest(manifest).length > 0) return fail('MANIFEST_INVALID');
+        if (hasUnsafeAgentInterfaceProperty(request)) return fail('GRANT_REQUEST_INVALID');
         const [manifestSnapshot, requestSnapshot] = structuredClone([manifest, request]);
-        if (validateAgentInterfaceManifest(manifestSnapshot).length > 0) return fail('MANIFEST_INVALID');
         if (!isRecord(requestSnapshot) || !isText(requestSnapshot.capabilityId) || !isText(requestSnapshot.maximumStage)) return fail('GRANT_REQUEST_INVALID');
         if (!DELEGABLE_STAGES.has(requestSnapshot.maximumStage as AgentDelegableStage)) return fail('STAGE_NOT_DELEGABLE');
         const capability = (manifestSnapshot as readonly AgentInterfaceCapability[]).find((item) => item.id === requestSnapshot.capabilityId);
         if (!capability) return fail('CAPABILITY_NOT_FOUND');
         if (capability.headlessDisposition !== 'available' || capability.authorityProfile !== 'agent_session_context_lease') return fail('CAPABILITY_NOT_GRANTABLE');
         if (!DELEGABLE_STAGES.has(capability.maximumStage as AgentDelegableStage)) return fail('STAGE_NOT_DELEGABLE');
-        const maximumStage = requestSnapshot.maximumStage as AgentDelegableStage;
-        const manifestMaximumStage = capability.maximumStage as AgentDelegableStage;
+        const maximumStage = requestSnapshot.maximumStage as AgentDelegableStage; const manifestMaximumStage = capability.maximumStage as AgentDelegableStage;
         if (STAGE_RANK[maximumStage] > STAGE_RANK[manifestMaximumStage]) return fail('STAGE_EXCEEDS_MANIFEST');
         return Object.freeze({ ok: true, grant: Object.freeze({
             capabilityId: capability.id,
@@ -83,7 +79,6 @@ export function resolveAgentCapabilityGrant(manifest: unknown, request: unknown)
         return fail('MANIFEST_INVALID');
     }
 }
-
 function sameArray(value: unknown, expected: readonly string[]): boolean {
     return Array.isArray(value) && Object.keys(value).length === value.length && Object.keys(value).every((key, index) => key === String(index)) && value.length === expected.length
         && value.every((item, index) => item === expected[index]);
@@ -95,6 +90,8 @@ function sameSources(value: unknown, expected: AgentInterfaceSourceClassificatio
 // @Codex: candidate stays untrusted; success returns a fresh current-manifest snapshot.
 export function revalidateAgentCapabilityGrant(manifest: unknown, candidate: unknown): AgentCapabilityGrantResolution {
     try {
+        if (validateAgentInterfaceManifest(manifest).length > 0) return fail('MANIFEST_INVALID');
+        if (hasUnsafeAgentInterfaceProperty(candidate)) return fail('GRANT_SNAPSHOT_INVALID');
         const [manifestSnapshot, candidateSnapshot] = structuredClone([manifest, candidate]);
         if (!isRecord(candidateSnapshot) || !isText(candidateSnapshot.capabilityId) || !isText(candidateSnapshot.maximumStage)) return fail('GRANT_SNAPSHOT_INVALID');
         const resolved = resolveAgentCapabilityGrant(manifestSnapshot, { capabilityId: candidateSnapshot.capabilityId, maximumStage: candidateSnapshot.maximumStage });
