@@ -3,7 +3,7 @@
 .freshness {
   position: relative;
   border-radius: 18px;
-  padding: 16px 18px 16px 22px;
+  padding: 16px 18px;
   color: var(--ink);
   display: flex;
   align-items: center;
@@ -14,19 +14,24 @@
     inset 0 1px 0 var(--surface-highlight),
     0 0 0 1px var(--line-strong);
 }
-.freshness::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 5px;
-  background: var(--ink-faint);
-}
 
 .freshnessLabel { display: flex; flex-direction: column; gap: 2px; }
 
-.freshnessTitle { font-size: 13px; font-weight: 600; color: var(--ink); }
+.freshnessTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.freshnessTitle::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
 
 .freshnessSub { font-size: 12px; color: var(--ink-muted); }
 
@@ -38,11 +43,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-.freshnessOk::before { background: var(--lume-signal-success); }
+.freshnessOk .freshnessTitle::before { background: var(--lume-signal-success); }
 
-.freshnessStale::before { background: var(--lume-signal-warning); }
+.freshnessStale .freshnessTitle::before { background: var(--lume-signal-warning); }
 
-.freshnessBroken::before { background: var(--lume-signal-critical); }
+.freshnessBroken .freshnessTitle::before { background: var(--lume-signal-critical); }
 
 /* ───────────── catalogs list ───────────── */
 

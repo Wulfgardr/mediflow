@@ -244,7 +244,7 @@ export default function BackupSchedulerUI() {
                     </p>
                 </div>
                 {status && (
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${status.installed ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-500/20 dark:bg-green-900/10 dark:text-green-300' : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'}`}>
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${status.installed ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-500/20 dark:bg-green-900/10 dark:text-green-300' : 'border-slate-200 bg-slate-100 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'}`}>
                         {status.installed ? 'Installato' : 'Non installato'}
                     </span>
                 )}
