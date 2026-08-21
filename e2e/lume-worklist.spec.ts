@@ -64,8 +64,8 @@ async function resolvedFontFamily(locator: Locator): Promise<string> {
 }
 
 async function assertWorklistContract(page: Page): Promise<void> {
-  const list = page.getByRole('list', { name: 'Elenco pazienti in carico', exact: true });
-  const listItems = list.getByRole('listitem');
+  const list = page.getByRole('listbox', { name: 'Elenco pazienti in carico', exact: true });
+  const listItems = list.getByRole('option');
   const rows = list.getByTestId('lume-patient-row');
   await expect(list).toBeVisible();
   await expect(listItems).toHaveCount(3);
@@ -91,11 +91,11 @@ async function assertWorklistContract(page: Page): Promise<void> {
   expect(new Set(codeFamilies)).toEqual(new Set([registerFamily]));
   expect(new Set(whenFamilies)).toEqual(new Set([registerFamily]));
 
-  await expect(firstRow).toHaveAttribute('aria-pressed', 'true');
-  await expect(secondRow).toHaveAttribute('aria-pressed', 'false');
+  await expect(firstRow).toHaveAttribute('aria-selected', 'true');
+  await expect(secondRow).toHaveAttribute('aria-selected', 'false');
   await secondRow.click();
-  await expect(firstRow).toHaveAttribute('aria-pressed', 'false');
-  await expect(secondRow).toHaveAttribute('aria-pressed', 'true');
+  await expect(firstRow).toHaveAttribute('aria-selected', 'false');
+  await expect(secondRow).toHaveAttribute('aria-selected', 'true');
 
   const rowSurfaces = await Promise.all([firstRow, secondRow].map((row) => row.evaluate((element) => {
     const style = getComputedStyle(element);
