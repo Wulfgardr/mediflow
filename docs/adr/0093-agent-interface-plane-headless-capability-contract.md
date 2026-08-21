@@ -1,8 +1,7 @@
 # ADR 0093: Agent Interface Plane headless
 
 Date: 2026-08-19
-Accepted: 2026-08-21
-Status: Accepted
+Status: Proposed
 
 ---
 
@@ -69,12 +68,11 @@ versionata, anche quando resta manuale o non disponibile.
 - **Opzione 4**: puo restare uno strumento di test o compatibilita, ma e fragile,
   poco osservabile e non offre un confine di autorita sufficiente.
 
-## Decisione
+## Decisione proposta
 
-Si adotta l'opzione 3: un **Agent Interface Plane (AIP)** locale, applicativo e
-fail-closed. L'accettazione autorizza solo le slice che rispettano i contratti
-di questo ADR. Non autorizza scritture cliniche, accesso diretto ai dati o
-adapter che ricostruiscono autorita da contenuto fornito dal chiamante.
+Si propone l'opzione 3: un **Agent Interface Plane (AIP)** locale, applicativo e
+fail-closed. Lo stato `Proposed` non autorizza ancora implementazione runtime o
+scritture.
 
 ### 1. Un solo contratto di capability
 
@@ -291,17 +289,18 @@ non e validato.
 La prima slice proposta, collegata a `WUL-558`, e solo locale, read-only e
 sintetica. Puo iniziare soltanto dopo l'accettazione di D1-D5:
 
-1. pubblicare schema macchina AIP e manifest parity Mini;
-2. classificare ogni capability web senza concedere autorita implicita;
-3. implementare un broker e un servizio condiviso in memoria, con stato
-   canonico broker-owned e fixture sintetiche;
-4. esporre `whoami`, `capabilities`, `patient search`, `patient show`,
-   `open-loops` e draft/preview solo dove il manifest li autorizza;
-5. aggiungere Mini come adapter pipe-first sottile, con output deterministico,
-   exit code stabili e receipt PHI-safe;
-6. negare contenuto authority caller-supplied, token locale, lease scaduti o
-   revocati, cross-patient, egress, accesso diretto e ogni `apply`;
-7. aggiungere MCP `stdio` solo dopo la validazione indipendente del servizio e
-   di Mini.
+1. definire uno schema macchina per il manifest AIP;
+2. classificare le capability esistenti senza renderne disponibili di nuove;
+3. introdurre modelli puri per sessione e context lease, senza persistenza o
+   route;
+4. esporre in un harness sintetico `agent.capabilities.list`,
+   `agent.context.describe` e una sola projection paziente esplicitamente
+   selezionata;
+5. produrre una receipt locale PHI-safe;
+6. verificare che token locale, lease scaduto o revocato, paziente differente,
+   accesso diretto e tentativo di `apply` siano negati;
+7. verificare che plaintext e segreti non compaiano in log, snapshot o
+   receipt.
 
-La slice non aggiunge AI, cloud, scritture cliniche o accesso a dati reali.
+MCP stdio e CLI arrivano solo dopo la validazione del servizio condiviso. La
+slice non aggiunge AI, cloud, scritture cliniche o accesso a dati reali.
