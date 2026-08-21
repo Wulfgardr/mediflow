@@ -20,7 +20,7 @@ import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 /* @Codex #98, #68 */
 type QuadroSignal = 'warning' | 'critical';
 
-type QuadroMetric = { label: string; value: string | number; note: string; signal?: QuadroSignal };
+type QuadroMetric = { label: string; value: string | number; note: string; signal?: QuadroSignal; loading?: boolean };
 type QuadroDiagnosis = { code: string; description: string };
 type QuadroTherapy = { name: string; dose: string };
 type QuadroRow = { title: string; value?: string; note?: string; signal?: QuadroSignal };
@@ -168,23 +168,39 @@ function PatientQuadro({
 
       <div className={patientStyles.quadroMetrics} data-testid="lume-quadro-metrics">
         {metrics.map((metric) => (
-          <div key={metric.label} className={patientStyles.quadroMetric} data-lume-surface="field">
+          <div
+            key={metric.label}
+            className={patientStyles.quadroMetric}
+            data-lume-surface="field"
+            aria-busy={metric.loading || undefined}
+          >
             <p className={patientStyles.quadroMetricLabel} data-testid="lume-quadro-metric-label">
               {metric.label}
             </p>
-            <p
-              className={classNames(
-                patientStyles.quadroMetricValue,
-                'lume-registro',
-                metric.signal && SIGNAL_VALUE_CLASSES[metric.signal],
-              )}
-              data-testid="lume-quadro-metric-value"
-              data-lume-signal={metric.signal}
-              data-lume-clinical-state={metric.signal}
-            >
-              {metric.value}
-            </p>
-            <p className={patientStyles.quadroMetricNote}>{metric.note}</p>
+            {/* @Codex WUL-UIUX: il caricamento è una linea in attesa, non un
+                valore finto «in attesa» che sembra un dato. */}
+            {metric.loading ? (
+              <div aria-hidden="true">
+                <div className="mf-skeleton h-5 w-16 mt-2" />
+                <div className="mf-skeleton h-3 w-28 mt-2" />
+              </div>
+            ) : (
+              <>
+                <p
+                  className={classNames(
+                    patientStyles.quadroMetricValue,
+                    'lume-registro',
+                    metric.signal && SIGNAL_VALUE_CLASSES[metric.signal],
+                  )}
+                  data-testid="lume-quadro-metric-value"
+                  data-lume-signal={metric.signal}
+                  data-lume-clinical-state={metric.signal}
+                >
+                  {metric.value}
+                </p>
+                <p className={patientStyles.quadroMetricNote}>{metric.note}</p>
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -266,23 +282,27 @@ function RealPatientArea({
   const metrics: QuadroMetric[] = [
     {
       label: 'Diario',
-      value: isWorkspaceLoading ? 'in attesa' : workspace?.entriesCount ?? 0,
-      note: isWorkspaceLoading ? 'Caricamento del diario locale in corso.' : latestEntry ? `${latestEntry.type} · ${latestEntry.date}` : 'Nessuna voce recente.',
+      value: workspace?.entriesCount ?? 0,
+      note: latestEntry ? `${latestEntry.type} · ${latestEntry.date}` : 'Nessuna voce recente.',
+      loading: isWorkspaceLoading,
     },
     {
       label: 'Terapie attive',
-      value: isWorkspaceLoading ? 'in attesa' : workspace?.activeTherapiesCount ?? 0,
-      note: isWorkspaceLoading ? 'Caricamento del piano terapeutico in corso.' : therapies[0]?.name ?? 'Nessun piano attivo.',
+      value: workspace?.activeTherapiesCount ?? 0,
+      note: therapies[0]?.name ?? 'Nessun piano attivo.',
+      loading: isWorkspaceLoading,
     },
     {
       label: 'Follow-up',
-      value: isWorkspaceLoading ? 'in attesa' : workspace?.pendingCheckupsCount ?? 0,
-      note: isWorkspaceLoading ? 'Caricamento dell’agenda locale in corso.' : nextCheckup ? `${nextCheckup.title} · ${nextCheckup.date}` : 'Nessun passaggio aperto.',
+      value: workspace?.pendingCheckupsCount ?? 0,
+      note: nextCheckup ? `${nextCheckup.title} · ${nextCheckup.date}` : 'Nessun passaggio aperto.',
+      loading: isWorkspaceLoading,
     },
     {
       label: 'Documenti',
-      value: isWorkspaceLoading ? 'in attesa' : workspace?.attachmentsCount ?? 0,
-      note: isWorkspaceLoading ? 'Caricamento dell’archivio locale in corso.' : workspace?.documentInsightCount ? `${workspace.documentInsightCount} sintesi disponibili.` : 'Nessuna sintesi disponibile.',
+      value: workspace?.attachmentsCount ?? 0,
+      note: workspace?.documentInsightCount ? `${workspace.documentInsightCount} sintesi disponibili.` : 'Nessuna sintesi disponibile.',
+      loading: isWorkspaceLoading,
     },
   ];
 

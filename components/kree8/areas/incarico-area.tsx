@@ -49,6 +49,7 @@ function IncaricoArea({
   searchFocusSignal,
   onSelectPatient,
   onOpenArea,
+  onRetryPatients,
   isReview,
 }: {
   patients: Kree8Patient[];
@@ -57,6 +58,7 @@ function IncaricoArea({
   searchFocusSignal: number;
   onSelectPatient: (patientId: string) => void;
   onOpenArea: (area: AreaId) => void;
+  onRetryPatients?: () => void;
   isReview: boolean;
 }) {
   const [scope, setScope] = useState<InboxScope>('ambulatorio');
@@ -90,6 +92,7 @@ function IncaricoArea({
   const selected = visible.find((p) => p.id === selectedPatientId) ?? visible[0] ?? null;
 
   const patientListParentRef = useRef<HTMLDivElement>(null);
+
   const patientRowVirtualizer = useVirtualizer({
     count: visible.length,
     getScrollElement: () => patientListParentRef.current,
@@ -224,13 +227,22 @@ function IncaricoArea({
           <div style={{ marginTop: 8 }}>
             {/* @Codex */}
             {patientStatus === 'idle' || patientStatus === 'loading' ? (
-              <p className={styles.emptyState} role="status" aria-live="polite">
-                Caricamento pazienti…
-              </p>
+              <div className={styles.emptyState} role="status" aria-live="polite" aria-label="Caricamento pazienti">
+                <div className="mf-skeleton h-12" />
+                <div className="mf-skeleton h-12 mt-2" />
+                <div className="mf-skeleton h-12 mt-2" />
+              </div>
             ) : patientStatus === 'error' ? (
-              <p className={styles.emptyState} role="alert">
-                Lista pazienti non disponibile. Verifica sessione e servizi locali.
-              </p>
+              <div className={styles.emptyState} role="alert">
+                {/* @Codex WUL-UIUX: l'errore dichiara cosa è successo e offre
+                    l'azione di recupero, come chiede il contratto PRODUCT.md. */}
+                <p>Lista pazienti non disponibile. Verifica sessione e servizi locali.</p>
+                {onRetryPatients ? (
+                  <button type="button" className={styles.ghostBtnSm} onClick={onRetryPatients}>
+                    Riprova
+                  </button>
+                ) : null}
+              </div>
             ) : visible.length === 0 ? (
               <p className={styles.emptyState}>
                 {normalizedQuery
