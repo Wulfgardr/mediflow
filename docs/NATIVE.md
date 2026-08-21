@@ -199,6 +199,33 @@ VoiceOver nel simulatore mobile; il limite e la deroga della sola candidata
 sorgente 0.8 sono registrati in
 [docs/known-limitations.md](./known-limitations.md).
 
+### 4. Temperamento mobile candidato e stato paired
+
+`WUL-556` usa **Guardia** come temperamento esplorativo su iPhone/iPadOS e
+**Carta** come substrato delle superfici cliniche. La scelta resta
+`PROPOSED_FOR_OWNER_REVIEW`: un rifiuto o un cambio del product owner blocca
+la promozione della candidata. Il client non forza il tema scuro; usa il canvas
+Guardia solo quando l'aspetto di sistema è scuro e mantiene componenti,
+materiali e navigazione di sistema.
+
+La decisione owner per questa slice è vincolante: **Carta descrive la grammatica
+del contenuto, non una palette**. Le superfici mobili non introducono crema,
+beige, avorio o parchment. Il giorno usa i colori neutrali adattivi già
+canonici (`canvas #eef0f2`, `field #f4f6f8`, `focal #fbfcfe`); il buio usa il
+canvas Guardia neutro `#0c0e12`. I colori success/warning/critical restano
+segnali funzionali e non derivano dalla metafora Carta. Le preview sintetiche
+coprono esplicitamente iPhone light e iPad dark.
+
+Il pannello `mobile-paired-status` rende distinguibili caricamento, errore,
+online, cache locale, offline in sola lettura e sessione scaduta. La resa stale
+ha preview e test sintetici, ma non è ancora cablata a metadata live: la cache
+oltre il TTL viene scartata. L'azione primaria misura almeno 48 pt, espone label
+VoiceOver e supporta `⌘R` e pointer su iPad.
+
+Questa superficie non concede capability. AIP/Mini e WUL-518 restano fonti
+host-only: manifest, receipt o stato headless non diventano un grant clinico nel
+client mobile.
+
 ---
 
 ## Architettura client-server

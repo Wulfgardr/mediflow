@@ -157,6 +157,23 @@ Owner: `WUL-403`.
 Rende visibili età/TTL della cache, stato stale, read-only e assenza di write
 queue. Non introduce sync multi-master né scritture offline.
 
+La candidata `WUL-556` aggiunge su iPhone e iPad un pannello nativo per gli
+stati `loading`, `error`, `online`, `cache`, `offline read-only` e
+`session-expired`. La preview e i test sintetici coprono anche la resa
+`stale`. Il runtime continua però a scartare lo snapshot oltre il TTL di 24
+ore: finché il contratto cache/headless non espone metadata separati, lo stato
+stale live resta `partial`, non `complete`.
+
+Per decisione owner, Carta resta una grammatica del contenuto e non introduce
+una palette calda. Le superfici della slice usano canvas e field neutrali
+adattivi; i soli colori non neutrali sono segnali funzionali di stato.
+
+| Superficie mobile | Stato candidata | Evidenza | Dipendenza host/headless |
+| --- | --- | --- | --- |
+| iPhone | `partial` | Test di presentazione, XCUITest e screenshot sintetico | Nessun grant nuovo; usa solo stato paired esistente |
+| iPadOS | `partial` | Stesso contratto, layout adattivo, `⌘R`, pointer, XCUITest e screenshot sintetico | Metadata TTL/stale live non esposti |
+| Capability AIP/Mini | `host-only / unavailable` | WUL-518 resta controller | Manifest e receipt non diventano autorità client |
+
 ### W6-C — decisione sul workflow documentale nativo
 
 Dipendenze: `WUL-417` (OCR Apple on-device), `WUL-383` (degradazione OCR) e

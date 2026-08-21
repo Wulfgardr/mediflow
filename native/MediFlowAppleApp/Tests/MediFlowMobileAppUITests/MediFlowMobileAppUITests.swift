@@ -272,6 +272,23 @@ final class MediFlowMobileAppUITests: XCTestCase {
         )
     }
 
+    /* @Codex */
+    func testPairedStatusIsVisibleAndReachableWithSyntheticPatients() throws {
+        launch(seedPatients: true)
+
+        let status = sectionView("mobile-paired-status")
+        XCTAssertTrue(status.waitForExistence(timeout: 20))
+        XCTAssertGreaterThanOrEqual(status.frame.height, 44)
+        XCTAssertFalse(status.value as? String == "")
+
+        let configure = app.buttons["Configura"]
+        XCTAssertTrue(configure.waitForExistence(timeout: 10))
+        XCTAssertGreaterThanOrEqual(configure.frame.height, 44)
+        attachScreenshot(named: UIDevice.current.userInterfaceIdiom == .pad
+            ? "WUL-556-iPad-Guardia-Carta"
+            : "WUL-556-iPhone-Guardia-Carta")
+    }
+
     // @Codex #142: AX Dynamic Type must select the existing single-column path.
     func testAccessibilityDynamicTypeUsesSinglePatientColumnOnIPad() throws {
         // Not applicable on iPhone: skipping keeps the iPhone suite meaningful
