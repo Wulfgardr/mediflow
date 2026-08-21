@@ -70,7 +70,7 @@ test('lume runtime tokens are the live default across theme changes, reload and 
   expect(await resolveActiveVar(page, '--lume-surface-canvas')).toBe(GRAFITE_CANVAS_RGB);
 });
 
-test('lume registered properties drive canvas light and SVG filo fill', async ({ page }) => {
+test('lume registered properties drive neutral canvas depth and SVG filo fill', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
 
   const canvas = page.locator('[data-lume-context]').first();
@@ -81,6 +81,7 @@ test('lume registered properties drive canvas light and SVG filo fill', async ({
       const style = getComputedStyle(element);
       return {
         light: style.getPropertyValue('--lume-surface-l').trim(),
+        depth: style.getPropertyValue('--lume-surface-depth').trim(),
         temperature: style.getPropertyValue('--lume-surface-temp').trim(),
         background: style.backgroundColor,
       };
@@ -92,9 +93,11 @@ test('lume registered properties drive canvas light and SVG filo fill', async ({
     return { incarico, scheda };
   });
   expect(lightSamples.incarico.light).toBe('5.5%');
-  expect(lightSamples.incarico.temperature).toBe('1.8%');
+  expect(lightSamples.incarico.depth).toBe('1.8%');
+  expect(lightSamples.incarico.temperature).toBe('');
   expect(lightSamples.scheda.light).toBe('7%');
-  expect(lightSamples.scheda.temperature).toBe('2.4%');
+  expect(lightSamples.scheda.depth).toBe('2.4%');
+  expect(lightSamples.scheda.temperature).toBe('');
   expect(lightSamples.scheda.background).not.toBe(lightSamples.incarico.background);
 
   const filoSamples = await page.evaluate(() => {
