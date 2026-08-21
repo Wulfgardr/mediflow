@@ -629,3 +629,12 @@
 @media (prefers-reduced-motion: reduce) {
   .quadroPrimaryAction, .quadroQuietAction { transition-duration: 0.01ms; }
 }
+
+/* @Codex WUL-UIUX: su puntatore grossolano (iPad tra le visite) i controlli
+   toccabili rispettano il minimo 44pt; il mouse conserva la densita. */
+@media (pointer: coarse) {
+  .scopeChip,
+  .quadroQuietAction {
+    min-height: 44px;
+  }
+}

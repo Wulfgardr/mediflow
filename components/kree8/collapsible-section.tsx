@@ -73,31 +73,36 @@ export function CollapsibleSection({
 
     return (
         <section id={id} className={`${surfaceClassName} scroll-mt-28`}>
-            <button
-                type="button"
-                onClick={() => setOpen((value) => !value)}
-                aria-expanded={open}
-                aria-controls={regionId}
-                className="flex w-full items-center gap-3 rounded-[inherit] p-5 text-left md:p-6"
-            >
-                <span className="min-w-0 flex-1">
-                    {kicker ? <span className="section-kicker">{kicker}</span> : null}
-                    <span className="mt-1 flex items-center gap-2 text-lg font-semibold text-ink">
-                        {Icon ? <Icon className="h-5 w-5 text-muted" /> : null}
-                        {title}
+            {/* @Codex WUL-UIUX: il titolo è un heading che contiene il controllo
+                di disclosure — pattern W3C APG. Gli screen reader possono saltare
+                di sezione in sezione per livello, non solo per anchor. */}
+            <h3 className="m-0">
+                <button
+                    type="button"
+                    onClick={() => setOpen((value) => !value)}
+                    aria-expanded={open}
+                    aria-controls={regionId}
+                    className="flex w-full items-center gap-3 rounded-[inherit] p-5 text-left md:p-6"
+                >
+                    <span className="min-w-0 flex-1">
+                        {kicker ? <span className="section-kicker">{kicker}</span> : null}
+                        <span className="mt-1 flex items-center gap-2 text-lg font-semibold text-ink">
+                            {Icon ? <Icon className="h-5 w-5 text-muted" /> : null}
+                            {title}
+                        </span>
+                        {!open && summary ? (
+                            <span className="mt-1 block truncate text-sm text-muted">{summary}</span>
+                        ) : null}
                     </span>
-                    {!open && summary ? (
-                        <span className="mt-1 block truncate text-sm text-muted">{summary}</span>
+                    {count !== undefined && count !== '' ? (
+                        <span className="apple-chip shrink-0">{count}</span>
                     ) : null}
-                </span>
-                {count !== undefined && count !== '' ? (
-                    <span className="apple-chip shrink-0">{count}</span>
-                ) : null}
-                <ChevronDown
-                    className={`h-5 w-5 shrink-0 text-muted transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-                    aria-hidden
-                />
-            </button>
+                    <ChevronDown
+                        className={`h-5 w-5 shrink-0 text-muted transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+                        aria-hidden
+                    />
+                </button>
+            </h3>
             <div id={regionId} hidden={!open} className="px-5 pb-5 md:px-6 md:pb-6">
                 {keepMounted || open ? children : null}
             </div>
