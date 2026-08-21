@@ -408,7 +408,7 @@ export function Kree8ClinicalCockpit({
       : patientState.status === 'ready'
         ? String(patientState.patients.filter((patient) => patient.list === 'attivi').length)
         : patientState.status === 'error'
-          ? '!'
+          ? 'n.d.'
           : '…';
   const diaryNavMeta =
     isReview
@@ -470,9 +470,8 @@ export function Kree8ClinicalCockpit({
         })}
 
         <div className={styles.railFooter}>
-          <div className={styles.railThemeToggle} aria-label="Tema interfaccia">
-            <ThemeToggle />
-          </div>
+          {/* @Codex WUL-UIUX: un solo ThemeToggle (qui rimosso): era renderizzato
+              due volte, nel brand e a piè rail, con lo stesso stato. */}
           <span className={styles.railTag}>
             <span className={styles.railDot} />
             Mac principale
