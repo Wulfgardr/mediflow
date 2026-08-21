@@ -22,7 +22,6 @@ type QuadroSignal = 'warning' | 'critical';
 
 type QuadroMetric = { label: string; value: string | number; note: string; signal?: QuadroSignal };
 type QuadroDiagnosis = { code: string; description: string };
-type QuadroTherapy = { name: string; dose: string };
 type QuadroRow = { title: string; value?: string; note?: string; signal?: QuadroSignal };
 type QuadroAction = { label: string; icon: ReactNode; href?: string; onClick?: () => void };
 
@@ -35,12 +34,8 @@ type PatientQuadroProps = {
   diagnoses: QuadroDiagnosis[];
   summary: string;
   metrics: QuadroMetric[];
-  therapies: QuadroTherapy[];
-  therapiesEmpty: string;
   nextRows: QuadroRow[];
   nextEmpty: string;
-  documentRows: QuadroRow[];
-  documentsEmpty: string;
   primaryAction: QuadroAction;
   quietActions: QuadroAction[];
 };
@@ -54,11 +49,6 @@ function splitDiagnosis(diagnosis: string): QuadroDiagnosis {
     return { code: 'non codificata', description: diagnosis };
   }
   return { code: diagnosis.slice(0, separatorIndex), description: diagnosis.slice(separatorIndex + 3) };
-}
-
-function splitTherapy(therapy: string): QuadroTherapy {
-  const [name, ...doseParts] = therapy.split(' · ');
-  return { name, dose: doseParts.join(' · ') || 'Dose non registrata' };
 }
 
 function QuadroActionControl({
@@ -130,12 +120,8 @@ function PatientQuadro({
   diagnoses,
   summary,
   metrics,
-  therapies,
-  therapiesEmpty,
   nextRows,
   nextEmpty,
-  documentRows,
-  documentsEmpty,
   primaryAction,
   quietActions,
 }: PatientQuadroProps) {
@@ -189,7 +175,7 @@ function PatientQuadro({
         ))}
       </div>
 
-      <div className={patientStyles.quadroSectionGrid}>
+      <div className={patientStyles.quadroSectionGrid} data-testid="lume-quadro-lens">
         <div className={patientStyles.quadroSection} data-testid="lume-quadro-section">
           <p className={patientStyles.quadroSectionLabel}>Diagnosi e sintesi</p>
           <ul className={patientStyles.quadroDiagnoses} aria-label="Diagnosi">
@@ -213,32 +199,8 @@ function PatientQuadro({
         </div>
 
         <div className={patientStyles.quadroSection} data-testid="lume-quadro-section">
-          <p className={patientStyles.quadroSectionLabel}>Terapie attive</p>
-          {therapies.length ? (
-            <div className={patientStyles.quadroTherapies}>
-              {therapies.map((therapy) => (
-                <div key={`${therapy.name}-${therapy.dose}`} className={patientStyles.quadroTherapy}>
-                  <span className={patientStyles.quadroTherapyName}>{therapy.name}</span>
-                  <span className={classNames(patientStyles.quadroTherapyDose, 'lume-registro')}>
-                    {therapy.dose}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className={patientStyles.quadroEmpty}>{therapiesEmpty}</p>
-          )}
-        </div>
-      </div>
-
-      <div className={patientStyles.quadroSectionGrid}>
-        <div className={patientStyles.quadroSection} data-testid="lume-quadro-section">
-          <p className={patientStyles.quadroSectionLabel}>Cosa fare ora</p>
+          <p className={patientStyles.quadroSectionLabel}>Prossima azione</p>
           <QuadroRows rows={nextRows} empty={nextEmpty} />
-        </div>
-        <div className={patientStyles.quadroSection} data-testid="lume-quadro-section">
-          <p className={patientStyles.quadroSectionLabel}>Documenti e codifiche</p>
-          <QuadroRows rows={documentRows} empty={documentsEmpty} />
         </div>
       </div>
 
@@ -261,7 +223,6 @@ function RealPatientArea({
   const nextCheckup = workspace?.nextCheckup;
   const latestObservation = workspace?.latestObservation;
   const codingHints = workspace?.codingHints ?? [];
-  const therapies = workspace?.therapyLabels.map(splitTherapy) ?? [];
 
   const metrics: QuadroMetric[] = [
     {
@@ -272,7 +233,7 @@ function RealPatientArea({
     {
       label: 'Terapie attive',
       value: isWorkspaceLoading ? 'in attesa' : workspace?.activeTherapiesCount ?? 0,
-      note: isWorkspaceLoading ? 'Caricamento del piano terapeutico in corso.' : therapies[0]?.name ?? 'Nessun piano attivo.',
+      note: isWorkspaceLoading ? 'Caricamento del piano terapeutico in corso.' : workspace?.therapyLabels[0] ?? 'Nessun piano attivo.',
     },
     {
       label: 'Follow-up',
@@ -297,10 +258,9 @@ function RealPatientArea({
     ...(latestObservation ? [{ title: latestObservation.label, value: latestObservation.date, note: 'Ultima osservazione registrata' }] : []),
   ];
 
-  const documentRows: QuadroRow[] = [
-    ...codingHints.map((hint) => ({ title: hint, note: 'Da rivedere prima di applicare.' })),
-    ...(workspace?.recentAttachmentNames ?? []).map((name) => ({ title: name, note: 'Documento recente agganciato.' })),
-  ];
+  if (codingHints.length > 0 && nextRows.length < 3) {
+    nextRows.push({ title: codingHints[0], note: 'Codifica da rivedere prima di applicare.' });
+  }
 
   return (
     <div className={styles.areaShell}>
@@ -318,12 +278,8 @@ function RealPatientArea({
         diagnoses={patient.diagnoses.map(splitDiagnosis)}
         summary={patient.summary}
         metrics={metrics}
-        therapies={therapies}
-        therapiesEmpty={isWorkspaceLoading ? 'Caricamento delle terapie locali in corso.' : 'Nessuna terapia attiva registrata.'}
         nextRows={nextRows}
         nextEmpty={isWorkspaceLoading ? 'Caricamento dei prossimi passaggi in corso.' : 'Nessun passaggio clinico aperto.'}
-        documentRows={documentRows}
-        documentsEmpty={isWorkspaceLoading ? 'Caricamento di documenti e codifiche in corso.' : 'Nessun documento o codice sospeso.'}
         primaryAction={{
           label: 'Apri scheda paziente',
           icon: <UserSquare2 size={13} />,
@@ -331,12 +287,8 @@ function RealPatientArea({
         }}
         quietActions={[
           { label: 'Nuova voce', icon: <Plus size={12} />, href: `${patient.href}/entries/new` },
-          { label: 'Anagrafica', icon: <Edit3 size={12} />, href: `${patient.href}/edit` },
-          { label: 'Agenda', icon: <CalendarClock size={12} />, onClick: () => onOpenArea('turno') },
           { label: 'Rivedi documenti', icon: <Sparkles size={13} />, href: `${patient.modulesHref}#documenti` },
-          { label: 'Scale cliniche', icon: <ListChecks size={12} />, href: `${patient.modulesHref}#scale` },
-          { label: 'Contesto SISS', icon: <Workflow size={12} />, href: `${patient.modulesHref}#contesto` },
-          { label: 'Apri moduli', icon: <ArrowUpRight size={12} />, href: patient.modulesHref },
+          { label: 'Agenda', icon: <CalendarClock size={12} />, onClick: () => onOpenArea('turno') },
         ]}
       />
     </div>
@@ -344,4 +296,4 @@ function RealPatientArea({
 }
 
 export { PatientQuadro, RealPatientArea };
-export type { QuadroAction, QuadroDiagnosis, QuadroMetric, QuadroRow, QuadroTherapy };
+export type { QuadroAction, QuadroDiagnosis, QuadroMetric, QuadroRow };

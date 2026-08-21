@@ -26,7 +26,6 @@ import SissHandoffDiary from '@/components/siss-handoff-diary';
 import SissPatientContextPanel from '@/components/siss-patient-context-panel';
 import TherapyManager from '@/components/therapy-manager';
 import TreatmentReasoningPanel from '@/components/treatment-reasoning-panel';
-import Timeline from '@/components/timeline';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
 import { AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY, isAiDocumentSynthesisEnabledValue } from '@/lib/ai-document-synthesis-kill-switch';
@@ -335,10 +334,6 @@ export default function PatientDetailPage() {
     const activeEntries = (entries ?? []).filter((entry) => !entry.deletedAt);
     const nonScaleEntries = activeEntries.filter((entry) => entry.type !== 'scale');
     const scaleEntries = activeEntries.filter((entry) => entry.type === 'scale');
-    /* @Codex WUL-UIUX: il Diario non deve mostrare le compilazioni scala (hanno
-       la loro sezione). Manteniamo le voci cancellate per il toggle audit interno
-       di Timeline; filtriamo solo il tipo scala, cosi il conteggio del chip torna. */
-    const timelineEntries = (entries ?? []).filter((entry) => entry.type !== 'scale');
     const recentEvidence = documentInsights.slice(0, 4);
     const leadDiagnosis = diagnosisItems[0];
     const nextCheckup = (checkups ?? [])[0];
@@ -505,19 +500,18 @@ export default function PatientDetailPage() {
         + openLoopProjection.standaloneLoops.length;
     /* @Codex LUME-104/68: il rail segue l'ordine clinico della superficie unica. */
     const workspaceNavItems: Kree8WorkspaceNavItem[] = [
-        { href: '#attenzione', label: 'Attenzione', meta: String(reviewQueueSummary.attentionCount + openLoopCount) },
-        { href: '#quadro', label: 'Quadro' },
-        { href: '#identita', label: 'Identità' },
-        { href: '#timeline', label: 'Timeline', meta: String(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length) },
-        { href: '#diario', label: 'Diario', meta: String(nonScaleEntries.length) },
-        { href: '#terapie', label: 'Terapie', meta: workspace ? String(workspace.activeTherapiesCount) : undefined },
-        { href: '#prestazioni', label: 'Prestazioni', meta: prestazioniCount !== undefined ? String(prestazioniCount) : undefined },
-        { href: '#parametri', label: 'Parametri', meta: workspace ? String(workspace.observationsCount) : undefined },
-        { href: '#protesica', label: 'Protesica', meta: protesicaCount !== undefined ? String(protesicaCount) : undefined },
-        { href: '#siss', label: 'SISS/FSE' },
-        { href: '#documenti', label: 'Documenti', meta: String(attachmentItems.length) },
-        { href: '#scale', label: 'Scale' },
-        { href: '#follow-up', label: 'Follow-up', meta: workspace ? String(workspace.pendingCheckupsCount) : undefined },
+        { group: 'Quadro e decisioni', href: '#attenzione', label: 'Attenzione', meta: String(reviewQueueSummary.attentionCount + openLoopCount) },
+        { group: 'Quadro e decisioni', href: '#quadro', label: 'Quadro' },
+        { group: 'Quadro e decisioni', href: '#identita', label: 'Identità' },
+        { group: 'Quadro e decisioni', href: '#parametri', label: 'Parametri', meta: workspace ? String(workspace.observationsCount) : undefined },
+        { group: 'Terapie e prescrizioni', href: '#terapie', label: 'Terapie', meta: workspace ? String(workspace.activeTherapiesCount) : undefined },
+        { group: 'Terapie e prescrizioni', href: '#prestazioni', label: 'Prestazioni', meta: prestazioniCount !== undefined ? String(prestazioniCount) : undefined },
+        { group: 'Terapie e prescrizioni', href: '#protesica', label: 'Protesica', meta: protesicaCount !== undefined ? String(protesicaCount) : undefined },
+        { group: 'Terapie e prescrizioni', href: '#siss', label: 'SISS/FSE' },
+        { group: 'Documenti e prove', href: '#documenti', label: 'Documenti', meta: String(attachmentItems.length) },
+        { group: 'Documenti e prove', href: '#scale', label: 'Scale' },
+        { group: 'Diario e follow-up', href: '#diario', label: 'Diario', meta: String(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length) },
+        { group: 'Diario e follow-up', href: '#follow-up', label: 'Follow-up', meta: workspace ? String(workspace.pendingCheckupsCount) : undefined },
     ];
 
     /* @Codex Validates against the FSE and builds the bundle, or returns null
@@ -719,27 +713,16 @@ export default function PatientDetailPage() {
                 </CollapsibleSection>
 
                 <CollapsibleSection
-                    id="timeline"
-                    kicker="Timeline"
-                    title="Timeline clinica"
-                    count={`${nonScaleEntries.length + (checkups ?? []).length + documentInsights.length} eventi`}
-                    summary="Diario, controlli e referti in ordine cronologico."
-                    surfaceClassName={workspaceStyles.clinicalSection}
-                >
-                    <ClinicalRiverTimeline entries={nonScaleEntries} checkups={checkups ?? []} documentInsights={documentInsights} />
-                </CollapsibleSection>
-
-                <CollapsibleSection
                     id="diario"
                     kicker="Diario"
                     title="Diario clinico"
-                    icon={FileText}
-                    count={`${nonScaleEntries.length} voci`}
-                    summary={nonScaleEntries.length === 0 ? 'Nessuna voce clinica registrata.' : 'Apri le voci attive del diario.'}
+                    count={`${nonScaleEntries.length + (checkups ?? []).length + documentInsights.length} eventi`}
+                    summary="Timeline unica di voci, controlli e referti in ordine cronologico."
                     surfaceClassName={workspaceStyles.clinicalSection}
                     keepMounted
                 >
-                    {entries ? <Timeline entries={timelineEntries} /> : <p className={workspaceStyles.mutedText}>Diario in caricamento.</p>}
+                    <span id="timeline" aria-hidden="true" />
+                    <ClinicalRiverTimeline entries={nonScaleEntries} checkups={checkups ?? []} documentInsights={documentInsights} />
                 </CollapsibleSection>
 
                     <CollapsibleSection

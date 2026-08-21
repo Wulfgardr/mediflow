@@ -155,7 +155,13 @@ for (const schedaCase of CASES) {
     const scroll = page.getByTestId('lume-scheda-scroll');
     const header = page.getByTestId('lume-scheda-header');
     const surface = page.getByTestId('lume-scheda-surface');
+    const sectionRail = page.getByRole('navigation', { name: 'Sezioni della vista' });
     await expect(header.getByRole('heading', { name: patient.name, level: 1 })).toBeVisible();
+    await expect(page.locator('h1')).toHaveCount(1);
+    await expect(sectionRail.getByRole('group')).toHaveCount(4);
+    await expect(sectionRail.getByRole('link', { name: /Timeline/ })).toHaveCount(0);
+    await expect(page.locator('#diario')).toHaveCount(1);
+    await expect(page.locator('#timeline')).toHaveCount(1);
     await expect(page.getByRole('button', { name: /Archivio documenti ed evidenze/ }))
       .toHaveAttribute('aria-expanded', 'false');
     await expectInViewport(header);

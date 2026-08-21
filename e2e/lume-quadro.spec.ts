@@ -161,7 +161,7 @@ async function assertQuadroContract(page: Page, quadro: Locator): Promise<void> 
   const primary = quadro.locator('[data-lume-action="primary"]');
   const quiet = quadro.locator('[data-lume-action="quiet"]');
   await expect(primary).toHaveCount(1);
-  await expect(quiet).toHaveCount(7);
+  await expect(quiet).toHaveCount(3);
   await expect(primary).toHaveCSS('background-color', await resolveColor(page, '--lume-ink'));
   await expect(primary).toHaveCSS('color', await resolveColor(page, '--lume-surface-focal'));
 
@@ -177,8 +177,10 @@ async function assertReflowStack(quadro: Locator): Promise<void> {
       return { top: box.top, bottom: box.bottom };
     }),
   );
-  expect(sections[1].top).toBeGreaterThanOrEqual(sections[0].bottom - 1);
-  expect(sections[3].top).toBeGreaterThanOrEqual(sections[2].bottom - 1);
+  expect(sections).toHaveLength(2);
+  for (let index = 1; index < sections.length; index += 1) {
+    expect(sections[index].top).toBeGreaterThanOrEqual(sections[index - 1].bottom - 1);
+  }
 }
 
 test('quadro live usa il paziente selezionato dal database sintetico', async ({ page }) => {

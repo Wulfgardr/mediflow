@@ -63,16 +63,16 @@ const signals: ClinicalSignal[] = [
 ];
 
 const navItems: Kree8WorkspaceNavItem[] = [
-    { href: '#quadro', label: 'Quadro' },
-    { href: '#insight', label: 'Sintesi AI' },
-    { href: '#timeline', label: 'Timeline', meta: '23' },
-    { href: '#diario', label: 'Diario', meta: '17' },
-    { href: '#parametri', label: 'Parametri', meta: '24' },
-    { href: '#terapie', label: 'Terapie', meta: '8' },
-    { href: '#prestazioni', label: 'Prestazioni', meta: '5' },
-    { href: '#protesica', label: 'Protesica', meta: '2' },
-    { href: '#siss', label: 'SISS/FSE' },
-    { href: '#follow-up', label: 'Follow-up', meta: '3' },
+    { group: 'Quadro e decisioni', href: '#quadro', label: 'Quadro' },
+    { group: 'Quadro e decisioni', href: '#insight', label: 'Sintesi AI' },
+    { group: 'Quadro e decisioni', href: '#parametri', label: 'Parametri', meta: '24' },
+    { group: 'Terapie e prescrizioni', href: '#terapie', label: 'Terapie', meta: '8' },
+    { group: 'Terapie e prescrizioni', href: '#prestazioni', label: 'Prestazioni', meta: '5' },
+    { group: 'Terapie e prescrizioni', href: '#protesica', label: 'Protesica', meta: '2' },
+    { group: 'Terapie e prescrizioni', href: '#siss', label: 'SISS/FSE' },
+    { group: 'Documenti e prove', href: '#documenti', label: 'Documenti', meta: '14' },
+    { group: 'Diario e follow-up', href: '#diario', label: 'Diario', meta: '23' },
+    { group: 'Diario e follow-up', href: '#follow-up', label: 'Follow-up', meta: '3' },
 ];
 
 function PlaceholderBody({ lines }: { lines: number }) {
@@ -81,7 +81,7 @@ function PlaceholderBody({ lines }: { lines: number }) {
             {Array.from({ length: lines }).map((_, index) => (
                 <div
                     key={index}
-                    className="rounded-[16px] border border-[color:rgba(112,106,100,0.12)] bg-white/60 px-4 py-3 text-sm text-[color:var(--lume-ink-muted)] dark:border-white/10 dark:bg-white/5"
+                    className="rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-white/60 px-4 py-3 text-sm text-[color:var(--lume-ink-muted)] dark:border-white/10 dark:bg-white/5"
                 >
                     Contenuto del gestore reale (placeholder di prova).
                 </div>
@@ -92,7 +92,7 @@ function PlaceholderBody({ lines }: { lines: number }) {
 
 export default function MockSchedaPage() {
     const actionsDock = (
-        <div className="patient-actions-dock rounded-[14px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 p-4 dark:bg-white/4">
+        <div className="patient-actions-dock rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-white/82 p-4 dark:bg-white/4">
             <button className="ui-btn-primary flex h-11 w-full items-center justify-center gap-2 px-4 text-sm font-semibold">
                 <Plus className="h-4 w-4" />
                 Nuova voce
@@ -146,29 +146,16 @@ export default function MockSchedaPage() {
                         </p>
                     </section>
 
-                    <section id="timeline" className="patient-detail-section border p-5 md:p-6 scroll-mt-28">
+                    <section id="diario" className="patient-detail-section border p-5 md:p-6 scroll-mt-28">
+                        <span id="timeline" aria-hidden="true" />
                         <div className="mb-5 flex items-center justify-between gap-3">
                             <div>
-                                <p className="section-kicker">Timeline</p>
-                                <h2 className="mt-1 text-xl font-semibold text-[color:var(--lume-ink)]">Timeline clinica</h2>
+                                <p className="section-kicker">Diario</p>
+                                <h2 className="mt-1 text-xl font-semibold text-[color:var(--lume-ink)]">Diario clinico</h2>
                             </div>
                             <span className="apple-chip">23 eventi in totale</span>
                         </div>
                         <PlaceholderBody lines={3} />
-                    </section>
-
-                    <section id="diario" className="patient-detail-section border p-5 md:p-6 scroll-mt-28">
-                        <div className="mb-5 flex items-center justify-between gap-3">
-                            <div>
-                                <p className="section-kicker">Diario</p>
-                                <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--lume-ink)]">
-                                    <FileText className="h-5 w-5 text-[color:var(--lume-ink-muted)]" />
-                                    Diario clinico
-                                </h2>
-                            </div>
-                            <span className="apple-chip">17 voci attive</span>
-                        </div>
-                        <PlaceholderBody lines={2} />
                     </section>
 
                     {/* Gestori operativi: collassati di default (progressive disclosure). */}
@@ -225,7 +212,7 @@ export default function MockSchedaPage() {
                 </div>
 
                 <div className={workspaceStyles.secondaryStack}>
-                    <section className="patient-detail-side-section border p-5 scroll-mt-28">
+                    <section id="documenti" className="patient-detail-side-section border p-5 scroll-mt-28">
                         <p className="section-kicker">Evidenze documentali</p>
                         <h3 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">Referti recenti</h3>
                         <div className="mt-4">
@@ -240,7 +227,7 @@ export default function MockSchedaPage() {
                             Follow-up
                         </h3>
                         <div className="mt-4 space-y-2">
-                            <div className="rounded-[12px] border border-[color:rgba(112,106,100,0.12)] bg-white/82 px-4 py-3 dark:bg-white/5">
+                            <div className="rounded-[12px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-white/82 px-4 py-3 dark:bg-white/5">
                                 <p className="text-sm font-semibold text-[color:var(--lume-ink)]">Controllo cardiologico</p>
                                 <span className="apple-chip">22/06/2026</span>
                             </div>

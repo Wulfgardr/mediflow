@@ -545,7 +545,7 @@
   gap: 10px; align-items: baseline; padding: 7px 0; color: var(--lume-ink); font-size: 13px;
   border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 9%, transparent);
 }
-.quadroDiagnosis:last-child, .quadroTherapy:last-child, .quadroRow:last-child { border-bottom: 0; }
+.quadroDiagnosis:last-child, .quadroRow:last-child { border-bottom: 0; }
 .quadroDiagnosisCode { color: var(--lume-ink-muted); font-size: 12px; overflow-wrap: anywhere; }
 .quadroStatus {
   margin: 10px 0 0; display: flex; align-items: baseline;
@@ -556,14 +556,7 @@
   margin: 8px 0 0; max-width: 70ch; color: var(--lume-ink-muted);
   font-size: 13px; line-height: 1.6; text-wrap: pretty;
 }
-.quadroTherapies, .quadroRows { display: flex; flex-direction: column; }
-.quadroTherapy {
-  min-width: 0; min-height: 40px; padding: 7px 0; display: flex;
-  align-items: center; justify-content: space-between; gap: 12px;
-  border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 9%, transparent);
-}
-.quadroTherapyName { min-width: 0; color: var(--lume-ink); font-size: 13px; font-weight: 540; }
-.quadroTherapyDose { flex: none; color: var(--lume-ink-muted); font-size: 12px; text-align: right; }
+.quadroRows { display: flex; flex-direction: column; }
 .quadroRow {
   min-width: 0; display: grid; grid-template-columns: 9px minmax(0, 1fr) auto;
   gap: 9px; align-items: start; padding: 8px 0;
@@ -619,8 +612,6 @@
   .quadroPrimaryAction { width: 100%; align-self: stretch; }
   .quadroMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .quadroSectionGrid { grid-template-columns: minmax(0, 1fr); }
-  .quadroTherapy { align-items: flex-start; flex-direction: column; gap: 3px; }
-  .quadroTherapyDose { text-align: left; }
   .quadroRow { grid-template-columns: 9px minmax(0, 1fr); }
   .quadroRowValue { grid-column: 2; max-width: none; text-align: left; }
   .quadroActions > * { flex: 1 1 142px; }
