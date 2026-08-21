@@ -12,9 +12,11 @@ read_when:
 Queste sono **studi di direzione, non target**: nessuna autorizza codice SwiftUI
 prima della verifica runtime. L'ordine delle evidenze resta quello di
 [DESIGN.md](../../DESIGN.md): guida Apple → architettura/Lume/ADR → evidenza
-runtime sul candidato esatto → craft secondario. La verifica visiva è oggi
-bloccata dal disco Xcode non collegato (WUL-527): ogni direzione include il
-proprio piano di prova.
+runtime sul candidato esatto → craft secondario. Il blocco strumentale è
+**risolto** (2026-08-21): il volume «Xcode Development» è montato, `MediFlowCore`
+compila con Xcode 26.6, `native-test.sh` passa 560/560 e
+`check:terminology-parity` 4/4 in locale — le verifiche della sezione 6 sono ora
+eseguibili.
 
 Base comune già fissata da [05-app-native.md](./lume/05-app-native.md), che
 nessuna direzione tocca: `LumePalette` code-first dai token DTCG; SF Pro per la
