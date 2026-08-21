@@ -96,7 +96,7 @@ type ClinicalAgendaBridgeClientState = {
   data?: ClinicalAgendaBridgePreview;
 };
 
-type Kree8PatientStatus = 'idle' | 'loading' | 'ready' | 'error';
+type Kree8PatientStatus = 'idle' | 'loading' | 'ready' | 'stale' | 'error';
 
 type Kree8PatientClientState = {
   status: Kree8PatientStatus;

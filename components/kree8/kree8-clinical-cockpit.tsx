@@ -197,6 +197,10 @@ type Kree8ClinicalCockpitProps = {
   initialArea?: AreaId;
   initialPatientId?: string;
   operatorName?: string;
+  /* @Codex: controlli limitati alla review sintetica per verificare gli stati
+     degradati senza dipendere da database o dati clinici reali. */
+  reviewPatientStatus?: Extract<Kree8PatientClientState['status'], 'ready' | 'loading' | 'stale' | 'error'>;
+  reviewNetworkOffline?: boolean;
 };
 
 export function Kree8ClinicalCockpit({
@@ -204,6 +208,8 @@ export function Kree8ClinicalCockpit({
   initialArea = 'turno',
   initialPatientId,
   operatorName: operatorNameProp,
+  reviewPatientStatus = 'ready',
+  reviewNetworkOffline = false,
 }: Kree8ClinicalCockpitProps) {
   const isReview = surface === 'review';
   const operatorName = operatorNameProp || (isReview ? 'Review design' : 'Sessione locale');
@@ -215,7 +221,12 @@ export function Kree8ClinicalCockpit({
   });
   const [patientState, setPatientState] = useState<Kree8PatientClientState>(() => (
     isReview
-      ? { status: 'ready', patients: REVIEW_PATIENT_LIST }
+      ? {
+        status: reviewPatientStatus,
+        patients: reviewPatientStatus === 'ready' || reviewPatientStatus === 'stale'
+          ? REVIEW_PATIENT_LIST
+          : [],
+      }
       : { status: 'idle', patients: [] }
   ));
   const [agendaState, setAgendaState] = useState<Kree8AgendaClientState>(() => (
@@ -226,6 +237,36 @@ export function Kree8ClinicalCockpit({
   const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(() => (
     isReview ? REVIEW_PATIENT_LIST[0]?.id : initialPatientId
   ));
+  const [networkOffline, setNetworkOffline] = useState(reviewNetworkOffline);
+
+  /* @Codex: l'assenza di rete non equivale all'indisponibilita del database
+     locale. L'avviso resta quindi non bloccante e descrive solo le funzioni che
+     possono dipendere da servizi esterni. */
+  useEffect(() => {
+    if (isReview) {
+      setNetworkOffline(reviewNetworkOffline);
+      return;
+    }
+
+    const readNetworkState = () => setNetworkOffline(!window.navigator.onLine);
+    readNetworkState();
+    window.addEventListener('online', readNetworkState);
+    window.addEventListener('offline', readNetworkState);
+    return () => {
+      window.removeEventListener('online', readNetworkState);
+      window.removeEventListener('offline', readNetworkState);
+    };
+  }, [isReview, reviewNetworkOffline]);
+
+  useEffect(() => {
+    if (!isReview) return;
+    setPatientState({
+      status: reviewPatientStatus,
+      patients: reviewPatientStatus === 'ready' || reviewPatientStatus === 'stale'
+        ? REVIEW_PATIENT_LIST
+        : [],
+    });
+  }, [isReview, reviewPatientStatus]);
 
   /* @Codex WUL-UIUX: riflette area e paziente selezionato nella query string di
      '/', cosi refresh e back del browser non perdono il punto di lavoro. Solo
@@ -286,7 +327,7 @@ export function Kree8ClinicalCockpit({
   /* @Codex */
   const diaryState = useMemo<Kree8DiaryClientState>(() => {
     if (isReview) return REVIEW_DIARY_STATE;
-    if (!liveDiaryRows || patientState.status !== 'ready') {
+    if (!liveDiaryRows || (patientState.status !== 'ready' && patientState.status !== 'stale')) {
       return {
         status: 'loading',
         entries: [],
@@ -358,13 +399,13 @@ export function Kree8ClinicalCockpit({
   useEffect(() => {
     if (isReview) return;
 
-    if (livePatientLoading) {
+    if (livePatientLoading && !livePatientRows) {
       setPatientState({ status: 'loading', patients: [] });
       setAgendaState({ status: 'loading', rows: [] });
       return;
     }
 
-    if (livePatientError) {
+    if (livePatientError && !livePatientRows) {
       setPatientState({ status: 'error', patients: [] });
       setAgendaState({ status: 'loading', rows: [] });
       return;
@@ -381,7 +422,7 @@ export function Kree8ClinicalCockpit({
       })
       .map(mapPatientForKree8);
     const checkups = liveCheckupRows ?? [];
-    setPatientState({ status: 'ready', patients });
+    setPatientState({ status: livePatientError ? 'stale' : 'ready', patients });
     setAgendaState({
       status: liveCheckupRows ? 'ready' : 'loading',
       rows: mapCheckupsForKree8(checkups, patients),
@@ -405,7 +446,7 @@ export function Kree8ClinicalCockpit({
   const patientNavMeta =
     isReview
       ? '312'
-      : patientState.status === 'ready'
+      : patientState.status === 'ready' || patientState.status === 'stale'
         ? String(patientState.patients.filter((patient) => patient.list === 'attivi').length)
         : patientState.status === 'error'
           ? '!'
@@ -509,6 +550,21 @@ export function Kree8ClinicalCockpit({
             data-testid="lume-frame-focus"
             data-lume-frame-element="focus"
           >
+            {networkOffline ? (
+              <div className={`mf-alert mf-alert-warning ${styles.degradedState}`} role="status">
+                <span>
+                  Rete non disponibile. I dati locali restano consultabili; invii e passaggi che
+                  richiedono servizi esterni possono restare in attesa.
+                </span>
+                <button
+                  type="button"
+                  className={styles.degradedStateAction}
+                  onClick={() => setNetworkOffline(isReview ? reviewNetworkOffline : !window.navigator.onLine)}
+                >
+                  Controlla connessione
+                </button>
+              </div>
+            ) : null}
             {/* @Codex WUL-UIUX: where-am-i persistente nelle sotto-aree paziente
                 (il rail le colora come Pazienti): tab Quadro / Documenti / SISS con
                 aria-current e nome del paziente attivo. */}
