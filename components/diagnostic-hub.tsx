@@ -181,7 +181,7 @@ export default function DiagnosticHub() {
                                 <button
                                     onClick={() => runCheck(check)}
                                     disabled={res.status === 'running'}
-                                    className="rounded-full bg-indigo-50 p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 transition-colors dark:bg-indigo-900/10 dark:text-indigo-300 dark:hover:bg-indigo-900/20"
+                                    className="rounded-full bg-indigo-50 p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-100 transition-colors dark:bg-indigo-900/10 dark:hover:bg-indigo-900/20"
                                     aria-label={`Esegui singolo test: ${check.name}`}
                                     title="Esegui singolo test"
                                 >
