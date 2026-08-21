@@ -1,6 +1,33 @@
 #if os(macOS)
 import SwiftUI
 
+/* @Codex */
+@MainActor
+struct ClinicalWorkspaceNavigationAction {
+    let section: ClinicalWorkspaceSection
+    let canCreatePatient: Bool
+    let select: (ClinicalWorkspaceSection) -> Void
+    let createPatient: () -> Void
+}
+
+struct ClinicalWorkspaceNavigationActionKey: FocusedValueKey {
+    typealias Value = ClinicalWorkspaceNavigationAction?
+    static var defaultValue: ClinicalWorkspaceNavigationAction? { nil }
+}
+
+/* @Codex */
+@MainActor
+struct ClinicalWorkspaceInspectorAction {
+    let isEnabled: Bool
+    let isPresented: Bool
+    let toggle: () -> Void
+}
+
+struct ClinicalWorkspaceInspectorActionKey: FocusedValueKey {
+    typealias Value = ClinicalWorkspaceInspectorAction?
+    static var defaultValue: ClinicalWorkspaceInspectorAction? { nil }
+}
+
 /// The current detail section exposes its own refresh semantics to the menu
 /// bar. This keeps ⌘R aligned with the visible workspace instead of treating
 /// every section as the patient list.
@@ -16,6 +43,16 @@ struct ClinicalWorkspaceRefreshActionKey: FocusedValueKey {
 }
 
 extension FocusedValues {
+    var clinicalWorkspaceNavigationAction: ClinicalWorkspaceNavigationAction? {
+        get { self[ClinicalWorkspaceNavigationActionKey.self] ?? nil }
+        set { self[ClinicalWorkspaceNavigationActionKey.self] = newValue }
+    }
+
+    var clinicalWorkspaceInspectorAction: ClinicalWorkspaceInspectorAction? {
+        get { self[ClinicalWorkspaceInspectorActionKey.self] ?? nil }
+        set { self[ClinicalWorkspaceInspectorActionKey.self] = newValue }
+    }
+
     var clinicalWorkspaceRefreshAction: ClinicalWorkspaceRefreshAction? {
         get { self[ClinicalWorkspaceRefreshActionKey.self] ?? nil }
         set { self[ClinicalWorkspaceRefreshActionKey.self] = newValue }
@@ -24,10 +61,8 @@ extension FocusedValues {
 
 /// Scene-level state of the macOS app.
 ///
-/// The Mac window and the menu bar are two separate SwiftUI scenes: commands
-/// cannot reach `@State` that lives inside the window's view tree. Holding the
-/// section and the workspace model here is what lets ⌘N, ⌘R and the Vai menu
-/// act on the same workspace the window is showing.
+/// One instance belongs to one window. Commands reach it through focused
+/// values, so a second window never inherits the first window's selection.
 @MainActor
 public final class MediFlowMacSceneModel: ObservableObject {
     @Published public var section: ClinicalWorkspaceSection = .patients
@@ -97,6 +132,7 @@ public struct MediFlowMacRootView: View {
     @ObservedObject private var scene: MediFlowMacSceneModel
     @ObservedObject private var appearance: AppleAppearanceStore
     @Environment(\.dynamicTypeSize) private var inheritedDynamicTypeSize
+    @SceneStorage("mediflow.mac.patientInspector.isPresented") private var isInspectorPresented = false
 
     public init(
         snapshot: AppleFoundationSnapshot,
@@ -127,7 +163,13 @@ public struct MediFlowMacRootView: View {
                         .navigationSubtitle("Avvio in corso")
                 }
             }
+            .modifier(MacPatientInspectorModifier(
+                workspaceModel: scene.workspaceModel,
+                section: scene.section,
+                isPresented: $isInspectorPresented
+            ))
         }
+        .focusedSceneValue(\.clinicalWorkspaceNavigationAction, navigationAction)
         .task {
             // Keeps the paired-snapshot read out of the scene initialiser, which
             // is the right place for it not to be: a scene initialiser should not
@@ -152,6 +194,16 @@ public struct MediFlowMacRootView: View {
         .environment(\.dynamicTypeSize, scene.launchDynamicTypeSizeOverride ?? inheritedDynamicTypeSize)
         .respectsAppleMotionPreference()
         .privacyShield(appearance: appearance)
+    }
+
+    /* @Codex */
+    private var navigationAction: ClinicalWorkspaceNavigationAction {
+        ClinicalWorkspaceNavigationAction(
+            section: scene.section,
+            canCreatePatient: scene.canCreatePatient,
+            select: scene.select,
+            createPatient: scene.createPatient
+        )
     }
 
     // MARK: - Sidebar
@@ -303,48 +355,53 @@ private struct MacDetailChrome<Content: View>: View {
 /// a shortcut, which is what makes the app usable from the keyboard and what
 /// VoiceOver users navigate first.
 public struct MediFlowMacCommands: Commands {
-    @ObservedObject private var scene: MediFlowMacSceneModel
+    @FocusedValue(\.clinicalWorkspaceNavigationAction) private var navigation
+    @FocusedValue(\.clinicalWorkspaceInspectorAction) private var inspector
     @FocusedValue(\.clinicalWorkspaceRefreshAction) private var workspaceRefresh
 
-    public init(scene: MediFlowMacSceneModel) {
-        _scene = ObservedObject(wrappedValue: scene)
-    }
+    public init() {}
 
     public var body: some Commands {
         // Replaces "New" wholesale: this app has one creatable thing, and a
         // File > New that opened a second empty window would be a lie.
         CommandGroup(replacing: .newItem) {
             Button("Nuovo paziente") {
-                scene.select(.patients)
-                scene.createPatient()
+                navigation?.select(.patients)
+                navigation?.createPatient()
             }
             .keyboardShortcut("n", modifiers: .command)
-            .disabled(scene.section == .patients && !scene.canCreatePatient)
+            .disabled(navigation == nil || (navigation?.section == .patients && navigation?.canCreatePatient == false))
         }
 
         CommandMenu("Vai") {
             ForEach(Array(ClinicalWorkspaceSection.clinicalSections.enumerated()), id: \.element) { index, item in
-                Button(item.title) { scene.select(item) }
+                Button(item.title) { navigation?.select(item) }
                     .keyboardShortcut(shortcutKey(for: index), modifiers: .command)
             }
             Divider()
             ForEach(MediFlowMacRootView.referenceSections + MediFlowMacRootView.systemSections) { item in
-                Button(item.title) { scene.select(item) }
+                Button(item.title) { navigation?.select(item) }
             }
             Divider()
             ForEach(MediFlowMacRootView.projectSections) { item in
-                Button(item.title) { scene.select(item) }
+                Button(item.title) { navigation?.select(item) }
             }
             Divider()
             Button("Aggiorna") {
                 if let workspaceRefresh {
                     workspaceRefresh.perform()
-                } else {
-                    scene.refresh()
                 }
             }
                 .keyboardShortcut("r", modifiers: .command)
-                .disabled(!(workspaceRefresh?.isEnabled ?? scene.canRefresh))
+                .disabled(!(workspaceRefresh?.isEnabled ?? false))
+        }
+
+        CommandMenu("Vista") {
+            Button(inspector?.isPresented == true ? "Nascondi dettagli paziente" : "Mostra dettagli paziente") {
+                inspector?.toggle()
+            }
+            .keyboardShortcut("i", modifiers: [.command, .option])
+            .disabled(!(inspector?.isEnabled ?? false))
         }
     }
 

@@ -8,6 +8,24 @@ read_when:
 # Lume su macOS: contratto Apple
 
 Stato: contratto di destinazione per la futura superficie principale macOS.
+
+## Decisione esplorativa WUL-565
+
+La slice WUL-565 adotta **Strumento su Carta** come default esplorativo macOS:
+chrome, toolbar, menu e inspector restano componenti di sistema. Carta indica
+la funzione semantica del contenuto clinico, non una palette o un materiale
+caldo. I blocchi dell'inspector usano `controlBackgroundColor` e
+`separatorColor`: colori neutrali nativi che seguono light mode, dark mode e le
+impostazioni del sistema. La slice non usa crema, beige, avorio, texture, ombre
+da foglio o altre rese skeuomorfiche.
+
+La correzione cromatica e accettata per WUL-565. La scelta identitaria piu
+ampia resta `PROPOSED_FOR_OWNER_REVIEW`: non approva una nuova identita di
+prodotto, non definisce la densita di tutte le viste e resta reversibile.
+
+L'inspector espone solo contesto locale e stato di autorita. Non aggiunge
+azioni headless e non attribuisce privilegi a Mini o CLI. Ogni futura azione
+resta gated dai contratti WUL-557 e WUL-518.
 Questo documento applica [ADR 0078](../../adr/0078-lume-lingua-di-design-di-destinazione.md)
 alla app reale `MediFlowMacApp`. Non governa la feature parity, che resta in un
 workstream separato, e non attiva le lane Windows/Linux.
@@ -44,7 +62,7 @@ Matrice operativa:
 | Livello | Contratto |
 | --- | --- |
 | Package condiviso | `MediFlowMac/Package.swift` conserva macOS 13 per il codice condiviso. |
-| App prodotto | `MediFlowMacApp` ha deployment target macOS 14. `.inspector()` e quindi ammesso senza fallback nel target app. |
+| App prodotto | `MediFlowMacApp` ha deployment target macOS 14. Usa `.inspector()` su macOS 14-26; macOS 13 del package e il runtime beta macOS 27 usano la sheet compatibile, perché su quest'ultimo l'API entra in un ciclo di layout riprodotto anche con contenuto minimo. |
 | Enhancement recente | Liquid Glass e le API geometriche/toolbar 26+ stanno dietro `#available(macOS 26, *)`; la struttura e la gerarchia non dipendono da esse. |
 | Evidenza del ramo card opaca | La correzione delle card cliniche opache e il suo test sono poi atterrati su `main` (PR #46). Un run storico WUL-55 del 2026-07-12 sul vecchio head PR #40 (`DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer xcodebuild -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj -scheme MediFlowMacApp -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build`) aveva dato `BUILD SUCCEEDED` con SDK macOS 27 e target macOS 14; questo packet docs-only non riesegue la build. |
 
@@ -108,7 +126,7 @@ Confermato localmente e contro-rivisto da Opus 4.8 max:
 | --- | --- | --- |
 | Le card cliniche usano `glassEffect` su OS 26+ | Risolto (PR #46): `clinicalCardStyle()` rende opaca la card clinica su ogni OS, `cardStyle()` è alias di compatibilità e `GlassCard` è deprecata e resa opaca | Consolidare le primitive Lume (`LumeSurface`/`LumeCard`) resta lavoro separato. |
 | Il workspace pazienti interno è un `HStack` con colonna fissa 360pt | Risolto nella slice M2a (#74) | `NavigationSplitView` + `List(selection:)` usano l'ID paziente stabile; la visibilità `.all` ripristina la worklist quando si rientra dalla sidebar clinica e il dettaglio resta opaco. |
-| Non esiste `.inspector()` nel workspace | Confermato | Introdurlo dopo lo split, per contesto e drill-down. |
+| Non esiste `.inspector()` nel workspace | Slice WUL-565 implementata: inspector contestuale su macOS 14-26, sheet equivalente su macOS 13 e sul runtime beta macOS 27, superfici cliniche neutrali native | Build bundle, test sintetici e percorso AX del fallback sono provati. Restano da chiudere VoiceOver narrato e isolamento focus tra due finestre; il pannello resta status-only. |
 | Identità paziente scorre via e non esiste `safeAreaInset` | Implementato nella slice M2b (#106): testata `focal` persistente con nome, codice abbreviato, età se nota e aggiornamento; heading AX autonomo. Il probe interattivo finale resta un gate separato | Le allergie restano escluse finché il contratto dati non espone un valore strutturato affidabile. |
 | Il Registro non e applicato a dose/valore/codice/data | Confermato | Modifier `.registro()` e audit dei call-site. |
 | La storia osservazioni e una sparkline senza assi o banda | Confermato | Non promuoverla come `RigaLaboratorio`; sostituirla solo con dati e fonti disponibili. |
@@ -132,7 +150,10 @@ simulate con dati inventati.
    Spostare il pairing fuori dalla worklist resta una slice distinta.
 4. **M3, sicurezza di contesto avanzata**: allergie e altri segnali invariabili
    entrano solo dopo un contratto dati strutturato; nessuna inferenza dalla prosa.
-5. **M4, densita a strati**: inspector e provenienza senza perdere la selezione.
+5. **M4, densita a strati**: WUL-565 consegna la prima slice di inspector e
+   provenienza senza perdere la selezione, con visibilita per finestra e comando
+   focalizzato. Non chiude M4: VoiceOver narrato, isolamento focus tra due
+   finestre, pairing in Settings e qualunque azione headless restano aperti.
 6. **M5, firma Lume**: filo, fuoco e motion sobri, dopo la prova della struttura.
 
 La prima slice, atterrata con PR #46, e la correzione delle card cliniche opache
@@ -142,9 +163,10 @@ sintetico light/dark (`ClinicalCardStyleTests`) e build del bundle macOS
 non una QA manuale completa dei gate qui sotto.
 
 Le slice M2a e M2b restano separate: #74/#94 possiedono lo split desktop, #106
-possiede la testata persistente. Inspector, spostamento del pairing e segnali
-clinici senza contratto dati restano esplicitamente aperti; il debito documentale
-sulle primitive M1 viene riconciliato nel follow-up docs finale di #68.
+possiede la testata persistente e WUL-565 possiede l'inspector status-only.
+Spostamento del pairing e segnali clinici senza contratto dati restano
+esplicitamente aperti; il debito documentale sulle primitive M1 viene
+riconciliato nel follow-up docs finale di #68.
 
 ## 8. Gate di verifica
 

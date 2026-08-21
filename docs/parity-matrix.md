@@ -196,6 +196,8 @@ La mappa registra i controlli esercitati nel closeout.
 | macOS | Agenda sidebar | `clinical-workspace-section-agenda-button` | Seleziona riga `List` | Click-map e probe AX PASS |
 | macOS | Riga paziente | `patient-cell-*` | Seleziona e carica dettaglio | Click-map e probe AX PASS |
 | macOS | Focus | focus system | Avanza con `Tab` e freccia | Interazione reale PASS |
+| macOS | Inspector paziente | `clinical-workspace-inspector-toggle` | Toolbar o `⌥⌘I` mostra/nasconde il contesto della finestra focalizzata | WUL-565: build SwiftPM/Xcode, test sintetico light/dark e percorso AX del fallback macOS 27 PASS; `.inspector` di sistema resta su macOS 14-26, VoiceOver narrato e isolamento tra due finestre pendenti |
+| macOS | Autorita headless | `clinical-workspace-inspector-authority` | Mostra stato informativo senza azioni o privilegi Mini/CLI | WUL-565: snapshot sintetico; contratto machine-readable gated da WUL-557/WUL-518 |
 
 ### AXPress
 

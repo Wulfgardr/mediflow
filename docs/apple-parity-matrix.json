@@ -367,11 +367,11 @@
       "area": "shell-globale",
       "feature": "Cockpit shell / rail navigazione globale + toolbar + deep-link",
       "web": "Kree8 cockpit shell con 5 aree, toolbar ricerca/filtri, deep-link query string, sub-area tabs (components/kree8/kree8-clinical-cockpit.tsx)",
-      "native": "partial: NavigationSplitView (macOS/iPad) / TabView (iPhone) con sezioni cliniche Pazienti/Agenda/Diario/Analytics/Scale e gruppo Progetto separato, piu master-detail pazienti (AppleFoundationViews.swift:210-292). Residuo ristretto: nessun deep-link/URL scheme nativo equivalente alla query string web ?area=&paziente=. Ricerca globale non conteggiata come residuo di parita: non esiste nemmeno come ricerca globale unica sulla web.",
+      "native": "partial: NavigationSplitView (macOS/iPad) / TabView (iPhone) con sezioni cliniche Pazienti/Agenda/Diario/Analytics/Scale e gruppo Progetto separato. Su macOS WUL-565 aggiunge inspector paziente status-only, toolbar/comando Option-Command-I, stato workspace per finestra, menu instradati alla finestra focalizzata e contenuto clinico su colori neutrali nativi adattivi; macOS 13 e il runtime beta macOS 27 usano un fallback sheet, mentre macOS 14-26 usa l'inspector di sistema. Carta resta una semantica e non introduce crema, beige, avorio o skeuomorfismo. Residuo: nessun deep-link/URL scheme nativo equivalente alla query string web ?area=&paziente=; VoiceOver narrato e isolamento focus tra due finestre della slice inspector pendenti. Ricerca globale non conteggiata come residuo di parita: non esiste nemmeno come ricerca globale unica sulla web.",
       "boundary": "n-a: chrome UI locale",
       "gap": "partial",
       "wave": "W3-macos-clinical-shell",
-      "evidence": "web-global.shell query string in components/kree8/kree8-clinical-cockpit.tsx:204-219; native-ui.navigazione; W3 S5 f01346656 AppleFoundationViews.swift"
+      "evidence": "web-global.shell query string in components/kree8/kree8-clinical-cockpit.tsx:204-219; native-ui.navigazione; W3 S5 f01346656 AppleFoundationViews.swift; WUL-565 MacWorkspaceRootView.swift + MacPatientContextInspector.swift + MacPatientContextInspectorTests"
     },
     {
       "area": "turno",
