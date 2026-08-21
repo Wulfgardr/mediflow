@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-07-29
+Ultimo aggiornamento: 2026-08-22
 
 ## 📚 Come usare questo indice
 
@@ -111,6 +111,7 @@ Ultimo aggiornamento: 2026-07-29
 | [docs/openapi/README.md](./openapi/README.md) | Runbook operativo per manutenzione della spec OpenAPI `/api/v1`. | Quando si cambia il contratto client-facing o si fa review di drift. |
 | [docs/design/2026-07-26-agenda-clinica-e-scadenze.md](./design/2026-07-26-agenda-clinica-e-scadenze.md) | Intento di prodotto post-0.8 per un'agenda centrata su scadenze cliniche e terapeutiche. | Quando si pianifica l'evoluzione dell'agenda senza confonderla con lo stato consegnato. |
 | [docs/design/2026-07-26-cosa-mutuare-analisi-esterna.md](./design/2026-07-26-cosa-mutuare-analisi-esterna.md) | Confronto critico con studi e prodotti esterni per ridurre attrito senza impoverire l'informazione clinica. | Quando si valutano scelte di gerarchia, carico cognitivo o consolidamento dei flussi. |
+| [docs/design/2026-08-21-web-redesign-consolidamento.md](./design/2026-08-21-web-redesign-consolidamento.md) | Programma Web «un fuoco, una risposta», decisioni Quadro/Scheda e Diario/Timeline, Carta neutra e inventario capability Web pre-contratto. | Quando si modifica o verifica IA, stati, tastiera, superfici Lume o input Web per WUL-557. |
 | [docs/design/vetro-clinico/README.md](./design/vetro-clinico/README.md) | Ingresso della baseline storica e transitoria Vetro Clinico: glossario, ordine di lettura, regole redazionali e precedenza. | Quando serve riconciliare una superficie transitoria senza usarla come destinazione attiva. |
 | [docs/design/vetro-clinico/01-fondamenta.md](./design/vetro-clinico/01-fondamenta.md) | Principi, audit onesto della baseline Vetro Clinico e decisioni vincolanti di transizione. | Quando serve distinguere stato rilevato, debito e direzione di design separata. |
 | [docs/design/vetro-clinico/02-token.md](./design/vetro-clinico/02-token.md) | Architettura token a tre livelli, palette semantica, tipografia, geometria, motion e azioni di consolidamento. | Quando si valuta una modifica a colore, corpo testo, raggio, ombra, blur o durata. |
