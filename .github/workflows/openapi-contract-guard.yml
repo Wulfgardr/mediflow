@@ -65,6 +65,9 @@ jobs:
         run: |
           npm run check:mini-parity
           npm run test:mini-parity
+      - name: Mini CLI synthetic contract
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run test:mini-cli
       - name: OpenAPI contract guard
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |
