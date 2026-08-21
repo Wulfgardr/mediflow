@@ -90,8 +90,9 @@ stati non sanno agire, il medico esperto non ha vie rapide.
 
 ## 4. Inventario capability Web
 
-Questa tabella è l'inventario umano canonico del lato Web. È un input per
-WUL-557 e per i consumer Mini/native futuri: **non è il contratto
+Questa tabella è il sottoinsieme umano delle capability toccate dal
+consolidamento UX Web. Il catalogo Web canonico completo resta la matrice a 66
+righe consumata da WUL-557: questa vista **non sostituisce il contratto
 machine-readable e non dichiara parity**. Gli stati `draft` indicano evidence
 reviewabile non ancora promossa su `main`.
 
@@ -113,8 +114,33 @@ reviewabile non ancora promossa su `main`.
 | `web.settings.governance` | `/settings` | Modifica impostazioni locali e kill switch | controlli reversibili e locali | `app/settings/page.tsx`, main |
 | `web.command.help` | cockpit | `Cmd/Ctrl+K` apre comandi; `?` apre aiuto | focus trap, Escape e ripristino focus | WUL-560, draft PR #189 |
 
-Il consumer contract resta bloccato finché WUL-557 non pubblica e verifica la
-forma machine-readable. WUL-564 resta il gate di verifica finale.
+### 4A. Riconciliazione con il contratto Mini verificato
+
+Baseline esatta: PR #184, head `3fd988b`, per il servizio AIP validato; PR #190,
+head `1e35733`, per il consumer Mini. Il manifest letto senza modificarlo è
+`packages/mini/contracts/mini-parity.json`, schema
+`mediflow.mini.parity-manifest.v1`. Il denominatore canonico è **66** e le righe
+con `miniDisposition=available` sono **4**, cioè **6,060606%**. È una metrica del
+pilot Mini, non un claim di parity complessiva del prodotto.
+
+| Input UX Web | Righe canoniche | Disposizione Mini al baseline | Gap da non comprimere |
+| --- | --- | --- | --- |
+| `web.session.unlock` | 37, 39 | riga 39 `available` (`whoami`); riga 37 `manual_only` | `whoami` osserva la sessione, non sblocca né gestisce il PIN |
+| `web.patient.list/search/open/create` | 1 | `available` (`patient search`, `patient show`) | create/update e la navigazione UI non sono comandi Mini disponibili |
+| `web.patient.quadro/scheda` | 20–22, 32 | `manual_only` | nessuna equivalenza Mini per cockpit, workspace, FHIR o PDF |
+| `web.diary.read/write` | 3, 4, 34 | `manual_only`; riga 4 `proposal_only` (`draft preview`) | preview sintetica non legge, firma o scrive il Diario |
+| `web.therapy.manage` | 8 | `manual_only` | CRUD e stato terapia restano manuali |
+| `web.documents.review` | 15–18 | `manual_only` | OCR, insight, Smart Import e referti non entrano nel pilot Mini |
+| `web.followup.manage` | 10, 11 | riga 11 `available` (`open-loops`); riga 10 `manual_only` | leggere loop aperti non equivale a creare o gestire follow-up |
+| `web.handoff.prepare` | 31 | `manual_only`, `HOST_AUTHORITY_ONLY` | nessuna apertura portale o attestazione di invio dal Mini |
+| `web.settings.governance` | 44–54, 64–66 | `manual_only`, prevalentemente `HOST_AUTHORITY_ONLY` | configurazione e mutazioni restano sull'host |
+| `web.command.help` | 32 | `manual_only` | palette e aiuto sono affordance Web, non capability Mini |
+| capability non presente nel sottoinsieme UX | 63 | `available` (`capabilities`) | discovery della boundary è contrattuale, non una nuova superficie UX |
+
+Questa riconciliazione conserva gli ID del manifest (`web-01…web-66`) come
+chiavi del consumer contract; gli ID leggibili `web.*` sopra restano alias di
+documentazione UX e non devono essere serializzati nel manifest. WUL-564 resta
+il gate di verifica finale.
 
 ## 5. Carta senza colore vintage
 
