@@ -157,6 +157,17 @@ Owner: `WUL-403`.
 Rende visibili età/TTL della cache, stato stale, read-only e assenza di write
 queue. Non introduce sync multi-master né scritture offline.
 
+La candidata `WUL-556` aggiunge su iPhone e iPad un pannello nativo per gli
+stati `loading`, `error`, `online`, `cache`, `offline read-only` e
+`session-expired`. La preview e i test sintetici coprono anche la resa
+`stale`. Il runtime continua però a scartare lo snapshot oltre il TTL di 24
+ore: finché il contratto cache/headless non espone metadata separati, lo stato
+stale live resta `partial`, non `complete`.
+
+Per decisione owner, Carta resta una grammatica del contenuto e non introduce
+una palette calda. Le superfici della slice usano canvas e field neutrali
+adattivi; i soli colori non neutrali sono segnali funzionali di stato.
+
 Il gate di consumo `WUL-557` è aperto sul manifest canonico
 `packages/mini/contracts/mini-parity.json`. I head PR #184
 `3fd988bafe71a058fdd7d3c25ea569793dcba903` e PR #190
@@ -178,6 +189,12 @@ sono `HOST_AUTHORITY_ONLY`, 38 `NOT_IN_MINI_PILOT` e 1
 slice `WUL-556`. `draft preview` (riga 4) resta `proposal_only` con ragione
 `SYNTHETIC_PREVIEW_ONLY`. Le altre righe conservano la disposizione e la ragione
 del manifest; le 23 `HOST_AUTHORITY_ONLY` restano host-only nella matrice Apple.
+
+| Superficie mobile | Stato candidata | Evidenza | Dipendenza host/headless |
+| --- | --- | --- | --- |
+| iPhone | `partial` | Test di presentazione, XCUITest e screenshot sintetico | Nessun grant nuovo; usa solo stato paired esistente |
+| iPadOS | `partial` | Stesso contratto, layout adattivo, `⌘R`, pointer, XCUITest e screenshot sintetico | Metadata TTL/stale live non esposti |
+| Capability AIP/Mini | Gap Apple e disposizione Mini restano assi separati | Manifest WUL-557: 4/66 disponibili | Le ragioni `partial`, host-only e `manual_only` restano esplicite; manifest e receipt non diventano autorità client; verifica manager e `WUL-564` bloccano la promozione |
 
 ### W6-C — decisione sul workflow documentale nativo
 
