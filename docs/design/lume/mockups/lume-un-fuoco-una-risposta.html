@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lume: un fuoco, una risposta — studio di consolidamento</title>
+<style>
+/* ============================================================
+   Studio di consolidamento web «un fuoco, una risposta».
+   File autonomo, nessuna dipendenza, nessun font remoto.
+   Dati esclusivamente sintetici, nessun dato reale.
+   Dimostra: testata unica, rail a 4 gruppi, delta prima dei
+   conteggi, stati azionabili, tastiera prima classe, ⌘K.
+   Riferimento: docs/design/2026-08-21-web-redesign-consolidamento.md
+   ============================================================ */
+
+:root {
+  /* Registro Giorno */
+  --canvas: #eef0f2;
+  --field: #f5f5f4;
+  --focal: #fbfaf7;
+  --chrome: #e6e8eb;
+  --ink: #1a1c1e;
+  --ink-muted: #5f6b76;
+  --minerale: #33506b;
+  --warning: #9a6a2f;
+  --critical: #a33a2f;
+  --success: #4b6354;
+  --plum: #555161;
+  --warning-tint: rgba(154, 106, 47, 0.10);
+  --critical-tint: rgba(163, 58, 47, 0.10);
+  --success-tint: rgba(75, 99, 84, 0.10);
+  --border: rgba(26, 28, 30, 0.10);
+  --border-chrome: rgba(26, 28, 30, 0.06);
+  --shadow-focal: 0 2px 8px rgba(26, 28, 30, 0.10);
+  --shadow-overlay: 0 12px 32px rgba(26, 28, 30, 0.18);
+  --focus-ring: 0 0 0 2px var(--canvas), 0 0 0 4px var(--minerale);
+
+  --r-panel: 20px;
+  --r-card: 14px;
+  --r-control: 10px;
+
+  --voce: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  --registro: ui-monospace, "SF Mono", "IBM Plex Mono", "Cascadia Mono", Menlo, monospace;
+
+  --dur-fuoco: 210ms;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.grafite {
+  --canvas: #121417;
+  --field: #191c21;
+  --focal: #22252b;
+  --chrome: #0e1013;
+  --ink: #e9ecef;
+  --ink-muted: #8f9aa6;
+  --minerale: #8fb0cc;
+  --warning: #c89c5a;
+  --critical: #d67668;
+  --success: #7e9e8a;
+  --plum: #9691a5;
+  --warning-tint: rgba(200, 156, 90, 0.14);
+  --critical-tint: rgba(214, 118, 104, 0.13);
+  --success-tint: rgba(126, 158, 138, 0.13);
+  --border: rgba(233, 236, 239, 0.10);
+  --border-chrome: rgba(233, 236, 239, 0.05);
+  --shadow-focal: 0 2px 10px rgba(0, 0, 0, 0.55);
+  --shadow-overlay: 0 16px 40px rgba(0, 0, 0, 0.65);
+}
+
+.guardia {
+  --canvas: #0c0e12;
+  --field: #14171d;
+  --focal: #1a1e26;
+  --chrome: #090b0e;
+  --ink: #e3e8ee;
+  --ink-muted: #8792a3;
+  --minerale: #7fa0bc;
+  --warning: #cfa35f;
+  --critical: #d98a7d;
+  --success: #85a291;
+  --plum: #9691a5;
+  --warning-tint: rgba(207, 163, 95, 0.14);
+  --critical-tint: rgba(217, 138, 125, 0.14);
+  --success-tint: rgba(133, 162, 145, 0.14);
+  --border: rgba(227, 232, 238, 0.09);
+  --border-chrome: rgba(227, 232, 238, 0.04);
+  --shadow-focal: 0 2px 10px rgba(0, 0, 0, 0.6);
+  --shadow-overlay: 0 12px 36px rgba(0, 0, 0, 0.7);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+::selection { background: color-mix(in srgb, var(--minerale) 28%, transparent); }
+
+html { scrollbar-color: color-mix(in srgb, var(--ink-muted) 45%, transparent) transparent; }
+
+body {
+  font-family: var(--voce);
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+  transition: background-color var(--dur-fuoco) var(--ease);
+}
+
+.registro {
+  font-family: var(--registro);
+  font-variant-numeric: tabular-nums;
+}
+
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, a:focus-visible, input:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--r-control);
+}
+svg { display: block; flex: none; }
+
+/* ── barra titolo dello studio ─────────────────────────────── */
+
+.studio-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 20px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+}
+.studio-title { display: flex; align-items: center; gap: 12px; }
+.brand-mark {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  background: var(--minerale);
+  color: var(--canvas);
+  display: grid; place-items: center;
+  font-family: var(--registro);
+  font-size: 12px;
+  font-weight: 600;
+}
+.studio-title h1 { font-size: 14px; font-weight: 600; letter-spacing: -0.02em; }
+.studio-title p { font-size: 12px; color: var(--ink-muted); }
+.registers { display: flex; gap: 6px; }
+.registers button {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 500;
+  transition: all var(--dur-fuoco) var(--ease);
+}
+.registers button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--canvas);
+  border-color: var(--ink);
+}
+
+/* ── guscio applicativo ───────────────────────────────────── */
+
+.app { display: flex; height: calc(100vh - 49px); min-height: 560px; }
+
+.rail {
+  width: 232px;
+  flex: none;
+  background: var(--chrome);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 10px;
+  overflow-y: auto;
+}
+.rail-context {
+  padding: 4px 10px 12px;
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+.rail-context strong { display: block; font-size: 13px; color: var(--ink); font-weight: 600; }
+
+.group { margin-bottom: 2px; }
+.group-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--r-control);
+  border: 0;
+  background: transparent;
+  font-weight: 550;
+  font-size: 13.5px;
+  color: var(--ink);
+  transition: background var(--dur-fuoco) var(--ease);
+}
+.group-head:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.group[data-open] .group-head { color: var(--minerale); }
+.group-head .chev { margin-left: auto; transition: transform var(--dur-fuoco) var(--ease); opacity: 0.7; }
+.group[data-open] .chev { transform: rotate(90deg); }
+.group-items { list-style: none; padding: 0 0 2px 14px; display: none; }
+.group[data-open] .group-items { display: block; }
+.group-items a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: var(--r-control);
+  font-size: 13px;
+  color: var(--ink-muted);
+  text-decoration: none;
+  transition: all var(--dur-fuoco) var(--ease);
+}
+.group-items a:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.group-items a[aria-current="page"] {
+  background: color-mix(in srgb, var(--minerale) 12%, transparent);
+  color: var(--minerale);
+  font-weight: 550;
+}
+.count { font-family: var(--registro); font-size: 11px; color: var(--ink-muted); }
+
+.rail-footer {
+  margin-top: auto;
+  padding: 12px 10px 4px;
+  border-top: 1px solid var(--border-chrome);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+/* ── colonna di lavoro ─────────────────────────────────────── */
+
+.work { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 14px 18px 0; overflow: hidden; }
+
+.topline { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.search {
+  flex: 1;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--field);
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+.search kbd {
+  margin-left: auto;
+  font-family: var(--registro);
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  padding: 1px 6px;
+  color: var(--ink-muted);
+  background: var(--canvas);
+}
+.recents { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
+.recents span { font-size: 11px; color: var(--ink-muted); margin-right: 2px; }
+.recents button {
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--field);
+  font-family: var(--registro);
+  font-size: 12px;
+  color: var(--ink-muted);
+  transition: all var(--dur-fuoco) var(--ease);
+}
+.recents button:hover { color: var(--ink); border-color: var(--ink-muted); }
+
+/* ── la superficie focale unica ────────────────────────────── */
+
+.focal-surface {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--focal);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel) var(--r-panel) 0 0;
+  box-shadow: var(--shadow-focal);
+  padding: 26px 34px 34px;
+  max-width: 980px;
+}
+
+.testata { display: flex; align-items: flex-start; gap: 18px; }
+.testata h2 { font-size: 24px; font-weight: 650; letter-spacing: -0.025em; line-height: 1.15; }
+.testata-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 7px;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+.testata-meta .reg { font-family: var(--registro); font-size: 12px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 550;
+  color: color-mix(in srgb, var(--plum) 62%, var(--ink));
+  background: color-mix(in srgb, var(--plum) 10%, transparent);
+}
+.allergy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 550;
+  color: var(--critical);
+}
+.head-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--minerale);
+  background: var(--minerale);
+  color: var(--canvas);
+  font-weight: 600;
+  font-size: 13px;
+  transition: filter var(--dur-fuoco) var(--ease);
+}
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-quiet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px; height: 38px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink-muted);
+  transition: all var(--dur-fuoco) var(--ease);
+}
+.btn-quiet:hover { color: var(--ink); border-color: var(--ink-muted); }
+
+/* delta prima dei conteggi */
+.deltas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.delta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--r-card);
+  background: var(--field);
+  border: 1px solid var(--border);
+}
+.delta .label { font-size: 11.5px; color: var(--ink-muted); }
+.delta .value { font-family: var(--registro); font-size: 15px; font-weight: 600; }
+.delta .trend { font-family: var(--registro); font-size: 11px; font-weight: 600; }
+.trend.up { color: var(--warning); }
+.trend.down { color: var(--success); }
+.trend.flat { color: var(--ink-muted); }
+.deltas-note { flex-basis: 100%; font-size: 11px; color: var(--ink-muted); }
+
+/* attenzione: una sola cosa da fare */
+.attention {
+  margin-top: 20px;
+  border-radius: var(--r-card);
+  background: var(--warning-tint);
+  padding: 16px 18px;
+}
+.attention h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 650;
+  color: color-mix(in srgb, var(--warning) 70%, var(--ink));
+  margin-bottom: 4px;
+}
+.attention-item { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+.attention-item p { flex: 1; min-width: 0; font-size: 13.5px; }
+.attention-item .when { display: block; font-family: var(--registro); font-size: 11.5px; color: var(--ink-muted); margin-top: 2px; }
+.attention-delta { font-family: var(--registro); font-size: 11px; color: var(--ink-muted); white-space: nowrap; }
+.btn-action {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--warning) 55%, transparent);
+  background: color-mix(in srgb, var(--warning) 14%, var(--focal));
+  color: color-mix(in srgb, var(--warning) 60%, var(--ink));
+  font-weight: 600;
+  font-size: 12.5px;
+  transition: filter var(--dur-fuoco) var(--ease);
+}
+.btn-action:hover { filter: brightness(1.05); }
+
+/* sezioni a hairline con disclosure corretta */
+.section { border-bottom: 1px solid var(--border); }
+.section:last-of-type { border-bottom: 0; }
+.section-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 2px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.section-head h3 { font-size: 15px; font-weight: 600; letter-spacing: -0.015em; }
+.section-head .chev { margin-left: auto; transition: transform var(--dur-fuoco) var(--ease); opacity: 0.65; }
+.section[data-open] .section-head .chev { transform: rotate(180deg); }
+.badge-modified {
+  font-family: var(--registro);
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--minerale) 12%, transparent);
+  color: var(--minerale);
+}
+.section-body { display: none; padding: 2px 2px 20px; }
+.section[data-open] .section-body { display: block; }
+
+.riga-terapia {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) 110px 130px 96px;
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 4px;
+  font-size: 13.5px;
+  border-top: 1px solid var(--border-chrome);
+}
+.riga-terapia:first-child { border-top: 0; }
+.riga-terapia .dose, .riga-terapia .dal, .riga-terapia .delta-col {
+  font-family: var(--registro); font-size: 12px; color: var(--ink-muted);
+}
+.delta-col.up { color: var(--warning); }
+.delta-col.new { color: var(--minerale); font-weight: 600; }
+
+/* filtri della river unica */
+.filters { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--field); border: 1px solid var(--border); margin-bottom: 14px; }
+.filters button {
+  height: 28px;
+  padding: 0 13px;
+  border-radius: 999px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 550;
+  transition: all var(--dur-fuoco) var(--ease);
+}
+.filters button[aria-pressed="true"] { background: var(--focal); color: var(--ink); box-shadow: var(--shadow-focal); }
+
+.filo { position: relative; padding-left: 22px; }
+.filo::before {
+  content: "";
+  position: absolute;
+  left: 5px; top: 8px; bottom: 8px;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, var(--border) 6%, var(--border) 94%, transparent);
+}
+.voce-river { position: relative; padding: 10px 0 12px; border-radius: var(--r-control); transition: background var(--dur-fuoco) var(--ease); }
+.voce-river:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.voce-river::before {
+  content: "";
+  position: absolute;
+  left: -21px; top: 17px;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--ink-muted);
+}
+.voce-river.clinico::before { background: var(--minerale); }
+.voce-river.followup::before { background: var(--plum); }
+.voce-river.nuova::before { box-shadow: 0 0 0 3px color-mix(in srgb, var(--minerale) 22%, transparent); }
+.voce-top { display: flex; align-items: baseline; gap: 10px; }
+.voce-top time { font-family: var(--registro); font-size: 11.5px; color: var(--ink-muted); white-space: nowrap; }
+.voce-top .tipo { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--ink-muted); text-transform: uppercase; }
+.voce-river p { font-size: 13.5px; margin-top: 2px; max-width: 68ch; }
+.voce-river .fonte { display: block; margin-top: 3px; font-family: var(--registro); font-size: 11px; color: var(--ink-muted); }
+
+/* stati onesti: caricamento ed errore con azione */
+.skeleton-line {
+  height: 12px;
+  border-radius: 6px;
+  margin: 10px 0;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--ink) 7%, transparent) 25%,
+    color-mix(in srgb, var(--ink) 12%, transparent) 50%,
+    color-mix(in srgb, var(--ink) 7%, transparent) 75%);
+  background-size: 200% 100%;
+  animation: respiro 1.6s var(--ease) infinite;
+}
+.skeleton-line:nth-child(2) { width: 72%; }
+.skeleton-line:nth-child(3) { width: 48%; }
+@keyframes respiro { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line { animation: none; }
+  * { transition-duration: 0ms !important; }
+}
+
+.errore {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: var(--r-card);
+  background: var(--critical-tint);
+  padding: 14px 16px;
+}
+.errore p { flex: 1; font-size: 13px; }
+.errore p strong { display: block; font-weight: 600; color: color-mix(in srgb, var(--critical) 70%, var(--ink)); }
+.errore p span { color: var(--ink-muted); font-size: 12px; }
+.btn-retry {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--critical) 50%, transparent);
+  background: transparent;
+  color: color-mix(in srgb, var(--critical) 72%, var(--ink));
+  font-weight: 600;
+  font-size: 12.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.btn-retry:hover { background: color-mix(in srgb, var(--critical) 12%, transparent); }
+
+/* legenda tastiera */
+.keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 12px 2px 16px;
+  font-size: 11.5px;
+  color: var(--ink-muted);
+}
+.keys b {
+  font-family: var(--registro);
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 0 5px;
+  background: var(--field);
+  color: var(--ink);
+}
+
+/* ── palette comandi ──────────────────────────────────────── */
+
+.palette-scrim {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--chrome) 55%, black 12%);
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  z-index: 50;
+}
+.palette-scrim[data-open] { display: flex; }
+.palette {
+  width: min(560px, calc(100vw - 32px));
+  background: var(--focal);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-overlay);
+  overflow: hidden;
+  transform-origin: top center;
+  animation: entra 165ms var(--ease);
+}
+@keyframes entra {
+  from { transform: translateY(-6px) scale(0.985); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .palette { animation: none; } }
+.palette input {
+  width: 100%;
+  height: 52px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  padding: 0 18px;
+}
+.palette input::placeholder { color: var(--ink-muted); }
+.palette-group { padding: 10px 8px 6px; }
+.palette-group h4 { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-muted); padding: 0 10px 6px; }
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  font-size: 13.5px;
+  text-align: left;
+}
+.palette-item[aria-selected="true"], .palette-item:hover { background: color-mix(in srgb, var(--minerale) 14%, transparent); }
+.palette-item .hint { margin-left: auto; font-family: var(--registro); font-size: 11px; color: var(--ink-muted); }
+
+/* nota a piè dello studio */
+.study-note {
+  padding: 10px 20px 14px;
+  font-size: 11px;
+  color: var(--ink-muted);
+  background: var(--chrome);
+  border-top: 1px solid var(--border-chrome);
+}
+
+/* guscio verticale della pagina */
+body { display: flex; flex-direction: column; height: 100vh; }
+.app { flex: 1; min-height: 0; }
+</style>
+</head>
+<body>
+
+<header class="studio-bar">
+  <div class="studio-title">
+    <div class="brand-mark">MF</div>
+    <div>
+      <h1>Un fuoco, una risposta</h1>
+      <p>Studio di consolidamento · Scheda clinica · dati esclusivamente sintetici</p>
+    </div>
+  </div>
+  <div class="registers" role="group" aria-label="Registro di luce">
+    <button type="button" data-reg="" aria-pressed="true">Giorno</button>
+    <button type="button" data-reg="grafite" aria-pressed="false">Grafite</button>
+    <button type="button" data-reg="guardia" aria-pressed="false">Guardia</button>
+  </div>
+</header>
+
+<div class="app">
+
+  <nav class="rail" aria-label="Navigazione primaria">
+    <p class="rail-context"><strong>Rossi Maria</strong>PT-2481 · lease di lavoro attivo</p>
+
+    <div class="group" data-open>
+      <button type="button" class="group-head" aria-expanded="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+        Quadro e decisioni
+        <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+      <ul class="group-items">
+        <li><a href="#" aria-current="page">Quadro <span class="count">Δ+1</span></a></li>
+        <li><a href="#">Attenzione <span class="count">3</span></a></li>
+        <li><a href="#">Diagnosi</a></li>
+        <li><a href="#">Obiettivi</a></li>
+      </ul>
+    </div>
+
+    <div class="group">
+      <button type="button" class="group-head" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2h8M12 6v6l4 2"/><circle cx="12" cy="14" r="8"/></svg>
+        Terapie e prescrizioni
+        <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+      <ul class="group-items">
+        <li><a href="#">Terapie <span class="count">4</span></a></li>
+        <li><a href="#">Prescrizioni</a></li>
+        <li><a href="#">Esenzioni <span class="count">031</span></a></li>
+        <li><a href="#">Scale</a></li>
+      </ul>
+    </div>
+
+    <div class="group">
+      <button type="button" class="group-head" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+        Documenti e prove
+        <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+      <ul class="group-items">
+        <li><a href="#">Documenti <span class="count">17</span></a></li>
+        <li><a href="#">Import da rivedere <span class="count">2</span></a></li>
+        <li><a href="#">Laboratorio</a></li>
+      </ul>
+    </div>
+
+    <div class="group">
+      <button type="button" class="group-head" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+        Diario e follow-up
+        <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+      <ul class="group-items">
+        <li><a href="#">River clinica</a></li>
+        <li><a href="#">Follow-up <span class="count">2</span></a></li>
+        <li><a href="#">Scadenze</a></li>
+      </ul>
+    </div>
+
+    <div class="rail-footer">
+      <span>Mac principale · locale</span>
+      <span class="registro">v0.8.2</span>
+    </div>
+  </nav>
+
+  <main class="work">
+    <div class="topline">
+      <button type="button" class="search" id="apri-palette" aria-label="Cerca o apri la palette comandi">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        Cerca paziente, voce, azione…
+        <kbd>⌘K</kbd>
+      </button>
+      <div class="recents">
+        <span>Visti di recente</span>
+        <button type="button">Bianchi R.</button>
+        <button type="button">Verdi G.</button>
+        <button type="button">Esposito L.</button>
+      </div>
+    </div>
+
+    <article class="focal-surface">
+
+      <header class="testata">
+        <div>
+          <h2>Rossi Maria</h2>
+          <div class="testata-meta">
+            <span class="reg">1948 · 78 anni</span>
+            <span class="chip">ADI dal 2024-03</span>
+            <span class="chip">Esenzione 031</span>
+            <span class="allergy">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg>
+              Allergie: 2 documentate
+            </span>
+          </div>
+        </div>
+        <div class="head-actions">
+          <button type="button" class="btn-primary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Nuova voce clinica
+          </button>
+          <button type="button" class="btn-quiet" aria-label="Altre azioni sulla scheda">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="5" cy="12" r="0.9"/><circle cx="12" cy="12" r="0.9"/><circle cx="19" cy="12" r="0.9"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="deltas" role="list" aria-label="Variazioni dall'ultima rilevazione">
+        <div class="delta" role="listitem">
+          <span class="label">PAM</span>
+          <span class="value">98</span>
+          <span class="trend up">▲ 4</span>
+        </div>
+        <div class="delta" role="listitem">
+          <span class="label">Peso</span>
+          <span class="value">71,4 kg</span>
+          <span class="trend down">▼ 1,2</span>
+        </div>
+        <div class="delta" role="listitem">
+          <span class="label">HbA1c</span>
+          <span class="value">7,1 %</span>
+          <span class="trend flat">= stabile</span>
+        </div>
+        <span class="deltas-note">Rispetto all'ultima rilevazione registrata · mai conteggi: variazioni.</span>
+      </div>
+
+      <section class="attention" aria-labelledby="att-titolo">
+        <h3 id="att-titolo">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg>
+          Attenzione · cosa fare adesso
+        </h3>
+        <div class="attention-item">
+          <p>Glicemia capillare da ripetere — richiesta del 18/08
+            <span class="when">scade 25/08 · loop GLI-114</span>
+          </p>
+          <span class="attention-delta registro">+1 dall'ultima apertura</span>
+          <button type="button" class="btn-action">Registra ora</button>
+        </div>
+      </section>
+
+      <section class="section" data-open aria-labelledby="ter-titolo">
+        <button type="button" class="section-head" aria-expanded="true" aria-controls="ter-corpo">
+          <h3 id="ter-titolo">Terapie</h3>
+          <span class="badge-modified">2 modifiche questa settimana</span>
+          <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="section-body" id="ter-corpo">
+          <div class="riga-terapia">
+            <span>Metformina</span>
+            <span class="dose">850 mg × 2</span>
+            <span class="dal">dal 2024-11</span>
+            <span class="delta-col up">dose ▲ 12/08</span>
+          </div>
+          <div class="riga-terapia">
+            <span>Enoxaparina</span>
+            <span class="dose">4.000 UI × 1</span>
+            <span class="dal">dal 2026-08-10</span>
+            <span class="delta-col new">nuova</span>
+          </div>
+          <div class="riga-terapia">
+            <span>Bisoprololo</span>
+            <span class="dose">2,5 mg × 1</span>
+            <span class="dal">dal 2025-02</span>
+            <span class="delta-col"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" data-open aria-labelledby="riv-titolo">
+        <button type="button" class="section-head" aria-expanded="true" aria-controls="riv-corpo">
+          <h3 id="riv-titolo">River clinica</h3>
+          <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="section-body" id="riv-corpo">
+          <div class="filters" role="group" aria-label="Filtra la river">
+            <button type="button" aria-pressed="true">Tutto</button>
+            <button type="button" aria-pressed="false">Clinico</button>
+            <button type="button" aria-pressed="false">Follow-up</button>
+            <button type="button" aria-pressed="false">Evidenze</button>
+          </div>
+          <div class="filo" role="feed" aria-label="Timeline clinica unica">
+            <article class="voce-river clinico nuova" tabindex="0">
+              <div class="voce-top"><time>oggi · 08:42</time><span class="tipo">Osservazione</span></div>
+              <p>Glicemia capillare 156 mg/dL post-prandiale. Nessun sintomo riferito; ripetizione programmata.</p>
+              <span class="fonte">registrata in sede · firma: L. Pegollo</span>
+            </article>
+            <article class="voce-river followup" tabindex="0">
+              <div class="voce-top"><time>ieri · 17:10</time><span class="tipo">Follow-up</span></div>
+              <p>Loop VIS-092 aperto: visita di conferma ADI programmata al 27/08.</p>
+            </article>
+            <article class="voce-river clinico" tabindex="0">
+              <div class="voce-top"><time>10/08</time><span class="tipo">Terapia</span></div>
+              <p>Enoxaparina 4.000 UI introdotta dopo dimissione reparto cardiologia.</p>
+              <span class="fonte">provenienza: lettera dimissione · documento #231</span>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" data-open aria-labelledby="lab-titolo">
+        <button type="button" class="section-head" aria-expanded="true" aria-controls="lab-corpo">
+          <h3 id="lab-titolo">Laboratorio</h3>
+          <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="section-body" id="lab-corpo" role="status" aria-label="Caricamento ultimi valori">
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line"></div>
+        </div>
+      </section>
+
+      <section class="section" data-open aria-labelledby="ese-titolo">
+        <button type="button" class="section-head" aria-expanded="true" aria-controls="ese-corpo">
+          <h3 id="ese-titolo">Esenzioni</h3>
+          <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="section-body" id="ese-corpo">
+          <div class="errore" role="alert">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>
+            <p><strong>Esenzioni non caricate</strong>
+              <span>Il servizio locale non risponde. Il resto della scheda resta consultabile.</span>
+            </p>
+            <button type="button" class="btn-retry">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg>
+              Riprova
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <footer class="keys" aria-label="Scorciatoie da tastiera">
+        <span><b>/</b> cerca</span>
+        <span><b>j</b> <b>k</b> naviga la river</span>
+        <span><b>↵</b> apri</span>
+        <span><b>n</b> nuova voce</span>
+        <span><b>⌘K</b> comandi</span>
+        <span><b>?</b> tutte le scorciatoie</span>
+      </footer>
+
+    </article>
+  </main>
+</div>
+
+<div class="palette-scrim" id="palette-scrim">
+  <div class="palette" role="dialog" aria-modal="true" aria-label="Palette comandi">
+    <input type="text" placeholder="Digita un comando o un nome…" aria-label="Cerca comandi" id="palette-input">
+    <div class="palette-group">
+      <h4>Vai</h4>
+      <button type="button" class="palette-item" aria-selected="true">Quadro Rossi Maria <span class="hint">G Q</span></button>
+      <button type="button" class="palette-item">Incarico del giorno <span class="hint">G I</span></button>
+      <button type="button" class="palette-item">Impostazioni <span class="hint">G S</span></button>
+    </div>
+    <div class="palette-group">
+      <h4>Azioni</h4>
+      <button type="button" class="palette-item">Nuova voce clinica <span class="hint">N</span></button>
+      <button type="button" class="palette-item">Registra osservazione…</button>
+      <button type="button" class="palette-item">Avvia scala MMSE su Rossi Maria</button>
+    </div>
+  </div>
+</div>
+
+<p class="study-note">Studio di interfaccia, non target consegnato · canone: docs/design/lume/canon · programma: docs/design/2026-08-21-web-redesign-consolidamento.md · fixture esclusivamente sintetiche.</p>
+
+<script>
+(function () {
+  var body = document.body;
+
+  /* registri di luce */
+  document.querySelectorAll('.registers button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.registers button').forEach(function (b) {
+        b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+      });
+      body.className = btn.dataset.reg;
+    });
+  });
+
+  /* gruppi rail e sezioni hairline */
+  document.querySelectorAll('.group-head').forEach(function (head) {
+    head.addEventListener('click', function () {
+      var g = head.closest('.group');
+      var open = g.hasAttribute('data-open');
+      if (open) { g.removeAttribute('data-open'); } else { g.setAttribute('data-open', ''); }
+      head.setAttribute('aria-expanded', String(!open));
+    });
+  });
+  document.querySelectorAll('.section-head').forEach(function (head) {
+    head.addEventListener('click', function () {
+      var s = head.closest('.section');
+      var open = s.hasAttribute('data-open');
+      if (open) { s.removeAttribute('data-open'); } else { s.setAttribute('data-open', ''); }
+      head.setAttribute('aria-expanded', String(!open));
+    });
+  });
+
+  /* filtri river */
+  document.querySelectorAll('.filters button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      btn.closest('.filters').querySelectorAll('button').forEach(function (b) {
+        b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+      });
+    });
+  });
+
+  /* palette comandi */
+  var scrim = document.getElementById('palette-scrim');
+  var input = document.getElementById('palette-input');
+  function apri() { scrim.setAttribute('data-open', ''); input.value = ''; input.focus(); }
+  function chiudi() { scrim.removeAttribute('data-open'); }
+  document.getElementById('apri-palette').addEventListener('click', apri);
+  scrim.addEventListener('click', function (e) { if (e.target === scrim) chiudi(); });
+  document.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); apri(); return; }
+    if (e.key === 'Escape') chiudi();
+    if (e.key === '/' && !scrim.hasAttribute('data-open')) { e.preventDefault(); apri(); }
+  });
+  input.addEventListener('keydown', function (e) {
+    var items = Array.prototype.slice.call(scrim.querySelectorAll('.palette-item'));
+    var i = items.findIndex(function (el) { return el.getAttribute('aria-selected') === 'true'; });
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      var n = e.key === 'ArrowDown' ? Math.min(i + 1, items.length - 1) : Math.max(i - 1, 0);
+      items.forEach(function (el) { el.setAttribute('aria-selected', 'false'); });
+      items[n].setAttribute('aria-selected', 'true');
+      items[n].scrollIntoView({ block: 'nearest' });
+    }
+    if (e.key === 'Enter') chiudi();
+  });
+
+  /* j/k sulla river */
+  var voci = Array.prototype.slice.call(document.querySelectorAll('.voce-river'));
+  var corrente = -1;
+  function marca(idx) {
+    voci.forEach(function (v) { v.style.background = ''; });
+    if (idx >= 0 && idx < voci.length) {
+      corrente = idx;
+      voci[idx].style.background = 'color-mix(in srgb, var(--minerale) 10%, transparent)';
+      voci[idx].scrollIntoView({ block: 'nearest' });
+    }
+  }
+  document.addEventListener('keydown', function (e) {
+    if (scrim.hasAttribute('data-open') || e.metaKey || e.ctrlKey || e.altKey) return;
+    var tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (e.key === 'j') marca(Math.min(corrente + 1, voci.length - 1));
+    if (e.key === 'k') marca(Math.max(corrente - 1, 0));
+  });
+})();
+</script>
+</body>
+</html>
