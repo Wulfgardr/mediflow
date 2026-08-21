@@ -75,35 +75,6 @@ function IncaricoArea({
     searchInputRef.current?.select();
   }, [searchFocusSignal]);
 
-  /* @Codex WUL-UIUX: modello tastiera dell'incarico. «/» porta alla ricerca,
-     «n» apre una nuova voce (o una nuova scheda se nessun paziente è in
-     contesto), «j»/«k» e le frecce navigano le righe visibili della lista
-     virtualizzata. Attivi solo fuori dai campi di testo. */
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const target = event.target;
-      if (target instanceof HTMLElement) {
-        const tag = target.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) {
-          return;
-        }
-      }
-      if (event.key === '/') {
-        event.preventDefault();
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
-        return;
-      }
-      if (event.key === 'n' || event.key === 'N') {
-        event.preventDefault();
-        const selectedPatient = visible.find((p) => p.id === selectedPatientId) ?? visible[0];
-        router.push(selectedPatient ? `${selectedPatient.href}/entries/new` : '/patients/new');
-      }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [router, visible, selectedPatientId]);
 
   const scopedPatients = useMemo(
     () =>
@@ -153,6 +124,36 @@ function IncaricoArea({
       moveRowFocus(-1);
     }
   };
+
+  /* @Codex WUL-UIUX: modello tastiera dell'incarico. «/» porta alla ricerca,
+     «n» apre una nuova voce (o una nuova scheda se nessun paziente è in
+     contesto), «j»/«k» e le frecce navigano le righe visibili della lista
+     virtualizzata. Attivi solo fuori dai campi di testo. */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        const tag = target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) {
+          return;
+        }
+      }
+      if (event.key === '/') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
+      if (event.key === 'n' || event.key === 'N') {
+        event.preventDefault();
+        const selectedPatient = visible.find((p) => p.id === selectedPatientId) ?? visible[0];
+        router.push(selectedPatient ? `${selectedPatient.href}/entries/new` : '/patients/new');
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [router, visible, selectedPatientId]);
 
   const patientRowVirtualizer = useVirtualizer({
     count: visible.length,
