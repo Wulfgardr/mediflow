@@ -199,6 +199,25 @@ VoiceOver nel simulatore mobile; il limite e la deroga della sola candidata
 sorgente 0.8 sono registrati in
 [docs/known-limitations.md](./known-limitations.md).
 
+### 4. Contratto Mini consumato dalla matrice mobile
+
+Il gate di consumo `WUL-557` usa il
+contratto machine-readable canonico
+`packages/mini/contracts/mini-parity.json`, verificato byte-identico nei head
+`3fd988bafe71a058fdd7d3c25ea569793dcba903` (PR #184) e
+`1e35733c0218eae67a1d6e158085aab7340bc26b` (PR #190). Il contratto dichiara
+4 righe `available` su 66 (`6.060606%`), 61 `manual_only`, 1 `proposal_only` e
+0 `unavailable`; le ragioni restano 23 `HOST_AUTHORITY_ONLY`, 38
+`NOT_IN_MINI_PILOT` e 1 `SYNTHETIC_PREVIEW_ONLY`.
+
+Per la slice `WUL-556`, `patient search/show` (riga 1), `whoami` (riga 39) e
+`capabilities` (riga 63) sono disponibili in Mini, ma non colmano i residui
+nativi e non diventano grant. La cache offline (riga 45) resta `manual_only`
+con ragione `NOT_IN_MINI_PILOT`, mentre iPhone/iPadOS restano `partial` per
+metadata stale live, dettaglio offline e write queue assenti. Manifest, receipt,
+stato paired e token locale non conferiscono autorità agentica. La parity resta
+incompleta fino alla verifica manager e a `WUL-564`.
+
 ---
 
 ## Architettura client-server

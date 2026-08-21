@@ -157,6 +157,34 @@ Owner: `WUL-403`.
 Rende visibili età/TTL della cache, stato stale, read-only e assenza di write
 queue. Non introduce sync multi-master né scritture offline.
 
+Il gate di consumo `WUL-557` è aperto sul manifest canonico
+`packages/mini/contracts/mini-parity.json`. I head PR #184
+`3fd988bafe71a058fdd7d3c25ea569793dcba903` e PR #190
+`1e35733c0218eae67a1d6e158085aab7340bc26b` espongono lo stesso contenuto
+(SHA-256 `8f84108732b7a8a9c1feb20cdedee17f4865044de98d8d997896f3a914d0e4d9`).
+La metrica Mini è 4/66 (`6.060606%`): 4 `available`, 61 `manual_only`, 1
+`proposal_only` e 0 `unavailable`. Le ragioni non vengono appiattite: 23 righe
+sono `HOST_AUTHORITY_ONLY`, 38 `NOT_IN_MINI_PILOT` e 1
+`SYNTHETIC_PREVIEW_ONLY`.
+
+| Riga web canonica | Contratto Mini esatto | Stato iPhone/iPadOS | Motivo residuo o confine |
+| --- | --- | --- | --- |
+| 1 — anagrafica paziente | `available`: `patient search`, `patient show` | `partial` | Mini copre ricerca/dettaglio; la riga Apple resta più ampia e mancano assign/unassign/move/duplicate |
+| 39 — blocco/stato sessione | `available`: `whoami` | `full-parity` nella matrice Apple; stati visuali coperti dalla slice | `whoami`, pairing o token locale non sono un grant agentico |
+| 45 — cache offline | `manual_only`: `NOT_IN_MINI_PILOT` | `partial` | Lista cifrata read-only; metadata stale live, dettaglio offline e write queue assenti |
+| 63 — discovery capability | `available`: `capabilities` | `full-parity` per consumo API | Il manifest descrive capability; non autorizza operazioni cliniche |
+
+`open-loops` (riga 11) è la quarta riga Mini `available`, ma non appartiene alla
+slice `WUL-556`. `draft preview` (riga 4) resta `proposal_only` con ragione
+`SYNTHETIC_PREVIEW_ONLY`. Le altre righe conservano la disposizione e la ragione
+del manifest; le 23 `HOST_AUTHORITY_ONLY` restano host-only nella matrice Apple.
+
+| Superficie mobile | Stato candidata | Evidenza | Dipendenza host/headless |
+| --- | --- | --- | --- |
+| iPhone | `partial` | Test di presentazione, XCUITest e screenshot sintetico | Nessun grant nuovo; usa solo stato paired esistente |
+| iPadOS | `partial` | Stesso contratto, layout adattivo, `⌘R`, pointer, XCUITest e screenshot sintetico | Metadata TTL/stale live non esposti |
+| Capability AIP/Mini | Gap Apple e disposizione Mini restano assi separati | Manifest WUL-557: 4/66 disponibili | Le ragioni `partial`, host-only e `manual_only` restano esplicite; manifest e receipt non diventano autorità client; verifica manager e `WUL-564` bloccano la promozione |
+
 ### W6-C — decisione sul workflow documentale nativo
 
 Dipendenze: `WUL-417` (OCR Apple on-device), `WUL-383` (degradazione OCR) e
