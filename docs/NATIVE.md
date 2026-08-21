@@ -193,11 +193,18 @@ Glass e un enhancement del chrome su OS compatibili, non un materiale da
 applicare alle card cliniche. macOS, iPhone e iPad condividono semantica e
 primitive, non la stessa navigazione o densita.
 
+La slice macOS WUL-566/WUL-567 conserva Carta come grammatica documentale, non
+come palette: nessuna resa crema, beige, avorio o parchment. L'inspector paziente usa
+colori neutrali nativi adattivi. Solo la major esatta macOS 27 usa lo sheet di
+compatibilita; macOS 28+ torna all'inspector di sistema.
+
 Gli audit XCTest e i test UI sono verdi su iPhone e iPad. VoiceOver è stato
 esercitato manualmente su macOS. La beta Xcode 27 non completa l'abilitazione
 VoiceOver nel simulatore mobile; il limite e la deroga della sola candidata
 sorgente 0.8 sono registrati in
 [docs/known-limitations.md](./known-limitations.md).
+La nuova slice inspector non aggiunge un PASS VoiceOver: nel run WUL-567 la
+sessione Mac era bloccata, quindi focus, resize e narrazione restano `PARTIAL`.
 
 ---
 
