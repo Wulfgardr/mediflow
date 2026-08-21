@@ -190,13 +190,7 @@
 }
 
 .brandThemeToggle {
-  display: none;
-}
-
-@media (max-width: 1024px) {
-  .brandThemeToggle {
-    display: inline-flex;
-  }
+  display: inline-flex;
 }
 
 .brandMark {
