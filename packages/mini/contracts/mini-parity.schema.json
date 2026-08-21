@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mediflow.local/schemas/mini-parity-manifest.v1.json",
+  "title": "MediFlow Mini parity manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "source",
+    "metric",
+    "capabilities"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "mediflow.mini.parity-manifest.v1"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "version",
+        "updated",
+        "totalRows"
+      ],
+      "properties": {
+        "path": {
+          "const": "docs/apple-parity-matrix.json"
+        },
+        "version": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "updated": {
+          "type": "string"
+        },
+        "totalRows": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "definition",
+        "availableRows",
+        "totalRows",
+        "parityPercent"
+      ],
+      "properties": {
+        "definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "availableRows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "totalRows": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "parityPercent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "webCapabilityId",
+          "sourceRow",
+          "area",
+          "webCapability",
+          "webDisposition",
+          "miniCommands",
+          "miniDisposition",
+          "reason"
+        ],
+        "properties": {
+          "webCapabilityId": {
+            "type": "string",
+            "pattern": "^web-[0-9]{2}-[a-z0-9-]+$"
+          },
+          "sourceRow": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "area": {
+            "type": "string",
+            "minLength": 1
+          },
+          "webCapability": {
+            "type": "string",
+            "minLength": 1
+          },
+          "webDisposition": {
+            "enum": [
+              "full-parity",
+              "partial",
+              "host-only"
+            ]
+          },
+          "miniCommands": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "miniDisposition": {
+            "enum": [
+              "available",
+              "proposal_only",
+              "manual_only",
+              "unavailable"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
