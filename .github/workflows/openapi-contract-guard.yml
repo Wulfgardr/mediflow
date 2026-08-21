@@ -60,6 +60,11 @@ jobs:
       - name: MLX operational parity guard
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run check:mlx-operational-parity
+      - name: Mini parity schema and source drift guard
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run check:mini-parity
+          npm run test:mini-parity
       - name: OpenAPI contract guard
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |
