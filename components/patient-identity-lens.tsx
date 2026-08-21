@@ -102,9 +102,9 @@ export function PatientIdentityLens({
                                 <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[color:var(--lume-ink-muted)]">
                                     Scheda paziente
                                 </p>
-                                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[color:var(--lume-ink)] md:text-[28px]">
+                                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[color:var(--lume-ink)] md:text-[28px]">
                                     <PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur>
-                                </h1>
+                                </h2>
                                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[color:var(--lume-ink-muted)]">
                                     <span className="lume-registro text-[12px] tracking-tight">
                                         <PrivacyBlur intensity="sm">{patient.taxCode}</PrivacyBlur>

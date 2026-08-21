@@ -331,6 +331,13 @@
 
 .sectionRail::-webkit-scrollbar { display: none; }
 
+.sectionGroup { flex: 0 0 auto; min-width: 0; }
+.sectionGroupLabel {
+  display: block; margin: 0 0 3px 4px; color: var(--k8-subtle);
+  font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.sectionGroupLinks { display: flex; align-items: center; gap: 6px; }
+
 .sectionLink {
   flex: 0 0 auto;
   scroll-snap-align: start;
@@ -360,6 +367,9 @@
     overflow: visible;
     scroll-snap-type: none;
   }
+
+  .sectionGroup { grid-column: 1 / -1; }
+  .sectionGroupLinks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   .sectionLink {
     min-width: 0;

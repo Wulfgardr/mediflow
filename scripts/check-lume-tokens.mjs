@@ -30,7 +30,7 @@ const FUNCTION_COLOR = /\b(?:rgba?|hsla?)\((?:[^()]*)\)/gi;
 // letterali legacy e le loro ripetizioni. La baseline deve combaciare
 // esattamente: una voce che copre meno letterali di quelli dichiarati fallisce.
 export const PALETTE_ALLOWLIST = [
-  {"path":"app/mockups/scheda/page.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":10,"fingerprint":"0b532d8493c010f98eba790c6cca032e0c871be43eccd5bb743d13b514892219"},
+  {"path":"app/mockups/scheda/page.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":7,"fingerprint":"a9261e48fe9ddbbcaa3ca087ea795d3f6cce439f8d8c67d20aa3849fce5a16c9"},
   {"path":"app/patients/[id]/edit/page.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":2,"fingerprint":"c465f2f78534069d2c5091795196bb3c49d4428b0c2aaa3a488617f7bc16d9a4"},
   {"path":"app/patients/[id]/scales/[scaleId]/page.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":8,"fingerprint":"2aa3c828cc9648c78578de11157a552e6a94dd15d7437c7e8b86d847a1024582"},
   {"path":"app/patients/[id]/scales/page.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":3,"fingerprint":"d5ff14dc1c75592ec7919d22cb7374120b0c3834bea183ea6fffd36e2e4fa75b"},

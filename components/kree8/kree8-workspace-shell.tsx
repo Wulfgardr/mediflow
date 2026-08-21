@@ -15,6 +15,7 @@ export type Kree8WorkspaceNavItem = {
   href: string;
   label: string;
   meta?: string;
+  group?: string;
 };
 
 type Kree8WorkspaceShellProps = {
@@ -58,6 +59,15 @@ export function Kree8WorkspaceShell({
   const activeHrefRef = useRef<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const navKey = navItems.map((item) => item.href).join('|');
+  const navGroups = navItems.reduce<Array<{ label?: string; items: Kree8WorkspaceNavItem[] }>>((groups, item) => {
+    const previous = groups.at(-1);
+    if (previous && previous.label === item.group) {
+      previous.items.push(item);
+    } else {
+      groups.push({ label: item.group, items: [item] });
+    }
+    return groups;
+  }, []);
   const PrimaryActionIcon = primaryAction?.icon;
 
   /* Lume focal locus + scrollspy (WUL-55, F2c). Un solo effetto governa la vita
@@ -270,16 +280,28 @@ export function Kree8WorkspaceShell({
 
         {navItems.length > 0 ? (
           <nav className={styles.sectionRail} aria-label="Sezioni della vista">
-            {navItems.map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className={styles.sectionLink}
-                aria-current={item.href === activeHref ? 'location' : undefined}
+            {navGroups.map((group, index) => (
+              <div
+                key={`${group.label ?? 'navigation'}-${index}`}
+                className={styles.sectionGroup}
+                role={group.label ? 'group' : undefined}
+                aria-label={group.label}
               >
-                <span>{item.label}</span>
-                {item.meta ? <small>{item.meta}</small> : null}
-              </a>
+                {group.label ? <span className={styles.sectionGroupLabel}>{group.label}</span> : null}
+                <div className={styles.sectionGroupLinks}>
+                  {group.items.map((item) => (
+                    <a
+                      key={item.href}
+                      href={item.href}
+                      className={styles.sectionLink}
+                      aria-current={item.href === activeHref ? 'location' : undefined}
+                    >
+                      <span>{item.label}</span>
+                      {item.meta ? <small>{item.meta}</small> : null}
+                    </a>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
         ) : null}
