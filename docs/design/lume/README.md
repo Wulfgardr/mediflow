@@ -68,6 +68,7 @@ Gli studi in [mockups/](./mockups/) sono apribili nel browser e non hanno dipend
 | [lume-campi.html](./mockups/lume-campi.html) | Campi e densità dell'informazione. |
 | [lume-voce.html](./mockups/lume-voce.html) | Ruoli tipografici di Voce e Registro. |
 | [lume-impostazioni.html](./mockups/lume-impostazioni.html) | Applicazione del linguaggio alle impostazioni. |
+| [lume-un-fuoco-una-risposta.html](./mockups/lume-un-fuoco-una-risposta.html) | Studio Web del consolidamento Quadro/Scheda, rail a quattro gruppi, stati azionabili e command center. |
 
 ## CURRENT EVIDENCE: catture runtime
 
