@@ -1,7 +1,8 @@
 # ADR 0093: Agent Interface Plane headless
 
 Date: 2026-08-19
-Status: Proposed
+Accepted: 2026-08-21
+Status: Accepted
 
 ---
 
@@ -68,11 +69,12 @@ versionata, anche quando resta manuale o non disponibile.
 - **Opzione 4**: puo restare uno strumento di test o compatibilita, ma e fragile,
   poco osservabile e non offre un confine di autorita sufficiente.
 
-## Decisione proposta
+## Decisione
 
-Si propone l'opzione 3: un **Agent Interface Plane (AIP)** locale, applicativo e
-fail-closed. Lo stato `Proposed` non autorizza ancora implementazione runtime o
-scritture.
+Si adotta l'opzione 3: un **Agent Interface Plane (AIP)** locale, applicativo e
+fail-closed. L'accettazione autorizza soltanto le slice che rispettano D1-D5 e
+non autorizza scritture cliniche, accesso diretto ai dati o adapter che
+ricostruiscono autorita da contenuto fornito dal chiamante.
 
 ### 1. Un solo contratto di capability
 
@@ -182,11 +184,9 @@ Restano fuori scope:
 
 ## Pacchetto decisionale owner-visible
 
-Le cinque proposte seguenti sono candidate collegate a `WUL-558`. Restano un
-unico gate: il proprietario deve accettarle o correggerle esplicitamente prima
-di cambiare lo stato dell'ADR. Fino ad allora vale
-`HOLD_CONTRACT — TRUSTED_BROKER_BOUNDARY_UNDECIDED` e nessun runtime e
-autorizzato.
+Le cinque decisioni seguenti sono state accettate come bundle dal proprietario
+in `WUL-558` il 2026-08-21. Alternative e falsificatori restano parte del
+contratto: un falsificatore osservato riapre l'ADR e blocca la promozione.
 
 ### D1. Context broker, chiavi e authority issuance
 
@@ -274,20 +274,13 @@ risultato o la receipt.
 
 ### Registrazione della decisione
 
-Il proprietario deve registrare in `WUL-558` una delle seguenti conclusioni:
-
-- accettazione di D1-D5 senza modifiche;
-- accettazione con correzioni nominate per ogni decisione interessata;
-- rifiuto con alternativa scelta e nuovo falsificatore verificabile.
-
-Solo dopo quella registrazione l'ADR puo passare ad `Accepted`. L'accettazione
-autorizza prima il servizio condiviso; Mini resta bloccato finche quel servizio
-non e validato.
+Il proprietario ha registrato in `WUL-558` l'accettazione di D1-D5 senza
+modifiche. L'accettazione autorizza prima il servizio condiviso; Mini resta
+bloccato finche quel servizio non e validato.
 
 ## First Thin Slice
 
-La prima slice proposta, collegata a `WUL-558`, e solo locale, read-only e
-sintetica. Puo iniziare soltanto dopo l'accettazione di D1-D5:
+La prima slice, collegata a `WUL-558`, e solo locale, read-only e sintetica:
 
 1. definire uno schema macchina per il manifest AIP;
 2. classificare le capability esistenti senza renderne disponibili di nuove;
