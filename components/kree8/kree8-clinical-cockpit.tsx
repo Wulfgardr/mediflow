@@ -213,7 +213,7 @@ export function Kree8ClinicalCockpit({
 }: Kree8ClinicalCockpitProps) {
   const isReview = surface === 'review';
   const operatorName = operatorNameProp || (isReview ? 'Review design' : 'Sessione locale');
-  const [area, setArea] = useState<AreaId>(() => (isReview ? 'turno' : initialArea));
+  const [area, setArea] = useState<AreaId>(() => initialArea);
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [patientSearchFocusSignal, setPatientSearchFocusSignal] = useState(0);
   const [agendaBridge, setAgendaBridge] = useState<ClinicalAgendaBridgeClientState>({

@@ -14,10 +14,12 @@ function Kree8SyntheticReviewSurface() {
     || requestedState === 'error'
     ? requestedState
     : 'ready';
+  const initialArea = searchParams.get('area') === 'incarico' ? 'incarico' : 'turno';
 
   return (
     <Kree8ClinicalCockpit
       surface="review"
+      initialArea={initialArea}
       reviewPatientStatus={reviewPatientStatus}
       reviewNetworkOffline={searchParams.get('network') === 'offline'}
     />
