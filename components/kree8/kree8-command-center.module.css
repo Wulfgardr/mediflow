@@ -1,0 +1,86 @@
+/* @Codex */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: start center;
+  padding: min(12vh, 96px) 16px 16px;
+  background: color-mix(in srgb, var(--lume-ink) 62%, transparent);
+}
+
+.dialog {
+  width: min(600px, 100%);
+  max-height: min(720px, 76vh);
+  overflow: hidden auto;
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+  border-radius: var(--lume-radius-panel);
+  background: var(--lume-surface-focal);
+  color: var(--lume-ink);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 12px;
+}
+
+.caption { margin: 0 0 4px; color: var(--lume-ink-muted); font-size: 11px; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; }
+.title { margin: 0; font-size: 20px; line-height: 1.2; }
+
+.close {
+  inline-size: 44px;
+  block-size: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+  border-radius: var(--lume-radius-control);
+  background: var(--lume-surface-field);
+  color: var(--lume-ink);
+  cursor: pointer;
+}
+
+.searchField {
+  min-height: 48px;
+  margin: 0 12px 8px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+  border-radius: var(--lume-radius-control);
+  background: var(--lume-surface-field);
+  color: var(--lume-ink-muted);
+}
+
+.searchField:focus-within { border-color: var(--lume-accent); box-shadow: var(--lume-focus-ring); }
+.searchField input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--lume-ink); font: inherit; }
+.searchField kbd, .shortcuts kbd { color: var(--lume-ink); font: 600 11px/1.2 var(--lume-font-mono); }
+
+.commandList { margin: 0; padding: 8px 12px 14px; display: grid; gap: 4px; list-style: none; }
+.command, .commandActive { min-height: 52px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 10px; border-radius: var(--lume-radius-control); cursor: pointer; }
+.command { color: var(--lume-ink-muted); }
+.commandActive { background: var(--lume-surface-field); color: var(--lume-ink); }
+.command b, .commandActive b { display: block; font-size: 13px; }
+.command small, .commandActive small { display: block; margin-top: 2px; color: var(--lume-ink-muted); font-size: 11px; }
+.empty { margin: 0; padding: 24px; color: var(--lume-ink-muted); text-align: center; }
+
+.shortcuts { margin: 0; padding: 4px 20px 20px; display: grid; gap: 2px; }
+.shortcuts > div { min-height: 48px; display: grid; grid-template-columns: minmax(120px, .7fr) minmax(0, 1fr); align-items: center; gap: 16px; border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 10%, transparent); }
+.shortcuts > div:last-child { border-bottom: 0; }
+.shortcuts dt, .shortcuts dd { margin: 0; }
+.shortcuts dd { color: var(--lume-ink-muted); font-size: 13px; }
+
+.close:focus-visible,
+.command:focus-visible,
+.commandActive:focus-visible { outline: none; box-shadow: var(--lume-focus-ring); }
+
+@media (max-width: 480px) {
+  .backdrop { padding: 12px; place-items: center; }
+  .dialog { max-height: calc(100vh - 24px); border-radius: var(--lume-radius-card); }
+  .shortcuts > div { grid-template-columns: 1fr; gap: 4px; padding-block: 9px; }
+}
