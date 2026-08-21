@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-28",
+  "generated": "2026-08-21",
   "source": "MediFlow 0.8 parity closeout against the frozen local source candidate",
   "release08Gate": {
     "asOf": "2026-07-28",
@@ -497,11 +497,11 @@
       "area": "cache-offline",
       "feature": "Cache pazienti cifrata offline (consultazione degradata)",
       "web": "n-a (web è online contro DB locale)",
-      "native": "partial: snapshot cifrato AES-GCM lista pazienti (Keychain, TTL 24h, scoping server+ambulatorio), restore offline-degraded; SOLO lista, no dettaglio/sotto-risorse, NO write queue (HomeBasePatientCacheStore.swift)",
+      "native": "partial: iPhone/iPad mostrano loading/error/online/cache/offline/sessione scaduta con azione accessibile e snapshot cifrato AES-GCM lista pazienti (Keychain, TTL 24h, scoping server+ambulatorio); restore offline-degraded in sola lettura. Lo stato visuale stale e coperto da preview/test sintetici, ma il runtime scarta ancora lo snapshot oltre TTL perche il contratto non espone metadata separati. SOLO lista, no dettaglio/sotto-risorse, NO write queue (MobilePairedStatusView.swift; HomeBasePatientCacheStore.swift)",
       "boundary": "n-a: derivata dal boundary, mai autorevole (vincolo docs-plan: no seconda source of truth)",
       "gap": "partial",
       "wave": "W1-mobile-core",
-      "evidence": "native-ui.cache offline; gap corrente WUL-403; nessuna offline write queue"
+      "evidence": "WUL-556 candidate: MobilePairedStatusPresentationTests e XCUITest iPhone/iPad con fixture sintetiche; WUL-403 resta aperta per metadata stale live; nessuna offline write queue"
     },
     {
       "area": "settings-host",
@@ -730,6 +730,29 @@
       "partial": [0, 2, 3, 4, 7, 9, 11, 14, 15, 19, 31, 35, 44],
       "outOfScope": [8, 16, 18, 29, 30, 34, 42, 43, 45, 46, 47, 48, 49, 51, 52, 53, 57, 58, 59, 61, 63, 64, 65]
     },
+    "miniContractConsumption": {
+      "status": "CONSUMED / HOLD_PROMOTION",
+      "canonicalPath": "packages/mini/contracts/mini-parity.json",
+      "schemaVersion": "mediflow.mini.parity-manifest.v1",
+      "heads": {
+        "pr184": "3fd988bafe71a058fdd7d3c25ea569793dcba903",
+        "pr190": "1e35733c0218eae67a1d6e158085aab7340bc26b"
+      },
+      "contentSha256": "8f84108732b7a8a9c1feb20cdedee17f4865044de98d8d997896f3a914d0e4d9",
+      "mappingRule": "rows[sourceRow - 1] maps to capabilities[sourceRow]; Mini disposition and Apple gap remain separate axes.",
+      "metric": {"definition": "Rows with miniDisposition=available divided by canonical web capability rows.", "availableRows": 4, "totalRows": 66, "parityPercent": 6.060606},
+      "dispositionCounts": {"available": 4, "manual_only": 61, "proposal_only": 1, "unavailable": 0},
+      "reasonCounts": {"HOST_AUTHORITY_ONLY": 23, "NOT_IN_MINI_PILOT": 38, "SYNTHETIC_PREVIEW_ONLY": 1, "none": 4},
+      "wul556Rows": [
+        {"sourceRow": 1, "webCapabilityId": "web-01-anagrafica-paziente-lista-ricerca-view-create-update", "miniCommands": ["patient search", "patient show"], "miniDisposition": "available", "reason": null, "appleGap": "partial", "interpretation": "Mini covers search/show only; broader Apple row residues remain."},
+        {"sourceRow": 39, "webCapabilityId": "web-39-blocco-sessione-immediato-stato-sessione", "miniCommands": ["whoami"], "miniDisposition": "available", "reason": null, "appleGap": "full-parity", "interpretation": "Session identity is observable; pairing and local tokens are not agentic grants."},
+        {"sourceRow": 45, "webCapabilityId": "web-45-cache-pazienti-cifrata-offline-consultazione-degradata", "miniCommands": [], "miniDisposition": "manual_only", "reason": "NOT_IN_MINI_PILOT", "appleGap": "partial", "interpretation": "Encrypted read-only list exists; live stale metadata, offline detail and write queue remain absent."},
+        {"sourceRow": 63, "webCapabilityId": "web-63-get-api-v1-network-capabilities-api-v1-network-identity-api-v1-n", "miniCommands": ["capabilities"], "miniDisposition": "available", "reason": null, "appleGap": "full-parity", "interpretation": "Capability discovery does not authorize clinical operations."}
+      ],
+      "excludedAvailableRow": {"sourceRow": 11, "miniCommands": ["open-loops"], "reason": "Outside WUL-556 slice."},
+      "authorityGuard": "Manifest, receipt, paired state and local token do not grant agentic or clinical authority.",
+      "remainingGates": ["manager verification", "WUL-564"]
+    },
     "interactionParity": {
       "verifiedAutomatic": [0, 12, 13, 14, 15, 17, 20, 31, 32, 33],
       "verifiedRealInteraction": [0, 31, 32],
@@ -759,7 +782,7 @@
       "webProduction": "104 pages and standalone build PASS; Chrome production at exact 200% and 400% zoom, main controls visible, no dev badge",
       "macOS": "clipping code integrated; built Xcode 27 bundle PASS at 1100, 1300 and 1600 points; click-map, focus, arrow input and real VoiceOver active before and after",
       "axProbe": "corrected to select native List rows, bind patient-specific detail content and avoid terminating external MediFlow sessions; typecheck and 6/6 tests PASS",
-      "offline": "WUL-403 remains open for visible TTL, stale state and explicit reconciliation"
+      "offline": "WUL-556 candidate makes loading/error/online/cache/offline/session-expired visible on iPhone/iPad and defines the stale presentation contract. WUL-403 remains open for live TTL metadata and stale-state wiring."
     },
     "controlToActionReference": {
       "canonicalDocument": "docs/parity-matrix.md#control-to-action-map",
@@ -772,7 +795,7 @@
     },
     "verdict": "PARTIAL / HOLD_PROMOTION"
   },
-  "updated": "2026-08-07 (0.8.1): aligned the 66-row feature contract with the AI settings information architecture (Fabric registry and governance split); 2026-08-07: fixed matrix drift in the 'AI conversazionale' row — the cited app/api/proxy/ai/chat/route.ts does not exist in the checkout; repointed to the real app/api/proxy/ollama/{chat,generate}/route.ts (L4 verification, host-only classification and guarded counts 30/13/21 unchanged). Previous: 2026-07-28 reconciled the 64-row feature contract against current web, macOS and assistive-technology evidence",
+  "updated": "2026-08-22: consumed the byte-identical Mini parity manifest from PR #184 head 3fd988b and PR #190 head 1e35733 without changing Apple gap classifications; promotion remains held for manager verification and WUL-564. Previous: 2026-08-07 aligned the 66-row feature contract with the AI settings information architecture and corrected the AI conversational endpoint evidence.",
   "version": 2,
   "summary": {
     "total": 66,
