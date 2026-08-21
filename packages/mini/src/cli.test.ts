@@ -1,17 +1,35 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { spawn, spawnSync } from 'node:child_process';
 import test from 'node:test';
 
 import { createSyntheticTrustedAgentService } from '../../../lib/agent-interface/trusted-service';
-import { MINI_EXIT, runMini } from './cli';
+import { MINI_EXIT, MINI_STDIN_MAX_BYTES, runMini } from './cli';
 
 const PATIENT = 'synthetic-patient-001';
 const json = (run: ReturnType<typeof runMini>) => JSON.parse(run.stdout);
+const CLI = ['scripts/run-strip-types.mjs', 'packages/mini/src/cli.ts'];
+
+function runWithOpenStdin(args: readonly string[], input = ''): Promise<{ code: number | null; stdout: string; stderr: string }> {
+    return new Promise((resolve, reject) => {
+        const child = spawn(process.execPath, [...CLI, ...args], { stdio: ['pipe', 'pipe', 'pipe'] });
+        let stdout = ''; let stderr = '';
+        child.stdout.setEncoding('utf8').on('data', (chunk) => { stdout += chunk; });
+        child.stderr.setEncoding('utf8').on('data', (chunk) => { stderr += chunk; });
+        child.stdin.on('error', () => undefined);
+        if (input) child.stdin.write(input);
+        const timeout = setTimeout(() => { child.kill(); reject(new Error('Mini waited for stdin')); }, 1_500);
+        child.on('error', reject);
+        child.on('close', (code) => { clearTimeout(timeout); resolve({ code, stdout, stderr }); });
+    });
+}
 
 test('nega il broker live assente e mostra help stabile', () => {
     assert.deepEqual(json(runMini(['whoami'])), { schemaVersion: 'mediflow.mini.output.v1', ok: false, error: 'BROKER_UNAVAILABLE' });
     assert.equal(runMini(['whoami']).exitCode, MINI_EXIT.BROKER_UNAVAILABLE);
     assert.match(runMini(['--help']).stdout, /patient search <query>/);
+    assert.match(runMini(['--help']).stdout, /npm run --silent mini --/);
+    assert.doesNotMatch(runMini(['--help']).stdout, /Usage: mediflow-mini/);
 });
 
 test('espone tutte le superfici sintetiche autorizzate con JSON deterministico', () => {
@@ -53,4 +71,19 @@ test('nega authority extra, query vuota, apply e lifecycle del broker', () => {
     const changed = createSyntheticTrustedAgentService(); changed.control.changeSelection();
     const changedRun = runMini(['--synthetic', 'whoami'], '', changed.service);
     assert.equal(changedRun.exitCode, MINI_EXIT.AUTHORITY); assert.equal(json(changedRun).error, 'SELECTION_CHANGED');
+});
+
+test('mantiene stdout pulito e chiude argv e input eccessivo senza attendere EOF', async () => {
+    const clean = spawnSync('npm', ['run', '--silent', 'mini', '--', '--synthetic', 'whoami'], { encoding: 'utf8' });
+    assert.equal(clean.status, MINI_EXIT.OK); assert.equal(clean.stderr, ''); assert.equal(JSON.parse(clean.stdout).ok, true);
+
+    const argvRun = await runWithOpenStdin(['--synthetic', 'whoami']);
+    assert.equal(argvRun.code, MINI_EXIT.OK); assert.equal(argvRun.stderr, ''); assert.equal(JSON.parse(argvRun.stdout).ok, true);
+
+    const oversized = await runWithOpenStdin(['--synthetic'], 'caller-text'.repeat(Math.ceil((MINI_STDIN_MAX_BYTES + 1) / 11)));
+    assert.equal(oversized.code, MINI_EXIT.USAGE); assert.equal(oversized.stderr, '');
+    assert.deepEqual(JSON.parse(oversized.stdout), {
+        schemaVersion: 'mediflow.mini.output.v1', ok: false, error: 'INPUT_TOO_LARGE',
+    });
+    assert.equal(oversized.stdout.includes('caller-text'), false);
 });

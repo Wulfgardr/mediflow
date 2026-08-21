@@ -6,10 +6,11 @@ import {
 } from '../../../lib/agent-interface/trusted-service';
 
 export const MINI_EXIT = Object.freeze({ OK: 0, USAGE: 2, AUTHORITY: 3, NOT_FOUND: 4, APPLY_DENIED: 5, BROKER_UNAVAILABLE: 69 });
+export const MINI_STDIN_MAX_BYTES = 16 * 1024;
 export const MINI_HELP = `MediFlow Mini — synthetic, read-only pilot
 
-Usage: mediflow-mini --synthetic [--format json|ndjson] <command>
-       printf '{"command":"whoami","args":{}}' | mediflow-mini --synthetic
+Usage: npm run --silent mini -- --synthetic [--format json|ndjson] <command>
+       printf '{"command":"whoami","args":{}}' | npm run --silent mini -- --synthetic
 
 Commands:
   whoami
@@ -65,7 +66,18 @@ function exitFor(error: AgentServiceError): number {
     return MINI_EXIT.AUTHORITY;
 }
 
-export function runMini(argv: readonly string[], stdin = '', injected?: TrustedAgentService): MiniRun {
+function shouldReadPipe(argv: readonly string[]): boolean {
+    let synthetic = false;
+    for (let index = 0; index < argv.length; index += 1) {
+        const arg = argv[index];
+        if (arg === '--synthetic') synthetic = true;
+        else if (arg === '--format' && (argv[index + 1] === 'json' || argv[index + 1] === 'ndjson')) index += 1;
+        else return false;
+    }
+    return synthetic;
+}
+
+export function runMini(argv: readonly string[], stdin = '', injected?: TrustedAgentService, inputTooLarge = false): MiniRun {
     if (argv.includes('--help') || argv.includes('-h')) return { exitCode: MINI_EXIT.OK, stdout: MINI_HELP, stderr: '' };
     let synthetic = false; let format: Format = 'json'; const words: string[] = [];
     for (let index = 0; index < argv.length; index += 1) {
@@ -76,6 +88,7 @@ export function runMini(argv: readonly string[], stdin = '', injected?: TrustedA
         else words.push(arg);
     }
     if (!synthetic) return failure('BROKER_UNAVAILABLE', MINI_EXIT.BROKER_UNAVAILABLE, format);
+    if (inputTooLarge) return failure('INPUT_TOO_LARGE', MINI_EXIT.USAGE, format);
     const request = words.length ? parseCommand(words) : parsePipe(stdin);
     if (!request) return failure('USAGE', MINI_EXIT.USAGE, format);
     const service = injected ?? createSyntheticTrustedAgentService().service;
@@ -87,9 +100,16 @@ export function runMini(argv: readonly string[], stdin = '', injected?: TrustedA
 }
 
 async function main(): Promise<void> {
-    let stdin = '';
-    if (!process.stdin.isTTY) { process.stdin.setEncoding('utf8'); for await (const chunk of process.stdin) stdin += chunk; }
-    const result = runMini(process.argv.slice(2), stdin);
+    const argv = process.argv.slice(2); let stdin = ''; let inputBytes = 0; let inputTooLarge = false;
+    if (shouldReadPipe(argv) && !process.stdin.isTTY) {
+        process.stdin.setEncoding('utf8');
+        for await (const chunk of process.stdin) {
+            inputBytes += Buffer.byteLength(chunk, 'utf8');
+            if (inputBytes > MINI_STDIN_MAX_BYTES) { inputTooLarge = true; process.stdin.destroy(); break; }
+            stdin += chunk;
+        }
+    }
+    const result = runMini(argv, stdin, undefined, inputTooLarge);
     process.stdout.write(result.stdout); process.stderr.write(result.stderr); process.exitCode = result.exitCode;
 }
 
