@@ -786,3 +786,19 @@
   border-color: var(--ink);
   background: var(--surface-soft);
 }
+
+/* @Codex WUL-UIUX: target tattili 44pt su pointer coarse; focus visibile
+   anche per le sub-tab del paziente. */
+.subareaTab:focus-visible,
+.subareaTabActive:focus-visible {
+  outline: none;
+  box-shadow: var(--lume-focus-ring);
+}
+
+@media (pointer: coarse) {
+  .subareaTab,
+  .toolChip,
+  .navItem {
+    min-height: 44px;
+  }
+}
