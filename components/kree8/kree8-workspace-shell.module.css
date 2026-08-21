@@ -640,3 +640,21 @@
   .clinicalSurface *::before,
   .clinicalSurface *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+/* @Codex WUL-UIUX: focus visibile sui restanti controlli della shell e
+   target tattili 44pt su pointer coarse. */
+.backButton:focus-visible,
+.sectionLink:focus-visible,
+.attentionAction:focus-visible {
+  outline: 2px solid var(--k8-focus);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .headerActionButton,
+  .backButton,
+  .sectionLink,
+  .attentionAction {
+    min-height: 44px;
+  }
+}
