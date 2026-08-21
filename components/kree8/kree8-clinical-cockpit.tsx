@@ -110,6 +110,7 @@ function AreaContent({
   isReview,
   onSelectPatient,
   onOpenArea,
+  onRetryPatients,
 }: {
   area: AreaId;
   filter: StatusFilter;
@@ -124,6 +125,7 @@ function AreaContent({
   isReview: boolean;
   onSelectPatient: (patientId: string) => void;
   onOpenArea: (area: AreaId) => void;
+  onRetryPatients: () => void;
 }) {
   switch (area) {
     case 'turno':
@@ -146,6 +148,7 @@ function AreaContent({
           searchFocusSignal={patientSearchFocusSignal}
           onSelectPatient={onSelectPatient}
           onOpenArea={onOpenArea}
+          onRetryPatients={onRetryPatients}
           isReview={isReview}
         />
       );
@@ -256,6 +259,7 @@ export function Kree8ClinicalCockpit({
     data: livePatientRows,
     error: livePatientError,
     loading: livePatientLoading,
+    refresh: refreshPatients,
   } = useLiveQueryState<Patient[]>(
     async () => (isReview ? [] : db.patients.toArray()),
     [isReview],
@@ -545,6 +549,7 @@ export function Kree8ClinicalCockpit({
                 isReview={isReview}
                 onSelectPatient={setSelectedPatientId}
                 onOpenArea={setArea}
+                onRetryPatients={refreshPatients}
               />
             </div>
           </main>
