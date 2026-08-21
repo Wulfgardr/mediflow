@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Activity,
   Archive,
@@ -61,6 +62,7 @@ function IncaricoArea({
   onRetryPatients?: () => void;
   isReview: boolean;
 }) {
+  const router = useRouter();
   const [scope, setScope] = useState<InboxScope>('ambulatorio');
   const [list, setList] = useState<InboxList>('attivi');
   const [query, setQuery] = useState('');
@@ -72,6 +74,36 @@ function IncaricoArea({
     searchInputRef.current?.focus();
     searchInputRef.current?.select();
   }, [searchFocusSignal]);
+
+  /* @Codex WUL-UIUX: modello tastiera dell'incarico. «/» porta alla ricerca,
+     «n» apre una nuova voce (o una nuova scheda se nessun paziente è in
+     contesto), «j»/«k» e le frecce navigano le righe visibili della lista
+     virtualizzata. Attivi solo fuori dai campi di testo. */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        const tag = target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) {
+          return;
+        }
+      }
+      if (event.key === '/') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
+      if (event.key === 'n' || event.key === 'N') {
+        event.preventDefault();
+        const selectedPatient = visible.find((p) => p.id === selectedPatientId) ?? visible[0];
+        router.push(selectedPatient ? `${selectedPatient.href}/entries/new` : '/patients/new');
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [router, visible, selectedPatientId]);
 
   const scopedPatients = useMemo(
     () =>
@@ -93,6 +125,35 @@ function IncaricoArea({
 
   const patientListParentRef = useRef<HTMLDivElement>(null);
 
+  /* @Codex WUL-UIUX: sposta il fuoco fra le righe renderizzate dalla
+     virtualizzazione; lo scroll segue il fuoco e la finestra si ricompone. */
+  const moveRowFocus = useCallback((delta: number) => {
+    const container = patientListParentRef.current;
+    if (!container) return;
+    const rows = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[data-testid="lume-patient-row"]'),
+    );
+    if (rows.length === 0) return;
+    const currentIndex = rows.findIndex((row) => row === document.activeElement);
+    const nextIndex = currentIndex < 0
+      ? (delta > 0 ? 0 : rows.length - 1)
+      : Math.min(rows.length - 1, Math.max(0, currentIndex + delta));
+    const nextRow = rows[nextIndex];
+    if (!nextRow) return;
+    nextRow.focus();
+    nextRow.scrollIntoView({ block: 'nearest' });
+  }, []);
+
+  const handleListKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'j' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveRowFocus(1);
+    } else if (event.key === 'k' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveRowFocus(-1);
+    }
+  };
+
   const patientRowVirtualizer = useVirtualizer({
     count: visible.length,
     getScrollElement: () => patientListParentRef.current,
@@ -110,7 +171,7 @@ function IncaricoArea({
           </h1>
           <p className={styles.areaSubtitle}>
             {patientStatus === 'ready'
-              ? 'Casi dell’ambulatorio e della rete locale, tra attivi e archivio.'
+              ? 'Casi dell’ambulatorio e della rete locale, tra attivi e archivio. Scorciatoie: / cerca · j e k navigano · n nuova voce.'
               : patientStatus === 'error'
                 ? 'Lista pazienti non disponibile: verifica sessione e servizi locali.'
                 : 'Preparazione della lista pazienti.'}
@@ -256,6 +317,7 @@ function IncaricoArea({
                 role="list"
                 aria-label="Elenco pazienti in carico"
                 data-testid="lume-patient-list"
+                onKeyDown={handleListKeyDown}
               >
                 <div
                   className={patientStyles.patientList}
