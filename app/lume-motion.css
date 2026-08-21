@@ -5,7 +5,7 @@
   initial-value: 0%;
 }
 
-@property --lume-surface-temp {
+@property --lume-surface-depth {
   syntax: '<percentage>';
   inherits: false;
   initial-value: 0%;
@@ -79,7 +79,7 @@
 
 .lume-focal {
   --lume-surface-l: 100%;
-  --lume-surface-temp: 8%;
+  --lume-surface-depth: 8%;
   --lume-focal-shadow-opacity: 1;
   position: relative;
   isolation: isolate;
@@ -90,12 +90,12 @@
       var(--lume-surface-field) calc(100% - var(--lume-surface-l)),
       var(--lume-surface-focal) var(--lume-surface-l)
     ),
-    var(--lume-surface-focal) var(--lume-surface-temp)
+    var(--lume-surface-focal) var(--lume-surface-depth)
   );
   transition:
     background-color var(--lume-dur-fuoco) var(--lume-ease),
     --lume-surface-l var(--lume-dur-fuoco) var(--lume-ease),
-    --lume-surface-temp var(--lume-dur-fuoco) var(--lume-ease);
+    --lume-surface-depth var(--lume-dur-fuoco) var(--lume-ease);
 }
 
 .lume-focal::before {

@@ -84,7 +84,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
     return (
         // @Codex WUL-273: scale engine can live inside the Kree8 workspace without the old page chrome.
         <div className="patient-detail-section mx-auto flex min-h-[500px] w-full max-w-3xl flex-col overflow-hidden border !p-0">
-            <div className="border-b border-[color:rgba(112,106,100,0.12)] p-6">
+            <div className="border-b border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] p-6">
                 <h2 className="text-2xl font-semibold tracking-tight text-[color:var(--lume-ink)]">{scale.title}</h2>
                 <p className="mt-1 text-sm text-[color:var(--lume-ink-muted)]">{scale.description}</p>
 
@@ -147,7 +147,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel }: ScaleEngine
                 </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[color:rgba(112,106,100,0.12)] p-5 md:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] p-5 md:p-6">
                 <button
                     onClick={onCancel}
                     className="mf-btn-secondary"

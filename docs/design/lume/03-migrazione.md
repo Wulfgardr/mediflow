@@ -27,7 +27,7 @@ Principio: Lume non butta niente di ciò che vale. Il consolidamento di Vetro Cl
 | (nessuno) | `surface.chrome` | Nuovo: il buio operativo |
 | `material.vitreous` (vetro strutturale) | RITIRATO | Il telaio diventa chrome opaco |
 | `material.specular` (vetro transitorio) | `overlay` (ombra+scrim; blur opzionale di piattaforma) | Il vetro resta solo qui |
-| `material.paper` | `surface.focal`/`surface.field` | La carta si fonde nel modello focale |
+| `material.paper` | `surface.focal`/`surface.field` | Carta descrive continuità documentale; le superfici restano neutrali |
 | `--glass-*` | RITIRATI | Dopo la migrazione degli overlay |
 | `radius.panel/card/control` 30/24/16 | 20/14/10 | Curva più asciutta |
 | `--mf-font-sans` | `font.voce` (variabile impacchettata; SF su Apple) | Richiede decisione sul font e bundling locale |
@@ -56,8 +56,8 @@ Aggiornamento mirato 2026-07-16, issue #71 e #75: il layer page-owned in `app/pa
 
 ## 4. Rischi
 
-- **Il gradiente di temperatura è sottile**: su monitor scadenti può sparire. Mitigazione: la gerarchia non dipende MAI dalla sola temperatura (c'è sempre luminanza + ombra + filo); la temperatura è rifinitura.
+- **La gerarchia neutra può appiattirsi**: su monitor scadenti i gradini possono convergere. Mitigazione: luminanza, hairline, spazio e ombra corta restano sempre osservabili.
 - **Fatica da doppio sistema** durante la convivenza L1-L5: `data-lume` è un marker tecnico fisso, non un gate né un selettore utente (ADR 0047 rispettato); la condizione di uscita già formalizzata in ADR 0078 resta il criterio vincolante e ogni slice deve ridurre, non ampliare, i consumatori legacy.
 - **Il font impacchettato** aggiunge peso al bundle e una scelta di licenza: candidati open (Inter, IBM Plex) con licenza OFL; su Apple si resta su SF (zero costo).
 - **Il filo tratteggiato come stato**: convenzione nuova da insegnare; mitigazione: legenda nella vista di aiuto `?` e coerenza assoluta (mai tratteggio decorativo).
-- **Regressione di identità**: togliendo il vetro, MediFlow deve restare riconoscibile; l'identità passa al filo, alla temperatura e alle due voci. Il dimostratore serve esattamente a giudicare questo prima di scrivere codice.
+- **Regressione di identità**: togliendo il vetro, MediFlow deve restare riconoscibile; l'identità passa al filo, alla gerarchia neutra e alle due voci. Il dimostratore serve esattamente a giudicare questo prima di scrivere codice.

@@ -18,7 +18,7 @@ Lume ha tre modi di dire le cose in movimento, e non si sovrappongono mai.
 
 | Portatore | Lavoro | Resa |
 | --- | --- | --- |
-| **La luce** | Il fuoco (cosa e in lavorazione adesso) | La superficie sale nella luce: luminanza e temperatura appena piu alte, ombra corta. Nessuna linea. |
+| **La luce** | Il fuoco (cosa e in lavorazione adesso) | La superficie sale nella luce: luminanza, spazio e ombra corta. Nessuna linea. |
 | **L'inchiostro** | Lo stato epistemico (bozza o firmato) | Il tono del testo: la bozza e a contrasto piu basso con una micro-etichetta onesta; il firmato e a contrasto pieno. La firma e il gesto che asciuga l'inchiostro. |
 | **Il filo** | La connessione, dove e reale | Una hairline continua resa come geometria SVG che si disegna: la spina della timeline, il connettore di provenienza, la storia di un valore. Mai sul lato di un riquadro. |
 
@@ -27,7 +27,7 @@ La regola che tiene tutto: **il fuoco non porta mai una linea, e la linea non ma
 ## 2. Leggi di movimento
 
 1. **La vitalita risponde al gesto, non va in loop.** Nessuna animazione ambientale, nessun respiro perenne, nessuno shimmer di attesa: sono proprio i movimenti che-vanno-avanti-da-soli a leggere come procedurali e da intelligenza artificiale. Il movimento nasce quando l'utente agisce (sposta il fuoco, firma, preme, trascina) e finisce.
-2. **La luce si sposta, non le superfici.** Quando il fuoco cambia, la luce fa un cross-fade di luminanza e temperatura (150-200ms, ease-out). La velocita e proporzionale alla scala del salto: riga vicina, breve; Quadro verso Scheda, piu lungo ma entro 250ms. Le variabili di luce si registrano via `@property` cosi da interpolare in modo pulito, oppure scattano; non si "trascinano" a caso.
+2. **La luce si sposta, non le superfici.** Quando il fuoco cambia, la luce fa un cross-fade di luminanza e ombra (150-200ms, ease-out). La velocita e proporzionale alla scala del salto: riga vicina, breve; Quadro verso Scheda, piu lungo ma entro 250ms. Le variabili di luce si registrano via `@property` cosi da interpolare in modo pulito, oppure scattano; non si "trascinano" a caso.
 3. **La conferma e transiente.** L'accento non resta come peso persistente: lampeggia brevemente per dare sicurezza e si spegne (una pulsazione di ombra e di alone minerale, ~300ms). E l'opposto della stanghetta fissa.
 4. **Il filo si disegna.** I connettori sono `stroke` SVG che entrano con `stroke-dashoffset` (draw-on), non `border-left`. "Il filo che prosegue" da Quadro a Scheda e una linea che si allunga, non una pagina che vola. Nota: draw-on non vuol dire aspetto tratteggiato; la linea a riposo e continua e piena.
 5. **I controlli sono materia reattiva.** Press `scale(0.97)` ~150ms su `:active`; l'azione emette un anello che parte dal punto del tocco e si spegne; hover = un lift sottile. La fisica (spring interrompibili) resta dove c'e un gesto diretto (riordino, drag).
@@ -64,7 +64,7 @@ L'interfaccia deve sembrare orchestrata da un modello che serve la cosa giusta a
 
 Queste primitive derivano dalla review di design del 2026-07-13, riconciliate alla direzione luce+inchiostro: quello che era pensato per far vivere la linea qui fa vivere la luce, l'inchiostro e il connettore.
 
-- **Variabili di luce registrate.** Le variabili di zona (`--surface-l` luminanza, `--surface-temp` temperatura) si dichiarano con `@property` a syntax tipata, cosi interpolano davvero durante il cross-fade; senza registrazione scattano invece di transire. Il cross-fade del fuoco anima queste, non un `translate` di superfici.
+- **Variabili di luce registrate.** Le variabili di zona (`--lume-surface-l` e `--lume-surface-depth`) si dichiarano con `@property` a syntax tipata, cosi interpolano davvero durante il cross-fade; senza registrazione scattano invece di transire. Il cross-fade del fuoco anima queste, non un `translate` di superfici.
 - **L'ombra non si anima.** Il sollevamento del fuoco (profondita 0 verso 1) anima l'`opacity` di uno strato-ombra pre-renderizzato (pseudo-elemento), non `box-shadow` diretto, che e paint-bound.
 - **Il filo e geometria vettoriale.** Un `<line>` o `<rect>` SVG (o `Path.trim` sul nativo), mai un bordo animato. Crescita lungo un asse dritto (la spina del diario che si allunga) uguale `transform: scaleY`, compositor-friendly; percorso non lineare (la provenienza) uguale `stroke-dashoffset`. Mai `opacity` da 0 a 1 su un filo: un filo che sfuma tradisce il suo significato di continuita.
 - **`--filo-fill` per il connettore che si completa.** Proprieta registrata `@property --filo-fill { syntax: '<percentage>'; inherits: false; initial-value: 0% }`, da 0 a 100% in ~200ms ease-out. In luce+inchiostro serve al FILO-CONNETTORE (la provenienza che si riempie fonte per fonte, 33/66/100, man mano che il medico conferma ciascuna; la spina che si completa), NON allo stato epistemico: lo stato resta inchiostro che asciuga (par. 1 e 3). Il riempimento e legato al gesto, mai temporizzato.

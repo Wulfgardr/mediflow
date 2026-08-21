@@ -361,7 +361,7 @@
  * on the border. */
 .canvas {
   --lume-surface-l: 0%;
-  --lume-surface-temp: 0%;
+  --lume-surface-depth: 0%;
   background: var(--lume-surface-canvas);
   padding: 14px;
   min-width: 0;
@@ -378,7 +378,7 @@
 
 .canvas[data-lume-context='turno'] {
   --lume-surface-l: 3.5%;
-  --lume-surface-temp: 1.1%;
+  --lume-surface-depth: 1.1%;
 }
 
 .framePanel {
@@ -422,14 +422,14 @@
 
 .canvas[data-lume-context='incarico'] {
   --lume-surface-l: 5.5%;
-  --lume-surface-temp: 1.8%;
+  --lume-surface-depth: 1.8%;
 }
 
 .canvas[data-lume-context='incarico'] .focusSurface { --k8-focus-wash: 2.5%; }
 
 .canvas[data-lume-context='scheda'] {
   --lume-surface-l: 7%;
-  --lume-surface-temp: 2.4%;
+  --lume-surface-depth: 2.4%;
   background: color-mix(in srgb, var(--lume-surface-canvas) 99%, var(--lume-surface-focal));
 }
 
@@ -437,7 +437,7 @@
 
 .canvas[data-lume-context='diario'] {
   --lume-surface-l: 4.5%;
-  --lume-surface-temp: 1.4%;
+  --lume-surface-depth: 1.4%;
 }
 
 .canvas[data-lume-context='diario'] .focusSurface { --k8-focus-wash: 1.5%; }

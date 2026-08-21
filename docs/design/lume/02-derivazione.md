@@ -27,7 +27,7 @@ Pattern emergenti: progressive disclosure con home calma; baseline personale pri
 
 Temi: post-glass (le critiche di leggibilità a Liquid Glass documentate da [WIRED](https://www.wired.com/story/designers-react-to-apple-liquid-glass/) e la correzione di Apple nelle beta), la luce come sistema (la HIG spaziale Apple: [Spatial layout](https://developer.apple.com/design/human-interface-guidelines/spatial-layout/): profondità per importanza, temperatura e ombre come grammatica), texture e grana controllata ([Creative Bloq 2026](https://www.creativebloq.com/design/graphic-design/texture-warmth-and-tactile-rebellion-the-big-graphic-design-trends-for-2026)), estetica e-ink ([Mudita](https://mudita.com/community/blog/introducing-mudita-mindful-design/)), tipografia variabile e optical sizing ([Monotype](https://guillaume-rondet.com/wp-content/uploads/2025/12/Monotype_Revision_2025_Report_EN.pdf)), data-ink alla Tufte nelle interfacce dense, dark grafite (non nero puro) con contratto di contrasto ([Android AEP](https://developer.android.com/distribute/aep/aep-req-dark-theme)), interfacce che compongono viste per task con provenienza e revisione ([OpenAI Canvas](https://help.openai.com/en/articles/9930697-what-is-the-canvas-featue-in-chatgpt-and-how-do-i-use-it)). Chi definisce il gusto: Apple (materia e luce), Nothing (luce come linguaggio funzionale), BUCK, COLLINS, Pentagram (rigore editoriale-scientifico).
 
-Gli otto ingredienti ad alto potenziale indicati dalla lane: profondità semantica, superfici opache intelligenti, palette da materiale (grafite, avorio freddo, blu minerale, un accento diagnostico), grana sub-percettiva, tipografia variabile con optical sizing, mono funzionale, densità Tufte, composizione di viste verificabili.
+Gli otto ingredienti ad alto potenziale indicati dalla lane: profondità semantica, superfici opache intelligenti, scala neutra con blu minerale e un accento diagnostico, grana sub-percettiva, tipografia variabile con optical sizing, mono funzionale, densità Tufte, composizione di viste verificabili.
 
 ## 2. Le decisioni di Lume, una per una
 
@@ -35,7 +35,7 @@ Gli otto ingredienti ad alto potenziale indicati dalla lane: profondità semanti
 | --- | --- |
 | La luce come sistema di gerarchia (fuoco/penombra/buio operativo) | R3: la lezione spaziale Apple e Nothing; R1: la sidebar dimmer di Linear elevata a legge; il post-glass che chiede profondità selettiva senza blur |
 | Superfici opache, vetro solo negli overlay | R1: il soft flat è il materiale del premium; R3: le critiche di leggibilità al vetro e la ritirata di Apple; R2: il dato clinico non tollera fondi instabili |
-| Palette avorio/grafite/minerale con gradiente di temperatura | R3: palette da materiale + temperatura come grammatica di profondità; distintiva senza decorazione |
+| Scala neutra giorno/grafite con accento minerale | La profondità usa luminanza, hairline e spazio; Carta resta grammatica documentale e non una palette |
 | Il filo come firma, con tratto = stato epistemico | R2: la provenienza visibile (Abridge, Heidi) trasformata da badge a segno grafico; R1: l'identità ownable dei prodotti premium ottenuta con un solo gesto, non con effetti |
 | Due voci (Voce + Registro mono per gli atomi verificabili) | R3: mono funzionale + variable type; R2: fiducia = dato distinguibile dal discorso; R1: i numeri ben composti di Mercury/Ramp |
 | Grammatica dell'attenzione (testata, colonna, baseline, riga di laboratorio canonica) | R2, quasi integralmente: è il consenso della frontiera clinica |

@@ -185,7 +185,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                                             className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border"
                                             style={selected
                                                 ? { borderColor: 'var(--lume-ink)', background: 'var(--lume-ink)' }
-                                                : { borderColor: 'rgba(112,106,100,0.28)' }}
+                                                : { borderColor: 'color-mix(in srgb, var(--lume-ink) 28%, transparent)' }}
                                         >
                                             {selected && <div className={`h-1.5 w-1.5 rounded-full ${c.selectedDot}`} />}
                                         </div>

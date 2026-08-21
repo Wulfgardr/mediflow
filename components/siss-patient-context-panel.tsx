@@ -935,7 +935,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
             </div>
 
             <details className="group mt-4">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-[10px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.78)] px-3 py-2 text-[12.5px] font-semibold text-[color:var(--lume-ink)] transition-colors hover:border-[color:color-mix(in_srgb,var(--lume-accent)_26%,transparent)] dark:border-[color:rgba(255,247,240,0.08)] dark:bg-white/4">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-[10px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-surface-focal)_78%,transparent)] px-3 py-2 text-[12.5px] font-semibold text-[color:var(--lume-ink)] transition-colors hover:border-[color:color-mix(in_srgb,var(--lume-accent)_26%,transparent)] dark:border-[color:color-mix(in_srgb,var(--lume-ink)_8%,transparent)] dark:bg-white/4">
                     <span className="flex items-center gap-2">
                         <ShieldAlert className="h-4 w-4 text-[color:var(--lume-signal-warning)]" />
                         Funzioni non automatiche

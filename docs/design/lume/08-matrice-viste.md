@@ -100,7 +100,7 @@ parte della coppia minima di screenshot web.
 
 ### Motion, reduce motion e contrasto
 
-- Fuoco: cross-fade di luminanza e temperatura in 150-200 ms, ease-out. Filo:
+- Fuoco: cross-fade di luminanza e ombra in 150-200 ms, ease-out. Filo:
   disegno SVG o `Path`, non bordo animato. Pressione diretta: scala 0,97 circa
   100 ms. I tempi e i portatori sono definiti in
   `docs/design/lume/07-gesto-e-movimento.md`.
