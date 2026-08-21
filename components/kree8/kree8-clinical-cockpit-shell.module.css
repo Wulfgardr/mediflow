@@ -420,6 +420,32 @@
   z-index: 1;
 }
 
+/* @Codex: avviso degradato azionabile, distinto dal contenuto locale. */
+.degradedState {
+  position: relative;
+  z-index: 1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  margin-block-end: 12px;
+}
+
+.degradedStateAction {
+  min-block-size: 44px;
+  padding-inline: 14px;
+  border: 1px solid currentColor;
+  border-radius: var(--lume-radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .degradedState { grid-template-columns: 1fr; }
+  .degradedStateAction { justify-self: stretch; }
+}
+
 .canvas[data-lume-context='incarico'] {
   --lume-surface-l: 5.5%;
   --lume-surface-temp: 1.8%;

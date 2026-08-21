@@ -111,6 +111,8 @@ function IncaricoArea({
           <p className={styles.areaSubtitle}>
             {patientStatus === 'ready'
               ? 'Casi dell’ambulatorio e della rete locale, tra attivi e archivio.'
+              : patientStatus === 'stale'
+                ? 'Ultimo snapshot locale disponibile: il refresh non è riuscito.'
               : patientStatus === 'error'
                 ? 'Lista pazienti non disponibile: verifica sessione e servizi locali.'
                 : 'Preparazione della lista pazienti.'}
@@ -225,6 +227,16 @@ function IncaricoArea({
           </header>
 
           <div style={{ marginTop: 8 }}>
+            {patientStatus === 'stale' ? (
+              <div className="mf-alert mf-alert-warning" role="status">
+                <span>Dati precedenti: l’ultimo aggiornamento non è riuscito.</span>
+                {onRetryPatients ? (
+                  <button type="button" className={styles.ghostBtnSm} onClick={onRetryPatients}>
+                    Riprova aggiornamento
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
             {/* @Codex */}
             {patientStatus === 'idle' || patientStatus === 'loading' ? (
               <div className={styles.emptyState} role="status" aria-live="polite" aria-label="Caricamento pazienti">

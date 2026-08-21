@@ -89,7 +89,7 @@ export function AuthHealthScreen({
 
                 {/* @Codex */}
                 {nextAction && (
-                    <div className="rounded-2xl border border-orange-100 bg-orange-50/60 p-4 text-sm text-orange-900 dark:border-orange-500/20 dark:bg-orange-900/10 dark:text-orange-200">
+                    <div className="rounded-2xl border border-orange-100 bg-orange-50/60 p-4 text-sm text-gray-700">
                         <div className="font-semibold text-orange-800 mb-1">Prossima azione</div>
                         <p>{nextAction}</p>
                     </div>

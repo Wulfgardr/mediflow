@@ -84,6 +84,8 @@ function TurnoArea({
   const patientTrendLabel =
     patientState.status === 'ready'
       ? `${formatCountLabel(patientState.patients.length, 'scheda', 'schede')} in carico`
+      : patientState.status === 'stale'
+        ? `${formatCountLabel(patientState.patients.length, 'scheda', 'schede')} da snapshot locale`
       : patientState.status === 'error'
         ? 'pazienti non disponibili'
         : 'aggiornamento in corso';
@@ -116,11 +118,11 @@ function TurnoArea({
     : [
       {
         title: 'Pazienti in carico',
-        body: patientState.status === 'ready'
+        body: patientState.status === 'ready' || patientState.status === 'stale'
           ? `${formatCountLabel(patientState.patients.length, 'scheda pronta', 'schede pronte')} nell’archivio locale.`
           : 'Preparazione della lista pazienti.',
-        pill: patientState.status === 'error' ? 'Errore' : 'In carico',
-        pillVariant: patientState.status === 'error' ? 'critical' : 'neutral',
+        pill: patientState.status === 'error' ? 'Errore' : patientState.status === 'stale' ? 'Dati precedenti' : 'In carico',
+        pillVariant: patientState.status === 'error' ? 'critical' : patientState.status === 'stale' ? 'warning' : 'neutral',
         action: 'Vai ai pazienti',
         target: 'incarico',
       },
@@ -157,6 +159,8 @@ function TurnoArea({
           <p className={styles.areaSubtitle}>
             {patientState.status === 'ready'
               ? 'Rivedi i passaggi della giornata: i filtri in alto ordinano l’agenda per urgenze, suggerimenti AI e passaggi manuali.'
+              : patientState.status === 'stale'
+                ? 'Rivedi lo snapshot locale disponibile; l’ultimo aggiornamento non è riuscito.'
               : 'Preparazione della giornata dopo sblocco PIN.'}
           </p>
         </div>
