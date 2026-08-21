@@ -83,7 +83,7 @@ test('both React hooks retain dynamic scope resolver wiring', () => {
     const source = readFileSync('lib/live-query.ts', 'utf8');
     const hookBlocks = [
         sourceBetween(source, 'export function useLiveQuery<', 'export type LiveQueryState'),
-        sourceBetween(source, 'export function useLiveQueryState<', '    return { data, error, loading };'),
+        sourceBetween(source, 'export function useLiveQueryState<', '    return { data, error, loading, refresh };'),
     ];
     for (const hookBlock of hookBlocks) {
         assert.match(hookBlock, /const tablesRef = useRef\(tables\);\s*tablesRef\.current = tables;/);
