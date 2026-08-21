@@ -730,6 +730,29 @@
       "partial": [0, 2, 3, 4, 7, 9, 11, 14, 15, 19, 31, 35, 44],
       "outOfScope": [8, 16, 18, 29, 30, 34, 42, 43, 45, 46, 47, 48, 49, 51, 52, 53, 57, 58, 59, 61, 63, 64, 65]
     },
+    "miniContractConsumption": {
+      "status": "CONSUMED / HOLD_PROMOTION",
+      "canonicalPath": "packages/mini/contracts/mini-parity.json",
+      "schemaVersion": "mediflow.mini.parity-manifest.v1",
+      "heads": {
+        "pr184": "3fd988bafe71a058fdd7d3c25ea569793dcba903",
+        "pr190": "1e35733c0218eae67a1d6e158085aab7340bc26b"
+      },
+      "contentSha256": "8f84108732b7a8a9c1feb20cdedee17f4865044de98d8d997896f3a914d0e4d9",
+      "mappingRule": "rows[sourceRow - 1] maps to capabilities[sourceRow]; Mini disposition and Apple gap remain separate axes.",
+      "metric": {"definition": "Rows with miniDisposition=available divided by canonical web capability rows.", "availableRows": 4, "totalRows": 66, "parityPercent": 6.060606},
+      "dispositionCounts": {"available": 4, "manual_only": 61, "proposal_only": 1, "unavailable": 0},
+      "reasonCounts": {"HOST_AUTHORITY_ONLY": 23, "NOT_IN_MINI_PILOT": 38, "SYNTHETIC_PREVIEW_ONLY": 1, "none": 4},
+      "wul556Rows": [
+        {"sourceRow": 1, "webCapabilityId": "web-01-anagrafica-paziente-lista-ricerca-view-create-update", "miniCommands": ["patient search", "patient show"], "miniDisposition": "available", "reason": null, "appleGap": "partial", "interpretation": "Mini covers search/show only; broader Apple row residues remain."},
+        {"sourceRow": 39, "webCapabilityId": "web-39-blocco-sessione-immediato-stato-sessione", "miniCommands": ["whoami"], "miniDisposition": "available", "reason": null, "appleGap": "full-parity", "interpretation": "Session identity is observable; pairing and local tokens are not agentic grants."},
+        {"sourceRow": 45, "webCapabilityId": "web-45-cache-pazienti-cifrata-offline-consultazione-degradata", "miniCommands": [], "miniDisposition": "manual_only", "reason": "NOT_IN_MINI_PILOT", "appleGap": "partial", "interpretation": "Encrypted read-only list exists; live stale metadata, offline detail and write queue remain absent."},
+        {"sourceRow": 63, "webCapabilityId": "web-63-get-api-v1-network-capabilities-api-v1-network-identity-api-v1-n", "miniCommands": ["capabilities"], "miniDisposition": "available", "reason": null, "appleGap": "full-parity", "interpretation": "Capability discovery does not authorize clinical operations."}
+      ],
+      "excludedAvailableRow": {"sourceRow": 11, "miniCommands": ["open-loops"], "reason": "Outside WUL-556 slice."},
+      "authorityGuard": "Manifest, receipt, paired state and local token do not grant agentic or clinical authority.",
+      "remainingGates": ["manager verification", "WUL-564"]
+    },
     "interactionParity": {
       "verifiedAutomatic": [0, 12, 13, 14, 15, 17, 20, 31, 32, 33],
       "verifiedRealInteraction": [0, 31, 32],
@@ -772,7 +795,7 @@
     },
     "verdict": "PARTIAL / HOLD_PROMOTION"
   },
-  "updated": "2026-08-07 (0.8.1): aligned the 66-row feature contract with the AI settings information architecture (Fabric registry and governance split); 2026-08-07: fixed matrix drift in the 'AI conversazionale' row — the cited app/api/proxy/ai/chat/route.ts does not exist in the checkout; repointed to the real app/api/proxy/ollama/{chat,generate}/route.ts (L4 verification, host-only classification and guarded counts 30/13/21 unchanged). Previous: 2026-07-28 reconciled the 64-row feature contract against current web, macOS and assistive-technology evidence",
+  "updated": "2026-08-22: consumed the byte-identical Mini parity manifest from PR #184 head 3fd988b and PR #190 head 1e35733 without changing Apple gap classifications; promotion remains held for manager verification and WUL-564. Previous: 2026-08-07 aligned the 66-row feature contract with the AI settings information architecture and corrected the AI conversational endpoint evidence.",
   "version": 2,
   "summary": {
     "total": 66,
