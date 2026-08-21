@@ -361,13 +361,14 @@
    each section remains visible and reachable without a hidden scrollbar. */
 @media (max-width: 480px) {
   .sectionRail {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: stretch;
     overflow: visible;
     scroll-snap-type: none;
   }
 
+  .sectionGroup { grid-column: 1 / -1; }
   .sectionGroupLinks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   .sectionLink {
