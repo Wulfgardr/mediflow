@@ -190,13 +190,7 @@
 }
 
 .brandThemeToggle {
-  display: none;
-}
-
-@media (max-width: 1024px) {
-  .brandThemeToggle {
-    display: inline-flex;
-  }
+  display: inline-flex;
 }
 
 .brandMark {
@@ -535,6 +529,11 @@
 .toolChip:hover { transform: translateY(-1px); }
 
 .toolChip:active { transform: scale(0.97); }
+
+.toolChipKbd {
+  color: var(--ink-muted);
+  font: 600 10px/1 var(--lume-font-mono);
+}
 
 .toolChipMuted {
   background: transparent;

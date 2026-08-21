@@ -40,6 +40,7 @@ import { RevisioneArea } from './areas/revisione-area';
 import { RepertoriArea } from './areas/repertori-area';
 import { HandoffArea } from './areas/handoff-area';
 import { GovernanceArea } from './areas/governance-area';
+import { Kree8CommandCenter, type CommandCenterMode } from './kree8-command-center';
 import {
   AREA_ID_VALUES,
   AREAS,
@@ -194,25 +195,49 @@ type Kree8ClinicalCockpitProps = {
   initialArea?: AreaId;
   initialPatientId?: string;
   operatorName?: string;
+  reviewPatientCount?: number;
 };
+
+/* @Codex: amplia solo la fixture di review per provare la virtualizzazione;
+   ogni riga resta sintetica e non raggiunge il database locale. */
+function buildReviewPatients(count: number): Kree8Patient[] {
+  const boundedCount = Math.min(250, Math.max(REVIEW_PATIENT_LIST.length, Math.floor(count)));
+  return Array.from({ length: boundedCount }, (_, index) => {
+    const source = REVIEW_PATIENT_LIST[index % REVIEW_PATIENT_LIST.length]!;
+    const sequence = String(index + 1).padStart(3, '0');
+    return {
+      ...source,
+      id: `review-${sequence}`,
+      name: `Caso sintetico ${sequence}`,
+      code: `SYN-${sequence}`,
+      href: `/patients/review-${sequence}`,
+      modulesHref: `/patients/review-${sequence}/modules`,
+      list: 'attivi',
+      scope: 'ambulatorio',
+    };
+  });
+}
 
 export function Kree8ClinicalCockpit({
   surface = 'live',
   initialArea = 'turno',
   initialPatientId,
   operatorName: operatorNameProp,
+  reviewPatientCount = REVIEW_PATIENT_LIST.length,
 }: Kree8ClinicalCockpitProps) {
   const isReview = surface === 'review';
   const operatorName = operatorNameProp || (isReview ? 'Review design' : 'Sessione locale');
-  const [area, setArea] = useState<AreaId>(() => (isReview ? 'turno' : initialArea));
+  const reviewPatients = useMemo(() => buildReviewPatients(reviewPatientCount), [reviewPatientCount]);
+  const [area, setArea] = useState<AreaId>(() => initialArea);
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [patientSearchFocusSignal, setPatientSearchFocusSignal] = useState(0);
+  const [commandCenterMode, setCommandCenterMode] = useState<CommandCenterMode>(null);
   const [agendaBridge, setAgendaBridge] = useState<ClinicalAgendaBridgeClientState>({
     status: 'idle',
   });
   const [patientState, setPatientState] = useState<Kree8PatientClientState>(() => (
     isReview
-      ? { status: 'ready', patients: REVIEW_PATIENT_LIST }
+      ? { status: 'ready', patients: reviewPatients }
       : { status: 'idle', patients: [] }
   ));
   const [agendaState, setAgendaState] = useState<Kree8AgendaClientState>(() => (
@@ -221,8 +246,30 @@ export function Kree8ClinicalCockpit({
       : { status: 'idle', rows: [] }
   ));
   const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(() => (
-    isReview ? REVIEW_PATIENT_LIST[0]?.id : initialPatientId
+    isReview ? reviewPatients[0]?.id : initialPatientId
   ));
+
+  /* @Codex: comandi globali della shell; i campi editabili conservano i propri
+     caratteri e Ctrl/Meta+K resta disponibile per aprire o chiudere la palette. */
+  useEffect(() => {
+    const handleGlobalCommand = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase('it-IT') === 'k') {
+        event.preventDefault();
+        setCommandCenterMode((current) => current === 'commands' ? null : 'commands');
+        return;
+      }
+      if (event.key !== '?' || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        const tag = target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return;
+      }
+      event.preventDefault();
+      setCommandCenterMode('help');
+    };
+    window.addEventListener('keydown', handleGlobalCommand);
+    return () => window.removeEventListener('keydown', handleGlobalCommand);
+  }, []);
 
   /* @Codex WUL-UIUX: riflette area e paziente selezionato nella query string di
      '/', cosi refresh e back del browser non perdono il punto di lavoro. Solo
@@ -404,7 +451,7 @@ export function Kree8ClinicalCockpit({
       : patientState.status === 'ready'
         ? String(patientState.patients.filter((patient) => patient.list === 'attivi').length)
         : patientState.status === 'error'
-          ? '!'
+          ? 'n.d.'
           : '…';
   const diaryNavMeta =
     isReview
@@ -466,9 +513,8 @@ export function Kree8ClinicalCockpit({
         })}
 
         <div className={styles.railFooter}>
-          <div className={styles.railThemeToggle} aria-label="Tema interfaccia">
-            <ThemeToggle />
-          </div>
+          {/* @Codex: il tema resta nel brand; un solo controllo evita due
+              gruppi identici con stato condiviso. */}
           <span className={styles.railTag}>
             <span className={styles.railDot} />
             Mac principale
@@ -492,6 +538,7 @@ export function Kree8ClinicalCockpit({
             setArea('incarico');
             setPatientSearchFocusSignal((current) => current + 1);
           }}
+          onOpenCommand={() => setCommandCenterMode('commands')}
           operatorName={operatorName}
         />
         <div
@@ -550,6 +597,17 @@ export function Kree8ClinicalCockpit({
           </main>
         </div>
       </section>
+
+      <Kree8CommandCenter
+        mode={commandCenterMode}
+        onClose={() => setCommandCenterMode(null)}
+        onOpenArea={setArea}
+        onSearchRequest={() => {
+          setArea('incarico');
+          setPatientSearchFocusSignal((current) => current + 1);
+        }}
+        onShowHelp={() => setCommandCenterMode('help')}
+      />
 
       {isReview && (
         <Link href="/" className={styles.exit} aria-label="Torna alla home MediFlow live">
