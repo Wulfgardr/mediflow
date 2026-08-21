@@ -196,6 +196,7 @@ La mappa registra i controlli esercitati nel closeout.
 | macOS | Agenda sidebar | `clinical-workspace-section-agenda-button` | Seleziona riga `List` | Click-map e probe AX PASS |
 | macOS | Riga paziente | `patient-cell-*` | Seleziona e carica dettaglio | Click-map e probe AX PASS |
 | macOS | Focus | focus system | Avanza con `Tab` e freccia | Interazione reale PASS |
+| macOS | Inspector paziente | `clinical-workspace-inspector-toggle` | Toolbar o `⌥⌘I` mostra/nasconde il contesto della finestra focalizzata | WUL-566/WUL-567: test focalizzati, 2 finestre simultanee osservate nello stesso PID, suite nativa, build Xcode e screenshot light/dark PASS; focus, resize e VoiceOver interattivi della slice `PARTIAL` per sessione bloccata. Il manifest Mini PR #184 mantiene `sourceRow: 32` a `manual_only`, senza comandi Mini. |
 
 ### AXPress
 
