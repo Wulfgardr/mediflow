@@ -182,84 +182,114 @@ Restano fuori scope:
 - billing enterprise o cambi al modello open-source di MediFlow;
 - nuovi claim clinici, regolatori o di completezza runtime.
 
-## Decisioni chiuse per l'accettazione
+## Pacchetto decisionale owner-visible
 
-### 1. Context broker e confine delle chiavi
+Le cinque proposte seguenti sono candidate collegate a `WUL-558`. Restano un
+unico gate: il proprietario deve accettarle o correggerle esplicitamente prima
+di cambiare lo stato dell'ADR. Fino ad allora vale
+`HOLD_CONTRACT — TRUSTED_BROKER_BOUNDARY_UNDECIDED` e nessun runtime e
+autorizzato.
 
-Il context broker vive nel processo host locale del Mac `home-base`, nello
-stesso trust domain dei servizi applicativi. Mantiene stato solo in memoria e
-non espone un'API dati generica.
+### D1. Context broker, chiavi e authority issuance
 
-Il client medico conserva la master key. Dopo unlock e selezione esplicita, il
-client decifra e minimizza la projection necessaria, quindi la consegna una
-sola volta al broker tramite un canale applicativo locale autenticato. Il
-broker non riceve la master key e non legge SQLite, filesystem clinico o
-ciphertext per conto dell'agente.
+**Candidato.** Il broker vive in memoria nel processo host locale `home-base`,
+nello stesso trust domain dei servizi applicativi. Il client medico conserva la
+master key, decifra e minimizza dopo unlock e selezione esplicita, poi consegna
+la projection tramite un canale applicativo locale autenticato. Il broker non
+riceve la master key e non legge SQLite, filesystem clinico o ciphertext.
 
-Il broker crea copie canoniche, validate tramite allowlist di own-key, di:
+Il broker possiede le copie canoniche di sessione, grant, lease, manifest,
+clock, revoca e `selectionEpoch`. Emette una credenziale breve e handle opachi.
+Sessione, lease, grant, clock, revoca o projection forniti dal chiamante sono
+input non fidati e vengono rifiutati tramite allowlist di sole own-key.
 
-- sessione agentica e grant risolti dal manifest corrente;
-- context lease e projection minimizzata;
-- clock, scadenza, revoca e `selectionEpoch` corrente;
-- eventuale autorizzazione step-up futura.
+**Alternative.** Tenere il broker nel client medico; usare un daemon locale
+separato; riusare token `/api/v1` o credenziali paired. L'ultima alternativa e
+incompatibile con il mandato minimo perche identifica un client o una sessione
+ampia, non concede autorita agentica delimitata.
 
-L'adapter riceve una credenziale breve e handle opachi generati dal broker.
-Ogni richiesta dell'agente contiene solo handle e argomenti operativi. Sessione,
-lease, grant, manifest, clock, revoca, projection e selection epoch forniti dal
-chiamante non costituiscono autorita e devono essere ignorati o rifiutati.
+**Falsificatore.** Il candidato va riaperto se il canale non puo autenticare
+origine e lifecycle senza trasferire master key o token generale, oppure se
+lock, logout e cambio selezione non possono invalidare lo stato prima della
+richiesta successiva.
 
-### 2. Prima projection clinica
+### D2. Prima projection clinica
 
-La prima projection clinica e `patient_open_loops.v1` per un solo paziente
-selezionato. Contiene soltanto attese deterministiche, riferimenti sorgente
-tipizzati, provenienza, freshness e versione attesa. Non contiene anagrafica
-completa, note libere, allegati o output generativi.
+**Candidato.** `patient_open_loops.v1`, per un solo paziente selezionato, con
+attese deterministiche, riferimenti sorgente tipizzati, provenienza, freshness
+e versione attesa. Niente anagrafica completa, note libere o allegati. La
+directory minima per `patient search/show` resta distinta e limitata a
+riferimento opaco, nome visualizzato, anno di nascita, stato archivio e
+versione nello stesso ambulatorio e mandato.
 
-`patient search` e `patient show` nel pilot usano una directory minima distinta,
-costruita dal broker per il solo ambulatorio e mandato correnti. I campi ammessi
-sono riferimento opaco, nome visualizzato, anno di nascita, stato archivio e
-versione. La ricerca bulk, cross-ambulatorio o senza mandato resta negata.
+**Alternative.** Iniziare senza projection paziente; usare un riepilogo
+clinico generale; esporre direttamente il record applicativo. Le ultime due
+aumentano dati e ambiguita prima di provare il confine minimo.
 
-### 3. Ordine degli adapter
+**Falsificatore.** La projection va ridisegnata se non basta a calcolare gli
+open loop in modo deterministico o se richiede testo libero, query bulk o dati
+non legati alla selezione corrente.
 
-L'ordine vincolante e:
+### D3. Ordine degli adapter
 
-1. contratto e servizio applicativo condiviso;
-2. **MediFlow Mini**, CLI pipe-first con JSON/NDJSON deterministici;
-3. MCP `stdio` come adapter successivo dello stesso servizio;
-4. REST agentico solo dopo un packet dedicato su trasporto e threat model.
+**Candidato.** Servizio applicativo condiviso, poi Mini CLI pipe-first, poi MCP
+`stdio`. REST agentico richiede un packet successivo su trasporto e threat
+model. Ogni adapter resta sottile e non ricostruisce authority.
 
-Nessun adapter puo importare database writer, ridefinire policy cliniche o
-validare in autonomia contenuto authority-bearing.
+**Alternative.** MCP prima della CLI; REST come primo adapter; implementazioni
+indipendenti per venue. REST e adapter indipendenti ampliano il confine prima
+che il contratto condiviso sia verificato.
 
-### 4. Sessione, revoca e step-up
+**Falsificatore.** L'ordine va riaperto se Mini richiede logica clinica o
+authority specifica della CLI invece di limitarsi a validazione input, invio e
+rendering del contratto comune.
 
-Una sessione medico valida crea un mandato agentico breve. Il broker lega il
-mandato a medico, ambulatorio, capability, stadio massimo, manifest version e
-selection epoch. Un lock, logout, cambio paziente, revoca esplicita, scadenza o
-manifest incompatibile invalida sessione e lease prima della prossima azione.
-Il broker usa il proprio clock; timestamp del chiamante non hanno autorita.
+### D4. Sessione, revoca e step-up
 
-Il pilot non include `apply`. Un futuro `apply` richiede `WUL-282` e una
-autorizzazione step-up broker-owned, monouso, con attore medico, sessione,
-lease, capability, target, digest dell'anteprima, versione attesa, scadenza e
-selection epoch. Ogni mismatch o primo tentativo consuma o invalida il grant.
+**Candidato.** Un mandato breve lega medico, ambulatorio, capability, stadio
+massimo, versione manifest e `selectionEpoch`. Il broker usa il proprio clock.
+Lock, logout, cambio paziente, revoca, expiry o manifest incompatibile
+invalidano sessione e lease. `apply` resta escluso. Un futuro step-up `WUL-282`
+e broker-owned, monouso e legato anche a target, digest anteprima e versione.
 
-### 5. Pilot senza egress
+**Alternative.** Riutilizzare token locale o paired; accettare timestamp e
+claim firmati dall'adapter; mantenere grant riutilizzabili. Queste alternative
+non danno al broker autorita corrente su freshness, revoca e primo tentativo.
 
-Il primo pilot usa `egress=none`, `fallback=denied_by_contract` e sole fixture
-sintetiche nelle prove. Adapter di rete, provider cloud, modelli esterni e tool
-con rete sono disabilitati. Un endpoint loopback, da solo, non dimostra questo
-confine: il gate deve negare ogni configurazione o dipendenza non dichiarata.
+**Falsificatore.** Il contratto va riaperto se una revoca non puo precedere la
+richiesta successiva, se un replay sopravvive al cambio selezione o se uno
+step-up puo essere riusato dopo mismatch o primo tentativo.
 
-L'accettazione dell'ADR non promuove un broker live. Fino alla consegna del
-canale applicativo autenticato, Mini puo eseguire solo il pilot sintetico e
-deve negare l'accesso a dati reali con un errore stabile.
+### D5. Pilot senza egress
+
+**Candidato.** `egress=none`, `fallback=denied_by_contract`, fixture solo
+sintetiche e nessun adapter di rete, provider cloud, modello esterno o tool con
+rete. Un endpoint loopback non prova da solo l'assenza di egress.
+
+**Alternative.** Modello locale loopback; provider esterno con minimizzazione;
+tool di rete allowlisted. Restano fuori dal primo pilot e richiedono confini e
+prove dedicati.
+
+**Falsificatore.** Il pilot va fermato se una capability dichiarata disponibile
+richiede rete, dati reali o dipendenze non dichiarate per produrre il proprio
+risultato o la receipt.
+
+### Registrazione della decisione
+
+Il proprietario deve registrare in `WUL-558` una delle seguenti conclusioni:
+
+- accettazione di D1-D5 senza modifiche;
+- accettazione con correzioni nominate per ogni decisione interessata;
+- rifiuto con alternativa scelta e nuovo falsificatore verificabile.
+
+Solo dopo quella registrazione l'ADR puo passare ad `Accepted`. L'accettazione
+autorizza prima il servizio condiviso; Mini resta bloccato finche quel servizio
+non e validato.
 
 ## First Thin Slice
 
-La prima slice proposta, collegata a `WUL-518`, e solo locale, read-only e
-sintetica:
+La prima slice proposta, collegata a `WUL-558`, e solo locale, read-only e
+sintetica. Puo iniziare soltanto dopo l'accettazione di D1-D5:
 
 1. pubblicare schema macchina AIP e manifest parity Mini;
 2. classificare ogni capability web senza concedere autorita implicita;
