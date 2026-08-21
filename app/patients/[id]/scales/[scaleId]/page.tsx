@@ -127,7 +127,7 @@ export default function ScaleRunnerPage() {
                                     'flex min-h-[54px] items-center justify-between gap-3 rounded-[16px] border px-4 text-sm font-semibold transition-[border-color,background-color,color]',
                                     setting === 'ambulatory'
                                         ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)]'
-                                        : 'border-[color:rgba(112,106,100,0.14)] bg-white text-[color:var(--lume-ink-muted)] hover:border-[color:rgba(112,106,100,0.2)]'
+                                        : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-white text-[color:var(--lume-ink-muted)] hover:border-[color:color-mix(in_srgb,var(--lume-ink)_20%,transparent)]'
                                 )}
                             >
                                 <span className="inline-flex items-center gap-2">
@@ -144,7 +144,7 @@ export default function ScaleRunnerPage() {
                                     'flex min-h-[54px] items-center justify-between gap-3 rounded-[16px] border px-4 text-sm font-semibold transition-[border-color,background-color,color]',
                                     setting === 'home'
                                         ? 'border-[color:rgba(182,106,60,0.24)] bg-[color:rgba(182,106,60,0.08)] text-[color:var(--lume-accent)] shadow-[0_12px_24px_rgba(182,106,60,0.08)]'
-                                        : 'border-[color:rgba(112,106,100,0.14)] bg-white text-[color:var(--lume-ink-muted)] hover:border-[color:rgba(112,106,100,0.2)]'
+                                        : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-white text-[color:var(--lume-ink-muted)] hover:border-[color:color-mix(in_srgb,var(--lume-ink)_20%,transparent)]'
                                 )}
                             >
                                 <span className="inline-flex items-center gap-2">

@@ -13,14 +13,14 @@ In ogni istante l'interfaccia ha un solo **fuoco**: l'oggetto clinico in lavoraz
 
 | Zona | Cosa contiene | Resa |
 | --- | --- | --- |
-| **Fuoco** | L'oggetto in lavorazione | Superficie più chiara e leggermente più calda, contrasto pieno, ombra corta che la solleva |
+| **Fuoco** | L'oggetto in lavorazione | Superficie neutra più chiara, contrasto pieno, ombra corta che la solleva |
 | **Penombra** | Il contesto di lavoro (worklist, pannelli vicini) | Superficie neutra, contrasto pieno del testo ma cromatismo trattenuto, nessuna ombra |
 | **Buio operativo** | Il telaio (rail, barre, chrome) | Superficie leggermente più scura e più fredda, contenuti attenuati, zero ornamento |
 
 Regole:
 
 - Il fuoco è UNO. Se due zone sembrano fuoco, la gerarchia è rotta.
-- Il fuoco non si assegna con il colore ma con la luce: luminanza, temperatura, ombra. Il colore resta ai segnali clinici.
+- Il fuoco non si assegna con il colore ma con la luce: luminanza, ombra e spazio. Il colore resta ai segnali clinici.
 - Il buio operativo non è nascosto: è presente e raggiungibile, ma non chiede attenzione (la lezione Linear: il chrome recede, il lavoro avanza).
 - La densità (comoda/densa) e il modello focale sono assi indipendenti: lo strumento denso ha comunque un fuoco.
 
@@ -35,14 +35,16 @@ Tre registri di luce, non tre temi (giorno/grafite seguono il chiaro/scuro di si
 | Token | Giorno | Grafite | Guardia |
 | --- | --- | --- | --- |
 | `surface.canvas` (periferia) | `#eef0f2` | `#121417` | `#0c0e12` |
-| `surface.field` (penombra) | `#f5f5f4` | `#191c21` | `#14171d` |
-| `surface.focal` (fuoco) | `#fbfaf7` | `#22252b` | `#1a1e26` |
+| `surface.field` (penombra) | `#f4f6f8` | `#191c21` | `#14171d` |
+| `surface.focal` (fuoco) | `#fbfcfe` | `#22252b` | `#1a1e26` |
 | `surface.chrome` (buio operativo) | `#e6e8eb` | `#0e1013` | `#090b0e` |
 | `ink.primary` | `#1a1c1e` | `#e9ecef` | `#e3e8ee` |
 | `ink.muted` | `#5c6772` | `#8f9aa6` | `#8792a3` |
 | `accent.minerale` (interattivo) | `#33506b` | `#8fb0cc` | `#7fa0bc` |
 
-Il gradiente di temperatura è la novità: il fuoco è appena più caldo (avorio), la periferia appena più fredda (minerale). Sotto la soglia del dichiarabile a parole, sopra la soglia del percepibile: è la lampada, non un tema.
+Le superfici restano neutrali. Il fuoco emerge per luminanza, contrasto, hairline,
+ombra corta e spazio; la metafora Carta non introduce crema, beige, avorio o
+altri toni vintage. Guardia e Strumento non implicano tinte proprie.
 
 I valori sono formalizzati nel sorgente token DTCG `tokens/lume.tokens.json` e misurati da `scripts/check-lume-tokens.mjs` (L1a). Il mirror CSS `app/lume-tokens.css`, importato dal layout insieme al marker fisso `data-lume="true"`, li porta nel runtime web con giorno su `:root` e grafite su `.dark` (L1b); il marker non governa la cascata e la guardia resta nel sorgente ma non è ancora un tema attivo. In `giorno` `ink.muted` è stato scurito da `#5f6b76` a `#5c6772`: il valore originale misurava 4,44:1 su `surface.chrome` (la superficie chiara più scura, quindi la coppia vincolante), sotto la soglia 4,5:1; ora misura 4,70:1. Le altre coppie erano già sopra soglia.
 
@@ -110,7 +112,7 @@ Il layout di Lume non presenta dati: presenta decisioni.
 
 ## 7. Motion: la luce si sposta
 
-- Quando il fuoco cambia, si muove la luce, non le superfici: cross-fade di luminanza e temperatura (150-200ms, ease-out) dal vecchio al nuovo fuoco. Il fuoco è la luce, non un filo sul bordo; i connettori (spina, provenienza) si ridisegnano come geometria SVG (vedi [07-gesto-e-movimento.md](./07-gesto-e-movimento.md)).
+- Quando il fuoco cambia, si muove la luce, non le superfici: cross-fade di luminanza e ombra (150-200ms, ease-out) dal vecchio al nuovo fuoco. Il fuoco è la luce, non un filo sul bordo; i connettori (spina, provenienza) si ridisegnano come geometria SVG (vedi [07-gesto-e-movimento.md](./07-gesto-e-movimento.md)).
 - Il filo può estendersi (una linea che si allunga, 200ms) per esprimere continuità: Quadro -> Scheda è il filo che prosegue, non una pagina che vola.
 - La manipolazione diretta (drag, riordino) mantiene le spring interrompibili di Vetro Clinico ([../vetro-clinico/04-interazione.md](../vetro-clinico/04-interazione.md)): la fisica resta dove c'è un gesto.
 - Niente parallasse, niente morphing di superfici, niente blur animato. Reduce Motion è quasi già soddisfatto per costruzione: il cross-fade è il comportamento di default, non il fallback.

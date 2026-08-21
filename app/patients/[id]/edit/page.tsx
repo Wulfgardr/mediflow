@@ -295,7 +295,7 @@ export default function EditPatientPage() {
                     />
                 </div>
 
-                <div id="azioni" className="border-t border-[color:rgba(112,106,100,0.12)] pt-6">
+                <div id="azioni" className="border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-6">
                     <div className="flex items-center gap-3 mb-8">
                         <div className="mf-icon-disc h-10 w-10 !text-[color:var(--lume-signal-critical)]">
                             <ShieldAlert className="w-5 h-5" />

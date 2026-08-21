@@ -8,7 +8,7 @@ decisione di Leonardo.
 
 Lume e' gia' condiviso piu' di quanto sembrasse. `LumePalette` nel pacchetto
 Apple contiene gli stessi esadecimali di `docs/design/lume/tokens/lume.tokens.json`,
-byte per byte: `#eef0f2`, `#f5f5f4`, `#fbfaf7`, `#e6e8eb` e i tre registri
+byte per byte: `#eef0f2`, `#f4f6f8`, `#fbfcfe`, `#e6e8eb` e i tre registri
 giorno, grafite, guardia. Web, iPhone e iPad disegnavano gia' da quella stessa
 sorgente.
 

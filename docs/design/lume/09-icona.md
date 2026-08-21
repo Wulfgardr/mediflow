@@ -19,8 +19,8 @@ medico. Non c'è testo. La forma resta leggibile a 16 pixel.
 
 | Variante | Sfondo | Filo | Nodo |
 | --- | --- | --- | --- |
-| Default (giorno) | gradiente carta `#fbfaf7 -> #eef0f2` | minerale profondo `#33506b` | core bianco, anello d'inchiostro |
-| Dark (grafite) | gradiente `#191c21 -> #121417` | minerale chiaro `#8fb0cc` | core `#fbfaf7`, anello minerale |
+| Default (giorno) | gradiente neutro `#fbfcfe -> #eef0f2` | minerale profondo `#33506b` | core neutro, anello d'inchiostro |
+| Dark (grafite) | gradiente `#191c21 -> #121417` | minerale chiaro `#8fb0cc` | core `#fbfcfe`, anello minerale |
 
 I valori provengono dai token Lume (`docs/design/lume/tokens/lume.tokens.json`).
 La variante tinted la deriva il sistema.

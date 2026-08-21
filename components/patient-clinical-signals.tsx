@@ -37,7 +37,7 @@ export function PatientClinicalSignals({ signals }: { signals: ClinicalSignal[] 
                 return (
                     <div
                         key={signal.label}
-                        className="rounded-[18px] border border-[color:rgba(112,106,100,0.12)] bg-white/72 px-4 py-3 dark:border-[color:rgba(255,247,240,0.1)] dark:bg-white/5"
+                        className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-white/72 px-4 py-3 dark:border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] dark:bg-white/5"
                     >
                         <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                             {Icon ? <Icon className="h-3.5 w-3.5" /> : null}

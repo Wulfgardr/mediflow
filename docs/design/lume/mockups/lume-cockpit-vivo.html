@@ -22,7 +22,7 @@
    ============================================================ */
 
 :root {
-  --canvas:#eef0f2; --field:#f5f5f4; --focal:#fbfaf7; --chrome:#e6e8eb;
+  --canvas:#eef0f2; --field:#f4f6f8; --focal:#fbfcfe; --chrome:#e6e8eb;
   --ink:#1a1c1e; --ink-muted:#5c6772; --minerale:#33506b;
   --warning:#9a6a2f; --critical:#a33a2f; --success:#4b6354; --plum:#555161;
   --warning-tint:rgba(154,106,47,0.10); --critical-tint:rgba(163,58,47,0.10); --success-tint:rgba(75,99,84,0.12);
@@ -122,7 +122,7 @@ body {
 @media (max-width:1180px){ .attn { flex:1 1 100%; min-height:auto; } }
 @media (max-width:900px){ .worklist { flex:1 1 100%; } .rail { flex:1 1 100%; flex-direction:row; align-items:center; min-height:auto; flex-wrap:wrap; } .rail .foot { display:none; } .roomswitch { flex-direction:row; } }
 
-/* Il fuoco: solo luce (luminanza+temperatura appena piu alte, ombra breve).
+/* Il fuoco: solo luce (luminanza e ombra breve).
    Mai una linea, mai una stanghetta sul bordo. */
 .pan[data-fuoco="true"] { background:linear-gradient(var(--warm),var(--warm)),var(--focal); box-shadow:var(--shadow-focal); }
 
