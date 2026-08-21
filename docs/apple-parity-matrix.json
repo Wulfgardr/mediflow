@@ -367,11 +367,11 @@
       "area": "shell-globale",
       "feature": "Cockpit shell / rail navigazione globale + toolbar + deep-link",
       "web": "Kree8 cockpit shell con 5 aree, toolbar ricerca/filtri, deep-link query string, sub-area tabs (components/kree8/kree8-clinical-cockpit.tsx)",
-      "native": "partial: NavigationSplitView (macOS/iPad) / TabView (iPhone) con sezioni cliniche Pazienti/Agenda/Diario/Analytics/Scale e gruppo Progetto separato, piu master-detail pazienti (AppleFoundationViews.swift:210-292). Residuo ristretto: nessun deep-link/URL scheme nativo equivalente alla query string web ?area=&paziente=. Ricerca globale non conteggiata come residuo di parita: non esiste nemmeno come ricerca globale unica sulla web.",
-      "boundary": "n-a: chrome UI locale",
+      "native": "partial: NavigationSplitView (macOS/iPad) / TabView (iPhone) con sezioni cliniche Pazienti/Agenda/Diario/Analytics/Scale e gruppo Progetto separato. Su macOS WUL-566 isola stato e comandi per finestra; WUL-567 aggiunge un inspector paziente status-only su colori neutrali nativi adattivi. Carta resta grammatica documentale e non introduce crema, beige, avorio, parchment o skeuomorfismo. Solo la major esatta macOS 27 usa lo sheet compatibile; macOS 28+ torna all'inspector nativo. Residui: nessun deep-link/URL scheme equivalente alla query string web ?area=&paziente=; focus, resize e VoiceOver interattivi della nuova slice inspector restano partial.",
+      "boundary": "n-a: chrome UI locale. Il manifest Mini PR #184 a 3fd988bafe71a058fdd7d3c25ea569793dcba903 mantiene sourceRow 32 a manual_only, miniCommands [], reason NOT_IN_MINI_PILOT: nessun comando Mini o claim di parity.",
       "gap": "partial",
       "wave": "W3-macos-clinical-shell",
-      "evidence": "web-global.shell query string in components/kree8/kree8-clinical-cockpit.tsx:204-219; native-ui.navigazione; W3 S5 f01346656 AppleFoundationViews.swift"
+      "evidence": "web-global.shell query string in components/kree8/kree8-clinical-cockpit.tsx:204-219; native-ui.navigazione; W3 S5 f01346656 AppleFoundationViews.swift; WUL-566 520f8b9f15a3b7f9f198c0e096aadf9cf764a6e7; WUL-567 556f06d3fa6a950bb8a6423dcdb00ef000a4f576; manifest Mini PR #184 3fd988bafe71a058fdd7d3c25ea569793dcba903 sourceRow 32"
     },
     {
       "area": "turno",
