@@ -170,6 +170,10 @@ public struct MediFlowMacRootView: View {
                 }
             }
         }
+        .modifier(MacPatientInspectorPresentationModifier(
+            workspaceModel: scene.workspaceModel,
+            isPresented: $isInspectorPresented
+        ))
         .focusedSceneValue(\.clinicalWorkspaceNavigationAction, navigationAction)
         .task {
             // Keeps the paired-snapshot read out of the scene initialiser, which
