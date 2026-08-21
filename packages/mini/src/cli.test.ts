@@ -40,13 +40,17 @@ test('nega authority extra, query vuota, apply e lifecycle del broker', () => {
     const forged = runMini(['--synthetic'], JSON.stringify({ command: 'whoami', args: {}, session: { role: 'admin' } }));
     assert.equal(forged.exitCode, MINI_EXIT.USAGE); assert.equal(forged.stdout.includes('admin'), false);
     assert.equal(runMini(['--synthetic', 'patient', 'search', '   ']).exitCode, MINI_EXIT.USAGE);
+    assert.equal(runMini(['--synthetic', 'patient', 'show', 'synthetic-missing']).exitCode, MINI_EXIT.NOT_FOUND);
     assert.equal(runMini(['--synthetic', 'apply', PATIENT]).exitCode, MINI_EXIT.APPLY_DENIED);
 
     const replay = createSyntheticTrustedAgentService();
     assert.equal(runMini(['--synthetic', 'whoami'], '', replay.service).exitCode, MINI_EXIT.OK);
-    assert.equal(json(runMini(['--synthetic', 'whoami'], '', replay.service)).error, 'REQUEST_REPLAYED');
+    const replayed = runMini(['--synthetic', 'whoami'], '', replay.service);
+    assert.equal(replayed.exitCode, MINI_EXIT.AUTHORITY); assert.equal(json(replayed).error, 'REQUEST_REPLAYED');
     const revoked = createSyntheticTrustedAgentService(); revoked.control.revoke();
-    assert.equal(json(runMini(['--synthetic', 'whoami'], '', revoked.service)).error, 'SESSION_REVOKED');
+    const revokedRun = runMini(['--synthetic', 'whoami'], '', revoked.service);
+    assert.equal(revokedRun.exitCode, MINI_EXIT.AUTHORITY); assert.equal(json(revokedRun).error, 'SESSION_REVOKED');
     const changed = createSyntheticTrustedAgentService(); changed.control.changeSelection();
-    assert.equal(json(runMini(['--synthetic', 'whoami'], '', changed.service)).error, 'SELECTION_CHANGED');
+    const changedRun = runMini(['--synthetic', 'whoami'], '', changed.service);
+    assert.equal(changedRun.exitCode, MINI_EXIT.AUTHORITY); assert.equal(json(changedRun).error, 'SELECTION_CHANGED');
 });
