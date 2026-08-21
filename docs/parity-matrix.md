@@ -179,12 +179,6 @@ slice `WUL-556`. `draft preview` (riga 4) resta `proposal_only` con ragione
 `SYNTHETIC_PREVIEW_ONLY`. Le altre righe conservano la disposizione e la ragione
 del manifest; le 23 `HOST_AUTHORITY_ONLY` restano host-only nella matrice Apple.
 
-| Superficie mobile | Stato candidata | Evidenza | Dipendenza host/headless |
-| --- | --- | --- | --- |
-| iPhone | `partial` | Test di presentazione, XCUITest e screenshot sintetico | Nessun grant nuovo; usa solo stato paired esistente |
-| iPadOS | `partial` | Stesso contratto, layout adattivo, `⌘R`, pointer, XCUITest e screenshot sintetico | Metadata TTL/stale live non esposti |
-| Capability AIP/Mini | Gap Apple e disposizione Mini restano assi separati | Manifest WUL-557: 4/66 disponibili | Le ragioni `partial`, host-only e `manual_only` restano esplicite; manifest e receipt non diventano autorità client; verifica manager e `WUL-564` bloccano la promozione |
-
 ### W6-C — decisione sul workflow documentale nativo
 
 Dipendenze: `WUL-417` (OCR Apple on-device), `WUL-383` (degradazione OCR) e
