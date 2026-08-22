@@ -10,7 +10,7 @@ import {
 } from './contract.ts';
 import { advanceOnboarding, startOnboarding, type ProviderOnboardingState } from './onboarding.ts';
 import { admitProvider, transitionProviderLifecycle } from './provider-lifecycle.ts';
-import { routeCandidateCapability } from './candidate-router.ts';
+import { routeCandidateCapability, routeHostCandidateCapability } from './candidate-router.ts';
 import { observeVenue } from './routing-observability.ts';
 
 const deterministic = DETERMINISTIC_CAPABILITY_DESCRIPTORS.icd_lookup;
@@ -120,6 +120,65 @@ test('una generativa richiede onboarding enabled, lifecycle disponibile e receip
     assert.equal(result.decision.receipt?.provider, 'ollama');
     assert.equal(result.decision.receipt?.providerReceipt?.provider, 'ollama');
     assert.equal(result.decision.fallback, 'denied_by_contract');
+});
+
+test('il router host usa il lifecycle persistito senza ricostruire onboarding', () => {
+    const result = routeHostCandidateCapability({
+        policy: policyFor(generative),
+        request: { descriptor: generative, venue: 'local_process', generative: binding },
+        observations: [observeVenue('local_process', 'available', null)],
+    }, availableLocal());
+    assert.equal(result.decision.outcome, 'resolved');
+    assert.equal(result.decision.receipt?.provider, 'ollama');
+});
+
+test('il router host nega lifecycle malformed, non disponibile o incoerente', () => {
+    const available = availableLocal();
+    const cases = [
+        [{ ...available, extra: 'not-allowed' }, 'provider_lifecycle_invalid'],
+        [transitionProviderLifecycle(available, 'degrade'), 'provider_lifecycle_unavailable'],
+        [transitionProviderLifecycle(available, 'revoke'), 'provider_lifecycle_unavailable'],
+        [{ ...available, credentialClass: 'api_key' }, 'provider_lifecycle_unavailable'],
+        [availableLocal('other_provider'), 'provider_receipt_mismatch'],
+    ] as const;
+
+    for (const [lifecycle, denialCode] of cases) {
+        const result = routeHostCandidateCapability({
+            policy: policyFor(generative),
+            request: { descriptor: generative, venue: 'local_process', generative: binding },
+            observations: [observeVenue('local_process', 'available', null)],
+        }, lifecycle as never);
+
+        assert.equal(result.decision.denialCode, denialCode);
+        assert.equal(result.decision.receipt, null);
+        assert.equal(result.resolution, null);
+    }
+});
+
+test('il router host legge ogni campo lifecycle una volta e ignora onboarding caller-supplied', () => {
+    let providerReads = 0;
+    const lifecycle = {
+        ...availableLocal(),
+        get provider() {
+            providerReads += 1;
+            return providerReads === 1 ? 'ollama' : 'private-patient-value';
+        },
+    };
+    let onboardingReads = 0;
+    const result = routeHostCandidateCapability({
+        policy: policyFor(generative),
+        request: { descriptor: generative, venue: 'local_process', generative: binding },
+        observations: [observeVenue('local_process', 'available', null)],
+        get onboarding() {
+            onboardingReads += 1;
+            return enabledLocal();
+        },
+    } as never, lifecycle);
+
+    assert.equal(result.decision.outcome, 'resolved');
+    assert.equal(providerReads, 1);
+    assert.equal(onboardingReads, 0);
+    assert.equal(JSON.stringify(result).includes('private-patient-value'), false);
 });
 
 test('snapshotta onboarding e lifecycle una sola volta prima dell admissione', () => {
