@@ -2,22 +2,21 @@
 import 'server-only';
 
 import { randomBytes } from 'node:crypto';
-import type { createTypedProjectionBroker } from '../typed-projection-broker';
+import { createTypedProjectionBroker, ProjectionBrokerError, type TypedProjectionBrokerConfig } from '../typed-projection-broker';
 import { bindProjectionBrokerToServerSession } from './server-session-projection-broker';
 import { getSession, registerServerSessionResource, type ServerSession } from './server-session';
 
-type BrokerControl = ReturnType<typeof createTypedProjectionBroker>['control'];
+type TypedBroker = ReturnType<typeof createTypedProjectionBroker>;
 type ActiveBinding = {
-    leaseRef: string;
-    selectionEpoch: number;
-    control: BrokerControl;
-    unregister: () => void;
+    selection: SelectionState; active: boolean; control: TypedBroker['control']; unregister: (() => void) | null;
+    ingest: TypedBroker['ingest']; service: TypedBroker['service'];
 };
 type CanonicalPair = Readonly<{ patientId: string; ambulatoryId: string }>;
 type SelectionSources = Readonly<{
     resolve(session: ServerSession, input: CanonicalPair): CanonicalPair;
     clock(): number;
     entropy(): Uint8Array;
+    brokerFactory(config: TypedProjectionBrokerConfig): TypedBroker;
 }>;
 type SelectionLease = Readonly<{
     sessionRef: string; selectionEpoch: number; patientRef: string; ambulatoryRef: string;
@@ -26,7 +25,7 @@ type SelectionLease = Readonly<{
 type SelectionState = CanonicalPair & SelectionLease;
 
 export type ServerSessionProjectionOwnerErrorCode =
-    | 'epoch_conflict' | 'epoch_not_advanced' | 'input_invalid' | 'lease_expired' | 'owner_disposed'
+    | 'broker_factory_failed' | 'broker_unavailable' | 'epoch_conflict' | 'input_invalid' | 'lease_expired' | 'owner_disposed'
     | 'owner_exists' | 'reference_unavailable' | 'selection_busy' | 'selection_unavailable'
     | 'session_ineligible' | 'session_unavailable' | 'stale_selection';
 
@@ -38,7 +37,8 @@ export class ServerSessionProjectionOwnerError extends Error {
 }
 
 export type ServerSessionProjectionOwner = Readonly<{
-    install(input: Readonly<{ leaseRef: string; selectionEpoch: number; control: BrokerControl }>): void;
+    acquireProjectionIngest(session: ServerSession, input: SelectionLeaseTuple): TypedBroker['ingest'];
+    resolveProjectionService(session: ServerSession): TypedBroker['service'];
     issueSelection(input: Readonly<{ expectedEpoch: number; patientId: string; ambulatoryId: string }>): SelectionLease;
     dereferenceSelection(session: ServerSession, input: Readonly<{
         sessionRef: string; selectionEpoch: number; patientRef: string; ambulatoryRef: string; leaseRef: string;
@@ -46,31 +46,18 @@ export type ServerSessionProjectionOwner = Readonly<{
     dispose(): void;
 }>;
 
+type SelectionLeaseTuple = Readonly<{ sessionRef: string; selectionEpoch: number; patientRef: string;
+    ambulatoryRef: string; leaseRef: string }>;
+
 function fail(code: ServerSessionProjectionOwnerErrorCode): never {
     throw new ServerSessionProjectionOwnerError(code);
 }
 
-function parseInstall(input: unknown) {
-    if (typeof input !== 'object' || input === null || Array.isArray(input)
-        || Object.getPrototypeOf(input) !== Object.prototype) fail('input_invalid');
-    const keys = Reflect.ownKeys(input);
-    if (keys.length !== 3 || keys.some((key) => !['leaseRef', 'selectionEpoch', 'control'].includes(String(key)))) {
-        fail('input_invalid');
-    }
-    const value = input as { leaseRef?: unknown; selectionEpoch?: unknown; control?: unknown };
-    if (typeof value.leaseRef !== 'string' || !/^[A-Za-z][A-Za-z0-9._:-]{15,159}$/u.test(value.leaseRef)) {
-        fail('input_invalid');
-    }
-    if (!Number.isSafeInteger(value.selectionEpoch) || (value.selectionEpoch as number) < 1) fail('input_invalid');
-    const control = value.control as Partial<BrokerControl> | null;
-    if (!control || typeof control.lock !== 'function' || typeof control.revoke !== 'function'
-        || typeof control.changeSelection !== 'function') fail('input_invalid');
-    return { leaseRef: value.leaseRef, selectionEpoch: value.selectionEpoch as number, control: control as BrokerControl };
-}
-
-function revoke(binding: ActiveBinding | null): void {
+function revoke(binding: ActiveBinding | null, unregister = true): void {
     if (!binding) return;
-    binding.unregister();
+    binding.active = false;
+    if (unregister) binding.unregister?.();
+    binding.unregister = null;
     try { binding.control.revoke(); } catch { /* Authority remains removed and cleanup detail stays opaque. */ }
 }
 
@@ -78,6 +65,7 @@ const defaultSources: SelectionSources = Object.freeze({
     resolve: () => fail('selection_unavailable'),
     clock: () => Date.now(),
     entropy: () => randomBytes(16),
+    brokerFactory: (config) => createTypedProjectionBroker(config),
 });
 
 function exact(input: unknown, keys: readonly string[]): Record<string, unknown> {
@@ -114,6 +102,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             let epoch = 0;
             let selection: SelectionState | null = null;
             let selecting = false;
+            let creating: SelectionState | null = null;
             let terminal = false;
             let unregisterOwner: (() => void) | null = null;
             const finish = (revokeActive: boolean) => {
@@ -126,7 +115,8 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 const previous = active;
                 active = null;
                 selection = null;
-                if (revokeActive) revoke(previous);
+                if (previous && revokeActive) revoke(previous);
+                else if (previous) { previous.active = false; previous.unregister = null; }
             };
             const issuedRefs = new Set<string>();
             const reference = (prefix: string) => {
@@ -143,16 +133,77 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 try { const now = sources.clock(); if (Number.isFinite(now)) return now; } catch { /* fixed error below */ }
                 return fail('selection_unavailable');
             };
+            const requireCurrentSession = (presented: ServerSession) => {
+                if (terminal || presented !== session || session.authChannel !== 'web' || getSession(session.id) !== session) fail('session_unavailable');
+            };
+            const readTuple = (input: unknown) => exact(input, ['sessionRef', 'selectionEpoch', 'patientRef', 'ambulatoryRef', 'leaseRef']) as SelectionLeaseTuple;
+            const tupleMatches = (value: SelectionLeaseTuple, current: SelectionState) =>
+                value.sessionRef === sessionRef && value.selectionEpoch === current.selectionEpoch
+                && value.patientRef === current.patientRef && value.ambulatoryRef === current.ambulatoryRef
+                && value.leaseRef === current.leaseRef;
+            const expire = () => { const previous = active; active = null; selection = null; revoke(previous); };
+            const candidateControl = (candidate: unknown): TypedBroker['control'] | null => {
+                if (typeof candidate !== 'object' || candidate === null) return null;
+                const descriptor = Object.getOwnPropertyDescriptor(candidate, 'control');
+                if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'object' || !descriptor.value) return null;
+                return typeof descriptor.value.revoke === 'function' ? descriptor.value as TypedBroker['control'] : null;
+            };
+            const validCandidate = (candidate: unknown): candidate is TypedBroker => {
+                if (typeof candidate !== 'object' || candidate === null) return false;
+                const value = candidate as Partial<TypedBroker>;
+                return typeof value.ingest?.ingest === 'function' && typeof value.service?.consume === 'function'
+                    && typeof value.control?.lock === 'function' && typeof value.control.revoke === 'function'
+                    && typeof value.control.changeSelection === 'function';
+            };
             const owner: ServerSessionProjectionOwner = Object.freeze({
-                install(input) {
-                    if (terminal) return fail('owner_disposed');
-                    const next = parseInstall(input);
-                    if (active && next.selectionEpoch <= active.selectionEpoch) return fail('epoch_not_advanced');
-                    const previous = active;
-                    active = null;
-                    revoke(previous);
-                    const unregister = bindProjectionBrokerToServerSession(session.id, next.control);
-                    active = { ...next, unregister };
+                acquireProjectionIngest(presentedSession, input) {
+                    requireCurrentSession(presentedSession);
+                    const value = readTuple(input); const current = selection;
+                    if (!current || !tupleMatches(value, current)) return fail('stale_selection');
+                    if (readClock() >= current.expiresAt) { expire(); return fail('lease_expired'); }
+                    if (active?.selection === current && active.active) return active.ingest;
+                    if (creating === current) return fail('broker_unavailable');
+                    creating = current;
+                    let candidate: unknown;
+                    try {
+                        candidate = sources.brokerFactory({ sessionRef: current.sessionRef, ambulatoryRef: current.ambulatoryRef,
+                            patientRef: current.patientRef, selectionEpoch: current.selectionEpoch, leaseRef: current.leaseRef,
+                            expiresAt: new Date(current.expiresAt).toISOString() });
+                    } catch { creating = null; return fail('broker_factory_failed'); }
+                    creating = null;
+                    try { if (!validCandidate(candidate)) throw new Error('malformed'); }
+                    catch {
+                        try { candidateControl(candidate)?.revoke(); } catch { /* Opaque cleanup failure. */ }
+                        return fail('broker_factory_failed');
+                    }
+                    try {
+                        requireCurrentSession(presentedSession);
+                        if (selection !== current || !tupleMatches(value, current)) fail('stale_selection');
+                        if (readClock() >= current.expiresAt) { expire(); fail('lease_expired'); }
+                    } catch (error) {
+                        try { candidate.control.revoke(); } catch { /* Opaque cleanup failure. */ }
+                        throw error;
+                    }
+                    const binding = { selection: current, active: false, control: candidate.control,
+                        unregister: null } as ActiveBinding;
+                    const assertActive = () => {
+                        if (!binding.active || active !== binding || selection !== current) {
+                            throw new ProjectionBrokerError('broker_revoked');
+                        }
+                    };
+                    binding.ingest = Object.freeze({ ingest(value) { assertActive(); return candidate.ingest.ingest(value); } });
+                    binding.service = Object.freeze({ consume(value) { assertActive(); return candidate.service.consume(value); } });
+                    try { binding.unregister = bindProjectionBrokerToServerSession(session.id, candidate.control); }
+                    catch { return fail('session_unavailable'); }
+                    binding.active = true; active = binding;
+                    return binding.ingest;
+                },
+                resolveProjectionService(presentedSession) {
+                    requireCurrentSession(presentedSession);
+                    if (!selection) return fail('stale_selection');
+                    if (readClock() >= selection.expiresAt) { expire(); return fail('lease_expired'); }
+                    if (!active?.active || active.selection !== selection) return fail('broker_unavailable');
+                    return active.service;
                 },
                 issueSelection(input) {
                     if (terminal) return fail('session_unavailable');
