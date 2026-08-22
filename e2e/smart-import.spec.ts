@@ -1,6 +1,18 @@
 /* @Codex */
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, setAiLaneKillSwitch } from './utils';
+
+async function bootstrapSmartImportSession(page: Page, pin: string) {
+  await page.route('**/api/ai/models', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ models: [{ name: 'qwen3.5:35b-a3b' }] }),
+    });
+  });
+  await bootstrapUnlockedSession(page, pin);
+  await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'enabled');
+}
 
 // WUL-274/Kree8: the cockpit patient search no longer exposes a patients-search-input
 // testid, and clicking a search result opens the Scheda (/modules) route. Tests create
@@ -43,6 +55,13 @@ async function createTherapyViaApi(page: Page, payload: Record<string, unknown>)
 async function openPatientScheda(page: Page, patientId: string) {
   await page.goto(`/patients/${patientId}/modules`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
+}
+
+async function openDocumentiSection(page: Page) {
+  const trigger = page.locator('section#documenti > button').first();
+  await expect(trigger).toBeVisible();
+  if (await trigger.getAttribute('aria-expanded') === 'false') await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
 }
 
 function smartImportDiagnosisInputId(label: string, icdQuery: string) {
@@ -388,7 +407,7 @@ test('smart import adds ICD diagnosis chips and therapy from patient notes after
     });
   });
 
-  await bootstrapUnlockedSession(page, pin);
+  await bootstrapSmartImportSession(page, pin);
   const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
@@ -397,6 +416,7 @@ test('smart import adds ICD diagnosis chips and therapy from patient notes after
   });
 
   await openPatientScheda(page, patientId);
+  await openDocumentiSection(page);
 
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
@@ -515,7 +535,7 @@ test('smart import keeps transition and uncertain therapies visible without trun
     });
   });
 
-  await bootstrapUnlockedSession(page, pin);
+  await bootstrapSmartImportSession(page, pin);
   const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
@@ -524,6 +544,7 @@ test('smart import keeps transition and uncertain therapies visible without trun
   });
 
   await openPatientScheda(page, patientId);
+  await openDocumentiSection(page);
 
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
@@ -614,7 +635,7 @@ test('smart import marks therapy dosage changes as update and keeps them editabl
     });
   });
 
-  await bootstrapUnlockedSession(page, pin);
+  await bootstrapSmartImportSession(page, pin);
   const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
@@ -623,6 +644,7 @@ test('smart import marks therapy dosage changes as update and keeps them editabl
   });
 
   await openPatientScheda(page, patientId);
+  await openDocumentiSection(page);
 
   await page.evaluate(async ({ id }) => {
     const response = await fetch('/api/therapies', {
@@ -644,6 +666,7 @@ test('smart import marks therapy dosage changes as update and keeps them editabl
   }, { id: patientId });
 
   await page.reload();
+  await openDocumentiSection(page);
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
 
@@ -699,7 +722,7 @@ test('smart import keeps manual-only therapy consultive and disables direct appl
     });
   });
 
-  await bootstrapUnlockedSession(page, pin);
+  await bootstrapSmartImportSession(page, pin);
   const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
@@ -708,6 +731,7 @@ test('smart import keeps manual-only therapy consultive and disables direct appl
   });
 
   await openPatientScheda(page, patientId);
+  await openDocumentiSection(page);
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
 
@@ -769,7 +793,7 @@ test('smart import keeps catalog therapy without useful dosage consultive and di
     });
   });
 
-  await bootstrapUnlockedSession(page, pin);
+  await bootstrapSmartImportSession(page, pin);
   const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
@@ -778,6 +802,7 @@ test('smart import keeps catalog therapy without useful dosage consultive and di
   });
 
   await openPatientScheda(page, patientId);
+  await openDocumentiSection(page);
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
 
@@ -857,7 +882,7 @@ test('smart import normalizes outgoing switch therapy to transition even when mo
     });
   });
 
-  await bootstrapUnlockedSession(page, pin);
+  await bootstrapSmartImportSession(page, pin);
   const patientId = await createPatientViaApi(page, {
     firstName,
     lastName,
@@ -866,6 +891,7 @@ test('smart import normalizes outgoing switch therapy to transition even when mo
   });
 
   await openPatientScheda(page, patientId);
+  await openDocumentiSection(page);
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
 
@@ -937,7 +963,7 @@ test('smart import hides already-present referral duplicates when the source has
     });
   });
 
-  await bootstrapUnlockedSession(page, pin);
+  await bootstrapSmartImportSession(page, pin);
 
   const patientId = await createPatientViaApi(page, {
     firstName: `Referral${suffix}`,
@@ -966,8 +992,8 @@ test('smart import hides already-present referral duplicates when the source has
     startDate: new Date('2026-04-01T08:00:00Z').toISOString(),
   });
 
-  // WUL-274/Kree8: the smart-import panel mounts on the primary Scheda route (/modules).
-  await page.goto(`/patients/${patientId}/modules`);
+  await openPatientScheda(page, patientId);
+  await openDocumentiSection(page);
   await expect(page.getByRole('button', { name: 'Analizza fonti' })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Analizza fonti' }).click();
 

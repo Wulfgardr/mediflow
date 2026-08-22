@@ -38,6 +38,12 @@ import {
     AI_SMART_IMPORT_KILL_SWITCH_KEY,
     assertAiSmartImportEnabledValue,
 } from '../../ai-smart-import-kill-switch';
+/* @Codex */
+import {
+    createPatientSmartImportCandidateHostSnapshot,
+    executePatientSmartImportFabricPreview,
+    PATIENT_SMART_IMPORT_FABRIC_METADATA,
+} from './patient-smart-import-fabric';
 
 export type { SmartImportConfidence, TherapySuggestionState, SmartImportReview, SmartImportReviewState };
 
@@ -841,7 +847,14 @@ export async function generatePatientSmartImportAnalysis(patientId: string): Pro
     const currentDiagnoses = parseDiagnoses(patient.diagnoses);
     const ai = await AIService.create('clinical');
     const prompt = buildStructuredPrompt(patient, currentDiagnoses, currentTherapies, sourceRecords);
-    const response = await ai.generate(prompt, undefined, SMART_IMPORT_OUTPUT_MAX_TOKENS);
+    const health = await ai.getHealth().catch(() => null);
+    const modelInfo = ai.getModelInfo();
+    const fabricPreview = await executePatientSmartImportFabricPreview({
+        modelInfo,
+        health,
+        host: createPatientSmartImportCandidateHostSnapshot(),
+    }, () => ai.generate(prompt, undefined, SMART_IMPORT_OUTPUT_MAX_TOKENS));
+    const response = fabricPreview.output;
     const parsed = parseAiPayload(response);
     const parsedData = parsed.value.data;
     const sourceMap = new Map(sourceRecords.map((source) => [source.id, source]));
@@ -919,7 +932,7 @@ export async function generatePatientSmartImportAnalysis(patientId: string): Pro
         therapy.evidence,
     )).sort(sortTherapySuggestions);
 
-    return {
+    const analysis: PatientSmartImportAnalysis = {
         generatedAt: new Date().toISOString(),
         // @Codex
         contract: {
@@ -940,6 +953,11 @@ export async function generatePatientSmartImportAnalysis(patientId: string): Pro
         diagnoses,
         therapies: therapySuggestions,
     };
+    Object.defineProperty(analysis, PATIENT_SMART_IMPORT_FABRIC_METADATA, {
+        value: fabricPreview.metadata,
+        enumerable: false,
+    });
+    return analysis;
 }
 
 function diagnosisExists(existing: Diagnosis[], suggestion: DiagnosisSmartImportSuggestion): boolean {
