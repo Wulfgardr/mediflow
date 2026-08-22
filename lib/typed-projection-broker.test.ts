@@ -47,6 +47,32 @@ test('ingests once and returns an opaque handle for one detached frozen consume'
         (error) => error instanceof ProjectionBrokerError && error.code === 'request_replayed');
 });
 
+test('consume uses the half-open freshness boundary, deletes stale records, and keeps lease priority', () => {
+    for (const consumeAt of [NOW, '2026-08-22T12:02:00.000Z', '2026-08-22T12:04:59.999Z']) {
+        let now = NOW;
+        const boundary = createTypedProjectionBroker(config(), sources({ clock: () => now }));
+        const handle = ingest(boundary);
+        now = consumeAt;
+        assert.equal(boundary.service.consume({ handle, capability: 'smart_import', requestId: requestId() }).capturedAt, NOW);
+        reject(() => boundary.service.consume({ handle, capability: 'smart_import', requestId: requestId() }), 'handle_missing');
+    }
+
+    let now = NOW;
+    const stale = createTypedProjectionBroker(config(), sources({ clock: () => now }));
+    const staleHandle = ingest(stale);
+    now = '2026-08-22T12:05:00.000Z';
+    const staleRequest = requestId();
+    reject(() => stale.service.consume({ handle: staleHandle, capability: 'smart_import', requestId: staleRequest }), 'projection_stale');
+    reject(() => stale.service.consume({ handle: staleHandle, capability: 'smart_import', requestId: staleRequest }), 'request_replayed');
+    reject(() => stale.service.consume({ handle: staleHandle, capability: 'smart_import', requestId: requestId() }), 'handle_missing');
+
+    now = NOW;
+    const leaseFirst = createTypedProjectionBroker({ ...config(), expiresAt: '2026-08-22T12:04:00.000Z' }, sources({ clock: () => now }));
+    const leaseHandle = ingest(leaseFirst);
+    now = '2026-08-22T12:05:00.000Z';
+    reject(() => leaseFirst.service.consume({ handle: leaseHandle, capability: 'smart_import', requestId: requestId() }), 'lease_expired');
+});
+
 test('maps throwing or invalid clock and entropy sources to one fixed error', () => {
     for (const source of [
         sources({ clock: () => { throw new Error('raw clock'); } }),

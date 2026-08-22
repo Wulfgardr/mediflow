@@ -1,7 +1,7 @@
 /* @Codex */
 import 'server-only';
 import { randomBytes } from 'node:crypto';
-import { SmartImportProjectionError, snapshotSmartImportProjection, type SmartImportProjection } from './smart-import-projection';
+import { SMART_IMPORT_PROJECTION_FRESHNESS_MS, SmartImportProjectionError, snapshotSmartImportProjection, type SmartImportProjection } from './smart-import-projection';
 
 export type ProjectionBrokerErrorCode =
     | 'broker_locked' | 'broker_revoked' | 'capability_mismatch' | 'handle_collision' | 'handle_missing'
@@ -97,12 +97,15 @@ export function createTypedProjectionBroker(configValue: TypedProjectionBrokerCo
         issued.add(handle); records.set(handle, snapshot); selectionChanged = false; return handle;
     } });
     const service = Object.freeze({ consume(inputValue: Readonly<{ handle: string; capability: 'smart_import'; requestId: string }>) {
-        const input = exact(inputValue, ['handle', 'capability', 'requestId'], 'input_invalid'); acceptRequest(input.requestId); active();
+        const input = exact(inputValue, ['handle', 'capability', 'requestId'], 'input_invalid'); acceptRequest(input.requestId); const now = active();
         if (selectionChanged) fail('selection_changed');
         if (input.capability !== 'smart_import') fail('capability_mismatch');
         if (typeof input.handle !== 'string' || !/^prj_[0-9a-f]{32}$/u.test(input.handle)) fail('input_invalid');
         const snapshot = records.get(input.handle);
         if (!snapshot) fail('handle_missing');
+        if (Date.parse(now) >= Date.parse(snapshot.capturedAt) + SMART_IMPORT_PROJECTION_FRESHNESS_MS) {
+            records.delete(input.handle); fail('projection_stale');
+        }
         records.delete(input.handle); return snapshot;
     } });
     const control = Object.freeze({
