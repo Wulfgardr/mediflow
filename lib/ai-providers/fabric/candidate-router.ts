@@ -59,6 +59,8 @@ export type CandidateRoutingInput = Readonly<{
     reconnection?: PairingReconnectionClass;
 }>;
 
+export type HostCandidateRoutingInput = Omit<CandidateRoutingInput, 'onboarding' | 'lifecycle'>;
+
 export type CandidateRoutingResult = Readonly<{
     decision: CandidateRoutingDecision;
     resolution: FabricResolution | null;
@@ -92,6 +94,18 @@ function snapshotCandidateRoutingInput(input: CandidateRoutingInput): CandidateR
         observations: input.observations,
         onboarding: input.onboarding,
         lifecycle: input.lifecycle,
+        reconnection: input.reconnection,
+    });
+}
+
+function snapshotHostCandidateRoutingInput(input: HostCandidateRoutingInput): CandidateRoutingInput {
+    if (!isRecord(input)) {
+        throw new FabricPolicyError('policy_invalid');
+    }
+    return Object.freeze({
+        policy: input.policy,
+        request: input.request,
+        observations: input.observations,
         reconnection: input.reconnection,
     });
 }
@@ -209,15 +223,19 @@ function snapshotGenerativeAdmission(input: CandidateRoutingInput): ProviderLife
     return lifecycle;
 }
 
-/**
- * Candidate-only admission layer for ADR 0091. It composes the pure resolver
- * with provider lifecycle and paired trust, but introduces no provider call,
- * persistence, credential handling, or fallback selection.
- */
-export function routeCandidateCapability(
-    input: CandidateRoutingInput,
+function snapshotPersistedGenerativeAdmission(value: unknown): ProviderLifecycleState | null {
+    const lifecycle = snapshotProviderLifecycle(value);
+    return lifecycle.credentialClass === 'local_model'
+        && lifecycle.status === 'available_unqualified'
+        ? lifecycle
+        : null;
+}
+
+function routeCandidateCapabilityWithAdmission(
+    inputSnapshot: CandidateRoutingInput,
+    snapshotAdmission: () => ProviderLifecycleState | null,
+    mapsOnboardingErrors: boolean,
 ): CandidateRoutingResult {
-    const inputSnapshot = snapshotCandidateRoutingInput(input);
     const context = snapshotCandidateDecisionContext(inputSnapshot);
     const observations = observationsFor(context.requestedVenue, inputSnapshot.observations);
     const requestedObservation = observations.find(
@@ -245,7 +263,7 @@ export function routeCandidateCapability(
     let admittedLifecycle: ProviderLifecycleState | null = null;
     if (context.descriptor.class === 'generative') {
         try {
-            admittedLifecycle = snapshotGenerativeAdmission(inputSnapshot);
+            admittedLifecycle = snapshotAdmission();
             if (!admittedLifecycle) {
                 return denied(context, observations, 'provider_lifecycle_unavailable');
             }
@@ -254,9 +272,9 @@ export function routeCandidateCapability(
                 return denied(
                     context,
                     observations,
-                    error.code === 'onboarding_not_enabled'
+                    mapsOnboardingErrors && (error.code === 'onboarding_not_enabled'
                         || error.code === 'credential_class_forbidden'
-                        || error.code === 'egress_profile_unsatisfied'
+                        || error.code === 'egress_profile_unsatisfied')
                         ? 'provider_onboarding_required'
                         : 'provider_lifecycle_invalid',
                 );
@@ -297,4 +315,32 @@ export function routeCandidateCapability(
         ),
         resolution: routed.resolution,
     });
+}
+
+/**
+ * Candidate-only admission layer for ADR 0091. It composes the pure resolver
+ * with provider lifecycle and paired trust, but introduces no provider call,
+ * persistence, credential handling, or fallback selection.
+ */
+export function routeCandidateCapability(
+    input: CandidateRoutingInput,
+): CandidateRoutingResult {
+    const inputSnapshot = snapshotCandidateRoutingInput(input);
+    return routeCandidateCapabilityWithAdmission(
+        inputSnapshot,
+        () => snapshotGenerativeAdmission(inputSnapshot),
+        true,
+    );
+}
+
+export function routeHostCandidateCapability(
+    input: HostCandidateRoutingInput,
+    lifecycle: ProviderLifecycleState,
+): CandidateRoutingResult {
+    const inputSnapshot = snapshotHostCandidateRoutingInput(input);
+    return routeCandidateCapabilityWithAdmission(
+        inputSnapshot,
+        () => snapshotPersistedGenerativeAdmission(lifecycle),
+        false,
+    );
 }
