@@ -54,6 +54,24 @@ test('fails with a fixed error before capability construction when no authentica
     assert.equal(factories, 0);
 });
 
+test('maps a capability factory fault to a fixed preview-unavailable error', async () => {
+    const current = context(() => ({ consume: () => ({}) }));
+    const service = createAuthenticatedSmartImportPreviewService({ acquireContext: async () => current,
+        createCapability: () => { throw new Error('synthetic factory marker'); } });
+
+    await assert.rejects(() => service.preview(REQUEST), (error: unknown) => rejects('preview_unavailable')(error)
+        && !/synthetic factory marker/u.test(error instanceof Error ? error.message : ''));
+});
+
+test('maps a capability preview fault to a fixed preview-unavailable error', async () => {
+    const current = context(() => ({ consume: () => ({}) }));
+    const service = createAuthenticatedSmartImportPreviewService({ acquireContext: async () => current,
+        createCapability: () => ({ preview: async () => { throw new Error('synthetic preview marker'); } }) });
+
+    await assert.rejects(() => service.preview(REQUEST), (error: unknown) => rejects('preview_unavailable')(error)
+        && !/synthetic preview marker/u.test(error instanceof Error ? error.message : ''));
+});
+
 test('keeps hostile input invalid after authentication and defers broker resolution behind the kill switch', async () => {
     let resolves = 0;
     const current = context(() => { resolves += 1; return { consume: () => ({}) }; });
