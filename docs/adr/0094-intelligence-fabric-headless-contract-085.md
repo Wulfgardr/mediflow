@@ -1,10 +1,10 @@
 # ADR 0094: contratto Intelligence Fabric e headless 0.8.5
 
-Date: 2026-08-22  
+Date: 2026-08-22
 Status: Proposed
 
-Issue: WUL-522  
-Baseline: `main` a `0d55c6d0f`, versione `0.8.2`  
+Issue: WUL-522
+Baseline: `main` a `0d55c6d0f`, versione `0.8.2`
 Program line: candidato `0.8.5`
 
 Related: [ADR 0089](./0089-contratto-intelligence-fabric-e-venue-esecutive.md),
