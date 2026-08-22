@@ -47,38 +47,39 @@ struct MobilePairedStatusPresentation: Equatable {
 /* @Codex */
 struct MobilePairedStatusView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     let presentation: MobilePairedStatusPresentation
     let onPrimaryAction: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            statusSymbol
-            VStack(alignment: .leading, spacing: 4) {
-                Text(presentation.title)
-                    .font(.headline)
-                Text(presentation.detail)
-                    .font(.subheadline)
-                    .foregroundStyle(mutedColor)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 8)
-            if let actionTitle = presentation.actionTitle {
-                Button(action: onPrimaryAction) {
-                    Text(actionTitle)
-                        .foregroundStyle(colorScheme == .dark ? Color.black : Color.white)
+            if dynamicTypeSize.isAccessibilitySize {
+                // The outer element retains the complete status and detail for
+                // assistive technologies. Keeping only the state symbol and its
+                // action on screen preserves the first patient row at AX sizes.
+                statusSymbol
+                Spacer(minLength: 8)
+                primaryActionButton(compact: true)
+            } else {
+                statusSymbol
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(presentation.title)
+                        .font(.headline)
+                        .lineLimit(isShortViewport ? 1 : nil)
+                    if !isShortViewport {
+                        Text(presentation.detail)
+                            .font(.subheadline)
+                            .foregroundStyle(mutedColor)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.primary)
-                .controlSize(.large)
-                .frame(minWidth: 48, minHeight: 48)
-                .contentShape(.interaction, Rectangle())
-                .hoverEffect(.highlight)
-                .keyboardShortcut("r", modifiers: .command)
-                .accessibilityHint("Aggiorna lo stato del collegamento con l'home-base.")
+                Spacer(minLength: 8)
+                primaryActionButton()
             }
         }
-        .padding(14)
+        .padding(dynamicTypeSize.isAccessibilitySize ? 8 : 14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .lumeSurface(zone: .field)
         .accessibilityElement(children: .contain)
@@ -107,6 +108,37 @@ struct MobilePairedStatusView: View {
         case .offline, .sessionExpired: return LumePalette.warning
         case .loading, .cached, .notLoaded: return mutedColor
         }
+    }
+
+    @ViewBuilder
+    private func primaryActionButton(compact: Bool = false) -> some View {
+        if let actionTitle = presentation.actionTitle {
+            Button(action: onPrimaryAction) {
+                if compact {
+                    Image(systemName: actionTitle == "Configura" || actionTitle == "Accedi"
+                        ? "slider.horizontal.3"
+                        : "arrow.clockwise")
+                        .font(.system(size: 20, weight: .semibold))
+                } else {
+                    Text(actionTitle)
+                        .fixedSize()
+                        .foregroundStyle(colorScheme == .dark ? Color.black : Color.white)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.primary)
+            .controlSize(.large)
+            .frame(minWidth: 48, minHeight: 48)
+            .contentShape(.interaction, Rectangle())
+            .hoverEffect(.highlight)
+            .keyboardShortcut("r", modifiers: .command)
+            .accessibilityLabel(actionTitle)
+            .accessibilityHint("Aggiorna lo stato del collegamento con l'home-base.")
+        }
+    }
+
+    private var isShortViewport: Bool {
+        verticalSizeClass == .compact
     }
 
     private var mutedColor: Color {
