@@ -112,6 +112,9 @@ test('session sliding does not renew the immutable half-open lease', (context) =
     sessionNow += 1_000;
     assert.equal(getSession(session.id), session);
     assert.ok(session.expiresAt > firstExpiry);
+    setNow(firstExpiry - 1);
+    assert.deepEqual(owner.dereferenceSelection(session, tuple(lease)), PAIR);
+    assert.deepEqual(owner.dereferenceSelection(session, tuple(lease)), PAIR);
     setNow(firstExpiry);
     assert.throws(() => owner.dereferenceSelection(session, tuple(lease)), rejects('lease_expired'));
     assert.throws(() => owner.dereferenceSelection(session, tuple(lease)), rejects('stale_selection'));
@@ -120,7 +123,7 @@ test('session sliding does not renew the immutable half-open lease', (context) =
     assert.equal(replacement.sessionRef, lease.sessionRef);
 });
 
-test('complete tuple is single-use; every field mismatch and early disposal fail closed', (context) => {
+test('current tuple is reusable while mismatches, replacement, disposal, and restart fail closed', (context) => {
     context.mock.method(Date, 'now', () => 10_000);
     const { registry, session, owner } = setup();
     const lease = issue(owner);
@@ -133,11 +136,12 @@ test('complete tuple is single-use; every field mismatch and early disposal fail
         assert.throws(() => owner.dereferenceSelection(session, wrong), rejects('stale_selection'));
     }
     assert.deepEqual(owner.dereferenceSelection(session, validTuple), PAIR);
-    assert.throws(() => owner.dereferenceSelection(session, validTuple), rejects('stale_selection'));
+    assert.deepEqual(owner.dereferenceSelection(session, validTuple), PAIR);
 
     const fresh = createServerSessionProjectionOwnerRegistry();
     assert.equal(fresh.lookup(session.id), null);
     const next = issue(owner, 1);
+    assert.throws(() => owner.dereferenceSelection(session, validTuple), rejects('stale_selection'));
     deleteSession(session.id);
     assert.throws(() => owner.dereferenceSelection(session, tuple(next)), rejects('session_unavailable'));
     assert.equal(registry.lookup(session.id), null);
