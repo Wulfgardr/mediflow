@@ -431,7 +431,20 @@ struct PairedPatientsWorkspaceView: View {
     }
 
     /* @Codex */
+    @ViewBuilder
     private var mobilePairedStatus: some View {
+        #if DEBUG
+        if let override = MobilePairedStatusUITestOverride.load() {
+            MobilePairedStatusView(presentation: override.presentation, onPrimaryAction: {})
+        } else {
+            liveMobilePairedStatus
+        }
+        #else
+        liveMobilePairedStatus
+        #endif
+    }
+
+    private var liveMobilePairedStatus: some View {
         MobilePairedStatusView(
             presentation: .make(
                 connectionState: model.connectionState,
