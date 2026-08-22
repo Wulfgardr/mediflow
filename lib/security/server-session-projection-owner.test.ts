@@ -139,15 +139,16 @@ test('reacquire preserves an existing selection without resolver or broker side 
     assert.deepEqual({ resolves, brokers, epoch: lease.selectionEpoch }, { resolves: 1, brokers: 0, epoch: 1 });
 });
 
-test('production composition acquires once after direct authentication without app reachability', () => {
+test('authenticated owner context acquires once and legacy owner helper only derives it', () => {
     const ownerSource = readFileSync(new URL('./server-session-projection-owner.ts', import.meta.url), 'utf8');
     const authSource = readFileSync(new URL('./server-auth.ts', import.meta.url), 'utf8');
     const productionSource = `${ownerSource}\n${authSource}`;
 
     assert.match(
         authSource,
-        /acquireAuthenticatedWebSessionProjectionOwner[\s\S]*const session = await requireSession\(\);[\s\S]*serverSessionProjectionOwnerRegistry\.acquire\(session\)/u,
+        /acquireAuthenticatedWebSessionProjectionOwnerContext[\s\S]*const session = await requireSession\(\);[\s\S]*serverSessionProjectionOwnerRegistry\.acquire\(session\)[\s\S]*Object\.freeze\(\{ session, owner \}\)/u,
     );
+    assert.match(authSource, /acquireAuthenticatedWebSessionProjectionOwner\(\)[\s\S]*acquireAuthenticatedWebSessionProjectionOwnerContext\(\)[\s\S]*\?\.owner/u);
     assert.doesNotMatch(authSource, /createAuthenticatedWebSessionProjectionOwner|serverSessionProjectionOwnerRegistry\.lookup\(/u);
     assert.doesNotMatch(
         productionSource,
