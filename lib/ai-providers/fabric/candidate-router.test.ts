@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DETERMINISTIC_CAPABILITY_DESCRIPTORS } from './deterministic-catalog.ts';
 import { GENERATIVE_CAPABILITY_DESCRIPTORS } from './generative-catalog.ts';
+import { localProviderRegistry } from '../registry.ts';
 import {
     FabricPolicyError,
     type FabricCapabilityDescriptor,
@@ -10,11 +11,16 @@ import {
 } from './contract.ts';
 import { advanceOnboarding, startOnboarding, type ProviderOnboardingState } from './onboarding.ts';
 import { admitProvider, transitionProviderLifecycle } from './provider-lifecycle.ts';
-import { routeCandidateCapability, routeHostCandidateCapability } from './candidate-router.ts';
+import {
+    routeCandidateCapability,
+    routeHostCandidateCapability,
+    routeHostResolvedCandidateCapability,
+} from './candidate-router.ts';
 import { observeVenue } from './routing-observability.ts';
 
 const deterministic = DETERMINISTIC_CAPABILITY_DESCRIPTORS.icd_lookup;
 const generative = GENERATIVE_CAPABILITY_DESCRIPTORS.patient_insight;
+const smartImport = GENERATIVE_CAPABILITY_DESCRIPTORS.smart_import;
 const binding = {
     task: 'caller_value_is_ignored',
     models: { clinical: 'qwen3.5:35b-a3b', reasoning: 'reasoning-model', ocr: 'ocr-model' },
@@ -130,6 +136,88 @@ test('il router host usa il lifecycle persistito senza ricostruire onboarding', 
     }, availableLocal());
     assert.equal(result.decision.outcome, 'resolved');
     assert.equal(result.decision.receipt?.provider, 'ollama');
+});
+
+test('il router host resolved riusa la stessa resolution e adapter', () => {
+    const hostResolution = localProviderRegistry.resolve({ ...binding, task: 'clinical' });
+    const result = routeHostResolvedCandidateCapability({
+        policy: policyFor(smartImport),
+        request: {
+            descriptor: smartImport,
+            venue: 'local_process',
+            generative: hostResolution,
+        },
+        observations: [observeVenue('local_process', 'available', null)],
+    }, availableLocal());
+
+    assert.equal(result.decision.outcome, 'resolved');
+    assert.equal(result.resolution?.generative, hostResolution);
+    assert.equal(result.resolution?.generative?.adapter, hostResolution.adapter);
+    assert.equal(result.decision.receipt, result.resolution?.receipt);
+    assert.equal(Object.isFrozen(result.decision) && Object.isFrozen(result.decision.receipt), true);
+});
+
+test('snapshotta la host resolution una sola volta prima del routing', () => {
+    const hostResolution = localProviderRegistry.resolve({ ...binding, task: 'clinical' });
+    let resolutionReads = 0;
+    const result = routeHostResolvedCandidateCapability({
+        policy: policyFor(smartImport),
+        request: {
+            descriptor: smartImport,
+            venue: 'local_process',
+            get generative() {
+                resolutionReads += 1;
+                return resolutionReads === 1 ? hostResolution : null as never;
+            },
+        },
+        observations: [observeVenue('local_process', 'available', null)],
+    }, availableLocal());
+
+    assert.equal(result.decision.outcome, 'resolved');
+    assert.equal(result.resolution?.generative, hostResolution);
+    assert.equal(resolutionReads, 1);
+});
+
+test('il router host resolved nega ogni gate prima di invocare il provider', () => {
+    const available = availableLocal();
+    const base = localProviderRegistry.resolve({ ...binding, task: 'clinical' });
+    let providerInvocations = 0;
+    const guardedResolution = {
+        ...base,
+        adapter: {
+            id: base.adapter.id,
+            kind: base.adapter.kind,
+            capabilities: base.adapter.capabilities,
+            getBaseUrl: () => base.adapter.getBaseUrl(),
+            getModel: () => base.adapter.getModel(),
+            chat: async () => { providerInvocations += 1; throw new Error('not-called'); },
+            listModels: async () => { providerInvocations += 1; throw new Error('not-called'); },
+        },
+    };
+    const input = {
+        policy: policyFor(smartImport),
+        request: { descriptor: smartImport, venue: 'local_process', generative: guardedResolution },
+        observations: [observeVenue('local_process', 'available', null)],
+    } as const;
+    const cases = [
+        [{ ...input, observations: [observeVenue('local_process', 'offline', 'daemon_unreachable')] }, available, 'venue_offline'],
+        [{ ...input, observations: [observeVenue('local_process', 'unknown', 'not_probed')] }, available, 'venue_unknown'],
+        [{ ...input, observations: [observeVenue('local_process', 'degraded', 'daemon_unreachable')] }, available, 'venue_degraded'],
+        [{ ...input, request: { ...input.request, venue: 'home_base' }, observations: [observeVenue('home_base', 'available', null)], reconnection: 're_login_required' }, available, 'paired_trust_denied'],
+        [input, { ...available, extra: 'not-allowed' }, 'provider_lifecycle_invalid'],
+        [input, transitionProviderLifecycle(available, 'degrade'), 'provider_lifecycle_unavailable'],
+        [input, transitionProviderLifecycle(available, 'revoke'), 'provider_lifecycle_unavailable'],
+        [input, availableLocal('other_provider'), 'provider_receipt_mismatch'],
+        [{ ...input, request: { ...input.request, generative: { ...guardedResolution, receipt: { ...guardedResolution.receipt, task: 'reasoning' } } } }, available, 'fabric_resolution_denied'],
+    ] as const;
+
+    for (const [candidate, lifecycle, denialCode] of cases) {
+        const result = routeHostResolvedCandidateCapability(candidate as never, lifecycle as never);
+        assert.equal(result.decision.denialCode, denialCode);
+        assert.equal(result.decision.receipt, null);
+        assert.equal(result.resolution, null);
+    }
+    assert.equal(providerInvocations, 0);
 });
 
 test('il router host nega lifecycle malformed, non disponibile o incoerente', () => {
