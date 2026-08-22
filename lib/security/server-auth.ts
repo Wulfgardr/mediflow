@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { users } from '@/lib/schema';
 import { deleteSession, getSession, SESSION_COOKIE_NAME, type ServerSession } from '@/lib/security/server-session';
+import { serverSessionProjectionOwnerRegistry } from '@/lib/security/server-session-projection-owner';
 /* @Codex */
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 
@@ -39,6 +40,13 @@ export async function requireSession(): Promise<ServerSession | null> {
     }
 
     return session;
+}
+
+/* @Codex */
+export async function createAuthenticatedWebSessionProjectionOwner() {
+    const session = await requireSession();
+    if (!session || session.authChannel !== 'web' || session.id === 'local-api') return null;
+    return serverSessionProjectionOwnerRegistry.create(session);
 }
 
 /* @Codex */
