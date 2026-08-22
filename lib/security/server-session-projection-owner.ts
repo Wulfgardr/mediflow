@@ -23,7 +23,7 @@ type SelectionLease = Readonly<{
     sessionRef: string; selectionEpoch: number; patientRef: string; ambulatoryRef: string;
     leaseRef: string; expiresAt: number;
 }>;
-type SelectionState = CanonicalPair & SelectionLease & Readonly<{ consumed: boolean }>;
+type SelectionState = CanonicalPair & SelectionLease;
 
 export type ServerSessionProjectionOwnerErrorCode =
     | 'epoch_conflict' | 'epoch_not_advanced' | 'input_invalid' | 'lease_expired' | 'owner_disposed'
@@ -174,7 +174,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         if (now >= expiresAt) fail('lease_expired');
                         const next: SelectionState = Object.freeze({ ...pair, sessionRef, selectionEpoch: epoch + 1,
                             patientRef: reference('ptr'), ambulatoryRef: reference('abr'), leaseRef: reference('lsr'),
-                            expiresAt, consumed: false });
+                            expiresAt });
                         const previous = active; active = null; revoke(previous);
                         epoch = next.selectionEpoch; selection = next;
                         return Object.freeze({ sessionRef, selectionEpoch: next.selectionEpoch, patientRef: next.patientRef,
@@ -189,10 +189,9 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         const previous = active; active = null; selection = null; revoke(previous); return fail('lease_expired');
                     }
                     if (presentedSession !== session || getSession(session.id) !== session) fail('session_unavailable');
-                    if (selection.consumed || value.sessionRef !== sessionRef || value.selectionEpoch !== selection.selectionEpoch
+                    if (value.sessionRef !== sessionRef || value.selectionEpoch !== selection.selectionEpoch
                         || value.patientRef !== selection.patientRef || value.ambulatoryRef !== selection.ambulatoryRef
                         || value.leaseRef !== selection.leaseRef) fail('stale_selection');
-                    selection = Object.freeze({ ...selection, consumed: true });
                     return Object.freeze({ patientId: selection.patientId, ambulatoryId: selection.ambulatoryId });
                 },
                 dispose() { finish(true); },
