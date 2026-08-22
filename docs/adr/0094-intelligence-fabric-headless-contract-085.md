@@ -68,7 +68,13 @@ credenziali.
 ### D3. Operazioni specifiche, nessun invoke generico
 
 Il contratto espone soltanto operazioni nominate e schema-bound. Nel candidato
-sono ammesse `read`, `review` e `preview` quando la capability le dichiara.
+sono ammessi `status`, `catalog`, `read` e `preview` quando la capability li
+dichiara. Il piano headless puo leggere lo stato di una review, ma non esegue
+`accept`, `reject` o `supersede`. Queste transizioni restano nella UI medica o
+in un servizio medico host-owned.
+
+`accept` non equivale ad `apply`, ma nessuno dei due e un comando headless nel
+pilot. La presenza di uno stato di review non amplia lo stadio autorizzato.
 
 Non esiste un comando headless `invoke`, `run-model` o equivalente. Un adapter
 non puo inoltrare prompt libero, nome modello, provider options o parametri di
@@ -102,21 +108,44 @@ review-first propri.
 Il gate deve fallire se un path chiama direttamente un provider o se una
 negazione Fabric viene trasformata in un fallback.
 
+WUL-522 e completa per la 0.8.5 soltanto quando il manifest associa a tutti i
+cinque path un comando nominato `capability.preview`. Patient Insight, Smart
+Import e Treatment Reasoning richiedono una projection paziente versionata e
+broker-owned. Document Synthesis e OCR richiedono la stessa projection e un
+handle documento opaco selezionato dal medico.
+
+Il chiamante non fornisce upload, testo del documento, prompt o domanda libera.
+Se manca una projection richiesta o l'handle documento, la disposition resta
+`manual_only` e WUL-522 non e completa per la 0.8.5.
+
+#### Seconda risoluzione per OCR Apple Vision
+
+Un risultato low-signal del provider OCR primario puo richiedere una seconda
+decisione Fabric esplicita e host-owned per Apple Vision. La seconda decisione
+produce receipt e provenance distinte dalla prima invocazione.
+
+Una denial Fabric non puo innescare Apple Vision. Senza una seconda risoluzione
+autorizzata, il path restituisce fallback negato oppure `ocr_pending`; non
+esegue un recupero implicito.
+
 ### D7. Lifecycle e review durabili
 
 Stato provider locale, revoca, degrado e review sopravvivono al riavvio
 attraverso servizi applicativi host-owned. Il piano headless non accede
 direttamente a SQLite e non definisce migrazioni.
 
-La review registra stato, attore, riferimenti opachi, receipt e versione. Il
-record non contiene prompt, risposta grezza o testo clinico. Review e apply
-restano lifecycle distinti.
+Il record Fabric durabile conserva stato, attore, riferimenti opachi, versione
+e receipt. Un'eventuale proposta sanitizzata vive in un record applicativo
+domain-owned referenziato dal record Fabric. Nessun record Fabric conserva il
+prompt o la risposta grezza del provider. Review e apply restano lifecycle
+distinti.
 
 ### D8. Pilot senza egress
 
-Il candidato usa fixture sintetiche e venue locali approvate. Sono esclusi
-cloud, provider remoti, credenziali reali, rete generica, accesso diretto a
-SQLite e fallback silenzioso.
+Il candidato usa fixture sintetiche e venue locali approvate. Loopback e un
+trasporto locale ammesso, ma non prova `egress=none`. La rete outbound generica
+resta bloccata. Sono esclusi cloud, provider remoti, credenziali reali, accesso
+diretto a SQLite e fallback silenzioso.
 
 `egress=none` richiede prove sul path completo. Loopback, nome del provider o
 digest del modello non dimostrano da soli l'assenza di egress.
@@ -126,6 +155,9 @@ digest del modello non dimostrano da soli l'assenza di egress.
 Un manifest machine-readable collega capability AIP, capability Fabric,
 operazione Mini, schema, disposition, stadio massimo, context binding, egress,
 fallback e reason.
+
+Ogni binding dichiara almeno `inputProjectionSchema`, `outputProposalSchema` e
+`availabilityDisposition`.
 
 Il drift gate confronta cataloghi Fabric, manifest AIP e comandi Mini. Deve
 fallire su ID mancanti o duplicati, binding incoerenti, generic invoke,
@@ -153,7 +185,7 @@ P0 ADR 0094 (questo packet)
        +--> A3 projection patient_open_loops.v1 [WUL-554]
        +--> A4 manifest AIP e drift base [WUL-553]
               \        |        /
-               A5 shared service read/review/preview
+               A5 shared service status/read/preview
 
 P0 --> F1 contratto invocazione Fabric host-owned
        +--> F2 Patient Insight gate
@@ -164,7 +196,7 @@ P0 --> F1 contratto invocazione Fabric host-owned
        +--> L1 lifecycle provider durabile
        +--> L2 review durabile senza apply
 
-A5 + F2..F6 + L1 + L2 --> B1 bridge AIP-Fabric
+A5 + F2..F6 + L1 + L2 --> B1 bridge AIP-Fabric status/read/preview
 A4 + B1               --> M1 manifest AIP-Fabric-Mini e drift
 M1                    --> M2 contratto Mini ricostruito
 M2                    --> M3 adapter Mini ricostruito
@@ -182,8 +214,8 @@ alla verifica dei sostituti.
 | F4 Smart Import | F1 | Resolver e receipt prima dell'attuale invocazione generativa. |
 | F5 OCR/fallback | F1 | Resolver prima dell'OCR; fallback locale esplicito o negato, mai silenzioso. |
 | F6 Treatment Reasoning | F1 | Risoluzione host-owned prima della lane ATHENA MLX. |
-| L1-L2 lifecycle/review | P0 | Stato provider e review durabili, senza apply clinico. |
-| B1-M1 bridge/manifest | A5, F2-F6, L1-L2 | Operazioni capability-specific e binding AIP-Fabric-Mini. |
+| L1-L2 lifecycle/review | P0 | Stato provider e stato review durabili; transizioni mediche e apply restano fuori dal piano headless. |
+| B1-M1 bridge/manifest | A5, F2-F6, L1-L2 | Operazioni capability-specific `status`, `read`, `preview` e binding AIP-Fabric-Mini. |
 | I1 integrazione sintetica | M3 | Broker, Fabric, proposta, receipt e review con denial lifecycle ed egress. |
 
 ## Falsificatori e stop condition
@@ -195,9 +227,12 @@ Riaprire l'ADR e fermare la promozione se:
 - una capability accetta prompt libero o generic invoke;
 - revoca, expiry o cambio selezione non precedono la richiesta successiva;
 - uno dei cinque path raggiunge un provider senza risoluzione Fabric;
+- il piano headless esegue `accept`, `reject`, `supersede` o `apply`;
+- una denial o una sola risoluzione OCR innescano Apple Vision;
 - review e apply condividono lo stesso stato o comando;
 - una receipt contiene testo clinico o autorizza un consumer;
-- compare egress, fallback, provider reale o accesso SQLite dal piano headless;
+- la rete outbound generica e disponibile, compare un fallback silenzioso o il
+  piano headless accede a SQLite;
 - il manifest non rileva una divergenza tra AIP, Fabric e Mini.
 
 ## Non-obiettivi
