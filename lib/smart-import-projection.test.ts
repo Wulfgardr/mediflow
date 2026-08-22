@@ -1,0 +1,62 @@
+/* @Codex */
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { SmartImportProjectionError, snapshotSmartImportProjection } from './smart-import-projection.ts';
+
+const NOW = '2026-08-22T12:00:00.000Z';
+const PATIENT_REF = 'patient.opaque-1234567890';
+const SOURCE_REF = 'source.opaque-1234567890';
+function projection() {
+    return {
+        schemaVersion: 'mediflow.smart-import.projection.v1', capability: 'smart_import', patientRef: PATIENT_REF,
+        selectionEpoch: 7, patientRevision: 3, sourceRevision: 5, capturedAt: NOW,
+        currentDiagnoses: [{ system: 'ICD-11', code: 'FAKE-1', description: 'Diagnosi sintetica' }],
+        currentActiveTherapies: [{ drugName: 'Farmaco sintetico', activePrinciple: null, dosage: '1 unita', aic: null, atc: null }],
+        therapyCandidateHints: [{ sourceId: SOURCE_REF, label: 'Fonte sintetica', excerpt: 'Indicazione sintetica.' }],
+        sources: [{ id: SOURCE_REF, kind: 'clinical-entry', label: 'Diario sintetico', date: NOW, content: 'Evidenza sintetica.' }],
+    };
+}
+const reject = (value: unknown, code = 'projection_invalid') => assert.throws(
+    () => snapshotSmartImportProjection(value, NOW),
+    (error) => error instanceof SmartImportProjectionError && error.code === code
+        && error.message === `Smart Import projection rejected: ${code}` && !/Diagnosi|Farmaco|opaque-123/u.test(error.message),
+);
+
+test('copies a valid closed projection into a deeply frozen snapshot', () => {
+    const input = projection();
+    const snapshot = snapshotSmartImportProjection(input, NOW);
+    input.sources[0].content = 'Mutazione successiva';
+    assert.equal(snapshot.sources[0].content, 'Evidenza sintetica.');
+    assert.equal(Object.isFrozen(snapshot), true);
+    assert.equal(Object.isFrozen(snapshot.sources), true);
+    assert.equal(Object.isFrozen(snapshot.sources[0]), true);
+});
+
+test('rejects extra, inherited, accessor and sparse structures without reading accessors', () => {
+    let reads = 0;
+    const accessor = projection();
+    Object.defineProperty(accessor.sources[0], 'content', { get() { reads += 1; return 'Non leggere'; } });
+    const sparse = projection(); sparse.sources = new Array(1) as typeof sparse.sources;
+    for (const value of [{ ...projection(), payload: 'arbitrary' }, Object.create(projection()), accessor, sparse]) reject(value);
+    assert.equal(reads, 0);
+});
+
+test('enforces bounds, freshness, positive versions, opaque refs and source kinds', () => {
+    const cases = [
+        (value: ReturnType<typeof projection>) => { value.capturedAt = '2026-08-22T11:54:59.999Z'; },
+        (value: ReturnType<typeof projection>) => { value.patientRevision = 0; },
+        (value: ReturnType<typeof projection>) => { value.sourceRevision = 0; },
+        (value: ReturnType<typeof projection>) => { value.patientRef = 'patient'; },
+        (value: ReturnType<typeof projection>) => { value.sources[0].kind = 'unknown'; },
+        (value: ReturnType<typeof projection>) => { value.sources[0].label = ' \n '; },
+        (value: ReturnType<typeof projection>) => { value.sources[0].content = 'x'.repeat(901); },
+    ];
+    cases.forEach((change, index) => { const value = projection(); change(value); reject(value, index === 0 ? 'projection_stale' : 'projection_invalid'); });
+});
+
+test('requires unique source refs and binds every candidate hint to a source', () => {
+    const duplicate = projection(); duplicate.sources.push({ ...duplicate.sources[0] });
+    reject(duplicate);
+    const unbound = projection(); unbound.therapyCandidateHints[0].sourceId = 'source.unbound-1234567890';
+    reject(unbound);
+});
