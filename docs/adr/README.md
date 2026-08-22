@@ -6,6 +6,7 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
+- [0095-broker-projection-e-servizi-host-per-capability.md](./0095-broker-projection-e-servizi-host-per-capability.md): fissa lifecycle post-onboarding, broker projection e servizi host capability-specific.
 - [0094-intelligence-fabric-headless-contract-085.md](./0094-intelligence-fabric-headless-contract-085.md): definisce l'Application Service Layer condiviso, separa Fabric e AIP e fissa completezza architetturale e operativa.
 - [0092-limite-digest-bound-readiness-ai-locale.md](./0092-limite-digest-bound-readiness-ai-locale.md): accetta un'annotazione distinta da `runtime`; il bracket resta detection best-effort.
 - [0089-contratto-intelligence-fabric-e-venue-esecutive.md](./0089-contratto-intelligence-fabric-e-venue-esecutive.md): contratto fabric per capability, venue esplicite, profili egress versionati e ricevute di risoluzione fail-closed.
