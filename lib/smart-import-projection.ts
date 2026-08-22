@@ -1,5 +1,6 @@
 /* @Codex */
 export type SmartImportProjectionErrorCode = 'projection_invalid' | 'projection_stale';
+export const SMART_IMPORT_PROJECTION_FRESHNESS_MS = 300_000;
 
 export class SmartImportProjectionError extends Error {
     constructor(readonly code: SmartImportProjectionErrorCode) {
@@ -93,7 +94,7 @@ function list<T>(value: unknown, max: number, snapshot: (entry: unknown) => T): 
 function snapshotContent(root: Record<string, unknown>, now: string): SmartImportProjectionContent {
     const capturedAt = iso(root.capturedAt) as string;
     const nowMs = Date.parse(iso(now) as string); const capturedMs = Date.parse(capturedAt);
-    if (capturedMs > nowMs || nowMs - capturedMs > 300_000) fail('projection_stale');
+    if (capturedMs > nowMs || nowMs - capturedMs >= SMART_IMPORT_PROJECTION_FRESHNESS_MS) fail('projection_stale');
     const currentDiagnoses = list(root.currentDiagnoses, 64, (entry) => {
         const item = exact(entry, ['system', 'code', 'description']);
         return Object.freeze({ system: text(item.system, 64) as string, code: text(item.code, 64) as string, description: text(item.description, 320) as string });

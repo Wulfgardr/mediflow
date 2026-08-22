@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+    SMART_IMPORT_PROJECTION_FRESHNESS_MS,
     SmartImportProjectionError,
     snapshotSmartImportProjection,
     snapshotSmartImportProjectionAttachment,
@@ -49,6 +50,15 @@ test('copies a valid closed projection into a deeply frozen snapshot', () => {
     assert.equal(Object.isFrozen(snapshot), true);
     assert.equal(Object.isFrozen(snapshot.sources), true);
     assert.equal(Object.isFrozen(snapshot.sources[0]), true);
+});
+
+test('uses one canonical half-open projection freshness window at ingest', () => {
+    assert.equal(SMART_IMPORT_PROJECTION_FRESHNESS_MS, 300_000);
+    assert.doesNotThrow(() => snapshotSmartImportProjection(projection(), '2026-08-22T12:04:59.999Z'));
+    assert.throws(
+        () => snapshotSmartImportProjection(projection(), '2026-08-22T12:05:00.000Z'),
+        (error) => error instanceof SmartImportProjectionError && error.code === 'projection_stale',
+    );
 });
 
 test('copies a valid authority-free attachment into a deeply frozen snapshot', () => {
