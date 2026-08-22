@@ -15,15 +15,11 @@ export type ProviderLifecycleActorClass = 'physician' | 'host_service';
 export type ProviderLifecycleRecord = Readonly<{
     schemaVersion: typeof PROVIDER_LIFECYCLE_STORE_SCHEMA_VERSION;
     lifecycle: ProviderLifecycleState;
-    actorClass: ProviderLifecycleActorClass;
-    actorRef: string;
-    version: number;
-    hostTimestamp: string;
-    receiptRef: string;
+    actorClass: ProviderLifecycleActorClass; actorRef: string;
+    version: number; hostTimestamp: string; receiptRef: string;
 }>;
 type CommonCommand = Readonly<{
-    expectedVersion: number;
-    actorClass: ProviderLifecycleActorClass;
+    expectedVersion: number; actorClass: ProviderLifecycleActorClass;
     actorRef: string;
     receiptRef: string;
 }>;
@@ -31,8 +27,8 @@ export type ProviderLifecycleStoreCommand =
     | (CommonCommand & Readonly<{ kind: 'admit'; lifecycle: ProviderLifecycleState }>)
     | (CommonCommand & Readonly<{ kind: 'transition'; event: ProviderLifecycleEvent }>);
 export type ProviderLifecycleStoreErrorCode =
-    | 'missing' | 'unreadable' | 'corrupt' | 'busy' | 'command_invalid'
-    | 'version_conflict' | 'transition_invalid' | 'clock_invalid';
+    | 'missing' | 'unreadable' | 'corrupt' | 'busy' | 'command_invalid' | 'version_conflict'
+    | 'transition_invalid' | 'clock_invalid';
 export class ProviderLifecycleStoreError extends Error {
     constructor(public readonly code: ProviderLifecycleStoreErrorCode) {
         super(`Provider lifecycle store rejected: ${code}`);
@@ -40,8 +36,8 @@ export class ProviderLifecycleStoreError extends Error {
     }
 }
 const ACTOR_CLASSES = new Set<unknown>(['physician', 'host_service']);
-const ACTOR_REF = /^actor_[0-9a-f]{16,64}$/;
-const RECEIPT_REF = /^receipt_[0-9a-f]{16,64}$/;
+const ACTOR_REF = /^actor_[0-9a-f]{32,64}$/;
+const RECEIPT_REF = /^receipt_[0-9a-f]{32,64}$/;
 function hasExactKeys(value: object, expected: readonly string[]): boolean {
     const keys = Reflect.ownKeys(value);
     return keys.length === expected.length && expected.every((key) => keys.includes(key));
