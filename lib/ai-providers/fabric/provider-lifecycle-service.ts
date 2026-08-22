@@ -1,5 +1,6 @@
 /* @Codex */
 import { randomBytes } from 'node:crypto';
+import path from 'node:path';
 import { admitProvider, type ProviderLifecycleEvent, type ProviderLifecycleState } from './provider-lifecycle';
 import {
     createProviderLifecycleStore,
@@ -87,7 +88,8 @@ function snapshotOnboarding(value: unknown): ProviderOnboardingState {
 
 export function createHostProviderLifecycleService(options: FactoryOptions = {}) {
     const config = dataRecord(options, [], ['appDataDir', 'sources']);
-    if (config.appDataDir !== undefined && typeof config.appDataDir !== 'string') {
+    if (config.appDataDir !== undefined
+        && (typeof config.appDataDir !== 'string' || !path.isAbsolute(config.appDataDir))) {
         throw new ProviderLifecycleServiceError('input_invalid');
     }
     const appDataDir = config.appDataDir as string | undefined;
