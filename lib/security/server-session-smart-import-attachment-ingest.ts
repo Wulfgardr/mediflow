@@ -3,9 +3,10 @@ import 'server-only';
 
 import { createHostSmartImportProjectionAttacher } from '../smart-import-projection-attachment-host';
 import { getSession, type ServerSession } from './server-session';
-import { createServerSessionProjectionOwnerRegistry } from './server-session-projection-owner';
+import { createServerSessionProjectionOwnerRegistry, type ServerSessionProjectionOwner } from './server-session-projection-owner';
 
 type ProjectionOwnerRegistry = Pick<ReturnType<typeof createServerSessionProjectionOwnerRegistry>, 'lookup'>;
+type ProjectionOwner = Pick<ServerSessionProjectionOwner, 'acquireProjectionIngest'>;
 type Tuple = Readonly<{ sessionRef: string; selectionEpoch: number; patientRef: string; ambulatoryRef: string; leaseRef: string }>;
 export type ServerSessionSmartImportAttachmentIngestErrorCode = 'input_invalid' | 'owner_unavailable' | 'session_unavailable';
 export class ServerSessionSmartImportAttachmentIngestError extends Error {
@@ -43,19 +44,33 @@ function tuple(value: unknown): Tuple {
     return Object.freeze({ sessionRef: opaque(input.sessionRef), selectionEpoch: input.selectionEpoch as number,
         patientRef: opaque(input.patientRef), ambulatoryRef: opaque(input.ambulatoryRef), leaseRef: opaque(input.leaseRef) });
 }
+function prepared(session: ServerSession, inputValue: unknown) {
+    if (session.authChannel !== 'web' || session.id === 'local-api' || getSession(session.id) !== session) fail('session_unavailable');
+    const input = safeExact(inputValue, ['tuple', 'attachment', 'requestId']);
+    return Object.freeze({ currentTuple: tuple(input.tuple), attachment: input.attachment, requestId: opaque(input.requestId) });
+}
+function ingestPrepared(session: ServerSession, owner: ProjectionOwner, input: ReturnType<typeof prepared>): string {
+    const ingest = owner.acquireProjectionIngest(session, input.currentTuple);
+    const projection = createHostSmartImportProjectionAttacher({ patientRef: input.currentTuple.patientRef,
+        selectionEpoch: input.currentTuple.selectionEpoch }).attach(input.attachment);
+    return ingest.ingest({ projection, requestId: input.requestId });
+}
+
+export function ingestServerSessionSmartImportAttachmentWithOwner(
+    session: ServerSession,
+    owner: ProjectionOwner,
+    inputValue: unknown,
+): string {
+    return ingestPrepared(session, owner, prepared(session, inputValue));
+}
 
 export function ingestServerSessionSmartImportAttachment(
     session: ServerSession,
     registry: ProjectionOwnerRegistry,
     inputValue: unknown,
 ): string {
-    if (session.authChannel !== 'web' || session.id === 'local-api' || getSession(session.id) !== session) fail('session_unavailable');
-    const input = safeExact(inputValue, ['tuple', 'attachment', 'requestId']);
-    const currentTuple = tuple(input.tuple); const requestId = opaque(input.requestId);
+    const input = prepared(session, inputValue);
     const owner = registry.lookup(session.id);
     if (!owner) fail('owner_unavailable');
-    const ingest = owner.acquireProjectionIngest(session, currentTuple);
-    const projection = createHostSmartImportProjectionAttacher({ patientRef: currentTuple.patientRef,
-        selectionEpoch: currentTuple.selectionEpoch }).attach(input.attachment);
-    return ingest.ingest({ projection, requestId });
+    return ingestPrepared(session, owner, input);
 }
