@@ -40,7 +40,7 @@ import {
 } from '../../ai-smart-import-kill-switch';
 /* @Codex */
 import {
-    createPatientSmartImportLocalHostSnapshot,
+    createPatientSmartImportCandidateHostSnapshot,
     executePatientSmartImportFabricPreview,
     PATIENT_SMART_IMPORT_FABRIC_METADATA,
 } from './patient-smart-import-fabric';
@@ -848,9 +848,11 @@ export async function generatePatientSmartImportAnalysis(patientId: string): Pro
     const ai = await AIService.create('clinical');
     const prompt = buildStructuredPrompt(patient, currentDiagnoses, currentTherapies, sourceRecords);
     const health = await ai.getHealth().catch(() => null);
+    const modelInfo = ai.getModelInfo();
     const fabricPreview = await executePatientSmartImportFabricPreview({
-        modelInfo: ai.getModelInfo(),
-        host: createPatientSmartImportLocalHostSnapshot(health),
+        modelInfo,
+        health,
+        host: createPatientSmartImportCandidateHostSnapshot(),
     }, () => ai.generate(prompt, undefined, SMART_IMPORT_OUTPUT_MAX_TOKENS));
     const response = fabricPreview.output;
     const parsed = parseAiPayload(response);

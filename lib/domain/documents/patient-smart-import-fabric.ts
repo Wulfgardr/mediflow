@@ -8,14 +8,13 @@ import type { FabricProvenanceRecord } from '../../ai-providers/fabric/contract'
 import { advanceOnboarding, startOnboarding, type ProviderOnboardingState } from '../../ai-providers/fabric/onboarding';
 import { admitProvider, type ProviderLifecycleState } from '../../ai-providers/fabric/provider-lifecycle';
 import type { ProviderSelectionReceipt } from '../../ai-providers/registry';
-import { observeVenue, type VenueObservation } from '../../ai-providers/fabric/routing-observability';
+import { observeVenue } from '../../ai-providers/fabric/routing-observability';
 import { buildProvenanceRecord } from '../../ai-providers/fabric/resolver';
 
 export const PATIENT_SMART_IMPORT_FABRIC_METADATA = Symbol('patient-smart-import-fabric-metadata');
 
 export type PatientSmartImportFabricHostSnapshot = Readonly<{
     capabilityAvailable: boolean;
-    observation: VenueObservation;
     onboarding: ProviderOnboardingState;
     lifecycle: ProviderLifecycleState;
 }>;
@@ -31,16 +30,13 @@ export class PatientSmartImportFabricDeniedError extends Error {
     }
 }
 
-export function createPatientSmartImportLocalHostSnapshot(health: unknown): PatientSmartImportFabricHostSnapshot {
+export function createPatientSmartImportCandidateHostSnapshot(): PatientSmartImportFabricHostSnapshot {
     const onboarding = ['configure', 'credential_declared', 'attest_local', 'enable'].reduce(
         (state, type) => advanceOnboarding(state, { type } as Parameters<typeof advanceOnboarding>[1]),
         startOnboarding('ollama', 'local_model'),
     );
-    const healthStatus = health && typeof health === 'object' ? (health as Record<string, unknown>).status : null;
     return Object.freeze({
         capabilityAvailable: true,
-        observation: observeVenue('local_process', healthStatus === 'ok' ? 'available' : 'offline',
-            healthStatus === 'ok' ? null : 'daemon_unreachable'),
         onboarding,
         lifecycle: admitProvider(onboarding),
     });
@@ -112,8 +108,21 @@ function receiptMatchesModel(
         && receipt.fallbackCount === 0;
 }
 
+function observeSelectedModel(health: unknown, selectedModel: string) {
+    if (!health || typeof health !== 'object' || Array.isArray(health)) {
+        return observeVenue('local_process', 'offline', 'daemon_unreachable');
+    }
+    const { status, models: rawModels } = health as Record<string, unknown>;
+    const models = Array.isArray(rawModels) ? Array.from(rawModels) : null;
+    if (status !== 'ok') return observeVenue('local_process', 'offline', 'daemon_unreachable');
+    if (!models || !models.every((model) => typeof model === 'string') || !models.includes(selectedModel)) {
+        return observeVenue('local_process', 'degraded', 'not_probed');
+    }
+    return observeVenue('local_process', 'available', null);
+}
+
 export async function executePatientSmartImportFabricPreview<T>(
-    input: Readonly<{ modelInfo: unknown; host: PatientSmartImportFabricHostSnapshot }>,
+    input: Readonly<{ modelInfo: unknown; health: unknown; host: PatientSmartImportFabricHostSnapshot }>,
     invokeProvider: () => Promise<T>,
 ): Promise<Readonly<{ output: T; metadata: PatientSmartImportFabricMetadata }>> {
     const requestId = globalThis.crypto.randomUUID();
@@ -137,7 +146,7 @@ export async function executePatientSmartImportFabricPreview<T>(
             task: 'clinical', provider: modelInfo.provider, models: { clinical: modelInfo.model },
             endpoint: modelInfo.baseUrl, chatTimeoutMs: 1_000,
         } },
-        observations: [host.observation],
+        observations: [observeSelectedModel(input.health, modelInfo.model)],
         onboarding: host.onboarding,
         lifecycle: host.lifecycle,
     });

@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { advanceOnboarding, startOnboarding } from '../../ai-providers/fabric/onboarding.ts';
 import { admitProvider, transitionProviderLifecycle } from '../../ai-providers/fabric/provider-lifecycle.ts';
-import { observeVenue } from '../../ai-providers/fabric/routing-observability.ts';
 import {
     executePatientSmartImportFabricPreview,
     PatientSmartImportFabricDeniedError,
@@ -21,7 +20,6 @@ function hostSnapshot(): PatientSmartImportFabricHostSnapshot {
     const onboarding = enabledLocal();
     return {
         capabilityAvailable: true,
-        observation: observeVenue('local_process', 'available', null),
         onboarding,
         lifecycle: admitProvider(onboarding),
     };
@@ -44,11 +42,12 @@ const modelInfo = Object.freeze({
         fallbackCount: 0 as const,
     }),
 });
+const health = Object.freeze({ status: 'ok', models: Object.freeze(['synthetic-model']) });
 
 test('Smart Import resolves its named Fabric capability before one provider preview', async () => {
     let invocations = 0;
     const result = await executePatientSmartImportFabricPreview(
-        { modelInfo, host: hostSnapshot() },
+        { modelInfo, health, host: hostSnapshot() },
         async () => {
             invocations += 1;
             return 'synthetic-provider-output';
@@ -66,17 +65,16 @@ test('Smart Import resolves its named Fabric capability before one provider prev
 test('Smart Import denials never invoke the provider or return a reusable receipt', async () => {
     const available = hostSnapshot();
     const cases = [
-        { ...available, capabilityAvailable: false },
-        { ...available, observation: observeVenue('local_process', 'offline', 'daemon_unreachable') },
-        { ...available, observation: observeVenue('local_process', 'degraded', 'daemon_unreachable') },
-        { ...available, lifecycle: transitionProviderLifecycle(available.lifecycle, 'degrade') },
-        { ...available, lifecycle: transitionProviderLifecycle(available.lifecycle, 'revoke') },
+        { host: { ...available, capabilityAvailable: false }, health },
+        { host: available, health: { status: 'error', models: [] } },
+        { host: { ...available, lifecycle: transitionProviderLifecycle(available.lifecycle, 'degrade') }, health },
+        { host: { ...available, lifecycle: transitionProviderLifecycle(available.lifecycle, 'revoke') }, health },
     ];
 
-    for (const host of cases) {
+    for (const candidate of cases) {
         let invocations = 0;
         await assert.rejects(
-            executePatientSmartImportFabricPreview({ modelInfo, host }, async () => {
+            executePatientSmartImportFabricPreview({ modelInfo, ...candidate }, async () => {
                 invocations += 1;
                 return 'must-not-run';
             }),
@@ -89,11 +87,22 @@ test('Smart Import denials never invoke the provider or return a reusable receip
     let mismatchInvocations = 0;
     await assert.rejects(
         executePatientSmartImportFabricPreview(
-            { modelInfo: { ...modelInfo, model: 'mismatched-model' }, host: available },
+            { modelInfo: { ...modelInfo, model: 'mismatched-model' }, health, host: available },
             async () => { mismatchInvocations += 1; return 'must-not-run'; },
         ),
         (error) => error instanceof PatientSmartImportFabricDeniedError
             && error.denial.denialCode === 'provider_receipt_mismatch',
     );
     assert.equal(mismatchInvocations, 0);
+});
+
+test('Smart Import denies when health omits the selected receipt model', async () => {
+    let invocations = 0;
+    await assert.rejects(executePatientSmartImportFabricPreview({
+        modelInfo,
+        health: { status: 'ok', models: ['different-model'] },
+        host: hostSnapshot(),
+    }, async () => { invocations += 1; return 'must-not-run'; }),
+    (error) => error instanceof PatientSmartImportFabricDeniedError && error.denial.receipt === null);
+    assert.equal(invocations, 0);
 });
