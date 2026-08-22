@@ -36,7 +36,8 @@ function resolution(chat: LocalProviderResolution['adapter']['chat']): LocalProv
         listModels: async () => [],
     }) };
 }
-type Stop = 'kill' | 'broker' | 'lifecycle' | 'binding' | 'readiness' | 'router' | 'chat' | 'parse' | 'source';
+type Stop = 'kill' | 'kill_unavailable' | 'broker' | 'lifecycle' | 'lifecycle_corrupt'
+    | 'lifecycle_unavailable' | 'binding' | 'readiness' | 'model' | 'router' | 'chat' | 'parse' | 'source';
 function stoppedCapability(stop: Stop, calls: string[]) {
     const binding = resolution(async () => {
         calls.push('chat');
@@ -47,26 +48,30 @@ function stoppedCapability(stop: Stop, calls: string[]) {
     const record = stop === 'router' ? { ...lifecycleRecord,
         lifecycle: { ...lifecycleRecord.lifecycle, provider: 'other_provider' } } : lifecycleRecord;
     return createPatientSmartImportHostCapability({
-        killSwitch: { read: async () => { calls.push('kill'); return stop === 'kill'
-            ? { status: 'denied', code: 'disabled' } : { status: 'enabled' }; } },
+        killSwitch: { read: async () => { calls.push('kill'); return stop === 'kill' || stop === 'kill_unavailable'
+            ? { status: 'denied', code: stop === 'kill' ? 'disabled' : 'unavailable' } : { status: 'enabled' }; } },
         broker: { consume: () => { calls.push('broker'); if (stop === 'broker') throw new Error('synthetic'); return projection; } },
-        lifecycle: { read: () => { calls.push('lifecycle'); return stop === 'lifecycle'
-            ? { status: 'denied', reason: 'missing' } : { status: 'available', record }; } },
+        lifecycle: { read: () => { calls.push('lifecycle'); return stop.startsWith('lifecycle')
+            ? { status: 'denied', reason: stop === 'lifecycle_corrupt' ? 'corrupt'
+                : stop === 'lifecycle_unavailable' ? 'unavailable' : 'missing' } : { status: 'available', record }; } },
         binding: { readClinical: async () => { calls.push('binding'); return stop === 'binding'
             ? { status: 'denied', code: 'settings_unavailable', resolution: null } : { status: 'available', resolution: binding }; } },
-        readiness: { observeClinical: async () => { calls.push('readiness'); return stop === 'readiness'
-            ? { status: 'denied', code: 'provider_unready', observation: { venue: 'local_process', state: 'offline', reason: 'daemon_unreachable' } }
+        readiness: { observeClinical: async () => { calls.push('readiness'); return stop === 'readiness' || stop === 'model'
+            ? { status: 'denied', code: stop === 'model' ? 'model_unavailable' : 'provider_unready', observation: stop === 'model'
+                ? { venue: 'local_process', state: 'degraded', reason: null }
+                : { venue: 'local_process', state: 'offline', reason: 'daemon_unreachable' } }
             : { status: 'available', code: null, observation: { venue: 'local_process', state: 'available', reason: null } }; } },
         route: (input, lifecycle) => { calls.push('router'); return routeHostResolvedCandidateCapability(input, lifecycle); },
-        sources: { clock: () => '2026-08-22T16:00:01.000Z',
-            entropy: () => stop === 'source' ? new Uint8Array(0) : new Uint8Array(16).fill(7) },
+        sources: { clock: () => { calls.push('clock'); return '2026-08-22T16:00:01.000Z'; },
+            entropy: () => { calls.push('entropy'); return stop === 'source' ? new Uint8Array(0) : new Uint8Array(16).fill(7); } },
     });
 }
 
 test('returns one frozen review-only proposal after the fixed host pipeline', async () => {
     const calls = { kill: 0, broker: 0, lifecycle: 0, binding: 0, readiness: 0, router: 0, chat: 0, clock: 0, entropy: 0 };
-    const binding = resolution(async (_messages, _signal, _maxTokens, options) => {
+    const binding = resolution(async (_messages, _signal, maxTokens, options) => {
         calls.chat += 1;
+        assert.equal(maxTokens, 1_100);
         assert.deepEqual(options, { responseFormat: 'json' });
         return { content: RESPONSE, stats: { latency: 1, tokensIn: 2, tokensOut: 3 } };
     });
@@ -98,16 +103,18 @@ test('returns one frozen review-only proposal after the fixed host pipeline', as
 });
 
 test('fails closed at every pre-invoke gate and rejects non-exact caller input', async () => {
-    const stages = [['kill', 'kill_switch_disabled'], ['broker', 'projection_unavailable'],
-        ['lifecycle', 'lifecycle_missing'], ['binding', 'provider_binding_denied'],
-        ['readiness', 'provider_unready'], ['router', 'fabric_denied']] as const;
-    const order = ['kill', 'broker', 'lifecycle', 'binding', 'readiness', 'router'];
-    for (const [stage, code] of stages) {
+    const stages = [['kill', 'kill_switch_disabled', 'kill'], ['kill_unavailable', 'kill_switch_unavailable', 'kill'],
+        ['broker', 'projection_unavailable', 'broker'], ['lifecycle', 'lifecycle_missing', 'lifecycle'],
+        ['lifecycle_corrupt', 'lifecycle_corrupt', 'lifecycle'], ['lifecycle_unavailable', 'lifecycle_unavailable', 'lifecycle'],
+        ['binding', 'provider_binding_denied', 'binding'], ['readiness', 'provider_unready', 'readiness'],
+        ['model', 'model_unavailable', 'readiness'], ['router', 'fabric_denied', 'router'], ['source', 'source_invalid', 'entropy']] as const;
+    const order = ['kill', 'broker', 'lifecycle', 'binding', 'readiness', 'router', 'clock', 'entropy'];
+    for (const [stage, code, gate] of stages) {
         const calls: string[] = [];
         const result = await stoppedCapability(stage, calls).preview({ handle: HANDLE, requestId: REQUEST_ID });
         assert.deepEqual(result, { writesPerformed: 0, apply: 'denied', status: 'denied', code,
             proposal: null, receipt: null, provenance: null, reviewRef: null });
-        assert.deepEqual(calls, order.slice(0, order.indexOf(stage) + 1));
+        assert.deepEqual(calls, order.slice(0, order.indexOf(gate) + 1));
     }
     const accessor = Object.defineProperty({ handle: HANDLE }, 'requestId', {
         enumerable: true, get: () => { throw new Error('synthetic accessor marker'); },
@@ -121,7 +128,7 @@ test('fails closed at every pre-invoke gate and rejects non-exact caller input',
 });
 
 test('uses failed only after chat and retains only PHI-safe routing evidence', async () => {
-    for (const [stage, code] of [['chat', 'provider_failed'], ['parse', 'proposal_invalid'], ['source', 'source_invalid']] as const) {
+    for (const [stage, code] of [['chat', 'provider_failed'], ['parse', 'proposal_invalid']] as const) {
         const calls: string[] = [];
         const result = await stoppedCapability(stage, calls).preview({ handle: HANDLE, requestId: REQUEST_ID });
         assert.equal(result.status, 'failed'); assert.equal(result.code, code); assert.equal(calls.at(-1), 'chat');

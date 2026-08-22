@@ -22,8 +22,8 @@ import {
 export type PatientSmartImportHostDenialCode =
     | 'input_invalid' | 'kill_switch_disabled' | 'kill_switch_unavailable'
     | 'projection_unavailable' | 'lifecycle_missing' | 'lifecycle_corrupt' | 'lifecycle_unavailable'
-    | 'provider_binding_denied' | 'provider_unready' | 'model_unavailable' | 'fabric_denied';
-export type PatientSmartImportHostFailureCode = 'provider_failed' | 'proposal_invalid' | 'source_invalid';
+    | 'provider_binding_denied' | 'provider_unready' | 'model_unavailable' | 'fabric_denied' | 'source_invalid';
+export type PatientSmartImportHostFailureCode = 'provider_failed' | 'proposal_invalid';
 type Common = Readonly<{ writesPerformed: 0; apply: 'denied' }>;
 export type PatientSmartImportHostCapabilityResult =
     | (Common & Readonly<{ status: 'available'; code: null; proposal: PatientSmartImportCapabilityProposal;
@@ -134,6 +134,10 @@ export function createPatientSmartImportHostCapability(dependencies: Dependencie
             if (routed.decision.outcome !== 'resolved' || !routed.decision.receipt || !routedResolution
                 || routed.decision.receipt !== routedResolution.receipt || routedBinding !== binding) return deny('fabric_denied');
             const receipt = routedResolution.receipt;
+            let generatedAt: string;
+            let correlation: string;
+            try { generatedAt = timestamp(sources); correlation = reviewRef(sources); }
+            catch { return deny('source_invalid'); }
             let provenance: FabricProvenanceRecord;
             let prompt: string;
             try {
@@ -144,21 +148,14 @@ export function createPatientSmartImportHostCapability(dependencies: Dependencie
             let response: string;
             try {
                 const providerResult = await routedBinding.adapter.chat(
-                    [{ role: 'user', content: prompt }], undefined, undefined, { responseFormat: 'json' },
+                    [{ role: 'user', content: prompt }], undefined, 1_100, { responseFormat: 'json' },
                 );
                 response = providerResult.content;
                 if (typeof response !== 'string') throw new Error('invalid');
             } catch { return failed('provider_failed', receipt, provenance); }
-
-            let generatedAt: string;
-            try { generatedAt = timestamp(sources); }
-            catch { return failed('source_invalid', receipt, provenance); }
             let proposal: PatientSmartImportCapabilityProposal;
             try { proposal = parsePatientSmartImportCapabilityProposal(response, projection, generatedAt); }
             catch { return failed('proposal_invalid', receipt, provenance); }
-            let correlation: string;
-            try { correlation = reviewRef(sources); }
-            catch { return failed('source_invalid', receipt, provenance); }
 
             return Object.freeze({ ...common, status: 'available', code: null, proposal, receipt, provenance,
                 reviewRef: correlation });
