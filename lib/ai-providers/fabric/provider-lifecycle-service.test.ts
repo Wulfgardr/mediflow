@@ -58,6 +58,8 @@ test('separates read service from host control and generates operation metadata'
 });
 
 test('rejects caller authority extras and snapshots host sources once', () => {
+    expectCode('input_invalid', () => createHostProviderLifecycleService({ appDataDir: '' }));
+    expectCode('input_invalid', () => createHostProviderLifecycleService({ appDataDir: 'relative/app-data' }));
     const appDataDir = root();
     let entropyReads = 0; let clockReads = 0;
     const boundary = createHostProviderLifecycleService({ appDataDir, sources: {
