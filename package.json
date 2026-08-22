@@ -65,7 +65,7 @@
     "test:pdf-service": "node scripts/run-strip-types.mjs --test lib/pdf-service.test.ts",
     "test:patient-document-import": "node scripts/run-strip-types.mjs --test lib/domain/documents/patient-import-decision.test.ts lib/domain/documents/patient-document-import-service.test.ts lib/domain/documents/patient-document-review.test.ts",
     "test:patient-document-decision": "node scripts/run-strip-types.mjs --test lib/domain/documents/patient-document-decision.test.ts",
-    "test:patient-smart-import": "node scripts/run-strip-types.mjs --test lib/domain/documents/patient-smart-import-service.test.ts",
+    "test:patient-smart-import": "node scripts/run-strip-types.mjs --test lib/domain/documents/patient-smart-import-fabric.test.ts lib/domain/documents/patient-smart-import-service.test.ts",
     "test:patient-structured-fields": "node scripts/run-strip-types.mjs --test lib/patient-structured-fields.test.ts",
     "test:locked-field-guard": "node scripts/run-strip-types.mjs --test lib/locked-field-guard.test.ts",
     "test:attachment-payload": "node scripts/run-strip-types.mjs --test lib/attachment-payload.test.ts",
