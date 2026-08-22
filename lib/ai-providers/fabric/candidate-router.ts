@@ -1,5 +1,6 @@
 /* @Codex */
 import type { PairingReconnectionClass } from '../../network-pairing-lifecycle';
+import { ProviderRegistryError } from '../registry';
 import { FABRIC_CAPABILITY_DESCRIPTORS } from './catalog';
 import type { ProviderOnboardingState } from './onboarding';
 import {
@@ -23,7 +24,11 @@ import {
     observeVenue,
     type VenueObservation,
 } from './routing-observability';
-import type { FabricResolution } from './resolver';
+import {
+    resolveFabricCapabilityWithHostResolution,
+    type FabricResolution,
+    type HostResolvedFabricRequest,
+} from './resolver';
 
 type FabricResolutionRequest = Parameters<typeof observeAndResolve>[1];
 
@@ -61,6 +66,13 @@ export type CandidateRoutingInput = Readonly<{
 
 export type HostCandidateRoutingInput = Omit<CandidateRoutingInput, 'onboarding' | 'lifecycle'>;
 
+export type HostResolvedCandidateRoutingInput = Readonly<{
+    policy: FabricExecutionPolicy;
+    request: HostResolvedFabricRequest;
+    observations: readonly VenueObservation[];
+    reconnection?: PairingReconnectionClass;
+}>;
+
 export type CandidateRoutingResult = Readonly<{
     decision: CandidateRoutingDecision;
     resolution: FabricResolution | null;
@@ -68,11 +80,18 @@ export type CandidateRoutingResult = Readonly<{
 
 type CandidateDecisionContext = Readonly<{
     policy: FabricExecutionPolicy;
-    request: FabricResolutionRequest;
+    request: FabricResolutionRequest | HostResolvedFabricRequest;
     requestId: string;
     capability: FabricCapabilityId;
     requestedVenue: FabricVenue;
     descriptor: FabricCapabilityDescriptor;
+}>;
+
+type CandidateRoutingGateInput = Readonly<{
+    policy: FabricExecutionPolicy;
+    request: FabricResolutionRequest | HostResolvedFabricRequest;
+    observations: readonly VenueObservation[];
+    reconnection?: PairingReconnectionClass;
 }>;
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
@@ -98,7 +117,9 @@ function snapshotCandidateRoutingInput(input: CandidateRoutingInput): CandidateR
     });
 }
 
-function snapshotHostCandidateRoutingInput(input: HostCandidateRoutingInput): CandidateRoutingInput {
+function snapshotHostRoutingInput<
+    T extends HostCandidateRoutingInput | HostResolvedCandidateRoutingInput,
+>(input: T): T {
     if (!isRecord(input)) {
         throw new FabricPolicyError('policy_invalid');
     }
@@ -107,10 +128,10 @@ function snapshotHostCandidateRoutingInput(input: HostCandidateRoutingInput): Ca
         request: input.request,
         observations: input.observations,
         reconnection: input.reconnection,
-    });
+    }) as T;
 }
 
-function snapshotCandidateDecisionContext(input: CandidateRoutingInput): CandidateDecisionContext {
+function snapshotCandidateDecisionContext(input: CandidateRoutingGateInput): CandidateDecisionContext {
     // Copy each caller-owned input before inspecting it. This denies getters
     // that change identifiers after validation and keeps invalid values out of
     // the observable decision shape.
@@ -231,10 +252,26 @@ function snapshotPersistedGenerativeAdmission(value: unknown): ProviderLifecycle
         : null;
 }
 
+function resolveObservedCandidate(
+    context: CandidateDecisionContext,
+    observations: readonly VenueObservation[],
+): FabricResolution | null {
+    const routed = observeAndResolve(
+        context.policy,
+        context.request as FabricResolutionRequest,
+        observations,
+    );
+    return routed.resolution && routed.decision.receipt ? routed.resolution : null;
+}
+
 function routeCandidateCapabilityWithAdmission(
-    inputSnapshot: CandidateRoutingInput,
+    inputSnapshot: CandidateRoutingGateInput,
     snapshotAdmission: () => ProviderLifecycleState | null,
     mapsOnboardingErrors: boolean,
+    resolve: (
+        context: CandidateDecisionContext,
+        observations: readonly VenueObservation[],
+    ) => FabricResolution | null,
 ): CandidateRoutingResult {
     const context = snapshotCandidateDecisionContext(inputSnapshot);
     const observations = observationsFor(context.requestedVenue, inputSnapshot.observations);
@@ -283,18 +320,14 @@ function routeCandidateCapabilityWithAdmission(
         }
     }
 
-    const routed = observeAndResolve(
-        context.policy,
-        context.request,
-        observations,
-    );
-    if (!routed.resolution || !routed.decision.receipt) {
+    const resolution = resolve(context, observations);
+    if (!resolution) {
         return denied(context, observations, 'fabric_resolution_denied');
     }
 
     if (context.descriptor.class === 'generative') {
         const lifecycle = admittedLifecycle;
-        const receipt = routed.decision.receipt;
+        const receipt = resolution.receipt;
         if (
             !lifecycle
             || receipt.provider !== lifecycle.provider
@@ -311,9 +344,9 @@ function routeCandidateCapabilityWithAdmission(
             observations,
             'resolved',
             null,
-            routed.decision.receipt,
+            resolution.receipt,
         ),
-        resolution: routed.resolution,
+        resolution,
     });
 }
 
@@ -330,6 +363,7 @@ export function routeCandidateCapability(
         inputSnapshot,
         () => snapshotGenerativeAdmission(inputSnapshot),
         true,
+        resolveObservedCandidate,
     );
 }
 
@@ -337,10 +371,36 @@ export function routeHostCandidateCapability(
     input: HostCandidateRoutingInput,
     lifecycle: ProviderLifecycleState,
 ): CandidateRoutingResult {
-    const inputSnapshot = snapshotHostCandidateRoutingInput(input);
+    const inputSnapshot = snapshotHostRoutingInput(input);
     return routeCandidateCapabilityWithAdmission(
         inputSnapshot,
         () => snapshotPersistedGenerativeAdmission(lifecycle),
         false,
+        resolveObservedCandidate,
+    );
+}
+
+export function routeHostResolvedCandidateCapability(
+    input: HostResolvedCandidateRoutingInput,
+    lifecycle: ProviderLifecycleState,
+): CandidateRoutingResult {
+    const inputSnapshot = snapshotHostRoutingInput(input);
+    return routeCandidateCapabilityWithAdmission(
+        inputSnapshot,
+        () => snapshotPersistedGenerativeAdmission(lifecycle),
+        false,
+        (context) => {
+            try {
+                return resolveFabricCapabilityWithHostResolution(
+                    context.policy,
+                    context.request as HostResolvedFabricRequest,
+                );
+            } catch (error) {
+                if (error instanceof FabricPolicyError || error instanceof ProviderRegistryError) {
+                    return null;
+                }
+                throw error;
+            }
+        },
     );
 }
