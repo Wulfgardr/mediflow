@@ -5,6 +5,10 @@ import { NextResponse } from 'next/server';
 
 import { apiFailure, apiInternalError } from '../api-error-response';
 import { ProjectionBrokerError, type ProjectionBrokerErrorCode } from '../typed-projection-broker';
+import {
+    SmartImportProjectionAttachmentHostError,
+    type SmartImportProjectionAttachmentHostErrorCode,
+} from '../smart-import-projection-attachment-host';
 import { SmartImportProjectionError, type SmartImportProjectionErrorCode } from '../smart-import-projection';
 import {
     ServerSessionSmartImportAttachmentIngestError,
@@ -20,12 +24,17 @@ function failure(code: string, status: number): NextResponse {
     return apiFailure(code, MESSAGE, status);
 }
 
+function exhaustiveCode(code: never): null {
+    void code;
+    return null;
+}
+
 function attachmentFailure(code: ServerSessionSmartImportAttachmentIngestErrorCode): NextResponse | null {
     switch (code) {
         case 'input_invalid': return failure(code, 400);
         case 'session_unavailable': return failure(code, 401);
         case 'owner_unavailable': return failure(code, 409);
-        default: return null;
+        default: return exhaustiveCode(code);
     }
 }
 
@@ -35,7 +44,7 @@ function brokerFailure(code: ProjectionBrokerErrorCode): NextResponse | null {
         case 'broker_locked': case 'broker_revoked': case 'request_replayed': case 'selection_changed': return failure(code, 409);
         case 'lease_expired': case 'projection_stale': return failure(code, 410);
         case 'handle_collision': case 'handle_missing': case 'source_invalid': return null;
-        default: return null;
+        default: return exhaustiveCode(code);
     }
 }
 
@@ -48,7 +57,7 @@ function ownerFailure(code: ServerSessionProjectionOwnerErrorCode): NextResponse
         case 'lease_expired': return failure(code, 410);
         case 'reference_unavailable': return failure(code, 503);
         case 'broker_factory_failed': case 'selection_unavailable': return null;
-        default: return null;
+        default: return exhaustiveCode(code);
     }
 }
 
@@ -56,7 +65,15 @@ function projectionFailure(code: SmartImportProjectionErrorCode): NextResponse |
     switch (code) {
         case 'projection_invalid': return failure(code, 400);
         case 'projection_stale': return failure(code, 410);
-        default: return null;
+        default: return exhaustiveCode(code);
+    }
+}
+
+function attachmentHostFailure(code: SmartImportProjectionAttachmentHostErrorCode): NextResponse | null {
+    switch (code) {
+        case 'authority_invalid': return null;
+        case 'source_invalid': return null;
+        default: return exhaustiveCode(code);
     }
 }
 
@@ -65,6 +82,7 @@ function typedFailure(error: unknown): NextResponse | null {
     if (error instanceof ProjectionBrokerError) return brokerFailure(error.code);
     if (error instanceof ServerSessionProjectionOwnerError) return ownerFailure(error.code);
     if (error instanceof SmartImportProjectionError) return projectionFailure(error.code);
+    if (error instanceof SmartImportProjectionAttachmentHostError) return attachmentHostFailure(error.code);
     return null;
 }
 

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { ProjectionBrokerError } from '../typed-projection-broker.ts';
+import { SmartImportProjectionAttachmentHostError } from '../smart-import-projection-attachment-host.ts';
 import { SmartImportProjectionError } from '../smart-import-projection.ts';
 import { ServerSessionSmartImportAttachmentIngestError } from './server-session-smart-import-attachment-ingest.ts';
 import {
@@ -83,6 +84,9 @@ test('maps every typed ingest error to its stable HTTP status', async () => {
         ...(['projection_invalid', 'projection_stale'] as const).map((code) => [
             new SmartImportProjectionError(code), code === 'projection_invalid' ? 400 : 410, code,
         ] as const),
+        ...(['authority_invalid', 'source_invalid'] as const).map((code) => [
+            new SmartImportProjectionAttachmentHostError(code), 500, code,
+        ] as const),
     ];
     const originalError = console.error; console.error = () => undefined;
     try {
@@ -104,6 +108,24 @@ test('passes unexpected original errors to server logging while sanitizing the r
         assert.equal(JSON.stringify(body).includes('synthetic raw'), false); assert.equal(entries.length, 1);
         assert.equal(entries[0]?.[1], error);
     } finally { console.error = originalError; }
+});
+
+test('sanitizes a runtime-invalid controlled code while retaining the original error for logging', async () => {
+    const originalError = console.error; const entries: unknown[][] = [];
+    const error = new ProjectionBrokerError('future_ingest_code' as never);
+    console.error = (...values: unknown[]) => { entries.push(values); };
+    try {
+        const response = await handler(error).handle(request());
+        await rejects(response, 500, 'internal_error');
+        assert.equal(entries.length, 1); assert.equal(entries[0]?.[1], error);
+    } finally { console.error = originalError; }
+});
+
+test('keeps controlled error unions explicit and host attachment faults internal', () => {
+    const source = readFileSync(new URL('./server-session-smart-import-ingest-http.ts', import.meta.url), 'utf8');
+    assert.match(source, /SmartImportProjectionAttachmentHostError/u);
+    assert.match(source, /function exhaustiveCode\(code: never\): null/u);
+    assert.doesNotMatch(source, /default:\s*return null;/u);
 });
 
 test('route remains a thin dynamic Node adapter over production ingest composition', () => {
