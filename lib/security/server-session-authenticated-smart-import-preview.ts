@@ -11,7 +11,7 @@ type Context = Readonly<{ session: ServerSession; owner: ServerSessionProjection
 type Capability = Readonly<{ preview(input: unknown): Promise<PatientSmartImportHostCapabilityResult> }>;
 type Sources = Readonly<{ acquireContext(): Promise<Context | null>; createCapability(broker: Broker): Capability }>;
 
-export type AuthenticatedSmartImportPreviewErrorCode = 'session_unavailable';
+export type AuthenticatedSmartImportPreviewErrorCode = 'preview_unavailable' | 'session_unavailable';
 export class AuthenticatedSmartImportPreviewError extends Error {
     constructor(readonly code: AuthenticatedSmartImportPreviewErrorCode) {
         super(`Authenticated Smart Import preview rejected: ${code}`);
@@ -26,18 +26,28 @@ function fail(code: AuthenticatedSmartImportPreviewErrorCode): never {
     throw new AuthenticatedSmartImportPreviewError(code);
 }
 
+function hasSafeInputBoundary(value: unknown): boolean {
+    if (value === null || typeof value !== 'object') return true;
+    try {
+        Object.getPrototypeOf(value);
+        for (const key of Reflect.ownKeys(value)) Object.getOwnPropertyDescriptor(value, key);
+        return true;
+    } catch { return false; }
+}
+
 export function createAuthenticatedSmartImportPreviewService(sources: Sources) {
     return Object.freeze({
         async preview(input: unknown): Promise<PatientSmartImportHostCapabilityResult> {
             let context: Context | null;
             try { context = await sources.acquireContext(); } catch { return fail('session_unavailable'); }
             if (!context) return fail('session_unavailable');
+            if (!hasSafeInputBoundary(input)) return inputInvalid;
             const broker: Broker = Object.freeze({
                 consume(value) { return context.owner.resolveProjectionService(context.session).consume(value); },
             });
             let capability: Capability;
-            try { capability = sources.createCapability(broker); } catch { return inputInvalid; }
-            try { return await capability.preview(input); } catch { return inputInvalid; }
+            try { capability = sources.createCapability(broker); } catch { return fail('preview_unavailable'); }
+            try { return await capability.preview(input); } catch { return fail('preview_unavailable'); }
         },
     });
 }
