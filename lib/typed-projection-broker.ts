@@ -1,7 +1,7 @@
 /* @Codex */
 import 'server-only';
 import { randomBytes } from 'node:crypto';
-import { SmartImportProjectionError, snapshotSmartImportProjection, type SmartImportProjection } from './smart-import-projection.ts';
+import { SmartImportProjectionError, snapshotSmartImportProjection, type SmartImportProjection } from './smart-import-projection';
 
 export type ProjectionBrokerErrorCode =
     | 'broker_locked' | 'broker_revoked' | 'capability_mismatch' | 'handle_collision' | 'handle_missing'
