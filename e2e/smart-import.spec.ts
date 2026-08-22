@@ -60,8 +60,10 @@ async function openPatientScheda(page: Page, patientId: string) {
 async function openDocumentiSection(page: Page) {
   const trigger = page.locator('section#documenti > button').first();
   await expect(trigger).toBeVisible();
-  if (await trigger.getAttribute('aria-expanded') === 'false') await trigger.click();
-  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await expect.poll(async () => {
+    if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click();
+    return await trigger.getAttribute('aria-expanded');
+  }).toBe('true');
 }
 
 function smartImportDiagnosisInputId(label: string, icdQuery: string) {
