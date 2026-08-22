@@ -6,9 +6,10 @@ import { join } from 'node:path';
 const OUT = process.argv[2] || './out6';
 mkdirSync(OUT, { recursive: true });
 
+/* @Codex: mantiene neutri gli asset Web senza cambiare la geometria del Filo. */
 const REG = {
-  giorno:  { c0: '#fbfaf7', c1: '#eef0f2', line: '#33506b', nodeCore: '#ffffff' },
-  grafite: { c0: '#191c21', c1: '#121417', line: '#8fb0cc', nodeCore: '#fbfaf7' },
+  giorno:  { c0: '#fbfcfe', c1: '#eef0f2', line: '#33506b', nodeCore: '#ffffff' },
+  grafite: { c0: '#191c21', c1: '#121417', line: '#8fb0cc', nodeCore: '#fbfcfe' },
 };
 
 function strokeFor(px) {
