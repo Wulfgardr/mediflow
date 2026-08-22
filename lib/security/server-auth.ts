@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { users } from '@/lib/schema';
 import { deleteSession, getSession, SESSION_COOKIE_NAME, type ServerSession } from '@/lib/security/server-session';
-import { serverSessionProjectionOwnerRegistry } from '@/lib/security/server-session-projection-owner';
+import { serverSessionProjectionOwnerRegistry } from '@/lib/security/server-session-projection-owner-production';
 /* @Codex */
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 
