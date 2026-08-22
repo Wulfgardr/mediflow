@@ -26,11 +26,11 @@ const attestation: OllamaLocalAttestation = {
     checkedAt: '2026-08-22T00:00:00.000Z',
 };
 
-function assertDenied(result: HostLocalProviderReadinessResult, code: string, state: string): void {
-    assert.equal(result.status, 'denied');
-    if (result.status !== 'denied') return;
-    assert.equal(result.code, code);
-    assert.equal(result.observation.state, state);
+const PROVIDER_DENIED = { status: 'denied', code: 'provider_unready', observation: { venue: 'local_process', state: 'offline', reason: 'daemon_unreachable' } } as const;
+const MODEL_DENIED = { status: 'denied', code: 'model_unavailable', observation: { venue: 'local_process', state: 'degraded', reason: null } } as const;
+
+function assertDenied(result: HostLocalProviderReadinessResult, expected: typeof PROVIDER_DENIED | typeof MODEL_DENIED): void {
+    assert.deepEqual(result, expected);
     assert.equal(Object.isFrozen(result), true);
     assert.equal(Object.isFrozen(result.observation), true);
 }
@@ -82,16 +82,16 @@ test('mappa gli errori locality in dinieghi fissi senza dettagli raw', async () 
     for (const code of ['endpoint_not_loopback', 'provider_unready'] as const) {
         const result = await createHostLocalProviderReadinessForTest(async () => { throw new OllamaLocalityError(code); })
             .observeClinical(resolution());
-        assertDenied(result, 'provider_unready', 'offline');
+        assertDenied(result, PROVIDER_DENIED);
     }
     for (const code of ['model_cloud_reference', 'model_not_local', 'model_pull_disabled', 'response_not_local'] as const) {
         const result = await createHostLocalProviderReadinessForTest(async () => { throw new OllamaLocalityError(code); })
             .observeClinical(resolution());
-        assertDenied(result, 'model_unavailable', 'degraded');
+        assertDenied(result, MODEL_DENIED);
     }
     const unexpected = await createHostLocalProviderReadinessForTest(async () => { throw new Error('synthetic raw exception'); })
         .observeClinical(resolution());
-    assertDenied(unexpected, 'provider_unready', 'offline');
+    assertDenied(unexpected, PROVIDER_DENIED);
     assert.equal(JSON.stringify(unexpected).includes('synthetic raw exception'), false);
 });
 
@@ -99,14 +99,18 @@ test('nega provider, adapter, endpoint o modello incoerenti senza attestare', as
     let calls = 0;
     const observer = createHostLocalProviderReadinessForTest(async () => { calls += 1; return attestation; });
     const valid = resolution();
-    const cases: LocalProviderResolution[] = [
-        { ...valid, receipt: { ...valid.receipt, provider: 'other' as never } },
-        { ...valid, adapter: { ...valid.adapter, id: 'other' } },
-        { ...valid, adapter: { ...valid.adapter, getBaseUrl: () => ['https:', '//remote.invalid'].join('') } },
-        { ...valid, adapter: { ...valid.adapter, getModel: () => 'different-local-model' } },
+    const withAdapter = (override: object) => ({ ...valid, adapter: Object.assign(
+        Object.create(Object.getPrototypeOf(valid.adapter)), valid.adapter, override,
+    ) }) as LocalProviderResolution;
+    const cases: [LocalProviderResolution, typeof PROVIDER_DENIED | typeof MODEL_DENIED][] = [
+        [{ ...valid, receipt: { ...valid.receipt, provider: 'other' as never } }, PROVIDER_DENIED],
+        [withAdapter({ id: 'other' }), PROVIDER_DENIED],
+        [withAdapter({ getBaseUrl: () => ['https:', '//remote.invalid'].join('') }), PROVIDER_DENIED],
+        [withAdapter({ getModel: () => 'different-local-model' }), MODEL_DENIED],
+        [{ ...valid, receipt: { ...valid.receipt, task: 'reasoning' } }, PROVIDER_DENIED],
     ];
-    for (const candidate of cases) {
-        assert.equal((await observer.observeClinical(candidate)).status, 'denied');
+    for (const [candidate, expected] of cases) {
+        assertDenied(await observer.observeClinical(candidate), expected);
     }
     assert.equal(calls, 0);
 });

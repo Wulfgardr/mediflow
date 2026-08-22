@@ -8,10 +8,10 @@ import {
 } from './ollama-locality';
 import type { LocalProviderResolution } from './registry';
 
-const READINESS_TIMEOUT_MS = 10_000;
+const READINESS_TIMEOUT_MS = 300_000;
 const AVAILABLE = Object.freeze({ venue: 'local_process', state: 'available', reason: null } as const);
 const OFFLINE = Object.freeze({ venue: 'local_process', state: 'offline', reason: 'daemon_unreachable' } as const);
-const DEGRADED = Object.freeze({ venue: 'local_process', state: 'degraded', reason: 'target_invalid' } as const);
+const DEGRADED = Object.freeze({ venue: 'local_process', state: 'degraded', reason: null } as const);
 
 export type HostLocalProviderReadinessResult =
     | Readonly<{ status: 'available'; code: null; observation: typeof AVAILABLE }>
@@ -29,12 +29,13 @@ function deny(code: 'provider_unready' | 'model_unavailable'): HostLocalProvider
 }
 
 function snapshotResolution(resolution: LocalProviderResolution): Snapshot | HostLocalProviderReadinessResult {
-    let provider: unknown, receiptModel: unknown, adapterId: unknown, adapterKind: unknown;
+    let provider: unknown, task: unknown, receiptModel: unknown, adapterId: unknown, adapterKind: unknown;
     let baseUrl: unknown, adapterModel: unknown;
     try {
         const receipt = resolution.receipt;
         const adapter = resolution.adapter;
         provider = receipt.provider;
+        task = receipt.task;
         receiptModel = receipt.model;
         adapterId = adapter.id;
         adapterKind = adapter.kind;
@@ -45,7 +46,7 @@ function snapshotResolution(resolution: LocalProviderResolution): Snapshot | Hos
     } catch {
         return deny('provider_unready');
     }
-    if (provider !== 'ollama' || adapterId !== 'ollama' || adapterKind !== 'local'
+    if (provider !== 'ollama' || task !== 'clinical' || adapterId !== 'ollama' || adapterKind !== 'local'
         || typeof baseUrl !== 'string') {
         return deny('provider_unready');
     }
