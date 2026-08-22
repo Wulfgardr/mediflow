@@ -1,7 +1,7 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ProviderRegistryError } from '../registry.ts';
+import { localProviderRegistry, ProviderRegistryError } from '../registry.ts';
 import {
     DETERMINISTIC_CAPABILITY_IDS, FABRIC_PREPROCESSING_LABELS,
     FABRIC_PREPROCESSING_LABEL_PATTERN, FABRIC_VENUES, GENERATIVE_CAPABILITY_IDS,
@@ -9,7 +9,11 @@ import {
 } from './contract.ts';
 import { DETERMINISTIC_CAPABILITY_DESCRIPTORS } from './deterministic-catalog.ts';
 import { GENERATIVE_CAPABILITY_DESCRIPTORS } from './generative-catalog.ts';
-import { buildProvenanceRecord, resolveFabricCapability } from './resolver.ts';
+import {
+    buildProvenanceRecord,
+    resolveFabricCapability,
+    resolveFabricCapabilityWithHostResolution,
+} from './resolver.ts';
 
 const binding = {
     task: 'caller_value_is_ignored',
@@ -46,6 +50,100 @@ test('risolve una generativa reale e deriva il task dalla capability', () => {
     assert.equal(result.receipt.model, 'qwen3.5:35b-a3b');
     assert.equal(result.receipt.providerReceipt, result.generative?.receipt);
     assert.equal(Object.isFrozen(result.receipt), true);
+});
+
+test('riusa la resolution host validata senza ricostruire adapter o binding', () => {
+    const descriptor = GENERATIVE_CAPABILITY_DESCRIPTORS.smart_import;
+    const hostResolution = localProviderRegistry.resolve({ ...binding, task: 'clinical' });
+
+    const result = resolveFabricCapabilityWithHostResolution(policyFor(descriptor), {
+        descriptor,
+        venue: 'local_process',
+        generative: hostResolution,
+    });
+
+    assert.equal(result.generative, hostResolution);
+    assert.equal(result.generative?.adapter, hostResolution.adapter);
+    assert.equal(result.receipt.providerReceipt, hostResolution.receipt);
+    assert.equal(result.receipt.model, hostResolution.receipt.model);
+});
+
+test('rifiuta una resolution host legata al task di un altro descriptor', () => {
+    const descriptor = GENERATIVE_CAPABILITY_DESCRIPTORS.smart_import;
+    const wrongTask = localProviderRegistry.resolve({ ...binding, task: 'reasoning' });
+
+    assert.throws(() => resolveFabricCapabilityWithHostResolution(policyFor(descriptor), {
+        descriptor,
+        venue: 'local_process',
+        generative: wrongTask,
+    }), (error) => error instanceof ProviderRegistryError && error.code === 'invalid_task');
+});
+
+test('rifiuta un descriptor host non canonico prima di emettere receipt', () => {
+    const descriptor = GENERATIVE_CAPABILITY_DESCRIPTORS.smart_import;
+    const hostResolution = localProviderRegistry.resolve({ ...binding, task: 'clinical' });
+    const forged = { ...descriptor } as FabricCapabilityDescriptor;
+
+    expectCode('capability_unknown', () => resolveFabricCapabilityWithHostResolution(
+        policyFor(descriptor),
+        { descriptor: forged, venue: 'local_process', generative: hostResolution },
+    ));
+});
+
+test('applica al binding host la stessa policy e le stesse venue fail-closed', () => {
+    const descriptor = GENERATIVE_CAPABILITY_DESCRIPTORS.smart_import;
+    const hostResolution = localProviderRegistry.resolve({ ...binding, task: 'clinical' });
+    const run = (policy: FabricExecutionPolicy, venue: FabricExecutionPolicy['allowedVenues'][number]) => (
+        resolveFabricCapabilityWithHostResolution(policy, { descriptor, venue, generative: hostResolution })
+    );
+
+    expectCode('policy_invalid', () => run({
+        ...policyFor(descriptor),
+        fallback: 'alternate',
+    } as unknown as FabricExecutionPolicy, 'local_process'));
+    expectCode('policy_invalid', () => run({
+        ...policyFor(descriptor),
+        operation: 'lookup',
+    }, 'local_process'));
+    expectCode('venue_not_allowed', () => run({
+        ...policyFor(descriptor),
+        allowedVenues: ['local_process'],
+    }, 'home_base'));
+    expectCode('cloud_not_authorized', () => run(policyFor(descriptor), 'cloud'));
+});
+
+test('nega mismatch host provider, modello, localita, endpoint e fallback senza invocare provider', () => {
+    const descriptor = GENERATIVE_CAPABILITY_DESCRIPTORS.smart_import;
+    const base = localProviderRegistry.resolve({ ...binding, task: 'clinical' });
+    let providerCalls = 0;
+    const adapter = (overrides: Record<string, unknown> = {}) => ({
+        id: 'ollama',
+        kind: 'local',
+        capabilities: base.adapter.capabilities,
+        getBaseUrl: () => base.adapter.getBaseUrl(),
+        getModel: () => base.adapter.getModel(),
+        chat: async () => { providerCalls += 1; throw new Error('not-called'); },
+        listModels: async () => { providerCalls += 1; throw new Error('not-called'); },
+        ...overrides,
+    });
+    const cases = [
+        [{ ...base, receipt: { ...base.receipt, provider: 'other' } }, 'provider_not_registered'],
+        [{ ...base, manifest: { ...base.manifest, provider: 'other' } }, 'provider_not_registered'],
+        [{ ...base, adapter: adapter({ id: 'other' }) }, 'provider_not_registered'],
+        [{ ...base, adapter: adapter({ getModel: () => 'other-model' }) }, 'invalid_model'],
+        [{ ...base, adapter: adapter({ kind: 'cloud' }) }, 'provider_not_local'],
+        [{ ...base, adapter: adapter({ getBaseUrl: () => 'http://localhost:11434' }) }, 'endpoint_not_local'],
+        [{ ...base, fallback: { strategy: 'none', candidates: ['other'] } }, 'provider_not_local'],
+    ] as const;
+
+    for (const [generative, code] of cases) {
+        assert.throws(() => resolveFabricCapabilityWithHostResolution(policyFor(descriptor), {
+            descriptor,
+            venue: 'local_process',
+            generative: generative as never,
+        }), (error) => error instanceof ProviderRegistryError && error.code === code);
+    }
+    assert.equal(providerCalls, 0);
 });
 
 test('risolve una deterministica in-house senza modello', () => {
