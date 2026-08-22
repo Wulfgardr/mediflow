@@ -2105,7 +2105,15 @@ test('smart import generation rejects an envelope with a mismatched task', async
     db.attachments.filter = (() => ({ toArray: async () => [] })) as unknown as typeof db.attachments.filter;
     db.therapies.filter = (() => ({ toArray: async () => [] })) as unknown as typeof db.therapies.filter;
     AIService.create = (async () => ({
-        getModelInfo: () => ({ provider: 'local', model: 'synthetic', baseUrl: 'http://127.0.0.1' }),
+        getModelInfo: () => ({
+            provider: 'ollama', model: 'synthetic', baseUrl: 'http://127.0.0.1:11434',
+            receipt: {
+                schemaVersion: 'mediflow.ai.provider-selection.v1', authorityPlane: 'clinical_application',
+                task: 'clinical', provider: 'ollama', model: 'synthetic', execution: 'local',
+                endpointClass: 'loopback', egress: 'none', runtimeReadiness: 'required', fallbackCount: 0,
+            },
+        }),
+        getHealth: async () => ({ status: 'ok', message: 'synthetic', models: ['synthetic'] }),
         generate: async () => JSON.stringify({
             schemaVersion: 'mediflow.ai.extract.v1',
             task: 'patient_insight',
