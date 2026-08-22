@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { users } from '@/lib/schema';
 import { deleteSession, getSession, SESSION_COOKIE_NAME, type ServerSession } from '@/lib/security/server-session';
+import type { ServerSessionProjectionOwner } from '@/lib/security/server-session-projection-owner';
 import { serverSessionProjectionOwnerRegistry } from '@/lib/security/server-session-projection-owner-production';
 /* @Codex */
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
@@ -42,11 +43,21 @@ export async function requireSession(): Promise<ServerSession | null> {
     return session;
 }
 
+export type AuthenticatedWebSessionProjectionOwnerContext = Readonly<{
+    session: ServerSession; owner: ServerSessionProjectionOwner;
+}>;
+
 /* @Codex */
-export async function acquireAuthenticatedWebSessionProjectionOwner() {
+export async function acquireAuthenticatedWebSessionProjectionOwnerContext(): Promise<AuthenticatedWebSessionProjectionOwnerContext | null> {
     const session = await requireSession();
     if (!session) return null;
-    return serverSessionProjectionOwnerRegistry.acquire(session);
+    const owner = serverSessionProjectionOwnerRegistry.acquire(session);
+    return Object.freeze({ session, owner });
+}
+
+/* @Codex */
+export async function acquireAuthenticatedWebSessionProjectionOwner() {
+    return (await acquireAuthenticatedWebSessionProjectionOwnerContext())?.owner ?? null;
 }
 
 /* @Codex */
