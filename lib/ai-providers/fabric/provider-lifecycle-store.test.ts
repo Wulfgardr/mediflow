@@ -30,7 +30,7 @@ test('persists an exact PHI-safe snapshot across restart', () => {
     const first = createProviderLifecycleStore(appDataDir, () => new Date('2026-08-22T10:00:00.000Z'));
     const saved = first.save({
         kind: 'admit', expectedVersion: 0, lifecycle,
-        actorClass: 'host_service', actorRef: 'actor_1234567812345678', receiptRef: 'receipt_1234567812345678',
+        actorClass: 'host_service', actorRef: 'actor_12345678123456781234567812345678', receiptRef: 'receipt_12345678123456781234567812345678',
     });
     assert.equal(saved.version, 1);
     assert.equal(saved.hostTimestamp, '2026-08-22T10:00:00.000Z');
@@ -50,26 +50,26 @@ test('enforces expectedVersion and terminal revocation after restart', () => {
     const store = createProviderLifecycleStore(appDataDir, () => new Date('2026-08-22T10:00:00.000Z'));
     store.save({
         kind: 'admit', expectedVersion: 0, lifecycle,
-        actorClass: 'physician', actorRef: 'actor_abcdef0123456789', receiptRef: 'receipt_abcdef0123456789',
+        actorClass: 'physician', actorRef: 'actor_abcdef0123456789abcdef0123456789', receiptRef: 'receipt_abcdef0123456789abcdef0123456789',
     });
     const degraded = store.save({
         kind: 'transition', expectedVersion: 1, event: 'degrade',
-        actorClass: 'host_service', actorRef: 'actor_8765432187654321', receiptRef: 'receipt_8765432187654321',
+        actorClass: 'host_service', actorRef: 'actor_87654321876543218765432187654321', receiptRef: 'receipt_87654321876543218765432187654321',
     });
     expectCode('version_conflict', () => store.save({
         kind: 'transition', expectedVersion: 1, event: 'recover',
-        actorClass: 'host_service', actorRef: 'actor_8765432187654321', receiptRef: 'receipt_8765432187654321',
+        actorClass: 'host_service', actorRef: 'actor_87654321876543218765432187654321', receiptRef: 'receipt_87654321876543218765432187654321',
     }));
     assert.equal(degraded.version, 2);
     store.save({
         kind: 'transition', expectedVersion: 2, event: 'revoke',
-        actorClass: 'physician', actorRef: 'actor_abcdef0123456789', receiptRef: 'receipt_deadbeef01234567',
+        actorClass: 'physician', actorRef: 'actor_abcdef0123456789abcdef0123456789', receiptRef: 'receipt_deadbeef01234567deadbeef01234567',
     });
     const restarted = createProviderLifecycleStore(appDataDir, () => new Date('2026-08-22T10:02:00.000Z'));
     assert.equal(restarted.load().lifecycle.status, 'revoked');
     expectCode('transition_invalid', () => restarted.save({
         kind: 'transition', expectedVersion: 3, event: 'recover',
-        actorClass: 'physician', actorRef: 'actor_abcdef0123456789', receiptRef: 'receipt_cafebabe01234567',
+        actorClass: 'physician', actorRef: 'actor_abcdef0123456789abcdef0123456789', receiptRef: 'receipt_cafebabe01234567cafebabe01234567',
     }));
 });
 test('fails closed on missing, corrupt, truncated, and unreadable state', () => {
@@ -92,14 +92,18 @@ test('rejects secret or clinical fields and an occupied writer lock', () => {
     const store = createProviderLifecycleStore(appDataDir, () => new Date('2026-08-22T10:00:00.000Z'));
     expectCode('command_invalid', () => store.save({
         kind: 'admit', expectedVersion: 0, lifecycle,
+        actorClass: 'host_service', actorRef: 'actor_1234567812345678', receiptRef: 'receipt_12345678123456781234567812345678',
+    }));
+    expectCode('command_invalid', () => store.save({
+        kind: 'admit', expectedVersion: 0, lifecycle,
         token: 'synthetic-secret', patientContext: 'synthetic-clinical-ref',
-        actorClass: 'host_service', actorRef: 'actor_1234567812345678', receiptRef: 'receipt_1234567812345678',
+        actorClass: 'host_service', actorRef: 'actor_12345678123456781234567812345678', receiptRef: 'receipt_12345678123456781234567812345678',
     }));
     assert.equal(fs.existsSync(paths.recordPath), false);
     fs.mkdirSync(path.dirname(paths.lockPath), { recursive: true });
     fs.writeFileSync(paths.lockPath, 'occupied');
     expectCode('busy', () => store.save({
         kind: 'admit', expectedVersion: 0, lifecycle,
-        actorClass: 'host_service', actorRef: 'actor_1234567812345678', receiptRef: 'receipt_1234567812345678',
+        actorClass: 'host_service', actorRef: 'actor_12345678123456781234567812345678', receiptRef: 'receipt_12345678123456781234567812345678',
     }));
 });
