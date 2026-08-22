@@ -1,7 +1,7 @@
 # ADR 0094: Intelligence Fabric e controllo headless 0.8.5
 
 Date: 2026-08-22
-Status: Proposed
+Status: Accepted
 
 Issue: WUL-522
 Baseline: `main` a `0d55c6d0f`, versione `0.8.2`
@@ -40,11 +40,10 @@ capability, senza confondere installazione, discovery, sessione e autorita.
 | AIP e Mini | PR #180-#190 aperte e draft | Restano evidenza; i replacement packet partono da `main` o da uno stack accettato. |
 | Step-up | WUL-282 e Backlog e blocca WUL-522 per apply | Nessun apply viene implementato da questo packet. |
 
-## Decisioni candidate
+## Decisioni
 
-L'accettazione deve registrare in WUL-522 l'approvazione esplicita di D1-D10.
-Fino a quel momento lo stato resta `ADR_PROPOSED_MANAGER_REVIEW` e nessun
-packet runtime e autorizzato.
+D1-D10 sono state accettate nel decision record WUL-522. L'accettazione
+dell'ADR non autorizza da sola alcun packet runtime.
 
 ### D1. Un solo Application Service Layer
 
@@ -277,5 +276,5 @@ Riaprire l'ADR e fermare la promozione se:
 - Nessun merge, promotion, tag, release, cleanup o security review.
 - Le PR #180-#183 restano evidence e non vengono riscritte.
 
-Il prossimo gate e una decisione manageriale esplicita su D1-D10. Fino ad
-allora lo stato e `ADR_PROPOSED_MANAGER_REVIEW`.
+Lo stato di delivery e `ADR_ACCEPTED_MANAGER_VERIFY`. Nessun packet runtime e
+autorizzato prima del successivo gate manageriale esplicito.
