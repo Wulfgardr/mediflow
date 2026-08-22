@@ -26,7 +26,7 @@ type SelectionState = CanonicalPair & SelectionLease;
 
 export type ServerSessionProjectionOwnerErrorCode =
     | 'broker_factory_failed' | 'broker_unavailable' | 'epoch_conflict' | 'input_invalid' | 'lease_expired' | 'owner_disposed'
-    | 'owner_exists' | 'reference_unavailable' | 'selection_busy' | 'selection_unavailable'
+    | 'owner_acquiring' | 'owner_exists' | 'reference_unavailable' | 'selection_busy' | 'selection_unavailable'
     | 'session_ineligible' | 'session_unavailable' | 'stale_selection';
 
 export class ServerSessionProjectionOwnerError extends Error {
@@ -86,10 +86,17 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
     const sources = Object.freeze({ ...defaultSources, ...sourceOverrides });
     const owners = new Map<string, ServerSessionProjectionOwner>();
     const retired = new Set<string>();
+    const acquiring = new Set<string>();
 
-    return Object.freeze({
+    const registry = {
         lookup(sessionId: string): ServerSessionProjectionOwner | null {
             return owners.get(sessionId) ?? null;
+        },
+        acquire(session: ServerSession): ServerSessionProjectionOwner {
+            if (session.authChannel !== 'web' || session.id === 'local-api' || getSession(session.id) !== session) {
+                return fail('session_ineligible');
+            }
+            return owners.get(session.id) ?? registry.create(session);
         },
         create(session: ServerSession): ServerSessionProjectionOwner {
             if (session.authChannel !== 'web' || session.id === 'local-api' || getSession(session.id) !== session) {
@@ -97,6 +104,9 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             }
             if (owners.has(session.id)) return fail('owner_exists');
             if (retired.has(session.id)) return fail('owner_disposed');
+            if (acquiring.has(session.id)) return fail('owner_acquiring');
+            acquiring.add(session.id);
+            try {
 
             let active: ActiveBinding | null = null;
             let epoch = 0;
@@ -252,6 +262,10 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             if (!unregisterOwner) return fail('session_ineligible');
             owners.set(session.id, owner);
             return owner;
+            } finally {
+                acquiring.delete(session.id);
+            }
         },
-    });
+    };
+    return Object.freeze(registry);
 }

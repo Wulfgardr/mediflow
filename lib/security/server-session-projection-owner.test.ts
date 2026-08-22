@@ -27,12 +27,36 @@ function rejects(code: string) {
     return (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === code;
 }
 
+test('acquire creates one owner and reuses its identity for the canonical session', () => {
+    let constructions = 0;
+    const registry = createServerSessionProjectionOwnerRegistry({ entropy: () => {
+        constructions += 1; return new Uint8Array(16);
+    } });
+    const value = session();
+    const first = registry.acquire(value);
+    const second = registry.acquire(value);
+
+    assert.equal(first, second);
+    assert.equal(registry.lookup(value.id), first);
+    assert.equal(constructions, 1);
+});
+
+test('acquire rejects synchronous source reentrancy with one fixed error', () => {
+    let reenter = true; const value = session();
+    const registry = createServerSessionProjectionOwnerRegistry({ entropy: () => {
+        if (reenter) { reenter = false; assert.throws(() => registry.acquire(value), rejects('owner_acquiring')); }
+        return new Uint8Array(16);
+    } });
+
+    assert.equal(registry.acquire(value), registry.lookup(value.id));
+});
+
 test('registry isolates sessions, rejects duplicate owners, and fresh lookup stays unavailable', () => {
     const registry = createServerSessionProjectionOwnerRegistry();
     const first = session();
     const second = session();
-    const firstOwner = registry.create(first);
-    const secondOwner = registry.create(second);
+    const firstOwner = registry.acquire(first);
+    const secondOwner = registry.acquire(second);
 
     assert.equal(registry.lookup(first.id), firstOwner);
     assert.equal(registry.lookup(second.id), secondOwner);
@@ -41,6 +65,16 @@ test('registry isolates sessions, rejects duplicate owners, and fresh lookup sta
     deleteSession(first.id);
     secondOwner.dispose();
     assert.equal(createServerSessionProjectionOwnerRegistry().lookup(first.id), null);
+});
+
+test('strict create and acquire share one winner without a lookup-create sequence', () => {
+    const createFirst = createServerSessionProjectionOwnerRegistry(); const firstSession = session();
+    const created = createFirst.create(firstSession);
+    assert.equal(createFirst.acquire(firstSession), created);
+
+    const acquireFirst = createServerSessionProjectionOwnerRegistry(); const secondSession = session();
+    acquireFirst.acquire(secondSession);
+    assert.throws(() => acquireFirst.create(secondSession), rejects('owner_exists'));
 });
 
 test('delete, expiry, reset, and explicit disposal are terminal and idempotent', () => {
@@ -82,19 +116,39 @@ test('native, system, and local-api identities cannot create an owner', () => {
 
     for (const value of [session('native'), session('system'), { ...web, id: 'local-api' }]) {
         assert.throws(() => registry.create(value), rejects('session_ineligible'));
+        assert.throws(() => registry.acquire(value), rejects('session_ineligible'));
     }
+    const owner = registry.acquire(web);
+    assert.throws(() => registry.acquire({ ...web }), rejects('session_ineligible'));
+    web.expiresAt = 0; assert.equal(getSession(web.id), null);
+    assert.throws(() => registry.acquire(web), rejects('session_ineligible'));
     assert.equal(registry.lookup(web.id), null);
+    assert.ok(owner);
 });
 
-test('production composition authenticates directly and has no provider or apply reachability', () => {
+test('reacquire preserves an existing selection without resolver or broker side effects', () => {
+    let resolves = 0; let brokers = 0;
+    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => { resolves += 1; return pair; },
+        brokerFactory: () => { brokers += 1; throw new Error('synthetic broker must remain unused'); } });
+    const value = session(); const owner = registry.acquire(value);
+    const lease = owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+
+    assert.equal(registry.acquire(value), owner);
+    assert.equal(owner.dereferenceSelection(value, { sessionRef: lease.sessionRef, selectionEpoch: lease.selectionEpoch,
+        patientRef: lease.patientRef, ambulatoryRef: lease.ambulatoryRef, leaseRef: lease.leaseRef }).patientId, PAIR.patientId);
+    assert.deepEqual({ resolves, brokers, epoch: lease.selectionEpoch }, { resolves: 1, brokers: 0, epoch: 1 });
+});
+
+test('production composition acquires once after direct authentication without app reachability', () => {
     const ownerSource = readFileSync(new URL('./server-session-projection-owner.ts', import.meta.url), 'utf8');
     const authSource = readFileSync(new URL('./server-auth.ts', import.meta.url), 'utf8');
     const productionSource = `${ownerSource}\n${authSource}`;
 
     assert.match(
         authSource,
-        /const session = await requireSession\(\);[\s\S]*serverSessionProjectionOwnerRegistry\.create\(session\)/u,
+        /acquireAuthenticatedWebSessionProjectionOwner[\s\S]*const session = await requireSession\(\);[\s\S]*serverSessionProjectionOwnerRegistry\.acquire\(session\)/u,
     );
+    assert.doesNotMatch(authSource, /createAuthenticatedWebSessionProjectionOwner|serverSessionProjectionOwnerRegistry\.lookup\(/u);
     assert.doesNotMatch(
         productionSource,
         /from ['"][^'"]*(?:provider|apply|patient-smart-import)[^'"]*['"]/u,

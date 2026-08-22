@@ -43,10 +43,10 @@ export async function requireSession(): Promise<ServerSession | null> {
 }
 
 /* @Codex */
-export async function createAuthenticatedWebSessionProjectionOwner() {
+export async function acquireAuthenticatedWebSessionProjectionOwner() {
     const session = await requireSession();
-    if (!session || session.authChannel !== 'web' || session.id === 'local-api') return null;
-    return serverSessionProjectionOwnerRegistry.create(session);
+    if (!session) return null;
+    return serverSessionProjectionOwnerRegistry.acquire(session);
 }
 
 /* @Codex */
