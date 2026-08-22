@@ -32,11 +32,22 @@ Import.
 
 ## Decisione
 
-### 1. Una selezione canonica per sessione medica server
+### 1. Una selezione canonica per sessione web autenticata
 
-Per il candidato 0.8.5, ogni sessione server autenticata come medico possiede
-un solo contesto clinico attivo. Il contesto lega un ambulatorio canonico e un
-paziente canonico.
+Per il Model A del prodotto 0.8.5, single-user e senza RBAC, ogni sessione web
+corrente e autenticata possiede un solo contesto clinico attivo. Il contesto
+lega un ambulatorio canonico e un paziente canonico esclusivamente per
+read, projection e preview.
+
+La stringa `role` non concede ne restringe questa capacita: non e step-up
+medico, non e un grant multiutente user↔ambulatorio e non autorizza write,
+decisioni di review o apply. In questa ADR, le espressioni "sessione medica"
+e "medico" descrivono il contesto clinico e non introducono un controllo di
+ruolo per il Model A. WUL-282 resta il blocco assoluto di qualunque apply.
+
+Un futuro scope reale user↔ambulatorio richiede un nuovo ADR, data model ed
+enforcement esplicito. Non puo derivare dal riuso silenzioso di cookie, role,
+pairing, token o receipt.
 
 Le tab del browser che condividono la sessione server condividono anche questa
 selezione. Se una tab cambia paziente o ambulatorio, l'host sostituisce la
