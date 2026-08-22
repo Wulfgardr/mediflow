@@ -1,7 +1,11 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { SmartImportProjectionError, snapshotSmartImportProjection } from './smart-import-projection.ts';
+import {
+    SmartImportProjectionError,
+    snapshotSmartImportProjection,
+    snapshotSmartImportProjectionAttachment,
+} from './smart-import-projection.ts';
 
 const NOW = '2026-08-22T12:00:00.000Z';
 const PATIENT_REF = 'patient.opaque-1234567890';
@@ -16,8 +20,23 @@ function projection() {
         sources: [{ id: SOURCE_REF, kind: 'clinical-entry', label: 'Diario sintetico', date: NOW, content: 'Evidenza sintetica.' }],
     };
 }
+function attachment() {
+    return {
+        schemaVersion: 'mediflow.smart-import.projection-attachment.v1', capability: 'smart_import',
+        patientRevision: 3, sourceRevision: 5, capturedAt: NOW,
+        currentDiagnoses: [{ system: 'ICD-11', code: 'FAKE-1', description: 'Diagnosi sintetica' }],
+        currentActiveTherapies: [{ drugName: 'Farmaco sintetico', activePrinciple: null, dosage: '1 unita', aic: null, atc: null }],
+        therapyCandidateHints: [{ sourceId: SOURCE_REF, label: 'Fonte sintetica', excerpt: 'Indicazione sintetica.' }],
+        sources: [{ id: SOURCE_REF, kind: 'clinical-entry', label: 'Diario sintetico', date: NOW, content: 'Evidenza sintetica.' }],
+    };
+}
 const reject = (value: unknown, code = 'projection_invalid') => assert.throws(
     () => snapshotSmartImportProjection(value, NOW),
+    (error) => error instanceof SmartImportProjectionError && error.code === code
+        && error.message === `Smart Import projection rejected: ${code}` && !/Diagnosi|Farmaco|opaque-123/u.test(error.message),
+);
+const rejectAttachment = (value: unknown, code = 'projection_invalid') => assert.throws(
+    () => snapshotSmartImportProjectionAttachment(value, NOW),
     (error) => error instanceof SmartImportProjectionError && error.code === code
         && error.message === `Smart Import projection rejected: ${code}` && !/Diagnosi|Farmaco|opaque-123/u.test(error.message),
 );
@@ -30,6 +49,46 @@ test('copies a valid closed projection into a deeply frozen snapshot', () => {
     assert.equal(Object.isFrozen(snapshot), true);
     assert.equal(Object.isFrozen(snapshot.sources), true);
     assert.equal(Object.isFrozen(snapshot.sources[0]), true);
+});
+
+test('copies a valid authority-free attachment into a deeply frozen snapshot', () => {
+    const input = attachment();
+    const value = snapshotSmartImportProjectionAttachment(input, NOW);
+    input.sources[0].content = 'Mutazione successiva';
+
+    assert.deepEqual(Reflect.ownKeys(value), [
+        'schemaVersion', 'capability', 'patientRevision', 'sourceRevision', 'capturedAt',
+        'currentDiagnoses', 'currentActiveTherapies', 'therapyCandidateHints', 'sources',
+    ]);
+    assert.equal(value.sources[0].content, 'Evidenza sintetica.');
+    assert.equal(Object.isFrozen(value.sources[0]), true);
+});
+
+test('rejects caller authority and malformed attachment structures without reading accessors', () => {
+    for (const key of ['patientRef', 'selectionEpoch', 'sessionRef', 'ambulatoryRef', 'leaseRef', 'actorRef',
+        'handle', 'requestId', 'provider', 'model', 'endpoint', 'receipt']) {
+        rejectAttachment({ ...attachment(), [key]: 'caller-authority' });
+    }
+    let reads = 0;
+    const accessor = attachment();
+    Object.defineProperty(accessor.sources[0], 'content', { get() { reads += 1; return 'Non leggere'; } });
+    const sparse = attachment(); sparse.sources = new Array(1) as typeof sparse.sources;
+    const symbol = attachment(); Object.defineProperty(symbol, Symbol('authority'), { value: true });
+    for (const value of [Object.create(attachment()), accessor, sparse, symbol]) rejectAttachment(value);
+    assert.equal(reads, 0);
+});
+
+test('enforces attachment freshness, revisions, bounds and source bindings', () => {
+    const cases = [
+        [(value: ReturnType<typeof attachment>) => { value.capturedAt = '2026-08-22T11:54:59.999Z'; }, 'projection_stale'],
+        [(value: ReturnType<typeof attachment>) => { value.patientRevision = 0; }, 'projection_invalid'],
+        [(value: ReturnType<typeof attachment>) => { value.sourceRevision = 0; }, 'projection_invalid'],
+        [(value: ReturnType<typeof attachment>) => { value.sources[0].kind = 'unknown'; }, 'projection_invalid'],
+        [(value: ReturnType<typeof attachment>) => { value.sources[0].content = 'x'.repeat(901); }, 'projection_invalid'],
+        [(value: ReturnType<typeof attachment>) => { value.sources.push({ ...value.sources[0] }); }, 'projection_invalid'],
+        [(value: ReturnType<typeof attachment>) => { value.therapyCandidateHints[0].sourceId = 'source.unbound-1234567890'; }, 'projection_invalid'],
+    ] as const;
+    for (const [change, code] of cases) { const value = attachment(); change(value); rejectAttachment(value, code); }
 });
 
 test('rejects extra, inherited, accessor and sparse structures without reading accessors', () => {

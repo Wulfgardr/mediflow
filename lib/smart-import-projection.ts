@@ -24,11 +24,7 @@ export type SmartImportProjectionSource = Readonly<{
     date: string | null;
     content: string;
 }>;
-export type SmartImportProjection = Readonly<{
-    schemaVersion: 'mediflow.smart-import.projection.v1';
-    capability: 'smart_import';
-    patientRef: string;
-    selectionEpoch: number;
+type SmartImportProjectionContent = Readonly<{
     patientRevision: number;
     sourceRevision: number;
     capturedAt: string;
@@ -36,6 +32,16 @@ export type SmartImportProjection = Readonly<{
     currentActiveTherapies: ReadonlyArray<ActiveTherapy>;
     therapyCandidateHints: ReadonlyArray<TherapyCandidateHint>;
     sources: ReadonlyArray<SmartImportProjectionSource>;
+}>;
+export type SmartImportProjectionAttachment = SmartImportProjectionContent & Readonly<{
+    schemaVersion: 'mediflow.smart-import.projection-attachment.v1';
+    capability: 'smart_import';
+}>;
+export type SmartImportProjection = SmartImportProjectionContent & Readonly<{
+    schemaVersion: 'mediflow.smart-import.projection.v1';
+    capability: 'smart_import';
+    patientRef: string;
+    selectionEpoch: number;
 }>;
 
 function fail(code: SmartImportProjectionErrorCode): never { throw new SmartImportProjectionError(code); }
@@ -84,10 +90,7 @@ function list<T>(value: unknown, max: number, snapshot: (entry: unknown) => T): 
     return Object.freeze(output);
 }
 
-function snapshot(value: unknown, now: string): SmartImportProjection {
-    const root = exact(value, ['schemaVersion', 'capability', 'patientRef', 'selectionEpoch', 'patientRevision', 'sourceRevision', 'capturedAt',
-        'currentDiagnoses', 'currentActiveTherapies', 'therapyCandidateHints', 'sources']);
-    if (root.schemaVersion !== 'mediflow.smart-import.projection.v1' || root.capability !== 'smart_import') fail('projection_invalid');
+function snapshotContent(root: Record<string, unknown>, now: string): SmartImportProjectionContent {
     const capturedAt = iso(root.capturedAt) as string;
     const nowMs = Date.parse(iso(now) as string); const capturedMs = Date.parse(capturedAt);
     if (capturedMs > nowMs || nowMs - capturedMs > 300_000) fail('projection_stale');
@@ -114,13 +117,33 @@ function snapshot(value: unknown, now: string): SmartImportProjection {
     if (sources.length === 0) fail('projection_invalid');
     const sourceIds = new Set(sources.map(({ id }) => id));
     if (sourceIds.size !== sources.length || therapyCandidateHints.some(({ sourceId }) => !sourceIds.has(sourceId))) fail('projection_invalid');
-    return Object.freeze({ schemaVersion: 'mediflow.smart-import.projection.v1', capability: 'smart_import', patientRef: opaque(root.patientRef),
-        selectionEpoch: positive(root.selectionEpoch), patientRevision: positive(root.patientRevision), sourceRevision: positive(root.sourceRevision), capturedAt,
+    return Object.freeze({ patientRevision: positive(root.patientRevision), sourceRevision: positive(root.sourceRevision), capturedAt,
         currentDiagnoses, currentActiveTherapies, therapyCandidateHints, sources });
+}
+
+function snapshot(value: unknown, now: string): SmartImportProjection {
+    const root = exact(value, ['schemaVersion', 'capability', 'patientRef', 'selectionEpoch', 'patientRevision', 'sourceRevision', 'capturedAt',
+        'currentDiagnoses', 'currentActiveTherapies', 'therapyCandidateHints', 'sources']);
+    if (root.schemaVersion !== 'mediflow.smart-import.projection.v1' || root.capability !== 'smart_import') fail('projection_invalid');
+    return Object.freeze({ schemaVersion: 'mediflow.smart-import.projection.v1', capability: 'smart_import', patientRef: opaque(root.patientRef),
+        selectionEpoch: positive(root.selectionEpoch), ...snapshotContent(root, now) });
 }
 
 export function snapshotSmartImportProjection(value: unknown, now: string): SmartImportProjection {
     try { return snapshot(value, now); } catch (error) {
+        if (error instanceof SmartImportProjectionError) throw error;
+        return fail('projection_invalid');
+    }
+}
+
+export function snapshotSmartImportProjectionAttachment(value: unknown, now: string): SmartImportProjectionAttachment {
+    try {
+        const root = exact(value, ['schemaVersion', 'capability', 'patientRevision', 'sourceRevision', 'capturedAt',
+            'currentDiagnoses', 'currentActiveTherapies', 'therapyCandidateHints', 'sources']);
+        if (root.schemaVersion !== 'mediflow.smart-import.projection-attachment.v1' || root.capability !== 'smart_import') fail('projection_invalid');
+        return Object.freeze({ schemaVersion: 'mediflow.smart-import.projection-attachment.v1', capability: 'smart_import',
+            ...snapshotContent(root, now) });
+    } catch (error) {
         if (error instanceof SmartImportProjectionError) throw error;
         return fail('projection_invalid');
     }
