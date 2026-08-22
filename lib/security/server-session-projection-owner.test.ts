@@ -8,27 +8,19 @@ import {
     ServerSessionProjectionOwnerError,
 } from './server-session-projection-owner.ts';
 import { clearAllSessions, createSession, deleteSession, getSession, type ServerSession } from './server-session.ts';
+import { ProjectionBrokerError } from '../typed-projection-broker.ts';
 
 const USER = {
     id: ['synthetic', 'user'].join('-'),
     username: ['synthetic', 'clinician'].join('-'),
     role: 'clinician',
 };
-const LEASE_A = 'lease.synthetic.0001';
-const LEASE_B = 'lease.synthetic.0002';
+const PAIR = { patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' };
 
 afterEach(() => clearAllSessions());
 
 function session(channel: ServerSession['authChannel'] = 'web') {
     return createSession(USER, channel);
-}
-
-function control(label: string, events: string[]) {
-    return {
-        lock() {},
-        revoke() { events.push(label); },
-        changeSelection(_value: Readonly<{ patientRef: string; selectionEpoch: number }>) {},
-    };
 }
 
 function rejects(code: string) {
@@ -41,51 +33,14 @@ test('registry isolates sessions, rejects duplicate owners, and fresh lookup sta
     const second = session();
     const firstOwner = registry.create(first);
     const secondOwner = registry.create(second);
-    const events: string[] = [];
-    firstOwner.install({ leaseRef: LEASE_A, selectionEpoch: 1, control: control('first', events) });
-    secondOwner.install({ leaseRef: LEASE_B, selectionEpoch: 1, control: control('second', events) });
 
     assert.equal(registry.lookup(first.id), firstOwner);
     assert.equal(registry.lookup(second.id), secondOwner);
     assert.notEqual(firstOwner, secondOwner);
     assert.throws(() => registry.create(first), rejects('owner_exists'));
     deleteSession(first.id);
-    assert.deepEqual(events, ['first']);
     secondOwner.dispose();
-    assert.deepEqual(events, ['first', 'second']);
     assert.equal(createServerSessionProjectionOwnerRegistry().lookup(first.id), null);
-});
-
-test('higher epoch revokes before replacing the single broker; equal and lower fail stable', () => {
-    const registry = createServerSessionProjectionOwnerRegistry();
-    const owner = registry.create(session());
-    const events: string[] = [];
-
-    owner.install({ leaseRef: LEASE_A, selectionEpoch: 2, control: control('old', events) });
-    assert.throws(
-        () => owner.install({ leaseRef: LEASE_B, selectionEpoch: 2, control: control('equal', events) }),
-        rejects('epoch_not_advanced'),
-    );
-    assert.throws(
-        () => owner.install({ leaseRef: LEASE_B, selectionEpoch: 1, control: control('lower', events) }),
-        rejects('epoch_not_advanced'),
-    );
-    assert.deepEqual(events, []);
-
-    owner.install({ leaseRef: LEASE_B, selectionEpoch: 3, control: control('new', events) });
-    assert.deepEqual(events, ['old']);
-    owner.dispose();
-    assert.deepEqual(events, ['old', 'new']);
-});
-
-test('install accepts only an opaque lease, trusted positive epoch, and broker control', () => {
-    const owner = createServerSessionProjectionOwnerRegistry().create(session());
-    const valid = { leaseRef: LEASE_A, selectionEpoch: 1, control: control('valid', []) };
-    const extra = { ...valid, patientRef: 'patient.synthetic' };
-
-    assert.throws(() => owner.install({ ...valid, leaseRef: 'short' }), rejects('input_invalid'));
-    assert.throws(() => owner.install({ ...valid, selectionEpoch: 0 }), rejects('input_invalid'));
-    assert.throws(() => owner.install(extra), rejects('input_invalid'));
 });
 
 test('delete, expiry, reset, and explicit disposal are terminal and idempotent', () => {
@@ -97,11 +52,18 @@ test('delete, expiry, reset, and explicit disposal are terminal and idempotent',
     ];
 
     for (const terminate of scenarios) {
-        const registry = createServerSessionProjectionOwnerRegistry();
+        let sequence = 0; const events: string[] = [];
+        const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair,
+            entropy: () => Uint8Array.from({ length: 16 }, (_, index) => sequence += index + 1),
+            brokerFactory: () => ({ ingest: Object.freeze({ ingest() { return 'unused'; } }),
+                service: Object.freeze({ consume() { return {}; } }), control: Object.freeze({ lock() {},
+                    changeSelection() {}, revoke() { events.push('revoked'); } }) }) as never });
         const value = session();
         const owner = registry.create(value);
-        const events: string[] = [];
-        owner.install({ leaseRef: LEASE_A, selectionEpoch: 1, control: control('revoked', events) });
+        const lease = owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+        const ingest = owner.acquireProjectionIngest(value, { sessionRef: lease.sessionRef,
+            selectionEpoch: lease.selectionEpoch, patientRef: lease.patientRef,
+            ambulatoryRef: lease.ambulatoryRef, leaseRef: lease.leaseRef });
 
         terminate(value, owner);
         owner.dispose();
@@ -109,10 +71,8 @@ test('delete, expiry, reset, and explicit disposal are terminal and idempotent',
 
         assert.equal(registry.lookup(value.id), null);
         assert.deepEqual(events, ['revoked']);
-        assert.throws(
-            () => owner.install({ leaseRef: LEASE_B, selectionEpoch: 2, control: control('late', events) }),
-            rejects('owner_disposed'),
-        );
+        assert.throws(() => ingest.ingest({} as never),
+            (error) => error instanceof ProjectionBrokerError && error.code === 'broker_revoked');
     }
 });
 
