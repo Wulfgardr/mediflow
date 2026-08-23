@@ -27,15 +27,15 @@ iOS/iPadOS runtime, documenti iOS/iPadOS, macOS runtime e macOS receipt.
 | Anchor Web/Mini | 66 | 66 `mapped` source-local |
 | AIP | 109 | 109 `mapped` source-local |
 | Fabric | 16 | 15 `mapped`; 1 `out_of_catalog` senza consumer non-test |
-| Superfici prodotto | 179 | 179 `unmapped` con authority e stage `unresolved` |
-| Relazioni provate | 121 | 66 Web↔Mini `supports`; 16 AIP↔Fabric `exact_identity`; 23 edge funzionali Fabric↔catalogo; 16 exposure verso Web-65 |
+| Superfici prodotto | 179 | 6 `mapped` Mini; 173 `out_of_catalog` source-bound |
+| Relazioni provate | 127 | 66 Web↔Mini `supports`; 16 AIP↔Fabric `exact_identity`; 23 edge funzionali Fabric↔catalogo; 16 exposure verso Web-65; 6 comandi Mini↔anchor |
 | Conflitti residui | 0 | I 16 conflitti Fabric↔anchor sono risolti dalla decisione prodotto versionata |
 
 `ledgerComplete=true`: le popolazioni congelate sono presenti una sola volta,
 hanno una disposizione terminale e una prova source-bound.
-`semanticBindingComplete=false`: le 179 superfici non hanno una relazione
-semantica diretta provata. La decisione prodotto ha chiuso solo il confine
-Fabric↔catalogo e non concede authority o stage.
+`semanticBindingComplete=true`: tutti i record hanno una disposizione positiva
+e provata. Le 168 superfici Web e le 5 superfici Apple restano
+`out_of_catalog`; la disposizione non concede authority o stage.
 
 ## Conflitti e prova necessaria
 
@@ -46,13 +46,16 @@ Le relazioni derivate sono in
 Web-65 è un'esposizione del roster, non un'identità. `document_identity_resolution`
 resta `out_of_catalog` fino a un consumer non-test provato.
 
-Per le superfici prodotto serve una relazione diretta, versionata e provata
-verso una capability canonica. Nome, ordine e prossimità non costituiscono
-prova; authority e stage non sono dedotti né uniti.
+La receipt delle disposizioni è
+[`surface-terminal-dispositions.v1.json`](./surface-terminal-dispositions.v1.json).
+I sei comandi Mini sono legati al rispettivo anchor tramite la gerarchia
+esplicita del manifest; ogni altra superficie è fuori dal catalogo chiuso.
+Nome, ordine e prossimità non costituiscono prova; authority e stage non sono
+dedotti né uniti.
 
 ## Claim ceiling e guard
 
-> mapping candidate locale verificato su exact head indipendenti; non integrato, non release-ready, non released
+> ledger semantico locale su exact head; C1 non prova runtime composition o integration; non integrato, non release-ready, non released
 
 Il validator falsifica record mancanti, extra o duplicati, digest dei source
 set driftati, vocabolari sconosciuti, receipt conflittuale collassata, union di

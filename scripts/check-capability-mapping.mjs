@@ -11,7 +11,8 @@ const COVERAGE_PATH = `${ROOT}/docs/capability-mapping/coverage-receipt.v1.json`
 const REPORT_PATH = `${ROOT}/docs/capability-mapping/mediflow-0.8.5-crosswalk.md`;
 const RELATION_KINDS = new Set(['exact_identity', 'implements', 'exposes', 'supports', 'authority_boundary_for']);
 const TERMINAL_DISPOSITIONS = new Set(['mapped', 'infrastructure_only', 'out_of_catalog', 'unmapped', 'conflicted']);
-const CLAIM_CEILING = 'mapping candidate locale verificato su exact head indipendenti; non integrato, non release-ready, non released';
+const EVIDENCE_KINDS = new Set(['code', 'manifest', 'document', 'test']);
+const CLAIM_CEILING = 'ledger semantico locale su exact head; C1 non prova runtime composition o integration; non integrato, non release-ready, non released';
 const FROZEN_REF_CACHE = new Set();
 
 function fail(message) { throw new Error(`capability mapping: ${message}`); }
@@ -111,7 +112,7 @@ function validateEvidenceArtifacts(basis, sourcePaths) {
     if (artifact.schema !== 'mediflow.capability-mapping.document-evidence.v1' || artifact.applyPolicy !== 'none' || !Array.isArray(artifact.records) || artifact.records.some((record) => record.evidenceKind !== 'document' || !sourcePaths.has(record.ref))) fail('document evidence artifact is invalid');
   }
   const keyboard = relativeJson(files[2], 'keyboard boundary file');
-  if (keyboard.schema !== 'mediflow.capability-mapping.keyboard-boundary.v1' || keyboard.applyPolicy !== 'none' || keyboard.terminalDisposition !== 'out_of_catalog' || keyboard.evidence?.some((evidence) => evidence.evidenceKind !== 'test' || !sourcePaths.has(evidence.ref))) fail('keyboard boundary artifact is invalid');
+  if (keyboard.schema !== 'mediflow.capability-mapping.keyboard-boundary.v1' || keyboard.applyPolicy !== 'none' || keyboard.terminalDisposition !== 'out_of_catalog' || JSON.stringify(keyboard.coveredSourceSetIds) !== JSON.stringify(['keyboard-http-routes', 'keyboard-product-pages', 'keyboard-command-evidence']) || keyboard.evidence?.some((evidence) => evidence.evidenceKind !== 'test' || !sourcePaths.has(evidence.ref))) fail('keyboard boundary artifact is invalid');
 }
 function validateFrozenRef(ref, label) {
   const match = typeof ref === 'string' && ref.match(/^([0-9a-f]{40}):(.+)$/);
@@ -122,14 +123,25 @@ function validateFrozenRef(ref, label) {
 }
 function validateProductDecision(basis, relations, fabric) {
   const receipt = relativeJson(basis.productDecisionReceiptFile, 'product decision receipt');
-  if (receipt.schema !== 'mediflow.capability-mapping.product-decision-receipt.v1' || receipt.status !== 'candidate_not_integrated' || receipt.applyPolicy !== 'none' || receipt.decisionId !== 'MF085-C1-FABRIC-CANONICAL-20260823' || receipt.decisionSha256 !== 'f64036aaa1abe2f54b748d03c4b561f1e38d22a047bcef342f680eb708b675dc' || receipt.decisionCount !== 16 || receipt.functionalRelationCount !== 23 || receipt.registryExposureCount !== 16 || JSON.stringify(receipt.outOfCatalogFabricIds) !== JSON.stringify(['document_identity_resolution'])) fail('product decision receipt is invalid');
+  if (receipt.schema !== 'mediflow.capability-mapping.product-decision-receipt.v1' || receipt.status !== 'candidate_not_integrated' || receipt.applyPolicy !== 'none' || receipt.decisionId !== 'MF085-C1-FABRIC-CANONICAL-20260823' || receipt.decisionSha256 !== 'c6ca0769ceb84b60f43cd6f9f8ebf310570e243709b3a6056ff88da1b72fe851' || receipt.claimCeiling !== 'local product-approved semantic mapping basis; not integrated, not release-ready, not released' || !receipt.bindingRule.includes('does not assert that the Fabric resolver dispatches that runtime') || receipt.decisionCount !== 16 || receipt.functionalRelationCount !== 23 || receipt.registryExposureCount !== 16 || JSON.stringify(receipt.outOfCatalogFabricIds) !== JSON.stringify(['document_identity_resolution'])) fail('product decision receipt is invalid');
   receipt.globalEvidence.forEach((evidence) => validateFrozenRef(evidence.ref, 'product decision evidence'));
   const decided = relations.filter((relation) => relation.decisionId === receipt.decisionId);
   const catalog = 'anchor:web:web-65-registro-intelligence-fabric-16-capability-4-venue-osservate-e-p@1e35733c0218';
   const exposures = decided.filter((relation) => relation.relationKind === 'exposes');
-  if (decided.length !== 39 || exposures.length !== 16 || new Set(exposures.map((relation) => relation.from)).size !== 16 || exposures.some((relation) => relation.to !== catalog || relation.exposureScope !== 'read_only_registry_roster') || decided.some((relation) => relation.relationKind === 'exact_identity' || relation.authority !== 'unresolved' || relation.stage !== 'unresolved')) fail('product decision relations collapse identity, authority, or stage');
+  const functional = decided.filter((relation) => relation.relationKind !== 'exposes');
+  if (decided.length !== 39 || exposures.length !== 16 || new Set(exposures.map((relation) => relation.from)).size !== 16 || exposures.some((relation) => relation.to !== catalog || relation.exposureScope !== 'read_only_registry_roster' || relation.runtimeBinding !== 'governance_exposure_only') || functional.some((relation) => relation.runtimeBinding?.startsWith('descriptor_entry_point_only') && relation.relationKind !== 'supports') || functional.some((relation) => relation.relationKind === 'implements' && relation.runtimeBinding !== 'runtime_bound_by_ai-summary-fabric') || decided.some((relation) => relation.relationKind === 'exact_identity' || relation.authority !== 'unresolved' || relation.stage !== 'unresolved')) fail('product decision relations collapse identity, authority, stage, or runtime binding');
   const identity = fabric.find((record) => record.sourceIdentity.identifier === 'document_identity_resolution');
   if (!identity || identity.terminalDisposition !== 'out_of_catalog' || decided.some((relation) => relation.from === identity.id && relation.relationKind !== 'exposes')) fail('document identity resolution has an unproven consumer');
+}
+function validateSurfaceDispositions(basis, relations, sourcePaths) {
+  const receipt = relativeJson(basis.surfaceDispositionReceiptFile, 'surface disposition receipt');
+  const expectedCounts = { webOutOfCatalog: 168, miniMapped: 6, iosIpadosOutOfCatalog: 1, macosOutOfCatalog: 4 };
+  if (receipt.schema !== 'mediflow.capability-mapping.surface-terminal-dispositions.v1' || receipt.status !== 'candidate_not_integrated' || receipt.applyPolicy !== 'none' || JSON.stringify(receipt.populationCounts) !== JSON.stringify(expectedCounts) || receipt.authorityRule !== 'terminal disposition does not grant or union authority or stage' || !sourcePaths.has(receipt.closedCatalogEvidence?.ref)) fail('surface disposition receipt is invalid');
+  const surfaces = populationRecords(basis.populations.surfaces);
+  const mini = surfaces.filter((record) => record.sourceIdentity.sourceKind === 'mini_command');
+  const nonMini = surfaces.filter((record) => record.sourceIdentity.sourceKind !== 'mini_command');
+  const miniBindings = relations.filter((relation) => relation.from.startsWith('surface:mini:command:'));
+  if (mini.length !== 6 || nonMini.length !== 173 || mini.some((record) => record.terminalDisposition !== 'mapped') || nonMini.some((record) => record.terminalDisposition !== 'out_of_catalog') || miniBindings.length !== mini.length || new Set(miniBindings.map((relation) => relation.from)).size !== mini.length || miniBindings.some((relation) => relation.relationKind !== 'supports' || relation.authority !== 'unresolved' || relation.stage !== 'unresolved')) fail('surface terminal dispositions are not positive and source-bound');
 }
 function dispositionCounts(records) {
   return Object.fromEntries([...TERMINAL_DISPOSITIONS].map((disposition) => [disposition, records.filter((record) => record.terminalDisposition === disposition).length]));
@@ -152,7 +164,8 @@ function validateCoverage(basis, coverage) {
     requireUnique(records, (record) => JSON.stringify(record.sourceIdentity), `${populationId} source identity`);
   }
   const relations = relationRecords(basis);
-  if (coverage.relationCoverage?.expectedCount !== 121 || coverage.relationCoverage.observedCount !== relations.length || relations.length !== 121) fail('coverage receipt relation coverage is incomplete or drifted');
+  const expectedRelations = populationRecords(basis.populations.anchors).length + populationRecords(basis.populations.fabric).length + 39 + populationRecords(basis.populations.surfaces).filter((record) => record.sourceIdentity.sourceKind === 'mini_command').length;
+  if (coverage.relationCoverage?.expectedCount !== expectedRelations || coverage.relationCoverage.observedCount !== relations.length || relations.length !== expectedRelations) fail('coverage receipt relation coverage is incomplete or drifted');
   requireUnique(relations, (relation) => relation.id, 'relations');
   const conflicts = conflictRecords(basis);
   const residual = conflicts.filter((conflict) => ['unmapped', 'conflicted'].includes(conflict.terminalDisposition));
@@ -164,7 +177,7 @@ function validateCoverage(basis, coverage) {
 }
 function validateHumanReport(coverage, report) {
   if (!report.includes(`> ${coverage.claimCeiling}`)) fail('human report claim ceiling drifted');
-  if (!report.includes('`ledgerComplete=true`') || !report.includes('`semanticBindingComplete=false`')) fail('human report completion claim drifted');
+  if (!report.includes(`\`ledgerComplete=${coverage.ledgerComplete}\``) || !report.includes(`\`semanticBindingComplete=${coverage.semanticBindingComplete}\``)) fail('human report completion claim drifted');
 }
 function validateWebMiniCrosswalk(basis, anchorRecords) {
   const population = basis.populations.anchors;
@@ -181,7 +194,7 @@ function validateNode(node, sourcePaths) {
   if (!node || typeof node !== 'object' || fields.some((field) => !(field in node))) fail('node is incomplete');
   if (!TERMINAL_DISPOSITIONS.has(node.terminalDisposition)) fail(`node ${node.id}: terminal disposition is invalid`);
   if (!Array.isArray(node.evidence) || node.evidence.length === 0) fail(`node ${node.id}: evidence is required`);
-  if (node.evidence.some((evidence) => !evidence || typeof evidence !== 'object' || typeof evidence.ref !== 'string' || !sourcePaths.has(evidence.ref))) fail(`node ${node.id}: evidence path escaped the source freeze`);
+  if (node.evidence.some((evidence) => !evidence || typeof evidence !== 'object' || !EVIDENCE_KINDS.has(evidence.evidenceKind) || typeof evidence.ref !== 'string' || !sourcePaths.has(evidence.ref))) fail(`node ${node.id}: evidence path escaped the source freeze`);
   if (typeof node.authority !== 'string' || typeof node.stage !== 'string') fail(`node ${node.id}: authority or stage is unioned`);
 }
 function validateBasis(basis, manifestBytes, sourcePaths) {
@@ -207,8 +220,9 @@ function validateBasis(basis, manifestBytes, sourcePaths) {
   validateWebMiniSurfaceEligibility(basis);
   validateEvidenceArtifacts(basis, sourcePaths);
   const relations = relationRecords(basis);
-  if (!relations.every((relation) => relation && typeof relation.id === 'string' && typeof relation.from === 'string' && typeof relation.to === 'string' && RELATION_KINDS.has(relation.relationKind) && Array.isArray(relation.evidence) && relation.evidence.length > 0 && relation.evidence.every((evidence) => evidence && typeof evidence.evidenceKind === 'string' && typeof evidence.locator === 'string' && (validateFrozenRef(evidence.ref, `relation ${relation.id}`), true)) && (![relation.authority, relation.stage].some((value) => value !== undefined && typeof value !== 'string')))) fail('relation contract is invalid');
+  if (!relations.every((relation) => relation && typeof relation.id === 'string' && typeof relation.from === 'string' && typeof relation.to === 'string' && RELATION_KINDS.has(relation.relationKind) && Array.isArray(relation.evidence) && relation.evidence.length > 0 && relation.evidence.every((evidence) => evidence && EVIDENCE_KINDS.has(evidence.evidenceKind) && typeof evidence.locator === 'string' && (validateFrozenRef(evidence.ref, `relation ${relation.id}`), true)) && (![relation.authority, relation.stage].some((value) => value !== undefined && typeof value !== 'string')))) fail('relation contract is invalid');
   validateProductDecision(basis, relations, populationRecords(basis.populations.fabric));
+  validateSurfaceDispositions(basis, relations, sourcePaths);
   const conflicts = conflictRecords(basis);
   const conflictFields = ['conflictId', 'subjectId', 'observedFact', 'ambiguity', 'decisionOwner', 'requiredEvidence', 'status', 'terminalDisposition', 'evidence'];
   if (!conflicts.every((conflict) => conflict && conflictFields.every((field) => field in conflict) && TERMINAL_DISPOSITIONS.has(conflict.terminalDisposition) && ['technical_worker', 'chief', 'product_owner', 'compliance_owner'].includes(conflict.decisionOwner) && Array.isArray(conflict.alternatives) && conflict.alternatives.length >= 2 && Array.isArray(conflict.consequences) && conflict.consequences.length === conflict.alternatives.length && Array.isArray(conflict.evidence) && conflict.evidence.length > 0)) fail('conflict contract is invalid');
@@ -218,6 +232,18 @@ function validateBasis(basis, manifestBytes, sourcePaths) {
   const terminal = [...nodes, ...conflicts];
   if (basis.ledgerComplete && terminal.some((value) => !TERMINAL_DISPOSITIONS.has(value.terminalDisposition))) fail('complete ledger has an undisposed record');
   if (basis.semanticBindingComplete && terminal.some((value) => ['unmapped', 'conflicted'].includes(value.terminalDisposition))) fail('semantic binding cannot be complete with unresolved records');
+  if (basis.semanticBindingComplete && populationRecords(basis.populations.surfaces).some((record) => !['mapped', 'infrastructure_only', 'out_of_catalog'].includes(record.terminalDisposition))) fail('semantic binding has a surface without a positive disposition');
+}
+function validateSourceSetConsumption(manifest, basis, sourcePaths) {
+  const refs = new Set(Object.values(basis.populations).flatMap(populationRecords).flatMap((record) => record.evidence.map((evidence) => evidence.ref)).concat(relationRecords(basis).flatMap((record) => record.evidence.map((evidence) => evidence.ref)), basis.evidenceFiles.flatMap((file) => relativeJson(file, 'evidence artifact').records?.flatMap((record) => record.evidence?.map((evidence) => evidence.ref) ?? [record.ref]) ?? [])));
+  const keyboard = relativeJson(basis.evidenceFiles[2], 'keyboard boundary file');
+  keyboard.evidence.forEach((evidence) => refs.add(evidence.ref));
+  for (const set of manifest.sourceSets) {
+    const source = manifest.sources.find((value) => value.sourceId === set.sourceId);
+    const roster = relativeJson(set.rosterFile, 'source roster');
+    if (!roster.records.some((record) => refs.has(`${source.commit}:${record.path}`)) && !keyboard.coveredSourceSetIds.includes(set.sourceSetId)) fail(`${set.sourceSetId}: source set is unconsumed`);
+  }
+  if (refs.size === 0 || ![...refs].every((ref) => sourcePaths.has(ref) || /^[0-9a-f]{40}:.+$/.test(ref))) fail('evidence ref contract is invalid');
 }
 
 export function validateCapabilityMapping(manifest = json(MANIFEST_PATH), basis = json(BASIS_PATH), manifestBytes = readFileSync(MANIFEST_PATH), coverage = json(COVERAGE_PATH), report = readFileSync(REPORT_PATH, 'utf8')) {
@@ -238,6 +264,7 @@ export function validateCapabilityMapping(manifest = json(MANIFEST_PATH), basis 
   }
   if (setIds.size !== 11) fail('source manifest is incomplete');
   validateBasis(basis, manifestBytes, sourcePaths);
+  validateSourceSetConsumption(manifest, basis, sourcePaths);
   validateCoverage(basis, coverage);
   validateHumanReport(coverage, report);
 }
