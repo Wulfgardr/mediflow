@@ -53,7 +53,6 @@ export const AUDIT_EVENT_TYPES = [
     'ambulatory.cleared',
     'ai.review.accepted',
     'ai.review.rejected',
-    'ai.review.superseded',
 ] as const;
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
