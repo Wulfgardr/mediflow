@@ -63,6 +63,19 @@ test('updates with CAS, preserves historical replay, and leaves stale records un
     assert.deepEqual(store.read(first.reviewId), updated);
 });
 
+test('fails closed on an altered replay snapshot after a terminated writer', () => {
+    const record = fixture('5'); const input = command(record, 'idem_1111111111111111');
+    assert.deepEqual(worker('create', input), { ...record, recordId: record.reviewId });
+    const sealedCiphertext = 'ENC:YWJj:dGFtcGVyZWQ=';
+    const tampered = { ...record, sealedCiphertext, sealedDigest: digest(sealedCiphertext) };
+    const db = new Database(path.join(dataDir, 'medical.db'));
+    try {
+        assert.equal(db.prepare('UPDATE durable_review_operations SET record_snapshot = ? WHERE review_id = ? AND idempotency_key = ?')
+            .run(JSON.stringify(tampered), record.reviewId, input.idempotencyKey).changes, 1);
+    } finally { db.close(); }
+    assert.throws(() => createDurableReviewRecordStore().create(input), (error) => error instanceof DurableReviewRecordStoreError && error.code === 'corrupt');
+});
+
 test('fails closed on unavailable durable storage and exposes no destructive authority', () => {
     const record = fixture('4'); const store = createDurableReviewRecordStore();
     store.create(command(record, 'idem_ffffffffffffffff'));
