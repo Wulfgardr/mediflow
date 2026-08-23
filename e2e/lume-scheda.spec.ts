@@ -154,6 +154,21 @@ test('la route legacy paziente converge sulla sola Scheda', async ({ page }) => 
   await expect(page.getByTestId('lume-quadro')).toHaveCount(0);
 });
 
+// @Codex
+test('il controllo back della Scheda torna alla lista pazienti', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const patient = await createFixture(page);
+
+  await page.goto(`/patients/${patient.id}/modules`);
+
+  const backControl = page.getByTestId('lume-scheda-header').getByRole('link', { name: 'Pazienti', exact: true });
+  await expect(backControl).toHaveAttribute('href', '/?area=incarico');
+  await backControl.click();
+  await expect(page).toHaveURL(/\?area=incarico(?:&paziente=[^&]+)?$/);
+  await expect(page.getByTestId('lume-scheda-header')).toHaveCount(0);
+});
+
 for (const schedaCase of CASES) {
   test(`Scheda Lume ${schedaCase.register} ${schedaCase.viewport}`, async ({ page }) => {
     await page.setViewportSize({ width: schedaCase.width, height: schedaCase.height });
