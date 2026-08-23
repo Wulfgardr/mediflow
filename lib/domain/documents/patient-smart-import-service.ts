@@ -382,7 +382,7 @@ function buildSourceRecords(
 
     const insightFileNames = new Set<string>();
     dedupeDocumentInsightsForContext(
-        parseDocumentInsights(patient.documentInsights)
+        [...parseDocumentInsights(patient.documentInsights)]
             .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
     )
         .insights
@@ -432,6 +432,43 @@ function buildSourceRecords(
         });
 
     return records;
+}
+
+export type PatientSmartImportProjectionCaptureInput = Readonly<{
+    patient: Readonly<{ version: Patient['version'] }>;
+    currentDiagnoses: ReadonlyArray<Readonly<{ system: string; code: string; description: string }>>;
+    currentActiveTherapies: ReadonlyArray<Readonly<{ drugName: string; activePrinciple: string | null; dosage: string | null; aic: string | null; atc: string | null }>>;
+    sources: ReadonlyArray<Readonly<{ kind: SmartImportEvidence['sourceKind']; originKey: string; label: string; date: string | null; content: string }>>;
+    therapyCandidateHints: ReadonlyArray<Readonly<{ kind: SmartImportEvidence['sourceKind']; originKey: string; label: string; excerpt: string }>>;
+}>;
+
+/** Preserves every legacy source record; the browser normalizer owns its 32-source rejection. */
+/* @Codex */
+export function buildPatientSmartImportProjectionCaptureInput(
+    patient: Patient,
+    entries: ClinicalEntry[],
+    attachments: Array<{ id: string; name: string; summarySnapshot?: string; createdAt: Date }>,
+    therapies: Therapy[],
+): PatientSmartImportProjectionCaptureInput {
+    const sourceRecords = buildSourceRecords(patient, entries, attachments);
+    const sources = sourceRecords.map((source) => Object.freeze({ kind: source.kind, originKey: source.id, label: source.label,
+        date: source.date ?? null, content: source.content }));
+    const byId = new Map(sourceRecords.map((source) => [source.id, source]));
+    const therapyCandidateHints = buildTherapyCandidateHints(sourceRecords).map((hint) => {
+        const source = byId.get(hint.sourceId)!;
+        return Object.freeze({ kind: source.kind, originKey: source.id, label: hint.label, excerpt: hint.excerpt });
+    });
+    return Object.freeze({
+        patient: Object.freeze({ version: patient.version }),
+        currentDiagnoses: Object.freeze(parseDiagnoses(patient.diagnoses).map((diagnosis) => Object.freeze({ system: diagnosis.system,
+            code: diagnosis.code, description: diagnosis.description }))),
+        currentActiveTherapies: Object.freeze(therapies.filter((therapy) => therapy.status === 'active').map((therapy) => Object.freeze({
+            drugName: therapy.drugName, activePrinciple: therapy.activePrinciple ?? null, dosage: therapy.dosage ?? null,
+            aic: therapy.aic ?? null, atc: therapy.atc ?? null,
+        }))),
+        sources: Object.freeze(sources),
+        therapyCandidateHints: Object.freeze(therapyCandidateHints),
+    });
 }
 
 function buildStructuredPrompt(
