@@ -1,15 +1,13 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-
 import {
     createDocumentSynthesisHostBoundary,
+    DocumentSynthesisHostBoundaryConfigurationError,
     type DocumentSynthesisDisposition,
 } from './document-synthesis-host-boundary';
-
 const freshness = '2026-08-23T12:00:00.000Z';
 const handle = 'dsh_0123456789abcdef0123456789abcdef';
-
 function boundary(disposition: DocumentSynthesisDisposition, now = Date.parse('2026-08-23T11:00:00.000Z')) {
     return createDocumentSynthesisHostBoundary({
         document: { handle, revision: 4, freshness },
@@ -19,15 +17,12 @@ function boundary(disposition: DocumentSynthesisDisposition, now = Date.parse('2
         now: () => now,
     });
 }
-
 function presentation(overrides: Record<string, unknown> = {}) {
     return { documentHandle: handle, revision: 4, freshness, ...overrides };
 }
-
 test('deterministic and generative dispositions use the same review-only host boundary', () => {
     for (const disposition of ['deterministic', 'generative'] as const) {
         const result = boundary(disposition).present(presentation());
-
         assert.equal(result.status, 'available');
         assert.equal(result.writesPerformed, 0);
         assert.equal(result.applyPolicy, 'none');
@@ -43,7 +38,6 @@ test('deterministic and generative dispositions use the same review-only host bo
 
 test('the boundary denies stale, mismatched revision, and expired document presentations', () => {
     const current = boundary('deterministic');
-
     assert.deepEqual(current.present(presentation({ revision: 3 })), {
         status: 'denied', code: 'revision_mismatch', metadata: null, writesPerformed: 0, applyPolicy: 'none',
     });
@@ -67,7 +61,6 @@ test('raw content, prompt, attachment, patient, provider, and authority injectio
         { authority: ['review_only', 'apply'] },
         { applyPolicy: 'apply' },
     ];
-
     for (const injection of injections) {
         const result = host.present(presentation(injection));
         assert.equal(result.status, 'denied');
@@ -82,7 +75,6 @@ test('the caller cannot bypass the branch or mutate review-only metadata', () =>
     assert.equal('deterministic' in host, false);
     assert.equal('generative' in host, false);
     assert.equal(host.present(presentation({ disposition: 'generative' })).code, 'input_invalid');
-
     const result = host.present(presentation());
     assert.equal(result.status, 'available');
     const forged = result as { metadata: { review: string; provenanceRef: string }; applyPolicy: string };
@@ -91,4 +83,50 @@ test('the caller cannot bypass the branch or mutate review-only metadata', () =>
     assert.throws(() => { forged.applyPolicy = 'apply'; }, TypeError);
     assert.equal(result.metadata?.review, 'review_only');
     assert.equal(result.applyPolicy, 'none');
+});
+test('hostile Proxy traps become typed denials or configuration rejection', () => {
+    const host = boundary('deterministic');
+    const prototypeTrap = new Proxy(presentation(), {
+        getPrototypeOf() { throw new Error('untrusted prototype trap'); },
+    });
+    const ownKeysTrap = new Proxy(presentation(), {
+        ownKeys() { throw new Error('untrusted own keys trap'); },
+    });
+    for (const value of [prototypeTrap, ownKeysTrap]) {
+        assert.deepEqual(host.present(value), {
+            status: 'denied', code: 'input_invalid', metadata: null, writesPerformed: 0, applyPolicy: 'none',
+        });
+    }
+    for (const configuration of [
+        new Proxy({}, { getPrototypeOf() { throw new Error('untrusted configuration prototype trap'); } }),
+        new Proxy({}, { ownKeys() { throw new Error('untrusted configuration own keys trap'); } }),
+    ]) {
+        assert.throws(() => createDocumentSynthesisHostBoundary(configuration), DocumentSynthesisHostBoundaryConfigurationError);
+    }
+    const nestedReadTrap = new Proxy({ handle, revision: 4, freshness }, {
+        get(target, property, receiver) {
+            if (property === 'handle') throw new Error('untrusted nested read trap');
+            return Reflect.get(target, property, receiver);
+        },
+    });
+    assert.throws(() => createDocumentSynthesisHostBoundary({
+        document: nestedReadTrap,
+        disposition: 'deterministic',
+        provenanceRef: 'provenance_0123456789abcdef',
+        receiptRef: 'receipt_0123456789abcdef',
+        now: () => Date.parse('2026-08-23T11:00:00.000Z'),
+    }), DocumentSynthesisHostBoundaryConfigurationError);
+});
+
+test('a throwing host clock fails closed without exposing its error', () => {
+    const host = createDocumentSynthesisHostBoundary({
+        document: { handle, revision: 4, freshness },
+        disposition: 'generative',
+        provenanceRef: 'provenance_0123456789abcdef',
+        receiptRef: 'receipt_0123456789abcdef',
+        now: () => { throw new Error('untrusted clock trap'); },
+    });
+    assert.deepEqual(host.present(presentation()), {
+        status: 'denied', code: 'handle_expired', metadata: null, writesPerformed: 0, applyPolicy: 'none',
+    });
 });
