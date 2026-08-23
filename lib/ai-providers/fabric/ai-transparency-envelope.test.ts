@@ -9,6 +9,7 @@ import {
 function inHouseEnvelope(): Record<string, unknown> {
     return {
         schemaVersion: 'mediflow.ai.transparency-envelope.v1',
+        presentationVersion: 'mediflow.ai.transparency-presentation.v1',
         disclosure: 'ai_generated_review_only',
         claimCeiling: 'ai_act_informed_technical_contract_candidate',
         capability: 'icd_lookup',
@@ -82,6 +83,7 @@ test('rifiuta mismatch tra envelope, provenance e receipt', () => {
 test('rifiuta valori non canonici, timestamp/versione invalidi, apply/write e overclaim', () => {
     const cases = [
         { schemaVersion: 'mediflow.ai.transparency-envelope.v2' },
+        { presentationVersion: 'mediflow.ai.transparency-presentation.v2' },
         { generatedAt: '23/08/2026' },
         { reviewState: 'applied' },
         { applyPolicy: 'manual_apply' },
@@ -89,6 +91,8 @@ test('rifiuta valori non canonici, timestamp/versione invalidi, apply/write e ov
         { claimCeiling: 'ai_act_compliant' },
     ];
     for (const change of cases) expectRejected({ ...inHouseEnvelope(), ...change });
+    const { presentationVersion: _presentationVersion, ...withoutPresentationVersion } = inHouseEnvelope();
+    expectRejected(withoutPresentationVersion);
 });
 
 test('lega il provider Ollama alla sua receipt locale senza segreti o fallback', () => {
@@ -111,4 +115,19 @@ test('lega il provider Ollama alla sua receipt locale senza segreti o fallback',
     assert.equal(snapshot.provider, 'ollama');
     assertDeepFrozen(snapshot);
     expectRejected({ ...ollama, provenance: { ...ollama.provenance, receipt: { ...ollama.provenance.receipt, providerReceipt: { ...receipt, fallbackCount: 1 } } } });
+    for (const model of ['qwen3:cloud', 'qwen3-cloud']) {
+        expectRejected({
+            ...ollama,
+            model,
+            provenance: {
+                ...ollama.provenance,
+                model,
+                receipt: {
+                    ...ollama.provenance.receipt,
+                    model,
+                    providerReceipt: { ...receipt, model },
+                },
+            },
+        });
+    }
 });
