@@ -3,7 +3,7 @@
   "mappingVersion": 1,
   "status": "candidate_not_integrated",
   "applyPolicy": "none",
-  "sourceManifestSha256": "5318f32920e2bf5a3718d5baf6f763062ec549d15c1683c723306fb8c49df1af",
+  "sourceManifestSha256": "239d9819ca724db0a72b299ffc14aa1b08562ff55acfab90ebe36445cdf5f78e",
   "claimCeiling": "mapping candidate locale verificato su exact head indipendenti; non integrato, non release-ready, non released",
   "populationCoverage": [
     {"populationId":"anchors","expectedCount":66,"observedCount":66,"terminalDispositionCounts":{"mapped":66,"infrastructure_only":0,"out_of_catalog":0,"unmapped":0,"conflicted":0}},

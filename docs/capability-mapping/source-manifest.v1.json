@@ -36,7 +36,9 @@
       ],
       "recordCount": 12,
       "sourceSetSha256": "60110905db895bf2a04e963f3563c403f05933395c9dbeaf94552b8adc3b5284",
-      "parser": "git-ls-tree-v1"
+      "parser": "git-ls-tree-v1",
+      "rosterFile": "docs/capability-mapping/sources/c0-core-contracts.v1.json",
+      "rosterSha256": "99191ed87b57b02c5ddb6998c941c1f9f8fc2a39a474e8897a27a99be32e462f"
     },
     {
       "sourceSetId": "aip-mini-contracts",
@@ -49,15 +51,17 @@
       ],
       "recordCount": 4,
       "sourceSetSha256": "390bdc23aef4ff38e8a30eeb92820f6329de43a965cc5883769e475d98deaa94",
-      "parser": "git-ls-tree-v1"
+      "parser": "git-ls-tree-v1",
+      "rosterFile": "docs/capability-mapping/sources/aip-mini-contracts.v1.json",
+      "rosterSha256": "4e0028dbc34d8685d7baa7e21de29bba0f35883764a67fc84f0fa547120d4d11"
     },
-    { "sourceSetId": "web-http-routes", "sourceId": "web", "pathMatcher": "^app/api(?:/|$).*\\/route\\.ts$", "recordCount": 140, "sourceSetSha256": "0aba6a8fd770581fc9c3801b3bc863f8b9e1f7a72eca84f029329aa9cf35ec0e", "parser": "git-ls-tree-v1" },
-    { "sourceSetId": "web-product-pages", "sourceId": "web", "pathMatcher": "^app(?:/|$).*\\/page\\.tsx$", "recordCount": 27, "sourceSetSha256": "6039f5aa2b182681e4cc8df33a5e3769c9ed0d12e4f847401ae293578b6cd42f", "parser": "git-ls-tree-v1" },
-    { "sourceSetId": "keyboard-http-routes", "sourceId": "keyboard", "pathMatcher": "^app/api(?:/|$).*\\/route\\.ts$", "recordCount": 140, "sourceSetSha256": "0aba6a8fd770581fc9c3801b3bc863f8b9e1f7a72eca84f029329aa9cf35ec0e", "parser": "git-ls-tree-v1" },
-    { "sourceSetId": "keyboard-product-pages", "sourceId": "keyboard", "pathMatcher": "^app(?:/|$).*\\/page\\.tsx$", "recordCount": 27, "sourceSetSha256": "ca40dbd98a8bde8c73085f0afccf2c398a60e2e796b949c67f3216c9ee152fd2", "parser": "git-ls-tree-v1" },
-    { "sourceSetId": "ios-ipados-runtime", "sourceId": "ios_runtime", "pathMatcher": "^native/MediFlowAppleApp/", "recordCount": 25, "sourceSetSha256": "cf2d03c45695c5e40101972e01d3ef07c4b6af7e698d96bac29694ea9c6e5da8", "parser": "git-ls-tree-v1" },
-    { "sourceSetId": "ios-ipados-docs", "sourceId": "ios_docs", "pathMatcher": "^docs/.*(apple|ios|ipados|parity|native).*$", "pathMatcherFlags": "i", "recordCount": 27, "sourceSetSha256": "0e2b9b0eba5623eb2a6c85ab055f5bd747161ca81c9aa259f183a15a303bbe64", "parser": "git-ls-tree-v1" },
-    { "sourceSetId": "macos-runtime", "sourceId": "macos", "pathMatcher": "^native/MediFlowMac/", "recordCount": 175, "sourceSetSha256": "63bf8b113f3be0492a72c4ba10231d1ef2d671c40975faa843b3f962cd0048f7", "parser": "git-ls-tree-v1" },
-    { "sourceSetId": "macos-boundary-receipt", "sourceId": "macos_receipt", "pathMatcher": "^(native/MediFlowMac/|docs/.*(macos|native|parity|receipt).*$)", "pathMatcherFlags": "i", "recordCount": 199, "sourceSetSha256": "4141ba6f67568a136d0944cc4d3dcd528aca42aeaf1da460bbe2dd4a8c1c639c", "parser": "git-ls-tree-v1" }
+    { "sourceSetId": "web-http-routes", "sourceId": "web", "pathMatcher": "^app/api(?:/|$).*\\/route\\.ts$", "recordCount": 140, "sourceSetSha256": "0aba6a8fd770581fc9c3801b3bc863f8b9e1f7a72eca84f029329aa9cf35ec0e", "parser": "git-ls-tree-v1", "rosterFile": "docs/capability-mapping/sources/web-http-routes.v1.json", "rosterSha256": "e98e5bb5985e6a8f63b89e298d83a803821485d25e5dbd94454c173a8456fef2" },
+    { "sourceSetId": "web-product-pages", "sourceId": "web", "pathMatcher": "^app(?:/.*)?/page\\.tsx$", "recordCount": 28, "sourceSetSha256": "c3e3c85624af00f93b7c33970e1e1f341bd4a405b3e32cf42c186051e70ac105", "parser": "git-ls-tree-v1", "rosterFile": "docs/capability-mapping/sources/web-product-pages.v1.json", "rosterSha256": "40fb9f66d362bdd6c0afd472114661235d7cf7ee57b2376866601c34d84ad2e2" },
+    { "sourceSetId": "keyboard-http-routes", "sourceId": "keyboard", "pathMatcher": "^app/api(?:/|$).*\\/route\\.ts$", "recordCount": 140, "sourceSetSha256": "0aba6a8fd770581fc9c3801b3bc863f8b9e1f7a72eca84f029329aa9cf35ec0e", "parser": "git-ls-tree-v1", "rosterFile": "docs/capability-mapping/sources/keyboard-http-routes.v1.json", "rosterSha256": "e98e5bb5985e6a8f63b89e298d83a803821485d25e5dbd94454c173a8456fef2" },
+    { "sourceSetId": "keyboard-product-pages", "sourceId": "keyboard", "pathMatcher": "^app(?:/.*)?/page\\.tsx$", "recordCount": 28, "sourceSetSha256": "609055f7461edb4ff390a0e6b593b7f907b6a993006f420d97f4823827edea56", "parser": "git-ls-tree-v1", "rosterFile": "docs/capability-mapping/sources/keyboard-product-pages.v1.json", "rosterSha256": "811a633aa9cd4d15825bef2f8ad3bdb8f6aa66d389239c16e5a1b2a2d088ee72" },
+    { "sourceSetId": "ios-ipados-runtime", "sourceId": "ios_runtime", "pathMatcher": "^native/MediFlowAppleApp/", "recordCount": 25, "sourceSetSha256": "cf2d03c45695c5e40101972e01d3ef07c4b6af7e698d96bac29694ea9c6e5da8", "parser": "git-ls-tree-v1", "rosterFile": "docs/capability-mapping/sources/ios-ipados-runtime.v1.json", "rosterSha256": "da7afbd4227ac7850b9a12f7ee72e59d4698d7c054072857fa84d47e6fe0f68f" },
+    { "sourceSetId": "ios-ipados-docs", "sourceId": "ios_docs", "pathMatcher": "^docs/.*(apple|ios|ipados|parity|native).*$", "pathMatcherFlags": "i", "recordCount": 27, "sourceSetSha256": "0e2b9b0eba5623eb2a6c85ab055f5bd747161ca81c9aa259f183a15a303bbe64", "parser": "git-ls-tree-v1", "rosterFile": "docs/capability-mapping/sources/ios-ipados-docs.v1.json", "rosterSha256": "77daf6ccc3ba45d212ce9530bfce67061475da9e32d96f53a1b28cd6aea32e89" },
+    { "sourceSetId": "macos-runtime", "sourceId": "macos", "pathMatcher": "^native/MediFlowMac/", "recordCount": 175, "sourceSetSha256": "63bf8b113f3be0492a72c4ba10231d1ef2d671c40975faa843b3f962cd0048f7", "parser": "git-ls-tree-v1", "rosterFile": "docs/capability-mapping/sources/macos-runtime.v1.json", "rosterSha256": "faf08b00c14a772d4e0e92a8d87d700ed1cd87bbf389f0277aaf3c10c3764c71" },
+    { "sourceSetId": "macos-boundary-receipt", "sourceId": "macos_receipt", "pathMatcher": "^(native/MediFlowMac/|docs/.*(macos|native|parity|receipt).*$)", "pathMatcherFlags": "i", "recordCount": 199, "sourceSetSha256": "4141ba6f67568a136d0944cc4d3dcd528aca42aeaf1da460bbe2dd4a8c1c639c", "parser": "git-ls-tree-v1", "rosterFile": "docs/capability-mapping/sources/macos-boundary-receipt.v1.json", "rosterSha256": "2a787cada46f70a86527fa6520fabe88a0a26bc8a215097ddf3cd920b095a9df" }
   ]
 }
