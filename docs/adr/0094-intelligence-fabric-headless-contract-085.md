@@ -278,3 +278,24 @@ Riaprire l'ADR e fermare la promozione se:
 
 Lo stato di delivery e `ADR_ACCEPTED_MANAGER_VERIFY`. Nessun packet runtime e
 autorizzato prima del successivo gate manageriale esplicito.
+
+## Addendum C0: catalogo applicativo canonico 0.8.5
+
+Il parser C0 ammette soltanto `mediflow.canonical-application-catalog.v1`:
+66 righe, ordinate esattamente da `sourceRow` 1 a 66, ID capability unici e
+`applyPolicy=none`. C1 conservera separatamente e senza perdita le 66 righe
+Mini e le 109 classificazioni AIP; C0 non le mappa, non le unisce e non ne
+deduce capability o autorita.
+
+`maxStage` riusa il vocabolario AIP (`observe`, `read`, `compute`, `propose`,
+`preview`) con il valore fail-closed `none`; `headlessDisposition` resta
+`available`, `proposal_only`, `manual_only` o `unavailable`. Gli ID schema
+usano la grammatica esistente `.vN`. Venue, provider ed egress riusano il
+contratto Fabric: `local_process` (compreso loopback) e una venue, non egress;
+nel candidato ogni riga mantiene `egress=none`.
+
+Ogni riga nega apply e non puo avere `maxStage=apply`. Un valore operativo meno
+restrittivo richiede evidenza diretta per il suo campo: l'assenza, il conflitto
+o una sorgente simile non costituiscono un grant. Questo addendum definisce
+solo l'ammissione del contratto e non abilita route, provider, rete, UI,
+persistenza, Mini, AIP o apply.
