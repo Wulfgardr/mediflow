@@ -61,17 +61,25 @@ export class DocumentSynthesisHostBoundaryConfigurationError extends Error {
 }
 
 function isPlainRecord(value: unknown): value is Record<PropertyKey, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value)
-        && Object.getPrototypeOf(value) === Object.prototype;
+    try {
+        return typeof value === 'object' && value !== null && !Array.isArray(value)
+            && Object.getPrototypeOf(value) === Object.prototype;
+    } catch {
+        return false;
+    }
 }
 
 function hasOnlyDataKeys(value: Record<PropertyKey, unknown>, keys: readonly string[]): boolean {
-    const ownKeys = Reflect.ownKeys(value);
-    if (ownKeys.length !== keys.length || !keys.every((key) => ownKeys.includes(key))) return false;
-    return keys.every((key) => {
-        const descriptor = Object.getOwnPropertyDescriptor(value, key);
-        return descriptor !== undefined && 'value' in descriptor;
-    });
+    try {
+        const ownKeys = Reflect.ownKeys(value);
+        if (ownKeys.length !== keys.length || !keys.every((key) => ownKeys.includes(key))) return false;
+        return keys.every((key) => {
+            const descriptor = Object.getOwnPropertyDescriptor(value, key);
+            return descriptor !== undefined && 'value' in descriptor;
+        });
+    } catch {
+        return false;
+    }
 }
 
 function isCanonicalTimestamp(value: unknown): value is string {
@@ -80,31 +88,39 @@ function isCanonicalTimestamp(value: unknown): value is string {
 }
 
 function parsePresentation(value: unknown): DocumentSynthesisDocumentPresentation | null {
-    if (!isPlainRecord(value) || !hasOnlyDataKeys(value, ['documentHandle', 'revision', 'freshness'])) return null;
-    const { documentHandle, revision, freshness } = value;
-    if (typeof documentHandle !== 'string' || !OPAQUE_DOCUMENT_HANDLE.test(documentHandle)
-        || typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 0
-        || !isCanonicalTimestamp(freshness)) return null;
-    return Object.freeze({ documentHandle, revision, freshness });
+    try {
+        if (!isPlainRecord(value) || !hasOnlyDataKeys(value, ['documentHandle', 'revision', 'freshness'])) return null;
+        const { documentHandle, revision, freshness } = value;
+        if (typeof documentHandle !== 'string' || !OPAQUE_DOCUMENT_HANDLE.test(documentHandle)
+            || typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 0
+            || !isCanonicalTimestamp(freshness)) return null;
+        return Object.freeze({ documentHandle, revision, freshness });
+    } catch {
+        return null;
+    }
 }
 
 function parseAuthority(value: unknown): HostAuthority | null {
-    if (!isPlainRecord(value) || !hasOnlyDataKeys(value, ['document', 'disposition', 'provenanceRef', 'receiptRef', 'now'])) return null;
-    if (!isPlainRecord(value.document) || !hasOnlyDataKeys(value.document, ['handle', 'revision', 'freshness'])) return null;
-    const document = parsePresentation(
-        { documentHandle: value.document.handle, revision: value.document.revision, freshness: value.document.freshness },
-    );
-    if (!document || (value.disposition !== 'deterministic' && value.disposition !== 'generative')
-        || typeof value.provenanceRef !== 'string' || !OPAQUE_REFERENCE.test(value.provenanceRef)
-        || typeof value.receiptRef !== 'string' || !OPAQUE_REFERENCE.test(value.receiptRef)
-        || typeof value.now !== 'function') return null;
-    return Object.freeze({
-        document: Object.freeze({ documentHandle: document.documentHandle, revision: document.revision, freshness: document.freshness }),
-        disposition: value.disposition,
-        provenanceRef: value.provenanceRef,
-        receiptRef: value.receiptRef,
-        now: value.now as () => number,
-    });
+    try {
+        if (!isPlainRecord(value) || !hasOnlyDataKeys(value, ['document', 'disposition', 'provenanceRef', 'receiptRef', 'now'])) return null;
+        if (!isPlainRecord(value.document) || !hasOnlyDataKeys(value.document, ['handle', 'revision', 'freshness'])) return null;
+        const document = parsePresentation(
+            { documentHandle: value.document.handle, revision: value.document.revision, freshness: value.document.freshness },
+        );
+        if (!document || (value.disposition !== 'deterministic' && value.disposition !== 'generative')
+            || typeof value.provenanceRef !== 'string' || !OPAQUE_REFERENCE.test(value.provenanceRef)
+            || typeof value.receiptRef !== 'string' || !OPAQUE_REFERENCE.test(value.receiptRef)
+            || typeof value.now !== 'function') return null;
+        return Object.freeze({
+            document: Object.freeze({ documentHandle: document.documentHandle, revision: document.revision, freshness: document.freshness }),
+            disposition: value.disposition,
+            provenanceRef: value.provenanceRef,
+            receiptRef: value.receiptRef,
+            now: value.now as () => number,
+        });
+    } catch {
+        return null;
+    }
 }
 
 function denied(code: DocumentSynthesisHostBoundaryDenialCode): DocumentSynthesisHostBoundaryResult {
@@ -143,7 +159,8 @@ export function createDocumentSynthesisHostBoundary(configuration: unknown): Rea
             if (presentation.documentHandle !== authority.document.documentHandle) return denied('document_mismatch');
             if (presentation.revision !== authority.document.revision) return denied('revision_mismatch');
             if (presentation.freshness !== authority.document.freshness) return denied('freshness_mismatch');
-            const now = authority.now();
+            let now: number;
+            try { now = authority.now(); } catch { return denied('handle_expired'); }
             if (!Number.isFinite(now) || now >= Date.parse(authority.document.freshness)) return denied('handle_expired');
             return available(authority);
         },
