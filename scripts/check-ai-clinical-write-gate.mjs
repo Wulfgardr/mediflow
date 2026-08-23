@@ -124,6 +124,14 @@ const AI_PATH_WRITE_CONTRACTS = [
         reference: 'docs/adr/0086-intelligent-scaffold-and-graded-automation-boundary.md',
     },
     {
+        module: 'lib/ai-providers/fabric/durable-review-record-store.ts',
+        lane: 'durable-review',
+        policy: 'non-clinical',
+        table: 'durableReviewRecords',
+        reason: 'Conserva soltanto envelope review sigillati e ledger di replay con digest; non scrive record clinici strutturati, decisioni o apply.',
+        reference: 'docs/adr/0094-intelligence-fabric-headless-contract-085.md',
+    },
+    {
         module: 'lib/patient-smart-import-apply.ts',
         lane: 'smart-import',
         policy: 'operator-confirmed',
