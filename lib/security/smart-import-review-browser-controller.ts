@@ -24,17 +24,21 @@ function exact(value: unknown): Record<string, unknown> | null {
 export function createSmartImportReviewBrowserController(sources: Sources = {}) {
     const context = createSmartImportContextProposalBrowserAdapter({ fetch: sources.fetch }); const selection = createSmartImportSelectionBrowserAdapter({ fetch: sources.fetch });
     const normalizer = createSmartImportProjectionAttachmentBrowserNormalizer({ clock: sources.clock }); const orchestrator = createSmartImportBrowserOrchestrator({ fetch: sources.fetch, requestId: sources.requestId, isCurrent: selection.isCurrent });
-    let proposal: SmartImportContextProposal | null = null; let initialized = false; let generation = 0; let operation = 0;
-    const reset = () => { generation += 1; operation += 1; proposal = null; initialized = false; selection.reset(); orchestrator.reset(); };
+    let proposal: SmartImportContextProposal | null = null; let generation = 0; let operation = 0; let readOperation = 0;
+    const reset = () => { generation += 1; operation += 1; readOperation += 1; proposal = null; selection.reset(); orchestrator.reset(); };
     return Object.freeze({
         reset,
-        async readProposal(): Promise<SmartImportContextProposal> { const value = await context.read(); proposal = value; return value; },
+        async readProposal(): Promise<SmartImportContextProposal> {
+            proposal = null; const token = generation; const currentRead = ++readOperation;
+            try { const value = await context.read(); if (token !== generation || currentRead !== readOperation) return fail('operation_superseded'); proposal = value; return value; }
+            catch (error) { if (token !== generation || currentRead !== readOperation) return fail('operation_superseded'); throw error; }
+        },
         async run(value: unknown, confirmed: true): Promise<SmartImportPreviewWireRoot> {
             if (confirmed !== true) return fail('confirmation_required'); const input = exact(value);
             if (!input || typeof input.patientId !== 'string') return fail('input_invalid'); if (input.proposal !== proposal || proposal === null) return fail('proposal_stale');
-            proposal = null; const token = generation; const currentOperation = ++operation; const current = () => { if (token !== generation || currentOperation !== operation) return fail('operation_superseded'); };
+            proposal = null; readOperation += 1; const token = generation; const currentOperation = ++operation; const current = () => { if (token !== generation || currentOperation !== operation) return fail('operation_superseded'); };
             try {
-                if (!initialized) { await selection.initialize(); current(); initialized = true; }
+                await selection.initialize(); current();
                 const lease = await selection.select({ patientId: input.patientId, ambulatoryId: (input.proposal as SmartImportContextProposal).ambulatoryId }, true); current();
                 const bound = normalizer.captureForCurrentSelection(input.captureInput, true, lease, selection.isCurrent); current();
                 const root = await orchestrator.run(lease, bound); current(); return parseSmartImportPreviewWireRoot(root) ?? fail('input_invalid');
