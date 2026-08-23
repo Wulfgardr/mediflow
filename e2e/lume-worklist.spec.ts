@@ -64,8 +64,8 @@ async function resolvedFontFamily(locator: Locator): Promise<string> {
 }
 
 async function assertWorklistContract(page: Page): Promise<void> {
-  const list = page.getByRole('list', { name: 'Elenco pazienti in carico', exact: true });
-  const listItems = list.getByRole('listitem');
+  const list = page.getByRole('listbox', { name: 'Elenco pazienti in carico', exact: true });
+  const listItems = list.getByRole('option');
   const rows = list.getByTestId('lume-patient-row');
   await expect(list).toBeVisible();
   await expect(listItems).toHaveCount(3);
@@ -91,11 +91,11 @@ async function assertWorklistContract(page: Page): Promise<void> {
   expect(new Set(codeFamilies)).toEqual(new Set([registerFamily]));
   expect(new Set(whenFamilies)).toEqual(new Set([registerFamily]));
 
-  await expect(firstRow).toHaveAttribute('aria-pressed', 'true');
-  await expect(secondRow).toHaveAttribute('aria-pressed', 'false');
+  await expect(firstRow).toHaveAttribute('aria-selected', 'true');
+  await expect(secondRow).toHaveAttribute('aria-selected', 'false');
   await secondRow.click();
-  await expect(firstRow).toHaveAttribute('aria-pressed', 'false');
-  await expect(secondRow).toHaveAttribute('aria-pressed', 'true');
+  await expect(firstRow).toHaveAttribute('aria-selected', 'false');
+  await expect(secondRow).toHaveAttribute('aria-selected', 'true');
 
   const rowSurfaces = await Promise.all([firstRow, secondRow].map((row) => row.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -296,3 +296,77 @@ for (const worklistCase of WORKLIST_CASES) {
     });
   });
 }
+
+test('la worklist virtuale attraversa l’indice completo e apre la sola Scheda', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const marker = `VirtualK1${Date.now().toString().slice(-8)}`;
+  const consoleErrors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+  await page.evaluate(async (fixtureMarker) => {
+    const responses = await Promise.all(Array.from({ length: 120 }, async (_, index) => {
+      const response = await fetch('/api/patients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: `Caso ${String(index + 1).padStart(3, '0')}`,
+          lastName: fixtureMarker,
+          taxCode: `${fixtureMarker.slice(-8)}${String(index).padStart(3, '0')}`,
+          birthDate: '1972-04-12T00:00:00.000Z',
+        }),
+      });
+      if (!response.ok) throw new Error(`Fixture virtuale ${index + 1}: HTTP ${response.status}`);
+    }));
+    await Promise.all(responses);
+  }, marker);
+  await page.goto('/?area=incarico');
+
+  const listbox = page.getByRole('listbox', { name: 'Elenco pazienti in carico', exact: true });
+  await expect(listbox).toBeVisible();
+  const search = page.getByRole('searchbox', { name: 'Cerca nella lista pazienti', exact: true });
+  await search.fill(marker);
+  await expect(page.getByText('120 risultati', { exact: true })).toBeVisible();
+
+  const firstRow = page.getByRole('option').first();
+  await firstRow.focus();
+  await firstRow.press('End');
+  const lastRow = page.locator('[data-patient-index="119"]');
+  await expect(lastRow).toBeFocused();
+  await expect(lastRow).toHaveAttribute('aria-selected', 'true');
+  await expect(lastRow).toHaveAttribute('data-patient-index', '119');
+
+  await page.keyboard.press('PageUp');
+  const pageUpIndex = await page.evaluate(() => Number(document.activeElement?.getAttribute('data-patient-index')));
+  expect(pageUpIndex).toBeGreaterThanOrEqual(0);
+  expect(pageUpIndex).toBeLessThan(119);
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(() => page.evaluate(() => Number(document.activeElement?.getAttribute('data-patient-index'))))
+    .toBe(pageUpIndex - 1);
+  await page.keyboard.press('j');
+  await page.keyboard.press('k');
+  await page.keyboard.press('Home');
+  await expect(page.locator('[data-patient-index="0"]')).toBeFocused();
+  await page.keyboard.press('PageDown');
+  const pageDownIndex = await page.evaluate(() => Number(document.activeElement?.getAttribute('data-patient-index')));
+  expect(pageDownIndex).toBeGreaterThan(0);
+  await assertNoHorizontalOverflow(page, [
+    { label: 'documento worklist virtuale', selector: 'document' },
+    { label: 'worklist virtuale', selector: '[data-testid="lume-worklist"]' },
+    { label: 'lista virtuale', selector: '[data-testid="lume-patient-list"]' },
+  ]);
+  await page.screenshot({ path: '/tmp/lume-worklist-k1-1440x900.png', animations: 'disabled' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator(`[data-patient-index="${pageDownIndex}"]`)).toBeFocused();
+  await assertNoHorizontalOverflow(page, [
+    { label: 'documento worklist virtuale narrow', selector: 'document' },
+    { label: 'worklist virtuale narrow', selector: '[data-testid="lume-worklist"]' },
+    { label: 'lista virtuale narrow', selector: '[data-testid="lume-patient-list"]' },
+  ]);
+  await page.screenshot({ path: '/tmp/lume-worklist-k1-390x844.png', animations: 'disabled' });
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('lume-scheda-header')).toBeVisible();
+  expect(consoleErrors).toEqual([]);
+});
