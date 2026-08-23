@@ -5,6 +5,7 @@ import test from 'node:test';
 import { createHeadlessSemanticOrchestrator, HEADLESS_P3_CLAIM_CEILING, type HeadlessSemanticHost } from './headless-semantic-orchestrator';
 const request = { adapterKind: 'chat' as const, intent: 'synthetic: summarize the selected fixture', requestRef: 'req_opaque0001', idempotencyRef: 'idem_opaque0001' };
 const roster = Array.from({ length: 66 }, (_, index) => `web-${String(index + 1).padStart(2, '0')}`);
+const fabricRoster = 'patient_insight smart_import document_synthesis ocr treatment_reasoning icd_lookup aifa_drug_search service_prescription_matching evidence_absorption patient_open_loops fhir_export document_classification document_identity_resolution pii_redaction_layer1 fse_document_validation observation_range_classification'.split(' ');
 function fixture(overrides: Partial<HeadlessSemanticHost> = {}) {
     let calls = 0; let epoch = 7; let mutationEpoch = 11;
     const host: HeadlessSemanticHost = {
@@ -12,12 +13,12 @@ function fixture(overrides: Partial<HeadlessSemanticHost> = {}) {
         plan: () => ({ operationId: 'op.fixture.read', input: { subjectRef: 'subject_opaque0001' } }),
         authorize: () => ({ allowed: true, policyDecision: 'per_operation_allow' }),
         registry: [{
-            operationId: 'op.fixture.read', capabilityId: 'web-01', applicationServiceRef: 'appsvc:fixture-read',
+            operationId: 'op.fixture.read', capabilityId: 'web-01', applicationServiceRef: 'appsvc:web-01',
             maximumStage: 'read', fabricDependency: null, inputKeys: ['subjectRef'],
             execute: () => { calls += 1; return { outcome: 'read', response: 'synthetic-response: fixture ready' }; },
         }],
         clock: () => '2026-08-24T08:00:00.000Z',
-        entropy: () => 'act_opaque0001',
+        entropy: () => 'act_0123456789abcdef0123456789abcdef',
         ...overrides,
     };
     return { host, calls: () => calls, setEpoch: (value: number) => { epoch = value; }, setMutationEpoch: (value: number) => { mutationEpoch = value; } };
@@ -29,7 +30,7 @@ test('executes one explicitly mapped named operation and emits a PHI-safe receip
     assert.deepEqual(result, {
         response: 'synthetic-response: fixture ready',
         receipt: {
-            requestRef: 'req_opaque0001', actionRef: 'act_opaque0001', capabilityId: 'web-01', outcome: 'read',
+            requestRef: 'req_opaque0001', actionRef: 'act_0123456789abcdef0123456789abcdef', capabilityId: 'web-01', outcome: 'read',
             policyDecision: 'per_operation_allow', revisionBinding: 'lease:7', createdAt: '2026-08-24T08:00:00.000Z',
         },
         writesPerformed: 0,
@@ -104,13 +105,19 @@ test('burns replay, detects swallowed reentry, and denies late host drift withou
 test('rejects unmapped capability identity, unsafe service output, SQL semantics, and sparse registries', () => {
     assert.equal(createHash('sha256').update(roster.join('\n')).digest('hex'), 'bcf32c0b19d4299527f5a05921b51345f9a9df390dedbca38590646f13e5a944');
     for (const capabilityId of roster) {
-        const exact = fixture(); exact.host.registry[0]!.capabilityId = capabilityId;
+        const exact = fixture(); exact.host.registry[0]!.capabilityId = capabilityId; exact.host.registry[0]!.applicationServiceRef = `appsvc:${capabilityId}`;
         assert.doesNotThrow(() => createHeadlessSemanticOrchestrator(exact.host));
     }
     const unmapped = fixture(); unmapped.host.registry[0]!.capabilityId = 'name-similarity';
     assert.throws(() => createHeadlessSemanticOrchestrator(unmapped.host).run(request), /registry_invalid/);
     const suffix = fixture(); suffix.host.registry[0]!.capabilityId = 'web-01-name-similarity';
     assert.throws(() => createHeadlessSemanticOrchestrator(suffix.host), /registry_invalid/);
+    for (const serviceRef of ['appsvc:web-02', 'rest:web-01', 'http:web-01', 'screen:web-01', 'transport:web-01']) {
+        const service = fixture(); service.host.registry[0]!.applicationServiceRef = serviceRef;
+        assert.throws(() => createHeadlessSemanticOrchestrator(service.host), /registry_invalid/);
+    }
+    for (const fabricDependency of fabricRoster) { const fabric = fixture(); fabric.host.registry[0]!.fabricDependency = fabricDependency; assert.doesNotThrow(() => createHeadlessSemanticOrchestrator(fabric.host)); }
+    for (const fabricDependency of ['fabric:patient_insight', 'unknown_capability']) { const fabric = fixture(); fabric.host.registry[0]!.fabricDependency = fabricDependency; assert.throws(() => createHeadlessSemanticOrchestrator(fabric.host), /registry_invalid/); }
     const unsafe = fixture(); unsafe.host.registry[0]!.execute = () => ({ outcome: 'read', response: 'synthetic-response: ok', prompt: 'leak' } as never);
     assert.throws(() => createHeadlessSemanticOrchestrator(unsafe.host).run(request), /service_output_invalid/);
     const thenable = fixture(); thenable.host.registry[0]!.execute = () => Promise.resolve({ outcome: 'read', response: 'synthetic-response: late' });
@@ -123,7 +130,7 @@ test('rejects unmapped capability identity, unsafe service output, SQL semantics
     assert.throws(() => createHeadlessSemanticOrchestrator(sensitive.host), /registry_invalid/);
     const freePrompt = fixture({ plan: () => ({ operationId: 'op.fixture.read', input: { subjectRef: 'prompt_opaque0001' } }) });
     assert.throws(() => createHeadlessSemanticOrchestrator(freePrompt.host).run(request), /plan_invalid/);
-    for (const receiptHost of [fixture({ clock: () => '2026-99-99T08:00:00.000Z' }), fixture({ clock: () => { throw new Error('host detail'); } }), fixture({ entropy: () => 'token_opaque0001' })])
+    for (const receiptHost of [fixture({ clock: () => '2026-99-99T08:00:00.000Z' }), fixture({ clock: () => { throw new Error('host detail'); } }), ...['provider', 'venue', 'authority', 'confirmation', 'apply', 'sql', 'sqlite'].map((value) => fixture({ entropy: () => `act_${value}` }))])
         assert.throws(() => createHeadlessSemanticOrchestrator(receiptHost.host).run(request), (error: unknown) => (error as { code?: string }).code === 'receipt_unavailable');
     let reads = 0;
     const trappedKeys = ['subjectRef']; Object.defineProperty(trappedKeys, '0', { get: () => { reads += 1; return 'subjectRef'; }, enumerable: true });

@@ -28,6 +28,8 @@ const AUTH_KEYS = ['allowed', 'policyDecision'] as const;
 const OUTPUT_KEYS = ['outcome', 'response'] as const;
 const OUTCOMES = new Set<Outcome>(['discovery', 'read', 'query', 'orchestration', 'preview', 'proposal']);
 const CAPABILITIES = new Set(Array.from({ length: 66 }, (_, index) => `web-${String(index + 1).padStart(2, '0')}`));
+const FABRIC_CAPABILITIES = new Set('patient_insight smart_import document_synthesis ocr treatment_reasoning icd_lookup aifa_drug_search service_prescription_matching evidence_absorption patient_open_loops fhir_export document_classification document_identity_resolution pii_redaction_layer1 fse_document_validation observation_range_classification'.split(' '));
+const ACTION_REF = /^act_[0-9a-f]{32}$/;
 const REF = /^[a-z][a-z0-9-]*_[a-z0-9][a-z0-9.-]{7,63}$/;
 const FORBIDDEN = /(?:^|[-_.:])(sql|sqlite|route|api|cli|provider|venue|authority|apply)(?:$|[-_.:])/i;
 const SENSITIVE_INPUT = new Set(['name', 'codicefiscale', 'patientid', 'clinicalpayload', 'prompt', 'modeloutput', 'credential', 'cookie', 'token']);
@@ -99,9 +101,9 @@ export function createHeadlessSemanticOrchestrator(candidate: HeadlessSemanticHo
         const keys = denseStrings(op.inputKeys, 'registry_invalid');
         if (typeof op.operationId !== 'string' || !/^op\.[a-z0-9.-]+$/.test(op.operationId) || FORBIDDEN.test(op.operationId)
             || typeof op.capabilityId !== 'string' || !CAPABILITIES.has(op.capabilityId)
-            || typeof op.applicationServiceRef !== 'string' || !/^appsvc:[a-z0-9-]+$/.test(op.applicationServiceRef) || FORBIDDEN.test(op.applicationServiceRef)
+            || op.applicationServiceRef !== `appsvc:${op.capabilityId}`
             || typeof op.maximumStage !== 'string' || !OUTCOMES.has(op.maximumStage as Outcome)
-            || !(op.fabricDependency === null || (typeof op.fabricDependency === 'string' && /^fabric:[a-z0-9-]+$/.test(op.fabricDependency)))
+            || !(op.fabricDependency === null || (typeof op.fabricDependency === 'string' && FABRIC_CAPABILITIES.has(op.fabricDependency)))
             || keys.some((key) => FORBIDDEN.test(key) || SENSITIVE_INPUT.has(key.toLowerCase()))
             || !callable(op.execute) || operations.has(op.operationId)) fail('registry_invalid');
         operations.set(op.operationId, Object.freeze({ ...op, inputKeys: Object.freeze(keys) }) as HeadlessSemanticOperation);
@@ -145,7 +147,7 @@ export function createHeadlessSemanticOrchestrator(candidate: HeadlessSemanticHo
                 const createdAt = canonicalTimestamp(invoke(host.clock, [], 'receipt_unavailable'));
                 const final = parseContext(invoke(host.acquireContext, [], 'context_unavailable'));
                 if (!sameContext(first, final)) fail('context_stale');
-                if (typeof actionRef !== 'string' || !REF.test(actionRef) || SENSITIVE_REF.test(actionRef)) fail('receipt_unavailable');
+                if (typeof actionRef !== 'string' || !ACTION_REF.test(actionRef)) fail('receipt_unavailable');
                 return Object.freeze({ response: output.response, receipt: Object.freeze({ requestRef: request.requestRef, actionRef, capabilityId: operation.capabilityId, outcome: output.outcome, policyDecision: auth.policyDecision, revisionBinding: `lease:${first.leaseEpoch}`, createdAt }), writesPerformed: 0 as const, applyPolicy: 'none' as const });
             } finally { busy = false; poisoned = false; }
         },
