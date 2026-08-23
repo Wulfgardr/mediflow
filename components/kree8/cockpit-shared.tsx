@@ -3,6 +3,7 @@ import Link from 'next/link';
 import {
   AlertTriangle,
   CalendarClock,
+  CircleHelp,
   Cloud,
   Database,
   FileSearch,
@@ -712,6 +713,7 @@ function Toolbar({
   setFilter,
   onOpenArea,
   onSearchRequest,
+  onOpenCommand,
   operatorName,
 }: {
   activeArea: AreaId;
@@ -719,6 +721,7 @@ function Toolbar({
   setFilter: (id: StatusFilter) => void;
   onOpenArea: (area: AreaId) => void;
   onSearchRequest: () => void;
+  onOpenCommand: () => void;
   operatorName: string;
 }) {
   const operatorInitials = buildOperatorInitials(operatorName);
@@ -757,6 +760,17 @@ function Toolbar({
       <button type="button" className={shellStyles.toolChip} onClick={() => onOpenArea('revisione')}>
         <FileSearch size={13} />
         Documenti paziente
+      </button>
+      {/* @Codex: scorciatoia esplicita per la palette read-only di navigazione e aiuto. */}
+      <button
+        type="button"
+        className={`${shellStyles.toolChip} ${shellStyles.commandToolChip}`}
+        onClick={onOpenCommand}
+        aria-label="Apri comandi e aiuto tastiera"
+      >
+        <CircleHelp size={13} aria-hidden="true" />
+        Comandi
+        <kbd className={shellStyles.toolChipKbd}>⌘K</kbd>
       </button>
       <span className={shellStyles.avatarPill}>
         <span className={shellStyles.avatarDot}>{operatorInitials}</span>

@@ -40,6 +40,7 @@ import { RevisioneArea } from './areas/revisione-area';
 import { RepertoriArea } from './areas/repertori-area';
 import { HandoffArea } from './areas/handoff-area';
 import { GovernanceArea } from './areas/governance-area';
+import { Kree8CommandCenter, type CommandCenterMode } from './kree8-command-center';
 import {
   AREA_ID_VALUES,
   AREAS,
@@ -209,6 +210,7 @@ export function Kree8ClinicalCockpit({
   const [area, setArea] = useState<AreaId>(() => (isReview ? 'turno' : initialArea));
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [patientSearchFocusSignal, setPatientSearchFocusSignal] = useState(0);
+  const [commandCenterMode, setCommandCenterMode] = useState<CommandCenterMode>(null);
   const [agendaBridge, setAgendaBridge] = useState<ClinicalAgendaBridgeClientState>({
     status: 'idle',
   });
@@ -225,6 +227,30 @@ export function Kree8ClinicalCockpit({
   const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(() => (
     isReview ? REVIEW_PATIENT_LIST[0]?.id : initialPatientId
   ));
+
+  /* @Codex: owner unico dei soli comandi globali della shell. K1 conserva / e
+     j/k nella worklist; i target editabili e modificatori non standard restano
+     fuori da questa scorciatoia per non intercettare input dell'utente. */
+  useEffect(() => {
+    const handleGlobalCommand = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        const tag = target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return;
+      }
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLocaleLowerCase('it-IT') === 'k') {
+        event.preventDefault();
+        setCommandCenterMode((current) => current === 'commands' ? null : 'commands');
+        return;
+      }
+      if (event.key !== '?' || event.metaKey || event.ctrlKey || event.altKey) return;
+      event.preventDefault();
+      setCommandCenterMode('help');
+    };
+    window.addEventListener('keydown', handleGlobalCommand);
+    return () => window.removeEventListener('keydown', handleGlobalCommand);
+  }, []);
 
   /* @Codex WUL-UIUX: riflette area e paziente selezionato nella query string di
      '/', cosi refresh e back del browser non perdono il punto di lavoro. Solo
@@ -494,6 +520,7 @@ export function Kree8ClinicalCockpit({
             setArea('incarico');
             setPatientSearchFocusSignal((current) => current + 1);
           }}
+          onOpenCommand={() => setCommandCenterMode('commands')}
           operatorName={operatorName}
         />
         <div
@@ -553,6 +580,17 @@ export function Kree8ClinicalCockpit({
           </main>
         </div>
       </section>
+
+      <Kree8CommandCenter
+        mode={commandCenterMode}
+        onClose={() => setCommandCenterMode(null)}
+        onOpenArea={setArea}
+        onSearchRequest={() => {
+          setArea('incarico');
+          setPatientSearchFocusSignal((current) => current + 1);
+        }}
+        onShowHelp={() => setCommandCenterMode('help')}
+      />
 
       {isReview && (
         <Link href="/" className={styles.exit} aria-label="Torna alla home MediFlow live">
