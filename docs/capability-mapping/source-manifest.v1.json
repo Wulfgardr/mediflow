@@ -56,8 +56,8 @@
     { "sourceSetId": "keyboard-http-routes", "sourceId": "keyboard", "pathMatcher": "^app/api(?:/|$).*\\/route\\.ts$", "recordCount": 140, "sourceSetSha256": "0aba6a8fd770581fc9c3801b3bc863f8b9e1f7a72eca84f029329aa9cf35ec0e", "parser": "git-ls-tree-v1" },
     { "sourceSetId": "keyboard-product-pages", "sourceId": "keyboard", "pathMatcher": "^app(?:/|$).*\\/page\\.tsx$", "recordCount": 27, "sourceSetSha256": "ca40dbd98a8bde8c73085f0afccf2c398a60e2e796b949c67f3216c9ee152fd2", "parser": "git-ls-tree-v1" },
     { "sourceSetId": "ios-ipados-runtime", "sourceId": "ios_runtime", "pathMatcher": "^native/MediFlowAppleApp/", "recordCount": 25, "sourceSetSha256": "cf2d03c45695c5e40101972e01d3ef07c4b6af7e698d96bac29694ea9c6e5da8", "parser": "git-ls-tree-v1" },
-    { "sourceSetId": "ios-ipados-docs", "sourceId": "ios_docs", "pathMatcher": "^docs/.*(apple|ios|ipados|parity|native).*$", "recordCount": 27, "sourceSetSha256": "0e2b9b0eba5623eb2a6c85ab055f5bd747161ca81c9aa259f183a15a303bbe64", "parser": "git-ls-tree-v1" },
+    { "sourceSetId": "ios-ipados-docs", "sourceId": "ios_docs", "pathMatcher": "^docs/.*(apple|ios|ipados|parity|native).*$", "pathMatcherFlags": "i", "recordCount": 27, "sourceSetSha256": "0e2b9b0eba5623eb2a6c85ab055f5bd747161ca81c9aa259f183a15a303bbe64", "parser": "git-ls-tree-v1" },
     { "sourceSetId": "macos-runtime", "sourceId": "macos", "pathMatcher": "^native/MediFlowMac/", "recordCount": 175, "sourceSetSha256": "63bf8b113f3be0492a72c4ba10231d1ef2d671c40975faa843b3f962cd0048f7", "parser": "git-ls-tree-v1" },
-    { "sourceSetId": "macos-boundary-receipt", "sourceId": "macos_receipt", "pathMatcher": "^(native/MediFlowMac/|docs/.*(macos|native|parity|receipt).*$)", "recordCount": 199, "sourceSetSha256": "4141ba6f67568a136d0944cc4d3dcd528aca42aeaf1da460bbe2dd4a8c1c639c", "parser": "git-ls-tree-v1" }
+    { "sourceSetId": "macos-boundary-receipt", "sourceId": "macos_receipt", "pathMatcher": "^(native/MediFlowMac/|docs/.*(macos|native|parity|receipt).*$)", "pathMatcherFlags": "i", "recordCount": 199, "sourceSetSha256": "4141ba6f67568a136d0944cc4d3dcd528aca42aeaf1da460bbe2dd4a8c1c639c", "parser": "git-ls-tree-v1" }
   ]
 }
