@@ -1,6 +1,7 @@
 /* @Codex */
 import { CLINICAL_REVIEW_STATES, type ClinicalReviewState } from './clinical-interaction';
 import { FABRIC_CAPABILITY_DESCRIPTORS } from './catalog';
+import { assertLocalOllamaModelReference } from '../ollama-locality';
 import {
     FABRIC_PREPROCESSING_LABELS,
     type FabricCapabilityId,
@@ -12,9 +13,12 @@ import {
 
 export const AI_TRANSPARENCY_ENVELOPE_SCHEMA_VERSION =
     'mediflow.ai.transparency-envelope.v1' as const;
+export const AI_TRANSPARENCY_ENVELOPE_PRESENTATION_VERSION =
+    'mediflow.ai.transparency-presentation.v1' as const;
 
 export type AiTransparencyEnvelope = Readonly<{
     schemaVersion: typeof AI_TRANSPARENCY_ENVELOPE_SCHEMA_VERSION;
+    presentationVersion: typeof AI_TRANSPARENCY_ENVELOPE_PRESENTATION_VERSION;
     disclosure: 'ai_generated_review_only';
     claimCeiling: 'ai_act_informed_technical_contract_candidate';
     capability: FabricCapabilityId;
@@ -92,6 +96,13 @@ function snapshotReceipt(value: unknown, capability: FabricCapabilityId): Fabric
     if (receipt.class !== descriptor.class || receipt.provider !== expectedProvider(capability) || !PROVIDERS.has(receipt.provider as FabricProviderRef)) return null;
     if (typeof receipt.venue !== 'string' || !descriptor.venues.includes(receipt.venue as FabricVenue) || receipt.model !== null && (typeof receipt.model !== 'string' || !MODEL_PATTERN.test(receipt.model))) return null;
     if ((receipt.provider === 'ollama') !== (typeof receipt.model === 'string')) return null;
+    if (receipt.provider === 'ollama') {
+        try {
+            assertLocalOllamaModelReference(receipt.model);
+        } catch {
+            return null;
+        }
+    }
     const profile = closedRecord(receipt.egressProfile, ['id', 'version', 'egress']);
     if (!profile || profile.id !== 'local_only' || profile.version !== 'mediflow.ai.egress-profile.v1' || profile.egress !== 'none') return null;
     if (receipt.provider !== 'ollama') return receipt.providerReceipt === null ? Object.freeze({ ...receipt, egressProfile: Object.freeze(profile) }) as FabricResolutionReceipt : null;
@@ -110,10 +121,10 @@ function snapshotProvenance(value: unknown, capability: FabricCapabilityId): Fab
 }
 
 export function createAiTransparencyEnvelope(value: unknown): AiTransparencyEnvelope {
-    const envelope = closedRecord(value, ['schemaVersion', 'disclosure', 'claimCeiling', 'capability', 'provider', 'model', 'venue', 'egress', 'generatedAt', 'reviewState', 'applyPolicy', 'writesPerformed', 'provenance']);
+    const envelope = closedRecord(value, ['schemaVersion', 'presentationVersion', 'disclosure', 'claimCeiling', 'capability', 'provider', 'model', 'venue', 'egress', 'generatedAt', 'reviewState', 'applyPolicy', 'writesPerformed', 'provenance']);
     const capability = typeof envelope?.capability === 'string' && Object.hasOwn(FABRIC_CAPABILITY_DESCRIPTORS, envelope.capability)
         ? envelope.capability as FabricCapabilityId : null;
     const provenance = capability ? snapshotProvenance(envelope?.provenance, capability) : null;
-    if (!envelope || !capability || envelope.schemaVersion !== AI_TRANSPARENCY_ENVELOPE_SCHEMA_VERSION || envelope.disclosure !== 'ai_generated_review_only' || envelope.claimCeiling !== 'ai_act_informed_technical_contract_candidate' || envelope.provider !== expectedProvider(capability) || envelope.model !== provenance?.model || envelope.venue !== provenance?.venue || envelope.egress !== 'none' || !validTimestamp(envelope.generatedAt) || !REVIEW_STATES.has(envelope.reviewState as string) || envelope.applyPolicy !== 'none' || envelope.writesPerformed !== 0 || !provenance) throw new AiTransparencyEnvelopeError();
+    if (!envelope || !capability || envelope.schemaVersion !== AI_TRANSPARENCY_ENVELOPE_SCHEMA_VERSION || envelope.presentationVersion !== AI_TRANSPARENCY_ENVELOPE_PRESENTATION_VERSION || envelope.disclosure !== 'ai_generated_review_only' || envelope.claimCeiling !== 'ai_act_informed_technical_contract_candidate' || envelope.provider !== expectedProvider(capability) || envelope.model !== provenance?.model || envelope.venue !== provenance?.venue || envelope.egress !== 'none' || !validTimestamp(envelope.generatedAt) || !REVIEW_STATES.has(envelope.reviewState as string) || envelope.applyPolicy !== 'none' || envelope.writesPerformed !== 0 || !provenance) throw new AiTransparencyEnvelopeError();
     return Object.freeze({ ...envelope, capability, provider: provenance.provider, model: provenance.model, venue: provenance.venue, generatedAt: envelope.generatedAt as string, reviewState: envelope.reviewState as ClinicalReviewState, provenance }) as AiTransparencyEnvelope;
 }
