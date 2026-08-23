@@ -9,6 +9,7 @@ export const BACKUP_COLLECTIONS = [
     'documentDiagnosisProposals',
     'durableReviewCommandStates',
     'durableReviewCommandOperations',
+    'durableReviewPatientLinks',
     'durableReviewRecords',
     'durableReviewOperations',
     'drugs',
@@ -17,6 +18,7 @@ export const BACKUP_COLLECTIONS = [
     'messages',
     'observations',
     'patients',
+    'physicianReviewAttestations',
     'prostheticPrescriptions',
     'serviceCatalogEntries',
     'servicePrescriptionItems',
@@ -33,15 +35,25 @@ export type BackupDataset = Record<Exclude<BackupCollectionName, AuditDependentC
     & Partial<Record<AuditDependentCommandCollection, BackupRecord[]>>;
 
 /* @Codex */
+const DURABLE_REVIEW_AUTHORITY_COLLECTIONS = new Set<BackupCollectionName>([
+    'durableReviewPatientLinks',
+    'physicianReviewAttestations',
+]);
+/* @Codex Artifacts created before durable review authority was added have no such collections. */
+const PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS = BACKUP_COLLECTIONS.filter(
+    (collection) => !DURABLE_REVIEW_AUTHORITY_COLLECTIONS.has(collection),
+);
+/* @Codex */
 const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
-    BACKUP_COLLECTIONS.filter((collection) => collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations'),
-    BACKUP_COLLECTIONS.filter((collection) => collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations' && collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations'),
-    BACKUP_COLLECTIONS.filter((collection) => collection !== 'documentDiagnosisProposals' && collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations' && collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations'),
+    PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS.filter((collection) => collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations'),
+    PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS.filter((collection) => collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations' && collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations'),
+    PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS.filter((collection) => collection !== 'documentDiagnosisProposals' && collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations' && collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations'),
 ];
 const PATIENT_DEPENDENT_COLLECTIONS: readonly BackupCollectionName[] = [
     'attachments',
     'checkups',
     'documentDiagnosisProposals',
+    'durableReviewPatientLinks',
     'entries',
     'observations',
     'prostheticPrescriptions',
@@ -361,6 +373,21 @@ async function assertCollectionReferences(
                 );
             }
         }
+    }
+
+    const durableReviewIds = new Set(
+        (payload.durableReviewRecords ?? [])
+            .map((item) => item.reviewId)
+            .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
+    );
+    const durableReviewPatientLinkIds = new Set<string>();
+    for (const link of payload.durableReviewPatientLinks ?? []) {
+        if (typeof link.reviewId !== 'string' || !durableReviewIds.has(link.reviewId)
+            || typeof link.patientId !== 'string' || !patientIds.has(link.patientId)
+            || durableReviewPatientLinkIds.has(link.reviewId)) {
+            throw new BackupArtifactError('invalid-manifest', 'durableReviewPatientLinks contains an invalid durable review reference.');
+        }
+        durableReviewPatientLinkIds.add(link.reviewId);
     }
 
     for (const message of payload.messages ?? []) {
