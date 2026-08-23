@@ -103,6 +103,19 @@ function applySchemaGuards() {
     }
     /* @Codex */
     try {
+        sqlite.prepare(`
+            CREATE TABLE IF NOT EXISTS physician_review_attestations (
+                actor_ref TEXT PRIMARY KEY NOT NULL REFERENCES users(id), schema_version TEXT NOT NULL,
+                capability TEXT NOT NULL, status TEXT NOT NULL, attestation_version INTEGER NOT NULL,
+                policy_version TEXT NOT NULL, revoked_at INTEGER,
+                created_at INTEGER NOT NULL DEFAULT (unixepoch()), updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+            )
+        `).run();
+    } catch (error) {
+        console.warn('[MediFlow] Physician review attestation schema check skipped:', error);
+    }
+    /* @Codex */
+    try {
         ensureColumn('attachments', 'summary_snapshot', 'summary_snapshot TEXT');
         /* @Codex */
         ensureColumn('attachments', 'parse_evidence_artifact_snapshot', 'parse_evidence_artifact_snapshot TEXT');

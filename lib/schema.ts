@@ -20,6 +20,19 @@ export const users = sqliteTable('users', {
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
+/* @Codex */
+export const physicianReviewAttestations = sqliteTable('physician_review_attestations', {
+    actorRef: text('actor_ref').primaryKey().references(() => users.id).notNull(),
+    schemaVersion: text('schema_version').notNull(),
+    capability: text('capability').notNull(),
+    status: text('status').notNull(),
+    attestationVersion: integer('attestation_version').notNull(),
+    policyVersion: text('policy_version').notNull(),
+    revokedAt: integer('revoked_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
 // --- Ambulatories (Multi-Tenant) ---
 export const ambulatories = sqliteTable('ambulatories', {
     id: text('id').primaryKey(),
