@@ -171,6 +171,29 @@ test('rejects swapped opaque prefixes and a POST epoch jump without installing a
     assert.deepEqual(await jumped.resync(), { selectionEpoch: 1, lease: null });
 });
 
+test('fences an older overlapping select before failure, malformed JSON, 500, or 409 can change the newer lease', async () => {
+    for (const outcome of ['fetch', 'json', 'non-ok', 'conflict'] as const) {
+        const old = deferred<Response>(); const oldJson = deferred<unknown>(); const jsonStarted = deferred<void>(); let calls = 0; let gets = 0;
+        const adapter = createSmartImportSelectionBrowserAdapter({ fetch: async () => {
+            calls += 1;
+            if (calls === 1) return response({ selectionEpoch: 0 });
+            if (calls === 2) return outcome === 'json' ? { ok: true, status: 200,
+                json: async () => { jsonStarted.resolve(); return oldJson.promise; } } as Response : old.promise;
+            if (calls === 3) return response({ selection: LEASE });
+            gets += 1; return response({ selectionEpoch: 1 });
+        } });
+        await adapter.initialize(); const pending = adapter.select(PROPOSAL, true);
+        if (outcome === 'json') await jsonStarted.promise;
+        await adapter.select(PROPOSAL, true);
+        if (outcome === 'fetch') old.reject(new Error('synthetic old failure'));
+        else if (outcome === 'json') oldJson.resolve({ malformed: true });
+        else old.resolve(response({}, outcome === 'conflict' ? 409 : 500));
+        await assert.rejects(() => pending, rejects('selection_superseded'));
+        assert.equal(gets, 0);
+        assert.deepEqual(await adapter.resync(), { selectionEpoch: 1, lease: LEASE });
+    }
+});
+
 test('accepts only caller proposals and remains a browser-only selection boundary', async () => {
     const adapter = createSmartImportSelectionBrowserAdapter({ fetch: async () => response({ selectionEpoch: 0 }) });
     await adapter.initialize();
