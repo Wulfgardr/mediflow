@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 
 import { apiFailure, apiInternalError } from '../api-error-response';
 import type { PatientSmartImportHostCapabilityResult } from '../domain/documents/patient-smart-import-host-capability';
+import { serializePatientSmartImportProposalWire } from '../smart-import-proposal-wire';
 import {
     AuthenticatedSmartImportPreviewError,
     type AuthenticatedSmartImportPreviewErrorCode,
@@ -68,14 +69,15 @@ function input(value: unknown): PreviewInput | null {
     return Object.freeze({ handle: record.handle, requestId: record.requestId });
 }
 
-function capabilityResult(value: unknown): PatientSmartImportHostCapabilityResult | null {
+function capabilityResult(value: unknown): object | null {
     const record = exact(value, ['writesPerformed', 'apply', 'status', 'code', 'proposal', 'receipt', 'provenance', 'reviewRef']);
     if (!record || record.writesPerformed !== 0 || record.apply !== 'denied') return null;
     if (record.status === 'available') {
+        const proposal = serializePatientSmartImportProposalWire(record.proposal);
         if (record.code !== null || typeof record.reviewRef !== 'string' || !/^review_[0-9a-f]{32}$/u.test(record.reviewRef)
-            || !record.proposal || !record.receipt || !record.provenance
-            || !plainData(record.proposal) || !plainData(record.receipt) || !plainData(record.provenance)) return null;
-        return value as PatientSmartImportHostCapabilityResult;
+            || !proposal || !record.receipt || !record.provenance
+            || !plainData(proposal) || !plainData(record.receipt) || !plainData(record.provenance)) return null;
+        return Object.freeze({ ...record, proposal });
     }
     if (record.status === 'denied') {
         if (typeof record.code !== 'string' || !DENIED_CODES.has(record.code) || record.proposal !== null || record.receipt !== null
