@@ -170,6 +170,9 @@ async function checksumValidDurableArtifact(mutate: (artifact: any) => void | Pr
         durableReviewOperations: [operation],
     }));
     await mutate(artifact);
+    for (const collection of artifact.manifest.collections) {
+        artifact.manifest.recordCounts[collection] = artifact.payload[collection].length;
+    }
     artifact.manifest.checksum = await sha256(stableStringify(artifact.payload));
     return artifact;
 }
@@ -228,6 +231,32 @@ test('rejects checksum-valid durable operations with noncanonical snapshot encod
             null,
             2,
         );
+    });
+
+    await assert.rejects(
+        () => parseBackupArtifact(artifact),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+    );
+});
+
+test('rejects checksum-valid replace snapshots that change patientRef', async () => {
+    const artifact = await checksumValidDurableArtifact(async (value) => {
+        const first = JSON.parse(value.payload.durableReviewOperations[0].recordSnapshot);
+        const second = { ...first, patientRef: `ptr_${'e'.repeat(32)}`, reviewRevision: 2 };
+        second.receiptBinding = await sha256(`${second.patientRef}\0${second.reviewId}\0${second.receiptRef}`);
+        second.provenanceBinding = await sha256(`${second.patientRef}\0${second.reviewId}\0${second.provenanceRef}`);
+        value.payload.durableReviewRecords[0] = { ...value.payload.durableReviewRecords[0], ...second };
+        const idempotencyKey = 'idem_bbbbbbbbbbbbbbbb';
+        value.payload.durableReviewOperations.push({
+            id: await sha256(`${second.reviewId}\0${idempotencyKey}`),
+            reviewId: second.reviewId,
+            idempotencyKey,
+            operation: 'replace',
+            expectedReviewRevision: 1,
+            operationDigest: await sha256(JSON.stringify(['replace', 1, second])),
+            recordSnapshot: JSON.stringify(second),
+            createdAt: '2026-03-17T08:11:00.000Z',
+        });
     });
 
     await assert.rejects(
