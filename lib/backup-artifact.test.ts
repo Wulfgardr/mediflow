@@ -200,6 +200,39 @@ async function checksumValidDurableArtifact(mutate: (artifact: any) => void | Pr
     return artifact;
 }
 
+/* @Codex */
+async function checksumValidAuthorityArtifact(mutate: (artifact: any) => void | Promise<void>): Promise<Record<string, unknown>> {
+    const { record, operation } = await durableReviewLedgerFixture();
+    const artifact = JSON.parse(await serializeBackupArtifact({
+        ...basePayload,
+        durableReviewRecords: [record],
+        durableReviewOperations: [operation],
+        durableReviewPatientLinks: [{
+            reviewId: record.reviewId,
+            patientId: 'pat-1',
+            createdAt: '2026-03-17T08:10:00.000Z',
+            updatedAt: '2026-03-17T08:10:00.000Z',
+        }],
+        physicianReviewAttestations: [{
+            actorRef: 'actor-synthetic',
+            schemaVersion: 'mediflow.physician-review-attestation.v1',
+            capability: 'physician_terminal_review',
+            status: 'active',
+            attestationVersion: 1,
+            policyVersion: 'physician_terminal_review.v1',
+            revokedAt: null,
+            createdAt: '2026-03-17T08:10:00.000Z',
+            updatedAt: '2026-03-17T08:10:00.000Z',
+        }],
+    }));
+    await mutate(artifact);
+    for (const collection of artifact.manifest.collections) {
+        artifact.manifest.recordCounts[collection] = artifact.payload[collection].length;
+    }
+    artifact.manifest.checksum = await sha256(stableStringify(artifact.payload));
+    return artifact;
+}
+
 test('rejects a durable review patient link that does not resolve within the artifact', async () => {
     const { record, operation } = await durableReviewLedgerFixture();
     const artifact = JSON.parse(await serializeBackupArtifact({
@@ -220,6 +253,37 @@ test('rejects a durable review patient link that does not resolve within the art
         () => parseBackupArtifact(artifact),
         (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
     );
+});
+
+test('rejects checksum-valid malformed durable review authority rows before restore', async () => {
+    const mutations: Array<(artifact: any) => void> = [
+        (artifact) => { artifact.payload.durableReviewPatientLinks[0].extra = true; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].extra = true; },
+        (artifact) => { artifact.payload.durableReviewPatientLinks[0].reviewId = 'review_not-canonical'; },
+        (artifact) => { artifact.payload.durableReviewPatientLinks[0].updatedAt = '2026-03-17T08:09:59.000Z'; },
+        (artifact) => { artifact.payload.durableReviewPatientLinks[0].createdAt = 'not-a-timestamp'; },
+        (artifact) => { artifact.payload.durableReviewPatientLinks.push({ ...artifact.payload.durableReviewPatientLinks[0] }); },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].schemaVersion = 'unexpected.v1'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].capability = 'unexpected'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].attestationVersion = 2; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].policyVersion = 'unexpected.v1'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].status = 'unexpected'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].actorRef = ' actor-synthetic'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].updatedAt = '2026-03-17T08:09:59.000Z'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].createdAt = 'not-a-timestamp'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].revokedAt = '2026-03-17T08:10:00.000Z'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].status = 'revoked'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].status = 'revoked'; artifact.payload.physicianReviewAttestations[0].revokedAt = '2026-03-17T08:09:59.000Z'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations.push({ ...artifact.payload.physicianReviewAttestations[0] }); },
+    ];
+
+    for (const mutate of mutations) {
+        const artifact = await checksumValidAuthorityArtifact(mutate);
+        await assert.rejects(
+            () => parseBackupArtifact(artifact),
+            (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+        );
+    }
 });
 
 test('rejects checksum-valid durable review records that violate canonical invariants', async () => {

@@ -58,7 +58,6 @@ const PATIENT_DEPENDENT_COLLECTIONS: readonly BackupCollectionName[] = [
     'attachments',
     'checkups',
     'documentDiagnosisProposals',
-    'durableReviewPatientLinks',
     'entries',
     'observations',
     'prostheticPrescriptions',
@@ -79,6 +78,11 @@ const DURABLE_RECORD_KEYS = ['patientRef', 'reviewId', 'reviewRevision', 'receip
 const DURABLE_BACKUP_RECORD_KEYS = ['id', ...DURABLE_RECORD_KEYS, 'createdAt'] as const;
 const DURABLE_OPERATION_KEYS = ['id', 'reviewId', 'idempotencyKey', 'operation', 'expectedReviewRevision', 'operationDigest', 'recordSnapshot', 'createdAt'] as const;
 const DURABLE_PRESENTATION_VERSION = 'mediflow.ai.durable-review.presentation.v1';
+const DURABLE_REVIEW_PATIENT_LINK_KEYS = ['reviewId', 'patientId', 'createdAt', 'updatedAt'] as const;
+const PHYSICIAN_REVIEW_ATTESTATION_KEYS = ['actorRef', 'schemaVersion', 'capability', 'status', 'attestationVersion', 'policyVersion', 'revokedAt', 'createdAt', 'updatedAt'] as const;
+const PHYSICIAN_REVIEW_ATTESTATION_SCHEMA = 'mediflow.physician-review-attestation.v1';
+const PHYSICIAN_REVIEW_CAPABILITY = 'physician_terminal_review';
+const PHYSICIAN_REVIEW_POLICY = 'physician_terminal_review.v1';
 
 export interface BackupArtifactManifest {
     scope: typeof BACKUP_ARTIFACT_SCOPE;
@@ -166,10 +170,69 @@ async function sha256Hex(value: string): Promise<string> {
 
 /* @Codex */
 function hasExactKeys(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
-    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) return false;
-    const descriptors = Object.getOwnPropertyDescriptors(value);
-    return Reflect.ownKeys(value).length === keys.length
-        && keys.every((key) => Object.hasOwn(descriptors, key) && 'value' in descriptors[key]! && descriptors[key]!.enumerable);
+    try {
+        if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) return false;
+        structuredClone(value);
+        const descriptors = Object.getOwnPropertyDescriptors(value);
+        return Reflect.ownKeys(value).length === keys.length
+            && keys.every((key) => Object.hasOwn(descriptors, key) && 'value' in descriptors[key]! && descriptors[key]!.enumerable);
+    } catch {
+        return false;
+    }
+}
+
+/* @Codex Authority rows retain dates as Date objects before serialization and canonical ISO strings after parsing. */
+function timestampMilliseconds(value: unknown): number | null {
+    if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.getTime() : null;
+    if (typeof value !== 'string') return null;
+    const date = new Date(value);
+    return Number.isFinite(date.getTime()) && date.toISOString() === value ? date.getTime() : null;
+}
+
+/* @Codex */
+function assertDurableReviewAuthorityRows(
+    payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
+    durableReviewIds: ReadonlySet<string>,
+    patientIds: ReadonlySet<string>,
+): void {
+    const linkedReviewIds = new Set<string>();
+    for (const link of payload.durableReviewPatientLinks ?? []) {
+        if (!hasExactKeys(link, DURABLE_REVIEW_PATIENT_LINK_KEYS)) {
+            throw new BackupArtifactError('invalid-manifest', 'durableReviewPatientLinks contains an invalid durable review reference.');
+        }
+        const createdAt = timestampMilliseconds(link.createdAt);
+        const updatedAt = timestampMilliseconds(link.updatedAt);
+        if (typeof link.reviewId !== 'string' || !DURABLE_REVIEW.test(link.reviewId) || !durableReviewIds.has(link.reviewId)
+            || typeof link.patientId !== 'string' || !patientIds.has(link.patientId)
+            || createdAt === null || updatedAt === null || updatedAt < createdAt
+            || linkedReviewIds.has(link.reviewId)) {
+            throw new BackupArtifactError('invalid-manifest', 'durableReviewPatientLinks contains an invalid durable review reference.');
+        }
+        linkedReviewIds.add(link.reviewId);
+    }
+
+    const actorRefs = new Set<string>();
+    for (const attestation of payload.physicianReviewAttestations ?? []) {
+        if (!hasExactKeys(attestation, PHYSICIAN_REVIEW_ATTESTATION_KEYS)) {
+            throw new BackupArtifactError('invalid-manifest', 'physicianReviewAttestations contains an invalid authority record.');
+        }
+        const createdAt = timestampMilliseconds(attestation.createdAt);
+        const updatedAt = timestampMilliseconds(attestation.updatedAt);
+        const revokedAt = attestation.revokedAt === null ? null : timestampMilliseconds(attestation.revokedAt);
+        const active = attestation.status === 'inactive' || attestation.status === 'active';
+        const revoked = attestation.status === 'revoked';
+        if (typeof attestation.actorRef !== 'string' || attestation.actorRef.trim() !== attestation.actorRef || attestation.actorRef.length === 0 || attestation.actorRef.length > 256 || actorRefs.has(attestation.actorRef)
+            || attestation.schemaVersion !== PHYSICIAN_REVIEW_ATTESTATION_SCHEMA
+            || attestation.capability !== PHYSICIAN_REVIEW_CAPABILITY
+            || attestation.attestationVersion !== 1 || attestation.policyVersion !== PHYSICIAN_REVIEW_POLICY
+            || (!active && !revoked) || (active && attestation.revokedAt !== null)
+            || (revoked && revokedAt === null)
+            || createdAt === null || updatedAt === null || updatedAt < createdAt
+            || (revokedAt !== null && revokedAt < createdAt)) {
+            throw new BackupArtifactError('invalid-manifest', 'physicianReviewAttestations contains an invalid authority record.');
+        }
+        actorRefs.add(attestation.actorRef);
+    }
 }
 
 /* @Codex */
@@ -385,16 +448,6 @@ async function assertCollectionReferences(
             .map((item) => item.reviewId)
             .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
     );
-    const durableReviewPatientLinkIds = new Set<string>();
-    for (const link of payload.durableReviewPatientLinks ?? []) {
-        if (typeof link.reviewId !== 'string' || !durableReviewIds.has(link.reviewId)
-            || typeof link.patientId !== 'string' || !patientIds.has(link.patientId)
-            || durableReviewPatientLinkIds.has(link.reviewId)) {
-            throw new BackupArtifactError('invalid-manifest', 'durableReviewPatientLinks contains an invalid durable review reference.');
-        }
-        durableReviewPatientLinkIds.add(link.reviewId);
-    }
-
     for (const message of payload.messages ?? []) {
         if (typeof message.conversationId !== 'string' || !conversationIds.has(message.conversationId)) {
             throw new BackupArtifactError(
@@ -405,6 +458,7 @@ async function assertCollectionReferences(
     }
 
     await assertDurableReviewLedger(payload);
+    assertDurableReviewAuthorityRows(payload, durableReviewIds, patientIds);
 }
 
 export async function createBackupArtifact(payload: BackupDataset, createdAt = new Date()): Promise<BackupArtifact> {
