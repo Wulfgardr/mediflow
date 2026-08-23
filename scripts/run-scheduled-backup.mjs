@@ -26,6 +26,8 @@ const BACKUP_TABLES = {
   attachments: 'attachments',
   conversations: 'conversations',
   documentDiagnosisProposals: 'document_diagnosis_proposals',
+  durableReviewCommandStates: 'durable_review_command_states',
+  durableReviewCommandOperations: 'durable_review_command_operations',
   durableReviewRecords: 'durable_review_records',
   durableReviewOperations: 'durable_review_operations',
   drugs: 'drugs',
@@ -418,6 +420,13 @@ function buildDataset(db, backupCollections) {
   })();
 }
 
+/* @Codex The command replay receipt is incomplete until the append-only audit ledger has its own restore contract. */
+function assertBackupEligibility(dataset) {
+  if (dataset.durableReviewCommandStates.length > 0 || dataset.durableReviewCommandOperations.length > 0) {
+    throw new Error('Il backup dei comandi review richiede il ledger audit append-only.');
+  }
+}
+
 async function main() {
   const dataDir = getDefaultDataDir();
   const dbPath = path.join(dataDir, 'medical.db');
@@ -442,6 +451,7 @@ async function main() {
 
     const createdAt = new Date();
     const payload = buildDataset(db, Object.keys(BACKUP_TABLES));
+    assertBackupEligibility(payload);
     const artifact = await serializeBackupArtifact(payload, createdAt);
     const fileName = `mediflow-backup-v1-${formatTimestamp(createdAt)}.mediflow`;
     const finalPath = path.join(destinationDir, fileName);
