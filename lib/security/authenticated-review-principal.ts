@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 import { dbServer } from '../db-server';
 import { users } from '../schema';
 import { readAuthenticatedWebSession } from './server-auth';
-import { getSession, type ServerSession } from './server-session';
+import { peekSession, type ServerSession } from './server-session';
 
 type CanonicalUser = Readonly<{ id: string; username: string }>;
 type Sources = Readonly<{
@@ -44,7 +44,7 @@ function fail(code: AuthenticatedReviewPrincipalErrorCode): never {
 function isCurrentWebSession(session: ServerSession): boolean {
     return session.authChannel === 'web'
         && session.id !== 'local-api'
-        && getSession(session.id) === session;
+        && peekSession(session.id) === session;
 }
 
 export function createAuthenticatedReviewPrincipalResolver(sources: Sources) {
