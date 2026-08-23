@@ -14,6 +14,8 @@ import {
 import { attachmentUpdateSchema } from '@/lib/api-schemas/attachments';
 /* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
+/* @Codex */
+import { createLegacyAttachmentResponseSnapshot } from '@/lib/attachment-legacy-response';
 
 /* STREAM B: full attachment retrieval INCLUDING the base64 `data` blob. The list
    endpoint (GET /api/attachments?metadata=true) omits the blob; this by-id read is
@@ -31,10 +33,14 @@ export async function GET(
         if (!row) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
-        return NextResponse.json({
-            ...row,
-            path: buildAttachmentPath(row.path, row.name, row.id),
-        });
+        const snapshot = createLegacyAttachmentResponseSnapshot(row);
+        if (!snapshot) {
+            return NextResponse.json({ error: 'Failed to serialize attachment' }, { status: 500 });
+        }
+        return NextResponse.json(Object.freeze({
+            ...snapshot,
+            path: buildAttachmentPath(snapshot.path, snapshot.name, snapshot.id),
+        }));
     } catch (error) {
         return NextResponse.json({ error: 'Failed to fetch attachment' }, { status: 500 });
     }

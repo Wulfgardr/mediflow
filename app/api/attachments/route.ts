@@ -15,6 +15,8 @@ import { parseListParams } from '@/lib/list-query-params';
 import { attachmentCreateSchema } from '@/lib/api-schemas/attachments';
 /* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
+/* @Codex */
+import { createLegacyAttachmentResponseSnapshot } from '@/lib/attachment-legacy-response';
 
 // Only plaintext columns are sortable (name/path/data are ENC:). size/type are
 // plaintext metadata and safe to sort on.
@@ -45,11 +47,14 @@ const ATTACHMENT_METADATA_COLUMNS = {
 import { isDocumentOcrQueueReason, isDocumentOcrQueueState } from '@/lib/domain/documents/document-ocr-queue';
 
 /* @Codex */
-function serializeAttachment<T extends { id: string; name: string; path: string }>(row: T): T {
-    return {
-        ...row,
-        path: buildAttachmentPath(row.path, row.name, row.id),
-    };
+function serializeAttachment<T extends { id: string; name: string; path: string }>(row: T): Readonly<Omit<T, 'documentSourceRef' | 'documentRevision' | 'documentFreshnessEpoch'>> | null {
+    const snapshot = createLegacyAttachmentResponseSnapshot(row);
+    if (!snapshot) return null;
+
+    return Object.freeze({
+        ...snapshot,
+        path: buildAttachmentPath(snapshot.path, snapshot.name, snapshot.id),
+    });
 }
 
 export async function GET(request: Request) {
@@ -89,7 +94,11 @@ export async function GET(request: Request) {
         if (typeof offset === 'number') query = query.offset(offset);
 
         const data = await query;
-        return NextResponse.json(data.map(serializeAttachment));
+        const response = data.map(serializeAttachment);
+        if (response.some((attachment) => attachment === null)) {
+            return NextResponse.json({ error: 'Failed to serialize attachment' }, { status: 500 });
+        }
+        return NextResponse.json(response);
     } catch (error) {
         return NextResponse.json({ error: "Failed to fetch attachments" }, { status: 500 });
     }
