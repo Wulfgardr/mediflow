@@ -7,6 +7,8 @@ export const BACKUP_COLLECTIONS = [
     'attachments',
     'conversations',
     'documentDiagnosisProposals',
+    'durableReviewRecords',
+    'durableReviewOperations',
     'drugs',
     'entries',
     'exemptions',
@@ -26,10 +28,11 @@ export type BackupCollectionName = (typeof BACKUP_COLLECTIONS)[number];
 export type BackupRecord = Record<string, unknown>;
 export type BackupDataset = Record<BackupCollectionName, BackupRecord[]>;
 
-const LEGACY_OPTIONAL_COLLECTION = 'documentDiagnosisProposals' as const;
-const LEGACY_BACKUP_COLLECTIONS = BACKUP_COLLECTIONS.filter(
-    (collection): collection is Exclude<BackupCollectionName, typeof LEGACY_OPTIONAL_COLLECTION> => collection !== LEGACY_OPTIONAL_COLLECTION,
-);
+/* @Codex */
+const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
+    BACKUP_COLLECTIONS.filter((collection) => collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations'),
+    BACKUP_COLLECTIONS.filter((collection) => collection !== 'documentDiagnosisProposals' && collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations'),
+];
 const PATIENT_DEPENDENT_COLLECTIONS: readonly BackupCollectionName[] = [
     'attachments',
     'checkups',
@@ -271,6 +274,21 @@ function assertCollectionReferences(
             );
         }
     }
+
+    /* @Codex */
+    const durableReviewIds = new Set(
+        (payload.durableReviewRecords ?? [])
+            .map((item) => item.reviewId)
+            .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
+    );
+    for (const operation of payload.durableReviewOperations ?? []) {
+        if (typeof operation.reviewId !== 'string' || !durableReviewIds.has(operation.reviewId)) {
+            throw new BackupArtifactError(
+                'invalid-manifest',
+                'durableReviewOperations contains an unknown review reference.',
+            );
+        }
+    }
 }
 
 export async function createBackupArtifact(payload: BackupDataset, createdAt = new Date()): Promise<BackupArtifact> {
@@ -330,11 +348,14 @@ export async function parseBackupArtifact(value: unknown): Promise<BackupArtifac
         throw new BackupArtifactError('invalid-manifest', 'Backup payload is missing.');
     }
 
-    const isLegacyV1 = hasCollectionSet(payload, LEGACY_BACKUP_COLLECTIONS);
-    const expectedCollections = isLegacyV1 ? LEGACY_BACKUP_COLLECTIONS : BACKUP_COLLECTIONS;
-    const expectedPatientDependentCollections = isLegacyV1
-        ? PATIENT_DEPENDENT_COLLECTIONS.filter((collection) => collection !== LEGACY_OPTIONAL_COLLECTION)
-        : PATIENT_DEPENDENT_COLLECTIONS;
+    const legacyCollections = LEGACY_COLLECTION_SETS.find((collections) => hasCollectionSet(payload, collections));
+    const expectedCollections = legacyCollections ?? BACKUP_COLLECTIONS;
+    const missingLegacyCollections = legacyCollections
+        ? BACKUP_COLLECTIONS.filter((collection) => !legacyCollections.includes(collection))
+        : [];
+    const expectedPatientDependentCollections = PATIENT_DEPENDENT_COLLECTIONS.filter(
+        (collection) => expectedCollections.includes(collection),
+    );
 
     assertCollectionSet(payload, expectedCollections);
     assertCollectionArrays(payload, expectedCollections);
@@ -361,13 +382,13 @@ export async function parseBackupArtifact(value: unknown): Promise<BackupArtifac
     }
 
     /* @Codex Legacy v1 artifacts are authenticated in their original form before this additive normalization. */
-    const normalizedPayload = isLegacyV1
-        ? { ...payload, [LEGACY_OPTIONAL_COLLECTION]: [] } as BackupDataset
+    const normalizedPayload = legacyCollections
+        ? { ...payload, ...Object.fromEntries(missingLegacyCollections.map((collection) => [collection, []])) } as BackupDataset
         : payload as BackupDataset;
-    const normalizedRecordCounts = isLegacyV1
-        ? { ...manifest.recordCounts, [LEGACY_OPTIONAL_COLLECTION]: 0 } as Record<BackupCollectionName, number>
+    const normalizedRecordCounts = legacyCollections
+        ? { ...manifest.recordCounts, ...Object.fromEntries(missingLegacyCollections.map((collection) => [collection, 0])) } as Record<BackupCollectionName, number>
         : manifest.recordCounts as Record<BackupCollectionName, number>;
-    const normalizedChecksum = isLegacyV1
+    const normalizedChecksum = legacyCollections
         ? await sha256Hex(stableStringify(normalizeJson(normalizedPayload)))
         : manifest.checksum;
 
