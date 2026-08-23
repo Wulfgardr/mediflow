@@ -24,7 +24,7 @@ targets:
       properties:
         CFBundleDisplayName: MediFlow
         CFBundleShortVersionString: 0.8.5
-        CFBundleVersion: 85
+        CFBundleVersion: "85"
         LSApplicationCategoryType: public.app-category.medical
         UIApplicationSupportsIndirectInputEvents: true
         # Local-network discovery: required so Bonjour home-base discovery and
@@ -67,7 +67,7 @@ targets:
       properties:
         CFBundleDisplayName: MediFlow
         CFBundleShortVersionString: 0.8.5
-        CFBundleVersion: 85
+        CFBundleVersion: "85"
         LSApplicationCategoryType: public.app-category.medical
         # Local-network discovery for the home-base Bonjour service. Guarded by
         # check-apple-network-entitlements.sh.
