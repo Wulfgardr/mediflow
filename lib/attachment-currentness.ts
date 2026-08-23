@@ -8,8 +8,34 @@ export const INITIAL_DOCUMENT_CURRENTNESS = 1;
 const DOCUMENT_SOURCE_REF_PATTERN = /^[0-9a-f]{64}$/u;
 
 /* @Codex */
+const INVALID_GENERATED_DOCUMENT_SOURCE_REF = 'Generated document source reference is invalid.';
+
+/* @Codex */
 export function createDocumentSourceRef(): string {
-    return randomBytes(32).toString('hex');
+    return createDocumentSourceRefFromEntropyForTest(randomBytes(32));
+}
+
+/* @Codex */
+export function createDocumentSourceRefFromEntropyForTest(entropy: unknown): string {
+    let value: string;
+    try {
+        if (
+            !Buffer.isBuffer(entropy)
+            || entropy.length !== 32
+            || Object.getOwnPropertyDescriptor(entropy, 'toString') !== undefined
+        ) {
+            throw new Error(INVALID_GENERATED_DOCUMENT_SOURCE_REF);
+        }
+        value = Buffer.prototype.toString.call(entropy, 'hex');
+    } catch {
+        throw new Error(INVALID_GENERATED_DOCUMENT_SOURCE_REF);
+    }
+
+    if (!isDocumentSourceRef(value)) {
+        throw new Error(INVALID_GENERATED_DOCUMENT_SOURCE_REF);
+    }
+
+    return value;
 }
 
 /* @Codex */

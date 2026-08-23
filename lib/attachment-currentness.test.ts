@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
     createDocumentSourceRef,
+    createDocumentSourceRefFromEntropyForTest,
     INITIAL_DOCUMENT_CURRENTNESS,
     isDocumentSourceRef,
 } from './attachment-currentness';
@@ -23,5 +24,24 @@ test('document source refs are generated host-side as opaque lowercase 256-bit v
 test('document source ref validation fails closed for malformed values', () => {
     for (const value of [undefined, null, '', 'a'.repeat(63), 'A'.repeat(64), 'g'.repeat(64), 1]) {
         assert.equal(isDocumentSourceRef(value), false);
+    }
+});
+
+/* @Codex */
+test('document source ref generation rejects malformed or proxied entropy without exposing it', () => {
+    const entropyWithAccessor = Buffer.alloc(32);
+    Object.defineProperty(entropyWithAccessor, 'toString', {
+        get() { throw new Error('must not read accessor'); },
+    });
+
+    for (const entropy of [
+        Buffer.alloc(31),
+        new Proxy(Buffer.alloc(32), {}),
+        entropyWithAccessor,
+    ]) {
+        assert.throws(
+            () => createDocumentSourceRefFromEntropyForTest(entropy),
+            { message: 'Generated document source reference is invalid.' },
+        );
     }
 });
