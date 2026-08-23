@@ -8,7 +8,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
-import { BACKUP_COLLECTIONS, parseBackupArtifact } from './backup-artifact';
+import { BACKUP_COLLECTIONS, createEmptyDataset, parseBackupArtifact, serializeBackupArtifact, stableStringify } from './backup-artifact';
 import { decryptData, encryptData, generateMasterKey } from './security/security';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -267,6 +267,64 @@ function restoreArtifact(targetDataDir: string, artifactPath: string): void {
         { MEDIFLOW_DATA_DIR: targetDataDir, W7_ARTIFACT_PATH: artifactPath },
     );
 }
+
+/* @Codex */
+function countCommandLedger(db: Database.Database): [number, number, number] {
+    const count = (table: string) => (db.prepare(`SELECT COUNT(*) AS count FROM ${quoteIdentifier(table)}`).get() as { count: number }).count;
+    return [count('durable_review_command_states'), count('durable_review_command_operations'), count('audit_events')];
+}
+
+/* @Codex */
+function seedCommandLedger(db: Database.Database): void {
+    const reviewId = `review_${'a'.repeat(32)}`;
+    db.prepare('INSERT INTO durable_review_command_states (review_id, review_state, revision, action) VALUES (?, ?, ?, ?)').run(reviewId, 'accepted', 2, 'accept');
+    db.prepare('INSERT INTO durable_review_command_operations (id, review_id, idempotency_key, command_digest, result_snapshot, audit_event_id) VALUES (?, ?, ?, ?, ?, ?)').run(
+        'command-operation-synthetic', reviewId, 'idem_aaaaaaaaaaaaaaaa', 'a'.repeat(64), JSON.stringify({ reviewId, state: 'accepted', revision: 2, eventId: `event_${'b'.repeat(32)}` }), `event_${'b'.repeat(32)}`,
+    );
+    db.prepare('INSERT INTO audit_events (event_id, schema_version, event_type, occurred_at, outcome, actor_type, actor_ref, subject_type, subject_ref, source_surface, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+        `event_${'b'.repeat(32)}`, 1, 'ai.review.accepted', 1_783_000_000, 'success', 'user', `actor_${'c'.repeat(32)}`, 'ai_review', reviewId, 'api', 1_783_000_000,
+    );
+}
+
+/* @Codex */
+test('blocks current and legacy empty artifacts before clearing a target command replay ledger', async () => {
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-command-hold-'));
+    const emptyDataDir = path.join(workDir, 'empty-target');
+    const protectedDataDir = path.join(workDir, 'protected-target');
+    const currentPath = path.join(workDir, 'current-empty.mediflow');
+    const legacyPath = path.join(workDir, 'legacy-empty.mediflow');
+
+    try {
+        prepareDatabase(emptyDataDir);
+        prepareDatabase(protectedDataDir);
+        const current = JSON.parse(await serializeBackupArtifact(createEmptyDataset())) as { manifest: { collections: string[]; recordCounts: Record<string, number>; checksum: string }; payload: Record<string, unknown> };
+        fs.writeFileSync(currentPath, JSON.stringify(current));
+        assert.doesNotThrow(() => restoreArtifact(emptyDataDir, currentPath));
+
+        const legacy = structuredClone(current);
+        for (const collection of ['durableReviewCommandStates', 'durableReviewCommandOperations']) {
+            delete legacy.payload[collection];
+            delete legacy.manifest.recordCounts[collection];
+        }
+        legacy.manifest.collections = legacy.manifest.collections.filter((collection) => collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations');
+        legacy.manifest.checksum = createHash('sha256').update(stableStringify(legacy.payload)).digest('hex');
+        fs.writeFileSync(legacyPath, JSON.stringify(legacy));
+
+        const protectedDb = new Database(path.join(protectedDataDir, 'medical.db'));
+        try {
+            seedCommandLedger(protectedDb);
+            assert.deepEqual(countCommandLedger(protectedDb), [1, 1, 1]);
+            assert.throws(() => restoreArtifact(protectedDataDir, currentPath), /Restore blocked/);
+            assert.deepEqual(countCommandLedger(protectedDb), [1, 1, 1]);
+            assert.throws(() => restoreArtifact(protectedDataDir, legacyPath), /Restore blocked/);
+            assert.deepEqual(countCommandLedger(protectedDb), [1, 1, 1]);
+        } finally {
+            protectedDb.close();
+        }
+    } finally {
+        fs.rmSync(workDir, { recursive: true, force: true });
+    }
+});
 
 test('scheduled backup restores every clinical table and preserves ciphertext bytes', async () => {
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-roundtrip-'));
