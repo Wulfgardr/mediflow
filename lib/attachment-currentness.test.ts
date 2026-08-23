@@ -29,14 +29,34 @@ test('document source ref validation fails closed for malformed values', () => {
 
 /* @Codex */
 test('document source ref generation rejects malformed or proxied entropy without exposing it', () => {
+    let lengthAccessorReads = 0;
+    let proxyGetReads = 0;
+    let toStringAccessorReads = 0;
+    const entropyWithLengthAccessor = Buffer.alloc(32);
+    Object.defineProperty(entropyWithLengthAccessor, 'length', {
+        get() {
+            lengthAccessorReads += 1;
+            return 32;
+        },
+    });
     const entropyWithAccessor = Buffer.alloc(32);
     Object.defineProperty(entropyWithAccessor, 'toString', {
-        get() { throw new Error('must not read accessor'); },
+        get() {
+            toStringAccessorReads += 1;
+            return () => 'must not call accessor';
+        },
+    });
+    const proxiedEntropy = new Proxy(Buffer.alloc(32), {
+        get(target, property, receiver) {
+            proxyGetReads += 1;
+            return Reflect.get(target, property, receiver);
+        },
     });
 
     for (const entropy of [
         Buffer.alloc(31),
-        new Proxy(Buffer.alloc(32), {}),
+        proxiedEntropy,
+        entropyWithLengthAccessor,
         entropyWithAccessor,
     ]) {
         assert.throws(
@@ -44,4 +64,8 @@ test('document source ref generation rejects malformed or proxied entropy withou
             { message: 'Generated document source reference is invalid.' },
         );
     }
+
+    assert.equal(lengthAccessorReads, 0);
+    assert.equal(proxyGetReads, 0);
+    assert.equal(toStringAccessorReads, 0);
 });

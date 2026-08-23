@@ -1,5 +1,6 @@
 import 'server-only';
 import { randomBytes } from 'node:crypto';
+import { types } from 'node:util';
 
 /* @Codex */
 export const INITIAL_DOCUMENT_CURRENTNESS = 1;
@@ -20,8 +21,9 @@ export function createDocumentSourceRefFromEntropyForTest(entropy: unknown): str
     let value: string;
     try {
         if (
-            !Buffer.isBuffer(entropy)
-            || entropy.length !== 32
+            types.isProxy(entropy)
+            || !Buffer.isBuffer(entropy)
+            || Object.getOwnPropertyDescriptor(entropy, 'length') !== undefined
             || Object.getOwnPropertyDescriptor(entropy, 'toString') !== undefined
         ) {
             throw new Error(INVALID_GENERATED_DOCUMENT_SOURCE_REF);
