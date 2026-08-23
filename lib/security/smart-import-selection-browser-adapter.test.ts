@@ -57,6 +57,69 @@ test('posts once only after explicit confirmation and returns the opaque lease',
     }]);
 });
 
+test('binds a successful lease to an in-memory context and invalidates it before a replacement select settles', async () => {
+    const delayed = deferred<Response>(); let calls = 0;
+    const adapter = createSmartImportSelectionBrowserAdapter({ fetch: async () => {
+        calls += 1;
+        if (calls === 1) return response({ selectionEpoch: 0 });
+        if (calls === 2) return response({ selection: LEASE });
+        if (calls === 3) return delayed.promise;
+        return response({ selection: { ...LEASE, selectionEpoch: 2 } });
+    } });
+    await adapter.initialize(); const first = await adapter.select(PROPOSAL, true);
+    assert.equal(adapter.isCurrent(first), true);
+    assert.equal(Object.isFrozen(first.selectionContext), true);
+    assert.equal(JSON.stringify(first).includes('selectionContext'), false);
+
+    const replacement = adapter.select(PROPOSAL, true);
+    assert.equal(adapter.isCurrent(first), false);
+    delayed.reject(new Error('synthetic failed replacement'));
+    await assert.rejects(() => replacement, rejects('selection_outcome_unknown'));
+    assert.equal(adapter.isCurrent(first), false);
+    const recovered = await adapter.select(PROPOSAL, true);
+    assert.notEqual(recovered.selectionContext, first.selectionContext);
+    assert.equal(adapter.isCurrent(recovered), true);
+});
+
+test('rotates lease context on reset, session failure, and a higher current epoch only', async () => {
+    const resettable = createSmartImportSelectionBrowserAdapter({ fetch: async (_url, init) =>
+        init?.method === 'GET' ? response({ selectionEpoch: 0 }) : response({ selection: LEASE }) });
+    await resettable.initialize(); const resetLease = await resettable.select(PROPOSAL, true);
+    resettable.reset(); assert.equal(resettable.isCurrent(resetLease), false);
+
+    let sessionCalls = 0;
+    const session = createSmartImportSelectionBrowserAdapter({ fetch: async () => {
+        sessionCalls += 1; return sessionCalls === 1 ? response({ selectionEpoch: 0 }) : sessionCalls === 2 ? response({ selection: LEASE }) : response({}, 401);
+    } });
+    await session.initialize(); const sessionLease = await session.select(PROPOSAL, true);
+    await assert.rejects(() => session.resync(), rejects('session_unavailable'));
+    assert.equal(session.isCurrent(sessionLease), false);
+
+    let epochCalls = 0;
+    const higher = createSmartImportSelectionBrowserAdapter({ fetch: async () => {
+        epochCalls += 1; return epochCalls === 1 ? response({ selectionEpoch: 0 }) : epochCalls === 2 ? response({ selection: LEASE }) : response({ selectionEpoch: 2 });
+    } });
+    await higher.initialize(); const higherLease = await higher.select(PROPOSAL, true);
+    await higher.resync(); assert.equal(higher.isCurrent(higherLease), false);
+});
+
+test('gives each successful selection a distinct context without letting stale reads rotate the newer one', async () => {
+    const delayedRead = deferred<Response>(); let calls = 0;
+    const adapter = createSmartImportSelectionBrowserAdapter({ fetch: async () => {
+        calls += 1;
+        if (calls === 1) return response({ selectionEpoch: 0 });
+        if (calls === 2) return response({ selection: LEASE });
+        if (calls === 3) return delayedRead.promise;
+        return response({ selection: { ...LEASE, selectionEpoch: 2 } });
+    } });
+    await adapter.initialize(); const first = await adapter.select(PROPOSAL, true); const staleRead = adapter.resync();
+    const second = await adapter.select(PROPOSAL, true);
+    assert.notEqual(second.selectionContext, first.selectionContext);
+    assert.equal(adapter.isCurrent(first), false); assert.equal(adapter.isCurrent(second), true);
+    delayedRead.resolve(response({ selectionEpoch: 1 })); await staleRead;
+    assert.equal(adapter.isCurrent(second), true);
+});
+
 test('conflict performs one resync, removes the lease, and requires a new confirmation', async () => {
     const calls: RequestInit[] = [];
     const values = [response({ selectionEpoch: 0 }), response({ selection: LEASE }), response({ selectionEpoch: 99 }, 409), response({ selectionEpoch: 2 }), response({ selection: { ...LEASE, selectionEpoch: 3 } })];
@@ -233,5 +296,6 @@ test('accepts only caller proposals and remains a browser-only selection boundar
         await assert.rejects(() => adapter.select(value as never, true), rejects('input_invalid'));
     }
     const source = readFileSync(new URL('./smart-import-selection-browser-adapter.ts', import.meta.url), 'utf8');
-    assert.doesNotMatch(source, /server-only|localStorage|sessionStorage|cookies\(|\/api\/context|patient\.ambulatoryId|setInterval|setTimeout|(?:ingest|preview|provider|apply)/u);
+    assert.doesNotMatch(source, /console\.|localStorage|sessionStorage|cookies\(|\/api\/context|patient\.ambulatoryId|setInterval|setTimeout|(?:ingest|preview|provider|apply)/u);
+    assert.doesNotMatch(source, /JSON\.stringify\([^)]*selectionContext/u);
 });

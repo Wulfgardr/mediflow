@@ -3,7 +3,10 @@
 
 export type SmartImportSelectionLease = Readonly<{ sessionRef: string; selectionEpoch: number; patientRef: string;
     ambulatoryRef: string; leaseRef: string; expiresAt: number }>;
-export type SmartImportSelectionBrowserSnapshot = Readonly<{ selectionEpoch: number | null; lease: SmartImportSelectionLease | null }>;
+/** Browser-only, non-authoritative identity; never sent or persisted. */
+export type SmartImportSelectionBrowserContext = Readonly<object>;
+export type SmartImportSelectionBrowserSnapshot = Readonly<{ selectionEpoch: number | null; lease: SmartImportSelectionLease | null;
+    selectionContext: SmartImportSelectionBrowserContext }>;
 export type SmartImportSelectionBrowserAdapterErrorCode = 'confirmation_required' | 'input_invalid' | 'response_invalid'
     | 'selection_unavailable' | 'selection_outcome_unknown' | 'selection_resync_required' | 'selection_superseded'
     | 'selection_generation_changed' | 'session_unavailable';
@@ -59,11 +62,17 @@ function lease(value: unknown): SmartImportSelectionLease | null {
 export function createSmartImportSelectionBrowserAdapter(sources: Sources = {}) {
     const request = sources.fetch ?? globalThis.fetch;
     let generation = 0; let selectionOperation = 0; let stateFence = 0; let currentEpoch: number | null = null; let currentLease: SmartImportSelectionLease | null = null;
-    const snapshot = (): SmartImportSelectionBrowserSnapshot => Object.freeze({ selectionEpoch: currentEpoch, lease: currentLease });
-    const reset = (): SmartImportSelectionBrowserSnapshot => { generation += 1; currentEpoch = null; currentLease = null; return snapshot(); };
+    let selectionContext: SmartImportSelectionBrowserContext = Object.freeze({});
+    const rotateContext = () => { selectionContext = Object.freeze({}); };
+    const snapshot = (): SmartImportSelectionBrowserSnapshot => {
+        const value = { selectionEpoch: currentEpoch, lease: currentLease } as SmartImportSelectionBrowserSnapshot;
+        Object.defineProperty(value, 'selectionContext', { value: selectionContext, enumerable: false, writable: false, configurable: false });
+        return Object.freeze(value);
+    };
+    const reset = (): SmartImportSelectionBrowserSnapshot => { generation += 1; rotateContext(); currentEpoch = null; currentLease = null; return snapshot(); };
     const acceptEpoch = (next: number): SmartImportSelectionBrowserSnapshot => {
         if (currentEpoch === null || next > currentEpoch) currentEpoch = next;
-        if (currentLease && currentEpoch > currentLease.selectionEpoch) currentLease = null;
+        if (currentLease && currentEpoch > currentLease.selectionEpoch) { rotateContext(); currentLease = null; }
         return snapshot();
     };
     const readEpoch = async (operation?: number): Promise<SmartImportSelectionBrowserSnapshot> => {
@@ -76,16 +85,16 @@ export function createSmartImportSelectionBrowserAdapter(sources: Sources = {}) 
         }
         if (!current()) return snapshot();
         if (response.status === 401) { reset(); return fail('session_unavailable'); }
-        if (!response.ok) { currentLease = null; return fail('selection_unavailable'); }
+        if (!response.ok) { if (currentLease) rotateContext(); currentLease = null; return fail('selection_unavailable'); }
         let body: unknown;
         try { body = await response.json(); } catch {
             if (!current()) return snapshot();
-            currentLease = null; return fail('response_invalid');
+            if (currentLease) rotateContext(); currentLease = null; return fail('response_invalid');
         }
         const next = epoch(body);
         if (next === null) {
             if (!current()) return snapshot();
-            currentLease = null; return fail('response_invalid');
+            if (currentLease) rotateContext(); currentLease = null; return fail('response_invalid');
         }
         return current() ? acceptEpoch(next) : snapshot();
     };
@@ -93,11 +102,16 @@ export function createSmartImportSelectionBrowserAdapter(sources: Sources = {}) 
         initialize: readEpoch,
         resync: readEpoch,
         reset,
+        isCurrent(value: unknown): boolean {
+            const candidate = exact(value, ['selectionEpoch', 'lease', 'selectionContext']);
+            return candidate !== null && candidate.selectionContext === selectionContext && candidate.selectionEpoch === currentEpoch
+                && candidate.lease !== null && candidate.lease === currentLease;
+        },
         async select(value: unknown, confirmed: true): Promise<SmartImportSelectionBrowserSnapshot> {
             if (confirmed !== true) return fail('confirmation_required');
             const selected = proposal(value); if (!selected) return fail('input_invalid');
             if (currentEpoch === null) return fail('selection_unavailable');
-            const token = generation; const operation = ++selectionOperation; stateFence += 1; const expectedEpoch = currentEpoch;
+            const token = generation; const operation = ++selectionOperation; stateFence += 1; rotateContext(); currentLease = null; const expectedEpoch = currentEpoch;
             const stale = () => token !== generation ? 'selection_generation_changed' as const
                 : operation !== selectionOperation ? 'selection_superseded' as const : null;
             let response: Response;

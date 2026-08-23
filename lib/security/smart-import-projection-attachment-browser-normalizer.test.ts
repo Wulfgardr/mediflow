@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { SmartImportProjectionAttachmentBrowserNormalizerError, createSmartImportProjectionAttachmentBrowserNormalizer } from './smart-import-projection-attachment-browser-normalizer.ts';
+import { createSmartImportSelectionBrowserAdapter } from './smart-import-selection-browser-adapter.ts';
 
 const NOW = '2026-08-23T12:00:00.000Z';
 const source = (originKey = 'origin.synthetic.a', kind = 'clinical-entry') => ({ kind, originKey, label: 'Label sintetico', date: NOW, content: 'Contenuto sintetico' });
@@ -79,11 +80,40 @@ test('copies diagnoses and therapies before the clock can mutate original arrays
     assert.deepEqual([captured.currentDiagnoses[0].code, captured.currentActiveTherapies[0].drugName], ['SYN-1', 'Farmaco sintetico']);
 });
 
+test('captures only for a current leased selection without putting its context on the wire', async () => {
+    let calls = 0;
+    const selection = createSmartImportSelectionBrowserAdapter({ fetch: async (_url, init) => {
+        calls += 1; return init?.method === 'GET' ? new Response(JSON.stringify({ selectionEpoch: 0 }))
+            : new Response(JSON.stringify({ selection: { sessionRef: `ssr_${'1'.repeat(32)}`, selectionEpoch: 1,
+                patientRef: `ptr_${'2'.repeat(32)}`, ambulatoryRef: `abr_${'3'.repeat(32)}`, leaseRef: `lsr_${'4'.repeat(32)}`, expiresAt: 123_456 } }));
+    } });
+    await selection.initialize(); const lease = await selection.select({ patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' }, true);
+    const normalizer = create(); const bound = normalizer.captureForCurrentSelection(input(), true, lease, selection.isCurrent);
+    assert.equal(bound.selectionContext, lease.selectionContext);
+    assert.equal(Object.isFrozen(bound), true);
+    assert.equal(JSON.stringify(bound).includes('selectionContext'), false);
+    assert.equal(JSON.stringify(bound.attachment).match(/(?:ssr_|ptr_|abr_|lsr_)/u), null);
+
+    selection.reset();
+    assert.throws(() => normalizer.captureForCurrentSelection(input(), true, lease, selection.isCurrent), rejects());
+});
+
+test('rejects hostile or unleased selection snapshots before clock/capture side effects', () => {
+    let clockCalls = 0; const normalizer = createSmartImportProjectionAttachmentBrowserNormalizer({ clock: () => { clockCalls += 1; return new Date(NOW); } });
+    for (const snapshot of [null, {}, { selectionEpoch: 1, lease: null, selectionContext: Object.freeze({}) }]) {
+        assert.throws(() => normalizer.captureForCurrentSelection(input(), true, snapshot, () => true), rejects());
+    }
+    const hostile: Record<string, unknown> = { selectionEpoch: 1, lease: {}, selectionContext: Object.freeze({}) };
+    Object.defineProperty(hostile, 'lease', { enumerable: true, get() { throw new Error('synthetic accessor'); } });
+    assert.throws(() => normalizer.captureForCurrentSelection(input(), true, hostile, () => true), rejects());
+    assert.equal(clockCalls, 0);
+});
+
 test('keeps sourceRevision local-only and leaves the shared freshness validator canonical', () => {
     const sourceText = readFileSync(new URL('./smart-import-projection-attachment-browser-normalizer.ts', import.meta.url), 'utf8');
     const validator = readFileSync(new URL('../smart-import-projection.ts', import.meta.url), 'utf8');
     assert.match(sourceText, /browser-adapter-local ordinal/u); assert.match(sourceText, /Number\.MAX_SAFE_INTEGER/u);
-    assert.doesNotMatch(sourceText, /console\.|localStorage|sessionStorage|selection|ingest|preview|apply/u);
+    assert.doesNotMatch(sourceText, /console\.|localStorage|sessionStorage|ingest|preview|apply/u);
     assert.doesNotMatch(sourceText, /sourceRevision\s*(?:===|!==|<=|>=|<|>)/u);
     assert.match(validator, /SMART_IMPORT_PROJECTION_FRESHNESS_MS\s*=\s*300_000/u);
 });
