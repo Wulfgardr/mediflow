@@ -355,6 +355,14 @@ export const durableReviewRecords = sqliteTable('durable_review_records', {
 });
 
 /* @Codex */
+export const durableReviewPatientLinks = sqliteTable('durable_review_patient_links', {
+    reviewId: text('review_id').primaryKey().references(() => durableReviewRecords.reviewId).notNull(),
+    patientId: text('patient_id').references(() => patients.id).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
+/* @Codex */
 export const durableReviewOperations = sqliteTable('durable_review_operations', {
     id: text('id').primaryKey(), reviewId: text('review_id').notNull(), idempotencyKey: text('idempotency_key').notNull(),
     operation: text('operation').notNull(), expectedReviewRevision: integer('expected_review_revision').notNull(), operationDigest: text('operation_digest').notNull(), recordSnapshot: text('record_snapshot').notNull(),

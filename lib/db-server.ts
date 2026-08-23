@@ -115,6 +115,16 @@ const normalizeSchemaSql = (value: string) => value.toLowerCase().replace(/if\s+
 const PHYSICIAN_REVIEW_ATTESTATIONS_SCHEMA = normalizeSchemaSql(PHYSICIAN_REVIEW_ATTESTATIONS_DDL);
 const PHYSICIAN_REVIEW_ATTESTATIONS_P2A_SCHEMA = normalizeSchemaSql(PHYSICIAN_REVIEW_ATTESTATIONS_P2A_DDL);
 /* @Codex */
+const DURABLE_REVIEW_PATIENT_LINKS_DDL = `
+    CREATE TABLE IF NOT EXISTS durable_review_patient_links (
+        review_id TEXT PRIMARY KEY NOT NULL REFERENCES durable_review_records(review_id),
+        patient_id TEXT NOT NULL REFERENCES patients(id),
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()), updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        CONSTRAINT durable_review_patient_links_timestamp_check CHECK (typeof(created_at) = 'integer' AND created_at BETWEEN 0 AND 8640000000000 AND typeof(updated_at) = 'integer' AND updated_at BETWEEN created_at AND 8640000000000)
+    )
+`;
+const DURABLE_REVIEW_PATIENT_LINKS_SCHEMA = normalizeSchemaSql(DURABLE_REVIEW_PATIENT_LINKS_DDL);
+/* @Codex */
 function physicianReviewAttestationSchemaEquals(expected: string): boolean {
     const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'physician_review_attestations'").get() as { sql?: unknown } | undefined;
     return typeof row?.sql === 'string' && normalizeSchemaSql(row.sql) === expected;
@@ -122,6 +132,11 @@ function physicianReviewAttestationSchemaEquals(expected: string): boolean {
 /* @Codex */
 export function hasCanonicalPhysicianReviewAttestationSchema(): boolean {
     return physicianReviewAttestationSchemaEquals(PHYSICIAN_REVIEW_ATTESTATIONS_SCHEMA);
+}
+/* @Codex */
+export function hasCanonicalDurableReviewPatientLinkSchema(): boolean {
+    const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'durable_review_patient_links'").get() as { sql?: unknown } | undefined;
+    return typeof row?.sql === 'string' && normalizeSchemaSql(row.sql) === DURABLE_REVIEW_PATIENT_LINKS_SCHEMA;
 }
 /* @Codex */
 function migrateP2aPhysicianReviewAttestationSchema(): void {
@@ -606,6 +621,8 @@ function applySchemaGuards() {
         )
     `).run();
     sqlite.prepare('CREATE UNIQUE INDEX IF NOT EXISTS durable_review_operations_review_key_unique ON durable_review_operations(review_id, idempotency_key)').run();
+    /* @Codex */
+    sqlite.prepare(DURABLE_REVIEW_PATIENT_LINKS_DDL).run();
     /* @Codex */
     sqlite.prepare(`
         CREATE TABLE IF NOT EXISTS durable_review_command_states (
