@@ -18,6 +18,12 @@ test('keeps all 66 Web/Mini rows lossless and authority-unresolved', () => {
   assert.ok(records.every((record) => record.authority === 'unresolved' && record.stage === 'unresolved'));
 });
 
+test('retains 109 source-local AIP identities without deduplication', () => {
+  const records = JSON.parse(readFileSync('docs/capability-mapping/nodes/aip-inventory.v1.json', 'utf8')).records;
+  assert.equal(records.length, 109);
+  assert.equal(new Set(records.map((record) => `${record.sourceIdentity.sourceKind}:${record.sourceIdentity.identifier}`)).size, 109);
+});
+
 test('rejects source drift and apply', () => {
   const drift = clone(manifest);
   drift.sourceSets[0].recordCount += 1;
