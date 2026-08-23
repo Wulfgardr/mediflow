@@ -38,12 +38,14 @@ export class ServerSessionProjectionOwnerError extends Error {
 
 export type ServerSessionProjectionOwner = Readonly<{
     snapshotSelectionEpoch(session: ServerSession): number;
+    snapshotReviewContextEpoch(session: ServerSession): number;
     acquireProjectionIngest(session: ServerSession, input: SelectionLeaseTuple): TypedBroker['ingest'];
     resolveProjectionService(session: ServerSession): TypedBroker['service'];
     issueSelection(input: Readonly<{ expectedEpoch: number; patientId: string; ambulatoryId: string }>): SelectionLease;
     dereferenceSelection(session: ServerSession, input: Readonly<{
         sessionRef: string; selectionEpoch: number; patientRef: string; ambulatoryRef: string; leaseRef: string;
     }>): CanonicalPair;
+    withLeaseCriticalSection<T>(session: ServerSession, callback: (selection: CanonicalPair) => T): T;
     dispose(): void;
 }>;
 
@@ -99,6 +101,12 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             }
             return owners.get(session.id)?.snapshotSelectionEpoch(session) ?? 0;
         },
+        snapshotReviewContextEpoch(session: ServerSession): number {
+            if (session.authChannel !== 'web' || session.id === 'local-api' || peekSession(session.id) !== session) {
+                return fail('session_ineligible');
+            }
+            return owners.get(session.id)?.snapshotReviewContextEpoch(session) ?? 0;
+        },
         acquire(session: ServerSession): ServerSessionProjectionOwner {
             if (session.authChannel !== 'web' || session.id === 'local-api' || getSession(session.id) !== session) {
                 return fail('session_ineligible');
@@ -117,8 +125,10 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
 
             let active: ActiveBinding | null = null;
             let epoch = 0;
+            let reviewContextEpoch = 0;
             let selection: SelectionState | null = null;
             let selecting = false;
+            let leaseCriticalSectionActive = false;
             let creating: SelectionState | null = null;
             let terminal = false;
             let unregisterOwner: (() => void) | null = null;
@@ -132,6 +142,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 const previous = active;
                 active = null;
                 selection = null;
+                reviewContextEpoch += 1;
                 if (previous && revokeActive) revoke(previous);
                 else if (previous) { previous.active = false; previous.unregister = null; }
             };
@@ -158,7 +169,12 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 value.sessionRef === sessionRef && value.selectionEpoch === current.selectionEpoch
                 && value.patientRef === current.patientRef && value.ambulatoryRef === current.ambulatoryRef
                 && value.leaseRef === current.leaseRef;
-            const expire = () => { const previous = active; active = null; selection = null; revoke(previous); };
+            const expire = () => {
+                const previous = active; const hadSelection = selection !== null;
+                active = null; selection = null;
+                if (hadSelection) reviewContextEpoch += 1;
+                revoke(previous);
+            };
             const candidateControl = (candidate: unknown): TypedBroker['control'] | null => {
                 if (typeof candidate !== 'object' || candidate === null) return null;
                 const descriptor = Object.getOwnPropertyDescriptor(candidate, 'control');
@@ -178,6 +194,12 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         return fail('session_unavailable');
                     }
                     return epoch;
+                },
+                snapshotReviewContextEpoch(presentedSession) {
+                    if (terminal || presentedSession !== session || session.authChannel !== 'web' || peekSession(session.id) !== session) {
+                        return fail('session_unavailable');
+                    }
+                    return reviewContextEpoch;
                 },
                 acquireProjectionIngest(presentedSession, input) {
                     requireCurrentSession(presentedSession);
@@ -250,6 +272,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                             patientRef: reference('ptr'), ambulatoryRef: reference('abr'), leaseRef: reference('lsr'),
                             expiresAt });
                         const previous = active; active = null; revoke(previous);
+                        reviewContextEpoch += 1;
                         epoch = next.selectionEpoch; selection = next;
                         return Object.freeze({ sessionRef, selectionEpoch: next.selectionEpoch, patientRef: next.patientRef,
                             ambulatoryRef: next.ambulatoryRef, leaseRef: next.leaseRef, expiresAt });
@@ -260,13 +283,51 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     if (terminal) return fail('session_unavailable');
                     if (!selection) return fail('stale_selection');
                     if (readClock() >= selection.expiresAt) {
-                        const previous = active; active = null; selection = null; revoke(previous); return fail('lease_expired');
+                        expire(); return fail('lease_expired');
                     }
                     if (presentedSession !== session || getSession(session.id) !== session) fail('session_unavailable');
                     if (value.sessionRef !== sessionRef || value.selectionEpoch !== selection.selectionEpoch
                         || value.patientRef !== selection.patientRef || value.ambulatoryRef !== selection.ambulatoryRef
                         || value.leaseRef !== selection.leaseRef) fail('stale_selection');
                     return Object.freeze({ patientId: selection.patientId, ambulatoryId: selection.ambulatoryId });
+                },
+                withLeaseCriticalSection(presentedSession, callback) {
+                    if (leaseCriticalSectionActive) return fail('selection_busy');
+                    if (typeof callback !== 'function') return fail('input_invalid');
+                    requireCurrentSession(presentedSession);
+                    const current = selection;
+                    if (!current) return fail('stale_selection');
+                    if (readClock() >= current.expiresAt) { expire(); return fail('lease_expired'); }
+                    const expectedSelectionEpoch = epoch;
+                    const expectedReviewContextEpoch = reviewContextEpoch;
+                    const assertUnchanged = () => {
+                        requireCurrentSession(presentedSession);
+                        if (selection !== current || epoch !== expectedSelectionEpoch || reviewContextEpoch !== expectedReviewContextEpoch) {
+                            return fail('stale_selection');
+                        }
+                        if (readClock() >= current.expiresAt) { expire(); return fail('lease_expired'); }
+                    };
+                    leaseCriticalSectionActive = true;
+                    try {
+                        let result: unknown;
+                        try {
+                            result = callback(Object.freeze({ patientId: current.patientId, ambulatoryId: current.ambulatoryId }));
+                        } catch (error) {
+                            assertUnchanged();
+                            throw error;
+                        }
+                        assertUnchanged();
+                        try {
+                            if (result !== null && (typeof result === 'object' || typeof result === 'function')
+                                && typeof (result as { then?: unknown }).then === 'function') {
+                                return fail('input_invalid');
+                            }
+                        } catch (error) {
+                            if (error instanceof ServerSessionProjectionOwnerError) throw error;
+                            return fail('input_invalid');
+                        }
+                        return result as never;
+                    } finally { leaseCriticalSectionActive = false; }
                 },
                 dispose() { finish(true); },
             });

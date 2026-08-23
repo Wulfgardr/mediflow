@@ -159,6 +159,64 @@ test('snapshots the owner-held epoch without acquisition, references, expiry cha
     assert.throws(() => registry.snapshotSelectionEpoch({ ...value }), rejects('session_ineligible'));
 });
 
+test('runs synchronous work against the canonical live selection and advances its review context on a selection switch', () => {
+    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair });
+    const value = session(); const owner = registry.acquire(value);
+    const first = owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+
+    assert.equal(owner.snapshotReviewContextEpoch(value), 1);
+    assert.deepEqual(owner.withLeaseCriticalSection(value, (selection) => selection), PAIR);
+    assert.throws(() => owner.withLeaseCriticalSection(value, () => {
+        owner.issueSelection({ expectedEpoch: first.selectionEpoch, patientId: 'patient.synthetic.02', ambulatoryId: PAIR.ambulatoryId });
+    }), rejects('stale_selection'));
+    assert.equal(owner.snapshotReviewContextEpoch(value), 2);
+});
+
+test('fails a lease critical section closed after expiry, session revocation, or disposal', () => {
+    let now = Date.now();
+    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair, clock: () => now });
+    const value = session();
+    const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+
+    now = value.expiresAt + 1;
+    assert.throws(() => owner.withLeaseCriticalSection(value, () => 'unused'), rejects('lease_expired'));
+    assert.equal(owner.snapshotReviewContextEpoch(value), 2);
+    owner.dispose();
+    assert.throws(() => owner.withLeaseCriticalSection(value, () => 'unused'), rejects('session_unavailable'));
+
+    now = Date.now();
+    const revoked = session(); const second = registry.acquire(revoked);
+    second.issueSelection({ expectedEpoch: 0, ...PAIR });
+    assert.throws(() => second.withLeaseCriticalSection(revoked, () => { deleteSession(revoked.id); }), rejects('session_unavailable'));
+});
+
+test('lease critical sections reject reentry and asynchronous results without leaving the owner busy', () => {
+    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair });
+    const value = session(); const owner = registry.acquire(value);
+    owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+
+    assert.equal(owner.withLeaseCriticalSection(value, () => {
+        assert.throws(() => owner.withLeaseCriticalSection(value, () => 'nested'), rejects('selection_busy'));
+        return 'outer';
+    }), 'outer');
+    assert.throws(() => owner.withLeaseCriticalSection(value, () => Promise.resolve('later')), rejects('input_invalid'));
+    assert.throws(() => owner.withLeaseCriticalSection(value, () => ({ get then() { throw new Error('synthetic hook'); } })),
+        rejects('input_invalid'));
+    assert.equal(owner.withLeaseCriticalSection(value, () => 'available'), 'available');
+});
+
+test('lease critical sections propagate callback failure and recheck expiry after synchronous work', () => {
+    let now = Date.now();
+    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair, clock: () => now });
+    const value = session();
+    const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const expected = new Error('synthetic callback failure');
+
+    assert.throws(() => owner.withLeaseCriticalSection(value, () => { throw expected; }), (error) => error === expected);
+    assert.throws(() => owner.withLeaseCriticalSection(value, () => { now = value.expiresAt + 1; return 'late'; }), rejects('lease_expired'));
+    assert.equal(owner.snapshotReviewContextEpoch(value), 2);
+});
+
 test('authenticated owner context acquires once and legacy owner helper only derives it', () => {
     const ownerSource = readFileSync(new URL('./server-session-projection-owner.ts', import.meta.url), 'utf8');
     const authSource = readFileSync(new URL('./server-auth.ts', import.meta.url), 'utf8');
