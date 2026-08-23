@@ -50,6 +50,8 @@ test('K4: tastiera cross-packet attraversa worklist, comandi e ricerca senza dup
   await expect(lastRow).toHaveAttribute('aria-selected', 'true');
 
   await page.keyboard.press('PageUp');
+  await expect.poll(() => page.evaluate(() => Number(document.activeElement?.getAttribute('data-patient-index'))))
+    .toBeLessThan(119);
   const pageUpIndex = await page.evaluate(() => Number(document.activeElement?.getAttribute('data-patient-index')));
   expect(pageUpIndex).toBeGreaterThanOrEqual(0);
   expect(pageUpIndex).toBeLessThan(119);
@@ -77,6 +79,7 @@ test('K4: tastiera cross-packet attraversa worklist, comandi e ricerca senza dup
   await expect(commandDialog.getByRole('option')).toHaveCount(1);
   await commandSearch.press('Enter');
   await expect(page.getByTestId('lume-frame-canvas')).toHaveAttribute('data-lume-context', 'diario');
+  await expect(search).not.toBeVisible();
 
   await page.keyboard.press('?');
   const helpDialog = page.getByRole('dialog', { name: 'Aiuto e scorciatoie', exact: true });
@@ -92,12 +95,16 @@ test('K4: tastiera cross-packet attraversa worklist, comandi e ricerca senza dup
   await expect(commandDialog.getByRole('option')).toHaveCount(1);
   await commandSearch.press('Enter');
   await expect(search).toBeVisible();
+  await page.keyboard.press('/');
+  await expect(search).toBeFocused();
   await search.fill('');
   await search.press('?');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(search).toHaveValue('?');
   await search.fill('');
-  await search.press('Escape');
+  await commandTrigger.focus();
+  await expect(commandTrigger).toBeFocused();
+  await expect(search).not.toBeFocused();
   await page.keyboard.press('/');
   await expect(search).toBeFocused();
 
