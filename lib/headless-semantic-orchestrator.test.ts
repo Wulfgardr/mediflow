@@ -1,27 +1,18 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
-import {
-    createHeadlessSemanticOrchestrator,
-    type HeadlessSemanticHost,
-} from './headless-semantic-orchestrator';
-
-const request = {
-    adapterKind: 'chat' as const,
-    intent: 'synthetic: summarize the selected fixture',
-    requestRef: 'req_opaque0001',
-    idempotencyRef: 'idem_opaque0001',
-};
-
+import { createHeadlessSemanticOrchestrator, HEADLESS_P3_CLAIM_CEILING, type HeadlessSemanticHost } from './headless-semantic-orchestrator';
+const request = { adapterKind: 'chat' as const, intent: 'synthetic: summarize the selected fixture', requestRef: 'req_opaque0001', idempotencyRef: 'idem_opaque0001' };
+const roster = Array.from({ length: 66 }, (_, index) => `web-${String(index + 1).padStart(2, '0')}`);
 function fixture(overrides: Partial<HeadlessSemanticHost> = {}) {
-    let calls = 0;
-    let epoch = 7;
+    let calls = 0; let epoch = 7; let mutationEpoch = 11;
     const host: HeadlessSemanticHost = {
-        acquireContext: () => ({ sessionRef: 'ses_opaque0001', activeRole: 'role_clinician', leaseEpoch: epoch, revoked: false, maxOperations: 1 }),
+        acquireContext: () => ({ sessionRef: 'ses_opaque0001', activeRole: 'role_clinician', leaseEpoch: epoch, mutationEpoch, revoked: false, maxOperations: 1 }),
         plan: () => ({ operationId: 'op.fixture.read', input: { subjectRef: 'subject_opaque0001' } }),
         authorize: () => ({ allowed: true, policyDecision: 'per_operation_allow' }),
         registry: [{
-            operationId: 'op.fixture.read', capabilityId: 'web-01-anagrafica-paziente-lista-ricerca-view-create-update', applicationServiceRef: 'appsvc:fixture-read',
+            operationId: 'op.fixture.read', capabilityId: 'web-01', applicationServiceRef: 'appsvc:fixture-read',
             maximumStage: 'read', fabricDependency: null, inputKeys: ['subjectRef'],
             execute: () => { calls += 1; return { outcome: 'read', response: 'synthetic-response: fixture ready' }; },
         }],
@@ -29,9 +20,8 @@ function fixture(overrides: Partial<HeadlessSemanticHost> = {}) {
         entropy: () => 'act_opaque0001',
         ...overrides,
     };
-    return { host, calls: () => calls, setEpoch: (value: number) => { epoch = value; } };
+    return { host, calls: () => calls, setEpoch: (value: number) => { epoch = value; }, setMutationEpoch: (value: number) => { mutationEpoch = value; } };
 }
-
 test('executes one explicitly mapped named operation and emits a PHI-safe receipt', () => {
     const { host, calls } = fixture();
     const result = createHeadlessSemanticOrchestrator(host).run(request);
@@ -39,7 +29,7 @@ test('executes one explicitly mapped named operation and emits a PHI-safe receip
     assert.deepEqual(result, {
         response: 'synthetic-response: fixture ready',
         receipt: {
-            requestRef: 'req_opaque0001', actionRef: 'act_opaque0001', capabilityId: 'web-01-anagrafica-paziente-lista-ricerca-view-create-update', outcome: 'read',
+            requestRef: 'req_opaque0001', actionRef: 'act_opaque0001', capabilityId: 'web-01', outcome: 'read',
             policyDecision: 'per_operation_allow', revisionBinding: 'lease:7', createdAt: '2026-08-24T08:00:00.000Z',
         },
         writesPerformed: 0,
@@ -47,7 +37,6 @@ test('executes one explicitly mapped named operation and emits a PHI-safe receip
     });
     assert.equal(createHeadlessSemanticOrchestrator(fixture().host).run({ ...request, adapterKind: 'voice' }).receipt.outcome, 'read');
 });
-
 test('rejects caller authority, planner-selected service, hostile records, and thenables', () => {
     const { host } = fixture();
     const runner = createHeadlessSemanticOrchestrator(host);
@@ -69,7 +58,6 @@ test('rejects caller authority, planner-selected service, hostile records, and t
     assert.throws(() => runner.run(Object.assign(Object.create({ inherited: true }), request)), /request_invalid/);
     assert.throws(() => runner.run({ ...request, [Symbol('authority')]: true } as never), /request_invalid/);
 });
-
 test('denies before execution when session, role, lease, revocation, authorization, or limits fail', () => {
     for (const acquireContext of [
         () => ({ sessionRef: '', activeRole: 'role_clinician', leaseEpoch: 7, revoked: false, maxOperations: 1 }),
@@ -86,7 +74,6 @@ test('denies before execution when session, role, lease, revocation, authorizati
     assert.throws(() => createHeadlessSemanticOrchestrator(denied.host).run(request), /authorization_denied/);
     assert.equal(denied.calls(), 0);
 });
-
 test('burns replay, detects swallowed reentry, and denies late host drift without a receipt', () => {
     const first = fixture();
     const runner = createHeadlessSemanticOrchestrator(first.host);
@@ -106,11 +93,24 @@ test('burns replay, detects swallowed reentry, and denies late host drift withou
     const drift = fixture();
     drift.host.registry[0]!.execute = () => { drift.setEpoch(8); return { outcome: 'read', response: 'synthetic-response: stale' }; };
     assert.throws(() => createHeadlessSemanticOrchestrator(drift.host).run(request), /context_stale/);
+    const write = fixture();
+    write.host.registry[0]!.execute = () => { write.setMutationEpoch(12); return { outcome: 'read', response: 'synthetic-response: false zero-write claim' }; };
+    assert.throws(() => createHeadlessSemanticOrchestrator(write.host).run(request), /context_stale/);
+    const aba = fixture();
+    aba.host.registry[0]!.execute = () => { aba.setEpoch(8); aba.setEpoch(7); aba.setMutationEpoch(12); aba.setMutationEpoch(11); return { outcome: 'read', response: 'synthetic-response: lying host' }; };
+    assert.doesNotThrow(() => createHeadlessSemanticOrchestrator(aba.host).run(request));
+    assert.match(HEADLESS_P3_CLAIM_CEILING, /monotonic nonreusable/);
 });
-
 test('rejects unmapped capability identity, unsafe service output, SQL semantics, and sparse registries', () => {
+    assert.equal(createHash('sha256').update(roster.join('\n')).digest('hex'), 'bcf32c0b19d4299527f5a05921b51345f9a9df390dedbca38590646f13e5a944');
+    for (const capabilityId of roster) {
+        const exact = fixture(); exact.host.registry[0]!.capabilityId = capabilityId;
+        assert.doesNotThrow(() => createHeadlessSemanticOrchestrator(exact.host));
+    }
     const unmapped = fixture(); unmapped.host.registry[0]!.capabilityId = 'name-similarity';
     assert.throws(() => createHeadlessSemanticOrchestrator(unmapped.host).run(request), /registry_invalid/);
+    const suffix = fixture(); suffix.host.registry[0]!.capabilityId = 'web-01-name-similarity';
+    assert.throws(() => createHeadlessSemanticOrchestrator(suffix.host), /registry_invalid/);
     const unsafe = fixture(); unsafe.host.registry[0]!.execute = () => ({ outcome: 'read', response: 'synthetic-response: ok', prompt: 'leak' } as never);
     assert.throws(() => createHeadlessSemanticOrchestrator(unsafe.host).run(request), /service_output_invalid/);
     const thenable = fixture(); thenable.host.registry[0]!.execute = () => Promise.resolve({ outcome: 'read', response: 'synthetic-response: late' });
@@ -123,6 +123,16 @@ test('rejects unmapped capability identity, unsafe service output, SQL semantics
     assert.throws(() => createHeadlessSemanticOrchestrator(sensitive.host), /registry_invalid/);
     const freePrompt = fixture({ plan: () => ({ operationId: 'op.fixture.read', input: { subjectRef: 'prompt_opaque0001' } }) });
     assert.throws(() => createHeadlessSemanticOrchestrator(freePrompt.host).run(request), /plan_invalid/);
+    for (const receiptHost of [fixture({ clock: () => '2026-99-99T08:00:00.000Z' }), fixture({ clock: () => { throw new Error('host detail'); } }), fixture({ entropy: () => 'token_opaque0001' })])
+        assert.throws(() => createHeadlessSemanticOrchestrator(receiptHost.host).run(request), (error: unknown) => (error as { code?: string }).code === 'receipt_unavailable');
+    let reads = 0;
+    const trappedKeys = ['subjectRef']; Object.defineProperty(trappedKeys, '0', { get: () => { reads += 1; return 'subjectRef'; }, enumerable: true });
+    const keyHost = fixture(); keyHost.host.registry[0]!.inputKeys = trappedKeys;
+    assert.throws(() => createHeadlessSemanticOrchestrator(keyHost.host), /registry_invalid/); assert.equal(reads, 0);
+    const registryHost = fixture(); const trappedRegistry = [registryHost.host.registry[0]!];
+    Object.defineProperty(trappedRegistry, '0', { get: () => { reads += 1; return registryHost.host.registry[0]!; }, enumerable: true });
+    registryHost.host.registry = trappedRegistry;
+    assert.throws(() => createHeadlessSemanticOrchestrator(registryHost.host), /host_invalid/); assert.equal(reads, 0);
     const sparse = fixture(); sparse.host.registry = new Array(1);
     assert.throws(() => createHeadlessSemanticOrchestrator(sparse.host), /host_invalid/);
 });
