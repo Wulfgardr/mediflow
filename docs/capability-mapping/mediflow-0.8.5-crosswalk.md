@@ -29,19 +29,20 @@ iOS/iPadOS runtime, documenti iOS/iPadOS, macOS runtime e macOS receipt.
 | Fabric | 16 | 16 `mapped` source-local |
 | Superfici prodotto | 179 | 179 `unmapped` con authority e stage `unresolved` |
 | Relazioni provate | 82 | 66 Web↔Mini `supports`; 16 AIP↔Fabric `exact_identity` |
-| Conflitti residui | 16 | Fabric↔anchor, tutti `unmapped` |
+| Conflitti residui | 16 | Fabric↔anchor, tutti `conflicted` e assegnati al product owner |
 
 `ledgerComplete=true`: le popolazioni congelate sono presenti una sola volta,
 hanno una disposizione terminale e una prova source-bound.
 `semanticBindingComplete=false`: le 179 superfici non hanno una relazione
-semantica diretta provata e i 16 conflitti Fabric↔anchor restano aperti.
+semantica diretta provata e i 16 conflitti Fabric↔anchor richiedono una
+decisione di prodotto.
 
 ## Conflitti e prova necessaria
 
 Il register completo è
 [`fabric-canonical-unmapped.v1.json`](./conflicts/fabric-canonical-unmapped.v1.json).
 Ogni record conserva fatto osservato, ambiguità, alternative, conseguenze,
-owner tecnico e prova richiesta. Per ognuno serve una crosswalk sorgente
+owner di prodotto e prova richiesta. Per ognuno serve una crosswalk sorgente
 accettata e versionata oppure un record canonico che nomini esplicitamente il
 relativo `FabricCapabilityId`.
 
