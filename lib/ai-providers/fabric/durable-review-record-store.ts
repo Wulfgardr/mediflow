@@ -40,15 +40,15 @@ function failStorage(error: unknown): never { if (error instanceof DurableReview
 /** Stores only client-sealed review envelopes and durable replay receipts. It owns neither keys nor plaintext. */
 export function createDurableReviewRecordStore() {
     const mutate = (operation: 'create' | 'replace', value: unknown): DurableReviewRecord => {
-        const input = mutation(value); const operationDigest = commandDigest(operation, input);
+        const input = mutation(value); const operationDigest = commandDigest(operation, input); const recordSnapshot = JSON.stringify(input.record);
         try { return runDbServerImmediateTransaction(() => {
             const existing = dbServer.select().from(durableReviewOperations).where(and(eq(durableReviewOperations.reviewId, input.record.reviewId), eq(durableReviewOperations.idempotencyKey, input.idempotencyKey))).get();
             const row = dbServer.select().from(durableReviewRecords).where(eq(durableReviewRecords.id, input.record.reviewId)).get();
-            if (existing) { if (existing.operation !== operation || existing.expectedReviewRevision !== input.expectedReviewRevision || existing.operationDigest !== operationDigest) throw new DurableReviewRecordStoreError('idempotency_conflict'); if (!row) throw new DurableReviewRecordStoreError('missing'); current(row); return replay(existing.recordSnapshot, input.record.reviewId); }
+            if (existing) { if (existing.operation !== operation || existing.expectedReviewRevision !== input.expectedReviewRevision || existing.operationDigest !== operationDigest) throw new DurableReviewRecordStoreError('idempotency_conflict'); if (existing.recordSnapshot !== recordSnapshot) throw new DurableReviewRecordStoreError('corrupt'); if (!row) throw new DurableReviewRecordStoreError('missing'); current(row); return replay(existing.recordSnapshot, input.record.reviewId); }
             const stored = row ? current(row) : null;
             if (operation === 'create' ? stored !== null || input.expectedReviewRevision !== 0 : !stored || stored.reviewRevision !== input.expectedReviewRevision || stored.patientRef !== input.record.patientRef) throw new DurableReviewRecordStoreError('revision_conflict');
             if (stored) dbServer.update(durableReviewRecords).set(input.record).where(eq(durableReviewRecords.id, input.record.reviewId)).run(); else dbServer.insert(durableReviewRecords).values({ id: input.record.reviewId, ...input.record }).run();
-            const result = publicRecord(input.record); dbServer.insert(durableReviewOperations).values({ id: digest(`${input.record.reviewId}\0${input.idempotencyKey}`), reviewId: input.record.reviewId, idempotencyKey: input.idempotencyKey, operation, expectedReviewRevision: input.expectedReviewRevision, operationDigest, recordSnapshot: JSON.stringify(input.record) }).run();
+            const result = publicRecord(input.record); dbServer.insert(durableReviewOperations).values({ id: digest(`${input.record.reviewId}\0${input.idempotencyKey}`), reviewId: input.record.reviewId, idempotencyKey: input.idempotencyKey, operation, expectedReviewRevision: input.expectedReviewRevision, operationDigest, recordSnapshot }).run();
             return result;
         }); } catch (error) { return failStorage(error); }
     };
