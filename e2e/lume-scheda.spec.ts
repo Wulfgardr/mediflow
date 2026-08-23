@@ -125,6 +125,68 @@ async function expectRegisterFont(locator: Locator, label: string, minimum: numb
   }
 }
 
+// @Codex WUL-562 D2: prova computata dei quattro registri e delle icone neutre.
+async function expectSurfaceHierarchyAndNeutralChrome(
+  page: Page,
+  scroll: Locator,
+  header: Locator,
+  surface: Locator,
+  minimumHeaderTarget: number,
+): Promise<void> {
+  const action = header.getByRole('button', { name: 'Azioni', exact: true });
+  const evidence = await page.evaluate(() => {
+    const resolveSurface = (variable: string) => {
+      const probe = document.createElement('span');
+      probe.style.backgroundColor = `var(${variable})`;
+      document.body.appendChild(probe);
+      const color = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return color;
+    };
+    const readColor = (selector: string) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element) throw new Error(`Superficie Lume assente: ${selector}`);
+      return getComputedStyle(element).backgroundColor;
+    };
+    const headerElement = document.querySelector<HTMLElement>('[data-testid="lume-scheda-header"]');
+    if (!headerElement) throw new Error('Testata Scheda assente');
+    const icons = [...headerElement.querySelectorAll<SVGElement>('svg')]
+      .filter((icon) => icon.getBoundingClientRect().width > 0 && icon.getBoundingClientRect().height > 0)
+      .map((icon) => ({
+        color: getComputedStyle(icon).color,
+        ownerColor: getComputedStyle(icon.parentElement as Element).color,
+      }));
+
+    return {
+      expected: {
+        canvas: resolveSurface('--lume-surface-canvas'),
+        chrome: resolveSurface('--lume-surface-chrome'),
+        field: resolveSurface('--lume-surface-field'),
+        focal: resolveSurface('--lume-surface-focal'),
+      },
+      actual: {
+        canvas: readColor('[data-testid="lume-scheda-scroll"]'),
+        chrome: readColor('[data-testid="lume-scheda-header"]'),
+        field: readColor('[data-testid="lume-scheda-header"] button[aria-haspopup="true"]'),
+        focal: readColor('[data-testid="lume-scheda-surface"]'),
+      },
+      icons,
+    };
+  });
+
+  expect(evidence.actual).toEqual(evidence.expected);
+  expect(evidence.icons.length).toBeGreaterThanOrEqual(3);
+  for (const icon of evidence.icons) expect(icon.color).toBe(icon.ownerColor);
+  await expect(action).toBeVisible();
+  await expect(action).toHaveCSS('background-color', evidence.expected.field);
+  const headerTargets = await header.locator('a, button').evaluateAll((elements) => elements
+    .filter((element) => (element as HTMLElement).offsetParent !== null)
+    .map((element) => Math.min(element.getBoundingClientRect().width, element.getBoundingClientRect().height)));
+  for (const target of headerTargets) expect(target).toBeGreaterThanOrEqual(minimumHeaderTarget);
+  await expect(scroll).toBeVisible();
+  await expect(surface).toBeVisible();
+}
+
 async function expectNarrowContract(page: Page, surface: Locator, header: Locator): Promise<void> {
   const overflow = await page.evaluate(() => ({
     document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -187,6 +249,13 @@ for (const schedaCase of CASES) {
     await expect(page.getByRole('heading', { name: patient.name, level: 1 })).toHaveCount(1);
     await expect(page.getByRole('button', { name: /Archivio documenti ed evidenze/ }))
       .toHaveAttribute('aria-expanded', 'false');
+    await expectSurfaceHierarchyAndNeutralChrome(
+      page,
+      scroll,
+      header,
+      surface,
+      schedaCase.viewport === 'narrow' ? 44 : 28,
+    );
     await expectInViewport(header);
     expect(await scroll.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
     await scroll.evaluate((element) => element.scrollTo(0, element.scrollHeight));

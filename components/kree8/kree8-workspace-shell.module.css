@@ -315,6 +315,15 @@
   color: var(--k8-ink);
 }
 
+/* @Codex WUL-562 D2: in Scheda i controlli del telaio restano una penombra
+   opaca. Così canvas, chrome, field e l'unica Carta focale usano registri
+   distinti senza introdurre una seconda elevazione o un segnale cromatico. */
+.clinicalShell .backButton,
+.clinicalShell .sectionLink,
+.clinicalShell .headerActionButton {
+  background: var(--k8-control-bg);
+}
+
 .backButton:active,
 .sectionLink:active { transform: scale(0.985); }
 
@@ -625,6 +634,14 @@
   .clinicalChrome { border-radius: 10px; }
   .clinicalSurface { border-radius: 14px; }
   .clinicalName { font-size: 18px; }
+  /* @Codex WUL-562 D2: il viewport stretto e un controllo diretto della
+     Scheda; i controlli della testata non dipendono dal solo media-query del
+     puntatore per raggiungere il minimo tattile. */
+  .clinicalShell .backButton,
+  .clinicalShell .headerPrimaryAction,
+  .clinicalShell .headerActionButton,
+  .clinicalShell .sectionLink,
+  .clinicalShell :global([data-testid='privacy-mode-header-toggle']) { min-height: 44px; }
   .attentionBand,
   .clinicalSection,
   .synoptic { padding: 16px; }
