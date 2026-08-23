@@ -24,6 +24,7 @@ const BACKUP_TABLES = {
     documentDiagnosisProposals: 'document_diagnosis_proposals',
     durableReviewCommandOperations: 'durable_review_command_operations',
     durableReviewCommandStates: 'durable_review_command_states',
+    durableReviewPatientLinks: 'durable_review_patient_links',
     durableReviewRecords: 'durable_review_records',
     durableReviewOperations: 'durable_review_operations',
     drugs: 'drugs',
@@ -32,6 +33,7 @@ const BACKUP_TABLES = {
     messages: 'messages',
     observations: 'observations',
     patients: 'patients',
+    physicianReviewAttestations: 'physician_review_attestations',
     prostheticPrescriptions: 'prosthetic_prescriptions',
     serviceCatalogEntries: 'service_catalog_entries',
     servicePrescriptionItems: 'service_prescription_items',
@@ -94,7 +96,16 @@ function insertRow(db: Database.Database, table: string, row: Record<string, unk
     ).run(...Object.values(row));
 }
 
-async function populateSyntheticClinicalFixture(db: Database.Database) {
+/* @Codex The authority record references a local user, which the backup intentionally does not export. */
+function alignSyntheticAuthorityActor(db: Database.Database): string {
+    const current = db.prepare('SELECT id FROM users LIMIT 1').get() as { id: string } | undefined;
+    assert.ok(current?.id, 'fixture database must contain a synthetic local user');
+    const actorRef = 'w7-review-authority-actor';
+    db.prepare('UPDATE users SET id = ? WHERE id = ?').run(actorRef, current.id);
+    return actorRef;
+}
+
+async function populateSyntheticClinicalFixture(db: Database.Database, actorRef: string) {
     const masterKey = await generateMasterKey();
     const seal = async (label: string): Promise<string> => {
         const encrypted = await encryptData(`synthetic:${label}`, masterKey);
@@ -222,6 +233,23 @@ async function populateSyntheticClinicalFixture(db: Database.Database) {
         record_snapshot: JSON.stringify(durableReviewRecord),
         created_at: now + 22,
     });
+    insertRow(db, 'durable_review_patient_links', {
+        review_id: durableReviewRecord.reviewId,
+        patient_id: 'w7-patient',
+        created_at: now + 22,
+        updated_at: now + 22,
+    });
+    insertRow(db, 'physician_review_attestations', {
+        actor_ref: actorRef,
+        schema_version: 'mediflow.physician-review-attestation.v1',
+        capability: 'physician_terminal_review',
+        status: 'active',
+        attestation_version: 1,
+        policy_version: 'physician_terminal_review.v1',
+        revoked_at: null,
+        created_at: now + 22,
+        updated_at: now + 22,
+    });
     insertRow(db, 'attachments', {
         id: 'w7-attachment', patient_id: 'w7-patient', type: 'application/pdf', size: 128,
         ...(await sealed('attachments', ['name', 'path', 'data', 'summary_snapshot', 'parse_evidence_artifact_snapshot', 'ocr_replay_artifact_snapshot'])),
@@ -340,6 +368,8 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
         const sourceDb = new Database(path.join(sourceDataDir, 'medical.db'));
         const targetDb = new Database(path.join(targetDataDir, 'medical.db'));
         try {
+            const sourceActorRef = alignSyntheticAuthorityActor(sourceDb);
+            assert.equal(alignSyntheticAuthorityActor(targetDb), sourceActorRef);
             const actualSchemaTables = schemaTables(sourceDb);
             const expectedSchemaTables = [
                 ...NON_BACKUP_TABLES,
@@ -352,7 +382,7 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             const clinicalTables = actualSchemaTables.filter((table) => !NON_BACKUP_TABLES.has(table) && !AUDIT_DEPENDENT_EMPTY_TABLES.has(table));
             clearBackupTables(sourceDb, clinicalTables);
             clearBackupTables(targetDb, clinicalTables);
-            const durableReviewCommand = await populateSyntheticClinicalFixture(sourceDb);
+            const durableReviewCommand = await populateSyntheticClinicalFixture(sourceDb, sourceActorRef);
 
             for (const table of clinicalTables) {
                 assert.equal(readOrderedRows(targetDb, table).length, 0, `target ${table} must be virgin before restore`);
