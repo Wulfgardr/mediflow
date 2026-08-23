@@ -125,6 +125,45 @@ const DURABLE_REVIEW_PATIENT_LINKS_DDL = `
 `;
 const DURABLE_REVIEW_PATIENT_LINKS_SCHEMA = normalizeSchemaSql(DURABLE_REVIEW_PATIENT_LINKS_DDL);
 /* @Codex */
+const ATTACHMENTS_CURRENTNESS_DDL = `
+    CREATE TABLE attachments (
+        id TEXT PRIMARY KEY NOT NULL,
+        patient_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        path TEXT NOT NULL,
+        data TEXT,
+        summary_snapshot TEXT,
+        parse_evidence_artifact_snapshot TEXT,
+        ocr_queue_state TEXT,
+        ocr_queue_reason TEXT,
+        ocr_queue_updated_at INTEGER,
+        ocr_replay_artifact_snapshot TEXT,
+        created_at INTEGER DEFAULT (unixepoch()),
+        document_source_ref TEXT NOT NULL UNIQUE CHECK (
+            length(document_source_ref) = 64
+            AND document_source_ref NOT GLOB '*[^0-9a-f]*'
+        ),
+        document_revision INTEGER NOT NULL CHECK (
+            typeof(document_revision) = 'integer' AND document_revision >= 1
+        ),
+        document_freshness_epoch INTEGER NOT NULL CHECK (
+            typeof(document_freshness_epoch) = 'integer' AND document_freshness_epoch >= 1
+        ),
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON UPDATE no action ON DELETE no action
+    )
+`;
+const ATTACHMENTS_CURRENTNESS_SCHEMA = normalizeSchemaSql(ATTACHMENTS_CURRENTNESS_DDL);
+const ATTACHMENTS_CURRENTNESS_INDEX_SCHEMA = normalizeSchemaSql(
+    'CREATE INDEX attachments_patient_idx ON attachments(patient_id)',
+);
+const ATTACHMENTS_CURRENTNESS_COLUMNS = [
+    'document_source_ref',
+    'document_revision',
+    'document_freshness_epoch',
+] as const;
+/* @Codex */
 function physicianReviewAttestationSchemaEquals(expected: string): boolean {
     const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'physician_review_attestations'").get() as { sql?: unknown } | undefined;
     return typeof row?.sql === 'string' && normalizeSchemaSql(row.sql) === expected;
@@ -159,6 +198,51 @@ function ensureColumn(table: string, columnName: string, columnSql: string) {
     if (!columns.includes(columnName)) {
         sqlite.prepare(`ALTER TABLE ${table} ADD COLUMN ${columnSql}`).run();
     }
+}
+/* @Codex */
+function attachmentCurrentnessState(): 'legacy' | 'canonical' {
+    const columns = (sqlite.prepare("SELECT name FROM pragma_table_info('attachments')").all() as TableInfoRow[])
+        .map((column) => column.name);
+    const present = ATTACHMENTS_CURRENTNESS_COLUMNS.filter((name) => columns.includes(name));
+    if (present.length === 0) return 'legacy';
+    if (present.length !== ATTACHMENTS_CURRENTNESS_COLUMNS.length) {
+        throw new Error('Attachment currentness schema is partial.');
+    }
+
+    const table = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'attachments'").get() as { sql?: unknown } | undefined;
+    const index = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'attachments_patient_idx'").get() as { sql?: unknown } | undefined;
+    if (
+        typeof table?.sql !== 'string'
+        || normalizeSchemaSql(table.sql) !== ATTACHMENTS_CURRENTNESS_SCHEMA
+        || typeof index?.sql !== 'string'
+        || normalizeSchemaSql(index.sql) !== ATTACHMENTS_CURRENTNESS_INDEX_SCHEMA
+    ) {
+        throw new Error('Attachment currentness schema is not canonical.');
+    }
+    return 'canonical';
+}
+/* @Codex */
+function upgradeLegacyAttachmentCurrentness(): void {
+    if (attachmentCurrentnessState() === 'canonical') return;
+
+    sqlite.exec('ALTER TABLE attachments RENAME TO attachments_currentness_legacy');
+    sqlite.exec(ATTACHMENTS_CURRENTNESS_DDL);
+    sqlite.exec(`
+        INSERT OR ROLLBACK INTO attachments (
+            id, patient_id, name, type, size, path, data,
+            summary_snapshot, parse_evidence_artifact_snapshot, ocr_queue_state,
+            ocr_queue_reason, ocr_queue_updated_at, ocr_replay_artifact_snapshot, created_at,
+            document_source_ref, document_revision, document_freshness_epoch
+        )
+        SELECT
+            id, patient_id, name, type, size, path, data,
+            summary_snapshot, parse_evidence_artifact_snapshot, ocr_queue_state,
+            ocr_queue_reason, ocr_queue_updated_at, ocr_replay_artifact_snapshot, created_at,
+            lower(hex(randomblob(32))), 1, 1
+        FROM attachments_currentness_legacy
+    `);
+    sqlite.exec('DROP TABLE attachments_currentness_legacy');
+    sqlite.exec('CREATE INDEX attachments_patient_idx ON attachments(patient_id)');
 }
 
 // Schema guards run on every (re)open so older DB files gain the tables and
@@ -197,6 +281,8 @@ function applySchemaGuards() {
     } catch (error) {
         console.warn('[MediFlow] Attachments schema check skipped:', error);
     }
+    /* @Codex */
+    upgradeLegacyAttachmentCurrentness();
     /* @Codex */
     try {
         ensureColumn('patients', 'exemptions', 'exemptions TEXT');
