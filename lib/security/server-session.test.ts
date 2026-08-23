@@ -8,11 +8,14 @@ import {
     createSession,
     deleteSession,
     getSession,
+    invalidateSessionsForUser,
     peekSession,
     registerServerSessionResource,
 } from './server-session';
 
 const SYNTHETIC_USERNAME = `synthetic-${randomUUID()}`;
+const TARGET_USERNAME = ['synthetic', 'target'].join('-');
+const OTHER_USERNAME = ['synthetic', 'other'].join('-');
 
 afterEach(() => clearAllSessions());
 
@@ -37,6 +40,34 @@ test('delete removes the session before disposing its resource exactly once', ()
     deleteSession(session.id);
 
     assert.deepEqual(events, ['session_deleted']);
+});
+
+test('user invalidation synchronously deletes every matching session and preserves other users', () => {
+    const first = createSession({ id: 'synthetic-target', username: TARGET_USERNAME, role: 'clinician' });
+    const second = createSession({ id: 'synthetic-target', username: TARGET_USERNAME, role: 'clinician' });
+    const unaffected = createSession({ id: 'synthetic-other', username: OTHER_USERNAME, role: 'clinician' });
+    const events: string[] = [];
+    let invalidating = true;
+
+    registerServerSessionResource(first.id, (reason) => {
+        assert.equal(invalidating, true);
+        assert.equal(getSession(first.id), null);
+        events.push(`first:${reason}`);
+    });
+    registerServerSessionResource(second.id, (reason) => {
+        assert.equal(invalidating, true);
+        assert.equal(getSession(second.id), null);
+        events.push(`second:${reason}`);
+    });
+    registerServerSessionResource(unaffected.id, (reason) => events.push(`other:${reason}`));
+
+    invalidateSessionsForUser('synthetic-target');
+    invalidating = false;
+
+    assert.equal(getSession(first.id), null);
+    assert.equal(getSession(second.id), null);
+    assert.equal(getSession(unaffected.id), unaffected);
+    assert.deepEqual(events, ['first:session_deleted', 'second:session_deleted']);
 });
 
 test('expired access disposes the resource before returning null', () => {

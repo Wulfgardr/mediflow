@@ -1,3 +1,4 @@
+/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -11,11 +12,20 @@ import {
     changePin,
     type PinChangeServiceDependencies,
 } from './pin-change-service';
-import { type ServerSession } from './server-session';
+import {
+    clearAllSessions,
+    createSession,
+    getSession,
+    registerServerSessionResource,
+    type ServerSession,
+} from './server-session';
 
 type TestDatabase = NonNullable<PinChangeServiceDependencies['db']>;
 type AuditInput = Parameters<NonNullable<PinChangeServiceDependencies['writeAuditEvent']>>[0];
 const TEST_USERNAME = ['test', 'user'].join('-');
+const OTHER_USERNAME = ['synthetic', 'other'].join('-');
+
+test.afterEach(() => clearAllSessions());
 
 function makeDatabase() {
     const sqlite = new Database(':memory:');
@@ -142,6 +152,62 @@ test('changePin persists the client re-wrap, resets lockout, and writes a redact
         assert.equal(metadata.reasonCode, 'pin_change');
         assert.equal(JSON.stringify(metadata).includes('1234'), false);
         assert.equal(JSON.stringify(metadata).includes('5678'), false);
+    } finally {
+        sqlite.close();
+    }
+});
+
+test('changePin removes all old sessions and session-scoped resources only after a successful rotation', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        await seedUser(db);
+        const active = createSession({ id: 'user-1', username: TEST_USERNAME, role: 'admin' });
+        const sibling = createSession({ id: 'user-1', username: TEST_USERNAME, role: 'admin' });
+        const otherUser = createSession({ id: 'user-2', username: OTHER_USERNAME, role: 'admin' });
+        const disposals: string[] = [];
+        registerServerSessionResource(active.id, (reason) => disposals.push(`active:${reason}`));
+        registerServerSessionResource(sibling.id, (reason) => disposals.push(`sibling:${reason}`));
+        registerServerSessionResource(otherUser.id, (reason) => disposals.push(`other:${reason}`));
+
+        const result = await changePin({
+            session: active,
+            request: new Request('http://127.0.0.1/api/auth/change-pin'),
+            currentPin: '1234',
+            newPin: '5678',
+            encryptedMasterKey: 'v2:rotated-blob',
+            salt: 'rotated-salt',
+        }, { db, writeAuditEvent: testAuditWriter(db) });
+
+        assert.deepEqual(result, { kind: 'success' });
+        assert.equal(getSession(active.id), null);
+        assert.equal(getSession(sibling.id), null);
+        assert.equal(getSession(otherUser.id), otherUser);
+        assert.deepEqual(disposals, ['active:session_deleted', 'sibling:session_deleted']);
+    } finally {
+        sqlite.close();
+    }
+});
+
+test('changePin preserves sessions when the credential rotation is rejected', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        await seedUser(db);
+        const active = createSession({ id: 'user-1', username: TEST_USERNAME, role: 'admin' });
+        const disposals: string[] = [];
+        registerServerSessionResource(active.id, (reason) => disposals.push(reason));
+
+        const result = await changePin({
+            session: active,
+            request: new Request('http://127.0.0.1/api/auth/change-pin'),
+            currentPin: '0000',
+            newPin: '5678',
+            encryptedMasterKey: 'v2:unchanged-blob',
+            salt: 'unchanged-salt',
+        }, { db, writeAuditEvent: testAuditWriter(db) });
+
+        assert.equal(result.kind, 'failure');
+        assert.equal(getSession(active.id), active);
+        assert.deepEqual(disposals, []);
     } finally {
         sqlite.close();
     }

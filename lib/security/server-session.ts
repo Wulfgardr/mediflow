@@ -135,6 +135,19 @@ export function deleteSession(sessionId: string | null | undefined): void {
 }
 
 /* @Codex */
+export function invalidateSessionsForUser(userId: string): void {
+    if (!userId) return;
+
+    const sessionIds = [...sessions.values()]
+        .filter((session) => session.userId === userId)
+        .map((session) => session.id);
+
+    for (const sessionId of sessionIds) {
+        deleteSession(sessionId);
+    }
+}
+
+/* @Codex */
 export function clearAllSessions(): void {
     const sessionIds = new Set([...sessions.keys(), ...sessionResources.keys()]);
     sessions.clear();
