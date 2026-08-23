@@ -18,7 +18,8 @@ export class SmartImportSelectionBrowserAdapterError extends Error {
 type Proposal = Readonly<{ patientId: string; ambulatoryId: string }>;
 type Sources = Readonly<{ fetch?: typeof fetch }>;
 const PATH = '/api/ai/smart-import/selection';
-const OPAQUE = /^(?:ssr|ptr|abr|lsr)_[0-9a-f]{32}$/u;
+const REF = Object.freeze({ sessionRef: /^ssr_[0-9a-f]{32}$/u, patientRef: /^ptr_[0-9a-f]{32}$/u,
+    ambulatoryRef: /^abr_[0-9a-f]{32}$/u, leaseRef: /^lsr_[0-9a-f]{32}$/u });
 
 function fail(code: SmartImportSelectionBrowserAdapterErrorCode): never { throw new SmartImportSelectionBrowserAdapterError(code); }
 function exact(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
@@ -48,7 +49,7 @@ function lease(value: unknown): SmartImportSelectionLease | null {
     const root = exact(value, ['selection']); const record = root ? exact(root.selection, ['sessionRef', 'selectionEpoch', 'patientRef', 'ambulatoryRef', 'leaseRef', 'expiresAt']) : null;
     if (!record || !Number.isSafeInteger(record.selectionEpoch) || (record.selectionEpoch as number) < 1
         || !Number.isSafeInteger(record.expiresAt) || (record.expiresAt as number) < 0
-        || !['sessionRef', 'patientRef', 'ambulatoryRef', 'leaseRef'].every((key) => typeof record[key] === 'string' && OPAQUE.test(record[key] as string))) return null;
+        || !Object.entries(REF).every(([key, pattern]) => typeof record[key] === 'string' && pattern.test(record[key] as string))) return null;
     return Object.freeze({ sessionRef: record.sessionRef as string, selectionEpoch: record.selectionEpoch as number,
         patientRef: record.patientRef as string, ambulatoryRef: record.ambulatoryRef as string,
         leaseRef: record.leaseRef as string, expiresAt: record.expiresAt as number });
@@ -75,9 +76,15 @@ export function createSmartImportSelectionBrowserAdapter(sources: Sources = {}) 
         if (response.status === 401) { reset(); return fail('session_unavailable'); }
         if (!response.ok) { currentLease = null; return fail('selection_unavailable'); }
         let body: unknown;
-        try { body = await response.json(); } catch { currentLease = null; return fail('response_invalid'); }
+        try { body = await response.json(); } catch {
+            if (token !== generation) return snapshot();
+            currentLease = null; return fail('response_invalid');
+        }
         const next = epoch(body);
-        if (next === null) { currentLease = null; return fail('response_invalid'); }
+        if (next === null) {
+            if (token !== generation) return snapshot();
+            currentLease = null; return fail('response_invalid');
+        }
         return token === generation ? acceptEpoch(next) : snapshot();
     };
     return Object.freeze({
@@ -93,8 +100,8 @@ export function createSmartImportSelectionBrowserAdapter(sources: Sources = {}) 
                 response = await request(PATH, { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json' },
                     body: JSON.stringify({ expectedEpoch, patientId: selected.patientId, ambulatoryId: selected.ambulatoryId }) });
             } catch {
-                currentLease = null;
                 if (token !== generation) return fail('selection_generation_changed');
+                currentLease = null;
                 return fail('selection_outcome_unknown');
             }
             if (token !== generation) return fail('selection_generation_changed');
@@ -102,15 +109,20 @@ export function createSmartImportSelectionBrowserAdapter(sources: Sources = {}) 
             if (response.status === 409) {
                 currentLease = null;
                 await readEpoch();
+                if (token !== generation) return fail('selection_generation_changed');
                 return fail('selection_resync_required');
             }
             if (!response.ok) { currentLease = null; return fail('selection_outcome_unknown'); }
             let body: unknown;
-            try { body = await response.json(); } catch { currentLease = null; return fail('response_invalid'); }
+            try { body = await response.json(); } catch {
+                if (token !== generation) return fail('selection_generation_changed');
+                currentLease = null; return fail('response_invalid');
+            }
+            if (token !== generation) return fail('selection_generation_changed');
             const next = lease(body);
             if (!next) { currentLease = null; return fail('response_invalid'); }
-            if (token !== generation) return fail('selection_generation_changed');
             if (currentEpoch !== null && next.selectionEpoch < currentEpoch) return fail('selection_superseded');
+            if (next.selectionEpoch !== expectedEpoch + 1) { currentLease = null; return fail('response_invalid'); }
             currentEpoch = next.selectionEpoch; currentLease = next;
             return snapshot();
         },
