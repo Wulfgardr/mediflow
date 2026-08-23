@@ -51,8 +51,7 @@ prova; authority e stage non sono dedotti né uniti.
 
 ## Claim ceiling e guard
 
-> mapping candidate locale verificato su exact head indipendenti; non
-> integrato, non release-ready, non released
+> mapping candidate locale verificato su exact head indipendenti; non integrato, non release-ready, non released
 
 Il validator falsifica record mancanti, extra o duplicati, digest dei source
 set driftati, vocabolari sconosciuti, receipt conflittuale collassata, union di

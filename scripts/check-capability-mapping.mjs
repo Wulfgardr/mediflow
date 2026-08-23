@@ -8,6 +8,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const MANIFEST_PATH = `${ROOT}/docs/capability-mapping/source-manifest.v1.json`;
 const BASIS_PATH = `${ROOT}/docs/capability-mapping/mapping-basis.v1.json`;
 const COVERAGE_PATH = `${ROOT}/docs/capability-mapping/coverage-receipt.v1.json`;
+const REPORT_PATH = `${ROOT}/docs/capability-mapping/mediflow-0.8.5-crosswalk.md`;
 const RELATION_KINDS = new Set(['exact_identity', 'implements', 'exposes', 'supports', 'authority_boundary_for']);
 const TERMINAL_DISPOSITIONS = new Set(['mapped', 'infrastructure_only', 'out_of_catalog', 'unmapped', 'conflicted']);
 const CLAIM_CEILING = 'mapping candidate locale verificato su exact head indipendenti; non integrato, non release-ready, non released';
@@ -107,6 +108,10 @@ function validateCoverage(basis, coverage) {
   if (coverage.ledgerComplete !== basis.ledgerComplete || coverage.semanticBindingComplete !== basis.semanticBindingComplete) fail('coverage receipt completion flags drifted');
   if (basis.ledgerComplete && [...expected.keys()].some((populationId) => populationRecords(basis.populations[populationId]).some((record) => !TERMINAL_DISPOSITIONS.has(record.terminalDisposition)))) fail('complete ledger has an undisposed record');
 }
+function validateHumanReport(coverage, report) {
+  if (!report.includes(`> ${coverage.claimCeiling}`)) fail('human report claim ceiling drifted');
+  if (!report.includes('`ledgerComplete=true`') || !report.includes('`semanticBindingComplete=false`')) fail('human report completion claim drifted');
+}
 function validateWebMiniCrosswalk(basis, anchorRecords) {
   const population = basis.populations.anchors;
   if (!population.recordFile) return;
@@ -147,14 +152,17 @@ function validateBasis(basis, manifestBytes) {
   const relations = relationRecords(basis);
   if (!relations.every((relation) => relation && RELATION_KINDS.has(relation.relationKind) && Array.isArray(relation.evidence) && relation.evidence.length > 0)) fail('relation contract is invalid');
   const conflicts = conflictRecords(basis);
-  if (!conflicts.every((conflict) => conflict && TERMINAL_DISPOSITIONS.has(conflict.terminalDisposition) && ['technical_worker', 'chief', 'product_owner', 'compliance_owner'].includes(conflict.decisionOwner) && Array.isArray(conflict.alternatives) && Array.isArray(conflict.consequences))) fail('conflict contract is invalid');
+  const conflictFields = ['conflictId', 'subjectId', 'observedFact', 'ambiguity', 'decisionOwner', 'requiredEvidence', 'status', 'terminalDisposition', 'evidence'];
+  if (!conflicts.every((conflict) => conflict && conflictFields.every((field) => field in conflict) && TERMINAL_DISPOSITIONS.has(conflict.terminalDisposition) && ['technical_worker', 'chief', 'product_owner', 'compliance_owner'].includes(conflict.decisionOwner) && Array.isArray(conflict.alternatives) && conflict.alternatives.length >= 2 && Array.isArray(conflict.consequences) && conflict.consequences.length === conflict.alternatives.length && Array.isArray(conflict.evidence) && conflict.evidence.length > 0)) fail('conflict contract is invalid');
+  requireUnique(conflicts, (conflict) => conflict.conflictId, 'conflicts');
+  requireUnique(conflicts, (conflict) => conflict.subjectId, 'conflict subjects');
   const nodes = Object.values(basis.populations).flatMap(populationRecords);
   const terminal = [...nodes, ...conflicts];
   if (basis.ledgerComplete && terminal.some((value) => !TERMINAL_DISPOSITIONS.has(value.terminalDisposition))) fail('complete ledger has an undisposed record');
   if (basis.semanticBindingComplete && terminal.some((value) => ['unmapped', 'conflicted'].includes(value.terminalDisposition))) fail('semantic binding cannot be complete with unresolved records');
 }
 
-export function validateCapabilityMapping(manifest = json(MANIFEST_PATH), basis = json(BASIS_PATH), manifestBytes = readFileSync(MANIFEST_PATH), coverage = json(COVERAGE_PATH)) {
+export function validateCapabilityMapping(manifest = json(MANIFEST_PATH), basis = json(BASIS_PATH), manifestBytes = readFileSync(MANIFEST_PATH), coverage = json(COVERAGE_PATH), report = readFileSync(REPORT_PATH, 'utf8')) {
   if (manifest.schema !== 'mediflow.capability-mapping.source-manifest.v1' || manifest.mappingVersion !== 1 || manifest.status !== 'candidate' || manifest.integrationStatus !== 'not_integrated' || manifest.applyPolicy !== 'none') fail('source manifest contract is invalid');
   const sources = new Map(manifest.sources?.map((source) => [source.sourceId, source]));
   if (sources.size !== 9 || [...sources.values()].some((source) => !/^[0-9a-f]{40}$/.test(source.commit) || !source.status.endsWith('not_integrated'))) fail('source roster is invalid');
@@ -171,6 +179,7 @@ export function validateCapabilityMapping(manifest = json(MANIFEST_PATH), basis 
   if (setIds.size !== 10) fail('source manifest is incomplete');
   validateBasis(basis, manifestBytes);
   validateCoverage(basis, coverage);
+  validateHumanReport(coverage, report);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) validateCapabilityMapping();

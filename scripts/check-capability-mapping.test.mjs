@@ -76,3 +76,10 @@ test('rejects source digest drift and authority or stage unions', () => {
   unioned.populations.surfaces.records.push({ id: 'surface:hostile@v1', sourceIdentity: 'hostile', description: 'synthetic hostile record', surface: 'test', stage: ['source', 'derived'], authority: ['source', 'derived'], input: 'unresolved', output: 'unresolved', provider: 'unresolved', venue: 'unresolved', egress: 'unresolved', evidence: ['test'], terminalDisposition: 'unmapped' });
   assert.throws(() => validateCapabilityMapping(manifest, unioned), /authority or stage is unioned/);
 });
+
+test('rejects incomplete conflicts and a stronger human report', () => {
+  const incompleteConflict = clone(basis);
+  incompleteConflict.conflicts.push({ conflictId: 'conflict:hostile@v1', subjectId: 'hostile', terminalDisposition: 'unmapped' });
+  assert.throws(() => validateCapabilityMapping(manifest, incompleteConflict), /conflict contract/);
+  assert.throws(() => validateCapabilityMapping(manifest, basis, undefined, coverage, 'semanticBindingComplete=true'), /human report claim ceiling/);
+});
