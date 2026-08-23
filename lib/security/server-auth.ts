@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { users } from '@/lib/schema';
-import { deleteSession, getSession, SESSION_COOKIE_NAME, type ServerSession } from '@/lib/security/server-session';
+import { deleteSession, getSession, peekSession, SESSION_COOKIE_NAME, type ServerSession } from '@/lib/security/server-session';
 import type { ServerSessionProjectionOwner } from '@/lib/security/server-session-projection-owner';
 import { serverSessionProjectionOwnerRegistry } from '@/lib/security/server-session-projection-owner-production';
 /* @Codex */
@@ -40,6 +40,25 @@ export async function requireSession(): Promise<ServerSession | null> {
         console.error('[MediFlow] Session validation against users table failed:', error);
     }
 
+    return session;
+}
+
+/* @Codex */
+export async function readAuthenticatedWebSession(): Promise<ServerSession | null> {
+    const cookieStore = await cookies();
+    const sessionId = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+    const session = peekSession(sessionId);
+    if (!session || !sessionId) return null;
+
+    const user = await dbServer
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.id, session.userId))
+        .get();
+    if (!user) {
+        deleteSession(sessionId);
+        return null;
+    }
     return session;
 }
 

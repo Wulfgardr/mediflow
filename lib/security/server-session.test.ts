@@ -8,6 +8,7 @@ import {
     createSession,
     deleteSession,
     getSession,
+    peekSession,
     registerServerSessionResource,
 } from './server-session';
 
@@ -60,6 +61,15 @@ test('live access preserves the resource and keeps sliding expiry', () => {
     assert.ok(session.expiresAt > previousExpiry);
     assert.deepEqual(events, []);
     unregister?.();
+});
+
+test('peek reads a live session without sliding its expiry', () => {
+    const session = syntheticSession();
+    session.expiresAt = Date.now() + 1_000;
+    const expiry = session.expiresAt;
+
+    assert.equal(peekSession(session.id), session);
+    assert.equal(session.expiresAt, expiry);
 });
 
 test('registration rejects missing and expired sessions without sliding expiry', () => {
