@@ -67,3 +67,12 @@ test('rejects missing, duplicate, collapsed, or overclaimed coverage', () => {
   overclaimed.semanticBindingComplete = true;
   assert.throws(() => validateCapabilityMapping(manifest, basis, undefined, overclaimed), /completion flags drifted/);
 });
+
+test('rejects source digest drift and authority or stage unions', () => {
+  const digestDrift = clone(manifest);
+  digestDrift.sourceSets[0].sourceSetSha256 = '0'.repeat(64);
+  assert.throws(() => validateCapabilityMapping(digestDrift, basis), /source drift/);
+  const unioned = clone(basis);
+  unioned.populations.surfaces.records.push({ id: 'surface:hostile@v1', sourceIdentity: 'hostile', description: 'synthetic hostile record', surface: 'test', stage: ['source', 'derived'], authority: ['source', 'derived'], input: 'unresolved', output: 'unresolved', provider: 'unresolved', venue: 'unresolved', egress: 'unresolved', evidence: ['test'], terminalDisposition: 'unmapped' });
+  assert.throws(() => validateCapabilityMapping(manifest, unioned), /authority or stage is unioned/);
+});
