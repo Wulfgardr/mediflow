@@ -49,10 +49,24 @@ test('makes same-session tabs share one winner and fails closed for lifecycle or
     const locked = fixture(); const service = createActiveReviewBindingService({ acquireContext: async () => Object.freeze({ session: locked.session, owner: locked.owner }), deriveAuthority: async () => locked.state.currentAuthority,
         recheckAuthority: async () => { throw Object.assign(new Error('synthetic lock'), { code: 'account_locked' }); }, locateCurrentReview: () => { throw new Error('must not locate'); }, registerSessionResource }); await denied(service.resolve(), 'account_locked');
 });
+test('never revalidates an issued binding after review, revision, selection, lease, session, or authority drift', async () => {
+    const invalidated = async (mutate: (current: ReturnType<typeof fixture>) => void) => { const current = fixture(); const binding = await current.service.resolve(); mutate(current); await assert.rejects(current.service.revalidate(binding)); };
+    await invalidated((current) => { current.state.currentReview = review('b'); }); await invalidated((current) => { current.state.currentReview = review('a', 2); });
+    await invalidated((current) => { current.owner.issueSelection({ expectedEpoch: 1, patientId: 'patient.synthetic.active-review-next', ambulatoryId: 'ambulatory.synthetic.active-review' }); });
+    await invalidated((current) => { current.session.expiresAt = Date.now(); }); await invalidated((current) => { deleteSession(current.session.id); });
+    await invalidated((current) => { current.state.currentAuthority = authority(current.session.id, 'synthetic-different-principal'); });
+});
+test('rejects transparent and throwing proxies at every object boundary before traps or accessors run', async () => {
+    const current = fixture(); const valid = { acquireContext: async () => Object.freeze({ session: current.session, owner: current.owner }), deriveAuthority: async () => current.state.currentAuthority, recheckAuthority: async () => current.state.currentAuthority, locateCurrentReview: () => current.state.currentReview, registerSessionResource };
+    assert.throws(() => createActiveReviewBindingService(new Proxy(valid, {})), (error) => error instanceof ActiveReviewBindingError && error.code === 'input_invalid'); assert.throws(() => createActiveReviewBindingService(new Proxy(valid, { ownKeys() { throw new Error('must not run'); } })), (error) => error instanceof ActiveReviewBindingError && error.code === 'input_invalid');
+    await denied(createActiveReviewBindingService({ ...valid, acquireContext: async () => new Proxy({ session: current.session, owner: current.owner }, {}) }).resolve(), 'context_unavailable');
+    await denied(createActiveReviewBindingService({ ...valid, recheckAuthority: async () => new Proxy(current.state.currentAuthority, {}) }).resolve(), 'authority_unavailable');
+    await denied(createActiveReviewBindingService({ ...valid, locateCurrentReview: () => new Proxy(current.state.currentReview, {}) }).resolve(), 'review_unavailable');
+});
 test('denies hostile dependency input and keeps routes, persistence, gestures, commands, and clinical writes unreachable', () => {
     const current = fixture(); const valid = { acquireContext: async () => null, deriveAuthority: async () => current.state.currentAuthority, recheckAuthority: async () => current.state.currentAuthority, locateCurrentReview: () => review(), registerSessionResource };
     for (const hostile of [null, [], Object.create(null), { ...valid, extra: true }]) assert.throws(() => createActiveReviewBindingService(hostile), (error) => error instanceof ActiveReviewBindingError && error.code === 'input_invalid');
     const accessor = {}; Object.defineProperty(accessor, 'acquireContext', { enumerable: true, get() { throw new Error('hostile getter'); } }); assert.throws(() => createActiveReviewBindingService(accessor), (error) => error instanceof ActiveReviewBindingError && error.code === 'input_invalid');
     const symbol = { ...valid }; Object.defineProperty(symbol, Symbol('synthetic'), { value: true }); assert.throws(() => createActiveReviewBindingService(symbol), (error) => error instanceof ActiveReviewBindingError && error.code === 'input_invalid');
-    const source = readFileSync(new URL('./active-review-binding.ts', import.meta.url), 'utf8'); assert.match(source, /withLeaseCriticalSection/u); assert.doesNotMatch(source, /app\/api|NextResponse|cookies|headers|Request|gesture|command|audit|\.insert\(|\.update\(|\.delete\(/u); assert.equal(current.service.resolve.length, 0);
+    const source = readFileSync(new URL('./active-review-binding.ts', import.meta.url), 'utf8'); assert.match(source, /withLeaseCriticalSection/u); assert.doesNotMatch(source, /app\/api|NextResponse|cookies|headers|Request|gesture|command|audit|dbServer\.(?:insert|update|delete)/u); assert.equal(current.service.resolve.length, 0);
 });

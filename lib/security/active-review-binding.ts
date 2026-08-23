@@ -1,6 +1,7 @@
 /* @Codex */
 import 'server-only';
 
+import { types } from 'node:util';
 import { createDurableCurrentReviewLocator, type DurableCurrentReviewIdentity } from '../ai-providers/fabric/durable-current-review-locator';
 import { acquireAuthenticatedWebSessionProjectionOwnerContext } from './server-auth';
 import { registerServerSessionResource, type ServerSession } from './server-session';
@@ -20,6 +21,7 @@ type BindingRecord = {
     reviewContextEpoch: number;
     reviewId: string;
     reviewRevision: number;
+    session: ServerSession;
     selectionEpoch: number;
     unregister: (() => void) | null;
 };
@@ -28,7 +30,7 @@ export type ActiveReviewBindingV1 = Readonly<{
     schemaVersion: typeof SCHEMA_VERSION;
 }>;
 
-export type ActiveReviewBindingErrorCode = 'authority_unavailable' | 'context_unavailable' | 'input_invalid' | 'review_unavailable' | 'session_unavailable';
+export type ActiveReviewBindingErrorCode = 'authority_unavailable' | 'binding_stale' | 'binding_unavailable' | 'context_unavailable' | 'input_invalid' | 'review_unavailable' | 'session_unavailable';
 
 export class ActiveReviewBindingError extends Error {
     constructor(readonly code: ActiveReviewBindingErrorCode) {
@@ -52,7 +54,7 @@ function fail(code: ActiveReviewBindingErrorCode): never {
 function exactSources(value: unknown): ActiveReviewBindingSources {
     const keys = ['acquireContext', 'deriveAuthority', 'locateCurrentReview', 'recheckAuthority', 'registerSessionResource'] as const;
     try {
-        if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype
+        if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype
             || Reflect.ownKeys(value).length !== keys.length) return fail('input_invalid');
         const result: Record<string, unknown> = {};
         for (const key of keys) {
@@ -69,14 +71,13 @@ function exactSources(value: unknown): ActiveReviewBindingSources {
 
 function context(value: unknown): Context {
     try {
-        if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype
+        if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype
             || Reflect.ownKeys(value).length !== 2) return fail('context_unavailable');
         const session = Object.getOwnPropertyDescriptor(value, 'session')?.value;
         const owner = Object.getOwnPropertyDescriptor(value, 'owner')?.value;
-        if (!session || typeof session !== 'object' || !owner || typeof owner !== 'object'
-            || typeof (owner as Owner).withLeaseCriticalSection !== 'function'
-            || typeof (owner as Owner).snapshotSelectionEpoch !== 'function'
-            || typeof (owner as Owner).snapshotReviewContextEpoch !== 'function') return fail('context_unavailable');
+        const ownerDescriptors = owner && typeof owner === 'object' && !types.isProxy(owner) ? Object.getOwnPropertyDescriptors(owner) : null;
+        if (!session || typeof session !== 'object' || types.isProxy(session) || !ownerDescriptors
+            || !['withLeaseCriticalSection', 'snapshotSelectionEpoch', 'snapshotReviewContextEpoch'].every((key) => 'value' in (ownerDescriptors[key] ?? {}) && typeof ownerDescriptors[key]?.value === 'function')) return fail('context_unavailable');
         return Object.freeze({ owner: owner as Owner, session: session as ServerSession });
     } catch (error) {
         if (error instanceof ActiveReviewBindingError) throw error;
@@ -85,15 +86,18 @@ function context(value: unknown): Context {
 }
 
 function authority(value: unknown, session: ServerSession): SessionPhysicianReviewAuthorityV1 {
+    const keys = ['schemaVersion', 'actorRef', 'attestationVersion', 'authenticated', 'unlocked', 'expiresAt', 'sessionGeneration', 'revocationGeneration'] as const;
     try {
-        if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) return fail('authority_unavailable');
-        const candidate = value as SessionPhysicianReviewAuthorityV1;
-        if (candidate.schemaVersion !== AUTHORITY_SCHEMA_VERSION || candidate.actorRef !== session.userId
-            || candidate.attestationVersion !== 1 || candidate.authenticated !== true || candidate.unlocked !== true
-            || !Number.isFinite(candidate.expiresAt) || candidate.expiresAt <= Date.now()
-            || typeof candidate.sessionGeneration !== 'string' || candidate.sessionGeneration.length === 0
-            || typeof candidate.revocationGeneration !== 'string' || candidate.revocationGeneration.length === 0) return fail('authority_unavailable');
-        return candidate;
+        if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) return fail('authority_unavailable');
+        const descriptors = Object.getOwnPropertyDescriptors(value);
+        if (Reflect.ownKeys(value).length !== keys.length || !keys.every((key) => 'value' in (descriptors[key] ?? {}))) return fail('authority_unavailable');
+        const candidate = descriptors as Record<(typeof keys)[number], PropertyDescriptor>;
+        if (candidate.schemaVersion.value !== AUTHORITY_SCHEMA_VERSION || candidate.actorRef.value !== session.userId
+            || candidate.attestationVersion.value !== 1 || candidate.authenticated.value !== true || candidate.unlocked.value !== true
+            || !Number.isFinite(candidate.expiresAt.value) || (candidate.expiresAt.value as number) <= Date.now()
+            || typeof candidate.sessionGeneration.value !== 'string' || candidate.sessionGeneration.value.length === 0
+            || typeof candidate.revocationGeneration.value !== 'string' || candidate.revocationGeneration.value.length === 0) return fail('authority_unavailable');
+        return value as SessionPhysicianReviewAuthorityV1;
     } catch (error) {
         if (error instanceof ActiveReviewBindingError) throw error;
         return fail('authority_unavailable');
@@ -102,7 +106,7 @@ function authority(value: unknown, session: ServerSession): SessionPhysicianRevi
 
 function review(value: unknown): DurableCurrentReviewIdentity {
     try {
-        if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype
+        if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype
             || Reflect.ownKeys(value).length !== 2) return fail('review_unavailable');
         const reviewId = Object.getOwnPropertyDescriptor(value, 'reviewId');
         const reviewRevision = Object.getOwnPropertyDescriptor(value, 'reviewRevision');
@@ -128,14 +132,17 @@ function opaqueBinding(): ActiveReviewBindingV1 {
 export function createActiveReviewBindingService(sourceValue: unknown) {
     const sources = exactSources(sourceValue);
     const records = new WeakMap<object, BindingRecord>();
+    const bindings = new WeakMap<object, BindingRecord>();
 
     const discard = (record: BindingRecord): void => {
         record.active = false;
+        records.delete(record.session);
+        bindings.delete(record.binding);
         record.unregister?.();
         record.unregister = null;
     };
 
-    return Object.freeze({
+    const service = {
         async resolve(): Promise<ActiveReviewBindingV1> {
             let acquired: Context | null;
             try { acquired = await sources.acquireContext(); } catch { return fail('context_unavailable'); }
@@ -165,7 +172,7 @@ export function createActiveReviewBindingService(sourceValue: unknown) {
 
                 const record: BindingRecord = {
                     active: true, authority: verifiedAuthority, binding: opaqueBinding(), patientId: selection.patientId,
-                    reviewContextEpoch, reviewId: identity.reviewId, reviewRevision: identity.reviewRevision, selectionEpoch, unregister: null,
+                    reviewContextEpoch, reviewId: identity.reviewId, reviewRevision: identity.reviewRevision, session: current.session, selectionEpoch, unregister: null,
                 };
                 let unregister: (() => void) | null;
                 try { unregister = sources.registerSessionResource(current.session.id, () => discard(record)); }
@@ -174,10 +181,20 @@ export function createActiveReviewBindingService(sourceValue: unknown) {
                 record.unregister = unregister;
                 if (existing) discard(existing);
                 records.set(current.session, record);
+                bindings.set(record.binding, record);
                 return record.binding;
             });
         },
-    });
+        async revalidate(candidate: unknown): Promise<ActiveReviewBindingV1> {
+            if (!candidate || typeof candidate !== 'object' || types.isProxy(candidate)) return fail('binding_unavailable');
+            const record = bindings.get(candidate);
+            if (!record?.active) return fail('binding_unavailable');
+            const current = await service.resolve();
+            if (current !== candidate) return fail('binding_stale');
+            return current;
+        },
+    };
+    return Object.freeze(service);
 }
 
 const durableCurrentReviewLocator = createDurableCurrentReviewLocator();
