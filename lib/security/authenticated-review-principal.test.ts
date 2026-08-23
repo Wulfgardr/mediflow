@@ -39,6 +39,16 @@ test('resolves only the opaque actor and current session binding from the canoni
     assert.deepEqual(Object.keys(principal).sort(), ['actorRef', 'sessionRef']);
 });
 
+test('resolving the canonical review principal does not slide session expiry', async () => {
+    const session = currentWebSession();
+    session.expiresAt = Date.now() + 60_000;
+    const expiry = session.expiresAt;
+
+    await resolver(session, async (userId) => [{ id: userId, username: USER.username }]).resolve();
+
+    assert.equal(session.expiresAt, expiry);
+});
+
 test('denies a missing canonical user and a username-discontinuous principal', async () => {
     const session = currentWebSession();
     await assert.rejects(
