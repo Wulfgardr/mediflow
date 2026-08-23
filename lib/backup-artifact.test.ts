@@ -45,6 +45,7 @@ const basePayload = {
     durableReviewOperations: [],
     durableReviewCommandStates: [],
     durableReviewCommandOperations: [],
+    durableReviewPatientLinks: [],
     drugs: [],
     entries: [
         {
@@ -87,6 +88,7 @@ const basePayload = {
             version: 1,
         },
     ],
+    physicianReviewAttestations: [],
     checkups: [],
     therapies: [],
 };
@@ -116,6 +118,8 @@ test('includes durable review records and replay operations in the authenticated
         durableReviewOperations: [],
         durableReviewCommandStates: [],
         durableReviewCommandOperations: [],
+        durableReviewPatientLinks: [],
+        physicianReviewAttestations: [],
     };
 
     const artifact = await createBackupArtifact(payload);
@@ -125,6 +129,8 @@ test('includes durable review records and replay operations in the authenticated
     assert.equal(artifact.manifest.recordCounts.durableReviewOperations, 0);
     assert.equal(artifact.manifest.recordCounts.durableReviewCommandStates, 0);
     assert.equal(artifact.manifest.recordCounts.durableReviewCommandOperations, 0);
+    assert.equal(artifact.manifest.recordCounts.durableReviewPatientLinks, 0);
+    assert.equal(artifact.manifest.recordCounts.physicianReviewAttestations, 0);
 });
 
 /* @Codex */
@@ -193,6 +199,28 @@ async function checksumValidDurableArtifact(mutate: (artifact: any) => void | Pr
     artifact.manifest.checksum = await sha256(stableStringify(artifact.payload));
     return artifact;
 }
+
+test('rejects a durable review patient link that does not resolve within the artifact', async () => {
+    const { record, operation } = await durableReviewLedgerFixture();
+    const artifact = JSON.parse(await serializeBackupArtifact({
+        ...basePayload,
+        durableReviewRecords: [record],
+        durableReviewOperations: [operation],
+        durableReviewPatientLinks: [{
+            reviewId: record.reviewId,
+            patientId: 'pat-1',
+            createdAt: '2026-03-17T08:10:00.000Z',
+            updatedAt: '2026-03-17T08:10:00.000Z',
+        }],
+    }));
+    artifact.payload.durableReviewPatientLinks[0].reviewId = `review_${'f'.repeat(32)}`;
+    artifact.manifest.checksum = await sha256(stableStringify(artifact.payload));
+
+    await assert.rejects(
+        () => parseBackupArtifact(artifact),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+    );
+});
 
 test('rejects checksum-valid durable review records that violate canonical invariants', async () => {
     const artifact = await checksumValidDurableArtifact((value) => {
@@ -322,13 +350,18 @@ async function legacyArtifact(): Promise<Record<string, any>> {
     delete artifact.payload.durableReviewOperations;
     delete artifact.payload.durableReviewCommandStates;
     delete artifact.payload.durableReviewCommandOperations;
+    delete artifact.payload.durableReviewPatientLinks;
+    delete artifact.payload.physicianReviewAttestations;
     artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'documentDiagnosisProposals');
     artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations' && collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations');
+    artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'durableReviewPatientLinks' && collection !== 'physicianReviewAttestations');
     delete artifact.manifest.recordCounts.documentDiagnosisProposals;
     delete artifact.manifest.recordCounts.durableReviewRecords;
     delete artifact.manifest.recordCounts.durableReviewOperations;
     delete artifact.manifest.recordCounts.durableReviewCommandStates;
     delete artifact.manifest.recordCounts.durableReviewCommandOperations;
+    delete artifact.manifest.recordCounts.durableReviewPatientLinks;
+    delete artifact.manifest.recordCounts.physicianReviewAttestations;
     const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(stableStringify(artifact.payload)));
     artifact.manifest.checksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
     return artifact;
@@ -344,11 +377,15 @@ test('accepts an authentic legacy v1 artifact and normalizes missing optional co
     assert.deepEqual(parsed.payload.durableReviewOperations, []);
     assert.deepEqual(parsed.payload.durableReviewCommandStates, []);
     assert.deepEqual(parsed.payload.durableReviewCommandOperations, []);
+    assert.deepEqual(parsed.payload.durableReviewPatientLinks, []);
+    assert.deepEqual(parsed.payload.physicianReviewAttestations, []);
     assert.equal(parsed.manifest.recordCounts.documentDiagnosisProposals, 0);
     assert.equal(parsed.manifest.recordCounts.durableReviewRecords, 0);
     assert.equal(parsed.manifest.recordCounts.durableReviewOperations, 0);
     assert.equal(parsed.manifest.recordCounts.durableReviewCommandStates, 0);
     assert.equal(parsed.manifest.recordCounts.durableReviewCommandOperations, 0);
+    assert.equal(parsed.manifest.recordCounts.durableReviewPatientLinks, 0);
+    assert.equal(parsed.manifest.recordCounts.physicianReviewAttestations, 0);
     assert.deepEqual(parsed.manifest.collections, BACKUP_COLLECTIONS);
     assert.equal(parsed.manifest.checksum, normalizedChecksum);
 });
@@ -360,11 +397,16 @@ test('accepts a legacy artifact without durable review collections', async () =>
     delete artifact.payload.durableReviewOperations;
     delete artifact.payload.durableReviewCommandStates;
     delete artifact.payload.durableReviewCommandOperations;
+    delete artifact.payload.durableReviewPatientLinks;
+    delete artifact.payload.physicianReviewAttestations;
     artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations' && collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations');
+    artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'durableReviewPatientLinks' && collection !== 'physicianReviewAttestations');
     delete artifact.manifest.recordCounts.durableReviewRecords;
     delete artifact.manifest.recordCounts.durableReviewOperations;
     delete artifact.manifest.recordCounts.durableReviewCommandStates;
     delete artifact.manifest.recordCounts.durableReviewCommandOperations;
+    delete artifact.manifest.recordCounts.durableReviewPatientLinks;
+    delete artifact.manifest.recordCounts.physicianReviewAttestations;
     const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(stableStringify(artifact.payload)));
     artifact.manifest.checksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 
@@ -375,6 +417,8 @@ test('accepts a legacy artifact without durable review collections', async () =>
     assert.deepEqual(parsed.payload.durableReviewOperations, []);
     assert.deepEqual(parsed.payload.durableReviewCommandStates, []);
     assert.deepEqual(parsed.payload.durableReviewCommandOperations, []);
+    assert.deepEqual(parsed.payload.durableReviewPatientLinks, []);
+    assert.deepEqual(parsed.payload.physicianReviewAttestations, []);
 });
 
 test('rejects almost-legacy and unknown backup collections', async () => {
