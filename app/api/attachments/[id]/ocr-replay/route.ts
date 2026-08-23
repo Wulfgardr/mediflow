@@ -1,12 +1,24 @@
 import { NextResponse } from 'next/server';
-import { dbServer } from '@/lib/db-server';
+import { dbServer, runDbServerImmediateTransaction } from '@/lib/db-server';
 import { attachments } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-import { canTransitionDocumentOcrQueueState, isDocumentOcrQueueState } from '@/lib/domain/documents/document-ocr-queue';
+import { isDocumentOcrQueueState } from '@/lib/domain/documents/document-ocr-queue';
 import { applyDocumentOcrReplay } from '@/lib/domain/documents/document-ocr-replay';
 import { attachmentOcrReplaySchema } from '@/lib/api-schemas/attachments';
 import { parseApiBody } from '@/lib/api-schemas/parse';
+/* @Codex */
+import { createAttachmentOcrReplayCurrentness } from '@/lib/attachment-ocr-replay-currentness';
+
+/* @Codex */
+const attachmentOcrReplayCurrentness = createAttachmentOcrReplayCurrentness({
+    database: dbServer,
+    runImmediateTransaction: runDbServerImmediateTransaction,
+});
+/* @Codex */
+const ATTACHMENT_OCR_REPLAY_KEYS = new Set<PropertyKey>([
+    'ocrText', 'documentSha256',
+]);
 
 /**
  * Replay documentale post-OCR per un allegato in coda OCR-needed.
@@ -27,7 +39,8 @@ export async function POST(
     try {
         const { id } = await params;
         const body = await request.json().catch(() => null) as unknown;
-        if (!body || typeof body !== 'object') {
+        if (!body || typeof body !== 'object'
+            || Reflect.ownKeys(body).some((key) => !ATTACHMENT_OCR_REPLAY_KEYS.has(key))) {
             return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
         }
         const parsedBody = parseApiBody(attachmentOcrReplaySchema, body);
@@ -38,6 +51,9 @@ export async function POST(
         const existing = await dbServer
             .select({
                 id: attachments.id,
+                documentSourceRef: attachments.documentSourceRef,
+                documentRevision: attachments.documentRevision,
+                documentFreshnessEpoch: attachments.documentFreshnessEpoch,
                 ocrQueueState: attachments.ocrQueueState,
                 ocrQueueReason: attachments.ocrQueueReason,
                 ocrReplayArtifactSnapshot: attachments.ocrReplayArtifactSnapshot,
@@ -61,36 +77,22 @@ export async function POST(
             previousArtifactSnapshot: existing.ocrReplayArtifactSnapshot,
         });
 
-        if (replay.outcome === 'duplicate') {
-            // Idempotenza: stesso hash documento + stesso testo OCR, l'artifact non
-            // viene mai riscritto. Lo stato transiente 'processing' viene comunque
-            // riallineato allo stato derivato dall'artifact già persistito.
-            let settledState: typeof currentState | typeof replay.nextState = currentState;
-            if (currentState === 'processing') {
-                await dbServer.update(attachments).set({
-                    ocrQueueState: replay.nextState,
-                    ocrQueueUpdatedAt: new Date(),
-                }).where(eq(attachments.id, existing.id));
-                settledState = replay.nextState;
-            }
-            return NextResponse.json({
-                outcome: replay.outcome,
-                state: settledState,
-                reason: existing.ocrQueueReason,
-                idempotencyKey: replay.artifact.idempotencyKey,
-                sufficientText: replay.sufficientText,
-            });
+        /* @Codex: currentness is host-owned; documentSha256 remains replay evidence only. */
+        const outcome = attachmentOcrReplayCurrentness.commit(existing, {
+            outcome: replay.outcome,
+            nextState: replay.nextState,
+            artifactSnapshot: replay.artifactSnapshot,
+            updatedAtMs: Date.now(),
+        });
+        if (outcome.status === 'not_found') {
+            return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
-
-        if (currentState !== 'processing' && !canTransitionDocumentOcrQueueState(currentState, 'processing')) {
-            return NextResponse.json({ error: 'Invalid OCR queue state transition' }, { status: 409 });
+        if (outcome.status === 'conflict') {
+            return NextResponse.json({ error: 'Attachment changed; reload and retry' }, { status: 409 });
         }
-
-        await dbServer.update(attachments).set({
-            ocrQueueState: replay.nextState,
-            ocrQueueUpdatedAt: new Date(),
-            ocrReplayArtifactSnapshot: replay.artifactSnapshot,
-        }).where(eq(attachments.id, existing.id));
+        if (outcome.status === 'failed') {
+            return NextResponse.json({ error: 'OCR replay failed' }, { status: 500 });
+        }
 
         console.info('[API] OCR replay', {
             attachmentId: existing.id,
@@ -106,8 +108,8 @@ export async function POST(
             idempotencyKey: replay.artifact.idempotencyKey,
             sufficientText: replay.sufficientText,
         });
-    } catch (error) {
-        console.error('[API] OCR replay failed:', error);
+    } catch {
+        console.error('[API] OCR replay failed');
         return NextResponse.json({ error: 'OCR replay failed' }, { status: 500 });
     }
 }
