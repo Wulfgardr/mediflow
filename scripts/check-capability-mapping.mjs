@@ -12,6 +12,7 @@ const REPORT_PATH = `${ROOT}/docs/capability-mapping/mediflow-0.8.5-crosswalk.md
 const RELATION_KINDS = new Set(['exact_identity', 'implements', 'exposes', 'supports', 'authority_boundary_for']);
 const TERMINAL_DISPOSITIONS = new Set(['mapped', 'infrastructure_only', 'out_of_catalog', 'unmapped', 'conflicted']);
 const CLAIM_CEILING = 'mapping candidate locale verificato su exact head indipendenti; non integrato, non release-ready, non released';
+const FROZEN_REF_CACHE = new Set();
 
 function fail(message) { throw new Error(`capability mapping: ${message}`); }
 function json(path) { return JSON.parse(readFileSync(path, 'utf8')); }
@@ -112,6 +113,24 @@ function validateEvidenceArtifacts(basis, sourcePaths) {
   const keyboard = relativeJson(files[2], 'keyboard boundary file');
   if (keyboard.schema !== 'mediflow.capability-mapping.keyboard-boundary.v1' || keyboard.applyPolicy !== 'none' || keyboard.terminalDisposition !== 'out_of_catalog' || keyboard.evidence?.some((evidence) => evidence.evidenceKind !== 'test' || !sourcePaths.has(evidence.ref))) fail('keyboard boundary artifact is invalid');
 }
+function validateFrozenRef(ref, label) {
+  const match = typeof ref === 'string' && ref.match(/^([0-9a-f]{40}):(.+)$/);
+  if (!match) fail(`${label}: invalid frozen ref`);
+  if (FROZEN_REF_CACHE.has(ref)) return;
+  try { git('cat-file', '-e', `${match[1]}:${match[2]}`); } catch { fail(`${label}: frozen ref does not resolve`); }
+  FROZEN_REF_CACHE.add(ref);
+}
+function validateProductDecision(basis, relations, fabric) {
+  const receipt = relativeJson(basis.productDecisionReceiptFile, 'product decision receipt');
+  if (receipt.schema !== 'mediflow.capability-mapping.product-decision-receipt.v1' || receipt.status !== 'candidate_not_integrated' || receipt.applyPolicy !== 'none' || receipt.decisionId !== 'MF085-C1-FABRIC-CANONICAL-20260823' || receipt.decisionSha256 !== 'f64036aaa1abe2f54b748d03c4b561f1e38d22a047bcef342f680eb708b675dc' || receipt.decisionCount !== 16 || receipt.functionalRelationCount !== 23 || receipt.registryExposureCount !== 16 || JSON.stringify(receipt.outOfCatalogFabricIds) !== JSON.stringify(['document_identity_resolution'])) fail('product decision receipt is invalid');
+  receipt.globalEvidence.forEach((evidence) => validateFrozenRef(evidence.ref, 'product decision evidence'));
+  const decided = relations.filter((relation) => relation.decisionId === receipt.decisionId);
+  const catalog = 'anchor:web:web-65-registro-intelligence-fabric-16-capability-4-venue-osservate-e-p@1e35733c0218';
+  const exposures = decided.filter((relation) => relation.relationKind === 'exposes');
+  if (decided.length !== 39 || exposures.length !== 16 || new Set(exposures.map((relation) => relation.from)).size !== 16 || exposures.some((relation) => relation.to !== catalog || relation.exposureScope !== 'read_only_registry_roster') || decided.some((relation) => relation.relationKind === 'exact_identity' || relation.authority !== 'unresolved' || relation.stage !== 'unresolved')) fail('product decision relations collapse identity, authority, or stage');
+  const identity = fabric.find((record) => record.sourceIdentity.identifier === 'document_identity_resolution');
+  if (!identity || identity.terminalDisposition !== 'out_of_catalog' || decided.some((relation) => relation.from === identity.id && relation.relationKind !== 'exposes')) fail('document identity resolution has an unproven consumer');
+}
 function dispositionCounts(records) {
   return Object.fromEntries([...TERMINAL_DISPOSITIONS].map((disposition) => [disposition, records.filter((record) => record.terminalDisposition === disposition).length]));
 }
@@ -133,7 +152,7 @@ function validateCoverage(basis, coverage) {
     requireUnique(records, (record) => JSON.stringify(record.sourceIdentity), `${populationId} source identity`);
   }
   const relations = relationRecords(basis);
-  if (coverage.relationCoverage?.expectedCount !== 82 || coverage.relationCoverage.observedCount !== relations.length || relations.length !== 82) fail('coverage receipt relation coverage is incomplete or drifted');
+  if (coverage.relationCoverage?.expectedCount !== 121 || coverage.relationCoverage.observedCount !== relations.length || relations.length !== 121) fail('coverage receipt relation coverage is incomplete or drifted');
   requireUnique(relations, (relation) => relation.id, 'relations');
   const conflicts = conflictRecords(basis);
   const residual = conflicts.filter((conflict) => ['unmapped', 'conflicted'].includes(conflict.terminalDisposition));
@@ -188,7 +207,8 @@ function validateBasis(basis, manifestBytes, sourcePaths) {
   validateWebMiniSurfaceEligibility(basis);
   validateEvidenceArtifacts(basis, sourcePaths);
   const relations = relationRecords(basis);
-  if (!relations.every((relation) => relation && RELATION_KINDS.has(relation.relationKind) && Array.isArray(relation.evidence) && relation.evidence.length > 0)) fail('relation contract is invalid');
+  if (!relations.every((relation) => relation && typeof relation.id === 'string' && typeof relation.from === 'string' && typeof relation.to === 'string' && RELATION_KINDS.has(relation.relationKind) && Array.isArray(relation.evidence) && relation.evidence.length > 0 && relation.evidence.every((evidence) => evidence && typeof evidence.evidenceKind === 'string' && typeof evidence.locator === 'string' && (validateFrozenRef(evidence.ref, `relation ${relation.id}`), true)) && (![relation.authority, relation.stage].some((value) => value !== undefined && typeof value !== 'string')))) fail('relation contract is invalid');
+  validateProductDecision(basis, relations, populationRecords(basis.populations.fabric));
   const conflicts = conflictRecords(basis);
   const conflictFields = ['conflictId', 'subjectId', 'observedFact', 'ambiguity', 'decisionOwner', 'requiredEvidence', 'status', 'terminalDisposition', 'evidence'];
   if (!conflicts.every((conflict) => conflict && conflictFields.every((field) => field in conflict) && TERMINAL_DISPOSITIONS.has(conflict.terminalDisposition) && ['technical_worker', 'chief', 'product_owner', 'compliance_owner'].includes(conflict.decisionOwner) && Array.isArray(conflict.alternatives) && conflict.alternatives.length >= 2 && Array.isArray(conflict.consequences) && conflict.consequences.length === conflict.alternatives.length && Array.isArray(conflict.evidence) && conflict.evidence.length > 0)) fail('conflict contract is invalid');
