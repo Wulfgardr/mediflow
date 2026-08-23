@@ -536,6 +536,11 @@
 
 .toolChip:active { transform: scale(0.97); }
 
+.toolChipKbd {
+  color: var(--ink-muted);
+  font: 600 10px/1 var(--lume-font-mono);
+}
+
 .toolChipMuted {
   background: transparent;
   color: var(--ink-muted);
@@ -622,7 +627,7 @@
   }
 
   .search {
-    flex: 1 0 100%;
+    flex: 1 1 calc(100% - 52px);
     min-height: 42px;
   }
 
@@ -631,10 +636,20 @@
   }
 
   .toolChip {
+    order: 1;
     flex: 1 1 calc(50% - 4px);
     justify-content: center;
     white-space: nowrap;
   }
+
+  .commandToolChip {
+    order: 0;
+    flex: 0 0 44px;
+    padding-inline: 0;
+    font-size: 0;
+  }
+
+  .commandToolChip .toolChipKbd { display: none; }
 
   .aiButton {
     flex: 1 0 100%;
