@@ -24,6 +24,12 @@ test('retains 109 source-local AIP identities without deduplication', () => {
   assert.equal(new Set(records.map((record) => `${record.sourceIdentity.sourceKind}:${record.sourceIdentity.identifier}`)).size, 109);
 });
 
+test('keeps every Fabric-to-canonical gap explicit and non-semantic', () => {
+  const records = JSON.parse(readFileSync('docs/capability-mapping/conflicts/fabric-canonical-unmapped.v1.json', 'utf8')).records;
+  assert.equal(records.length, 16);
+  assert.ok(records.every((record) => record.terminalDisposition === 'unmapped' && record.decisionOwner === 'technical_worker'));
+});
+
 test('rejects source drift and apply', () => {
   const drift = clone(manifest);
   drift.sourceSets[0].recordCount += 1;
