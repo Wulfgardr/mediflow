@@ -25,10 +25,16 @@ test('retains 109 source-local AIP identities without deduplication', () => {
   assert.equal(new Set(records.map((record) => `${record.sourceIdentity.sourceKind}:${record.sourceIdentity.identifier}`)).size, 109);
 });
 
-test('keeps every Fabric-to-canonical product decision explicit and non-semantic', () => {
-  const records = JSON.parse(readFileSync('docs/capability-mapping/conflicts/fabric-canonical-unmapped.v1.json', 'utf8')).records;
-  assert.equal(records.length, 16);
-  assert.ok(records.every((record) => record.terminalDisposition === 'conflicted' && record.decisionOwner === 'product_owner'));
+test('keeps every Fabric-to-canonical product decision explicit and non-identical', () => {
+  const records = JSON.parse(readFileSync('docs/capability-mapping/relations/fabric-canonical-bindings.v1.json', 'utf8')).records;
+  assert.equal(records.length, 39);
+  assert.equal(records.filter((record) => record.relationKind === 'exposes').length, 16);
+  assert.ok(records.every((record) => record.relationKind !== 'exact_identity' && record.authority === 'unresolved' && record.stage === 'unresolved'));
+});
+
+test('keeps document identity resolution out of catalog until a non-test consumer exists', () => {
+  const records = JSON.parse(readFileSync('docs/capability-mapping/nodes/fabric-inventory.v1.json', 'utf8')).records;
+  assert.equal(records.find((record) => record.sourceIdentity.identifier === 'document_identity_resolution').terminalDisposition, 'out_of_catalog');
 });
 
 test('enumerates frozen Web routes and pages without inferred authority', () => {
