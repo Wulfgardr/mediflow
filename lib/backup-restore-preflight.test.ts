@@ -18,6 +18,7 @@ const basePayload = {
     durableReviewOperations: [],
     durableReviewCommandStates: [],
     durableReviewCommandOperations: [],
+    durableReviewPatientLinks: [],
     drugs: [],
     entries: [],
     exemptions: [],
@@ -29,6 +30,7 @@ const basePayload = {
     servicePrescriptions: [],
     sissHandoffs: [],
     patients: [],
+    physicianReviewAttestations: [],
     checkups: [],
     therapies: [],
 };
