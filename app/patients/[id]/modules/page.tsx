@@ -614,8 +614,8 @@ export default function PatientDetailPage() {
             eyebrow="Scheda clinica"
             title={`${patient.lastName} ${patient.firstName}`}
             subtitle=""
-            backHref={`/patients/${id}`}
-            backLabel="Quadro paziente"
+            backHref="/?area=incarico"
+            backLabel="Pazienti"
             patientAtoms={[
                 patient.taxCode ? `Codice ${patient.taxCode}` : 'Codice non disponibile',
                 ageLabel,
