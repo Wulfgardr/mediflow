@@ -4,13 +4,19 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { AuthenticatedSmartImportPreviewError } from './server-session-authenticated-smart-import-preview.ts';
+import { serializePatientSmartImportProposalWire } from '../smart-import-proposal-wire.ts';
 import { createSmartImportPreviewHttpHandler } from './server-session-smart-import-preview-http.ts';
 
 const INPUT = Object.freeze({ handle: `prj_${'1'.repeat(32)}`, requestId: `req_${'2'.repeat(32)}` });
 const RECEIPT = Object.freeze({ id: 'synthetic-receipt' });
+const PROPOSAL = Object.freeze({ schemaVersion: 'mediflow.smart-import.proposal.v1', generatedAt: '2026-08-23T12:00:00.000Z',
+    contract: Object.freeze({ validJson: true, validTask: true, legacyContract: false }), summary: '',
+    diagnoses: Object.freeze([Object.freeze({ label: 'Sintesi', icdQuery: 'SINT', confidence: 'high', evidence: 'Evidenza', sourceId: 'source.synthetic.1', explicitCode: undefined })]),
+    therapies: Object.freeze([]), servicePrescriptions: Object.freeze([]), writesPerformed: 0 as const });
 const AVAILABLE = Object.freeze({ writesPerformed: 0 as const, apply: 'denied' as const, status: 'available' as const,
-    code: null, proposal: Object.freeze({ summary: 'synthetic preview' }), receipt: RECEIPT,
+    code: null, proposal: PROPOSAL, receipt: RECEIPT,
     provenance: Object.freeze({ id: 'synthetic-provenance', receipt: RECEIPT }), reviewRef: `review_${'3'.repeat(32)}` });
+const AVAILABLE_WIRE = Object.freeze({ ...AVAILABLE, proposal: serializePatientSmartImportProposalWire(PROPOSAL) });
 const DENIED_CODES = ['input_invalid', 'kill_switch_disabled', 'kill_switch_unavailable', 'projection_unavailable',
     'lifecycle_missing', 'lifecycle_corrupt', 'lifecycle_unavailable', 'provider_binding_denied', 'provider_unready',
     'model_unavailable', 'fabric_denied', 'source_invalid'] as const;
@@ -43,8 +49,9 @@ async function rejects(response: Response, status: number, code: string) {
 test('serializes one available review-only capability result without echoing input', async () => {
     const current = subject(); const response = await current.preview(request()); const body = await response.json();
     assert.equal(response.status, 200); assert.equal(response.headers.get('Cache-Control'), 'no-store');
-    assert.deepEqual(body, { preview: AVAILABLE }); assert.equal(current.calls(), 1); assert.deepEqual(current.received(), INPUT);
+    assert.deepEqual(body, { preview: AVAILABLE_WIRE }); assert.equal(current.calls(), 1); assert.deepEqual(current.received(), INPUT);
     assert.equal(AVAILABLE.provenance.receipt, AVAILABLE.receipt);
+    assert.equal('explicitCode' in (body.preview.proposal as typeof PROPOSAL).diagnoses[0], false);
     assert.equal(JSON.stringify(body).includes(INPUT.handle), false); assert.equal(JSON.stringify(body).includes(INPUT.requestId), false);
 });
 
