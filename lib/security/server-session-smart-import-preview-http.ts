@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 
 import { apiFailure, apiInternalError } from '../api-error-response';
 import type { PatientSmartImportHostCapabilityResult } from '../domain/documents/patient-smart-import-host-capability';
-import { serializePatientSmartImportProposalWire } from '../smart-import-proposal-wire';
+import { serializeSmartImportPreviewWireRoot } from '../smart-import-preview-wire';
 import {
     AuthenticatedSmartImportPreviewError,
     type AuthenticatedSmartImportPreviewErrorCode,
@@ -15,10 +15,6 @@ type PreviewInput = Readonly<{ handle: string; requestId: string }>;
 type Sources = Readonly<{ preview(input: PreviewInput): Promise<PatientSmartImportHostCapabilityResult> }>;
 
 const MESSAGE = 'Preview Smart Import non disponibile.';
-const DENIED_CODES = new Set(['input_invalid', 'kill_switch_disabled', 'kill_switch_unavailable', 'projection_unavailable',
-    'lifecycle_missing', 'lifecycle_corrupt', 'lifecycle_unavailable', 'provider_binding_denied', 'provider_unready',
-    'model_unavailable', 'fabric_denied', 'source_invalid']);
-const FAILED_CODES = new Set(['provider_failed', 'proposal_invalid']);
 
 function failure(code: string, status: number): NextResponse { return apiFailure(code, MESSAGE, status); }
 function exhaustiveCode(code: never): null { void code; return null; }
@@ -38,58 +34,11 @@ function exact(value: unknown, keys: readonly string[]): Record<string, unknown>
     } catch { return null; }
 }
 
-function plainData(value: unknown, active = new Set<object>()): boolean {
-    if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
-    if (typeof value === 'number') return Number.isFinite(value);
-    if (!value || typeof value !== 'object' || active.has(value)) return false;
-    try {
-        active.add(value);
-        if (Array.isArray(value)) {
-            if (Object.getPrototypeOf(value) !== Array.prototype || Reflect.ownKeys(value).length !== value.length + 1) return false;
-            for (let index = 0; index < value.length; index += 1) {
-                const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-                if (!descriptor || !('value' in descriptor) || !plainData(descriptor.value, active)) return false;
-            }
-            return true;
-        }
-        if (Object.getPrototypeOf(value) !== Object.prototype) return false;
-        for (const key of Reflect.ownKeys(value)) {
-            if (typeof key !== 'string') return false;
-            const descriptor = Object.getOwnPropertyDescriptor(value, key);
-            if (!descriptor || !('value' in descriptor) || !plainData(descriptor.value, active)) return false;
-        }
-        return true;
-    } catch { return false; } finally { active.delete(value); }
-}
-
 function input(value: unknown): PreviewInput | null {
     const record = exact(value, ['handle', 'requestId']);
     if (!record || typeof record.handle !== 'string' || !/^prj_[0-9a-f]{32}$/u.test(record.handle)
         || typeof record.requestId !== 'string' || !/^[A-Za-z][A-Za-z0-9._:-]{15,159}$/u.test(record.requestId)) return null;
     return Object.freeze({ handle: record.handle, requestId: record.requestId });
-}
-
-function capabilityResult(value: unknown): object | null {
-    const record = exact(value, ['writesPerformed', 'apply', 'status', 'code', 'proposal', 'receipt', 'provenance', 'reviewRef']);
-    if (!record || record.writesPerformed !== 0 || record.apply !== 'denied') return null;
-    if (record.status === 'available') {
-        const proposal = serializePatientSmartImportProposalWire(record.proposal);
-        if (record.code !== null || typeof record.reviewRef !== 'string' || !/^review_[0-9a-f]{32}$/u.test(record.reviewRef)
-            || !proposal || !record.receipt || !record.provenance
-            || !plainData(proposal) || !plainData(record.receipt) || !plainData(record.provenance)) return null;
-        return Object.freeze({ ...record, proposal });
-    }
-    if (record.status === 'denied') {
-        if (typeof record.code !== 'string' || !DENIED_CODES.has(record.code) || record.proposal !== null || record.receipt !== null
-            || record.provenance !== null || record.reviewRef !== null) return null;
-        return value as PatientSmartImportHostCapabilityResult;
-    }
-    if (record.status === 'failed') {
-        if (typeof record.code !== 'string' || !FAILED_CODES.has(record.code) || record.proposal !== null || record.reviewRef !== null
-            || !record.receipt || !record.provenance || !plainData(record.receipt) || !plainData(record.provenance)) return null;
-        return value as PatientSmartImportHostCapabilityResult;
-    }
-    return null;
 }
 
 function typedFailure(code: AuthenticatedSmartImportPreviewErrorCode): NextResponse | null {
@@ -108,9 +57,9 @@ export function createSmartImportPreviewHttpHandler(sources: Sources) {
         if (!parsed) return failure('input_invalid', 400);
         try {
             const result = await sources.preview(parsed);
-            const preview = capabilityResult(result);
-            if (!preview) return apiInternalError('POST Smart Import preview', result);
-            const response = NextResponse.json({ preview }); response.headers.set('Cache-Control', 'no-store');
+            const snapshot = serializeSmartImportPreviewWireRoot({ preview: result });
+            if (!snapshot) return apiInternalError('POST Smart Import preview', result);
+            const response = NextResponse.json(snapshot); response.headers.set('Cache-Control', 'no-store');
             return response;
         } catch (error) {
             if (error instanceof AuthenticatedSmartImportPreviewError) return typedFailure(error.code) ?? apiInternalError('POST Smart Import preview', error);
