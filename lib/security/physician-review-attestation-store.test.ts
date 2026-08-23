@@ -33,6 +33,34 @@ function insertCanonicalUser(id: string): void {
 }
 insertCanonicalUser(ACTOR_A);
 insertCanonicalUser(ACTOR_B);
+
+test('DDL rejects forged fixed fields, lifecycle values, and timestamp domains', () => {
+    const db = new Database(path.join(dataDir, 'medical.db'));
+    try {
+        const invalidRows = [
+            ['forged.schema', 'physician_terminal_review', 'inactive', 1, 'physician_terminal_review.v1', null, 1, 1],
+            ['mediflow.physician-review-attestation.v1', 'forged_capability', 'inactive', 1, 'physician_terminal_review.v1', null, 1, 1],
+            ['mediflow.physician-review-attestation.v1', 'physician_terminal_review', 'active', 1, 'physician_terminal_review.v1', null, 1, 1],
+            ['mediflow.physician-review-attestation.v1', 'physician_terminal_review', 'inactive', 99, 'physician_terminal_review.v1', null, 1, 1],
+            ['mediflow.physician-review-attestation.v1', 'physician_terminal_review', 'inactive', 1, 'forged.policy', null, 1, 1],
+            ['mediflow.physician-review-attestation.v1', 'physician_terminal_review', 'inactive', 1, 'physician_terminal_review.v1', 1, 1, 1],
+            ['mediflow.physician-review-attestation.v1', 'physician_terminal_review', 'revoked', 1, 'physician_terminal_review.v1', null, 1, 1],
+            ['mediflow.physician-review-attestation.v1', 'physician_terminal_review', 'inactive', 1, 'physician_terminal_review.v1', null, 'not-a-timestamp', 1],
+        ];
+        for (const [index, values] of invalidRows.entries()) {
+            const actorRef = `synthetic-forged-attestation-${index}`;
+            insertCanonicalUser(actorRef);
+            assert.throws(() => db.prepare(`
+                INSERT INTO physician_review_attestations (
+                    actor_ref, schema_version, capability, status, attestation_version, policy_version, revoked_at, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(actorRef, ...values));
+        }
+    } finally {
+        db.close();
+    }
+});
+
 test('creates only a fixed, default-inactive attestation for one canonical opaque actor', () => {
     const store = createPhysicianReviewAttestationStore();
     const created = store.createInactive(ACTOR_A);
@@ -94,13 +122,10 @@ test('exposes no caller control over capability, state, versions, or actor metad
         store.createInactive(ACTOR_B, { status: 'active', capability: 'admin', policyVersion: 'forged' });
     }
 });
-test('fails closed for corrupt state and unavailable storage without exposing driver details', () => {
+test('fails closed for corrupt state, invalid dates, orphaned actors, and unconstrained prior tables', () => {
     const db = new Database(path.join(dataDir, 'medical.db'));
-    try {
-        db.prepare("UPDATE physician_review_attestations SET status = 'active' WHERE actor_ref = ?").run(ACTOR_A);
-    } finally {
-        db.close();
-    }
+    db.pragma('ignore_check_constraints = ON');
+    try { db.prepare("UPDATE physician_review_attestations SET status = 'active' WHERE actor_ref = ?").run(ACTOR_A); } finally { db.pragma('ignore_check_constraints = OFF'); }
 
     const store = createPhysicianReviewAttestationStore();
     assert.throws(
@@ -108,18 +133,46 @@ test('fails closed for corrupt state and unavailable storage without exposing dr
         (error) => error instanceof PhysicianReviewAttestationStoreError && error.code === 'stored_state_invalid',
     );
 
-    const unavailable = new Database(path.join(dataDir, 'medical.db'));
+    db.pragma('ignore_check_constraints = ON');
     try {
-        unavailable.exec('DROP TABLE physician_review_attestations');
+        db.prepare("UPDATE physician_review_attestations SET status = 'inactive', created_at = 'not-a-timestamp' WHERE actor_ref = ?").run(ACTOR_A);
     } finally {
-        unavailable.close();
+        db.pragma('ignore_check_constraints = OFF');
     }
     assert.throws(
         () => store.read(ACTOR_A),
-        (error) => error instanceof PhysicianReviewAttestationStoreError
-            && error.code === 'storage_unavailable'
-            && !/sqlite|no such table/i.test(error.message),
+        (error) => error instanceof PhysicianReviewAttestationStoreError && error.code === 'stored_state_invalid',
     );
+
+    db.prepare('UPDATE physician_review_attestations SET created_at = 1, updated_at = 1 WHERE actor_ref = ?').run(ACTOR_A);
+    store.createInactive(ACTOR_B);
+    db.pragma('foreign_keys = OFF');
+    try { db.prepare('DELETE FROM users WHERE id = ?').run(ACTOR_B); } finally { db.pragma('foreign_keys = ON'); }
+    assert.throws(
+        () => store.read(ACTOR_B),
+        (error) => error instanceof PhysicianReviewAttestationStoreError && error.code === 'actor_missing',
+    );
+
+    db.exec('DROP TABLE physician_review_attestations');
+    db.exec(`
+        CREATE TABLE physician_review_attestations (
+            actor_ref TEXT PRIMARY KEY NOT NULL, schema_version TEXT NOT NULL, capability TEXT NOT NULL,
+            status TEXT NOT NULL, attestation_version INTEGER NOT NULL, policy_version TEXT NOT NULL,
+            revoked_at INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+        )
+    `);
+    db.prepare(`
+        INSERT INTO physician_review_attestations VALUES (?, 'mediflow.physician-review-attestation.v1',
+            'physician_terminal_review', 'inactive', 1, 'physician_terminal_review.v1', NULL, 1, 1)
+    `).run(ACTOR_A);
+    assert.throws(
+        () => store.read(ACTOR_A),
+        (error) => error instanceof PhysicianReviewAttestationStoreError
+            && String(error.code) === 'schema_incompatible'
+            && !/sqlite|constraint/i.test(error.message),
+    );
+
+    db.close();
 });
 
 after(() => fs.rmSync(dataDir, { recursive: true, force: true }));

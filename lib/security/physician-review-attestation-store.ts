@@ -3,7 +3,7 @@ import 'server-only';
 
 import { eq } from 'drizzle-orm';
 
-import { dbServer, runDbServerImmediateTransaction } from '../db-server';
+import { dbServer, hasCanonicalPhysicianReviewAttestationSchema, runDbServerImmediateTransaction } from '../db-server';
 import { physicianReviewAttestations, users } from '../schema';
 
 const SCHEMA_VERSION = 'mediflow.physician-review-attestation.v1' as const;
@@ -27,6 +27,7 @@ export type PhysicianReviewAttestationStoreErrorCode =
     | 'actor_missing'
     | 'attestation_conflict'
     | 'attestation_missing'
+    | 'schema_incompatible'
     | 'storage_unavailable'
     | 'stored_state_invalid';
 
@@ -45,17 +46,38 @@ function validActorRef(value: unknown): value is string {
     return typeof value === 'string' && value.length > 0 && value.length <= 256 && value === value.trim();
 }
 
+function validDate(value: unknown): value is Date {
+    return value instanceof Date && Number.isFinite(value.getTime());
+}
+
 function record(row: typeof physicianReviewAttestations.$inferSelect): PhysicianReviewAttestationV1 {
     const status = row.status === 'inactive' || row.status === 'revoked' ? row.status : null;
     const lifecycleValid = (status === 'inactive' && row.revokedAt === null) || (status === 'revoked' && row.revokedAt instanceof Date);
+    const timestampOrderValid = validDate(row.createdAt) && validDate(row.updatedAt)
+        && row.updatedAt.getTime() >= row.createdAt.getTime()
+        && (row.revokedAt === null || (validDate(row.revokedAt) && row.revokedAt.getTime() >= row.createdAt.getTime()));
     if (row.schemaVersion !== SCHEMA_VERSION || row.capability !== CAPABILITY || !status || !lifecycleValid
         || row.attestationVersion !== 1 || row.policyVersion !== POLICY_VERSION
-        || !(row.createdAt instanceof Date) || !(row.updatedAt instanceof Date)) return fail('stored_state_invalid');
+        || !timestampOrderValid) return fail('stored_state_invalid');
     return Object.freeze({
         schemaVersion: SCHEMA_VERSION, actorRef: row.actorRef, capability: CAPABILITY, status,
         attestationVersion: 1, policyVersion: POLICY_VERSION, revokedAt: row.revokedAt,
         createdAt: row.createdAt, updatedAt: row.updatedAt,
     });
+}
+
+function canonicalActor(actorRef: string): void {
+    const matches = dbServer.select({ id: users.id }).from(users).where(eq(users.id, actorRef)).limit(2).all();
+    if (matches.length === 0) return fail('actor_missing');
+    if (matches.length !== 1 || matches[0].id !== actorRef) return fail('stored_state_invalid');
+}
+
+function readCurrent(actorRef: string): PhysicianReviewAttestationV1 {
+    if (!hasCanonicalPhysicianReviewAttestationSchema()) return fail('schema_incompatible');
+    canonicalActor(actorRef);
+    const row = dbServer.select().from(physicianReviewAttestations).where(eq(physicianReviewAttestations.actorRef, actorRef)).get();
+    if (!row) return fail('attestation_missing');
+    return record(row);
 }
 
 function storage(error: unknown): never {
@@ -67,12 +89,7 @@ function storage(error: unknown): never {
 export function createPhysicianReviewAttestationStore() {
     const load = (actorRef: unknown): PhysicianReviewAttestationV1 => {
         if (!validActorRef(actorRef)) return fail('actor_invalid');
-        try {
-            const row = dbServer.select().from(physicianReviewAttestations)
-                .where(eq(physicianReviewAttestations.actorRef, actorRef)).get();
-            if (!row) return fail('attestation_missing');
-            return record(row);
-        } catch (error) { return storage(error); }
+        try { return runDbServerImmediateTransaction(() => readCurrent(actorRef)); } catch (error) { return storage(error); }
     };
 
     return Object.freeze({
@@ -80,15 +97,14 @@ export function createPhysicianReviewAttestationStore() {
             if (!validActorRef(actorRef)) return fail('actor_invalid');
             try {
                 return runDbServerImmediateTransaction(() => {
-                    const actor = dbServer.select({ id: users.id }).from(users).where(eq(users.id, actorRef)).limit(2).all();
-                    if (actor.length === 0) return fail('actor_missing');
-                    if (actor.length !== 1) return fail('stored_state_invalid');
+                    if (!hasCanonicalPhysicianReviewAttestationSchema()) return fail('schema_incompatible');
+                    canonicalActor(actorRef);
                     if (dbServer.select({ actorRef: physicianReviewAttestations.actorRef }).from(physicianReviewAttestations).where(eq(physicianReviewAttestations.actorRef, actorRef)).get()) return fail('attestation_conflict');
                     dbServer.insert(physicianReviewAttestations).values({
                         actorRef, schemaVersion: SCHEMA_VERSION, capability: CAPABILITY, status: 'inactive',
                         attestationVersion: 1, policyVersion: POLICY_VERSION, revokedAt: null,
                     }).run();
-                    return load(actorRef);
+                    return readCurrent(actorRef);
                 });
             } catch (error) { return storage(error); }
         },

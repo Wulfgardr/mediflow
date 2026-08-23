@@ -76,6 +76,31 @@ if (!fs.existsSync(dbPath) && fs.existsSync(legacyDbPath)) {
 let sqlite = new Database(dbPath);
 initSqlitePragmas(sqlite);
 /* @Codex */
+const PHYSICIAN_REVIEW_ATTESTATIONS_DDL = `
+    CREATE TABLE physician_review_attestations (
+        actor_ref TEXT PRIMARY KEY NOT NULL REFERENCES users(id) CHECK (length(actor_ref) BETWEEN 1 AND 256 AND trim(actor_ref) = actor_ref),
+        schema_version TEXT NOT NULL CHECK (schema_version = 'mediflow.physician-review-attestation.v1'),
+        capability TEXT NOT NULL CHECK (capability = 'physician_terminal_review'),
+        status TEXT NOT NULL CHECK (status IN ('inactive', 'revoked')),
+        attestation_version INTEGER NOT NULL CHECK (attestation_version = 1),
+        policy_version TEXT NOT NULL CHECK (policy_version = 'physician_terminal_review.v1'),
+        revoked_at INTEGER, created_at INTEGER NOT NULL DEFAULT (unixepoch()), updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        CONSTRAINT physician_review_attestations_lifecycle_check CHECK ((status = 'inactive' AND revoked_at IS NULL) OR (status = 'revoked' AND revoked_at IS NOT NULL)),
+        CONSTRAINT physician_review_attestations_timestamp_check CHECK (
+            typeof(created_at) = 'integer' AND created_at BETWEEN 0 AND 8640000000000
+            AND typeof(updated_at) = 'integer' AND updated_at BETWEEN created_at AND 8640000000000
+            AND (revoked_at IS NULL OR (typeof(revoked_at) = 'integer' AND revoked_at BETWEEN created_at AND 8640000000000))
+        )
+    )
+`;
+const normalizeSchemaSql = (value: string) => value.toLowerCase().replace(/if\s+not\s+exists/gu, '').replace(/[\s`"']/gu, '');
+const PHYSICIAN_REVIEW_ATTESTATIONS_SCHEMA = normalizeSchemaSql(PHYSICIAN_REVIEW_ATTESTATIONS_DDL);
+/* @Codex */
+export function hasCanonicalPhysicianReviewAttestationSchema(): boolean {
+    const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'physician_review_attestations'").get() as { sql?: unknown } | undefined;
+    return typeof row?.sql === 'string' && normalizeSchemaSql(row.sql) === PHYSICIAN_REVIEW_ATTESTATIONS_SCHEMA;
+}
+/* @Codex */
 type TableInfoRow = { name: string };
 /* @Codex */
 function ensureColumn(table: string, columnName: string, columnSql: string) {
@@ -103,14 +128,7 @@ function applySchemaGuards() {
     }
     /* @Codex */
     try {
-        sqlite.prepare(`
-            CREATE TABLE IF NOT EXISTS physician_review_attestations (
-                actor_ref TEXT PRIMARY KEY NOT NULL REFERENCES users(id), schema_version TEXT NOT NULL,
-                capability TEXT NOT NULL, status TEXT NOT NULL, attestation_version INTEGER NOT NULL,
-                policy_version TEXT NOT NULL, revoked_at INTEGER,
-                created_at INTEGER NOT NULL DEFAULT (unixepoch()), updated_at INTEGER NOT NULL DEFAULT (unixepoch())
-            )
-        `).run();
+        sqlite.prepare(PHYSICIAN_REVIEW_ATTESTATIONS_DDL.replace('CREATE TABLE', 'CREATE TABLE IF NOT EXISTS')).run();
     } catch (error) {
         console.warn('[MediFlow] Physician review attestation schema check skipped:', error);
     }
