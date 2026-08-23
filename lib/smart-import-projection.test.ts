@@ -61,6 +61,12 @@ test('uses one canonical half-open projection freshness window at ingest', () =>
     );
 });
 
+test('uses the same half-open freshness boundary for authority-free attachments', () => {
+    assert.doesNotThrow(() => snapshotSmartImportProjectionAttachment(attachment(), '2026-08-22T12:04:59.999Z'));
+    assert.throws(() => snapshotSmartImportProjectionAttachment(attachment(), '2026-08-22T12:05:00.000Z'), (error) => error instanceof SmartImportProjectionError && error.code === 'projection_stale');
+    assert.throws(() => snapshotSmartImportProjectionAttachment({ ...attachment(), capturedAt: '2026-08-22T12:00:00.001Z' }, NOW), (error) => error instanceof SmartImportProjectionError && error.code === 'projection_stale');
+});
+
 test('copies a valid authority-free attachment into a deeply frozen snapshot', () => {
     const input = attachment();
     const value = snapshotSmartImportProjectionAttachment(input, NOW);
