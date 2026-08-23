@@ -7,6 +7,8 @@ export const BACKUP_COLLECTIONS = [
     'attachments',
     'conversations',
     'documentDiagnosisProposals',
+    'durableReviewCommandStates',
+    'durableReviewCommandOperations',
     'durableReviewRecords',
     'durableReviewOperations',
     'drugs',
@@ -26,12 +28,15 @@ export const BACKUP_COLLECTIONS = [
 
 export type BackupCollectionName = (typeof BACKUP_COLLECTIONS)[number];
 export type BackupRecord = Record<string, unknown>;
-export type BackupDataset = Record<BackupCollectionName, BackupRecord[]>;
+type AuditDependentCommandCollection = 'durableReviewCommandStates' | 'durableReviewCommandOperations';
+export type BackupDataset = Record<Exclude<BackupCollectionName, AuditDependentCommandCollection>, BackupRecord[]>
+    & Partial<Record<AuditDependentCommandCollection, BackupRecord[]>>;
 
 /* @Codex */
 const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
-    BACKUP_COLLECTIONS.filter((collection) => collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations'),
-    BACKUP_COLLECTIONS.filter((collection) => collection !== 'documentDiagnosisProposals' && collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations'),
+    BACKUP_COLLECTIONS.filter((collection) => collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations'),
+    BACKUP_COLLECTIONS.filter((collection) => collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations' && collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations'),
+    BACKUP_COLLECTIONS.filter((collection) => collection !== 'documentDiagnosisProposals' && collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations' && collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations'),
 ];
 const PATIENT_DEPENDENT_COLLECTIONS: readonly BackupCollectionName[] = [
     'attachments',
@@ -173,6 +178,10 @@ async function normalizeDurableReviewRecord(value: unknown): Promise<Record<stri
 
 /* @Codex */
 async function assertDurableReviewLedger(payload: Partial<Record<BackupCollectionName, BackupRecord[]>>): Promise<void> {
+    /* @Codex The v1 payload does not own the append-only audit ledger required by command replay. */
+    if ((payload.durableReviewCommandStates?.length ?? 0) > 0 || (payload.durableReviewCommandOperations?.length ?? 0) > 0) {
+        throw new BackupArtifactError('invalid-manifest', 'Durable review command state requires its append-only audit ledger.');
+    }
     const records = new Map<string, Record<string, unknown>>();
     for (const row of payload.durableReviewRecords ?? []) {
         if (!hasExactKeys(row, DURABLE_BACKUP_RECORD_KEYS) || row.id !== row.reviewId) throw new BackupArtifactError('invalid-manifest', 'Durable review record is invalid.');
@@ -367,15 +376,17 @@ async function assertCollectionReferences(
 }
 
 export async function createBackupArtifact(payload: BackupDataset, createdAt = new Date()): Promise<BackupArtifact> {
-    assertCollectionSet(payload);
-    await assertCollectionReferences(payload);
+    /* @Codex Existing v1 producers add the audit-dependent collections as empty until audit restore is separately contracted. */
+    const currentPayload = { ...createEmptyDataset(), ...payload } as BackupDataset;
+    assertCollectionSet(currentPayload as Record<string, unknown>);
+    await assertCollectionReferences(currentPayload);
 
     const recordCounts = createEmptyCounts();
     for (const collection of BACKUP_COLLECTIONS) {
-        recordCounts[collection] = payload[collection].length;
+        recordCounts[collection] = currentPayload[collection]?.length ?? 0;
     }
 
-    const payloadSnapshot = normalizeJson(payload);
+    const payloadSnapshot = normalizeJson(currentPayload);
     const checksum = await sha256Hex(stableStringify(payloadSnapshot));
 
     return {
@@ -389,7 +400,7 @@ export async function createBackupArtifact(payload: BackupDataset, createdAt = n
             collections: [...BACKUP_COLLECTIONS],
             recordCounts,
         },
-        payload,
+        payload: currentPayload,
     };
 }
 

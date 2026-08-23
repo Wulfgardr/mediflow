@@ -6,6 +6,8 @@ import {
     checkups,
     conversations,
     documentDiagnosisProposals,
+    durableReviewCommandOperations,
+    durableReviewCommandStates,
     durableReviewOperations,
     durableReviewRecords,
     drugs,
@@ -29,6 +31,8 @@ const CLEAR_ORDER: BackupCollectionName[] = [
     'messages',
     'attachments',
     'documentDiagnosisProposals',
+    'durableReviewCommandOperations',
+    'durableReviewCommandStates',
     'durableReviewOperations',
     'durableReviewRecords',
     'observations',
@@ -56,6 +60,8 @@ const INSERT_ORDER: BackupCollectionName[] = [
     'documentDiagnosisProposals',
     'durableReviewRecords',
     'durableReviewOperations',
+    'durableReviewCommandStates',
+    'durableReviewCommandOperations',
     'entries',
     'therapies',
     'checkups',
@@ -75,6 +81,8 @@ const TABLE_LOOKUP = {
     checkups,
     conversations,
     documentDiagnosisProposals,
+    durableReviewCommandOperations,
+    durableReviewCommandStates,
     durableReviewOperations,
     durableReviewRecords,
     drugs,
@@ -172,7 +180,7 @@ export function restoreBackupArtifact(artifact: BackupArtifact): void {
         tx.delete(patientsToAmbulatories).run();
 
         for (const collection of INSERT_ORDER) {
-            insertRows(tx, TABLE_LOOKUP[collection], artifact.payload[collection]);
+            insertRows(tx, TABLE_LOOKUP[collection], artifact.payload[collection] ?? []);
         }
 
         insertRows(tx, patientsToAmbulatories, derivePatientAmbulatoryLinks(artifact.payload.patients));

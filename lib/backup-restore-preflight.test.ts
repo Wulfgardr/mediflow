@@ -16,6 +16,8 @@ const basePayload = {
     documentDiagnosisProposals: [],
     durableReviewRecords: [],
     durableReviewOperations: [],
+    durableReviewCommandStates: [],
+    durableReviewCommandOperations: [],
     drugs: [],
     entries: [],
     exemptions: [],
