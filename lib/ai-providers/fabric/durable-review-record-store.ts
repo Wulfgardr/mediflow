@@ -7,21 +7,22 @@ import { durableReviewRecords } from '../../schema';
 
 export const DURABLE_REVIEW_PRESENTATION_VERSION = 'mediflow.ai.durable-review.presentation.v1' as const;
 export type DurableReviewRecord = Readonly<{
-    recordId: string; reviewId: string; reviewRevision: 1; receiptRef: string; provenanceRef: string;
+    recordId: string; patientRef: string; reviewId: string; reviewRevision: 1; receiptRef: string; provenanceRef: string;
     receiptBinding: string; provenanceBinding: string; presentationVersion: typeof DURABLE_REVIEW_PRESENTATION_VERSION;
     sealedCiphertext: string; sealedDigest: string;
 }>;
 type DurableReviewInput = Omit<DurableReviewRecord, 'recordId'>;
-export type DurableReviewRecordStoreErrorCode = 'invalid_record' | 'duplicate' | 'missing' | 'corrupt';
+export type DurableReviewRecordStoreErrorCode = 'invalid_record' | 'duplicate' | 'missing' | 'corrupt' | 'storage_unavailable';
 export class DurableReviewRecordStoreError extends Error {
     constructor(public readonly code: DurableReviewRecordStoreErrorCode) { super(`Durable review record rejected: ${code}`); }
 }
 const REVIEW = /^review_[0-9a-f]{32}$/;
+const PATIENT = /^ptr_[0-9a-f]{32}$/;
 const RECEIPT = /^receipt_[0-9a-f]{32}$/;
 const PROVENANCE = /^provenance_[0-9a-f]{32}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const SEALED = /^ENC:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}$/;
-const INPUT_KEYS = ['reviewId', 'reviewRevision', 'receiptRef', 'provenanceRef', 'receiptBinding', 'provenanceBinding', 'presentationVersion', 'sealedCiphertext', 'sealedDigest'] as const;
+const INPUT_KEYS = ['patientRef', 'reviewId', 'reviewRevision', 'receiptRef', 'provenanceRef', 'receiptBinding', 'provenanceBinding', 'presentationVersion', 'sealedCiphertext', 'sealedDigest'] as const;
 
 function digest(value: string): string { return createHash('sha256').update(value).digest('hex'); }
 function exact(value: object, keys: readonly string[]): boolean {
@@ -30,24 +31,31 @@ function exact(value: object, keys: readonly string[]): boolean {
         Object.hasOwn(descriptors, key) && 'value' in descriptors[key]! && descriptors[key]!.enumerable
     ));
 }
-function snapshot(value: unknown): DurableReviewInput {
+function normalize(value: unknown): DurableReviewInput {
     if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype || !exact(value, INPUT_KEYS)) {
         throw new DurableReviewRecordStoreError('invalid_record');
     }
     const input = value as Record<string, unknown>;
-    const reviewId = input.reviewId; const receiptRef = input.receiptRef; const provenanceRef = input.provenanceRef;
+    const patientRef = input.patientRef; const reviewId = input.reviewId; const receiptRef = input.receiptRef; const provenanceRef = input.provenanceRef;
     const receiptBinding = input.receiptBinding; const provenanceBinding = input.provenanceBinding;
     const ciphertext = input.sealedCiphertext; const sealedDigest = input.sealedDigest;
     if (
-        typeof reviewId !== 'string' || !REVIEW.test(reviewId) || input.reviewRevision !== 1
+        typeof patientRef !== 'string' || !PATIENT.test(patientRef) || typeof reviewId !== 'string' || !REVIEW.test(reviewId) || input.reviewRevision !== 1
         || typeof receiptRef !== 'string' || !RECEIPT.test(receiptRef) || typeof provenanceRef !== 'string' || !PROVENANCE.test(provenanceRef)
-        || typeof receiptBinding !== 'string' || !SHA256.test(receiptBinding) || receiptBinding !== digest(`${reviewId}\0${receiptRef}`)
-        || typeof provenanceBinding !== 'string' || !SHA256.test(provenanceBinding) || provenanceBinding !== digest(`${reviewId}\0${provenanceRef}`)
+        || typeof receiptBinding !== 'string' || !SHA256.test(receiptBinding) || receiptBinding !== digest(`${patientRef}\0${reviewId}\0${receiptRef}`)
+        || typeof provenanceBinding !== 'string' || !SHA256.test(provenanceBinding) || provenanceBinding !== digest(`${patientRef}\0${reviewId}\0${provenanceRef}`)
         || input.presentationVersion !== DURABLE_REVIEW_PRESENTATION_VERSION || typeof ciphertext !== 'string' || !SEALED.test(ciphertext)
         || typeof sealedDigest !== 'string' || !SHA256.test(sealedDigest) || sealedDigest !== digest(ciphertext)
     ) throw new DurableReviewRecordStoreError('invalid_record');
-    return Object.freeze({ reviewId, reviewRevision: 1, receiptRef, provenanceRef, receiptBinding, provenanceBinding,
+    return Object.freeze({ patientRef, reviewId, reviewRevision: 1, receiptRef, provenanceRef, receiptBinding, provenanceBinding,
         presentationVersion: DURABLE_REVIEW_PRESENTATION_VERSION, sealedCiphertext: ciphertext, sealedDigest });
+}
+function snapshot(value: unknown): DurableReviewInput {
+    try { return normalize(value); } catch { throw new DurableReviewRecordStoreError('invalid_record'); }
+}
+function isDuplicate(error: unknown): boolean {
+    try { return typeof error === 'object' && error !== null && ['SQLITE_CONSTRAINT_PRIMARYKEY', 'SQLITE_CONSTRAINT_UNIQUE'].includes(String((error as { code?: unknown }).code)); }
+    catch { return false; }
 }
 function publicRecord(value: DurableReviewInput, recordId = value.reviewId): DurableReviewRecord {
     if (recordId !== value.reviewId) throw new DurableReviewRecordStoreError('corrupt');
@@ -60,12 +68,14 @@ export function createDurableReviewRecordStore() {
         const record = snapshot(value);
         try {
             dbServer.insert(durableReviewRecords).values({ id: record.reviewId, ...record }).run();
-        } catch { throw new DurableReviewRecordStoreError('duplicate'); }
+        } catch (error) { throw new DurableReviewRecordStoreError(isDuplicate(error) ? 'duplicate' : 'storage_unavailable'); }
         return publicRecord(record);
     }
     function read(reviewId: unknown): DurableReviewRecord {
         if (typeof reviewId !== 'string' || !REVIEW.test(reviewId)) throw new DurableReviewRecordStoreError('missing');
-        const row = dbServer.select().from(durableReviewRecords).where(eq(durableReviewRecords.id, reviewId)).get();
+        let row;
+        try { row = dbServer.select().from(durableReviewRecords).where(eq(durableReviewRecords.id, reviewId)).get(); }
+        catch { throw new DurableReviewRecordStoreError('storage_unavailable'); }
         if (!row) throw new DurableReviewRecordStoreError('missing');
         const { id, createdAt: _createdAt, ...stored } = row;
         try { return publicRecord(snapshot(stored), id); }
