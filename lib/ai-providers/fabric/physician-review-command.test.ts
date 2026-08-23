@@ -35,8 +35,8 @@ function reviewRecord(suffix: string) {
 
 const request = (action: 'accept' | 'reject' | 'supersede', key: string, proof: string, expectedRevision = 1, uncertaintyAcknowledged = false) =>
     ({ action, expectedRevision, idempotencyKey: key, gestureProof: proof, uncertaintyAcknowledged });
-const context = (reviewId: string, uncertaintyAcknowledgmentRequired = false, actorRef = 'actor_11111111111111111111111111111111') =>
-    ({ reviewId, actorRef, role: 'physician', uncertaintyAcknowledgmentRequired });
+const context = (reviewId: string, uncertaintyAcknowledgmentRequired = false, actorRef = '11111111-1111-4111-8111-111111111111') =>
+    ({ reviewId, actorRef, uncertaintyAcknowledgmentRequired });
 const expectCode = (code: string, execute: () => unknown) => assert.throws(execute, (error) => error instanceof PhysicianReviewCommandError && error.code === code);
 function acceptedReview(suffix: string) {
     const record = reviewRecord(suffix); const proof = `gesture_${suffix.repeat(32)}`; const eventId = `event_${suffix.repeat(32)}`;
@@ -54,9 +54,9 @@ test('accepts a host-resolved physician review and writes an opaque audit receip
     createDurableReviewRecordStore().create({ record, expectedReviewRevision: 0, idempotencyKey: 'idem_aaaaaaaaaaaaaaaa' });
     let gestureUsed = false;
     const service = createPhysicianReviewCommandService({
-        resolveContext: () => ({ reviewId, actorRef: 'actor_11111111111111111111111111111111', role: 'physician', uncertaintyAcknowledgmentRequired: true }),
+        resolveContext: () => ({ reviewId, actorRef: '11111111-1111-4111-8111-111111111111', uncertaintyAcknowledgmentRequired: true }),
         consumeGesture: (scope) => {
-            if (scope.proof !== 'gesture_11111111111111111111111111111111' || scope.actorRef !== 'actor_11111111111111111111111111111111' || scope.action !== 'accept' || scope.reviewId !== reviewId || scope.expectedRevision !== 1 || gestureUsed) return false;
+            if (scope.proof !== 'gesture_11111111111111111111111111111111' || scope.actorRef !== '11111111-1111-4111-8111-111111111111' || scope.action !== 'accept' || scope.reviewId !== reviewId || scope.expectedRevision !== 1 || gestureUsed) return false;
             gestureUsed = true;
             return true;
         },
@@ -75,7 +75,7 @@ test('accepts a host-resolved physician review and writes an opaque audit receip
     assert.deepEqual(service.execute(input), expected, 'an equivalent idempotent replay must not consume the one-use gesture again');
     expectCode('idempotency_conflict', () => service.execute(request('accept', input.idempotencyKey, 'gesture_99999999999999999999999999999999', 1, true)));
     const actorB = createPhysicianReviewCommandService({
-        resolveContext: () => context(reviewId, true, 'actor_22222222222222222222222222222222'), consumeGesture: () => { throw new Error('replay must not consume'); }, eventId: () => 'event_22222222222222222222222222222222', now: () => 2,
+        resolveContext: () => context(reviewId, true, '22222222-2222-4222-8222-222222222222'), consumeGesture: () => { throw new Error('replay must not consume'); }, eventId: () => 'event_22222222222222222222222222222222', now: () => 2,
     });
     expectCode('idempotency_conflict', () => actorB.execute(input));
     expectCode('idempotency_conflict', () => service.execute(request('reject', input.idempotencyKey, input.gestureProof)));
@@ -87,32 +87,51 @@ test('accepts a host-resolved physician review and writes an opaque audit receip
         assert.deepEqual(audit, {
             event_id: expected.eventId,
             event_type: 'ai.review.accepted',
-            actor_ref: 'actor_11111111111111111111111111111111',
+            actor_ref: '11111111-1111-4111-8111-111111111111',
             subject_ref: reviewId,
             occurred_at: 1_700_000_000,
-            redacted_metadata: `{"flags":["accept","accepted","digest_${digest(JSON.stringify(['accept', 1, true, digest(input.gestureProof), 'actor_11111111111111111111111111111111']))}"],"resourceVersion":2}`,
+            redacted_metadata: `{"flags":["accept","accepted","digest_${digest(JSON.stringify(['accept', 1, true, digest(input.gestureProof), '11111111-1111-4111-8111-111111111111']))}"],"resourceVersion":2}`,
         });
         assert.doesNotMatch(JSON.stringify(audit), /sealedCiphertext|synthetic-review|plaintext|proposal/i);
     } finally { sqlite.close(); }
 });
 
-test('rejects a non-physician and caller-supplied actor or patient fields before any gesture is consumed', () => {
+test('accepts a UUID actorRef only from resolveContext and rejects role or caller authority before any gesture is consumed', () => {
     let gestures = 0;
-    const denied = createPhysicianReviewCommandService({
-        resolveContext: () => ({ ...context('review_22222222222222222222222222222222'), role: 'application' }),
+    const roleInjected = createPhysicianReviewCommandService({
+        resolveContext: () => ({ ...context('review_22222222222222222222222222222222'), role: 'physician' }),
         consumeGesture: () => { gestures += 1; return true; }, eventId: () => 'event_22222222222222222222222222222222', now: () => 1,
     });
-    expectCode('actor_forbidden', () => denied.execute(request('reject', 'idem_cccccccccccccccc', 'gesture_22222222222222222222222222222222')));
+    expectCode('context_unavailable', () => roleInjected.execute(request('reject', 'idem_cccccccccccccccc', 'gesture_22222222222222222222222222222222')));
     const injected = createPhysicianReviewCommandService({
         resolveContext: () => context('review_22222222222222222222222222222222'),
         consumeGesture: () => { gestures += 1; return true; }, eventId: () => 'event_22222222222222222222222222222222', now: () => 1,
     });
-    expectCode('invalid_command', () => injected.execute({ ...request('reject', 'idem_cccccccccccccccc', 'gesture_22222222222222222222222222222222'), actorRef: 'actor_injected', patientRef: 'ptr_injected' }));
+    expectCode('invalid_command', () => injected.execute({ ...request('reject', 'idem_cccccccccccccccc', 'gesture_22222222222222222222222222222222'), actorRef: 'forged-user', role: 'physician', patientRef: 'ptr_injected', reviewId: 'review_injected' }));
     const unavailable = createPhysicianReviewCommandService({
         resolveContext: () => { throw new Error('synthetic host failure'); },
         consumeGesture: () => { gestures += 1; return true; }, eventId: () => 'event_22222222222222222222222222222222', now: () => 1,
     });
     expectCode('context_unavailable', () => unavailable.execute(request('reject', 'idem_cccccccccccccccc', 'gesture_22222222222222222222222222222222')));
+    assert.equal(gestures, 0);
+});
+
+test('fails closed before gesture and CAS when the host context has a missing, blank, hostile, or extra actor field', () => {
+    let gestures = 0;
+    const reviewId = 'review_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const input = request('reject', 'idem_kkkkkkkkkkkkkkkk', 'gesture_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    for (const invalid of [undefined, '', ' actor ', { id: '11111111-1111-4111-8111-111111111111' }]) {
+        const service = createPhysicianReviewCommandService({
+            resolveContext: () => ({ reviewId, actorRef: invalid, uncertaintyAcknowledgmentRequired: false }),
+            consumeGesture: () => { gestures += 1; return true; }, eventId: () => 'event_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', now: () => 1,
+        });
+        expectCode('context_unavailable', () => service.execute(input));
+    }
+    const extra = createPhysicianReviewCommandService({
+        resolveContext: () => ({ ...context(reviewId), canonicalUserId: '11111111-1111-4111-8111-111111111111' }),
+        consumeGesture: () => { gestures += 1; return true; }, eventId: () => 'event_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', now: () => 1,
+    });
+    expectCode('context_unavailable', () => extra.execute(input));
     assert.equal(gestures, 0);
 });
 
