@@ -46,6 +46,7 @@ test('keeps equal content from distinct origins and rejects more than 32 sources
     const same = { ...source('origin.b'), originKey: 'origin.c' };
     assert.equal(create().capture(input({ sources: [source('origin.b'), same], therapyCandidateHints: [] }), true).sources.length, 2);
     const many = Array.from({ length: 32 }, (_, index) => source(`origin.synthetic.${index}`));
+    assert.equal(create().capture(input({ sources: [...many, many[0]], therapyCandidateHints: [] }), true).sources.length, 32);
     assert.equal(create().capture(input({ sources: many, therapyCandidateHints: [] }), true).sources.length, 32);
     assert.throws(() => create().capture(input({ sources: [...many, source('origin.synthetic.33')], therapyCandidateHints: [] }), true), rejects());
 });
@@ -54,6 +55,7 @@ test('rebinds exact hint duplicates after sorting and rejects unbound or excessi
     const hints = [{ kind: 'clinical-entry', originKey: 'origin.b', label: 'B', excerpt: 'B' }, { kind: 'patient-notes', originKey: 'origin.a', label: 'A', excerpt: 'A' }, { kind: 'clinical-entry', originKey: 'origin.b', label: 'B', excerpt: 'B' }];
     const value = create().capture(input({ sources: [source('origin.b'), source('origin.a', 'patient-notes')], therapyCandidateHints: hints }), true);
     assert.deepEqual(value.therapyCandidateHints.map(({ sourceId, label }) => [sourceId, label]), [['source.local.00000000001.01', 'A'], ['source.local.00000000001.02', 'B']]);
+    assert.equal(create().capture(input({ sources: [source('origin.b')], therapyCandidateHints: Array.from({ length: 33 }, () => hints[0]) }), true).therapyCandidateHints.length, 1);
     assert.throws(() => create().capture(input({ therapyCandidateHints: [{ ...hints[0], originKey: 'origin.unbound' }] }), true), rejects());
     assert.throws(() => create().capture(input({ therapyCandidateHints: Array.from({ length: 33 }, (_, index) => ({ ...hints[0], label: `L${index}` })) }), true), rejects());
 });
@@ -64,6 +66,17 @@ test('fails closed when patient.version changes during the synchronous capture f
         descriptors += 1; if (descriptors > 1) value.version = 4; return Reflect.getOwnPropertyDescriptor(value, key);
     } });
     assert.throws(() => create().capture(input({ patient }), true), rejects());
+});
+
+test('copies diagnoses and therapies before the clock can mutate original arrays or objects', () => {
+    const value = input();
+    const adapter = createSmartImportProjectionAttachmentBrowserNormalizer({ clock: () => {
+        value.currentDiagnoses[0] = { system: 'ICD-11', code: 'SYN-9', description: 'Mutazione sintetica' };
+        value.currentActiveTherapies[0] = { drugName: 'Mutazione sintetica', activePrinciple: null, dosage: null, aic: null, atc: null };
+        return new Date(NOW);
+    } });
+    const captured = adapter.capture(value, true);
+    assert.deepEqual([captured.currentDiagnoses[0].code, captured.currentActiveTherapies[0].drugName], ['SYN-1', 'Farmaco sintetico']);
 });
 
 test('keeps sourceRevision local-only and leaves the shared freshness validator canonical', () => {
