@@ -1,0 +1,29 @@
+{
+  "schema": "mediflow.capability-mapping.plane-inventory.v1",
+  "plane": "fabric",
+  "inventoryVersion": 1,
+  "status": "candidate_not_integrated",
+  "applyPolicy": "none",
+  "claimCeiling": "P1 referential Fabric roster; not runtime, integration, release, or Headless authority evidence",
+  "adr": {
+    "ref": "54b56c2bb4a9eb1bd76f198fc58457ebd7623e5b:docs/adr/0100-fabric-vs-headless-semantic-plane.md",
+    "gitBlob": "e9abf64d566ff54d7d767f03580ea911bc6ef32e"
+  },
+  "source": {
+    "ref": "b25ace437fda8d89b402c63cba2adb38295f188c:docs/capability-mapping/nodes/fabric-inventory.v1.json",
+    "gitBlob": "43923de3e2f13065c8d034228b53c2b80b019f9f",
+    "expectedCount": 16,
+    "observedCount": 16
+  },
+  "relations": {
+    "ref": "b25ace437fda8d89b402c63cba2adb38295f188c:docs/capability-mapping/relations/fabric-canonical-bindings.v1.json",
+    "gitBlob": "ad9a150d228cfca96d1a17a19a81f5e8680cef06",
+    "expectedCount": 39,
+    "observedCount": 39
+  },
+  "rowPolicy": {
+    "authority": "fabric_only_not_headless",
+    "stage": "inherited_unresolved",
+    "applyPolicy": "none"
+  }
+}
