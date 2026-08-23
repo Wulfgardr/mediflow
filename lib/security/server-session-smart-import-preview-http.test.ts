@@ -7,9 +7,10 @@ import { AuthenticatedSmartImportPreviewError } from './server-session-authentic
 import { createSmartImportPreviewHttpHandler } from './server-session-smart-import-preview-http.ts';
 
 const INPUT = Object.freeze({ handle: `prj_${'1'.repeat(32)}`, requestId: `req_${'2'.repeat(32)}` });
+const RECEIPT = Object.freeze({ id: 'synthetic-receipt' });
 const AVAILABLE = Object.freeze({ writesPerformed: 0 as const, apply: 'denied' as const, status: 'available' as const,
-    code: null, proposal: Object.freeze({ summary: 'synthetic preview' }), receipt: Object.freeze({ id: 'synthetic-receipt' }),
-    provenance: Object.freeze({ id: 'synthetic-provenance' }), reviewRef: `review_${'3'.repeat(32)}` });
+    code: null, proposal: Object.freeze({ summary: 'synthetic preview' }), receipt: RECEIPT,
+    provenance: Object.freeze({ id: 'synthetic-provenance', receipt: RECEIPT }), reviewRef: `review_${'3'.repeat(32)}` });
 const DENIED_CODES = ['input_invalid', 'kill_switch_disabled', 'kill_switch_unavailable', 'projection_unavailable',
     'lifecycle_missing', 'lifecycle_corrupt', 'lifecycle_unavailable', 'provider_binding_denied', 'provider_unready',
     'model_unavailable', 'fabric_denied', 'source_invalid'] as const;
@@ -21,9 +22,11 @@ function request(body: unknown = INPUT): Request {
 }
 function denied(code: typeof DENIED_CODES[number] = DENIED_CODES[0]) { return Object.freeze({ writesPerformed: 0 as const, apply: 'denied' as const,
     status: 'denied' as const, code, proposal: null, receipt: null, provenance: null, reviewRef: null }); }
-function failed(code: typeof FAILED_CODES[number] = FAILED_CODES[0]) { return Object.freeze({ writesPerformed: 0 as const, apply: 'denied' as const,
-    status: 'failed' as const, code, proposal: null, receipt: Object.freeze({ id: 'synthetic-receipt' }),
-    provenance: Object.freeze({ id: 'synthetic-provenance' }), reviewRef: null }); }
+function failed(code: typeof FAILED_CODES[number] = FAILED_CODES[0]) {
+    const receipt = Object.freeze({ id: 'synthetic-receipt' });
+    return Object.freeze({ writesPerformed: 0 as const, apply: 'denied' as const, status: 'failed' as const,
+        code, proposal: null, receipt, provenance: Object.freeze({ id: 'synthetic-provenance', receipt }), reviewRef: null });
+}
 function subject(result: unknown = AVAILABLE) {
     let calls = 0; let received: unknown;
     return Object.freeze({ calls: () => calls, received: () => received,
@@ -41,6 +44,7 @@ test('serializes one available review-only capability result without echoing inp
     const current = subject(); const response = await current.preview(request()); const body = await response.json();
     assert.equal(response.status, 200); assert.equal(response.headers.get('Cache-Control'), 'no-store');
     assert.deepEqual(body, { preview: AVAILABLE }); assert.equal(current.calls(), 1); assert.deepEqual(current.received(), INPUT);
+    assert.equal(AVAILABLE.provenance.receipt, AVAILABLE.receipt);
     assert.equal(JSON.stringify(body).includes(INPUT.handle), false); assert.equal(JSON.stringify(body).includes(INPUT.requestId), false);
 });
 
@@ -49,6 +53,7 @@ test('keeps every denied and failed review-only domain outcome at 200', async ()
         const response = await subject(result).preview(request());
         assert.equal(response.status, 200); assert.equal(response.headers.get('Cache-Control'), 'no-store');
         assert.deepEqual(await response.json(), { preview: result });
+        if (result.status === 'failed') assert.equal(result.provenance.receipt, result.receipt);
     }
 });
 
@@ -71,8 +76,11 @@ test('maps controlled authentication preview errors', async () => {
 
 test('rejects malformed or authority-expanding runtime results without exposing them', async () => {
     const originalError = console.error; const entries: unknown[][] = []; console.error = (...values: unknown[]) => { entries.push(values); };
+    const cycle: { self?: unknown } = {}; cycle.self = cycle;
     const malformed = [{ ...denied(), writesPerformed: 1 }, { ...denied(), apply: 'allowed' },
-        { ...denied(), extra: true }, Object.assign(Object.create({ inherited: true }), denied())];
+        { ...denied(), extra: true }, Object.assign(Object.create({ inherited: true }), denied()),
+        { ...AVAILABLE, proposal: cycle }, { ...AVAILABLE, proposal: { score: Number.NaN } }, { ...AVAILABLE, proposal: { score: Infinity } },
+        { ...AVAILABLE, reviewRef: 'review_synthetic' }];
     try {
         for (const result of malformed) {
             const response = await subject(result).preview(request()); await rejects(response, 500, 'internal_error');

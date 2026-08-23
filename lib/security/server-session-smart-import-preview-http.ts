@@ -37,23 +37,28 @@ function exact(value: unknown, keys: readonly string[]): Record<string, unknown>
     } catch { return null; }
 }
 
-function plainData(value: unknown, seen = new Set<object>()): boolean {
-    if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) return true;
-    if (!value || typeof value !== 'object' || seen.has(value)) return false;
+function plainData(value: unknown, active = new Set<object>()): boolean {
+    if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
+    if (typeof value === 'number') return Number.isFinite(value);
+    if (!value || typeof value !== 'object' || active.has(value)) return false;
     try {
-        seen.add(value);
+        active.add(value);
         if (Array.isArray(value)) {
             if (Object.getPrototypeOf(value) !== Array.prototype || Reflect.ownKeys(value).length !== value.length + 1) return false;
-            return value.every((item) => plainData(item, seen));
+            for (let index = 0; index < value.length; index += 1) {
+                const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+                if (!descriptor || !('value' in descriptor) || !plainData(descriptor.value, active)) return false;
+            }
+            return true;
         }
         if (Object.getPrototypeOf(value) !== Object.prototype) return false;
         for (const key of Reflect.ownKeys(value)) {
             if (typeof key !== 'string') return false;
             const descriptor = Object.getOwnPropertyDescriptor(value, key);
-            if (!descriptor || !('value' in descriptor) || !plainData(descriptor.value, seen)) return false;
+            if (!descriptor || !('value' in descriptor) || !plainData(descriptor.value, active)) return false;
         }
         return true;
-    } catch { return false; }
+    } catch { return false; } finally { active.delete(value); }
 }
 
 function input(value: unknown): PreviewInput | null {
@@ -67,7 +72,8 @@ function capabilityResult(value: unknown): PatientSmartImportHostCapabilityResul
     const record = exact(value, ['writesPerformed', 'apply', 'status', 'code', 'proposal', 'receipt', 'provenance', 'reviewRef']);
     if (!record || record.writesPerformed !== 0 || record.apply !== 'denied') return null;
     if (record.status === 'available') {
-        if (record.code !== null || typeof record.reviewRef !== 'string' || !record.proposal || !record.receipt || !record.provenance
+        if (record.code !== null || typeof record.reviewRef !== 'string' || !/^review_[0-9a-f]{32}$/u.test(record.reviewRef)
+            || !record.proposal || !record.receipt || !record.provenance
             || !plainData(record.proposal) || !plainData(record.receipt) || !plainData(record.provenance)) return null;
         return value as PatientSmartImportHostCapabilityResult;
     }
