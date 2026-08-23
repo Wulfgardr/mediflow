@@ -87,6 +87,11 @@ test('uses the real P4 primitive, preserving its reentry and restart denials', (
     owner.issueSelection({ expectedEpoch: 0, patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' });
     const lease = createPatientInsightAtomicLease({ owner, session, entropy: () => new Uint8Array(16), clock: () => 1 });
     const first = lease.replaceCurrentness(1, 1, 'fresh-1', false);
+    const otherSession = createSession({ id: ['synthetic', 'other'].join('-'), username: ['synthetic', 'other'].join('-'), role: 'clinician' });
+    const otherOwner = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair }).acquire(otherSession);
+    otherOwner.issueSelection({ expectedEpoch: 0, patientId: 'patient.synthetic.other', ambulatoryId: 'ambulatory.synthetic.other' });
+    const other = createPatientInsightAtomicLease({ owner: otherOwner, session: otherSession });
+    assert.throws(() => other.consume(first, () => 'never'), rejects('input_invalid'));
     assert.throws(() => lease.consume(first, () => owner.withLeaseCriticalSection(session, () => 'nested')),
         (error) => error instanceof ServerSessionProjectionOwnerError && error.code === 'selection_busy');
     const second = lease.replaceCurrentness(2, 2, 'fresh-2', false);
@@ -119,4 +124,22 @@ test('rejects hostile handles without touching Proxy or accessor traps and has n
     assert.throws(() => lease.consume(hostile, () => 'never'), rejects('input_invalid'));
     assert.equal(traps, 0);
     assert.deepEqual(Object.keys(lease), ['replaceCurrentness', 'consume', 'dispose']);
+});
+
+test('does not read an ambient Object.prototype.then getter while creating or consuming an opaque record', () => {
+    const session = createSession({ id: ['synthetic', 'ambient'].join('-'), username: ['synthetic', 'ambient'].join('-'), role: 'clinician' });
+    const owner = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair }).acquire(session);
+    owner.issueSelection({ expectedEpoch: 0, patientId: 'patient.synthetic.ambient', ambulatoryId: 'ambulatory.synthetic.ambient' });
+    const lease = createPatientInsightAtomicLease({ owner, session, entropy: () => new Uint8Array(16), clock: () => 1 });
+    const prior = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+    let reads = 0;
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { reads += 1; return undefined; } });
+    try {
+        const current = lease.replaceCurrentness(1, 1, 'fresh-1', false);
+        assert.equal(lease.consume(current, () => 'staged'), 'staged');
+    } finally {
+        if (prior) Object.defineProperty(Object.prototype, 'then', prior);
+        else delete (Object.prototype as { then?: unknown }).then;
+    }
+    assert.equal(reads, 0);
 });

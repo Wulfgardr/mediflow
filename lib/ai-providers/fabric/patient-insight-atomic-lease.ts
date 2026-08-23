@@ -75,7 +75,7 @@ export function createPatientInsightAtomicLease(input: Readonly<{
                 if (last && capabilityEpoch <= last.capabilityEpoch) fail('epoch_regressed');
                 const key = fingerprint(next);
                 if (fingerprints.has(key)) fail('epoch_aba');
-                const record = Object.freeze({});
+                const record = Object.freeze(Object.create(null));
                 records.set(record, { currentness: next, spent: false });
                 fingerprints.add(key); last = next; current = record;
                 if (isRevoked) revoked = true;
