@@ -97,56 +97,6 @@ export function PatientIdentityLens({
             <section className="patient-identity-lens patient-identity-lens-reader lume-panel relative overflow-hidden p-5 md:p-6">
                 <div className="relative z-10 grid gap-5 xl:grid-cols-[minmax(0,1.38fr)_320px] xl:items-start">
                     <div className="min-w-0 space-y-5">
-                        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.02fr)_minmax(320px,0.98fr)] lg:items-start lg:divide-x lg:divide-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)]">
-                            <div className="min-w-0 lg:pr-5">
-                                <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[color:var(--lume-ink-muted)]">
-                                    Scheda paziente
-                                </p>
-                                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[color:var(--lume-ink)] md:text-[28px]">
-                                    <PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur>
-                                </h1>
-                                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[color:var(--lume-ink-muted)]">
-                                    <span className="lume-registro text-[12px] tracking-tight">
-                                        <PrivacyBlur intensity="sm">{patient.taxCode}</PrivacyBlur>
-                                    </span>
-                                    <span>{ageLabel}</span>
-                                    <span className="inline-flex items-center gap-1.5">
-                                        <Calendar className="h-3.5 w-3.5" />
-                                        {birthDateLabel}
-                                    </span>
-                                </div>
-
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                    <StatusGlyph
-                                        kind={patient.isArchived ? 'archived' : patient.isAdi ? 'active' : 'follow-up'}
-                                        label={patient.isArchived ? 'Archiviato' : patient.isAdi ? 'Attivo' : 'Follow-up'}
-                                        tone="neutral"
-                                    />
-                                    {codedDiagnosisCount > 0 ? <StatusGlyph kind="review" label={`${codedDiagnosisCount} diagnosi`} tone="neutral" /> : null}
-                                    {exemptions.length > 0 ? <StatusGlyph kind="completed" label={`${exemptions.length} esenzioni`} tone="neutral" /> : null}
-                                </div>
-                            </div>
-
-                            <div className="lg:pl-5">
-                                <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
-                                    In due righe
-                                </p>
-                                <p className="mt-2 text-[15px] leading-7 text-[color:var(--lume-ink)]">
-                                    {summary ?? 'Nessuna sintesi clinica disponibile.'}
-                                </p>
-                                {nextStep ? (
-                                    <div className="mt-3 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-3">
-                                        <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
-                                            Prossimo passaggio
-                                        </p>
-                                        <p className="mt-1.5 text-sm leading-6 text-[color:var(--lume-ink)]">
-                                            {nextStep}
-                                        </p>
-                                    </div>
-                                ) : null}
-                            </div>
-                        </div>
-
                         <div className="border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-5">
                             <div className="flex flex-wrap items-baseline justify-between gap-3">
                                 <h2 className="text-sm font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">

@@ -141,6 +141,19 @@ async function expectNarrowContract(page: Page, surface: Locator, header: Locato
   await expectInViewport(header);
 }
 
+test('la route legacy paziente converge sulla sola Scheda', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const patient = await createFixture(page);
+
+  await page.goto(`/patients/${patient.id}`);
+
+  await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`));
+  await expect(page.getByTestId('lume-scheda-header')).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: patient.name, level: 1 })).toHaveCount(1);
+  await expect(page.getByTestId('lume-quadro')).toHaveCount(0);
+});
+
 for (const schedaCase of CASES) {
   test(`Scheda Lume ${schedaCase.register} ${schedaCase.viewport}`, async ({ page }) => {
     await page.setViewportSize({ width: schedaCase.width, height: schedaCase.height });
@@ -156,6 +169,7 @@ for (const schedaCase of CASES) {
     const header = page.getByTestId('lume-scheda-header');
     const surface = page.getByTestId('lume-scheda-surface');
     await expect(header.getByRole('heading', { name: patient.name, level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: patient.name, level: 1 })).toHaveCount(1);
     await expect(page.getByRole('button', { name: /Archivio documenti ed evidenze/ }))
       .toHaveAttribute('aria-expanded', 'false');
     await expectInViewport(header);
