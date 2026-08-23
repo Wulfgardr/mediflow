@@ -339,9 +339,10 @@ test('la worklist virtuale attraversa l’indice completo e apre la sola Scheda'
   await expect(lastRow).toHaveAttribute('data-patient-index', '119');
 
   await page.keyboard.press('PageUp');
+  await expect.poll(() => page.evaluate(() => Number(document.activeElement?.getAttribute('data-patient-index'))))
+    .toBeLessThan(119);
   const pageUpIndex = await page.evaluate(() => Number(document.activeElement?.getAttribute('data-patient-index')));
   expect(pageUpIndex).toBeGreaterThanOrEqual(0);
-  expect(pageUpIndex).toBeLessThan(119);
   await page.keyboard.press('ArrowUp');
   await expect.poll(() => page.evaluate(() => Number(document.activeElement?.getAttribute('data-patient-index'))))
     .toBe(pageUpIndex - 1);
@@ -350,8 +351,9 @@ test('la worklist virtuale attraversa l’indice completo e apre la sola Scheda'
   await page.keyboard.press('Home');
   await expect(page.locator('[data-patient-index="0"]')).toBeFocused();
   await page.keyboard.press('PageDown');
+  await expect.poll(() => page.evaluate(() => Number(document.activeElement?.getAttribute('data-patient-index'))))
+    .toBeGreaterThan(0);
   const pageDownIndex = await page.evaluate(() => Number(document.activeElement?.getAttribute('data-patient-index')));
-  expect(pageDownIndex).toBeGreaterThan(0);
   await assertNoHorizontalOverflow(page, [
     { label: 'documento worklist virtuale', selector: 'document' },
     { label: 'worklist virtuale', selector: '[data-testid="lume-worklist"]' },
