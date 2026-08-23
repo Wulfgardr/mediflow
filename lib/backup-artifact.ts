@@ -1,3 +1,5 @@
+import { types } from 'node:util';
+
 export const BACKUP_ARTIFACT_FORMAT = 'mediflow-backup' as const;
 export const BACKUP_ARTIFACT_VERSION = 1 as const;
 export const BACKUP_ARTIFACT_SCOPE = 'mediflow-web-local-backup' as const;
@@ -171,11 +173,13 @@ async function sha256Hex(value: string): Promise<string> {
 /* @Codex */
 function hasExactKeys(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
     try {
-        if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) return false;
-        structuredClone(value);
+        if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value)) return false;
         const descriptors = Object.getOwnPropertyDescriptors(value);
-        return Reflect.ownKeys(value).length === keys.length
-            && keys.every((key) => Object.hasOwn(descriptors, key) && 'value' in descriptors[key]! && descriptors[key]!.enumerable);
+        if (Reflect.ownKeys(value).length !== keys.length
+            || !keys.every((key) => Object.hasOwn(descriptors, key) && 'value' in descriptors[key]! && descriptors[key]!.enumerable)) {
+            return false;
+        }
+        return Object.getPrototypeOf(value) === Object.prototype;
     } catch {
         return false;
     }

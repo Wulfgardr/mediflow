@@ -286,6 +286,55 @@ test('rejects checksum-valid malformed durable review authority rows before rest
     }
 });
 
+/* @Codex */
+test('rejects hostile durable review authority rows without invoking accessors or proxy traps', async () => {
+    const authorityRow = {
+        actorRef: 'actor-synthetic',
+        schemaVersion: 'mediflow.physician-review-attestation.v1',
+        capability: 'physician_terminal_review',
+        status: 'active',
+        attestationVersion: 1,
+        policyVersion: 'physician_terminal_review.v1',
+        revokedAt: null,
+        createdAt: '2026-03-17T08:10:00.000Z',
+        updatedAt: '2026-03-17T08:10:00.000Z',
+    };
+    let accessorReads = 0;
+    const accessorRow = { ...authorityRow };
+    Object.defineProperty(accessorRow, 'actorRef', {
+        enumerable: true,
+        get: () => {
+            accessorReads += 1;
+            return authorityRow.actorRef;
+        },
+    });
+    let transparentProxyTraps = 0;
+    const transparentProxy = new Proxy(authorityRow, {
+        get: (target, key, receiver) => { transparentProxyTraps += 1; return Reflect.get(target, key, receiver); },
+        getPrototypeOf: (target) => { transparentProxyTraps += 1; return Reflect.getPrototypeOf(target); },
+        getOwnPropertyDescriptor: (target, key) => { transparentProxyTraps += 1; return Reflect.getOwnPropertyDescriptor(target, key); },
+        ownKeys: (target) => { transparentProxyTraps += 1; return Reflect.ownKeys(target); },
+    });
+    let throwingProxyTraps = 0;
+    const throwingProxy = new Proxy(authorityRow, {
+        get: () => { throwingProxyTraps += 1; throw new Error('proxy read'); },
+        getPrototypeOf: () => { throwingProxyTraps += 1; throw new Error('proxy reflection'); },
+        getOwnPropertyDescriptor: () => { throwingProxyTraps += 1; throw new Error('proxy descriptor'); },
+        ownKeys: () => { throwingProxyTraps += 1; throw new Error('proxy keys'); },
+    });
+
+    for (const row of [accessorRow, transparentProxy, throwingProxy]) {
+        await assert.rejects(
+            () => createBackupArtifact({ ...basePayload, physicianReviewAttestations: [row] }),
+            (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+        );
+    }
+
+    assert.equal(accessorReads, 0);
+    assert.equal(transparentProxyTraps, 0);
+    assert.equal(throwingProxyTraps, 0);
+});
+
 test('rejects checksum-valid durable review records that violate canonical invariants', async () => {
     const artifact = await checksumValidDurableArtifact((value) => {
         value.payload.durableReviewRecords[0].id = `review_${'f'.repeat(32)}`;
