@@ -46,19 +46,20 @@ proposta, `reviewRevision`, `sourceRevision` del browser e
 essere dati di osservazione o di verifica in altri contratti, ma non validano
 un locator OCR.
 
-### Locator volatile e consumo atomico
+### Locator volatile, emissione e consumo atomico
 
 Il broker emette un locator OCR monouso, in memoria e legato al lease corrente.
 Il locator non contiene attachment ID, patient ID, contenuto, hash, provider,
 venue, egress, authority, prompt o apply. Non puo diventare un handle per
 selezionare provider o per autorizzare esecuzione.
 
-Il broker deve emettere e consumare il locator nella stessa sezione critica
-sincrona P4. La sezione risolve la sorgente host-owned, verifica lease,
-selezione e currentness, poi marca il locator consumato prima di restituire il
-risultato. E vietato risolvere o riverificare la sorgente in una sezione di
-lease distinta. Dopo il riavvio, lo stato in memoria non esiste e ogni locator
-precedente viene negato.
+L'emissione e il consumo sono operazioni distinte nel tempo. Entrambe usano lo
+stesso owner e il primitivo P4 sincrono, ma non avvengono nella stessa
+invocazione. Durante il consumo, una sola sezione critica P4 risolve la sorgente
+host-owned, verifica lease, selezione e currentness, poi brucia il locator
+monouso prima di restituire il risultato. E vietato aprire una seconda sezione
+di lease fra resolve e consume. Dopo il riavvio, lo stato in memoria non esiste
+e ogni locator precedente viene negato.
 
 Il cambio di sessione, review o selezione, l'eliminazione, purge, restore,
 logout, expiry e riavvio revocano o distruggono tutti i locator interessati.
@@ -72,9 +73,10 @@ compatibili non puo riusare silenziosamente una sorgente stantia. O3a deve
 scegliere e verificare una policy esplicita di deny oppure rebase; fino ad allora
 la continuita resta `HOLD`.
 
-La policy provider e la sua esecuzione restano separate rispettivamente in
-O-HANDLE e O-RUNNER. Il locator non sostituisce la decisione Fabric e non
-abilita fallback silenziosi. `applyPolicy=none` resta invariato.
+La decisione del resolver Fabric e l'invocazione del provider restano confini
+separati. Il locator non sostituisce la decisione Fabric, non sceglie provider,
+venue o fallback e non abilita fallback silenziosi. `applyPolicy=none` resta
+invariato.
 
 ## DAG e ownership
 
@@ -83,7 +85,7 @@ O1 schema
   -> O2 writer e read guard
      -> O3a backup/restore
      -> O3b cascade/revocation
-     -> O4 bridge P4 e locator
+     -> O4 bridge P4 e locator: emissione e consumo distinti
         -> O5 replay, route e client
 ```
 
@@ -113,7 +115,8 @@ Fermare il lavoro e mantenere il denial se:
 - un locator contiene dati vietati, persiste, sopravvive a restart o e riusato;
 - resolve e consume avvengono in sezioni di lease diverse;
 - backup legacy riusa silenziosamente una sorgente stantia;
-- O-HANDLE o O-RUNNER scelgono provider, venue o fallback tramite il locator;
+- il locator permette di scegliere provider, venue o fallback, oppure sostituisce
+  la decisione del resolver Fabric;
 - compare apply o cambia `applyPolicy=none`.
 
 ## Non-obiettivi
