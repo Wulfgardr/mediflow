@@ -421,6 +421,23 @@ test('accepts a legacy artifact without durable review collections', async () =>
     assert.deepEqual(parsed.payload.physicianReviewAttestations, []);
 });
 
+test('accepts an authority-era artifact without command ledger collections', async () => {
+    const artifact = JSON.parse(await serializeBackupArtifact(basePayload));
+    delete artifact.payload.durableReviewCommandStates;
+    delete artifact.payload.durableReviewCommandOperations;
+    artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations');
+    delete artifact.manifest.recordCounts.durableReviewCommandStates;
+    delete artifact.manifest.recordCounts.durableReviewCommandOperations;
+    artifact.manifest.checksum = await sha256(stableStringify(artifact.payload));
+
+    const parsed = await parseBackupArtifact(artifact);
+
+    assert.deepEqual(parsed.payload.durableReviewPatientLinks, []);
+    assert.deepEqual(parsed.payload.physicianReviewAttestations, []);
+    assert.deepEqual(parsed.payload.durableReviewCommandStates, []);
+    assert.deepEqual(parsed.payload.durableReviewCommandOperations, []);
+});
+
 test('rejects almost-legacy and unknown backup collections', async () => {
     const missingHistorical = await legacyArtifact();
     delete missingHistorical.payload.therapies;

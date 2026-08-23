@@ -44,10 +44,15 @@ const PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS = BACKUP_COLLECTIONS.filter(
     (collection) => !DURABLE_REVIEW_AUTHORITY_COLLECTIONS.has(collection),
 );
 /* @Codex */
+const LEGACY_OMITTED_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
+    ['durableReviewCommandStates', 'durableReviewCommandOperations'],
+    ['durableReviewRecords', 'durableReviewOperations', 'durableReviewCommandStates', 'durableReviewCommandOperations'],
+    ['documentDiagnosisProposals', 'durableReviewRecords', 'durableReviewOperations', 'durableReviewCommandStates', 'durableReviewCommandOperations'],
+];
+/* @Codex v1 recognizes both the authority-era and pre-authority collection generations. */
 const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
-    PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS.filter((collection) => collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations'),
-    PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS.filter((collection) => collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations' && collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations'),
-    PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS.filter((collection) => collection !== 'documentDiagnosisProposals' && collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations' && collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations'),
+    ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => BACKUP_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
+    ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
 ];
 const PATIENT_DEPENDENT_COLLECTIONS: readonly BackupCollectionName[] = [
     'attachments',
