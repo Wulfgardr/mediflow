@@ -3,22 +3,17 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { dbServer, runDbServerImmediateTransaction } from '../../db-server';
-import {
-    auditEvents,
-    durableReviewCommandOperations,
-    durableReviewCommandStates,
-    durableReviewRecords,
-} from '../../schema';
+import { auditEvents, durableReviewCommandOperations, durableReviewCommandStates, durableReviewRecords } from '../../schema';
 
-export type PhysicianReviewAction = 'accept' | 'reject' | 'supersede';
-type PhysicianReviewState = 'accepted' | 'rejected' | 'superseded';
+export type PhysicianReviewAction = 'accept' | 'reject';
+type PhysicianReviewState = 'accepted' | 'rejected';
 export type PhysicianReviewCommandErrorCode = 'invalid_command' | 'context_unavailable' | 'actor_forbidden' | 'gesture_invalid' | 'uncertainty_acknowledgment_required' | 'missing' | 'revision_conflict' | 'idempotency_conflict' | 'terminal' | 'corrupt' | 'storage_unavailable';
 export class PhysicianReviewCommandError extends Error {
     constructor(public readonly code: PhysicianReviewCommandErrorCode) { super(`Physician review command rejected: ${code}`); }
 }
 export type PhysicianReviewCommandSources = Readonly<{
     resolveContext: () => unknown;
-    consumeGesture: (scope: Readonly<{ proof: string; action: PhysicianReviewAction; reviewId: string; expectedRevision: number }>) => unknown;
+    consumeGesture: (scope: Readonly<{ proof: string; actorRef: string; action: PhysicianReviewAction; reviewId: string; expectedRevision: number }>) => unknown;
     eventId: () => unknown;
     now: () => unknown;
 }>;
@@ -32,7 +27,7 @@ const COMMAND_KEYS = ['action', 'expectedRevision', 'idempotencyKey', 'gesturePr
 const CONTEXT_KEYS = ['reviewId', 'actorRef', 'role', 'uncertaintyAcknowledgmentRequired'] as const;
 const RESULT_KEYS = ['reviewId', 'state', 'revision', 'eventId'] as const;
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
-const stateFor = (action: PhysicianReviewAction): PhysicianReviewState => action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : 'superseded';
+const stateFor = (action: PhysicianReviewAction): PhysicianReviewState => action === 'accept' ? 'accepted' : 'rejected';
 function fail(code: PhysicianReviewCommandErrorCode): never { throw new PhysicianReviewCommandError(code); }
 function exact(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
     if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) return false;
@@ -42,8 +37,8 @@ function exact(value: unknown, keys: readonly string[]): value is Record<string,
 function command(value: unknown): Command {
     if (!exact(value, COMMAND_KEYS)) return fail('invalid_command');
     const { action, expectedRevision, idempotencyKey, gestureProof, uncertaintyAcknowledged } = value;
-    if ((action !== 'accept' && action !== 'reject' && action !== 'supersede') || typeof expectedRevision !== 'number' || !Number.isSafeInteger(expectedRevision) || expectedRevision < 1 || typeof idempotencyKey !== 'string' || !KEY.test(idempotencyKey) || typeof gestureProof !== 'string' || !GESTURE.test(gestureProof) || typeof uncertaintyAcknowledged !== 'boolean') return fail('invalid_command');
-    return Object.freeze({ action, expectedRevision: expectedRevision as number, idempotencyKey, gestureProof, uncertaintyAcknowledged });
+    if ((action !== 'accept' && action !== 'reject') || typeof expectedRevision !== 'number' || !Number.isSafeInteger(expectedRevision) || expectedRevision < 1 || typeof idempotencyKey !== 'string' || !KEY.test(idempotencyKey) || typeof gestureProof !== 'string' || !GESTURE.test(gestureProof) || typeof uncertaintyAcknowledged !== 'boolean') return fail('invalid_command');
+    return Object.freeze({ action, expectedRevision, idempotencyKey, gestureProof, uncertaintyAcknowledged });
 }
 function context(value: unknown): Context {
     if (!exact(value, CONTEXT_KEYS)) return fail('context_unavailable');
@@ -55,54 +50,62 @@ function context(value: unknown): Context {
 function result(value: unknown): PhysicianReviewCommandResult {
     if (!exact(value, RESULT_KEYS)) return fail('corrupt');
     const { reviewId, state, revision, eventId } = value;
-    if (typeof reviewId !== 'string' || !REVIEW.test(reviewId) || (state !== 'accepted' && state !== 'rejected' && state !== 'superseded') || typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 2 || typeof eventId !== 'string' || !EVENT.test(eventId)) return fail('corrupt');
-    return Object.freeze({ reviewId, state, revision: revision as number, eventId });
+    if (typeof reviewId !== 'string' || !REVIEW.test(reviewId) || (state !== 'accepted' && state !== 'rejected') || typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 2 || typeof eventId !== 'string' || !EVENT.test(eventId)) return fail('corrupt');
+    return Object.freeze({ reviewId, state, revision, eventId });
+}
+function replayResult(snapshot: string): PhysicianReviewCommandResult {
+    try { return result(JSON.parse(snapshot) as unknown); } catch (error) { if (error instanceof PhysicianReviewCommandError) throw error; return fail('corrupt'); }
 }
 function storage(error: unknown): never { if (error instanceof PhysicianReviewCommandError) throw error; return fail('storage_unavailable'); }
+function commandDigest(input: Command, actorRef: string): string { return digest(JSON.stringify([input.action, input.expectedRevision, input.uncertaintyAcknowledged, digest(input.gestureProof), actorRef])); }
+function operationId(reviewId: string, idempotencyKey: string): string { return digest(`${reviewId}\0${idempotencyKey}`); }
+function metadata(input: Command, state: PhysicianReviewState, digestValue: string, revision: number): string {
+    return JSON.stringify({ flags: [input.action, state, `digest_${digestValue}`], resourceVersion: revision });
+}
 
-/** Runs one host-resolved, gesture-bound terminal review transition. It cannot apply clinical data. */
+/** Validates the complete durable replay receipt, including its append-only PHI-safe audit event. */
+function replay(resolved: Context, input: Command, digestValue: string): PhysicianReviewCommandResult | null {
+    const operation = dbServer.select().from(durableReviewCommandOperations).where(and(eq(durableReviewCommandOperations.reviewId, resolved.reviewId), eq(durableReviewCommandOperations.idempotencyKey, input.idempotencyKey))).get();
+    if (!operation) return null;
+    if (operation.id !== operationId(resolved.reviewId, input.idempotencyKey)) fail('corrupt');
+    if (operation.commandDigest !== digestValue) fail('idempotency_conflict');
+    const parsed = replayResult(operation.resultSnapshot); const state = stateFor(input.action);
+    if (parsed.reviewId !== resolved.reviewId || parsed.state !== state || parsed.revision !== input.expectedRevision + 1 || parsed.eventId !== operation.auditEventId) fail('corrupt');
+    const stored = dbServer.select().from(durableReviewCommandStates).where(eq(durableReviewCommandStates.reviewId, resolved.reviewId)).get();
+    if (!stored || stored.reviewState !== state || stored.action !== input.action || stored.revision !== parsed.revision) fail('corrupt');
+    const audit = dbServer.select().from(auditEvents).where(eq(auditEvents.eventId, parsed.eventId)).get();
+    if (!audit || audit.schemaVersion !== 1 || audit.eventType !== `ai.review.${state}` || audit.outcome !== 'success' || audit.actorType !== 'user' || audit.actorRef !== resolved.actorRef || audit.subjectType !== 'ai_review' || audit.subjectRef !== resolved.reviewId || audit.sourceSurface !== 'api' || audit.requestId !== null || audit.redactedMetadata !== metadata(input, state, digestValue, parsed.revision) || !(audit.occurredAt instanceof Date) || !(audit.createdAt instanceof Date)) fail('corrupt');
+    return parsed;
+}
+function preflight(resolved: Context, input: Command): void {
+    const record = dbServer.select({ reviewRevision: durableReviewRecords.reviewRevision }).from(durableReviewRecords).where(eq(durableReviewRecords.id, resolved.reviewId)).get();
+    if (!record) fail('missing');
+    if (record.reviewRevision !== input.expectedRevision) fail('revision_conflict');
+    if (dbServer.select({ reviewId: durableReviewCommandStates.reviewId }).from(durableReviewCommandStates).where(eq(durableReviewCommandStates.reviewId, resolved.reviewId)).get()) fail('terminal');
+}
+
+/** Runs one host-resolved review transition. A concurrent winner or audit rollback may consume a proof; callers fail closed and obtain a new proof before retrying. */
 export function createPhysicianReviewCommandService(sources: PhysicianReviewCommandSources) {
     return Object.freeze({ execute(value: unknown): PhysicianReviewCommandResult {
         const input = command(value); let resolved: Context;
         try { resolved = context(sources.resolveContext()); } catch (error) { if (error instanceof PhysicianReviewCommandError) throw error; return fail('context_unavailable'); }
         if (input.action === 'accept' && resolved.uncertaintyAcknowledgmentRequired && !input.uncertaintyAcknowledged) fail('uncertainty_acknowledgment_required');
-        const state = stateFor(input.action); const commandDigest = digest(JSON.stringify([input.action, input.expectedRevision, input.uncertaintyAcknowledged]));
-        try {
-            const replay = dbServer.select().from(durableReviewCommandOperations).where(and(eq(durableReviewCommandOperations.reviewId, resolved.reviewId), eq(durableReviewCommandOperations.idempotencyKey, input.idempotencyKey))).get();
-            if (replay) {
-                if (replay.commandDigest !== commandDigest) fail('idempotency_conflict');
-                const parsed = result(JSON.parse(replay.resultSnapshot) as unknown);
-                if (parsed.reviewId !== resolved.reviewId || parsed.eventId !== replay.auditEventId) fail('corrupt');
-                return parsed;
-            }
-        } catch (error) { return storage(error); }
+        const digestValue = commandDigest(input, resolved.actorRef);
+        try { const previous = replay(resolved, input, digestValue); if (previous) return previous; preflight(resolved, input); } catch (error) { return storage(error); }
         let gesture: unknown;
-        try { gesture = sources.consumeGesture(Object.freeze({ proof: input.gestureProof, action: input.action, reviewId: resolved.reviewId, expectedRevision: input.expectedRevision })); } catch { return fail('gesture_invalid'); }
+        try { gesture = sources.consumeGesture(Object.freeze({ proof: input.gestureProof, actorRef: resolved.actorRef, action: input.action, reviewId: resolved.reviewId, expectedRevision: input.expectedRevision })); } catch { return fail('gesture_invalid'); }
         if (gesture !== true) return fail('gesture_invalid');
         let eventId: unknown; let now: unknown;
         try { eventId = sources.eventId(); now = sources.now(); } catch { return fail('context_unavailable'); }
         if (typeof eventId !== 'string' || !EVENT.test(eventId) || typeof now !== 'number' || !Number.isSafeInteger(now) || now < 0) return fail('context_unavailable');
-        const resolvedEventId = eventId; const occurredAt = now;
-        try {
-            return runDbServerImmediateTransaction(() => {
-                const replay = dbServer.select().from(durableReviewCommandOperations).where(and(eq(durableReviewCommandOperations.reviewId, resolved.reviewId), eq(durableReviewCommandOperations.idempotencyKey, input.idempotencyKey))).get();
-                if (replay) {
-                    if (replay.commandDigest !== commandDigest) fail('idempotency_conflict');
-                    const parsed = result(JSON.parse(replay.resultSnapshot) as unknown);
-                    if (parsed.reviewId !== resolved.reviewId || parsed.eventId !== replay.auditEventId) fail('corrupt');
-                    return parsed;
-                }
-                const record = dbServer.select({ reviewRevision: durableReviewRecords.reviewRevision }).from(durableReviewRecords).where(eq(durableReviewRecords.id, resolved.reviewId)).get();
-                if (!record) fail('missing');
-                if (record.reviewRevision !== input.expectedRevision) fail('revision_conflict');
-                const current = dbServer.select().from(durableReviewCommandStates).where(eq(durableReviewCommandStates.reviewId, resolved.reviewId)).get();
-                if (current) fail('terminal');
-                const outcome = Object.freeze({ reviewId: resolved.reviewId, state, revision: input.expectedRevision + 1, eventId: resolvedEventId });
-                dbServer.insert(durableReviewCommandStates).values({ reviewId: outcome.reviewId, reviewState: outcome.state, revision: outcome.revision, action: input.action }).run();
-                dbServer.insert(auditEvents).values({ eventId: outcome.eventId, schemaVersion: 1, eventType: `ai.review.${outcome.state}`, occurredAt: new Date(occurredAt), outcome: 'success', actorType: 'user', actorRef: resolved.actorRef, subjectType: 'ai_review', subjectRef: outcome.reviewId, sourceSurface: 'api', requestId: null, redactedMetadata: JSON.stringify({ flags: [input.action, outcome.state, `digest_${commandDigest}`], resourceVersion: outcome.revision }), createdAt: new Date(occurredAt) }).run();
-                dbServer.insert(durableReviewCommandOperations).values({ id: digest(`${outcome.reviewId}\0${input.idempotencyKey}`), reviewId: outcome.reviewId, idempotencyKey: input.idempotencyKey, commandDigest, resultSnapshot: JSON.stringify(outcome), auditEventId: outcome.eventId }).run();
-                return result(outcome);
-            });
-        } catch (error) { return storage(error); }
+        const state = stateFor(input.action); const outcome = Object.freeze({ reviewId: resolved.reviewId, state, revision: input.expectedRevision + 1, eventId });
+        try { return runDbServerImmediateTransaction(() => {
+            const previous = replay(resolved, input, digestValue); if (previous) return previous;
+            preflight(resolved, input);
+            dbServer.insert(durableReviewCommandStates).values({ reviewId: outcome.reviewId, reviewState: outcome.state, revision: outcome.revision, action: input.action }).run();
+            dbServer.insert(auditEvents).values({ eventId: outcome.eventId, schemaVersion: 1, eventType: `ai.review.${outcome.state}`, occurredAt: new Date(now), outcome: 'success', actorType: 'user', actorRef: resolved.actorRef, subjectType: 'ai_review', subjectRef: outcome.reviewId, sourceSurface: 'api', requestId: null, redactedMetadata: metadata(input, outcome.state, digestValue, outcome.revision), createdAt: new Date(now) }).run();
+            dbServer.insert(durableReviewCommandOperations).values({ id: operationId(outcome.reviewId, input.idempotencyKey), reviewId: outcome.reviewId, idempotencyKey: input.idempotencyKey, commandDigest: digestValue, resultSnapshot: JSON.stringify(outcome), auditEventId: outcome.eventId }).run();
+            return result(outcome);
+        }); } catch (error) { return storage(error); }
     } });
 }
