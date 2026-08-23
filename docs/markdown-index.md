@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-08-22
+Ultimo aggiornamento: 2026-08-23
 
 ## 📚 Come usare questo indice
 
@@ -101,6 +101,7 @@ Ultimo aggiornamento: 2026-08-22
 | [docs/analysis/2026-07-29-intelligence-fabric-run.md](./analysis/2026-07-29-intelligence-fabric-run.md) | Run record CoS del programma Intelligence Fabric WUL-522: consolidamento stack provider, ADR 0089, lane, verifiche e decision audit. | Quando si riprende, verifica o promuove il programma Intelligence Fabric post-0.8. |
 | [docs/analysis/2026-07-30-intelligence-fabric-horizon-run.md](./analysis/2026-07-30-intelligence-fabric-horizon-run.md) | Run record del checkpoint Horizon: giudizio congelato, slice di prima adozione Fabric su document_synthesis, DAG, ownership e falsificatori. | Quando si riprende o verifica il checkpoint Horizon della Intelligence Fabric. |
 | [docs/analysis/2026-08-06-pk1-patient-insight-fabric-run.md](./analysis/2026-08-06-pk1-patient-insight-fabric-run.md) | Run record della wave PK-1: adozione Fabric su patient insight, quattro round writer/verifica, GO — VERIFIED, HOLD_REMOTE_PROMOTION invariato. | Quando si riprende o verifica l'adozione Fabric di patient insight o si prepara PK-2. |
+| [docs/capability-mapping/mediflow-0.8.5-crosswalk.md](./capability-mapping/mediflow-0.8.5-crosswalk.md) | Vista derivata del mapping WUL-522, con provenance congelata, copertura, conflitti residui e claim ceiling candidate-only. | Quando si verifica il mapping 0.8.5 senza trasformare inventari o gap in parity. |
 | [docs/analysis/2026-07-05-audit-esterno-v2-triage.md](./analysis/2026-07-05-audit-esterno-v2-triage.md) | Triage secondario dell'audit esterno V2, collegato a `WUL-470` e figlie `WUL-471`..`WUL-475`, con separazione tra obiezioni misframed e residui azionabili su PIN, FHIR, MDR, sync futuro e drift ADR. | Quando si rivedono le issue nate dall'audit esterno V2 o serve recuperare il razionale completo dietro il tracker Linear. |
 | [docs/analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md](./analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md) | Closeout secondario di provider scaffold, control-flow, attese locali e roadmap dello stack intelligente, riallineato alla verita di `main`. | Quando si pianifica una nuova slice AI/euristica o si verifica cosa resta oltre le PR #39, #41, #42 e #43. |
 | [docs/analysis/2026-07-17-installabilita-v0-scope.md](./analysis/2026-07-17-installabilita-v0-scope.md) | Scope e proof macOS per WUL-455: confronto bundle Node, Tauri sidecar ed Electron, raccomandazione v0, build riproducibile e limiti non provati. | Quando si pianifica l'installabilita o si verifica la proof macOS avviabile senza Node installato sulla macchina di esecuzione. |
