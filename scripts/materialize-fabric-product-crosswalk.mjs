@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const DECISION_PATH = '/Users/leonardopegollo/.codex/visualizations/2026/08/22/01a02a9c-3789-7032-8d93-1ed327390921/mediflow-0.8.5-fabric-product-crosswalk-decision-v1.json';
-const DECISION_SHA256 = 'f64036aaa1abe2f54b748d03c4b561f1e38d22a047bcef342f680eb708b675dc';
+const DECISION_SHA256 = 'c6ca0769ceb84b60f43cd6f9f8ebf310570e243709b3a6056ff88da1b72fe851';
 const FABRIC_PATH = `${ROOT}/docs/capability-mapping/nodes/fabric-inventory.v1.json`;
 const ANCHOR_PATH = `${ROOT}/docs/capability-mapping/nodes/web-mini-crosswalk.v1.json`;
 const RELATION_PATH = `${ROOT}/docs/capability-mapping/relations/fabric-canonical-bindings.v1.json`;
@@ -35,7 +35,7 @@ function relationEvidence(evidence) {
 const bytes = readFileSync(DECISION_PATH);
 if (sha256(bytes) !== DECISION_SHA256) fail('decision SHA-256 drifted');
 const decision = JSON.parse(bytes);
-if (decision.schema !== 'mediflow.fabric-product-crosswalk-decision.v1' || decision.decisionId !== 'MF085-C1-FABRIC-CANONICAL-20260823' || decision.status !== 'approved_local_mapping_basis' || decision.applyPolicy !== 'none' || !Array.isArray(decision.globalEvidence) || !Array.isArray(decision.decisions)) fail('decision contract is invalid');
+if (decision.schema !== 'mediflow.fabric-product-crosswalk-decision.v1' || decision.decisionId !== 'MF085-C1-FABRIC-CANONICAL-20260823' || decision.status !== 'approved_local_mapping_basis' || decision.applyPolicy !== 'none' || !Array.isArray(decision.globalEvidence) || !Array.isArray(decision.decisions) || typeof decision.bindingRule !== 'string' || typeof decision.claimCeiling !== 'string') fail('decision contract is invalid');
 decision.globalEvidence.forEach(({ ref }) => verifyRef(ref));
 
 const fabric = json(FABRIC_PATH);
@@ -49,19 +49,19 @@ if (!catalog) fail('canonical web-65 catalog anchor is missing');
 const records = [];
 for (const entry of decision.decisions) {
   const fabricRecord = fabricByIdentifier.get(entry.fabricId);
-  if (!fabricRecord || !['mapped', 'out_of_catalog'].includes(entry.terminalDisposition) || !Array.isArray(entry.functionalEdges) || !Array.isArray(entry.evidence) || entry.evidence.length === 0) fail(`decision for ${entry.fabricId} is invalid`);
+  if (!fabricRecord || !['mapped', 'out_of_catalog'].includes(entry.terminalDisposition) || !Array.isArray(entry.functionalEdges) || !Array.isArray(entry.evidence) || entry.evidence.length === 0 || typeof entry.runtimeBinding !== 'string') fail(`decision for ${entry.fabricId} is invalid`);
   entry.evidence.forEach(({ ref }) => verifyRef(ref));
   fabricRecord.terminalDisposition = entry.terminalDisposition;
   for (const edge of entry.functionalEdges) {
     const anchor = anchorsByIdentifier.get(edge.canonicalId);
-    if (!anchor || !['implements', 'supports', 'authority_boundary_for'].includes(edge.relationKind)) fail(`functional edge for ${entry.fabricId} is invalid`);
-    records.push({ id: `relation:fabric-canonical:${entry.fabricId}:${edge.canonicalId}@v1`, from: fabricRecord.id, to: anchor.id, relationKind: edge.relationKind, authority: 'unresolved', stage: 'unresolved', decisionId: decision.decisionId, evidence: relationEvidence(entry.evidence) });
+    if (!anchor || !['implements', 'supports', 'authority_boundary_for'].includes(edge.relationKind) || (entry.runtimeBinding.startsWith('descriptor_entry_point_only') && edge.relationKind !== 'supports')) fail(`functional edge for ${entry.fabricId} is invalid`);
+    records.push({ id: `relation:fabric-canonical:${entry.fabricId}:${edge.canonicalId}@v1`, from: fabricRecord.id, to: anchor.id, relationKind: edge.relationKind, authority: 'unresolved', stage: 'unresolved', decisionId: decision.decisionId, runtimeBinding: entry.runtimeBinding, evidence: relationEvidence(entry.evidence) });
   }
-  records.push({ id: `relation:fabric-registry:${entry.fabricId}:web-65@v1`, from: fabricRecord.id, to: catalog.id, relationKind: 'exposes', authority: 'unresolved', stage: 'unresolved', exposureScope: 'read_only_registry_roster', decisionId: decision.decisionId, evidence: relationEvidence(decision.globalEvidence) });
+  records.push({ id: `relation:fabric-registry:${entry.fabricId}:web-65@v1`, from: fabricRecord.id, to: catalog.id, relationKind: 'exposes', authority: 'unresolved', stage: 'unresolved', exposureScope: 'read_only_registry_roster', runtimeBinding: 'governance_exposure_only', decisionId: decision.decisionId, evidence: relationEvidence(decision.globalEvidence) });
 }
 if (records.length !== 39 || new Set(records.map(({ id }) => id)).size !== records.length || records.filter(({ relationKind }) => relationKind === 'exposes').length !== 16) fail('derived relation roster is incomplete');
 
 write(FABRIC_PATH, fabric);
 write(RELATION_PATH, { schema: 'mediflow.capability-mapping.fabric-canonical-bindings.v1', status: 'candidate_not_integrated', applyPolicy: 'none', decisionId: decision.decisionId, decisionSha256: DECISION_SHA256, records });
-write(RECEIPT_PATH, { schema: 'mediflow.capability-mapping.product-decision-receipt.v1', status: 'candidate_not_integrated', applyPolicy: 'none', decisionId: decision.decisionId, decisionSha256: DECISION_SHA256, decisionPath: DECISION_PATH, globalEvidence: decision.globalEvidence, decisionCount: decision.decisions.length, functionalRelationCount: records.length - 16, registryExposureCount: 16, outOfCatalogFabricIds: decision.decisions.filter(({ terminalDisposition }) => terminalDisposition === 'out_of_catalog').map(({ fabricId }) => fabricId) });
+write(RECEIPT_PATH, { schema: 'mediflow.capability-mapping.product-decision-receipt.v1', status: 'candidate_not_integrated', applyPolicy: 'none', decisionId: decision.decisionId, decisionSha256: DECISION_SHA256, decisionPath: DECISION_PATH, claimCeiling: decision.claimCeiling, bindingRule: decision.bindingRule, globalEvidence: decision.globalEvidence, decisionCount: decision.decisions.length, functionalRelationCount: records.length - 16, registryExposureCount: 16, outOfCatalogFabricIds: decision.decisions.filter(({ terminalDisposition }) => terminalDisposition === 'out_of_catalog').map(({ fabricId }) => fabricId) });
 write(CONFLICT_PATH, { schema: 'mediflow.capability-mapping.conflict-register.v1', status: 'resolved_by_product_decision', applyPolicy: 'none', decisionId: decision.decisionId, decisionSha256: DECISION_SHA256, records: [] });
