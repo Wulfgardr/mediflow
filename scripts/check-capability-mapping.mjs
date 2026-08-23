@@ -50,6 +50,11 @@ function populationRecords(population) {
     if (!Array.isArray(external.records)) fail('population record file has no records');
     records.push(...external.records);
   }
+  for (const file of population.recordFiles ?? []) {
+    const external = relativeJson(file, 'population record file');
+    if (!Array.isArray(external.records)) fail('population record file has no records');
+    records.push(...external.records);
+  }
   return records;
 }
 function relationRecords(basis) {
