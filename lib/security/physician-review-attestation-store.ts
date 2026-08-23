@@ -1,7 +1,7 @@
 /* @Codex */
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 import { dbServer, hasCanonicalPhysicianReviewAttestationSchema, runDbServerImmediateTransaction } from '../db-server';
 import { physicianReviewAttestations, users } from '../schema';
@@ -14,7 +14,7 @@ export type PhysicianReviewAttestationV1 = Readonly<{
     schemaVersion: typeof SCHEMA_VERSION;
     actorRef: string;
     capability: typeof CAPABILITY;
-    status: 'inactive' | 'revoked';
+    status: 'inactive' | 'active' | 'revoked';
     attestationVersion: 1;
     policyVersion: typeof POLICY_VERSION;
     revokedAt: Date | null;
@@ -27,6 +27,7 @@ export type PhysicianReviewAttestationStoreErrorCode =
     | 'actor_missing'
     | 'attestation_conflict'
     | 'attestation_missing'
+    | 'attestation_not_inactive'
     | 'schema_incompatible'
     | 'storage_unavailable'
     | 'stored_state_invalid';
@@ -51,8 +52,9 @@ function validDate(value: unknown): value is Date {
 }
 
 function record(row: typeof physicianReviewAttestations.$inferSelect): PhysicianReviewAttestationV1 {
-    const status = row.status === 'inactive' || row.status === 'revoked' ? row.status : null;
-    const lifecycleValid = (status === 'inactive' && row.revokedAt === null) || (status === 'revoked' && row.revokedAt instanceof Date);
+    const status = row.status === 'inactive' || row.status === 'active' || row.status === 'revoked' ? row.status : null;
+    const lifecycleValid = ((status === 'inactive' || status === 'active') && row.revokedAt === null)
+        || (status === 'revoked' && row.revokedAt instanceof Date);
     const timestampOrderValid = validDate(row.createdAt) && validDate(row.updatedAt)
         && row.updatedAt.getTime() >= row.createdAt.getTime()
         && (row.revokedAt === null || (validDate(row.revokedAt) && row.revokedAt.getTime() >= row.createdAt.getTime()));
@@ -104,6 +106,32 @@ export function createPhysicianReviewAttestationStore() {
                         actorRef, schemaVersion: SCHEMA_VERSION, capability: CAPABILITY, status: 'inactive',
                         attestationVersion: 1, policyVersion: POLICY_VERSION, revokedAt: null,
                     }).run();
+                    return readCurrent(actorRef);
+                });
+            } catch (error) { return storage(error); }
+        },
+        /** Activates exactly one default-inactive attestation under the SQLite writer lock. */
+        activate(actorRef: unknown): PhysicianReviewAttestationV1 {
+            if (!validActorRef(actorRef)) return fail('actor_invalid');
+            try {
+                return runDbServerImmediateTransaction(() => {
+                    if (!hasCanonicalPhysicianReviewAttestationSchema()) return fail('schema_incompatible');
+                    canonicalActor(actorRef);
+                    const current = readCurrent(actorRef);
+                    if (current.status !== 'inactive') return fail('attestation_not_inactive');
+                    const outcome = dbServer.update(physicianReviewAttestations).set({
+                        status: 'active',
+                        updatedAt: new Date(),
+                    }).where(and(
+                        eq(physicianReviewAttestations.actorRef, actorRef),
+                        eq(physicianReviewAttestations.schemaVersion, SCHEMA_VERSION),
+                        eq(physicianReviewAttestations.capability, CAPABILITY),
+                        eq(physicianReviewAttestations.status, 'inactive'),
+                        eq(physicianReviewAttestations.attestationVersion, 1),
+                        eq(physicianReviewAttestations.policyVersion, POLICY_VERSION),
+                        isNull(physicianReviewAttestations.revokedAt),
+                    )).run();
+                    if (outcome.changes !== 1) return fail('attestation_conflict');
                     return readCurrent(actorRef);
                 });
             } catch (error) { return storage(error); }
