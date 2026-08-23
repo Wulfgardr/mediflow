@@ -4,7 +4,7 @@ import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { createTypedProjectionBroker, ProjectionBrokerError, type TypedProjectionBrokerConfig } from '../typed-projection-broker';
 import { bindProjectionBrokerToServerSession } from './server-session-projection-broker';
-import { getSession, registerServerSessionResource, type ServerSession } from './server-session';
+import { getSession, peekSession, registerServerSessionResource, type ServerSession } from './server-session';
 
 type TypedBroker = ReturnType<typeof createTypedProjectionBroker>;
 type ActiveBinding = {
@@ -37,6 +37,7 @@ export class ServerSessionProjectionOwnerError extends Error {
 }
 
 export type ServerSessionProjectionOwner = Readonly<{
+    snapshotSelectionEpoch(session: ServerSession): number;
     acquireProjectionIngest(session: ServerSession, input: SelectionLeaseTuple): TypedBroker['ingest'];
     resolveProjectionService(session: ServerSession): TypedBroker['service'];
     issueSelection(input: Readonly<{ expectedEpoch: number; patientId: string; ambulatoryId: string }>): SelectionLease;
@@ -91,6 +92,12 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
     const registry = {
         lookup(sessionId: string): ServerSessionProjectionOwner | null {
             return owners.get(sessionId) ?? null;
+        },
+        snapshotSelectionEpoch(session: ServerSession): number {
+            if (session.authChannel !== 'web' || session.id === 'local-api' || peekSession(session.id) !== session) {
+                return fail('session_ineligible');
+            }
+            return owners.get(session.id)?.snapshotSelectionEpoch(session) ?? 0;
         },
         acquire(session: ServerSession): ServerSessionProjectionOwner {
             if (session.authChannel !== 'web' || session.id === 'local-api' || getSession(session.id) !== session) {
@@ -166,6 +173,12 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     && typeof value.control.changeSelection === 'function';
             };
             const owner: ServerSessionProjectionOwner = Object.freeze({
+                snapshotSelectionEpoch(presentedSession) {
+                    if (terminal || presentedSession !== session || session.authChannel !== 'web' || peekSession(session.id) !== session) {
+                        return fail('session_unavailable');
+                    }
+                    return epoch;
+                },
                 acquireProjectionIngest(presentedSession, input) {
                     requireCurrentSession(presentedSession);
                     const value = readTuple(input); const current = selection;

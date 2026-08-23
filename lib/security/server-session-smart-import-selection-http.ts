@@ -10,6 +10,7 @@ type SelectionInput = Readonly<{ expectedEpoch: number; patientId: string; ambul
 type SelectionLease = Readonly<{ sessionRef: string; selectionEpoch: number; patientRef: string;
     ambulatoryRef: string; leaseRef: string; expiresAt: number }>;
 type Sources = Readonly<{ issueSelection(input: SelectionInput): Promise<SelectionLease> }>;
+type EpochSources = Readonly<{ readEpoch(): Promise<number> }>;
 
 const MESSAGE = 'Selezione Smart Import non disponibile.';
 
@@ -60,6 +61,29 @@ export function createSmartImportSelectionHttpHandler(sources: Sources) {
             return response;
         } catch (error) {
             return typedFailure(error) ?? apiInternalError('POST Smart Import selection', error);
+        }
+    };
+}
+
+/* @Codex */
+export function createSmartImportSelectionEpochHttpHandler(sources: EpochSources) {
+    return async (): Promise<NextResponse> => {
+        try {
+            const selectionEpoch = await sources.readEpoch();
+            if (!Number.isSafeInteger(selectionEpoch) || selectionEpoch < 0) {
+                return apiInternalError('GET Smart Import selection epoch', selectionEpoch);
+            }
+            const response = NextResponse.json({ selectionEpoch });
+            response.headers.set('Cache-Control', 'no-store');
+            return response;
+        } catch (error) {
+            if (error instanceof AuthenticatedWebSessionSelectionError && error.code === 'session_unavailable') {
+                return failure('session_unavailable', 401);
+            }
+            if (error instanceof ServerSessionProjectionOwnerError && (error.code === 'session_unavailable' || error.code === 'session_ineligible')) {
+                return failure('session_unavailable', 401);
+            }
+            return apiInternalError('GET Smart Import selection epoch', error);
         }
     };
 }

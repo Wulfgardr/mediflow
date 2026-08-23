@@ -5,6 +5,7 @@ import test from 'node:test';
 
 import { AuthenticatedWebSessionSelectionError } from './server-session-authenticated-selection.ts';
 import {
+    createSmartImportSelectionEpochHttpHandler,
     createSmartImportSelectionHttpHandler,
 } from './server-session-smart-import-selection-http.ts';
 import { ServerSessionProjectionOwnerError } from './server-session-projection-owner.ts';
@@ -83,10 +84,42 @@ test('sanitizes unexpected and impossible owner errors without input or raw deta
     } finally { console.error = originalError; }
 });
 
-test('route delegates only to production selection composition with a dynamic Node runtime', () => {
+test('returns only the current epoch with no-store through one read-only composition call', async () => {
+    let calls = 0;
+    const handle = createSmartImportSelectionEpochHttpHandler({ readEpoch: async () => { calls += 1; return 4; } });
+    const response = await handle();
+
+    assert.equal(response.status, 200); assert.equal(response.headers.get('Cache-Control'), 'no-store');
+    assert.deepEqual(await response.json(), { selectionEpoch: 4 }); assert.equal(calls, 1);
+});
+
+test('maps session errors and sanitizes invalid epoch or internal faults without disclosing conflicts', async () => {
+    const originalError = console.error; const entries: unknown[][] = []; console.error = (...values: unknown[]) => { entries.push(values); };
+    try {
+        for (const error of [new AuthenticatedWebSessionSelectionError('session_unavailable'), new ServerSessionProjectionOwnerError('session_ineligible')]) {
+            const response = await createSmartImportSelectionEpochHttpHandler({ readEpoch: async () => { throw error; } })();
+            await rejects(401, 'session_unavailable')(response);
+        }
+        for (const source of [async () => -1, async () => { throw new Error('synthetic raw selection conflict'); }]) {
+            const response = await createSmartImportSelectionEpochHttpHandler({ readEpoch: source })(); const body = await response.json();
+            assert.equal(response.status, 500); assert.equal(response.headers.get('Cache-Control'), 'no-store');
+            assert.deepEqual(body, { error: 'Errore interno del server.', code: 'internal_error' });
+            assert.equal(JSON.stringify(body).includes('selectionEpoch'), false);
+            assert.equal(JSON.stringify(body).includes('synthetic raw'), false);
+        }
+        assert.equal(entries.length, 2);
+    } finally { console.error = originalError; }
+});
+
+test('route keeps POST unchanged and wires GET only to the epoch composition with a dynamic Node runtime', () => {
     const source = readFileSync(new URL('../../app/api/ai/smart-import/selection/route.ts', import.meta.url), 'utf8');
+    const epochProduction = readFileSync(new URL('./server-session-authenticated-selection-epoch-production.ts', import.meta.url), 'utf8');
     assert.match(source, /runtime\s*=\s*'nodejs'|runtime\s*=\s*"nodejs"/u);
     assert.match(source, /dynamic\s*=\s*'force-dynamic'|dynamic\s*=\s*"force-dynamic"/u);
     assert.match(source, /issueAuthenticatedWebSessionSelection/u);
+    assert.match(source, /readAuthenticatedWebSessionSelectionEpoch/u);
+    assert.match(source, /export const GET = createSmartImportSelectionEpochHttpHandler/u);
+    assert.match(epochProduction, /readAuthenticatedWebSession()[\s\S]*snapshotSelectionEpoch\(session\)/u);
+    assert.doesNotMatch(epochProduction, /\.acquire\(|issueSelection|patient|ambulatory|lease|expiresAt|Ref/u);
     assert.doesNotMatch(source, /requireSession|createServerSessionProjectionOwnerRegistry|resolveProjectionService|(?:ingest|preview|apply)/u);
 });

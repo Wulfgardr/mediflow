@@ -117,6 +117,18 @@ export function getSession(sessionId: string | null | undefined): ServerSession 
     return session;
 }
 
+/* @Codex */
+export function peekSession(sessionId: string | null | undefined): ServerSession | null {
+    if (!sessionId) return null;
+    const session = sessions.get(sessionId);
+    if (!session) return null;
+    if (session.expiresAt <= Date.now()) {
+        terminateSession(sessionId, 'session_expired');
+        return null;
+    }
+    return session;
+}
+
 export function deleteSession(sessionId: string | null | undefined): void {
     if (!sessionId) return;
     terminateSession(sessionId, 'session_deleted');

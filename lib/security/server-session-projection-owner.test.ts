@@ -139,6 +139,26 @@ test('reacquire preserves an existing selection without resolver or broker side 
     assert.deepEqual({ resolves, brokers, epoch: lease.selectionEpoch }, { resolves: 1, brokers: 0, epoch: 1 });
 });
 
+test('snapshots the owner-held epoch without acquisition, references, expiry changes, or conflict disclosure', () => {
+    let resolves = 0; let brokers = 0;
+    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => { resolves += 1; return pair; },
+        brokerFactory: () => { brokers += 1; throw new Error('synthetic broker must remain unused'); } });
+    const value = session(); value.expiresAt = Date.now() + 1_000; const freshExpiry = value.expiresAt;
+
+    assert.equal(registry.snapshotSelectionEpoch(value), 0);
+    assert.equal(registry.lookup(value.id), null);
+    assert.equal(value.expiresAt, freshExpiry);
+    const owner = registry.acquire(value);
+    assert.equal(registry.snapshotSelectionEpoch(value), 0);
+    const winner = owner.issueSelection({ expectedEpoch: 0, ...PAIR }); const issuedExpiry = value.expiresAt;
+    assert.equal(registry.snapshotSelectionEpoch(value), winner.selectionEpoch);
+    assert.equal(value.expiresAt, issuedExpiry);
+    assert.throws(() => owner.issueSelection({ expectedEpoch: 0, ...PAIR }), rejects('epoch_conflict'));
+    assert.equal(registry.snapshotSelectionEpoch(value), winner.selectionEpoch);
+    assert.deepEqual({ resolves, brokers }, { resolves: 2, brokers: 0 });
+    assert.throws(() => registry.snapshotSelectionEpoch({ ...value }), rejects('session_ineligible'));
+});
+
 test('authenticated owner context acquires once and legacy owner helper only derives it', () => {
     const ownerSource = readFileSync(new URL('./server-session-projection-owner.ts', import.meta.url), 'utf8');
     const authSource = readFileSync(new URL('./server-auth.ts', import.meta.url), 'utf8');

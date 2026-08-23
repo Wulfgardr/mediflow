@@ -98,7 +98,7 @@ test('projection broker is lookup-only until one lazy ingest acquisition', (cont
     const lease = issue(owner);
     reenter = () => { assert.throws(() => owner.acquireProjectionIngest(session, tuple(lease)), rejects('broker_unavailable')); };
 
-    assert.deepEqual(Object.keys(owner), ['acquireProjectionIngest', 'resolveProjectionService', 'issueSelection', 'dereferenceSelection', 'dispose']);
+    assert.deepEqual(Object.keys(owner), ['snapshotSelectionEpoch', 'acquireProjectionIngest', 'resolveProjectionService', 'issueSelection', 'dereferenceSelection', 'dispose']);
     assert.throws(() => owner.resolveProjectionService(session), rejects('broker_unavailable'));
     const foreign = createSession(USER);
     assert.throws(() => owner.acquireProjectionIngest(foreign, { ...tuple(lease), patientRef: 'forged.reference.0001' }),
