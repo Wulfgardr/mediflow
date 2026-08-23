@@ -19,7 +19,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>0.8.5</string>
 	<key>CFBundleVersion</key>
-	<integer>85</integer>
+	<string>85</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.medical</string>
 	<key>NSBonjourServices</key>
