@@ -30,6 +30,12 @@ test('keeps every Fabric-to-canonical gap explicit and non-semantic', () => {
   assert.ok(records.every((record) => record.terminalDisposition === 'unmapped' && record.decisionOwner === 'technical_worker'));
 });
 
+test('enumerates frozen Web routes and pages without inferred authority', () => {
+  const records = JSON.parse(readFileSync('docs/capability-mapping/nodes/web-surfaces.v1.json', 'utf8')).records;
+  assert.equal(records.length, 168);
+  assert.ok(records.every((record) => record.authority === 'unresolved' && record.terminalDisposition === 'unmapped'));
+});
+
 test('rejects source drift and apply', () => {
   const drift = clone(manifest);
   drift.sourceSets[0].recordCount += 1;
