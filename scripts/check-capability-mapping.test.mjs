@@ -37,6 +37,12 @@ test('enumerates frozen Web routes and pages without inferred authority', () => 
   assert.ok(records.every((record) => record.authority === 'unresolved' && record.terminalDisposition === 'unmapped'));
 });
 
+test('rejects Web or Mini records outside the functional surface policy', () => {
+  const escaped = clone(basis);
+  escaped.populations.surfaces.records.push({ id: 'surface:web:asset@v1', sourceIdentity: { sourceKind: 'web_surface', identifier: 'public/icon.png' }, description: 'synthetic hostile record', surface: 'web_page', stage: 'unresolved', authority: 'unresolved', input: 'unresolved', output: 'unresolved', provider: 'unresolved', venue: 'unresolved', egress: 'unresolved', evidence: [{ evidenceKind: 'code', ref: '93362ca505149f5d6c51502784395e65126921df:app/page.tsx' }], terminalDisposition: 'unmapped' });
+  assert.throws(() => validateCapabilityMapping(manifest, escaped), /web surface eligibility/);
+});
+
 test('rejects source drift and apply', () => {
   const drift = clone(manifest);
   drift.sourceSets[0].recordCount += 1;
