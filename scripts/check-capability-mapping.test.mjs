@@ -12,6 +12,12 @@ test('accepts the frozen M0 contracts', () => {
   assert.doesNotThrow(() => validateCapabilityMapping());
 });
 
+test('keeps all 66 Web/Mini rows lossless and authority-unresolved', () => {
+  const records = JSON.parse(readFileSync('docs/capability-mapping/nodes/web-mini-crosswalk.v1.json', 'utf8')).records;
+  assert.equal(records.length, 66);
+  assert.ok(records.every((record) => record.authority === 'unresolved' && record.stage === 'unresolved'));
+});
+
 test('rejects source drift and apply', () => {
   const drift = clone(manifest);
   drift.sourceSets[0].recordCount += 1;
@@ -26,7 +32,7 @@ test('rejects unknown mapping vocabulary and unjustified completion', () => {
   unknown.relationKinds[0] = 'similar_to';
   assert.throws(() => validateCapabilityMapping(manifest, unknown), /relation kind vocabulary/);
   const incomplete = clone(basis);
-  incomplete.populations.anchors.records.push({ id: 'anchor.v1', sourceIdentity: 'synthetic', description: 'synthetic hostile record', surface: 'test', stage: 'none', authority: 'unresolved', input: 'unresolved', output: 'unresolved', provider: 'unresolved', venue: 'unresolved', egress: 'unresolved', evidence: ['test'], terminalDisposition: 'unmapped' });
+  incomplete.populations.surfaces.records.push({ id: 'surface.v1', sourceIdentity: 'synthetic', description: 'synthetic hostile record', surface: 'test', stage: 'none', authority: 'unresolved', input: 'unresolved', output: 'unresolved', provider: 'unresolved', venue: 'unresolved', egress: 'unresolved', evidence: ['test'], terminalDisposition: 'unmapped' });
   incomplete.semanticBindingComplete = true;
   assert.throws(() => validateCapabilityMapping(manifest, incomplete), /semantic binding/);
 });
