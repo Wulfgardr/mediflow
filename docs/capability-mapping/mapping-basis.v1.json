@@ -13,7 +13,7 @@
   "relationFiles": ["docs/capability-mapping/relations/web-mini-bindings.v1.json", "docs/capability-mapping/relations/aip-fabric-identities.v1.json"],
   "conflicts": [],
   "conflictFiles": ["docs/capability-mapping/conflicts/fabric-canonical-unmapped.v1.json"],
-  "ledgerComplete": false,
+  "ledgerComplete": true,
   "semanticBindingComplete": false,
   "claimCeiling": "mapping candidate locale verificato su exact head indipendenti; non integrato, non release-ready, non released"
 }

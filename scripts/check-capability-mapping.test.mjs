@@ -6,6 +6,7 @@ import { validateCapabilityMapping } from './check-capability-mapping.mjs';
 
 const manifest = JSON.parse(readFileSync('docs/capability-mapping/source-manifest.v1.json', 'utf8'));
 const basis = JSON.parse(readFileSync('docs/capability-mapping/mapping-basis.v1.json', 'utf8'));
+const coverage = JSON.parse(readFileSync('docs/capability-mapping/coverage-receipt.v1.json', 'utf8'));
 const clone = (value) => structuredClone(value);
 
 test('accepts the frozen M0 contracts', () => {
@@ -53,4 +54,16 @@ test('rejects unknown mapping vocabulary and unjustified completion', () => {
   incomplete.populations.surfaces.records.push({ id: 'surface.v1', sourceIdentity: 'synthetic', description: 'synthetic hostile record', surface: 'test', stage: 'none', authority: 'unresolved', input: 'unresolved', output: 'unresolved', provider: 'unresolved', venue: 'unresolved', egress: 'unresolved', evidence: ['test'], terminalDisposition: 'unmapped' });
   incomplete.semanticBindingComplete = true;
   assert.throws(() => validateCapabilityMapping(manifest, incomplete), /semantic binding/);
+});
+
+test('rejects missing, duplicate, collapsed, or overclaimed coverage', () => {
+  const missing = clone(coverage);
+  missing.populationCoverage[0].observedCount -= 1;
+  assert.throws(() => validateCapabilityMapping(manifest, basis, undefined, missing), /anchors is incomplete/);
+  const duplicate = clone(coverage);
+  duplicate.conflictCoverage.residualConflictIds[1] = duplicate.conflictCoverage.residualConflictIds[0];
+  assert.throws(() => validateCapabilityMapping(manifest, basis, undefined, duplicate), /conflict coverage is incomplete or collapsed/);
+  const overclaimed = clone(coverage);
+  overclaimed.semanticBindingComplete = true;
+  assert.throws(() => validateCapabilityMapping(manifest, basis, undefined, overclaimed), /completion flags drifted/);
 });

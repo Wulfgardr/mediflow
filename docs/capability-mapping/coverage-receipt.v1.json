@@ -1,0 +1,49 @@
+{
+  "schema": "mediflow.capability-mapping.coverage-receipt.v1",
+  "mappingVersion": 1,
+  "status": "candidate_not_integrated",
+  "applyPolicy": "none",
+  "sourceManifestSha256": "5318f32920e2bf5a3718d5baf6f763062ec549d15c1683c723306fb8c49df1af",
+  "claimCeiling": "mapping candidate locale verificato su exact head indipendenti; non integrato, non release-ready, non released",
+  "populationCoverage": [
+    {"populationId":"anchors","expectedCount":66,"observedCount":66,"terminalDispositionCounts":{"mapped":66,"infrastructure_only":0,"out_of_catalog":0,"unmapped":0,"conflicted":0}},
+    {"populationId":"aip","expectedCount":109,"observedCount":109,"terminalDispositionCounts":{"mapped":109,"infrastructure_only":0,"out_of_catalog":0,"unmapped":0,"conflicted":0}},
+    {"populationId":"fabric","expectedCount":16,"observedCount":16,"terminalDispositionCounts":{"mapped":16,"infrastructure_only":0,"out_of_catalog":0,"unmapped":0,"conflicted":0}},
+    {"populationId":"surfaces","expectedCount":600,"observedCount":600,"terminalDispositionCounts":{"mapped":0,"infrastructure_only":0,"out_of_catalog":0,"unmapped":600,"conflicted":0}}
+  ],
+  "relationCoverage": {"expectedCount":82,"observedCount":82},
+  "conflictCoverage": {
+    "observedCount": 16,
+    "residualCount": 16,
+    "residualConflictIds": [
+      "conflict:fabric-canonical:patient_insight@v1",
+      "conflict:fabric-canonical:smart_import@v1",
+      "conflict:fabric-canonical:document_synthesis@v1",
+      "conflict:fabric-canonical:ocr@v1",
+      "conflict:fabric-canonical:treatment_reasoning@v1",
+      "conflict:fabric-canonical:icd_lookup@v1",
+      "conflict:fabric-canonical:aifa_drug_search@v1",
+      "conflict:fabric-canonical:service_prescription_matching@v1",
+      "conflict:fabric-canonical:evidence_absorption@v1",
+      "conflict:fabric-canonical:patient_open_loops@v1",
+      "conflict:fabric-canonical:fhir_export@v1",
+      "conflict:fabric-canonical:document_classification@v1",
+      "conflict:fabric-canonical:document_identity_resolution@v1",
+      "conflict:fabric-canonical:pii_redaction_layer1@v1",
+      "conflict:fabric-canonical:fse_document_validation@v1",
+      "conflict:fabric-canonical:observation_range_classification@v1"
+    ]
+  },
+  "ledgerComplete": true,
+  "semanticBindingComplete": false,
+  "requiredEvidence": [
+    {
+      "scope": "Fabric-to-anchor",
+      "requirement": "An accepted, versioned source crosswalk or a canonical record that explicitly names each FabricCapabilityId."
+    },
+    {
+      "scope": "product surfaces",
+      "requirement": "A direct, versioned relation from each unresolved surface to a canonical capability; names, order, and proximity are not evidence."
+    }
+  ]
+}
