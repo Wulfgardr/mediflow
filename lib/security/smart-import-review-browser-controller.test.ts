@@ -41,3 +41,12 @@ test('capture invalid prevents ingest and reset fences an in-flight run', async 
     const staleProposal = await stale.readProposal(); const run = stale.run({ patientId: 'patient.synthetic.01', proposal: staleProposal, captureInput }, true); stale.reset(); pending.resolve(response({ selectionEpoch: 0 }));
     await assert.rejects(() => run, rejects('operation_superseded'));
 });
+
+test('fences reset and overlapping context reads so only the latest proposal can run', async () => {
+    const first = deferred<Response>(); let reads = 0; let posts = 0;
+    const controller = createSmartImportReviewBrowserController({ fetch: async (_path, init) => { if (init?.method === 'POST') posts += 1; reads += 1; return reads === 1 ? first.promise : response({ ambulatoryId: `ambulatory.synthetic.0${reads}` }); } });
+    const stale = controller.readProposal(); controller.reset(); first.resolve(response({ ambulatoryId: 'ambulatory.synthetic.01' })); await assert.rejects(() => stale, rejects('operation_superseded'));
+    const oldRead = controller.readProposal(); const newest = await controller.readProposal(); await assert.rejects(() => oldRead, rejects('operation_superseded'));
+    await assert.rejects(() => controller.run({ patientId: 'patient.synthetic.01', proposal: Object.freeze({ ambulatoryId: 'ambulatory.synthetic.02' }), captureInput }, true), rejects('proposal_stale'));
+    assert.equal(newest.ambulatoryId, 'ambulatory.synthetic.03'); assert.equal(posts, 0);
+});
