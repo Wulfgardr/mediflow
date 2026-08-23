@@ -61,6 +61,15 @@ function relationRecords(basis) {
   }
   return records;
 }
+function conflictRecords(basis) {
+  const records = [...basis.conflicts];
+  for (const file of basis.conflictFiles ?? []) {
+    const external = relativeJson(file, 'conflict file');
+    if (!Array.isArray(external.records)) fail('conflict file has no records');
+    records.push(...external.records);
+  }
+  return records;
+}
 function validateWebMiniCrosswalk(basis, anchorRecords) {
   const population = basis.populations.anchors;
   if (!population.recordFile) return;
@@ -99,9 +108,10 @@ function validateBasis(basis, manifestBytes) {
   }
   const relations = relationRecords(basis);
   if (!relations.every((relation) => relation && RELATION_KINDS.has(relation.relationKind) && Array.isArray(relation.evidence) && relation.evidence.length > 0)) fail('relation contract is invalid');
-  if (!Array.isArray(basis.conflicts) || !basis.conflicts.every((conflict) => conflict && TERMINAL_DISPOSITIONS.has(conflict.terminalDisposition))) fail('conflict contract is invalid');
+  const conflicts = conflictRecords(basis);
+  if (!conflicts.every((conflict) => conflict && TERMINAL_DISPOSITIONS.has(conflict.terminalDisposition) && ['technical_worker', 'chief', 'product_owner', 'compliance_owner'].includes(conflict.decisionOwner) && Array.isArray(conflict.alternatives) && Array.isArray(conflict.consequences))) fail('conflict contract is invalid');
   const nodes = Object.values(basis.populations).flatMap(populationRecords);
-  const terminal = [...nodes, ...basis.conflicts];
+  const terminal = [...nodes, ...conflicts];
   if (basis.ledgerComplete && terminal.some((value) => !TERMINAL_DISPOSITIONS.has(value.terminalDisposition))) fail('complete ledger has an undisposed record');
   if (basis.semanticBindingComplete && terminal.some((value) => ['unmapped', 'conflicted'].includes(value.terminalDisposition))) fail('semantic binding cannot be complete with unresolved records');
 }
