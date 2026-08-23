@@ -115,6 +115,9 @@ test('network attachment create accepts the real paired projection and applies s
     assert.equal(row?.ocrQueueReason, 'paired_upload');
     assert.ok(row?.ocrQueueUpdatedAt);
     assert.ok(row?.createdAt);
+    assert.match(row?.documentSourceRef ?? '', /^[0-9a-f]{64}$/u);
+    assert.equal(row?.documentRevision, 1);
+    assert.equal(row?.documentFreshnessEpoch, 1);
 
     const audit = dbServer.select().from(auditEvents)
         .where(and(eq(auditEvents.eventType, 'attachment.created'), eq(auditEvents.subjectRef, result.value.id)))
@@ -143,6 +146,9 @@ test('network attachment create rejects every field outside the allowlist', asyn
         ocrQueueReason: 'text_layer_absent',
         ocrReplayArtifactSnapshot: 'ENC:aXY=:cmVwbGF5',
         ocrQueueUpdatedAt: new Date().toISOString(),
+        documentSourceRef: 'a'.repeat(64),
+        documentRevision: 1,
+        documentFreshnessEpoch: 1,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         unexpectedFutureField: 'anything',

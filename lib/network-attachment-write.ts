@@ -19,6 +19,8 @@ import { activePatients } from './patient-lifecycle';
 import type { NetworkWriteContext } from './network-write-context';
 /* @Codex */
 import { attachments, patients, patientsToAmbulatories } from './schema';
+/* @Codex */
+import { createDocumentSourceRef, INITIAL_DOCUMENT_CURRENTNESS } from './attachment-currentness';
 
 /* @Codex */
 export const NETWORK_ATTACHMENT_WRITE_CAPABILITY = 'network.replica.write-documents';
@@ -193,6 +195,12 @@ export async function createNetworkScopedAttachment(
             ocrQueueReason: 'paired_upload',
             ocrQueueUpdatedAt: now,
             createdAt: now,
+            /* @Codex */
+            documentSourceRef: createDocumentSourceRef(),
+            /* @Codex */
+            documentRevision: INITIAL_DOCUMENT_CURRENTNESS,
+            /* @Codex */
+            documentFreshnessEpoch: INITIAL_DOCUMENT_CURRENTNESS,
         }).run();
 
         return { status: 201, value: { id: newId } };

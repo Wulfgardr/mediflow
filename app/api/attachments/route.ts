@@ -17,6 +17,8 @@ import { attachmentCreateSchema } from '@/lib/api-schemas/attachments';
 import { parseApiBody } from '@/lib/api-schemas/parse';
 /* @Codex */
 import { createLegacyAttachmentResponseSnapshot } from '@/lib/attachment-legacy-response';
+/* @Codex */
+import { createDocumentSourceRef, INITIAL_DOCUMENT_CURRENTNESS } from '@/lib/attachment-currentness';
 
 // Only plaintext columns are sortable (name/path/data are ENC:). size/type are
 // plaintext metadata and safe to sort on.
@@ -162,7 +164,13 @@ export async function POST(request: Request) {
             ocrQueueState: isDocumentOcrQueueState(body.ocrQueueState) ? body.ocrQueueState : null,
             ocrQueueReason: isDocumentOcrQueueReason(body.ocrQueueReason) ? body.ocrQueueReason : null,
             ocrQueueUpdatedAt: isDocumentOcrQueueState(body.ocrQueueState) ? new Date() : null,
-            createdAt: new Date()
+            createdAt: new Date(),
+            /* @Codex */
+            documentSourceRef: createDocumentSourceRef(),
+            /* @Codex */
+            documentRevision: INITIAL_DOCUMENT_CURRENTNESS,
+            /* @Codex */
+            documentFreshnessEpoch: INITIAL_DOCUMENT_CURRENTNESS,
         });
 
         return NextResponse.json({ id: newId }, { status: 201 });

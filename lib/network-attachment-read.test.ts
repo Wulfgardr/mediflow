@@ -91,6 +91,9 @@ function resetDatabase(): void {
             ocrQueueReason: 'paired_upload',
             ocrQueueUpdatedAt: new Date('2026-07-10T09:00:00.000Z'),
             createdAt: new Date('2026-07-10T09:00:00.000Z'),
+            documentSourceRef: 'a'.repeat(64),
+            documentRevision: 1,
+            documentFreshnessEpoch: 1,
         },
         {
             id: OTHER_PATIENT_ATTACHMENT_ID,
@@ -101,6 +104,9 @@ function resetDatabase(): void {
             path: `attachments/${OTHER_PATIENT_ATTACHMENT_ID}-altro.pdf`,
             data: SEALED_DATA,
             createdAt: new Date('2026-07-10T08:00:00.000Z'),
+            documentSourceRef: 'b'.repeat(64),
+            documentRevision: 1,
+            documentFreshnessEpoch: 1,
         },
     ]).run();
 }

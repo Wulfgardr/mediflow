@@ -475,6 +475,12 @@ export const attachments = sqliteTable('attachments', {
     ocrQueueUpdatedAt: integer('ocr_queue_updated_at', { mode: 'timestamp' }),
     ocrReplayArtifactSnapshot: text('ocr_replay_artifact_snapshot'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+    /* @Codex */
+    documentSourceRef: text('document_source_ref').notNull(),
+    /* @Codex */
+    documentRevision: integer('document_revision').notNull(),
+    /* @Codex */
+    documentFreshnessEpoch: integer('document_freshness_epoch').notNull(),
 }, (t) => ({
     // WUL-268 (STREAM A): mirrors runtime guards in db-server.ts.
     patientIdx: index('attachments_patient_idx').on(t.patientId),

@@ -55,7 +55,21 @@ export const NETWORK_ATTACHMENT_METADATA_COLUMNS = {
     createdAt: attachments.createdAt,
 } as const;
 
-type AttachmentSummaryRow = Omit<typeof attachments.$inferSelect, 'data'>;
+type AttachmentSummaryRow = Pick<typeof attachments.$inferSelect,
+    | 'id'
+    | 'patientId'
+    | 'name'
+    | 'type'
+    | 'size'
+    | 'path'
+    | 'summarySnapshot'
+    | 'parseEvidenceArtifactSnapshot'
+    | 'ocrQueueState'
+    | 'ocrQueueReason'
+    | 'ocrQueueUpdatedAt'
+    | 'ocrReplayArtifactSnapshot'
+    | 'createdAt'
+>;
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
