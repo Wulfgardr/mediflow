@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { buildPatientInsightPrompt, createPatientInsightHostBoundary } from './patient-insight-host-boundary.ts';
+import { createPatientInsightHostBoundary } from './patient-insight-host-boundary.ts';
 
 const ref = (prefix: string) => `${prefix}_${'a'.repeat(32)}`;
 const context = () => ({
-    binding: { leaseRef: ref('lease'), patientRef: ref('patient'), selectionEpoch: 7 },
+    binding: { leaseRef: ref('lsr'), patientRef: ref('ptr'), selectionEpoch: 7 },
     receipt: { schemaVersion: 'mediflow.patient-insight.host-receipt.v1', reference: ref('receipt'), capability: 'patient_insight', authority: 'host_service', writesPerformed: 0, applyPolicy: 'none' },
     provenance: { schemaVersion: 'mediflow.patient-insight.host-provenance.v1', reference: ref('provenance'), capability: 'patient_insight', receiptRef: ref('receipt') },
 });
@@ -20,7 +20,8 @@ test('prepares a frozen review-only proposal from an allowlisted minimized proje
     assert.deepEqual([result.receiptReference, result.provenanceReference], [ref('receipt'), ref('provenance')]);
     assert.deepEqual(Object.keys(result), ['status', 'writesPerformed', 'applyPolicy', 'receiptReference', 'provenanceReference', 'proposal']);
     assert.equal(Object.isFrozen(result), true); assert.equal(Object.isFrozen(result.proposal), true);
-    assert.equal(buildPatientInsightPrompt(input.projection), buildPatientInsightPrompt(request().projection));
+    const repeated = boundary.prepare(request()); assert.equal(repeated.status, 'available'); if (repeated.status !== 'available') return;
+    assert.equal(result.proposal.promptFingerprint, repeated.proposal.promptFingerprint);
     input.projection.clinicalFocus = 'mutated'; input.projection.activeConditions[0] = 'mutated';
     assert.equal(result.proposal.promptFingerprint, 'pi_223cbf9d');
 });
@@ -43,6 +44,10 @@ test('rejects malformed host receipt, provenance, opaque binding, and authority 
         { ...context(), receipt: { ...context().receipt, applyPolicy: 'apply' } },
         { ...context(), provenance: { ...context().provenance, receiptRef: ref('other') } },
         { ...context(), binding: { ...context().binding, selectionEpoch: '7' } },
+        { ...context(), binding: { ...context().binding, leaseRef: ref('lease') } },
+        { ...context(), binding: { ...context().binding, patientRef: ref('patient') } },
+        { ...context(), binding: { ...context().binding, leaseRef: `lsr_${'a'.repeat(33)}` } },
+        { ...context(), binding: { ...context().binding, patientRef: `ptr_${'a'.repeat(31)}` } },
         { ...context(), binding: { ...context().binding, patientRef: 'Synthetic Name' } },
     ];
     for (const value of invalid) assert.throws(() => createPatientInsightHostBoundary(value));
@@ -52,4 +57,5 @@ test('contains no provider, persistence, free prompt, or apply path', () => {
     const source = readFileSync(new URL('./patient-insight-host-boundary.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(source, /\b(fetch|provider|persist|database|writeFile)\b/ui);
     assert.doesNotMatch(source, /callerIdentity|patientId|fullName|taxCode/ui);
+    assert.doesNotMatch(source, /export function buildPatientInsightPrompt/u);
 });

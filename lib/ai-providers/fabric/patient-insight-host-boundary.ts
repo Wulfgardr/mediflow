@@ -3,7 +3,7 @@ export type PatientInsightProjection = Readonly<{ schemaVersion: 'mediflow.patie
 export type PatientInsightHostResult = Readonly<{ status: 'available'; writesPerformed: 0; applyPolicy: 'none'; receiptReference: string; provenanceReference: string; proposal: Readonly<{ schemaVersion: 'mediflow.patient-insight.review-proposal.v1'; reviewOnly: true; promptFingerprint: string }> }> | Readonly<{ status: 'denied'; code: 'input_invalid'; writesPerformed: 0; applyPolicy: 'none' }>;
 export type PatientInsightHostBoundary = Readonly<{ prepare: (request: unknown) => PatientInsightHostResult }>;
 
-const reference = /^(lease|patient|receipt|provenance)_[a-f0-9]{32,64}$/;
+const reference = /^(?:(?:lsr|ptr)_[a-f0-9]{32}|(?:receipt|provenance)_[a-f0-9]{32,64})$/;
 const denied = Object.freeze({ status: 'denied' as const, code: 'input_invalid' as const, writesPerformed: 0 as const, applyPolicy: 'none' as const });
 
 function record(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
@@ -29,7 +29,7 @@ function projection(value: unknown): PatientInsightProjection | null {
 function fingerprint(value: string): string { let hash = 2166136261; for (let index = 0; index < value.length; index += 1) hash = Math.imul(hash ^ value.charCodeAt(index), 16777619) >>> 0; return `pi_${hash.toString(16).padStart(8, '0')}`; }
 
 /** Deterministic host-side construction; route input cannot add text to this prompt. */
-export function buildPatientInsightPrompt(value: Pick<PatientInsightProjection, 'clinicalFocus' | 'activeConditions' | 'currentTherapies' | 'recentClinicalEvents'>): string {
+function buildPatientInsightPrompt(value: Pick<PatientInsightProjection, 'clinicalFocus' | 'activeConditions' | 'currentTherapies' | 'recentClinicalEvents'>): string {
     return ['Patient Insight review request.', `Clinical focus: ${value.clinicalFocus}`, `Active conditions: ${value.activeConditions.join('; ') || 'none'}`, `Current therapies: ${value.currentTherapies.join('; ') || 'none'}`, `Recent clinical events: ${value.recentClinicalEvents.join('; ') || 'none'}`, 'Return a review-only clinical summary.'].join('\n');
 }
 
