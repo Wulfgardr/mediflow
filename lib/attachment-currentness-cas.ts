@@ -22,6 +22,8 @@ export type AttachmentCurrentnessCasOutcome =
 
 const REQUEST_KEYS = ['id', 'documentSourceRef', 'expectedRevision', 'expectedFreshnessEpoch'] as const;
 const denied = (code: AttachmentCurrentnessCasCode): AttachmentCurrentnessCasOutcome => Object.freeze({ status: 'denied', code });
+const transactionRecord = <T extends object>(value: T): T => Object.freeze(Object.assign(Object.create(null) as object, value)) as T;
+const transactionDenied = (code: AttachmentCurrentnessCasCode): AttachmentCurrentnessCasOutcome => transactionRecord({ status: 'denied', code });
 const activeHosts = new WeakMap<object, { reentered: boolean }>();
 
 class Rollback extends Error { constructor(readonly code: AttachmentCurrentnessCasCode) { super('Attachment currentness mutation denied.'); } }
@@ -56,7 +58,8 @@ export function createAttachmentCurrentnessCas(host: Host) {
             if (existing) { existing.reentered = true; return denied('operation_reentered'); }
             const state = { reentered: false };
             activeHosts.set(host.database, state);
-            try { return host.runImmediateTransaction(() => {
+            try {
+                const outcome = host.runImmediateTransaction<AttachmentCurrentnessCasOutcome>(() => {
                 const candidates = host.database.select({
                     id: attachments.id,
                     documentSourceRef: attachments.documentSourceRef,
@@ -66,14 +69,14 @@ export function createAttachmentCurrentnessCas(host: Host) {
                     eq(attachments.id, request.id),
                     eq(attachments.documentSourceRef, request.documentSourceRef),
                 )).all();
-                if (candidates.length === 0) return denied('missing');
-                if (candidates.length !== 1) return denied('cardinality_violation');
+                if (candidates.length === 0) return transactionDenied('missing');
+                if (candidates.length !== 1) return transactionDenied('cardinality_violation');
                 const current = candidates[0]!;
                 if (current.id !== request.id || current.documentSourceRef !== request.documentSourceRef) {
-                    return denied('identity_mismatch');
+                    return transactionDenied('identity_mismatch');
                 }
                 if (current.documentRevision !== request.expectedRevision || current.documentFreshnessEpoch !== request.expectedFreshnessEpoch) {
-                    return denied('stale');
+                    return transactionDenied('stale');
                 }
                 let result: unknown;
                 try { result = (mutation as (database: BetterSQLite3Database) => unknown)(host.database); }
@@ -104,13 +107,17 @@ export function createAttachmentCurrentnessCas(host: Host) {
                     eq(attachments.documentFreshnessEpoch, request.expectedFreshnessEpoch),
                 )).run();
                 if (advanced.changes !== 1) throw new Rollback('stale');
-                const receipt = Object.freeze({
+                const receipt = transactionRecord({
                     documentSourceRef: request.documentSourceRef,
                     documentRevision,
                     documentFreshnessEpoch,
                 });
-                return Object.freeze({ status: 'committed' as const, receipt });
-            }); } catch (error) {
+                return transactionRecord({ status: 'committed' as const, receipt });
+                });
+                if (outcome.status === 'denied') return denied(outcome.code);
+                const receipt = Object.freeze({ ...outcome.receipt });
+                return Object.freeze({ status: 'committed', receipt });
+            } catch (error) {
                 return denied(error instanceof Rollback ? error.code : 'storage_unavailable');
             } finally { activeHosts.delete(host.database); }
         },

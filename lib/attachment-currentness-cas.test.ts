@@ -52,6 +52,34 @@ test('commits one synchronous mutation and advances both counters exactly once',
     } finally { value.close(); }
 });
 
+test('commits without reading an ambient Object.prototype.then getter', () => {
+    const value = fixture();
+    const previous = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+    let thenReads = 0;
+    let outcome: unknown;
+    let row: unknown;
+    try {
+        Object.defineProperty(Object.prototype, 'then', {
+            configurable: true,
+            get() { thenReads += 1; return () => undefined; },
+        });
+        outcome = value.cas.mutate({ id: 'attachment-a', documentSourceRef: REF_A, expectedRevision: 1, expectedFreshnessEpoch: 1 }, () => {
+            const result = value.sqlite.prepare("UPDATE attachments SET marker = 'ambient-safe'").run();
+            return { changes: result.changes };
+        });
+        row = value.sqlite.prepare('SELECT marker, document_revision, document_freshness_epoch FROM attachments').get();
+    } finally {
+        if (previous) Object.defineProperty(Object.prototype, 'then', previous);
+        else delete (Object.prototype as { then?: unknown }).then;
+    }
+    try {
+        assert.equal(thenReads, 0);
+        assert.equal((outcome as { status?: unknown }).status, 'committed');
+        assert.deepEqual((outcome as { receipt?: unknown }).receipt, { documentSourceRef: REF_A, documentRevision: 2, documentFreshnessEpoch: 2 });
+        assert.deepEqual(row, { marker: 'ambient-safe', document_revision: 2, document_freshness_epoch: 2 });
+    } finally { value.close(); }
+});
+
 test('denies missing, mismatched, stale, and split identity before mutation', () => {
     const value = fixture();
     let calls = 0;
