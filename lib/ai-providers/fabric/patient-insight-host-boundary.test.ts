@@ -42,6 +42,7 @@ test('rejects malformed host receipt, provenance, opaque binding, and authority 
         { ...context(), receipt: { ...context().receipt, authority: 'host_service|physician' } },
         { ...context(), receipt: { ...context().receipt, applyPolicy: 'apply' } },
         { ...context(), provenance: { ...context().provenance, receiptRef: ref('other') } },
+        { ...context(), binding: { ...context().binding, selectionEpoch: '7' } },
         { ...context(), binding: { ...context().binding, patientRef: 'Synthetic Name' } },
     ];
     for (const value of invalid) assert.throws(() => createPatientInsightHostBoundary(value));
