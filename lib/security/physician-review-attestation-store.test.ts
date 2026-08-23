@@ -40,7 +40,7 @@ test('DDL rejects forged fixed fields, lifecycle values, and timestamp domains',
         const invalidRows = [
             ['forged.schema', 'physician_terminal_review', 'inactive', 1, 'physician_terminal_review.v1', null, 1, 1],
             ['mediflow.physician-review-attestation.v1', 'forged_capability', 'inactive', 1, 'physician_terminal_review.v1', null, 1, 1],
-            ['mediflow.physician-review-attestation.v1', 'physician_terminal_review', 'active', 1, 'physician_terminal_review.v1', null, 1, 1],
+            ['mediflow.physician-review-attestation.v1', 'physician_terminal_review', 'active', 1, 'physician_terminal_review.v1', 1, 1, 1],
             ['mediflow.physician-review-attestation.v1', 'physician_terminal_review', 'inactive', 99, 'physician_terminal_review.v1', null, 1, 1],
             ['mediflow.physician-review-attestation.v1', 'physician_terminal_review', 'inactive', 1, 'forged.policy', null, 1, 1],
             ['mediflow.physician-review-attestation.v1', 'physician_terminal_review', 'inactive', 1, 'physician_terminal_review.v1', 1, 1, 1],
@@ -122,10 +122,32 @@ test('exposes no caller control over capability, state, versions, or actor metad
         store.createInactive(ACTOR_B, { status: 'active', capability: 'admin', policyVersion: 'forged' });
     }
 });
+test('activates once through the exact inactive record and returns no general authority', async () => {
+    const store = createPhysicianReviewAttestationStore();
+    const activation = Promise.allSettled([
+        Promise.resolve().then(() => store.activate(ACTOR_A)),
+        Promise.resolve().then(() => store.activate(ACTOR_A)),
+    ]);
+    const results = await activation;
+    const fulfilled = results.filter((result) => result.status === 'fulfilled');
+    const rejected = results.filter((result) => result.status === 'rejected');
+
+    assert.equal(fulfilled.length, 1);
+    assert.equal(rejected.length, 1);
+    assert.equal(store.read(ACTOR_A).status, 'active');
+    assert.throws(
+        () => store.activate(ACTOR_A),
+        (error) => error instanceof PhysicianReviewAttestationStoreError && error.code === 'attestation_not_inactive',
+    );
+    assert.deepEqual(Object.keys(store.read(ACTOR_A)).sort(), [
+        'actorRef', 'attestationVersion', 'capability', 'createdAt', 'policyVersion', 'revokedAt', 'schemaVersion', 'status', 'updatedAt',
+    ]);
+});
+
 test('fails closed for corrupt state, invalid dates, orphaned actors, and unconstrained prior tables', () => {
     const db = new Database(path.join(dataDir, 'medical.db'));
     db.pragma('ignore_check_constraints = ON');
-    try { db.prepare("UPDATE physician_review_attestations SET status = 'active' WHERE actor_ref = ?").run(ACTOR_A); } finally { db.pragma('ignore_check_constraints = OFF'); }
+    try { db.prepare("UPDATE physician_review_attestations SET status = 'active', revoked_at = 1 WHERE actor_ref = ?").run(ACTOR_A); } finally { db.pragma('ignore_check_constraints = OFF'); }
 
     const store = createPhysicianReviewAttestationStore();
     assert.throws(
