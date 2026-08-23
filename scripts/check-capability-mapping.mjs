@@ -87,6 +87,21 @@ function conflictRecords(basis) {
   }
   return records;
 }
+function validateWebMiniSurfaceEligibility(basis) {
+  const policy = relativeJson(basis.surfaceEligibilityFile, 'surface eligibility file');
+  if (policy.schema !== 'mediflow.capability-mapping.surface-eligibility.v1' || policy.mappingVersion !== 1 || policy.applyPolicy !== 'none' || !Array.isArray(policy.rules) || !Array.isArray(policy.excludedFromSurfacePopulation)) fail('surface eligibility contract is invalid');
+  const records = populationRecords(basis.populations.surfaces);
+  const web = records.filter((record) => record.sourceIdentity?.sourceKind === 'web_surface');
+  const webRoutes = relativeJson('docs/capability-mapping/sources/web-http-routes.v1.json', 'web route roster').records.map((record) => record.path);
+  const webPages = relativeJson('docs/capability-mapping/sources/web-product-pages.v1.json', 'web page roster').records.map((record) => record.path);
+  const bySurface = (surface) => web.filter((record) => record.surface === surface).map((record) => record.sourceIdentity.identifier).sort();
+  if (JSON.stringify(bySurface('web_http_route')) !== JSON.stringify(webRoutes) || JSON.stringify(bySurface('web_page')) !== JSON.stringify(webPages) || web.some((record) => !['web_http_route', 'web_page'].includes(record.surface))) fail('web surface eligibility drifted');
+  const mini = records.filter((record) => record.sourceIdentity?.sourceKind === 'mini_command');
+  const source = JSON.parse(git('show', '1e35733c0218eae67a1d6e158085aab7340bc26b:packages/mini/contracts/mini-parity.json'));
+  const expectedMini = source.capabilities.flatMap((capability, index) => (capability.miniCommands ?? []).map((_, commandIndex) => `${capability.webCapabilityId}:${commandIndex + 1}:${index + 1}`)).sort();
+  const actualMini = mini.map((record) => `${record.sourceIdentity.identifier}:${record.sourceIdentity.sourceRow}`).sort();
+  if (mini.some((record) => record.surface !== 'mini_command') || JSON.stringify(actualMini) !== JSON.stringify(expectedMini)) fail('Mini command surface eligibility drifted');
+}
 function dispositionCounts(records) {
   return Object.fromEntries([...TERMINAL_DISPOSITIONS].map((disposition) => [disposition, records.filter((record) => record.terminalDisposition === disposition).length]));
 }
@@ -160,6 +175,7 @@ function validateBasis(basis, manifestBytes, sourcePaths) {
     if (!Array.isArray(records)) fail(`${population} population contract is invalid`);
     records.forEach((record) => validateNode(record, sourcePaths));
   }
+  validateWebMiniSurfaceEligibility(basis);
   const relations = relationRecords(basis);
   if (!relations.every((relation) => relation && RELATION_KINDS.has(relation.relationKind) && Array.isArray(relation.evidence) && relation.evidence.length > 0)) fail('relation contract is invalid');
   const conflicts = conflictRecords(basis);
