@@ -115,3 +115,43 @@ test('lume registered properties drive canvas light and SVG filo fill', async ({
   expect(filoSamples.quarter).toBe('75%');
   expect(filoSamples.threeQuarters).toBe('25%');
 });
+
+test('lume mobile theme and privacy controls retain 44px touch targets and state', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+
+  const theme = page.getByRole('button', { name: 'Tema Scuro' });
+  const themeTargets = page.locator('button[aria-label^="Tema "]');
+  const privacy = page.getByTestId('privacy-mode-header-toggle');
+  await expect(theme).toBeVisible({ timeout: 20_000 });
+  await expect(themeTargets).toHaveCount(3);
+  await expect(privacy).toBeVisible();
+
+  const targets = await themeTargets.evaluateAll((elements) => elements.map((element) => {
+    const { width, height } = element.getBoundingClientRect();
+    return { width, height };
+  }));
+  targets.push(await privacy.evaluate((element) => {
+    const { width, height } = element.getBoundingClientRect();
+    return { width, height };
+  }));
+  for (const target of targets) {
+    expect(target.width).toBeGreaterThanOrEqual(44);
+    expect(target.height).toBeGreaterThanOrEqual(44);
+  }
+
+  await theme.focus();
+  await expect(theme).toBeFocused();
+  await theme.press('Enter');
+  await expect(page.locator('html')).toHaveClass(/dark/);
+
+  await privacy.focus();
+  await expect(privacy).toBeFocused();
+  await privacy.press('Space');
+  await expect(privacy).toHaveAttribute('aria-pressed', 'true');
+
+  const horizontalOverflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(horizontalOverflow).toBeLessThanOrEqual(1);
+});
