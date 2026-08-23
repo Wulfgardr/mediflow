@@ -163,6 +163,26 @@ const ATTACHMENTS_CURRENTNESS_COLUMNS = [
     'document_revision',
     'document_freshness_epoch',
 ] as const;
+const ATTACHMENTS_LEGACY_DDL = `
+    CREATE TABLE attachments (
+        id TEXT PRIMARY KEY NOT NULL,
+        patient_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        path TEXT NOT NULL,
+        data TEXT,
+        created_at INTEGER DEFAULT (unixepoch()),
+        summary_snapshot TEXT,
+        parse_evidence_artifact_snapshot TEXT,
+        ocr_queue_state TEXT,
+        ocr_queue_reason TEXT,
+        ocr_queue_updated_at INTEGER,
+        ocr_replay_artifact_snapshot TEXT,
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON UPDATE no action ON DELETE no action
+    )
+`;
+const ATTACHMENTS_LEGACY_SCHEMA = normalizeSchemaSql(ATTACHMENTS_LEGACY_DDL);
 const ATTACHMENTS_LEGACY_COLUMNS = [
     [0, 'id', 'TEXT', 1, null, 1],
     [1, 'patient_id', 'TEXT', 1, null, 0],
@@ -207,7 +227,7 @@ function migrateP2aPhysicianReviewAttestationSchema(): void {
     }).immediate();
 }
 /* @Codex */
-type TableInfoRow = { cid: number; name: string; type: string; notnull: number; dflt_value: string | null; pk: number };
+type TableInfoRow = { cid: number; name: string; type: string; notnull: number; dflt_value: string | null; pk: number; hidden?: number };
 /* @Codex */
 function ensureColumn(table: string, columnName: string, columnSql: string) {
     const columns = (sqlite.prepare(`PRAGMA table_info(${table})`).all() as TableInfoRow[]).map((col) => col.name);
@@ -216,35 +236,51 @@ function ensureColumn(table: string, columnName: string, columnSql: string) {
     }
 }
 /* @Codex */
-function hasCanonicalLegacyAttachmentFingerprint(): boolean {
-    const table = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'attachments'").get() as { sql?: unknown } | undefined;
-    if (typeof table?.sql !== 'string') return false;
-    const tableSql = normalizeSchemaSql(table.sql);
-    if (['check(', 'collate', 'generatedalways', 'autoincrement', 'onconflict', 'strict', 'withoutrowid'].some((fragment) => tableSql.includes(fragment))) return false;
-    const columns = sqlite.prepare("SELECT cid, name, type, \"notnull\", dflt_value, pk FROM pragma_table_info('attachments') ORDER BY cid")
-        .all() as TableInfoRow[];
-    if (columns.length !== ATTACHMENTS_LEGACY_COLUMNS.length) return false;
-    if (!columns.every((column, index) => ATTACHMENTS_LEGACY_COLUMNS[index].every((value, field) => value === [column.cid, column.name, column.type, column.notnull, column.dflt_value, column.pk][field]))) return false;
-
+function hasCanonicalAttachmentForeignKey(): boolean {
     const foreignKeys = sqlite.prepare("SELECT id, seq, \"table\", \"from\", \"to\", on_update, on_delete, match FROM pragma_foreign_key_list('attachments')")
         .all() as Array<{ id: number; seq: number; table: string; from: string; to: string; on_update: string; on_delete: string; match: string }>;
-    if (foreignKeys.length !== 1 || !foreignKeys.every((row) => row.id === 0 && row.seq === 0 && row.table === 'patients' && row.from === 'patient_id' && row.to === 'id' && row.on_update === 'NO ACTION' && row.on_delete === 'NO ACTION' && row.match === 'NONE')) return false;
-
+    return foreignKeys.length === 1 && foreignKeys.every((row) => row.id === 0 && row.seq === 0 && row.table === 'patients' && row.from === 'patient_id' && row.to === 'id' && row.on_update === 'NO ACTION' && row.on_delete === 'NO ACTION' && row.match === 'NONE');
+}
+/* @Codex */
+function hasExactAttachmentIndex(name: string, unique: number, origin: string, cid: number, column: string): boolean {
+    const index = sqlite.prepare("SELECT name, \"unique\", origin, partial FROM pragma_index_list('attachments') WHERE name = ?")
+        .get(name) as { name: string; unique: number; origin: string; partial: number } | undefined;
+    if (!index || index.unique !== unique || index.origin !== origin || index.partial !== 0) return false;
+    const columns = sqlite.prepare('SELECT seqno, cid, name, desc, coll, key FROM pragma_index_xinfo(?) ORDER BY seqno')
+        .all(name) as Array<{ seqno: number; cid: number; name: string | null; desc: number; coll: string; key: number }>;
+    return columns.length === 2
+        && columns[0].seqno === 0 && columns[0].cid === cid && columns[0].name === column && columns[0].desc === 0 && columns[0].coll === 'BINARY' && columns[0].key === 1
+        && columns[1].seqno === 1 && columns[1].cid === -1 && columns[1].name === null && columns[1].desc === 0 && columns[1].coll === 'BINARY' && columns[1].key === 0;
+}
+/* @Codex */
+function hasCanonicalAttachmentIndexes(currentness: boolean): boolean {
     const indexes = sqlite.prepare("SELECT name, \"unique\", origin, partial FROM pragma_index_list('attachments')")
         .all() as Array<{ name: string; unique: number; origin: string; partial: number }>;
-    const patientIndex = indexes.find((row) => row.name === 'attachments_patient_idx');
-    const primaryIndex = indexes.find((row) => row.origin === 'pk');
-    if (indexes.length !== 2 || !patientIndex || !primaryIndex || patientIndex.unique !== 0 || patientIndex.origin !== 'c' || patientIndex.partial !== 0 || primaryIndex.unique !== 1 || primaryIndex.partial !== 0) return false;
-    const patientIndexColumns = sqlite.prepare("SELECT seqno, cid, name FROM pragma_index_info('attachments_patient_idx')")
-        .all() as Array<{ seqno: number; cid: number; name: string }>;
-    const primaryIndexColumns = sqlite.prepare('SELECT seqno, cid, name FROM pragma_index_info(?)')
-        .all(primaryIndex.name) as Array<{ seqno: number; cid: number; name: string }>;
-    return patientIndexColumns.length === 1 && patientIndexColumns[0].seqno === 0 && patientIndexColumns[0].cid === 1 && patientIndexColumns[0].name === 'patient_id'
-        && primaryIndexColumns.length === 1 && primaryIndexColumns[0].seqno === 0 && primaryIndexColumns[0].cid === 0 && primaryIndexColumns[0].name === 'id';
+    const primary = indexes.find((index) => index.origin === 'pk');
+    const sourceRef = indexes.find((index) => index.origin === 'u');
+    const patientSql = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'attachments_patient_idx'")
+        .get() as { sql?: unknown } | undefined;
+    return indexes.length === (currentness ? 3 : 2)
+        && typeof patientSql?.sql === 'string'
+        && normalizeSchemaSql(patientSql.sql) === ATTACHMENTS_CURRENTNESS_INDEX_SCHEMA
+        && hasExactAttachmentIndex('attachments_patient_idx', 0, 'c', 1, 'patient_id')
+        && !!primary && hasExactAttachmentIndex(primary.name, 1, 'pk', 0, 'id')
+        && (currentness ? !!sourceRef && hasExactAttachmentIndex(sourceRef.name, 1, 'u', 14, 'document_source_ref') : !sourceRef);
+}
+/* @Codex */
+function hasCanonicalLegacyAttachmentFingerprint(): boolean {
+    const table = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'attachments'").get() as { sql?: unknown } | undefined;
+    if (typeof table?.sql !== 'string' || normalizeSchemaSql(table.sql) !== ATTACHMENTS_LEGACY_SCHEMA) return false;
+    const columns = sqlite.prepare("SELECT cid, name, type, \"notnull\", dflt_value, pk, hidden FROM pragma_table_xinfo('attachments') ORDER BY cid")
+        .all() as TableInfoRow[];
+    if (columns.length !== ATTACHMENTS_LEGACY_COLUMNS.length) return false;
+    return columns.every((column, index) => column.hidden === 0 && ATTACHMENTS_LEGACY_COLUMNS[index].every((value, field) => value === [column.cid, column.name, column.type, column.notnull, column.dflt_value, column.pk][field]))
+        && hasCanonicalAttachmentForeignKey()
+        && hasCanonicalAttachmentIndexes(false);
 }
 /* @Codex */
 function attachmentCurrentnessState(): 'legacy' | 'canonical' {
-    const columns = (sqlite.prepare("SELECT name FROM pragma_table_info('attachments')").all() as TableInfoRow[])
+    const columns = (sqlite.prepare("SELECT name FROM pragma_table_xinfo('attachments')").all() as TableInfoRow[])
         .map((column) => column.name);
     const present = ATTACHMENTS_CURRENTNESS_COLUMNS.filter((name) => columns.includes(name));
     if (present.length === 0) {
@@ -258,12 +294,14 @@ function attachmentCurrentnessState(): 'legacy' | 'canonical' {
     }
 
     const table = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'attachments'").get() as { sql?: unknown } | undefined;
-    const index = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'attachments_patient_idx'").get() as { sql?: unknown } | undefined;
+    const xinfo = sqlite.prepare("SELECT hidden FROM pragma_table_xinfo('attachments')").all() as Array<{ hidden: number }>;
     if (
         typeof table?.sql !== 'string'
         || normalizeSchemaSql(table.sql) !== ATTACHMENTS_CURRENTNESS_SCHEMA
-        || typeof index?.sql !== 'string'
-        || normalizeSchemaSql(index.sql) !== ATTACHMENTS_CURRENTNESS_INDEX_SCHEMA
+        || xinfo.length !== 17
+        || !xinfo.every((column) => column.hidden === 0)
+        || !hasCanonicalAttachmentForeignKey()
+        || !hasCanonicalAttachmentIndexes(true)
     ) {
         throw new Error('Attachment currentness schema is not canonical.');
     }
@@ -302,6 +340,8 @@ function applySchemaGuards() {
         console.warn('[MediFlow] Ambulatories schema check skipped:', error);
     }
     /* @Codex */
+    upgradeLegacyAttachmentCurrentness();
+    /* @Codex */
     try {
         ensureColumn('users', 'failed_login_attempts', 'failed_login_attempts INTEGER NOT NULL DEFAULT 0');
         ensureColumn('users', 'first_failed_login_at', 'first_failed_login_at INTEGER');
@@ -329,8 +369,6 @@ function applySchemaGuards() {
     } catch (error) {
         console.warn('[MediFlow] Attachments schema check skipped:', error);
     }
-    /* @Codex */
-    upgradeLegacyAttachmentCurrentness();
     /* @Codex */
     try {
         ensureColumn('patients', 'exemptions', 'exemptions TEXT');
