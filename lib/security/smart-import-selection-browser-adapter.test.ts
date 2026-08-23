@@ -18,8 +18,9 @@ function response(body: unknown, status = 200): Response {
 }
 function deferred<T>() {
     let resolve!: (value: T) => void;
-    const promise = new Promise<T>((next) => { resolve = next; });
-    return { promise, resolve };
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((next, fail) => { resolve = next; reject = fail; });
+    return { promise, resolve, reject };
 }
 function rejects(code: string) {
     return (error: unknown) => error instanceof SmartImportSelectionBrowserAdapterError && error.code === code;
@@ -128,6 +129,46 @@ test('fences a prior generation and resets state on explicit reset or session fa
     await postSessionFailure.initialize();
     await assert.rejects(() => postSessionFailure.select(PROPOSAL, true), rejects('session_unavailable'));
     assert.deepEqual(postSessionFailure.reset(), { selectionEpoch: null, lease: null });
+});
+
+test('does not let an old POST failure or delayed JSON failure erase a newer generation lease', async () => {
+    for (const oldOutcome of ['fetch', 'json'] as const) {
+        const old = deferred<Response>(); const oldJson = deferred<unknown>(); const jsonStarted = deferred<void>(); let calls = 0;
+        const adapter = createSmartImportSelectionBrowserAdapter({ fetch: async () => {
+            calls += 1;
+            if (calls === 1 || calls === 3 || calls === 5) return response({ selectionEpoch: calls === 5 ? 1 : 0 });
+            if (calls === 2) return oldOutcome === 'fetch' ? old.promise : { ok: true, status: 200,
+                json: async () => { jsonStarted.resolve(); return oldJson.promise; } } as Response;
+            return response({ selection: LEASE });
+        } });
+        await adapter.initialize(); const pending = adapter.select(PROPOSAL, true);
+        if (oldOutcome === 'json') await jsonStarted.promise;
+        adapter.reset(); await adapter.initialize(); await adapter.select(PROPOSAL, true);
+        if (oldOutcome === 'fetch') old.reject(new Error('synthetic old fetch failure'));
+        else oldJson.reject(new Error('synthetic old json failure'));
+        await assert.rejects(() => pending, rejects('selection_generation_changed'));
+        assert.deepEqual(await adapter.resync(), { selectionEpoch: 1, lease: LEASE });
+    }
+});
+
+test('rejects swapped opaque prefixes and a POST epoch jump without installing a lease', async () => {
+    const swapped = { ...LEASE, sessionRef: LEASE.patientRef };
+    let calls = 0;
+    const prefix = createSmartImportSelectionBrowserAdapter({ fetch: async () => {
+        calls += 1; return calls === 1 ? response({ selectionEpoch: 0 }) : response({ selection: swapped });
+    } });
+    await prefix.initialize(); await assert.rejects(() => prefix.select(PROPOSAL, true), rejects('response_invalid'));
+
+    const jumped = createSmartImportSelectionBrowserAdapter({ fetch: async () => {
+        calls += 1;
+        if (calls === 3) return response({ selectionEpoch: 0 });
+        if (calls === 4) return response({ selection: { ...LEASE, selectionEpoch: 1 } });
+        if (calls === 5) return response({ selection: { ...LEASE, selectionEpoch: 3 } });
+        return response({ selectionEpoch: 1 });
+    } });
+    await jumped.initialize(); await jumped.select(PROPOSAL, true);
+    await assert.rejects(() => jumped.select(PROPOSAL, true), rejects('response_invalid'));
+    assert.deepEqual(await jumped.resync(), { selectionEpoch: 1, lease: null });
 });
 
 test('accepts only caller proposals and remains a browser-only selection boundary', async () => {
