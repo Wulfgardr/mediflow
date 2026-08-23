@@ -519,6 +519,15 @@ function applySchemaGuards() {
     sqlite.prepare('CREATE INDEX IF NOT EXISTS document_diagnosis_proposals_patient_idx ON document_diagnosis_proposals(patient_id)').run();
     sqlite.prepare('CREATE INDEX IF NOT EXISTS document_diagnosis_proposals_patient_status_idx ON document_diagnosis_proposals(patient_id, status)').run();
     sqlite.prepare('CREATE UNIQUE INDEX IF NOT EXISTS document_diagnosis_proposals_source_candidate_unique ON document_diagnosis_proposals(patient_id, source_document_key, candidate_key)').run();
+    /* @Codex */
+    sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS durable_review_records (
+            id TEXT PRIMARY KEY NOT NULL, review_id TEXT NOT NULL UNIQUE, review_revision INTEGER NOT NULL,
+            receipt_ref TEXT NOT NULL, provenance_ref TEXT NOT NULL, receipt_binding TEXT NOT NULL, provenance_binding TEXT NOT NULL,
+            presentation_version TEXT NOT NULL, sealed_ciphertext TEXT NOT NULL, sealed_digest TEXT NOT NULL,
+            created_at INTEGER DEFAULT (unixepoch())
+        )
+    `).run();
     // WUL-268 (STREAM A): core tables shipped without secondary indices, so
     // patient-scoped reads and lookups fell back to full table scans (verified
     // via EXPLAIN QUERY PLAN). Guards are the operative migration mechanism, so
