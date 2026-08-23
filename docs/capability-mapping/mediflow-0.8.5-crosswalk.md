@@ -15,7 +15,7 @@ conflitti restano nei rispettivi file JSON referenziati dalla matrice.
 ## Provenienza congelata
 
 Il manifest sorgente ha SHA-256
-`239d9819ca724db0a72b299ffc14aa1b08562ff55acfab90ebe36445cdf5f78e`.
+`17e231ff12773fc2926fc65e879b39c32bf1929f1d42ce824e2293047591cce1`.
 Comprende nove head indipendenti: baseline, C0, AIP/Mini, Web, keyboard,
 iOS/iPadOS runtime, documenti iOS/iPadOS, macOS runtime e macOS receipt.
 `applyPolicy` è `none` in ogni artefatto di mapping.
@@ -27,13 +27,13 @@ iOS/iPadOS runtime, documenti iOS/iPadOS, macOS runtime e macOS receipt.
 | Anchor Web/Mini | 66 | 66 `mapped` source-local |
 | AIP | 109 | 109 `mapped` source-local |
 | Fabric | 16 | 16 `mapped` source-local |
-| Superfici prodotto | 600 | 600 `unmapped` con authority e stage `unresolved` |
+| Superfici prodotto | 179 | 179 `unmapped` con authority e stage `unresolved` |
 | Relazioni provate | 82 | 66 Web↔Mini `supports`; 16 AIP↔Fabric `exact_identity` |
 | Conflitti residui | 16 | Fabric↔anchor, tutti `unmapped` |
 
 `ledgerComplete=true`: le popolazioni congelate sono presenti una sola volta,
 hanno una disposizione terminale e una prova source-bound.
-`semanticBindingComplete=false`: le 600 superfici non hanno una relazione
+`semanticBindingComplete=false`: le 179 superfici non hanno una relazione
 semantica diretta provata e i 16 conflitti Fabric↔anchor restano aperti.
 
 ## Conflitti e prova necessaria
