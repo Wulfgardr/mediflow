@@ -24,7 +24,7 @@ import { users } from '@/lib/schema';
 /* @Codex */
 import type { dbServer as dbServerType } from '@/lib/db-server';
 /* @Codex */
-import type { ServerSession } from '@/lib/security/server-session';
+import { invalidateSessionsForUser, type ServerSession } from '@/lib/security/server-session';
 
 type PinChangeDatabase = typeof dbServerType;
 
@@ -119,6 +119,9 @@ export async function changePin(
             message: 'Il PIN è stato modificato da un’altra sessione. Ricarica e riprova.',
         };
     }
+
+    /* @Codex: the successful credential CAS invalidates every prior server session synchronously. */
+    invalidateSessionsForUser(user.id);
 
     try {
         const context = auditContextFromSession(input.session);
