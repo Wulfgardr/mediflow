@@ -175,6 +175,9 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 if (hadSelection) reviewContextEpoch += 1;
                 revoke(previous);
             };
+            const rejectLeaseCriticalSectionReentry = () => {
+                if (leaseCriticalSectionActive) fail('selection_busy');
+            };
             const candidateControl = (candidate: unknown): TypedBroker['control'] | null => {
                 if (typeof candidate !== 'object' || candidate === null) return null;
                 const descriptor = Object.getOwnPropertyDescriptor(candidate, 'control');
@@ -202,6 +205,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     return reviewContextEpoch;
                 },
                 acquireProjectionIngest(presentedSession, input) {
+                    rejectLeaseCriticalSectionReentry();
                     requireCurrentSession(presentedSession);
                     const value = readTuple(input); const current = selection;
                     if (!current || !tupleMatches(value, current)) return fail('stale_selection');
@@ -244,6 +248,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     return binding.ingest;
                 },
                 resolveProjectionService(presentedSession) {
+                    rejectLeaseCriticalSectionReentry();
                     requireCurrentSession(presentedSession);
                     if (!selection) return fail('stale_selection');
                     if (readClock() >= selection.expiresAt) { expire(); return fail('lease_expired'); }
@@ -251,6 +256,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     return active.service;
                 },
                 issueSelection(input) {
+                    rejectLeaseCriticalSectionReentry();
                     if (terminal) return fail('session_unavailable');
                     if (selecting) return fail('selection_busy');
                     selecting = true;
@@ -279,6 +285,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     } finally { selecting = false; }
                 },
                 dereferenceSelection(presentedSession, input) {
+                    rejectLeaseCriticalSectionReentry();
                     const value = exact(input, ['sessionRef', 'selectionEpoch', 'patientRef', 'ambulatoryRef', 'leaseRef']);
                     if (terminal) return fail('session_unavailable');
                     if (!selection) return fail('stale_selection');
@@ -317,19 +324,17 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                             throw error;
                         }
                         assertUnchanged();
+                        let thenable = false;
                         try {
-                            if (result !== null && (typeof result === 'object' || typeof result === 'function')
-                                && typeof (result as { then?: unknown }).then === 'function') {
-                                return fail('input_invalid');
-                            }
-                        } catch (error) {
-                            if (error instanceof ServerSessionProjectionOwnerError) throw error;
-                            return fail('input_invalid');
-                        }
+                            thenable = result !== null && (typeof result === 'object' || typeof result === 'function')
+                                && typeof (result as { then?: unknown }).then === 'function';
+                        } catch { return fail('input_invalid'); }
+                        assertUnchanged();
+                        if (thenable) return fail('input_invalid');
                         return result as never;
                     } finally { leaseCriticalSectionActive = false; }
                 },
-                dispose() { finish(true); },
+                dispose() { rejectLeaseCriticalSectionReentry(); finish(true); },
             });
 
             unregisterOwner = registerServerSessionResource(session.id, () => finish(false));

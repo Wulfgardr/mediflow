@@ -159,7 +159,7 @@ test('snapshots the owner-held epoch without acquisition, references, expiry cha
     assert.throws(() => registry.snapshotSelectionEpoch({ ...value }), rejects('session_ineligible'));
 });
 
-test('runs synchronous work against the canonical live selection and advances its review context on a selection switch', () => {
+test('runs synchronous work against the canonical live selection and denies a reentrant selection switch', () => {
     const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair });
     const value = session(); const owner = registry.acquire(value);
     const first = owner.issueSelection({ expectedEpoch: 0, ...PAIR });
@@ -168,8 +168,8 @@ test('runs synchronous work against the canonical live selection and advances it
     assert.deepEqual(owner.withLeaseCriticalSection(value, (selection) => selection), PAIR);
     assert.throws(() => owner.withLeaseCriticalSection(value, () => {
         owner.issueSelection({ expectedEpoch: first.selectionEpoch, patientId: 'patient.synthetic.02', ambulatoryId: PAIR.ambulatoryId });
-    }), rejects('stale_selection'));
-    assert.equal(owner.snapshotReviewContextEpoch(value), 2);
+    }), rejects('selection_busy'));
+    assert.equal(owner.snapshotReviewContextEpoch(value), 1);
 });
 
 test('fails a lease critical section closed after expiry, session revocation, or disposal', () => {
@@ -203,6 +203,46 @@ test('lease critical sections reject reentry and asynchronous results without le
     assert.throws(() => owner.withLeaseCriticalSection(value, () => ({ get then() { throw new Error('synthetic hook'); } })),
         rejects('input_invalid'));
     assert.equal(owner.withLeaseCriticalSection(value, () => 'available'), 'available');
+});
+
+test('lease critical sections reject direct selection reentry before canonical state or sources change', () => {
+    let resolves = 0; let entropy = 0;
+    const registry = createServerSessionProjectionOwnerRegistry({
+        resolve: (_session, pair) => { resolves += 1; return pair; },
+        entropy: () => Uint8Array.from({ length: 16 }, (_, index) => (entropy += 1) + index),
+    });
+    const value = session(); const owner = registry.acquire(value);
+    const lease = owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const before = Object.freeze({ selectionEpoch: owner.snapshotSelectionEpoch(value), reviewContextEpoch: owner.snapshotReviewContextEpoch(value),
+        patientRef: lease.patientRef, ambulatoryRef: lease.ambulatoryRef, leaseRef: lease.leaseRef, resolves, entropy });
+
+    assert.equal(owner.withLeaseCriticalSection(value, () => {
+        assert.throws(() => owner.issueSelection({ expectedEpoch: lease.selectionEpoch, patientId: 'patient.synthetic.02', ambulatoryId: PAIR.ambulatoryId }),
+            rejects('selection_busy'));
+        return 'held';
+    }), 'held');
+    assert.deepEqual({ selectionEpoch: owner.snapshotSelectionEpoch(value), reviewContextEpoch: owner.snapshotReviewContextEpoch(value),
+        patientRef: lease.patientRef, ambulatoryRef: lease.ambulatoryRef, leaseRef: lease.leaseRef, resolves, entropy }, before);
+});
+
+test('lease critical sections retain canonical state through hostile then getter inspection', () => {
+    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair });
+    const value = session(); const owner = registry.acquire(value);
+    const lease = owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const before = Object.freeze({ selectionEpoch: owner.snapshotSelectionEpoch(value), reviewContextEpoch: owner.snapshotReviewContextEpoch(value),
+        patientRef: lease.patientRef, ambulatoryRef: lease.ambulatoryRef, leaseRef: lease.leaseRef });
+    let inspections = 0;
+    const hostile = Object.defineProperty({}, 'then', { get() {
+        inspections += 1;
+        assert.throws(() => owner.issueSelection({ expectedEpoch: lease.selectionEpoch, patientId: 'patient.synthetic.02', ambulatoryId: PAIR.ambulatoryId }),
+            rejects('selection_busy'));
+        return undefined;
+    } });
+
+    assert.equal(owner.withLeaseCriticalSection(value, () => hostile), hostile);
+    assert.equal(inspections, 1);
+    assert.deepEqual({ selectionEpoch: owner.snapshotSelectionEpoch(value), reviewContextEpoch: owner.snapshotReviewContextEpoch(value),
+        patientRef: lease.patientRef, ambulatoryRef: lease.ambulatoryRef, leaseRef: lease.leaseRef }, before);
 });
 
 test('lease critical sections propagate callback failure and recheck expiry after synchronous work', () => {
