@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import { users } from '@/lib/schema';
 import { dbServer } from '@/lib/db-server';
 import { SECURITY_CONFIG } from './security';
-import type { AuthenticatedReviewPrincipalV1 } from './authenticated-review-principal';
+import { resolveAuthenticatedReviewPrincipal, type AuthenticatedReviewPrincipalV1 } from './authenticated-review-principal';
 
 type CanonicalCredential = Readonly<{ id: string; passwordHash: string }>;
 type ResolvePrincipal = () => Promise<AuthenticatedReviewPrincipalV1>;
@@ -126,3 +126,8 @@ export function createFreshReviewPinUniquenessVerifier(sources: FreshReviewPinUn
         },
     });
 }
+
+/** The production P1b seam resolves actor and session exclusively through the P1a host resolver. */
+export const verifyFreshReviewPin = createFreshReviewPinUniquenessVerifier({
+    resolvePrincipal: resolveAuthenticatedReviewPrincipal,
+}).verify;
