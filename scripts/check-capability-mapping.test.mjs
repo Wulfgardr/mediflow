@@ -51,7 +51,7 @@ test('rejects unknown mapping vocabulary and unjustified completion', () => {
   unknown.relationKinds[0] = 'similar_to';
   assert.throws(() => validateCapabilityMapping(manifest, unknown), /relation kind vocabulary/);
   const incomplete = clone(basis);
-  incomplete.populations.surfaces.records.push({ id: 'surface.v1', sourceIdentity: 'synthetic', description: 'synthetic hostile record', surface: 'test', stage: 'none', authority: 'unresolved', input: 'unresolved', output: 'unresolved', provider: 'unresolved', venue: 'unresolved', egress: 'unresolved', evidence: ['test'], terminalDisposition: 'unmapped' });
+  incomplete.populations.surfaces.records.push({ id: 'surface.v1', sourceIdentity: 'synthetic', description: 'synthetic hostile record', surface: 'test', stage: 'none', authority: 'unresolved', input: 'unresolved', output: 'unresolved', provider: 'unresolved', venue: 'unresolved', egress: 'unresolved', evidence: [{ evidenceKind: 'code', ref: '28a1a36b162f160e872ce5153cad03f38eacfd22:lib/ai-providers/fabric/contract.ts' }], terminalDisposition: 'unmapped' });
   incomplete.semanticBindingComplete = true;
   assert.throws(() => validateCapabilityMapping(manifest, incomplete), /semantic binding/);
 });
@@ -73,7 +73,7 @@ test('rejects source digest drift and authority or stage unions', () => {
   digestDrift.sourceSets[0].sourceSetSha256 = '0'.repeat(64);
   assert.throws(() => validateCapabilityMapping(digestDrift, basis), /source drift/);
   const unioned = clone(basis);
-  unioned.populations.surfaces.records.push({ id: 'surface:hostile@v1', sourceIdentity: 'hostile', description: 'synthetic hostile record', surface: 'test', stage: ['source', 'derived'], authority: ['source', 'derived'], input: 'unresolved', output: 'unresolved', provider: 'unresolved', venue: 'unresolved', egress: 'unresolved', evidence: ['test'], terminalDisposition: 'unmapped' });
+  unioned.populations.surfaces.records.push({ id: 'surface:hostile@v1', sourceIdentity: 'hostile', description: 'synthetic hostile record', surface: 'test', stage: ['source', 'derived'], authority: ['source', 'derived'], input: 'unresolved', output: 'unresolved', provider: 'unresolved', venue: 'unresolved', egress: 'unresolved', evidence: [{ evidenceKind: 'code', ref: '28a1a36b162f160e872ce5153cad03f38eacfd22:lib/ai-providers/fabric/contract.ts' }], terminalDisposition: 'unmapped' });
   assert.throws(() => validateCapabilityMapping(manifest, unioned), /authority or stage is unioned/);
 });
 
@@ -82,4 +82,16 @@ test('rejects incomplete conflicts and a stronger human report', () => {
   incompleteConflict.conflicts.push({ conflictId: 'conflict:hostile@v1', subjectId: 'hostile', terminalDisposition: 'unmapped' });
   assert.throws(() => validateCapabilityMapping(manifest, incompleteConflict), /conflict contract/);
   assert.throws(() => validateCapabilityMapping(manifest, basis, undefined, coverage, 'semanticBindingComplete=true'), /human report claim ceiling/);
+});
+
+test('rejects roster selector, digest, and node-path escape', () => {
+  const selectorDrift = clone(manifest);
+  selectorDrift.sourceSets.find((set) => set.sourceSetId === 'web-product-pages').pathMatcher = '^app/.+/page\\.tsx$';
+  assert.throws(() => validateCapabilityMapping(selectorDrift, basis), /source roster path drift/);
+  const rosterDigestDrift = clone(manifest);
+  rosterDigestDrift.sourceSets[0].rosterSha256 = '0'.repeat(64);
+  assert.throws(() => validateCapabilityMapping(rosterDigestDrift, basis), /source roster digest drift/);
+  const escaped = clone(basis);
+  escaped.populations.surfaces.records.push({ id: 'surface:escape@v1', sourceIdentity: 'escape', description: 'synthetic hostile record', surface: 'test', stage: 'unresolved', authority: 'unresolved', input: 'unresolved', output: 'unresolved', provider: 'unresolved', venue: 'unresolved', egress: 'unresolved', evidence: [{ evidenceKind: 'code', ref: '28a1a36b162f160e872ce5153cad03f38eacfd22:outside/freeze.ts' }], terminalDisposition: 'unmapped' });
+  assert.throws(() => validateCapabilityMapping(manifest, escaped), /evidence path escaped/);
 });

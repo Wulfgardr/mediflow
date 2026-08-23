@@ -27,16 +27,26 @@ function tree(ref) {
 function digest(records) {
   return sha256(records.map(({ path, gitBlob, byteLength }) => `${path}\0${gitBlob}\0${byteLength}\n`).join(''));
 }
+function rosterDigest(records) {
+  return sha256(records.map(({ path, gitBlob, byteLength, sha256: contentSha256 }) => `${path}\0${gitBlob}\0${byteLength}\0${contentSha256}\n`).join(''));
+}
 function sourceRecords(set, source) {
   const records = tree(source.commit);
-  if (Array.isArray(set.paths)) return set.paths.map((expected) => {
+  const selected = Array.isArray(set.paths) ? set.paths.map((expected) => {
     const actual = records.find((record) => record.path === expected.path);
     if (!actual || actual.gitBlob !== expected.gitBlob || actual.byteLength !== expected.byteLength) fail(`${set.sourceSetId}: source drift at ${expected.path}`);
     return actual;
-  }).sort((a, b) => a.path.localeCompare(b.path));
-  if (typeof set.pathMatcher !== 'string') fail(`${set.sourceSetId}: missing closed path selector`);
-  const matcher = new RegExp(set.pathMatcher, set.pathMatcherFlags ?? '');
-  return records.filter((record) => matcher.test(record.path)).sort((a, b) => a.path.localeCompare(b.path));
+  }).sort((a, b) => a.path.localeCompare(b.path)) : (() => {
+    if (typeof set.pathMatcher !== 'string') fail(`${set.sourceSetId}: missing closed path selector`);
+    const matcher = new RegExp(set.pathMatcher, set.pathMatcherFlags ?? '');
+    return records.filter((record) => matcher.test(record.path)).sort((a, b) => a.path.localeCompare(b.path));
+  })();
+  const roster = relativeJson(set.rosterFile, `${set.sourceSetId}: source roster`);
+  if (roster.schema !== 'mediflow.capability-mapping.source-roster.v1' || roster.sourceSetId !== set.sourceSetId || roster.sourceId !== set.sourceId || roster.sourceRef !== source.commit || !Array.isArray(roster.records)) fail(`${set.sourceSetId}: source roster contract is invalid`);
+  if (roster.records.some((record) => !record || !/^[0-9a-f]{64}$/.test(record.sha256)) || rosterDigest(roster.records) !== set.rosterSha256) fail(`${set.sourceSetId}: source roster digest drift`);
+  const triples = (values) => values.map(({ path, gitBlob, byteLength }) => `${path}\0${gitBlob}\0${byteLength}`);
+  if (JSON.stringify(triples(roster.records)) !== JSON.stringify(triples(selected))) fail(`${set.sourceSetId}: source roster path drift`);
+  return roster.records;
 }
 function requireExactArray(actual, expected, label) {
   if (!Array.isArray(actual) || actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) fail(`${label} is invalid`);
@@ -122,14 +132,15 @@ function validateWebMiniCrosswalk(basis, anchorRecords) {
     if (JSON.stringify(record.sourceRecord) !== JSON.stringify(source.capabilities[index])) fail(`web-mini crosswalk lost source record ${index + 1}`);
   });
 }
-function validateNode(node) {
+function validateNode(node, sourcePaths) {
   const fields = ['id', 'sourceIdentity', 'description', 'surface', 'stage', 'authority', 'input', 'output', 'provider', 'venue', 'egress', 'evidence', 'terminalDisposition'];
   if (!node || typeof node !== 'object' || fields.some((field) => !(field in node))) fail('node is incomplete');
   if (!TERMINAL_DISPOSITIONS.has(node.terminalDisposition)) fail(`node ${node.id}: terminal disposition is invalid`);
   if (!Array.isArray(node.evidence) || node.evidence.length === 0) fail(`node ${node.id}: evidence is required`);
+  if (node.evidence.some((evidence) => !evidence || typeof evidence !== 'object' || typeof evidence.ref !== 'string' || !sourcePaths.has(evidence.ref))) fail(`node ${node.id}: evidence path escaped the source freeze`);
   if (typeof node.authority !== 'string' || typeof node.stage !== 'string') fail(`node ${node.id}: authority or stage is unioned`);
 }
-function validateBasis(basis, manifestBytes) {
+function validateBasis(basis, manifestBytes, sourcePaths) {
   if (basis.schema !== 'mediflow.capability-mapping.basis.v1' || basis.mappingVersion !== 1) fail('mapping basis schema is invalid');
   if (basis.sourceManifestSha256 !== sha256(manifestBytes)) fail('mapping basis source manifest digest drifted');
   if (basis.applyPolicy !== 'none') fail('applyPolicy must be none');
@@ -140,14 +151,14 @@ function validateBasis(basis, manifestBytes) {
     const value = basis.populations?.[population];
     if (!value || value.expectedCount !== expected || !Array.isArray(value.records)) fail(`${population} population contract is invalid`);
     const records = populationRecords(value);
-    records.forEach(validateNode);
+    records.forEach((record) => validateNode(record, sourcePaths));
     if (records.length > expected) fail(`${population} has too many records`);
     if (population === 'anchors') validateWebMiniCrosswalk(basis, records);
   }
   for (const population of ['fabric', 'surfaces']) {
     const records = basis.populations?.[population] && populationRecords(basis.populations[population]);
     if (!Array.isArray(records)) fail(`${population} population contract is invalid`);
-    records.forEach(validateNode);
+    records.forEach((record) => validateNode(record, sourcePaths));
   }
   const relations = relationRecords(basis);
   if (!relations.every((relation) => relation && RELATION_KINDS.has(relation.relationKind) && Array.isArray(relation.evidence) && relation.evidence.length > 0)) fail('relation contract is invalid');
@@ -167,6 +178,7 @@ export function validateCapabilityMapping(manifest = json(MANIFEST_PATH), basis 
   const sources = new Map(manifest.sources?.map((source) => [source.sourceId, source]));
   if (sources.size !== 9 || [...sources.values()].some((source) => !/^[0-9a-f]{40}$/.test(source.commit) || !source.status.endsWith('not_integrated'))) fail('source roster is invalid');
   const setIds = new Set();
+  const sourcePaths = new Set();
   for (const set of manifest.sourceSets ?? []) {
     if (setIds.has(set.sourceSetId)) fail(`duplicate source set ${set.sourceSetId}`);
     setIds.add(set.sourceSetId);
@@ -175,9 +187,10 @@ export function validateCapabilityMapping(manifest = json(MANIFEST_PATH), basis 
     git('cat-file', '-e', `${source.commit}^{commit}`);
     const records = sourceRecords(set, source);
     if (records.length !== set.recordCount || digest(records) !== set.sourceSetSha256) fail(`${set.sourceSetId}: source drift`);
+    records.forEach((record) => sourcePaths.add(`${source.commit}:${record.path}`));
   }
   if (setIds.size !== 10) fail('source manifest is incomplete');
-  validateBasis(basis, manifestBytes);
+  validateBasis(basis, manifestBytes, sourcePaths);
   validateCoverage(basis, coverage);
   validateHumanReport(coverage, report);
 }

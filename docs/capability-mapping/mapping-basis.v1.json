@@ -1,7 +1,7 @@
 {
   "schema": "mediflow.capability-mapping.basis.v1",
   "mappingVersion": 1,
-  "sourceManifestSha256": "5318f32920e2bf5a3718d5baf6f763062ec549d15c1683c723306fb8c49df1af",
+  "sourceManifestSha256": "239d9819ca724db0a72b299ffc14aa1b08562ff55acfab90ebe36445cdf5f78e",
   "applyPolicy": "none",
   "relationKinds": ["exact_identity", "implements", "exposes", "supports", "authority_boundary_for"],
   "terminalDispositions": ["mapped", "infrastructure_only", "out_of_catalog", "unmapped", "conflicted"],
