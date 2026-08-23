@@ -34,6 +34,18 @@ test('accetta solo endpoint loopback e riferimenti modello non cloud', () => {
     );
 });
 
+test('limita il riferimento modello locale a 674 byte UTF-8 dopo trim senza ripararlo', () => {
+    const ascii = 'a'.repeat(674); const multibyte = `${'€'.repeat(224)}aa`;
+    assert.doesNotThrow(() => assertLocalOllamaModelReference(`  ${ascii}  `));
+    assert.doesNotThrow(() => assertLocalOllamaModelReference(multibyte));
+    for (const value of ['a'.repeat(675), `${multibyte}a`]) assert.throws(
+        () => assertLocalOllamaModelReference(value),
+        (error) => error instanceof OllamaLocalityError && error.code === 'model_not_local',
+    );
+    assert.throws(() => assertLocalOllamaModelReference('qwen:cloud'),
+        (error) => error instanceof OllamaLocalityError && error.code === 'model_cloud_reference');
+});
+
 test('attesta il modello locale senza inviare un prompt', async (t) => {
     const originalFetch = globalThis.fetch;
     const calls: Array<{ url: string; init?: RequestInit }> = [];
