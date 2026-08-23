@@ -77,6 +77,17 @@ test('rejects catalog drift, apply, and unevidenced authority at the public seam
     }
 });
 
+test('rejects a permissive field when its direct evidence conflicts', () => {
+    const input = safeCatalog();
+    input.entries[0].lifecycle = 'active';
+    (input.entries[0] as Record<string, unknown>).evidence = [
+        { kind: 'accepted_adr', ref: 'synthetic:supports-lifecycle', supports: ['/lifecycle'], polarity: 'supports' },
+        { kind: 'accepted_adr', ref: 'synthetic:contradicts-lifecycle', supports: ['/lifecycle'], polarity: 'contradicts' },
+    ];
+
+    assert.throws(() => snapshotCanonicalApplicationCatalog(input), /Canonical application catalog rejected/);
+});
+
 test('admits an operational row only when every permissive value has direct evidence', () => {
     const input = safeCatalog();
     const row = input.entries[0];
