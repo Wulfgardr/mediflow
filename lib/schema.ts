@@ -348,6 +348,18 @@ export const durableReviewOperations = sqliteTable('durable_review_operations', 
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 }, (t) => ({ reviewKeyUnique: uniqueIndex('durable_review_operations_review_key_unique').on(t.reviewId, t.idempotencyKey) }));
 
+/* @Codex */
+export const durableReviewCommandStates = sqliteTable('durable_review_command_states', {
+    reviewId: text('review_id').primaryKey(), reviewState: text('review_state').notNull(), revision: integer('revision').notNull(), action: text('action').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
+/* @Codex */
+export const durableReviewCommandOperations = sqliteTable('durable_review_command_operations', {
+    id: text('id').primaryKey(), reviewId: text('review_id').notNull(), idempotencyKey: text('idempotency_key').notNull(), commandDigest: text('command_digest').notNull(),
+    resultSnapshot: text('result_snapshot').notNull(), auditEventId: text('audit_event_id').notNull(), createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+}, (t) => ({ reviewKeyUnique: uniqueIndex('durable_review_command_operations_review_key_unique').on(t.reviewId, t.idempotencyKey) }));
+
 // --- Checkups / Appointments ---
 export const checkups = sqliteTable('checkups', {
     id: text('id').primaryKey(),

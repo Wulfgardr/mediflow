@@ -132,6 +132,14 @@ const AI_PATH_WRITE_CONTRACTS = [
         reference: 'docs/adr/0094-intelligence-fabric-headless-contract-085.md',
     },
     {
+        module: 'lib/ai-providers/fabric/physician-review-command.ts',
+        lane: 'physician-review',
+        policy: 'non-clinical',
+        table: 'durableReviewCommandStates',
+        reason: 'La transazione registra solo stato review terminale, replay idempotente e audit PHI-safe; non scrive record clinici strutturati né espone apply.',
+        reference: 'docs/adr/0095-broker-projection-e-servizi-host-per-capability.md',
+    },
+    {
         module: 'lib/patient-smart-import-apply.ts',
         lane: 'smart-import',
         policy: 'operator-confirmed',
