@@ -59,14 +59,14 @@ export function createSmartImportBrowserOrchestrator(sources: Sources) {
             try { ingestId = identifier(); previewId = identifier(); } catch { return fail('input_invalid'); }
             if (typeof ingestId !== 'string' || typeof previewId !== 'string' || ingestId === previewId || RAW_UUID.test(ingestId) || RAW_UUID.test(previewId) || !REQUEST_ID.test(ingestId) || !REQUEST_ID.test(previewId)) return fail('input_invalid');
             let ingestResponse: Response;
-            try { ingestResponse = await request('/api/ai/smart-import/ingest', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tuple: selected.tuple, attachment: bound.attachment, requestId: ingestId }) }); } catch { current(); return fail('ingest_unavailable'); }
-            current(); if (!ingestResponse.ok) return fail('ingest_outcome_unknown'); let ingestBody: unknown;
+            try { ingestResponse = await request('/api/ai/smart-import/ingest', { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tuple: selected.tuple, attachment: bound.attachment, requestId: ingestId }) }); } catch { current(); return fail('ingest_outcome_unknown'); }
+            current(); if (!ingestResponse.ok) return fail('ingest_unavailable'); let ingestBody: unknown;
             try { ingestBody = await ingestResponse.json(); } catch { current(); return fail('response_invalid'); }
             current(); const ingested = exact(ingestBody, ['handle']);
             if (!ingested || typeof ingested.handle !== 'string' || !/^prj_[0-9a-f]{32}$/u.test(ingested.handle)) return fail('response_invalid'); current();
             let previewResponse: Response;
-            try { previewResponse = await request('/api/ai/smart-import/preview', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ handle: ingested.handle, requestId: previewId }) }); } catch { current(); return fail('preview_unavailable'); }
-            current(); if (!previewResponse.ok) return fail('preview_outcome_unknown'); let previewBody: unknown;
+            try { previewResponse = await request('/api/ai/smart-import/preview', { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ handle: ingested.handle, requestId: previewId }) }); } catch { current(); return fail('preview_outcome_unknown'); }
+            current(); if (!previewResponse.ok) return fail('preview_unavailable'); let previewBody: unknown;
             try { previewBody = await previewResponse.json(); } catch { current(); return fail('response_invalid'); }
             current(); const parsed = parseSmartImportPreviewWireRoot(previewBody); current();
             if (!parsed) return fail('response_invalid'); current(); return parsed;
