@@ -116,7 +116,9 @@ export function createSmartImportProjectionAttachmentBrowserNormalizer(sources: 
             try {
                 const context = selectionContext(snapshot);
                 if (typeof isCurrent !== 'function' || isCurrent(snapshot) !== true) return fail();
-                return bind(capture(value, confirmed), context);
+                const attachment = capture(value, confirmed);
+                if (isCurrent(snapshot) !== true) return fail();
+                return bind(attachment, context);
             } catch (error) { if (error instanceof SmartImportProjectionAttachmentBrowserNormalizerError) throw error; return fail(); }
         },
     });

@@ -109,6 +109,35 @@ test('rejects hostile or unleased selection snapshots before clock/capture side 
     assert.equal(clockCalls, 0);
 });
 
+test('rechecks the leased selection after synchronous capture before binding a sidecar', async () => {
+    let calls = 0;
+    const selection = createSmartImportSelectionBrowserAdapter({ fetch: async (_url, init) => {
+        calls += 1; return init?.method === 'GET' ? new Response(JSON.stringify({ selectionEpoch: 0 }))
+            : new Response(JSON.stringify({ selection: { sessionRef: `ssr_${'1'.repeat(32)}`, selectionEpoch: 1,
+                patientRef: `ptr_${'2'.repeat(32)}`, ambulatoryRef: `abr_${'3'.repeat(32)}`, leaseRef: `lsr_${'4'.repeat(32)}`, expiresAt: 123_456 } }));
+    } });
+    await selection.initialize(); const lease = await selection.select({ patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' }, true);
+    const normalizer = createSmartImportProjectionAttachmentBrowserNormalizer({ clock: () => { selection.reset(); return new Date(NOW); } });
+    assert.throws(() => normalizer.captureForCurrentSelection(input(), true, lease, selection.isCurrent), rejects());
+    assert.equal(selection.isCurrent(lease), false);
+});
+
+test('sanitizes a verifier fault raised after capture', async () => {
+    let calls = 0;
+    const selection = createSmartImportSelectionBrowserAdapter({ fetch: async (_url, init) => {
+        calls += 1; return init?.method === 'GET' ? new Response(JSON.stringify({ selectionEpoch: 0 }))
+            : new Response(JSON.stringify({ selection: { sessionRef: `ssr_${'1'.repeat(32)}`, selectionEpoch: 1,
+                patientRef: `ptr_${'2'.repeat(32)}`, ambulatoryRef: `abr_${'3'.repeat(32)}`, leaseRef: `lsr_${'4'.repeat(32)}`, expiresAt: 123_456 } }));
+    } });
+    await selection.initialize(); const lease = await selection.select({ patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' }, true);
+    let verifies = 0; let clockCalls = 0;
+    const normalizer = createSmartImportProjectionAttachmentBrowserNormalizer({ clock: () => { clockCalls += 1; return new Date(NOW); } });
+    assert.throws(() => normalizer.captureForCurrentSelection(input(), true, lease, () => {
+        verifies += 1; if (verifies === 1) return true; throw new Error('synthetic raw marker');
+    }), rejects());
+    assert.deepEqual([verifies, clockCalls], [2, 1]);
+});
+
 test('keeps sourceRevision local-only and leaves the shared freshness validator canonical', () => {
     const sourceText = readFileSync(new URL('./smart-import-projection-attachment-browser-normalizer.ts', import.meta.url), 'utf8');
     const validator = readFileSync(new URL('../smart-import-projection.ts', import.meta.url), 'utf8');
