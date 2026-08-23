@@ -62,9 +62,6 @@ export function assertLocalOllamaModelReference(model: unknown): asserts model i
         throw new OllamaLocalityError('model_not_local');
     }
     const trimmed = model.trim();
-    if (!trimmed || new TextEncoder().encode(trimmed).byteLength > OLLAMA_LOCAL_MODEL_REFERENCE_MAX_UTF8_BYTES) {
-        throw new OllamaLocalityError('model_not_local');
-    }
     const normalized = trimmed.toLowerCase();
     if (
         normalized.includes('://')
@@ -73,6 +70,9 @@ export function assertLocalOllamaModelReference(model: unknown): asserts model i
         || normalized.endsWith('-cloud')
     ) {
         throw new OllamaLocalityError('model_cloud_reference');
+    }
+    if (!trimmed || new TextEncoder().encode(trimmed).byteLength > OLLAMA_LOCAL_MODEL_REFERENCE_MAX_UTF8_BYTES) {
+        throw new OllamaLocalityError('model_not_local');
     }
 }
 

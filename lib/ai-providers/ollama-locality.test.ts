@@ -44,6 +44,10 @@ test('limita il riferimento modello locale a 674 byte UTF-8 dopo trim senza ripa
     );
     assert.throws(() => assertLocalOllamaModelReference('qwen:cloud'),
         (error) => error instanceof OllamaLocalityError && error.code === 'model_cloud_reference');
+    for (const value of [`${'a'.repeat(670)}:cloud`, `${'a'.repeat(670)}-cloud`, ['https:', '//', 'a'.repeat(670)].join(''), `ollama.com/${'a'.repeat(670)}`]) assert.throws(
+        () => assertLocalOllamaModelReference(value),
+        (error) => error instanceof OllamaLocalityError && error.code === 'model_cloud_reference',
+    );
 });
 
 test('attesta il modello locale senza inviare un prompt', async (t) => {
