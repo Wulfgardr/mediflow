@@ -529,6 +529,15 @@ function applySchemaGuards() {
         )
     `).run();
     ensureColumn('durable_review_records', 'patient_ref', "patient_ref TEXT NOT NULL DEFAULT ''");
+    /* @Codex */
+    sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS durable_review_operations (
+            id TEXT PRIMARY KEY NOT NULL, review_id TEXT NOT NULL, idempotency_key TEXT NOT NULL,
+            operation TEXT NOT NULL, expected_review_revision INTEGER NOT NULL, operation_digest TEXT NOT NULL,
+            record_snapshot TEXT NOT NULL, created_at INTEGER DEFAULT (unixepoch())
+        )
+    `).run();
+    sqlite.prepare('CREATE UNIQUE INDEX IF NOT EXISTS durable_review_operations_review_key_unique ON durable_review_operations(review_id, idempotency_key)').run();
     // WUL-268 (STREAM A): core tables shipped without secondary indices, so
     // patient-scoped reads and lookups fell back to full table scans (verified
     // via EXPLAIN QUERY PLAN). Guards are the operative migration mechanism, so
@@ -612,3 +621,9 @@ const sqliteHandle = new Proxy({} as Database.Database, {
     },
 });
 export const dbServer = drizzle(sqliteHandle);
+
+/* @Codex */
+/** Runs a bounded DB mutation under SQLite's writer lock so stale readers cannot race a CAS decision. */
+export function runDbServerImmediateTransaction<T>(operation: () => T): T {
+    return sqlite.transaction(operation).immediate();
+}
