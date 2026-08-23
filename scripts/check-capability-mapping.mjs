@@ -102,6 +102,16 @@ function validateWebMiniSurfaceEligibility(basis) {
   const actualMini = mini.map((record) => `${record.sourceIdentity.identifier}:${record.sourceIdentity.sourceRow}`).sort();
   if (mini.some((record) => record.surface !== 'mini_command') || JSON.stringify(actualMini) !== JSON.stringify(expectedMini)) fail('Mini command surface eligibility drifted');
 }
+function validateEvidenceArtifacts(basis, sourcePaths) {
+  const files = basis.evidenceFiles ?? [];
+  if (!Array.isArray(files) || files.length !== 3) fail('evidence artifact roster is invalid');
+  for (const file of files.slice(0, 2)) {
+    const artifact = relativeJson(file, 'document evidence file');
+    if (artifact.schema !== 'mediflow.capability-mapping.document-evidence.v1' || artifact.applyPolicy !== 'none' || !Array.isArray(artifact.records) || artifact.records.some((record) => record.evidenceKind !== 'document' || !sourcePaths.has(record.ref))) fail('document evidence artifact is invalid');
+  }
+  const keyboard = relativeJson(files[2], 'keyboard boundary file');
+  if (keyboard.schema !== 'mediflow.capability-mapping.keyboard-boundary.v1' || keyboard.applyPolicy !== 'none' || keyboard.terminalDisposition !== 'out_of_catalog' || keyboard.evidence?.some((evidence) => evidence.evidenceKind !== 'test' || !sourcePaths.has(evidence.ref))) fail('keyboard boundary artifact is invalid');
+}
 function dispositionCounts(records) {
   return Object.fromEntries([...TERMINAL_DISPOSITIONS].map((disposition) => [disposition, records.filter((record) => record.terminalDisposition === disposition).length]));
 }
@@ -112,7 +122,7 @@ function requireUnique(records, key, label) {
 function validateCoverage(basis, coverage) {
   if (coverage.schema !== 'mediflow.capability-mapping.coverage-receipt.v1' || coverage.mappingVersion !== 1 || coverage.status !== 'candidate_not_integrated' || coverage.applyPolicy !== 'none') fail('coverage receipt contract is invalid');
   if (coverage.sourceManifestSha256 !== basis.sourceManifestSha256 || coverage.claimCeiling !== basis.claimCeiling) fail('coverage receipt provenance or claim ceiling drifted');
-  const expected = new Map([['anchors', 66], ['aip', 109], ['fabric', 16], ['surfaces', 600]]);
+  const expected = new Map([['anchors', 66], ['aip', 109], ['fabric', 16], ['surfaces', 179]]);
   const declared = new Map((coverage.populationCoverage ?? []).map((entry) => [entry.populationId, entry]));
   if (declared.size !== expected.size) fail('coverage receipt population roster is invalid');
   for (const [populationId, expectedCount] of expected) {
@@ -176,6 +186,7 @@ function validateBasis(basis, manifestBytes, sourcePaths) {
     records.forEach((record) => validateNode(record, sourcePaths));
   }
   validateWebMiniSurfaceEligibility(basis);
+  validateEvidenceArtifacts(basis, sourcePaths);
   const relations = relationRecords(basis);
   if (!relations.every((relation) => relation && RELATION_KINDS.has(relation.relationKind) && Array.isArray(relation.evidence) && relation.evidence.length > 0)) fail('relation contract is invalid');
   const conflicts = conflictRecords(basis);
@@ -205,7 +216,7 @@ export function validateCapabilityMapping(manifest = json(MANIFEST_PATH), basis 
     if (records.length !== set.recordCount || digest(records) !== set.sourceSetSha256) fail(`${set.sourceSetId}: source drift`);
     records.forEach((record) => sourcePaths.add(`${source.commit}:${record.path}`));
   }
-  if (setIds.size !== 10) fail('source manifest is incomplete');
+  if (setIds.size !== 11) fail('source manifest is incomplete');
   validateBasis(basis, manifestBytes, sourcePaths);
   validateCoverage(basis, coverage);
   validateHumanReport(coverage, report);

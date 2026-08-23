@@ -1,7 +1,7 @@
 {
   "schema": "mediflow.capability-mapping.basis.v1",
   "mappingVersion": 1,
-  "sourceManifestSha256": "239d9819ca724db0a72b299ffc14aa1b08562ff55acfab90ebe36445cdf5f78e",
+  "sourceManifestSha256": "17e231ff12773fc2926fc65e879b39c32bf1929f1d42ce824e2293047591cce1",
   "applyPolicy": "none",
   "relationKinds": ["exact_identity", "implements", "exposes", "supports", "authority_boundary_for"],
   "terminalDispositions": ["mapped", "infrastructure_only", "out_of_catalog", "unmapped", "conflicted"],
@@ -9,7 +9,8 @@
   "relationContract": ["id", "from", "to", "relationKind", "evidence"],
   "conflictContract": ["conflictId", "subjectId", "observedFact", "ambiguity", "alternatives", "consequences", "decisionOwner", "requiredEvidence", "status", "terminalDisposition"],
   "surfaceEligibilityFile": "docs/capability-mapping/surface-eligibility.v1.json",
-  "populations": { "anchors": { "expectedCount": 66, "records": [], "recordFile": "docs/capability-mapping/nodes/web-mini-crosswalk.v1.json" }, "aip": { "expectedCount": 109, "records": [], "recordFile": "docs/capability-mapping/nodes/aip-inventory.v1.json" }, "fabric": { "records": [], "recordFile": "docs/capability-mapping/nodes/fabric-inventory.v1.json" }, "surfaces": { "records": [], "recordFile": "docs/capability-mapping/nodes/web-surfaces.v1.json", "recordFiles": ["docs/capability-mapping/nodes/mini-command-surfaces.v1.json", "docs/capability-mapping/nodes/ios-ipados-runtime-surfaces.v1.json", "docs/capability-mapping/nodes/ios-ipados-doc-surfaces.v1.json", "docs/capability-mapping/nodes/macos-runtime-surfaces.v1.json", "docs/capability-mapping/nodes/macos-receipt-surfaces.v1.json"] } },
+  "populations": { "anchors": { "expectedCount": 66, "records": [], "recordFile": "docs/capability-mapping/nodes/web-mini-crosswalk.v1.json" }, "aip": { "expectedCount": 109, "records": [], "recordFile": "docs/capability-mapping/nodes/aip-inventory.v1.json" }, "fabric": { "records": [], "recordFile": "docs/capability-mapping/nodes/fabric-inventory.v1.json" }, "surfaces": { "records": [], "recordFile": "docs/capability-mapping/nodes/web-surfaces.v1.json", "recordFiles": ["docs/capability-mapping/nodes/mini-command-surfaces.v1.json", "docs/capability-mapping/nodes/ios-ipados-runtime-surfaces.v1.json", "docs/capability-mapping/nodes/macos-runtime-surfaces.v1.json"] } },
+  "evidenceFiles": ["docs/capability-mapping/nodes/ios-ipados-doc-surfaces.v1.json", "docs/capability-mapping/nodes/macos-receipt-surfaces.v1.json", "docs/capability-mapping/keyboard-boundary.v1.json"],
   "relations": [],
   "relationFiles": ["docs/capability-mapping/relations/web-mini-bindings.v1.json", "docs/capability-mapping/relations/aip-fabric-identities.v1.json"],
   "conflicts": [],
