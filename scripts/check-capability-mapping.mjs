@@ -39,6 +39,38 @@ function sourceRecords(set, source) {
 function requireExactArray(actual, expected, label) {
   if (!Array.isArray(actual) || actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) fail(`${label} is invalid`);
 }
+function relativeJson(path, label) {
+  if (typeof path !== 'string' || !path.startsWith('docs/capability-mapping/') || path.includes('..')) fail(`${label} is invalid`);
+  return json(`${ROOT}/${path}`);
+}
+function populationRecords(population) {
+  const records = [...population.records];
+  if (population.recordFile) {
+    const external = relativeJson(population.recordFile, 'population record file');
+    if (!Array.isArray(external.records)) fail('population record file has no records');
+    records.push(...external.records);
+  }
+  return records;
+}
+function relationRecords(basis) {
+  const records = [...basis.relations];
+  for (const file of basis.relationFiles ?? []) {
+    const external = relativeJson(file, 'relation file');
+    if (!Array.isArray(external.records)) fail('relation file has no records');
+    records.push(...external.records);
+  }
+  return records;
+}
+function validateWebMiniCrosswalk(basis, anchorRecords) {
+  const population = basis.populations.anchors;
+  if (!population.recordFile) return;
+  const source = JSON.parse(git('show', '1e35733c0218eae67a1d6e158085aab7340bc26b:packages/mini/contracts/mini-parity.json'));
+  if (anchorRecords.length !== 66 || source.capabilities?.length !== 66) fail('web-mini crosswalk coverage drift');
+  anchorRecords.forEach((record, index) => {
+    if (record.sourceIdentity?.sourceRow !== index + 1 || record.authority !== 'unresolved' || record.stage !== 'unresolved' || record.terminalDisposition !== 'mapped') fail('web-mini crosswalk derives authority or stage');
+    if (JSON.stringify(record.sourceRecord) !== JSON.stringify(source.capabilities[index])) fail(`web-mini crosswalk lost source record ${index + 1}`);
+  });
+}
 function validateNode(node) {
   const fields = ['id', 'sourceIdentity', 'description', 'surface', 'stage', 'authority', 'input', 'output', 'provider', 'venue', 'egress', 'evidence', 'terminalDisposition'];
   if (!node || typeof node !== 'object' || fields.some((field) => !(field in node))) fail('node is incomplete');
@@ -55,17 +87,20 @@ function validateBasis(basis, manifestBytes) {
   for (const [population, expected] of [['anchors', 66], ['aip', 109]]) {
     const value = basis.populations?.[population];
     if (!value || value.expectedCount !== expected || !Array.isArray(value.records)) fail(`${population} population contract is invalid`);
-    value.records.forEach(validateNode);
-    if (value.records.length > expected) fail(`${population} has too many records`);
+    const records = populationRecords(value);
+    records.forEach(validateNode);
+    if (records.length > expected) fail(`${population} has too many records`);
+    if (population === 'anchors') validateWebMiniCrosswalk(basis, records);
   }
   for (const population of ['fabric', 'surfaces']) {
-    const records = basis.populations?.[population]?.records;
+    const records = basis.populations?.[population] && populationRecords(basis.populations[population]);
     if (!Array.isArray(records)) fail(`${population} population contract is invalid`);
     records.forEach(validateNode);
   }
-  if (!Array.isArray(basis.relations) || !basis.relations.every((relation) => relation && RELATION_KINDS.has(relation.relationKind) && Array.isArray(relation.evidence) && relation.evidence.length > 0)) fail('relation contract is invalid');
+  const relations = relationRecords(basis);
+  if (!relations.every((relation) => relation && RELATION_KINDS.has(relation.relationKind) && Array.isArray(relation.evidence) && relation.evidence.length > 0)) fail('relation contract is invalid');
   if (!Array.isArray(basis.conflicts) || !basis.conflicts.every((conflict) => conflict && TERMINAL_DISPOSITIONS.has(conflict.terminalDisposition))) fail('conflict contract is invalid');
-  const nodes = Object.values(basis.populations).flatMap((population) => population.records);
+  const nodes = Object.values(basis.populations).flatMap(populationRecords);
   const terminal = [...nodes, ...basis.conflicts];
   if (basis.ledgerComplete && terminal.some((value) => !TERMINAL_DISPOSITIONS.has(value.terminalDisposition))) fail('complete ledger has an undisposed record');
   if (basis.semanticBindingComplete && terminal.some((value) => ['unmapped', 'conflicted'].includes(value.terminalDisposition))) fail('semantic binding cannot be complete with unresolved records');
