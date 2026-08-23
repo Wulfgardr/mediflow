@@ -163,6 +163,22 @@ const ATTACHMENTS_CURRENTNESS_COLUMNS = [
     'document_revision',
     'document_freshness_epoch',
 ] as const;
+const ATTACHMENTS_LEGACY_COLUMNS = [
+    [0, 'id', 'TEXT', 1, null, 1],
+    [1, 'patient_id', 'TEXT', 1, null, 0],
+    [2, 'name', 'TEXT', 1, null, 0],
+    [3, 'type', 'TEXT', 1, null, 0],
+    [4, 'size', 'INTEGER', 1, null, 0],
+    [5, 'path', 'TEXT', 1, null, 0],
+    [6, 'data', 'TEXT', 0, null, 0],
+    [7, 'created_at', 'INTEGER', 0, 'unixepoch()', 0],
+    [8, 'summary_snapshot', 'TEXT', 0, null, 0],
+    [9, 'parse_evidence_artifact_snapshot', 'TEXT', 0, null, 0],
+    [10, 'ocr_queue_state', 'TEXT', 0, null, 0],
+    [11, 'ocr_queue_reason', 'TEXT', 0, null, 0],
+    [12, 'ocr_queue_updated_at', 'INTEGER', 0, null, 0],
+    [13, 'ocr_replay_artifact_snapshot', 'TEXT', 0, null, 0],
+] as const;
 /* @Codex */
 function physicianReviewAttestationSchemaEquals(expected: string): boolean {
     const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'physician_review_attestations'").get() as { sql?: unknown } | undefined;
@@ -191,7 +207,7 @@ function migrateP2aPhysicianReviewAttestationSchema(): void {
     }).immediate();
 }
 /* @Codex */
-type TableInfoRow = { name: string };
+type TableInfoRow = { cid: number; name: string; type: string; notnull: number; dflt_value: string | null; pk: number };
 /* @Codex */
 function ensureColumn(table: string, columnName: string, columnSql: string) {
     const columns = (sqlite.prepare(`PRAGMA table_info(${table})`).all() as TableInfoRow[]).map((col) => col.name);
@@ -200,11 +216,43 @@ function ensureColumn(table: string, columnName: string, columnSql: string) {
     }
 }
 /* @Codex */
+function hasCanonicalLegacyAttachmentFingerprint(): boolean {
+    const table = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'attachments'").get() as { sql?: unknown } | undefined;
+    if (typeof table?.sql !== 'string') return false;
+    const tableSql = normalizeSchemaSql(table.sql);
+    if (['check(', 'collate', 'generatedalways', 'autoincrement', 'onconflict', 'strict', 'withoutrowid'].some((fragment) => tableSql.includes(fragment))) return false;
+    const columns = sqlite.prepare("SELECT cid, name, type, \"notnull\", dflt_value, pk FROM pragma_table_info('attachments') ORDER BY cid")
+        .all() as TableInfoRow[];
+    if (columns.length !== ATTACHMENTS_LEGACY_COLUMNS.length) return false;
+    if (!columns.every((column, index) => ATTACHMENTS_LEGACY_COLUMNS[index].every((value, field) => value === [column.cid, column.name, column.type, column.notnull, column.dflt_value, column.pk][field]))) return false;
+
+    const foreignKeys = sqlite.prepare("SELECT id, seq, \"table\", \"from\", \"to\", on_update, on_delete, match FROM pragma_foreign_key_list('attachments')")
+        .all() as Array<{ id: number; seq: number; table: string; from: string; to: string; on_update: string; on_delete: string; match: string }>;
+    if (foreignKeys.length !== 1 || !foreignKeys.every((row) => row.id === 0 && row.seq === 0 && row.table === 'patients' && row.from === 'patient_id' && row.to === 'id' && row.on_update === 'NO ACTION' && row.on_delete === 'NO ACTION' && row.match === 'NONE')) return false;
+
+    const indexes = sqlite.prepare("SELECT name, \"unique\", origin, partial FROM pragma_index_list('attachments')")
+        .all() as Array<{ name: string; unique: number; origin: string; partial: number }>;
+    const patientIndex = indexes.find((row) => row.name === 'attachments_patient_idx');
+    const primaryIndex = indexes.find((row) => row.origin === 'pk');
+    if (indexes.length !== 2 || !patientIndex || !primaryIndex || patientIndex.unique !== 0 || patientIndex.origin !== 'c' || patientIndex.partial !== 0 || primaryIndex.unique !== 1 || primaryIndex.partial !== 0) return false;
+    const patientIndexColumns = sqlite.prepare("SELECT seqno, cid, name FROM pragma_index_info('attachments_patient_idx')")
+        .all() as Array<{ seqno: number; cid: number; name: string }>;
+    const primaryIndexColumns = sqlite.prepare('SELECT seqno, cid, name FROM pragma_index_info(?)')
+        .all(primaryIndex.name) as Array<{ seqno: number; cid: number; name: string }>;
+    return patientIndexColumns.length === 1 && patientIndexColumns[0].seqno === 0 && patientIndexColumns[0].cid === 1 && patientIndexColumns[0].name === 'patient_id'
+        && primaryIndexColumns.length === 1 && primaryIndexColumns[0].seqno === 0 && primaryIndexColumns[0].cid === 0 && primaryIndexColumns[0].name === 'id';
+}
+/* @Codex */
 function attachmentCurrentnessState(): 'legacy' | 'canonical' {
     const columns = (sqlite.prepare("SELECT name FROM pragma_table_info('attachments')").all() as TableInfoRow[])
         .map((column) => column.name);
     const present = ATTACHMENTS_CURRENTNESS_COLUMNS.filter((name) => columns.includes(name));
-    if (present.length === 0) return 'legacy';
+    if (present.length === 0) {
+        if (!hasCanonicalLegacyAttachmentFingerprint()) {
+            throw new Error('Attachment legacy schema is not canonical.');
+        }
+        return 'legacy';
+    }
     if (present.length !== ATTACHMENTS_CURRENTNESS_COLUMNS.length) {
         throw new Error('Attachment currentness schema is partial.');
     }

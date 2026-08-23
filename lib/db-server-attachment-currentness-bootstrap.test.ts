@@ -70,6 +70,20 @@ function withLegacyDatabase(prefix: string, run: (dbPath: string, dataDir: strin
     }
 }
 
+function attachmentSnapshot(dbPath: string): unknown {
+    const db = new Database(dbPath, { readonly: true });
+    try {
+        return {
+            table: db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'attachments'").get(),
+            index: db.prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'attachments_patient_idx'").get(),
+            columns: db.prepare("SELECT cid, name, type, \"notnull\", dflt_value, pk FROM pragma_table_info('attachments') ORDER BY cid").all(),
+            rows: db.prepare('SELECT * FROM attachments ORDER BY id').all(),
+        };
+    } finally {
+        db.close();
+    }
+}
+
 test('attachment currentness guard upgrades legacy data and is stable across restart', () => withLegacyDatabase('mediflow-currentness-live-', (dbPath, dataDir) => {
     const beforeDb = new Database(dbPath, { readonly: true });
     const before = beforeDb.prepare(`SELECT ${LEGACY_COLUMNS.join(', ')} FROM attachments ORDER BY id`).all();
@@ -113,6 +127,47 @@ test('attachment currentness guard rejects partial and non-canonical states with
             const columns = inspect.prepare("SELECT name FROM pragma_table_info('attachments') WHERE name LIKE 'document_%' ORDER BY name").all().map((row) => (row as { name: string }).name);
             assert.deepEqual(columns, state === 'partial' ? ['document_source_ref'] : ['document_freshness_epoch', 'document_revision', 'document_source_ref']);
             inspect.close();
+        });
+    }
+});
+
+test('attachment currentness guard rejects drifted legacy fingerprints before rebuild', () => {
+    for (const drift of ['extra', 'missing', 'type', 'index', 'constraint'] as const) {
+        withLegacyDatabase(`mediflow-currentness-legacy-${drift}-`, (dbPath, dataDir) => {
+            const db = new Database(dbPath);
+            if (drift === 'extra') {
+                db.exec("ALTER TABLE attachments ADD COLUMN unexpected_provenance TEXT; UPDATE attachments SET unexpected_provenance = 'preserve-me';");
+            } else if (drift === 'missing') {
+                db.exec('ALTER TABLE attachments DROP COLUMN summary_snapshot;');
+            } else if (drift === 'index') {
+                db.exec('DROP INDEX attachments_patient_idx; CREATE INDEX attachments_patient_idx ON attachments(name);');
+            } else if (drift === 'type') {
+                db.exec(`DROP INDEX attachments_patient_idx; ALTER TABLE attachments RENAME TO attachments_type_drift;
+                    CREATE TABLE attachments (
+                        id TEXT PRIMARY KEY NOT NULL, patient_id TEXT NOT NULL, name TEXT NOT NULL, type TEXT NOT NULL,
+                        size TEXT NOT NULL, path TEXT NOT NULL, data TEXT, created_at INTEGER DEFAULT (unixepoch()),
+                        summary_snapshot TEXT, parse_evidence_artifact_snapshot TEXT, ocr_queue_state TEXT,
+                        ocr_queue_reason TEXT, ocr_queue_updated_at INTEGER, ocr_replay_artifact_snapshot TEXT,
+                        FOREIGN KEY (patient_id) REFERENCES patients(id) ON UPDATE no action ON DELETE no action
+                    ); INSERT INTO attachments SELECT * FROM attachments_type_drift;
+                    DROP TABLE attachments_type_drift; CREATE INDEX attachments_patient_idx ON attachments(patient_id);`);
+            } else {
+                db.exec(`DROP INDEX attachments_patient_idx; ALTER TABLE attachments RENAME TO attachments_constraint_drift;
+                    CREATE TABLE attachments (
+                        id TEXT PRIMARY KEY NOT NULL, patient_id TEXT NOT NULL, name TEXT NOT NULL, type TEXT NOT NULL,
+                        size INTEGER NOT NULL CHECK (size > 0), path TEXT NOT NULL, data TEXT, created_at INTEGER DEFAULT (unixepoch()),
+                        summary_snapshot TEXT, parse_evidence_artifact_snapshot TEXT, ocr_queue_state TEXT,
+                        ocr_queue_reason TEXT, ocr_queue_updated_at INTEGER, ocr_replay_artifact_snapshot TEXT,
+                        FOREIGN KEY (patient_id) REFERENCES patients(id) ON UPDATE no action ON DELETE no action
+                    ); INSERT INTO attachments SELECT * FROM attachments_constraint_drift;
+                    DROP TABLE attachments_constraint_drift; CREATE INDEX attachments_patient_idx ON attachments(patient_id);`);
+            }
+            db.close();
+
+            const before = attachmentSnapshot(dbPath);
+            const result = bootstrap(dataDir);
+            assert.notEqual(result.status, 0, result.output);
+            assert.deepEqual(attachmentSnapshot(dbPath), before);
         });
     }
 });
