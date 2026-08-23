@@ -853,6 +853,7 @@ export default function PatientDetailPage() {
                             <PatientSmartImportPanel
                                 patient={patient}
                                 entries={entries}
+                                activeTherapies={activeTherapies}
                                 onReviewSnapshotChange={setSmartImportReview}
                             />
                         ) : null}
