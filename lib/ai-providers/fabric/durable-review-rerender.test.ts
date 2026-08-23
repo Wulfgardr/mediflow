@@ -5,17 +5,18 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { after, test } from 'node:test';
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-durable-rerender-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 execFileSync(process.execPath, ['scripts/prepare-e2e-db.mjs'], { env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir } });
 
-const { createDurableReviewRecordStore } = await import('./durable-review-record-store.ts');
 const { DurableReviewRerenderError, createDurableReviewRerender } = await import('./durable-review-rerender.ts');
 
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 const patientRef = `ptr_${'1'.repeat(32)}`;
+const otherPatientRef = `ptr_${'5'.repeat(32)}`;
 const reviewId = `review_${'2'.repeat(32)}`;
 const receiptRef = `receipt_${'3'.repeat(32)}`;
 const provenanceRef = `provenance_${'4'.repeat(32)}`;
@@ -35,7 +36,7 @@ const proposal = Object.freeze({
 
 function envelope(overrides: Record<string, unknown> = {}): Record<string, unknown> {
     return {
-        schemaVersion: 'mediflow.ai.durable-review-envelope.v1', presentationVersion: 'mediflow.ai.durable-review.presentation.v1', reviewId, reviewRevision: 1,
+        schemaVersion: 'mediflow.ai.durable-review-envelope.v1', presentationVersion: 'mediflow.ai.durable-review.presentation.v1', patientRef, reviewId, reviewRevision: 1,
         receiptRef, provenanceRef, proposal, receipt, provenance,
         ...overrides,
     };
@@ -53,20 +54,29 @@ function unsealForTest(value: string): unknown {
     return JSON.parse(Buffer.from(parts[2], 'base64').toString('utf8'));
 }
 
-function record(sealedCiphertext = seal(envelope()), reviewRevision = 1): Record<string, unknown> {
+function record(sealedCiphertext = seal(envelope()), reviewRevision = 1, storedPatientRef = patientRef): Record<string, unknown> {
     return {
-        patientRef, reviewId, reviewRevision, receiptRef, provenanceRef,
-        receiptBinding: digest(`${patientRef}\0${reviewId}\0${receiptRef}`), provenanceBinding: digest(`${patientRef}\0${reviewId}\0${provenanceRef}`),
+        patientRef: storedPatientRef, reviewId, reviewRevision, receiptRef, provenanceRef,
+        receiptBinding: digest(`${storedPatientRef}\0${reviewId}\0${receiptRef}`), provenanceBinding: digest(`${storedPatientRef}\0${reviewId}\0${provenanceRef}`),
         presentationVersion: 'mediflow.ai.durable-review.presentation.v1', sealedCiphertext, sealedDigest: digest(sealedCiphertext),
     };
 }
 
-function storedRecord(sealedCiphertext = seal(envelope()), reviewRevision = 1): Record<string, unknown> {
-    return { recordId: reviewId, ...record(sealedCiphertext, reviewRevision) };
+function storedRecord(sealedCiphertext = seal(envelope()), reviewRevision = 1, storedPatientRef = patientRef): Record<string, unknown> {
+    return { recordId: reviewId, ...record(sealedCiphertext, reviewRevision, storedPatientRef) };
 }
 
-function newProcessRead(): unknown {
-    return JSON.parse(execFileSync(process.execPath, ['scripts/run-strip-types.mjs', 'scripts/durable-review-record-store-worker.mjs', 'read'], {
+function writerProcess(value: unknown): unknown {
+    return JSON.parse(execFileSync(process.execPath, ['scripts/run-strip-types.mjs', 'scripts/durable-review-record-store-worker.mjs', 'create'], {
+        encoding: 'utf8', env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_DURABLE_REVIEW_RECORD: JSON.stringify(value) },
+    }));
+}
+
+function freshReaderClientProcess(): unknown {
+    const storeUrl = pathToFileURL(path.join(process.cwd(), 'lib/ai-providers/fabric/durable-review-record-store.ts')).href;
+    const rerenderUrl = pathToFileURL(path.join(process.cwd(), 'lib/ai-providers/fabric/durable-review-rerender.ts')).href;
+    const source = `import { createDurableReviewRecordStore } from ${JSON.stringify(storeUrl)}; import { createDurableReviewRerender } from ${JSON.stringify(rerenderUrl)}; const reviewId = JSON.parse(process.env.MEDIFLOW_DURABLE_REVIEW_RECORD ?? 'null'); const record = createDurableReviewRecordStore().read(reviewId); const rendered = await createDurableReviewRerender((sealed) => { const parts = sealed.split(':'); if (parts.length !== 3 || parts[0] !== 'ENC' || parts[1] !== 'dGVzdC1jbGllbnQ=') throw new Error(); return JSON.parse(Buffer.from(parts[2], 'base64').toString('utf8')); }).rerender(record); process.stdout.write(JSON.stringify(rendered));`;
+    return JSON.parse(execFileSync(process.execPath, ['scripts/run-strip-types.mjs', '--input-type=module', '--eval', source], {
         encoding: 'utf8', env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_DURABLE_REVIEW_RECORD: JSON.stringify(reviewId) },
     }));
 }
@@ -80,10 +90,10 @@ async function assertRejected(value: unknown): Promise<void> {
 
 test('re-renders the saved sealed review deterministically after a fresh reader process', async () => {
     const persisted = record();
-    createDurableReviewRecordStore().create({ record: persisted, expectedReviewRevision: 0, idempotencyKey: 'idem_aaaaaaaaaaaaaaaa' });
+    assert.deepEqual(writerProcess({ record: persisted, expectedReviewRevision: 0, idempotencyKey: 'idem_aaaaaaaaaaaaaaaa' }), { ...persisted, recordId: reviewId });
 
-    const first = await createDurableReviewRerender(unsealForTest).rerender(newProcessRead());
-    const second = await createDurableReviewRerender(unsealForTest).rerender(newProcessRead());
+    const first = freshReaderClientProcess() as Awaited<ReturnType<ReturnType<typeof createDurableReviewRerender>['rerender']>>;
+    const second = freshReaderClientProcess() as Awaited<ReturnType<ReturnType<typeof createDurableReviewRerender>['rerender']>>;
 
     assert.deepEqual(first.model, second.model);
     assert.equal(first.dom, second.dom);
@@ -103,6 +113,7 @@ test('rejects altered record bindings, revision, sealed digest, version, extras,
         { ...base, presentationVersion: 'mediflow.ai.durable-review.presentation.v2' },
         { ...base, extra: 'forbidden' },
         storedRecord(seal(envelope({ reviewRevision: 2 }))),
+        storedRecord(seal(envelope()), 1, otherPatientRef),
         storedRecord('ENC:dGVzdC1jbGllbnQ=:bm90LWpzb24='),
         storedRecord(seal(envelope({ extra: 'forbidden' }))),
     ];
@@ -116,6 +127,12 @@ test('keeps the renderer read-only and does not expose plaintext to the host rec
     assert.equal(JSON.stringify(persisted).includes('Synthetic review proposal.'), false);
     assert.equal(JSON.stringify(persisted).includes('patientId'), false);
     await assertRejected({ ...storedRecord(), sealedCiphertext: seal(envelope({ prompt: 'synthetic forbidden prompt' })) });
+});
+
+test('escapes synthetic HTML supplied by the sealed proposal', async () => {
+    const injected = await createDurableReviewRerender(unsealForTest).rerender(storedRecord(seal(envelope({ proposal: { ...proposal, summary: '<img src=x onerror=alert(1)>' } }))));
+    assert.match(injected.dom, /&lt;img src=x onerror=alert\(1\)&gt;/u);
+    assert.doesNotMatch(injected.dom, /<img/u);
 });
 
 after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
