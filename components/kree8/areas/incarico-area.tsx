@@ -28,6 +28,7 @@ import type {
   Kree8PatientStatus,
 } from '../cockpit-shared';
 import type { InboxList, Kree8Patient } from '@/lib/patient-workspace';
+import { nextVirtualRowIndex, type VirtualListNavigationKey } from '@/lib/kree8-keyboard-navigation';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
 import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 
@@ -96,71 +97,102 @@ function IncaricoArea({
 
   const patientListParentRef = useRef<HTMLDivElement>(null);
 
-  /* @Codex WUL-UIUX: sposta il fuoco fra le righe renderizzate dalla
-     virtualizzazione; lo scroll segue il fuoco e la finestra si ricompone. */
-  const moveRowFocus = useCallback((delta: number) => {
-    const container = patientListParentRef.current;
-    if (!container) return;
-    const rows = Array.from(
-      container.querySelectorAll<HTMLButtonElement>('[data-testid="lume-patient-row"]'),
-    );
-    if (rows.length === 0) return;
-    const currentIndex = rows.findIndex((row) => row === document.activeElement);
-    const nextIndex = currentIndex < 0
-      ? (delta > 0 ? 0 : rows.length - 1)
-      : Math.min(rows.length - 1, Math.max(0, currentIndex + delta));
-    const nextRow = rows[nextIndex];
-    if (!nextRow) return;
-    nextRow.focus();
-    nextRow.scrollIntoView({ block: 'nearest' });
-  }, []);
-
-  const handleListKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'j' || event.key === 'ArrowDown') {
-      event.preventDefault();
-      moveRowFocus(1);
-    } else if (event.key === 'k' || event.key === 'ArrowUp') {
-      event.preventDefault();
-      moveRowFocus(-1);
-    }
-  };
-
-  /* @Codex WUL-UIUX: modello tastiera dell'incarico. «/» porta alla ricerca,
-     «n» apre una nuova voce (o una nuova scheda se nessun paziente è in
-     contesto), «j»/«k» e le frecce navigano le righe visibili della lista
-     virtualizzata. Attivi solo fuori dai campi di testo. */
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const target = event.target;
-      if (target instanceof HTMLElement) {
-        const tag = target.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) {
-          return;
-        }
-      }
-      if (event.key === '/') {
-        event.preventDefault();
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
-        return;
-      }
-      if (event.key === 'n' || event.key === 'N') {
-        event.preventDefault();
-        const selectedPatient = visible.find((p) => p.id === selectedPatientId) ?? visible[0];
-        router.push(selectedPatient ? `${selectedPatient.href}/entries/new` : '/patients/new');
-      }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [router, visible, selectedPatientId]);
-
   const patientRowVirtualizer = useVirtualizer({
     count: visible.length,
     getScrollElement: () => patientListParentRef.current,
     estimateSize: () => 52,
     overscan: 8,
   });
+
+  /* @Codex: il focus segue l'indice completo, non il sottoinsieme DOM prodotto
+     dalla virtualizzazione. Dopo lo scroll attende il nuovo render e porta il
+     focus sulla riga corrispondente. */
+  const focusRowAtIndex = useCallback((requestedIndex: number) => {
+    if (visible.length === 0) return;
+    const index = Math.min(visible.length - 1, Math.max(0, requestedIndex));
+    const patient = visible[index];
+    if (!patient) return;
+    onSelectPatient(patient.id);
+    patientRowVirtualizer.scrollToIndex(index, { align: 'auto' });
+
+    const focusRenderedRow = (attempts: number) => {
+      const row = patientListParentRef.current?.querySelector<HTMLButtonElement>(
+        `[data-patient-index="${index}"]`,
+      );
+      if (row) {
+        row.focus();
+        return;
+      }
+      if (attempts > 0) window.requestAnimationFrame(() => focusRenderedRow(attempts - 1));
+    };
+    window.requestAnimationFrame(() => focusRenderedRow(2));
+  }, [onSelectPatient, patientRowVirtualizer, visible]);
+
+  const currentRowIndex = useCallback((target: EventTarget | null) => {
+    const focusedRow = target instanceof HTMLElement
+      ? target.closest<HTMLElement>('[data-patient-index]')
+      : null;
+    const parsed = focusedRow ? Number(focusedRow.dataset.patientIndex) : Number.NaN;
+    if (Number.isInteger(parsed)) return parsed;
+    const selectedIndex = visible.findIndex((patient) => patient.id === selectedPatientId);
+    return selectedIndex >= 0 ? selectedIndex : 0;
+  }, [selectedPatientId, visible]);
+
+  const navigateRows = useCallback((key: VirtualListNavigationKey, target: EventTarget | null) => {
+    const viewportHeight = patientListParentRef.current?.clientHeight ?? 62;
+    const index = nextVirtualRowIndex({
+      key,
+      currentIndex: currentRowIndex(target),
+      rowCount: visible.length,
+      pageSize: Math.max(1, Math.floor(viewportHeight / 62)),
+    });
+    if (index !== null) focusRowAtIndex(index);
+  }, [currentRowIndex, focusRowAtIndex, visible.length]);
+
+  const handleListKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const navigationKeys: VirtualListNavigationKey[] = [
+      'ArrowDown', 'ArrowUp', 'j', 'k', 'Home', 'End', 'PageDown', 'PageUp',
+    ];
+    if (navigationKeys.includes(event.key as VirtualListNavigationKey)) {
+      event.preventDefault();
+      navigateRows(event.key as VirtualListNavigationKey, event.target);
+      return;
+    }
+    if (event.key !== 'Enter') return;
+    const patient = visible[currentRowIndex(event.target)];
+    if (!patient) return;
+    event.preventDefault();
+    onSelectPatient(patient.id);
+    if (isReview) onOpenArea('scheda');
+    else router.push(patient.modulesHref);
+  };
+
+  /* @Codex: scorciatoie contestuali, disattivate nei campi editabili. */
+  useEffect(() => {
+    const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        const tag = target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return;
+      }
+      if (event.key === '/') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+      else if (event.key === 'n' || event.key === 'N') {
+        event.preventDefault();
+        const patient = visible[currentRowIndex(document.activeElement)];
+        router.push(patient ? `${patient.href}/entries/new` : '/patients/new');
+      } else if (event.key === 'j' || event.key === 'k') {
+        event.preventDefault();
+        navigateRows(event.key, document.activeElement);
+      }
+    };
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    return () => document.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [currentRowIndex, navigateRows, router, visible]);
 
   return (
     <div className={styles.areaShell}>
@@ -172,7 +204,7 @@ function IncaricoArea({
           </h1>
           <p className={styles.areaSubtitle}>
             {patientStatus === 'ready'
-              ? 'Casi dell’ambulatorio e della rete locale, tra attivi e archivio. Scorciatoie: / cerca · j e k navigano · n nuova voce.'
+              ? 'Casi dell’ambulatorio e della rete locale. Usa le frecce o j/k per navigare, Invio per aprire; premi ? per l’aiuto completo.'
               : patientStatus === 'error'
                 ? 'Lista pazienti non disponibile: verifica sessione e servizi locali.'
                 : 'Preparazione della lista pazienti.'}
@@ -315,7 +347,7 @@ function IncaricoArea({
               <div
                 ref={patientListParentRef}
                 className={patientStyles.patientListViewport}
-                role="list"
+                role="listbox"
                 aria-label="Elenco pazienti in carico"
                 data-testid="lume-patient-list"
                 onKeyDown={handleListKeyDown}
@@ -335,7 +367,7 @@ function IncaricoArea({
                         ref={patientRowVirtualizer.measureElement}
                         data-index={virtualRow.index}
                         className={patientStyles.patientRowWrap}
-                        role="listitem"
+                        role="presentation"
                         style={{
                           position: 'absolute',
                           top: 0,
@@ -351,7 +383,10 @@ function IncaricoArea({
                             isSelected && patientStyles.patientRowSelected,
                           )}
                           onClick={() => onSelectPatient(p.id)}
-                          aria-pressed={isSelected}
+                          role="option"
+                          aria-selected={isSelected}
+                          tabIndex={isSelected ? 0 : -1}
+                          data-patient-index={virtualRow.index}
                           data-testid="lume-patient-row"
                         >
                           <span className={patientStyles.patientRowContent} data-lume-row-part="content">
