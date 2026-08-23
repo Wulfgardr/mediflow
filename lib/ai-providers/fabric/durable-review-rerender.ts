@@ -58,7 +58,7 @@ const PROVENANCE = /^provenance_[0-9a-f]{32}$/u;
 const SHA256 = /^[0-9a-f]{64}$/u;
 const SEALED = /^ENC:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}$/u;
 const RECORD_KEYS = ['recordId', 'patientRef', 'reviewId', 'reviewRevision', 'receiptRef', 'provenanceRef', 'receiptBinding', 'provenanceBinding', 'presentationVersion', 'sealedCiphertext', 'sealedDigest'] as const;
-const ENVELOPE_KEYS = ['schemaVersion', 'presentationVersion', 'reviewId', 'reviewRevision', 'receiptRef', 'provenanceRef', 'proposal', 'receipt', 'provenance'] as const;
+const ENVELOPE_KEYS = ['schemaVersion', 'presentationVersion', 'patientRef', 'reviewId', 'reviewRevision', 'receiptRef', 'provenanceRef', 'proposal', 'receipt', 'provenance'] as const;
 
 async function digest(value: string): Promise<string> {
     try {
@@ -104,7 +104,8 @@ function escapeHtml(value: string): string {
 }
 
 function renderDom(model: DurableReviewRerenderModel): string {
-    return `<article data-durable-review-version="${model.presentationVersion}"><h2>Review proposal</h2><p>${escapeHtml(model.proposal.summary)}</p><dl><dt>Review</dt><dd>${model.reviewId}</dd><dt>Revision</dt><dd>${model.reviewRevision}</dd><dt>Receipt</dt><dd>${model.receiptRef} · ${model.receipt.provider} · ${model.receipt.model ?? 'none'}</dd><dt>Provenance</dt><dd>${model.provenanceRef} · ${model.provenance.venue} · ${model.provenance.preprocessing.join(', ')}</dd><dt>Presentation</dt><dd>${model.presentationVersion}</dd></dl></article>`;
+    const text = escapeHtml;
+    return `<article data-durable-review-version="${text(model.presentationVersion)}"><h2>Review proposal</h2><p>${text(model.proposal.summary)}</p><dl><dt>Review</dt><dd>${text(model.reviewId)}</dd><dt>Revision</dt><dd>${model.reviewRevision}</dd><dt>Receipt</dt><dd>${text(model.receiptRef)} · ${text(model.receipt.provider)} · ${text(model.receipt.model ?? 'none')}</dd><dt>Provenance</dt><dd>${text(model.provenanceRef)} · ${text(model.provenance.venue)} · ${text(model.provenance.preprocessing.join(', '))}</dd><dt>Presentation</dt><dd>${text(model.presentationVersion)}</dd></dl></article>`;
 }
 
 async function rerender(value: unknown, unseal: DurableReviewUnsealBoundary): Promise<DurableReviewRerender> {
@@ -116,6 +117,7 @@ async function rerender(value: unknown, unseal: DurableReviewUnsealBoundary): Pr
     if (!envelope
         || envelope.schemaVersion !== DURABLE_REVIEW_RERENDER_ENVELOPE_VERSION
         || envelope.presentationVersion !== stored.presentationVersion
+        || envelope.patientRef !== stored.patientRef
         || envelope.reviewId !== stored.reviewId
         || envelope.reviewRevision !== stored.reviewRevision
         || envelope.receiptRef !== stored.receiptRef
