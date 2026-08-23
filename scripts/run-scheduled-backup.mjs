@@ -26,6 +26,8 @@ const BACKUP_TABLES = {
   attachments: 'attachments',
   conversations: 'conversations',
   documentDiagnosisProposals: 'document_diagnosis_proposals',
+  durableReviewRecords: 'durable_review_records',
+  durableReviewOperations: 'durable_review_operations',
   drugs: 'drugs',
   entries: 'entries',
   exemptions: 'exemptions',

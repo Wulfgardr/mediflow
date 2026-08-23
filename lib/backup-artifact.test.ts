@@ -41,6 +41,8 @@ const basePayload = {
             updatedAt: '2026-03-17T08:07:00.000Z',
         },
     ],
+    durableReviewRecords: [],
+    durableReviewOperations: [],
     drugs: [],
     entries: [
         {
@@ -104,6 +106,21 @@ test('creates a stable backup artifact with checksum and manifest', async () => 
     assert.equal(stableStringify(parsed.payload), stableStringify(basePayload));
 });
 
+/* @Codex */
+test('includes durable review records and replay operations in the authenticated artifact', async () => {
+    const payload = {
+        ...basePayload,
+        durableReviewRecords: [],
+        durableReviewOperations: [],
+    };
+
+    const artifact = await createBackupArtifact(payload);
+
+    assert.deepEqual(artifact.manifest.collections, BACKUP_COLLECTIONS);
+    assert.equal(artifact.manifest.recordCounts.durableReviewRecords, 0);
+    assert.equal(artifact.manifest.recordCounts.durableReviewOperations, 0);
+});
+
 test('rejects tampered payloads before restore', async () => {
     const serialized = await serializeBackupArtifact(basePayload);
     const tampered = JSON.parse(serialized);
@@ -140,22 +157,49 @@ test('preserves patient assigned ambulatory ids inside the backup payload', asyn
 async function legacyArtifact(): Promise<Record<string, any>> {
     const artifact = JSON.parse(await serializeBackupArtifact(basePayload));
     delete artifact.payload.documentDiagnosisProposals;
+    delete artifact.payload.durableReviewRecords;
+    delete artifact.payload.durableReviewOperations;
     artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'documentDiagnosisProposals');
+    artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations');
     delete artifact.manifest.recordCounts.documentDiagnosisProposals;
+    delete artifact.manifest.recordCounts.durableReviewRecords;
+    delete artifact.manifest.recordCounts.durableReviewOperations;
     const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(stableStringify(artifact.payload)));
     artifact.manifest.checksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
     return artifact;
 }
 
-test('accepts an authentic legacy v1 artifact and normalizes its missing proposal snapshot', async () => {
+test('accepts an authentic legacy v1 artifact and normalizes missing optional collections', async () => {
     const parsed = await parseBackupArtifact(await legacyArtifact());
     const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(stableStringify(parsed.payload)));
     const normalizedChecksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 
     assert.deepEqual(parsed.payload.documentDiagnosisProposals, []);
+    assert.deepEqual(parsed.payload.durableReviewRecords, []);
+    assert.deepEqual(parsed.payload.durableReviewOperations, []);
     assert.equal(parsed.manifest.recordCounts.documentDiagnosisProposals, 0);
+    assert.equal(parsed.manifest.recordCounts.durableReviewRecords, 0);
+    assert.equal(parsed.manifest.recordCounts.durableReviewOperations, 0);
     assert.deepEqual(parsed.manifest.collections, BACKUP_COLLECTIONS);
     assert.equal(parsed.manifest.checksum, normalizedChecksum);
+});
+
+/* @Codex */
+test('accepts a legacy artifact without durable review collections', async () => {
+    const artifact = JSON.parse(await serializeBackupArtifact(basePayload));
+    delete artifact.payload.durableReviewRecords;
+    delete artifact.payload.durableReviewOperations;
+    artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations');
+    delete artifact.manifest.recordCounts.durableReviewRecords;
+    delete artifact.manifest.recordCounts.durableReviewOperations;
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(stableStringify(artifact.payload)));
+    artifact.manifest.checksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+
+    const parsed = await parseBackupArtifact(artifact);
+
+    assert.deepEqual(parsed.payload.documentDiagnosisProposals, basePayload.documentDiagnosisProposals);
+    assert.deepEqual(parsed.payload.durableReviewRecords, []);
+    assert.deepEqual(parsed.payload.durableReviewOperations, []);
 });
 
 test('rejects almost-legacy and unknown backup collections', async () => {

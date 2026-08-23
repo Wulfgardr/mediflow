@@ -14,6 +14,8 @@ const basePayload = {
     attachments: [],
     conversations: [],
     documentDiagnosisProposals: [],
+    durableReviewRecords: [],
+    durableReviewOperations: [],
     drugs: [],
     entries: [],
     exemptions: [],

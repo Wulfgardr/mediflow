@@ -1,6 +1,7 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,6 +20,8 @@ const BACKUP_TABLES = {
     attachments: 'attachments',
     conversations: 'conversations',
     documentDiagnosisProposals: 'document_diagnosis_proposals',
+    durableReviewRecords: 'durable_review_records',
+    durableReviewOperations: 'durable_review_operations',
     drugs: 'drugs',
     entries: 'entries',
     exemptions: 'exemptions',
@@ -87,7 +90,7 @@ function insertRow(db: Database.Database, table: string, row: Record<string, unk
     ).run(...Object.values(row));
 }
 
-async function populateSyntheticClinicalFixture(db: Database.Database): Promise<void> {
+async function populateSyntheticClinicalFixture(db: Database.Database) {
     const masterKey = await generateMasterKey();
     const seal = async (label: string): Promise<string> => {
         const encrypted = await encryptData(`synthetic:${label}`, masterKey);
@@ -170,6 +173,51 @@ async function populateSyntheticClinicalFixture(db: Database.Database): Promise<
         id: 'w7-proposal-other-source', source_document_key: 'source-hmac-w7-other', status: 'pending', decided_at: null,
         decision_actor_type: null, decision_actor_ref: null, decision_payload: null,
     });
+    const durableReviewRecord = {
+        patientRef: `ptr_${'a'.repeat(32)}`,
+        reviewId: `review_${'b'.repeat(32)}`,
+        reviewRevision: 1,
+        receiptRef: `receipt_${'c'.repeat(32)}`,
+        provenanceRef: `provenance_${'d'.repeat(32)}`,
+        receiptBinding: '',
+        provenanceBinding: '',
+        presentationVersion: 'mediflow.ai.durable-review.presentation.v1',
+        sealedCiphertext: 'ENC:YWJj:c3ludGhldGljLWR1cmFibGUtcmV2aWV3',
+        sealedDigest: '',
+    };
+    const digest = (value: string) => createHash('sha256').update(value).digest('hex');
+    durableReviewRecord.receiptBinding = digest(`${durableReviewRecord.patientRef}\0${durableReviewRecord.reviewId}\0${durableReviewRecord.receiptRef}`);
+    durableReviewRecord.provenanceBinding = digest(`${durableReviewRecord.patientRef}\0${durableReviewRecord.reviewId}\0${durableReviewRecord.provenanceRef}`);
+    durableReviewRecord.sealedDigest = digest(durableReviewRecord.sealedCiphertext);
+    const durableReviewCommand = {
+        record: durableReviewRecord,
+        expectedReviewRevision: 0,
+        idempotencyKey: 'idem_aaaaaaaaaaaaaaaa',
+    };
+    insertRow(db, 'durable_review_records', {
+        id: durableReviewRecord.reviewId,
+        patient_ref: durableReviewRecord.patientRef,
+        review_id: durableReviewRecord.reviewId,
+        review_revision: durableReviewRecord.reviewRevision,
+        receipt_ref: durableReviewRecord.receiptRef,
+        provenance_ref: durableReviewRecord.provenanceRef,
+        receipt_binding: durableReviewRecord.receiptBinding,
+        provenance_binding: durableReviewRecord.provenanceBinding,
+        presentation_version: durableReviewRecord.presentationVersion,
+        sealed_ciphertext: durableReviewRecord.sealedCiphertext,
+        sealed_digest: durableReviewRecord.sealedDigest,
+        created_at: now + 22,
+    });
+    insertRow(db, 'durable_review_operations', {
+        id: digest(`${durableReviewRecord.reviewId}\0${durableReviewCommand.idempotencyKey}`),
+        review_id: durableReviewRecord.reviewId,
+        idempotency_key: durableReviewCommand.idempotencyKey,
+        operation: 'create',
+        expected_review_revision: durableReviewCommand.expectedReviewRevision,
+        operation_digest: digest(JSON.stringify(['create', durableReviewCommand.expectedReviewRevision, durableReviewRecord])),
+        record_snapshot: JSON.stringify(durableReviewRecord),
+        created_at: now + 22,
+    });
     insertRow(db, 'attachments', {
         id: 'w7-attachment', patient_id: 'w7-patient', type: 'application/pdf', size: 128,
         ...(await sealed('attachments', ['name', 'path', 'data', 'summary_snapshot', 'parse_evidence_artifact_snapshot', 'ocr_replay_artifact_snapshot'])),
@@ -180,8 +228,9 @@ async function populateSyntheticClinicalFixture(db: Database.Database): Promise<
         id: 'w7-message', conversation_id: 'w7-conversation', role: 'user', content: await seal('messages.content'), metadata: await seal('messages.metadata'),
         attachment_type: 'application/octet-stream', attachment_base64: await seal('messages.attachment_base64'), created_at: now + 24,
     });
-    insertRow(db, 'drugs', { aic: 'W7AIC', name: 'Farmaco sintetico', active_principle: 'Principio sintetico', company: 'Azienda sintetica', packaging: 'Fixture', class: 'A', price: 123, atc: 'W7ATC' });
+    insertRow(db, 'drugs', { aic: 'W7AIC', name: 'Farmaco sintetico', active_principle: 'Principio sintetico', company: 'Azienda sintetica', packaging: 'Fixture', packaging_search: 'fixture', class: 'A', price: 123, atc: 'W7ATC' });
     insertRow(db, 'exemptions', { code: 'W7EX', description: 'Esenzione sintetica', type: 'synthetic', source: 'fixture', start_date: now, end_date: now + 30, is_pharma: 1, is_specialist: 1, is_national: 0, updated_at: now + 25 });
+    return durableReviewCommand;
 }
 
 function primaryKeyColumns(db: Database.Database, table: string): string[] {
@@ -241,7 +290,7 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             const clinicalTables = actualSchemaTables.filter((table) => !NON_BACKUP_TABLES.has(table));
             clearBackupTables(sourceDb, clinicalTables);
             clearBackupTables(targetDb, clinicalTables);
-            await populateSyntheticClinicalFixture(sourceDb);
+            const durableReviewCommand = await populateSyntheticClinicalFixture(sourceDb);
 
             for (const table of clinicalTables) {
                 assert.equal(readOrderedRows(targetDb, table).length, 0, `target ${table} must be virgin before restore`);
@@ -269,6 +318,12 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             }
 
             restoreArtifact(targetDataDir, runner.artifactPath);
+
+            const replayed = JSON.parse(runNode(
+                ['scripts/run-strip-types.mjs', 'scripts/durable-review-record-store-worker.mjs', 'create'],
+                { MEDIFLOW_DATA_DIR: targetDataDir, MEDIFLOW_DURABLE_REVIEW_RECORD: JSON.stringify(durableReviewCommand) },
+            ));
+            assert.deepEqual(replayed, { recordId: durableReviewCommand.record.reviewId, ...durableReviewCommand.record });
 
             let encryptedFieldCount = 0;
             for (const table of clinicalTables) {
