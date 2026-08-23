@@ -194,6 +194,36 @@ test('fences an older overlapping select before failure, malformed JSON, 500, or
     }
 });
 
+test('fences public GETs at select start and again at successful POST installation', async () => {
+    const oldRead = deferred<Response>(); const post = deferred<Response>(); let calls = 0;
+    const starts = createSmartImportSelectionBrowserAdapter({ fetch: async () => {
+        calls += 1; return calls === 1 ? response({ selectionEpoch: 0 }) : calls === 2 ? oldRead.promise : post.promise;
+    } });
+    await starts.initialize(); const staleAtStart = starts.resync(); const pendingPost = starts.select(PROPOSAL, true);
+    oldRead.resolve(response({}, 500));
+    assert.deepEqual(await staleAtStart, { selectionEpoch: 0, lease: null });
+    post.resolve(response({ selection: LEASE }));
+    assert.deepEqual(await pendingPost, { selectionEpoch: 1, lease: LEASE });
+
+    for (const outcome of ['lower', 'json', 'non-ok', 'session'] as const) {
+        const laterRead = deferred<Response>(); const laterJson = deferred<unknown>(); const jsonStarted = deferred<void>(); const laterPost = deferred<Response>(); calls = 0;
+        const adapter = createSmartImportSelectionBrowserAdapter({ fetch: async () => {
+            calls += 1;
+            if (calls === 1) return response({ selectionEpoch: 0 });
+            if (calls === 2) return laterPost.promise;
+            if (outcome === 'json') return { ok: true, status: 200, json: async () => { jsonStarted.resolve(); return laterJson.promise; } } as Response;
+            return laterRead.promise;
+        } });
+        await adapter.initialize(); const pending = adapter.select(PROPOSAL, true); const staleAfterStart = adapter.resync();
+        if (outcome === 'json') await jsonStarted.promise;
+        laterPost.resolve(response({ selection: LEASE }));
+        await pending;
+        if (outcome === 'json') laterJson.reject(new Error('synthetic stale malformed JSON'));
+        else laterRead.resolve(response(outcome === 'lower' ? { selectionEpoch: 0 } : {}, outcome === 'session' ? 401 : 500));
+        assert.deepEqual(await staleAfterStart, { selectionEpoch: 1, lease: LEASE });
+    }
+});
+
 test('accepts only caller proposals and remains a browser-only selection boundary', async () => {
     const adapter = createSmartImportSelectionBrowserAdapter({ fetch: async () => response({ selectionEpoch: 0 }) });
     await adapter.initialize();

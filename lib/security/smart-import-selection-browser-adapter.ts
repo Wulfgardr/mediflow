@@ -58,7 +58,7 @@ function lease(value: unknown): SmartImportSelectionLease | null {
 /* @Codex */
 export function createSmartImportSelectionBrowserAdapter(sources: Sources = {}) {
     const request = sources.fetch ?? globalThis.fetch;
-    let generation = 0; let selectionOperation = 0; let currentEpoch: number | null = null; let currentLease: SmartImportSelectionLease | null = null;
+    let generation = 0; let selectionOperation = 0; let stateFence = 0; let currentEpoch: number | null = null; let currentLease: SmartImportSelectionLease | null = null;
     const snapshot = (): SmartImportSelectionBrowserSnapshot => Object.freeze({ selectionEpoch: currentEpoch, lease: currentLease });
     const reset = (): SmartImportSelectionBrowserSnapshot => { generation += 1; currentEpoch = null; currentLease = null; return snapshot(); };
     const acceptEpoch = (next: number): SmartImportSelectionBrowserSnapshot => {
@@ -67,8 +67,9 @@ export function createSmartImportSelectionBrowserAdapter(sources: Sources = {}) 
         return snapshot();
     };
     const readEpoch = async (operation?: number): Promise<SmartImportSelectionBrowserSnapshot> => {
-        const token = generation; let response: Response;
-        const current = () => token === generation && (operation === undefined || operation === selectionOperation);
+        const token = generation; const fence = stateFence; let response: Response;
+        // A stale public read, including a 401, cannot revoke later local state.
+        const current = () => token === generation && (operation === undefined ? fence === stateFence : operation === selectionOperation);
         try { response = await request(PATH, { method: 'GET', cache: 'no-store' }); } catch {
             if (!current()) return snapshot();
             return fail('selection_unavailable');
@@ -96,7 +97,7 @@ export function createSmartImportSelectionBrowserAdapter(sources: Sources = {}) 
             if (confirmed !== true) return fail('confirmation_required');
             const selected = proposal(value); if (!selected) return fail('input_invalid');
             if (currentEpoch === null) return fail('selection_unavailable');
-            const token = generation; const operation = ++selectionOperation; const expectedEpoch = currentEpoch;
+            const token = generation; const operation = ++selectionOperation; stateFence += 1; const expectedEpoch = currentEpoch;
             const stale = () => token !== generation ? 'selection_generation_changed' as const
                 : operation !== selectionOperation ? 'selection_superseded' as const : null;
             let response: Response;
@@ -127,7 +128,7 @@ export function createSmartImportSelectionBrowserAdapter(sources: Sources = {}) 
             if (!next) { currentLease = null; return fail('response_invalid'); }
             if (currentEpoch !== null && next.selectionEpoch < currentEpoch) return fail('selection_superseded');
             if (next.selectionEpoch !== expectedEpoch + 1) { currentLease = null; return fail('response_invalid'); }
-            currentEpoch = next.selectionEpoch; currentLease = next;
+            currentEpoch = next.selectionEpoch; currentLease = next; stateFence += 1;
             return snapshot();
         },
     });
