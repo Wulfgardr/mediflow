@@ -58,7 +58,7 @@ function lease(value: unknown): SmartImportSelectionLease | null {
 /* @Codex */
 export function createSmartImportSelectionBrowserAdapter(sources: Sources = {}) {
     const request = sources.fetch ?? globalThis.fetch;
-    let generation = 0; let currentEpoch: number | null = null; let currentLease: SmartImportSelectionLease | null = null;
+    let generation = 0; let selectionOperation = 0; let currentEpoch: number | null = null; let currentLease: SmartImportSelectionLease | null = null;
     const snapshot = (): SmartImportSelectionBrowserSnapshot => Object.freeze({ selectionEpoch: currentEpoch, lease: currentLease });
     const reset = (): SmartImportSelectionBrowserSnapshot => { generation += 1; currentEpoch = null; currentLease = null; return snapshot(); };
     const acceptEpoch = (next: number): SmartImportSelectionBrowserSnapshot => {
@@ -66,26 +66,27 @@ export function createSmartImportSelectionBrowserAdapter(sources: Sources = {}) 
         if (currentLease && currentEpoch > currentLease.selectionEpoch) currentLease = null;
         return snapshot();
     };
-    const readEpoch = async (): Promise<SmartImportSelectionBrowserSnapshot> => {
+    const readEpoch = async (operation?: number): Promise<SmartImportSelectionBrowserSnapshot> => {
         const token = generation; let response: Response;
+        const current = () => token === generation && (operation === undefined || operation === selectionOperation);
         try { response = await request(PATH, { method: 'GET', cache: 'no-store' }); } catch {
-            if (token !== generation) return snapshot();
+            if (!current()) return snapshot();
             return fail('selection_unavailable');
         }
-        if (token !== generation) return snapshot();
+        if (!current()) return snapshot();
         if (response.status === 401) { reset(); return fail('session_unavailable'); }
         if (!response.ok) { currentLease = null; return fail('selection_unavailable'); }
         let body: unknown;
         try { body = await response.json(); } catch {
-            if (token !== generation) return snapshot();
+            if (!current()) return snapshot();
             currentLease = null; return fail('response_invalid');
         }
         const next = epoch(body);
         if (next === null) {
-            if (token !== generation) return snapshot();
+            if (!current()) return snapshot();
             currentLease = null; return fail('response_invalid');
         }
-        return token === generation ? acceptEpoch(next) : snapshot();
+        return current() ? acceptEpoch(next) : snapshot();
     };
     return Object.freeze({
         initialize: readEpoch,
@@ -95,30 +96,33 @@ export function createSmartImportSelectionBrowserAdapter(sources: Sources = {}) 
             if (confirmed !== true) return fail('confirmation_required');
             const selected = proposal(value); if (!selected) return fail('input_invalid');
             if (currentEpoch === null) return fail('selection_unavailable');
-            const token = generation; const expectedEpoch = currentEpoch; let response: Response;
+            const token = generation; const operation = ++selectionOperation; const expectedEpoch = currentEpoch;
+            const stale = () => token !== generation ? 'selection_generation_changed' as const
+                : operation !== selectionOperation ? 'selection_superseded' as const : null;
+            let response: Response;
             try {
                 response = await request(PATH, { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json' },
                     body: JSON.stringify({ expectedEpoch, patientId: selected.patientId, ambulatoryId: selected.ambulatoryId }) });
             } catch {
-                if (token !== generation) return fail('selection_generation_changed');
+                const code = stale(); if (code) return fail(code);
                 currentLease = null;
                 return fail('selection_outcome_unknown');
             }
-            if (token !== generation) return fail('selection_generation_changed');
+            const responseCode = stale(); if (responseCode) return fail(responseCode);
             if (response.status === 401) { reset(); return fail('session_unavailable'); }
             if (response.status === 409) {
                 currentLease = null;
-                await readEpoch();
-                if (token !== generation) return fail('selection_generation_changed');
+                await readEpoch(operation);
+                const conflictCode = stale(); if (conflictCode) return fail(conflictCode);
                 return fail('selection_resync_required');
             }
             if (!response.ok) { currentLease = null; return fail('selection_outcome_unknown'); }
             let body: unknown;
             try { body = await response.json(); } catch {
-                if (token !== generation) return fail('selection_generation_changed');
+                const code = stale(); if (code) return fail(code);
                 currentLease = null; return fail('response_invalid');
             }
-            if (token !== generation) return fail('selection_generation_changed');
+            const bodyCode = stale(); if (bodyCode) return fail(bodyCode);
             const next = lease(body);
             if (!next) { currentLease = null; return fail('response_invalid'); }
             if (currentEpoch !== null && next.selectionEpoch < currentEpoch) return fail('selection_superseded');
