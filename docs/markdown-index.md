@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-07-29
+Ultimo aggiornamento: 2026-08-23
 
 ## 📚 Come usare questo indice
 
@@ -95,6 +95,7 @@ Ultimo aggiornamento: 2026-07-29
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [docs/analysis/2026-07-17-baseline-performance.md](./analysis/2026-07-17-baseline-performance.md) | Baseline riproducibile delle route list principali su 200 e 2000 pazienti sintetici, con payload, tempi HTTP, costo di decifratura simulato e campioni grezzi JSON. | Quando si misura o confronta una modifica a query list, paginazione, allegati o decifratura client. |
+| [docs/analysis/2026-08-23-web-lume-recomposition-r0.md](./analysis/2026-08-23-web-lume-recomposition-r0.md) | Decision basis locale R0 per ancestry, equivalenza, collisioni e ordine depth-first della futura ricomposizione Web Lume. | Quando si riconciliano baseline Lume, Web #209 e tastiera #200 senza confondere candidato, integrazione e rilascio. |
 | [docs/analysis/2026-07-27-parity-0.8-recovery-run.md](./analysis/2026-07-27-parity-0.8-recovery-run.md) | Run record CoS della recovery UI/parity 0.8, con ledger Claude, candidata locale, contratti, prove e blocker. | Quando si valuta il candidato locale 0.8 o si ricostruisce l'ownership del lavoro UI recente. |
 | [docs/analysis/2026-07-28-provider-program-post-0.8-run.md](./analysis/2026-07-28-provider-program-post-0.8-run.md) | Run record CoS del programma provider intelligenti post-0.8, con stato reale, trust boundary, matrice superfici, auth, packet e gate. | Quando si pianificano provider AI, egress, credenziali o parity intelligente senza ampliare la release 0.8. |
 | [docs/analysis/2026-07-26-openminis-intelligent-scaffold-audit.md](./analysis/2026-07-26-openminis-intelligent-scaffold-audit.md) | Audit clean-room dei pattern OpenMinis per lo scaffold intelligente, con confini di riuso e divieti di importazione. | Quando si progetta lo scaffold provider o si valuta il riuso di pattern esterni senza importarne autorità o egress. |
