@@ -28,6 +28,7 @@ const BACKUP_TABLES = {
   documentDiagnosisProposals: 'document_diagnosis_proposals',
   durableReviewCommandStates: 'durable_review_command_states',
   durableReviewCommandOperations: 'durable_review_command_operations',
+  durableReviewPatientLinks: 'durable_review_patient_links',
   durableReviewRecords: 'durable_review_records',
   durableReviewOperations: 'durable_review_operations',
   drugs: 'drugs',
@@ -36,6 +37,7 @@ const BACKUP_TABLES = {
   messages: 'messages',
   observations: 'observations',
   patients: 'patients',
+  physicianReviewAttestations: 'physician_review_attestations',
   prostheticPrescriptions: 'prosthetic_prescriptions',
   serviceCatalogEntries: 'service_catalog_entries',
   servicePrescriptionItems: 'service_prescription_items',
@@ -408,6 +410,9 @@ function buildDataset(db, backupCollections) {
 
     dataset.attachments = filterRowsByReference(dataset.attachments, 'patientId', patientIds);
     dataset.documentDiagnosisProposals = filterRowsByReference(dataset.documentDiagnosisProposals, 'patientId', patientIds);
+    dataset.durableReviewPatientLinks = filterRowsByReference(dataset.durableReviewPatientLinks, 'patientId', patientIds);
+    const durableReviewIds = new Set(dataset.durableReviewRecords.map((row) => row.reviewId).filter((value) => typeof value === 'string' && value.length > 0));
+    dataset.durableReviewPatientLinks = filterRowsByReference(dataset.durableReviewPatientLinks, 'reviewId', durableReviewIds);
     dataset.entries = filterRowsByReference(dataset.entries, 'patientId', patientIds);
     dataset.observations = filterRowsByReference(dataset.observations, 'patientId', patientIds);
     dataset.checkups = filterRowsByReference(dataset.checkups, 'patientId', patientIds);
