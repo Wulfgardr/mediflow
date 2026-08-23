@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { dbServer } from '@/lib/db-server';
+import { dbServer, runDbServerImmediateTransaction } from '@/lib/db-server';
 import { attachments } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 /* @Codex */
@@ -16,6 +16,18 @@ import { attachmentUpdateSchema } from '@/lib/api-schemas/attachments';
 import { parseApiBody } from '@/lib/api-schemas/parse';
 /* @Codex */
 import { createLegacyAttachmentResponseSnapshot } from '@/lib/attachment-legacy-response';
+/* @Codex */
+import { createAttachmentWebPutCurrentness } from '@/lib/attachment-web-put-currentness';
+
+/* @Codex */
+const attachmentWebPutCurrentness = createAttachmentWebPutCurrentness({
+    database: dbServer,
+    runImmediateTransaction: runDbServerImmediateTransaction,
+});
+/* @Codex */
+const ATTACHMENT_WEB_PUT_KEYS = new Set<PropertyKey>([
+    'summarySnapshot', 'parseEvidenceArtifactSnapshot', 'ocrQueueState',
+]);
 
 /* STREAM B: full attachment retrieval INCLUDING the base64 `data` blob. The list
    endpoint (GET /api/attachments?metadata=true) omits the blob; this by-id read is
@@ -59,12 +71,22 @@ export async function PUT(
         if (!body || typeof body !== 'object') {
             return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
         }
+        /* @Codex: an exact allowlist keeps every currentness and authority field host-owned. */
+        if (Reflect.ownKeys(body).some((key) => !ATTACHMENT_WEB_PUT_KEYS.has(key))) {
+            return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+        }
         const parsedBody = parseApiBody(attachmentUpdateSchema, body);
         if (!parsedBody.ok) return parsedBody.response;
         const payload = parsedBody.data;
 
         const existing = await dbServer
-            .select({ id: attachments.id, ocrQueueState: attachments.ocrQueueState })
+            .select({
+                id: attachments.id,
+                documentSourceRef: attachments.documentSourceRef,
+                documentRevision: attachments.documentRevision,
+                documentFreshnessEpoch: attachments.documentFreshnessEpoch,
+                ocrQueueState: attachments.ocrQueueState,
+            })
             .from(attachments)
             .where(eq(attachments.id, id))
             .get();
@@ -113,7 +135,24 @@ export async function PUT(
             return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
         }
 
-        await dbServer.update(attachments).set(updateData).where(eq(attachments.id, id));
+        const outcome = attachmentWebPutCurrentness.mutate({
+            id: existing.id,
+            documentSourceRef: existing.documentSourceRef,
+            documentRevision: existing.documentRevision,
+            documentFreshnessEpoch: existing.documentFreshnessEpoch,
+        }, (database) => {
+            const result = database.update(attachments).set(updateData).where(eq(attachments.id, id)).run();
+            return { changes: result.changes };
+        });
+        if (outcome.status === 'not_found') {
+            return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        }
+        if (outcome.status === 'conflict') {
+            return NextResponse.json({ error: 'Attachment changed; reload and retry' }, { status: 409 });
+        }
+        if (outcome.status === 'failed') {
+            return NextResponse.json({ error: 'Update Failed' }, { status: 500 });
+        }
         return NextResponse.json({ success: true });
     } catch (error) {
         return NextResponse.json({ error: "Update Failed" }, { status: 500 });
