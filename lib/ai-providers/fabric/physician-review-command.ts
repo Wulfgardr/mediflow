@@ -18,13 +18,13 @@ export type PhysicianReviewCommandSources = Readonly<{
     now: () => unknown;
 }>;
 type Command = Readonly<{ action: PhysicianReviewAction; expectedRevision: number; idempotencyKey: string; gestureProof: string; uncertaintyAcknowledged: boolean }>;
-type Context = Readonly<{ reviewId: string; actorRef: string; role: 'physician'; uncertaintyAcknowledgmentRequired: boolean }>;
+type Context = Readonly<{ reviewId: string; actorRef: string; uncertaintyAcknowledgmentRequired: boolean }>;
 export type PhysicianReviewCommandResult = Readonly<{ reviewId: string; state: PhysicianReviewState; revision: number; eventId: string }>;
 
-const REVIEW = /^review_[0-9a-f]{32}$/u; const ACTOR = /^actor_[0-9a-f]{32}$/u; const EVENT = /^event_[0-9a-f]{32}$/u;
+const REVIEW = /^review_[0-9a-f]{32}$/u; const EVENT = /^event_[0-9a-f]{32}$/u;
 const KEY = /^idem_[a-z0-9]{16,160}$/u; const GESTURE = /^gesture_[0-9a-f]{32}$/u;
 const COMMAND_KEYS = ['action', 'expectedRevision', 'idempotencyKey', 'gestureProof', 'uncertaintyAcknowledged'] as const;
-const CONTEXT_KEYS = ['reviewId', 'actorRef', 'role', 'uncertaintyAcknowledgmentRequired'] as const;
+const CONTEXT_KEYS = ['reviewId', 'actorRef', 'uncertaintyAcknowledgmentRequired'] as const;
 const RESULT_KEYS = ['reviewId', 'state', 'revision', 'eventId'] as const;
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 const stateFor = (action: PhysicianReviewAction): PhysicianReviewState => action === 'accept' ? 'accepted' : 'rejected';
@@ -42,10 +42,9 @@ function command(value: unknown): Command {
 }
 function context(value: unknown): Context {
     if (!exact(value, CONTEXT_KEYS)) return fail('context_unavailable');
-    const { reviewId, actorRef, role, uncertaintyAcknowledgmentRequired } = value;
-    if (typeof reviewId !== 'string' || !REVIEW.test(reviewId) || typeof actorRef !== 'string' || !ACTOR.test(actorRef) || typeof uncertaintyAcknowledgmentRequired !== 'boolean') return fail('context_unavailable');
-    if (role !== 'physician') return fail('actor_forbidden');
-    return Object.freeze({ reviewId, actorRef, role, uncertaintyAcknowledgmentRequired });
+    const { reviewId, actorRef, uncertaintyAcknowledgmentRequired } = value;
+    if (typeof reviewId !== 'string' || !REVIEW.test(reviewId) || typeof actorRef !== 'string' || actorRef.length === 0 || actorRef.length > 256 || actorRef !== actorRef.trim() || typeof uncertaintyAcknowledgmentRequired !== 'boolean') return fail('context_unavailable');
+    return Object.freeze({ reviewId, actorRef, uncertaintyAcknowledgmentRequired });
 }
 function result(value: unknown): PhysicianReviewCommandResult {
     if (!exact(value, RESULT_KEYS)) return fail('corrupt');
