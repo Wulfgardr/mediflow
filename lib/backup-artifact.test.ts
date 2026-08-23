@@ -121,6 +121,121 @@ test('includes durable review records and replay operations in the authenticated
     assert.equal(artifact.manifest.recordCounts.durableReviewOperations, 0);
 });
 
+/* @Codex */
+async function sha256(value: string): Promise<string> {
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/* @Codex */
+async function durableReviewLedgerFixture() {
+    const record = {
+        id: `review_${'a'.repeat(32)}`,
+        patientRef: `ptr_${'b'.repeat(32)}`,
+        reviewId: `review_${'a'.repeat(32)}`,
+        reviewRevision: 1,
+        receiptRef: `receipt_${'c'.repeat(32)}`,
+        provenanceRef: `provenance_${'d'.repeat(32)}`,
+        receiptBinding: '',
+        provenanceBinding: '',
+        presentationVersion: 'mediflow.ai.durable-review.presentation.v1',
+        sealedCiphertext: 'ENC:YWJj:c3ludGhldGljLWR1cmFibGUtcmV2aWV3',
+        sealedDigest: '',
+        createdAt: '2026-03-17T08:10:00.000Z',
+    };
+    record.receiptBinding = await sha256(`${record.patientRef}\0${record.reviewId}\0${record.receiptRef}`);
+    record.provenanceBinding = await sha256(`${record.patientRef}\0${record.reviewId}\0${record.provenanceRef}`);
+    record.sealedDigest = await sha256(record.sealedCiphertext);
+    const snapshot = (({ id: _id, createdAt: _createdAt, ...value }) => value)(record);
+    const idempotencyKey = 'idem_aaaaaaaaaaaaaaaa';
+    const operation = {
+        id: await sha256(`${record.reviewId}\0${idempotencyKey}`),
+        reviewId: record.reviewId,
+        idempotencyKey,
+        operation: 'create',
+        expectedReviewRevision: 0,
+        operationDigest: await sha256(JSON.stringify(['create', 0, snapshot])),
+        recordSnapshot: JSON.stringify(snapshot),
+        createdAt: '2026-03-17T08:10:00.000Z',
+    };
+    return { record, operation };
+}
+
+/* @Codex */
+async function checksumValidDurableArtifact(mutate: (artifact: any) => void | Promise<void>): Promise<Record<string, unknown>> {
+    const { record, operation } = await durableReviewLedgerFixture();
+    const artifact = JSON.parse(await serializeBackupArtifact({
+        ...basePayload,
+        durableReviewRecords: [record],
+        durableReviewOperations: [operation],
+    }));
+    await mutate(artifact);
+    artifact.manifest.checksum = await sha256(stableStringify(artifact.payload));
+    return artifact;
+}
+
+test('rejects checksum-valid durable review records that violate canonical invariants', async () => {
+    const artifact = await checksumValidDurableArtifact((value) => {
+        value.payload.durableReviewRecords[0].id = `review_${'f'.repeat(32)}`;
+    });
+
+    await assert.rejects(
+        () => parseBackupArtifact(artifact),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+    );
+});
+
+test('rejects checksum-valid durable operations with a mismatched operation identity', async () => {
+    const artifact = await checksumValidDurableArtifact((value) => {
+        value.payload.durableReviewOperations[0].id = 'not-the-canonical-operation-id';
+    });
+
+    await assert.rejects(
+        () => parseBackupArtifact(artifact),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+    );
+});
+
+test('rejects checksum-valid orphan durable operations', async () => {
+    const artifact = await checksumValidDurableArtifact((value) => {
+        value.payload.durableReviewOperations[0].reviewId = `review_${'f'.repeat(32)}`;
+    });
+
+    await assert.rejects(
+        () => parseBackupArtifact(artifact),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+    );
+});
+
+test('rejects checksum-valid durable operations with an altered replay snapshot', async () => {
+    const artifact = await checksumValidDurableArtifact(async (value) => {
+        const snapshot = JSON.parse(value.payload.durableReviewOperations[0].recordSnapshot);
+        snapshot.sealedCiphertext = 'ENC:YWJj:YWx0ZXJlZC1yZXBsYXk=';
+        snapshot.sealedDigest = await sha256(snapshot.sealedCiphertext);
+        value.payload.durableReviewOperations[0].recordSnapshot = JSON.stringify(snapshot);
+    });
+
+    await assert.rejects(
+        () => parseBackupArtifact(artifact),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+    );
+});
+
+test('rejects checksum-valid durable operations with noncanonical snapshot encoding', async () => {
+    const artifact = await checksumValidDurableArtifact((value) => {
+        value.payload.durableReviewOperations[0].recordSnapshot = JSON.stringify(
+            JSON.parse(value.payload.durableReviewOperations[0].recordSnapshot),
+            null,
+            2,
+        );
+    });
+
+    await assert.rejects(
+        () => parseBackupArtifact(artifact),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+    );
+});
+
 test('rejects tampered payloads before restore', async () => {
     const serialized = await serializeBackupArtifact(basePayload);
     const tampered = JSON.parse(serialized);
