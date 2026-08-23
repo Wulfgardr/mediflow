@@ -66,3 +66,8 @@ test('non include endpoint, prompt o credenziali nella ricevuta', () => {
     assert.equal(serialized.includes('prompt'), false);
     assert.equal(serialized.includes('credential'), false);
 });
+
+test('riusa la locality assertion e conserva il modello trimmato nella ricevuta', () => {
+    const resolved = localProviderRegistry.resolve({ ...BASE_BINDING, models: { ...BASE_BINDING.models, clinical: '  qwen3.5:35b-a3b  ' } });
+    assert.equal(resolved.receipt.model, 'qwen3.5:35b-a3b');
+});
