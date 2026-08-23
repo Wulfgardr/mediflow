@@ -50,6 +50,12 @@ test('denies zero, multiple, and terminal matches without selecting a row', () =
     rejects(() => locator.locate(terminal.patientId), 'terminal');
 });
 
+test('returns the sole nonterminal review when valid terminal history shares the canonical patient', () => {
+    const historical = seed('8'); const current = seed('9', historical.patientId); const db = database();
+    try { db.prepare("INSERT INTO durable_review_command_states (review_id, review_state, revision, action) VALUES (?, 'rejected', 2, 'reject')").run(historical.reviewId); } finally { db.close(); }
+    assert.deepEqual(createDurableCurrentReviewLocator().locate(historical.patientId), { reviewId: current.reviewId, reviewRevision: 1 });
+});
+
 test('rejects hostile values and never treats a rotating patientRef as a canonical patient id', () => {
     const fixture = seed('5'); const locator = createDurableCurrentReviewLocator(); let reads = 0;
     const accessor = {};

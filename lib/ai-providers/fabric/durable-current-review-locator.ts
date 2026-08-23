@@ -51,13 +51,14 @@ function validateRecord(row: Record<string, unknown>, patientId: string): Durabl
     return Object.freeze({ reviewId, reviewRevision });
 }
 
-function validateTerminal(row: Record<string, unknown>, current: DurableCurrentReviewIdentity): void {
+function classifyCurrent(row: Record<string, unknown>, patientId: string): DurableCurrentReviewIdentity | null {
+    const current = validateRecord(row, patientId);
     const { commandReviewId, reviewState, commandRevision, action } = row;
-    if (commandReviewId === null && reviewState === null && commandRevision === null && action === null) return;
+    if (commandReviewId === null && reviewState === null && commandRevision === null && action === null) return current;
     if (commandReviewId !== current.reviewId || (reviewState !== 'accepted' && reviewState !== 'rejected')
         || (action !== 'accept' && action !== 'reject') || (reviewState === 'accepted' ? action !== 'accept' : action !== 'reject')
         || typeof commandRevision !== 'number' || !Number.isSafeInteger(commandRevision) || commandRevision !== current.reviewRevision + 1) fail('corrupt');
-    fail('terminal');
+    return null;
 }
 
 function storage(error: unknown): never {
@@ -88,10 +89,10 @@ export function createDurableCurrentReviewLocator() {
                     .leftJoin(durableReviewCommandStates, eq(durableReviewPatientLinks.reviewId, durableReviewCommandStates.reviewId))
                     .where(eq(durableReviewPatientLinks.patientId, patientId)).all();
                 if (rows.length === 0) fail('current_missing');
-                if (rows.length !== 1) fail('current_ambiguous');
-                const current = validateRecord(rows[0] as Record<string, unknown>, patientId);
-                validateTerminal(rows[0] as Record<string, unknown>, current);
-                return current;
+                const current = rows.map((row) => classifyCurrent(row as Record<string, unknown>, patientId)).filter((row): row is DurableCurrentReviewIdentity => row !== null);
+                if (current.length === 0) fail('terminal');
+                if (current.length !== 1) fail('current_ambiguous');
+                return current[0];
             } catch (error) {
                 return storage(error);
             }
