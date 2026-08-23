@@ -16,13 +16,13 @@ function authority(sessionId: string, actorRef: string = USER.id) {
 function fixture() {
     const session = createSession(USER, 'web'); const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze(pair) }); const owner = registry.acquire(session);
     owner.issueSelection({ expectedEpoch: 0, patientId: 'patient.synthetic.active-review', ambulatoryId: 'ambulatory.synthetic.active-review' });
-    const state = { currentAuthority: authority(session.id), currentReview: review(), locatorError: null as Error | null, locatorCalls: 0, recheckCalls: 0, session: session as typeof session | null };
+    const state = { currentAuthority: authority(session.id), currentReview: review(), locatorError: null as Error | null, locatorCalls: 0, recheckCalls: 0, registrations: 0, session: session as typeof session | null };
     const service = createActiveReviewBindingService({
         acquireContext: async () => state.session ? Object.freeze({ session: state.session, owner }) : null,
         deriveAuthority: async () => state.currentAuthority,
         recheckAuthority: async (candidate: unknown) => { state.recheckCalls += 1; if (candidate !== state.currentAuthority) throw new ActiveReviewBindingError('authority_unavailable'); return state.currentAuthority; },
         locateCurrentReview: (patientId: string) => { state.locatorCalls += 1; if (state.locatorError) throw state.locatorError; assert.equal(typeof patientId, 'string'); return state.currentReview; },
-        registerSessionResource,
+        registerSessionResource: (...args: Parameters<typeof registerSessionResource>) => { state.registrations += 1; return registerSessionResource(...args); },
     });
     return { owner, service, session, state };
 }
@@ -50,6 +50,8 @@ test('makes same-session tabs share one winner and fails closed for lifecycle or
         recheckAuthority: async () => { throw Object.assign(new Error('synthetic lock'), { code: 'account_locked' }); }, locateCurrentReview: () => { throw new Error('must not locate'); }, registerSessionResource }); await denied(service.resolve(), 'account_locked');
 });
 test('never revalidates an issued binding after review, revision, selection, lease, session, or authority drift', async () => {
+    const observed = fixture(); const stale = await observed.service.resolve(); const registrations = observed.state.registrations; observed.state.currentReview = review('b'); await assert.rejects(observed.service.revalidate(stale)); assert.equal(observed.state.registrations, registrations); const replacement = await observed.service.resolve(); assert.notEqual(replacement, stale); assert.equal(observed.state.registrations, registrations + 1); assert.deepEqual(await Promise.all([observed.service.revalidate(replacement), observed.service.revalidate(replacement)]), [replacement, replacement]);
+    const reentrant = fixture(); const reentrantService = createActiveReviewBindingService({ acquireContext: async () => Object.freeze({ session: reentrant.session, owner: reentrant.owner }), deriveAuthority: async () => reentrant.state.currentAuthority, recheckAuthority: async () => reentrant.state.currentAuthority, locateCurrentReview: () => { assert.throws(() => reentrant.owner.withLeaseCriticalSection(reentrant.session, () => 'synthetic'), /selection_busy/u); return reentrant.state.currentReview; }, registerSessionResource }); const reentrantBinding = await reentrantService.resolve(); assert.equal(await reentrantService.revalidate(reentrantBinding), reentrantBinding);
     const invalidated = async (mutate: (current: ReturnType<typeof fixture>) => void) => { const current = fixture(); const binding = await current.service.resolve(); mutate(current); await assert.rejects(current.service.revalidate(binding)); };
     await invalidated((current) => { current.state.currentReview = review('b'); }); await invalidated((current) => { current.state.currentReview = review('a', 2); });
     await invalidated((current) => { current.owner.issueSelection({ expectedEpoch: 1, patientId: 'patient.synthetic.active-review-next', ambulatoryId: 'ambulatory.synthetic.active-review' }); });
