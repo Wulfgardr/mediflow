@@ -189,9 +189,24 @@ export function createActiveReviewBindingService(sourceValue: unknown) {
             if (!candidate || typeof candidate !== 'object' || types.isProxy(candidate)) return fail('binding_unavailable');
             const record = bindings.get(candidate);
             if (!record?.active) return fail('binding_unavailable');
-            const current = await service.resolve();
-            if (current !== candidate) return fail('binding_stale');
-            return current;
+            let acquired: Context | null;
+            try { acquired = await sources.acquireContext(); } catch { return fail('context_unavailable'); }
+            if (!acquired) return fail('session_unavailable');
+            const current = context(acquired);
+            let derived: SessionPhysicianReviewAuthorityV1;
+            let rechecked: SessionPhysicianReviewAuthorityV1;
+            try { derived = await sources.deriveAuthority(); rechecked = await sources.recheckAuthority(derived); } catch (error) { throw error; }
+            const verifiedAuthority = authority(rechecked, current.session);
+            return current.owner.withLeaseCriticalSection(current.session, (selection) => {
+                const selectionEpoch = current.owner.snapshotSelectionEpoch(current.session);
+                const reviewContextEpoch = current.owner.snapshotReviewContextEpoch(current.session);
+                const identity = review(sources.locateCurrentReview(selection.patientId));
+                if (!record.active || record.binding !== candidate || record.session !== current.session || records.get(current.session) !== record
+                    || bindings.get(candidate) !== record || record.authority !== verifiedAuthority || record.patientId !== selection.patientId
+                    || record.selectionEpoch !== selectionEpoch || record.reviewContextEpoch !== reviewContextEpoch
+                    || record.reviewId !== identity.reviewId || record.reviewRevision !== identity.reviewRevision) return fail('binding_stale');
+                return candidate as ActiveReviewBindingV1;
+            });
         },
     };
     return Object.freeze(service);
