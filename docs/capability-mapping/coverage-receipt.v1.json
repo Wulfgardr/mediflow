@@ -4,25 +4,20 @@
   "status": "candidate_not_integrated",
   "applyPolicy": "none",
   "sourceManifestSha256": "17e231ff12773fc2926fc65e879b39c32bf1929f1d42ce824e2293047591cce1",
-  "claimCeiling": "mapping candidate locale verificato su exact head indipendenti; non integrato, non release-ready, non released",
+  "claimCeiling": "ledger semantico locale su exact head; C1 non prova runtime composition o integration; non integrato, non release-ready, non released",
   "populationCoverage": [
     {"populationId":"anchors","expectedCount":66,"observedCount":66,"terminalDispositionCounts":{"mapped":66,"infrastructure_only":0,"out_of_catalog":0,"unmapped":0,"conflicted":0}},
     {"populationId":"aip","expectedCount":109,"observedCount":109,"terminalDispositionCounts":{"mapped":109,"infrastructure_only":0,"out_of_catalog":0,"unmapped":0,"conflicted":0}},
     {"populationId":"fabric","expectedCount":16,"observedCount":16,"terminalDispositionCounts":{"mapped":15,"infrastructure_only":0,"out_of_catalog":1,"unmapped":0,"conflicted":0}},
-    {"populationId":"surfaces","expectedCount":179,"observedCount":179,"terminalDispositionCounts":{"mapped":0,"infrastructure_only":0,"out_of_catalog":0,"unmapped":179,"conflicted":0}}
+    {"populationId":"surfaces","expectedCount":179,"observedCount":179,"terminalDispositionCounts":{"mapped":6,"infrastructure_only":0,"out_of_catalog":173,"unmapped":0,"conflicted":0}}
   ],
-  "relationCoverage": {"expectedCount":121,"observedCount":121},
+  "relationCoverage": {"expectedCount":127,"observedCount":127},
   "conflictCoverage": {
     "observedCount": 0,
     "residualCount": 0,
     "residualConflictIds": []
   },
   "ledgerComplete": true,
-  "semanticBindingComplete": false,
-  "requiredEvidence": [
-    {
-      "scope": "product surfaces",
-      "requirement": "A direct, versioned relation from each unresolved surface to a canonical capability; names, order, and proximity are not evidence."
-    }
-  ]
+  "semanticBindingComplete": true,
+  "requiredEvidence": []
 }

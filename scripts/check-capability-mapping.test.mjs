@@ -37,10 +37,18 @@ test('keeps document identity resolution out of catalog until a non-test consume
   assert.equal(records.find((record) => record.sourceIdentity.identifier === 'document_identity_resolution').terminalDisposition, 'out_of_catalog');
 });
 
-test('enumerates frozen Web routes and pages without inferred authority', () => {
+test('rejects descriptor-only Fabric entries presented as runtime implementations', () => {
+  const bindings = JSON.parse(readFileSync('docs/capability-mapping/relations/fabric-canonical-bindings.v1.json', 'utf8')).records;
+  const descriptor = bindings.find((record) => record.runtimeBinding === 'descriptor_entry_point_only');
+  const tampered = clone(basis);
+  tampered.relations.push({ ...descriptor, id: 'relation:hostile-descriptor-runtime@v1', relationKind: 'implements' });
+  assert.throws(() => validateCapabilityMapping(manifest, tampered), /runtime binding/);
+});
+
+test('disposes frozen Web routes and pages outside the closed catalog without inferred authority', () => {
   const records = JSON.parse(readFileSync('docs/capability-mapping/nodes/web-surfaces.v1.json', 'utf8')).records;
   assert.equal(records.length, 168);
-  assert.ok(records.every((record) => record.authority === 'unresolved' && record.terminalDisposition === 'unmapped'));
+  assert.ok(records.every((record) => record.authority === 'unresolved' && record.terminalDisposition === 'out_of_catalog'));
 });
 
 test('rejects Web or Mini records outside the functional surface policy', () => {
@@ -65,7 +73,7 @@ test('rejects unknown mapping vocabulary and unjustified completion', () => {
   const incomplete = clone(basis);
   incomplete.populations.surfaces.records.push({ id: 'surface.v1', sourceIdentity: 'synthetic', description: 'synthetic hostile record', surface: 'test', stage: 'none', authority: 'unresolved', input: 'unresolved', output: 'unresolved', provider: 'unresolved', venue: 'unresolved', egress: 'unresolved', evidence: [{ evidenceKind: 'code', ref: '28a1a36b162f160e872ce5153cad03f38eacfd22:lib/ai-providers/fabric/contract.ts' }], terminalDisposition: 'unmapped' });
   incomplete.semanticBindingComplete = true;
-  assert.throws(() => validateCapabilityMapping(manifest, incomplete), /semantic binding/);
+  assert.throws(() => validateCapabilityMapping(manifest, incomplete), /surface terminal dispositions|semantic binding/);
 });
 
 test('rejects missing, duplicate, collapsed, or overclaimed coverage', () => {
@@ -73,10 +81,10 @@ test('rejects missing, duplicate, collapsed, or overclaimed coverage', () => {
   missing.populationCoverage[0].observedCount -= 1;
   assert.throws(() => validateCapabilityMapping(manifest, basis, undefined, missing), /anchors is incomplete/);
   const duplicate = clone(coverage);
-  duplicate.conflictCoverage.residualConflictIds[1] = duplicate.conflictCoverage.residualConflictIds[0];
-  assert.throws(() => validateCapabilityMapping(manifest, basis, undefined, duplicate), /conflict coverage is incomplete or collapsed/);
+  duplicate.relationCoverage.observedCount += 1;
+  assert.throws(() => validateCapabilityMapping(manifest, basis, undefined, duplicate), /relation coverage is incomplete or drifted/);
   const overclaimed = clone(coverage);
-  overclaimed.semanticBindingComplete = true;
+  overclaimed.semanticBindingComplete = false;
   assert.throws(() => validateCapabilityMapping(manifest, basis, undefined, overclaimed), /completion flags drifted/);
 });
 
