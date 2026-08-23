@@ -211,7 +211,7 @@ async function assertDurableReviewLedger(payload: Partial<Record<BackupCollectio
         const operations = operationsByReview.get(reviewId)?.sort((left, right) => (left.record.reviewRevision as number) - (right.record.reviewRevision as number));
         if (!operations || operations.length === 0 || operations[0].operation !== 'create' || operations[0].expectedReviewRevision !== 0) throw new BackupArtifactError('invalid-manifest', 'Durable review ledger is incomplete.');
         for (let index = 1; index < operations.length; index += 1) {
-            if (operations[index].operation !== 'replace' || operations[index].expectedReviewRevision !== operations[index - 1].record.reviewRevision) throw new BackupArtifactError('invalid-manifest', 'Durable review ledger is inconsistent.');
+            if (operations[index].operation !== 'replace' || operations[index].expectedReviewRevision !== operations[index - 1].record.reviewRevision || operations[index].record.patientRef !== operations[index - 1].record.patientRef) throw new BackupArtifactError('invalid-manifest', 'Durable review ledger is inconsistent.');
         }
         const latest = operations.at(-1)!.record;
         if (JSON.stringify(latest) !== JSON.stringify(current)) throw new BackupArtifactError('invalid-manifest', 'Durable review ledger is inconsistent.');
