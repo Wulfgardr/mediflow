@@ -156,7 +156,6 @@ function AreaContent({
       return (
         <SchedaArea
           patient={selectedPatient}
-          workspace={patientWorkspace}
           isReview={isReview}
           onOpenArea={onOpenArea}
         />

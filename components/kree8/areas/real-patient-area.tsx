@@ -1,20 +1,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import {
-  ArrowUpRight,
-  CalendarClock,
-  Edit3,
-  ListChecks,
-  Plus,
-  Sparkles,
-  UserSquare2,
-  Workflow,
-} from 'lucide-react';
 
 import { classNames } from '../cockpit-shared';
-import type { AreaId } from '../cockpit-shared';
-import type { Kree8Patient, Kree8PatientWorkspace } from '@/lib/patient-workspace';
-import styles from '../kree8-clinical-cockpit-foundation.module.css';
 import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 
 /* @Codex #98, #68 */
@@ -47,19 +34,6 @@ type PatientQuadroProps = {
 
 const SIGNAL_VALUE_CLASSES: Record<QuadroSignal, string> = { warning: patientStyles.quadroMetricWarning, critical: patientStyles.quadroMetricCritical };
 const SIGNAL_DOT_CLASSES: Record<QuadroSignal, string> = { warning: patientStyles.quadroSignalWarning, critical: patientStyles.quadroSignalCritical };
-
-function splitDiagnosis(diagnosis: string): QuadroDiagnosis {
-  const separatorIndex = diagnosis.indexOf(' · ');
-  if (separatorIndex < 0) {
-    return { code: 'non codificata', description: diagnosis };
-  }
-  return { code: diagnosis.slice(0, separatorIndex), description: diagnosis.slice(separatorIndex + 3) };
-}
-
-function splitTherapy(therapy: string): QuadroTherapy {
-  const [name, ...doseParts] = therapy.split(' · ');
-  return { name, dose: doseParts.join(' · ') || 'Dose non registrata' };
-}
 
 function QuadroActionControl({
   action,
@@ -267,101 +241,5 @@ function PatientQuadro({
   );
 }
 
-function RealPatientArea({
-  patient,
-  workspace,
-  onOpenArea,
-}: { patient: Kree8Patient; workspace?: Kree8PatientWorkspace | null; onOpenArea: (area: AreaId) => void }) {
-  const isWorkspaceLoading = workspace === undefined;
-  const latestEntry = workspace?.latestEntry;
-  const nextCheckup = workspace?.nextCheckup;
-  const latestObservation = workspace?.latestObservation;
-  const codingHints = workspace?.codingHints ?? [];
-  const therapies = workspace?.therapyLabels.map(splitTherapy) ?? [];
-
-  const metrics: QuadroMetric[] = [
-    {
-      label: 'Diario',
-      value: workspace?.entriesCount ?? 0,
-      note: latestEntry ? `${latestEntry.type} · ${latestEntry.date}` : 'Nessuna voce recente.',
-      loading: isWorkspaceLoading,
-    },
-    {
-      label: 'Terapie attive',
-      value: workspace?.activeTherapiesCount ?? 0,
-      note: therapies[0]?.name ?? 'Nessun piano attivo.',
-      loading: isWorkspaceLoading,
-    },
-    {
-      label: 'Follow-up',
-      value: workspace?.pendingCheckupsCount ?? 0,
-      note: nextCheckup ? `${nextCheckup.title} · ${nextCheckup.date}` : 'Nessun passaggio aperto.',
-      loading: isWorkspaceLoading,
-    },
-    {
-      label: 'Documenti',
-      value: workspace?.attachmentsCount ?? 0,
-      note: workspace?.documentInsightCount ? `${workspace.documentInsightCount} sintesi disponibili.` : 'Nessuna sintesi disponibile.',
-      loading: isWorkspaceLoading,
-    },
-  ];
-
-  const nextRows: QuadroRow[] = [
-    ...(latestEntry ? [{ title: latestEntry.title, value: latestEntry.date, note: latestEntry.type }] : []),
-    ...(nextCheckup ? [{
-      title: nextCheckup.title,
-      value: nextCheckup.date,
-      note: nextCheckup.pillLabel,
-      signal: nextCheckup.pill === 'critical' || nextCheckup.pill === 'warning' ? nextCheckup.pill : undefined,
-    } as QuadroRow] : []),
-    ...(latestObservation ? [{ title: latestObservation.label, value: latestObservation.date, note: 'Ultima osservazione registrata' }] : []),
-  ];
-
-  const documentRows: QuadroRow[] = [
-    ...codingHints.map((hint) => ({ title: hint, note: 'Da rivedere prima di applicare.' })),
-    ...(workspace?.recentAttachmentNames ?? []).map((name) => ({ title: name, note: 'Documento recente agganciato.' })),
-  ];
-
-  return (
-    <div className={styles.areaShell}>
-      <PatientQuadro
-        headingId="lume-quadro-real-title"
-        caption="Quadro paziente"
-        name={patient.name}
-        atoms={[
-          patient.code,
-          patient.ageLabel,
-          patient.pathway,
-          `aggiornato ${patient.lastTouch}`,
-        ]}
-        status={patient.statusLabel}
-        diagnoses={patient.diagnoses.map(splitDiagnosis)}
-        summary={patient.summary}
-        metrics={metrics}
-        therapies={therapies}
-        therapiesEmpty={isWorkspaceLoading ? 'Caricamento delle terapie locali in corso.' : 'Nessuna terapia attiva registrata.'}
-        nextRows={nextRows}
-        nextEmpty={isWorkspaceLoading ? 'Caricamento dei prossimi passaggi in corso.' : 'Nessun passaggio clinico aperto.'}
-        documentRows={documentRows}
-        documentsEmpty={isWorkspaceLoading ? 'Caricamento di documenti e codifiche in corso.' : 'Nessun documento o codice sospeso.'}
-        primaryAction={{
-          label: 'Apri scheda paziente',
-          icon: <UserSquare2 size={13} />,
-          href: patient.modulesHref,
-        }}
-        quietActions={[
-          { label: 'Nuova voce', icon: <Plus size={12} />, href: `${patient.href}/entries/new` },
-          { label: 'Anagrafica', icon: <Edit3 size={12} />, href: `${patient.href}/edit` },
-          { label: 'Agenda', icon: <CalendarClock size={12} />, onClick: () => onOpenArea('turno') },
-          { label: 'Rivedi documenti', icon: <Sparkles size={13} />, href: `${patient.modulesHref}#documenti` },
-          { label: 'Scale cliniche', icon: <ListChecks size={12} />, href: `${patient.modulesHref}#scale` },
-          { label: 'Contesto SISS', icon: <Workflow size={12} />, href: `${patient.modulesHref}#contesto` },
-          { label: 'Apri moduli', icon: <ArrowUpRight size={12} />, href: patient.modulesHref },
-        ]}
-      />
-    </div>
-  );
-}
-
-export { PatientQuadro, RealPatientArea };
+export { PatientQuadro };
 export type { QuadroAction, QuadroDiagnosis, QuadroMetric, QuadroRow, QuadroTherapy };

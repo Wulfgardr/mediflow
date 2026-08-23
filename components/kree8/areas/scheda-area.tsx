@@ -1,3 +1,7 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   CalendarClock,
   FileSignature,
@@ -10,8 +14,8 @@ import {
 } from 'lucide-react';
 
 import type { AreaId } from '../cockpit-shared';
-import type { Kree8Patient, Kree8PatientWorkspace } from '@/lib/patient-workspace';
-import { PatientQuadro, RealPatientArea } from './real-patient-area';
+import type { Kree8Patient } from '@/lib/patient-workspace';
+import { PatientQuadro } from './real-patient-area';
 import type { QuadroAction, QuadroDiagnosis, QuadroMetric, QuadroRow, QuadroTherapy } from './real-patient-area';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
 import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
@@ -55,12 +59,11 @@ const REVIEW_DOCUMENT_ROWS: QuadroRow[] = [
 
 function SchedaArea({
   patient,
-  workspace,
   isReview,
   onOpenArea,
-}: { patient?: Kree8Patient | null; workspace?: Kree8PatientWorkspace | null; isReview: boolean; onOpenArea: (area: AreaId) => void }) {
+}: { patient?: Kree8Patient | null; isReview: boolean; onOpenArea: (area: AreaId) => void }) {
   if (!isReview && patient) {
-    return <RealPatientArea patient={patient} workspace={workspace} onOpenArea={onOpenArea} />;
+    return <LiveSchedaRedirect href={patient.modulesHref} />;
   }
 
   if (!isReview && !patient) {
@@ -121,6 +124,17 @@ function SchedaArea({
       />
     </div>
   );
+}
+
+/* @Codex WUL-562: Quadro nel cockpit e solo navigazione verso la Scheda. */
+function LiveSchedaRedirect({ href }: { href: string }) {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace(href);
+  }, [href, router]);
+
+  return null;
 }
 
 export { SchedaArea };

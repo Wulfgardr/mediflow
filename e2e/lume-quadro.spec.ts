@@ -181,7 +181,7 @@ async function assertReflowStack(quadro: Locator): Promise<void> {
   expect(sections[3].top).toBeGreaterThanOrEqual(sections[2].bottom - 1);
 }
 
-test('quadro live usa il paziente selezionato dal database sintetico', async ({ page }) => {
+test('la navigazione Quadro del paziente selezionato converge sulla Scheda', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const patient = await createLivePatientFixture(page);
 
@@ -190,21 +190,9 @@ test('quadro live usa il paziente selezionato dal database sintetico', async ({ 
   await expect(lens.getByRole('heading', { name: patient.name, level: 2 })).toBeVisible();
   await lens.getByRole('button', { name: 'Quadro', exact: true }).click();
 
-  const quadro = page.getByTestId('lume-quadro');
-  await expect(page.getByTestId('lume-frame-canvas')).toHaveAttribute('data-lume-context', 'scheda');
-  await expect(quadro.getByRole('heading', { name: patient.name, level: 1 })).toBeVisible();
-  await expect(quadro.getByRole('list', { name: 'Diagnosi', exact: true })).toContainText(
-    'QC00Controllo sintetico del Quadro',
-  );
-  await expect(quadro.getByTestId('lume-quadro-metric-value')).toHaveCount(4);
-  await expect(quadro.getByTestId('lume-quadro-metric-value').first()).not.toHaveText('in attesa');
-  await assertIbmPlexMono(quadro.getByTestId('lume-quadro-metric-value'), 'Valori metrici live');
-  await assertIbmPlexMono(quadro.getByTestId('lume-quadro-atom'), 'Atomi della testata live');
-  await assertSingleFocalShadow(page);
-  await expect(quadro.locator('[data-lume-action="primary"]')).toHaveAttribute(
-    'href',
-    `/patients/${patient.id}/modules`,
-  );
+  await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`));
+  await expect(page.getByTestId('lume-scheda-header')).toHaveCount(1);
+  await expect(page.getByTestId('lume-quadro')).toHaveCount(0);
 });
 
 for (const quadroCase of QUADRO_CASES) {
