@@ -47,8 +47,14 @@ test('rejects descriptor-only Fabric entries presented as runtime implementation
 
 test('disposes frozen Web routes and pages outside the closed catalog without inferred authority', () => {
   const records = JSON.parse(readFileSync('docs/capability-mapping/nodes/web-surfaces.v1.json', 'utf8')).records;
-  assert.equal(records.length, 168);
+  assert.equal(records.length, 166);
   assert.ok(records.every((record) => record.authority === 'unresolved' && record.terminalDisposition === 'out_of_catalog'));
+});
+
+test('rejects mockup or test-bench routes in the product-surface population', () => {
+  const escaped = clone(basis);
+  escaped.populations.surfaces.records.push({ id: 'surface:web:mockup@v1', sourceIdentity: { sourceKind: 'web_surface', identifier: 'app/mockups/scheda/page.tsx' }, description: 'synthetic hostile record', surface: 'web_page', stage: 'unresolved', authority: 'unresolved', input: 'unresolved', output: 'unresolved', provider: 'unresolved', venue: 'unresolved', egress: 'unresolved', evidence: [{ evidenceKind: 'code', ref: '93362ca505149f5d6c51502784395e65126921df:app/mockups/scheda/page.tsx' }], terminalDisposition: 'out_of_catalog' });
+  assert.throws(() => validateCapabilityMapping(manifest, escaped), /evidence path escaped|web surface eligibility/);
 });
 
 test('rejects Web or Mini records outside the functional surface policy', () => {

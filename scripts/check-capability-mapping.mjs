@@ -97,7 +97,7 @@ function validateWebMiniSurfaceEligibility(basis) {
   const webRoutes = relativeJson('docs/capability-mapping/sources/web-http-routes.v1.json', 'web route roster').records.map((record) => record.path);
   const webPages = relativeJson('docs/capability-mapping/sources/web-product-pages.v1.json', 'web page roster').records.map((record) => record.path);
   const bySurface = (surface) => web.filter((record) => record.surface === surface).map((record) => record.sourceIdentity.identifier).sort();
-  if (JSON.stringify(bySurface('web_http_route')) !== JSON.stringify(webRoutes) || JSON.stringify(bySurface('web_page')) !== JSON.stringify(webPages) || web.some((record) => !['web_http_route', 'web_page'].includes(record.surface))) fail('web surface eligibility drifted');
+  if (JSON.stringify(bySurface('web_http_route')) !== JSON.stringify(webRoutes) || JSON.stringify(bySurface('web_page')) !== JSON.stringify(webPages) || web.some((record) => !['web_http_route', 'web_page'].includes(record.surface) || record.sourceIdentity.identifier.startsWith('app/mockups/'))) fail('web surface eligibility drifted');
   const mini = records.filter((record) => record.sourceIdentity?.sourceKind === 'mini_command');
   const source = JSON.parse(git('show', '1e35733c0218eae67a1d6e158085aab7340bc26b:packages/mini/contracts/mini-parity.json'));
   const expectedMini = source.capabilities.flatMap((capability, index) => (capability.miniCommands ?? []).map((_, commandIndex) => `${capability.webCapabilityId}:${commandIndex + 1}:${index + 1}`)).sort();
@@ -135,13 +135,18 @@ function validateProductDecision(basis, relations, fabric) {
 }
 function validateSurfaceDispositions(basis, relations, sourcePaths) {
   const receipt = relativeJson(basis.surfaceDispositionReceiptFile, 'surface disposition receipt');
-  const expectedCounts = { webOutOfCatalog: 168, miniMapped: 6, iosIpadosOutOfCatalog: 1, macosOutOfCatalog: 4 };
+  const expectedCounts = { webOutOfCatalog: 166, miniMapped: 6, iosIpadosOutOfCatalog: 1, macosOutOfCatalog: 4 };
   if (receipt.schema !== 'mediflow.capability-mapping.surface-terminal-dispositions.v1' || receipt.status !== 'candidate_not_integrated' || receipt.applyPolicy !== 'none' || JSON.stringify(receipt.populationCounts) !== JSON.stringify(expectedCounts) || receipt.authorityRule !== 'terminal disposition does not grant or union authority or stage' || !sourcePaths.has(receipt.closedCatalogEvidence?.ref)) fail('surface disposition receipt is invalid');
   const surfaces = populationRecords(basis.populations.surfaces);
   const mini = surfaces.filter((record) => record.sourceIdentity.sourceKind === 'mini_command');
   const nonMini = surfaces.filter((record) => record.sourceIdentity.sourceKind !== 'mini_command');
   const miniBindings = relations.filter((relation) => relation.from.startsWith('surface:mini:command:'));
-  if (mini.length !== 6 || nonMini.length !== 173 || mini.some((record) => record.terminalDisposition !== 'mapped') || nonMini.some((record) => record.terminalDisposition !== 'out_of_catalog') || miniBindings.length !== mini.length || new Set(miniBindings.map((relation) => relation.from)).size !== mini.length || miniBindings.some((relation) => relation.relationKind !== 'supports' || relation.authority !== 'unresolved' || relation.stage !== 'unresolved')) fail('surface terminal dispositions are not positive and source-bound');
+  if (mini.length !== 6 || nonMini.length !== 171 || mini.some((record) => record.terminalDisposition !== 'mapped') || nonMini.some((record) => record.terminalDisposition !== 'out_of_catalog') || miniBindings.length !== mini.length || new Set(miniBindings.map((relation) => relation.from)).size !== mini.length || miniBindings.some((relation) => relation.relationKind !== 'supports' || relation.authority !== 'unresolved' || relation.stage !== 'unresolved')) fail('surface terminal dispositions are not positive and source-bound');
+}
+function validateMockupBoundary(basis) {
+  const boundary = relativeJson(basis.mockupBoundaryFile, 'mockup boundary file');
+  if (boundary.schema !== 'mediflow.capability-mapping.mockup-boundary.v1' || boundary.status !== 'candidate_not_integrated' || boundary.applyPolicy !== 'none' || boundary.terminalDisposition !== 'out_of_catalog' || boundary.excludedPathPrefix !== 'app/mockups/' || !Array.isArray(boundary.evidence) || boundary.evidence.length !== 2) fail('mockup boundary artifact is invalid');
+  boundary.evidence.forEach((evidence) => validateFrozenRef(evidence.ref, 'mockup boundary evidence'));
 }
 function dispositionCounts(records) {
   return Object.fromEntries([...TERMINAL_DISPOSITIONS].map((disposition) => [disposition, records.filter((record) => record.terminalDisposition === disposition).length]));
@@ -153,7 +158,7 @@ function requireUnique(records, key, label) {
 function validateCoverage(basis, coverage) {
   if (coverage.schema !== 'mediflow.capability-mapping.coverage-receipt.v1' || coverage.mappingVersion !== 1 || coverage.status !== 'candidate_not_integrated' || coverage.applyPolicy !== 'none') fail('coverage receipt contract is invalid');
   if (coverage.sourceManifestSha256 !== basis.sourceManifestSha256 || coverage.claimCeiling !== basis.claimCeiling) fail('coverage receipt provenance or claim ceiling drifted');
-  const expected = new Map([['anchors', 66], ['aip', 109], ['fabric', 16], ['surfaces', 179]]);
+  const expected = new Map([['anchors', 66], ['aip', 109], ['fabric', 16], ['surfaces', 177]]);
   const declared = new Map((coverage.populationCoverage ?? []).map((entry) => [entry.populationId, entry]));
   if (declared.size !== expected.size) fail('coverage receipt population roster is invalid');
   for (const [populationId, expectedCount] of expected) {
@@ -223,6 +228,7 @@ function validateBasis(basis, manifestBytes, sourcePaths) {
   if (!relations.every((relation) => relation && typeof relation.id === 'string' && typeof relation.from === 'string' && typeof relation.to === 'string' && RELATION_KINDS.has(relation.relationKind) && Array.isArray(relation.evidence) && relation.evidence.length > 0 && relation.evidence.every((evidence) => evidence && EVIDENCE_KINDS.has(evidence.evidenceKind) && typeof evidence.locator === 'string' && (validateFrozenRef(evidence.ref, `relation ${relation.id}`), true)) && (![relation.authority, relation.stage].some((value) => value !== undefined && typeof value !== 'string')))) fail('relation contract is invalid');
   validateProductDecision(basis, relations, populationRecords(basis.populations.fabric));
   validateSurfaceDispositions(basis, relations, sourcePaths);
+  validateMockupBoundary(basis);
   const conflicts = conflictRecords(basis);
   const conflictFields = ['conflictId', 'subjectId', 'observedFact', 'ambiguity', 'decisionOwner', 'requiredEvidence', 'status', 'terminalDisposition', 'evidence'];
   if (!conflicts.every((conflict) => conflict && conflictFields.every((field) => field in conflict) && TERMINAL_DISPOSITIONS.has(conflict.terminalDisposition) && ['technical_worker', 'chief', 'product_owner', 'compliance_owner'].includes(conflict.decisionOwner) && Array.isArray(conflict.alternatives) && conflict.alternatives.length >= 2 && Array.isArray(conflict.consequences) && conflict.consequences.length === conflict.alternatives.length && Array.isArray(conflict.evidence) && conflict.evidence.length > 0)) fail('conflict contract is invalid');

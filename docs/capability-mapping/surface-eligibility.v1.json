@@ -5,7 +5,7 @@
   "applyPolicy": "none",
   "rules": [
     {"platform":"web","surfaceKind":"web_http_route","eligibility":"an exported app/api route.ts module frozen in web-http-routes"},
-    {"platform":"web","surfaceKind":"web_page","eligibility":"an app page.tsx module frozen in web-product-pages, including app/page.tsx"},
+    {"platform":"web","surfaceKind":"web_page","eligibility":"an app page.tsx module frozen in web-product-pages, including app/page.tsx but excluding app/mockups/** candidate design evidence"},
     {"platform":"mini","surfaceKind":"mini_command","eligibility":"a declared miniCommands entry in the frozen Mini parity manifest"},
     {"platform":"apple","surfaceKind":"native_entry_or_ui_symbol","eligibility":"a proven @main app entry, SwiftUI View, Commands type, workspace entry, or action boundary; enforced from R2"}
   ],
@@ -15,6 +15,7 @@
     "test code and fixtures",
     "user interface state",
     "project metadata",
-    "documentation used only as evidence"
+    "documentation used only as evidence",
+    "app/mockups/** candidate design evidence and test benches"
   ]
 }

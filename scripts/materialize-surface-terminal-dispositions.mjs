@@ -22,7 +22,7 @@ function replace(path, from, to, expected) {
 }
 function write(path, value) { writeFileSync(path, `${JSON.stringify(value)}\n`); }
 
-replace(WEB, '"terminalDisposition":"unmapped"', '"terminalDisposition":"out_of_catalog"', 168);
+replace(WEB, '"terminalDisposition":"unmapped"', '"terminalDisposition":"out_of_catalog"', 166);
 replace(MINI, '"terminalDisposition":"unmapped"', '"terminalDisposition":"mapped"', 6);
 replace(IOS, '"terminalDisposition":"unmapped"', '"terminalDisposition":"out_of_catalog"', 1);
 replace(MACOS, '"terminalDisposition":"unmapped"', '"terminalDisposition":"out_of_catalog"', 4);
@@ -34,4 +34,4 @@ const records = mini.map((record) => {
 });
 if (records.length !== 6 || new Set(records.map(({ to }) => to)).size !== 5) fail('Mini command hierarchy is incomplete');
 write(RELATIONS, { schema: 'mediflow.capability-mapping.mini-command-bindings.v1', status: 'candidate_not_integrated', applyPolicy: 'none', records });
-write(RECEIPT, { schema: 'mediflow.capability-mapping.surface-terminal-dispositions.v1', status: 'candidate_not_integrated', applyPolicy: 'none', closedCatalogEvidence: { ref: MINI_REF, locator: '/capabilities', claim: 'the 66-row canonical catalog is closed; source-only Web and Apple entries without a declared canonical relation are out_of_catalog' }, populationCounts: { webOutOfCatalog: 168, miniMapped: 6, iosIpadosOutOfCatalog: 1, macosOutOfCatalog: 4 }, authorityRule: 'terminal disposition does not grant or union authority or stage' });
+write(RECEIPT, { schema: 'mediflow.capability-mapping.surface-terminal-dispositions.v1', status: 'candidate_not_integrated', applyPolicy: 'none', closedCatalogEvidence: { ref: MINI_REF, locator: '/capabilities', claim: 'the 66-row canonical catalog is closed; source-only Web and Apple entries without a declared canonical relation are out_of_catalog' }, populationCounts: { webOutOfCatalog: 166, miniMapped: 6, iosIpadosOutOfCatalog: 1, macosOutOfCatalog: 4 }, authorityRule: 'terminal disposition does not grant or union authority or stage' });
