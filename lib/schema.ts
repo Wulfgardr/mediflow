@@ -332,6 +332,15 @@ export const documentDiagnosisProposals = sqliteTable('document_diagnosis_propos
     ),
 }));
 
+/* @Codex */
+export const durableReviewRecords = sqliteTable('durable_review_records', {
+    id: text('id').primaryKey(), reviewId: text('review_id').notNull().unique(), reviewRevision: integer('review_revision').notNull(),
+    receiptRef: text('receipt_ref').notNull(), provenanceRef: text('provenance_ref').notNull(),
+    receiptBinding: text('receipt_binding').notNull(), provenanceBinding: text('provenance_binding').notNull(),
+    presentationVersion: text('presentation_version').notNull(), sealedCiphertext: text('sealed_ciphertext').notNull(), sealedDigest: text('sealed_digest').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
 // --- Checkups / Appointments ---
 export const checkups = sqliteTable('checkups', {
     id: text('id').primaryKey(),
