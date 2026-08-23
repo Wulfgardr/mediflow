@@ -9,19 +9,21 @@ read_when:
 
 Date: 2026-08-23
 
-Status: `CANDIDATE LOCAL / ROUTING ONLY`
+Status: `ACCEPTED ROUTING / D0 CLOSED`
 
 Issue: WUL-562
 
 ## Outcome
 
-R0 records ancestry, patch equivalence, collisions, and the minimum future
-recomposition order. R0 does not change runtime code or CSS.
+R0 records ancestry, patch equivalence, collisions, the accepted D0 product
+meaning, and the minimum future recomposition order. R0 does not change runtime
+code or CSS.
 
-The combined runtime candidate remains `HOLD_RUNTIME_RECOMPOSITION`. Web #209
-crosses structure, design semantics, CSS, icons, tests, and capability
-documentation. The frozen Lume baseline and Web #209 also disagree on whether
-Quadro is absorbed into Scheda or remains a distinct concise lens.
+The R0 routing decision is accepted and D0 is closed. A monolithic runtime
+recomposition remains in `HOLD_RUNTIME_RECOMPOSITION` because Web #209 crosses
+structure, design semantics, CSS, icons, tests, and capability documentation.
+D1 may proceed as a separate runtime packet with one boundary and fewer than
+about 300 gross lines.
 
 This document is a local candidate artifact. It is not integrated,
 release-ready, released, or promoted.
@@ -30,13 +32,35 @@ release-ready, released, or promoted.
 
 | Role | Exact SHA | Meaning |
 | --- | --- | --- |
-| Lume baseline candidate | `e1414c5c0d20601caf726e01eb495fb2745b6c40` | R0 base and owner branch start |
+| Lume baseline candidate | `e1414c5c0d20601caf726e01eb495fb2745b6c40` | `codex/ui-consolidamento-p0`; R0 base and accepted product source |
 | Web #209 | `93362ca505149f5d6c51502784395e65126921df` | Web inventory after neutral icons |
 | Keyboard #200 | `5fbe5eaa16b6f79eb578644afe0131dd58544238` | Complete keyboard, listbox, and command-center model |
 | Main merge-base | `0d55c6d0f29a86c3333efc49bc0159563d9518b9` | Shared ancestor of all three candidates |
 
 Kree8 names remain implementation paths and historical internal naming. They
 do not replace Lume as the product design direction established by ADR 0078.
+
+## D0 accepted decision
+
+For MediFlow 0.8.5, the accepted candidate source is
+`codex/ui-consolidamento-p0@e1414c5c0d20601caf726e01eb495fb2745b6c40`
+and its document **Un fuoco, una risposta**.
+
+The accepted composition is:
+
+- Scheda at `/patients/[id]/modules` is the complete clinical workspace;
+- `PatientSynopticSheet` is the single header for Scheda;
+- Scheda absorbs and eliminates the parallel Quadro surface implemented by
+  `components/kree8/areas/real-patient-area.tsx`;
+- the rail group named **Quadro e decisioni** remains. It is navigation inside
+  Scheda, not a second header or a parallel clinical surface;
+- keyboard #200 remains the owner of the complete keyboard model.
+
+This decision supersedes only the divergent Web #209 meaning that preserves
+Quadro as a separate concise lens. Web #209 remains eligible as evidence for
+non-contradictory elements that a later packet verifies against the accepted
+source. Eligible elements include focused tests, neutral Lume treatments,
+icons, and capability documentation. Eligibility is not integration proof.
 
 ## Ancestry and commit equivalence
 
@@ -79,11 +103,11 @@ The baseline/Web conflict is contractual, not only textual:
 - the baseline redesign document says that Scheda absorbs and eliminates the
   parallel Quadro;
 - Web #209 says that Quadro remains a concise state-and-next-action lens and
-  Scheda remains the full workspace.
+  Scheda remains the full workspace. D0 supersedes this meaning for 0.8.5.
 
-No runtime recomposition can choose between these meanings without a current
-product owner decision. Git auto-merge does not resolve focus targets, touch
-targets, responsive grouping, surface depth, or keyboard behavior.
+Git auto-merge does not implement the accepted decision and does not resolve
+focus targets, touch targets, responsive grouping, surface depth, or keyboard
+behavior.
 
 ## Mockup boundary
 
@@ -103,11 +127,13 @@ R0 does not modify Mini, Apple, Fabric, F6, mappings, or apply policy.
 Each numbered packet must stay independently reviewable and below about 300
 gross lines. Stop when a packet reaches a second boundary.
 
-1. **D0: decide Quadro versus Scheda.** Record one product meaning for the
-   frozen Lume candidate. Until then, keep runtime recomposition in `HOLD`.
-2. **D1: recompose Web #209 structure.** After D0, manually reproduce only the
-   accepted Quadro/Scheda structure and its focused allowlist/mobile tests.
-   Do not cherry-pick the Web merge commits.
+1. **D0 closed: Scheda absorbs Quadro.** Use the frozen Lume candidate and the
+   decision above. Preserve **Quadro e decisioni** only as a rail group.
+2. **D1: implement the accepted Scheda composition.** Use a separate runtime
+   packet below about 300 gross lines. Limit ownership to removal or absorption
+   of the parallel `real-patient-area` surface and its focused tests. Do not
+   include CSS, icons, capability documentation, or keyboard work. Do not
+   cherry-pick the Web merge commits.
 3. **D2: recompose neutral Lume surfaces.** Review Carta neutrality, surface
    depth, responsive layout, and neutral icons as a separate packet. Do not
    accept the auto-merged CSS as proof of semantic compatibility.
@@ -132,13 +158,14 @@ prevents later Web replay from overwriting #200.
 
 | State | R0 result |
 | --- | --- |
-| Candidate | Yes: local routing artifact only |
+| Candidate | Yes: accepted local routing; D0 closed |
 | Integrated | No |
 | Release-ready | No |
 | Released | No |
 
-Keep `HOLD_RUNTIME_RECOMPOSITION` if ownership is ambiguous, D0 remains open,
-a packet crosses a second boundary, a diff exceeds about 300 gross lines, an
+Keep `HOLD_RUNTIME_RECOMPOSITION` for a monolithic merge. Stop an individual
+packet if ownership is ambiguous, it contradicts the accepted Scheda meaning,
+it crosses a second boundary, its diff exceeds about 300 gross lines, an
 apply/authority question appears, or any PHI, PII, credential, or authenticated
 session material appears.
 
