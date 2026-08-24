@@ -28,8 +28,15 @@ type SelectionState = CanonicalPair & SelectionLease;
 const authenticOwners = new WeakSet<object>();
 const weakSetAdd = WeakSet.prototype.add;
 const weakSetHas = WeakSet.prototype.has;
+const weakMapSet = WeakMap.prototype.set;
+const weakMapGet = WeakMap.prototype.get;
 const applyIntrinsic = Reflect.apply;
 const isProxy = types.isProxy;
+const isAsyncFunction = types.isAsyncFunction;
+const isPromise = types.isPromise;
+const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const getPrototypeOf = Object.getPrototypeOf;
+const promiseThen = Promise.prototype.then;
 
 function addOwnerIdentity(registry: WeakSet<object>, owner: object): void {
     applyIntrinsic(weakSetAdd, registry, [owner]);
@@ -37,6 +44,14 @@ function addOwnerIdentity(registry: WeakSet<object>, owner: object): void {
 
 function hasOwnerIdentity(registry: WeakSet<object>, candidate: object): boolean {
     return applyIntrinsic(weakSetHas, registry, [candidate]);
+}
+
+function setWeakMapValue<T>(registry: WeakMap<object, T>, key: object, value: T): void {
+    applyIntrinsic(weakMapSet, registry, [key, value]);
+}
+
+function getWeakMapValue<T>(registry: WeakMap<object, T>, key: object): T | undefined {
+    return applyIntrinsic(weakMapGet, registry, [key]);
 }
 
 export type ServerSessionProjectionOwnerErrorCode =
@@ -63,6 +78,68 @@ export type ServerSessionProjectionOwner = Readonly<{
     withLeaseCriticalSection<T>(session: ServerSession, callback: (selection: CanonicalPair) => T): T;
     dispose(): void;
 }>;
+
+export type LeaseCommitTurn = object;
+export type LeaseCommitTurnPhase = 'abort' | 'commit';
+type LeaseCommitTurnState = {
+    owner: ServerSessionProjectionOwner; session: ServerSession; phase: 'abort' | 'closed' | 'commit' | 'prepare';
+    live: boolean; spent: boolean;
+};
+type LeaseCommitTurnRunner = (session: ServerSession, prepare: (selection: CanonicalPair) => unknown,
+    commit: (prepared: unknown, turn: LeaseCommitTurn) => unknown, abort: (turn: LeaseCommitTurn) => unknown) => void;
+
+const commitTurnRunners = new WeakMap<object, LeaseCommitTurnRunner>();
+const commitTurnStates = new WeakMap<object, LeaseCommitTurnState>();
+
+function synchronousCallback(candidate: unknown): candidate is (...args: never[]) => unknown {
+    return typeof candidate === 'function' && !isProxy(candidate) && !isAsyncFunction(candidate);
+}
+
+function observeNativePromise(value: unknown): void {
+    if ((typeof value !== 'object' || value === null) && typeof value !== 'function') return;
+    if (isProxy(value) || !isPromise(value)) return;
+    try { applyIntrinsic(promiseThen, value, [undefined, () => undefined]); } catch { /* A late completion stays opaque. */ }
+}
+
+function hasThenable(value: unknown): boolean {
+    if ((typeof value !== 'object' || value === null) && typeof value !== 'function') return false;
+    if (isProxy(value) || isPromise(value)) return true;
+    try {
+        let cursor: object | null = value;
+        while (cursor) {
+            if (isProxy(cursor) || getOwnPropertyDescriptor(cursor, 'then')) return true;
+            cursor = getPrototypeOf(cursor);
+        }
+    } catch { return true; }
+    return false;
+}
+
+function rejectThenable(value: unknown): void {
+    if (!hasThenable(value)) return;
+    observeNativePromise(value);
+    return fail('input_invalid');
+}
+
+export function spendLeaseCommitTurn(owner: unknown, session: ServerSession, turn: unknown, phase: LeaseCommitTurnPhase): void {
+    if (!isServerSessionProjectionOwner(owner) || (phase !== 'abort' && phase !== 'commit')
+        || typeof turn !== 'object' || turn === null || isProxy(turn)) return fail('input_invalid');
+    const state = getWeakMapValue(commitTurnStates, turn);
+    if (!state || !state.live || state.spent || state.owner !== owner || state.session !== session || state.phase !== phase) {
+        return fail('selection_unavailable');
+    }
+    state.spent = true;
+}
+
+export function withLeaseCommitTurn<T>(owner: unknown, session: ServerSession,
+    prepare: (selection: CanonicalPair) => T, commit: (prepared: T, turn: LeaseCommitTurn) => unknown,
+    abort: (turn: LeaseCommitTurn) => unknown): void {
+    if (!isServerSessionProjectionOwner(owner) || !synchronousCallback(prepare)
+        || !synchronousCallback(commit) || !synchronousCallback(abort)) return fail('input_invalid');
+    const runner = getWeakMapValue(commitTurnRunners, owner);
+    if (!runner) return fail('owner_disposed');
+    runner(session, prepare as (selection: CanonicalPair) => unknown,
+        commit as (prepared: unknown, turn: LeaseCommitTurn) => unknown, abort as (turn: LeaseCommitTurn) => unknown);
+}
 
 export function isServerSessionProjectionOwner(candidate: unknown): candidate is ServerSessionProjectionOwner {
     if (typeof candidate !== 'object' || candidate === null || isProxy(candidate)) return false;
@@ -202,6 +279,60 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             };
             const rejectLeaseCriticalSectionReentry = () => {
                 if (leaseCriticalSectionActive) fail('selection_busy');
+            };
+            const commitTurnRunner: LeaseCommitTurnRunner = (presentedSession, prepare, commit, abort) => {
+                if (leaseCriticalSectionActive) return fail('selection_busy');
+                const current = selection;
+                const expectedSelectionEpoch = epoch;
+                const expectedReviewContextEpoch = reviewContextEpoch;
+                const assertCurrent = () => {
+                    requireCurrentSession(presentedSession);
+                    if (!current || selection !== current || epoch !== expectedSelectionEpoch || reviewContextEpoch !== expectedReviewContextEpoch) {
+                        return fail('stale_selection');
+                    }
+                    const now = readClock();
+                    requireCurrentSession(presentedSession);
+                    if (selection !== current || epoch !== expectedSelectionEpoch || reviewContextEpoch !== expectedReviewContextEpoch) {
+                        return fail('stale_selection');
+                    }
+                    if (now >= current.expiresAt) { expire(); return fail('lease_expired'); }
+                };
+                leaseCriticalSectionActive = true;
+                const turn = Object.freeze(Object.create(null));
+                const state: LeaseCommitTurnState = { owner, session: presentedSession, phase: 'prepare', live: true, spent: false };
+                setWeakMapValue(commitTurnStates, turn, state);
+                const abortOnce = (cause: unknown): never => {
+                    state.phase = 'abort';
+                    let outcome: unknown;
+                    const unsafeCause = hasThenable(cause);
+                    observeNativePromise(cause);
+                    try { outcome = abort(turn); } catch (error) { observeNativePromise(error); /* The primary precommit outcome remains authoritative. */ }
+                    observeNativePromise(outcome);
+                    if (!state.spent) return fail('selection_unavailable');
+                    if (unsafeCause) return fail('input_invalid');
+                    throw cause;
+                };
+                try {
+                    let prepared: unknown;
+                    try { assertCurrent(); prepared = prepare(Object.freeze({ patientId: current!.patientId, ambulatoryId: current!.ambulatoryId })); }
+                    catch (error) { return abortOnce(error); }
+                    try { rejectThenable(prepared); assertCurrent(); }
+                    catch (error) { return abortOnce(error); }
+                    state.phase = 'commit';
+                    let outcome: unknown;
+                    try { outcome = commit(prepared, turn); } catch (error) {
+                        observeNativePromise(error);
+                        if (state.spent) return;
+                        return abortOnce(error);
+                    }
+                    observeNativePromise(outcome);
+                    if (state.spent) return;
+                    return abortOnce(new ServerSessionProjectionOwnerError('selection_unavailable'));
+                } finally {
+                    state.live = false;
+                    state.phase = 'closed';
+                    leaseCriticalSectionActive = false;
+                }
             };
             const candidateControl = (candidate: unknown): TypedBroker['control'] | null => {
                 if (typeof candidate !== 'object' || candidate === null) return null;
@@ -367,6 +498,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             owners.set(session.id, owner);
             addOwnerIdentity(registryOwners, owner);
             addOwnerIdentity(authenticOwners, owner);
+            setWeakMapValue(commitTurnRunners, owner, commitTurnRunner);
             return owner;
             } finally {
                 acquiring.delete(session.id);
