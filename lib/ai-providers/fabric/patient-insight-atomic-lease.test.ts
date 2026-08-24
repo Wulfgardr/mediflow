@@ -38,12 +38,79 @@ test('publishes one primitive staging result only after the P4 final currentness
     assert.throws(() => lease.consume(current, () => 'replay'), rejects('record_spent'));
 });
 
-test('rejects stale, revoked, regressed, duplicate, and ABA currentness without publication', () => {
+test('rejects an issued record after its P4 selection epoch changes before consume', () => {
+    const { state, lease } = fixture();
+    const current = lease.replaceCurrentness(1, 1, 'fresh-1', false);
+    state.selectionEpoch += 1;
+    let published = false;
+    assert.throws(() => lease.consume(current, () => { published = true; return 'never'; }), rejects('stale_selection'));
+    assert.equal(published, false);
+});
+
+test('rejects an issued record after its P4 review-context epoch changes before consume', () => {
+    const { state, lease } = fixture();
+    const current = lease.replaceCurrentness(1, 1, 'fresh-1', false);
+    state.reviewContextEpoch += 1;
+    let published = false;
+    assert.throws(() => lease.consume(current, () => { published = true; return 'never'; }), rejects('stale_selection'));
+    assert.equal(published, false);
+});
+
+test('binds issued records to the real P4 selection and review-context epochs', () => {
+    const session = createSession({ id: ['synthetic', 'p4-binding'].join('-'), username: ['synthetic', 'clinician'].join('-'), role: 'clinician' });
+    const owner = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair }).acquire(session);
+    const first = owner.issueSelection({ expectedEpoch: 0, patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' });
+    assert.deepEqual({ selectionEpoch: owner.snapshotSelectionEpoch(session), reviewContextEpoch: owner.snapshotReviewContextEpoch(session) }, { selectionEpoch: 1, reviewContextEpoch: 1 });
+    const lease = createPatientInsightAtomicLease({ owner, session, entropy: () => new Uint8Array(16), clock: () => 1 });
+    const current = lease.replaceCurrentness(1, 1, 'fresh-1', false);
+    owner.issueSelection({ expectedEpoch: first.selectionEpoch, patientId: 'patient.synthetic.02', ambulatoryId: 'ambulatory.synthetic.01' });
+    let published = false;
+    assert.throws(() => lease.consume(current, () => { published = true; return 'never'; }), rejects('stale_selection'));
+    assert.equal(published, false);
+});
+
+test('allows two sequential stable same-snapshot observations as distinct opaque records', () => {
     const { lease } = fixture();
+    const first = lease.replaceCurrentness(1, 1, 'fresh-1', false);
+    assert.equal(lease.consume(first, () => 'staged-1'), 'staged-1');
+    const stable = lease.replaceCurrentness(1, 1, 'fresh-1', false);
+    assert.notEqual(first, stable);
+    assert.equal(lease.consume(stable, () => 'staged-2'), 'staged-2');
+});
+
+test('makes an unconsumed stable observation stale when a new observation replaces it', () => {
+    const { lease } = fixture();
+    const first = lease.replaceCurrentness(1, 1, 'fresh-1', false);
+    const stable = lease.replaceCurrentness(1, 1, 'fresh-1', false);
+    assert.notEqual(first, stable);
+    assert.throws(() => lease.consume(first, () => 'never'), rejects('stale_currentness'));
+    assert.throws(() => lease.consume(first, () => 'replay'), rejects('record_spent'));
+    assert.equal(lease.consume(stable, () => 'staged'), 'staged');
+});
+
+test('rejects changed same-epoch and duplicate transition currentness without residue', () => {
+    const { lease } = fixture();
+    const first = lease.replaceCurrentness(1, 1, 'fresh-1', false);
+    assert.throws(() => lease.replaceCurrentness(1, 2, 'fresh-1', false), rejects('epoch_aba'));
+    assert.throws(() => lease.replaceCurrentness(1, 1, 'fresh-2', false), rejects('epoch_aba'));
+    assert.throws(() => lease.replaceCurrentness(1, 1, 'fresh-1', true), rejects('epoch_aba'));
+    assert.equal(lease.consume(first, () => 'staged'), 'staged');
+
+    const transitions = fixture().lease;
+    transitions.replaceCurrentness(1, 1, 'fresh-1', false);
+    const second = transitions.replaceCurrentness(2, 2, 'fresh-2', false);
+    assert.throws(() => transitions.replaceCurrentness(3, 2, 'fresh-2', false), rejects('epoch_aba'));
+    assert.throws(() => transitions.replaceCurrentness(3, 1, 'fresh-1', false), rejects('epoch_aba'));
+    assert.equal(transitions.consume(second, () => 'staged'), 'staged');
+});
+
+test('rejects stale, revoked, regressed, and reset currentness without publication', () => {
+    const { lease } = fixture();
+    assert.throws(() => lease.replaceCurrentness(0, 1, 'fresh-0', false), rejects('input_invalid'));
     const first = lease.replaceCurrentness(1, 1, 'fresh-1', false);
     const second = lease.replaceCurrentness(2, 2, 'fresh-2', false);
     assert.throws(() => lease.consume(first, () => 'never'), rejects('stale_currentness'));
-    assert.throws(() => lease.replaceCurrentness(2, 1, 'fresh-1', false), rejects('epoch_regressed'));
+    assert.throws(() => lease.replaceCurrentness(1, 1, 'fresh-1', false), rejects('epoch_regressed'));
     assert.throws(() => lease.replaceCurrentness(3, 1, 'fresh-1', false), rejects('epoch_aba'));
     const revoked = lease.replaceCurrentness(3, 3, 'fresh-3', true);
     assert.throws(() => lease.consume(revoked, () => 'never'), rejects('revoked'));
@@ -111,7 +178,14 @@ test('fails closed for nested P4 use, dispose, promises, thenables, and hostile 
     assert.throws(() => lease.consume(again, () => accessor), rejects('input_invalid'));
     assert.equal(reads, 0);
 
-    const final = lease.replaceCurrentness(3, 3, 'fresh-3', false);
+    const callable = lease.replaceCurrentness(3, 3, 'fresh-3', false);
+    let applies = 0;
+    const callableProxy = new Proxy(() => 'unexpected', { get() { reads += 1; return undefined; }, apply() { applies += 1; return 'unexpected'; } });
+    assert.throws(() => lease.consume(callable, callableProxy), rejects('input_invalid'));
+    assert.equal(reads, 0);
+    assert.equal(applies, 0);
+
+    const final = lease.replaceCurrentness(4, 4, 'fresh-4', false);
     lease.dispose();
     assert.throws(() => lease.consume(final, () => 'never'), rejects('disposed'));
 });
