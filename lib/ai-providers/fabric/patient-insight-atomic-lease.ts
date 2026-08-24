@@ -1,6 +1,8 @@
 /* @Codex */
 import 'server-only';
 
+import { types } from 'node:util';
+
 import type { ServerSessionProjectionOwner } from '../../security/server-session-projection-owner.ts';
 import type { ServerSession } from '../../security/server-session.ts';
 
@@ -72,12 +74,23 @@ export function createPatientInsightAtomicLease(input: Readonly<{
                 }
                 if (revoked) fail('revoked');
                 const next = Object.freeze({ capabilityEpoch, revision, freshnessToken, revoked: isRevoked });
-                if (last && capabilityEpoch <= last.capabilityEpoch) fail('epoch_regressed');
                 const key = fingerprint(next);
-                if (fingerprints.has(key)) fail('epoch_aba');
+                if (last) {
+                    if (capabilityEpoch < last.capabilityEpoch) fail('epoch_regressed');
+                    if (capabilityEpoch === last.capabilityEpoch) {
+                        if (key !== fingerprint(last)) fail('epoch_aba');
+                    } else {
+                        if (fingerprints.has(key)) fail('epoch_aba');
+                        fingerprints.add(key);
+                        last = next;
+                    }
+                } else {
+                    fingerprints.add(key);
+                    last = next;
+                }
                 const record = Object.freeze(Object.create(null));
                 records.set(record, { currentness: next, spent: false });
-                fingerprints.add(key); last = next; current = record;
+                current = record;
                 if (isRevoked) revoked = true;
                 return record;
             });
@@ -89,7 +102,7 @@ export function createPatientInsightAtomicLease(input: Readonly<{
             if (!captured) throw new PatientInsightAtomicLeaseError('input_invalid');
             if (captured.spent) fail('record_spent');
             captured.spent = true;
-            if (typeof stage !== 'function') fail('input_invalid');
+            if (typeof stage !== 'function' || types.isProxy(stage)) fail('input_invalid');
             let staged: unknown;
             insideP4(() => {
                 const boundary = snapshot();
