@@ -231,31 +231,56 @@ test('il controllo back della Scheda torna alla lista pazienti', async ({ page }
   await expect(page.getByTestId('lume-scheda-header')).toHaveCount(0);
 });
 
-// @Codex WUL-560 L7A: L7B owns semantic grouping; until then every existing
-// destination remains present, ordered and reachable through the flat fallback.
-test('la rail conserva le tredici sezioni non mappate senza cambiare destinazione', async ({ page }) => {
+// @Codex WUL-560 L7B: D-WebRail-01 binds every canonical destination once.
+test('la rail raggruppa le tredici sezioni e mantiene una sola destinazione corrente', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const patient = await createFixture(page);
   await page.goto(`/patients/${patient.id}/modules`);
 
   const rail = page.getByRole('navigation', { name: 'Sezioni della vista' });
-  await expect(rail).toHaveAttribute('data-rail-mode', 'unmapped');
-  const links = rail.getByRole('link');
+  await expect(rail).toHaveAttribute('data-rail-mode', 'grouped');
+  const disclosures = rail.getByRole('button');
+  await expect(disclosures).toHaveText([
+    'Quadro e decisioni', 'Terapie e prescrizioni', 'Documenti e prove', 'Diario e follow-up',
+  ]);
+  await expect(disclosures.nth(0)).toHaveAttribute('aria-expanded', 'true');
+  for (let index = 1; index < 4; index += 1) {
+    await expect(disclosures.nth(index)).toHaveAttribute('aria-expanded', 'false');
+  }
+  expect(new Set(await disclosures.evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-controls')))).size)
+    .toBe(4);
+
+  const links = rail.locator('a');
   await expect(links).toHaveCount(13);
   await expect(links).toHaveText([
-    /Attenzione/, /Quadro/, /Identità/, /Timeline/, /Diario/, /Terapie/,
-    /Prestazioni/, /Parametri/, /Protesica/, /SISS\/FSE/, /Documenti/, /Scale/, /Follow-up/,
+    /Quadro/, /Attenzione/, /Identità/, /Parametri/, /Terapie/, /Prestazioni/,
+    /Protesica/, /Scale/, /Documenti/, /SISS\/FSE/, /Timeline/, /Diario/, /Follow-up/,
   ]);
   expect(await links.evaluateAll((elements) => elements.map((element) => element.getAttribute('href')))).toEqual([
-    '#attenzione', '#quadro', '#identita', '#timeline', '#diario', '#terapie',
-    '#prestazioni', '#parametri', '#protesica', '#siss', '#documenti', '#scale', '#follow-up',
+    '#quadro', '#attenzione', '#identita', '#parametri', '#terapie', '#prestazioni',
+    '#protesica', '#scale', '#documenti', '#siss', '#timeline', '#diario', '#follow-up',
   ]);
 
-  await links.nth(1).focus();
-  await expect(links.nth(1)).toBeFocused();
+  const current = page.locator('[aria-current="location"]');
+  await expect.poll(() => current.count()).toBe(1);
+  const currentHref = await current.getAttribute('href');
+  await disclosures.nth(0).focus();
+  await page.keyboard.press('Space');
+  await expect(disclosures.nth(0)).toHaveAttribute('aria-expanded', 'false');
+  await expect(current).toHaveCount(1);
+  await expect(current).toBeVisible();
+  await expect(current).toHaveAttribute('href', currentHref!);
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/#quadro$/);
+  await expect(disclosures.nth(0)).toHaveAttribute('aria-expanded', 'true');
+  await expect(current).toHaveCount(1);
+
+  await disclosures.nth(1).focus();
+  await page.keyboard.press('Enter');
+  const therapies = rail.getByRole('link', { name: /Terapie/ });
+  await therapies.focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/#terapie$/);
 });
 
 for (const schedaCase of CASES) {
