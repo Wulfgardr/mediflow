@@ -5,6 +5,7 @@ import { afterEach, test } from 'node:test';
 
 import {
     createServerSessionProjectionOwnerRegistry,
+    isServerSessionProjectionOwner,
     ServerSessionProjectionOwnerError,
 } from './server-session-projection-owner.ts';
 import { clearAllSessions, createSession, deleteSession, getSession, type ServerSession } from './server-session.ts';
@@ -39,6 +40,94 @@ test('acquire creates one owner and reuses its identity for the canonical sessio
     assert.equal(first, second);
     assert.equal(registry.lookup(value.id), first);
     assert.equal(constructions, 1);
+});
+
+test('recognizes only published module owners and isolates registry identity', () => {
+    const firstRegistry = createServerSessionProjectionOwnerRegistry();
+    const secondRegistry = createServerSessionProjectionOwnerRegistry();
+    const value = session();
+    const owner = firstRegistry.acquire(value);
+    const lookalike = Object.freeze({ ...owner });
+
+    assert.equal(isServerSessionProjectionOwner(owner), true);
+    assert.equal(firstRegistry.isAuthenticOwner(owner), true);
+    assert.equal(secondRegistry.isAuthenticOwner(owner), false);
+    assert.equal(isServerSessionProjectionOwner(lookalike), false);
+    assert.equal(firstRegistry.isAuthenticOwner(lookalike), false);
+    assert.equal(isServerSessionProjectionOwner(Object.create(owner)), false);
+    for (const malformed of [null, undefined, false, 1, 'owner', [], {}, Object.create(null)]) {
+        assert.equal(isServerSessionProjectionOwner(malformed), false);
+        assert.equal(firstRegistry.isAuthenticOwner(malformed), false);
+    }
+    let reads = 0;
+    const accessor = Object.defineProperty({}, 'dispose', { get() { reads += 1; return owner.dispose; } });
+    assert.equal(isServerSessionProjectionOwner(accessor), false);
+    assert.equal(firstRegistry.isAuthenticOwner(accessor), false);
+    assert.equal(reads, 0);
+});
+
+test('rejects owner proxies before traps or structural reflection', () => {
+    const registry = createServerSessionProjectionOwnerRegistry();
+    const owner = registry.acquire(session());
+    let traps = 0;
+    const proxy = new Proxy(owner, {
+        get() { traps += 1; throw new Error('synthetic get trap'); },
+        getOwnPropertyDescriptor() { traps += 1; throw new Error('synthetic descriptor trap'); },
+        getPrototypeOf() { traps += 1; throw new Error('synthetic prototype trap'); },
+        has() { traps += 1; throw new Error('synthetic has trap'); },
+        ownKeys() { traps += 1; throw new Error('synthetic ownKeys trap'); },
+    });
+    const transparentProxy = new Proxy(owner, {});
+
+    assert.equal(isServerSessionProjectionOwner(proxy), false);
+    assert.equal(registry.isAuthenticOwner(proxy), false);
+    assert.equal(isServerSessionProjectionOwner(transparentProxy), false);
+    assert.equal(registry.isAuthenticOwner(transparentProxy), false);
+    assert.equal(traps, 0);
+});
+
+test('uses captured identity intrinsics after ambient prototype mutation', () => {
+    const originalAdd = WeakSet.prototype.add;
+    const originalHas = WeakSet.prototype.has;
+    const originalApply = Reflect.apply;
+    try {
+        WeakSet.prototype.add = () => { throw new Error('synthetic ambient add'); };
+        WeakSet.prototype.has = () => { throw new Error('synthetic ambient has'); };
+        Reflect.apply = () => { throw new Error('synthetic ambient apply'); };
+        const registry = createServerSessionProjectionOwnerRegistry();
+        const owner = registry.acquire(session());
+        assert.equal(isServerSessionProjectionOwner(owner), true);
+        assert.equal(registry.isAuthenticOwner(owner), true);
+    } finally {
+        WeakSet.prototype.add = originalAdd;
+        WeakSet.prototype.has = originalHas;
+        Reflect.apply = originalApply;
+    }
+});
+
+test('publishes authenticity only after successful construction', () => {
+    const value = session();
+    const registry = createServerSessionProjectionOwnerRegistry({ entropy: () => {
+        deleteSession(value.id);
+        return new Uint8Array(16);
+    } });
+
+    assert.throws(() => registry.acquire(value), rejects('session_ineligible'));
+    assert.equal(registry.lookup(value.id), null);
+    assert.equal(isServerSessionProjectionOwner(Object.freeze({})), false);
+});
+
+test('keeps disposed identity recognizable while operations remain terminal', () => {
+    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair });
+    const value = session();
+    const owner = registry.acquire(value);
+    owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    owner.dispose();
+
+    assert.equal(isServerSessionProjectionOwner(owner), true);
+    assert.equal(registry.isAuthenticOwner(owner), true);
+    assert.equal(registry.lookup(value.id), null);
+    assert.throws(() => owner.withLeaseCriticalSection(value, () => 'unused'), rejects('session_unavailable'));
 });
 
 test('acquire rejects synchronous source reentrancy with one fixed error', () => {

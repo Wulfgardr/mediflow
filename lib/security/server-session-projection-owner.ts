@@ -2,6 +2,7 @@
 import 'server-only';
 
 import { randomBytes } from 'node:crypto';
+import { types } from 'node:util';
 import { createTypedProjectionBroker, ProjectionBrokerError, type TypedProjectionBrokerConfig } from '../typed-projection-broker';
 import { bindProjectionBrokerToServerSession } from './server-session-projection-broker';
 import { getSession, peekSession, registerServerSessionResource, type ServerSession } from './server-session';
@@ -23,6 +24,20 @@ type SelectionLease = Readonly<{
     leaseRef: string; expiresAt: number;
 }>;
 type SelectionState = CanonicalPair & SelectionLease;
+
+const authenticOwners = new WeakSet<object>();
+const weakSetAdd = WeakSet.prototype.add;
+const weakSetHas = WeakSet.prototype.has;
+const applyIntrinsic = Reflect.apply;
+const isProxy = types.isProxy;
+
+function addOwnerIdentity(registry: WeakSet<object>, owner: object): void {
+    applyIntrinsic(weakSetAdd, registry, [owner]);
+}
+
+function hasOwnerIdentity(registry: WeakSet<object>, candidate: object): boolean {
+    return applyIntrinsic(weakSetHas, registry, [candidate]);
+}
 
 export type ServerSessionProjectionOwnerErrorCode =
     | 'broker_factory_failed' | 'broker_unavailable' | 'epoch_conflict' | 'input_invalid' | 'lease_expired' | 'owner_disposed'
@@ -48,6 +63,11 @@ export type ServerSessionProjectionOwner = Readonly<{
     withLeaseCriticalSection<T>(session: ServerSession, callback: (selection: CanonicalPair) => T): T;
     dispose(): void;
 }>;
+
+export function isServerSessionProjectionOwner(candidate: unknown): candidate is ServerSessionProjectionOwner {
+    if (typeof candidate !== 'object' || candidate === null || isProxy(candidate)) return false;
+    return hasOwnerIdentity(authenticOwners, candidate);
+}
 
 type SelectionLeaseTuple = Readonly<{ sessionRef: string; selectionEpoch: number; patientRef: string;
     ambulatoryRef: string; leaseRef: string }>;
@@ -88,10 +108,15 @@ function exact(input: unknown, keys: readonly string[]): Record<string, unknown>
 export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Partial<SelectionSources> = {}) {
     const sources = Object.freeze({ ...defaultSources, ...sourceOverrides });
     const owners = new Map<string, ServerSessionProjectionOwner>();
+    const registryOwners = new WeakSet<object>();
     const retired = new Set<string>();
     const acquiring = new Set<string>();
 
     const registry = {
+        isAuthenticOwner(candidate: unknown): candidate is ServerSessionProjectionOwner {
+            if (!isServerSessionProjectionOwner(candidate)) return false;
+            return hasOwnerIdentity(registryOwners, candidate);
+        },
         lookup(sessionId: string): ServerSessionProjectionOwner | null {
             return owners.get(sessionId) ?? null;
         },
@@ -340,6 +365,8 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             unregisterOwner = registerServerSessionResource(session.id, () => finish(false));
             if (!unregisterOwner) return fail('session_ineligible');
             owners.set(session.id, owner);
+            addOwnerIdentity(registryOwners, owner);
+            addOwnerIdentity(authenticOwners, owner);
             return owner;
             } finally {
                 acquiring.delete(session.id);
