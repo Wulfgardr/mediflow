@@ -6,7 +6,7 @@ import test from 'node:test';
 import {
     buildPatientModuleRailGroups,
     validatePatientModuleRailGroups,
-} from './patient-module-rail-mapping';
+} from './patient-module-rail-mapping.ts';
 
 const canonicalItems = () => [
     { href: '#quadro', label: 'Quadro', meta: 'q' },
