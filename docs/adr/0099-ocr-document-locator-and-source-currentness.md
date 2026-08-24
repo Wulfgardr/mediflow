@@ -1,15 +1,17 @@
 # ADR 0099: locator OCR e currentness della sorgente documentale
 
 Date: 2026-08-23
-Status: Proposed
+Status: Accepted
 
 Issue: WUL-522
 Program line: candidato `0.8.5`
+Baseline: `de6faac0326a41c165d0912ffadf206e1cfc3892`
 
 Related: [ADR 0088](./0088-deterministic-pdf-page-router.md),
 [ADR 0094](./0094-intelligence-fabric-headless-contract-085.md),
 [ADR 0095](./0095-broker-projection-e-servizi-host-per-capability.md),
-[ADR 0096](./0096-owner-sessione-selezione-e-lifetime-broker.md) e
+[ADR 0096](./0096-owner-sessione-selezione-e-lifetime-broker.md),
+[ADR 0089](./0089-contratto-intelligence-fabric-e-venue-esecutive.md) e
 [ADR 0098](./0098-physician-terminal-review-authority.md).
 
 ## Problema
@@ -22,7 +24,9 @@ validazione e consumo.
 
 Serve un contratto che permetta a O1 di introdurre metadati documentali senza
 trasformare ID di dominio, hash, versioni di review o dati del chiamante in
-autorita di currentness.
+autorita di currentness. Prima del locator runtime O4, serve anche fissare chi
+puo consumare una sorgente, con quale selezione e quale evidenza puo attraversare
+un confine asincrono.
 
 ## Decisione
 
@@ -46,25 +50,132 @@ proposta, `reviewRevision`, `sourceRevision` del browser e
 essere dati di osservazione o di verifica in altri contratti, ma non validano
 un locator OCR.
 
-### Locator volatile, emissione e consumo atomico
+### Locator volatile e operazione asincrona privata
 
-Il broker emette un locator OCR monouso, in memoria e legato al lease corrente.
+Il broker emette un locator OCR monouso, in memoria e legato all'owner corrente.
 Il locator non contiene attachment ID, patient ID, contenuto, hash, provider,
 venue, egress, authority, prompt o apply. Non puo diventare un handle per
-selezionare provider o per autorizzare esecuzione.
+selezionare provider o autorizzare esecuzione.
 
-L'emissione e il consumo sono operazioni distinte nel tempo. Entrambe usano lo
-stesso owner e il primitivo P4 sincrono, ma non avvengono nella stessa
-invocazione. Durante il consumo, una sola sezione critica P4 risolve la sorgente
-host-owned, verifica lease, selezione e currentness, poi brucia il locator
-monouso prima di restituire il risultato. E vietato aprire una seconda sezione
-di lease fra resolve e consume. Dopo il riavvio, lo stato in memoria non esiste
-e ogni locator precedente viene negato.
+Il protocollo che attraversa il lavoro asincrono usa esattamente due sezioni
+critiche P4 sincrone: `begin` e `finalize`. Una sezione P4 non puo contenere un
+`Promise`, un thenable o un'attesa asincrona. Un controllo adiacente alla
+sezione critica non sostituisce una rivalidazione dentro P4. L'emissione del
+locator non autorizza il lavoro e non sostituisce `begin`; una singola
+esecuzione O4 non apre una terza sezione P4.
+
+Durante `begin`, la prima sezione P4 esegue in modo indivisibile queste azioni:
+
+1. acquisisce il record esatto del locator e lo brucia;
+2. verifica sessione, owner, selezione, lease e currentness;
+3. risolve e isola la sorgente host-owned;
+4. crea un record in-flight unico, opaco e privato dell'host;
+5. restituisce al solo coordinator una capability dell'operazione e lo snapshot
+   effimero necessario al lavoro asincrono.
+
+Se una verifica nega `begin`, il locator resta bruciato e nessun record in-flight
+viene pubblicato.
+
+Il record in-flight lega sessione, `selectionEpoch`, `reviewContextEpoch`,
+`documentSourceRef`, `documentRevision`, `documentFreshnessEpoch`, generazione
+di revoca, scadenza e riferimento all'evidenza minimizzata della sorgente. La
+capability non codifica questi valori e non contiene paziente, documento,
+contenuto, provider, venue, egress, authority, prompt o apply. Il coordinator
+trusted e l'unico consumer. Chiamante, route e provider non la ricevono.
+
+Il lavoro provider-neutral avviene fuori da P4. Durante `finalize`, la seconda
+sezione P4 accetta soltanto la capability privata, acquisisce una sola volta il
+record in-flight e rivalida tutti i binding. Il locator non viene riusato e non
+partecipa a `finalize`. Un esito valido chiude il record come `spent`. Un
+mismatch, una revoca, un timeout, un abort, un dispose o un completamento
+tardivo lo chiude come `denied`. Entrambe le chiusure eliminano snapshot,
+binding e riferimenti effimeri.
 
 Il cambio di sessione, review o selezione, l'eliminazione, purge, restore,
-logout, expiry e riavvio revocano o distruggono tutti i locator interessati.
-Una revoca non ammette fallback, riemissione implicita o continuazione con un
-locator precedente.
+logout, expiry e riavvio revocano o distruggono locator e operazioni in-flight
+interessati. Una revoca non ammette fallback, riemissione implicita o
+continuazione con un locator o una capability precedente.
+
+### Stati terminali e cleanup
+
+Il locator e il record in-flight hanno lifecycle distinti:
+
+| Oggetto | Stato iniziale | Transizione consentita | Stato terminale |
+| --- | --- | --- | --- |
+| Locator | `issued` | un solo tentativo `begin` | `burned` |
+| Operazione | `in_flight` | un solo tentativo `finalize`, oppure timeout, abort, revoca o dispose | `spent` oppure `denied` |
+
+L'owner privato serializza tutte le transizioni. La prima transizione terminale
+vince e nessun percorso puo riportare un oggetto a uno stato precedente.
+
+Un secondo `begin` sullo stesso locator viene negato. Un secondo `finalize`,
+anche concorrente, trova un record gia terminale e viene negato. Timeout, abort,
+revoca e dispose vincono contro un completamento successivo: un risultato
+tardivo non puo riaprire il record. Ogni denial elimina il record e lo snapshot
+senza lasciare una capability riutilizzabile.
+
+Una capability forgiata, avvolta o usata da una sessione diversa viene negata
+prima di raggiungere sorgente, provider o output. Il coordinator non puo
+trasferire la capability a un'altra operazione.
+
+Un riavvio elimina le mappe private di locator e operazioni. Dopo il riavvio,
+sia il locator sia la capability falliscono chiusi. Nessun record viene
+ricostruito da ID, hash, timestamp, versione, cache, receipt o input del
+chiamante.
+
+### O4: locator opaco, monouso e host-owned
+
+O4 e un bridge host-owned. Il suo locator e opaco, volatile e monouso. Non e
+un riferimento documento riutilizzabile, una capability Fabric, una receipt o
+un grant. Il chiamante puo richiedere l'operazione, ma non puo creare,
+modificare, rinnovare, decifrare o consumare il locator come autorita.
+
+L'host emette il locator solo dopo avere risolto una selezione corrente. Il
+locator lega, senza esporli, almeno sessione, lease, selezione e
+`selectionEpoch`, `documentSourceRef`, `documentRevision`,
+`documentFreshnessEpoch`, scadenza e generazione di revoca. L'host conserva
+questi binding solo in memoria.
+
+`begin` rivalida i binding prima di pubblicare l'operazione in-flight.
+`finalize` li rivalida dopo il completamento asincrono e prima di pubblicare
+l'esito. Il confronto include `selectionEpoch`, `reviewContextEpoch`,
+generazione di revoca e incarnazione `documentSourceRef`, oltre a revision e
+freshness. Ogni transizione della sorgente incrementa i valori monotoni. Una
+sostituzione ABA non puo quindi tornare allo stesso stato accettabile.
+
+### Sorgenti cifrate e authority di decifratura
+
+Una sorgente attachment con prefisso `ENC:` e un denial O4, salvo una decrypt
+authority host-owned. La decrypt authority deve appartenere alla stessa
+sessione, selezione, lease, currentness e generazione di revoca del locator e
+dell'operazione in-flight. La sola presenza di `ENC:` non prova questa
+authority.
+
+Nessun chiamante decifra il payload per O4. O4 non persiste, restituisce o
+registra nei log payload grezzi, plaintext, chiavi, prompt o output provider.
+L'evidenza host e PHI-safe e contiene soltanto gli esiti e i binding opachi
+necessari al passo successivo.
+
+### Selezione, evidenza e binding provider
+
+L'ordine O4 e stretto e depth-first:
+
+```text
+O4 locator
+  -> begin P4: consume, selezione ed evidenza host PHI-safe
+  -> coordinator provider-neutral
+  -> provider binding esplicito
+  -> lavoro asincrono
+  -> finalize P4: rivalidazione e chiusura
+  -> O5 route
+```
+
+Il coordinator riceve solo l'evidenza host valida. Risolve il provider secondo
+ADR 0089 e non puo dedurre un binding dal nome del registry, dal modello, dalla
+venue o da un risultato precedente. Un denial O4 non raggiunge il coordinator.
+
+`applyPolicy=none` resta invariato. O4 esegue zero scritture: non applica
+output OCR, non modifica review, non persiste payload e non abilita route O5.
 
 ### Backup e confini Fabric
 
@@ -85,7 +196,7 @@ O1 schema
   -> O2 writer e read guard
      -> O3a backup/restore
      -> O3b cascade/revocation
-     -> O4 bridge P4 e locator: emissione e consumo distinti
+     -> O4 bridge P4 e locator: begin e finalize distinti
         -> O5 replay, route e client
 ```
 
@@ -96,13 +207,24 @@ resta sotto circa 300 LOC. Un conflitto fra owner, una semantica non definita o
 una base non integrata interrompe il packet: nessun owner assorbe il confine
 altrui.
 
+O4 precede O5. O5 non crea un locator, non riesegue la selezione, non riusa
+l'evidenza e non aggiunge fallback. Provider binding e route restano due
+confini successivi al coordinator.
+
 ## Evidenza e stato
 
-Questo ADR e una candidata documentale. Non prova schema, writer, backup,
-revoca, bridge, route, client, provider o runtime. L'integrazione richiede i
-gate del DAG e le verifiche specifiche di ciascun packet. Una release richiede
-evidenza di integrazione e i suoi gate separati; questa decisione non dichiara
-release, conformita o promozione.
+La decisione O4 e accettata per il candidato `0.8.5`, ma questo packet e solo
+documentale. Non prova schema, writer, backup, revoca, bridge, route, client,
+provider o runtime.
+
+| Stato | Cosa prova questo ADR |
+| --- | --- |
+| Contratto candidato | La decisione O4 e `Accepted`; il DAG e i denial sono canonici. |
+| Integrato | Non dichiarato. Richiede O1-O5 e le verifiche di integrazione specifiche. |
+| Release-ready | Non dichiarato. Richiede i gate di release separati. |
+| Released | Non dichiarato. Richiede evidenza della pubblicazione effettiva. |
+
+Questa decisione non dichiara conformita normativa, promozione o release.
 
 ## Falsificatori e stop condition
 
@@ -113,11 +235,27 @@ Fermare il lavoro e mantenere il denial se:
 - una mutazione accettata non incrementa insieme revision ed epoch;
 - delete/recreate riusa `documentSourceRef`;
 - un locator contiene dati vietati, persiste, sopravvive a restart o e riusato;
-- resolve e consume avvengono in sezioni di lease diverse;
+- `begin` non risolve, valida e brucia il locator nella stessa sezione P4;
+- una sezione P4 attraversa un `Promise`, un thenable o un'attesa asincrona;
+- il lavoro asincrono non e racchiuso da esattamente un `begin` P4 e un
+  `finalize` P4, oppure un controllo adiacente sostituisce una rivalidazione;
+- `finalize` riusa il locator invece della capability privata dell'operazione;
+- capability o record in-flight diventano caller-supplied, raggiungono route o
+  provider, oppure contengono paziente, documento, contenuto, provider,
+  authority o apply;
+- duplicati, timeout, abort, revoca, dispose o completamenti tardivi lasciano
+  record, snapshot o capability riutilizzabili;
+- selection, sessione, revision, freshness, revoca o incarnazione sorgente
+  possono cambiare senza denial, incluso un caso ABA;
+- una sorgente `ENC:` e decifrata senza decrypt authority host-owned con gli
+  stessi binding del locator;
+- un chiamante decifra, oppure O4 persiste o registra payload grezzo,
+  plaintext, chiavi, prompt o output provider;
 - backup legacy riusa silenziosamente una sorgente stantia;
 - il locator permette di scegliere provider, venue o fallback, oppure sostituisce
   la decisione del resolver Fabric;
-- compare apply o cambia `applyPolicy=none`.
+- O4 raggiunge O5 senza selezione, evidenza host e coordinator provider-neutral;
+- compare una scrittura, apply o cambia `applyPolicy=none`.
 
 ## Non-obiettivi
 
