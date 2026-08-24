@@ -1,4 +1,6 @@
 /* @Codex */
+import { types } from 'node:util';
+
 export type PatientInsightProjection = Readonly<{ schemaVersion: 'mediflow.patient-insight.projection.v1'; clinicalFocus: string; activeConditions: readonly string[]; currentTherapies: readonly string[]; recentClinicalEvents: readonly string[] }>;
 export type PatientInsightHostResult = Readonly<{ status: 'available'; writesPerformed: 0; applyPolicy: 'none'; receiptReference: string; provenanceReference: string; proposal: Readonly<{ schemaVersion: 'mediflow.patient-insight.review-proposal.v1'; reviewOnly: true; promptFingerprint: string }> }> | Readonly<{ status: 'denied'; code: 'input_invalid'; writesPerformed: 0; applyPolicy: 'none' }>;
 export type PatientInsightHostBoundary = Readonly<{ prepare: (request: unknown) => PatientInsightHostResult }>;
@@ -8,7 +10,7 @@ const denied = Object.freeze({ status: 'denied' as const, code: 'input_invalid' 
 
 function record(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
     try {
-        if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) return null;
+        if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) return null;
         const own = Reflect.ownKeys(value); if (own.length !== keys.length || own.some((key) => typeof key !== 'string' || !keys.includes(key))) return null;
         const copy: Record<string, unknown> = {}; for (const key of keys) { const descriptor = Object.getOwnPropertyDescriptor(value, key); if (!descriptor || !('value' in descriptor)) return null; copy[key] = descriptor.value; }
         return copy;
@@ -17,7 +19,7 @@ function record(value: unknown, keys: readonly string[]): Record<string, unknown
 function text(value: unknown): string | null { return typeof value === 'string' && value.length > 0 && value.length <= 240 && value.trim() === value ? value : null; }
 function labels(value: unknown): readonly string[] | null {
     try {
-        if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > 12 || Reflect.ownKeys(value).length !== value.length + 1) return null;
+        if (types.isProxy(value) || !Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > 12 || Reflect.ownKeys(value).length !== value.length + 1) return null;
         const output: string[] = []; for (let index = 0; index < value.length; index += 1) { const descriptor = Object.getOwnPropertyDescriptor(value, String(index)); const label = descriptor && 'value' in descriptor ? text(descriptor.value) : null; if (!label) return null; output.push(label); }
         return Object.freeze(output);
     } catch { return null; }

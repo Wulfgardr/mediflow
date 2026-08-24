@@ -1,6 +1,8 @@
 /* @Codex */
 import 'server-only';
 
+import { types } from 'node:util';
+
 import type { PatientInsightProjection } from './patient-insight-host-boundary';
 
 export type PatientInsightCanonicalHostSources = Readonly<{
@@ -16,7 +18,7 @@ export type PatientInsightHostProjectionResolver = Readonly<{
 
 function record(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
     try {
-        if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) return null;
+        if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) return null;
         const own = Reflect.ownKeys(value);
         if (own.length !== keys.length || own.some((key) => typeof key !== 'string' || !keys.includes(key))) return null;
         const output: Record<string, unknown> = {};
@@ -35,7 +37,7 @@ function text(value: unknown): string | null {
 
 function labels(value: unknown, key: 'label' | 'summary'): readonly string[] | null {
     try {
-        if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > 12
+        if (types.isProxy(value) || !Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > 12
             || Reflect.ownKeys(value).length !== value.length + 1) return null;
         const output: string[] = [];
         for (let index = 0; index < value.length; index += 1) {
