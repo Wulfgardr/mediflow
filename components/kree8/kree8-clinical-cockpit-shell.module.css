@@ -273,15 +273,18 @@
   .rail {
     display: flex;
     flex-wrap: wrap;
-    padding: 5px 6px;
-    gap: 4px;
+    /* @Codex Keep the 44px controls while the brand and two destination rows
+       stay inside the compact composition's 150px vertical budget. */
+    padding: 2px 6px;
+    gap: 2px 4px;
     overflow: visible;
     scroll-snap-type: none;
   }
 
   .brand {
     flex: 1 1 100%;
-    padding: 4px 6px;
+    min-height: 44px;
+    padding: 0 4px;
   }
 
   .navItem {
