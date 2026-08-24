@@ -25,6 +25,7 @@ import { useInactivityLock } from '@/lib/hooks/use-inactivity-lock';
 /* @Codex */
 import {
     clearSecuritySession,
+    lockSecuritySession,
     persistSecuritySession,
     restoreSecuritySession,
 } from '@/lib/security/client-security-session';
@@ -138,8 +139,10 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const lock = () => {
         setIsLocked(true);
         setAuthErrorMessage(null);
-        // @Codex - clear server session when locking
-        logoutSecuritySession();
+        lockSecuritySession(
+            () => setActiveMasterKey(null),
+            logoutSecuritySession,
+        );
         // setIsAuthenticated(false); // Do not de-auth, just lock screen.
     };
 

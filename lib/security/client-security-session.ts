@@ -36,7 +36,43 @@ export async function restoreSecuritySession<T>(): Promise<RestoredSecuritySessi
 }
 
 /* @Codex */
+function getSessionStorage(): Storage | null {
+    try {
+        return typeof sessionStorage === 'undefined' ? null : sessionStorage;
+    } catch {
+        return null;
+    }
+}
+
+/* @Codex */
 export function clearSecuritySession(): void {
-    sessionStorage.removeItem(SESSION_KEY_STORAGE_KEY);
-    sessionStorage.removeItem(SESSION_USER_STORAGE_KEY);
+    const storage = getSessionStorage();
+    if (!storage) return;
+
+    try {
+        storage.removeItem(SESSION_KEY_STORAGE_KEY);
+    } catch {
+        // Storage can be unavailable in a restricted browser context.
+    }
+
+    try {
+        storage.removeItem(SESSION_USER_STORAGE_KEY);
+    } catch {
+        // Continue so an unavailable storage API cannot retain the active key.
+    }
+}
+
+/* @Codex */
+export function lockSecuritySession(
+    clearActiveMasterKey: () => void,
+    logoutServerSession: () => void,
+): void {
+    clearSecuritySession();
+    clearActiveMasterKey();
+
+    try {
+        logoutServerSession();
+    } catch {
+        // Local lock state must not depend on an asynchronous logout request.
+    }
 }
