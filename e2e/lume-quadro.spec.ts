@@ -61,6 +61,13 @@ async function setRegister(page: Page, register: QuadroCase['register']): Promis
   }, register);
 }
 
+async function openPatientActionsMenu(lens: Locator): Promise<Locator> {
+  await lens.getByRole('button', { name: 'Altre azioni paziente', exact: true }).click();
+  const menu = lens.page().getByRole('menu', { name: 'Azioni paziente', exact: true });
+  await expect(menu).toBeVisible();
+  return menu;
+}
+
 async function openSyntheticQuadro(page: Page, quadroCase: QuadroCase): Promise<Locator> {
   await page.setViewportSize({ width: quadroCase.width, height: quadroCase.height });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
@@ -68,8 +75,9 @@ async function openSyntheticQuadro(page: Page, quadroCase: QuadroCase): Promise<
   await page.waitForLoadState('domcontentloaded');
   await setRegister(page, quadroCase.register);
   await page.getByRole('button', { name: /Pazienti/ }).click();
-  await expect(page.getByTestId('lume-patient-lens')).toBeVisible();
-  await page.getByRole('button', { name: 'Quadro', exact: true }).click();
+  const lens = page.getByTestId('lume-patient-lens');
+  await expect(lens).toBeVisible();
+  await (await openPatientActionsMenu(lens)).getByRole('menuitem', { name: 'Quadro', exact: true }).click();
   const quadro = page.getByTestId('lume-quadro');
   await expect(quadro).toBeVisible();
   return quadro;
@@ -188,7 +196,7 @@ test('la navigazione Quadro del paziente selezionato converge sulla Scheda', asy
   await page.goto(`/?area=incarico&paziente=${patient.id}`);
   const lens = page.getByTestId('lume-patient-lens');
   await expect(lens.getByRole('heading', { name: patient.name, level: 2 })).toBeVisible();
-  await lens.getByRole('button', { name: 'Quadro', exact: true }).click();
+  await (await openPatientActionsMenu(lens)).getByRole('menuitem', { name: 'Quadro', exact: true }).click();
 
   await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`));
   await expect(page.getByTestId('lume-scheda-header')).toHaveCount(1);
