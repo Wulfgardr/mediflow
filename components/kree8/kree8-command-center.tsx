@@ -6,11 +6,13 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useRouter } from 'next/navigation';
 import {
   CalendarClock,
+  ChartNoAxesCombined,
   CircleHelp,
   CornerDownLeft,
   Database,
   FileText,
   Plus,
+  Scale,
   Search,
   Settings,
   Users,
@@ -68,11 +70,17 @@ export function Kree8CommandCenter({
       onOpenArea(area);
       onClose();
     };
+    const openRoute = (href: string) => {
+      router.push(href);
+      onClose();
+    };
     return [
       { id: 'agenda', label: 'Apri Agenda', hint: 'Area di turno', icon: CalendarClock, run: () => openArea('turno') },
       { id: 'patients', label: 'Apri Pazienti', hint: 'Lista e lente rapida', icon: Users, run: () => openArea('incarico') },
       { id: 'diary', label: 'Apri Diario', hint: 'Timeline clinica', icon: FileText, run: () => openArea('diario') },
       { id: 'catalogs', label: 'Apri Repertori', hint: 'Cataloghi locali', icon: Database, run: () => openArea('repertori') },
+      { id: 'analytics', label: 'Apri Analisi', hint: 'Cruscotto locale', icon: ChartNoAxesCombined, run: () => openRoute('/analytics') },
+      { id: 'scales', label: 'Apri Scale cliniche', hint: 'Catalogo e somministrazione', icon: Scale, run: () => openRoute('/scales') },
       { id: 'settings', label: 'Apri Impostazioni', hint: 'Governance locale', icon: Settings, run: () => openArea('governance') },
       {
         id: 'search',
@@ -84,7 +92,7 @@ export function Kree8CommandCenter({
           onClose();
         },
       },
-      { id: 'new', label: 'Nuova scheda', hint: 'Apri il flusso di inserimento', icon: Plus, run: () => router.push('/patients/new') },
+      { id: 'new', label: 'Nuova scheda', hint: 'Apri il flusso di inserimento', icon: Plus, run: () => openRoute('/patients/new') },
       { id: 'help', label: 'Aiuto tastiera', hint: 'Scorciatoie disponibili', icon: CircleHelp, run: onShowHelp },
     ];
   }, [onClose, onOpenArea, onSearchRequest, onShowHelp, router]);
