@@ -1,4 +1,6 @@
 /* @Codex */
+import { types } from 'node:util';
+
 export type LocalOcrProvider = 'ollama_ocr' | 'apple_vision';
 
 export type LocalOcrProviderResolution = Readonly<{
@@ -26,13 +28,13 @@ export type LocalOcrProviderResolution = Readonly<{
 
 function record(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
     try {
-        if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) return null;
+        if (!value || typeof value !== 'object' || Array.isArray(value) || types.isProxy(value) || Object.getPrototypeOf(value) !== Object.prototype) return null;
         const ownKeys = Reflect.ownKeys(value);
         if (ownKeys.length !== keys.length || ownKeys.some((key) => typeof key !== 'string' || !keys.includes(key))) return null;
         const output: Record<string, unknown> = {};
         for (const key of keys) {
             const descriptor = Object.getOwnPropertyDescriptor(value, key);
-            if (!descriptor || !('value' in descriptor)) return null;
+            if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return null;
             output[key] = descriptor.value;
         }
         return output;

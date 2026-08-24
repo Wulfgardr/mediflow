@@ -101,12 +101,32 @@ test('rejects cross-provider evidence plus malformed venue, egress, authority, a
 test('rejects extra keys, accessors, and non-plain prototypes without reading hostile accessors', () => {
     assert.equal(resolveLocalOcrProvider({ ...ollamaOcrInput(), receipt: { ...ollamaOcrInput().receipt, extra: true } }), null);
 
+    let accessorReads = 0;
     const accessorReceipt = { ...ollamaOcrInput().receipt };
-    Object.defineProperty(accessorReceipt, 'provider', { enumerable: true, get: () => { throw new Error('must not read'); } });
+    Object.defineProperty(accessorReceipt, 'provider', { enumerable: true, get: () => { accessorReads += 1; return 'ollama_ocr'; } });
     assert.equal(resolveLocalOcrProvider({ ...ollamaOcrInput(), receipt: accessorReceipt }), null);
+    assert.equal(accessorReads, 0);
+
+    const nonEnumerableReceipt = { ...ollamaOcrInput().receipt };
+    Object.defineProperty(nonEnumerableReceipt, 'provider', { enumerable: false, value: 'ollama_ocr' });
+    assert.equal(resolveLocalOcrProvider({ ...ollamaOcrInput(), receipt: nonEnumerableReceipt }), null);
 
     const prototypeReceipt = Object.assign(Object.create({ inherited: true }), ollamaOcrInput().receipt);
     assert.equal(resolveLocalOcrProvider({ ...ollamaOcrInput(), receipt: prototypeReceipt }), null);
+});
+
+test('rejects outer and nested proxies before executing reflection traps', () => {
+    const trapCounters = { outer: 0, receipt: 0, provenance: 0 };
+    const traps = (key: keyof typeof trapCounters): ProxyHandler<object> => ({
+        get: () => { trapCounters[key] += 1; throw new Error('must not read'); },
+        getOwnPropertyDescriptor: () => { trapCounters[key] += 1; throw new Error('must not reflect'); },
+        getPrototypeOf: () => { trapCounters[key] += 1; throw new Error('must not reflect'); },
+        ownKeys: () => { trapCounters[key] += 1; throw new Error('must not reflect'); },
+    });
+    assert.equal(resolveLocalOcrProvider(new Proxy(ollamaOcrInput(), traps('outer'))), null);
+    assert.equal(resolveLocalOcrProvider({ ...ollamaOcrInput(), receipt: new Proxy(ollamaOcrInput().receipt, traps('receipt')) }), null);
+    assert.equal(resolveLocalOcrProvider({ ...ollamaOcrInput(), provenance: new Proxy(ollamaOcrInput().provenance, traps('provenance')) }), null);
+    assert.deepEqual(trapCounters, { outer: 0, receipt: 0, provenance: 0 });
 });
 
 test('snapshots accepted metadata so later input or result mutation cannot change the receipt', () => {
