@@ -237,10 +237,23 @@ test('document import review proposes extracted data and creates the scheda with
   // (/?area=turno&paziente=<id>): only require leaving the create form.
   await page.waitForURL((url) => !url.pathname.startsWith('/patients/new'), { timeout: 20_000 });
 
-  // The created scheda carries the reviewed diagnosis and the structured therapy.
-  // The Scheda summary renders the lead diagnosis as "<code> · <descrizione>".
+  // The created Scheda renders the reviewed fields through the current semantic
+  // Quadro region. Assert the distinct accessible nodes rather than the obsolete
+  // combined text node, so both the diagnosis and the structured therapy must persist.
   await page.goto(`/patients/${created.id}/modules`);
-  await expect(page.getByText(`5A11 · ${diagnosisLabel}`).first()).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText('Humalog KwikPen').first()).toBeVisible();
-  await expect(page.getByText('4 U ai pasti principali').first()).toBeVisible();
+  const quadro = page.getByRole('region', {
+    name: 'Baseline e dati verificabili',
+    exact: true,
+  });
+  await expect(quadro).toHaveCount(1);
+  await expect(quadro.getByText('5A11', { exact: true })).toHaveCount(1);
+  await expect(quadro.getByText(diagnosisLabel, { exact: true })).toHaveCount(1);
+  await expect(quadro.getByText('ICD-11', { exact: true })).toHaveCount(1);
+
+  const reviewedTherapy = quadro.getByRole('listitem').filter({
+    has: page.getByText('Humalog KwikPen', { exact: true }),
+  });
+  await expect(reviewedTherapy).toHaveCount(1);
+  await expect(reviewedTherapy.getByText('Humalog KwikPen', { exact: true })).toBeVisible();
+  await expect(reviewedTherapy.getByText('4 U ai pasti principali', { exact: true })).toBeVisible();
 });

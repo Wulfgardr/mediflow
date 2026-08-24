@@ -22,15 +22,11 @@ async function createPatient(
   }, payload);
 }
 
-// WUL-274/Kree8: the patient header moved into the cockpit "Quadro" area
-// (components/kree8/areas/real-patient-area.tsx, caption "Quadro paziente"). The old
-// "Diagnosi in scheda" section with an "ICD-11 <code> · <desc>" label and an explicit
-// "Nessuna codifica ICD" empty-state was superseded. The Quadro identity dock renders
-// each diagnosis as a "<code> · <desc>" chip (patient-workspace parseDiagnosisLabels,
-// no system prefix); for a diagnosis-free patient mapPatientForKree8 substitutes the
-// "Profilo da completare" placeholder chip, which must be visible so the empty state
-// cannot pass trivially when nothing renders.
-test('patient header renders ICD chips and explicit empty state', async ({ page }) => {
+// WUL-560: the canonical patient view is /patients/:id/modules. Its Scheda semantics
+// expose the lead diagnosis separately in the Quadro region and the secondary coding
+// in the Identita region. Keep every code, description and system assertion scoped to
+// the current region so a duplicated or stale aggregate string cannot satisfy the test.
+test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
   const suffix = `${Date.now()}`.slice(-4);
   const diagnosisDescription = 'Disturbo depressivo maggiore, episodio singolo lieve';
@@ -71,37 +67,31 @@ test('patient header renders ICD chips and explicit empty state', async ({ page 
     diagnoses: [],
   });
 
-  const diagnosisList = page.getByRole('list', {
-    name: 'Diagnosi',
+  await page.goto(`/patients/${patientWithDiagnosisId}/modules`);
+  await expect(page.getByText('Scheda clinica', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: `Header${suffix} Icd${suffix}`, exact: true })).toBeVisible();
+
+  const quadro = page.getByRole('region', {
+    name: 'Baseline e dati verificabili',
     exact: true,
   });
-  const diagnosisChip = diagnosisList
-    .getByRole('listitem')
-    .filter({ hasText: diagnosisDescription });
+  await expect(quadro).toHaveCount(1);
+  await expect(quadro.getByText('Problema guida', { exact: true })).toBeVisible();
+  await expect(quadro.getByText('EF00', { exact: true })).toHaveCount(1);
+  await expect(quadro.getByText(diagnosisDescription, { exact: true })).toHaveCount(1);
+  await expect(quadro.getByText('ICD-11', { exact: true })).toHaveCount(1);
 
-  /* @Codex: il chip e' una voce di lista nominata dal contenuto visibile.
-     Il match esatto, lo snapshot ARIA e la cardinalita' esplicita evitano che
-     un attributo non esposto o un duplicato rendano verde il contratto. */
-  await page.goto(`/patients/${patientWithDiagnosisId}`);
-  await expect(page.getByText('Quadro paziente')).toBeVisible();
-  await expect(diagnosisList).toHaveCount(1);
-  await expect(diagnosisChip).toHaveCount(1);
-  await expect(diagnosisChip).toBeVisible();
-  await expect(diagnosisChip).toHaveCSS('min-width', '0px');
-  await expect(diagnosisChip).toHaveCSS('max-width', '100%');
-  await expect(diagnosisChip).toContainText('EF00');
-  await expect(diagnosisChip).toContainText(diagnosisDescription);
-  await expect(diagnosisChip).toMatchAriaSnapshot(
-    `- listitem: EF00 ${diagnosisDescription}`
-  );
+  const identitySection = page.locator('#identita');
+  const leadDiagnosisCard = identitySection.locator('.patient-diagnosis-card');
+  await expect(identitySection).toHaveCount(1);
+  await expect(identitySection.getByRole('heading', { name: 'Quadro clinico', exact: true })).toHaveCount(1);
+  await expect(leadDiagnosisCard).toHaveCount(1);
+  await expect(leadDiagnosisCard.getByText('EF00', { exact: true })).toHaveCount(1);
+  await expect(leadDiagnosisCard.getByText(diagnosisDescription, { exact: true })).toHaveCount(1);
+  await expect(leadDiagnosisCard.getByText('ICD-11', { exact: true })).toHaveCount(1);
 
-  await page.reload();
-  await expect(diagnosisChip).toHaveCount(1);
-  await expect(diagnosisChip).toBeVisible();
-
-  /* @Codex: la lente clinica deve lasciare il listitem senza nome d'autore e
-     conservare codice, descrizione e sistema nel contenuto accessibile. */
-  await page.goto(`/patients/${patientWithDiagnosisId}/modules`);
+  /* @Codex: la lista secondaria espone ciascun codice come item autonomo e
+     conserva codice, descrizione e sistema nel nome accessibile. */
   const secondaryDiagnosisList = page.getByRole('list', {
     name: 'Diagnosi codificate secondarie',
     exact: true,
@@ -116,8 +106,13 @@ test('patient header renders ICD chips and explicit empty state', async ({ page 
     `- listitem: BA00 ${secondaryDiagnosisDescription} ICD-11`
   );
 
-  await page.goto(`/patients/${patientWithoutDiagnosisId}`);
-  await expect(page.getByText('Quadro paziente')).toBeVisible();
-  await expect(page.getByText('Profilo da completare')).toBeVisible();
-  await expect(diagnosisChip).toHaveCount(0);
+  await page.goto(`/patients/${patientWithoutDiagnosisId}/modules`);
+  const emptyQuadro = page.getByRole('region', {
+    name: 'Baseline e dati verificabili',
+    exact: true,
+  });
+  await expect(emptyQuadro).toHaveCount(1);
+  await expect(emptyQuadro.getByText('Problema guida', { exact: true })).toBeVisible();
+  await expect(emptyQuadro.getByText('Nessuna diagnosi codificata in scheda.', { exact: true })).toHaveCount(1);
+  await expect(emptyQuadro.getByText('EF00', { exact: true })).toHaveCount(0);
 });
