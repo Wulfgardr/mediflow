@@ -1,6 +1,7 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { createRequire } from 'node:module';
 import { afterEach, test } from 'node:test';
 
 import {
@@ -196,21 +197,54 @@ test('disposal cannot register a new resource on the terminated session', () => 
     assert.equal(nestedRegistration, null);
 });
 
-test('clear disposes an orphan registration left by host module drift', () => {
-    const session = syntheticSession();
-    const reasons: string[] = [];
-    registerServerSessionResource(session.id, (reason) => reasons.push(reason));
-    globalThis.__mediflowSessions?.delete(session.id);
+test('does not trust global registry pointers across module wrappers', () => {
+    const sessionGlobals = globalThis as typeof globalThis & {
+        __mediflowSessions?: Map<string, unknown>;
+        __mediflowSessionResources?: Map<string, unknown>;
+    };
+    const sessionsDescriptor = Object.getOwnPropertyDescriptor(sessionGlobals, '__mediflowSessions');
+    const resourcesDescriptor = Object.getOwnPropertyDescriptor(sessionGlobals, '__mediflowSessionResources');
+    const forgedSessions = new Map<string, unknown>();
+    const forgedResources = new Map<string, unknown>();
+    const nodeRequire = createRequire(import.meta.url);
+    const modulePath = nodeRequire.resolve('./server-session.ts');
+    const originalModule = nodeRequire.cache[modulePath];
+    let secondary: typeof import('./server-session') | undefined;
 
-    clearAllSessions();
+    try {
+        forgedSessions.set('forged-session', Object.freeze({ id: 'forged-session' }));
+        sessionGlobals.__mediflowSessions = forgedSessions;
+        sessionGlobals.__mediflowSessionResources = forgedResources;
 
-    assert.deepEqual(reasons, ['sessions_cleared']);
+        const primary = syntheticSession();
+        assert.equal(forgedSessions.has(primary.id), false);
+        assert.equal(getSession('forged-session'), null);
+        deleteSession(primary.id);
+        assert.equal(getSession(primary.id), null);
+
+        delete nodeRequire.cache[modulePath];
+        secondary = nodeRequire(modulePath) as typeof import('./server-session');
+        assert.equal(secondary.getSession(primary.id), null);
+        const secondSession = secondary.createSession({ id: 'user-secondary', username: SYNTHETIC_USERNAME, role: 'clinician' });
+        assert.equal(getSession(secondSession.id), null);
+        secondary.clearAllSessions();
+    } finally {
+        if (sessionsDescriptor) Object.defineProperty(sessionGlobals, '__mediflowSessions', sessionsDescriptor);
+        else delete sessionGlobals.__mediflowSessions;
+        if (resourcesDescriptor) Object.defineProperty(sessionGlobals, '__mediflowSessionResources', resourcesDescriptor);
+        else delete sessionGlobals.__mediflowSessionResources;
+        secondary?.clearAllSessions();
+        if (originalModule) nodeRequire.cache[modulePath] = originalModule;
+        else delete nodeRequire.cache[modulePath];
+    }
 });
 
 test('keeps session state and the H1b commit turn isolated from post-load ambient intrinsics', () => {
     const mapPrototype = Map.prototype;
     const setPrototype = Set.prototype;
     const arrayPrototype = Array.prototype;
+    const mapIteratorPrototype = Object.getPrototypeOf(new Map().keys());
+    const setIteratorPrototype = Object.getPrototypeOf(new Set().values());
     const originalDateNow = Date.now;
     const originals = {
         map: globalThis.Map,
@@ -222,14 +256,20 @@ test('keeps session state and the H1b commit turn isolated from post-load ambien
         mapHas: mapPrototype.has,
         mapKeys: mapPrototype.keys,
         mapValues: mapPrototype.values,
+        mapIteratorNext: mapIteratorPrototype.next,
         setAdd: setPrototype.add,
         setDelete: setPrototype.delete,
         setValues: setPrototype.values,
+        setIteratorNext: setIteratorPrototype.next,
+        setSize: Object.getOwnPropertyDescriptor(setPrototype, 'size')!,
         dateNow: originalDateNow,
         functionCall: Function.prototype.call,
         functionApply: Function.prototype.apply,
         functionBind: Function.prototype.bind,
         reflectApply: Reflect.apply,
+        objectGetPrototypeOf: Object.getPrototypeOf,
+        objectGetOwnPropertyDescriptor: Object.getOwnPropertyDescriptor,
+        arrayPush: arrayPrototype.push,
         arrayIterator: arrayPrototype[Symbol.iterator],
     };
     const prepared = Object.freeze({ synthetic: 'prepared' });
@@ -238,7 +278,8 @@ test('keeps session state and the H1b commit turn isolated from post-load ambien
     let poisonedCalls = 0;
     let live: ReturnType<typeof createSession> | undefined;
     let expiryAfterZero = 0; let expiryAfterInfinity = 0; let expiryAfterFuture = 0;
-    let deleted = false; let invalidated = false; let cleared = false;
+    let deleted = false; let invalidated = false; let cleared = false; let expiredRemainsClosed = false;
+    let disposerCalls = 0; let disposerReason: string | undefined;
     let aborts = 0; let commits = 0;
     let firstFailure: unknown;
     const poison = () => { poisonedCalls += 1; throw new Error('synthetic ambient intrinsic'); };
@@ -253,18 +294,25 @@ test('keeps session state and the H1b commit turn isolated from post-load ambien
         mapPrototype.has = poison as typeof mapPrototype.has;
         mapPrototype.keys = poison as typeof mapPrototype.keys;
         mapPrototype.values = poison as typeof mapPrototype.values;
+        mapIteratorPrototype.next = poison as typeof mapIteratorPrototype.next;
         setPrototype.add = poison as typeof setPrototype.add;
         setPrototype.delete = poison as typeof setPrototype.delete;
         setPrototype.values = poison as typeof setPrototype.values;
+        setIteratorPrototype.next = poison as typeof setIteratorPrototype.next;
+        Object.defineProperty(setPrototype, 'size', { ...originals.setSize, get: poison });
         Date.now = () => 0;
         Function.prototype.call = poison as typeof Function.prototype.call;
         Function.prototype.apply = poison as typeof Function.prototype.apply;
         Function.prototype.bind = poison as typeof Function.prototype.bind;
         Reflect.apply = poison as typeof Reflect.apply;
+        Object.getPrototypeOf = poison as typeof Object.getPrototypeOf;
+        Object.getOwnPropertyDescriptor = poison as typeof Object.getOwnPropertyDescriptor;
+        arrayPrototype.push = poison as typeof arrayPrototype.push;
         arrayPrototype[Symbol.iterator] = poison as typeof arrayPrototype[typeof Symbol.iterator];
 
         live = syntheticSession();
         assert.equal(getSession(live.id), live);
+        assert.equal(peekSession(live.id), live);
         expiryAfterZero = live.expiresAt;
 
         Date.now = () => Infinity;
@@ -279,12 +327,19 @@ test('keeps session state and the H1b commit turn isolated from post-load ambien
         deleteSession(deletedSession.id);
         deleted = getSession(deletedSession.id) === null;
 
+        const expiredSession = syntheticSession();
+        expiredSession.expiresAt = 0;
+        assert.equal(getSession(expiredSession.id), null);
+        expiredRemainsClosed = peekSession(expiredSession.id) === null;
+
         const invalidatedSession = createSession({ id: 'user-synthetic-invalidate', username: SYNTHETIC_USERNAME, role: 'clinician' });
         invalidateSessionsForUser('user-synthetic-invalidate');
         invalidated = getSession(invalidatedSession.id) === null;
 
         const clearedSession = syntheticSession();
-        registerServerSessionResource(clearedSession.id, () => undefined);
+        const unregister = registerServerSessionResource(clearedSession.id, () => { disposerCalls += 1; disposerReason = 'unregistered'; });
+        unregister?.();
+        registerServerSessionResource(clearedSession.id, (reason) => { disposerCalls += 1; disposerReason = reason; });
         clearAllSessions();
         cleared = getSession(clearedSession.id) === null;
 
@@ -310,14 +365,20 @@ test('keeps session state and the H1b commit turn isolated from post-load ambien
         mapPrototype.has = originals.mapHas;
         mapPrototype.keys = originals.mapKeys;
         mapPrototype.values = originals.mapValues;
+        mapIteratorPrototype.next = originals.mapIteratorNext;
         setPrototype.add = originals.setAdd;
         setPrototype.delete = originals.setDelete;
         setPrototype.values = originals.setValues;
+        setIteratorPrototype.next = originals.setIteratorNext;
+        Object.defineProperty(setPrototype, 'size', originals.setSize);
         Date.now = originals.dateNow;
         Function.prototype.call = originals.functionCall;
         Function.prototype.apply = originals.functionApply;
         Function.prototype.bind = originals.functionBind;
         Reflect.apply = originals.reflectApply;
+        Object.getPrototypeOf = originals.objectGetPrototypeOf;
+        Object.getOwnPropertyDescriptor = originals.objectGetOwnPropertyDescriptor;
+        arrayPrototype.push = originals.arrayPush;
         arrayPrototype[Symbol.iterator] = originals.arrayIterator;
     }
 
@@ -331,6 +392,8 @@ test('keeps session state and the H1b commit turn isolated from post-load ambien
     assert.equal(deleted, true);
     assert.equal(invalidated, true);
     assert.equal(cleared, true);
+    assert.equal(expiredRemainsClosed, true);
+    assert.deepEqual({ disposerCalls, disposerReason }, { disposerCalls: 1, disposerReason: 'sessions_cleared' });
     assert.equal(poisonedCalls, 0);
     assert.equal(firstFailure instanceof ServerSessionProjectionOwnerError && firstFailure.code, 'selection_unavailable');
     assert.deepEqual({ aborts, commits }, { aborts: 1, commits: 1 });
