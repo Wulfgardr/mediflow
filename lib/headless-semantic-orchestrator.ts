@@ -1,7 +1,6 @@
 /* @Codex */
 import 'server-only';
 import { types } from 'node:util';
-
 type AdapterKind = 'chat' | 'voice'; type Scalar = string | number | boolean;
 type Outcome = 'discovery' | 'read' | 'query' | 'orchestration' | 'preview' | 'proposal';
 type Input = Readonly<Record<string, Scalar>>;
@@ -18,7 +17,6 @@ export interface HeadlessSemanticHost {
 }
 export class HeadlessSemanticError extends Error { constructor(readonly code: string) { super(code); this.name = 'HeadlessSemanticError'; } }
 export const HEADLESS_P3_CLAIM_CEILING = 'Candidate synthetic harness; epoch comparison depends on host-owned monotonic nonreusable lease and mutation epochs; no runtime, integration, release, write, or apply claim.';
-
 const REQUEST_KEYS = ['adapterKind', 'intent', 'requestRef', 'idempotencyRef'] as const;
 const HOST_KEYS = ['acquireContext', 'plan', 'authorize', 'registry', 'clock', 'entropy'] as const;
 const OP_KEYS = ['operationId', 'capabilityId', 'applicationServiceRef', 'maximumStage', 'fabricDependency', 'inputKeys', 'execute'] as const;
@@ -28,7 +26,7 @@ const AUTH_KEYS = ['allowed', 'policyDecision'] as const;
 const OUTPUT_KEYS = ['outcome', 'response'] as const;
 const OUTCOMES = new Set<Outcome>(['discovery', 'read', 'query', 'orchestration', 'preview', 'proposal']);
 const CAPABILITIES = new Set(Array.from({ length: 66 }, (_, index) => `web-${String(index + 1).padStart(2, '0')}`));
-const FABRIC_CAPABILITIES = new Set('patient_insight smart_import document_synthesis ocr treatment_reasoning icd_lookup aifa_drug_search service_prescription_matching evidence_absorption patient_open_loops fhir_export document_classification document_identity_resolution pii_redaction_layer1 fse_document_validation observation_range_classification'.split(' '));
+const FABRIC_CAPABILITIES = new Set('fabric:patient_insight@28a1a36b162f fabric:smart_import@28a1a36b162f fabric:document_synthesis@28a1a36b162f fabric:ocr@28a1a36b162f fabric:treatment_reasoning@28a1a36b162f fabric:icd_lookup@28a1a36b162f fabric:aifa_drug_search@28a1a36b162f fabric:service_prescription_matching@28a1a36b162f fabric:evidence_absorption@28a1a36b162f fabric:patient_open_loops@28a1a36b162f fabric:fhir_export@28a1a36b162f fabric:document_classification@28a1a36b162f fabric:document_identity_resolution@28a1a36b162f fabric:pii_redaction_layer1@28a1a36b162f fabric:fse_document_validation@28a1a36b162f fabric:observation_range_classification@28a1a36b162f'.split(' '));
 const ACTION_REF = /^act_[0-9a-f]{32}$/;
 const REF = /^[a-z][a-z0-9-]*_[a-z0-9][a-z0-9.-]{7,63}$/;
 const FORBIDDEN = /(?:^|[-_.:])(sql|sqlite|route|api|cli|provider|venue|authority|apply)(?:$|[-_.:])/i;
@@ -108,7 +106,6 @@ export function createHeadlessSemanticOrchestrator(candidate: HeadlessSemanticHo
             || !callable(op.execute) || operations.has(op.operationId)) fail('registry_invalid');
         operations.set(op.operationId, Object.freeze({ ...op, inputKeys: Object.freeze(keys) }) as HeadlessSemanticOperation);
     }
-
     const seen = new Set<string>();
     let busy = false;
     let poisoned = false;
