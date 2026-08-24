@@ -27,6 +27,14 @@ export type FabricVenueCopy = Readonly<{
     description: string;
 }>;
 
+export type FabricProviderDisclosure = Readonly<{
+    id: 'ollama' | 'athena' | 'apple_vision_ocr' | 'openai' | 'anthropic';
+    mark: 'O' | 'A' | 'V';
+    title: string;
+    detail: string;
+    observation: string;
+}>;
+
 export const FABRIC_VENUE_COPY: Readonly<Record<FabricVenue, FabricVenueCopy>> = Object.freeze({
     local_process: Object.freeze({
         title: 'Questo Mac',
@@ -61,6 +69,60 @@ export const VENUE_OBSERVATION_STATE_LABELS: Readonly<Record<VenueObservationSta
     offline: 'Non disponibile',
     unknown: 'Stato non verificato',
 });
+
+export function buildFabricProviderDisclosures(
+    status: FabricStatusSnapshot,
+    observability: FabricObservabilitySnapshot,
+): readonly FabricProviderDisclosure[] {
+    const localProcess = observability.observations.find((observation) => observation.venue === 'local_process');
+    const localProcessObservation = localProcess
+        ? `Percorso registrato: local_process (${VENUE_OBSERVATION_STATE_LABELS[localProcess.state]}).`
+        : 'Percorso local_process non presente nel registro.';
+    const availabilityNote = status.readinessNote === 'available_unqualified'
+        ? 'Disponibilità non qualificata: non indica accesso, autenticazione, attivazione o prontezza.'
+        : 'Il registro non qualifica accesso, autenticazione, attivazione o prontezza.';
+    const closedEgress = status.egressGateOpen === false
+        ? 'Egress chiuso.'
+        : 'Lo stato egress non viene dichiarato chiuso in questa proiezione.';
+
+    return Object.freeze([
+        Object.freeze({
+            id: 'ollama' as const,
+            mark: 'O' as const,
+            title: 'Ollama',
+            detail: 'Ollama usa local_process osservato. Il modello è configurato per capacità e non è esposto qui.',
+            observation: `${localProcessObservation} ${availabilityNote}`,
+        }),
+        Object.freeze({
+            id: 'athena' as const,
+            mark: 'A' as const,
+            title: 'ATHENA',
+            detail: 'Provider athena_mlx con ATHENA-R1-Qwen3-8B. Lo stato non è osservato in questo registro.',
+            observation: availabilityNote,
+        }),
+        Object.freeze({
+            id: 'apple_vision_ocr' as const,
+            mark: 'V' as const,
+            title: 'Apple Vision OCR',
+            detail: 'Fallback locale solo macOS. Non è una capacità Fabric on-device.',
+            observation: availabilityNote,
+        }),
+        Object.freeze({
+            id: 'openai' as const,
+            mark: 'O' as const,
+            title: 'OpenAI',
+            detail: `Candidato consumer_login. Accesso non configurabile. ${closedEgress}`,
+            observation: availabilityNote,
+        }),
+        Object.freeze({
+            id: 'anthropic' as const,
+            mark: 'A' as const,
+            title: 'Anthropic',
+            detail: `Candidato consumer_login. Accesso non configurabile. ${closedEgress}`,
+            observation: availabilityNote,
+        }),
+    ]);
+}
 
 export const FABRIC_CAPABILITY_LABELS: Readonly<Record<FabricCapabilityId, string>> = Object.freeze({
     patient_insight: 'Sintesi del quadro paziente',

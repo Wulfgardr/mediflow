@@ -443,6 +443,69 @@
 .fabricEgressRow dd .fabricCount {
     margin-top: 0.55rem;
 }
+.fabricProviderDisclosure {
+    margin-top: 1.5rem;
+    border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+    padding-top: 1.25rem;
+}
+.fabricProviderDisclosure .fabricBlockHeader {
+    margin-bottom: 0.85rem;
+}
+.fabricProviderDisclosure h3 {
+    margin: 0;
+    color: var(--lume-ink);
+    font-size: 0.92rem;
+    font-weight: 650;
+}
+.fabricProviderList {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.fabricProviderRow {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.7rem;
+    align-items: start;
+    border: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
+    border-radius: var(--lume-radius-card);
+    background: var(--lume-surface-field);
+    padding: 0.85rem;
+}
+.fabricProviderMark {
+    display: grid;
+    width: 1.8rem;
+    height: 1.8rem;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--lume-ink) 18%, transparent);
+    border-radius: 999px;
+    color: var(--lume-ink-muted);
+    font-family: var(--lume-settings-register-family, "IBM Plex Mono", var(--font-registro), "SF Mono", monospace);
+    font-size: 0.72rem;
+    font-weight: 650;
+}
+.fabricProviderRow h4,
+.fabricProviderRow p {
+    margin: 0;
+}
+.fabricProviderRow h4 {
+    color: var(--lume-ink);
+    font-size: 0.78rem;
+    font-weight: 650;
+}
+.fabricProviderRow p {
+    margin-top: 0.3rem;
+    color: var(--lume-ink-muted);
+    font-size: 0.7rem;
+    line-height: 1.45;
+}
+.fabricProviderRow .fabricProviderObservation {
+    color: var(--lume-ink-muted);
+    font-size: 0.64rem;
+}
 .fabricRegistryGroups {
     display: grid;
     gap: 1.75rem;
@@ -750,6 +813,9 @@
     .fabricVenueRow,
     .fabricEgressRow,
     .fabricCapabilityRow {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .fabricProviderList {
         grid-template-columns: minmax(0, 1fr);
     }
     .fabricGuarantee code {

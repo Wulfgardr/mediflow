@@ -1,5 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { FABRIC_CAPABILITY_DESCRIPTORS } from './ai-providers/fabric/catalog';
@@ -13,6 +14,7 @@ import {
     FABRIC_CAPABILITY_LABELS,
     FABRIC_VENUE_COPY,
     VENUE_OBSERVATION_REASON_LABELS,
+    buildFabricProviderDisclosures,
     groupFabricCapabilities,
 } from './fabric-settings-view';
 
@@ -56,4 +58,46 @@ test('groups and orders the complete registry by capability class', () => {
     assert.deepEqual(groups[0].capabilities.map((item) => item.id), [...GENERATIVE_CAPABILITY_IDS]);
     assert.equal(groups[1].id, 'deterministic');
     assert.deepEqual(groups[1].capabilities.map((item) => item.id), [...DETERMINISTIC_CAPABILITY_IDS]);
+});
+
+test('projects five provider paths without turning the snapshots into readiness or access claims', () => {
+    const disclosures = buildFabricProviderDisclosures({
+        schemaVersion: 'mediflow.ai.fabric-status.v1',
+        contractVersion: 'mediflow.ai.fabric.v1',
+        egressGateOpen: false,
+        readinessNote: 'available_unqualified',
+        capabilities: [],
+    }, {
+        schemaVersion: 'mediflow.ai.fabric-observability.v1',
+        fallback: 'denied_by_contract',
+        observations: [
+            { venue: 'local_process', state: 'available', reason: null },
+            { venue: 'home_base', state: 'offline', reason: 'mode_disabled' },
+            { venue: 'on_device', state: 'unknown', reason: 'not_implemented' },
+            { venue: 'cloud', state: 'offline', reason: 'egress_profile_closed' },
+        ],
+    });
+
+    assert.deepEqual(disclosures.map((disclosure) => disclosure.id), [
+        'ollama', 'athena', 'apple_vision_ocr', 'openai', 'anthropic',
+    ]);
+    assert.deepEqual(disclosures.map((disclosure) => disclosure.mark), ['O', 'A', 'V', 'O', 'A']);
+    assert.match(disclosures[0].detail, /local_process/u);
+    assert.match(disclosures[0].detail, /modello.*capacità.*non è esposto qui/u);
+    assert.match(disclosures[1].detail, /athena_mlx.*ATHENA-R1-Qwen3-8B.*non è osservato/u);
+    assert.match(disclosures[2].detail, /solo macOS.*Non è una capacità Fabric on-device/u);
+    for (const disclosure of disclosures.slice(3)) {
+        assert.match(disclosure.detail, /consumer_login.*Accesso non configurabile.*Egress chiuso/u);
+    }
+    assert.match(disclosures[0].observation, /Disponibilità non qualificata/u);
+    assert.doesNotMatch(JSON.stringify(disclosures), /ready|pronto|autenticat|abilitat|configura.*modello|kill.?switch/iu);
+});
+
+test('keeps the provider disclosure component static and free of actions or provider calls', () => {
+    const source = readFileSync(new URL('../components/settings/fabric-venue-section.tsx', import.meta.url), 'utf8');
+
+    assert.match(source, /<section/u);
+    assert.match(source, /<li/u);
+    assert.doesNotMatch(source, /<form|<button|<input|<select|<textarea|<a\s|<Link\b|fetch\(|useEffect|useState|onClick|onSubmit|href=/u);
+    assert.doesNotMatch(source, /killSwitch|model\s*:|route|router|egressGateOpen\s*=|isEgressGateOpen/u);
 });
