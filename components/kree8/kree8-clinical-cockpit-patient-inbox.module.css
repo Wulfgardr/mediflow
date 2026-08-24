@@ -396,10 +396,10 @@
 }
 
 .caseLensActionMenu {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + 8px);
-  right: 0;
+  position: fixed;
+  z-index: 1050;
+  top: 0;
+  left: 0;
   width: min(230px, calc(100vw - 40px));
   padding: 6px;
   display: flex;
@@ -409,7 +409,10 @@
   border-radius: 14px;
   background: var(--lume-surface-focal);
   box-shadow: 0 12px 28px color-mix(in srgb, var(--lume-ink) 16%, transparent);
+  visibility: hidden;
 }
+
+.caseLensActionMenu[data-positioned='true'] { visibility: visible; }
 
 .caseLensMenuItem {
   min-height: 44px;
@@ -459,11 +462,6 @@
   }
 
   .worklistLensActions { grid-template-columns: minmax(0, 1fr) auto; }
-
-  .caseLensActionMenu {
-    top: auto;
-    bottom: calc(100% + 8px);
-  }
 
 }
 
