@@ -110,3 +110,53 @@ test('K4: tastiera cross-packet attraversa worklist, comandi e ricerca senza dup
 
   expect(consoleErrors).toEqual([]);
 });
+
+test('L9: i comandi raggiungono Analisi e Scale una sola volta senza scorciatoie di authority', async ({ page }) => {
+  const consoleErrors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  await page.goto('/?area=incarico');
+
+  const commandTrigger = page.getByRole('button', { name: 'Apri comandi e aiuto tastiera', exact: true });
+  await commandTrigger.focus();
+  await page.keyboard.press('ControlOrMeta+KeyK');
+
+  const commandDialog = page.getByRole('dialog', { name: 'Comandi MediFlow', exact: true });
+  const commandSearch = page.getByRole('combobox', { name: 'Cerca un comando', exact: true });
+  await expect(commandDialog).toHaveCount(1);
+  await expect(commandSearch).toBeFocused();
+
+  await commandSearch.fill('Analisi');
+  const analyticsCommand = commandDialog.getByRole('option', { name: /Apri Analisi/ });
+  await expect(commandDialog.getByRole('option')).toHaveCount(1);
+  await expect(analyticsCommand).toHaveCount(1);
+  await expect(analyticsCommand).not.toHaveAttribute('aria-disabled', 'true');
+  await commandSearch.press('Enter');
+  await expect(page).toHaveURL(/\/analytics$/);
+  await expect(page.getByRole('heading', { name: 'Cruscotto locale', level: 1 })).toBeVisible();
+
+  await page.goto('/?area=incarico');
+  await commandTrigger.focus();
+  await page.keyboard.press('ControlOrMeta+KeyK');
+  await expect(commandSearch).toBeFocused();
+  await commandSearch.fill('Scale');
+  const scalesCommand = commandDialog.getByRole('option', { name: /Apri Scale cliniche/ });
+  await expect(commandDialog.getByRole('option')).toHaveCount(1);
+  await expect(scalesCommand).toHaveCount(1);
+  await expect(scalesCommand).not.toHaveAttribute('aria-disabled', 'true');
+  await commandSearch.press('Escape');
+  await expect(commandDialog).toHaveCount(0);
+  await expect(commandTrigger).toBeFocused();
+
+  await page.keyboard.press('ControlOrMeta+KeyK');
+  await commandSearch.fill('Scale');
+  await commandSearch.press('Enter');
+  await expect(page).toHaveURL(/\/scales$/);
+  await expect(page.getByRole('heading', { name: 'Scale cliniche', level: 1 })).toBeVisible();
+
+  expect(consoleErrors).toEqual([]);
+});
