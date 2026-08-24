@@ -6,6 +6,7 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
+- [0100-fabric-vs-headless-semantic-plane.md](./0100-fabric-vs-headless-semantic-plane.md): propone piani Fabric e Headless separati, con inventari e gate SHA distinti; non abilita runtime, cloud o apply.
 - [0098-physician-terminal-review-authority.md](./0098-physician-terminal-review-authority.md): propone la capability locale stretta per accept/reject review, con gesto monouso e route assente fino ai gate.
 - [0096-owner-sessione-selezione-e-lifetime-broker.md](./0096-owner-sessione-selezione-e-lifetime-broker.md): fissa owner session-scoped, selezione canonica e broker per lease.
 - [0095-broker-projection-e-servizi-host-per-capability.md](./0095-broker-projection-e-servizi-host-per-capability.md): fissa lifecycle post-onboarding, broker projection e servizi host capability-specific.
