@@ -33,6 +33,24 @@ function bootstrapDatabase(): { sqlite: Database.Database; db: BetterSQLite3Data
         if (sql.trim().length === 0) continue;
         sqlite.exec(sql);
     }
+    // @Codex: db-server owns this runtime table; the cascade fixture must
+    // materialize its parent before exercising the migrated patient-link table.
+    sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS durable_review_records (
+            id TEXT PRIMARY KEY NOT NULL,
+            patient_ref TEXT NOT NULL,
+            review_id TEXT NOT NULL UNIQUE,
+            review_revision INTEGER NOT NULL,
+            receipt_ref TEXT NOT NULL,
+            provenance_ref TEXT NOT NULL,
+            receipt_binding TEXT NOT NULL,
+            provenance_binding TEXT NOT NULL,
+            presentation_version TEXT NOT NULL,
+            sealed_ciphertext TEXT NOT NULL,
+            sealed_digest TEXT NOT NULL,
+            created_at INTEGER DEFAULT (unixepoch())
+        )
+    `);
     sqlite.pragma('foreign_keys = ON');
     return { sqlite, db: drizzle(sqlite) };
 }
@@ -46,6 +64,29 @@ function insertPatientWithChildren(sqlite: Database.Database, patientId: string)
     sqlite.prepare(
         "INSERT INTO patients (id, first_name, last_name, tax_code) VALUES (?, 'Mario', 'Rossi', 'RSSMRA80A01H501X')"
     ).run(patientId);
+    /* @Codex */
+    const reviewId = `review-${suffix}`;
+    sqlite.prepare(`
+        INSERT INTO durable_review_records (
+            id, patient_ref, review_id, review_revision, receipt_ref,
+            provenance_ref, receipt_binding, provenance_binding,
+            presentation_version, sealed_ciphertext, sealed_digest
+        ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+        reviewId,
+        `ptr-${suffix}`,
+        reviewId,
+        `receipt-${suffix}`,
+        `provenance-${suffix}`,
+        '0'.repeat(64),
+        '1'.repeat(64),
+        'mediflow.ai.durable-review.presentation.v1',
+        'ENC:c3ludGhldGlj:Y2lwaGVy',
+        '2'.repeat(64)
+    );
+    sqlite.prepare(
+        'INSERT INTO durable_review_patient_links (review_id, patient_id) VALUES (?, ?)'
+    ).run(reviewId, patientId);
     sqlite.prepare(
         "INSERT INTO service_prescriptions (id, patient_id, prescribed_at, service_name) VALUES (?, ?, 1, 'Visita di controllo')"
     ).run(`sp-${suffix}`, patientId);
