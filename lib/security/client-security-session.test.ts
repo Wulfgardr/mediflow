@@ -6,6 +6,7 @@ import {
     lockSecuritySession,
     restoreSecuritySession,
 } from './client-security-session';
+import { logoutSecuritySession } from './client-auth-api';
 
 const SESSION_KEY_STORAGE_KEY = 'mediflow_session_key';
 const SESSION_USER_STORAGE_KEY = 'mediflow_user';
@@ -100,6 +101,35 @@ test('a logout failure cannot retain the local key or persisted session', (t) =>
             throw new Error('synthetic logout failure');
         },
     ));
+    assert.equal(storage.getItem(SESSION_KEY_STORAGE_KEY), null);
+    assert.equal(storage.getItem(SESSION_USER_STORAGE_KEY), null);
+    assert.equal(db.isKeySet(), false);
+});
+
+test('a rejected logout request does not create an unhandled rejection', async (t) => {
+    const storage = new MemorySessionStorage();
+    storeSyntheticSession(storage);
+    const restoreStorage = installSessionStorage(storage as unknown as Storage);
+    const originalFetch = globalThis.fetch;
+    const unhandledRejections: unknown[] = [];
+    const onUnhandledRejection = (reason: unknown) => {
+        unhandledRejections.push(reason);
+    };
+    db.setKey({} as CryptoKey);
+    globalThis.fetch = (() => Promise.reject(new Error('synthetic logout rejection'))) as typeof fetch;
+    process.on('unhandledRejection', onUnhandledRejection);
+
+    t.after(() => {
+        process.off('unhandledRejection', onUnhandledRejection);
+        globalThis.fetch = originalFetch;
+        db.setKey(null);
+        restoreStorage();
+    });
+
+    lockSecuritySession(() => db.setKey(null), logoutSecuritySession);
+
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.deepEqual(unhandledRejections, []);
     assert.equal(storage.getItem(SESSION_KEY_STORAGE_KEY), null);
     assert.equal(storage.getItem(SESSION_USER_STORAGE_KEY), null);
     assert.equal(db.isKeySet(), false);

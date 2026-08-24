@@ -65,13 +65,13 @@ export function clearSecuritySession(): void {
 /* @Codex */
 export function lockSecuritySession(
     clearActiveMasterKey: () => void,
-    logoutServerSession: () => void,
+    logoutServerSession: () => void | Promise<void>,
 ): void {
     clearSecuritySession();
     clearActiveMasterKey();
 
     try {
-        logoutServerSession();
+        void Promise.resolve(logoutServerSession()).catch(() => undefined);
     } catch {
         // Local lock state must not depend on an asynchronous logout request.
     }
