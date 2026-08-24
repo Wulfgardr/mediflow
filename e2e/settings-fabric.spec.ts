@@ -30,7 +30,10 @@ test('Fabric settings renders the read-only venue and capability registry', asyn
   await expect(providerDisclosure).toContainText('ATHENA-R1-Qwen3-8B');
   await expect(providerDisclosure).toContainText('Non è una capacità Fabric on-device');
   await expect(providerDisclosure).toContainText('Accesso non configurabile. Egress chiuso.');
-  await expect(providerDisclosure).toContainText('Disponibilità non qualificata');
+  await expect(page.getByTestId('fabric-provider-ollama')).toContainText('Disponibilità non qualificata');
+  for (const provider of ['athena', 'apple_vision_ocr', 'openai', 'anthropic']) {
+    await expect(page.getByTestId(`fabric-provider-${provider}`)).not.toContainText('Disponibilità non qualificata');
+  }
 
   await expect(page.getByTestId('fabric-capability-patient_insight')).toBeVisible();
   await expect(page.getByTestId('fabric-capability-icd_lookup')).toBeVisible();

@@ -90,7 +90,14 @@ test('projects five provider paths without turning the snapshots into readiness 
         assert.match(disclosure.detail, /consumer_login.*Accesso non configurabile.*Egress chiuso/u);
     }
     assert.match(disclosures[0].observation, /Disponibilità non qualificata/u);
-    assert.doesNotMatch(JSON.stringify(disclosures), /ready|pronto|autenticat|abilitat|configura.*modello|kill.?switch/iu);
+    assert.match(disclosures[1].observation, /ATHENA.*stato.*non osservato/u);
+    assert.match(disclosures[2].observation, /Fallback macOS locale.*on-device Fabric/u);
+    assert.match(disclosures[3].observation, /OpenAI.*candidato.*consumer_login.*Egress chiuso/u);
+    assert.match(disclosures[4].observation, /Anthropic.*candidato.*consumer_login.*Egress chiuso/u);
+    for (const disclosure of disclosures.slice(1)) {
+        assert.doesNotMatch(disclosure.observation, /Disponibilità non qualificata/u);
+    }
+    assert.doesNotMatch(JSON.stringify(disclosures), /\bready\b|\bpronto\b|\bautenticato\b|\babilitato\b|configura.*modello|kill.?switch/iu);
 });
 
 test('keeps the provider disclosure component static and free of actions or provider calls', () => {

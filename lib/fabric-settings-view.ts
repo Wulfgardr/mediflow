@@ -78,7 +78,7 @@ export function buildFabricProviderDisclosures(
     const localProcessObservation = localProcess
         ? `Percorso registrato: local_process (${VENUE_OBSERVATION_STATE_LABELS[localProcess.state]}).`
         : 'Percorso local_process non presente nel registro.';
-    const availabilityNote = status.readinessNote === 'available_unqualified'
+    const ollamaAvailabilityNote = status.readinessNote === 'available_unqualified'
         ? 'Disponibilità non qualificata: non indica accesso, autenticazione, attivazione o prontezza.'
         : 'Il registro non qualifica accesso, autenticazione, attivazione o prontezza.';
     const closedEgress = status.egressGateOpen === false
@@ -91,35 +91,35 @@ export function buildFabricProviderDisclosures(
             mark: 'O' as const,
             title: 'Ollama',
             detail: 'Ollama usa local_process osservato. Il modello è configurato per capacità e non è esposto qui.',
-            observation: `${localProcessObservation} ${availabilityNote}`,
+            observation: `${localProcessObservation} ${ollamaAvailabilityNote}`,
         }),
         Object.freeze({
             id: 'athena' as const,
             mark: 'A' as const,
             title: 'ATHENA',
             detail: 'Provider athena_mlx con ATHENA-R1-Qwen3-8B. Lo stato non è osservato in questo registro.',
-            observation: availabilityNote,
+            observation: 'ATHENA: stato provider non osservato in questo registro.',
         }),
         Object.freeze({
             id: 'apple_vision_ocr' as const,
             mark: 'V' as const,
             title: 'Apple Vision OCR',
             detail: 'Fallback locale solo macOS. Non è una capacità Fabric on-device.',
-            observation: availabilityNote,
+            observation: 'Fallback macOS locale; nessuna venue on-device Fabric dichiarata.',
         }),
         Object.freeze({
             id: 'openai' as const,
             mark: 'O' as const,
             title: 'OpenAI',
             detail: `Candidato consumer_login. Accesso non configurabile. ${closedEgress}`,
-            observation: availabilityNote,
+            observation: `OpenAI: candidato consumer_login disabilitato. Accesso non configurabile. ${closedEgress}`,
         }),
         Object.freeze({
             id: 'anthropic' as const,
             mark: 'A' as const,
             title: 'Anthropic',
             detail: `Candidato consumer_login. Accesso non configurabile. ${closedEgress}`,
-            observation: availabilityNote,
+            observation: `Anthropic: candidato consumer_login disabilitato. Accesso non configurabile. ${closedEgress}`,
         }),
     ]);
 }
