@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import {
   Activity,
   Archive,
   Cloud,
+  Ellipsis,
   FileSearch,
   FileText,
   MapPin,
@@ -67,7 +69,12 @@ function IncaricoArea({
   const [scope, setScope] = useState<InboxScope>('ambulatorio');
   const [list, setList] = useState<InboxList>('attivi');
   const [query, setQuery] = useState('');
+  const [isActionsOpen, setIsActionsOpen] = useState(false);
+  const [actionsMenuPosition, setActionsMenuPosition] = useState<{ left: number; top: number } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const actionsTriggerRef = useRef<HTMLButtonElement>(null);
+  const actionsMenuRef = useRef<HTMLDivElement>(null);
   const normalizedQuery = useMemo(() => normalizeClinicalSearch(query), [query]);
 
   useEffect(() => {
@@ -94,6 +101,82 @@ function IncaricoArea({
   );
 
   const selected = visible.find((p) => p.id === selectedPatientId) ?? visible[0] ?? null;
+
+  /* @Codex WUL-560 L6A: the disclosure owns focus and closes when its patient
+     context changes. The four existing actions keep their original handlers. */
+  useEffect(() => {
+    setIsActionsOpen(false);
+  }, [selected?.id]);
+
+  useLayoutEffect(() => {
+    if (!isActionsOpen) return;
+    const positionMenu = () => {
+      const trigger = actionsTriggerRef.current?.getBoundingClientRect();
+      const menu = actionsMenuRef.current;
+      if (!trigger || !menu) return;
+      const margin = 8;
+      const gap = 8;
+      const below = trigger.bottom + gap;
+      const above = trigger.top - gap - menu.offsetHeight;
+      const top = below + menu.offsetHeight <= innerHeight - margin
+        ? below
+        : above >= margin && above + menu.offsetHeight <= innerHeight - margin ? above : Math.max(margin, innerHeight - margin - menu.offsetHeight);
+      const left = Math.min(Math.max(margin, trigger.right - menu.offsetWidth), innerWidth - margin - menu.offsetWidth);
+      setActionsMenuPosition({ left, top });
+    };
+    positionMenu();
+    window.addEventListener('resize', positionMenu);
+    window.addEventListener('scroll', positionMenu, true);
+    return () => {
+      window.removeEventListener('resize', positionMenu);
+      window.removeEventListener('scroll', positionMenu, true);
+    };
+  }, [isActionsOpen]);
+
+  useEffect(() => {
+    if (!isActionsOpen) return;
+    const firstItem = actionsMenuRef.current?.querySelector<HTMLElement>('[role="menuitem"]');
+    window.requestAnimationFrame(() => firstItem?.focus());
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !actionsRef.current?.contains(event.target) && !actionsMenuRef.current?.contains(event.target)) {
+        setIsActionsOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setIsActionsOpen(false);
+      window.requestAnimationFrame(() => actionsTriggerRef.current?.focus());
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isActionsOpen]);
+
+  const handleActionMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const items = [...event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+    const currentIndex = items.findIndex((item) => item === document.activeElement);
+    const lastIndex = items.length - 1;
+    let nextIndex: number | null = null;
+    if (event.key === 'ArrowDown') nextIndex = currentIndex >= lastIndex ? 0 : currentIndex + 1;
+    else if (event.key === 'ArrowUp') nextIndex = currentIndex <= 0 ? lastIndex : currentIndex - 1;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = lastIndex;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    items[nextIndex]?.focus();
+  };
+
+  const overflowActions: Array<{ href?: string; icon: ReactNode; label: string; run?: () => void }> = selected ? [
+    { label: 'Quadro', icon: <FileSearch size={14} aria-hidden="true" />, run: () => onOpenArea('scheda') },
+    { label: 'Nuova voce', icon: <Plus size={14} aria-hidden="true" />, href: `${selected.href}/entries/new` },
+    { label: 'Documenti', icon: <FileText size={14} aria-hidden="true" />, href: `${selected.modulesHref}#documenti` },
+    { label: 'Prepara SISS', icon: <Workflow size={14} aria-hidden="true" />, run: () => onOpenArea('handoff') },
+  ] : [];
 
   const patientListParentRef = useRef<HTMLDivElement>(null);
 
@@ -481,22 +564,49 @@ function IncaricoArea({
                 <UserSquare2 size={13} />
                 Apri scheda paziente
               </Link>
-              <button type="button" className={styles.ghostBtnSm} data-lume-action="quiet" onClick={() => onOpenArea('scheda')}>
-                <FileSearch size={12} />
-                Quadro
-              </button>
-              <Link href={`${selected.href}/entries/new`} className={styles.ghostBtnSm} data-lume-action="quiet">
-                <Plus size={12} />
-                Nuova voce
-              </Link>
-              <Link href={`${selected.modulesHref}#documenti`} className={styles.ghostBtnSm} data-lume-action="quiet">
-                <FileText size={12} />
-                Documenti
-              </Link>
-              <button type="button" className={styles.ghostBtnSm} data-lume-action="quiet" onClick={() => onOpenArea('handoff')}>
-                <Workflow size={12} />
-                Prepara SISS
-              </button>
+              <div ref={actionsRef} className={patientStyles.caseLensActionOverflow}>
+                <button
+                  ref={actionsTriggerRef}
+                  type="button"
+                  className={patientStyles.caseLensOverflowTrigger}
+                  aria-label="Altre azioni paziente"
+                  aria-haspopup="menu"
+                  aria-expanded={isActionsOpen}
+                  aria-controls={isActionsOpen ? 'lume-patient-actions-menu' : undefined}
+                  data-lume-action="overflow"
+                  onClick={() => setIsActionsOpen((open) => !open)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'ArrowDown') return;
+                    event.preventDefault();
+                    setIsActionsOpen(true);
+                  }}
+                >
+                  <Ellipsis size={18} aria-hidden="true" />
+                </button>
+                {isActionsOpen ? createPortal(
+                  <div
+                    ref={actionsMenuRef}
+                    id="lume-patient-actions-menu"
+                    className={patientStyles.caseLensActionMenu}
+                    role="menu"
+                    aria-label="Azioni paziente"
+                    data-positioned={actionsMenuPosition ? 'true' : 'false'}
+                    style={actionsMenuPosition ?? undefined}
+                    onKeyDown={handleActionMenuKeyDown}
+                  >
+                    {overflowActions.map(({ href, icon, label, run }) => href ? (
+                      <Link key={label} href={href} className={patientStyles.caseLensMenuItem} role="menuitem" tabIndex={-1} onClick={() => setIsActionsOpen(false)}>
+                        {icon}{label}
+                      </Link>
+                    ) : (
+                      <button key={label} type="button" className={patientStyles.caseLensMenuItem} role="menuitem" tabIndex={-1} onClick={() => { setIsActionsOpen(false); run?.(); }}>
+                        {icon}{label}
+                      </button>
+                    ))}
+                  </div>,
+                  document.body,
+                ) : null}
+              </div>
             </div>
           </aside>
         ) : (
