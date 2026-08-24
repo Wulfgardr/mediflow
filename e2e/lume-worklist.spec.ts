@@ -26,6 +26,7 @@ const WORKLIST_CASES: WorklistCase[] = (['giorno', 'grafite'] as const).flatMap(
   WORKLIST_VIEWPORTS.map((viewport) => ({ register, ...viewport })),
 );
 
+const MENU_COLLISION_VIEWPORTS: Omit<WorklistCase, 'register'>[] = [{ viewport: 'compact-transition', width: 640, height: 1024 }, { viewport: 'rail-boundary', width: 701, height: 900 }];
 async function setRegister(page: Page, register: WorklistCase['register']): Promise<void> {
   await page.evaluate((nextRegister) => {
     const theme = nextRegister === 'grafite' ? 'dark' : 'light';
@@ -75,11 +76,11 @@ async function assertLensActionContract(page: Page): Promise<void> {
   await expect(trigger).toBeVisible();
   await expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-  await expect(lens.getByRole('menu', { name: 'Azioni paziente' })).toHaveCount(0);
+  await expect(page.getByRole('menu', { name: 'Azioni paziente' })).toHaveCount(0);
 
   await trigger.focus();
   await trigger.press('Enter');
-  const menu = lens.getByRole('menu', { name: 'Azioni paziente' });
+  const menu = page.getByRole('menu', { name: 'Azioni paziente' });
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
   await expect(menu).toBeVisible();
 
@@ -349,6 +350,24 @@ test('L6A mantiene quattro azioni nell’overflow mobile accessibile', async ({ 
   });
   await assertLensActionContract(page);
 });
+for (const register of ['giorno', 'grafite'] as const) {
+  for (const viewport of MENU_COLLISION_VIEWPORTS) {
+    test(`L6A contiene il menu senza scroll a ${viewport.width}px in registro ${register}`, async ({ page }) => {
+      await openSyntheticWorklist(page, { register, ...viewport });
+      expect(await page.evaluate(() => scrollY)).toBe(0);
+      const lens = page.getByTestId('lume-patient-lens'); const trigger = lens.getByRole('button', { name: 'Altre azioni paziente', exact: true });
+      await trigger.evaluate((element) => (element as HTMLElement).click());
+      const menu = page.getByRole('menu', { name: 'Azioni paziente', exact: true });
+      await expect(menu).toBeVisible();
+      const fitsViewport = await menu.evaluate((element, size) => {
+        const box = element.getBoundingClientRect();
+        return box.top >= 8 && box.bottom <= size.height - 8 && box.left >= 8 && box.right <= size.width - 8;
+      }, viewport);
+      expect(await page.evaluate(() => scrollY)).toBe(0);
+      expect(fitsViewport).toBe(true);
+    });
+  }
+}
 
 test('la worklist virtuale attraversa l’indice completo e apre la sola Scheda', async ({ page }) => {
   test.setTimeout(90_000);
