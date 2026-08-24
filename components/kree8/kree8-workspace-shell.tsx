@@ -320,7 +320,7 @@ export function Kree8WorkspaceShell({
                         <a
                           href={item.href}
                           className={styles.sectionLink}
-                          aria-current={item.href === activeHref ? 'location' : undefined}
+                          aria-current={expanded && item.href === activeHref ? 'location' : undefined}
                         >
                           <span>{item.label}</span>
                           {item.meta ? <small>{item.meta}</small> : null}
