@@ -79,13 +79,34 @@ Ogni risoluzione dichiara la venue effettiva:
 
 - `local_process`: processo host localhost, incluso il daemon loopback;
 - `home_base`: nodo host che esegue per conto di un client paired;
-- `on_device`: esecuzione locale del client; oggi nessuna capability la
-  dichiara (Foundation Models resta `hold`);
+- `on_device`: esecuzione locale del client. Nel catalogo Fabric non esiste una
+  capability integrata per questa venue. Il solo adapter OCR locale candidato
+  oggi presente usa `apple_vision`; non e un'integrazione Fabric, non e
+  release-ready e non e released. Foundation Models resta `hold`;
 - `cloud`: provider remoto esplicitamente autorizzato; oggi nessuna capability
   la dichiara.
 
-L'assenza di `on_device` e `cloud` descrive lo stato corrente, non un vincolo
-permanente: la loro apertura richiede ADR dedicati (ADR 0092).
+L'assenza di una capability Fabric integrata in `on_device` e di qualunque
+capability `cloud` descrive lo stato corrente, non un vincolo permanente: la
+loro apertura richiede ADR dedicati (ADR 0092).
+
+### 2.1 Binding OCR espliciti
+
+Il registry `ollama` e la capability Fabric `ollama_ocr` sono collegati solo da
+un mapping host-owned, esplicito e versionato. Il mapping conserva almeno
+`registryId: ollama`, `capabilityId: ollama_ocr` e `bindingVersion`. Il resolver
+legge il mapping prima dell'invocazione. Non puo inferirlo dal nome del modello,
+dalla venue, da una receipt o da un alias silenzioso.
+
+Il lifecycle Apple e `apple_vision`. L'host puo selezionarlo soltanto con una
+decisione provider esplicita per la venue `on_device`. Apple Vision non e un
+fallback automatico di `ollama_ocr`, ne di qualunque altro provider. Un denial
+o un errore del binding non seleziona un altro provider.
+
+Il mapping e il lifecycle non sono grant riusabili. Restano soggetti a policy,
+sessione, selezione, currentness, revoca e receipt della singola operazione.
+ADR 0099 definisce il contratto O4 prima che un locator OCR raggiunga questo
+confine.
 
 ### 3. Profili egress versionati
 
@@ -178,6 +199,10 @@ Fermare un packet fabric se:
 - una risoluzione degrada invece di fallire;
 - una ricevuta o un tipo vengono usati come autorizzazione;
 - una capability viene dedotta dal nome del modello;
+- `ollama` viene collegato a `ollama_ocr` senza mapping host-owned, esplicito e
+  versionato;
+- `apple_vision` viene selezionato come fallback automatico o il suo adapter
+  candidato viene dichiarato integrato, release-ready o released;
 - un profilo egress viene cambiato senza atto esplicito;
 - un client paired riceve un grant provider o una credenziale;
 - compare PHI/PII reale in fixture, log o ricevute.

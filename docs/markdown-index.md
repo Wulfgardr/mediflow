@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-08-23
+Ultimo aggiornamento: 2026-08-24
 
 ## 📚 Come usare questo indice
 
@@ -159,7 +159,7 @@ Ultimo aggiornamento: 2026-08-23
 | [docs/adr/0086-intelligent-scaffold-and-graded-automation-boundary.md](./adr/0086-intelligent-scaffold-and-graded-automation-boundary.md) | Propone lo scaffold model-agnostic, il chiarimento fail-closed e l'automazione graduata; non aggiunge inbox conversazionale o runtime esterni alla 0.8. |
 | [docs/adr/0087-registro-proposte-diagnostiche-documentali.md](./adr/0087-registro-proposte-diagnostiche-documentali.md) | Foundation persistente locale delle proposte, separata dalle diagnosi cliniche; backup/restore e purge la includono, mentre writer, route, UI, transizioni e applicazione restano assenti. |
 | [docs/adr/0088-deterministic-pdf-page-router.md](./adr/0088-deterministic-pdf-page-router.md) | Router PDF locale per-pagina: text layer nativo completo e OCR selettivo in processo limitato, senza egress o auto-write clinici. |
-| [docs/adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md](./adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md) | Contratto fabric: routing per capability, venue esplicite, profili egress versionati, policy immutabile e ricevute che non autorizzano consumer. |
+| [docs/adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md](./adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md) | Contratto fabric: routing per capability, venue esplicite, binding OCR host-owned versionati, profili egress, policy immutabile e ricevute che non autorizzano consumer. |
 | [docs/adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md](./adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md) | Giunture fabric: ciclo di vita trust paired con revoca host-side, onboarding provider fail-closed per classe di credenziale, decisioni di routing osservabili con fallback negato e contratto di interazione clinica. |
 | [docs/adr/0091-candidato-locale-fabric-admissione-continuita-status.md](./adr/0091-candidato-locale-fabric-admissione-continuita-status.md) | Candidato locale Fabric: admissione provider, continuita fail-closed, stato paired read-only e harness sintetico senza egress o scritture cliniche. |
 | [docs/adr/0092-limite-digest-bound-readiness-ai-locale.md](./adr/0092-limite-digest-bound-readiness-ai-locale.md) | ADR accettato: annotazione distinta da `runtime`, bracket digest best-effort e qualified readiness bloccata. |
@@ -167,7 +167,7 @@ Ultimo aggiornamento: 2026-08-23
 | [docs/adr/0095-broker-projection-e-servizi-host-per-capability.md](./adr/0095-broker-projection-e-servizi-host-per-capability.md) | ADR accettata per lifecycle post-onboarding, broker di projection minimizzate e servizi host capability-specific. |
 | [docs/adr/0096-owner-sessione-selezione-e-lifetime-broker.md](./adr/0096-owner-sessione-selezione-e-lifetime-broker.md) | ADR accettata per owner session-scoped, selezione canonica, invalidazione e broker per lease. |
 | [docs/adr/0098-physician-terminal-review-authority.md](./adr/0098-physician-terminal-review-authority.md) | ADR proposta per capability locale di review terminale, gesto monouso e route assente fino ai gate. |
-| [docs/adr/0099-ocr-document-locator-and-source-currentness.md](./adr/0099-ocr-document-locator-and-source-currentness.md) | ADR proposta per currentness della sorgente OCR e locator monouso volatile; separa schema O1, revoca, backup, bridge P4 e route/client senza autorizzare runtime o apply. |
+| [docs/adr/0099-ocr-document-locator-and-source-currentness.md](./adr/0099-ocr-document-locator-and-source-currentness.md) | ADR accettata per currentness della sorgente OCR e locator O4 host-owned monouso, con revalidation pre/post async; separa O1-O5 senza autorizzare runtime o apply. |
 | [docs/adr/0012-operator-reviewed-smart-import-from-patient-context.md](./adr/0012-operator-reviewed-smart-import-from-patient-context.md) | Smart import reviewable da note, diario e documenti verso diagnosi ICD-11 e terapie nel profilo paziente. |
 | [docs/adr/0013-qwen35-default-text-only-medgemma-specialist.md](./adr/0013-qwen35-default-text-only-medgemma-specialist.md) | Aggiorna il default text-only a `qwen3.5:35b-a3b` e mantiene MedGemma come opzione specialistica non-default. |
 | [docs/adr/0014-native-token-bootstrap-secure-first.md](./adr/0014-native-token-bootstrap-secure-first.md) | Precedenza secure-first del token native (`Keychain -> config -> legacy`) e failure mode espliciti. |
