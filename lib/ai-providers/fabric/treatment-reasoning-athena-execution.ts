@@ -26,9 +26,10 @@ type Denied = Readonly<{
 export type TreatmentReasoningAthenaExecutionResult = Completed | Denied;
 
 type Snapshot = Readonly<{ evidenceRefs: readonly string[]; receiptRef: string; provenanceRef: string }>;
-type Host = Readonly<{ policy: () => unknown; invoke: (input: Readonly<{ instruction: string; signal: AbortSignal }>) => unknown }>;
+type CancellationSignal = Readonly<{ aborted: boolean }>;
+type Host = Readonly<{ policy: () => unknown; invoke: (input: Readonly<{ instruction: string; signal: CancellationSignal }>) => unknown }>;
 type Configuration = Readonly<{ host: Host; timeoutMs: number }>;
-const COMMON = Object.freeze({ writesPerformed: 0 as const, applyPolicy: 'none' as const, fallback: 'denied_by_contract' as const });
+const COMMON = freeze({ writesPerformed: 0 as const, applyPolicy: 'none' as const, fallback: 'denied_by_contract' as const });
 const REF = /^[a-z][a-z0-9._-]{2,127}$/u;
 const MAX_REFS = 16;
 const MAX_TIMEOUT_MS = 60_000;
@@ -37,12 +38,14 @@ export class TreatmentReasoningAthenaExecutionConfigurationError extends Error {
     constructor() { super('Treatment reasoning ATHENA execution configuration rejected'); this.name = 'TreatmentReasoningAthenaExecutionConfigurationError'; }
 }
 
+function freeze<T extends object>(value: T): Readonly<T> { return Object.freeze(Object.assign(Object.create(null), value)); }
+
 function record(value: unknown, expected: readonly string[]): Record<string, unknown> | null {
     try {
         if (types.isProxy(value) || typeof value !== 'object' || value === null || Object.getPrototypeOf(value) !== Object.prototype) return null;
         const keys = Reflect.ownKeys(value);
         if (keys.length !== expected.length || !expected.every((key) => keys.includes(key))) return null;
-        const copy: Record<string, unknown> = {};
+        const copy = Object.create(null) as Record<string, unknown>;
         for (const key of expected) {
             const descriptor = Object.getOwnPropertyDescriptor(value, key);
             if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return null;
@@ -85,7 +88,7 @@ function configuration(value: unknown): Configuration | null {
     const host = config && record(config.host, ['policy', 'invoke']);
     if (!config || !host || !zeroArg(host.policy) || types.isProxy(host.invoke) || typeof host.invoke !== 'function'
         || !Number.isSafeInteger(config.timeoutMs) || (config.timeoutMs as number) < 1 || (config.timeoutMs as number) > MAX_TIMEOUT_MS) return null;
-    return Object.freeze({ host: Object.freeze({ policy: host.policy as () => unknown, invoke: host.invoke as Host['invoke'] }), timeoutMs: config.timeoutMs as number });
+    return freeze({ host: freeze({ policy: host.policy as () => unknown, invoke: host.invoke as Host['invoke'] }), timeoutMs: config.timeoutMs as number });
 }
 
 function snapshot(value: unknown): Snapshot | null {
@@ -100,7 +103,7 @@ function snapshot(value: unknown): Snapshot | null {
         || preview.stage !== 'preview' || preview.review !== 'required' || uncertainty.level !== 'low' || uncertainty.source !== 'degraded_default'
         || evidence.source !== 'host_minimized' || !Number.isSafeInteger(evidence.count)) return null;
     const evidenceRefs = refs(input.evidenceRefs, evidence.count as number);
-    return evidenceRefs ? Object.freeze({ evidenceRefs, receiptRef, provenanceRef }) : null;
+    return evidenceRefs ? freeze({ evidenceRefs, receiptRef, provenanceRef }) : null;
 }
 
 function hostReceipt(value: unknown, input: Snapshot): HostReceipt | null {
@@ -109,30 +112,31 @@ function hostReceipt(value: unknown, input: Snapshot): HostReceipt | null {
     if (!policy || !receiptRef || !provenanceRef || policy.provider !== 'athena_mlx' || policy.venue !== 'local_process'
         || policy.credentialClass !== 'local_model' || policy.model !== ATHENA_R1_QWEN3_8B_MODEL_ID
         || receiptRef !== input.receiptRef || provenanceRef !== input.provenanceRef) return null;
-    return Object.freeze({ provider: 'athena_mlx', venue: 'local_process', credentialClass: 'local_model', model: ATHENA_R1_QWEN3_8B_MODEL_ID, receiptRef, provenanceRef });
+    return freeze({ provider: 'athena_mlx' as const, venue: 'local_process' as const, credentialClass: 'local_model' as const, model: ATHENA_R1_QWEN3_8B_MODEL_ID, receiptRef, provenanceRef });
 }
 
 function instruction(input: Snapshot): string {
     return ['task=treatment_reasoning', 'stage=preview', 'review=required', `evidence_refs=${input.evidenceRefs.join(',')}`, 'response_schema=mediflow.treatment_reasoning.v1'].join('\n');
 }
 
-function denied(code: Denied['code']): Denied { return Object.freeze({ status: 'denied', code, envelope: null, sourceBindings: null, host: null, ...COMMON }); }
+function denied(code: Denied['code']): Denied { return freeze({ status: 'denied' as const, code, envelope: null, sourceBindings: null, host: null, ...COMMON }) as Denied; }
 
-async function invokeOnce(host: Host, timeoutMs: number, input: Snapshot): Promise<Readonly<{ kind: 'value'; value: unknown }> | Readonly<{ kind: 'failed' }> | Readonly<{ kind: 'timeout' }>> {
-    const controller = new AbortController();
+function invokeOnce(host: Host, timeoutMs: number, input: Snapshot): Promise<Readonly<{ kind: 'value'; value: unknown }> | Readonly<{ kind: 'failed' }> | Readonly<{ kind: 'timeout' }>> {
+    let cancelled = false;
+    const signal = Object.freeze(Object.create(null, { aborted: { enumerable: true, get: () => cancelled } })) as CancellationSignal;
     return new Promise((resolve) => {
         let settled = false;
         const finish = (outcome: Readonly<{ kind: 'value'; value: unknown }> | Readonly<{ kind: 'failed' }> | Readonly<{ kind: 'timeout' }>) => {
             if (settled) return; settled = true; clearTimeout(timer); resolve(outcome);
         };
-        const timer = setTimeout(() => { controller.abort(); finish(Object.freeze({ kind: 'timeout' as const })); }, timeoutMs);
+        const timer = setTimeout(() => { cancelled = true; finish(freeze({ kind: 'timeout' as const })); }, timeoutMs);
         Promise.resolve().then(() => {
             try {
-                const result = host.invoke(Object.freeze({ instruction: instruction(input), signal: controller.signal }));
-                if (!nativePromise(result)) return finish(Object.freeze({ kind: 'value' as const, value: result }));
-                Promise.prototype.then.call(result, (value) => finish(Object.freeze({ kind: 'value' as const, value })), () => finish(Object.freeze({ kind: 'failed' as const })));
-            } catch { finish(Object.freeze({ kind: 'failed' as const })); }
-        }, () => finish(Object.freeze({ kind: 'failed' as const })));
+                const result = host.invoke(freeze({ instruction: instruction(input), signal }));
+                if (!nativePromise(result)) return finish(freeze({ kind: 'value' as const, value: result }));
+                Promise.prototype.then.call(result, (value) => finish(freeze({ kind: 'value' as const, value })), () => finish(freeze({ kind: 'failed' as const })));
+            } catch { finish(freeze({ kind: 'failed' as const })); }
+        }, () => finish(freeze({ kind: 'failed' as const })));
     });
 }
 
@@ -140,20 +144,21 @@ async function invokeOnce(host: Host, timeoutMs: number, input: Snapshot): Promi
 export function createTreatmentReasoningAthenaExecution(value: unknown): Readonly<{ execute(input: unknown): Promise<TreatmentReasoningAthenaExecutionResult> }> {
     const config = configuration(value);
     if (!config) throw new TreatmentReasoningAthenaExecutionConfigurationError();
-    return Object.freeze({ async execute(value: unknown): Promise<TreatmentReasoningAthenaExecutionResult> {
+    return freeze({ execute(value: unknown): Promise<TreatmentReasoningAthenaExecutionResult> {
         const input = snapshot(value);
-        if (!input) return denied('input_invalid');
+        if (!input) return Promise.resolve(denied('input_invalid'));
         let host: HostReceipt | null;
         try { host = hostReceipt(config.host.policy(), input); } catch { host = null; }
-        if (!host) return denied('host_invalid');
-        const outcome = await invokeOnce(config.host, config.timeoutMs, input);
-        if (outcome.kind === 'timeout') return denied('execution_timeout');
-        if (outcome.kind === 'failed') return denied('provider_failed');
-        try {
-            const normalized = createTreatmentReasoningAthenaOutputContract({ allowedEvidenceRefs: input.evidenceRefs }).normalize(outcome.value);
-            return normalized.status === 'accepted'
-                ? Object.freeze({ status: 'completed' as const, code: null, envelope: normalized.value, sourceBindings: normalized.sourceBindings, host, ...COMMON })
-                : denied('provider_invalid');
-        } catch { return denied('provider_invalid'); }
+        if (!host) return Promise.resolve(denied('host_invalid'));
+        return invokeOnce(config.host, config.timeoutMs, input).then((outcome): TreatmentReasoningAthenaExecutionResult => {
+            if (outcome.kind === 'timeout') return denied('execution_timeout');
+            if (outcome.kind === 'failed') return denied('provider_failed');
+            try {
+                const normalized = createTreatmentReasoningAthenaOutputContract({ allowedEvidenceRefs: input.evidenceRefs }).normalize(outcome.value);
+                return normalized.status === 'accepted'
+                    ? freeze({ status: 'completed' as const, code: null, envelope: normalized.value, sourceBindings: normalized.sourceBindings, host, ...COMMON }) as Completed
+                    : denied('provider_invalid');
+            } catch { return denied('provider_invalid'); }
+        });
     } });
 }
