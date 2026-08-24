@@ -79,7 +79,7 @@ export default function SettingsAiFabricPage() {
             {state.kind === 'error' ? <FabricErrorState /> : null}
             {state.kind === 'ready' ? (
                 <div className="space-y-6">
-                    <FabricVenueSection snapshot={state.observability} />
+                    <FabricVenueSection snapshot={state.observability} status={state.status} />
                     <FabricEgressSection snapshot={state.status} />
                     <FabricCapabilityRegistry snapshot={state.status} />
                 </div>

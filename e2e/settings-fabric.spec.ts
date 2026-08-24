@@ -21,6 +21,20 @@ test('Fabric settings renders the read-only venue and capability registry', asyn
   await expect(surface).toContainText('Fuori dalla postazione');
   await expect(surface).toContainText('la richiesta viene rifiutata');
 
+  const providerDisclosure = page.getByTestId('fabric-provider-disclosure');
+  await expect(providerDisclosure).toBeVisible();
+  for (const provider of ['ollama', 'athena', 'apple_vision_ocr', 'openai', 'anthropic']) {
+    await expect(page.getByTestId(`fabric-provider-${provider}`)).toBeVisible();
+  }
+  await expect(providerDisclosure).toContainText('Il modello è configurato per capacità e non è esposto qui.');
+  await expect(providerDisclosure).toContainText('ATHENA-R1-Qwen3-8B');
+  await expect(providerDisclosure).toContainText('Non è una capacità Fabric on-device');
+  await expect(providerDisclosure).toContainText('Accesso non configurabile. Egress chiuso.');
+  await expect(page.getByTestId('fabric-provider-ollama')).toContainText('Disponibilità non qualificata');
+  for (const provider of ['athena', 'apple_vision_ocr', 'openai', 'anthropic']) {
+    await expect(page.getByTestId(`fabric-provider-${provider}`)).not.toContainText('Disponibilità non qualificata');
+  }
+
   await expect(page.getByTestId('fabric-capability-patient_insight')).toBeVisible();
   await expect(page.getByTestId('fabric-capability-icd_lookup')).toBeVisible();
   await expect(page.getByTestId('fabric-group-generative')).toBeVisible();
@@ -29,6 +43,7 @@ test('Fabric settings renders the read-only venue and capability registry', asyn
 
   await expect(surface.locator('form')).toHaveCount(0);
   await expect(surface.locator('input, select, textarea, button, [role="switch"], [contenteditable="true"]')).toHaveCount(0);
+  await expect(providerDisclosure.locator('a, [role="link"]')).toHaveCount(0);
 
   await page.screenshot({
     path: '/tmp/mediflow-settings-fabric.png',
@@ -41,6 +56,10 @@ test('Fabric settings renders the read-only venue and capability registry', asyn
   });
   await page.getByTestId('fabric-capability-registry').screenshot({
     path: '/tmp/mediflow-settings-fabric-registry.png',
+    animations: 'disabled',
+  });
+  await providerDisclosure.screenshot({
+    path: '/tmp/mediflow-settings-fabric-providers.png',
     animations: 'disabled',
   });
 });
