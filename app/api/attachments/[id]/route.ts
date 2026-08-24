@@ -18,9 +18,16 @@ import { parseApiBody } from '@/lib/api-schemas/parse';
 import { createLegacyAttachmentResponseSnapshot } from '@/lib/attachment-legacy-response';
 /* @Codex */
 import { createAttachmentWebPutCurrentness } from '@/lib/attachment-web-put-currentness';
+/* @Codex */
+import { createAttachmentWebDeleteCurrentness } from '@/lib/attachment-web-delete-currentness';
 
 /* @Codex */
 const attachmentWebPutCurrentness = createAttachmentWebPutCurrentness({
+    database: dbServer,
+    runImmediateTransaction: runDbServerImmediateTransaction,
+});
+/* @Codex */
+const attachmentWebDeleteCurrentness = createAttachmentWebDeleteCurrentness({
     database: dbServer,
     runImmediateTransaction: runDbServerImmediateTransaction,
 });
@@ -160,7 +167,7 @@ export async function PUT(
 }
 
 export async function DELETE(
-    request: Request,
+    _request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
     /* @Codex */
@@ -169,7 +176,25 @@ export async function DELETE(
 
     try {
         const { id } = await params;
-        await dbServer.delete(attachments).where(eq(attachments.id, id));
+        const existing = await dbServer
+            .select({
+                id: attachments.id,
+                documentSourceRef: attachments.documentSourceRef,
+                documentRevision: attachments.documentRevision,
+                documentFreshnessEpoch: attachments.documentFreshnessEpoch,
+            })
+            .from(attachments)
+            .where(eq(attachments.id, id))
+            .get();
+        if (!existing) return NextResponse.json({ success: true });
+
+        const outcome = attachmentWebDeleteCurrentness.delete(existing);
+        if (outcome.status === 'conflict') {
+            return NextResponse.json({ error: 'Attachment changed; reload and retry' }, { status: 409 });
+        }
+        if (outcome.status === 'failed') {
+            return NextResponse.json({ error: 'Delete Failed' }, { status: 500 });
+        }
         return NextResponse.json({ success: true });
     } catch (error) {
         return NextResponse.json({ error: "Delete Failed" }, { status: 500 });
