@@ -26,7 +26,8 @@ type Denied = Readonly<{
 export type TreatmentReasoningAthenaExecutionResult = Completed | Denied;
 
 type Snapshot = Readonly<{ evidenceRefs: readonly string[]; receiptRef: string; provenanceRef: string }>;
-type CancellationSignal = Readonly<{ aborted: boolean }>;
+type CancellationSignal = Readonly<{ isAborted: () => boolean }>;
+type Cancellation = Readonly<{ signal: CancellationSignal; cancel: () => void }>;
 type Host = Readonly<{ policy: () => unknown; invoke: (input: Readonly<{ instruction: string; signal: CancellationSignal }>) => unknown }>;
 type Configuration = Readonly<{ host: Host; timeoutMs: number }>;
 const COMMON = freeze({ writesPerformed: 0 as const, applyPolicy: 'none' as const, fallback: 'denied_by_contract' as const });
@@ -83,6 +84,14 @@ function nativePromise(value: unknown): value is Promise<unknown> {
     return !types.isProxy(value) && value instanceof Promise && !Object.hasOwn(value, 'then');
 }
 
+function cancellation(): Cancellation {
+    let cancelled = false;
+    const signal = freeze({ isAborted: () => cancelled }) as CancellationSignal;
+    const descriptor = Object.getOwnPropertyDescriptor(signal, 'isAborted');
+    if (Reflect.ownKeys(signal).length !== 1 || !descriptor || !descriptor.enumerable || !('value' in descriptor) || !zeroArg(descriptor.value)) throw new TreatmentReasoningAthenaExecutionConfigurationError();
+    return freeze({ signal, cancel: () => { cancelled = true; } }) as Cancellation;
+}
+
 function configuration(value: unknown): Configuration | null {
     const config = record(value, ['host', 'timeoutMs']);
     const host = config && record(config.host, ['policy', 'invoke']);
@@ -122,17 +131,16 @@ function instruction(input: Snapshot): string {
 function denied(code: Denied['code']): Denied { return freeze({ status: 'denied' as const, code, envelope: null, sourceBindings: null, host: null, ...COMMON }) as Denied; }
 
 function invokeOnce(host: Host, timeoutMs: number, input: Snapshot): Promise<Readonly<{ kind: 'value'; value: unknown }> | Readonly<{ kind: 'failed' }> | Readonly<{ kind: 'timeout' }>> {
-    let cancelled = false;
-    const signal = Object.freeze(Object.create(null, { aborted: { enumerable: true, get: () => cancelled } })) as CancellationSignal;
+    const state = cancellation();
     return new Promise((resolve) => {
         let settled = false;
         const finish = (outcome: Readonly<{ kind: 'value'; value: unknown }> | Readonly<{ kind: 'failed' }> | Readonly<{ kind: 'timeout' }>) => {
             if (settled) return; settled = true; clearTimeout(timer); resolve(outcome);
         };
-        const timer = setTimeout(() => { cancelled = true; finish(freeze({ kind: 'timeout' as const })); }, timeoutMs);
+        const timer = setTimeout(() => { state.cancel(); finish(freeze({ kind: 'timeout' as const })); }, timeoutMs);
         Promise.resolve().then(() => {
             try {
-                const result = host.invoke(freeze({ instruction: instruction(input), signal }));
+                const result = host.invoke(freeze({ instruction: instruction(input), signal: state.signal }));
                 if (!nativePromise(result)) return finish(freeze({ kind: 'value' as const, value: result }));
                 Promise.prototype.then.call(result, (value) => finish(freeze({ kind: 'value' as const, value })), () => finish(freeze({ kind: 'failed' as const })));
             } catch { finish(freeze({ kind: 'failed' as const })); }
