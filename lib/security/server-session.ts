@@ -23,6 +23,7 @@ const setDelete = Set.prototype.delete;
 const setValues = Set.prototype.values;
 const setIteratorNext = ObjectGetPrototypeOf(new SetConstructor().values()).next;
 const setSize = ObjectGetOwnPropertyDescriptor(Set.prototype, 'size')!.get!;
+const arrayPush = Array.prototype.push;
 
 function getMapValue<K, V>(registry: Map<K, V>, key: K): V | undefined {
     return applyIntrinsic(mapGet, registry, [key]);
@@ -68,11 +69,8 @@ function setSizeOf<T>(registry: Set<T>): number {
     return applyIntrinsic(setSize, registry, []);
 }
 
-declare global {
-    // eslint-disable-next-line no-var
-    var __mediflowSessions: Map<string, ServerSession> | undefined;
-    // eslint-disable-next-line no-var
-    var __mediflowSessionResources: Map<string, Set<ServerSessionResourceRegistration>> | undefined;
+function appendArrayValue<T>(target: T[], value: T): void {
+    applyIntrinsic(arrayPush, target, [value]);
 }
 
 export type ServerSessionDisposalReason = 'session_deleted' | 'session_expired' | 'sessions_cleared';
@@ -93,11 +91,8 @@ export interface ServerSession {
     expiresAt: number;
 }
 
-const sessions = globalThis.__mediflowSessions ?? new MapConstructor<string, ServerSession>();
-globalThis.__mediflowSessions = sessions;
-const sessionResources = globalThis.__mediflowSessionResources
-    ?? new MapConstructor<string, Set<ServerSessionResourceRegistration>>();
-globalThis.__mediflowSessionResources = sessionResources;
+const sessions = new MapConstructor<string, ServerSession>();
+const sessionResources = new MapConstructor<string, Set<ServerSessionResourceRegistration>>();
 
 function disposeSessionResources(sessionId: string, reason: ServerSessionDisposalReason): void {
     const registrations = getMapValue(sessionResources, sessionId);
@@ -206,7 +201,7 @@ export function invalidateSessionsForUser(userId: string): void {
     const sessionIds: string[] = [];
     const iterator = mapValuesOf(sessions);
     for (let next = nextMapIterator<ServerSession>(iterator); !next.done; next = nextMapIterator<ServerSession>(iterator)) {
-        if (next.value.userId === userId) sessionIds.push(next.value.id);
+        if (next.value.userId === userId) appendArrayValue(sessionIds, next.value.id);
     }
 
     for (let index = 0; index < sessionIds.length; index += 1) {
@@ -219,7 +214,7 @@ export function clearAllSessions(): void {
     const sessionIds: string[] = [];
     const sessionIterator = mapKeysOf(sessions);
     for (let next = nextMapIterator<string>(sessionIterator); !next.done; next = nextMapIterator<string>(sessionIterator)) {
-        sessionIds.push(next.value);
+        appendArrayValue(sessionIds, next.value);
     }
     const resourceIterator = mapKeysOf(sessionResources);
     for (let next = nextMapIterator<string>(resourceIterator); !next.done; next = nextMapIterator<string>(resourceIterator)) {
@@ -228,7 +223,7 @@ export function clearAllSessions(): void {
         for (let index = 0; index < sessionIds.length; index += 1) {
             if (sessionIds[index] === sessionId) { known = true; break; }
         }
-        if (!known) sessionIds.push(sessionId);
+        if (!known) appendArrayValue(sessionIds, sessionId);
     }
     clearMap(sessions);
     for (let index = 0; index < sessionIds.length; index += 1) {

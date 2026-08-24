@@ -203,6 +203,11 @@ test('session sliding does not renew the immutable half-open lease', () => {
     setNow(leaseExpiry);
     assert.throws(() => owner.dereferenceSelection(session, tuple(lease)), rejects('lease_expired'));
     assert.throws(() => owner.dereferenceSelection(session, tuple(lease)), rejects('stale_selection'));
+    session.expiresAt = leaseExpiry + 1_000;
+    setNow(leaseExpiry - 1);
+    const replacement = issue(owner, 1);
+    assert.equal(replacement.selectionEpoch, 2);
+    assert.equal(replacement.sessionRef, lease.sessionRef);
 });
 
 test('current tuple is reusable while mismatches, replacement, disposal, and restart fail closed', (context) => {
