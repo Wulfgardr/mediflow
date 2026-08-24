@@ -66,7 +66,12 @@ function insertPatientWithChildren(sqlite: Database.Database, patientId: string)
         "INSERT INTO patients (id, first_name, last_name, tax_code) VALUES (?, 'Mario', 'Rossi', 'RSSMRA80A01H501X')"
     ).run(patientId);
     /* @Codex */
-    const reviewId = `review-${suffix}`;
+    const digest = (value: string): string => createHash('sha256').update(value).digest('hex');
+    const patientRef = `ptr_${digest(`synthetic:patient:${suffix}`).slice(0, 32)}`;
+    const reviewId = `review_${digest(`synthetic:review:${suffix}`).slice(0, 32)}`;
+    const receiptRef = `receipt_${digest(`synthetic:receipt:${suffix}`).slice(0, 32)}`;
+    const provenanceRef = `provenance_${digest(`synthetic:provenance:${suffix}`).slice(0, 32)}`;
+    const sealedCiphertext = 'ENC:c3ludGhldGlj:Y2lwaGVy';
     sqlite.prepare(`
         INSERT INTO durable_review_records (
             id, patient_ref, review_id, review_revision, receipt_ref,
@@ -75,15 +80,15 @@ function insertPatientWithChildren(sqlite: Database.Database, patientId: string)
         ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         reviewId,
-        `ptr-${suffix}`,
+        patientRef,
         reviewId,
-        `receipt-${suffix}`,
-        `provenance-${suffix}`,
-        '0'.repeat(64),
-        '1'.repeat(64),
+        receiptRef,
+        provenanceRef,
+        digest(`${patientRef}\0${reviewId}\0${receiptRef}`),
+        digest(`${patientRef}\0${reviewId}\0${provenanceRef}`),
         'mediflow.ai.durable-review.presentation.v1',
-        'ENC:c3ludGhldGlj:Y2lwaGVy',
-        '2'.repeat(64),
+        sealedCiphertext,
+        digest(sealedCiphertext),
     );
     sqlite.prepare(
         'INSERT INTO durable_review_patient_links (review_id, patient_id) VALUES (?, ?)',
