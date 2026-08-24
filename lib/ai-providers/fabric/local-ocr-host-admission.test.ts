@@ -38,17 +38,39 @@ test('denies unavailable, mismatched, and caller-supplied alternate providers wi
 
 test('rejects ambiguous, hostile, accessor, and prototype host inputs without reading accessors', async () => {
     let reads = 0;
-    const accessor = {};
-    Object.defineProperty(accessor, 'provider', { enumerable: true, get: () => { reads += 1; return 'ollama_ocr'; } });
+    const accessorPolicy = { ...policy('ollama_ocr') };
+    Object.defineProperty(accessorPolicy, 'provider', { enumerable: true, get: () => { reads += 1; return 'ollama_ocr'; } });
+    const accessorReadiness = { ...readiness('ollama_ocr') };
+    Object.defineProperty(accessorReadiness, 'provider', { enumerable: true, get: () => { reads += 1; return 'ollama_ocr'; } });
+    const nonEnumerablePolicy = { ...policy('ollama_ocr') };
+    Object.defineProperty(nonEnumerablePolicy, 'provider', { enumerable: false, value: 'ollama_ocr' });
+    const nonEnumerableReadiness = { ...readiness('ollama_ocr') };
+    Object.defineProperty(nonEnumerableReadiness, 'provider', { enumerable: false, value: 'ollama_ocr' });
     const inherited = Object.assign(Object.create({ inherited: true }), readiness('ollama_ocr'));
     for (const [hostPolicy, hostReadiness, code] of [
         [{ ...policy('ollama_ocr'), fallback: 'apple_vision' }, readiness('ollama_ocr'), 'policy_invalid'],
-        [accessor, readiness('ollama_ocr'), 'policy_invalid'],
+        [accessorPolicy, readiness('ollama_ocr'), 'policy_invalid'],
+        [nonEnumerablePolicy, readiness('ollama_ocr'), 'policy_invalid'],
         [policy('ollama_ocr'), { ...readiness('ollama_ocr'), extra: true }, 'readiness_invalid'],
-        [policy('ollama_ocr'), accessor, 'readiness_invalid'],
+        [policy('ollama_ocr'), accessorReadiness, 'readiness_invalid'],
+        [policy('ollama_ocr'), nonEnumerableReadiness, 'readiness_invalid'],
         [policy('ollama_ocr'), inherited, 'readiness_invalid'],
     ] as const) assert.deepEqual(await service(hostPolicy, hostReadiness).admit(), deny(code));
     assert.equal(reads, 0);
+});
+
+test('rejects transparent and throwing policy or readiness proxies before executing traps', async () => {
+    const counters = { transparentPolicy: 0, throwingPolicy: 0, transparentReadiness: 0, throwingReadiness: 0 };
+    const wrap = <T extends object>(value: T, key: keyof typeof counters, throwing: boolean) => new Proxy(value, {
+        getOwnPropertyDescriptor: (target, property) => { counters[key] += 1; if (throwing) throw new Error('must not reflect'); return Reflect.getOwnPropertyDescriptor(target, property); },
+        getPrototypeOf: (target) => { counters[key] += 1; if (throwing) throw new Error('must not reflect'); return Reflect.getPrototypeOf(target); },
+        ownKeys: (target) => { counters[key] += 1; if (throwing) throw new Error('must not reflect'); return Reflect.ownKeys(target); },
+    });
+    assert.deepEqual(await service(wrap(policy('ollama_ocr'), 'transparentPolicy', false), readiness('ollama_ocr')).admit(), deny('policy_invalid'));
+    assert.deepEqual(await service(wrap(policy('ollama_ocr'), 'throwingPolicy', true), readiness('ollama_ocr')).admit(), deny('policy_invalid'));
+    assert.deepEqual(await service(policy('ollama_ocr'), wrap(readiness('ollama_ocr'), 'transparentReadiness', false)).admit(), deny('readiness_invalid'));
+    assert.deepEqual(await service(policy('ollama_ocr'), wrap(readiness('ollama_ocr'), 'throwingReadiness', true)).admit(), deny('readiness_invalid'));
+    assert.deepEqual(counters, { transparentPolicy: 0, throwingPolicy: 0, transparentReadiness: 0, throwingReadiness: 0 });
 });
 
 test('redacts host reader failures', async () => {

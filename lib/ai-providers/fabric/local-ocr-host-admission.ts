@@ -1,6 +1,8 @@
 /* @Codex */
 import 'server-only';
 
+import { types } from 'node:util';
+
 type LocalOcrProvider = 'ollama_ocr' | 'apple_vision';
 type LocalOcrVenue = 'local_process' | 'on_device';
 type Binding = Readonly<{ provider: LocalOcrProvider; venue: LocalOcrVenue; egress: 'none' }>;
@@ -25,13 +27,13 @@ type Reader = () => Promise<unknown>;
 
 function record(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
     try {
-        if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) return null;
+        if (!value || typeof value !== 'object' || Array.isArray(value) || types.isProxy(value) || Object.getPrototypeOf(value) !== Object.prototype) return null;
         const ownKeys = Reflect.ownKeys(value);
         if (ownKeys.length !== keys.length || ownKeys.some((key) => typeof key !== 'string' || !keys.includes(key))) return null;
         const snapshot: Record<string, unknown> = {};
         for (const key of keys) {
             const descriptor = Object.getOwnPropertyDescriptor(value, key);
-            if (!descriptor || !('value' in descriptor)) return null;
+            if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return null;
             snapshot[key] = descriptor.value;
         }
         return snapshot;
