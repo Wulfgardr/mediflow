@@ -38,6 +38,37 @@ test('publishes one primitive staging result only after the P4 final currentness
     assert.throws(() => lease.consume(current, () => 'replay'), rejects('record_spent'));
 });
 
+test('rejects an issued record after its P4 selection epoch changes before consume', () => {
+    const { state, lease } = fixture();
+    const current = lease.replaceCurrentness(1, 1, 'fresh-1', false);
+    state.selectionEpoch += 1;
+    let published = false;
+    assert.throws(() => lease.consume(current, () => { published = true; return 'never'; }), rejects('stale_selection'));
+    assert.equal(published, false);
+});
+
+test('rejects an issued record after its P4 review-context epoch changes before consume', () => {
+    const { state, lease } = fixture();
+    const current = lease.replaceCurrentness(1, 1, 'fresh-1', false);
+    state.reviewContextEpoch += 1;
+    let published = false;
+    assert.throws(() => lease.consume(current, () => { published = true; return 'never'; }), rejects('stale_selection'));
+    assert.equal(published, false);
+});
+
+test('binds issued records to the real P4 selection and review-context epochs', () => {
+    const session = createSession({ id: ['synthetic', 'p4-binding'].join('-'), username: ['synthetic', 'clinician'].join('-'), role: 'clinician' });
+    const owner = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair }).acquire(session);
+    const first = owner.issueSelection({ expectedEpoch: 0, patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' });
+    assert.deepEqual({ selectionEpoch: owner.snapshotSelectionEpoch(session), reviewContextEpoch: owner.snapshotReviewContextEpoch(session) }, { selectionEpoch: 1, reviewContextEpoch: 1 });
+    const lease = createPatientInsightAtomicLease({ owner, session, entropy: () => new Uint8Array(16), clock: () => 1 });
+    const current = lease.replaceCurrentness(1, 1, 'fresh-1', false);
+    owner.issueSelection({ expectedEpoch: first.selectionEpoch, patientId: 'patient.synthetic.02', ambulatoryId: 'ambulatory.synthetic.01' });
+    let published = false;
+    assert.throws(() => lease.consume(current, () => { published = true; return 'never'; }), rejects('stale_selection'));
+    assert.equal(published, false);
+});
+
 test('allows two sequential stable same-snapshot observations as distinct opaque records', () => {
     const { lease } = fixture();
     const first = lease.replaceCurrentness(1, 1, 'fresh-1', false);

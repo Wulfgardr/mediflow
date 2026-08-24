@@ -9,7 +9,8 @@ import type { ServerSession } from '../../security/server-session.ts';
 type Owner = Pick<ServerSessionProjectionOwner,
     'snapshotSelectionEpoch' | 'snapshotReviewContextEpoch' | 'withLeaseCriticalSection'>;
 type Currentness = Readonly<{ capabilityEpoch: number; revision: number; freshnessToken: string; revoked: boolean }>;
-type RecordState = { readonly currentness: Currentness; spent: boolean };
+type P4Boundary = Readonly<{ selectionEpoch: number; reviewContextEpoch: number }>;
+type RecordState = { readonly currentness: Currentness; readonly p4Boundary: P4Boundary; spent: boolean };
 
 export type PatientInsightAtomicLeaseErrorCode =
     | 'disposed' | 'epoch_aba' | 'epoch_regressed' | 'input_invalid' | 'record_spent' | 'revoked'
@@ -46,7 +47,7 @@ export function createPatientInsightAtomicLease(input: Readonly<{
 
     const fail = (code: PatientInsightAtomicLeaseErrorCode): never => { throw new PatientInsightAtomicLeaseError(code); };
     const insideP4 = <T>(callback: () => T): T => owner.withLeaseCriticalSection(session, callback);
-    const snapshot = () => Object.freeze({ selectionEpoch: owner.snapshotSelectionEpoch(session),
+    const snapshot = (): P4Boundary => Object.freeze({ selectionEpoch: owner.snapshotSelectionEpoch(session),
         reviewContextEpoch: owner.snapshotReviewContextEpoch(session) });
     const assertFiniteClock = () => {
         const now = clock();
@@ -57,7 +58,7 @@ export function createPatientInsightAtomicLease(input: Readonly<{
         if (!(value instanceof Uint8Array) || value.byteLength < 16) fail('input_invalid');
     };
     const fingerprint = (value: Currentness) => `${value.revision}\u0000${value.freshnessToken}\u0000${value.revoked}`;
-    const assertStable = (record: object, boundary: Readonly<{ selectionEpoch: number; reviewContextEpoch: number }>) => {
+    const assertStable = (record: object, boundary: P4Boundary) => {
         const next = snapshot();
         if (next.selectionEpoch !== boundary.selectionEpoch || next.reviewContextEpoch !== boundary.reviewContextEpoch) fail('stale_selection');
         if (current !== record) fail('stale_currentness');
@@ -89,7 +90,7 @@ export function createPatientInsightAtomicLease(input: Readonly<{
                     last = next;
                 }
                 const record = Object.freeze(Object.create(null));
-                records.set(record, { currentness: next, spent: false });
+                records.set(record, { currentness: next, p4Boundary: snapshot(), spent: false });
                 current = record;
                 if (isRevoked) revoked = true;
                 return record;
@@ -105,13 +106,12 @@ export function createPatientInsightAtomicLease(input: Readonly<{
             if (typeof stage !== 'function' || types.isProxy(stage)) fail('input_invalid');
             let staged: unknown;
             insideP4(() => {
-                const boundary = snapshot();
                 if (current !== record) fail('stale_currentness');
                 if (revoked || captured.currentness.revoked) fail('revoked');
-                assertEntropy(); assertFiniteClock(); assertStable(record, boundary);
+                assertEntropy(); assertFiniteClock(); assertStable(record, captured.p4Boundary);
                 staged = stage();
                 if (staged !== null && (typeof staged === 'object' || typeof staged === 'function')) fail('input_invalid');
-                assertStable(record, boundary);
+                assertStable(record, captured.p4Boundary);
                 return undefined;
             });
             return staged as never;
