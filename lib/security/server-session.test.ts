@@ -12,6 +12,12 @@ import {
     peekSession,
     registerServerSessionResource,
 } from './server-session';
+import {
+    createServerSessionProjectionOwnerRegistry,
+    ServerSessionProjectionOwnerError,
+    spendLeaseCommitTurn,
+    withLeaseCommitTurn,
+} from './server-session-projection-owner';
 
 const SYNTHETIC_USERNAME = `synthetic-${randomUUID()}`;
 const TARGET_USERNAME = ['synthetic', 'target'].join('-');
@@ -199,4 +205,133 @@ test('clear disposes an orphan registration left by host module drift', () => {
     clearAllSessions();
 
     assert.deepEqual(reasons, ['sessions_cleared']);
+});
+
+test('keeps session state and the H1b commit turn isolated from post-load ambient intrinsics', () => {
+    const mapPrototype = Map.prototype;
+    const setPrototype = Set.prototype;
+    const arrayPrototype = Array.prototype;
+    const originalDateNow = Date.now;
+    const originals = {
+        map: globalThis.Map,
+        set: globalThis.Set,
+        mapGet: mapPrototype.get,
+        mapSet: mapPrototype.set,
+        mapDelete: mapPrototype.delete,
+        mapClear: mapPrototype.clear,
+        mapHas: mapPrototype.has,
+        mapKeys: mapPrototype.keys,
+        mapValues: mapPrototype.values,
+        setAdd: setPrototype.add,
+        setDelete: setPrototype.delete,
+        setValues: setPrototype.values,
+        dateNow: originalDateNow,
+        functionCall: Function.prototype.call,
+        functionApply: Function.prototype.apply,
+        functionBind: Function.prototype.bind,
+        reflectApply: Reflect.apply,
+        arrayIterator: arrayPrototype[Symbol.iterator],
+    };
+    const prepared = Object.freeze({ synthetic: 'prepared' });
+    const now = originalDateNow();
+    const distantFuture = now + 1000 * 60 * 60 * 24 * 365;
+    let poisonedCalls = 0;
+    let live: ReturnType<typeof createSession> | undefined;
+    let expiryAfterZero = 0; let expiryAfterInfinity = 0; let expiryAfterFuture = 0;
+    let deleted = false; let invalidated = false; let cleared = false;
+    let aborts = 0; let commits = 0;
+    let firstFailure: unknown;
+    const poison = () => { poisonedCalls += 1; throw new Error('synthetic ambient intrinsic'); };
+
+    try {
+        globalThis.Map = poison as unknown as typeof Map;
+        globalThis.Set = poison as unknown as typeof Set;
+        mapPrototype.get = poison as typeof mapPrototype.get;
+        mapPrototype.set = poison as typeof mapPrototype.set;
+        mapPrototype.delete = poison as typeof mapPrototype.delete;
+        mapPrototype.clear = poison as typeof mapPrototype.clear;
+        mapPrototype.has = poison as typeof mapPrototype.has;
+        mapPrototype.keys = poison as typeof mapPrototype.keys;
+        mapPrototype.values = poison as typeof mapPrototype.values;
+        setPrototype.add = poison as typeof setPrototype.add;
+        setPrototype.delete = poison as typeof setPrototype.delete;
+        setPrototype.values = poison as typeof setPrototype.values;
+        Date.now = () => 0;
+        Function.prototype.call = poison as typeof Function.prototype.call;
+        Function.prototype.apply = poison as typeof Function.prototype.apply;
+        Function.prototype.bind = poison as typeof Function.prototype.bind;
+        Reflect.apply = poison as typeof Reflect.apply;
+        arrayPrototype[Symbol.iterator] = poison as typeof arrayPrototype[typeof Symbol.iterator];
+
+        live = syntheticSession();
+        assert.equal(getSession(live.id), live);
+        expiryAfterZero = live.expiresAt;
+
+        Date.now = () => Infinity;
+        assert.equal(getSession(live.id), live);
+        expiryAfterInfinity = live.expiresAt;
+
+        Date.now = () => distantFuture;
+        assert.equal(getSession(live.id), live);
+        expiryAfterFuture = live.expiresAt;
+
+        const deletedSession = syntheticSession();
+        deleteSession(deletedSession.id);
+        deleted = getSession(deletedSession.id) === null;
+
+        const invalidatedSession = createSession({ id: 'user-synthetic-invalidate', username: SYNTHETIC_USERNAME, role: 'clinician' });
+        invalidateSessionsForUser('user-synthetic-invalidate');
+        invalidated = getSession(invalidatedSession.id) === null;
+
+        const clearedSession = syntheticSession();
+        registerServerSessionResource(clearedSession.id, () => undefined);
+        clearAllSessions();
+        cleared = getSession(clearedSession.id) === null;
+
+        const ownerSession = syntheticSession();
+        const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze(pair) });
+        const owner = registry.acquire(ownerSession);
+        owner.issueSelection({ expectedEpoch: 0, patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' });
+        try {
+            withLeaseCommitTurn(owner, ownerSession, () => prepared,
+                () => undefined,
+                (turn) => { aborts += 1; spendLeaseCommitTurn(owner, ownerSession, turn, 'abort'); });
+        } catch (error) { firstFailure = error; }
+        withLeaseCommitTurn(owner, ownerSession, () => prepared,
+            (_prepared, turn) => { commits += 1; spendLeaseCommitTurn(owner, ownerSession, turn, 'commit'); },
+            () => assert.fail('retry must not abort'));
+    } finally {
+        globalThis.Map = originals.map;
+        globalThis.Set = originals.set;
+        mapPrototype.get = originals.mapGet;
+        mapPrototype.set = originals.mapSet;
+        mapPrototype.delete = originals.mapDelete;
+        mapPrototype.clear = originals.mapClear;
+        mapPrototype.has = originals.mapHas;
+        mapPrototype.keys = originals.mapKeys;
+        mapPrototype.values = originals.mapValues;
+        setPrototype.add = originals.setAdd;
+        setPrototype.delete = originals.setDelete;
+        setPrototype.values = originals.setValues;
+        Date.now = originals.dateNow;
+        Function.prototype.call = originals.functionCall;
+        Function.prototype.apply = originals.functionApply;
+        Function.prototype.bind = originals.functionBind;
+        Reflect.apply = originals.reflectApply;
+        arrayPrototype[Symbol.iterator] = originals.arrayIterator;
+    }
+
+    assert.ok(live);
+    assert.ok(Number.isFinite(expiryAfterZero));
+    assert.ok(Number.isFinite(expiryAfterInfinity));
+    assert.ok(Number.isFinite(expiryAfterFuture));
+    assert.ok(expiryAfterZero > now);
+    assert.ok(expiryAfterInfinity > now);
+    assert.ok(expiryAfterFuture > now && expiryAfterFuture < distantFuture);
+    assert.equal(deleted, true);
+    assert.equal(invalidated, true);
+    assert.equal(cleared, true);
+    assert.equal(poisonedCalls, 0);
+    assert.equal(firstFailure instanceof ServerSessionProjectionOwnerError && firstFailure.code, 'selection_unavailable');
+    assert.deepEqual({ aborts, commits }, { aborts: 1, commits: 1 });
 });

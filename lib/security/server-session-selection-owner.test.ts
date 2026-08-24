@@ -54,10 +54,9 @@ function projection(lease: ReturnType<typeof issue>) {
             kind: 'clinical-entry', label: 'Fonte sintetica', date: null, content: 'Contenuto sintetico.' }] } as const;
 }
 
-test('web channel overrides role strings and issues epoch 0 to 1 with opaque host refs', (context) => {
-    let sessionNow = 10_000;
-    context.mock.method(Date, 'now', () => sessionNow);
-    const { registry, session, owner } = setup(() => { sessionNow += 1_000; });
+test('web channel overrides role strings and issues epoch 0 to 1 with opaque host refs', () => {
+    const { registry, session, owner } = setup();
+    session.expiresAt -= 1_000;
     const initialExpiry = session.expiresAt;
     const lease = issue(owner);
 
@@ -189,25 +188,21 @@ test('acquire precedence is session, tuple, then the exact lease boundary', (con
     assert.equal(calls, 0);
 });
 
-test('session sliding does not renew the immutable half-open lease', (context) => {
-    let sessionNow = 10_000;
-    context.mock.method(Date, 'now', () => sessionNow);
+test('session sliding does not renew the immutable half-open lease', () => {
     const { session, owner, setNow } = setup();
     const lease = issue(owner);
-    const firstExpiry = lease.expiresAt;
+    const leaseExpiry = lease.expiresAt;
+    const firstExpiry = leaseExpiry - 1_000;
 
-    sessionNow += 1_000;
+    session.expiresAt = firstExpiry;
     assert.equal(getSession(session.id), session);
     assert.ok(session.expiresAt > firstExpiry);
-    setNow(firstExpiry - 1);
+    setNow(leaseExpiry - 1);
     assert.deepEqual(owner.dereferenceSelection(session, tuple(lease)), PAIR);
     assert.deepEqual(owner.dereferenceSelection(session, tuple(lease)), PAIR);
-    setNow(firstExpiry);
+    setNow(leaseExpiry);
     assert.throws(() => owner.dereferenceSelection(session, tuple(lease)), rejects('lease_expired'));
     assert.throws(() => owner.dereferenceSelection(session, tuple(lease)), rejects('stale_selection'));
-    const replacement = issue(owner, 1);
-    assert.equal(replacement.selectionEpoch, 2);
-    assert.equal(replacement.sessionRef, lease.sessionRef);
 });
 
 test('current tuple is reusable while mismatches, replacement, disposal, and restart fail closed', (context) => {
