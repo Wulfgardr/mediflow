@@ -85,6 +85,82 @@ function attachmentSnapshot(dbPath: string): unknown {
     }
 }
 
+/* @Codex */
+function catalogSnapshot(dbPath: string): unknown {
+    const db = new Database(dbPath, { readonly: true });
+    try {
+        return {
+            catalog: db.prepare('SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY type, name, tbl_name').all(),
+            sourceRows: db.prepare('SELECT * FROM attachment_hostile_source ORDER BY id').all(),
+        };
+    } finally {
+        db.close();
+    }
+}
+
+/* @Codex */
+type SqliteExecutor = { exec(sql: string): unknown };
+
+/* @Codex */
+test('attachment currentness guard permits a new database with no attachments table', () => {
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-currentness-empty-'));
+    try {
+        const result = bootstrap(dataDir);
+        assert.equal(result.status, 0, result.output);
+
+        const db = new Database(path.join(dataDir, 'medical.db'), { readonly: true });
+        assert.equal(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'attachments'").get(), undefined);
+        db.close();
+    } finally {
+        fs.rmSync(dataDir, { recursive: true, force: true });
+    }
+});
+
+/* @Codex */
+test('attachment currentness guard rejects case-insensitive attachment object names without mutation', () => {
+    const hostileObjects = [
+        {
+            name: 'ATTACHMENTS',
+            create(db: SqliteExecutor) {
+                db.exec('ALTER TABLE attachments RENAME TO attachment_hostile_source; CREATE TABLE ATTACHMENTS AS SELECT * FROM attachment_hostile_source;');
+            },
+        },
+        {
+            name: 'Attachments',
+            create(db: SqliteExecutor) {
+                db.exec('ALTER TABLE attachments RENAME TO attachment_hostile_source; CREATE VIEW Attachments AS SELECT id FROM attachment_hostile_source;');
+            },
+        },
+        {
+            name: 'aTtAcHmEnTs',
+            create(db: SqliteExecutor) {
+                db.exec('ALTER TABLE attachments RENAME TO attachment_hostile_source; CREATE TABLE attachment_hostile_target (id TEXT PRIMARY KEY); CREATE TRIGGER aTtAcHmEnTs AFTER INSERT ON attachment_hostile_target BEGIN SELECT 1; END;');
+            },
+        },
+        {
+            name: 'AtTaChMeNtS',
+            create(db: SqliteExecutor) {
+                db.exec('ALTER TABLE attachments RENAME TO attachment_hostile_source; CREATE TABLE attachment_hostile_target (id TEXT PRIMARY KEY); CREATE INDEX AtTaChMeNtS ON attachment_hostile_target(id);');
+            },
+        },
+    ];
+
+    for (const hostile of hostileObjects) {
+        withLegacyDatabase(`mediflow-currentness-hostile-${hostile.name}-`, (dbPath, dataDir) => {
+            assert.equal(bootstrap(dataDir).status, 0);
+            const db = new Database(dbPath);
+            hostile.create(db);
+            db.close();
+
+            const before = catalogSnapshot(dbPath);
+            const result = bootstrap(dataDir);
+            assert.notEqual(result.status, 0, result.output);
+            assert.match(result.output, /Attachment currentness schema is not canonical\./u);
+            assert.deepEqual(catalogSnapshot(dbPath), before);
+        });
+    }
+});
+
 test('attachment currentness guard upgrades legacy data and is stable across restart', () => withLegacyDatabase('mediflow-currentness-live-', (dbPath, dataDir) => {
     const beforeDb = new Database(dbPath, { readonly: true });
     const before = beforeDb.prepare(`SELECT ${LEGACY_COLUMNS.join(', ')} FROM attachments ORDER BY id`).all();
