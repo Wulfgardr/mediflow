@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { types } from 'node:util';
 
 import { createPatientInsightHostBoundary } from './patient-insight-host-boundary.ts';
 import { PatientInsightBrokerError, createPatientInsightBroker, isPatientInsightBrokerCapability, type PatientInsightBrokerHost } from './patient-insight-broker.ts';
@@ -59,6 +60,40 @@ test('aborts a staged reservation on every precommit denial and releases fixed e
     const fixed = Uint8Array.from({ length: 16 }, (_, index) => index); const fixture = host({ entropy: () => fixed }); const broker = createPatientInsightBroker(fixture.value);
     const denied = broker.stage(); fixture.setCurrentness(state({ revision: 4 })); reject(() => broker.publish(denied), 'revision_stale'); reject(() => broker.abort(denied), 'reservation_missing');
     fixture.setCurrentness(state()); const retry = broker.stage(); assert.equal(broker.publish(retry), `pib_${'000102030405060708090a0b0c0d0e0f'}`);
+});
+
+test('cleans an authentic reservation when ambient reflection denies precommit validation', () => {
+    const fixed = Uint8Array.from({ length: 16 }, (_, index) => index);
+    const expectedHandle = `pib_${'000102030405060708090a0b0c0d0e0f'}`;
+    const hostileIntrinsics = [
+        [Object, 'getPrototypeOf'],
+        [Reflect, 'ownKeys'],
+        [Array, 'isArray'],
+        [types, 'isProxy'],
+        [Object, 'isFrozen'],
+    ] as const;
+
+    for (const [target, key] of hostileIntrinsics) {
+        for (const operation of ['publish', 'abort'] as const) {
+            const broker = createPatientInsightBroker(host({ entropy: () => fixed }).value);
+            const reservation = broker.stage();
+            const descriptor = Object.getOwnPropertyDescriptor(target, key);
+            assert.ok(descriptor, `missing ${key} descriptor`);
+            try {
+                Object.defineProperty(target, key, { ...descriptor, value() { throw new Error(`hostile ${key}`); } });
+                reject(() => broker[operation](reservation), 'input_invalid');
+            } finally {
+                Object.defineProperty(target, key, descriptor);
+            }
+
+            reject(() => broker.consume({ handle: expectedHandle }), 'handle_missing');
+            reject(() => broker.publish(reservation), 'reservation_missing');
+            reject(() => broker.abort(reservation), 'reservation_missing');
+            const retry = broker.stage();
+            assert.equal(broker.publish(retry), expectedHandle, `${operation}/${key} must release fixed entropy and hidden handle state`);
+            assert.equal(broker.consume({ handle: expectedHandle }).status, 'available');
+        }
+    }
 });
 
 test('rejects fixed entropy only while its reservation or handle remains live', () => {

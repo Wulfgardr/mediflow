@@ -133,6 +133,11 @@ export function createPatientInsightBroker(value: PatientInsightBrokerHost): Pat
     const abortEntry = (reservation: object, entry: ReservationEntry): void => {
         weakMapDelete(reservations, reservation); setDelete(liveEntropyHandles, entry.entropyHandle); setDelete(reservedHandles, entry.handle);
     };
+    const liveReservationEntry = (value: unknown): Readonly<{ reservation: object; entry: ReservationEntry }> | null => {
+        if (!value || typeof value !== 'object' || !weakSetHas(authenticReservations, value)) return null;
+        const entry = weakMapGet(reservations, value);
+        return entry ? { reservation: value, entry } : null;
+    };
     const completeRecord = (handle: string, entropyHandle: string, snapshot: Currentness, result: Extract<PatientInsightHostResult, { status: 'available' }>): RecordEntry => Object.freeze({ handle, entropyHandle, currentness: snapshot, accepted: result });
     const validPreparedEntry = (entry: ReservationEntry): boolean => Object.isFrozen(entry) && Object.isFrozen(entry.record) && entry.record.handle === entry.handle && entry.record.entropyHandle === entry.entropyHandle && handlePattern.test(entry.handle) && handlePattern.test(entry.entropyHandle) && Object.isFrozen(entry.record.currentness) && Object.isFrozen(entry.record.accepted);
     const stage = (): object => {
@@ -151,10 +156,11 @@ export function createPatientInsightBroker(value: PatientInsightBrokerHost): Pat
         return reservation;
     };
     const publish = (inputValue: unknown, verifyCurrentness = true): string => {
-        const reservation = reservationInput(inputValue);
-        if (!weakSetHas(authenticReservations, reservation)) fail('reservation_missing');
-        const entry = weakMapGet(reservations, reservation); if (!entry) fail('reservation_missing');
+        const live = liveReservationEntry(inputValue);
+        if (!live) { reservationInput(inputValue); fail('reservation_missing'); }
+        const { reservation, entry } = live;
         try {
+            reservationInput(reservation);
             if (!validPreparedEntry(entry)) fail('reservation_missing');
             if (verifyCurrentness) { readClock(); ensureNotPoisoned(); const current = readCurrentness(); ensureNotPoisoned(); currentnessChanged(entry.record.currentness, current); }
             ensureNotPoisoned();
@@ -165,8 +171,11 @@ export function createPatientInsightBroker(value: PatientInsightBrokerHost): Pat
         } catch (error) { abortEntry(reservation, entry); throw error; }
     };
     const abort = (inputValue: unknown): void => {
-        const reservation = reservationInput(inputValue); if (!weakSetHas(authenticReservations, reservation)) fail('reservation_missing'); const entry = weakMapGet(reservations, reservation); if (!entry) fail('reservation_missing');
-        abortEntry(reservation, entry);
+        const live = liveReservationEntry(inputValue);
+        if (!live) { reservationInput(inputValue); fail('reservation_missing'); }
+        const { reservation, entry } = live;
+        try { reservationInput(reservation); abortEntry(reservation, entry); }
+        catch (error) { abortEntry(reservation, entry); throw error; }
     };
     const exclusive = <Result>(callback: () => Result, commitLast = false): Result => {
         if (operationActive) { operationPoisoned = true; fail('operation_reentered'); }
