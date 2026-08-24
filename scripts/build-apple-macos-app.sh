@@ -22,6 +22,10 @@ SCHEME="MediFlowMacApp"
 CONFIG="${MEDIFLOW_MAC_CONFIG:-Debug}"
 DERIVED="${MEDIFLOW_MAC_DERIVED_DATA:-$ROOT_DIR/tmp-mac-derived-data}"
 
+if [[ "$CONFIG" == "Release" ]]; then
+  node "$ROOT_DIR/scripts/macos-release-path-hygiene.mjs" --source-root "$ROOT_DIR" --check-source
+fi
+
 # xcodebuild needs a full Xcode (the Liquid Glass code needs the 26 SDK).
 if [[ "$(xcode-select -p 2>/dev/null)" == *CommandLineTools* ]] || ! command -v xcodebuild >/dev/null 2>&1; then
   for dev in /Applications/Xcode.app/Contents/Developer /Applications/Xcode-beta.app/Contents/Developer; do
@@ -71,6 +75,8 @@ cp -R "$ROOT_DIR/$NEXT_DIST_DIR/static" "$WEB/.next/static"
 [[ -d "$ROOT_DIR/public" ]] && cp -R "$ROOT_DIR/public" "$WEB/public"
 cp "$ROOT_DIR/scripts/local-api-tls-proxy.mjs" "$RES/local-api-tls-proxy.mjs"
 "$ROOT_DIR/scripts/check-macos-web-runtime-native-payload.sh" --normalize --web-runtime "$WEB"
+# @Codex: remove only local symbols before optional signing, then reject personal markers.
+node "$ROOT_DIR/scripts/macos-release-path-hygiene.mjs" --app "$APP" --strip --check
 
 # 4. Optional codesign (so the injected runtime is covered for distribution)
 if [[ -n "${MEDIFLOW_CODESIGN_IDENTITY:-}" ]]; then
