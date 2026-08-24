@@ -340,6 +340,54 @@
 
 .sectionRail::-webkit-scrollbar { display: none; }
 
+/* @Codex WUL-560 L7A: grouped disclosure is opt-in. Flat callers keep the
+   exact unmapped rail until their own mapping packet supplies the closed tuple. */
+.groupedSectionRail {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+  overflow: visible;
+  scroll-snap-type: none;
+}
+
+.sectionGroup {
+  min-width: 0;
+  border: 1px solid var(--k8-line-strong);
+  border-radius: 12px;
+  background: var(--k8-control-bg);
+}
+
+.sectionGroupButton {
+  width: 100%;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--k8-ink);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sectionGroupButton:focus-visible {
+  outline: 2px solid var(--k8-focus);
+  outline-offset: 2px;
+}
+
+.sectionGroupChevron { flex: 0 0 auto; transition: transform var(--lume-dur-fuoco) var(--lume-ease); }
+.sectionGroupButton[aria-expanded='true'] .sectionGroupChevron { transform: rotate(90deg); }
+.sectionGroupItems { margin: 0; padding: 0 6px 6px; list-style: none; }
+.sectionGroupItems li + li { margin-top: 4px; }
+.sectionGroupItems .sectionLink { width: 100%; justify-content: space-between; }
+.sectionActivePeek { width: calc(100% - 12px); margin: 0 6px 6px; justify-content: space-between; }
+
 .sectionLink {
   flex: 0 0 auto;
   scroll-snap-align: start;
@@ -375,6 +423,14 @@
     width: 100%;
     justify-content: space-between;
   }
+}
+
+@media (max-width: 900px) {
+  .groupedSectionRail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 480px) {
+  .groupedSectionRail { grid-template-columns: 1fr; }
 }
 
 /* @Codex WUL-UIUX: sezione attiva (scrollspy). Stile coerente con :hover ma
@@ -641,6 +697,7 @@
   .clinicalShell .headerPrimaryAction,
   .clinicalShell .headerActionButton,
   .clinicalShell .sectionLink,
+  .clinicalShell .sectionGroupButton,
   .clinicalShell :global([data-testid='privacy-mode-header-toggle']) { min-height: 44px; }
   .attentionBand,
   .clinicalSection,
@@ -671,6 +728,7 @@
   .headerActionButton,
   .backButton,
   .sectionLink,
+  .sectionGroupButton,
   .attentionAction {
     min-height: 44px;
   }

@@ -231,6 +231,33 @@ test('il controllo back della Scheda torna alla lista pazienti', async ({ page }
   await expect(page.getByTestId('lume-scheda-header')).toHaveCount(0);
 });
 
+// @Codex WUL-560 L7A: L7B owns semantic grouping; until then every existing
+// destination remains present, ordered and reachable through the flat fallback.
+test('la rail conserva le tredici sezioni non mappate senza cambiare destinazione', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const patient = await createFixture(page);
+  await page.goto(`/patients/${patient.id}/modules`);
+
+  const rail = page.getByRole('navigation', { name: 'Sezioni della vista' });
+  await expect(rail).toHaveAttribute('data-rail-mode', 'unmapped');
+  const links = rail.getByRole('link');
+  await expect(links).toHaveCount(13);
+  await expect(links).toHaveText([
+    /Attenzione/, /Quadro/, /Identità/, /Timeline/, /Diario/, /Terapie/,
+    /Prestazioni/, /Parametri/, /Protesica/, /SISS\/FSE/, /Documenti/, /Scale/, /Follow-up/,
+  ]);
+  expect(await links.evaluateAll((elements) => elements.map((element) => element.getAttribute('href')))).toEqual([
+    '#attenzione', '#quadro', '#identita', '#timeline', '#diario', '#terapie',
+    '#prestazioni', '#parametri', '#protesica', '#siss', '#documenti', '#scale', '#follow-up',
+  ]);
+
+  await links.nth(1).focus();
+  await expect(links.nth(1)).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/#quadro$/);
+});
+
 for (const schedaCase of CASES) {
   test(`Scheda Lume ${schedaCase.register} ${schedaCase.viewport}`, async ({ page }) => {
     await page.setViewportSize({ width: schedaCase.width, height: schedaCase.height });
