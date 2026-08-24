@@ -31,6 +31,16 @@ test('source root is existing, canonical, and neutral', () => {
 for (const [name, payload, ok] of [['personal', `// ${os.homedir()}/repo`, false], ['pem', '-----BEGIN PRIVATE KEY-----\nAAAAAAAAAAAAAAAAAAAAAAAA\n-----END PRIVATE KEY-----', false], ['aws', 'AKIAAAAAAAAAAAAAAAAA', false], ['github', '// ghp_1234567890123456789012345678901234567890', false], ['slack', 'xoxb-AAAAAAAAAAAAAAAAAAAAAAAA', false], ['neutral', '// /private/tmp/mediflow-source', true]]) {
   test(`payload marker policy: ${name}`, () => { const app = fixture(`${server}${payload}\n`); try { const result = run(['--app', app, '--check']); ok ? assert.equal(result.status, 0, result.stderr) : assert.notEqual(result.status, 0); } finally { fs.rmSync(app, { recursive: true, force: true }); } });
 }
+test('denies canonical HOME markers through a declared-home symlink', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-home-')), home = path.join(root, 'canonical'), declared = path.join(root, 'declared');
+  fs.mkdirSync(home); const canonical = fs.realpathSync.native(home); const app = fixture(`${server}// ${canonical}/secret\n`); fs.symlinkSync(home, declared, 'dir');
+  try {
+    const result = run(['--app', app, '--check'], { HOME: declared });
+    assert.notEqual(result.status, 0); assert.match(result.stderr, /current home directory/); assert.doesNotMatch(result.stderr, new RegExp(canonical));
+    const stale = path.join(root, 'stale'), staleResult = run(['--app', app, '--check'], { HOME: stale });
+    assert.notEqual(staleResult.status, 0); assert.match(staleResult.stderr, /cannot canonicalize local home/); assert.doesNotMatch(staleResult.stderr, new RegExp(stale));
+  } finally { fs.rmSync(app, { recursive: true, force: true }); fs.rmSync(root, { recursive: true, force: true }); }
+});
 test('payload links are contained, dereferenced, and cycle-safe', () => {
   const app = fixture(), resources = path.join(app, 'Contents', 'Resources'), link = path.join(resources, 'alias');
   const outside = path.join(os.tmpdir(), `mediflow-secret-${Date.now()}`); fs.writeFileSync(outside, 'ghp_1234567890123456789012345678901234567890'); fs.symlinkSync(outside, link);

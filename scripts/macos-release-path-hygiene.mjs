@@ -29,16 +29,21 @@ for (let index = 0; index < args.length; index += 1) {
 }
 if ((!checkSource && !strip && !check && !smoke) || (checkSource && !sourceRoot) || ((strip || check || smoke) && !app)) usage();
 if (app) { app = path.resolve(app); if (!fs.existsSync(app)) fail('app must exist'); }
+function localHomes() {
+  const declared = [...new Set([os.homedir(), process.env.HOME].filter(Boolean).map((home) => path.resolve(home)))];
+  try { return [...new Set([...declared, ...declared.map((home) => fs.realpathSync.native(home))])]; }
+  catch { fail('cannot canonicalize local home'); }
+}
+const homes = localHomes();
 function unsafeSourceRoot(root) {
   if (!path.isAbsolute(root)) fail('source root must be absolute');
   let stat; try { stat = fs.statSync(root); } catch { fail('source root must be an existing directory'); }
   if (!stat.isDirectory()) fail('source root must be an existing directory');
   let resolved; try { resolved = fs.realpathSync.native(root); } catch { fail('source root must be an existing directory'); }
-  const home = fs.realpathSync.native(os.homedir());
   const inside = (value, base) => value === base || value.startsWith(`${base}${path.sep}`);
   const inCodex = resolved.split(path.sep).some((part, index, parts) => part === '.codex' && parts[index + 1] === 'worktrees');
   return inside(resolved, '/Users') || inCodex ||
-    (home !== '/' && inside(resolved, home));
+    homes.some((home) => home !== '/' && inside(resolved, home));
 }
 function executable() { return path.join(app, 'Contents', 'MacOS', 'MediFlow'); }
 function webRuntime() { return path.join(app, 'Contents', 'Resources', 'WebRuntime'); }
@@ -67,7 +72,7 @@ function stripExecutable() {
   assertArm64Macho(file);
 }
 const forbidden = [
-  ['current home directory', path.resolve(os.homedir())],
+  ...homes.map((home) => ['current home directory', home]),
   ['Codex worktree', '/.codex/worktrees/'],
 ].map(([label, literal]) => [label, (text) => text.includes(literal)]).concat([
   ['private key', /-----BEGIN(?: [A-Z]+)? PRIVATE KEY-----[\s\S]{20,}?-----END(?: [A-Z]+)? PRIVATE KEY-----/],
