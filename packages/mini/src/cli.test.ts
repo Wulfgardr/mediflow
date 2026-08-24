@@ -28,6 +28,7 @@ test('parses one exact JSON transport envelope without mapping a command', () =>
         format: 'ndjson', request: { command: 'opaque.intent', args: { key: 'value' } },
     });
     assert.equal(parseMiniTransport(['--format', 'xml'], '{}'), null);
+    assert.equal(parseMiniTransport(['--format', 'json', '--format', 'ndjson'], '{"command":"opaque.intent","args":{}}'), null);
     assert.equal(parseMiniTransport(['opaque.intent'], '{}'), null);
     assert.equal(parseMiniTransport([], '{"command":"x","args":{},"extra":"forged"}'), null);
 });
@@ -38,6 +39,8 @@ test('renders JSON and ordered NDJSON without execution', () => {
         { index: 0, item: 'first' }, { index: 1, item: 'second' },
     ]);
     assert.equal(renderMiniTransport({ items: [] }, 'ndjson'), '{"index":null,"item":null}\n');
+    const sparse = ['first']; sparse.length = 2;
+    assert.deepEqual(JSON.parse(renderMiniTransport({ items: sparse }, 'ndjson')), { error: 'NDJSON_SPARSE_ITEMS', index: 1 });
 });
 
 test('keeps the CLI unbound and help transport-only', () => {
@@ -46,6 +49,9 @@ test('keeps the CLI unbound and help transport-only', () => {
     assert.deepEqual(JSON.parse(result.stdout), {
         schemaVersion: 'mediflow.mini.transport.v1', ok: false, error: 'TRANSPORT_UNBOUND',
     });
+    const duplicate = runMiniTransport(['--format', 'ndjson', '--format', 'json'], '{"command":"opaque.intent","args":{}}');
+    assert.equal(duplicate.exitCode, MINI_EXIT.USAGE);
+    assert.deepEqual(JSON.parse(duplicate.stdout), { schemaVersion: 'mediflow.mini.transport.v1', ok: false, error: 'USAGE' });
     assert.equal(MINI_HELP, `MediFlow Mini transport candidate
 
 Usage: npm run --silent mini -- [--format json|ndjson]

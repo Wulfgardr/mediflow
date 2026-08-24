@@ -18,12 +18,13 @@ export type MiniTransport = Readonly<{ format: Format; request: TransportRequest
 export type MiniRun = Readonly<{ exitCode: number; stdout: string; stderr: string }>;
 
 function parseFormat(argv: readonly string[]): Format | null {
-    let format: Format = 'json';
+    let format: Format = 'json'; let seen = false;
     for (let index = 0; index < argv.length; index += 1) {
-        if (argv[index] !== '--format') return null;
+        if (argv[index] !== '--format' || seen) return null;
         const value = argv[index + 1];
         if (value !== 'json' && value !== 'ndjson') return null;
         format = value;
+        seen = true;
         index += 1;
     }
     return format;
@@ -54,6 +55,9 @@ export function renderMiniTransport(value: Record<string, unknown>, format: Form
     const items = value.items;
     if (!Array.isArray(items)) return `${JSON.stringify(value)}\n`;
     if (items.length === 0) return `${JSON.stringify({ index: null, item: null })}\n`;
+    for (let index = 0; index < items.length; index += 1) {
+        if (!Object.hasOwn(items, index)) return `${JSON.stringify({ error: 'NDJSON_SPARSE_ITEMS', index })}\n`;
+    }
     return items.map((item, index) => JSON.stringify({ index, item })).join('\n') + '\n';
 }
 
@@ -65,15 +69,10 @@ function failure(error: string, exitCode: number, format: Format): MiniRun {
     };
 }
 
-function requestedFormat(argv: readonly string[]): Format {
-    const formatIndex = argv.indexOf('--format');
-    return argv[formatIndex + 1] === 'ndjson' ? 'ndjson' : 'json';
-}
-
 export function runMiniTransport(argv: readonly string[], stdin = '', inputTooLarge = false): MiniRun {
     if (argv.includes('--help') || argv.includes('-h')) return { exitCode: MINI_EXIT.OK, stdout: MINI_HELP, stderr: '' };
-    const format = requestedFormat(argv);
-    if (parseFormat(argv) === null) return failure('USAGE', MINI_EXIT.USAGE, format);
+    const parsedFormat = parseFormat(argv); const format = parsedFormat ?? 'json';
+    if (!parsedFormat) return failure('USAGE', MINI_EXIT.USAGE, format);
     if (inputTooLarge) return failure('INPUT_TOO_LARGE', MINI_EXIT.USAGE, format);
     if (!parseMiniTransport(argv, stdin)) return failure('USAGE', MINI_EXIT.USAGE, format);
     return failure('TRANSPORT_UNBOUND', MINI_EXIT.BROKER_UNAVAILABLE, format);
