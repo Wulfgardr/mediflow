@@ -25,17 +25,43 @@ type SelectionLease = Readonly<{
 }>;
 type SelectionState = CanonicalPair & SelectionLease;
 
-const authenticOwners = new WeakSet<object>();
+const ObjectCreate = Object.create;
+const ObjectFreeze = Object.freeze;
+const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const ObjectGetPrototypeOf = Object.getPrototypeOf;
+const ObjectPrototype = Object.prototype;
+const ArrayIsArray = Array.isArray;
+const NumberIsFinite = Number.isFinite;
+const NumberIsSafeInteger = Number.isSafeInteger;
+const DateNow = Date.now;
+const DateConstructor = Date;
+const Uint8ArrayConstructor = Uint8Array;
+const dateToISOString = Date.prototype.toISOString;
+const numberToString = Number.prototype.toString;
+const stringPadStart = String.prototype.padStart;
+const WeakMapConstructor = WeakMap;
+const WeakSetConstructor = WeakSet;
+const MapConstructor = Map;
+const SetConstructor = Set;
+const authenticOwners = new WeakSetConstructor<object>();
 const weakSetAdd = WeakSet.prototype.add;
 const weakSetHas = WeakSet.prototype.has;
 const weakMapSet = WeakMap.prototype.set;
 const weakMapGet = WeakMap.prototype.get;
 const applyIntrinsic = Reflect.apply;
+const ownKeysIntrinsic = Reflect.ownKeys;
+const mapGet = Map.prototype.get;
+const mapSet = Map.prototype.set;
+const mapHas = Map.prototype.has;
+const mapDelete = Map.prototype.delete;
+const setAdd = Set.prototype.add;
+const setHas = Set.prototype.has;
+const setDelete = Set.prototype.delete;
 const isProxy = types.isProxy;
 const isAsyncFunction = types.isAsyncFunction;
 const isPromise = types.isPromise;
-const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
-const getPrototypeOf = Object.getPrototypeOf;
+const getOwnPropertyDescriptor = ObjectGetOwnPropertyDescriptor;
+const getPrototypeOf = ObjectGetPrototypeOf;
 const promiseThen = Promise.prototype.then;
 
 function addOwnerIdentity(registry: WeakSet<object>, owner: object): void {
@@ -52,6 +78,34 @@ function setWeakMapValue<T>(registry: WeakMap<object, T>, key: object, value: T)
 
 function getWeakMapValue<T>(registry: WeakMap<object, T>, key: object): T | undefined {
     return applyIntrinsic(weakMapGet, registry, [key]);
+}
+
+function getMapValue<K, V>(registry: Map<K, V>, key: K): V | undefined {
+    return applyIntrinsic(mapGet, registry, [key]);
+}
+
+function setMapValue<K, V>(registry: Map<K, V>, key: K, value: V): void {
+    applyIntrinsic(mapSet, registry, [key, value]);
+}
+
+function hasMapValue<K, V>(registry: Map<K, V>, key: K): boolean {
+    return applyIntrinsic(mapHas, registry, [key]);
+}
+
+function deleteMapValue<K, V>(registry: Map<K, V>, key: K): void {
+    applyIntrinsic(mapDelete, registry, [key]);
+}
+
+function addSetValue<T>(registry: Set<T>, value: T): void {
+    applyIntrinsic(setAdd, registry, [value]);
+}
+
+function hasSetValue<T>(registry: Set<T>, value: T): boolean {
+    return applyIntrinsic(setHas, registry, [value]);
+}
+
+function deleteSetValue<T>(registry: Set<T>, value: T): void {
+    applyIntrinsic(setDelete, registry, [value]);
 }
 
 export type ServerSessionProjectionOwnerErrorCode =
@@ -88,8 +142,8 @@ type LeaseCommitTurnState = {
 type LeaseCommitTurnRunner = (session: ServerSession, prepare: (selection: CanonicalPair) => unknown,
     commit: (prepared: unknown, turn: LeaseCommitTurn) => unknown, abort: (turn: LeaseCommitTurn) => unknown) => void;
 
-const commitTurnRunners = new WeakMap<object, LeaseCommitTurnRunner>();
-const commitTurnStates = new WeakMap<object, LeaseCommitTurnState>();
+const commitTurnRunners = new WeakMapConstructor<object, LeaseCommitTurnRunner>();
+const commitTurnStates = new WeakMapConstructor<object, LeaseCommitTurnState>();
 
 function synchronousCallback(candidate: unknown): candidate is (...args: never[]) => unknown {
     return typeof candidate === 'function' && !isProxy(candidate) && !isAsyncFunction(candidate);
@@ -161,33 +215,33 @@ function revoke(binding: ActiveBinding | null, unregister = true): void {
     try { binding.control.revoke(); } catch { /* Authority remains removed and cleanup detail stays opaque. */ }
 }
 
-const defaultSources: SelectionSources = Object.freeze({
+const defaultSources: SelectionSources = ObjectFreeze({
     resolve: () => fail('selection_unavailable'),
-    clock: () => Date.now(),
+    clock: () => DateNow(),
     entropy: () => randomBytes(16),
     brokerFactory: (config) => createTypedProjectionBroker(config),
 });
 
 function exact(input: unknown, keys: readonly string[]): Record<string, unknown> {
-    if (typeof input !== 'object' || input === null || Array.isArray(input)
-        || Object.getPrototypeOf(input) !== Object.prototype || Reflect.ownKeys(input).length !== keys.length) {
+    if (typeof input !== 'object' || input === null || ArrayIsArray(input)
+        || getPrototypeOf(input) !== ObjectPrototype || ownKeysIntrinsic(input).length !== keys.length) {
         return fail('input_invalid');
     }
     const result: Record<string, unknown> = {};
-    for (const key of keys) {
-        const descriptor = Object.getOwnPropertyDescriptor(input, key);
+    for (let index = 0; index < keys.length; index += 1) {
+        const descriptor = getOwnPropertyDescriptor(input, keys[index]);
         if (!descriptor || !('value' in descriptor)) return fail('input_invalid');
-        result[key] = descriptor.value;
+        result[keys[index]] = descriptor.value;
     }
     return result;
 }
 
 export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Partial<SelectionSources> = {}) {
-    const sources = Object.freeze({ ...defaultSources, ...sourceOverrides });
-    const owners = new Map<string, ServerSessionProjectionOwner>();
-    const registryOwners = new WeakSet<object>();
-    const retired = new Set<string>();
-    const acquiring = new Set<string>();
+    const sources = ObjectFreeze({ ...defaultSources, ...sourceOverrides });
+    const owners = new MapConstructor<string, ServerSessionProjectionOwner>();
+    const registryOwners = new WeakSetConstructor<object>();
+    const retired = new SetConstructor<string>();
+    const acquiring = new SetConstructor<string>();
 
     const registry = {
         isAuthenticOwner(candidate: unknown): candidate is ServerSessionProjectionOwner {
@@ -195,34 +249,34 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             return hasOwnerIdentity(registryOwners, candidate);
         },
         lookup(sessionId: string): ServerSessionProjectionOwner | null {
-            return owners.get(sessionId) ?? null;
+            return getMapValue(owners, sessionId) ?? null;
         },
         snapshotSelectionEpoch(session: ServerSession): number {
             if (session.authChannel !== 'web' || session.id === 'local-api' || peekSession(session.id) !== session) {
                 return fail('session_ineligible');
             }
-            return owners.get(session.id)?.snapshotSelectionEpoch(session) ?? 0;
+            return getMapValue(owners, session.id)?.snapshotSelectionEpoch(session) ?? 0;
         },
         snapshotReviewContextEpoch(session: ServerSession): number {
             if (session.authChannel !== 'web' || session.id === 'local-api' || peekSession(session.id) !== session) {
                 return fail('session_ineligible');
             }
-            return owners.get(session.id)?.snapshotReviewContextEpoch(session) ?? 0;
+            return getMapValue(owners, session.id)?.snapshotReviewContextEpoch(session) ?? 0;
         },
         acquire(session: ServerSession): ServerSessionProjectionOwner {
             if (session.authChannel !== 'web' || session.id === 'local-api' || getSession(session.id) !== session) {
                 return fail('session_ineligible');
             }
-            return owners.get(session.id) ?? registry.create(session);
+            return getMapValue(owners, session.id) ?? registry.create(session);
         },
         create(session: ServerSession): ServerSessionProjectionOwner {
             if (session.authChannel !== 'web' || session.id === 'local-api' || getSession(session.id) !== session) {
                 return fail('session_ineligible');
             }
-            if (owners.has(session.id)) return fail('owner_exists');
-            if (retired.has(session.id)) return fail('owner_disposed');
-            if (acquiring.has(session.id)) return fail('owner_acquiring');
-            acquiring.add(session.id);
+            if (hasMapValue(owners, session.id)) return fail('owner_exists');
+            if (hasSetValue(retired, session.id)) return fail('owner_disposed');
+            if (hasSetValue(acquiring, session.id)) return fail('owner_acquiring');
+            addSetValue(acquiring, session.id);
             try {
 
             let active: ActiveBinding | null = null;
@@ -237,8 +291,8 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             const finish = (revokeActive: boolean) => {
                 if (terminal) return;
                 terminal = true;
-                retired.add(session.id);
-                owners.delete(session.id);
+                addSetValue(retired, session.id);
+                deleteMapValue(owners, session.id);
                 unregisterOwner?.();
                 unregisterOwner = null;
                 const previous = active;
@@ -248,19 +302,21 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 if (previous && revokeActive) revoke(previous);
                 else if (previous) { previous.active = false; previous.unregister = null; }
             };
-            const issuedRefs = new Set<string>();
+            const issuedRefs = new SetConstructor<string>();
             const reference = (prefix: string) => {
                 let bytes: Uint8Array;
                 try { bytes = sources.entropy(); } catch { return fail('reference_unavailable'); }
-                if (!(bytes instanceof Uint8Array) || bytes.byteLength < 16) return fail('reference_unavailable');
-                let hex = ''; for (let index = 0; index < 16; index += 1) hex += bytes[index].toString(16).padStart(2, '0');
+                if (!(bytes instanceof Uint8ArrayConstructor) || bytes.byteLength < 16) return fail('reference_unavailable');
+                let hex = ''; for (let index = 0; index < 16; index += 1) {
+                    hex += applyIntrinsic(stringPadStart, applyIntrinsic(numberToString, bytes[index], [16]), [2, '0']);
+                }
                 const value = `${prefix}_${hex}`;
-                if (issuedRefs.has(value)) return fail('reference_unavailable');
-                issuedRefs.add(value); return value;
+                if (hasSetValue(issuedRefs, value)) return fail('reference_unavailable');
+                addSetValue(issuedRefs, value); return value;
             };
             const sessionRef = reference('ssr');
             const readClock = () => {
-                try { const now = sources.clock(); if (Number.isFinite(now)) return now; } catch { /* fixed error below */ }
+                try { const now = sources.clock(); if (NumberIsFinite(now)) return now; } catch { /* fixed error below */ }
                 return fail('selection_unavailable');
             };
             const requireCurrentSession = (presented: ServerSession) => {
@@ -298,7 +354,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     if (now >= current.expiresAt) { expire(); return fail('lease_expired'); }
                 };
                 leaseCriticalSectionActive = true;
-                const turn = Object.freeze(Object.create(null));
+                const turn = ObjectFreeze(ObjectCreate(null));
                 const state: LeaseCommitTurnState = { owner, session: presentedSession, phase: 'prepare', live: true, spent: false };
                 setWeakMapValue(commitTurnStates, turn, state);
                 const abortOnce = (cause: unknown): never => {
@@ -314,7 +370,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 };
                 try {
                     let prepared: unknown;
-                    try { assertCurrent(); prepared = prepare(Object.freeze({ patientId: current!.patientId, ambulatoryId: current!.ambulatoryId })); }
+                    try { assertCurrent(); prepared = prepare(ObjectFreeze({ patientId: current!.patientId, ambulatoryId: current!.ambulatoryId })); }
                     catch (error) { return abortOnce(error); }
                     try { rejectThenable(prepared); assertCurrent(); }
                     catch (error) { return abortOnce(error); }
@@ -336,7 +392,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             };
             const candidateControl = (candidate: unknown): TypedBroker['control'] | null => {
                 if (typeof candidate !== 'object' || candidate === null) return null;
-                const descriptor = Object.getOwnPropertyDescriptor(candidate, 'control');
+                const descriptor = getOwnPropertyDescriptor(candidate, 'control');
                 if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'object' || !descriptor.value) return null;
                 return typeof descriptor.value.revoke === 'function' ? descriptor.value as TypedBroker['control'] : null;
             };
@@ -347,7 +403,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     && typeof value.control?.lock === 'function' && typeof value.control.revoke === 'function'
                     && typeof value.control.changeSelection === 'function';
             };
-            const owner: ServerSessionProjectionOwner = Object.freeze({
+            const owner: ServerSessionProjectionOwner = ObjectFreeze({
                 snapshotSelectionEpoch(presentedSession) {
                     if (terminal || presentedSession !== session || session.authChannel !== 'web' || peekSession(session.id) !== session) {
                         return fail('session_unavailable');
@@ -373,7 +429,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     try {
                         candidate = sources.brokerFactory({ sessionRef: current.sessionRef, ambulatoryRef: current.ambulatoryRef,
                             patientRef: current.patientRef, selectionEpoch: current.selectionEpoch, leaseRef: current.leaseRef,
-                            expiresAt: new Date(current.expiresAt).toISOString() });
+                            expiresAt: applyIntrinsic(dateToISOString, new DateConstructor(current.expiresAt), []) });
                     } catch { creating = null; return fail('broker_factory_failed'); }
                     creating = null;
                     try { if (!validCandidate(candidate)) throw new Error('malformed'); }
@@ -396,8 +452,8 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                             throw new ProjectionBrokerError('broker_revoked');
                         }
                     };
-                    binding.ingest = Object.freeze({ ingest(value) { assertActive(); return candidate.ingest.ingest(value); } });
-                    binding.service = Object.freeze({ consume(value) { assertActive(); return candidate.service.consume(value); } });
+                    binding.ingest = ObjectFreeze({ ingest(value) { assertActive(); return candidate.ingest.ingest(value); } });
+                    binding.service = ObjectFreeze({ consume(value) { assertActive(); return candidate.service.consume(value); } });
                     try { binding.unregister = bindProjectionBrokerToServerSession(session.id, candidate.control); }
                     catch { return fail('session_unavailable'); }
                     binding.active = true; active = binding;
@@ -418,7 +474,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     selecting = true;
                     try {
                         const value = exact(input, ['expectedEpoch', 'patientId', 'ambulatoryId']);
-                        if (!Number.isSafeInteger(value.expectedEpoch) || (value.expectedEpoch as number) < 0
+                        if (!NumberIsSafeInteger(value.expectedEpoch) || (value.expectedEpoch as number) < 0
                             || typeof value.patientId !== 'string' || typeof value.ambulatoryId !== 'string') fail('input_invalid');
                         const live = getSession(session.id);
                         if (session.authChannel !== 'web' || live !== session) fail('session_unavailable');
@@ -430,13 +486,13 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         if (value.expectedEpoch !== epoch) fail('epoch_conflict');
                         const now = readClock(); const expiresAt = finalSession.expiresAt;
                         if (now >= expiresAt) fail('lease_expired');
-                        const next: SelectionState = Object.freeze({ ...pair, sessionRef, selectionEpoch: epoch + 1,
+                        const next: SelectionState = ObjectFreeze({ ...pair, sessionRef, selectionEpoch: epoch + 1,
                             patientRef: reference('ptr'), ambulatoryRef: reference('abr'), leaseRef: reference('lsr'),
                             expiresAt });
                         const previous = active; active = null; revoke(previous);
                         reviewContextEpoch += 1;
                         epoch = next.selectionEpoch; selection = next;
-                        return Object.freeze({ sessionRef, selectionEpoch: next.selectionEpoch, patientRef: next.patientRef,
+                        return ObjectFreeze({ sessionRef, selectionEpoch: next.selectionEpoch, patientRef: next.patientRef,
                             ambulatoryRef: next.ambulatoryRef, leaseRef: next.leaseRef, expiresAt });
                     } finally { selecting = false; }
                 },
@@ -452,7 +508,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     if (value.sessionRef !== sessionRef || value.selectionEpoch !== selection.selectionEpoch
                         || value.patientRef !== selection.patientRef || value.ambulatoryRef !== selection.ambulatoryRef
                         || value.leaseRef !== selection.leaseRef) fail('stale_selection');
-                    return Object.freeze({ patientId: selection.patientId, ambulatoryId: selection.ambulatoryId });
+                    return ObjectFreeze({ patientId: selection.patientId, ambulatoryId: selection.ambulatoryId });
                 },
                 withLeaseCriticalSection(presentedSession, callback) {
                     if (leaseCriticalSectionActive) return fail('selection_busy');
@@ -474,7 +530,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     try {
                         let result: unknown;
                         try {
-                            result = callback(Object.freeze({ patientId: current.patientId, ambulatoryId: current.ambulatoryId }));
+                            result = callback(ObjectFreeze({ patientId: current.patientId, ambulatoryId: current.ambulatoryId }));
                         } catch (error) {
                             assertUnchanged();
                             throw error;
@@ -495,15 +551,15 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
 
             unregisterOwner = registerServerSessionResource(session.id, () => finish(false));
             if (!unregisterOwner) return fail('session_ineligible');
-            owners.set(session.id, owner);
+            setMapValue(owners, session.id, owner);
             addOwnerIdentity(registryOwners, owner);
             addOwnerIdentity(authenticOwners, owner);
             setWeakMapValue(commitTurnRunners, owner, commitTurnRunner);
             return owner;
             } finally {
-                acquiring.delete(session.id);
+                deleteSetValue(acquiring, session.id);
             }
         },
     };
-    return Object.freeze(registry);
+    return ObjectFreeze(registry);
 }

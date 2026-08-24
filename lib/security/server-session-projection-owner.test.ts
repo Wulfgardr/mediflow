@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { afterEach, test } from 'node:test';
+import { types } from 'node:util';
 
 import {
     createServerSessionProjectionOwnerRegistry,
@@ -153,6 +154,93 @@ test('requires an authentic live turn for synchronous commit and abort work', ()
         });
 
     assert.deepEqual(events, ['commit']);
+});
+
+test('keeps the shared H2a precommit turn isolated from poisoned ambient intrinsics', () => {
+    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair });
+    const value = session(); const owner = registry.acquire(value);
+    const h2aRecordAndTicket = Object.freeze({ record: 'synthetic-h2a-record', ticket: 'synthetic-h2a-ticket' });
+    const originals = {
+        create: Object.create, freeze: Object.freeze, assign: Object.assign, isFrozen: Object.isFrozen,
+        getPrototypeOf: Object.getPrototypeOf, getOwnPropertyDescriptor: Object.getOwnPropertyDescriptor,
+        ownKeys: Reflect.ownKeys, apply: Reflect.apply,
+        weakMapGet: WeakMap.prototype.get, weakMapSet: WeakMap.prototype.set,
+        weakSetAdd: WeakSet.prototype.add, weakSetHas: WeakSet.prototype.has,
+        setAdd: Set.prototype.add, setHas: Set.prototype.has, setDelete: Set.prototype.delete,
+        isProxy: types.isProxy, isAsyncFunction: types.isAsyncFunction, isPromise: types.isPromise,
+        promiseThen: Promise.prototype.then,
+    };
+    let poisonedCalls = 0; let lease: ReturnType<typeof owner.issueSelection> | undefined;
+    let canonical: { patientId: string; ambulatoryId: string } | undefined; let firstFailure: unknown;
+    const turns: object[] = []; let aborts = 0; let commits = 0;
+    const poison = () => { poisonedCalls += 1; throw new Error('synthetic ambient intrinsic'); };
+
+    try {
+        Object.create = poison as typeof Object.create;
+        Object.freeze = poison as typeof Object.freeze;
+        Object.assign = poison as typeof Object.assign;
+        Object.isFrozen = poison as typeof Object.isFrozen;
+        Object.getPrototypeOf = poison as typeof Object.getPrototypeOf;
+        Object.getOwnPropertyDescriptor = poison as typeof Object.getOwnPropertyDescriptor;
+        Reflect.ownKeys = poison as typeof Reflect.ownKeys;
+        Reflect.apply = poison as typeof Reflect.apply;
+        WeakMap.prototype.get = poison as typeof WeakMap.prototype.get;
+        WeakMap.prototype.set = poison as typeof WeakMap.prototype.set;
+        WeakSet.prototype.add = poison as typeof WeakSet.prototype.add;
+        WeakSet.prototype.has = poison as typeof WeakSet.prototype.has;
+        Set.prototype.add = poison as typeof Set.prototype.add;
+        Set.prototype.has = poison as typeof Set.prototype.has;
+        Set.prototype.delete = poison as typeof Set.prototype.delete;
+        types.isProxy = poison as unknown as typeof types.isProxy;
+        types.isAsyncFunction = poison as unknown as typeof types.isAsyncFunction;
+        types.isPromise = poison as unknown as typeof types.isPromise;
+        Promise.prototype.then = poison as typeof Promise.prototype.then;
+
+        lease = owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+        canonical = owner.withLeaseCriticalSection(value, (selection) => selection);
+        try {
+            withLeaseCommitTurn(owner, value, () => h2aRecordAndTicket,
+                (_prepared, turn) => { turns.push(turn); },
+                (turn) => { aborts += 1; turns.push(turn); spendLeaseCommitTurn(owner, value, turn, 'abort'); });
+        } catch (error) { firstFailure = error; }
+        withLeaseCommitTurn(owner, value, () => h2aRecordAndTicket,
+            (_prepared, turn) => { commits += 1; turns.push(turn); spendLeaseCommitTurn(owner, value, turn, 'commit'); },
+            () => assert.fail('retry must not abort'));
+    } finally {
+        Object.create = originals.create;
+        Object.freeze = originals.freeze;
+        Object.assign = originals.assign;
+        Object.isFrozen = originals.isFrozen;
+        Object.getPrototypeOf = originals.getPrototypeOf;
+        Object.getOwnPropertyDescriptor = originals.getOwnPropertyDescriptor;
+        Reflect.ownKeys = originals.ownKeys;
+        Reflect.apply = originals.apply;
+        WeakMap.prototype.get = originals.weakMapGet;
+        WeakMap.prototype.set = originals.weakMapSet;
+        WeakSet.prototype.add = originals.weakSetAdd;
+        WeakSet.prototype.has = originals.weakSetHas;
+        Set.prototype.add = originals.setAdd;
+        Set.prototype.has = originals.setHas;
+        Set.prototype.delete = originals.setDelete;
+        types.isProxy = originals.isProxy;
+        types.isAsyncFunction = originals.isAsyncFunction;
+        types.isPromise = originals.isPromise;
+        Promise.prototype.then = originals.promiseThen;
+    }
+
+    assert.equal(poisonedCalls, 0);
+    assert.ok(lease);
+    assert.deepEqual(canonical, PAIR);
+    assert.equal(originals.isFrozen(lease), true);
+    assert.equal(originals.isFrozen(canonical), true);
+    assert.equal(firstFailure instanceof ServerSessionProjectionOwnerError && firstFailure.code, 'selection_unavailable');
+    assert.deepEqual({ aborts, commits, turns: turns.length }, { aborts: 1, commits: 1, turns: 3 });
+    assert.equal(turns[0], turns[1]);
+    assert.notEqual(turns[1], turns[2]);
+    for (const turn of turns) {
+        assert.equal(originals.getPrototypeOf(turn), null);
+        assert.equal(originals.isFrozen(turn), true);
+    }
 });
 
 test('aborts once on a precommit thenable without leaking native rejections', async () => {
