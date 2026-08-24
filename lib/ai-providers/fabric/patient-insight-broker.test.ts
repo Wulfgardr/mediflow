@@ -2,9 +2,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { types } from 'node:util';
 
 import { createPatientInsightHostBoundary } from './patient-insight-host-boundary.ts';
-import { PatientInsightBrokerError, createPatientInsightBroker, type PatientInsightBrokerHost } from './patient-insight-broker.ts';
+import { PatientInsightBrokerError, createPatientInsightBroker, isPatientInsightBrokerCapability, type PatientInsightBrokerHost } from './patient-insight-broker.ts';
 
 const ref = (prefix: string) => `${prefix}_${'a'.repeat(32)}`;
 const now = '2026-08-23T12:00:00.000Z';
@@ -55,12 +56,44 @@ test('aborts every staged record and releases fixed entropy for a retry', () => 
     const afterConsume = broker.publish(broker.stage()); assert.notEqual(afterConsume, handle); reject(() => broker.consume({ handle }), 'handle_replayed'); assert.equal(broker.consume({ handle: afterConsume }).status, 'available');
 });
 
-test('retains a stage on denial so abort is complete and no denial or throw leaves a live reservation', () => {
+test('aborts a staged reservation on every precommit denial and releases fixed entropy', () => {
     const fixed = Uint8Array.from({ length: 16 }, (_, index) => index); const fixture = host({ entropy: () => fixed }); const broker = createPatientInsightBroker(fixture.value);
-    const denied = broker.stage(); fixture.setCurrentness(state({ revision: 4 })); reject(() => broker.publish(denied), 'revision_stale'); broker.abort(denied);
-    fixture.setCurrentness(state()); const afterDenial = broker.stage(); broker.abort(afterDenial);
-    const afterThrow = broker.stage(); try { throw new Error('synthetic P4 denial'); } catch { broker.abort(afterThrow); }
-    assert.equal(Object.getPrototypeOf(broker.stage()), null);
+    const denied = broker.stage(); fixture.setCurrentness(state({ revision: 4 })); reject(() => broker.publish(denied), 'revision_stale'); reject(() => broker.abort(denied), 'reservation_missing');
+    fixture.setCurrentness(state()); const retry = broker.stage(); assert.equal(broker.publish(retry), `pib_${'000102030405060708090a0b0c0d0e0f'}`);
+});
+
+test('cleans an authentic reservation when ambient reflection denies precommit validation', () => {
+    const fixed = Uint8Array.from({ length: 16 }, (_, index) => index);
+    const expectedHandle = `pib_${'000102030405060708090a0b0c0d0e0f'}`;
+    const hostileIntrinsics = [
+        [Object, 'getPrototypeOf'],
+        [Reflect, 'ownKeys'],
+        [Array, 'isArray'],
+        [types, 'isProxy'],
+        [Object, 'isFrozen'],
+    ] as const;
+
+    for (const [target, key] of hostileIntrinsics) {
+        for (const operation of ['publish', 'abort'] as const) {
+            const broker = createPatientInsightBroker(host({ entropy: () => fixed }).value);
+            const reservation = broker.stage();
+            const descriptor = Object.getOwnPropertyDescriptor(target, key);
+            assert.ok(descriptor, `missing ${key} descriptor`);
+            try {
+                Object.defineProperty(target, key, { ...descriptor, value() { throw new Error(`hostile ${key}`); } });
+                reject(() => broker[operation](reservation), 'input_invalid');
+            } finally {
+                Object.defineProperty(target, key, descriptor);
+            }
+
+            reject(() => broker.consume({ handle: expectedHandle }), 'handle_missing');
+            reject(() => broker.publish(reservation), 'reservation_missing');
+            reject(() => broker.abort(reservation), 'reservation_missing');
+            const retry = broker.stage();
+            assert.equal(broker.publish(retry), expectedHandle, `${operation}/${key} must release fixed entropy and hidden handle state`);
+            assert.equal(broker.consume({ handle: expectedHandle }).status, 'available');
+        }
+    }
 });
 
 test('rejects fixed entropy only while its reservation or handle remains live', () => {
@@ -85,6 +118,34 @@ test('rejects forged, cross-broker, duplicate, accessor, Proxy, symbol, and then
     assert.equal(thenReads, 0); reject(() => first.publish(reservation), 'reservation_missing'); reject(() => first.abort(reservation), 'reservation_missing');
 });
 
+test('recognizes only the module-issued broker and reservation identities without Proxy traps', () => {
+    const broker = createPatientInsightBroker(host().value); const reservation = broker.stage(); let traps = 0;
+    const brokerProxy = new Proxy(broker, { get() { traps += 1; throw new Error('synthetic broker Proxy'); } });
+    const reservationProxy = new Proxy(reservation, { get() { traps += 1; throw new Error('synthetic reservation Proxy'); }, ownKeys() { traps += 1; throw new Error('synthetic reservation Proxy'); } });
+    const brokerLike = Object.freeze({ stage: broker.stage, publish: broker.publish, abort: broker.abort, issue: broker.issue, consume: broker.consume });
+    const reservationLike = Object.freeze(Object.create(null));
+    assert.equal(isPatientInsightBrokerCapability(broker), true); assert.equal(isPatientInsightBrokerCapability(brokerLike), false); assert.equal(isPatientInsightBrokerCapability(brokerProxy), false);
+    reject(() => broker.publish(reservationLike), 'reservation_missing'); reject(() => broker.publish(reservationProxy), 'input_invalid'); reject(() => broker.abort(reservationProxy), 'input_invalid');
+    assert.equal(traps, 0); broker.abort(reservation);
+});
+
+test('commits with captured collection intrinsics and performs no postcommit denial', () => {
+    const broker = createPatientInsightBroker(host().value); const reservation = broker.stage();
+    const methods = [
+        [Map.prototype, 'get'], [Map.prototype, 'set'], [Map.prototype, 'has'], [Map.prototype, 'delete'],
+        [Set.prototype, 'add'], [Set.prototype, 'has'], [Set.prototype, 'delete'],
+        [WeakMap.prototype, 'get'], [WeakMap.prototype, 'set'], [WeakMap.prototype, 'delete'],
+        [WeakSet.prototype, 'has'],
+    ] as const;
+    const originals = methods.map(([target, key]) => [target, key, Object.getOwnPropertyDescriptor(target, key)] as const);
+    try {
+        for (const [target, key] of methods) Object.defineProperty(target, key, { configurable: true, value() { throw new Error(`hostile ${key}`); } });
+        const handle = broker.publish(reservation); assert.match(handle, /^pib_[0-9a-f]{32}$/u);
+    } finally {
+        for (const [target, key, descriptor] of originals) if (descriptor) Object.defineProperty(target, key, descriptor);
+    }
+});
+
 test('fails closed on lifecycle reentry without publishing or reserving a partial result', () => {
     const fixture = host({ clock: () => { broker.stage(); return now; } }); const broker = createPatientInsightBroker(fixture.value);
     reject(() => broker.stage(), 'operation_reentered');
@@ -104,11 +165,11 @@ test('makes swallowed currentness reentry sticky at stage and releases the same 
     const retry = broker.stage(); assert.equal(broker.publish(retry), `pib_${'000102030405060708090a0b0c0d0e0f'}`);
 });
 
-test('makes swallowed currentness reentry sticky at publish without consuming its reservation', () => {
+test('aborts a reservation when currentness reentry denies publish', () => {
     const fixed = Uint8Array.from({ length: 16 }, (_, index) => index); let reenter = false; const lifecycle = { reservation: null as object | null };
     const fixture = host({ entropy: () => fixed, readCurrentness: () => { if (reenter && lifecycle.reservation) { try { broker.abort(lifecycle.reservation); } catch (error) { assert.equal((error as PatientInsightBrokerError).code, 'operation_reentered'); } } return Object.freeze({ selectionEpoch: 7, revision: 3, freshnessToken: 'fresh_token_0123456789abcdef', isRevoked: () => false }); } }); const broker = createPatientInsightBroker(fixture.value);
     lifecycle.reservation = broker.stage(); reenter = true; reject(() => broker.publish(lifecycle.reservation), 'operation_reentered'); reenter = false;
-    broker.abort(lifecycle.reservation); const retry = broker.stage(); assert.equal(broker.publish(retry), `pib_${'000102030405060708090a0b0c0d0e0f'}`);
+    reject(() => broker.abort(lifecycle.reservation), 'reservation_missing'); const retry = broker.stage(); assert.equal(broker.publish(retry), `pib_${'000102030405060708090a0b0c0d0e0f'}`);
 });
 
 test('fails closed after selection, revision, freshness, or revocation changes', () => {

@@ -26,10 +26,29 @@ export type PatientInsightBroker = Readonly<{
 }>;
 
 type Currentness = Readonly<{ selectionEpoch: number; revision: number; freshnessToken: string }>;
-type RecordEntry = Readonly<{ entropyHandle: string; currentness: Currentness; accepted: Extract<PatientInsightHostResult, { status: 'available' }> }>;
-type ReservationEntry = Readonly<{ entropyHandle: string; handle: string; currentness: Currentness; accepted: Extract<PatientInsightHostResult, { status: 'available' }> }>;
+type RecordEntry = Readonly<{ handle: string; entropyHandle: string; currentness: Currentness; accepted: Extract<PatientInsightHostResult, { status: 'available' }> }>;
+type ReservationEntry = Readonly<{ entropyHandle: string; handle: string; record: RecordEntry }>;
 const handlePattern = /^pib_[0-9a-f]{32}$/u;
 const tokenPattern = /^[A-Za-z][A-Za-z0-9._:-]{15,159}$/u;
+const authenticBrokers = new WeakSet<object>();
+const authenticReservations = new WeakSet<object>();
+const mapGet = Function.prototype.call.bind(Map.prototype.get) as <Key, Value>(map: Map<Key, Value>, key: Key) => Value | undefined;
+const mapSet = Function.prototype.call.bind(Map.prototype.set) as <Key, Value>(map: Map<Key, Value>, key: Key, value: Value) => Map<Key, Value>;
+const mapDelete = Function.prototype.call.bind(Map.prototype.delete) as <Key, Value>(map: Map<Key, Value>, key: Key) => boolean;
+const mapHas = Function.prototype.call.bind(Map.prototype.has) as <Key, Value>(map: Map<Key, Value>, key: Key) => boolean;
+const setAdd = Function.prototype.call.bind(Set.prototype.add) as <Value>(set: Set<Value>, value: Value) => Set<Value>;
+const setDelete = Function.prototype.call.bind(Set.prototype.delete) as <Value>(set: Set<Value>, value: Value) => boolean;
+const setHas = Function.prototype.call.bind(Set.prototype.has) as <Value>(set: Set<Value>, value: Value) => boolean;
+const weakMapGet = Function.prototype.call.bind(WeakMap.prototype.get) as <Key extends object, Value>(map: WeakMap<Key, Value>, key: Key) => Value | undefined;
+const weakMapSet = Function.prototype.call.bind(WeakMap.prototype.set) as <Key extends object, Value>(map: WeakMap<Key, Value>, key: Key, value: Value) => WeakMap<Key, Value>;
+const weakMapDelete = Function.prototype.call.bind(WeakMap.prototype.delete) as <Key extends object, Value>(map: WeakMap<Key, Value>, key: Key) => boolean;
+const weakSetAdd = Function.prototype.call.bind(WeakSet.prototype.add) as <Value extends object>(set: WeakSet<Value>, value: Value) => WeakSet<Value>;
+const weakSetHas = Function.prototype.call.bind(WeakSet.prototype.has) as <Value extends object>(set: WeakSet<Value>, value: Value) => boolean;
+
+/** Returns true only for the frozen broker capability created by this module. */
+export function isPatientInsightBrokerCapability(value: unknown): value is PatientInsightBroker {
+    try { return !!value && typeof value === 'object' && !types.isProxy(value) && weakSetHas(authenticBrokers, value); } catch { return false; }
+}
 
 function fail(code: PatientInsightBrokerErrorCode): never { throw new PatientInsightBrokerError(code); }
 function callable(value: unknown): value is () => unknown { return typeof value === 'function' && !types.isProxy(value); }
@@ -76,7 +95,7 @@ export function createPatientInsightBroker(value: PatientInsightBrokerHost): Pat
     const boundaryValue = host && exact(host.boundary, ['prepare']);
     if (!host || !Object.isFrozen(value) || !boundaryValue || !callable(host.readCurrentness) || !callable(host.readSources) || !callable(boundaryValue.prepare) || !callable(host.clock) || !callable(host.entropy)) fail('input_invalid');
     const resolver = createPatientInsightHostProjectionResolver(); const records = new Map<string, RecordEntry>(); const reservations = new WeakMap<object, ReservationEntry>(); const liveEntropyHandles = new Set<string>(); const reservedHandles = new Set<string>(); const consumed = new Set<string>();
-    let operationActive = false; let operationPoisoned = false; let operationCleanup: (() => void) | null = null;
+    let operationActive = false; let operationPoisoned = false;
     const readCurrentness = () => {
         let result: unknown; try { result = (host.readCurrentness as () => unknown)(); } catch { return fail('dependency_unavailable'); }
         const snapshot = currentness(result); if (!snapshot) fail('dependency_unavailable'); return snapshot;
@@ -105,16 +124,22 @@ export function createPatientInsightBroker(value: PatientInsightBrokerHost): Pat
     };
     const availableHandle = (entropyHandle: string): string => {
         let candidate = entropyHandle;
-        while (records.has(candidate) || reservedHandles.has(candidate) || consumed.has(candidate)) {
+        while (mapHas(records, candidate) || setHas(reservedHandles, candidate) || setHas(consumed, candidate)) {
             const next = nextHandle(candidate); if (!next) fail('handle_collision'); candidate = next;
         }
         return candidate;
     };
-    const discardOperationState = (): void => {
-        const cleanup = operationCleanup as (() => void) | null; operationCleanup = null;
-        if (cleanup) cleanup();
+    const ensureNotPoisoned = (): void => { if (operationPoisoned) fail('operation_reentered'); };
+    const abortEntry = (reservation: object, entry: ReservationEntry): void => {
+        weakMapDelete(reservations, reservation); setDelete(liveEntropyHandles, entry.entropyHandle); setDelete(reservedHandles, entry.handle);
     };
-    const ensureNotPoisoned = (): void => { if (operationPoisoned) { discardOperationState(); fail('operation_reentered'); } };
+    const liveReservationEntry = (value: unknown): Readonly<{ reservation: object; entry: ReservationEntry }> | null => {
+        if (!value || typeof value !== 'object' || !weakSetHas(authenticReservations, value)) return null;
+        const entry = weakMapGet(reservations, value);
+        return entry ? { reservation: value, entry } : null;
+    };
+    const completeRecord = (handle: string, entropyHandle: string, snapshot: Currentness, result: Extract<PatientInsightHostResult, { status: 'available' }>): RecordEntry => Object.freeze({ handle, entropyHandle, currentness: snapshot, accepted: result });
+    const validPreparedEntry = (entry: ReservationEntry): boolean => Object.isFrozen(entry) && Object.isFrozen(entry.record) && entry.record.handle === entry.handle && entry.record.entropyHandle === entry.entropyHandle && handlePattern.test(entry.handle) && handlePattern.test(entry.entropyHandle) && Object.isFrozen(entry.record.currentness) && Object.isFrozen(entry.record.accepted);
     const stage = (): object => {
         const snapshot = readCurrentness(); ensureNotPoisoned(); readClock(); ensureNotPoisoned(); let sources: unknown;
         try { sources = (host.readSources as () => unknown)(); } catch { return fail('dependency_unavailable'); }
@@ -123,51 +148,59 @@ export function createPatientInsightBroker(value: PatientInsightBrokerHost): Pat
         let output: unknown; try { output = (boundaryValue.prepare as (request: Readonly<{ projection: PatientInsightProjection }>) => unknown)(Object.freeze({ projection })); } catch { return fail('dependency_unavailable'); }
         ensureNotPoisoned();
         const result = accepted(output); if (!result) fail('proposal_invalid'); const entropyHandle = issueHandle();
-        if (liveEntropyHandles.has(entropyHandle)) fail('handle_collision'); const handle = availableHandle(entropyHandle);
+        if (setHas(liveEntropyHandles, entropyHandle)) fail('handle_collision'); const handle = availableHandle(entropyHandle);
         const current = readCurrentness(); ensureNotPoisoned(); currentnessChanged(snapshot, current);
-        const reservation = Object.freeze(Object.create(null)) as object; const entry = Object.freeze({ entropyHandle, handle, currentness: snapshot, accepted: result });
-        reservations.set(reservation, entry); liveEntropyHandles.add(entropyHandle); reservedHandles.add(handle);
-        operationCleanup = () => { if (reservations.get(reservation) === entry) { reservations.delete(reservation); liveEntropyHandles.delete(entry.entropyHandle); reservedHandles.delete(entry.handle); } };
-        ensureNotPoisoned();
+        const record = completeRecord(handle, entropyHandle, snapshot, result); const reservation = Object.freeze(Object.create(null)) as object; const entry = Object.freeze({ entropyHandle, handle, record });
+        if (!validPreparedEntry(entry)) fail('proposal_invalid');
+        weakMapSet(reservations, reservation, entry); weakSetAdd(authenticReservations, reservation); setAdd(liveEntropyHandles, entropyHandle); setAdd(reservedHandles, handle);
         return reservation;
     };
     const publish = (inputValue: unknown, verifyCurrentness = true): string => {
-        const reservation = reservationInput(inputValue); const entry = reservations.get(reservation); if (!entry) fail('reservation_missing');
-        if (verifyCurrentness) { readClock(); ensureNotPoisoned(); const current = readCurrentness(); ensureNotPoisoned(); currentnessChanged(entry.currentness, current); }
-        ensureNotPoisoned();
-        if (records.has(entry.handle)) fail('handle_collision');
-        const record = Object.freeze({ entropyHandle: entry.entropyHandle, currentness: entry.currentness, accepted: entry.accepted });
-        reservations.delete(reservation); reservedHandles.delete(entry.handle); records.set(entry.handle, record);
-        operationCleanup = () => { if (records.get(entry.handle) === record) { records.delete(entry.handle); liveEntropyHandles.delete(record.entropyHandle); } };
-        ensureNotPoisoned();
-        return entry.handle;
+        const live = liveReservationEntry(inputValue);
+        if (!live) { reservationInput(inputValue); fail('reservation_missing'); }
+        const { reservation, entry } = live;
+        try {
+            reservationInput(reservation);
+            if (!validPreparedEntry(entry)) fail('reservation_missing');
+            if (verifyCurrentness) { readClock(); ensureNotPoisoned(); const current = readCurrentness(); ensureNotPoisoned(); currentnessChanged(entry.record.currentness, current); }
+            ensureNotPoisoned();
+            if (mapHas(records, entry.handle) || !setHas(reservedHandles, entry.handle) || !setHas(liveEntropyHandles, entry.entropyHandle)) fail('handle_collision');
+            // @Codex: Commit uses only captured collection intrinsics and prepared private data.
+            weakMapDelete(reservations, reservation); setDelete(reservedHandles, entry.handle); mapSet(records, entry.handle, entry.record);
+            return entry.handle;
+        } catch (error) { abortEntry(reservation, entry); throw error; }
     };
     const abort = (inputValue: unknown): void => {
-        const reservation = reservationInput(inputValue); const entry = reservations.get(reservation); if (!entry) fail('reservation_missing');
-        reservations.delete(reservation); liveEntropyHandles.delete(entry.entropyHandle); reservedHandles.delete(entry.handle);
+        const live = liveReservationEntry(inputValue);
+        if (!live) { reservationInput(inputValue); fail('reservation_missing'); }
+        const { reservation, entry } = live;
+        try { reservationInput(reservation); abortEntry(reservation, entry); }
+        catch (error) { abortEntry(reservation, entry); throw error; }
     };
-    const exclusive = <Result>(callback: () => Result): Result => {
+    const exclusive = <Result>(callback: () => Result, commitLast = false): Result => {
         if (operationActive) { operationPoisoned = true; fail('operation_reentered'); }
-        operationActive = true; operationPoisoned = false; operationCleanup = null;
+        operationActive = true; operationPoisoned = false;
         try {
             const result = callback();
-            if (operationPoisoned) { discardOperationState(); fail('operation_reentered'); }
+            if (!commitLast && operationPoisoned) fail('operation_reentered');
             return result;
-        } finally { operationActive = false; operationPoisoned = false; operationCleanup = null; }
+        } finally { operationActive = false; operationPoisoned = false; }
     };
-    return Object.freeze({
+    const broker = Object.freeze({
         stage() { return exclusive(stage); },
-        publish(inputValue) { return exclusive(() => publish(inputValue)); },
-        abort(inputValue) { return exclusive(() => abort(inputValue)); },
+        publish(inputValue: unknown) { return exclusive(() => publish(inputValue), true); },
+        abort(inputValue: unknown) { return exclusive(() => abort(inputValue), true); },
         issue() {
-            return exclusive(() => publish(stage(), false));
+            return exclusive(() => publish(stage(), false), true);
         },
-        consume(inputValue) {
+        consume(inputValue: unknown) {
             return exclusive(() => {
                 const input = exact(inputValue, ['handle']); if (!input || typeof input.handle !== 'string' || !handlePattern.test(input.handle)) fail('input_invalid');
-                if (consumed.has(input.handle)) fail('handle_replayed'); const entry = records.get(input.handle); if (!entry) fail('handle_missing'); records.delete(input.handle); liveEntropyHandles.delete(entry.entropyHandle); consumed.add(input.handle);
+                if (setHas(consumed, input.handle)) fail('handle_replayed'); const entry = mapGet(records, input.handle); if (!entry) fail('handle_missing'); mapDelete(records, input.handle); setDelete(liveEntropyHandles, entry.entropyHandle); setAdd(consumed, input.handle);
                 readClock(); ensureNotPoisoned(); const current = readCurrentness(); ensureNotPoisoned(); currentnessChanged(entry.currentness, current); return entry.accepted;
             });
         },
     });
+    weakSetAdd(authenticBrokers, broker);
+    return broker;
 }
