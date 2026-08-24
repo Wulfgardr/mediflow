@@ -85,6 +85,21 @@ function attachmentSnapshot(dbPath: string): unknown {
     }
 }
 
+/* @Codex */
+test('attachment currentness guard permits a new database with no attachments table', () => {
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-currentness-empty-'));
+    try {
+        const result = bootstrap(dataDir);
+        assert.equal(result.status, 0, result.output);
+
+        const db = new Database(path.join(dataDir, 'medical.db'), { readonly: true });
+        assert.equal(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'attachments'").get(), undefined);
+        db.close();
+    } finally {
+        fs.rmSync(dataDir, { recursive: true, force: true });
+    }
+});
+
 test('attachment currentness guard upgrades legacy data and is stable across restart', () => withLegacyDatabase('mediflow-currentness-live-', (dbPath, dataDir) => {
     const beforeDb = new Database(dbPath, { readonly: true });
     const before = beforeDb.prepare(`SELECT ${LEGACY_COLUMNS.join(', ')} FROM attachments ORDER BY id`).all();

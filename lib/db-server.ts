@@ -279,7 +279,10 @@ function hasCanonicalLegacyAttachmentFingerprint(): boolean {
         && hasCanonicalAttachmentIndexes(false);
 }
 /* @Codex */
-function attachmentCurrentnessState(): 'legacy' | 'canonical' {
+function attachmentCurrentnessState(): 'missing' | 'legacy' | 'canonical' {
+    const attachmentTable = sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'attachments'").get();
+    if (!attachmentTable) return 'missing';
+
     const columns = (sqlite.prepare("SELECT name FROM pragma_table_xinfo('attachments')").all() as TableInfoRow[])
         .map((column) => column.name);
     const present = ATTACHMENTS_CURRENTNESS_COLUMNS.filter((name) => columns.includes(name));
@@ -309,7 +312,8 @@ function attachmentCurrentnessState(): 'legacy' | 'canonical' {
 }
 /* @Codex */
 function upgradeLegacyAttachmentCurrentness(): void {
-    if (attachmentCurrentnessState() === 'canonical') return;
+    const state = attachmentCurrentnessState();
+    if (state === 'missing' || state === 'canonical') return;
 
     sqlite.exec('ALTER TABLE attachments RENAME TO attachments_currentness_legacy');
     sqlite.exec(ATTACHMENTS_CURRENTNESS_DDL);
