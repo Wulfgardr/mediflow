@@ -154,7 +154,7 @@ async function hasFixedBoundary(runtime: AppleVisionOcrProcessRuntime): Promise<
 
 function invoke(runtime: AppleVisionOcrProcessRuntime, imagePath: string): Promise<string | null> {
     return new Promise((resolve) => {
-        let output = Buffer.alloc(0); let errors = Buffer.alloc(0); let settled = false; let terminating = false;
+        let output = Buffer.alloc(0); let errors = Buffer.alloc(0); let settled = false; let terminating = false; let childFailed = false;
         const timer = { value: undefined as unknown };
         const finish = (value: string | null) => {
             if (settled) return;
@@ -182,8 +182,8 @@ function invoke(runtime: AppleVisionOcrProcessRuntime, imagePath: string): Promi
         };
         child.stdout.on('data', (chunk: Buffer | string) => collect('stdout', chunk));
         child.stderr.on('data', (chunk: Buffer | string) => collect('stderr', chunk));
-        child.once('error', () => finish(null));
-        child.once('close', (code, signal) => finish(!terminating && code === 0 && signal === null ? output.toString('utf8') : null));
+        child.once('error', () => { childFailed = true; terminate(); });
+        child.once('close', (code, signal) => finish(!childFailed && !terminating && code === 0 && signal === null ? output.toString('utf8') : null));
         try { timer.value = runtime.setTimer(terminate, TIMEOUT_MS); } catch { terminate(); }
     });
 }

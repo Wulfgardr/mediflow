@@ -90,6 +90,19 @@ test('contains a throwing platform facade and returns a frozen failed result', a
     assertResult(await harness({ platformThrows: true }).run(), 'failed');
 });
 
+test('latches child error without cleanup until close confirms termination', async () => {
+    const subject = harness(); const run = await subject.start(); let settled = false;
+    void run.pending.then(() => { settled = true; });
+    run.child.emit('error', new Error('synthetic'));
+    assert.deepEqual(run.child.kills, ['SIGKILL']);
+    assert.deepEqual(subject.removals, []);
+    for (let index = 0; index < 4; index += 1) await Promise.resolve();
+    assert.equal(settled, false);
+    run.child.emit('close', null, 'SIGKILL');
+    assertResult(await run.pending, 'failed');
+    assert.deepEqual(subject.removals, ['/tmp/ocr-test']);
+});
+
 test('waits for a terminal child event after timer failure or a refused kill', async () => {
     const timer = harness({ setTimerThrows: true }); const timerRun = await timer.start();
     assert.deepEqual(timerRun.child.kills, ['SIGKILL']);
@@ -126,7 +139,7 @@ test('fails closed for launch, child, overflow, timeout, late output, and cleanu
     assertResult(await launch.run(), 'failed');
     assert.equal(launch.spawns.length, 0);
     const cases = [
-        async (subject: ReturnType<typeof harness>, run: Awaited<ReturnType<ReturnType<typeof harness>['start']>>) => { run.child.emit('error', new Error('synthetic')); },
+        async (subject: ReturnType<typeof harness>, run: Awaited<ReturnType<ReturnType<typeof harness>['start']>>) => { run.child.emit('error', new Error('synthetic')); run.child.emit('close', null, 'SIGKILL'); },
         async (subject: ReturnType<typeof harness>, run: Awaited<ReturnType<ReturnType<typeof harness>['start']>>) => { run.child.emit('close', 2, null); },
         async (subject: ReturnType<typeof harness>, run: Awaited<ReturnType<ReturnType<typeof harness>['start']>>) => { run.child.emit('close', null, 'SIGTERM'); },
         async (subject: ReturnType<typeof harness>, run: Awaited<ReturnType<ReturnType<typeof harness>['start']>>) => { run.child.stdout.emit('data', Buffer.alloc(32 * 1024 + 1)); assert.deepEqual(run.child.kills, ['SIGKILL']); run.child.emit('close', null, 'SIGKILL'); },
