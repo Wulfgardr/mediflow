@@ -177,7 +177,7 @@ function sourceBindings(value: unknown, allowed: ReadonlySet<string>, expected: 
     const accepted = new Map<string, TreatmentReasoningAthenaSourceBinding>();
     for (const entry of input) {
         const item = record(entry, ['claimPath', 'claim', 'evidenceRefs']);
-        const claimPath = item && text(item.claimPath, MAX.label);
+        const claimPath = item && typeof item.claimPath === 'string' && item.claimPath.length <= MAX.label ? item.claimPath : null;
         const claim = item && text(item.claim, MAX.recommendation);
         const evidenceRefs = item && refs(item.evidenceRefs, allowed);
         if (!item || !claimPath || !claim || expectedByPath.get(claimPath) !== claim || !evidenceRefs || evidenceRefs.length === 0 || accepted.has(claimPath)) return null;

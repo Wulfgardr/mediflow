@@ -90,6 +90,30 @@ test('requires one exact allowlisted binding for every substantive claim', () =>
     for (const value of [missing, unknown, duplicate, extra, empty, unknownRef, duplicateRef]) denied(value);
 });
 
+test('rejects claim paths that drift from the exact canonical spelling', () => {
+    const driftedPaths = [
+        ' summary', 'summary ', 'summary\n', 'Summary', 'data/recommendation',
+        'data.reasoning[0]', 'data.reasoning.00', 'data.caveats.0\u0000',
+    ];
+    for (const claimPath of driftedPaths) {
+        const value = output();
+        value.sourceBindings[0].claimPath = claimPath;
+        denied(value);
+    }
+});
+
+test('accepts complete bindings in any input order and emits canonical frozen order', () => {
+    const value = output();
+    value.sourceBindings = [value.sourceBindings[3], value.sourceBindings[1], value.sourceBindings[0], value.sourceBindings[2]];
+    const result = contract().normalize(value);
+    assert.equal(result.status, 'accepted');
+    if (result.status === 'accepted') {
+        assert.deepEqual(result.sourceBindings, sourceBindings());
+        assert.equal(Object.isFrozen(result.sourceBindings), true);
+        assert.equal(Object.isFrozen(result.sourceBindings[0]), true);
+    }
+});
+
 test('rejects hostile source bindings without reading accessors or proxy traps', () => {
     let reads = 0;
     let traps = 0;
