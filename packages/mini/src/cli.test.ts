@@ -31,6 +31,9 @@ test('parses one exact JSON transport envelope without mapping a command', () =>
     assert.equal(parseMiniTransport(['--format', 'json', '--format', 'ndjson'], '{"command":"opaque.intent","args":{}}'), null);
     assert.equal(parseMiniTransport(['opaque.intent'], '{}'), null);
     assert.equal(parseMiniTransport([], '{"command":"x","args":{},"extra":"forged"}'), null);
+    assert.equal(parseMiniTransport([], '{"command":"first","command":"second","args":{}}'), null);
+    assert.equal(parseMiniTransport([], '{"command":"opaque.intent","args":{},"\\u0061rgs":{}}'), null);
+    assert.equal(parseMiniTransport([], '{"command":"opaque.intent","args":{"key":"first","key":"second"}}'), null);
 });
 
 test('renders JSON and ordered NDJSON without execution', () => {

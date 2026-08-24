@@ -30,9 +30,34 @@ function parseFormat(argv: readonly string[]): Format | null {
     return format;
 }
 
+function hasDuplicateObjectKeys(raw: string): boolean {
+    const objectKeys: Array<Set<string> | null> = [];
+    for (let index = 0; index < raw.length; index += 1) {
+        const character = raw[index];
+        if (character === '{') { objectKeys.push(new Set()); continue; }
+        if (character === '[') { objectKeys.push(null); continue; }
+        if (character === '}' || character === ']') { objectKeys.pop(); continue; }
+        if (character !== '"') continue;
+        const start = index;
+        for (index += 1; index < raw.length; index += 1) {
+            if (raw[index] === '\\') { index += 1; continue; }
+            if (raw[index] === '"') break;
+        }
+        let next = index + 1;
+        while (/\s/u.test(raw[next] ?? '')) next += 1;
+        const keys = objectKeys.at(-1);
+        if (raw[next] !== ':' || !keys) continue;
+        const key = JSON.parse(raw.slice(start, index + 1)) as string;
+        if (keys.has(key)) return true;
+        keys.add(key);
+    }
+    return false;
+}
+
 function parseEnvelope(raw: string): TransportRequest | null {
     try {
         const value = JSON.parse(raw);
+        if (hasDuplicateObjectKeys(raw)) return null;
         if (typeof value !== 'object' || value === null || Array.isArray(value)
             || Object.keys(value).sort().join(',') !== 'args,command'
             || typeof value.command !== 'string' || typeof value.args !== 'object'
