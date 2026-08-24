@@ -150,6 +150,50 @@ Service Layer entro mandato e lease broker-owned. Non accedono direttamente
 al provider, al Fabric, al lifecycle store, al control o alla projection
 plaintext.
 
+### 9. Addendum A+: autenticita del broker e commit-last P4
+
+Questo addendum registra la decisione A+ per P4. Deriva dal solo consulto
+terminale GPT-5.6 Pro `MF085-PRO-P4-20260824-01` e da un difetto verificato
+localmente. Il consulto e consiglio decisionale in sola lettura; ne il
+consulto ne il difetto provano un'implementazione, un test runtime o una
+promozione.
+
+P4 accetta soltanto una capability broker congelata e autentica del modulo
+esatto. Un oggetto structuralmente valido, un wrapper, un proxy o una
+capability ricostruita dal chiamante non sono equivalenti e devono essere
+negati. Il broker e il lease/owner esatto condividono una relazione privata e
+non falsificabile. P4 e gli adapter non possono osservarla, crearla o
+ricostruirla.
+
+Il broker possiede il ciclo di una reservation opaca:
+
+| Stato | Responsabilita del broker | Stato visibile a P4 |
+| --- | --- | --- |
+| `staged` | Costruisce l'handle completo e valida il suo descrittore. Non pubblica authority. | Nessuno. |
+| `aborted` | Elimina la reservation negata e ogni residuo. L'entropia fissa riservata puo essere riusata. | Nessuno. |
+| `committed` | Pubblica l'handle e applica le regole di uso unico, replay e revoca. | Solo l'handle opaco pubblicato. |
+
+`stage` prepara e valida l'handle opaco completo prima di ogni pubblicazione
+irreversibile. Il broker esegue la validazione finale del lease e della
+currentness, poi il commit, nella stessa sezione critica sincrona e senza
+yield. La sezione non accetta `Promise`, thenable, re-entry o callback del
+chiamante. Dopo il commit non sono ammessi denial, validazione o rollback
+implicito. Ogni denial prima del commit deve abortire la reservation staged,
+lasciare zero residui e non pubblicare authority.
+
+Prima del commit, broker e P4 devono negare effetti di proxy, accessor,
+thenable ambientale e reflection. La validazione usa soltanto i dati interni
+gia preparati dal broker; non legge proprieta controllate dal chiamante e non
+richiama codice del chiamante.
+
+P4 verifica l'autenticita del modulo e il descrittore gia congelato. Non
+costruisce handle, non conia identita, non pubblica reservation e non esegue
+il commit. Il broker costruisce, valida, abortisce o committa; P4 compone solo
+dopo l'ammissione esatta. Questo separa la responsabilita di reservation da
+quella di composizione. L'esito resta review-only, con zero scritture e
+`applyPolicy=none`; questo addendum non concede provider, route, persistenza o
+authority di applicazione.
+
 ## Topologia accettata
 
 ```text
@@ -208,6 +252,22 @@ broker production projection ingest
 WUL-282 -- blocks --> any apply
 ```
 
+Il ramo P4 del DAG e sostituito dal seguente ordine obbligatorio:
+
+```text
+ADR addendum A+
+  -> packet broker: autenticita privata e commit-last
+  -> composer P4 ricostruito
+  -> falsificatore cross-boundary solo test
+  -> integrazione
+```
+
+Il commit trattenuto `bf862360b4b3c1d707d88b633cda6e4dba6d1777` non puo
+essere corretto o promosso in place. Precede questo confine e non puo provare
+la relazione privata, l'ammissione module-authentic o il commit-last. Un
+patch locale mescolerebbe broker e composer nello stesso packet. Va quindi
+ricostruito nell'ordine del DAG su una base accettata.
+
 Le frecce indicano dipendenza e ordine di review, non autorizzazione al merge.
 Il manager deve scegliere e verificare ogni base esatta prima del packet
 successivo. Le PR esistenti restano draft ed evidence; questa ADR non le
@@ -229,6 +289,15 @@ Fermare la promozione se:
 - uno dei cinque smart path usa ancora il proxy generico nel claim end-to-end;
 - un adapter riceve prompt o risposta provider grezzi;
 - una denial genera output o una receipt non nulla;
+- P4 accetta un oggetto broker-like, proxy, wrapper o capability ricostruita;
+- un adapter puo osservare, creare o riflettere la relazione privata
+  broker/lease/owner;
+- una reservation viene pubblicata prima della validazione completa di
+  descrittore, lease e currentness;
+- la sezione commit usa `await`, thenable, callback, re-entry o codice
+  caller-controlled;
+- una denial, validazione o rollback avviene dopo il commit, oppure un abort
+  lascia handle, stato o entropia riservata non riusabile;
 - `host_service` viene presentato come identita medica;
 - compare apply prima di WUL-282, review persistente e step-up accettato;
 - compaiono PHI/PII reali, credenziali, cloud, egress o fallback silenzioso.
@@ -237,7 +306,8 @@ Fermare la promozione se:
 
 Questo packet non aggiunge runtime, route, store, migrazioni, UI, provider,
 credenziali, dati clinici, cloud, egress, apply, review persistente o job. Non
-modifica il proxy legacy e non esegue merge o promotion.
+modifica il proxy legacy e non esegue merge o promotion. Le verifiche future
+usano soltanto fixture sintetiche.
 
 Lo stato di delivery e `ADR0095_ACCEPTED_CI_PENDING_MANAGER_VERIFY`. Il primo
 packet runtime resta soggetto a una nuova autorizzazione manageriale.
