@@ -143,13 +143,49 @@ Una sessione `local-api`, `system` o equivalente non prova l'identita del
 medico e non puo creare un owner clinico. Il token locale resta un meccanismo
 di trasporto o servizio entro i suoi scope, non una sessione medica.
 
+### 6. Addendum A+: relazione privata owner, lease e broker
+
+Per P4, l'owner di sessione deve mantenere una relazione privata,
+in-process e non falsificabile tra owner, lease esatto e broker esatto. La
+relazione identifica la capability broker congelata dal suo modulo di origine,
+non dalla sua forma. Un adapter P4 non riceve alcun token, factory, brand,
+simbolo, digest, timestamp, nonce o riferimento da cui ricostruirla.
+
+Il registry host risolve la relazione soltanto internamente. Proxy, accessor,
+reflection, thenable ambientali e valori caller-supplied devono essere negati
+prima di una reservation o di un commit. Nessun controllo post-commit puo
+trasformare una pubblicazione gia riuscita in una denial.
+
+Un riavvio, sostituzione del processo o mismatch del processo proprietario
+nega il lease e la relazione senza ripristino. Owner, lease, broker,
+reservation e handle restano solo in memoria. Non sono serializzati,
+persistiti, esportati o ricreati per P4.
+
+L'owner puo esporre a P4 soltanto l'esito di una reservation gia committata.
+P4 non puo vedere una reservation `staged` o `aborted`, e non puo scegliere il
+passaggio a `committed`. Il broker prepara il descrittore completo, valida
+lease e currentness e pubblica solo dopo il commit sincrono non rientrante.
+Un denial pre-commit termina in `aborted`, con zero residui; l'handle non
+diventa osservabile.
+
+Questa e una decisione di confine, non prova di implementazione. Registra il
+consiglio in sola lettura `MF085-PRO-P4-20260824-01` e il difetto verificato
+localmente come input per il prossimo packet. Non autorizza runtime, route,
+storage, provider, persistenza, applicazione policy o promozione.
+L'esito P4 resta review-only, con zero scritture e `applyPolicy=none`.
+
 ## DAG di implementazione
 
 ```text
-ADR 0096
+ADR 0095/0096 addendum A+
+  -> packet broker: autenticita privata e commit-last
+  -> composer P4 ricostruito
+  -> falsificatore cross-boundary solo test
+  -> integrazione
+
+owner session-scoped e broker per lease
   -> disposal delle risorse server-session
   -> projection input senza authority caller-supplied
-  -> owner session-scoped e broker per lease
   -> registry host di processo
   -> risoluzione canonica ambulatorio/paziente
   -> projection ingest capability-specific
@@ -158,9 +194,10 @@ ADR 0096
   -> adapter browser Smart Import
 ```
 
-Ogni packet modifica un solo confine e resta sotto circa 300 LOC. La preview
-route viene dopo owner, invalidazione, selezione canonica e ingest. La route non
-crea il broker e accetta soltanto `handle` e `requestId` come input applicativi.
+L'addendum A+ precede ogni ramo P4. Ogni packet modifica un solo confine e
+resta sotto circa 300 LOC. La preview route viene dopo owner, invalidazione,
+selezione canonica e ingest. La route non crea il broker e accetta soltanto
+`handle` e `requestId` come input applicativi.
 
 Il wiring client del lock e un packet separato dal core session-scoped. Nessun
 claim end-to-end include il lock finche il client non attende una conferma
@@ -201,6 +238,13 @@ Fermare la promozione se:
 - il lock client viene dichiarato efficace senza conferma server;
 - una sessione agente o `local-api` eredita l'autorita del medico;
 - un restart ricostruisce o accetta un handle precedente;
+- P4 o un adapter ricostruisce, osserva o falsifica la relazione privata tra
+  owner, lease e broker;
+- una reservation `staged` o `aborted` diventa osservabile da P4;
+- un commit usa yield, `Promise`, thenable, callback o re-entry, oppure
+  verifica lease/currentness dopo la pubblicazione;
+- proxy, accessor o reflection del chiamante producono un effetto prima del
+  commit;
 - una topologia multi-process aggiunge replica, persistenza o fallback senza
   una nuova decisione;
 - projection, handle o riferimenti clinici entrano in log o storage.
