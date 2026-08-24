@@ -63,6 +63,53 @@ async function resolvedFontFamily(locator: Locator): Promise<string> {
   return locator.evaluate((element) => getComputedStyle(element).fontFamily);
 }
 
+/* @Codex WUL-560 L6A: the patient lens exposes one focal action while the
+   other four remain keyboard-reachable in a single disclosure menu. */
+async function assertLensActionContract(page: Page): Promise<void> {
+  const lens = page.getByTestId('lume-patient-lens');
+  const primary = lens.getByRole('link', { name: 'Apri scheda paziente', exact: true });
+  const trigger = lens.getByRole('button', { name: 'Altre azioni paziente', exact: true });
+
+  await expect(primary).toBeVisible();
+  await expect(lens.locator('[data-lume-action="primary"]')).toHaveCount(1);
+  await expect(trigger).toBeVisible();
+  await expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(lens.getByRole('menu', { name: 'Azioni paziente' })).toHaveCount(0);
+
+  await trigger.focus();
+  await trigger.press('Enter');
+  const menu = lens.getByRole('menu', { name: 'Azioni paziente' });
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await expect(menu).toBeVisible();
+
+  const items = menu.getByRole('menuitem');
+  await expect(items).toHaveCount(4);
+  await expect(items.nth(0)).toHaveText('Quadro');
+  await expect(items.nth(1)).toHaveText('Nuova voce');
+  await expect(items.nth(2)).toHaveText('Documenti');
+  await expect(items.nth(3)).toHaveText('Prepara SISS');
+  await expect(items.nth(0)).toBeFocused();
+
+  const menuGeometry = await menu.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
+  });
+  expect(menuGeometry.left).toBeGreaterThanOrEqual(-1);
+  expect(menuGeometry.right).toBeLessThanOrEqual(await page.evaluate(() => innerWidth + 1));
+  expect(menuGeometry.top).toBeGreaterThanOrEqual(-1);
+  expect(menuGeometry.bottom).toBeLessThanOrEqual(await page.evaluate(() => innerHeight + 1));
+
+  await page.keyboard.press('End');
+  await expect(items.nth(3)).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(items.nth(0)).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+}
+
 async function assertWorklistContract(page: Page): Promise<void> {
   const list = page.getByRole('listbox', { name: 'Elenco pazienti in carico', exact: true });
   const listItems = list.getByRole('option');
@@ -136,8 +183,7 @@ async function assertWorklistContract(page: Page): Promise<void> {
 
   const lens = page.getByTestId('lume-patient-lens');
   expect(await resolvedFontFamily(lens.getByTestId('lume-patient-atoms'))).toBe(registerFamily);
-  await expect(lens.locator('[data-lume-action="primary"]')).toHaveCount(1);
-  await expect(lens.locator('[data-lume-action="quiet"]')).toHaveCount(4);
+  await assertLensActionContract(page);
 
   const search = page.getByRole('searchbox', { name: 'Cerca nella lista pazienti', exact: true });
   await search.fill('nessun caso sintetico corrispondente');
@@ -296,6 +342,13 @@ for (const worklistCase of WORKLIST_CASES) {
     });
   });
 }
+
+test('L6A mantiene quattro azioni nell’overflow mobile accessibile', async ({ page }) => {
+  await openSyntheticWorklist(page, {
+    register: 'giorno', viewport: 'phone', width: 390, height: 844,
+  });
+  await assertLensActionContract(page);
+});
 
 test('la worklist virtuale attraversa l’indice completo e apre la sola Scheda', async ({ page }) => {
   test.setTimeout(90_000);

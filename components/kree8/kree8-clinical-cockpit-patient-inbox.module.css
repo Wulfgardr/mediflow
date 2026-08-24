@@ -356,7 +356,78 @@
   line-height: 1.55;
 }
 
-.caseLensActions { display: flex; gap: 6px; flex-wrap: wrap; }
+.caseLensActions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.worklistLensActions > [data-lume-action='primary'] {
+  min-height: 44px;
+  min-width: 0;
+  justify-content: center;
+}
+
+.caseLensActionOverflow { position: relative; }
+
+.caseLensOverflowTrigger {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+  border-radius: 12px;
+  background: var(--lume-surface-field);
+  color: var(--lume-ink);
+  cursor: pointer;
+}
+
+.caseLensOverflowTrigger:hover,
+.caseLensMenuItem:hover {
+  background: color-mix(in srgb, var(--lume-accent) 7%, var(--lume-surface-field));
+}
+
+.caseLensOverflowTrigger:focus-visible,
+.caseLensMenuItem:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lume-accent) 40%, transparent);
+}
+
+.caseLensActionMenu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(230px, calc(100vw - 40px));
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent);
+  border-radius: 14px;
+  background: var(--lume-surface-focal);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--lume-ink) 16%, transparent);
+}
+
+.caseLensMenuItem {
+  min-height: 44px;
+  width: 100%;
+  padding: 9px 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--lume-ink);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
 
 @media (max-width: 700px) {
   .worklistPanelHeader {
@@ -387,8 +458,11 @@
     position: static;
   }
 
-  .worklistLensActions > * {
-    max-width: 100%;
+  .worklistLensActions { grid-template-columns: minmax(0, 1fr) auto; }
+
+  .caseLensActionMenu {
+    top: auto;
+    bottom: calc(100% + 8px);
   }
 
 }
