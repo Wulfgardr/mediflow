@@ -20,10 +20,16 @@ export type AttachmentCurrentnessCasOutcome =
     | Readonly<{ status: 'committed'; receipt: Receipt }>
     | Readonly<{ status: 'denied'; code: AttachmentCurrentnessCasCode }>;
 
+export type AttachmentCurrentnessDeleteOutcome =
+    | Readonly<{ status: 'committed' }>
+    | Readonly<{ status: 'denied'; code: AttachmentCurrentnessCasCode }>;
+
 const REQUEST_KEYS = ['id', 'documentSourceRef', 'expectedRevision', 'expectedFreshnessEpoch'] as const;
 const denied = (code: AttachmentCurrentnessCasCode): AttachmentCurrentnessCasOutcome => Object.freeze({ status: 'denied', code });
+const deleteDenied = (code: AttachmentCurrentnessCasCode): AttachmentCurrentnessDeleteOutcome => Object.freeze({ status: 'denied', code });
 const transactionRecord = <T extends object>(value: T): T => Object.freeze(Object.assign(Object.create(null) as object, value)) as T;
 const transactionDenied = (code: AttachmentCurrentnessCasCode): AttachmentCurrentnessCasOutcome => transactionRecord({ status: 'denied', code });
+const transactionDeleteDenied = (code: AttachmentCurrentnessCasCode): AttachmentCurrentnessDeleteOutcome => transactionRecord({ status: 'denied', code });
 const activeHosts = new WeakMap<object, { reentered: boolean }>();
 
 class Rollback extends Error { constructor(readonly code: AttachmentCurrentnessCasCode) { super('Attachment currentness mutation denied.'); } }
@@ -48,6 +54,54 @@ function parseRequest(value: unknown): Request | null {
 
 export function createAttachmentCurrentnessCas(host: Host) {
     return Object.freeze({
+        delete(value: unknown): AttachmentCurrentnessDeleteOutcome {
+            const request = parseRequest(value);
+            if (!request) return deleteDenied('invalid_request');
+            const existing = activeHosts.get(host.database);
+            if (existing) { existing.reentered = true; return deleteDenied('operation_reentered'); }
+            const state = { reentered: false };
+            activeHosts.set(host.database, state);
+            try {
+                const outcome = host.runImmediateTransaction<AttachmentCurrentnessDeleteOutcome>(() => {
+                    const candidates = host.database.select({
+                        id: attachments.id,
+                        documentSourceRef: attachments.documentSourceRef,
+                        documentRevision: attachments.documentRevision,
+                        documentFreshnessEpoch: attachments.documentFreshnessEpoch,
+                    }).from(attachments).where(or(
+                        eq(attachments.id, request.id),
+                        eq(attachments.documentSourceRef, request.documentSourceRef),
+                    )).all();
+                    if (candidates.length === 0) return transactionDeleteDenied('missing');
+                    if (candidates.length !== 1) return transactionDeleteDenied('cardinality_violation');
+                    const current = candidates[0]!;
+                    if (current.id !== request.id || current.documentSourceRef !== request.documentSourceRef) {
+                        return transactionDeleteDenied('identity_mismatch');
+                    }
+                    if (current.documentRevision !== request.expectedRevision || current.documentFreshnessEpoch !== request.expectedFreshnessEpoch) {
+                        return transactionDeleteDenied('stale');
+                    }
+                    const deleted = host.database.delete(attachments).where(and(
+                        eq(attachments.id, request.id),
+                        eq(attachments.documentSourceRef, request.documentSourceRef),
+                        eq(attachments.documentRevision, request.expectedRevision),
+                        eq(attachments.documentFreshnessEpoch, request.expectedFreshnessEpoch),
+                    )).run();
+                    if (deleted.changes !== 1) throw new Rollback('stale');
+                    if (state.reentered) throw new Rollback('operation_reentered');
+                    const remaining = host.database.select({ id: attachments.id }).from(attachments).where(or(
+                        eq(attachments.id, request.id),
+                        eq(attachments.documentSourceRef, request.documentSourceRef),
+                    )).all();
+                    if (remaining.length !== 0) throw new Rollback('cardinality_violation');
+                    return transactionRecord({ status: 'committed' as const });
+                });
+                if (outcome.status === 'denied') return deleteDenied(outcome.code);
+                return Object.freeze({ status: 'committed' });
+            } catch (error) {
+                return deleteDenied(error instanceof Rollback ? error.code : 'storage_unavailable');
+            } finally { activeHosts.delete(host.database); }
+        },
         mutate(value: unknown, mutation: unknown): AttachmentCurrentnessCasOutcome {
             const request = parseRequest(value);
             if (!request || typeof mutation !== 'function' || types.isProxy(mutation) || types.isAsyncFunction(mutation)) return denied('invalid_request');
