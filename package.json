@@ -34,6 +34,8 @@
     "check:mlx-operational-parity": "node scripts/check-mlx-operational-parity.mjs",
     "check:apple-wide-qa": "node scripts/check-apple-wide-qa-manifest.mjs",
     "check:claims": "node scripts/check-claims-guard.mjs",
+    "mini": "node scripts/run-strip-types.mjs packages/mini/src/cli.ts",
+    "test:mini-cli": "node scripts/run-strip-types.mjs --test packages/mini/src/cli.test.ts",
     "check:terminology-parity": "bash scripts/check-terminology-parity.sh",
     "workflow-monitor": "node scripts/codex-workflow-monitor.mjs",
     "rehearse:api-v1-compatibility": "node scripts/api-v1-compatibility-rehearsal.mjs",
