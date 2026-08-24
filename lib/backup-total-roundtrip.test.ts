@@ -254,6 +254,9 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
         id: 'w7-attachment', patient_id: 'w7-patient', type: 'application/pdf', size: 128,
         ...(await sealed('attachments', ['name', 'path', 'data', 'summary_snapshot', 'parse_evidence_artifact_snapshot', 'ocr_replay_artifact_snapshot'])),
         ocr_queue_state: 'ocr_done', ocr_queue_reason: 'synthetic', ocr_queue_updated_at: now + 22, created_at: now + 22,
+        document_source_ref: createHash('sha256').update('synthetic:w7-attachment').digest('hex'),
+        document_revision: 1,
+        document_freshness_epoch: 1,
     });
     insertRow(db, 'conversations', { id: 'w7-conversation', title: await seal('conversations.title'), updated_at: now + 23, is_archived: 1, is_deleted: 1, created_at: now + 23 });
     insertRow(db, 'messages', {
