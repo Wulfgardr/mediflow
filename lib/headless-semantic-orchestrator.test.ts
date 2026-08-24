@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { createHeadlessSemanticOrchestrator, HEADLESS_P3_CLAIM_CEILING, type HeadlessSemanticHost } from './headless-semantic-orchestrator';
+import { createHeadlessSemanticOrchestrator, HEADLESS_P3_CLAIM_CEILING, HEADLESS_P3_FABRIC_RECORD_IDS, type HeadlessSemanticHost } from './headless-semantic-orchestrator';
 const request = { adapterKind: 'chat' as const, intent: 'synthetic: summarize the selected fixture', requestRef: 'req_opaque0001', idempotencyRef: 'idem_opaque0001' };
 const roster = Array.from({ length: 66 }, (_, index) => `web-${String(index + 1).padStart(2, '0')}`);
 function fixture(overrides: Partial<HeadlessSemanticHost> = {}) {
@@ -118,7 +118,7 @@ test('rejects unmapped capability identity, unsafe service output, SQL semantics
     assert.equal(Object.getPrototypeOf(source), Object.prototype); const records = Object.getOwnPropertyDescriptor(source as object, 'records');
     assert.ok(records && 'value' in records && Array.isArray(records.value));
     const fabricRoster = records.value.map((record: unknown) => { assert.equal(Object.getPrototypeOf(record), Object.prototype); const id = Object.getOwnPropertyDescriptor(record as object, 'id'); assert.ok(id && 'value' in id && typeof id.value === 'string'); return id.value; });
-    assert.equal(fabricRoster.length, 16); assert.equal(createHash('sha256').update(fabricRoster.join('\n')).digest('hex'), 'c975f45c0fa5c57f681628ec3592865077d1a3801d268a7a7fdfc3669281adbb');
+    assert.equal(fabricRoster.length, 16); assert.deepEqual(HEADLESS_P3_FABRIC_RECORD_IDS, fabricRoster); assert.equal(createHash('sha256').update(fabricRoster.join('\n')).digest('hex'), 'c975f45c0fa5c57f681628ec3592865077d1a3801d268a7a7fdfc3669281adbb');
     for (const fabricDependency of fabricRoster) { const fabric = fixture(); fabric.host.registry[0]!.fabricDependency = fabricDependency; assert.doesNotThrow(() => createHeadlessSemanticOrchestrator(fabric.host)); }
     for (const fabricDependency of ['patient_insight', 'fabric:patient_insight@28a1a36b162f-forged', 'fabric:provider@28a1a36b162f', 'fabric:venue@28a1a36b162f', 'fabric:sqlite@28a1a36b162f']) { const fabric = fixture(); fabric.host.registry[0]!.fabricDependency = fabricDependency; assert.throws(() => createHeadlessSemanticOrchestrator(fabric.host), /registry_invalid/); }
     const unsafe = fixture(); unsafe.host.registry[0]!.execute = () => ({ outcome: 'read', response: 'synthetic-response: ok', prompt: 'leak' } as never);
