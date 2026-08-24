@@ -149,6 +149,36 @@ test('rejects transparent Proxies before their traps or accessors are evaluated'
     const broker = createPatientInsightBroker(host().value); reject(() => broker.consume(new Proxy({ handle: `pib_${'a'.repeat(32)}` }, {})), 'input_invalid');
 });
 
+test('rejects callable Proxy dependencies and entropy results before any trap runs', () => {
+    const callableProxy = (sideEffects: { value: number }): (() => boolean) => new Proxy(() => false, {
+        apply() { sideEffects.value += 1; throw new Error('synthetic callable Proxy'); },
+        get() { sideEffects.value += 1; throw new Error('synthetic callable Proxy'); },
+    });
+    for (const dependency of ['readCurrentness', 'readSources', 'clock', 'entropy'] as const) {
+        const sideEffects = { value: 0 };
+        reject(() => createPatientInsightBroker(host({ [dependency]: callableProxy(sideEffects) } as never).value), 'input_invalid');
+        assert.equal(sideEffects.value, 0, `${dependency} Proxy must not run`);
+    }
+    const prepareSideEffects = { value: 0 };
+    reject(() => createPatientInsightBroker(host({ boundary: Object.freeze({ prepare: callableProxy(prepareSideEffects) }) as never }).value), 'input_invalid');
+    assert.equal(prepareSideEffects.value, 0, 'prepare Proxy must not run');
+
+    const revokedSideEffects = { value: 0 };
+    const revokedBroker = createPatientInsightBroker(host({
+        readCurrentness: () => Object.freeze({ selectionEpoch: 7, revision: 3, freshnessToken: 'fresh_token_0123456789abcdef', isRevoked: callableProxy(revokedSideEffects) }),
+    }).value);
+    reject(() => revokedBroker.issue(), 'dependency_unavailable');
+    assert.equal(revokedSideEffects.value, 0, 'isRevoked Proxy must not run');
+
+    let entropyCalls = 0; const entropyResultSideEffects = { value: 0 };
+    const entropyBroker = createPatientInsightBroker(host({
+        entropy: () => { entropyCalls += 1; return new Proxy(new Uint8Array(16), { get() { entropyResultSideEffects.value += 1; throw new Error('synthetic entropy result Proxy'); } }); },
+    }).value);
+    reject(() => entropyBroker.issue(), 'dependency_unavailable');
+    assert.equal(entropyCalls, 1, 'entropy is invoked exactly once');
+    assert.equal(entropyResultSideEffects.value, 0, 'entropy Proxy result must not be reflected or read');
+});
+
 test('rejects non-enumerable broker records at every caller-controlled record seam', () => {
     const hidden = (value: Record<string, unknown>, key: string) => {
         const clone = { ...value };
@@ -228,5 +258,5 @@ test('does not reach forbidden concerns or reuse the Smart Import broker', () =>
     const source = readFileSync(new URL('./patient-insight-broker.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(source, /typed-projection-broker|smart-import|provider-lifecycle|fetch\(/u);
     assert.doesNotMatch(source, /database|persist|writeFile|patientRef|sessionRef|route|apply\(/ui);
-    assert.match(source, /ABA[\s\S]*P4[\s\S]*HOLD/u);
+    assert.match(source, /P4 composer must retain a staged reservation and must not call publish before final P4 validation/u);
 });

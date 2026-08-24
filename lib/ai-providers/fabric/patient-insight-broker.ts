@@ -32,6 +32,7 @@ const handlePattern = /^pib_[0-9a-f]{32}$/u;
 const tokenPattern = /^[A-Za-z][A-Za-z0-9._:-]{15,159}$/u;
 
 function fail(code: PatientInsightBrokerErrorCode): never { throw new PatientInsightBrokerError(code); }
+function callable(value: unknown): value is () => unknown { return typeof value === 'function' && !types.isProxy(value); }
 function exact(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
     try {
         if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) return null;
@@ -47,7 +48,7 @@ function timestamp(value: unknown): string | null {
 function currentness(value: unknown): Currentness | null {
     try {
         const input = exact(value, ['selectionEpoch', 'revision', 'freshnessToken', 'isRevoked']);
-        if (!input || !Object.isFrozen(value) || !Number.isSafeInteger(input.selectionEpoch) || (input.selectionEpoch as number) < 1 || !Number.isSafeInteger(input.revision) || (input.revision as number) < 0 || typeof input.freshnessToken !== 'string' || !tokenPattern.test(input.freshnessToken) || typeof input.isRevoked !== 'function') return null;
+        if (!input || !Object.isFrozen(value) || !Number.isSafeInteger(input.selectionEpoch) || (input.selectionEpoch as number) < 1 || !Number.isSafeInteger(input.revision) || (input.revision as number) < 0 || typeof input.freshnessToken !== 'string' || !tokenPattern.test(input.freshnessToken) || !callable(input.isRevoked)) return null;
         const revoked = (input.isRevoked as () => unknown)();
         if (typeof revoked !== 'boolean') return null;
         if (revoked) return fail('revoked');
@@ -69,11 +70,11 @@ function currentnessChanged(before: Currentness, after: Currentness): void {
     if (after.freshnessToken !== before.freshnessToken) fail('freshness_stale');
 }
 
-/** Candidate-only: ABA needs P4 lease critical section; production remains HOLD. */
+/** Candidate-only: ABA needs P4 lease critical section; production remains HOLD. A P4 composer must retain a staged reservation and must not call publish before final P4 validation. */
 export function createPatientInsightBroker(value: PatientInsightBrokerHost): PatientInsightBroker {
     const host = exact(value, ['readCurrentness', 'readSources', 'boundary', 'clock', 'entropy']);
     const boundaryValue = host && exact(host.boundary, ['prepare']);
-    if (!host || !Object.isFrozen(value) || !boundaryValue || typeof host.readCurrentness !== 'function' || typeof host.readSources !== 'function' || typeof boundaryValue.prepare !== 'function' || typeof host.clock !== 'function' || typeof host.entropy !== 'function') fail('input_invalid');
+    if (!host || !Object.isFrozen(value) || !boundaryValue || !callable(host.readCurrentness) || !callable(host.readSources) || !callable(boundaryValue.prepare) || !callable(host.clock) || !callable(host.entropy)) fail('input_invalid');
     const resolver = createPatientInsightHostProjectionResolver(); const records = new Map<string, RecordEntry>(); const reservations = new WeakMap<object, ReservationEntry>(); const liveEntropyHandles = new Set<string>(); const reservedHandles = new Set<string>(); const consumed = new Set<string>();
     let operationActive = false; let operationPoisoned = false; let operationCleanup: (() => void) | null = null;
     const readCurrentness = () => {
@@ -84,7 +85,7 @@ export function createPatientInsightBroker(value: PatientInsightBrokerHost): Pat
     const issueHandle = () => {
         let bytes: unknown; try { bytes = (host.entropy as () => unknown)(); } catch { return fail('dependency_unavailable'); }
         try {
-            if (!(bytes instanceof Uint8Array) || bytes.byteLength < 16) fail('dependency_unavailable');
+            if (types.isProxy(bytes) || !(bytes instanceof Uint8Array) || bytes.byteLength < 16) fail('dependency_unavailable');
             let hex = ''; for (let index = 0; index < 16; index += 1) hex += bytes[index].toString(16).padStart(2, '0'); return `pib_${hex}`;
         } catch (error) { if (error instanceof PatientInsightBrokerError) throw error; return fail('dependency_unavailable'); }
     };
