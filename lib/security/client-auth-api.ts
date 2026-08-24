@@ -103,8 +103,8 @@ async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Pro
 }
 
 /* @Codex */
-export function logoutSecuritySession(): void {
-    void fetch('/api/auth/logout', { method: 'POST' });
+export function logoutSecuritySession(): Promise<void> {
+    return fetch('/api/auth/logout', { method: 'POST' }).then(() => undefined);
 }
 
 /* @Codex */
