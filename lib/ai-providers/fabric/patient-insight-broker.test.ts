@@ -95,6 +95,29 @@ test('rejects non-enumerable broker records at every caller-controlled record se
     reject(() => broker.consume(hidden({ handle: `pib_${'a'.repeat(32)}` }, 'handle')), 'input_invalid');
 });
 
+test('requires a boolean revocation result and publishes no record for non-boolean values', () => {
+    let thenReads = 0;
+    const thenable = Object.create(null, { then: { enumerable: true, get() { thenReads += 1; return () => undefined; } } });
+    for (const invalid of [0, 1, undefined, null, 'false', Object.freeze({}), Promise.resolve(false), thenable]) {
+        let revoked: unknown = invalid; let entropyCalls = 0;
+        const fixture = host({
+            readCurrentness: () => Object.freeze({ selectionEpoch: 7, revision: 3, freshnessToken: 'fresh_token_0123456789abcdef', isRevoked: () => revoked as never }),
+            entropy: () => { entropyCalls += 1; return new Uint8Array(16).fill(9); },
+        });
+        const broker = createPatientInsightBroker(fixture.value);
+        reject(() => broker.issue(), 'dependency_unavailable');
+        assert.equal(entropyCalls, 0);
+        revoked = false;
+        const handle = broker.issue();
+        assert.equal(handle, `pib_${'09'.repeat(16)}`);
+        assert.equal(entropyCalls, 1);
+        assert.equal(broker.consume({ handle }).status, 'available');
+    }
+    assert.equal(thenReads, 0);
+    const revoked = host({ readCurrentness: () => Object.freeze({ selectionEpoch: 7, revision: 3, freshnessToken: 'fresh_token_0123456789abcdef', isRevoked: () => true }) });
+    reject(() => createPatientInsightBroker(revoked.value).issue(), 'revoked');
+});
+
 test('rechecks currentness after issue dependencies and orders consume clock before currentness', () => {
     let change = () => {}; let calls = 0;
     const clockFixture = host({ clock: () => { calls += 1; if (calls === 2) change(); return now; } }); change = () => clockFixture.setCurrentness(state({ revision: 4 }));

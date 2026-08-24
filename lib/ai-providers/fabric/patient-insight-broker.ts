@@ -41,7 +41,9 @@ function currentness(value: unknown): Currentness | null {
     try {
         const input = exact(value, ['selectionEpoch', 'revision', 'freshnessToken', 'isRevoked']);
         if (!input || !Object.isFrozen(value) || !Number.isSafeInteger(input.selectionEpoch) || (input.selectionEpoch as number) < 1 || !Number.isSafeInteger(input.revision) || (input.revision as number) < 0 || typeof input.freshnessToken !== 'string' || !tokenPattern.test(input.freshnessToken) || typeof input.isRevoked !== 'function') return null;
-        if (input.isRevoked()) return fail('revoked');
+        const revoked = (input.isRevoked as () => unknown)();
+        if (typeof revoked !== 'boolean') return null;
+        if (revoked) return fail('revoked');
         return Object.freeze({ selectionEpoch: input.selectionEpoch as number, revision: input.revision as number, freshnessToken: input.freshnessToken });
     } catch (error) { if (error instanceof PatientInsightBrokerError) throw error; return null; }
 }
