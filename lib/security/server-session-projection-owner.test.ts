@@ -7,6 +7,8 @@ import {
     createServerSessionProjectionOwnerRegistry,
     isServerSessionProjectionOwner,
     ServerSessionProjectionOwnerError,
+    spendLeaseCommitTurn,
+    withLeaseCommitTurn,
 } from './server-session-projection-owner.ts';
 import { clearAllSessions, createSession, deleteSession, getSession, type ServerSession } from './server-session.ts';
 import { ProjectionBrokerError } from '../typed-projection-broker.ts';
@@ -128,6 +130,124 @@ test('keeps disposed identity recognizable while operations remain terminal', ()
     assert.equal(registry.isAuthenticOwner(owner), true);
     assert.equal(registry.lookup(value.id), null);
     assert.throws(() => owner.withLeaseCriticalSection(value, () => 'unused'), rejects('session_unavailable'));
+});
+
+test('requires an authentic live turn for synchronous commit and abort work', () => {
+    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair });
+    const value = session(); const owner = registry.acquire(value);
+    owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const events: string[] = [];
+
+    withLeaseCommitTurn(owner, value,
+        (selection) => Object.freeze({ selection }),
+        (prepared, turn) => {
+            assert.equal(prepared.selection.patientId, PAIR.patientId);
+            assert.equal(Object.getPrototypeOf(turn), null);
+            assert.equal(Object.isFrozen(turn), true);
+            spendLeaseCommitTurn(owner, value, turn, 'commit');
+            events.push('commit');
+        },
+        (turn) => {
+            spendLeaseCommitTurn(owner, value, turn, 'abort');
+            events.push('abort');
+        });
+
+    assert.deepEqual(events, ['commit']);
+});
+
+test('aborts once on a precommit thenable without leaking native rejections', async () => {
+    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair });
+    const value = session(); const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const unhandled: unknown[] = []; let resurrection: unknown;
+    const observe = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', observe);
+    try {
+        assert.throws(() => withLeaseCommitTurn(owner, value,
+            () => Promise.reject(new Error('synthetic prepare rejection')),
+            () => assert.fail('commit must not run'),
+            (turn) => {
+                spendLeaseCommitTurn(owner, value, turn, 'abort');
+                queueMicrotask(() => { try { spendLeaseCommitTurn(owner, value, turn, 'abort'); } catch (error) { resurrection = error; } });
+                return Promise.reject(new Error('synthetic late abort'));
+            }),
+        rejects('input_invalid'));
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        assert.equal(resurrection instanceof ServerSessionProjectionOwnerError && resurrection.code, 'selection_unavailable');
+        assert.deepEqual(unhandled, []);
+    } finally { process.off('unhandledRejection', observe); }
+});
+
+test('closes spent turns before late work and keeps a spent commit terminal', async () => {
+    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair });
+    const value = session(); const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    let late: unknown; let later: unknown; let aborts = 0; const unhandled: unknown[] = []; const observe = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', observe);
+    try {
+        withLeaseCommitTurn(owner, value, () => 'prepared', (_prepared, turn) => {
+            spendLeaseCommitTurn(owner, value, turn, 'commit');
+            assert.throws(() => spendLeaseCommitTurn(owner, value, turn, 'commit'), rejects('selection_unavailable'));
+            queueMicrotask(() => { try { spendLeaseCommitTurn(owner, value, turn, 'commit'); } catch (error) { late = error; } });
+            setImmediate(() => { try { spendLeaseCommitTurn(owner, value, turn, 'commit'); } catch (error) { later = error; } });
+            return Promise.reject(new Error('synthetic late commit'));
+        }, () => { aborts += 1; });
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        assert.equal(aborts, 0);
+        assert.equal(late instanceof ServerSessionProjectionOwnerError && late.code, 'selection_unavailable');
+        assert.equal(later instanceof ServerSessionProjectionOwnerError && later.code, 'selection_unavailable');
+        assert.deepEqual(unhandled, []);
+
+        withLeaseCommitTurn(owner, value, () => 'prepared-again', (_prepared, turn) => {
+            spendLeaseCommitTurn(owner, value, turn, 'commit');
+            throw new Error('synthetic post-spend throw');
+        }, () => { aborts += 1; });
+        assert.equal(aborts, 0);
+    } finally { process.off('unhandledRejection', observe); }
+});
+
+test('denies dynamic commit and abort completions before they can spend a turn', async () => {
+    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair });
+    const value = session(); const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const unhandled: unknown[] = []; const observe = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', observe);
+    try {
+        assert.throws(() => withLeaseCommitTurn(owner, value, () => 'prepared',
+            () => Promise.reject(new Error('synthetic unspent commit')),
+            (turn) => spendLeaseCommitTurn(owner, value, turn, 'abort')), rejects('selection_unavailable'));
+        assert.throws(() => withLeaseCommitTurn(owner, value, () => 'prepared-again',
+            () => { throw Promise.reject(new Error('synthetic thrown commit')); },
+            (turn) => spendLeaseCommitTurn(owner, value, turn, 'abort')), rejects('input_invalid'));
+        assert.throws(() => withLeaseCommitTurn(owner, value, () => { throw new Error('synthetic prepare failure'); },
+            () => assert.fail('commit must not run'), () => Promise.reject(new Error('synthetic unspent abort'))),
+        rejects('selection_unavailable'));
+        let thenReads = 0; const originalThen = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+        try {
+            Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { thenReads += 1; return undefined; } });
+            assert.throws(() => withLeaseCommitTurn(owner, value, () => Object.freeze({ staged: true }),
+                () => assert.fail('commit must not run'), (turn) => spendLeaseCommitTurn(owner, value, turn, 'abort')), rejects('input_invalid'));
+            assert.equal(thenReads, 0);
+        } finally {
+            if (originalThen) Object.defineProperty(Object.prototype, 'then', originalThen);
+            else delete (Object.prototype as { then?: unknown }).then;
+        }
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        assert.deepEqual(unhandled, []);
+    } finally { process.off('unhandledRejection', observe); }
+});
+
+test('denies unspent, forged, cross-session, and late clock commit attempts before publication', () => {
+    let now = Date.now();
+    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair, clock: () => now });
+    const value = session(); const other = session(); const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    let aborts = 0; let traps = 0;
+    assert.throws(() => withLeaseCommitTurn(owner, value, () => 'prepared', (_prepared, turn) => {
+        assert.throws(() => spendLeaseCommitTurn(owner, other, turn, 'commit'), rejects('selection_unavailable'));
+        assert.throws(() => spendLeaseCommitTurn(owner, value, new Proxy(turn, { get() { traps += 1; return undefined; } }), 'commit'), rejects('input_invalid'));
+    }, (turn) => { aborts += 1; spendLeaseCommitTurn(owner, value, turn, 'abort'); }), rejects('selection_unavailable'));
+    assert.deepEqual({ aborts, traps }, { aborts: 1, traps: 0 });
+
+    const second = registry.acquire(other); second.issueSelection({ expectedEpoch: 0, ...PAIR });
+    assert.throws(() => withLeaseCommitTurn(second, other, () => { now = other.expiresAt + 1; return 'late'; },
+        () => assert.fail('commit must not run'), (turn) => spendLeaseCommitTurn(second, other, turn, 'abort')), rejects('lease_expired'));
 });
 
 test('acquire rejects synchronous source reentrancy with one fixed error', () => {
