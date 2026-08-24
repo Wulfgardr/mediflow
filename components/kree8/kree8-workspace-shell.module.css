@@ -358,6 +358,7 @@
 }
 
 .sectionGroupButton {
+  box-sizing: border-box;
   width: 100%;
   min-height: 44px;
   display: flex;
@@ -385,8 +386,8 @@
 .sectionGroupButton[aria-expanded='true'] .sectionGroupChevron { transform: rotate(90deg); }
 .sectionGroupItems { margin: 0; padding: 0 6px 6px; list-style: none; }
 .sectionGroupItems li + li { margin-top: 4px; }
-.sectionGroupItems .sectionLink { width: 100%; min-height: 44px; justify-content: space-between; }
-.sectionActivePeek { width: calc(100% - 12px); min-height: 44px; margin: 0 6px 6px; justify-content: space-between; }
+.sectionGroupItems .sectionLink { box-sizing: border-box; width: 100%; min-height: 44px; justify-content: space-between; }
+.sectionActivePeek { box-sizing: border-box; width: calc(100% - 12px); min-height: 44px; margin: 0 6px 6px; justify-content: space-between; }
 
 .sectionLink {
   flex: 0 0 auto;
@@ -423,6 +424,8 @@
     width: 100%;
     justify-content: space-between;
   }
+
+  .groupedSectionRail .sectionActivePeek { width: calc(100% - 12px); }
 }
 
 @media (max-width: 900px) {
