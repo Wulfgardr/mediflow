@@ -2,8 +2,8 @@
 import 'server-only';
 
 import { types } from 'node:util';
-import type { PatientInsightHostBoundary, PatientInsightHostResult, PatientInsightProjection } from './patient-insight-host-boundary.ts';
-import { createPatientInsightHostProjectionResolver } from './patient-insight-host-projection.ts';
+import type { PatientInsightHostBoundary, PatientInsightHostResult, PatientInsightProjection } from './patient-insight-host-boundary';
+import { createPatientInsightHostProjectionResolver } from './patient-insight-host-projection';
 
 export type PatientInsightBrokerErrorCode = 'dependency_unavailable' | 'freshness_stale' | 'handle_collision' | 'handle_missing' | 'handle_replayed' | 'input_invalid' | 'operation_reentered' | 'proposal_invalid' | 'reservation_missing' | 'revision_stale' | 'revoked' | 'selection_changed';
 export class PatientInsightBrokerError extends Error {
