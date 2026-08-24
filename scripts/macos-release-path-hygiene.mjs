@@ -34,7 +34,9 @@ function localHomes() {
   try { return [...new Set([...declared, ...declared.map((home) => fs.realpathSync.native(home))])]; }
   catch { fail('cannot canonicalize local home'); }
 }
-const homes = localHomes();
+let homes = [], homesUnavailable = false;
+try { homes = localHomes(); } catch { homesUnavailable = true; }
+function requireHomes() { if (homesUnavailable) fail('cannot canonicalize local home'); return homes; }
 function unsafeSourceRoot(root) {
   if (!path.isAbsolute(root)) fail('source root must be absolute');
   let stat; try { stat = fs.statSync(root); } catch { fail('source root must be an existing directory'); }
@@ -43,33 +45,29 @@ function unsafeSourceRoot(root) {
   const inside = (value, base) => value === base || value.startsWith(`${base}${path.sep}`);
   const inCodex = resolved.split(path.sep).some((part, index, parts) => part === '.codex' && parts[index + 1] === 'worktrees');
   return inside(resolved, '/Users') || inCodex ||
-    homes.some((home) => home !== '/' && inside(resolved, home));
+    requireHomes().some((home) => home !== '/' && inside(resolved, home));
 }
 function executable() { return path.join(app, 'Contents', 'MacOS', 'MediFlow'); }
 function webRuntime() { return path.join(app, 'Contents', 'Resources', 'WebRuntime'); }
 
-const MACHO_ARM64 = 0x0100000c;
-function isArm64Macho(file) {
+const MACHO_CPUS = new Set([0x0100000c, 0x01000007]);
+function isSupportedMacho(file) {
   try {
     const data = fs.readFileSync(file);
-    if (data.length < 8) return false;
-    const le = data.readUInt32LE(0), be = data.readUInt32BE(0);
-    if (le === 0xfeedfacf || be === 0xfeedfacf) return (le === 0xfeedfacf ? data.readUInt32LE(4) : data.readUInt32BE(4)) === MACHO_ARM64;
-    const fat = be === 0xcafebabe || be === 0xcafebabf ? { little: false, step: be === 0xcafebabf ? 32 : 20 } : be === 0xbebafeca || be === 0xbfbafeca ? { little: true, step: be === 0xbfbafeca ? 32 : 20 } : null;
-    if (!fat) return false;
-    const read = (offset) => fat.little ? data.readUInt32LE(offset) : data.readUInt32BE(offset);
-    for (let index = 0; index < read(4) && 8 + index * fat.step + 4 <= data.length; index += 1) if (read(8 + index * fat.step) === MACHO_ARM64) return true;
+    if (data.length < 32) return false;
+    const le = data.readUInt32LE(0);
+    if (le === 0xfeedfacf) return MACHO_CPUS.has(data.readUInt32LE(4));
   } catch {}
   return false;
 }
-function assertArm64Macho(file) { if (!isArm64Macho(file)) fail('native executable must be a Mach-O arm64 binary'); }
+function assertSupportedMacho(file) { if (!isSupportedMacho(file)) fail('native executable must be a Mach-O arm64 or x86_64 binary'); }
 function stripExecutable() {
   const file = executable();
   if (!fs.existsSync(file)) fail('missing native executable');
-  assertArm64Macho(file);
+  assertSupportedMacho(file);
   const result = spawnSync('strip', ['-x', file], { encoding: 'utf8' });
-  if (result.status !== 0) fail(`strip failed: ${(result.stderr || result.error?.message || 'unknown error').trim()}`);
-  assertArm64Macho(file);
+  if (result.status !== 0) fail('strip failed');
+  assertSupportedMacho(file);
 }
 const forbidden = [
   ...homes.map((home) => ['current home directory', home]),
@@ -81,6 +79,7 @@ const forbidden = [
   ['Slack token', '\\bxox[baprs]-[A-Za-z0-9-]{20,}\\b'],
 ].map(([label, pattern]) => [label, (text) => new RegExp(pattern).test(text)]));
 function checkPayload() {
+  requireHomes();
   const contents = path.join(app, 'Contents');
   let canonicalApp, canonicalContents;
   try { canonicalApp = fs.realpathSync.native(app); canonicalContents = fs.realpathSync.native(contents); }
@@ -190,6 +189,6 @@ try {
   if (smoke) await smokeRelocatedRuntime();
   console.log('macOS release path hygiene passed');
 } catch (error) {
-  console.error(error instanceof Error ? error.message : String(error));
+  console.error(error instanceof Error && error.message.startsWith('macOS release path hygiene:') ? error.message : 'macOS release path hygiene: operation failed');
   process.exitCode = 1;
 }

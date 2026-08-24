@@ -50,14 +50,18 @@ test('payload links are contained, dereferenced, and cycle-safe', () => {
     fs.unlinkSync(link); fs.symlinkSync('loop-b', path.join(resources, 'loop-a')); fs.symlinkSync('loop-a', link); assert.match(run(['--app', app, '--check']).stderr, /invalid payload link/);
   } finally { fs.rmSync(app, { recursive: true, force: true }); fs.rmSync(outside, { force: true }); }
 });
-test('strip requires arm64 Mach-O and rechecks after strip', () => {
-  const bad = fixture(server, Buffer.from('not Mach-O')), good = fixture(), okTools = tool('exit 0'), corruptTools = tool('printf bad > "$2"');
+test('strip requires a complete supported Mach-O and rechecks after strip', () => {
+  const x86 = Buffer.from(macho), unsupported = Buffer.from(macho); x86.writeUInt32LE(0x01000007, 4); unsupported.writeUInt32LE(0x01000008, 4);
+  const bad = fixture(server, Buffer.from('not Mach-O')), truncated = fixture(server, macho.subarray(0, 8)), other = fixture(server, unsupported), x86App = fixture(server, x86), good = fixture(), okTools = tool('exit 0'), corruptTools = tool('printf bad > "$2"');
   try {
     assert.match(run(['--app', bad, '--strip'], { PATH: `${okTools}:${process.env.PATH}` }).stderr, /Mach-O arm64/);
+    assert.match(run(['--app', truncated, '--strip'], { PATH: `${okTools}:${process.env.PATH}` }).stderr, /Mach-O arm64/);
+    assert.match(run(['--app', other, '--strip'], { PATH: `${okTools}:${process.env.PATH}` }).stderr, /Mach-O arm64/);
+    assert.equal(run(['--app', x86App, '--strip'], { PATH: `${okTools}:${process.env.PATH}` }).status, 0);
     assert.match(run(['--app', good, '--strip'], { PATH: `${corruptTools}:${process.env.PATH}` }).stderr, /Mach-O arm64/);
-  } finally { for (const item of [bad, good, okTools, corruptTools]) fs.rmSync(item, { recursive: true, force: true }); }
+  } finally { for (const item of [bad, truncated, other, x86App, good, okTools, corruptTools]) fs.rmSync(item, { recursive: true, force: true }); }
 });
-test('fails closed when strip fails', () => { const app = fixture(), bin = tool('exit 7'); try { const result = run(['--app', app, '--strip'], { PATH: `${bin}:${process.env.PATH}` }); assert.match(result.stderr, /strip failed/); } finally { fs.rmSync(app, { recursive: true, force: true }); fs.rmSync(bin, { recursive: true, force: true }); } });
+test('fails closed when strip fails without leaking tool diagnostics', () => { const app = fixture(), bin = tool("printf '/Users/example/secret' >&2\nexit 7"); try { const result = run(['--app', app, '--strip'], { PATH: `${bin}:${process.env.PATH}` }); assert.match(result.stderr, /strip failed/); assert.doesNotMatch(result.stderr, /\/Users\//); } finally { fs.rmSync(app, { recursive: true, force: true }); fs.rmSync(bin, { recursive: true, force: true }); } });
 test('smokes copied WebRuntime on loopback only', () => { const app = fixture(), pidFile = path.join(app, 'child.pid'); try { assert.equal(run(['--app', app, '--smoke'], { MEDIFLOW_TEST_PID_FILE: pidFile }).status, 0); gone(pidFile); } finally { fs.rmSync(app, { recursive: true, force: true }); } });
 test('bounds smoke timeout, collision, and child cleanup', async () => {
   const hanging = "const fs=require('node:fs');if(process.env.MEDIFLOW_TEST_PID_FILE)fs.writeFileSync(process.env.MEDIFLOW_TEST_PID_FILE,String(process.pid));require('node:http').createServer(()=>{}).listen(process.env.PORT,process.env.HOSTNAME);";
