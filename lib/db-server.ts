@@ -280,8 +280,11 @@ function hasCanonicalLegacyAttachmentFingerprint(): boolean {
 }
 /* @Codex */
 function attachmentCurrentnessState(): 'missing' | 'legacy' | 'canonical' {
-    const attachmentTable = sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'attachments'").get();
-    if (!attachmentTable) return 'missing';
+    const attachmentObject = sqlite.prepare("SELECT type, name FROM sqlite_master WHERE name = 'attachments' COLLATE NOCASE").get() as { type: string; name: string } | undefined;
+    if (!attachmentObject) return 'missing';
+    if (attachmentObject.type !== 'table' || attachmentObject.name !== 'attachments') {
+        throw new Error('Attachment currentness schema is not canonical.');
+    }
 
     const columns = (sqlite.prepare("SELECT name FROM pragma_table_xinfo('attachments')").all() as TableInfoRow[])
         .map((column) => column.name);
