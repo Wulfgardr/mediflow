@@ -143,6 +143,20 @@ Una sessione `local-api`, `system` o equivalente non prova l'identita del
 medico e non puo creare un owner clinico. Il token locale resta un meccanismo
 di trasporto o servizio entro i suoi scope, non una sessione medica.
 
+### 6. Commit protetto solo con turno autenticato dell'host
+
+Il commit finale di un'operazione protetta richiede un turno o capability
+effimero, autenticato e host-owned, valido soltanto dentro la sezione critica
+del lease. Stato capability non puo pubblicare o mutare senza quel turno.
+
+L'abort prima del commit e al piu una volta. Dopo il commit non sono ammesse
+mutazioni capability asincrone o capaci di negare l'esito. Callback dinamiche
+che restituiscono Promise o thenable non sono un confine di enforcement
+accettabile: il runtime deve possedere e verificare il turno fino al commit.
+
+Questa regola non definisce API, provider, route, persistenza o apply; questi
+restano packet separati e sottoposti ai rispettivi gate.
+
 ## DAG di implementazione
 
 ```text
