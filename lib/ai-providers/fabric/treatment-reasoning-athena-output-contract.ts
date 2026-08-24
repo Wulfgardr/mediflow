@@ -9,9 +9,10 @@ const OPAQUE_REF = /^[a-z][a-z0-9._-]{2,127}$/u;
 const ACTIONS = new Set(['no_action', 'review_only', 'open_therapy_form_prefill', 'open_monitoring_form_prefill', 'open_diagnosis_review']);
 const POLICIES = new Set(['no_write', 'review_only', 'form_prefill_only']);
 const SEVERITIES = new Set(['info', 'caution', 'urgent_review']);
-const MAX = Object.freeze({ summary: 480, recommendation: 900, text: 400, label: 180, rationale: 400, evidence: 10, reasoning: 8, caveats: 8, flags: 8, actions: 8, refs: 12, tools: 12, limitations: 8 });
+const MAX = Object.freeze({ summary: 480, recommendation: 900, text: 400, label: 180, rationale: 400, evidence: 10, reasoning: 8, caveats: 8, flags: 8, actions: 8, refs: 12, bindings: 18, tools: 12, limitations: 8 });
 
-type Accepted = Readonly<{ status: 'accepted'; code: null; value: TreatmentReasoningEnvelope; writesPerformed: 0; applyPolicy: 'none' }>;
+export type TreatmentReasoningAthenaSourceBinding = Readonly<{ claimPath: string; claim: string; evidenceRefs: readonly string[] }>;
+type Accepted = Readonly<{ status: 'accepted'; code: null; value: TreatmentReasoningEnvelope; sourceBindings: readonly TreatmentReasoningAthenaSourceBinding[]; writesPerformed: 0; applyPolicy: 'none' }>;
 type Denied = Readonly<{ status: 'denied'; code: 'configuration_invalid' | 'output_invalid'; value: null; writesPerformed: 0; applyPolicy: 'none' }>;
 export type TreatmentReasoningAthenaOutputContractResult = Accepted | Denied;
 
@@ -160,13 +161,44 @@ function snapshotAllowlist(value: unknown): ReadonlySet<string> | null {
     return result;
 }
 
+function claimTargets(summary: string, recommendation: string, reasoning: readonly string[], caveats: readonly string[]): readonly Readonly<{ claimPath: string; claim: string }>[] {
+    return Object.freeze([
+        Object.freeze({ claimPath: 'summary', claim: summary }),
+        Object.freeze({ claimPath: 'data.recommendation', claim: recommendation }),
+        ...reasoning.map((claim, index) => Object.freeze({ claimPath: `data.reasoning.${index}`, claim })),
+        ...caveats.map((claim, index) => Object.freeze({ claimPath: `data.caveats.${index}`, claim })),
+    ]);
+}
+
+function sourceBindings(value: unknown, allowed: ReadonlySet<string>, expected: readonly Readonly<{ claimPath: string; claim: string }>[]): readonly TreatmentReasoningAthenaSourceBinding[] | null {
+    const input = array(value, MAX.bindings);
+    if (!input || input.length !== expected.length) return null;
+    const expectedByPath = new Map(expected.map((item) => [item.claimPath, item.claim]));
+    const accepted = new Map<string, TreatmentReasoningAthenaSourceBinding>();
+    for (const entry of input) {
+        const item = record(entry, ['claimPath', 'claim', 'evidenceRefs']);
+        const claimPath = item && text(item.claimPath, MAX.label);
+        const claim = item && text(item.claim, MAX.recommendation);
+        const evidenceRefs = item && refs(item.evidenceRefs, allowed);
+        if (!item || !claimPath || !claim || expectedByPath.get(claimPath) !== claim || !evidenceRefs || evidenceRefs.length === 0 || accepted.has(claimPath)) return null;
+        accepted.set(claimPath, Object.freeze({ claimPath, claim, evidenceRefs }));
+    }
+    const normalized: TreatmentReasoningAthenaSourceBinding[] = [];
+    for (const target of expected) {
+        const binding = accepted.get(target.claimPath);
+        if (!binding) return null;
+        normalized.push(binding);
+    }
+    return Object.freeze(normalized);
+}
+
 /** Server-only closed-record parser for the minimized provider payload; host attestation stays outside this boundary. */
 export function createTreatmentReasoningAthenaOutputContract(configuration: unknown): Readonly<{ normalize(value: unknown): TreatmentReasoningAthenaOutputContractResult }> {
     const config = record(configuration, ['allowedEvidenceRefs']);
     const allowed = config && snapshotAllowlist(config.allowedEvidenceRefs);
     if (!config || !allowed) throw new Error('Treatment reasoning ATHENA output contract configuration rejected');
     return Object.freeze({ normalize(value: unknown): TreatmentReasoningAthenaOutputContractResult {
-        const input = record(value, ['schemaVersion', 'task', 'summary', 'data']);
+        const input = record(value, ['schemaVersion', 'task', 'summary', 'data', 'sourceBindings']);
         const summary = input && text(input.summary, MAX.summary);
         const data = input && record(input.data, ['recommendation', 'keyEvidence', 'reasoning', 'caveats', 'safetyFlags', 'suggestedActions', 'trace']);
         const recommendation = data && text(data.recommendation, MAX.recommendation);
@@ -176,8 +208,11 @@ export function createTreatmentReasoningAthenaOutputContract(configuration: unkn
         const flags = data && safetyFlags(data.safetyFlags, allowed);
         const suggestedActions = data && actions(data.suggestedActions, allowed);
         const normalizedTrace = data && trace(data.trace);
-        if (!input || input.schemaVersion !== TREATMENT_REASONING_SCHEMA_VERSION || input.task !== 'treatment_reasoning' || !summary || !data || !recommendation || !evidence || !reasoning || !caveats || !flags || !suggestedActions || !normalizedTrace) return Object.freeze({ status: 'denied' as const, code: 'output_invalid' as const, value: null, ...COMMON });
+        const normalizedBindings = input && summary && recommendation && reasoning && caveats
+            ? sourceBindings(input.sourceBindings, allowed, claimTargets(summary, recommendation, reasoning, caveats))
+            : null;
+        if (!input || input.schemaVersion !== TREATMENT_REASONING_SCHEMA_VERSION || input.task !== 'treatment_reasoning' || !summary || !data || !recommendation || !evidence || !reasoning || !caveats || !flags || !suggestedActions || !normalizedTrace || !normalizedBindings) return Object.freeze({ status: 'denied' as const, code: 'output_invalid' as const, value: null, ...COMMON });
         const normalized = Object.freeze({ schemaVersion: TREATMENT_REASONING_SCHEMA_VERSION, task: 'treatment_reasoning' as const, summary, data: Object.freeze({ recommendation, keyEvidence: evidence, reasoning, caveats, safetyFlags: flags, suggestedActions, trace: normalizedTrace }) });
-        return Object.freeze({ status: 'accepted' as const, code: null, value: normalized, ...COMMON });
+        return Object.freeze({ status: 'accepted' as const, code: null, value: normalized, sourceBindings: normalizedBindings, ...COMMON });
     } });
 }

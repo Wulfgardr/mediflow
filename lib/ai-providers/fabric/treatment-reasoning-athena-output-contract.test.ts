@@ -6,6 +6,12 @@ import { readFileSync } from 'node:fs';
 import { createTreatmentReasoningAthenaOutputContract } from './treatment-reasoning-athena-output-contract';
 
 const refs = () => ['evidence.synthetic.alpha', 'evidence.synthetic.beta'];
+const sourceBindings = () => [
+    { claimPath: 'summary', claim: 'Synthetic review summary.', evidenceRefs: ['evidence.synthetic.alpha'] },
+    { claimPath: 'data.recommendation', claim: 'Review the bounded evidence before a clinical decision.', evidenceRefs: ['evidence.synthetic.alpha'] },
+    { claimPath: 'data.reasoning.0', claim: 'The evidence needs clinician review.', evidenceRefs: ['evidence.synthetic.alpha'] },
+    { claimPath: 'data.caveats.0', claim: 'Synthetic fixture; not a prescription.', evidenceRefs: ['evidence.synthetic.beta'] },
+];
 const output = (extra: Record<string, unknown> = {}) => ({
     schemaVersion: 'mediflow.treatment_reasoning.v1', task: 'treatment_reasoning', summary: 'Synthetic review summary.',
     data: {
@@ -16,6 +22,7 @@ const output = (extra: Record<string, unknown> = {}) => ({
         suggestedActions: [{ id: 'action.synthetic.review', intent: 'review_only', label: 'Review evidence', rationale: 'No clinical write is permitted.', writePolicy: 'review_only', evidenceRefs: ['evidence.synthetic.alpha'] }],
         trace: { mode: 'local_model', toolsUsed: ['tool.synthetic.local'], limitations: ['No external lookup.'] },
     },
+    sourceBindings: sourceBindings(),
     ...extra,
 });
 const contract = () => createTreatmentReasoningAthenaOutputContract({ allowedEvidenceRefs: refs() });
@@ -32,10 +39,14 @@ test('is server-only and normalizes the canonical minimized review-only output',
     if (result.status === 'accepted') {
         assert.equal(result.value.schemaVersion, 'mediflow.treatment_reasoning.v1');
         assert.equal(result.value.data.trace.model, undefined);
+        assert.deepEqual(result.sourceBindings, sourceBindings());
         assert.equal(result.writesPerformed, 0);
         assert.equal(result.applyPolicy, 'none');
         assert.equal(Object.isFrozen(result.value), true);
         assert.equal(Object.isFrozen(result.value.data.keyEvidence), true);
+        assert.equal(Object.isFrozen(result.sourceBindings), true);
+        assert.equal(Object.isFrozen(result.sourceBindings[0]), true);
+        assert.equal(Object.isFrozen(result.sourceBindings[0].evidenceRefs), true);
     }
 });
 
@@ -47,6 +58,58 @@ test('binds every evidence-bearing statement, flag, and action to the request al
     const unboundAction = output();
     unboundAction.data.suggestedActions[0].evidenceRefs = [];
     for (const value of [unknownEvidence, unboundFlag, unboundAction]) denied(value);
+});
+
+test('rejects substantive provider claims without explicit source bindings', () => {
+    const summary = output();
+    summary.summary = 'Unsupported synthetic claim without an evidence binding.';
+    const recommendation = output();
+    recommendation.data.recommendation = 'Unbound synthetic recommendation.';
+    const reasoning = output();
+    reasoning.data.reasoning[0] = 'Unbound synthetic reasoning.';
+    const caveat = output();
+    caveat.data.caveats[0] = 'Unbound synthetic caveat.';
+    for (const value of [summary, recommendation, reasoning, caveat]) denied(value);
+});
+
+test('requires one exact allowlisted binding for every substantive claim', () => {
+    const missing = output();
+    missing.sourceBindings.pop();
+    const unknown = output();
+    unknown.sourceBindings[0].claimPath = 'data.unknown';
+    const duplicate = output();
+    duplicate.sourceBindings[3] = { ...duplicate.sourceBindings[2] };
+    const extra = output();
+    extra.sourceBindings.push({ claimPath: 'data.reasoning.1', claim: 'Count drift.', evidenceRefs: ['evidence.synthetic.alpha'] });
+    const empty = output();
+    empty.sourceBindings[0].evidenceRefs = [];
+    const unknownRef = output();
+    unknownRef.sourceBindings[0].evidenceRefs = ['evidence.synthetic.unknown'];
+    const duplicateRef = output();
+    duplicateRef.sourceBindings[0].evidenceRefs = ['evidence.synthetic.alpha', 'evidence.synthetic.alpha'];
+    for (const value of [missing, unknown, duplicate, extra, empty, unknownRef, duplicateRef]) denied(value);
+});
+
+test('rejects hostile source bindings without reading accessors or proxy traps', () => {
+    let reads = 0;
+    let traps = 0;
+    const accessor = output();
+    Object.defineProperty(accessor.sourceBindings[0], 'claim', { enumerable: true, get() { reads += 1; return 'Synthetic review summary.'; } });
+    const bindingProxy = output();
+    bindingProxy.sourceBindings[0] = new Proxy(bindingProxy.sourceBindings[0], {
+        get() { traps += 1; return undefined; }, getPrototypeOf() { traps += 1; return Object.prototype; }, ownKeys() { traps += 1; return []; },
+    });
+    const arrayProxy = output();
+    arrayProxy.sourceBindings = new Proxy(arrayProxy.sourceBindings, {
+        get() { traps += 1; return undefined; }, getPrototypeOf() { traps += 1; return Array.prototype; }, ownKeys() { traps += 1; return []; },
+    });
+    const hidden = output();
+    Object.defineProperty(hidden.sourceBindings[0], 'claim', { enumerable: false, value: 'Synthetic review summary.' });
+    const sparse = output();
+    delete sparse.sourceBindings[0];
+    for (const value of [accessor, bindingProxy, arrayProxy, hidden, sparse]) denied(value);
+    assert.equal(reads, 0);
+    assert.equal(traps, 0);
 });
 
 test('rejects hostile closed records without reading accessors, proxies, or ambient then', () => {
