@@ -226,7 +226,7 @@ function attachmentCurrentnessSchemaMatches(expected: string, canonical: boolean
     const expectedIndexes = canonical ? 3 : 2;
     const hasExpectedIndexes = indexes.length === expectedIndexes && indexes.every((index) => {
         if (typeof index.name !== 'string' || (index.unique !== 0 && index.unique !== 1) || index.partial !== 0) return false;
-        const keys = (sqlite.prepare(`PRAGMA index_xinfo(${index.name})`).all() as Array<{ name?: unknown; desc?: unknown; coll?: unknown; key?: unknown }>)
+        const keys = (sqlite.prepare('SELECT name, "desc", coll, "key" FROM pragma_index_xinfo(?)').all(index.name) as Array<{ name?: unknown; desc?: unknown; coll?: unknown; key?: unknown }>)
             .filter((row) => row.key === 1);
         const key = keys.length === 1 && keys[0].desc === 0 && keys[0].coll === 'BINARY' ? keys[0].name : null;
         return (index.name === 'attachments_patient_idx' && index.origin === 'c' && index.unique === 0 && key === 'patient_id')
@@ -245,29 +245,34 @@ function attachmentCurrentnessSchemaMatches(expected: string, canonical: boolean
 }
 /* @Codex */
 function upgradeLegacyAttachmentCurrentness(): void {
-    const stale = sqlite.prepare("SELECT 1 FROM sqlite_master WHERE lower(name) = 'attachments_currentness_legacy' LIMIT 1").get();
-    const trigger = sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND lower(tbl_name) = 'attachments' LIMIT 1").get();
-    if (stale || trigger) denyAttachmentCurrentnessMigration();
-    if (attachmentCurrentnessSchemaMatches(ATTACHMENT_CURRENTNESS_CANONICAL_SCHEMA, true)) {
-        const invalid = sqlite.prepare(`SELECT 1 FROM attachments WHERE typeof(document_source_ref) != 'text'
-            OR length(document_source_ref) != 64 OR document_source_ref GLOB '*[^0-9a-f]*'
-            OR typeof(document_revision) != 'integer' OR document_revision NOT BETWEEN 1 AND 9007199254740991
-            OR typeof(document_freshness_epoch) != 'integer' OR document_freshness_epoch NOT BETWEEN 1 AND 9007199254740991 LIMIT 1`).get();
-        if (invalid) denyAttachmentCurrentnessMigration();
-        return;
+    try {
+        const stale = sqlite.prepare("SELECT 1 FROM sqlite_master WHERE lower(name) = 'attachments_currentness_legacy' LIMIT 1").get();
+        const trigger = sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND lower(tbl_name) = 'attachments' LIMIT 1").get();
+        if (stale || trigger) denyAttachmentCurrentnessMigration();
+        if (attachmentCurrentnessSchemaMatches(ATTACHMENT_CURRENTNESS_CANONICAL_SCHEMA, true)) {
+            const invalid = sqlite.prepare(`SELECT 1 FROM attachments WHERE typeof(document_source_ref) != 'text'
+                OR length(document_source_ref) != 64 OR document_source_ref GLOB '*[^0-9a-f]*'
+                OR typeof(document_revision) != 'integer' OR document_revision NOT BETWEEN 1 AND 9007199254740991
+                OR typeof(document_freshness_epoch) != 'integer' OR document_freshness_epoch NOT BETWEEN 1 AND 9007199254740991 LIMIT 1`).get();
+            if (invalid) denyAttachmentCurrentnessMigration();
+            return;
+        }
+        if (!attachmentCurrentnessSchemaMatches(ATTACHMENT_CURRENTNESS_LEGACY_SCHEMA, false)) denyAttachmentCurrentnessMigration();
+        if (sqlite.prepare('SELECT 1 FROM attachments AS attachment LEFT JOIN patients AS patient ON patient.id = attachment.patient_id WHERE patient.id IS NULL LIMIT 1').get()) denyAttachmentCurrentnessMigration();
+        sqlite.exec('ALTER TABLE attachments RENAME TO attachments_currentness_legacy');
+        sqlite.exec(ATTACHMENT_CURRENTNESS_CANONICAL_DDL);
+        sqlite.exec(`INSERT INTO attachments (id, patient_id, name, type, size, path, data, created_at, summary_snapshot,
+            parse_evidence_artifact_snapshot, ocr_queue_state, ocr_queue_reason, ocr_queue_updated_at, ocr_replay_artifact_snapshot,
+            document_source_ref, document_revision, document_freshness_epoch)
+            SELECT id, patient_id, name, type, size, path, data, created_at, summary_snapshot,
+            parse_evidence_artifact_snapshot, ocr_queue_state, ocr_queue_reason, ocr_queue_updated_at, ocr_replay_artifact_snapshot,
+            lower(hex(randomblob(32))), 1, 1 FROM attachments_currentness_legacy`);
+        sqlite.exec('DROP TABLE attachments_currentness_legacy');
+        sqlite.exec('CREATE INDEX attachments_patient_idx ON attachments(patient_id)');
+    } catch (error) {
+        if (error instanceof Error && error.message === ATTACHMENT_CURRENTNESS_ERROR) throw error;
+        denyAttachmentCurrentnessMigration();
     }
-    if (!attachmentCurrentnessSchemaMatches(ATTACHMENT_CURRENTNESS_LEGACY_SCHEMA, false)) denyAttachmentCurrentnessMigration();
-    if (sqlite.prepare('SELECT 1 FROM attachments AS attachment LEFT JOIN patients AS patient ON patient.id = attachment.patient_id WHERE patient.id IS NULL LIMIT 1').get()) denyAttachmentCurrentnessMigration();
-    sqlite.exec('ALTER TABLE attachments RENAME TO attachments_currentness_legacy');
-    sqlite.exec(ATTACHMENT_CURRENTNESS_CANONICAL_DDL);
-    sqlite.exec(`INSERT INTO attachments (id, patient_id, name, type, size, path, data, created_at, summary_snapshot,
-        parse_evidence_artifact_snapshot, ocr_queue_state, ocr_queue_reason, ocr_queue_updated_at, ocr_replay_artifact_snapshot,
-        document_source_ref, document_revision, document_freshness_epoch)
-        SELECT id, patient_id, name, type, size, path, data, created_at, summary_snapshot,
-        parse_evidence_artifact_snapshot, ocr_queue_state, ocr_queue_reason, ocr_queue_updated_at, ocr_replay_artifact_snapshot,
-        lower(hex(randomblob(32))), 1, 1 FROM attachments_currentness_legacy`);
-    sqlite.exec('DROP TABLE attachments_currentness_legacy');
-    sqlite.exec('CREATE INDEX attachments_patient_idx ON attachments(patient_id)');
 }
 
 // Schema guards run on every (re)open so older DB files gain the tables and
