@@ -150,18 +150,22 @@ test('fails closed on reselection, expiry, logout, disposal, cross-session, and 
     assert.equal(port.snapshot(), null);
 });
 
-test('poisons active preparation and preserves active disposal for both ports', () => {
-    for (const kind of ['patient-insight', 'ocr'] as const) {
+test('denies nested public operations during a Patient Insight or OCR snapshot', () => {
+    for (const kind of ['patient-insight', 'ocr'] as const) for (const operation of ['snapshot', 'prepare', 'commit', 'abort', 'dispose'] as const) {
         let armed = false;
         const registry = createServerSessionProjectionOwnerRegistry({
             resolve: (_session, pair) => pair, entropy: () => new Uint8Array(16),
-            clock: () => { if (armed) { armed = false; port.dispose(); } return 1_000; },
+            clock: () => { if (armed) { armed = false;
+                if (operation === 'snapshot') port.snapshot(); else if (operation === 'prepare') port.prepare(Object.freeze({ expected: current } as never));
+                else if (operation === 'commit') port.commit(Object.freeze({ expected: current, replacement: current } as never));
+                else if (operation === 'abort') port.abort(Object.freeze({ replacement: current } as never)); else port.dispose();
+            } return 1_000; },
         });
         const value = session(); const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
         const port = kind === 'patient-insight' ? owner.mintPatientInsightLeaseCommitPort(value) : owner.mintOcrLeaseCommitPort(value);
         const current = port.snapshot()!.currentRef;
         armed = true;
-        assert.equal(port.prepare(Object.freeze({ expected: current })), null);
-        assert.deepEqual(port.snapshot(), { currentRef: current, stagedRef: null, generation: 0, terminal: true });
+        assert.equal(port.snapshot(), null);
+        assert.deepEqual(port.snapshot(), { currentRef: current, stagedRef: null, generation: 0, terminal: operation === 'dispose' });
     }
 });
