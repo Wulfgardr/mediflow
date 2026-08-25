@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
+import { types } from 'node:util';
 
 import {
     captureDocumentSynthesisSourceSet,
@@ -208,4 +209,27 @@ test('uses captured Object and Reflect intrinsics after import without leaking o
     assert.deepEqual(projection.sources.map((item) => ({ ...item })), [{ label: 'S1', sourceText: 'first' }, { label: 'S2', sourceText: 'second' }]);
     assert.deepEqual(Reflect.ownKeys(projection), ['schemaVersion', 'sources']);
     for (const item of projection.sources) assert.deepEqual(Reflect.ownKeys(item), ['label', 'sourceText']);
+});
+
+test('captures collection, Unicode, proxy, encoder, JSON, and iterator intrinsics without observation', async () => {
+    const arrayMethods = ['includes', 'map', 'reduce', 'some', 'sort', 'push'] as const;
+    const arrayDescriptors = arrayMethods.map((key) => [key, Object.getOwnPropertyDescriptor(Array.prototype, key)] as const);
+    const iterator = Object.getOwnPropertyDescriptor(Array.prototype, Symbol.iterator); const from = Object.getOwnPropertyDescriptor(Array, 'from'); const uint8From = Object.getOwnPropertyDescriptor(Uint8Array, 'from'); const encode = Object.getOwnPropertyDescriptor(TextEncoder.prototype, 'encode'); const stringify = Object.getOwnPropertyDescriptor(JSON, 'stringify'); const proxy = Object.getOwnPropertyDescriptor(types, 'isProxy');
+    const stringDescriptors = ['charCodeAt', 'replace', 'normalize', 'trim'].map((key) => [key, Object.getOwnPropertyDescriptor(String.prototype, key)] as const);
+    assert.ok(iterator?.configurable); assert.ok(from?.configurable); assert.ok(encode?.configurable); assert.ok(stringify?.configurable); assert.ok(proxy?.configurable);
+    const priorToJson = Object.getOwnPropertyDescriptor(Object.prototype, 'toJSON'); const valid = sourceSet([source({ documentSourceRef: 'b', sourceText: 'second' }), source({ documentSourceRef: 'a', sourceText: 'Cafe\u0301\rfirst' })]); let reads = 0; let traps = 0; let captured: ReturnType<typeof captureDocumentSynthesisSourceSet> | undefined;
+    const transparent = new Proxy(valid, { ownKeys() { traps += 1; return []; }, get() { traps += 1; return null; }, getPrototypeOf() { traps += 1; return Object.prototype; } }); const poison = () => { throw new Error('ambient poison'); };
+    try {
+        for (let index = 0; index < arrayDescriptors.length; index += 1) Object.defineProperty(Array.prototype, arrayDescriptors[index]![0], { ...arrayDescriptors[index]![1], value: poison });
+        Object.defineProperty(Array.prototype, Symbol.iterator, { ...iterator, value: poison }); Object.defineProperty(Array, 'from', { ...from, value: poison }); Object.defineProperty(Uint8Array, 'from', uint8From ? { ...uint8From, value: poison } : { configurable: true, writable: true, value: poison }); Object.defineProperty(TextEncoder.prototype, 'encode', { ...encode, value: poison }); Object.defineProperty(JSON, 'stringify', { ...stringify, value: poison });
+        for (let index = 0; index < stringDescriptors.length; index += 1) Object.defineProperty(String.prototype, stringDescriptors[index]![0], { ...stringDescriptors[index]![1], value: poison });
+        Object.defineProperty(Object.prototype, 'toJSON', { configurable: true, get() { reads += 1; return poison; } }); Object.defineProperty(types, 'isProxy', { ...proxy, value: () => false }); denied(captureDocumentSynthesisSourceSet(transparent)); Object.defineProperty(types, 'isProxy', { ...proxy, value: poison }); captured = captureDocumentSynthesisSourceSet(valid);
+    } finally {
+        for (let index = 0; index < arrayDescriptors.length; index += 1) Object.defineProperty(Array.prototype, arrayDescriptors[index]![0], arrayDescriptors[index]![1]!);
+        Object.defineProperty(Array.prototype, Symbol.iterator, iterator!); Object.defineProperty(Array, 'from', from!); if (uint8From) Object.defineProperty(Uint8Array, 'from', uint8From); else delete (Uint8Array as unknown as Record<string, unknown>).from; Object.defineProperty(TextEncoder.prototype, 'encode', encode!); Object.defineProperty(JSON, 'stringify', stringify!); Object.defineProperty(types, 'isProxy', proxy!);
+        for (let index = 0; index < stringDescriptors.length; index += 1) Object.defineProperty(String.prototype, stringDescriptors[index]![0], stringDescriptors[index]![1]!);
+        if (priorToJson) Object.defineProperty(Object.prototype, 'toJSON', priorToJson); else delete (Object.prototype as Record<string, unknown>).toJSON;
+    }
+    const result = available(captured!); const projection = composeDocumentSynthesisProviderProjection(result.sourceSet); assert.ok(projection); assert.equal(projection.sources[0]?.label, 'S1'); assert.equal(reads, 0); assert.equal(traps, 0);
+    let unhandled = 0; const listener = () => { unhandled += 1; }; process.on('unhandledRejection', listener); try { await new Promise<void>((resolve) => setImmediate(resolve)); } finally { process.off('unhandledRejection', listener); } assert.equal(unhandled, 0);
 });
