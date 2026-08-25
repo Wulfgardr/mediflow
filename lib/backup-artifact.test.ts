@@ -273,6 +273,52 @@ test('accepts only exact lifecycle-bound headless SOAP active-role attestation r
     assert.equal(parsed.payload.headlessSoapActiveRoleAttestations[0].operationId, 'mediflow.clinical_diary.append_soap.v1');
 });
 
+test('uses whole-second non-negative canonical timestamps and a stable H2 attestation order', async () => {
+    const source = JSON.parse(await serializeBackupArtifact({
+        ...basePayload,
+        headlessSoapActiveRoleAttestations: [{
+            attestationRef: 'soap-attestation-z', actorRef: 'actor-z', schemaVersion: 'mediflow.headless-soap-active-role-attestation.v1',
+            role: 'physician', operationId: 'mediflow.clinical_diary.append_soap.v1', policyVersion: 'clinician_confirmed_single_use.v1',
+            status: 'active', attestationVersion: 1, issuerRef: 'issuer-z', expiresAt: '2026-03-17T09:00:00.000Z', activatedAt: '2026-03-17T08:00:00.000Z', revocationGeneration: 0, revokedAt: null, createdAt: '2026-03-17T08:00:00.000Z', updatedAt: '2026-03-17T08:00:00.000Z',
+        }, {
+            attestationRef: 'soap-attestation-a', actorRef: 'actor-a', schemaVersion: 'mediflow.headless-soap-active-role-attestation.v1',
+            role: 'physician', operationId: 'mediflow.clinical_diary.append_soap.v1', policyVersion: 'clinician_confirmed_single_use.v1',
+            status: 'active', attestationVersion: 1, issuerRef: 'issuer-a', expiresAt: '2026-03-17T09:00:00.000Z', activatedAt: '2026-03-17T08:00:00.000Z', revocationGeneration: 0, revokedAt: null, createdAt: '2026-03-17T08:00:00.000Z', updatedAt: '2026-03-17T08:00:00.000Z',
+        }],
+    }));
+    const rows = source.payload.headlessSoapActiveRoleAttestations;
+    const forward = await createBackupArtifact({ ...basePayload, headlessSoapActiveRoleAttestations: rows });
+    const reverse = await createBackupArtifact({ ...basePayload, headlessSoapActiveRoleAttestations: [...rows].reverse() });
+    assert.deepEqual(forward.payload.headlessSoapActiveRoleAttestations.map((row) => row.attestationRef), ['soap-attestation-a', 'soap-attestation-z']);
+    assert.equal(forward.manifest.checksum, reverse.manifest.checksum);
+
+    for (const timestamp of ['1969-12-31T23:59:59.000Z', '2026-03-17T08:00:00.001Z']) {
+        const artifact = await checksumValidHeadlessSoapAttestationArtifact((value) => { value.payload.headlessSoapActiveRoleAttestations[0].createdAt = timestamp; });
+        await assert.rejects(() => parseBackupArtifact(artifact), (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest');
+    }
+    const dateArtifact = await checksumValidHeadlessSoapAttestationArtifact((value) => { value.payload.headlessSoapActiveRoleAttestations[0].createdAt = new Date('2026-03-17T08:00:00.000Z'); });
+    await assert.rejects(() => parseBackupArtifact(dateArtifact), (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest');
+});
+
+test('rejects Proxy backup roots before reflection with one sanitized error', async () => {
+    let transparentTraps = 0;
+    const transparent = new Proxy({ format: BACKUP_ARTIFACT_FORMAT }, {
+        get: (target, key, receiver) => { transparentTraps += 1; return Reflect.get(target, key, receiver); },
+        getPrototypeOf: (target) => { transparentTraps += 1; return Reflect.getPrototypeOf(target); },
+        ownKeys: (target) => { transparentTraps += 1; return Reflect.ownKeys(target); },
+    });
+    let throwingTraps = 0;
+    const throwing = new Proxy({}, { get: () => { throwingTraps += 1; throw new Error('private root detail'); } });
+    for (const root of [transparent, throwing]) {
+        await assert.rejects(
+            () => parseBackupArtifact(root),
+            (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-json' && error.message === 'Backup artifact must be a JSON object.',
+        );
+    }
+    assert.equal(transparentTraps, 0);
+    assert.equal(throwingTraps, 0);
+});
+
 test('rejects malformed, duplicated, and lifecycle-invalid headless SOAP active-role attestations', async () => {
     const mutations: Array<(artifact: any) => void> = [
         (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].extra = true; },

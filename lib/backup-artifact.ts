@@ -205,6 +205,13 @@ function timestampMilliseconds(value: unknown): number | null {
     return Number.isFinite(date.getTime()) && date.toISOString() === value ? date.getTime() : null;
 }
 
+/* @Codex H2a-S persists whole Unix seconds and serializes only canonical, non-negative ISO timestamps. */
+function headlessSoapTimestampMilliseconds(value: unknown, serialized: boolean): number | null {
+    if (serialized && typeof value !== 'string') return null;
+    const milliseconds = timestampMilliseconds(value);
+    return milliseconds === null || milliseconds < 0 || milliseconds % 1000 !== 0 ? null : milliseconds;
+}
+
 /* @Codex */
 function assertDurableReviewAuthorityRows(
     payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
@@ -252,18 +259,21 @@ function assertDurableReviewAuthorityRows(
 }
 
 /* @Codex H2a-S backup accounting validates only persistent attestation facts; it never restores a session or grant. */
-function assertHeadlessSoapActiveRoleAttestationRows(payload: Partial<Record<BackupCollectionName, BackupRecord[]>>): void {
+function assertHeadlessSoapActiveRoleAttestationRows(
+    payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
+    serialized: boolean,
+): void {
     const attestationRefs = new Set<string>();
     const actorRefs = new Set<string>();
     for (const attestation of payload.headlessSoapActiveRoleAttestations ?? []) {
         if (!hasExactKeys(attestation, HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_KEYS)) {
             throw new BackupArtifactError('invalid-manifest', 'headless SOAP active-role attestations contain an invalid authority record.');
         }
-        const createdAt = timestampMilliseconds(attestation.createdAt);
-        const updatedAt = timestampMilliseconds(attestation.updatedAt);
-        const expiresAt = attestation.expiresAt === null ? null : timestampMilliseconds(attestation.expiresAt);
-        const activatedAt = attestation.activatedAt === null ? null : timestampMilliseconds(attestation.activatedAt);
-        const revokedAt = attestation.revokedAt === null ? null : timestampMilliseconds(attestation.revokedAt);
+        const createdAt = headlessSoapTimestampMilliseconds(attestation.createdAt, serialized);
+        const updatedAt = headlessSoapTimestampMilliseconds(attestation.updatedAt, serialized);
+        const expiresAt = attestation.expiresAt === null ? null : headlessSoapTimestampMilliseconds(attestation.expiresAt, serialized);
+        const activatedAt = attestation.activatedAt === null ? null : headlessSoapTimestampMilliseconds(attestation.activatedAt, serialized);
+        const revokedAt = attestation.revokedAt === null ? null : headlessSoapTimestampMilliseconds(attestation.revokedAt, serialized);
         const hasValidIssuer = typeof attestation.issuerRef === 'string'
             && attestation.issuerRef.trim() === attestation.issuerRef
             && attestation.issuerRef.length >= 1 && attestation.issuerRef.length <= 256;
@@ -438,6 +448,7 @@ function parseAssignedAmbulatoryMemberships(value: unknown): Array<{ ambulatoryI
 async function assertCollectionReferences(
     payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
     patientDependentCollections: readonly BackupCollectionName[] = PATIENT_DEPENDENT_COLLECTIONS,
+    serialized = false,
 ): Promise<void> {
     const ambulatoryIds = new Set(
         (payload.ambulatories ?? [])
@@ -522,7 +533,15 @@ async function assertCollectionReferences(
 
     await assertDurableReviewLedger(payload);
     assertDurableReviewAuthorityRows(payload, durableReviewIds, patientIds);
-    assertHeadlessSoapActiveRoleAttestationRows(payload);
+    assertHeadlessSoapActiveRoleAttestationRows(payload, serialized);
+}
+
+/* @Codex Backup producers canonicalize the H2a-S collection after exact-row validation. */
+function sortHeadlessSoapActiveRoleAttestations(rows: BackupRecord[]): BackupRecord[] {
+    return [...rows].sort((left, right) => {
+        const byAttestation = String(left.attestationRef).localeCompare(String(right.attestationRef));
+        return byAttestation === 0 ? String(left.actorRef).localeCompare(String(right.actorRef)) : byAttestation;
+    });
 }
 
 export async function createBackupArtifact(payload: BackupDataset, createdAt = new Date()): Promise<BackupArtifact> {
@@ -530,13 +549,17 @@ export async function createBackupArtifact(payload: BackupDataset, createdAt = n
     const currentPayload = { ...createEmptyDataset(), ...payload } as BackupDataset;
     assertCollectionSet(currentPayload as Record<string, unknown>);
     await assertCollectionReferences(currentPayload);
+    const canonicalPayload = {
+        ...currentPayload,
+        headlessSoapActiveRoleAttestations: sortHeadlessSoapActiveRoleAttestations(currentPayload.headlessSoapActiveRoleAttestations),
+    } as BackupDataset;
 
     const recordCounts = createEmptyCounts();
     for (const collection of BACKUP_COLLECTIONS) {
-        recordCounts[collection] = currentPayload[collection]?.length ?? 0;
+        recordCounts[collection] = canonicalPayload[collection]?.length ?? 0;
     }
 
-    const payloadSnapshot = normalizeJson(currentPayload);
+    const payloadSnapshot = normalizeJson(canonicalPayload);
     const checksum = await sha256Hex(stableStringify(payloadSnapshot));
 
     return {
@@ -550,7 +573,7 @@ export async function createBackupArtifact(payload: BackupDataset, createdAt = n
             collections: [...BACKUP_COLLECTIONS],
             recordCounts,
         },
-        payload: currentPayload,
+        payload: canonicalPayload,
     };
 }
 
@@ -560,7 +583,7 @@ export async function serializeBackupArtifact(payload: BackupDataset, createdAt 
 }
 
 export async function parseBackupArtifact(value: unknown): Promise<BackupArtifact> {
-    if (!value || typeof value !== 'object') {
+    if (!value || typeof value !== 'object' || types.isProxy(value)) {
         throw new BackupArtifactError('invalid-json', 'Backup artifact must be a JSON object.');
     }
 
@@ -605,7 +628,7 @@ export async function parseBackupArtifact(value: unknown): Promise<BackupArtifac
     }
 
     assertCollectionCounts(payload, manifest.recordCounts as Record<string, unknown>, expectedCollections);
-    await assertCollectionReferences(payload as Partial<Record<BackupCollectionName, BackupRecord[]>>, expectedPatientDependentCollections);
+    await assertCollectionReferences(payload as Partial<Record<BackupCollectionName, BackupRecord[]>>, expectedPatientDependentCollections, true);
 
     const createdAt = new Date(manifest.createdAt);
     if (Number.isNaN(createdAt.getTime())) {
