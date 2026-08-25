@@ -150,20 +150,18 @@ test('fails closed on reselection, expiry, logout, disposal, cross-session, and 
     assert.equal(port.snapshot(), null);
 });
 
-test('does not publish when a hostile clock reenters a port operation', () => {
-    let armed = false;
-    const registry = createServerSessionProjectionOwnerRegistry({
-        resolve: (_session, pair) => pair,
-        entropy: () => new Uint8Array(16),
-        clock: () => {
-            if (armed && port) { armed = false; assert.equal(port.snapshot(), null); }
-            return 1_000;
-        },
-    });
-    const value = session(); const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
-    const port = owner.mintPatientInsightLeaseCommitPort(value);
-    const current = port.snapshot()!.currentRef;
-    armed = true;
-    assert.equal(port.prepare(Object.freeze({ expected: current })), null);
-    assert.equal(port.snapshot()!.stagedRef, null);
+test('poisons active preparation and preserves active disposal for both ports', () => {
+    for (const kind of ['patient-insight', 'ocr'] as const) {
+        let armed = false;
+        const registry = createServerSessionProjectionOwnerRegistry({
+            resolve: (_session, pair) => pair, entropy: () => new Uint8Array(16),
+            clock: () => { if (armed) { armed = false; port.dispose(); } return 1_000; },
+        });
+        const value = session(); const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+        const port = kind === 'patient-insight' ? owner.mintPatientInsightLeaseCommitPort(value) : owner.mintOcrLeaseCommitPort(value);
+        const current = port.snapshot()!.currentRef;
+        armed = true;
+        assert.equal(port.prepare(Object.freeze({ expected: current })), null);
+        assert.deepEqual(port.snapshot(), { currentRef: current, stagedRef: null, generation: 0, terminal: true });
+    }
 });
