@@ -29,6 +29,8 @@ const ObjectCreate = Object.create;
 const ObjectFreeze = Object.freeze;
 const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const ObjectGetPrototypeOf = Object.getPrototypeOf;
+const ObjectIsFrozen = Object.isFrozen;
+const ObjectDefineProperty = Object.defineProperty;
 const ObjectPrototype = Object.prototype;
 const ArrayIsArray = Array.isArray;
 const NumberIsFinite = Number.isFinite;
@@ -39,15 +41,12 @@ const Uint8ArrayConstructor = Uint8Array;
 const dateToISOString = Date.prototype.toISOString;
 const numberToString = Number.prototype.toString;
 const stringPadStart = String.prototype.padStart;
-const WeakMapConstructor = WeakMap;
 const WeakSetConstructor = WeakSet;
 const MapConstructor = Map;
 const SetConstructor = Set;
 const authenticOwners = new WeakSetConstructor<object>();
 const weakSetAdd = WeakSet.prototype.add;
 const weakSetHas = WeakSet.prototype.has;
-const weakMapSet = WeakMap.prototype.set;
-const weakMapGet = WeakMap.prototype.get;
 const applyIntrinsic = Reflect.apply;
 const ownKeysIntrinsic = Reflect.ownKeys;
 const mapGet = Map.prototype.get;
@@ -58,11 +57,8 @@ const setAdd = Set.prototype.add;
 const setHas = Set.prototype.has;
 const setDelete = Set.prototype.delete;
 const isProxy = types.isProxy;
-const isAsyncFunction = types.isAsyncFunction;
-const isPromise = types.isPromise;
 const getOwnPropertyDescriptor = ObjectGetOwnPropertyDescriptor;
 const getPrototypeOf = ObjectGetPrototypeOf;
-const promiseThen = Promise.prototype.then;
 
 function addOwnerIdentity(registry: WeakSet<object>, owner: object): void {
     applyIntrinsic(weakSetAdd, registry, [owner]);
@@ -70,14 +66,6 @@ function addOwnerIdentity(registry: WeakSet<object>, owner: object): void {
 
 function hasOwnerIdentity(registry: WeakSet<object>, candidate: object): boolean {
     return applyIntrinsic(weakSetHas, registry, [candidate]);
-}
-
-function setWeakMapValue<T>(registry: WeakMap<object, T>, key: object, value: T): void {
-    applyIntrinsic(weakMapSet, registry, [key, value]);
-}
-
-function getWeakMapValue<T>(registry: WeakMap<object, T>, key: object): T | undefined {
-    return applyIntrinsic(weakMapGet, registry, [key]);
 }
 
 function getMapValue<K, V>(registry: Map<K, V>, key: K): V | undefined {
@@ -129,71 +117,33 @@ export type ServerSessionProjectionOwner = Readonly<{
     dereferenceSelection(session: ServerSession, input: Readonly<{
         sessionRef: string; selectionEpoch: number; patientRef: string; ambulatoryRef: string; leaseRef: string;
     }>): CanonicalPair;
+    mintPatientInsightLeaseCommitPort(session: ServerSession): PatientInsightLeaseCommitPort;
+    mintOcrLeaseCommitPort(session: ServerSession): OcrLeaseCommitPort;
     withLeaseCriticalSection<T>(session: ServerSession, callback: (selection: CanonicalPair) => T): T;
     dispose(): void;
 }>;
 
-export type LeaseCommitTurn = object;
-export type LeaseCommitTurnPhase = 'abort' | 'commit';
-type LeaseCommitTurnState = {
-    owner: ServerSessionProjectionOwner; session: ServerSession; phase: 'abort' | 'closed' | 'commit' | 'prepare';
-    live: boolean; spent: boolean;
-};
-type LeaseCommitTurnRunner = (session: ServerSession, prepare: (selection: CanonicalPair) => unknown,
-    commit: (prepared: unknown, turn: LeaseCommitTurn) => unknown, abort: (turn: LeaseCommitTurn) => unknown) => void;
-
-const commitTurnRunners = new WeakMapConstructor<object, LeaseCommitTurnRunner>();
-const commitTurnStates = new WeakMapConstructor<object, LeaseCommitTurnState>();
-
-function synchronousCallback(candidate: unknown): candidate is (...args: never[]) => unknown {
-    return typeof candidate === 'function' && !isProxy(candidate) && !isAsyncFunction(candidate);
-}
-
-function observeNativePromise(value: unknown): void {
-    if ((typeof value !== 'object' || value === null) && typeof value !== 'function') return;
-    if (isProxy(value) || !isPromise(value)) return;
-    try { applyIntrinsic(promiseThen, value, [undefined, () => undefined]); } catch { /* A late completion stays opaque. */ }
-}
-
-function hasThenable(value: unknown): boolean {
-    if ((typeof value !== 'object' || value === null) && typeof value !== 'function') return false;
-    if (isProxy(value) || isPromise(value)) return true;
-    try {
-        let cursor: object | null = value;
-        while (cursor) {
-            if (isProxy(cursor) || getOwnPropertyDescriptor(cursor, 'then')) return true;
-            cursor = getPrototypeOf(cursor);
-        }
-    } catch { return true; }
-    return false;
-}
-
-function rejectThenable(value: unknown): void {
-    if (!hasThenable(value)) return;
-    observeNativePromise(value);
-    return fail('input_invalid');
-}
-
-export function spendLeaseCommitTurn(owner: unknown, session: ServerSession, turn: unknown, phase: LeaseCommitTurnPhase): void {
-    if (!isServerSessionProjectionOwner(owner) || (phase !== 'abort' && phase !== 'commit')
-        || typeof turn !== 'object' || turn === null || isProxy(turn)) return fail('input_invalid');
-    const state = getWeakMapValue(commitTurnStates, turn);
-    if (!state || !state.live || state.spent || state.owner !== owner || state.session !== session || state.phase !== phase) {
-        return fail('selection_unavailable');
-    }
-    state.spent = true;
-}
-
-export function withLeaseCommitTurn<T>(owner: unknown, session: ServerSession,
-    prepare: (selection: CanonicalPair) => T, commit: (prepared: T, turn: LeaseCommitTurn) => unknown,
-    abort: (turn: LeaseCommitTurn) => unknown): void {
-    if (!isServerSessionProjectionOwner(owner) || !synchronousCallback(prepare)
-        || !synchronousCallback(commit) || !synchronousCallback(abort)) return fail('input_invalid');
-    const runner = getWeakMapValue(commitTurnRunners, owner);
-    if (!runner) return fail('owner_disposed');
-    runner(session, prepare as (selection: CanonicalPair) => unknown,
-        commit as (prepared: unknown, turn: LeaseCommitTurn) => unknown, abort as (turn: LeaseCommitTurn) => unknown);
-}
+declare const patientInsightLeaseCommitRef: unique symbol;
+declare const ocrLeaseCommitRef: unique symbol;
+export type PatientInsightLeaseCommitRef = Readonly<{ readonly [patientInsightLeaseCommitRef]?: never }>;
+export type OcrLeaseCommitRef = Readonly<{ readonly [ocrLeaseCommitRef]?: never }>;
+type LeaseCommitSnapshot<Ref extends object> = Readonly<{
+    currentRef: Ref; stagedRef: Ref | null; generation: number; terminal: boolean;
+}>;
+export type PatientInsightLeaseCommitPort = Readonly<{
+    snapshot(): LeaseCommitSnapshot<PatientInsightLeaseCommitRef> | null;
+    prepare(input: Readonly<{ expected: PatientInsightLeaseCommitRef }>): PatientInsightLeaseCommitRef | null;
+    commit(input: Readonly<{ expected: PatientInsightLeaseCommitRef; replacement: PatientInsightLeaseCommitRef }>): boolean;
+    abort(input: Readonly<{ replacement: PatientInsightLeaseCommitRef }>): boolean;
+    dispose(): void;
+}>;
+export type OcrLeaseCommitPort = Readonly<{
+    snapshot(): LeaseCommitSnapshot<OcrLeaseCommitRef> | null;
+    prepare(input: Readonly<{ expected: OcrLeaseCommitRef }>): OcrLeaseCommitRef | null;
+    commit(input: Readonly<{ expected: OcrLeaseCommitRef; replacement: OcrLeaseCommitRef }>): boolean;
+    abort(input: Readonly<{ replacement: OcrLeaseCommitRef }>): boolean;
+    dispose(): void;
+}>;
 
 export function isServerSessionProjectionOwner(candidate: unknown): candidate is ServerSessionProjectionOwner {
     if (typeof candidate !== 'object' || candidate === null || isProxy(candidate)) return false;
@@ -234,6 +184,21 @@ function exact(input: unknown, keys: readonly string[]): Record<string, unknown>
         result[keys[index]] = descriptor.value;
     }
     return result;
+}
+
+function frozenExact(input: unknown, keys: readonly string[]): Record<string, unknown> | null {
+    if (typeof input !== 'object' || input === null || isProxy(input)) return null;
+    try {
+        if (ArrayIsArray(input) || !ObjectIsFrozen(input) || getPrototypeOf(input) !== ObjectPrototype
+            || ownKeysIntrinsic(input).length !== keys.length) return null;
+        const result: Record<string, unknown> = ObjectCreate(null);
+        for (let index = 0; index < keys.length; index += 1) {
+            const descriptor = getOwnPropertyDescriptor(input, keys[index]);
+            if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return null;
+            result[keys[index]] = descriptor.value;
+        }
+        return result;
+    } catch { return null; }
 }
 
 export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Partial<SelectionSources> = {}) {
@@ -303,6 +268,10 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 else if (previous) { previous.active = false; previous.unregister = null; }
             };
             const issuedRefs = new SetConstructor<string>();
+            const patientInsightRefs = new WeakSetConstructor<object>();
+            const ocrRefs = new WeakSetConstructor<object>();
+            const patientInsightPorts = new WeakSetConstructor<object>();
+            const ocrPorts = new WeakSetConstructor<object>();
             const reference = (prefix: string) => {
                 let bytes: Uint8Array;
                 try { bytes = sources.entropy(); } catch { return fail('reference_unavailable'); }
@@ -336,59 +305,100 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             const rejectLeaseCriticalSectionReentry = () => {
                 if (leaseCriticalSectionActive) fail('selection_busy');
             };
-            const commitTurnRunner: LeaseCommitTurnRunner = (presentedSession, prepare, commit, abort) => {
-                if (leaseCriticalSectionActive) return fail('selection_busy');
-                const current = selection;
-                const expectedSelectionEpoch = epoch;
-                const expectedReviewContextEpoch = reviewContextEpoch;
-                const assertCurrent = () => {
-                    requireCurrentSession(presentedSession);
-                    if (!current || selection !== current || epoch !== expectedSelectionEpoch || reviewContextEpoch !== expectedReviewContextEpoch) {
-                        return fail('stale_selection');
-                    }
-                    const now = readClock();
-                    requireCurrentSession(presentedSession);
-                    if (selection !== current || epoch !== expectedSelectionEpoch || reviewContextEpoch !== expectedReviewContextEpoch) {
-                        return fail('stale_selection');
-                    }
-                    if (now >= current.expiresAt) { expire(); return fail('lease_expired'); }
-                };
-                leaseCriticalSectionActive = true;
-                const turn = ObjectFreeze(ObjectCreate(null));
-                const state: LeaseCommitTurnState = { owner, session: presentedSession, phase: 'prepare', live: true, spent: false };
-                setWeakMapValue(commitTurnStates, turn, state);
-                const abortOnce = (cause: unknown): never => {
-                    state.phase = 'abort';
-                    let outcome: unknown;
-                    const unsafeCause = hasThenable(cause);
-                    observeNativePromise(cause);
-                    try { outcome = abort(turn); } catch (error) { observeNativePromise(error); /* The primary precommit outcome remains authoritative. */ }
-                    observeNativePromise(outcome);
-                    if (!state.spent) return fail('selection_unavailable');
-                    if (unsafeCause) return fail('input_invalid');
-                    throw cause;
-                };
-                try {
-                    let prepared: unknown;
-                    try { assertCurrent(); prepared = prepare(ObjectFreeze({ patientId: current!.patientId, ambulatoryId: current!.ambulatoryId })); }
-                    catch (error) { return abortOnce(error); }
-                    try { rejectThenable(prepared); assertCurrent(); }
-                    catch (error) { return abortOnce(error); }
-                    state.phase = 'commit';
-                    let outcome: unknown;
-                    try { outcome = commit(prepared, turn); } catch (error) {
-                        observeNativePromise(error);
-                        if (state.spent) return;
-                        return abortOnce(error);
-                    }
-                    observeNativePromise(outcome);
-                    if (state.spent) return;
-                    return abortOnce(new ServerSessionProjectionOwnerError('selection_unavailable'));
-                } finally {
-                    state.live = false;
-                    state.phase = 'closed';
-                    leaseCriticalSectionActive = false;
+            const mintLeaseCommitPort = <Ref extends object>(presentedSession: ServerSession,
+                refs: WeakSet<object>, ports: WeakSet<object>) => {
+                rejectLeaseCriticalSectionReentry();
+                requireCurrentSession(presentedSession);
+                const boundSelection = selection;
+                const boundSelectionEpoch = epoch;
+                const boundReviewContextEpoch = reviewContextEpoch;
+                if (!boundSelection) return fail('stale_selection');
+                if (readClock() >= boundSelection.expiresAt) { expire(); return fail('lease_expired'); }
+                requireCurrentSession(presentedSession);
+                if (selection !== boundSelection || epoch !== boundSelectionEpoch || reviewContextEpoch !== boundReviewContextEpoch) {
+                    return fail('stale_selection');
                 }
+                const mintRef = (): Ref => {
+                    const ref = ObjectFreeze(ObjectCreate(null));
+                    addOwnerIdentity(refs, ref);
+                    return ref as Ref;
+                };
+                let ownerState: LeaseCommitSnapshot<Ref> = ObjectFreeze({ currentRef: mintRef(), stagedRef: null as Ref | null, generation: 0, terminal: false });
+                let portActive = false;
+                let portReentered = false;
+                const current = () => {
+                    if (terminal || presentedSession !== session || session.authChannel !== 'web'
+                        || selection !== boundSelection || epoch !== boundSelectionEpoch || reviewContextEpoch !== boundReviewContextEpoch) return false;
+                    let now: number;
+                    try {
+                        if (getSession(session.id) !== session) return false;
+                        now = sources.clock();
+                    } catch { return false; }
+                    return NumberIsFinite(now) && now < boundSelection.expiresAt && !terminal
+                        && presentedSession === session && session.authChannel === 'web' && getSession(session.id) === session
+                        && selection === boundSelection && epoch === boundSelectionEpoch && reviewContextEpoch === boundReviewContextEpoch;
+                };
+                const owns = (candidate: unknown): candidate is Ref =>
+                    typeof candidate === 'object' && candidate !== null && !isProxy(candidate) && hasOwnerIdentity(refs, candidate);
+                const port = ObjectFreeze({
+                    snapshot() {
+                        if (portActive) { portReentered = true; return null; }
+                        if (!current()) return null;
+                        return ObjectFreeze({ currentRef: ownerState.currentRef, stagedRef: ownerState.stagedRef,
+                            generation: ownerState.generation, terminal: ownerState.terminal });
+                    },
+                    prepare(input: unknown) {
+                        if (portActive || ownerState.terminal) return null;
+                        portActive = true;
+                        portReentered = false;
+                        const request = frozenExact(input, ['expected']);
+                        if (!request || !current() || portReentered || !owns(request.expected) || request.expected !== ownerState.currentRef || ownerState.stagedRef !== null) {
+                            portActive = false; return null;
+                        }
+                        const replacement = mintRef();
+                        const next = ObjectFreeze({ currentRef: ownerState.currentRef, stagedRef: replacement,
+                            generation: ownerState.generation, terminal: false });
+                        portActive = false;
+                        ownerState = next;
+                        return replacement;
+                    },
+                    commit(input: unknown) {
+                        if (portActive || ownerState.terminal) return false;
+                        portActive = true;
+                        portReentered = false;
+                        const request = frozenExact(input, ['expected', 'replacement']);
+                        if (!request || !current() || portReentered || !owns(request.expected) || !owns(request.replacement)
+                            || request.expected !== ownerState.currentRef || request.replacement !== ownerState.stagedRef) {
+                            portActive = false; return false;
+                        }
+                        const next = ObjectFreeze({ currentRef: request.replacement as Ref, stagedRef: null as Ref | null,
+                            generation: ownerState.generation + 1, terminal: true });
+                        portActive = false;
+                        ownerState = next;
+                        return true;
+                    },
+                    abort(input: unknown) {
+                        if (portActive || ownerState.terminal) return false;
+                        portActive = true;
+                        portReentered = false;
+                        const request = frozenExact(input, ['replacement']);
+                        if (!request || !current() || portReentered || !owns(request.replacement) || request.replacement !== ownerState.stagedRef) {
+                            portActive = false; return false;
+                        }
+                        const next = ObjectFreeze({ currentRef: ownerState.currentRef, stagedRef: null as Ref | null,
+                            generation: ownerState.generation, terminal: true });
+                        portActive = false;
+                        ownerState = next;
+                        return true;
+                    },
+                    dispose() {
+                        if (ownerState.terminal) return;
+                        ownerState = ObjectFreeze({ currentRef: ownerState.currentRef, stagedRef: null as Ref | null,
+                            generation: ownerState.generation, terminal: true });
+                    },
+                });
+                addOwnerIdentity(ports, port);
+                return port;
             };
             const candidateControl = (candidate: unknown): TypedBroker['control'] | null => {
                 if (typeof candidate !== 'object' || candidate === null) return null;
@@ -403,7 +413,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     && typeof value.control?.lock === 'function' && typeof value.control.revoke === 'function'
                     && typeof value.control.changeSelection === 'function';
             };
-            const owner: ServerSessionProjectionOwner = ObjectFreeze({
+            const owner: Omit<ServerSessionProjectionOwner, 'mintPatientInsightLeaseCommitPort' | 'mintOcrLeaseCommitPort'> = {
                 snapshotSelectionEpoch(presentedSession) {
                     if (terminal || presentedSession !== session || session.authChannel !== 'web' || peekSession(session.id) !== session) {
                         return fail('session_unavailable');
@@ -547,15 +557,23 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     } finally { leaseCriticalSectionActive = false; }
                 },
                 dispose() { rejectLeaseCriticalSectionReentry(); finish(true); },
-            });
+            };
+            ObjectDefineProperty(owner, 'mintPatientInsightLeaseCommitPort', { enumerable: false, value(presentedSession: ServerSession) {
+                if (this !== owner) return fail('session_unavailable');
+                return mintLeaseCommitPort<PatientInsightLeaseCommitRef>(presentedSession, patientInsightRefs, patientInsightPorts) as PatientInsightLeaseCommitPort;
+            } });
+            ObjectDefineProperty(owner, 'mintOcrLeaseCommitPort', { enumerable: false, value(presentedSession: ServerSession) {
+                if (this !== owner) return fail('session_unavailable');
+                return mintLeaseCommitPort<OcrLeaseCommitRef>(presentedSession, ocrRefs, ocrPorts) as OcrLeaseCommitPort;
+            } });
+            const completedOwner = ObjectFreeze(owner) as unknown as ServerSessionProjectionOwner;
 
             unregisterOwner = registerServerSessionResource(session.id, () => finish(false));
             if (!unregisterOwner) return fail('session_ineligible');
-            setMapValue(owners, session.id, owner);
-            addOwnerIdentity(registryOwners, owner);
-            addOwnerIdentity(authenticOwners, owner);
-            setWeakMapValue(commitTurnRunners, owner, commitTurnRunner);
-            return owner;
+            setMapValue(owners, session.id, completedOwner);
+            addOwnerIdentity(registryOwners, completedOwner);
+            addOwnerIdentity(authenticOwners, completedOwner);
+            return completedOwner;
             } finally {
                 deleteSetValue(acquiring, session.id);
             }

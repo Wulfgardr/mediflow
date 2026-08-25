@@ -13,12 +13,6 @@ import {
     peekSession,
     registerServerSessionResource,
 } from './server-session';
-import {
-    createServerSessionProjectionOwnerRegistry,
-    ServerSessionProjectionOwnerError,
-    spendLeaseCommitTurn,
-    withLeaseCommitTurn,
-} from './server-session-projection-owner';
 
 const SYNTHETIC_USERNAME = `synthetic-${randomUUID()}`;
 const TARGET_USERNAME = ['synthetic', 'target'].join('-');
@@ -239,7 +233,7 @@ test('does not trust global registry pointers across module wrappers', () => {
     }
 });
 
-test('keeps session state and the H1b commit turn isolated from post-load ambient intrinsics', () => {
+test('keeps session state isolated from post-load ambient intrinsics', () => {
     const mapPrototype = Map.prototype;
     const setPrototype = Set.prototype;
     const arrayPrototype = Array.prototype;
@@ -272,7 +266,6 @@ test('keeps session state and the H1b commit turn isolated from post-load ambien
         arrayPush: arrayPrototype.push,
         arrayIterator: arrayPrototype[Symbol.iterator],
     };
-    const prepared = Object.freeze({ synthetic: 'prepared' });
     const now = originalDateNow();
     const distantFuture = now + 1000 * 60 * 60 * 24 * 365;
     let poisonedCalls = 0;
@@ -280,8 +273,6 @@ test('keeps session state and the H1b commit turn isolated from post-load ambien
     let expiryAfterZero = 0; let expiryAfterInfinity = 0; let expiryAfterFuture = 0;
     let deleted = false; let invalidated = false; let cleared = false; let expiredRemainsClosed = false;
     let disposerCalls = 0; let disposerReason: string | undefined;
-    let aborts = 0; let commits = 0;
-    let firstFailure: unknown;
     const poison = () => { poisonedCalls += 1; throw new Error('synthetic ambient intrinsic'); };
 
     try {
@@ -343,18 +334,6 @@ test('keeps session state and the H1b commit turn isolated from post-load ambien
         clearAllSessions();
         cleared = getSession(clearedSession.id) === null;
 
-        const ownerSession = syntheticSession();
-        const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze(pair) });
-        const owner = registry.acquire(ownerSession);
-        owner.issueSelection({ expectedEpoch: 0, patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' });
-        try {
-            withLeaseCommitTurn(owner, ownerSession, () => prepared,
-                () => undefined,
-                (turn) => { aborts += 1; spendLeaseCommitTurn(owner, ownerSession, turn, 'abort'); });
-        } catch (error) { firstFailure = error; }
-        withLeaseCommitTurn(owner, ownerSession, () => prepared,
-            (_prepared, turn) => { commits += 1; spendLeaseCommitTurn(owner, ownerSession, turn, 'commit'); },
-            () => assert.fail('retry must not abort'));
     } finally {
         globalThis.Map = originals.map;
         globalThis.Set = originals.set;
@@ -395,6 +374,4 @@ test('keeps session state and the H1b commit turn isolated from post-load ambien
     assert.equal(expiredRemainsClosed, true);
     assert.deepEqual({ disposerCalls, disposerReason }, { disposerCalls: 1, disposerReason: 'sessions_cleared' });
     assert.equal(poisonedCalls, 0);
-    assert.equal(firstFailure instanceof ServerSessionProjectionOwnerError && firstFailure.code, 'selection_unavailable');
-    assert.deepEqual({ aborts, commits }, { aborts: 1, commits: 1 });
 });
