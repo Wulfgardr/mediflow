@@ -2,7 +2,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createDocumentSynthesisOutputContract } from './document-synthesis-output-contract';
+import { types } from 'node:util';
+import { createDocumentSynthesisOutputContract, normalizeDocumentSynthesisOutput } from './document-synthesis-output-contract';
 
 const baseOutput = () => ({
     schemaVersion: 'mediflow.ai.extract.v1',
@@ -20,9 +21,14 @@ const baseOutput = () => ({
 });
 
 const denied = (value: unknown) => {
-    assert.deepEqual(createDocumentSynthesisOutputContract().normalize(value), {
-        status: 'denied', code: 'output_invalid', value: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none',
-    });
+    const result = createDocumentSynthesisOutputContract().normalize(value);
+    assert.equal(result.status, 'denied');
+    assert.equal(result.code, 'output_invalid');
+    assert.equal(result.value, null);
+    assert.equal(result.reviewOnly, true);
+    assert.equal(result.writesPerformed, 0);
+    assert.equal(result.applyPolicy, 'none');
+    assert.equal(Object.getPrototypeOf(result), null);
 };
 
 test('normalizes deterministic and generative outputs to one immutable review envelope', () => {
@@ -42,6 +48,11 @@ test('normalizes deterministic and generative outputs to one immutable review en
         assert.equal(Object.isFrozen(deterministic.value.data), true);
         assert.equal(Object.isFrozen(deterministic.value.data.diagnoses), true);
         assert.equal(deterministic.value.data.diagnoses[0]?.code, 'SYN-1');
+        assert.equal(Object.getPrototypeOf(deterministic), null);
+        assert.equal(Object.getPrototypeOf(deterministic.value), null);
+        assert.equal(Object.getPrototypeOf(deterministic.value.data), null);
+        assert.equal(Object.getPrototypeOf(deterministic.value.data.diagnoses[0]!), null);
+        assert.equal(Object.getOwnPropertyDescriptor(deterministic.value.data.diagnoses, 'toJSON')?.value, null);
     }
 });
 
@@ -84,4 +95,70 @@ test('rejects nested hostile, sparse and out-of-contract values', () => {
     const invalidConfidence = baseOutput(); invalidConfidence.data.diagnoses[0]!.confidence = 'unknown' as never;
     const invalidArray = baseOutput(); invalidArray.data.servicePrescriptions = Array.from({ length: 65 }, () => ({})) as never;
     for (const value of [nestedAccessor, nestedProxy, nestedExtra, invalidConfidence, invalidArray]) denied(value);
+});
+
+test('captures proxy detection before post-import poisoning with zero transparent proxy traps', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(types, 'isProxy');
+    assert.ok(descriptor?.configurable);
+    let traps = 0;
+    const transparent = new Proxy(baseOutput(), {
+        getOwnPropertyDescriptor() { traps += 1; return undefined; },
+        getPrototypeOf() { traps += 1; return Object.prototype; },
+        ownKeys() { traps += 1; return []; },
+    });
+    try {
+        Object.defineProperty(types, 'isProxy', { ...descriptor, value: () => false });
+        denied(transparent);
+        Object.defineProperty(types, 'isProxy', { ...descriptor, value: () => { throw new Error('poisoned'); } });
+        denied(transparent);
+    } finally {
+        Object.defineProperty(types, 'isProxy', descriptor);
+    }
+    assert.equal(traps, 0);
+});
+
+test('never reads inherited toJSON or JSON stringify while producing a stable canonical envelope', () => {
+    const objectToJson = Object.getOwnPropertyDescriptor(Object.prototype, 'toJSON');
+    const stringify = Object.getOwnPropertyDescriptor(JSON, 'stringify');
+    const capturedStringify = JSON.stringify;
+    let reads = 0;
+    try {
+        Object.defineProperty(Object.prototype, 'toJSON', { configurable: true, get() { reads += 1; return () => 'poison'; } });
+        Object.defineProperty(JSON, 'stringify', { ...stringify, value: () => { throw new Error('JSON poison'); } });
+        const result = normalizeDocumentSynthesisOutput(baseOutput());
+        assert.equal(result.status, 'available');
+        assert.equal(reads, 0);
+        if (result.status === 'available') {
+            assert.equal(Object.getPrototypeOf(result.value), null);
+            assert.equal(Object.getPrototypeOf(result.value.data), null);
+            assert.equal(Object.getOwnPropertyDescriptor(result.value.data.medications, 'toJSON')?.value, null);
+            assert.match(capturedStringify(result.value), /Synthetic medicine/u);
+        }
+    } finally {
+        if (objectToJson) Object.defineProperty(Object.prototype, 'toJSON', objectToJson); else delete (Object.prototype as Record<string, unknown>).toJSON;
+        if (stringify) Object.defineProperty(JSON, 'stringify', stringify);
+    }
+    assert.equal(reads, 0);
+});
+
+test('snapshots accepted values without post-return mutation or thenable work', async () => {
+    const source = baseOutput();
+    const result = normalizeDocumentSynthesisOutput(source);
+    assert.equal(result.status, 'available');
+    source.summary = 'Mutated after normalization';
+    source.data.diagnoses[0]!.description = 'Mutated after normalization';
+    let unhandled = 0;
+    const listener = () => { unhandled += 1; };
+    process.on('unhandledRejection', listener);
+    try {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+    } finally {
+        process.off('unhandledRejection', listener);
+    }
+    assert.equal(unhandled, 0);
+    assert.equal(result.status, 'available');
+    if (result.status === 'available') {
+        assert.equal(result.value.summary, 'Synthetic document review.');
+        assert.equal(result.value.data.diagnoses[0]?.description, 'Synthetic finding');
+    }
 });
