@@ -21,6 +21,7 @@ export const BACKUP_COLLECTIONS = [
     'observations',
     'patients',
     'physicianReviewAttestations',
+    'headlessSoapActiveRoleAttestations',
     'prostheticPrescriptions',
     'serviceCatalogEntries',
     'servicePrescriptionItems',
@@ -41,8 +42,12 @@ const DURABLE_REVIEW_AUTHORITY_COLLECTIONS = new Set<BackupCollectionName>([
     'durableReviewPatientLinks',
     'physicianReviewAttestations',
 ]);
+/* @Codex Artifacts created before H2a-S have no SOAP active-role attestation rows. */
+const PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS = BACKUP_COLLECTIONS.filter(
+    (collection) => collection !== 'headlessSoapActiveRoleAttestations',
+);
 /* @Codex Artifacts created before durable review authority was added have no such collections. */
-const PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS = BACKUP_COLLECTIONS.filter(
+const PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS = PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS.filter(
     (collection) => !DURABLE_REVIEW_AUTHORITY_COLLECTIONS.has(collection),
 );
 /* @Codex */
@@ -53,7 +58,9 @@ const LEGACY_OMITTED_COLLECTION_SETS: readonly (readonly BackupCollectionName[])
 ];
 /* @Codex v1 recognizes both the authority-era and pre-authority collection generations. */
 const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
+    PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS,
     ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => BACKUP_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
+    ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
     ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
 ];
 const PATIENT_DEPENDENT_COLLECTIONS: readonly BackupCollectionName[] = [
@@ -85,6 +92,11 @@ const PHYSICIAN_REVIEW_ATTESTATION_KEYS = ['actorRef', 'schemaVersion', 'capabil
 const PHYSICIAN_REVIEW_ATTESTATION_SCHEMA = 'mediflow.physician-review-attestation.v1';
 const PHYSICIAN_REVIEW_CAPABILITY = 'physician_terminal_review';
 const PHYSICIAN_REVIEW_POLICY = 'physician_terminal_review.v1';
+const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_KEYS = ['attestationRef', 'actorRef', 'schemaVersion', 'role', 'operationId', 'policyVersion', 'status', 'attestationVersion', 'issuerRef', 'expiresAt', 'activatedAt', 'revocationGeneration', 'revokedAt', 'createdAt', 'updatedAt'] as const;
+const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_SCHEMA = 'mediflow.headless-soap-active-role-attestation.v1';
+const HEADLESS_SOAP_ACTIVE_ROLE_ROLE = 'physician';
+const HEADLESS_SOAP_ACTIVE_ROLE_OPERATION = 'mediflow.clinical_diary.append_soap.v1';
+const HEADLESS_SOAP_ACTIVE_ROLE_POLICY = 'clinician_confirmed_single_use.v1';
 
 export interface BackupArtifactManifest {
     scope: typeof BACKUP_ARTIFACT_SCOPE;
@@ -235,6 +247,53 @@ function assertDurableReviewAuthorityRows(
             || (revokedAt !== null && revokedAt < createdAt)) {
             throw new BackupArtifactError('invalid-manifest', 'physicianReviewAttestations contains an invalid authority record.');
         }
+        actorRefs.add(attestation.actorRef);
+    }
+}
+
+/* @Codex H2a-S backup accounting validates only persistent attestation facts; it never restores a session or grant. */
+function assertHeadlessSoapActiveRoleAttestationRows(payload: Partial<Record<BackupCollectionName, BackupRecord[]>>): void {
+    const attestationRefs = new Set<string>();
+    const actorRefs = new Set<string>();
+    for (const attestation of payload.headlessSoapActiveRoleAttestations ?? []) {
+        if (!hasExactKeys(attestation, HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_KEYS)) {
+            throw new BackupArtifactError('invalid-manifest', 'headless SOAP active-role attestations contain an invalid authority record.');
+        }
+        const createdAt = timestampMilliseconds(attestation.createdAt);
+        const updatedAt = timestampMilliseconds(attestation.updatedAt);
+        const expiresAt = attestation.expiresAt === null ? null : timestampMilliseconds(attestation.expiresAt);
+        const activatedAt = attestation.activatedAt === null ? null : timestampMilliseconds(attestation.activatedAt);
+        const revokedAt = attestation.revokedAt === null ? null : timestampMilliseconds(attestation.revokedAt);
+        const hasValidIssuer = typeof attestation.issuerRef === 'string'
+            && attestation.issuerRef.trim() === attestation.issuerRef
+            && attestation.issuerRef.length >= 1 && attestation.issuerRef.length <= 256;
+        const inactive = attestation.status === 'inactive'
+            && attestation.issuerRef === null && expiresAt === null && activatedAt === null && revokedAt === null
+            && attestation.revocationGeneration === 0;
+        const active = attestation.status === 'active'
+            && hasValidIssuer && expiresAt !== null && activatedAt !== null && revokedAt === null
+            && attestation.revocationGeneration === 0;
+        const revoked = attestation.status === 'revoked'
+            && revokedAt !== null && typeof attestation.revocationGeneration === 'number'
+            && Number.isSafeInteger(attestation.revocationGeneration) && attestation.revocationGeneration >= 1
+            && ((attestation.issuerRef === null && expiresAt === null && activatedAt === null)
+                || (hasValidIssuer && expiresAt !== null && activatedAt !== null));
+        if (typeof attestation.attestationRef !== 'string' || attestation.attestationRef.trim() !== attestation.attestationRef || attestation.attestationRef.length < 1 || attestation.attestationRef.length > 256 || attestationRefs.has(attestation.attestationRef)
+            || typeof attestation.actorRef !== 'string' || attestation.actorRef.trim() !== attestation.actorRef || attestation.actorRef.length < 1 || attestation.actorRef.length > 256 || actorRefs.has(attestation.actorRef)
+            || attestation.schemaVersion !== HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_SCHEMA
+            || attestation.role !== HEADLESS_SOAP_ACTIVE_ROLE_ROLE
+            || attestation.operationId !== HEADLESS_SOAP_ACTIVE_ROLE_OPERATION
+            || attestation.policyVersion !== HEADLESS_SOAP_ACTIVE_ROLE_POLICY
+            || attestation.attestationVersion !== 1
+            || typeof attestation.revocationGeneration !== 'number' || !Number.isSafeInteger(attestation.revocationGeneration) || attestation.revocationGeneration < 0
+            || (!inactive && !active && !revoked)
+            || createdAt === null || updatedAt === null || updatedAt < createdAt
+            || (expiresAt !== null && expiresAt < createdAt)
+            || (activatedAt !== null && (activatedAt < createdAt || (expiresAt !== null && activatedAt > expiresAt)))
+            || (revokedAt !== null && (revokedAt < createdAt || (activatedAt !== null && revokedAt < activatedAt)))) {
+            throw new BackupArtifactError('invalid-manifest', 'headless SOAP active-role attestations contain an invalid authority record.');
+        }
+        attestationRefs.add(attestation.attestationRef);
         actorRefs.add(attestation.actorRef);
     }
 }
@@ -463,6 +522,7 @@ async function assertCollectionReferences(
 
     await assertDurableReviewLedger(payload);
     assertDurableReviewAuthorityRows(payload, durableReviewIds, patientIds);
+    assertHeadlessSoapActiveRoleAttestationRows(payload);
 }
 
 export async function createBackupArtifact(payload: BackupDataset, createdAt = new Date()): Promise<BackupArtifact> {
