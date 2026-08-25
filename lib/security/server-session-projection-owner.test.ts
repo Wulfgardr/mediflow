@@ -155,6 +155,72 @@ test('durable review commit port poisons hostile-clock reentry into generic and 
     }
 });
 
+test('owner-wide lease-port isolation denies every H1f outer operation against durable mint, spend, and dispose', () => {
+    for (const kind of ['patient', 'ocr', 'document', 'treatment'] as const)
+        for (const outer of ['snapshot', 'prepare', 'commit', 'abort'] as const)
+            for (const nested of ['mint', 'spend', 'dispose'] as const) {
+                let armed = false; let nestedResult: unknown = undefined;
+                const registry = createServerSessionProjectionOwnerRegistry({
+                    resolve: (_session, pair) => pair, entropy: () => new Uint8Array(16),
+                    clock: () => { if (armed) { armed = false;
+                        try { nestedResult = nested === 'mint' ? owner.mintDurableReviewCommitPort(value)
+                            : nested === 'spend' ? spendDurableReviewCommitPort(durable) : disposeDurableReviewCommitPort(durable); } catch { nestedResult = 'denied'; }
+                    } return 1_000; },
+                });
+                const value = session(); const owner = registry.acquire(value);
+                owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+                const h1f = kind === 'patient' ? owner.mintPatientInsightLeaseCommitPort(value) : kind === 'ocr' ? owner.mintOcrLeaseCommitPort(value)
+                    : kind === 'document' ? owner.mintDocumentSynthesisLeaseCommitPort(value) : owner.mintTreatmentReasoningLeaseCommitPort(value);
+                const before = h1f.snapshot()!;
+                const staged = outer === 'commit' || outer === 'abort' ? h1f.prepare(Object.freeze({ expected: before.currentRef }))! : null;
+                const durable = nested === 'mint' ? null : owner.mintDurableReviewCommitPort(value);
+                armed = true;
+                const result = outer === 'snapshot' ? h1f.snapshot() : outer === 'prepare' ? h1f.prepare(Object.freeze({ expected: before.currentRef }))
+                    : outer === 'commit' ? h1f.commit(Object.freeze({ expected: before.currentRef, replacement: staged! })) : h1f.abort(Object.freeze({ replacement: staged! }));
+                assert.equal(result, outer === 'snapshot' || outer === 'prepare' ? null : false);
+                assert.equal(nestedResult, nested === 'mint' ? 'denied' : nested === 'spend' ? false : undefined);
+                const after = h1f.snapshot()!;
+                assert.equal(after.currentRef, before.currentRef);
+                assert.equal(after.stagedRef, staged);
+                assert.equal(after.generation, before.generation);
+                assert.equal(after.terminal, false);
+                if (durable) { assert.equal(spendDurableReviewCommitPort(durable), true); disposeDurableReviewCommitPort(durable); }
+            }
+});
+
+test('owner-wide lease-port isolation denies durable mint and spend against every H1f port operation', () => {
+    for (const kind of ['patient', 'ocr', 'document', 'treatment'] as const)
+        for (const nested of ['snapshot', 'prepare', 'commit', 'abort', 'dispose'] as const)
+            for (const outer of ['mint', 'spend'] as const) {
+                let armed = false; let nestedResult: unknown = undefined;
+                const registry = createServerSessionProjectionOwnerRegistry({
+                    resolve: (_session, pair) => pair, entropy: () => new Uint8Array(16),
+                    clock: () => { if (armed) { armed = false;
+                        nestedResult = nested === 'snapshot' ? h1f.snapshot() : nested === 'prepare' ? h1f.prepare(Object.freeze({ expected: before.currentRef }))
+                            : nested === 'commit' ? h1f.commit(Object.freeze({ expected: before.currentRef, replacement: staged! }))
+                                : nested === 'abort' ? h1f.abort(Object.freeze({ replacement: staged! })) : h1f.dispose();
+                    } return 1_000; },
+                });
+                const value = session(); const owner = registry.acquire(value);
+                owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+                const h1f = kind === 'patient' ? owner.mintPatientInsightLeaseCommitPort(value) : kind === 'ocr' ? owner.mintOcrLeaseCommitPort(value)
+                    : kind === 'document' ? owner.mintDocumentSynthesisLeaseCommitPort(value) : owner.mintTreatmentReasoningLeaseCommitPort(value);
+                const before = h1f.snapshot()!;
+                const staged = nested === 'commit' || nested === 'abort' ? h1f.prepare(Object.freeze({ expected: before.currentRef }))! : null;
+                const durable = outer === 'spend' ? owner.mintDurableReviewCommitPort(value) : null;
+                armed = true;
+                if (outer === 'mint') assert.throws(() => owner.mintDurableReviewCommitPort(value), ServerSessionProjectionOwnerError);
+                else assert.equal(spendDurableReviewCommitPort(durable), false);
+                assert.equal(nestedResult, nested === 'snapshot' || nested === 'prepare' ? null : nested === 'commit' || nested === 'abort' ? false : undefined);
+                const after = h1f.snapshot()!;
+                assert.equal(after.currentRef, before.currentRef);
+                assert.equal(after.stagedRef, staged);
+                assert.equal(after.generation, before.generation);
+                assert.equal(after.terminal, false);
+                if (durable) disposeDurableReviewCommitPort(durable);
+            }
+});
+
 test('Treatment Reasoning port has a private brand and fails closed for stale, expired, replayed, disposed, and foreign authority', () => {
     const first = ownerWithSelection();
     const treatment = first.owner.mintTreatmentReasoningLeaseCommitPort(first.value);
