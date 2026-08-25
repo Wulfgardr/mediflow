@@ -38,6 +38,7 @@ const BACKUP_TABLES = {
   observations: 'observations',
   patients: 'patients',
   physicianReviewAttestations: 'physician_review_attestations',
+  headlessSoapActiveRoleAttestations: 'headless_soap_active_role_attestations',
   prostheticPrescriptions: 'prosthetic_prescriptions',
   serviceCatalogEntries: 'service_catalog_entries',
   servicePrescriptionItems: 'service_prescription_items',
