@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { types } from 'node:util';
 
 /* @Codex */
 export type SemanticOutcome = 'discovery' | 'read' | 'query' | 'orchestration' | 'preview' | 'proposal';
@@ -34,16 +35,23 @@ type Session = Readonly<{ sessionRef: string; active: boolean; activeRole: strin
 type Stored = Readonly<{ digest: string; receipt: SemanticReceipt }>;
 
 function own(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  if (value === null || typeof value !== 'object') return null;
+  if (types.isProxy(value)) return null;
+  if (Array.isArray(value)) return null;
   try {
     const prototype = Object.getPrototypeOf(value);
     if (prototype !== Object.prototype && prototype !== null) return null;
     const names = Object.getOwnPropertyNames(value);
     if (names.length !== keys.length || names.some((name) => !keys.includes(name)) || Object.getOwnPropertySymbols(value).length) return null;
     const descriptors = Object.getOwnPropertyDescriptors(value);
-    if (names.some((name) => !('value' in descriptors[name]!))) return null;
+    if (names.some((name) => !('value' in descriptors[name]!) || descriptors[name]!.enumerable !== true)) return null;
     return value as Record<string, unknown>;
   } catch { return null; }
+}
+
+function array(value: unknown): readonly unknown[] | null {
+  if (value === null || typeof value !== 'object' || types.isProxy(value) || !Array.isArray(value)) return null;
+  return value;
 }
 
 function text(value: unknown): string | null { return typeof value === 'string' && TOKEN.test(value) ? value : null; }
@@ -54,9 +62,11 @@ function nullRecord<T extends object>(value: T): Readonly<T> { return Object.fre
 function safeValue(value: unknown, depth = 0): unknown | null | typeof FORBIDDEN_INPUT {
   if (depth > 8 || value === null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  if (Array.isArray(value)) {
-    if (value.length > 64) return null;
-    const items = value.map(item => safeValue(item, depth + 1));
+  if (typeof value === 'object' && types.isProxy(value)) return null;
+  const itemsValue = array(value);
+  if (itemsValue) {
+    if (itemsValue.length > 64) return null;
+    const items = itemsValue.map(item => safeValue(item, depth + 1));
     return items.includes(FORBIDDEN_INPUT) ? FORBIDDEN_INPUT : items.some(item => item === null) ? null : frozen(items);
   }
   if (typeof value !== 'object') return null;
@@ -76,9 +86,9 @@ function safeValue(value: unknown, depth = 0): unknown | null | typeof FORBIDDEN
 }
 
 function normalizePlan(value: unknown): Plan | null | typeof FORBIDDEN_INPUT {
-  const record = own(value, ['requestRef', 'actions']); if (!record || !text(record.requestRef) || !Array.isArray(record.actions) || record.actions.length < 1 || record.actions.length > 32) return null;
+  const record = own(value, ['requestRef', 'actions']); const rawActions = record ? array(record.actions) : null; if (!record || !text(record.requestRef) || !rawActions || rawActions.length < 1 || rawActions.length > 32) return null;
   const actions: Action[] = [];
-  for (const item of record.actions) {
+  for (const item of rawActions) {
     const action = own(item, ['actionRef', 'operationId', 'capabilityId', 'applicationServiceRef', 'stage', 'idempotencyKey', 'input']);
     if (!action) return null;
     const input = safeValue(action.input);
@@ -91,8 +101,9 @@ function normalizePlan(value: unknown): Plan | null | typeof FORBIDDEN_INPUT {
 
 function normalizeSession(value: unknown): Session | null {
   const record = own(value, ['sessionRef', 'active', 'activeRole', 'leaseEpoch', 'revoked', 'authorizedCapabilityIds']);
-  if (!record || !text(record.sessionRef) || !text(record.activeRole) || typeof record.active !== 'boolean' || typeof record.revoked !== 'boolean' || !Number.isSafeInteger(record.leaseEpoch) || (record.leaseEpoch as number) < 1 || !Array.isArray(record.authorizedCapabilityIds)) return null;
-  const capabilities = record.authorizedCapabilityIds.map(text); if (capabilities.some(item => !item)) return null;
+  const rawCapabilities = record ? array(record.authorizedCapabilityIds) : null;
+  if (!record || !text(record.sessionRef) || !text(record.activeRole) || typeof record.active !== 'boolean' || typeof record.revoked !== 'boolean' || !Number.isSafeInteger(record.leaseEpoch) || (record.leaseEpoch as number) < 1 || !rawCapabilities) return null;
+  const capabilities = rawCapabilities.map(text); if (capabilities.some(item => !item)) return null;
   return frozen({ sessionRef: record.sessionRef as string, active: record.active as boolean, activeRole: record.activeRole as string, leaseEpoch: record.leaseEpoch as number, revoked: record.revoked as boolean, authorizedCapabilityIds: frozen(capabilities as string[]) });
 }
 
@@ -103,8 +114,9 @@ function promiseLike(value: object): boolean {
 }
 
 export function createSemanticRuntime(registry: unknown, options: Readonly<{ maxOperations?: number }> = {}): SemanticRuntime {
-  const operations = new Map<string, SemanticOperation>(); let registryInvalid = !Array.isArray(registry) || !Number.isSafeInteger(options.maxOperations ?? 32) || (options.maxOperations ?? 32) < 1 || (options.maxOperations ?? 32) > 32;
-  const entries = Array.isArray(registry) ? registry : [];
+  const rawEntries = array(registry);
+  const entries = rawEntries ?? [];
+  const operations = new Map<string, SemanticOperation>(); let registryInvalid = !rawEntries || !Number.isSafeInteger(options.maxOperations ?? 32) || (options.maxOperations ?? 32) < 1 || (options.maxOperations ?? 32) > 32;
   if (!registryInvalid) for (const entry of entries) {
     const record = own(entry, ['operationId', 'capabilityId', 'applicationServiceRef', 'maximumStage', 'authorityPolicy', 'execute']);
     if (!record || !text(record.operationId) || !text(record.capabilityId) || !text(record.applicationServiceRef) || !stage(record.maximumStage) || record.authorityPolicy !== 'read_only' || typeof record.execute !== 'function' || operations.has(record.operationId as string)) { registryInvalid = true; break; }
@@ -130,7 +142,7 @@ export function createSemanticRuntime(registry: unknown, options: Readonly<{ max
         const operation = operations.get(action.operationId)!; const scope = `${session.sessionRef}\0${operation.operationId}\0${action.idempotencyKey}`; const operationDigest = digest({ operationId: action.operationId, capabilityId: action.capabilityId, applicationServiceRef: action.applicationServiceRef, stage: action.stage, input: action.input }); const previous = ledger.get(scope);
         if (previous) { receipts.push(previous.digest === operationDigest ? nullRecord({ ...previous.receipt, policyDecision: 'replay' as const }) : deny('idempotency_conflict', plan.requestRef, action)); continue; }
         let host: unknown; try { host = operation.execute(action.input); } catch { const receipt = deny('host_threw', plan.requestRef, action); ledger.set(scope, frozen({ digest: operationDigest, receipt })); receipts.push(receipt); continue; }
-        const output = host && typeof host === 'object' && !promiseLike(host) ? own(host, ['outcome', 'resultRef']) : null;
+        const output = host && typeof host === 'object' && !types.isProxy(host) && !promiseLike(host) ? own(host, ['outcome', 'resultRef']) : null;
         if (!output || !stage(output.outcome) || !text(output.resultRef) || (STAGE_INDEX.get(output.outcome as SemanticOutcome) ?? 99) > (STAGE_INDEX.get(operation.maximumStage) ?? -1)) { const receipt = deny('host_result_invalid', plan.requestRef, action); ledger.set(scope, frozen({ digest: operationDigest, receipt })); receipts.push(receipt); continue; }
         const receipt: SemanticReceipt = nullRecord({ schema: 'mediflow.headless.receipt.v1' as const, requestRef: plan.requestRef, actionRef: action.actionRef, operationId: operation.operationId, capabilityId: operation.capabilityId, outcome: output.outcome as SemanticOutcome, policyDecision: 'executed' as const, revisionBinding: `lease:${session.leaseEpoch}`, createdAt: `runtime:${++tick}`, applyPolicy: 'none' as const, writesPerformed: 0 as const, resultRef: output.resultRef as string }); ledger.set(scope, frozen({ digest: operationDigest, receipt })); receipts.push(receipt);
       }
