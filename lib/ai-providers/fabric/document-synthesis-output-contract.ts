@@ -44,7 +44,6 @@ const CREATE = Object.create;
 const FREEZE = Object.freeze;
 const DEFINE = Object.defineProperty;
 const APPLY = Reflect.apply;
-const SLICE = Array.prototype.slice;
 const NORMALIZE = String.prototype.normalize;
 const REPLACE = String.prototype.replace;
 const TRIM = String.prototype.trim;
@@ -54,12 +53,16 @@ const WHITESPACE = /\s+/gu;
 
 function sealedRecord<T>(entries: readonly (readonly [string, unknown])[]): T {
     const result = CREATE(null) as Record<string, unknown>;
-    for (const [key, value] of entries) result[key] = value;
+    for (let index = 0; index < entries.length; index += 1) {
+        const entry = entries[index]!;
+        result[entry[0]] = entry[1];
+    }
     return FREEZE(result) as T;
 }
 
 function sealedList<T>(items: readonly T[]): readonly T[] {
-    const result = APPLY(SLICE, items, []) as T[];
+    const result: T[] = [];
+    for (let index = 0; index < items.length; index += 1) result[index] = items[index]!;
     DEFINE(result, 'toJSON', { value: null, enumerable: false, configurable: false, writable: false });
     return FREEZE(result);
 }
@@ -79,13 +82,14 @@ function record(value: unknown, required: readonly string[], optional: readonly 
         const keys = OWN_KEYS(value);
         if (keys.length < required.length || keys.length > required.length + optional.length) return null;
         const copy = CREATE(null) as Record<string, unknown>;
-        for (const key of keys) {
+        for (let index = 0; index < keys.length; index += 1) {
+            const key = keys[index];
             if (typeof key !== 'string' || (!allowed(key, required) && !allowed(key, optional))) return null;
             const descriptor = GET_DESCRIPTOR(value, key);
             if (!descriptor || !descriptor.enumerable || !HAS_OWN(descriptor, 'value')) return null;
             copy[key] = descriptor.value;
         }
-        for (const key of required) if (!HAS_OWN(copy, key)) return null;
+        for (let index = 0; index < required.length; index += 1) if (!HAS_OWN(copy, required[index]!)) return null;
         return copy;
     } catch { return null; }
 }
@@ -118,7 +122,8 @@ function confidence(value: unknown): Confidence | null { return typeof value ===
 function optionalText(input: Record<string, unknown>, key: string, maximum = 700): string | undefined | null { return HAS_OWN(input, key) ? text(input[key], maximum) : undefined; }
 function optionalEntries(input: Record<string, unknown>, keys: readonly string[], maximum: number): readonly (readonly [string, string])[] | null {
     const result: Array<readonly [string, string]> = [];
-    for (const key of keys) {
+    for (let index = 0; index < keys.length; index += 1) {
+        const key = keys[index]!;
         const value = optionalText(input, key, maximum);
         if (value === null) return null;
         if (value !== undefined) result[result.length] = [key, value];
@@ -135,29 +140,31 @@ function diagnosis(value: unknown): Diagnosis | null {
 }
 function problem(value: unknown): Problem | null {
     const item = record(value, ['label', 'icdQuery', 'confidence', 'evidence'], ['sourceId', 'explicitCode']);
-    const label = item && text(item.label, 180); const query = item && text(item.icdQuery, 160); const level = item && confidence(item.confidence); const evidence = item && text(item.evidence, 400); const optional = item && optionalEntries(item, ['sourceId', 'explicitCode'], 160);
-    if (!item || !label || !query || !level || !evidence || optional === null) return null;
-    return sealedRecord<Problem>([['label', label], ['icdQuery', query], ['confidence', level], ['evidence', evidence], ...(optional ?? [])]);
+    const label = item && text(item.label, 180); const query = item && text(item.icdQuery, 160); const level = item && confidence(item.confidence); const evidence = item && text(item.evidence, 400); const sourceId = item && optionalText(item, 'sourceId', 160); const explicitCode = item && optionalText(item, 'explicitCode', 120);
+    if (!item || !label || !query || !level || !evidence || sourceId === null || explicitCode === null) return null;
+    const entries: Array<readonly [string, unknown]> = [['label', label], ['icdQuery', query], ['confidence', level], ['evidence', evidence]];
+    if (sourceId !== undefined) entries[entries.length] = ['sourceId', sourceId]; if (explicitCode !== undefined) entries[entries.length] = ['explicitCode', explicitCode];
+    return sealedRecord<Problem>(entries);
 }
 function therapy(value: unknown): Therapy | null {
     const item = record(value, ['drugMention', 'drugQuery', 'confidence', 'evidence'], ['activePrinciple', 'dosage', 'motivation', 'therapyState', 'reviewNote', 'sourceId']);
     const mention = item && text(item.drugMention, 180); const query = item && text(item.drugQuery, 180); const level = item && confidence(item.confidence); const evidence = item && text(item.evidence, 400); const optional = item && optionalEntries(item, ['activePrinciple', 'dosage', 'motivation', 'reviewNote', 'sourceId'], 400); const state = item && (HAS_OWN(item, 'therapyState') ? item.therapyState : undefined);
     if (!item || !mention || !query || !level || !evidence || optional === null || (state !== undefined && (typeof state !== 'string' || !allowed(state, ['active', 'transition', 'uncertain', 'inactive'])))) return null;
-    const entries: Array<readonly [string, unknown]> = [['drugMention', mention], ['drugQuery', query], ['confidence', level], ['evidence', evidence], ...(optional ?? [])]; if (state !== undefined) entries[entries.length] = ['therapyState', state];
+    const entries: Array<readonly [string, unknown]> = [['drugMention', mention], ['drugQuery', query], ['confidence', level], ['evidence', evidence]]; for (let index = 0; index < optional!.length; index += 1) entries[entries.length] = optional![index]!; if (state !== undefined) entries[entries.length] = ['therapyState', state];
     return sealedRecord<Therapy>(entries);
 }
 function serviceItem(value: unknown): ServiceItem | null {
     const item = record(value, ['serviceName', 'confidence', 'evidence'], ['category', 'codeSystem', 'serviceCode', 'sourceId']);
     const name = item && text(item.serviceName, 180); const level = item && confidence(item.confidence); const evidence = item && text(item.evidence, 400); const optional = item && optionalEntries(item, ['codeSystem', 'serviceCode', 'sourceId'], 160); const category = item && (HAS_OWN(item, 'category') ? item.category : undefined);
     if (!item || !name || !level || !evidence || optional === null || (category !== undefined && (typeof category !== 'string' || !allowed(category, ['lab', 'imaging', 'visit', 'rehab', 'screening', 'procedure', 'other'])))) return null;
-    const entries: Array<readonly [string, unknown]> = [['serviceName', name], ['confidence', level], ['evidence', evidence], ...(optional ?? [])]; if (category !== undefined) entries[entries.length] = ['category', category];
+    const entries: Array<readonly [string, unknown]> = [['serviceName', name], ['confidence', level], ['evidence', evidence]]; for (let index = 0; index < optional!.length; index += 1) entries[entries.length] = optional![index]!; if (category !== undefined) entries[entries.length] = ['category', category];
     return sealedRecord<ServiceItem>(entries);
 }
 function service(value: unknown): Service | null {
     const item = record(value, ['serviceName', 'confidence', 'evidence'], ['category', 'priority', 'codeSystem', 'serviceCode', 'clinicalQuestion', 'provider', 'prescribedAt', 'requestReference', 'sourceId', 'items']);
     const name = item && text(item.serviceName, 180); const level = item && confidence(item.confidence); const evidence = item && text(item.evidence, 400); const optional = item && optionalEntries(item, ['priority', 'codeSystem', 'serviceCode', 'clinicalQuestion', 'provider', 'prescribedAt', 'requestReference', 'sourceId'], 180); const category = item && (HAS_OWN(item, 'category') ? item.category : undefined); const items = item && (HAS_OWN(item, 'items') ? list(item.items, 32, serviceItem) : undefined);
     if (!item || !name || !level || !evidence || optional === null || items === null || (category !== undefined && (typeof category !== 'string' || !allowed(category, ['lab', 'imaging', 'visit', 'rehab', 'screening', 'procedure', 'other'])))) return null;
-    const entries: Array<readonly [string, unknown]> = [['serviceName', name], ['confidence', level], ['evidence', evidence], ...(optional ?? [])]; if (category !== undefined) entries[entries.length] = ['category', category]; if (items !== undefined) entries[entries.length] = ['items', items];
+    const entries: Array<readonly [string, unknown]> = [['serviceName', name], ['confidence', level], ['evidence', evidence]]; for (let index = 0; index < optional!.length; index += 1) entries[entries.length] = optional![index]!; if (category !== undefined) entries[entries.length] = ['category', category]; if (items !== undefined) entries[entries.length] = ['items', items];
     return sealedRecord<Service>(entries);
 }
 
