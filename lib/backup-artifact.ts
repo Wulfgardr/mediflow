@@ -97,6 +97,7 @@ const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_SCHEMA = 'mediflow.headless-soap-act
 const HEADLESS_SOAP_ACTIVE_ROLE_ROLE = 'physician';
 const HEADLESS_SOAP_ACTIVE_ROLE_OPERATION = 'mediflow.clinical_diary.append_soap.v1';
 const HEADLESS_SOAP_ACTIVE_ROLE_POLICY = 'clinician_confirmed_single_use.v1';
+const BACKUP_ARTIFACT_ROOT_KEYS = ['format', 'version', 'manifest', 'payload'] as const;
 
 export interface BackupArtifactManifest {
     scope: typeof BACKUP_ARTIFACT_SCOPE;
@@ -585,6 +586,9 @@ export async function serializeBackupArtifact(payload: BackupDataset, createdAt 
 export async function parseBackupArtifact(value: unknown): Promise<BackupArtifact> {
     if (!value || typeof value !== 'object' || types.isProxy(value)) {
         throw new BackupArtifactError('invalid-json', 'Backup artifact must be a JSON object.');
+    }
+    if (!hasExactKeys(value, BACKUP_ARTIFACT_ROOT_KEYS)) {
+        throw new BackupArtifactError('invalid-manifest', 'Backup artifact root is invalid.');
     }
 
     const artifact = value as Partial<BackupArtifact> & { manifest?: Partial<BackupArtifactManifest>; payload?: Record<string, unknown> };

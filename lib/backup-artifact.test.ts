@@ -319,6 +319,30 @@ test('rejects Proxy backup roots before reflection with one sanitized error', as
     assert.equal(throwingTraps, 0);
 });
 
+test('accepts only an exact own data-only canonical backup root', async () => {
+    const valid = JSON.parse(await serializeBackupArtifact(basePayload));
+    let inheritedReads = 0;
+    const inherited = Object.create({ get format() { inheritedReads += 1; return BACKUP_ARTIFACT_FORMAT; } });
+    Object.assign(inherited, (({ format: _format, ...rest }) => rest)(valid));
+    let accessorReads = 0;
+    const accessor = { ...valid };
+    Object.defineProperty(accessor, 'format', { enumerable: true, get: () => { accessorReads += 1; return BACKUP_ARTIFACT_FORMAT; } });
+    const nonEnumerable = { ...valid };
+    Object.defineProperty(nonEnumerable, 'format', { enumerable: false, value: BACKUP_ARTIFACT_FORMAT });
+    const symbol = { ...valid, [Symbol('unexpected')]: true };
+    const thenable = { ...valid, then: () => undefined };
+    const customPrototype = Object.assign(Object.create({}), valid);
+    const nullPrototype = Object.assign(Object.create(null), valid);
+    for (const root of [inherited, accessor, nonEnumerable, symbol, thenable, customPrototype, nullPrototype]) {
+        await assert.rejects(
+            () => parseBackupArtifact(root),
+            (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest' && error.message === 'Backup artifact root is invalid.',
+        );
+    }
+    assert.equal(inheritedReads, 0);
+    assert.equal(accessorReads, 0);
+});
+
 test('rejects malformed, duplicated, and lifecycle-invalid headless SOAP active-role attestations', async () => {
     const mutations: Array<(artifact: any) => void> = [
         (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].extra = true; },
