@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   APPLICATION_OPERATION_DESCRIPTORS,
   resolveApplicationOperation,
@@ -14,12 +16,17 @@ const expected = [
   ['anchor:web:web-39-blocco-sessione-immediato-stato-sessione@1e35733c0218', 'whoami'],
   ['anchor:web:web-63-get-api-v1-network-capabilities-api-v1-network-identity-api-v1-n@1e35733c0218', 'capabilities'],
 ] as const;
+const descriptors = () => {
+  const output = [] as (typeof APPLICATION_OPERATION_DESCRIPTORS)[number][];
+  for (let index = 0; index < APPLICATION_OPERATION_DESCRIPTORS.length; index += 1) output.push(APPLICATION_OPERATION_DESCRIPTORS[index]!);
+  return output;
+};
 
 test('binds only the six directly evidenced Mini commands to their exact canonical anchors', () => {
   assert.equal(APPLICATION_OPERATION_DESCRIPTORS.length, 6);
-  assert.deepEqual(APPLICATION_OPERATION_DESCRIPTORS.map(({ anchorId, miniCommandId }) => [anchorId, miniCommandId]), expected);
-  for (const descriptor of APPLICATION_OPERATION_DESCRIPTORS) {
-    assert.deepEqual(descriptor.evidence, {
+  assert.deepEqual(descriptors().map(({ anchorId, miniCommandId }) => [anchorId, miniCommandId]), expected);
+  for (const descriptor of descriptors()) {
+    assert.deepEqual({ ...descriptor.evidence }, {
       sourceCommit: '1e35733c0218eae67a1d6e158085aab7340bc26b',
       sourcePath: 'packages/mini/contracts/mini-parity.json',
       sourceBlob: 'ecde8213824a2e46e6ec3216ce63009366a1f373',
@@ -30,15 +37,20 @@ test('binds only the six directly evidenced Mini commands to their exact canonic
 });
 
 test('keeps every evidenced command unavailable while the operational contract is unresolved', () => {
-  for (const descriptor of APPLICATION_OPERATION_DESCRIPTORS) {
+  for (const descriptor of descriptors()) {
     assert.equal(descriptor.status, 'denied');
     assert.equal(descriptor.availability, 'unavailable');
     assert.equal(descriptor.operationId, null);
-    assert.deepEqual(descriptor.unresolved, ['operational_id', 'input_schema', 'output_schema', 'stage', 'authority', 'revision', 'limits']);
+    assert.deepEqual(Array.from(descriptor.unresolved), ['operational_id', 'input_schema', 'output_schema', 'stage', 'authority', 'revision', 'limits']);
     assert.equal(descriptor.applyPolicy, 'none');
     assert.equal(descriptor.writesPerformed, 0);
     assert.equal(Object.isFrozen(descriptor), true);
+    assert.equal(Object.getPrototypeOf(descriptor), null);
+    assert.equal(Object.getPrototypeOf(descriptor.evidence), null);
+    assert.equal(Object.getPrototypeOf(descriptor.unresolved), null);
   }
+  assert.equal(Object.isFrozen(APPLICATION_OPERATION_DESCRIPTORS), true);
+  assert.equal(Object.getPrototypeOf(APPLICATION_OPERATION_DESCRIPTORS), null);
 });
 
 test('denies by default and never derives an anchor from a command-like value', () => {
@@ -53,4 +65,16 @@ test('denies by default and never derives an anchor from a command-like value', 
     assert.equal(result.descriptor, null);
   }
   assert.equal(resolveApplicationOperation('similar-anchor', 'patient search').reason, 'unknown_mini_command');
+});
+
+test('does not inherit then or inspect hostile object inputs', () => {
+  const known = resolveApplicationOperation(expected[0][0], expected[0][1]);
+  const hostile = new Proxy({}, { get() { throw new Error('must not read'); } });
+  assert.equal(resolveApplicationOperation(hostile, hostile).reason, 'unknown_mini_command');
+  assert.throws(() => { (known as unknown as { status: string }).status = 'allowed'; });
+  const loader = fileURLToPath(new URL('../../scripts/register-strip-types-loader.mjs', import.meta.url));
+  const registry = new URL('./application-operation-registry.ts', import.meta.url).href;
+  const source = `import { APPLICATION_OPERATION_DESCRIPTORS as d, resolveApplicationOperation as r } from ${JSON.stringify(registry)}; let reads=0,traps=0,unhandled=0; process.on('unhandledRejection',()=>unhandled++); Object.defineProperty(Object.prototype,'then',{configurable:true,get(){reads++;}}); const p=new Proxy({}, {get(){traps++;throw Error()}}); const x=r('anchor:web:web-01-anagrafica-paziente-lista-ricerca-view-create-update@1e35733c0218','patient search'),y=r(p,p); if(Object.getPrototypeOf(d)||Object.getPrototypeOf(x)||Object.getPrototypeOf(x.descriptor)||Object.getPrototypeOf(x.descriptor.evidence)||Object.getPrototypeOf(x.descriptor.unresolved)||y.descriptor||traps)process.exit(1); Promise.resolve(d).then(()=>{Promise.resolve(x).then(()=>{setImmediate(()=>process.exit(reads||unhandled?1:0));});});`;
+  const child = spawnSync(process.execPath, ['--experimental-strip-types', '--import', loader, '--input-type=module', '-e', source], { encoding: 'utf8', timeout: 5000 });
+  assert.equal(child.status, 0, child.stdout + child.stderr);
 });
