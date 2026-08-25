@@ -161,6 +161,115 @@ function ensureColumn(table: string, columnName: string, columnSql: string) {
     }
 }
 
+/* @Codex */
+const ATTACHMENT_CURRENTNESS_LEGACY_DDL = `
+    CREATE TABLE attachments (
+        id TEXT PRIMARY KEY NOT NULL, patient_id TEXT NOT NULL, name TEXT NOT NULL,
+        type TEXT NOT NULL, size INTEGER NOT NULL, path TEXT NOT NULL, data TEXT,
+        created_at INTEGER DEFAULT (unixepoch()), summary_snapshot TEXT,
+        parse_evidence_artifact_snapshot TEXT, ocr_queue_state TEXT,
+        ocr_queue_reason TEXT, ocr_queue_updated_at INTEGER,
+        ocr_replay_artifact_snapshot TEXT,
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON UPDATE NO ACTION ON DELETE NO ACTION
+    )
+`;
+/* @Codex */
+const ATTACHMENT_CURRENTNESS_CANONICAL_DDL = `
+    CREATE TABLE attachments (
+        id TEXT PRIMARY KEY NOT NULL, patient_id TEXT NOT NULL, name TEXT NOT NULL,
+        type TEXT NOT NULL, size INTEGER NOT NULL, path TEXT NOT NULL, data TEXT,
+        created_at INTEGER DEFAULT (unixepoch()), summary_snapshot TEXT,
+        parse_evidence_artifact_snapshot TEXT, ocr_queue_state TEXT,
+        ocr_queue_reason TEXT, ocr_queue_updated_at INTEGER,
+        ocr_replay_artifact_snapshot TEXT,
+        document_source_ref TEXT NOT NULL UNIQUE CHECK (
+            length(document_source_ref) = 64 AND document_source_ref NOT GLOB '*[^0-9a-f]*'
+        ),
+        document_revision INTEGER NOT NULL CHECK (
+            typeof(document_revision) = 'integer' AND document_revision BETWEEN 1 AND 9007199254740991
+        ),
+        document_freshness_epoch INTEGER NOT NULL CHECK (
+            typeof(document_freshness_epoch) = 'integer' AND document_freshness_epoch BETWEEN 1 AND 9007199254740991
+        ),
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON UPDATE NO ACTION ON DELETE NO ACTION
+    )
+`;
+/* @Codex */
+const ATTACHMENT_CURRENTNESS_LEGACY_SCHEMA = normalizeSchemaSql(ATTACHMENT_CURRENTNESS_LEGACY_DDL);
+/* @Codex */
+const ATTACHMENT_CURRENTNESS_CANONICAL_SCHEMA = normalizeSchemaSql(ATTACHMENT_CURRENTNESS_CANONICAL_DDL);
+/* @Codex */
+const ATTACHMENT_CURRENTNESS_COLUMNS = [
+    ['id', 'TEXT', 1, null, 1], ['patient_id', 'TEXT', 1, null, 0], ['name', 'TEXT', 1, null, 0],
+    ['type', 'TEXT', 1, null, 0], ['size', 'INTEGER', 1, null, 0], ['path', 'TEXT', 1, null, 0],
+    ['data', 'TEXT', 0, null, 0], ['created_at', 'INTEGER', 0, 'unixepoch()', 0],
+    ['summary_snapshot', 'TEXT', 0, null, 0], ['parse_evidence_artifact_snapshot', 'TEXT', 0, null, 0],
+    ['ocr_queue_state', 'TEXT', 0, null, 0], ['ocr_queue_reason', 'TEXT', 0, null, 0],
+    ['ocr_queue_updated_at', 'INTEGER', 0, null, 0], ['ocr_replay_artifact_snapshot', 'TEXT', 0, null, 0],
+] as const;
+/* @Codex */
+const ATTACHMENT_CURRENTNESS_ERROR = 'ATTACHMENT_CURRENTNESS_MIGRATION_UNSUPPORTED';
+
+/* @Codex */
+function denyAttachmentCurrentnessMigration(): never {
+    throw new Error(ATTACHMENT_CURRENTNESS_ERROR);
+}
+/* @Codex */
+function attachmentCurrentnessSchemaMatches(expected: string, canonical: boolean): boolean {
+    const table = sqlite.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'table' AND lower(name) = 'attachments'").get() as { name?: unknown; sql?: unknown } | undefined;
+    const columns = sqlite.prepare('PRAGMA table_xinfo(attachments)').all() as Array<{ name?: unknown; type?: unknown; notnull?: unknown; dflt_value?: unknown; pk?: unknown; hidden?: unknown }>;
+    const expectedColumns = canonical
+        ? [...ATTACHMENT_CURRENTNESS_COLUMNS, ['document_source_ref', 'TEXT', 1, null, 0], ['document_revision', 'INTEGER', 1, null, 0], ['document_freshness_epoch', 'INTEGER', 1, null, 0]]
+        : ATTACHMENT_CURRENTNESS_COLUMNS;
+    const foreignKeys = sqlite.prepare('PRAGMA foreign_key_list(attachments)').all() as Array<Record<string, unknown>>;
+    const indexes = sqlite.prepare('PRAGMA index_list(attachments)').all() as Array<{ name?: unknown; unique?: unknown; origin?: unknown; partial?: unknown }>;
+    const expectedIndexes = canonical ? 3 : 2;
+    const hasExpectedIndexes = indexes.length === expectedIndexes && indexes.every((index) => {
+        if (typeof index.name !== 'string' || (index.unique !== 0 && index.unique !== 1) || index.partial !== 0) return false;
+        const keys = (sqlite.prepare(`PRAGMA index_xinfo(${index.name})`).all() as Array<{ name?: unknown; desc?: unknown; coll?: unknown; key?: unknown }>)
+            .filter((row) => row.key === 1);
+        const key = keys.length === 1 && keys[0].desc === 0 && keys[0].coll === 'BINARY' ? keys[0].name : null;
+        return (index.name === 'attachments_patient_idx' && index.origin === 'c' && index.unique === 0 && key === 'patient_id')
+            || (index.origin === 'pk' && index.unique === 1 && key === 'id')
+            || (canonical && index.origin === 'u' && index.unique === 1 && key === 'document_source_ref');
+    });
+    return table?.name === 'attachments' && typeof table.sql === 'string' && normalizeSchemaSql(table.sql) === expected
+        && columns.length === expectedColumns.length && columns.every((column, index) => {
+            const field = expectedColumns[index];
+            return column.name === field[0] && column.type === field[1] && column.notnull === field[2]
+                && column.dflt_value === field[3] && column.pk === field[4] && column.hidden === 0;
+        }) && foreignKeys.length === 1 && foreignKeys[0].id === 0 && foreignKeys[0].seq === 0
+        && foreignKeys[0].table === 'patients' && foreignKeys[0].from === 'patient_id' && foreignKeys[0].to === 'id'
+        && foreignKeys[0].on_update === 'NO ACTION' && foreignKeys[0].on_delete === 'NO ACTION' && foreignKeys[0].match === 'NONE'
+        && hasExpectedIndexes;
+}
+/* @Codex */
+function upgradeLegacyAttachmentCurrentness(): void {
+    const stale = sqlite.prepare("SELECT 1 FROM sqlite_master WHERE lower(name) = 'attachments_currentness_legacy' LIMIT 1").get();
+    const trigger = sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND lower(tbl_name) = 'attachments' LIMIT 1").get();
+    if (stale || trigger) denyAttachmentCurrentnessMigration();
+    if (attachmentCurrentnessSchemaMatches(ATTACHMENT_CURRENTNESS_CANONICAL_SCHEMA, true)) {
+        const invalid = sqlite.prepare(`SELECT 1 FROM attachments WHERE typeof(document_source_ref) != 'text'
+            OR length(document_source_ref) != 64 OR document_source_ref GLOB '*[^0-9a-f]*'
+            OR typeof(document_revision) != 'integer' OR document_revision NOT BETWEEN 1 AND 9007199254740991
+            OR typeof(document_freshness_epoch) != 'integer' OR document_freshness_epoch NOT BETWEEN 1 AND 9007199254740991 LIMIT 1`).get();
+        if (invalid) denyAttachmentCurrentnessMigration();
+        return;
+    }
+    if (!attachmentCurrentnessSchemaMatches(ATTACHMENT_CURRENTNESS_LEGACY_SCHEMA, false)) denyAttachmentCurrentnessMigration();
+    if (sqlite.prepare('SELECT 1 FROM attachments AS attachment LEFT JOIN patients AS patient ON patient.id = attachment.patient_id WHERE patient.id IS NULL LIMIT 1').get()) denyAttachmentCurrentnessMigration();
+    sqlite.exec('ALTER TABLE attachments RENAME TO attachments_currentness_legacy');
+    sqlite.exec(ATTACHMENT_CURRENTNESS_CANONICAL_DDL);
+    sqlite.exec(`INSERT INTO attachments (id, patient_id, name, type, size, path, data, created_at, summary_snapshot,
+        parse_evidence_artifact_snapshot, ocr_queue_state, ocr_queue_reason, ocr_queue_updated_at, ocr_replay_artifact_snapshot,
+        document_source_ref, document_revision, document_freshness_epoch)
+        SELECT id, patient_id, name, type, size, path, data, created_at, summary_snapshot,
+        parse_evidence_artifact_snapshot, ocr_queue_state, ocr_queue_reason, ocr_queue_updated_at, ocr_replay_artifact_snapshot,
+        lower(hex(randomblob(32))), 1, 1 FROM attachments_currentness_legacy`);
+    sqlite.exec('DROP TABLE attachments_currentness_legacy');
+    sqlite.exec('CREATE INDEX attachments_patient_idx ON attachments(patient_id)');
+}
+
 // Schema guards run on every (re)open so older DB files gain the tables and
 // columns the current code expects (re-applied after a repair swaps the file).
 function applySchemaGuards() {
@@ -675,7 +784,10 @@ function applySchemaGuardsSerially(): void {
     // BEGIN IMMEDIATE lets SQLite arbitrate one schema writer while the other
     // workers wait under busy_timeout, preventing concurrent check-then-ALTER
     // races and duplicate-column warnings.
-    sqlite.transaction(applySchemaGuards).immediate();
+    sqlite.transaction(() => {
+        applySchemaGuards();
+        upgradeLegacyAttachmentCurrentness();
+    }).immediate();
 }
 
 applySchemaGuardsSerially();
