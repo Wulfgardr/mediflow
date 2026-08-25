@@ -61,6 +61,7 @@ function duplicateJsonKeys(content: string): boolean {
 }
 
 function parseOneJsonObject(content: string): unknown | null {
+    if (content.length > MAX_CONTENT_CHARS) return null;
     const trimmed = content.trim();
     if (!trimmed || trimmed.length > MAX_CONTENT_CHARS || duplicateJsonKeys(trimmed)) return null;
     try {
