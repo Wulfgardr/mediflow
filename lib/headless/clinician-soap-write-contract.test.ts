@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
+import { types } from 'node:util';
 import {
     CLINICIAN_SOAP_DRAFT_SCHEMA,
     CLINICIAN_SOAP_OPERATION_ID,
@@ -110,4 +111,36 @@ test('uses only the six authorized fields and never returns raw SOAP in denials'
     const result = validateClinicianSoapWriteDraft(hostile);
     assert.equal(result.status, 'denied');
     assert.equal(JSON.stringify(result).includes('forbidden'), false);
+});
+
+function poison(owner: object, key: PropertyKey): () => void {
+    const ownDescriptor = Object.getOwnPropertyDescriptor(owner, key); let cursor: object | null = owner; let descriptor = ownDescriptor;
+    while (!descriptor && cursor) { cursor = Object.getPrototypeOf(cursor); descriptor = cursor ? Object.getOwnPropertyDescriptor(cursor, key) : undefined; }
+    if (!descriptor) throw new Error('missing intrinsic');
+    Object.defineProperty(owner, key, { configurable: true, enumerable: descriptor.enumerable, writable: true, value: () => { throw new Error('poisoned intrinsic'); } });
+    return () => { if (ownDescriptor) Object.defineProperty(owner, key, ownDescriptor); else Reflect.deleteProperty(owner, key); };
+}
+
+test('uses captured intrinsics after import and never leaks or defers hostile SOAP', () => {
+    let traps = 0; let unhandled = 0; const source = draft();
+    const proxy = new Proxy(draft({ subjective: 'RAW_SECRET_SOAP' }), { getPrototypeOf() { traps += 1; throw new Error('trap'); } });
+    const hashPrototype = Object.getPrototypeOf(createHash('sha256'));
+    const valueDescriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'value');
+    const restores = [
+        poison(types, 'isProxy'), poison(Object, 'assign'), poison(Object, 'hasOwn'), poison(TextEncoder.prototype, 'encode'),
+        poison(String.prototype, 'charCodeAt'), poison(String.prototype, 'normalize'), poison(String.prototype, 'trim'), poison(String.prototype, 'replace'),
+        poison(Array.prototype, 'map'), poison(Array, 'from'), poison(Uint8Array, 'of'), poison(hashPrototype, 'update'), poison(hashPrototype, 'digest'), poison(Buffer, 'from'), poison(Buffer.prototype, 'toString'),
+    ];
+    Object.defineProperty(Object.prototype, 'value', { configurable: true, get() { throw new Error('poisoned value'); } });
+    const onUnhandled = () => { unhandled += 1; }; process.on('unhandledRejection', onUnhandled);
+    let result: ReturnType<typeof validateClinicianSoapWriteDraft> | undefined; let denial: ReturnType<typeof validateClinicianSoapWriteDraft> | undefined;
+    try { result = validateClinicianSoapWriteDraft(source); source.subjective = 'post-return'; denial = validateClinicianSoapWriteDraft(proxy); } finally {
+        process.off('unhandledRejection', onUnhandled);
+        if (valueDescriptor) Object.defineProperty(Object.prototype, 'value', valueDescriptor); else delete (Object.prototype as { value?: unknown }).value;
+        for (let index = restores.length - 1; index >= 0; index -= 1) restores[index]!();
+    }
+    if (!result || !denial) throw new Error('missing result');
+    assert.equal(result.status, 'accepted'); assert.equal(result.subjective, 'S'); assert.equal(Object.getPrototypeOf(result), null);
+    assert.equal(denial.status, 'denied'); assert.equal(JSON.stringify(denial).includes('RAW_SECRET_SOAP'), false);
+    assert.equal(traps, 0); assert.equal(unhandled, 0);
 });
