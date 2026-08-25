@@ -54,10 +54,9 @@ function projection(lease: ReturnType<typeof issue>) {
             kind: 'clinical-entry', label: 'Fonte sintetica', date: null, content: 'Contenuto sintetico.' }] } as const;
 }
 
-test('web channel overrides role strings and issues epoch 0 to 1 with opaque host refs', (context) => {
-    let sessionNow = 10_000;
-    context.mock.method(Date, 'now', () => sessionNow);
-    const { registry, session, owner } = setup(() => { sessionNow += 1_000; });
+test('web channel overrides role strings and issues epoch 0 to 1 with opaque host refs', () => {
+    const { registry, session, owner } = setup();
+    session.expiresAt -= 1_000;
     const initialExpiry = session.expiresAt;
     const lease = issue(owner);
 
@@ -98,7 +97,7 @@ test('projection broker is lookup-only until one lazy ingest acquisition', (cont
     const lease = issue(owner);
     reenter = () => { assert.throws(() => owner.acquireProjectionIngest(session, tuple(lease)), rejects('broker_unavailable')); };
 
-    assert.deepEqual(Object.keys(owner), ['snapshotSelectionEpoch', 'acquireProjectionIngest', 'resolveProjectionService', 'issueSelection', 'dereferenceSelection', 'dispose']);
+    assert.deepEqual(Object.keys(owner), ['snapshotSelectionEpoch', 'snapshotReviewContextEpoch', 'acquireProjectionIngest', 'resolveProjectionService', 'issueSelection', 'dereferenceSelection', 'withLeaseCriticalSection', 'dispose']);
     assert.throws(() => owner.resolveProjectionService(session), rejects('broker_unavailable'));
     const foreign = createSession(USER);
     assert.throws(() => owner.acquireProjectionIngest(foreign, { ...tuple(lease), patientRef: 'forged.reference.0001' }),
@@ -189,22 +188,23 @@ test('acquire precedence is session, tuple, then the exact lease boundary', (con
     assert.equal(calls, 0);
 });
 
-test('session sliding does not renew the immutable half-open lease', (context) => {
-    let sessionNow = 10_000;
-    context.mock.method(Date, 'now', () => sessionNow);
+test('session sliding does not renew the immutable half-open lease', () => {
     const { session, owner, setNow } = setup();
     const lease = issue(owner);
-    const firstExpiry = lease.expiresAt;
+    const leaseExpiry = lease.expiresAt;
+    const firstExpiry = leaseExpiry - 1_000;
 
-    sessionNow += 1_000;
+    session.expiresAt = firstExpiry;
     assert.equal(getSession(session.id), session);
     assert.ok(session.expiresAt > firstExpiry);
-    setNow(firstExpiry - 1);
+    setNow(leaseExpiry - 1);
     assert.deepEqual(owner.dereferenceSelection(session, tuple(lease)), PAIR);
     assert.deepEqual(owner.dereferenceSelection(session, tuple(lease)), PAIR);
-    setNow(firstExpiry);
+    setNow(leaseExpiry);
     assert.throws(() => owner.dereferenceSelection(session, tuple(lease)), rejects('lease_expired'));
     assert.throws(() => owner.dereferenceSelection(session, tuple(lease)), rejects('stale_selection'));
+    session.expiresAt = leaseExpiry + 1_000;
+    setNow(leaseExpiry - 1);
     const replacement = issue(owner, 1);
     assert.equal(replacement.selectionEpoch, 2);
     assert.equal(replacement.sessionRef, lease.sessionRef);

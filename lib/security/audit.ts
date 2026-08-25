@@ -51,12 +51,14 @@ export const AUDIT_EVENT_TYPES = [
     'ambulatory.updated',
     'ambulatory.deleted',
     'ambulatory.cleared',
+    'ai.review.accepted',
+    'ai.review.rejected',
 ] as const;
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
 export type AuditOutcome = 'success' | 'failure' | 'denied';
 export type AuditActorType = 'user' | 'system';
-export type AuditSubjectType = 'session' | 'patient' | 'ambulatory' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'attachment' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings';
+export type AuditSubjectType = 'session' | 'patient' | 'ambulatory' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'attachment' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings' | 'ai_review';
 export type AuditSourceSurface = 'web' | 'native' | 'api' | 'job';
 export type AuditAuthContext = 'session' | 'local-token' | 'anonymous';
 
@@ -389,6 +391,7 @@ export function summarizeAuditEvents(records: AuditRecord[], isTruncated = false
         service_prescription_item: 0,
         siss_handoff: 0,
         settings: 0,
+        ai_review: 0,
     };
     const eventTypeCounts = new Map<AuditEventType, number>();
     const actors = new Set<string>();

@@ -41,6 +41,11 @@ const basePayload = {
             updatedAt: '2026-03-17T08:07:00.000Z',
         },
     ],
+    durableReviewRecords: [],
+    durableReviewOperations: [],
+    durableReviewCommandStates: [],
+    durableReviewCommandOperations: [],
+    durableReviewPatientLinks: [],
     drugs: [],
     entries: [
         {
@@ -83,6 +88,7 @@ const basePayload = {
             version: 1,
         },
     ],
+    physicianReviewAttestations: [],
     checkups: [],
     therapies: [],
 };
@@ -102,6 +108,319 @@ test('creates a stable backup artifact with checksum and manifest', async () => 
 
     assert.equal(parsed.manifest.checksum, artifact.manifest.checksum);
     assert.equal(stableStringify(parsed.payload), stableStringify(basePayload));
+});
+
+/* @Codex */
+test('includes durable review records and replay operations in the authenticated artifact', async () => {
+    const payload = {
+        ...basePayload,
+        durableReviewRecords: [],
+        durableReviewOperations: [],
+        durableReviewCommandStates: [],
+        durableReviewCommandOperations: [],
+        durableReviewPatientLinks: [],
+        physicianReviewAttestations: [],
+    };
+
+    const artifact = await createBackupArtifact(payload);
+
+    assert.deepEqual(artifact.manifest.collections, BACKUP_COLLECTIONS);
+    assert.equal(artifact.manifest.recordCounts.durableReviewRecords, 0);
+    assert.equal(artifact.manifest.recordCounts.durableReviewOperations, 0);
+    assert.equal(artifact.manifest.recordCounts.durableReviewCommandStates, 0);
+    assert.equal(artifact.manifest.recordCounts.durableReviewCommandOperations, 0);
+    assert.equal(artifact.manifest.recordCounts.durableReviewPatientLinks, 0);
+    assert.equal(artifact.manifest.recordCounts.physicianReviewAttestations, 0);
+});
+
+/* @Codex */
+test('rejects command state without the append-only audit ledger needed for replay', async () => {
+    await assert.rejects(
+        createBackupArtifact({
+            ...basePayload,
+            durableReviewCommandStates: [{ reviewId: `review_${'a'.repeat(32)}`, reviewState: 'accepted', revision: 2, action: 'accept' }],
+        }),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+    );
+});
+
+/* @Codex */
+async function sha256(value: string): Promise<string> {
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/* @Codex */
+async function durableReviewLedgerFixture() {
+    const record = {
+        id: `review_${'a'.repeat(32)}`,
+        patientRef: `ptr_${'b'.repeat(32)}`,
+        reviewId: `review_${'a'.repeat(32)}`,
+        reviewRevision: 1,
+        receiptRef: `receipt_${'c'.repeat(32)}`,
+        provenanceRef: `provenance_${'d'.repeat(32)}`,
+        receiptBinding: '',
+        provenanceBinding: '',
+        presentationVersion: 'mediflow.ai.durable-review.presentation.v1',
+        sealedCiphertext: 'ENC:YWJj:c3ludGhldGljLWR1cmFibGUtcmV2aWV3',
+        sealedDigest: '',
+        createdAt: '2026-03-17T08:10:00.000Z',
+    };
+    record.receiptBinding = await sha256(`${record.patientRef}\0${record.reviewId}\0${record.receiptRef}`);
+    record.provenanceBinding = await sha256(`${record.patientRef}\0${record.reviewId}\0${record.provenanceRef}`);
+    record.sealedDigest = await sha256(record.sealedCiphertext);
+    const snapshot = (({ id: _id, createdAt: _createdAt, ...value }) => value)(record);
+    const idempotencyKey = 'idem_aaaaaaaaaaaaaaaa';
+    const operation = {
+        id: await sha256(`${record.reviewId}\0${idempotencyKey}`),
+        reviewId: record.reviewId,
+        idempotencyKey,
+        operation: 'create',
+        expectedReviewRevision: 0,
+        operationDigest: await sha256(JSON.stringify(['create', 0, snapshot])),
+        recordSnapshot: JSON.stringify(snapshot),
+        createdAt: '2026-03-17T08:10:00.000Z',
+    };
+    return { record, operation };
+}
+
+/* @Codex */
+async function checksumValidDurableArtifact(mutate: (artifact: any) => void | Promise<void>): Promise<Record<string, unknown>> {
+    const { record, operation } = await durableReviewLedgerFixture();
+    const artifact = JSON.parse(await serializeBackupArtifact({
+        ...basePayload,
+        durableReviewRecords: [record],
+        durableReviewOperations: [operation],
+    }));
+    await mutate(artifact);
+    for (const collection of artifact.manifest.collections) {
+        artifact.manifest.recordCounts[collection] = artifact.payload[collection].length;
+    }
+    artifact.manifest.checksum = await sha256(stableStringify(artifact.payload));
+    return artifact;
+}
+
+/* @Codex */
+async function checksumValidAuthorityArtifact(mutate: (artifact: any) => void | Promise<void>): Promise<Record<string, unknown>> {
+    const { record, operation } = await durableReviewLedgerFixture();
+    const artifact = JSON.parse(await serializeBackupArtifact({
+        ...basePayload,
+        durableReviewRecords: [record],
+        durableReviewOperations: [operation],
+        durableReviewPatientLinks: [{
+            reviewId: record.reviewId,
+            patientId: 'pat-1',
+            createdAt: '2026-03-17T08:10:00.000Z',
+            updatedAt: '2026-03-17T08:10:00.000Z',
+        }],
+        physicianReviewAttestations: [{
+            actorRef: 'actor-synthetic',
+            schemaVersion: 'mediflow.physician-review-attestation.v1',
+            capability: 'physician_terminal_review',
+            status: 'active',
+            attestationVersion: 1,
+            policyVersion: 'physician_terminal_review.v1',
+            revokedAt: null,
+            createdAt: '2026-03-17T08:10:00.000Z',
+            updatedAt: '2026-03-17T08:10:00.000Z',
+        }],
+    }));
+    await mutate(artifact);
+    for (const collection of artifact.manifest.collections) {
+        artifact.manifest.recordCounts[collection] = artifact.payload[collection].length;
+    }
+    artifact.manifest.checksum = await sha256(stableStringify(artifact.payload));
+    return artifact;
+}
+
+test('rejects a durable review patient link that does not resolve within the artifact', async () => {
+    const { record, operation } = await durableReviewLedgerFixture();
+    const artifact = JSON.parse(await serializeBackupArtifact({
+        ...basePayload,
+        durableReviewRecords: [record],
+        durableReviewOperations: [operation],
+        durableReviewPatientLinks: [{
+            reviewId: record.reviewId,
+            patientId: 'pat-1',
+            createdAt: '2026-03-17T08:10:00.000Z',
+            updatedAt: '2026-03-17T08:10:00.000Z',
+        }],
+    }));
+    artifact.payload.durableReviewPatientLinks[0].reviewId = `review_${'f'.repeat(32)}`;
+    artifact.manifest.checksum = await sha256(stableStringify(artifact.payload));
+
+    await assert.rejects(
+        () => parseBackupArtifact(artifact),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+    );
+});
+
+test('rejects checksum-valid malformed durable review authority rows before restore', async () => {
+    const mutations: Array<(artifact: any) => void> = [
+        (artifact) => { artifact.payload.durableReviewPatientLinks[0].extra = true; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].extra = true; },
+        (artifact) => { artifact.payload.durableReviewPatientLinks[0].reviewId = 'review_not-canonical'; },
+        (artifact) => { artifact.payload.durableReviewPatientLinks[0].updatedAt = '2026-03-17T08:09:59.000Z'; },
+        (artifact) => { artifact.payload.durableReviewPatientLinks[0].createdAt = 'not-a-timestamp'; },
+        (artifact) => { artifact.payload.durableReviewPatientLinks.push({ ...artifact.payload.durableReviewPatientLinks[0] }); },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].schemaVersion = 'unexpected.v1'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].capability = 'unexpected'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].attestationVersion = 2; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].policyVersion = 'unexpected.v1'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].status = 'unexpected'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].actorRef = ' actor-synthetic'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].updatedAt = '2026-03-17T08:09:59.000Z'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].createdAt = 'not-a-timestamp'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].revokedAt = '2026-03-17T08:10:00.000Z'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].status = 'revoked'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations[0].status = 'revoked'; artifact.payload.physicianReviewAttestations[0].revokedAt = '2026-03-17T08:09:59.000Z'; },
+        (artifact) => { artifact.payload.physicianReviewAttestations.push({ ...artifact.payload.physicianReviewAttestations[0] }); },
+    ];
+
+    for (const mutate of mutations) {
+        const artifact = await checksumValidAuthorityArtifact(mutate);
+        await assert.rejects(
+            () => parseBackupArtifact(artifact),
+            (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+        );
+    }
+});
+
+/* @Codex */
+test('rejects hostile durable review authority rows without invoking accessors or proxy traps', async () => {
+    const authorityRow = {
+        actorRef: 'actor-synthetic',
+        schemaVersion: 'mediflow.physician-review-attestation.v1',
+        capability: 'physician_terminal_review',
+        status: 'active',
+        attestationVersion: 1,
+        policyVersion: 'physician_terminal_review.v1',
+        revokedAt: null,
+        createdAt: '2026-03-17T08:10:00.000Z',
+        updatedAt: '2026-03-17T08:10:00.000Z',
+    };
+    let accessorReads = 0;
+    const accessorRow = { ...authorityRow };
+    Object.defineProperty(accessorRow, 'actorRef', {
+        enumerable: true,
+        get: () => {
+            accessorReads += 1;
+            return authorityRow.actorRef;
+        },
+    });
+    let transparentProxyTraps = 0;
+    const transparentProxy = new Proxy(authorityRow, {
+        get: (target, key, receiver) => { transparentProxyTraps += 1; return Reflect.get(target, key, receiver); },
+        getPrototypeOf: (target) => { transparentProxyTraps += 1; return Reflect.getPrototypeOf(target); },
+        getOwnPropertyDescriptor: (target, key) => { transparentProxyTraps += 1; return Reflect.getOwnPropertyDescriptor(target, key); },
+        ownKeys: (target) => { transparentProxyTraps += 1; return Reflect.ownKeys(target); },
+    });
+    let throwingProxyTraps = 0;
+    const throwingProxy = new Proxy(authorityRow, {
+        get: () => { throwingProxyTraps += 1; throw new Error('proxy read'); },
+        getPrototypeOf: () => { throwingProxyTraps += 1; throw new Error('proxy reflection'); },
+        getOwnPropertyDescriptor: () => { throwingProxyTraps += 1; throw new Error('proxy descriptor'); },
+        ownKeys: () => { throwingProxyTraps += 1; throw new Error('proxy keys'); },
+    });
+
+    for (const row of [accessorRow, transparentProxy, throwingProxy]) {
+        await assert.rejects(
+            () => createBackupArtifact({ ...basePayload, physicianReviewAttestations: [row] }),
+            (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+        );
+    }
+
+    assert.equal(accessorReads, 0);
+    assert.equal(transparentProxyTraps, 0);
+    assert.equal(throwingProxyTraps, 0);
+});
+
+test('rejects checksum-valid durable review records that violate canonical invariants', async () => {
+    const artifact = await checksumValidDurableArtifact((value) => {
+        value.payload.durableReviewRecords[0].id = `review_${'f'.repeat(32)}`;
+    });
+
+    await assert.rejects(
+        () => parseBackupArtifact(artifact),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+    );
+});
+
+test('rejects checksum-valid durable operations with a mismatched operation identity', async () => {
+    const artifact = await checksumValidDurableArtifact((value) => {
+        value.payload.durableReviewOperations[0].id = 'not-the-canonical-operation-id';
+    });
+
+    await assert.rejects(
+        () => parseBackupArtifact(artifact),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+    );
+});
+
+test('rejects checksum-valid orphan durable operations', async () => {
+    const artifact = await checksumValidDurableArtifact((value) => {
+        value.payload.durableReviewOperations[0].reviewId = `review_${'f'.repeat(32)}`;
+    });
+
+    await assert.rejects(
+        () => parseBackupArtifact(artifact),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+    );
+});
+
+test('rejects checksum-valid durable operations with an altered replay snapshot', async () => {
+    const artifact = await checksumValidDurableArtifact(async (value) => {
+        const snapshot = JSON.parse(value.payload.durableReviewOperations[0].recordSnapshot);
+        snapshot.sealedCiphertext = 'ENC:YWJj:YWx0ZXJlZC1yZXBsYXk=';
+        snapshot.sealedDigest = await sha256(snapshot.sealedCiphertext);
+        value.payload.durableReviewOperations[0].recordSnapshot = JSON.stringify(snapshot);
+    });
+
+    await assert.rejects(
+        () => parseBackupArtifact(artifact),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+    );
+});
+
+test('rejects checksum-valid durable operations with noncanonical snapshot encoding', async () => {
+    const artifact = await checksumValidDurableArtifact((value) => {
+        value.payload.durableReviewOperations[0].recordSnapshot = JSON.stringify(
+            JSON.parse(value.payload.durableReviewOperations[0].recordSnapshot),
+            null,
+            2,
+        );
+    });
+
+    await assert.rejects(
+        () => parseBackupArtifact(artifact),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+    );
+});
+
+test('rejects checksum-valid replace snapshots that change patientRef', async () => {
+    const artifact = await checksumValidDurableArtifact(async (value) => {
+        const first = JSON.parse(value.payload.durableReviewOperations[0].recordSnapshot);
+        const second = { ...first, patientRef: `ptr_${'e'.repeat(32)}`, reviewRevision: 2 };
+        second.receiptBinding = await sha256(`${second.patientRef}\0${second.reviewId}\0${second.receiptRef}`);
+        second.provenanceBinding = await sha256(`${second.patientRef}\0${second.reviewId}\0${second.provenanceRef}`);
+        value.payload.durableReviewRecords[0] = { ...value.payload.durableReviewRecords[0], ...second };
+        const idempotencyKey = 'idem_bbbbbbbbbbbbbbbb';
+        value.payload.durableReviewOperations.push({
+            id: await sha256(`${second.reviewId}\0${idempotencyKey}`),
+            reviewId: second.reviewId,
+            idempotencyKey,
+            operation: 'replace',
+            expectedReviewRevision: 1,
+            operationDigest: await sha256(JSON.stringify(['replace', 1, second])),
+            recordSnapshot: JSON.stringify(second),
+            createdAt: '2026-03-17T08:11:00.000Z',
+        });
+    });
+
+    await assert.rejects(
+        () => parseBackupArtifact(artifact),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+    );
 });
 
 test('rejects tampered payloads before restore', async () => {
@@ -140,22 +459,96 @@ test('preserves patient assigned ambulatory ids inside the backup payload', asyn
 async function legacyArtifact(): Promise<Record<string, any>> {
     const artifact = JSON.parse(await serializeBackupArtifact(basePayload));
     delete artifact.payload.documentDiagnosisProposals;
+    delete artifact.payload.durableReviewRecords;
+    delete artifact.payload.durableReviewOperations;
+    delete artifact.payload.durableReviewCommandStates;
+    delete artifact.payload.durableReviewCommandOperations;
+    delete artifact.payload.durableReviewPatientLinks;
+    delete artifact.payload.physicianReviewAttestations;
     artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'documentDiagnosisProposals');
+    artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations' && collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations');
+    artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'durableReviewPatientLinks' && collection !== 'physicianReviewAttestations');
     delete artifact.manifest.recordCounts.documentDiagnosisProposals;
+    delete artifact.manifest.recordCounts.durableReviewRecords;
+    delete artifact.manifest.recordCounts.durableReviewOperations;
+    delete artifact.manifest.recordCounts.durableReviewCommandStates;
+    delete artifact.manifest.recordCounts.durableReviewCommandOperations;
+    delete artifact.manifest.recordCounts.durableReviewPatientLinks;
+    delete artifact.manifest.recordCounts.physicianReviewAttestations;
     const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(stableStringify(artifact.payload)));
     artifact.manifest.checksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
     return artifact;
 }
 
-test('accepts an authentic legacy v1 artifact and normalizes its missing proposal snapshot', async () => {
+test('accepts an authentic legacy v1 artifact and normalizes missing optional collections', async () => {
     const parsed = await parseBackupArtifact(await legacyArtifact());
     const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(stableStringify(parsed.payload)));
     const normalizedChecksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 
     assert.deepEqual(parsed.payload.documentDiagnosisProposals, []);
+    assert.deepEqual(parsed.payload.durableReviewRecords, []);
+    assert.deepEqual(parsed.payload.durableReviewOperations, []);
+    assert.deepEqual(parsed.payload.durableReviewCommandStates, []);
+    assert.deepEqual(parsed.payload.durableReviewCommandOperations, []);
+    assert.deepEqual(parsed.payload.durableReviewPatientLinks, []);
+    assert.deepEqual(parsed.payload.physicianReviewAttestations, []);
     assert.equal(parsed.manifest.recordCounts.documentDiagnosisProposals, 0);
+    assert.equal(parsed.manifest.recordCounts.durableReviewRecords, 0);
+    assert.equal(parsed.manifest.recordCounts.durableReviewOperations, 0);
+    assert.equal(parsed.manifest.recordCounts.durableReviewCommandStates, 0);
+    assert.equal(parsed.manifest.recordCounts.durableReviewCommandOperations, 0);
+    assert.equal(parsed.manifest.recordCounts.durableReviewPatientLinks, 0);
+    assert.equal(parsed.manifest.recordCounts.physicianReviewAttestations, 0);
     assert.deepEqual(parsed.manifest.collections, BACKUP_COLLECTIONS);
     assert.equal(parsed.manifest.checksum, normalizedChecksum);
+});
+
+/* @Codex */
+test('accepts a legacy artifact without durable review collections', async () => {
+    const artifact = JSON.parse(await serializeBackupArtifact(basePayload));
+    delete artifact.payload.durableReviewRecords;
+    delete artifact.payload.durableReviewOperations;
+    delete artifact.payload.durableReviewCommandStates;
+    delete artifact.payload.durableReviewCommandOperations;
+    delete artifact.payload.durableReviewPatientLinks;
+    delete artifact.payload.physicianReviewAttestations;
+    artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations' && collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations');
+    artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'durableReviewPatientLinks' && collection !== 'physicianReviewAttestations');
+    delete artifact.manifest.recordCounts.durableReviewRecords;
+    delete artifact.manifest.recordCounts.durableReviewOperations;
+    delete artifact.manifest.recordCounts.durableReviewCommandStates;
+    delete artifact.manifest.recordCounts.durableReviewCommandOperations;
+    delete artifact.manifest.recordCounts.durableReviewPatientLinks;
+    delete artifact.manifest.recordCounts.physicianReviewAttestations;
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(stableStringify(artifact.payload)));
+    artifact.manifest.checksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+
+    const parsed = await parseBackupArtifact(artifact);
+
+    assert.deepEqual(parsed.payload.documentDiagnosisProposals, basePayload.documentDiagnosisProposals);
+    assert.deepEqual(parsed.payload.durableReviewRecords, []);
+    assert.deepEqual(parsed.payload.durableReviewOperations, []);
+    assert.deepEqual(parsed.payload.durableReviewCommandStates, []);
+    assert.deepEqual(parsed.payload.durableReviewCommandOperations, []);
+    assert.deepEqual(parsed.payload.durableReviewPatientLinks, []);
+    assert.deepEqual(parsed.payload.physicianReviewAttestations, []);
+});
+
+test('accepts an authority-era artifact without command ledger collections', async () => {
+    const artifact = JSON.parse(await serializeBackupArtifact(basePayload));
+    delete artifact.payload.durableReviewCommandStates;
+    delete artifact.payload.durableReviewCommandOperations;
+    artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations');
+    delete artifact.manifest.recordCounts.durableReviewCommandStates;
+    delete artifact.manifest.recordCounts.durableReviewCommandOperations;
+    artifact.manifest.checksum = await sha256(stableStringify(artifact.payload));
+
+    const parsed = await parseBackupArtifact(artifact);
+
+    assert.deepEqual(parsed.payload.durableReviewPatientLinks, []);
+    assert.deepEqual(parsed.payload.physicianReviewAttestations, []);
+    assert.deepEqual(parsed.payload.durableReviewCommandStates, []);
+    assert.deepEqual(parsed.payload.durableReviewCommandOperations, []);
 });
 
 test('rejects almost-legacy and unknown backup collections', async () => {

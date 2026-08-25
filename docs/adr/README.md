@@ -6,6 +6,7 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
+- [0098-physician-terminal-review-authority.md](./0098-physician-terminal-review-authority.md): propone la capability locale stretta per accept/reject review, con gesto monouso e route assente fino ai gate.
 - [0096-owner-sessione-selezione-e-lifetime-broker.md](./0096-owner-sessione-selezione-e-lifetime-broker.md): fissa owner session-scoped, selezione canonica e broker per lease.
 - [0095-broker-projection-e-servizi-host-per-capability.md](./0095-broker-projection-e-servizi-host-per-capability.md): fissa lifecycle post-onboarding, broker projection e servizi host capability-specific.
 - [0094-intelligence-fabric-headless-contract-085.md](./0094-intelligence-fabric-headless-contract-085.md): definisce l'Application Service Layer condiviso, separa Fabric e AIP e fissa completezza architetturale e operativa.

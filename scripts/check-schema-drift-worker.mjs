@@ -50,7 +50,7 @@ applyBaseMigrations(resolveDataPath('medical.db'));
 
 // Importing db-server runs applySchemaGuards() against the temp DB (side effect),
 // layering the guard-owned tables, columns and indices on top of the base schema.
-await import('@/lib/db-server');
+const { hasCanonicalDurableReviewPatientLinkSchema, hasCanonicalPhysicianReviewAttestationSchema } = await import('@/lib/db-server');
 
 function collectExpected() {
     const expectedTables = new Map();
@@ -98,6 +98,13 @@ function main() {
     const live = collectLive(dbPath);
 
     const problems = [];
+
+    if (!hasCanonicalPhysicianReviewAttestationSchema()) {
+        problems.push('INVALID CONSTRAINTS: "physician_review_attestations" is not the canonical constrained DDL.');
+    }
+    if (!hasCanonicalDurableReviewPatientLinkSchema()) {
+        problems.push('INVALID CONSTRAINTS: "durable_review_patient_links" is not the canonical constrained DDL.');
+    }
 
     // Every table declared in schema.ts must exist in the bootstrapped runtime
     // schema, with all its columns. (The runtime may carry extra tables/columns/

@@ -7,6 +7,9 @@ import {
     checkups,
     conversations,
     documentDiagnosisProposals,
+    durableReviewOperations,
+    durableReviewPatientLinks,
+    durableReviewRecords,
     drugs,
     entries,
     exemptions,
@@ -14,6 +17,7 @@ import {
     observations,
     patients,
     patientsToAmbulatories,
+    physicianReviewAttestations,
     prostheticPrescriptions,
     serviceCatalogEntries,
     servicePrescriptionItems,
@@ -69,12 +73,16 @@ function buildBackupDataset(): BackupDataset {
         const attachmentsRows = tx.select().from(attachments).all();
         const conversationsRows = tx.select().from(conversations).all();
         const documentDiagnosisProposalRows = tx.select().from(documentDiagnosisProposals).all();
+        const durableReviewRecordRows = tx.select().from(durableReviewRecords).all();
+        const durableReviewOperationRows = tx.select().from(durableReviewOperations).all();
+        const durableReviewPatientLinkRows = tx.select().from(durableReviewPatientLinks).all();
         const drugsRows = tx.select().from(drugs).all();
         const entriesRows = tx.select().from(entries).all();
         const exemptionsRows = tx.select().from(exemptions).all();
         const messagesRows = tx.select().from(messages).all();
         const observationsRows = tx.select().from(observations).all();
         const patientsRows = tx.select().from(patients).all();
+        const physicianReviewAttestationRows = tx.select().from(physicianReviewAttestations).all();
         const prostheticPrescriptionRows = tx.select().from(prostheticPrescriptions).all();
         const serviceCatalogRows = tx.select().from(serviceCatalogEntries).all();
         const servicePrescriptionItemRows = tx.select().from(servicePrescriptionItems).all();
@@ -96,18 +104,30 @@ function buildBackupDataset(): BackupDataset {
             .map((conversation) => conversation.id)
             .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
     );
+    const durableReviewIds = new Set(
+        durableReviewRecordRows
+            .map((record) => record.reviewId)
+            .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
+    );
 
         return {
             ambulatories: sortBackupRows(ambulatoriesRows),
             attachments: sortBackupRows(filterRowsByReference(attachmentsRows, 'patientId', patientIds)),
             conversations: sortBackupRows(conversationsRows),
             documentDiagnosisProposals: sortBackupRows(filterRowsByReference(documentDiagnosisProposalRows, 'patientId', patientIds)),
+            durableReviewPatientLinks: sortBackupRows(
+                filterRowsByReference(durableReviewPatientLinkRows, 'patientId', patientIds)
+                    .filter((link) => typeof link.reviewId === 'string' && durableReviewIds.has(link.reviewId)),
+            ),
+            durableReviewRecords: sortBackupRows(durableReviewRecordRows),
+            durableReviewOperations: sortBackupRows(durableReviewOperationRows),
             drugs: sortBackupRows(drugsRows),
             entries: sortBackupRows(filterRowsByReference(entriesRows, 'patientId', patientIds)),
             exemptions: sortBackupRows(exemptionsRows),
             messages: sortBackupRows(filterRowsByReference(messagesRows, 'conversationId', conversationIds)),
             observations: sortBackupRows(filterRowsByReference(observationsRows, 'patientId', patientIds)),
             patients: sortBackupRows(enrichedPatients),
+            physicianReviewAttestations: sortBackupRows(physicianReviewAttestationRows),
             prostheticPrescriptions: sortBackupRows(filterRowsByReference(prostheticPrescriptionRows, 'patientId', patientIds)),
             serviceCatalogEntries: sortBackupRows(serviceCatalogRows),
             servicePrescriptionItems: sortBackupRows(filterRowsByReference(servicePrescriptionItemRows, 'patientId', patientIds)),
