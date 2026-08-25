@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
+import { Buffer } from 'node:buffer';
 import Database from 'better-sqlite3';
 
 const root = process.cwd();
@@ -98,6 +99,43 @@ test('prototype poisoning cannot alter the fixed data mutation or commit a zero 
     reset();
     rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), undefined), 'input_invalid');
     assert.deepEqual(snapshot(), before);
+});
+
+test('captures mutable intrinsics before post-import poisoning', () => {
+    reset();
+    const before = snapshot();
+    const originals = {
+        getPrototypeOf: Object.getPrototypeOf, getOwnPropertyDescriptors: Object.getOwnPropertyDescriptors, hasOwn: Object.hasOwn,
+        defineProperties: Object.defineProperties, freeze: Object.freeze, ownKeys: Reflect.ownKeys, isArray: Array.isArray,
+        every: Array.prototype.every, isSafeInteger: Number.isSafeInteger, trim: String.prototype.trim, test: RegExp.prototype.test,
+        weakSetAdd: WeakSet.prototype.add, weakSetHas: WeakSet.prototype.has, bufferToString: Buffer.prototype.toString, then: Promise.prototype.then,
+    };
+    let minted: ReturnType<typeof host.createHostAttachmentCurrentness> | undefined;
+    let denial: unknown;
+    let denialIsHost = false;
+    try {
+        const poison = () => { throw new Error('synthetic intrinsic poison'); };
+        Object.getPrototypeOf = poison as typeof Object.getPrototypeOf; Object.getOwnPropertyDescriptors = poison as typeof Object.getOwnPropertyDescriptors; Object.hasOwn = poison as typeof Object.hasOwn; Object.defineProperties = poison as typeof Object.defineProperties; Object.freeze = poison as typeof Object.freeze;
+        Reflect.ownKeys = poison as typeof Reflect.ownKeys; Array.isArray = poison as unknown as typeof Array.isArray; Array.prototype.every = poison as unknown as typeof Array.prototype.every; Number.isSafeInteger = poison as typeof Number.isSafeInteger;
+        String.prototype.trim = poison as typeof String.prototype.trim; RegExp.prototype.test = poison as typeof RegExp.prototype.test; WeakSet.prototype.add = poison as typeof WeakSet.prototype.add; WeakSet.prototype.has = poison as typeof WeakSet.prototype.has;
+        Buffer.prototype.toString = poison as typeof Buffer.prototype.toString; Promise.prototype.then = poison as typeof Promise.prototype.then;
+        minted = host.createHostAttachmentCurrentness();
+        try { host.transitionAttachmentContentCurrentness(' attachment.synthetic.1', expected(), 'new'); } catch (error) { denial = error; }
+        denialIsHost = host.isAttachmentCurrentnessHostError(denial);
+    } finally {
+        Object.getPrototypeOf = originals.getPrototypeOf; Object.getOwnPropertyDescriptors = originals.getOwnPropertyDescriptors; Object.hasOwn = originals.hasOwn;
+        Object.defineProperties = originals.defineProperties; Object.freeze = originals.freeze; Reflect.ownKeys = originals.ownKeys; Array.isArray = originals.isArray;
+        Array.prototype.every = originals.every; Number.isSafeInteger = originals.isSafeInteger; String.prototype.trim = originals.trim; RegExp.prototype.test = originals.test;
+        WeakSet.prototype.add = originals.weakSetAdd; WeakSet.prototype.has = originals.weakSetHas; Buffer.prototype.toString = originals.bufferToString; Promise.prototype.then = originals.then;
+    }
+    assert.ok(minted); assert.match(minted.sourceRef, /^[0-9a-f]{64}$/u); assert.equal(Object.isFrozen(minted), true);
+    assert.equal(denialIsHost, true);
+    assert.equal((denial as { code?: unknown }).code, 'input_invalid');
+    assert.deepEqual(snapshot(), before);
+    const advanced = host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), null);
+    assert.deepEqual(advanced, { sourceRef: ref, revision: 2, freshnessEpoch: 2 }); assert.equal(Object.isFrozen(advanced), true);
+    assert.deepEqual(snapshot(), { patient_id: 'patient.synthetic.1', data: null, document_source_ref: ref, document_revision: 2, document_freshness_epoch: 2 });
+    assert.notDeepEqual(snapshot(), before);
 });
 
 test('leaves the immediate transaction reusable after every denial', () => {
