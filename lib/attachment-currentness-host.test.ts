@@ -7,7 +7,6 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import Database from 'better-sqlite3';
-import type { HostAttachmentContentMutation } from './attachment-currentness-host';
 
 const root = process.cwd();
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-o2a-'));
@@ -33,14 +32,14 @@ function reset(values: { revision?: number; freshnessEpoch?: number; sourceRef?:
 function snapshot() {
     const db = new Database(dbPath); try { return db.prepare('SELECT patient_id, data, document_source_ref, document_revision, document_freshness_epoch FROM attachments').get(); } finally { db.close(); }
 }
-function rejects(action: () => unknown, code: 'input_invalid' | 'attachment_missing' | 'currentness_conflict' | 'currentness_overflow' | 'operation_invalid' | 'operation_failed' | 'reentry' | 'stored_state_invalid') {
-    assert.throws(action, (error: unknown) => error instanceof host.AttachmentCurrentnessHostError && error.code === code && error.message === `Attachment currentness host rejected: ${code}`);
+function rejects(action: () => unknown, code: 'input_invalid' | 'attachment_missing' | 'currentness_conflict' | 'currentness_overflow' | 'stored_state_invalid') {
+    assert.throws(action, (error: unknown) => host.isAttachmentCurrentnessHostError(error) && error.code === code && error.message === `Attachment currentness host rejected: ${code}`);
 }
 function worker(): Promise<string> {
     return new Promise((resolve, reject) => {
         const child = spawn(process.execPath, [path.join(root, 'scripts/run-strip-types.mjs'), path.join(dataDir, 'worker.mjs')], { cwd: root, env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir }, stdio: ['ignore', 'pipe', 'pipe'] });
         let output = ''; child.stdout.on('data', (part) => { output += String(part); }); child.stderr.on('data', (part) => { output += String(part); });
-        child.once('error', reject); child.once('close', () => resolve(output.trim()));
+        child.once('error', reject); child.once('close', () => { child.stdout.destroy(); child.stderr.destroy(); resolve(output.trim()); });
     });
 }
 test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
@@ -51,57 +50,68 @@ test('mints only opaque host source refs with the initial tuple', () => {
     assert.deepEqual({ revision: first.revision, freshnessEpoch: first.freshnessEpoch }, { revision: 1, freshnessEpoch: 1 });
 });
 
-test('atomically changes sealed data and advances the exact expected triple', () => {
+test('atomically replaces exact string or null data and advances the exact expected triple', () => {
     reset();
-    const next = host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), (mutation) => mutation.replaceData('new'));
+    const next = host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), 'new');
     assert.deepEqual(next, { sourceRef: ref, revision: 2, freshnessEpoch: 2 });
     assert.deepEqual(snapshot(), { patient_id: 'patient.synthetic.1', data: 'new', document_source_ref: ref, document_revision: 2, document_freshness_epoch: 2 });
-    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), (mutation) => mutation.replaceData('again')), 'currentness_conflict');
+    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), 'again'), 'currentness_conflict');
+    reset(); assert.deepEqual(host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), null), { sourceRef: ref, revision: 2, freshnessEpoch: 2 });
+    assert.equal((snapshot() as { data: string | null }).data, null);
 });
 
 test('denies missing, malformed, stale, overflow, and caller-selected patient input without writes', () => {
     reset(); const before = snapshot();
-    rejects(() => host.transitionAttachmentContentCurrentness('missing.synthetic', expected(), () => undefined), 'attachment_missing');
-    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', { ...expected(), patientId: 'patient.other' }, () => undefined), 'input_invalid');
-    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', { ...expected(), revision: 0 }, () => undefined), 'input_invalid');
-    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', { ...expected(), sourceRef: 'A'.repeat(64) }, () => undefined), 'input_invalid');
+    rejects(() => host.transitionAttachmentContentCurrentness('missing.synthetic', expected(), 'new'), 'attachment_missing');
+    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', { ...expected(), patientId: 'patient.other' }, 'new'), 'input_invalid');
+    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', { ...expected(), revision: 0 }, 'new'), 'input_invalid');
+    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', { ...expected(), sourceRef: 'A'.repeat(64) }, 'new'), 'input_invalid');
     assert.deepEqual(snapshot(), before);
     reset({ revision: Number.MAX_SAFE_INTEGER }); const overflow = snapshot();
-    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', { ...expected(), revision: Number.MAX_SAFE_INTEGER }, (mutation) => mutation.replaceData('new')), 'currentness_overflow');
+    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', { ...expected(), revision: Number.MAX_SAFE_INTEGER }, 'new'), 'currentness_overflow');
     assert.deepEqual(snapshot(), overflow);
     reset({ freshnessEpoch: Number.MAX_SAFE_INTEGER }); const overflowEpoch = snapshot();
-    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', { ...expected(), freshnessEpoch: Number.MAX_SAFE_INTEGER }, (mutation) => mutation.replaceData('new')), 'currentness_overflow');
+    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', { ...expected(), freshnessEpoch: Number.MAX_SAFE_INTEGER }, 'new'), 'currentness_overflow');
     assert.deepEqual(snapshot(), overflowEpoch);
     reset(); const malformed = new Database(dbPath); malformed.pragma('ignore_check_constraints = ON'); malformed.prepare("UPDATE attachments SET document_source_ref = 'UPPER'").run(); malformed.close();
-    const malformedBefore = snapshot(); rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), () => undefined), 'stored_state_invalid');
+    const malformedBefore = snapshot(); rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), 'new'), 'stored_state_invalid');
     assert.deepEqual(snapshot(), malformedBefore);
 });
 
-test('rolls back thrown, async, thenable, proxied, accessor, and reentrant host operations', () => {
-    reset(); const before = snapshot(); let reads = 0;
-    const accessor = Object.defineProperty({}, 'sourceRef', { enumerable: true, get() { reads += 1; return ref; } });
-    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', accessor, () => undefined), 'input_invalid');
-    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), () => { throw new Error('synthetic secret'); }), 'operation_failed');
-    let leaked: HostAttachmentContentMutation | null = null;
-    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), (mutation) => { leaked = mutation; return Promise.resolve(); }), 'operation_invalid');
-    rejects(() => leaked!.replaceData('late'), 'operation_invalid');
-    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), () => ({ then: () => undefined })), 'operation_invalid');
-    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), new Proxy(() => undefined, {})), 'input_invalid');
-    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), () => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), () => undefined)), 'reentry');
-    assert.equal(reads, 0); assert.deepEqual(snapshot(), before);
+test('rejects callback-era values before transaction work and never exposes forged errors', async () => {
+    reset(); const before = snapshot(); let getterReads = 0; let queued = false;
+    const forged = Object.assign(new Error('SELECT synthetic secret'), { code: 'currentness_conflict' });
+    const thenable = Object.defineProperty({}, 'then', { get() { getterReads += 1; return () => undefined; } });
+    const queuedFunction = () => { queueMicrotask(() => { queued = true; }); return 'new'; };
+    for (const value of [undefined, forged, Promise.resolve('new'), thenable, queuedFunction, new Proxy({}, {})]) rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), value), 'input_invalid');
+    await Promise.resolve();
+    assert.equal(getterReads, 0); assert.equal(queued, false); assert.equal(host.isAttachmentCurrentnessHostError(forged), false);
+    assert.equal(host.isAttachmentCurrentnessHostError(Object.create(forged)), false); assert.equal(host.isAttachmentCurrentnessHostError(new Proxy(forged, {})), false);
+    assert.deepEqual(snapshot(), before);
 });
 
-test('requires exactly one sealed mutation and leaves the transaction reusable after every denial', () => {
+test('prototype poisoning cannot alter the fixed data mutation or commit a zero replacement', () => {
     reset(); const before = snapshot();
-    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), () => undefined), 'operation_invalid');
-    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), (mutation) => { mutation.replaceData('one'); mutation.replaceData('two'); }), 'operation_invalid');
+    Object.defineProperty(Object.prototype, 'replaceData', { configurable: true, get() { throw new Error('synthetic secret'); } });
+    try { assert.deepEqual(host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), 'new'), { sourceRef: ref, revision: 2, freshnessEpoch: 2 }); }
+    finally { delete (Object.prototype as { replaceData?: unknown }).replaceData; }
+    reset();
+    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), undefined), 'input_invalid');
+    assert.deepEqual(snapshot(), before);
+});
+
+test('leaves the immediate transaction reusable after every denial', () => {
+    reset(); const before = snapshot();
+    rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), { value: 'new' }), 'input_invalid');
     assert.deepEqual(snapshot(), before);
     const db = new Database(dbPath); try { db.transaction(() => undefined).immediate(); } finally { db.close(); }
 });
 
 test('two process-level duplicate CAS attempts have one winner', { timeout: 30_000 }, async () => {
-    reset();
-    fs.writeFileSync(path.join(dataDir, 'worker.mjs'), `const host = await import('@/lib/attachment-currentness-host');\ntry { host.transitionAttachmentContentCurrentness('attachment.synthetic.1', { sourceRef: '${ref}', revision: 1, freshnessEpoch: 1 }, (mutation) => mutation.replaceData('winner')); console.log('winner'); } catch (error) { console.log(error instanceof host.AttachmentCurrentnessHostError ? error.code : 'unknown'); }\n`);
-    assert.deepEqual((await Promise.all([worker(), worker()])).sort(), ['currentness_conflict', 'winner']);
-    assert.deepEqual(snapshot(), { patient_id: 'patient.synthetic.1', data: 'winner', document_source_ref: ref, document_revision: 2, document_freshness_epoch: 2 });
+    reset(); const workerPath = path.join(dataDir, 'worker.mjs');
+    fs.writeFileSync(workerPath, `const host = await import('@/lib/attachment-currentness-host');\ntry { host.transitionAttachmentContentCurrentness('attachment.synthetic.1', { sourceRef: '${ref}', revision: 1, freshnessEpoch: 1 }, 'winner'); console.log('winner'); } catch (error) { console.log(host.isAttachmentCurrentnessHostError(error) ? error.code : 'unknown'); }\n`);
+    try {
+        assert.deepEqual((await Promise.all([worker(), worker()])).sort(), ['currentness_conflict', 'winner']);
+        assert.deepEqual(snapshot(), { patient_id: 'patient.synthetic.1', data: 'winner', document_source_ref: ref, document_revision: 2, document_freshness_epoch: 2 });
+    } finally { fs.rmSync(workerPath, { force: true }); }
 });
