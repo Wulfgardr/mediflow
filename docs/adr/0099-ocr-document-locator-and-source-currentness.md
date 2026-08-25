@@ -1,7 +1,7 @@
 # ADR 0099: locator OCR e currentness della sorgente documentale
 
 Date: 2026-08-23
-Status: Proposed
+Status: Accepted
 
 Issue: WUL-522
 Program line: candidato `0.8.5`
@@ -40,6 +40,13 @@ conservativo `documentRevision` e `documentFreshnessEpoch`, anche quando il
 contenuto o il significato risultano uguali. Delete e recreate producono una
 nuova `documentSourceRef`; non riusano quella eliminata.
 
+Una migrazione raw che riproduce dati gia canonici deve essere idempotente.
+Alla riesecuzione conserva ogni `documentSourceRef`, `documentRevision` e
+`documentFreshnessEpoch` canonico esistente. Non rigenera l'identita e non
+incrementa i valori per effetto del replay. Se non puo conservare tutti e tre i
+valori per ogni record interessato, fallisce atomicamente prima di qualunque
+mutazione. Il replay non puo lasciare uno stato parzialmente migrato.
+
 `createdAt`, `ocrQueueUpdatedAt`, `patients.version`, la versione della
 proposta, `reviewRevision`, `sourceRevision` del browser e
 `documentSha256` fornito dal chiamante non sono currentness canonica. Possono
@@ -66,12 +73,20 @@ logout, expiry e riavvio revocano o distruggono tutti i locator interessati.
 Una revoca non ammette fallback, riemissione implicita o continuazione con un
 locator precedente.
 
-### Backup e confini Fabric
+### Backup, restore e confini Fabric
 
-Il supporto legacy dei backup resta fail-closed. Un backup privo di metadati
-compatibili non puo riusare silenziosamente una sorgente stantia. O3a deve
-scegliere e verificare una policy esplicita di deny oppure rebase; fino ad allora
-la continuita resta `HOLD`.
+Il restore 0.8.5 richiede, per ogni attachment, gli esatti tre campi
+`documentSourceRef`, `documentRevision` e `documentFreshnessEpoch`. Un
+artefatto legacy di backup o restore che ne omette anche uno viene negato prima
+della mutazione con un errore tipizzato e sanitizzato
+`BACKUP_DOCUMENT_CURRENTNESS_UNSUPPORTED`. L'errore non include contenuto,
+identificatori clinici o metadati dell'artefatto.
+
+Il restore 0.8.5 non ribasa, non genera e non deduce i tre valori mancanti. Una
+futura migrazione, autorizzata separatamente, puo produrre un artefatto di
+rebase revisionato. Il suo contratto, la sua evidenza e la sua applicazione non
+appartengono a questo restore. Fino a quel momento la continuita legacy resta
+negata, non `HOLD` operativo.
 
 La decisione del resolver Fabric e l'invocazione del provider restano confini
 separati. Il locator non sostituisce la decisione Fabric, non sceglie provider,
@@ -81,28 +96,34 @@ invariato.
 ## DAG e ownership
 
 ```text
-O1 schema
-  -> O2 writer e read guard
-     -> O3a backup/restore
-     -> O3b cascade/revocation
-     -> O4 bridge P4 e locator: emissione e consumo distinti
-        -> O5 replay, route e client
+O1a schema e vincoli dei tre campi
+  -> O1b migrazione raw idempotente e atomica
+     -> O1c fixture e verifica schema
+        -> O2a writer attachment host-owned
+        -> O2b read guard e serializzazione
+        -> O2c CAS update e incremento atomico revision+epoch
+        -> O2d delete/recreate con nuova sourceRef
+        -> O2e verifiche writer e read guard
+           -> O3a deny backup/restore legacy tipizzato
+           -> O3b cascade e revoca
+           -> O4 bridge P4 e locator: emissione e consumo distinti
+              -> O5 replay, route e client
 ```
 
-O3a e O3b possono procedere in parallelo solo dopo O2. Ogni owner modifica un
-solo confine: O1 schema, O2 writer/read guard, O3a backup/restore, O3b
-cascade/revocation, O4 bridge/locator, O5 replay/route/client. Ogni packet
-resta sotto circa 300 LOC. Un conflitto fra owner, una semantica non definita o
-una base non integrata interrompe il packet: nessun owner assorbe il confine
-altrui.
+O3a e O3b possono procedere in parallelo solo dopo O2e. O1a, O1b e O1c sono
+sub-packet distinti dello schema; O2a-O2e sono sub-packet distinti dei writer e
+read guard. Ogni owner modifica un solo confine. Ogni packet resta sotto circa
+300 LOC. Un conflitto fra owner, una semantica non definita o una base non
+integrata interrompe il packet: nessun owner assorbe il confine altrui.
 
 ## Evidenza e stato
 
-Questo ADR e una candidata documentale. Non prova schema, writer, backup,
-revoca, bridge, route, client, provider o runtime. L'integrazione richiede i
-gate del DAG e le verifiche specifiche di ciascun packet. Una release richiede
-evidenza di integrazione e i suoi gate separati; questa decisione non dichiara
-release, conformita o promozione.
+Questo ADR accetta il contratto documentale. Non prova schema, migrazione,
+writer, backup, restore, revoca, bridge, route, client, provider o runtime.
+Il runtime resta non implementato. L'integrazione richiede i gate del DAG e le
+verifiche specifiche di ciascun packet. Una release richiede evidenza di
+integrazione e i suoi gate separati; questa decisione non dichiara release,
+conformita o promozione.
 
 ## Falsificatori e stop condition
 
@@ -112,9 +133,12 @@ Fermare il lavoro e mantenere il denial se:
   chiamante diventa currentness canonica;
 - una mutazione accettata non incrementa insieme revision ed epoch;
 - delete/recreate riusa `documentSourceRef`;
+- una migrazione raw rigenera i valori canonici, incrementa revision o epoch
+  durante un replay, oppure fallisce dopo una mutazione parziale;
 - un locator contiene dati vietati, persiste, sopravvive a restart o e riusato;
 - resolve e consume avvengono in sezioni di lease diverse;
-- backup legacy riusa silenziosamente una sorgente stantia;
+- un backup o restore senza tutti e tre i campi viene accettato, ribasato o
+  modificato senza un errore tipizzato e sanitizzato;
 - il locator permette di scegliere provider, venue o fallback, oppure sostituisce
   la decisione del resolver Fabric;
 - compare apply o cambia `applyPolicy=none`.
