@@ -144,3 +144,30 @@ test('uses captured intrinsics after import and never leaks or defers hostile SO
     assert.equal(denial.status, 'denied'); assert.equal(JSON.stringify(denial).includes('RAW_SECRET_SOAP'), false);
     assert.equal(traps, 0); assert.equal(unhandled, 0);
 });
+
+test('captures the TypedArray byteLength getter before post-import poisoning', () => {
+    const prototype = Object.getPrototypeOf(Uint8Array.prototype); const descriptor = Object.getOwnPropertyDescriptor(prototype, 'byteLength');
+    if (!descriptor) throw new Error('missing byteLength descriptor');
+    const expected = accepted(draft()).digest.sha256.hex; const normal = draft(); const oversized = draft({ subjective: 'a'.repeat(16_385) });
+    const getters = [() => 0, () => 100_000, () => { throw new Error('poisoned byteLength'); }]; let unhandled = 0;
+    const onUnhandled = () => { unhandled += 1; }; process.on('unhandledRejection', onUnhandled);
+    try {
+        for (let index = 0; index < getters.length; index += 1) {
+            let acceptedResult: ReturnType<typeof validateClinicianSoapWriteDraft> | undefined; let deniedResult: ReturnType<typeof validateClinicianSoapWriteDraft> | undefined;
+            Object.defineProperty(prototype, 'byteLength', { configurable: true, get: getters[index]! });
+            try { acceptedResult = validateClinicianSoapWriteDraft(normal); deniedResult = validateClinicianSoapWriteDraft(oversized); } finally { Object.defineProperty(prototype, 'byteLength', descriptor); }
+            if (!acceptedResult || !deniedResult) throw new Error('missing result');
+            assert.equal(acceptedResult.status, 'accepted'); if (acceptedResult.status === 'accepted') assert.equal(acceptedResult.digest.sha256.hex, expected);
+            assert.equal(deniedResult.status, 'denied'); assert.equal(JSON.stringify(deniedResult).includes('a'.repeat(32)), false);
+        }
+    } finally { process.off('unhandledRejection', onUnhandled); }
+    assert.equal(unhandled, 0);
+});
+
+test('does not use Array iteration after module initialization', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(Array.prototype, Symbol.iterator); const source = draft(); let result: ReturnType<typeof validateClinicianSoapWriteDraft> | undefined;
+    if (!descriptor) throw new Error('missing array iterator');
+    Object.defineProperty(Array.prototype, Symbol.iterator, { ...descriptor, value: () => { throw new Error('poisoned iterator'); } });
+    try { result = validateClinicianSoapWriteDraft(source); } finally { Object.defineProperty(Array.prototype, Symbol.iterator, descriptor); }
+    if (!result) throw new Error('missing result'); assert.equal(result.status, 'accepted'); assert.equal(Object.getPrototypeOf(result), null);
+});
