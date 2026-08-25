@@ -35,6 +35,21 @@ function denied(value: { status: string; sourceSet?: unknown; projection?: unkno
     assert.equal('sourceSet' in value ? value.sourceSet : value.projection, null);
 }
 
+function withPostImportObjectPoison<T>(callback: () => T): T {
+    const targets = [
+        [Object, 'create'], [Object, 'assign'], [Object, 'freeze'], [Object, 'hasOwn'],
+        [Object, 'getOwnPropertyDescriptor'], [Object, 'getPrototypeOf'], [Reflect, 'ownKeys'], [Reflect, 'apply'],
+    ] as const;
+    const descriptors = targets.map(([target, key]) => [target, key, Object.getOwnPropertyDescriptor(target, key)] as const);
+    const poison = () => { throw new Error('ambient intrinsic poisoned after import'); };
+    try {
+        for (const [target, key, descriptor] of descriptors) Object.defineProperty(target, key, { ...descriptor, value: poison });
+        return callback();
+    } finally {
+        for (const [target, key, descriptor] of descriptors) Object.defineProperty(target, key, descriptor!);
+    }
+}
+
 test('normalizes the closed projection record and returns immutable raw projection bytes', () => {
     const result = available(normalizeDocumentSynthesisProjection(source()));
     assert.equal(result instanceof Promise, false);
@@ -175,4 +190,22 @@ test('uses the immutable capture snapshot, deeply freezes a null-prototype outpu
         assert.equal(composeDocumentSynthesisProviderProjection(captured) instanceof Promise, false);
     } finally { if (originalThen) Object.defineProperty(Object.prototype, 'then', originalThen); else delete (Object.prototype as { then?: unknown }).then; }
     assert.equal(reads, 0);
+});
+
+test('uses captured Object and Reflect intrinsics after import without leaking or deferring work', () => {
+    const raw = sourceSet([source({ documentSourceRef: 'b', sourceText: 'second' }), source({ documentSourceRef: 'a', sourceText: 'first' })]);
+    const result = withPostImportObjectPoison(() => {
+        const captured = captureDocumentSynthesisSourceSet(raw);
+        return { captured, projection: captured.status === 'available' ? composeDocumentSynthesisProviderProjection(captured.sourceSet) : null };
+    });
+    const projection = result.projection;
+    assert.equal(result.captured.status, 'available');
+    assert.ok(projection);
+    assert.equal(projection instanceof Promise, false);
+    assert.equal(Object.getPrototypeOf(projection), null);
+    assert.equal(Object.isFrozen(projection), true);
+    assert.equal(Object.isFrozen(projection.sources), true);
+    assert.deepEqual(projection.sources.map((item) => ({ ...item })), [{ label: 'S1', sourceText: 'first' }, { label: 'S2', sourceText: 'second' }]);
+    assert.deepEqual(Reflect.ownKeys(projection), ['schemaVersion', 'sources']);
+    for (const item of projection.sources) assert.deepEqual(Reflect.ownKeys(item), ['label', 'sourceText']);
 });

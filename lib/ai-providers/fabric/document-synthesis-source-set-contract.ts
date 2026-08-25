@@ -15,13 +15,19 @@ const BYTE = BigInt(255);
 const SHIFT = BigInt(8);
 const MAX_U64 = BigInt('18446744073709551615');
 const encoder = new TextEncoder();
+const ObjectCreate = Object.create;
+const ObjectFreeze = Object.freeze;
+const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const ObjectGetPrototypeOf = Object.getPrototypeOf;
+const ObjectHasOwn = Object.hasOwn;
+const ReflectOwnKeys = Reflect.ownKeys;
+const ReflectApply = Reflect.apply;
 const WeakSetConstructor = WeakSet;
 const WeakMapConstructor = WeakMap;
 const weakSetAdd = WeakSet.prototype.add;
 const weakSetHas = WeakSet.prototype.has;
 const weakMapGet = WeakMap.prototype.get;
 const weakMapSet = WeakMap.prototype.set;
-const apply = Reflect.apply;
 const authenticSourceSets = new WeakSetConstructor<object>();
 
 type Bytes = readonly number[];
@@ -38,25 +44,29 @@ export type DocumentSynthesisSourceSetResult = Readonly<{ status: 'available'; c
 type ParsedProjection = Readonly<{ documentSourceRef: string; documentRevision: bigint; documentFreshnessEpoch: bigint; sourceText: string; sourceBytes: Uint8Array }>;
 const providerSources = new WeakMapConstructor<object, readonly ProviderSource[]>();
 
-function sealed<T extends object>(value: T): Readonly<T> { return Object.freeze(Object.assign(Object.create(null) as T, value)); }
-function bytes(value: Uint8Array | readonly number[]): Bytes { return Object.freeze(Array.from(value)); }
+function sealed<T extends object>(value: T): Readonly<T> {
+    const output = ObjectCreate(null) as T;
+    for (const key of ReflectOwnKeys(value)) if (typeof key === 'string') (output as Record<string, unknown>)[key] = (value as Record<string, unknown>)[key];
+    return ObjectFreeze(output);
+}
+function bytes(value: Uint8Array | readonly number[]): Bytes { return ObjectFreeze(Array.from(value)); }
 function deniedProjection(): DocumentSynthesisProjectionResult { return sealed({ status: 'denied' as const, code: 'input_invalid' as const, projection: null }); }
 function deniedSourceSet(): DocumentSynthesisSourceSetResult { return sealed({ status: 'denied' as const, code: 'input_invalid' as const, sourceSet: null }); }
 
-function addSourceSetIdentity(value: object): void { apply(weakSetAdd, authenticSourceSets, [value]); }
-function hasSourceSetIdentity(value: object): boolean { return apply(weakSetHas, authenticSourceSets, [value]); }
-function setProviderSources(value: object, sources: readonly ProviderSource[]): void { apply(weakMapSet, providerSources, [value, sources]); }
-function getProviderSources(value: object): readonly ProviderSource[] | undefined { return apply(weakMapGet, providerSources, [value]) as readonly ProviderSource[] | undefined; }
+function addSourceSetIdentity(value: object): void { ReflectApply(weakSetAdd, authenticSourceSets, [value]); }
+function hasSourceSetIdentity(value: object): boolean { return ReflectApply(weakSetHas, authenticSourceSets, [value]); }
+function setProviderSources(value: object, sources: readonly ProviderSource[]): void { ReflectApply(weakMapSet, providerSources, [value, sources]); }
+function getProviderSources(value: object): readonly ProviderSource[] | undefined { return ReflectApply(weakMapGet, providerSources, [value]) as readonly ProviderSource[] | undefined; }
 
 function record(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
     try {
-        if (typeof value !== 'object' || value === null || Array.isArray(value) || types.isProxy(value) || Object.getPrototypeOf(value) !== OBJECT) return null;
-        const found = Reflect.ownKeys(value);
+        if (typeof value !== 'object' || value === null || Array.isArray(value) || types.isProxy(value) || ObjectGetPrototypeOf(value) !== OBJECT) return null;
+        const found = ReflectOwnKeys(value);
         if (found.length !== keys.length || found.some((key) => typeof key !== 'string' || !keys.includes(key))) return null;
-        const copy: Record<string, unknown> = Object.create(null);
+        const copy: Record<string, unknown> = ObjectCreate(null);
         for (const key of keys) {
-            const descriptor = Object.getOwnPropertyDescriptor(value, key);
-            if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) return null;
+            const descriptor = ObjectGetOwnPropertyDescriptor(value, key);
+            if (!descriptor || !descriptor.enumerable || !ObjectHasOwn(descriptor, 'value')) return null;
             copy[key] = descriptor.value;
         }
         return copy;
@@ -65,13 +75,13 @@ function record(value: unknown, keys: readonly string[]): Record<string, unknown
 
 function array(value: unknown): readonly unknown[] | null {
     try {
-        if (!Array.isArray(value) || types.isProxy(value) || Object.getPrototypeOf(value) !== ARRAY || value.length < 1 || value.length > 32) return null;
-        const found = Reflect.ownKeys(value);
+        if (!Array.isArray(value) || types.isProxy(value) || ObjectGetPrototypeOf(value) !== ARRAY || value.length < 1 || value.length > 32) return null;
+        const found = ReflectOwnKeys(value);
         if (found.length !== value.length + 1 || !found.includes('length')) return null;
         const copy: unknown[] = [];
         for (let index = 0; index < value.length; index += 1) {
-            const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-            if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) return null;
+            const descriptor = ObjectGetOwnPropertyDescriptor(value, String(index));
+            if (!descriptor || !descriptor.enumerable || !ObjectHasOwn(descriptor, 'value')) return null;
             copy.push(descriptor.value);
         }
         return copy;
@@ -139,8 +149,8 @@ export function captureDocumentSynthesisSourceSet(value: unknown): DocumentSynth
         const payload: number[] = [...u32(encoder.encode(DOMAIN).length), ...encoder.encode(DOMAIN), 0, 1, sources.length, ...u64(input.sourceSetEpoch), ...u64(input.revocationGeneration)];
         for (const item of sources) payload.push(...u32(encoder.encode(item.label).length), ...encoder.encode(item.label), ...u32(encoder.encode(item.documentSourceRef).length), ...encoder.encode(item.documentSourceRef), ...u64(item.documentRevision), ...u64(item.documentFreshnessEpoch), ...item.projectionDigestSha256);
         const digestPayloadBytes = bytes(payload);
-        const sourceSet = sealed({ sourceSetEpoch: input.sourceSetEpoch, revocationGeneration: input.revocationGeneration, sources: Object.freeze(sources), digestPayloadBytes, sourceSetDigestSha256: digest(digestPayloadBytes) });
-        const snapshot = Object.freeze(sources.map((item) => sealed({ label: item.label, sourceText: item.sourceText }) as ProviderSource));
+        const sourceSet = sealed({ sourceSetEpoch: input.sourceSetEpoch, revocationGeneration: input.revocationGeneration, sources: ObjectFreeze(sources), digestPayloadBytes, sourceSetDigestSha256: digest(digestPayloadBytes) });
+        const snapshot = ObjectFreeze(sources.map((item) => sealed({ label: item.label, sourceText: item.sourceText }) as ProviderSource));
         addSourceSetIdentity(sourceSet);
         setProviderSources(sourceSet, snapshot);
         return sealed({ status: 'available' as const, code: null, sourceSet });
