@@ -1,4 +1,5 @@
 /* @Codex */
+import { types } from 'node:util';
 
 export const DOCUMENT_SYNTHESIS_HOST_BOUNDARY_SCHEMA_VERSION = 'mediflow.document-synthesis.host-boundary.v1' as const;
 
@@ -46,12 +47,20 @@ type HostAuthority = Readonly<{
     disposition: DocumentSynthesisDisposition;
     provenanceRef: string;
     receiptRef: string;
-    now: () => number;
+    now: () => unknown;
 }>;
 
 const OPAQUE_DOCUMENT_HANDLE = /^dsh_[a-f0-9]{32}$/u;
 const OPAQUE_REFERENCE = /^(?:provenance|receipt)_[A-Za-z0-9._:-]{16,128}$/u;
-const COMMON = Object.freeze({ writesPerformed: 0 as const, applyPolicy: 'none' as const });
+const OBJECT_PROTOTYPE = Object.prototype;
+const NATIVE_PROMISE_THEN = Promise.prototype.then;
+const ASYNC_FUNCTION_PROTOTYPE = Object.getPrototypeOf(async () => undefined);
+
+function freezeRecord<T extends Record<string, unknown>>(value: T): Readonly<T> {
+    return Object.freeze(Object.assign(Object.create(null) as T, value));
+}
+
+const COMMON = freezeRecord({ writesPerformed: 0 as const, applyPolicy: 'none' as const });
 
 export class DocumentSynthesisHostBoundaryConfigurationError extends Error {
     constructor() {
@@ -62,8 +71,8 @@ export class DocumentSynthesisHostBoundaryConfigurationError extends Error {
 
 function isPlainRecord(value: unknown): value is Record<PropertyKey, unknown> {
     try {
-        return typeof value === 'object' && value !== null && !Array.isArray(value)
-            && Object.getPrototypeOf(value) === Object.prototype;
+        return typeof value === 'object' && value !== null && !Array.isArray(value) && !types.isProxy(value)
+            && Object.getPrototypeOf(value) === OBJECT_PROTOTYPE;
     } catch {
         return false;
     }
@@ -75,7 +84,7 @@ function hasOnlyDataKeys(value: Record<PropertyKey, unknown>, keys: readonly str
         if (ownKeys.length !== keys.length || !keys.every((key) => ownKeys.includes(key))) return false;
         return keys.every((key) => {
             const descriptor = Object.getOwnPropertyDescriptor(value, key);
-            return descriptor !== undefined && 'value' in descriptor;
+            return descriptor !== undefined && descriptor.enumerable && 'value' in descriptor;
         });
     } catch {
         return false;
@@ -94,7 +103,7 @@ function parsePresentation(value: unknown): DocumentSynthesisDocumentPresentatio
         if (typeof documentHandle !== 'string' || !OPAQUE_DOCUMENT_HANDLE.test(documentHandle)
             || typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 0
             || !isCanonicalTimestamp(freshness)) return null;
-        return Object.freeze({ documentHandle, revision, freshness });
+        return freezeRecord({ documentHandle, revision, freshness });
     } catch {
         return null;
     }
@@ -110,13 +119,14 @@ function parseAuthority(value: unknown): HostAuthority | null {
         if (!document || (value.disposition !== 'deterministic' && value.disposition !== 'generative')
             || typeof value.provenanceRef !== 'string' || !OPAQUE_REFERENCE.test(value.provenanceRef)
             || typeof value.receiptRef !== 'string' || !OPAQUE_REFERENCE.test(value.receiptRef)
-            || typeof value.now !== 'function') return null;
-        return Object.freeze({
-            document: Object.freeze({ documentHandle: document.documentHandle, revision: document.revision, freshness: document.freshness }),
+            || typeof value.now !== 'function' || types.isProxy(value.now)
+            || Object.getPrototypeOf(value.now) === ASYNC_FUNCTION_PROTOTYPE) return null;
+        return freezeRecord({
+            document: freezeRecord({ documentHandle: document.documentHandle, revision: document.revision, freshness: document.freshness }),
             disposition: value.disposition,
             provenanceRef: value.provenanceRef,
             receiptRef: value.receiptRef,
-            now: value.now as () => number,
+            now: value.now as () => unknown,
         });
     } catch {
         return null;
@@ -124,12 +134,12 @@ function parseAuthority(value: unknown): HostAuthority | null {
 }
 
 function denied(code: DocumentSynthesisHostBoundaryDenialCode): DocumentSynthesisHostBoundaryResult {
-    return Object.freeze({ status: 'denied', code, metadata: null, ...COMMON });
+    return freezeRecord({ status: 'denied' as const, code, metadata: null, ...COMMON });
 }
 
 function available(authority: HostAuthority): DocumentSynthesisHostBoundaryResult {
-    const document = Object.freeze({ ...authority.document });
-    const metadata = Object.freeze({
+    const document = freezeRecord({ ...authority.document });
+    const metadata = freezeRecord({
         schemaVersion: DOCUMENT_SYNTHESIS_HOST_BOUNDARY_SCHEMA_VERSION,
         disposition: authority.disposition,
         document,
@@ -137,7 +147,20 @@ function available(authority: HostAuthority): DocumentSynthesisHostBoundaryResul
         provenanceRef: authority.provenanceRef,
         receiptRef: authority.receiptRef,
     });
-    return Object.freeze({ status: 'available', code: null, metadata, ...COMMON });
+    return freezeRecord({ status: 'available' as const, code: null, metadata, ...COMMON });
+}
+
+function readClock(now: () => unknown): number | null {
+    try {
+        const value = now();
+        if (types.isPromise(value)) {
+            try { void NATIVE_PROMISE_THEN.call(value, undefined, () => undefined); } catch { /* fail closed */ }
+            return null;
+        }
+        return typeof value === 'number' && Number.isFinite(value) ? value : null;
+    } catch {
+        return null;
+    }
 }
 
 /**
@@ -159,9 +182,8 @@ export function createDocumentSynthesisHostBoundary(configuration: unknown): Rea
             if (presentation.documentHandle !== authority.document.documentHandle) return denied('document_mismatch');
             if (presentation.revision !== authority.document.revision) return denied('revision_mismatch');
             if (presentation.freshness !== authority.document.freshness) return denied('freshness_mismatch');
-            let now: number;
-            try { now = authority.now(); } catch { return denied('handle_expired'); }
-            if (!Number.isFinite(now) || now >= Date.parse(authority.document.freshness)) return denied('handle_expired');
+            const now = readClock(authority.now);
+            if (now === null || now >= Date.parse(authority.document.freshness)) return denied('handle_expired');
             return available(authority);
         },
     });
