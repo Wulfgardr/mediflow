@@ -20,6 +20,19 @@ const baseOutput = () => ({
     },
 });
 
+const richOutput = (): Record<string, unknown> => {
+    const value = baseOutput() as unknown as Record<string, unknown>;
+    const data = value.data as Record<string, unknown>;
+    (data.problemStatements as Array<Record<string, unknown>>)[0]!.explicitCode = 'SYN-EXPLICIT';
+    (data.therapyCandidates as Array<Record<string, unknown>>)[0]!.activePrinciple = 'Synthetic active principle';
+    (data.therapyCandidates as Array<Record<string, unknown>>)[0]!.therapyState = 'active';
+    data.servicePrescriptions = [{
+        serviceName: 'Synthetic service', confidence: 'high', evidence: 'Synthetic source', category: 'visit', sourceId: 'source.synthetic.1',
+        items: [{ serviceName: 'Synthetic item', confidence: 'medium', evidence: 'Synthetic source', category: 'lab', sourceId: 'source.synthetic.1' }],
+    }];
+    return value;
+};
+
 const denied = (value: unknown) => {
     const result = createDocumentSynthesisOutputContract().normalize(value);
     assert.equal(result.status, 'denied');
@@ -35,6 +48,8 @@ test('normalizes deterministic and generative outputs to one immutable review en
     const source = readFileSync(new URL('./document-synthesis-output-contract.ts', import.meta.url), 'utf8');
     assert.match(source, /^import 'server-only';\n/u);
     assert.doesNotMatch(source, /(?:fetch\(|invoke\(|route|sqlite|database)/iu);
+    assert.doesNotMatch(source, /for\s*\([^)]*\bof\b/u);
+    assert.doesNotMatch(source, /\.\.\./u);
     const contract = createDocumentSynthesisOutputContract();
     const deterministic = contract.normalize(baseOutput());
     const generative = contract.normalize(structuredClone(baseOutput()));
@@ -161,4 +176,46 @@ test('snapshots accepted values without post-return mutation or thenable work', 
         assert.equal(result.value.summary, 'Synthetic document review.');
         assert.equal(result.value.data.diagnoses[0]?.description, 'Synthetic finding');
     }
+});
+
+test('keeps the baseline explicitCode limit at 120 while preserving other field limits', () => {
+    const at120 = baseOutput();
+    (at120.data.problemStatements[0] as Record<string, unknown>).explicitCode = 'x'.repeat(120);
+    assert.equal(normalizeDocumentSynthesisOutput(at120).status, 'available');
+    const at121 = baseOutput();
+    (at121.data.problemStatements[0] as Record<string, unknown>).explicitCode = 'x'.repeat(121);
+    denied(at121);
+    const at160 = baseOutput();
+    (at160.data.problemStatements[0] as Record<string, unknown>).explicitCode = 'x'.repeat(160);
+    denied(at160);
+    const source = readFileSync(new URL('./document-synthesis-output-contract.ts', import.meta.url), 'utf8');
+    assert.match(source, /optionalText\(item, 'explicitCode', 120\)/u);
+    assert.doesNotMatch(source, /optionalText\(item, 'explicitCode', 160\)/u);
+});
+
+test('does not observe poisoned Array iteration on available or denied nested output paths', async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(Array.prototype, Symbol.iterator);
+    assert.ok(descriptor?.configurable);
+    const availableInput = richOutput();
+    const deniedInput = richOutput();
+    const deniedData = deniedInput.data as Record<string, unknown>;
+    ((deniedData.servicePrescriptions as Array<Record<string, unknown>>)[0]!).authority = 'forbidden';
+    let reads = 0;
+    let available: ReturnType<typeof normalizeDocumentSynthesisOutput> | undefined;
+    let deniedResult: ReturnType<typeof normalizeDocumentSynthesisOutput> | undefined;
+    try {
+        Object.defineProperty(Array.prototype, Symbol.iterator, { ...descriptor, value: false });
+        available = normalizeDocumentSynthesisOutput(availableInput);
+        deniedResult = normalizeDocumentSynthesisOutput(deniedInput);
+        Object.defineProperty(Array.prototype, Symbol.iterator, { configurable: true, get() { reads += 1; throw new Error('iterator poison'); } });
+        available = normalizeDocumentSynthesisOutput(availableInput);
+        deniedResult = normalizeDocumentSynthesisOutput(deniedInput);
+    } finally {
+        Object.defineProperty(Array.prototype, Symbol.iterator, descriptor);
+    }
+    assert.equal(reads, 0);
+    assert.equal(available?.status, 'available');
+    assert.equal(deniedResult?.status, 'denied');
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(reads, 0);
 });
