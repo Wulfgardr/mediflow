@@ -185,3 +185,38 @@ test('denies a result when the final critical-section clock disposes its session
         assert.equal(registry.lookup(value.id), null);
     }
 });
+
+test('never republishes selection after lifecycle disposal during resolve or final clock', () => {
+    for (const phase of ['resolve', 'clock'] as const) for (const lifecycle of ['owner', 'session'] as const) for (const existing of [false, true]) {
+        let arm = false; let entropy = 0;
+        const registry = createServerSessionProjectionOwnerRegistry({
+            resolve: (_session, pair) => { if (arm && phase === 'resolve') dispose(); return pair; },
+            entropy: () => Uint8Array.from({ length: 16 }, (_, index) => (entropy += 1) + index),
+            clock: () => { if (arm && phase === 'clock') dispose(); return 1_000; },
+        });
+        const value = session(); const owner = registry.acquire(value);
+        if (existing) owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+        const expectedEpoch = existing ? 1 : 0;
+        const dispose = () => { if (lifecycle === 'owner') owner.dispose(); else deleteSession(value.id); };
+        arm = true;
+        assert.throws(() => owner.issueSelection({ expectedEpoch, ...PAIR }),
+            (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
+        assert.equal(registry.lookup(value.id), null);
+        assert.throws(() => owner.snapshotSelectionEpoch(value),
+            (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
+        assert.throws(() => owner.issueSelection({ expectedEpoch, ...PAIR }),
+            (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
+    }
+});
+
+test('keeps nested issueSelection busy while resolving the outer selection', () => {
+    let arm = false;
+    const registry = createServerSessionProjectionOwnerRegistry({
+        resolve: (_session, pair) => { if (arm) assert.throws(() => owner.issueSelection({ expectedEpoch: 0, ...PAIR }),
+            (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'selection_busy'); return pair; },
+        entropy: () => new Uint8Array(16), clock: () => 1_000,
+    });
+    const value = session(); const owner = registry.acquire(value); arm = true;
+    assert.equal(owner.issueSelection({ expectedEpoch: 0, ...PAIR }).selectionEpoch, 1);
+    assert.equal(owner.snapshotSelectionEpoch(value), 1);
+});

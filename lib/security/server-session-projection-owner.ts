@@ -499,13 +499,20 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         let pair: CanonicalPair;
                         try { pair = sources.resolve(session, { patientId: value.patientId, ambulatoryId: value.ambulatoryId }); }
                         catch { return fail('selection_unavailable'); }
-                        const finalSession = getSession(session.id);
-                        if (finalSession !== session || session.authChannel !== 'web') fail('session_unavailable');
-                        if (value.expectedEpoch !== epoch) fail('epoch_conflict');
-                        const now = readClock(); const expiresAt = finalSession.expiresAt;
+                        const assertCurrent = () => {
+                            const currentSession = getSession(session.id);
+                            if (terminal || currentSession !== session || session.authChannel !== 'web' || getMapValue(owners, session.id) !== owner) {
+                                return fail('session_unavailable');
+                            }
+                            if (value.expectedEpoch !== epoch) return fail('epoch_conflict');
+                            return currentSession;
+                        };
+                        assertCurrent();
+                        const patientRef = reference('ptr'); const ambulatoryRef = reference('abr'); const leaseRef = reference('lsr');
+                        const now = readClock(); const finalSession = assertCurrent(); const expiresAt = finalSession.expiresAt;
                         if (now >= expiresAt) fail('lease_expired');
                         const next: SelectionState = ObjectFreeze({ ...pair, sessionRef, selectionEpoch: epoch + 1,
-                            patientRef: reference('ptr'), ambulatoryRef: reference('abr'), leaseRef: reference('lsr'),
+                            patientRef, ambulatoryRef, leaseRef,
                             expiresAt });
                         const previous = active; active = null; revoke(previous);
                         reviewContextEpoch += 1;
