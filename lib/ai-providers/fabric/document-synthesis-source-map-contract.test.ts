@@ -42,6 +42,7 @@ test('maps every normalized document-synthesis claim to one immutable review-onl
 });
 
 test('denies missing, extra, duplicate, invalid, empty and stale citation bindings', () => {
+    const reordered = request(); reordered.citations.reverse(); deny(reordered);
     const missing = request(); missing.citations.pop(); deny(missing);
     const extra = request(); extra.citations.push({ claimPath: 'data.unknown', sourceIds: ['source.synthetic.extra'] }); deny(extra);
     const duplicate = request(); duplicate.citations[1] = { claimPath: 'summary', sourceIds: ['source.synthetic.2'] }; deny(duplicate);

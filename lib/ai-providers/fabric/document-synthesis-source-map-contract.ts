@@ -73,7 +73,7 @@ export function createDocumentSynthesisSourceMapContract(): Readonly<{ map(value
         if (!input || !normalized || normalized.status !== 'available' || typeof input.outputSha256 !== 'string' || !SHA256.test(input.outputSha256) || !citations || citations.some((item) => item === null)) return denied();
         const outputSha256 = createHash('sha256').update(JSON.stringify(normalized.value), 'utf8').digest('hex');
         const claimPaths = paths(normalized.value); const items = citations as ClaimSource[];
-        if (input.outputSha256 !== outputSha256 || items.length !== claimPaths.length || new Set(items.map((item) => item.claimPath)).size !== items.length || items.some((item) => !claimPaths.includes(item.claimPath))) return denied();
+        if (input.outputSha256 !== outputSha256 || items.length !== claimPaths.length || new Set(items.map((item) => item.claimPath)).size !== items.length || items.some((item, index) => item.claimPath !== claimPaths[index])) return denied();
         const byPath = new Map(items.map((item) => [item.claimPath, item] as const));
         const claims = Object.freeze(claimPaths.map((claimPath) => nullRecord<ClaimSource>({ claimPath, sourceIds: Object.freeze([...(byPath.get(claimPath)!.sourceIds)] as string[]) })));
         return nullRecord<Available>({ status: 'available', code: null, sourceMap: nullRecord<SourceMap>({ schemaVersion: DOCUMENT_SYNTHESIS_SOURCE_MAP_SCHEMA_VERSION, outputSha256, claims }), ...COMMON });
