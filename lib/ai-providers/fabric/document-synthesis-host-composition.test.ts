@@ -13,12 +13,12 @@ const paths = ['summary', 'data.qualityLevel', 'data.qualityReason', 'data.medic
 const output = () => ({ schemaVersion: 'mediflow.ai.extract.v1', task: 'document_synthesis', summary: 'Synthetic summary.', data: { qualityLevel: 'green', qualityReason: 'Synthetic reason.', medications: ['Synthetic one', 'Synthetic two'], diagnoses: [{ code: 'SYN-1', description: 'Synthetic diagnosis', system: 'ICD-11' }], problemStatements: [{ label: 'Synthetic problem', icdQuery: 'SYN-2', confidence: 'high', evidence: 'Synthetic evidence' }], therapyCandidates: [{ drugMention: 'Synthetic therapy', drugQuery: 'synthetic', confidence: 'medium', evidence: 'Synthetic evidence' }], servicePrescriptions: [{ serviceName: 'Synthetic service', confidence: 'low', evidence: 'Synthetic evidence', items: [{ serviceName: 'Synthetic item', confidence: 'high', evidence: 'Synthetic evidence' }] }] } });
 const candidate = () => { const value = output(); return { output: value, outputSha256: createHash('sha256').update(JSON.stringify(value), 'utf8').digest('hex'), citations: paths.map((claimPath, index) => ({ claimPath, sourceIds: [`source.synthetic.${index % 3 + 1}`] })) }; };
 
-function composition(disposition: 'deterministic' | 'generative', current = () => ({ revision: 7, freshness, disposition })) {
+function composition(disposition: 'deterministic' | 'generative', current: () => unknown = () => ({ revision: 7, freshness, disposition }), dependencies: Partial<{ clock: () => unknown; entropy: () => unknown }> = {}) {
     return createDocumentSynthesisHostComposition({
         authority: { patientRef: 'patient.canonical-1234567890', document: { revision: 7, freshness }, disposition, provenanceRef: 'provenance_0123456789abcdef', receiptRef: 'receipt_0123456789abcdef' },
         currentness: current,
         sources: [1, 2, 3].map((number) => ({ sourceId: `source.synthetic.${number}`, sourceRef: `document_source_synthetic_${String(number).padStart(16, '0')}`, digestSha256: String(number).repeat(64) })),
-        clock: () => Date.parse('2026-08-25T11:00:00.000Z'), entropy: () => Uint8Array.from({ length: 16 }, (_, index) => index),
+        clock: dependencies.clock ?? (() => Date.parse('2026-08-25T11:00:00.000Z')), entropy: dependencies.entropy ?? (() => Uint8Array.from({ length: 16 }, (_, index) => index)),
     });
 }
 
@@ -54,4 +54,15 @@ test('denies caller identity, raw execution, forged, accessor, proxy, thenable, 
 
 test('rejects hostile host configuration before it can become authority', () => {
     assert.throws(() => createDocumentSynthesisHostComposition(new Proxy({}, { ownKeys() { throw new Error('synthetic trap'); } })), DocumentSynthesisHostCompositionConfigurationError);
+});
+
+test('poisons every reentry during entropy, currentness, or clock and never publishes after it', () => {
+    for (const source of ['entropy', 'currentness', 'clock'] as const) for (const operation of ['issue', 'consumeAndMap', 'dispose'] as const) {
+        let service: ReturnType<typeof composition> | null = null; let nested: unknown = null;
+        const reenter = () => { nested = operation === 'issue' ? service?.issue() : operation === 'consumeAndMap' ? service?.consumeAndMap(candidate()) : service?.dispose(); return source === 'entropy' ? Uint8Array.from({ length: 16 }, (_, index) => index) : source === 'clock' ? Date.parse('2026-08-25T11:00:00.000Z') : { revision: 7, freshness, disposition: 'deterministic' as const }; };
+        service = composition('deterministic', source === 'currentness' ? reenter : () => ({ revision: 7, freshness, disposition: 'deterministic' as const }), { clock: source === 'clock' ? reenter : () => Date.parse('2026-08-25T11:00:00.000Z'), entropy: source === 'entropy' ? reenter : () => Uint8Array.from({ length: 16 }, (_, index) => index) });
+        const outer = source === 'entropy' ? service.issue() : (service.issue(), service.consumeAndMap(candidate()));
+        if (operation !== 'dispose') assert.equal((nested as { status: string } | null)?.status, 'denied');
+        assert.equal((outer as { status: string }).status, 'denied'); assert.equal(service.consumeAndMap(candidate()).status, 'denied'); assert.equal(service.issue().status, 'denied');
+    }
 });
