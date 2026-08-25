@@ -26,6 +26,29 @@ const plan = (overrides: Record<string, unknown> = {}) => ({
   }], ...overrides,
 });
 
+function trapProxy<T extends object>(value: T, throwing = false): { value: T; traps: () => number } {
+  let count = 0;
+  const trap = <R>(fallback: () => R): R => {
+    count += 1;
+    if (throwing) throw new Error('proxy trap must not run');
+    return fallback();
+  };
+  return {
+    value: new Proxy(value, {
+      getPrototypeOf(target) { return trap(() => Reflect.getPrototypeOf(target)); },
+      ownKeys(target) { return trap(() => Reflect.ownKeys(target)); },
+      getOwnPropertyDescriptor(target, property) { return trap(() => Reflect.getOwnPropertyDescriptor(target, property)); },
+      get(target, property, receiver) { return trap(() => Reflect.get(target, property, receiver)); },
+    }),
+    traps: () => count,
+  };
+}
+
+function nonEnumerable<T extends object, K extends keyof T>(value: T, key: K): T {
+  Object.defineProperty(value, key, { ...Object.getOwnPropertyDescriptor(value, key)!, enumerable: false });
+  return value;
+}
+
 test('executes only a closed, explicitly bound synthetic operation and returns a PHI-safe frozen receipt', () => {
   let calls = 0;
   const runtime = createSemanticRuntime([operation(() => { calls += 1; return { outcome: 'read', resultRef: 'synthetic:record:1' }; })], { maxOperations: 1 });
@@ -68,4 +91,48 @@ test('fails closed on accessors, proxies, promises, and an ambient then without 
     assert.equal(proxyRuntime.execute(plan({ actions: [{ ...plan().actions[0], idempotencyKey: 'proxy' }] }), session()).receipts[0].denialCode, 'host_result_invalid');
     assert.equal(calls, 1); assert.equal(ambientThenCalls, 0);
   } finally { (Promise.prototype as unknown as { then: unknown }).then = originalThen; }
+});
+
+test('rejects proxy and non-enumerable boundaries before reflection or host execution', async () => {
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+  process.on('unhandledRejection', onUnhandled);
+  try {
+    for (const throwing of [false, true]) {
+      let calls = 0;
+      const runtime = createSemanticRuntime([operation(() => { calls += 1; return { outcome: 'read', resultRef: 'synthetic:result' }; })]);
+      const rawPlan = trapProxy(plan(), throwing);
+      assert.equal(runtime.execute(rawPlan.value, session()).receipts[0].denialCode, 'invalid_plan');
+      assert.equal(rawPlan.traps(), 0); assert.equal(calls, 0);
+
+      const rawSession = trapProxy(session(), throwing);
+      assert.equal(runtime.execute(plan({ requestRef: `session-${throwing}` }), rawSession.value).receipts[0].denialCode, 'invalid_session');
+      assert.equal(rawSession.traps(), 0); assert.equal(calls, 0);
+
+      const rawRegistry = trapProxy([operation()], throwing);
+      const registryRuntime = createSemanticRuntime(rawRegistry.value);
+      assert.equal(registryRuntime.execute(plan({ requestRef: `registry-${throwing}` }), session()).receipts[0].denialCode, 'registry_invalid');
+      assert.equal(rawRegistry.traps(), 0);
+
+      const rawInput = trapProxy({ query: 'synthetic' }, throwing);
+      assert.equal(runtime.execute(plan({ requestRef: `input-${throwing}`, actions: [{ ...plan().actions[0], idempotencyKey: `input-${throwing}`, input: rawInput.value }] }), session()).receipts[0].denialCode, 'invalid_plan');
+      assert.equal(rawInput.traps(), 0); assert.equal(calls, 0);
+
+      const rawResult = trapProxy({ outcome: 'read', resultRef: 'synthetic:result' }, throwing);
+      const resultRuntime = createSemanticRuntime([operation(() => rawResult.value as never)]);
+      assert.equal(resultRuntime.execute(plan({ requestRef: `result-${throwing}`, actions: [{ ...plan().actions[0], idempotencyKey: `result-${throwing}` }] }), session()).receipts[0].denialCode, 'host_result_invalid');
+      assert.equal(rawResult.traps(), 0);
+    }
+
+    const runtime = createSemanticRuntime([operation()]);
+    assert.equal(runtime.execute(nonEnumerable(plan(), 'requestRef'), session()).receipts[0].denialCode, 'invalid_plan');
+    assert.equal(runtime.execute(plan({ requestRef: 'non-enumerable-session' }), nonEnumerable(session(), 'sessionRef')).receipts[0].denialCode, 'invalid_session');
+    assert.equal(createSemanticRuntime([nonEnumerable(operation(), 'operationId')]).execute(plan({ requestRef: 'non-enumerable-registry' }), session()).receipts[0].denialCode, 'registry_invalid');
+    assert.equal(runtime.execute(plan({ requestRef: 'non-enumerable-input', actions: [{ ...plan().actions[0], idempotencyKey: 'non-enumerable-input', input: nonEnumerable({ query: 'synthetic' }, 'query') }] }), session()).receipts[0].denialCode, 'invalid_plan');
+    const resultRuntime = createSemanticRuntime([operation(() => nonEnumerable({ outcome: 'read', resultRef: 'synthetic:result' }, 'resultRef'))]);
+    assert.equal(resultRuntime.execute(plan({ requestRef: 'non-enumerable-result', actions: [{ ...plan().actions[0], idempotencyKey: 'non-enumerable-result' }] }), session()).receipts[0].denialCode, 'host_result_invalid');
+
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.deepEqual(unhandled, []);
+  } finally { process.off('unhandledRejection', onUnhandled); }
 });
