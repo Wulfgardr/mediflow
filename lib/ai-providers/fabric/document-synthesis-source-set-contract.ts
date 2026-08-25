@@ -15,19 +15,38 @@ const BYTE = BigInt(255);
 const SHIFT = BigInt(8);
 const MAX_U64 = BigInt('18446744073709551615');
 const encoder = new TextEncoder();
+const WeakSetConstructor = WeakSet;
+const WeakMapConstructor = WeakMap;
+const weakSetAdd = WeakSet.prototype.add;
+const weakSetHas = WeakSet.prototype.has;
+const weakMapGet = WeakMap.prototype.get;
+const weakMapSet = WeakMap.prototype.set;
+const apply = Reflect.apply;
+const authenticSourceSets = new WeakSetConstructor<object>();
 
 type Bytes = readonly number[];
 type Projection = Readonly<{ documentSourceRef: string; documentRevision: bigint; documentFreshnessEpoch: bigint; sourceText: string; sourceByteLength: number; projectionDigestSha256: Bytes }>;
 type Source = Readonly<Projection & { label: string }>;
 type SourceSet = Readonly<{ sourceSetEpoch: bigint; revocationGeneration: bigint; sources: readonly Source[]; digestPayloadBytes: Bytes; sourceSetDigestSha256: Bytes }>;
+type ProviderSource = Readonly<{ label: string; sourceText: string }>;
+export type DocumentSynthesisProviderProjection = Readonly<{
+    schemaVersion: 'mediflow.document-synthesis.provider-projection.v1';
+    sources: readonly ProviderSource[];
+}>;
 export type DocumentSynthesisProjectionResult = Readonly<{ status: 'available'; code: null; projection: Projection }> | Readonly<{ status: 'denied'; code: 'input_invalid'; projection: null }>;
 export type DocumentSynthesisSourceSetResult = Readonly<{ status: 'available'; code: null; sourceSet: SourceSet }> | Readonly<{ status: 'denied'; code: 'input_invalid'; sourceSet: null }>;
 type ParsedProjection = Readonly<{ documentSourceRef: string; documentRevision: bigint; documentFreshnessEpoch: bigint; sourceText: string; sourceBytes: Uint8Array }>;
+const providerSources = new WeakMapConstructor<object, readonly ProviderSource[]>();
 
 function sealed<T extends object>(value: T): Readonly<T> { return Object.freeze(Object.assign(Object.create(null) as T, value)); }
 function bytes(value: Uint8Array | readonly number[]): Bytes { return Object.freeze(Array.from(value)); }
 function deniedProjection(): DocumentSynthesisProjectionResult { return sealed({ status: 'denied' as const, code: 'input_invalid' as const, projection: null }); }
 function deniedSourceSet(): DocumentSynthesisSourceSetResult { return sealed({ status: 'denied' as const, code: 'input_invalid' as const, sourceSet: null }); }
+
+function addSourceSetIdentity(value: object): void { apply(weakSetAdd, authenticSourceSets, [value]); }
+function hasSourceSetIdentity(value: object): boolean { return apply(weakSetHas, authenticSourceSets, [value]); }
+function setProviderSources(value: object, sources: readonly ProviderSource[]): void { apply(weakMapSet, providerSources, [value, sources]); }
+function getProviderSources(value: object): readonly ProviderSource[] | undefined { return apply(weakMapGet, providerSources, [value]) as readonly ProviderSource[] | undefined; }
 
 function record(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
     try {
@@ -120,6 +139,21 @@ export function captureDocumentSynthesisSourceSet(value: unknown): DocumentSynth
         const payload: number[] = [...u32(encoder.encode(DOMAIN).length), ...encoder.encode(DOMAIN), 0, 1, sources.length, ...u64(input.sourceSetEpoch), ...u64(input.revocationGeneration)];
         for (const item of sources) payload.push(...u32(encoder.encode(item.label).length), ...encoder.encode(item.label), ...u32(encoder.encode(item.documentSourceRef).length), ...encoder.encode(item.documentSourceRef), ...u64(item.documentRevision), ...u64(item.documentFreshnessEpoch), ...item.projectionDigestSha256);
         const digestPayloadBytes = bytes(payload);
-        return sealed({ status: 'available' as const, code: null, sourceSet: sealed({ sourceSetEpoch: input.sourceSetEpoch, revocationGeneration: input.revocationGeneration, sources: Object.freeze(sources), digestPayloadBytes, sourceSetDigestSha256: digest(digestPayloadBytes) }) });
+        const sourceSet = sealed({ sourceSetEpoch: input.sourceSetEpoch, revocationGeneration: input.revocationGeneration, sources: Object.freeze(sources), digestPayloadBytes, sourceSetDigestSha256: digest(digestPayloadBytes) });
+        const snapshot = Object.freeze(sources.map((item) => sealed({ label: item.label, sourceText: item.sourceText }) as ProviderSource));
+        addSourceSetIdentity(sourceSet);
+        setProviderSources(sourceSet, snapshot);
+        return sealed({ status: 'available' as const, code: null, sourceSet });
     } catch { return deniedSourceSet(); }
+}
+
+/** Projects an authentic C3c2 source-set identity into the provider's minimal input only. */
+export function composeDocumentSynthesisProviderProjection(sourceSet: unknown): DocumentSynthesisProviderProjection | null {
+    if (typeof sourceSet !== 'object' || sourceSet === null || !hasSourceSetIdentity(sourceSet)) return null;
+    const snapshot = getProviderSources(sourceSet);
+    if (!snapshot) return null;
+    return sealed({
+        schemaVersion: 'mediflow.document-synthesis.provider-projection.v1' as const,
+        sources: snapshot,
+    });
 }
