@@ -54,7 +54,25 @@ test('rejects malformed, empty, oversize, multiple, trailing, duplicate, incompl
         JSON.stringify({ ...output(), data: { ...output().data, medications: [null] } }),
         '{"schemaVersion":"mediflow.ai.extract.v1","task":"document_synthesis","summary":"Synthetic document review.","data":{"qualityLevel":"green","medications":[,],"diagnoses":[],"problemStatements":[],"therapyCandidates":[],"servicePrescriptions":[]}}',
         JSON.stringify({ schemaVersion: 'mediflow.ai.extract.v1', task: 'document_synthesis', summary: 'Synthetic document review.' }),
+]) denied(response(content));
+});
+
+test('rejects canonical JSON whose raw provider content exceeds the bound only through whitespace framing', () => {
+    const canonical = JSON.stringify(output());
+    const padding = ' '.repeat(262_145 - canonical.length);
+    for (const content of [
+        `${canonical}${padding}`,
+        `${padding}${canonical}`,
+        `${padding.slice(0, Math.floor(padding.length / 2))}${canonical}${padding.slice(Math.floor(padding.length / 2))}`,
     ]) denied(response(content));
+
+    const source = readFileSync(new URL('./document-synthesis-provider-response.ts', import.meta.url), 'utf8');
+    const parseOneJsonObject = source.indexOf('function parseOneJsonObject');
+    const rawSizeGuard = source.indexOf('if (content.length > MAX_CONTENT_CHARS) return null;', parseOneJsonObject);
+    assert.ok(rawSizeGuard > parseOneJsonObject);
+    for (const operation of ['const trimmed = content.trim();', 'duplicateJsonKeys(trimmed)', 'JSON.parse(trimmed)']) {
+        assert.ok(rawSizeGuard < source.indexOf(operation, parseOneJsonObject));
+    }
 });
 
 test('rejects non-data-only response records before accessors, proxies, symbols, prototypes, arrays, or thenables run', () => {
