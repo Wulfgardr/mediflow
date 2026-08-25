@@ -76,6 +76,82 @@ if (!fs.existsSync(dbPath) && fs.existsSync(legacyDbPath)) {
 let sqlite = new Database(dbPath);
 initSqlitePragmas(sqlite);
 /* @Codex */
+const PHYSICIAN_REVIEW_ATTESTATIONS_DDL = `
+    CREATE TABLE physician_review_attestations (
+        actor_ref TEXT PRIMARY KEY NOT NULL REFERENCES users(id) CHECK (length(actor_ref) BETWEEN 1 AND 256 AND trim(actor_ref) = actor_ref),
+        schema_version TEXT NOT NULL CHECK (schema_version = 'mediflow.physician-review-attestation.v1'),
+        capability TEXT NOT NULL CHECK (capability = 'physician_terminal_review'),
+        status TEXT NOT NULL CHECK (status IN ('inactive', 'active', 'revoked')),
+        attestation_version INTEGER NOT NULL CHECK (attestation_version = 1),
+        policy_version TEXT NOT NULL CHECK (policy_version = 'physician_terminal_review.v1'),
+        revoked_at INTEGER, created_at INTEGER NOT NULL DEFAULT (unixepoch()), updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        CONSTRAINT physician_review_attestations_lifecycle_check CHECK ((status IN ('inactive', 'active') AND revoked_at IS NULL) OR (status = 'revoked' AND revoked_at IS NOT NULL)),
+        CONSTRAINT physician_review_attestations_timestamp_check CHECK (
+            typeof(created_at) = 'integer' AND created_at BETWEEN 0 AND 8640000000000
+            AND typeof(updated_at) = 'integer' AND updated_at BETWEEN created_at AND 8640000000000
+            AND (revoked_at IS NULL OR (typeof(revoked_at) = 'integer' AND revoked_at BETWEEN created_at AND 8640000000000))
+        )
+    )
+`;
+/* @Codex */
+const PHYSICIAN_REVIEW_ATTESTATIONS_P2A_DDL = `
+    CREATE TABLE physician_review_attestations (
+        actor_ref TEXT PRIMARY KEY NOT NULL REFERENCES users(id) CHECK (length(actor_ref) BETWEEN 1 AND 256 AND trim(actor_ref) = actor_ref),
+        schema_version TEXT NOT NULL CHECK (schema_version = 'mediflow.physician-review-attestation.v1'),
+        capability TEXT NOT NULL CHECK (capability = 'physician_terminal_review'),
+        status TEXT NOT NULL CHECK (status IN ('inactive', 'revoked')),
+        attestation_version INTEGER NOT NULL CHECK (attestation_version = 1),
+        policy_version TEXT NOT NULL CHECK (policy_version = 'physician_terminal_review.v1'),
+        revoked_at INTEGER, created_at INTEGER NOT NULL DEFAULT (unixepoch()), updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        CONSTRAINT physician_review_attestations_lifecycle_check CHECK ((status = 'inactive' AND revoked_at IS NULL) OR (status = 'revoked' AND revoked_at IS NOT NULL)),
+        CONSTRAINT physician_review_attestations_timestamp_check CHECK (
+            typeof(created_at) = 'integer' AND created_at BETWEEN 0 AND 8640000000000
+            AND typeof(updated_at) = 'integer' AND updated_at BETWEEN created_at AND 8640000000000
+            AND (revoked_at IS NULL OR (typeof(revoked_at) = 'integer' AND revoked_at BETWEEN created_at AND 8640000000000))
+        )
+    )
+`;
+const normalizeSchemaSql = (value: string) => value.toLowerCase().replace(/if\s+not\s+exists/gu, '').replace(/[\s`"']/gu, '');
+const PHYSICIAN_REVIEW_ATTESTATIONS_SCHEMA = normalizeSchemaSql(PHYSICIAN_REVIEW_ATTESTATIONS_DDL);
+const PHYSICIAN_REVIEW_ATTESTATIONS_P2A_SCHEMA = normalizeSchemaSql(PHYSICIAN_REVIEW_ATTESTATIONS_P2A_DDL);
+/* @Codex */
+const DURABLE_REVIEW_PATIENT_LINKS_DDL = `
+    CREATE TABLE IF NOT EXISTS durable_review_patient_links (
+        review_id TEXT PRIMARY KEY NOT NULL REFERENCES durable_review_records(review_id),
+        patient_id TEXT NOT NULL REFERENCES patients(id),
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()), updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        CONSTRAINT durable_review_patient_links_timestamp_check CHECK (typeof(created_at) = 'integer' AND created_at BETWEEN 0 AND 8640000000000 AND typeof(updated_at) = 'integer' AND updated_at BETWEEN created_at AND 8640000000000)
+    )
+`;
+const DURABLE_REVIEW_PATIENT_LINKS_SCHEMA = normalizeSchemaSql(DURABLE_REVIEW_PATIENT_LINKS_DDL);
+/* @Codex */
+function physicianReviewAttestationSchemaEquals(expected: string): boolean {
+    const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'physician_review_attestations'").get() as { sql?: unknown } | undefined;
+    return typeof row?.sql === 'string' && normalizeSchemaSql(row.sql) === expected;
+}
+/* @Codex */
+export function hasCanonicalPhysicianReviewAttestationSchema(): boolean {
+    return physicianReviewAttestationSchemaEquals(PHYSICIAN_REVIEW_ATTESTATIONS_SCHEMA);
+}
+/* @Codex */
+export function hasCanonicalDurableReviewPatientLinkSchema(): boolean {
+    const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'durable_review_patient_links'").get() as { sql?: unknown } | undefined;
+    return typeof row?.sql === 'string' && normalizeSchemaSql(row.sql) === DURABLE_REVIEW_PATIENT_LINKS_SCHEMA;
+}
+/* @Codex */
+function migrateP2aPhysicianReviewAttestationSchema(): void {
+    if (!physicianReviewAttestationSchemaEquals(PHYSICIAN_REVIEW_ATTESTATIONS_P2A_SCHEMA)) return;
+    sqlite.transaction(() => {
+        sqlite.exec('ALTER TABLE physician_review_attestations RENAME TO physician_review_attestations_p2a');
+        sqlite.prepare(PHYSICIAN_REVIEW_ATTESTATIONS_DDL).run();
+        sqlite.exec(`INSERT INTO physician_review_attestations (
+            actor_ref, schema_version, capability, status, attestation_version, policy_version, revoked_at, created_at, updated_at
+        ) SELECT actor_ref, schema_version, capability, status, attestation_version, policy_version, revoked_at, created_at, updated_at
+        FROM physician_review_attestations_p2a`);
+        sqlite.exec('DROP TABLE physician_review_attestations_p2a');
+    }).immediate();
+}
+/* @Codex */
 type TableInfoRow = { name: string };
 /* @Codex */
 function ensureColumn(table: string, columnName: string, columnSql: string) {
@@ -100,6 +176,13 @@ function applySchemaGuards() {
         ensureColumn('users', 'locked_until', 'locked_until INTEGER');
     } catch (error) {
         console.warn('[MediFlow] Users schema check skipped:', error);
+    }
+    /* @Codex */
+    try {
+        migrateP2aPhysicianReviewAttestationSchema();
+        sqlite.prepare(PHYSICIAN_REVIEW_ATTESTATIONS_DDL.replace('CREATE TABLE', 'CREATE TABLE IF NOT EXISTS')).run();
+    } catch (error) {
+        console.warn('[MediFlow] Physician review attestation schema check skipped:', error);
     }
     /* @Codex */
     try {
@@ -519,6 +602,42 @@ function applySchemaGuards() {
     sqlite.prepare('CREATE INDEX IF NOT EXISTS document_diagnosis_proposals_patient_idx ON document_diagnosis_proposals(patient_id)').run();
     sqlite.prepare('CREATE INDEX IF NOT EXISTS document_diagnosis_proposals_patient_status_idx ON document_diagnosis_proposals(patient_id, status)').run();
     sqlite.prepare('CREATE UNIQUE INDEX IF NOT EXISTS document_diagnosis_proposals_source_candidate_unique ON document_diagnosis_proposals(patient_id, source_document_key, candidate_key)').run();
+    /* @Codex */
+    sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS durable_review_records (
+            id TEXT PRIMARY KEY NOT NULL, patient_ref TEXT NOT NULL, review_id TEXT NOT NULL UNIQUE, review_revision INTEGER NOT NULL,
+            receipt_ref TEXT NOT NULL, provenance_ref TEXT NOT NULL, receipt_binding TEXT NOT NULL, provenance_binding TEXT NOT NULL,
+            presentation_version TEXT NOT NULL, sealed_ciphertext TEXT NOT NULL, sealed_digest TEXT NOT NULL,
+            created_at INTEGER DEFAULT (unixepoch())
+        )
+    `).run();
+    ensureColumn('durable_review_records', 'patient_ref', "patient_ref TEXT NOT NULL DEFAULT ''");
+    /* @Codex */
+    sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS durable_review_operations (
+            id TEXT PRIMARY KEY NOT NULL, review_id TEXT NOT NULL, idempotency_key TEXT NOT NULL,
+            operation TEXT NOT NULL, expected_review_revision INTEGER NOT NULL, operation_digest TEXT NOT NULL,
+            record_snapshot TEXT NOT NULL, created_at INTEGER DEFAULT (unixepoch())
+        )
+    `).run();
+    sqlite.prepare('CREATE UNIQUE INDEX IF NOT EXISTS durable_review_operations_review_key_unique ON durable_review_operations(review_id, idempotency_key)').run();
+    /* @Codex */
+    sqlite.prepare(DURABLE_REVIEW_PATIENT_LINKS_DDL).run();
+    /* @Codex */
+    sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS durable_review_command_states (
+            review_id TEXT PRIMARY KEY NOT NULL, review_state TEXT NOT NULL, revision INTEGER NOT NULL, action TEXT NOT NULL,
+            created_at INTEGER DEFAULT (unixepoch())
+        )
+    `).run();
+    /* @Codex */
+    sqlite.prepare(`
+        CREATE TABLE IF NOT EXISTS durable_review_command_operations (
+            id TEXT PRIMARY KEY NOT NULL, review_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, command_digest TEXT NOT NULL,
+            result_snapshot TEXT NOT NULL, audit_event_id TEXT NOT NULL, created_at INTEGER DEFAULT (unixepoch())
+        )
+    `).run();
+    sqlite.prepare('CREATE UNIQUE INDEX IF NOT EXISTS durable_review_command_operations_review_key_unique ON durable_review_command_operations(review_id, idempotency_key)').run();
     // WUL-268 (STREAM A): core tables shipped without secondary indices, so
     // patient-scoped reads and lookups fell back to full table scans (verified
     // via EXPLAIN QUERY PLAN). Guards are the operative migration mechanism, so
@@ -602,3 +721,9 @@ const sqliteHandle = new Proxy({} as Database.Database, {
     },
 });
 export const dbServer = drizzle(sqliteHandle);
+
+/* @Codex */
+/** Runs a bounded DB mutation under SQLite's writer lock so stale readers cannot race a CAS decision. */
+export function runDbServerImmediateTransaction<T>(operation: () => T): T {
+    return sqlite.transaction(operation).immediate();
+}

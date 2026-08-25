@@ -5,16 +5,12 @@ import { afterEach, test } from 'node:test';
 
 import {
     createServerSessionProjectionOwnerRegistry,
+    isServerSessionProjectionOwner,
     ServerSessionProjectionOwnerError,
 } from './server-session-projection-owner.ts';
-import { clearAllSessions, createSession, deleteSession, getSession, type ServerSession } from './server-session.ts';
-import { ProjectionBrokerError } from '../typed-projection-broker.ts';
+import { clearAllSessions, createSession, deleteSession, type ServerSession } from './server-session.ts';
 
-const USER = {
-    id: ['synthetic', 'user'].join('-'),
-    username: ['synthetic', 'clinician'].join('-'),
-    role: 'clinician',
-};
+const USER = { id: ['synthetic', 'user'].join('-'), username: ['synthetic', 'clinician'].join('-'), role: 'clinician' };
 const PAIR = { patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' };
 
 afterEach(() => clearAllSessions());
@@ -23,155 +19,245 @@ function session(channel: ServerSession['authChannel'] = 'web') {
     return createSession(USER, channel);
 }
 
-function rejects(code: string) {
-    return (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === code;
+function ownerWithSelection(now = 1_000) {
+    let clock = now;
+    let entropy = 0;
+    const registry = createServerSessionProjectionOwnerRegistry({
+        clock: () => clock,
+        entropy: () => Uint8Array.from({ length: 16 }, (_, index) => (entropy += 1) + index),
+        resolve: (_session, pair) => Object.freeze({ ...pair }),
+    });
+    const value = session();
+    const owner = registry.acquire(value);
+    owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    return { registry, value, owner, setClock: (next: number) => { clock = next; } };
 }
 
-test('acquire creates one owner and reuses its identity for the canonical session', () => {
-    let constructions = 0;
-    const registry = createServerSessionProjectionOwnerRegistry({ entropy: () => {
-        constructions += 1; return new Uint8Array(16);
-    } });
-    const value = session();
-    const first = registry.acquire(value);
-    const second = registry.acquire(value);
-
-    assert.equal(first, second);
-    assert.equal(registry.lookup(value.id), first);
-    assert.equal(constructions, 1);
-});
-
-test('acquire rejects synchronous source reentrancy with one fixed error', () => {
-    let reenter = true; const value = session();
-    const registry = createServerSessionProjectionOwnerRegistry({ entropy: () => {
-        if (reenter) { reenter = false; assert.throws(() => registry.acquire(value), rejects('owner_acquiring')); }
-        return new Uint8Array(16);
-    } });
-
-    assert.equal(registry.acquire(value), registry.lookup(value.id));
-});
-
-test('registry isolates sessions, rejects duplicate owners, and fresh lookup stays unavailable', () => {
-    const registry = createServerSessionProjectionOwnerRegistry();
-    const first = session();
-    const second = session();
-    const firstOwner = registry.acquire(first);
-    const secondOwner = registry.acquire(second);
-
-    assert.equal(registry.lookup(first.id), firstOwner);
-    assert.equal(registry.lookup(second.id), secondOwner);
-    assert.notEqual(firstOwner, secondOwner);
-    assert.throws(() => registry.create(first), rejects('owner_exists'));
-    deleteSession(first.id);
-    secondOwner.dispose();
-    assert.equal(createServerSessionProjectionOwnerRegistry().lookup(first.id), null);
-});
-
-test('strict create and acquire share one winner without a lookup-create sequence', () => {
-    const createFirst = createServerSessionProjectionOwnerRegistry(); const firstSession = session();
-    const created = createFirst.create(firstSession);
-    assert.equal(createFirst.acquire(firstSession), created);
-
-    const acquireFirst = createServerSessionProjectionOwnerRegistry(); const secondSession = session();
-    acquireFirst.acquire(secondSession);
-    assert.throws(() => acquireFirst.create(secondSession), rejects('owner_exists'));
-});
-
-test('delete, expiry, reset, and explicit disposal are terminal and idempotent', () => {
-    const scenarios = [
-        (value: ServerSession) => deleteSession(value.id),
-        (value: ServerSession) => { value.expiresAt = 0; assert.equal(getSession(value.id), null); },
-        () => clearAllSessions(),
-        (_value: ServerSession, owner: { dispose(): void }) => owner.dispose(),
-    ];
-
-    for (const terminate of scenarios) {
-        let sequence = 0; const events: string[] = [];
-        const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair,
-            entropy: () => Uint8Array.from({ length: 16 }, (_, index) => sequence += index + 1),
-            brokerFactory: () => ({ ingest: Object.freeze({ ingest() { return 'unused'; } }),
-                service: Object.freeze({ consume() { return {}; } }), control: Object.freeze({ lock() {},
-                    changeSelection() {}, revoke() { events.push('revoked'); } }) }) as never });
-        const value = session();
-        const owner = registry.create(value);
-        const lease = owner.issueSelection({ expectedEpoch: 0, ...PAIR });
-        const ingest = owner.acquireProjectionIngest(value, { sessionRef: lease.sessionRef,
-            selectionEpoch: lease.selectionEpoch, patientRef: lease.patientRef,
-            ambulatoryRef: lease.ambulatoryRef, leaseRef: lease.leaseRef });
-
-        terminate(value, owner);
-        owner.dispose();
-        owner.dispose();
-
-        assert.equal(registry.lookup(value.id), null);
-        assert.deepEqual(events, ['revoked']);
-        assert.throws(() => ingest.ingest({} as never),
-            (error) => error instanceof ProjectionBrokerError && error.code === 'broker_revoked');
-    }
-});
-
-test('native, system, and local-api identities cannot create an owner', () => {
-    const registry = createServerSessionProjectionOwnerRegistry();
-    const web = session();
-
-    for (const value of [session('native'), session('system'), { ...web, id: 'local-api' }]) {
-        assert.throws(() => registry.create(value), rejects('session_ineligible'));
-        assert.throws(() => registry.acquire(value), rejects('session_ineligible'));
-    }
-    const owner = registry.acquire(web);
-    assert.throws(() => registry.acquire({ ...web }), rejects('session_ineligible'));
-    web.expiresAt = 0; assert.equal(getSession(web.id), null);
-    assert.throws(() => registry.acquire(web), rejects('session_ineligible'));
-    assert.equal(registry.lookup(web.id), null);
-    assert.ok(owner);
-});
-
-test('reacquire preserves an existing selection without resolver or broker side effects', () => {
-    let resolves = 0; let brokers = 0;
-    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => { resolves += 1; return pair; },
-        brokerFactory: () => { brokers += 1; throw new Error('synthetic broker must remain unused'); } });
-    const value = session(); const owner = registry.acquire(value);
-    const lease = owner.issueSelection({ expectedEpoch: 0, ...PAIR });
-
+test('keeps authentic owner identity private to the registry', () => {
+    const { registry, value, owner } = ownerWithSelection();
+    const lookalike = Object.freeze({ ...owner });
+    assert.equal(isServerSessionProjectionOwner(owner), true);
+    assert.equal(registry.isAuthenticOwner(owner), true);
+    assert.equal(isServerSessionProjectionOwner(lookalike), false);
+    assert.equal(registry.isAuthenticOwner(lookalike), false);
     assert.equal(registry.acquire(value), owner);
-    assert.equal(owner.dereferenceSelection(value, { sessionRef: lease.sessionRef, selectionEpoch: lease.selectionEpoch,
-        patientRef: lease.patientRef, ambulatoryRef: lease.ambulatoryRef, leaseRef: lease.leaseRef }).patientId, PAIR.patientId);
-    assert.deepEqual({ resolves, brokers, epoch: lease.selectionEpoch }, { resolves: 1, brokers: 0, epoch: 1 });
 });
 
-test('snapshots the owner-held epoch without acquisition, references, expiry changes, or conflict disclosure', () => {
-    let resolves = 0; let brokers = 0;
-    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => { resolves += 1; return pair; },
-        brokerFactory: () => { brokers += 1; throw new Error('synthetic broker must remain unused'); } });
-    const value = session(); value.expiresAt = Date.now() + 1_000; const freshExpiry = value.expiresAt;
-
-    assert.equal(registry.snapshotSelectionEpoch(value), 0);
-    assert.equal(registry.lookup(value.id), null);
-    assert.equal(value.expiresAt, freshExpiry);
-    const owner = registry.acquire(value);
-    assert.equal(registry.snapshotSelectionEpoch(value), 0);
-    const winner = owner.issueSelection({ expectedEpoch: 0, ...PAIR }); const issuedExpiry = value.expiresAt;
-    assert.equal(registry.snapshotSelectionEpoch(value), winner.selectionEpoch);
-    assert.equal(value.expiresAt, issuedExpiry);
-    assert.throws(() => owner.issueSelection({ expectedEpoch: 0, ...PAIR }), rejects('epoch_conflict'));
-    assert.equal(registry.snapshotSelectionEpoch(value), winner.selectionEpoch);
-    assert.deepEqual({ resolves, brokers }, { resolves: 2, brokers: 0 });
-    assert.throws(() => registry.snapshotSelectionEpoch({ ...value }), rejects('session_ineligible'));
+test('removes the generic commit turn surface and mints separated closed ports', () => {
+    const source = readFileSync(new URL('./server-session-projection-owner.ts', import.meta.url), 'utf8');
+    assert.doesNotMatch(source, /(?:LeaseCommitTurn|spendLeaseCommitTurn|withLeaseCommitTurn)/u);
+    const { value, owner } = ownerWithSelection();
+    const patientInsight = owner.mintPatientInsightLeaseCommitPort(value);
+    const secondPatientInsight = owner.mintPatientInsightLeaseCommitPort(value);
+    const ocr = owner.mintOcrLeaseCommitPort(value);
+    const documentSynthesis = owner.mintDocumentSynthesisLeaseCommitPort(value);
+    const patientSnapshot = patientInsight.snapshot();
+    const ocrSnapshot = ocr.snapshot();
+    const documentSnapshot = documentSynthesis.snapshot();
+    assert.ok(patientSnapshot); assert.ok(ocrSnapshot); assert.ok(documentSnapshot);
+    assert.notEqual(patientInsight, secondPatientInsight);
+    assert.notEqual(patientInsight, ocr);
+    assert.notEqual(patientInsight, documentSynthesis);
+    assert.notEqual(ocr, documentSynthesis);
+    assert.deepEqual(Object.keys(patientInsight), ['snapshot', 'prepare', 'commit', 'abort', 'dispose']);
+    assert.equal(Object.isFrozen(patientInsight), true);
+    assert.equal(Object.getPrototypeOf(patientSnapshot.currentRef), null);
+    assert.equal(Object.isFrozen(patientSnapshot.currentRef), true);
+    const replacement = patientInsight.prepare(Object.freeze({ expected: patientSnapshot.currentRef }));
+    assert.ok(replacement);
+    assert.equal(secondPatientInsight.commit(Object.freeze({
+        expected: secondPatientInsight.snapshot()!.currentRef, replacement,
+    } as never)), false);
+    assert.equal(ocr.commit(Object.freeze({ expected: ocrSnapshot.currentRef, replacement } as never)), false);
+    assert.equal(documentSynthesis.commit(Object.freeze({ expected: documentSnapshot.currentRef, replacement } as never)), false);
+    assert.equal(patientInsight.commit(Object.freeze({ expected: patientSnapshot.currentRef, replacement })), true);
+    assert.equal(patientInsight.snapshot()!.terminal, true);
+    assert.equal(patientInsight.commit(Object.freeze({ expected: patientSnapshot.currentRef, replacement })), false);
+    assert.equal(patientInsight.abort(Object.freeze({ replacement })), false);
 });
 
-test('authenticated owner context acquires once and legacy owner helper only derives it', () => {
-    const ownerSource = readFileSync(new URL('./server-session-projection-owner.ts', import.meta.url), 'utf8');
-    const authSource = readFileSync(new URL('./server-auth.ts', import.meta.url), 'utf8');
-    const productionSource = `${ownerSource}\n${authSource}`;
+test('Document Synthesis accepts only frozen exact own data records without reading hostile inputs', () => {
+    const { value, owner } = ownerWithSelection();
+    const port = owner.mintDocumentSynthesisLeaseCommitPort(value);
+    const current = port.snapshot()!.currentRef;
+    let reads = 0; let traps = 0;
+    const accessor = Object.freeze(Object.defineProperty({}, 'expected', {
+        enumerable: true, get() { reads += 1; return current; },
+    }));
+    const proxy = new Proxy(Object.freeze({ expected: current }), {
+        get() { traps += 1; throw new Error('synthetic get trap'); },
+        ownKeys() { traps += 1; throw new Error('synthetic ownKeys trap'); },
+    });
+    const hidden = Object.freeze(Object.defineProperty({ expected: current }, 'hidden', { value: true }));
+    const custom = Object.freeze(Object.assign(Object.create(null), { expected: current }));
+    const thenable = Object.freeze(Object.defineProperty({ expected: current }, 'then', { enumerable: true, get() { reads += 1; return () => undefined; } }));
 
-    assert.match(
-        authSource,
-        /acquireAuthenticatedWebSessionProjectionOwnerContext[\s\S]*const session = await requireSession\(\);[\s\S]*serverSessionProjectionOwnerRegistry\.acquire\(session\)[\s\S]*Object\.freeze\(\{ session, owner \}\)/u,
-    );
-    assert.match(authSource, /acquireAuthenticatedWebSessionProjectionOwner\(\)[\s\S]*acquireAuthenticatedWebSessionProjectionOwnerContext\(\)[\s\S]*\?\.owner/u);
-    assert.doesNotMatch(authSource, /createAuthenticatedWebSessionProjectionOwner|serverSessionProjectionOwnerRegistry\.lookup\(/u);
-    assert.doesNotMatch(
-        productionSource,
-        /from ['"][^'"]*(?:provider|apply|patient-smart-import)[^'"]*['"]/u,
-    );
+    for (const request of [accessor, proxy, Object.freeze({ expected: current, extra: true }), hidden,
+        Object.freeze({ expected: current, [Symbol('synthetic')]: true }), custom, thenable, { expected: current }]) {
+        assert.equal(port.prepare(request as never), null);
+    }
+    assert.equal(reads, 0);
+    assert.equal(traps, 0);
+});
+
+test('Document Synthesis stages a private replacement before a single terminal owner-state replacement', () => {
+    const { value, owner } = ownerWithSelection();
+    const port = owner.mintDocumentSynthesisLeaseCommitPort(value);
+    const before = port.snapshot()!;
+    const replacement = port.prepare(Object.freeze({ expected: before.currentRef }));
+    assert.ok(replacement);
+    const staged = port.snapshot()!;
+    assert.equal(staged.currentRef, before.currentRef);
+    assert.equal(staged.stagedRef, replacement);
+    assert.equal(staged.generation, before.generation);
+    assert.equal(port.commit(Object.freeze({ expected: before.currentRef, replacement })), true);
+    const committed = port.snapshot()!;
+    assert.equal(committed.currentRef, replacement);
+    assert.equal(committed.stagedRef, null);
+    assert.equal(committed.generation, before.generation + 1);
+    assert.equal(committed.terminal, true);
+});
+
+test('Document Synthesis aborts once before commit and never rolls a completed state back', () => {
+    const { value, owner } = ownerWithSelection();
+    const port = owner.mintDocumentSynthesisLeaseCommitPort(value);
+    const current = port.snapshot()!.currentRef;
+    const replacement = port.prepare(Object.freeze({ expected: current }));
+    assert.ok(replacement);
+    assert.equal(port.abort(Object.freeze({ replacement })), true);
+    assert.equal(port.snapshot()!.currentRef, current);
+    assert.equal(port.snapshot()!.stagedRef, null);
+    assert.equal(port.abort(Object.freeze({ replacement })), false);
+    assert.equal(port.commit(Object.freeze({ expected: current, replacement })), false);
+});
+
+test('fails closed on reselection, expiry, logout, disposal, cross-session, and fresh registry', () => {
+    const first = ownerWithSelection();
+    const port = first.owner.mintPatientInsightLeaseCommitPort(first.value);
+    const current = port.snapshot()!.currentRef;
+    const replacement = port.prepare(Object.freeze({ expected: current }));
+    assert.ok(replacement);
+    first.owner.issueSelection({ expectedEpoch: 1, ...PAIR });
+    assert.equal(port.commit(Object.freeze({ expected: current, replacement })), false);
+
+    const expired = ownerWithSelection(); const expiryPort = expired.owner.mintOcrLeaseCommitPort(expired.value);
+    const expiryCurrent = expiryPort.snapshot()!.currentRef;
+    const expiryReplacement = expiryPort.prepare(Object.freeze({ expected: expiryCurrent }));
+    expired.setClock(expired.value.expiresAt);
+    assert.equal(expiryPort.commit(Object.freeze({ expected: expiryCurrent, replacement: expiryReplacement! })), false);
+
+    const loggedOut = ownerWithSelection(); const logoutPort = loggedOut.owner.mintOcrLeaseCommitPort(loggedOut.value);
+    deleteSession(loggedOut.value.id);
+    assert.equal(logoutPort.snapshot(), null);
+    const foreign = session();
+    assert.throws(() => first.owner.mintPatientInsightLeaseCommitPort(foreign));
+    assert.throws(() => ({ mint: first.owner.mintPatientInsightLeaseCommitPort }).mint(first.value));
+    assert.equal(createServerSessionProjectionOwnerRegistry().lookup(first.value.id), null);
+    first.owner.dispose();
+    assert.equal(port.snapshot(), null);
+});
+
+test('denies same-kind nested operations and isolates cross-kind ports during snapshots', () => {
+    for (const kind of ['patient-insight', 'ocr', 'document-synthesis'] as const) for (const operation of ['snapshot', 'prepare', 'commit', 'abort', 'dispose'] as const) {
+        let armed = false;
+        const registry = createServerSessionProjectionOwnerRegistry({
+            resolve: (_session, pair) => pair, entropy: () => new Uint8Array(16),
+            clock: () => { if (armed) { armed = false;
+                if (operation === 'snapshot') port.snapshot(); else if (operation === 'prepare') port.prepare(Object.freeze({ expected: current } as never));
+                else if (operation === 'commit') port.commit(Object.freeze({ expected: current, replacement: current } as never));
+                else if (operation === 'abort') port.abort(Object.freeze({ replacement: current } as never)); else port.dispose();
+            } return 1_000; },
+        });
+        const value = session(); const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+        const port = kind === 'patient-insight' ? owner.mintPatientInsightLeaseCommitPort(value) : kind === 'ocr' ? owner.mintOcrLeaseCommitPort(value) : owner.mintDocumentSynthesisLeaseCommitPort(value);
+        const current = port.snapshot()!.currentRef;
+        armed = true;
+        assert.equal(port.snapshot(), null);
+        assert.deepEqual(port.snapshot(), { currentRef: current, stagedRef: null, generation: 0, terminal: operation === 'dispose' });
+    }
+});
+
+test('Document Synthesis ports cannot union authority with Patient Insight or OCR ports', () => {
+    const { value, owner } = ownerWithSelection();
+    const document = owner.mintDocumentSynthesisLeaseCommitPort(value);
+    const patient = owner.mintPatientInsightLeaseCommitPort(value);
+    const ocr = owner.mintOcrLeaseCommitPort(value);
+    const current = document.snapshot()!.currentRef;
+    const replacement = document.prepare(Object.freeze({ expected: current }));
+    assert.ok(replacement);
+    assert.equal(patient.commit(Object.freeze({ expected: patient.snapshot()!.currentRef, replacement } as never)), false);
+    assert.equal(ocr.abort(Object.freeze({ replacement } as never)), false);
+    assert.equal(document.commit(Object.freeze({ expected: current, replacement })), true);
+    assert.deepEqual(document.snapshot(), { currentRef: replacement, stagedRef: null, generation: 1, terminal: true });
+});
+
+test('Document Synthesis port never reads ambient then or schedules post-return work', async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+    let reads = 0; let unhandled = 0;
+    const onUnhandled = () => { unhandled += 1; };
+    const { value, owner } = ownerWithSelection(); const port = owner.mintDocumentSynthesisLeaseCommitPort(value);
+    const current = port.snapshot()!.currentRef;
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { reads += 1; return undefined; } });
+    process.on('unhandledRejection', onUnhandled);
+    try {
+        const before = reads; const replacement = port.prepare(Object.freeze({ expected: current }));
+        assert.ok(replacement); assert.equal(port.commit(Object.freeze({ expected: current, replacement })), true);
+        assert.deepEqual(port.snapshot(), { currentRef: replacement, stagedRef: null, generation: 1, terminal: true });
+        assert.equal(reads, before);
+    } finally {
+        if (descriptor) Object.defineProperty(Object.prototype, 'then', descriptor); else delete (Object.prototype as { then?: unknown }).then;
+    }
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    process.off('unhandledRejection', onUnhandled);
+    assert.equal(unhandled, 0);
+});
+
+test('denies a result when the final critical-section clock disposes its session owner', () => {
+    for (const result of [Object.freeze({ kind: 'normal' }), Object.freeze({ then() { /* probe only */ } })]) {
+        let arm = false; let armedClockReads = 0;
+        const registry = createServerSessionProjectionOwnerRegistry({
+            resolve: (_session, pair) => pair, entropy: () => new Uint8Array(16),
+            clock: () => { if (arm && ++armedClockReads === 2) deleteSession(value.id); return 1_000; },
+        });
+        const value = session(); const owner = registry.acquire(value);
+        owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+        assert.throws(() => owner.withLeaseCriticalSection(value, () => { arm = true; return result; }),
+            (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
+        assert.equal(registry.lookup(value.id), null);
+    }
+});
+
+test('never republishes selection after lifecycle disposal during resolve or final clock', () => {
+    for (const phase of ['resolve', 'clock'] as const) for (const lifecycle of ['owner', 'session'] as const) for (const existing of [false, true]) {
+        let arm = false; let entropy = 0;
+        const registry = createServerSessionProjectionOwnerRegistry({
+            resolve: (_session, pair) => { if (arm && phase === 'resolve') dispose(); return pair; },
+            entropy: () => Uint8Array.from({ length: 16 }, (_, index) => (entropy += 1) + index),
+            clock: () => { if (arm && phase === 'clock') dispose(); return 1_000; },
+        });
+        const value = session(); const owner = registry.acquire(value);
+        if (existing) owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+        const expectedEpoch = existing ? 1 : 0;
+        const dispose = () => { if (lifecycle === 'owner') owner.dispose(); else deleteSession(value.id); };
+        arm = true;
+        assert.throws(() => owner.issueSelection({ expectedEpoch, ...PAIR }),
+            (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
+        assert.equal(registry.lookup(value.id), null);
+        assert.throws(() => owner.snapshotSelectionEpoch(value),
+            (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
+        assert.throws(() => owner.issueSelection({ expectedEpoch, ...PAIR }),
+            (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
+    }
+});
+
+test('keeps nested issueSelection busy while resolving the outer selection', () => {
+    let arm = false;
+    const registry = createServerSessionProjectionOwnerRegistry({
+        resolve: (_session, pair) => { if (arm) assert.throws(() => owner.issueSelection({ expectedEpoch: 0, ...PAIR }),
+            (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'selection_busy'); return pair; },
+        entropy: () => new Uint8Array(16), clock: () => 1_000,
+    });
+    const value = session(); const owner = registry.acquire(value); arm = true;
+    assert.equal(owner.issueSelection({ expectedEpoch: 0, ...PAIR }).selectionEpoch, 1);
+    assert.equal(owner.snapshotSelectionEpoch(value), 1);
 });

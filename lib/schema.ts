@@ -20,6 +20,19 @@ export const users = sqliteTable('users', {
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
+/* @Codex */
+export const physicianReviewAttestations = sqliteTable('physician_review_attestations', {
+    actorRef: text('actor_ref').primaryKey().references(() => users.id).notNull(),
+    schemaVersion: text('schema_version').notNull(),
+    capability: text('capability').notNull(),
+    status: text('status').notNull(),
+    attestationVersion: integer('attestation_version').notNull(),
+    policyVersion: text('policy_version').notNull(),
+    revokedAt: integer('revoked_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
 // --- Ambulatories (Multi-Tenant) ---
 export const ambulatories = sqliteTable('ambulatories', {
     id: text('id').primaryKey(),
@@ -331,6 +344,42 @@ export const documentDiagnosisProposals = sqliteTable('document_diagnosis_propos
         t.candidateKey,
     ),
 }));
+
+/* @Codex */
+export const durableReviewRecords = sqliteTable('durable_review_records', {
+    id: text('id').primaryKey(), patientRef: text('patient_ref').notNull(), reviewId: text('review_id').notNull().unique(), reviewRevision: integer('review_revision').notNull(),
+    receiptRef: text('receipt_ref').notNull(), provenanceRef: text('provenance_ref').notNull(),
+    receiptBinding: text('receipt_binding').notNull(), provenanceBinding: text('provenance_binding').notNull(),
+    presentationVersion: text('presentation_version').notNull(), sealedCiphertext: text('sealed_ciphertext').notNull(), sealedDigest: text('sealed_digest').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
+/* @Codex */
+export const durableReviewPatientLinks = sqliteTable('durable_review_patient_links', {
+    reviewId: text('review_id').primaryKey().references(() => durableReviewRecords.reviewId).notNull(),
+    patientId: text('patient_id').references(() => patients.id).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
+/* @Codex */
+export const durableReviewOperations = sqliteTable('durable_review_operations', {
+    id: text('id').primaryKey(), reviewId: text('review_id').notNull(), idempotencyKey: text('idempotency_key').notNull(),
+    operation: text('operation').notNull(), expectedReviewRevision: integer('expected_review_revision').notNull(), operationDigest: text('operation_digest').notNull(), recordSnapshot: text('record_snapshot').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+}, (t) => ({ reviewKeyUnique: uniqueIndex('durable_review_operations_review_key_unique').on(t.reviewId, t.idempotencyKey) }));
+
+/* @Codex */
+export const durableReviewCommandStates = sqliteTable('durable_review_command_states', {
+    reviewId: text('review_id').primaryKey(), reviewState: text('review_state').notNull(), revision: integer('revision').notNull(), action: text('action').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+});
+
+/* @Codex */
+export const durableReviewCommandOperations = sqliteTable('durable_review_command_operations', {
+    id: text('id').primaryKey(), reviewId: text('review_id').notNull(), idempotencyKey: text('idempotency_key').notNull(), commandDigest: text('command_digest').notNull(),
+    resultSnapshot: text('result_snapshot').notNull(), auditEventId: text('audit_event_id').notNull(), createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
+}, (t) => ({ reviewKeyUnique: uniqueIndex('durable_review_command_operations_review_key_unique').on(t.reviewId, t.idempotencyKey) }));
 
 // --- Checkups / Appointments ---
 export const checkups = sqliteTable('checkups', {

@@ -6,6 +6,11 @@ import {
     checkups,
     conversations,
     documentDiagnosisProposals,
+    durableReviewCommandOperations,
+    durableReviewCommandStates,
+    durableReviewOperations,
+    durableReviewPatientLinks,
+    durableReviewRecords,
     drugs,
     entries,
     exemptions,
@@ -13,6 +18,7 @@ import {
     observations,
     patients,
     patientsToAmbulatories,
+    physicianReviewAttestations,
     prostheticPrescriptions,
     serviceCatalogEntries,
     servicePrescriptionItems,
@@ -27,6 +33,12 @@ const CLEAR_ORDER: BackupCollectionName[] = [
     'messages',
     'attachments',
     'documentDiagnosisProposals',
+    'durableReviewCommandOperations',
+    'durableReviewCommandStates',
+    'durableReviewPatientLinks',
+    'durableReviewOperations',
+    'durableReviewRecords',
+    'physicianReviewAttestations',
     'observations',
     'prostheticPrescriptions',
     'servicePrescriptionItems',
@@ -49,7 +61,13 @@ const INSERT_ORDER: BackupCollectionName[] = [
     'exemptions',
     'conversations',
     'patients',
+    'physicianReviewAttestations',
     'documentDiagnosisProposals',
+    'durableReviewRecords',
+    'durableReviewOperations',
+    'durableReviewPatientLinks',
+    'durableReviewCommandStates',
+    'durableReviewCommandOperations',
     'entries',
     'therapies',
     'checkups',
@@ -69,12 +87,18 @@ const TABLE_LOOKUP = {
     checkups,
     conversations,
     documentDiagnosisProposals,
+    durableReviewCommandOperations,
+    durableReviewCommandStates,
+    durableReviewOperations,
+    durableReviewPatientLinks,
+    durableReviewRecords,
     drugs,
     entries,
     exemptions,
     messages,
     observations,
     patients,
+    physicianReviewAttestations,
     prostheticPrescriptions,
     serviceCatalogEntries,
     servicePrescriptionItems,
@@ -85,6 +109,15 @@ const TABLE_LOOKUP = {
 
 type InsertRunner = Pick<typeof dbServer, 'insert'>;
 type InsertableTable = (typeof TABLE_LOOKUP)[BackupCollectionName] | typeof patientsToAmbulatories;
+
+/* @Codex v1 cannot restore command replay receipts without their append-only audit ledger. */
+function assertCommandRecoveryIsRepresentable(): void {
+    const state = dbServer.select({ reviewId: durableReviewCommandStates.reviewId }).from(durableReviewCommandStates).get();
+    const operation = dbServer.select({ id: durableReviewCommandOperations.id }).from(durableReviewCommandOperations).get();
+    if (state || operation) {
+        throw new Error('Restore blocked: durable review commands require the append-only audit ledger.');
+    }
+}
 
 function chunk<T>(items: T[], size: number): T[][] {
     const chunks: T[][] = [];
@@ -158,13 +191,14 @@ function insertRows<T extends Record<string, unknown>>(
 
 export function restoreBackupArtifact(artifact: BackupArtifact): void {
     dbServer.transaction((tx) => {
+        assertCommandRecoveryIsRepresentable();
         for (const collection of CLEAR_ORDER) {
             tx.delete(TABLE_LOOKUP[collection]).run();
         }
         tx.delete(patientsToAmbulatories).run();
 
         for (const collection of INSERT_ORDER) {
-            insertRows(tx, TABLE_LOOKUP[collection], artifact.payload[collection]);
+            insertRows(tx, TABLE_LOOKUP[collection], artifact.payload[collection] ?? []);
         }
 
         insertRows(tx, patientsToAmbulatories, derivePatientAmbulatoryLinks(artifact.payload.patients));
