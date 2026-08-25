@@ -211,6 +211,35 @@ test('uses captured Object and Reflect intrinsics after import without leaking o
     for (const item of projection.sources) assert.deepEqual(Reflect.ownKeys(item), ['label', 'sourceText']);
 });
 
+test('captures String conversion before post-import global poisoning without changing the golden source-set codec', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'String');
+    assert.ok(descriptor?.configurable);
+    const input = sourceSet([source({ documentSourceRef: 'a', documentRevision: n(1), documentFreshnessEpoch: n(2), sourceText: 'x' })], { sourceSetEpoch: n(3), revocationGeneration: n(4) });
+    const baseline = available(captureDocumentSynthesisSourceSet(input)).sourceSet;
+    let calls = 0;
+    const poison = () => { calls += 1; throw new Error('global String poisoned after import'); };
+    let falseResult: ReturnType<typeof captureDocumentSynthesisSourceSet> | undefined;
+    let throwingResult: ReturnType<typeof captureDocumentSynthesisSourceSet> | undefined;
+    let proxyResult: ReturnType<typeof captureDocumentSynthesisSourceSet> | undefined;
+    try {
+        Object.defineProperty(globalThis, 'String', { ...descriptor, value: false });
+        falseResult = captureDocumentSynthesisSourceSet(input);
+        Object.defineProperty(globalThis, 'String', { ...descriptor, value: poison });
+        throwingResult = captureDocumentSynthesisSourceSet(input);
+        const transparent = new Proxy(descriptor!.value as object, { apply() { calls += 1; throw new Error('global String Proxy called'); }, get() { calls += 1; throw new Error('global String Proxy read'); } });
+        Object.defineProperty(globalThis, 'String', { ...descriptor, value: transparent });
+        proxyResult = captureDocumentSynthesisSourceSet(input);
+    } finally {
+        Object.defineProperty(globalThis, 'String', descriptor!);
+    }
+    for (const result of [falseResult, throwingResult, proxyResult]) {
+        const captured = available(result!);
+        assert.deepEqual(captured.sourceSet.digestPayloadBytes, baseline.digestPayloadBytes);
+        assert.deepEqual(captured.sourceSet.sourceSetDigestSha256, baseline.sourceSetDigestSha256);
+    }
+    assert.equal(calls, 0);
+});
+
 test('captures collection, Unicode, proxy, encoder, JSON, and iterator intrinsics without observation', async () => {
     const arrayMethods = ['includes', 'map', 'reduce', 'some', 'sort', 'push'] as const;
     const arrayDescriptors = arrayMethods.map((key) => [key, Object.getOwnPropertyDescriptor(Array.prototype, key)] as const);

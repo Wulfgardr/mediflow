@@ -26,6 +26,7 @@ const ReflectApply = Reflect.apply;
 const ArrayIsArray = Array.isArray;
 const IsProxy = types.isProxy;
 const StringCharCodeAt = String.prototype.charCodeAt;
+const StringConstructor = String;
 const StringReplace = String.prototype.replace;
 const StringNormalize = String.prototype.normalize;
 const StringTrim = String.prototype.trim;
@@ -99,7 +100,8 @@ function array(value: unknown): readonly unknown[] | null {
         if (found.length !== length.value + 1) return null;
         const copy: unknown[] = [];
         for (let index = 0; index < length.value; index += 1) {
-            const descriptor = ObjectGetOwnPropertyDescriptor(value, String(index));
+            const key = ReflectApply(StringConstructor, undefined, [index]) as string;
+            const descriptor = ObjectGetOwnPropertyDescriptor(value, key);
             if (!descriptor || !descriptor.enumerable || !ObjectHasOwn(descriptor, 'value')) return null;
             copy[index] = descriptor.value;
         }
