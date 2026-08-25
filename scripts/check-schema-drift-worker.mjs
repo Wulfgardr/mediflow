@@ -50,7 +50,7 @@ applyBaseMigrations(resolveDataPath('medical.db'));
 
 // Importing db-server runs applySchemaGuards() against the temp DB (side effect),
 // layering the guard-owned tables, columns and indices on top of the base schema.
-const { hasCanonicalDurableReviewPatientLinkSchema, hasCanonicalPhysicianReviewAttestationSchema } = await import('@/lib/db-server');
+const { hasCanonicalDurableReviewPatientLinkSchema, hasCanonicalHeadlessSoapActiveRoleAttestationSchema, hasCanonicalPhysicianReviewAttestationSchema } = await import('@/lib/db-server');
 
 function collectExpected() {
     const expectedTables = new Map();
@@ -101,6 +101,9 @@ function main() {
 
     if (!hasCanonicalPhysicianReviewAttestationSchema()) {
         problems.push('INVALID CONSTRAINTS: "physician_review_attestations" is not the canonical constrained DDL.');
+    }
+    if (!hasCanonicalHeadlessSoapActiveRoleAttestationSchema()) {
+        problems.push('INVALID CONSTRAINTS: Headless SOAP active-role attestation schema is not canonical.');
     }
     if (!hasCanonicalDurableReviewPatientLinkSchema()) {
         problems.push('INVALID CONSTRAINTS: "durable_review_patient_links" is not the canonical constrained DDL.');

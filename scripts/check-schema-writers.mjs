@@ -50,6 +50,11 @@ const infrastructure = new Set([
 // va rimossa.
 const allowlist = [
   {
+    table: 'headless_soap_active_role_attestations',
+    reason: 'H2a-S0 consegna solo schema/bootstrap fail-closed; il writer host-owned inactive/read/revoke e separato nel packet H2a-S1 imposto da ADR 0097, senza enrollment o session grant.',
+    reference: 'docs/adr/0097-active-role-session-and-step-up-authorization.md',
+  },
+  {
     table: 'document_diagnosis_proposals',
     reason: 'assenza deliberata, non dimenticanza: ADR 0087 (Accepted) consegna la sola '
       + 'foundation persistente e rinvia writer, route, UI e transizioni a un packet '
