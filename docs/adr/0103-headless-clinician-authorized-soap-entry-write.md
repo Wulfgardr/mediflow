@@ -73,10 +73,18 @@ principal/authentication generation, `selectionEpoch`, patient version, azione
 expiry e policy digest. Fissa anche l'entry field set: type, title, date,
 setting, metadata e nessun attachment, piu le quattro sezioni SOAP.
 
+Ogni sessione figlia e dedicata a una sola proposta. Ha un budget di una
+proposta, TTL breve e stato terminale dopo denial, commit o restart. Non puo
+approvare o autorizzare un'altra proposta, operazione, paziente, field set,
+payload o sessione successiva.
+
 ### Sessione di medico e lifecycle della proposta
 
 H2a e H2b richiedono una sessione active-role del medico autenticato accettata
-o restacked. L'host deve risolvere `actorRef`, principal/authentication
+o restacked. L'active-role grant e diary-operation-scoped a
+`mediflow.clinical_diary.append_soap.v1`, inattivo per default e attivabile
+solo da attestazione host-owned e step-up fresco. Non e un grant generale o
+riusabile. L'host deve risolvere `actorRef`, principal/authentication
 generation, active-role grant ref/version/revocation generation, identita della
 sessione padre/figlia e del lease, e il minimo audit PHI-safe. `role`, actor,
 cookie, PIN, pairing, token, receipt o body non sono authority.
@@ -111,7 +119,9 @@ memory-only e valida al massimo 30 secondi. Il suo stato e atomico e monouso:
 `minted -> in_flight -> spent`. Lock, logout, revoca, expiry, cambio di
 principal/role/patient/ambulatory, lease, epoch, version, policy o proposta la
 invalidano. Un commit fallito la brucia e richiede nuova review, seal, gesto e
-PIN fresco.
+PIN fresco. La proof include il budget della sola proposta e non puo superare
+la sessione figlia terminale o autorizzare una proposta, operazione, paziente,
+field set, payload o sessione successiva.
 
 ### Binding, commit e ricevuta
 
@@ -146,8 +156,8 @@ runtime o parity Apple.
 | Fase | Confine richiesto |
 | --- | --- |
 | H1 | DTO SOAP chiuso, own-key rejection, digest e denial currentness. |
-| H2a | Restack accettato della sessione medico: `actorRef`, principal/auth generation, role grant e audit minimo. |
-| H2b | Owner host di sessione padre/figlia e lease con ref/version/revocation generation, senza authority caller. |
+| H2a | Restack accettato della sessione medico: `actorRef`, principal/auth generation, grant diary-operation-scoped inattivo, attestazione host-owned, step-up fresco e audit minimo. |
+| H2b | Owner host di sessione padre/figlia e lease con ref/version/revocation generation; una figlia ha budget una proposta, TTL e terminalita, senza authority caller. |
 | H3 | Lifecycle memory-only `inspect -> preview -> proposal`, expiry e wipe; eventuale record minimizzato solo se provato. |
 | H4 | Entry field set host-fixed e client seal/reopen con confronto byte-esatto. |
 | H5a | UI dedicata con gesto esplicito; ogni superficie conversazionale o Mini resta non approvante. |
@@ -167,11 +177,12 @@ remote.
 
 ## Stop rule, claim ceiling e consegna
 
-Fermare se compare una seconda operazione, authority write generale, un campo
-authority caller-defined, approvazione implicita, riuso ADR 0098, proof
-persistita, transazione parziale, replay non esatto, SQLite diretto, union
-Fabric/Headless, provider, venue, egress, attachment o boundary architetturale
-ulteriore.
+Fermare se compare una seconda operazione, authority write generale, grant non
+diary-operation-scoped o riusabile, sessione figlia con piu di una proposta,
+un campo authority caller-defined, approvazione implicita, riuso ADR 0098,
+proof persistita o riusata fuori dal suo proposal budget, transazione parziale,
+replay non esatto, SQLite diretto, union Fabric/Headless, provider, venue,
+egress, attachment o boundary architetturale ulteriore.
 
 Questa decisione accettata non implementa runtime, route, schema, migrazione,
 writer, UI, test runtime, dati clinici, provider, cloud, egress, Mini apply,
