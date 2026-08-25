@@ -50,11 +50,15 @@ test('removes the generic commit turn surface and mints separated closed ports',
     const patientInsight = owner.mintPatientInsightLeaseCommitPort(value);
     const secondPatientInsight = owner.mintPatientInsightLeaseCommitPort(value);
     const ocr = owner.mintOcrLeaseCommitPort(value);
+    const documentSynthesis = owner.mintDocumentSynthesisLeaseCommitPort(value);
     const patientSnapshot = patientInsight.snapshot();
     const ocrSnapshot = ocr.snapshot();
-    assert.ok(patientSnapshot); assert.ok(ocrSnapshot);
+    const documentSnapshot = documentSynthesis.snapshot();
+    assert.ok(patientSnapshot); assert.ok(ocrSnapshot); assert.ok(documentSnapshot);
     assert.notEqual(patientInsight, secondPatientInsight);
     assert.notEqual(patientInsight, ocr);
+    assert.notEqual(patientInsight, documentSynthesis);
+    assert.notEqual(ocr, documentSynthesis);
     assert.deepEqual(Object.keys(patientInsight), ['snapshot', 'prepare', 'commit', 'abort', 'dispose']);
     assert.equal(Object.isFrozen(patientInsight), true);
     assert.equal(Object.getPrototypeOf(patientSnapshot.currentRef), null);
@@ -65,15 +69,16 @@ test('removes the generic commit turn surface and mints separated closed ports',
         expected: secondPatientInsight.snapshot()!.currentRef, replacement,
     } as never)), false);
     assert.equal(ocr.commit(Object.freeze({ expected: ocrSnapshot.currentRef, replacement } as never)), false);
+    assert.equal(documentSynthesis.commit(Object.freeze({ expected: documentSnapshot.currentRef, replacement } as never)), false);
     assert.equal(patientInsight.commit(Object.freeze({ expected: patientSnapshot.currentRef, replacement })), true);
     assert.equal(patientInsight.snapshot()!.terminal, true);
     assert.equal(patientInsight.commit(Object.freeze({ expected: patientSnapshot.currentRef, replacement })), false);
     assert.equal(patientInsight.abort(Object.freeze({ replacement })), false);
 });
 
-test('accepts only frozen exact own data records without reading hostile inputs', () => {
+test('Document Synthesis accepts only frozen exact own data records without reading hostile inputs', () => {
     const { value, owner } = ownerWithSelection();
-    const port = owner.mintPatientInsightLeaseCommitPort(value);
+    const port = owner.mintDocumentSynthesisLeaseCommitPort(value);
     const current = port.snapshot()!.currentRef;
     let reads = 0; let traps = 0;
     const accessor = Object.freeze(Object.defineProperty({}, 'expected', {
@@ -85,18 +90,19 @@ test('accepts only frozen exact own data records without reading hostile inputs'
     });
     const hidden = Object.freeze(Object.defineProperty({ expected: current }, 'hidden', { value: true }));
     const custom = Object.freeze(Object.assign(Object.create(null), { expected: current }));
+    const thenable = Object.freeze(Object.defineProperty({ expected: current }, 'then', { enumerable: true, get() { reads += 1; return () => undefined; } }));
 
     for (const request of [accessor, proxy, Object.freeze({ expected: current, extra: true }), hidden,
-        Object.freeze({ expected: current, [Symbol('synthetic')]: true }), custom, { expected: current }]) {
+        Object.freeze({ expected: current, [Symbol('synthetic')]: true }), custom, thenable, { expected: current }]) {
         assert.equal(port.prepare(request as never), null);
     }
     assert.equal(reads, 0);
     assert.equal(traps, 0);
 });
 
-test('stages a private replacement before a single terminal owner-state replacement', () => {
+test('Document Synthesis stages a private replacement before a single terminal owner-state replacement', () => {
     const { value, owner } = ownerWithSelection();
-    const port = owner.mintPatientInsightLeaseCommitPort(value);
+    const port = owner.mintDocumentSynthesisLeaseCommitPort(value);
     const before = port.snapshot()!;
     const replacement = port.prepare(Object.freeze({ expected: before.currentRef }));
     assert.ok(replacement);
@@ -112,9 +118,9 @@ test('stages a private replacement before a single terminal owner-state replacem
     assert.equal(committed.terminal, true);
 });
 
-test('aborts once before commit and never rolls a completed state back', () => {
+test('Document Synthesis aborts once before commit and never rolls a completed state back', () => {
     const { value, owner } = ownerWithSelection();
-    const port = owner.mintOcrLeaseCommitPort(value);
+    const port = owner.mintDocumentSynthesisLeaseCommitPort(value);
     const current = port.snapshot()!.currentRef;
     const replacement = port.prepare(Object.freeze({ expected: current }));
     assert.ok(replacement);
@@ -151,8 +157,8 @@ test('fails closed on reselection, expiry, logout, disposal, cross-session, and 
     assert.equal(port.snapshot(), null);
 });
 
-test('denies nested public operations during a Patient Insight or OCR snapshot', () => {
-    for (const kind of ['patient-insight', 'ocr'] as const) for (const operation of ['snapshot', 'prepare', 'commit', 'abort', 'dispose'] as const) {
+test('denies same-kind nested operations and isolates cross-kind ports during snapshots', () => {
+    for (const kind of ['patient-insight', 'ocr', 'document-synthesis'] as const) for (const operation of ['snapshot', 'prepare', 'commit', 'abort', 'dispose'] as const) {
         let armed = false;
         const registry = createServerSessionProjectionOwnerRegistry({
             resolve: (_session, pair) => pair, entropy: () => new Uint8Array(16),
@@ -163,12 +169,47 @@ test('denies nested public operations during a Patient Insight or OCR snapshot',
             } return 1_000; },
         });
         const value = session(); const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
-        const port = kind === 'patient-insight' ? owner.mintPatientInsightLeaseCommitPort(value) : owner.mintOcrLeaseCommitPort(value);
+        const port = kind === 'patient-insight' ? owner.mintPatientInsightLeaseCommitPort(value) : kind === 'ocr' ? owner.mintOcrLeaseCommitPort(value) : owner.mintDocumentSynthesisLeaseCommitPort(value);
         const current = port.snapshot()!.currentRef;
         armed = true;
         assert.equal(port.snapshot(), null);
         assert.deepEqual(port.snapshot(), { currentRef: current, stagedRef: null, generation: 0, terminal: operation === 'dispose' });
     }
+});
+
+test('Document Synthesis ports cannot union authority with Patient Insight or OCR ports', () => {
+    const { value, owner } = ownerWithSelection();
+    const document = owner.mintDocumentSynthesisLeaseCommitPort(value);
+    const patient = owner.mintPatientInsightLeaseCommitPort(value);
+    const ocr = owner.mintOcrLeaseCommitPort(value);
+    const current = document.snapshot()!.currentRef;
+    const replacement = document.prepare(Object.freeze({ expected: current }));
+    assert.ok(replacement);
+    assert.equal(patient.commit(Object.freeze({ expected: patient.snapshot()!.currentRef, replacement } as never)), false);
+    assert.equal(ocr.abort(Object.freeze({ replacement } as never)), false);
+    assert.equal(document.commit(Object.freeze({ expected: current, replacement })), true);
+    assert.deepEqual(document.snapshot(), { currentRef: replacement, stagedRef: null, generation: 1, terminal: true });
+});
+
+test('Document Synthesis port never reads ambient then or schedules post-return work', async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+    let reads = 0; let unhandled = 0;
+    const onUnhandled = () => { unhandled += 1; };
+    const { value, owner } = ownerWithSelection(); const port = owner.mintDocumentSynthesisLeaseCommitPort(value);
+    const current = port.snapshot()!.currentRef;
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { reads += 1; return undefined; } });
+    process.on('unhandledRejection', onUnhandled);
+    try {
+        const before = reads; const replacement = port.prepare(Object.freeze({ expected: current }));
+        assert.ok(replacement); assert.equal(port.commit(Object.freeze({ expected: current, replacement })), true);
+        assert.deepEqual(port.snapshot(), { currentRef: replacement, stagedRef: null, generation: 1, terminal: true });
+        assert.equal(reads, before);
+    } finally {
+        if (descriptor) Object.defineProperty(Object.prototype, 'then', descriptor); else delete (Object.prototype as { then?: unknown }).then;
+    }
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    process.off('unhandledRejection', onUnhandled);
+    assert.equal(unhandled, 0);
 });
 
 test('denies a result when the final critical-section clock disposes its session owner', () => {

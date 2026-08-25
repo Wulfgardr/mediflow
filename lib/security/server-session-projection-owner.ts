@@ -119,14 +119,17 @@ export type ServerSessionProjectionOwner = Readonly<{
     }>): CanonicalPair;
     mintPatientInsightLeaseCommitPort(session: ServerSession): PatientInsightLeaseCommitPort;
     mintOcrLeaseCommitPort(session: ServerSession): OcrLeaseCommitPort;
+    mintDocumentSynthesisLeaseCommitPort(session: ServerSession): DocumentSynthesisLeaseCommitPort;
     withLeaseCriticalSection<T>(session: ServerSession, callback: (selection: CanonicalPair) => T): T;
     dispose(): void;
 }>;
 
 declare const patientInsightLeaseCommitRef: unique symbol;
 declare const ocrLeaseCommitRef: unique symbol;
+declare const documentSynthesisLeaseCommitRef: unique symbol;
 export type PatientInsightLeaseCommitRef = Readonly<{ readonly [patientInsightLeaseCommitRef]?: never }>;
 export type OcrLeaseCommitRef = Readonly<{ readonly [ocrLeaseCommitRef]?: never }>;
+export type DocumentSynthesisLeaseCommitRef = Readonly<{ readonly [documentSynthesisLeaseCommitRef]?: never }>;
 type LeaseCommitSnapshot<Ref extends object> = Readonly<{
     currentRef: Ref; stagedRef: Ref | null; generation: number; terminal: boolean;
 }>;
@@ -142,6 +145,13 @@ export type OcrLeaseCommitPort = Readonly<{
     prepare(input: Readonly<{ expected: OcrLeaseCommitRef }>): OcrLeaseCommitRef | null;
     commit(input: Readonly<{ expected: OcrLeaseCommitRef; replacement: OcrLeaseCommitRef }>): boolean;
     abort(input: Readonly<{ replacement: OcrLeaseCommitRef }>): boolean;
+    dispose(): void;
+}>;
+export type DocumentSynthesisLeaseCommitPort = Readonly<{
+    snapshot(): LeaseCommitSnapshot<DocumentSynthesisLeaseCommitRef> | null;
+    prepare(input: Readonly<{ expected: DocumentSynthesisLeaseCommitRef }>): DocumentSynthesisLeaseCommitRef | null;
+    commit(input: Readonly<{ expected: DocumentSynthesisLeaseCommitRef; replacement: DocumentSynthesisLeaseCommitRef }>): boolean;
+    abort(input: Readonly<{ replacement: DocumentSynthesisLeaseCommitRef }>): boolean;
     dispose(): void;
 }>;
 
@@ -270,8 +280,10 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             const issuedRefs = new SetConstructor<string>();
             const patientInsightRefs = new WeakSetConstructor<object>();
             const ocrRefs = new WeakSetConstructor<object>();
+            const documentSynthesisRefs = new WeakSetConstructor<object>();
             const patientInsightPorts = new WeakSetConstructor<object>();
             const ocrPorts = new WeakSetConstructor<object>();
+            const documentSynthesisPorts = new WeakSetConstructor<object>();
             const reference = (prefix: string) => {
                 let bytes: Uint8Array;
                 try { bytes = sources.entropy(); } catch { return fail('reference_unavailable'); }
@@ -421,7 +433,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     && typeof value.control?.lock === 'function' && typeof value.control.revoke === 'function'
                     && typeof value.control.changeSelection === 'function';
             };
-            const owner: Omit<ServerSessionProjectionOwner, 'mintPatientInsightLeaseCommitPort' | 'mintOcrLeaseCommitPort'> = {
+            const owner: Omit<ServerSessionProjectionOwner, 'mintPatientInsightLeaseCommitPort' | 'mintOcrLeaseCommitPort' | 'mintDocumentSynthesisLeaseCommitPort'> = {
                 snapshotSelectionEpoch(presentedSession) {
                     if (terminal || presentedSession !== session || session.authChannel !== 'web' || peekSession(session.id) !== session) {
                         return fail('session_unavailable');
@@ -581,6 +593,10 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             ObjectDefineProperty(owner, 'mintOcrLeaseCommitPort', { enumerable: false, value(presentedSession: ServerSession) {
                 if (this !== owner) return fail('session_unavailable');
                 return mintLeaseCommitPort<OcrLeaseCommitRef>(presentedSession, ocrRefs, ocrPorts) as OcrLeaseCommitPort;
+            } });
+            ObjectDefineProperty(owner, 'mintDocumentSynthesisLeaseCommitPort', { enumerable: false, value(presentedSession: ServerSession) {
+                if (this !== owner) return fail('session_unavailable');
+                return mintLeaseCommitPort<DocumentSynthesisLeaseCommitRef>(presentedSession, documentSynthesisRefs, documentSynthesisPorts) as DocumentSynthesisLeaseCommitPort;
             } });
             const completedOwner = ObjectFreeze(owner) as unknown as ServerSessionProjectionOwner;
 
