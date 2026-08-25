@@ -44,18 +44,47 @@ Il burn avviene all'inizio e impedisce un secondo consumo. Un timestamp non
 prova la correntezza; la correntezza dipende dai binding ed epoch riletti
 dall'host.
 
-### Cattura e input del provider
+### Cattura, ordine e limiti del source set
 
-All'inizio l'host acquisisce un set ordinato, gli assegna `S1`...`Sn` e costruisce
-la projection normalizzata. Il provider riceve soltanto testo normalizzato
-taggato e le relative etichette. Non riceve riferimenti canonici, digest,
-provider binding, receipt, provenance o plaintext dell'allegato originale.
+La frontiera di sorgente e indipendente dal rendering del prompt. Prima del
+renderer, l'host cattura fonti esatte e uniche, le ordina per
+`documentSourceRef` canonico in ordine bytewise crescente, poi per
+`documentRevision` `u64` e `documentFreshnessEpoch` `u64`. I duplicati negano.
 
-Ogni claim canonico del provider deve restituire le sole etichette consentite e
-una citazione testuale esatta. L'host verifica che ogni etichetta appartenga al
-set, che la citazione compaia una sola volta nel testo etichettato, quindi
-calcola offset e `quoteSha256`. L'host rifiuta citazioni assenti, ambigue,
-sconosciute, duplicate o non citate.
+Il source set contiene da 1 a 32 fonti. Dopo l'ordinamento l'host assegna, senza
+salti, le sole etichette globalmente uniche `S1`...`Sn`. Il renderer non puo
+aggiungere, rimuovere, riordinare o troncare fonti o etichette.
+
+`mediflow.document-synthesis.host-projection.v1` conserva il limite esistente:
+una fonte deve avere al massimo 12.000 unita UTF-16 prima e dopo la
+normalizzazione. Per compatibilita, il limite v1 della projection normalizzata
+e 36.000 byte UTF-8 per fonte e 1.152.000 byte UTF-8 per l'insieme. Una fonte o
+un insieme oltre il limite nega prima della chiamata provider; non esiste
+troncamento silenzioso.
+
+### Normalizzazione, etichette e citazioni
+
+La normalizzazione v1 e congelata: rifiuta testo che non sia Unicode valido,
+inclusi surrogate isolati, e i controlli `U+0000`...`U+0008`, `U+000B`,
+`U+000C`, `U+000E`...`U+001F` e `U+007F`. Sostituisce `CRLF` e `CR` con `LF`,
+applica NFC e infine l'esistente `String.prototype.trim()`. Il trim fa parte
+della normalizzazione e non e un passaggio di rendering.
+
+Il provider riceve soltanto testo normalizzato taggato e le relative etichette.
+Non riceve riferimenti canonici, digest, provider binding, receipt, provenance
+o plaintext dell'allegato originale. Non puo coniare etichette.
+
+Ogni claim canonico deve restituire una citazione testuale esatta e un sottoinsieme
+non vuoto, univoco, senza ripetizioni e ordinato numericamente, delle etichette
+host `S1`...`Sn`. Etichette ripetute, duplicate, sconosciute o gapped negano;
+il set globale deve restare contiguo e ogni etichetta dichiarata deve esistere.
+
+Per ogni coppia etichetta-citazione, l'host confronta la citazione con gli
+esatti byte UTF-8 normalizzati della sola projection nominata dall'etichetta.
+La citazione deve comparire una sola volta in quella sorgente. L'offset e un
+intervallo zero-based half-open di byte UTF-8 nella stessa projection;
+`quoteSha256` usa gli esatti byte dell'occorrenza. L'host rifiuta citazioni
+assenti, ambigue, sconosciute, duplicate o non citate.
 
 Questo contratto ha il seguente ceiling: supporto dichiarato dal provider con
 membership e locator validati dall'host. Non dimostra entailment, correttezza
@@ -76,6 +105,16 @@ La provenance dichiara soltanto: set di projection catturato e posseduto
 dall'host; scope esatto del digest dell'input provider; semantica di citazione
 dichiarata dal modello; causalita del modello non stabilita.
 
+`sourceSetDigestSha256` usa il codec binario domain-separated
+`mediflow.document-synthesis.source-set-digest.v1`, non JSON o ordine di
+oggetto. Il payload serializza nell'ordine fisso: tag UTF-8 con prefisso di
+lunghezza, versione `u16`, numero fonti `u8`, `sourceSetEpoch` `u64` e
+`revocationGeneration` `u64`, tutti unsigned big-endian. Per ogni sorgente in
+ordine: etichetta UTF-8 length-prefixed, `documentSourceRef` UTF-8
+length-prefixed, `documentRevision` `u64`, `documentFreshnessEpoch` `u64` e i
+32 byte raw di `projectionDigestSha256`. Nessun digest e codificato come hex,
+nessun campo puo dipendere dall'ordine JSON.
+
 ### Fence a due fasi e receipt finale
 
 La prima sezione e sincrona: begin, controllo P4 e snapshot delle fonti, burn
@@ -83,13 +122,22 @@ dell'handle e preparazione dell'invocazione. Segue esattamente una chiamata
 asincrona al provider, con cancellazione interna.
 
 La seconda sezione e sincrona: rilettura completa degli epoch, validazione di
-citazioni e digest, costruzione preventiva della receipt e commit con il lease
-DS come ultima operazione. Le sezioni protette non accettano `Promise` o
-thenable. Non eseguono DB, persistenza o scritture cliniche.
+citazioni e digest, preparazione di un payload receipt non osservabile e commit
+con il lease DS come ultima operazione. Le sezioni protette non accettano
+`Promise` o thenable. Non eseguono DB, persistenza o scritture cliniche.
 
-Solo dopo la rilettura e il commit l'host emette la receipt finale. La receipt
-lega i digest di output, citazioni, source set e provider-binding receipt.
-Dichiara `review-only`, `applyPolicy=none` e `writesPerformed=0`.
+Solo dopo la rilettura e il commit l'host crea e restituisce receipt e
+provenance finali. La receipt lega i digest di output, citazioni, source set e
+provider-binding receipt. Dichiara `review-only`, `applyPolicy=none` e
+`writesPerformed=0`.
+
+I gate avversari sono obbligatori e deterministici. Se durante la chiamata
+asincrona cambiano revoca, selezione, review, revisione documento, freshness,
+source set o expiry, l'operazione abortisce o termina negata. Un completamento
+tardivo puo essere osservato per la denial, ma non e mai pubblicato. La
+revalidation finale e il commit-last devono riuscire prima di creare o
+restituire receipt o provenance; un failure iniettato prima del commit prova
+`receipt: null`.
 
 ### Riconciliazione dell'integrazione
 
