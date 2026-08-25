@@ -74,3 +74,41 @@ test('denies forged source sets, forbidden authority fields, mutation, hostile s
     }
     assert.equal(reads, 0); assert.equal(traps, 0);
 });
+
+test('captures Array, Object, Reflect, String, encoder, JSON, proxy, and prototype intrinsics without deferred observation', async () => {
+    const define = Object.defineProperty; const get = Object.getOwnPropertyDescriptor;
+    const targets = [
+        [Object, 'create'], [Object, 'freeze'], [Object, 'getOwnPropertyDescriptor'], [Object, 'getPrototypeOf'], [Object, 'hasOwn'],
+        [Reflect, 'ownKeys'], [Reflect, 'apply'], [Array, 'isArray'], [Array.prototype, 'includes'], [Array.prototype, Symbol.iterator],
+        [String.prototype, 'charCodeAt'], [TextEncoder.prototype, 'encode'], [JSON, 'stringify'], [types, 'isProxy'],
+    ] as const;
+    const descriptors = targets.map(([target, key]) => [target, key, get(target, key)] as const);
+    const globalString = get(globalThis, 'String'); const globalTextEncoder = get(globalThis, 'TextEncoder');
+    const previousToJson = get(Object.prototype, 'toJSON'); const previousThen = get(Object.prototype, 'then');
+    assert.ok(globalString?.configurable); assert.ok(globalTextEncoder?.configurable);
+    const input = valid(); const baseline = available(validateDocumentSynthesisProviderCitations(input));
+    let reads = 0; let traps = 0; const poison = () => { reads += 1; throw new Error('ambient intrinsic poisoned after import'); };
+    const transparent = new Proxy(valid(), { ownKeys() { traps += 1; return []; }, get() { traps += 1; return null; }, getPrototypeOf() { traps += 1; return Object.prototype; } });
+    let captured: ReturnType<typeof validateDocumentSynthesisProviderCitations> | undefined;
+    try {
+        for (let index = 0; index < descriptors.length; index += 1) define(descriptors[index]![0], descriptors[index]![1], { ...descriptors[index]![2], value: poison });
+        define(globalThis, 'String', { ...globalString, value: false }); define(globalThis, 'TextEncoder', { ...globalTextEncoder, value: false });
+        define(Object.prototype, 'toJSON', { configurable: true, get() { reads += 1; return poison; } });
+        define(Object.prototype, 'then', { configurable: true, get() { reads += 1; return poison; } });
+        define(types, 'isProxy', { ...get(types, 'isProxy'), value: () => false });
+        denied(transparent);
+        define(types, 'isProxy', { ...get(types, 'isProxy'), value: poison });
+        captured = validateDocumentSynthesisProviderCitations(input);
+    } finally {
+        for (let index = 0; index < descriptors.length; index += 1) define(descriptors[index]![0], descriptors[index]![1], descriptors[index]![2]!);
+        define(globalThis, 'String', globalString!); define(globalThis, 'TextEncoder', globalTextEncoder!);
+        if (previousToJson) define(Object.prototype, 'toJSON', previousToJson); else delete (Object.prototype as Record<string, unknown>).toJSON;
+        if (previousThen) define(Object.prototype, 'then', previousThen); else delete (Object.prototype as Record<string, unknown>).then;
+    }
+    const result = available(captured!);
+    assert.deepEqual(result.citations.map((item) => ({ ...item })), baseline.citations.map((item) => ({ ...item })));
+    assert.equal(reads, 0); assert.equal(traps, 0); assert.equal(result instanceof Promise, false);
+    let unhandled = 0; const listener = () => { unhandled += 1; }; process.on('unhandledRejection', listener);
+    try { await new Promise<void>((resolve) => setImmediate(resolve)); } finally { process.off('unhandledRejection', listener); }
+    assert.equal(unhandled, 0);
+});
