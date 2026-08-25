@@ -294,6 +294,8 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             let selection: SelectionState | null = null;
             let selecting = false;
             let leaseCriticalSectionActive = false;
+            let leasePortOperationActive = false;
+            let leasePortOperationPoisoned = false;
             let durableReviewOperationActive = false;
             let durableReviewOperationPoisoned = false;
             let durableReviewCommitInFlight: object | null = null;
@@ -357,6 +359,13 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             const rejectLeaseCriticalSectionReentry = () => {
                 if (leaseCriticalSectionActive) fail('selection_busy');
             };
+            const beginLeasePortOperation = () => {
+                if (leasePortOperationActive) { leasePortOperationPoisoned = true; return false; }
+                leasePortOperationActive = true;
+                leasePortOperationPoisoned = false;
+                return true;
+            };
+            const endLeasePortOperation = () => { leasePortOperationActive = false; };
             const rejectDurableReviewReentry = () => {
                 if (!durableReviewOperationActive) return false;
                 durableReviewOperationPoisoned = true;
@@ -400,120 +409,141 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 const port = ObjectFreeze({
                     snapshot() {
                         if (portActive) { portReentered = true; return null; }
+                        if (!beginLeasePortOperation()) return null;
                         portActive = true;
                         portReentered = false;
                         try {
-                            if (!current() || portReentered) return null;
+                            if (!current() || portReentered || leasePortOperationPoisoned) return null;
                             return ObjectFreeze({ currentRef: ownerState.currentRef, stagedRef: ownerState.stagedRef,
                                 generation: ownerState.generation, terminal: ownerState.terminal });
-                        } finally { portActive = false; }
+                        } finally { portActive = false; endLeasePortOperation(); }
                     },
                     prepare(input: unknown) {
                         if (portActive) { portReentered = true; return null; }
                         if (ownerState.terminal) return null;
+                        if (!beginLeasePortOperation()) return null;
                         portActive = true;
                         portReentered = false;
-                        const request = frozenExact(input, ['expected']);
-                        if (!request || !current() || portReentered || ownerState.terminal || !owns(request.expected) || request.expected !== ownerState.currentRef || ownerState.stagedRef !== null) {
-                            portActive = false; return null;
+                        try {
+                            const request = frozenExact(input, ['expected']);
+                            if (!request || !current() || portReentered || leasePortOperationPoisoned || ownerState.terminal
+                                || !owns(request.expected) || request.expected !== ownerState.currentRef || ownerState.stagedRef !== null) return null;
+                            const replacement = mintRef();
+                            ownerState = ObjectFreeze({ currentRef: ownerState.currentRef, stagedRef: replacement,
+                                generation: ownerState.generation, terminal: false });
+                            return replacement;
+                        } finally {
+                            portActive = false;
+                            endLeasePortOperation();
                         }
-                        const replacement = mintRef();
-                        const next = ObjectFreeze({ currentRef: ownerState.currentRef, stagedRef: replacement,
-                            generation: ownerState.generation, terminal: false });
-                        portActive = false;
-                        ownerState = next;
-                        return replacement;
                     },
                     commit(input: unknown) {
                         if (portActive) { portReentered = true; return false; }
                         if (ownerState.terminal) return false;
+                        if (!beginLeasePortOperation()) return false;
                         portActive = true;
                         portReentered = false;
-                        const request = frozenExact(input, ['expected', 'replacement']);
-                        if (!request || !current() || portReentered || ownerState.terminal || !owns(request.expected) || !owns(request.replacement)
-                            || request.expected !== ownerState.currentRef || request.replacement !== ownerState.stagedRef) {
-                            portActive = false; return false;
+                        try {
+                            const request = frozenExact(input, ['expected', 'replacement']);
+                            if (!request || !current() || portReentered || leasePortOperationPoisoned || ownerState.terminal
+                                || !owns(request.expected) || !owns(request.replacement) || request.expected !== ownerState.currentRef
+                                || request.replacement !== ownerState.stagedRef) return false;
+                            ownerState = ObjectFreeze({ currentRef: request.replacement as Ref, stagedRef: null as Ref | null,
+                                generation: ownerState.generation + 1, terminal: true });
+                            return true;
+                        } finally {
+                            portActive = false;
+                            endLeasePortOperation();
                         }
-                        const next = ObjectFreeze({ currentRef: request.replacement as Ref, stagedRef: null as Ref | null,
-                            generation: ownerState.generation + 1, terminal: true });
-                        portActive = false;
-                        ownerState = next;
-                        return true;
                     },
                     abort(input: unknown) {
                         if (portActive) { portReentered = true; return false; }
                         if (ownerState.terminal) return false;
+                        if (!beginLeasePortOperation()) return false;
                         portActive = true;
                         portReentered = false;
-                        const request = frozenExact(input, ['replacement']);
-                        if (!request || !current() || portReentered || ownerState.terminal || !owns(request.replacement) || request.replacement !== ownerState.stagedRef) {
-                            portActive = false; return false;
+                        try {
+                            const request = frozenExact(input, ['replacement']);
+                            if (!request || !current() || portReentered || leasePortOperationPoisoned || ownerState.terminal
+                                || !owns(request.replacement) || request.replacement !== ownerState.stagedRef) return false;
+                            ownerState = ObjectFreeze({ currentRef: ownerState.currentRef, stagedRef: null as Ref | null,
+                                generation: ownerState.generation, terminal: true });
+                            return true;
+                        } finally {
+                            portActive = false;
+                            endLeasePortOperation();
                         }
-                        const next = ObjectFreeze({ currentRef: ownerState.currentRef, stagedRef: null as Ref | null,
-                            generation: ownerState.generation, terminal: true });
-                        portActive = false;
-                        ownerState = next;
-                        return true;
                     },
                     dispose() {
-                        if (portActive) portReentered = true;
-                        if (ownerState.terminal) return;
-                        ownerState = ObjectFreeze({ currentRef: ownerState.currentRef, stagedRef: null as Ref | null,
-                            generation: ownerState.generation, terminal: true });
+                        const outer = !portActive;
+                        if (!outer) portReentered = true;
+                        else if (!beginLeasePortOperation()) return;
+                        if (ownerState.terminal) { if (outer) endLeasePortOperation(); return; }
+                        try {
+                            if (!leasePortOperationPoisoned) ownerState = ObjectFreeze({ currentRef: ownerState.currentRef,
+                                stagedRef: null as Ref | null, generation: ownerState.generation, terminal: true });
+                        } finally { if (outer) endLeasePortOperation(); }
                     },
                 });
                 addOwnerIdentity(ports, port);
                 return port;
             };
             const mintDurableReviewCommitPort = (presentedSession: ServerSession): DurableReviewCommitPort => {
-                if (rejectDurableReviewReentry()) return fail('selection_busy');
-                rejectLeaseCriticalSectionReentry();
-                requireCurrentSession(presentedSession);
-                const boundSelection = selection;
-                const boundSelectionEpoch = epoch;
-                const boundReviewContextEpoch = reviewContextEpoch;
-                if (!boundSelection || durableReviewCommitInFlight !== null) return fail('stale_selection');
-                durableReviewOperationActive = true;
-                durableReviewOperationPoisoned = false;
+                if (!beginLeasePortOperation()) return fail('selection_busy');
                 try {
+                    if (rejectDurableReviewReentry()) return fail('selection_busy');
+                    rejectLeaseCriticalSectionReentry();
+                    requireCurrentSession(presentedSession);
+                    const boundSelection = selection;
+                    const boundSelectionEpoch = epoch;
+                    const boundReviewContextEpoch = reviewContextEpoch;
+                    if (!boundSelection || durableReviewCommitInFlight !== null) return fail('stale_selection');
+                    durableReviewOperationActive = true;
+                    durableReviewOperationPoisoned = false;
                     if (readClock() >= boundSelection.expiresAt) { expire(); return fail('lease_expired'); }
                     requireCurrentSession(presentedSession);
-                    if (durableReviewOperationPoisoned || selection !== boundSelection || epoch !== boundSelectionEpoch
+                    if (leasePortOperationPoisoned || durableReviewOperationPoisoned || selection !== boundSelection || epoch !== boundSelectionEpoch
                         || reviewContextEpoch !== boundReviewContextEpoch || durableReviewCommitInFlight !== null) return fail('stale_selection');
                     const token = ObjectFreeze(ObjectCreate(null));
                     let spent = false;
                     let disposed = false;
                     const current = () => {
-                        if (durableReviewOperationPoisoned || terminal || disposed || durableReviewCommitInFlight !== token
+                        if (leasePortOperationPoisoned || durableReviewOperationPoisoned || terminal || disposed || durableReviewCommitInFlight !== token
                             || presentedSession !== session || session.authChannel !== 'web' || selection !== boundSelection
                             || epoch !== boundSelectionEpoch || reviewContextEpoch !== boundReviewContextEpoch) return false;
                         let now: number;
                         try { now = sources.clock(); } catch { return false; }
-                        return !durableReviewOperationPoisoned && NumberIsFinite(now) && now < boundSelection.expiresAt
+                        return !leasePortOperationPoisoned && !durableReviewOperationPoisoned && NumberIsFinite(now) && now < boundSelection.expiresAt
                             && !terminal && presentedSession === session && session.authChannel === 'web'
                             && getSession(session.id) === session && selection === boundSelection && epoch === boundSelectionEpoch
                             && reviewContextEpoch === boundReviewContextEpoch && durableReviewCommitInFlight === token;
                     };
                     const record: DurableReviewCommitRecord = ObjectFreeze({
                         spend() {
-                            if (rejectDurableReviewReentry() || spent || disposed) return false;
+                            if (!beginLeasePortOperation()) return false;
+                            if (rejectDurableReviewReentry() || spent || disposed) { endLeasePortOperation(); return false; }
                             durableReviewOperationActive = true;
                             durableReviewOperationPoisoned = false;
                             spent = true;
-                            try { return current(); }
-                            finally { durableReviewOperationActive = false; }
+                            try { return !leasePortOperationPoisoned && current(); }
+                            finally { durableReviewOperationActive = false; endLeasePortOperation(); }
                         },
                         dispose() {
-                            if (rejectDurableReviewReentry()) return;
-                            disposed = true;
-                            if (durableReviewCommitInFlight === token) durableReviewCommitInFlight = null;
+                            if (!beginLeasePortOperation()) return;
+                            if (rejectDurableReviewReentry()) { endLeasePortOperation(); return; }
+                            try {
+                                if (!leasePortOperationPoisoned) {
+                                    disposed = true;
+                                    if (durableReviewCommitInFlight === token) durableReviewCommitInFlight = null;
+                                }
+                            } finally { endLeasePortOperation(); }
                         },
                     });
                     durableReviewCommitInFlight = token;
                     addOwnerIdentity(authenticDurableReviewCommitPorts, token);
                     applyIntrinsic(weakMapSet, durableReviewCommitPorts, [token, record]);
                     return token as DurableReviewCommitPort;
-                } finally { durableReviewOperationActive = false; }
+                } finally { durableReviewOperationActive = false; endLeasePortOperation(); }
             };
             const candidateControl = (candidate: unknown): TypedBroker['control'] | null => {
                 if (typeof candidate !== 'object' || candidate === null) return null;
