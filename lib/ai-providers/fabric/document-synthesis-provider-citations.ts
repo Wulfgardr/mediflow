@@ -25,6 +25,7 @@ const ReflectOwnKeys = Reflect.ownKeys;
 const ReflectApply = Reflect.apply;
 const ArrayIsArray = Array.isArray;
 const ArrayIncludes = Array.prototype.includes;
+const IsProxy = types.isProxy;
 const NumberIsSafeInteger = Number.isSafeInteger;
 const StringCharCodeAt = String.prototype.charCodeAt;
 const encode = TextEncoder.prototype.encode;
@@ -38,7 +39,7 @@ function sealed<T extends object>(value: T): Readonly<T> {
 }
 function record(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
     try {
-        if (!value || typeof value !== 'object' || ArrayIsArray(value) || types.isProxy(value) || ObjectGetPrototypeOf(value) !== OBJECT) return null;
+        if (!value || typeof value !== 'object' || ArrayIsArray(value) || IsProxy(value) || ObjectGetPrototypeOf(value) !== OBJECT) return null;
         const found = ReflectOwnKeys(value); if (found.length !== keys.length) return null;
         for (const key of keys) if (!ReflectApply(ArrayIncludes, found, [key])) return null;
         const copy = ObjectCreate(null) as Record<string, unknown>;
@@ -48,13 +49,21 @@ function record(value: unknown, keys: readonly string[]): Record<string, unknown
 }
 function array(value: unknown): readonly unknown[] | null {
     try {
-        if (!ArrayIsArray(value) || types.isProxy(value) || ObjectGetPrototypeOf(value) !== ARRAY || value.length < 1 || value.length > 32 || ReflectOwnKeys(value).length !== value.length + 1) return null;
+        if (!ArrayIsArray(value) || IsProxy(value) || ObjectGetPrototypeOf(value) !== ARRAY || value.length < 1 || value.length > 32 || ReflectOwnKeys(value).length !== value.length + 1) return null;
         const copy: unknown[] = [];
         for (let index = 0; index < value.length; index += 1) { const descriptor = ObjectGetOwnPropertyDescriptor(value, String(index)); if (!descriptor || !descriptor.enumerable || !ObjectHasOwn(descriptor, 'value')) return null; copy[index] = descriptor.value; }
         return ObjectFreeze(copy);
     } catch { return null; }
 }
 function integer(value: unknown): value is number { return typeof value === 'number' && NumberIsSafeInteger(value); }
+function scalar(value: string): boolean {
+    for (let index = 0; index < value.length; index += 1) {
+        const code = ReflectApply(StringCharCodeAt, value, [index]) as number;
+        if (code >= 0xd800 && code <= 0xdbff) { if (index + 1 >= value.length) return false; const next = ReflectApply(StringCharCodeAt, value, [index + 1]) as number; if (next < 0xdc00 || next > 0xdfff) return false; index += 1; }
+        else if (code >= 0xdc00 && code <= 0xdfff) return false;
+    }
+    return true;
+}
 function hex(value: unknown): value is string {
     if (typeof value !== 'string' || value.length !== 64) return false;
     for (let index = 0; index < value.length; index += 1) { const code = ReflectApply(StringCharCodeAt, value, [index]) as number; if (!((code >= 48 && code <= 57) || (code >= 97 && code <= 102))) return false; }
@@ -65,7 +74,7 @@ function equal(left: Uint8Array, right: Uint8Array, start = 0): boolean { if (le
 function occurrences(quote: Uint8Array, source: Uint8Array): number { let count = 0; for (let index = 0; index + quote.length <= source.length; index += 1) if (equal(quote, source, index)) count += 1; return count; }
 function citation(value: unknown, label: string, sourceText: string): Citation | null {
     const item = record(value, ['label', 'quote', 'startByte', 'endByte', 'quoteSha256']);
-    if (!item || item.label !== label || typeof item.quote !== 'string' || !integer(item.startByte) || !integer(item.endByte) || item.startByte < 0 || item.endByte <= item.startByte || !hex(item.quoteSha256)) return null;
+    if (!item || item.label !== label || typeof item.quote !== 'string' || !scalar(item.quote) || !integer(item.startByte) || !integer(item.endByte) || item.startByte < 0 || item.endByte <= item.startByte || !hex(item.quoteSha256)) return null;
     const quote = utf8(item.quote); const source = utf8(sourceText);
     if (!quote.length || item.endByte > source.length || item.endByte - item.startByte !== quote.length || !equal(quote, source, item.startByte) || occurrences(quote, source) !== 1 || createHash('sha256').update(quote).digest('hex') !== item.quoteSha256) return null;
     return sealed({ label, quote: item.quote, startByte: item.startByte, endByte: item.endByte, quoteSha256: item.quoteSha256 }) as Citation;
