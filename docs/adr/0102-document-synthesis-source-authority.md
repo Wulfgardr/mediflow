@@ -1,7 +1,7 @@
 # ADR 0102: autorita della sorgente per Document Synthesis
 
 Date: 2026-08-25
-Status: Proposed
+Status: Accepted
 
 Issue: WUL-522
 Program line: candidato `0.8.5`
@@ -47,9 +47,10 @@ dall'host.
 ### Cattura, ordine e limiti del source set
 
 La frontiera di sorgente e indipendente dal rendering del prompt. Prima del
-renderer, l'host cattura fonti esatte e uniche, le ordina per
-`documentSourceRef` canonico in ordine bytewise crescente, poi per
-`documentRevision` `u64` e `documentFreshnessEpoch` `u64`. I duplicati negano.
+renderer, l'host cattura fonti esatte e uniche, le ordina con confronto
+lessicografico dei byte UTF-8 normalizzati e unsigned di `documentSourceRef`,
+poi per `documentRevision` `u64BE` e `documentFreshnessEpoch` `u64BE`. Non usa
+ordine locale, codepoint o case-insensitive. I duplicati negano.
 
 Il source set contiene da 1 a 32 fonti. Dopo l'ordinamento l'host assegna, senza
 salti, le sole etichette globalmente uniche `S1`...`Sn`. Il renderer non puo
@@ -107,13 +108,28 @@ dichiarata dal modello; causalita del modello non stabilita.
 
 `sourceSetDigestSha256` usa il codec binario domain-separated
 `mediflow.document-synthesis.source-set-digest.v1`, non JSON o ordine di
-oggetto. Il payload serializza nell'ordine fisso: tag UTF-8 con prefisso di
-lunghezza, versione `u16`, numero fonti `u8`, `sourceSetEpoch` `u64` e
-`revocationGeneration` `u64`, tutti unsigned big-endian. Per ogni sorgente in
-ordine: etichetta UTF-8 length-prefixed, `documentSourceRef` UTF-8
-length-prefixed, `documentRevision` `u64`, `documentFreshnessEpoch` `u64` e i
-32 byte raw di `projectionDigestSha256`. Nessun digest e codificato come hex,
-nessun campo puo dipendere dall'ordine JSON.
+oggetto. Il payload e l'esatta concatenazione:
+
+```text
+u32BE(byteLength(domainTag)) || utf8(domainTag) || u16BE(1) || u8(sourceCount)
+|| u64BE(sourceSetEpoch) || u64BE(revocationGeneration)
+|| per ogni sorgente ordinata:
+   u32BE(byteLength(label)) || utf8(label)
+   || u32BE(byteLength(documentSourceRef)) || utf8(documentSourceRef)
+   || u64BE(documentRevision) || u64BE(documentFreshnessEpoch)
+   || raw32(projectionDigestSha256)
+```
+
+`domainTag` e la stringa esatta del nome codec. Ogni prefisso UTF-8 e `u32`
+unsigned big-endian del numero di byte, seguito immediatamente da esattamente
+quei byte UTF-8, senza terminatore o padding. `sourceCount`, epoch e revisioni
+usano gli stessi interi unsigned big-endian indicati nel payload. Il digest e
+SHA-256 dei soli byte concatenati sopra.
+
+Prima dell'hash l'host rifiuta overflow dei prefissi, UTF-8 o Unicode invalidi,
+valori vuoti quando tag, etichetta o `documentSourceRef` devono essere non
+vuoti, e byte oltre i limiti di campo, sorgente o aggregato gia definiti. I
+digest restano 32 byte raw, non hex. Nessun campo puo dipendere dall'ordine JSON.
 
 ### Fence a due fasi e receipt finale
 
@@ -186,5 +202,7 @@ caller-supplied, review persistente, apply o scritture cliniche. Non prova
 plaintext originale, authority del provider, entailment, correttezza clinica o
 causalita del modello.
 
-Lo stato e `Proposed`. Qualunque packet runtime richiede autorizzazione
-manageriale separata e una base di integrazione esplicita.
+Lo stato e `Accepted`. Un packet downstream delimitato richiede un gate
+precedente accettato e una base esatta; non richiede una nuova autorizzazione
+utente per ogni fase. Questa decisione non autorizza runtime, azioni remote,
+egress, persistenza o scritture cliniche.
