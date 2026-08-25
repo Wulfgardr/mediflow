@@ -343,9 +343,13 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 const port = ObjectFreeze({
                     snapshot() {
                         if (portActive) { portReentered = true; return null; }
-                        if (!current()) return null;
-                        return ObjectFreeze({ currentRef: ownerState.currentRef, stagedRef: ownerState.stagedRef,
-                            generation: ownerState.generation, terminal: ownerState.terminal });
+                        portActive = true;
+                        portReentered = false;
+                        try {
+                            if (!current() || portReentered) return null;
+                            return ObjectFreeze({ currentRef: ownerState.currentRef, stagedRef: ownerState.stagedRef,
+                                generation: ownerState.generation, terminal: ownerState.terminal });
+                        } finally { portActive = false; }
                     },
                     prepare(input: unknown) {
                         if (portActive) { portReentered = true; return null; }
