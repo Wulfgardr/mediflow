@@ -538,11 +538,12 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     const expectedSelectionEpoch = epoch;
                     const expectedReviewContextEpoch = reviewContextEpoch;
                     const assertUnchanged = () => {
+                        const now = readClock();
                         requireCurrentSession(presentedSession);
                         if (selection !== current || epoch !== expectedSelectionEpoch || reviewContextEpoch !== expectedReviewContextEpoch) {
                             return fail('stale_selection');
                         }
-                        if (readClock() >= current.expiresAt) { expire(); return fail('lease_expired'); }
+                        if (now >= current.expiresAt) { expire(); return fail('lease_expired'); }
                     };
                     leaseCriticalSectionActive = true;
                     try {

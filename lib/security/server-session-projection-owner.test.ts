@@ -6,6 +6,7 @@ import { afterEach, test } from 'node:test';
 import {
     createServerSessionProjectionOwnerRegistry,
     isServerSessionProjectionOwner,
+    ServerSessionProjectionOwnerError,
 } from './server-session-projection-owner.ts';
 import { clearAllSessions, createSession, deleteSession, type ServerSession } from './server-session.ts';
 
@@ -167,5 +168,20 @@ test('denies nested public operations during a Patient Insight or OCR snapshot',
         armed = true;
         assert.equal(port.snapshot(), null);
         assert.deepEqual(port.snapshot(), { currentRef: current, stagedRef: null, generation: 0, terminal: operation === 'dispose' });
+    }
+});
+
+test('denies a result when the final critical-section clock disposes its session owner', () => {
+    for (const result of [Object.freeze({ kind: 'normal' }), Object.freeze({ then() { /* probe only */ } })]) {
+        let arm = false; let armedClockReads = 0;
+        const registry = createServerSessionProjectionOwnerRegistry({
+            resolve: (_session, pair) => pair, entropy: () => new Uint8Array(16),
+            clock: () => { if (arm && ++armedClockReads === 2) deleteSession(value.id); return 1_000; },
+        });
+        const value = session(); const owner = registry.acquire(value);
+        owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+        assert.throws(() => owner.withLeaseCriticalSection(value, () => { arm = true; return result; }),
+            (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
+        assert.equal(registry.lookup(value.id), null);
     }
 });
