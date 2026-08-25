@@ -49,8 +49,8 @@ export const dynamic = 'force-dynamic';
 /* @Codex */
 function sortBackupRows<T extends Record<string, unknown>>(rows: T[]): T[] {
     return [...rows].sort((left, right) => {
-        const leftKey = String(left.id ?? left.key ?? left.code ?? left.aic ?? left.patientId ?? left.conversationId ?? '');
-        const rightKey = String(right.id ?? right.key ?? right.code ?? right.aic ?? right.patientId ?? right.conversationId ?? '');
+        const leftKey = String(left.attestationRef ?? left.actorRef ?? left.id ?? left.key ?? left.code ?? left.aic ?? left.patientId ?? left.conversationId ?? '');
+        const rightKey = String(right.attestationRef ?? right.actorRef ?? right.id ?? right.key ?? right.code ?? right.aic ?? right.patientId ?? right.conversationId ?? '');
         return leftKey.localeCompare(rightKey);
     });
 }
