@@ -112,3 +112,33 @@ test('captures Array, Object, Reflect, String, encoder, JSON, proxy, and prototy
     try { await new Promise<void>((resolve) => setImmediate(resolve)); } finally { process.off('unhandledRejection', listener); }
     assert.equal(unhandled, 0);
 });
+
+test('captures SHA-256 Hash update and digest methods before post-import prototype poisoning', async () => {
+    const define = Object.defineProperty; const get = Object.getOwnPropertyDescriptor;
+    const probe = createHash('sha256'); const prototype = Object.getPrototypeOf(probe);
+    const update = get(prototype, 'update'); const digest = get(prototype, 'digest');
+    assert.ok(update?.configurable); assert.ok(digest?.configurable);
+    const input = valid(); const baseline = available(validateDocumentSynthesisProviderCitations(input));
+    const invalid = { ...valid(), citations: [{ ...valid().citations[0]!, quoteSha256: '0'.repeat(64) }, valid().citations[1]! ] };
+    let calls = 0; const poison = () => { calls += 1; throw new Error('Hash prototype poisoned after import'); };
+    const proxyUpdate = new Proxy(update!.value as CallableFunction, { apply() { calls += 1; throw new Error('Hash update Proxy called'); }, get() { calls += 1; throw new Error('Hash update Proxy read'); } });
+    const proxyDigest = new Proxy(digest!.value as CallableFunction, { apply() { calls += 1; throw new Error('Hash digest Proxy called'); }, get() { calls += 1; throw new Error('Hash digest Proxy read'); } });
+    let falseResult: ReturnType<typeof validateDocumentSynthesisProviderCitations> | undefined;
+    let throwingResult: ReturnType<typeof validateDocumentSynthesisProviderCitations> | undefined;
+    let proxyResult: ReturnType<typeof validateDocumentSynthesisProviderCitations> | undefined;
+    try {
+        define(prototype, 'update', { ...update, value: false }); define(prototype, 'digest', { ...digest, value: false });
+        falseResult = validateDocumentSynthesisProviderCitations(input); denied(invalid);
+        define(prototype, 'update', { ...update, value: poison }); define(prototype, 'digest', { ...digest, value: poison });
+        throwingResult = validateDocumentSynthesisProviderCitations(input);
+        define(prototype, 'update', { ...update, value: proxyUpdate }); define(prototype, 'digest', { ...digest, value: proxyDigest });
+        proxyResult = validateDocumentSynthesisProviderCitations(input);
+    } finally {
+        define(prototype, 'update', update!); define(prototype, 'digest', digest!);
+    }
+    for (const result of [falseResult, throwingResult, proxyResult]) assert.deepEqual(available(result!).citations.map((item) => ({ ...item })), baseline.citations.map((item) => ({ ...item })));
+    assert.equal(calls, 0);
+    let unhandled = 0; const listener = () => { unhandled += 1; }; process.on('unhandledRejection', listener);
+    try { await new Promise<void>((resolve) => setImmediate(resolve)); } finally { process.off('unhandledRejection', listener); }
+    assert.equal(unhandled, 0);
+});
