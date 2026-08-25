@@ -348,11 +348,12 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                             generation: ownerState.generation, terminal: ownerState.terminal });
                     },
                     prepare(input: unknown) {
-                        if (portActive || ownerState.terminal) return null;
+                        if (portActive) { portReentered = true; return null; }
+                        if (ownerState.terminal) return null;
                         portActive = true;
                         portReentered = false;
                         const request = frozenExact(input, ['expected']);
-                        if (!request || !current() || portReentered || !owns(request.expected) || request.expected !== ownerState.currentRef || ownerState.stagedRef !== null) {
+                        if (!request || !current() || portReentered || ownerState.terminal || !owns(request.expected) || request.expected !== ownerState.currentRef || ownerState.stagedRef !== null) {
                             portActive = false; return null;
                         }
                         const replacement = mintRef();
@@ -363,11 +364,12 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         return replacement;
                     },
                     commit(input: unknown) {
-                        if (portActive || ownerState.terminal) return false;
+                        if (portActive) { portReentered = true; return false; }
+                        if (ownerState.terminal) return false;
                         portActive = true;
                         portReentered = false;
                         const request = frozenExact(input, ['expected', 'replacement']);
-                        if (!request || !current() || portReentered || !owns(request.expected) || !owns(request.replacement)
+                        if (!request || !current() || portReentered || ownerState.terminal || !owns(request.expected) || !owns(request.replacement)
                             || request.expected !== ownerState.currentRef || request.replacement !== ownerState.stagedRef) {
                             portActive = false; return false;
                         }
@@ -378,11 +380,12 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         return true;
                     },
                     abort(input: unknown) {
-                        if (portActive || ownerState.terminal) return false;
+                        if (portActive) { portReentered = true; return false; }
+                        if (ownerState.terminal) return false;
                         portActive = true;
                         portReentered = false;
                         const request = frozenExact(input, ['replacement']);
-                        if (!request || !current() || portReentered || !owns(request.replacement) || request.replacement !== ownerState.stagedRef) {
+                        if (!request || !current() || portReentered || ownerState.terminal || !owns(request.replacement) || request.replacement !== ownerState.stagedRef) {
                             portActive = false; return false;
                         }
                         const next = ObjectFreeze({ currentRef: ownerState.currentRef, stagedRef: null as Ref | null,
@@ -392,6 +395,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         return true;
                     },
                     dispose() {
+                        if (portActive) portReentered = true;
                         if (ownerState.terminal) return;
                         ownerState = ObjectFreeze({ currentRef: ownerState.currentRef, stagedRef: null as Ref | null,
                             generation: ownerState.generation, terminal: true });
