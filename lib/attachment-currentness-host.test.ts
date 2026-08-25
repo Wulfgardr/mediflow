@@ -7,6 +7,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import { Buffer } from 'node:buffer';
+import { sql } from 'drizzle-orm';
 import Database from 'better-sqlite3';
 
 const root = process.cwd();
@@ -19,6 +20,7 @@ migrationDb.close();
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 const requireCurrent = createRequire(import.meta.url);
 const host = requireCurrent('./attachment-currentness-host') as typeof import('./attachment-currentness-host');
+const databaseHost = requireCurrent('./db-server') as typeof import('./db-server');
 
 const ref = 'a'.repeat(64); const expected = () => ({ sourceRef: ref, revision: 1, freshnessEpoch: 1 });
 function reset(values: { revision?: number; freshnessEpoch?: number; sourceRef?: string; data?: string | null } = {}) {
@@ -36,12 +38,17 @@ function snapshot() {
 function rejects(action: () => unknown, code: 'input_invalid' | 'attachment_missing' | 'currentness_conflict' | 'currentness_overflow' | 'stored_state_invalid') {
     assert.throws(action, (error: unknown) => host.isAttachmentCurrentnessHostError(error) && error.code === code && error.message === `Attachment currentness host rejected: ${code}`);
 }
-function worker(): Promise<string> {
+function worker(workerPath = path.join(dataDir, 'worker.mjs')): Promise<string> {
     return new Promise((resolve, reject) => {
-        const child = spawn(process.execPath, [path.join(root, 'scripts/run-strip-types.mjs'), path.join(dataDir, 'worker.mjs')], { cwd: root, env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir }, stdio: ['ignore', 'pipe', 'pipe'] });
+        const child = spawn(process.execPath, [path.join(root, 'scripts/run-strip-types.mjs'), workerPath], { cwd: root, env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir }, stdio: ['ignore', 'pipe', 'pipe'] });
         let output = ''; child.stdout.on('data', (part) => { output += String(part); }); child.stderr.on('data', (part) => { output += String(part); });
         child.once('error', reject); child.once('close', () => { child.stdout.destroy(); child.stderr.destroy(); resolve(output.trim()); });
     });
+}
+function adversarialWorker(setup: string): Promise<string> {
+    const workerPath = path.join(dataDir, 'adversarial-worker.mjs');
+    fs.writeFileSync(workerPath, `const database = await import('@/lib/db-server');\nconst originalRun = database.dbServer.run.bind(database.dbServer);\nlet reads = 0;\n${setup}\nObject.defineProperty(database.dbServer, 'run', { value: (...args) => { originalRun(...args); return result; } });\nconst host = await import('@/lib/attachment-currentness-host');\ntry { host.transitionAttachmentContentCurrentness('attachment.synthetic.1', { sourceRef: '${ref}', revision: 1, freshnessEpoch: 1 }, 'winner'); console.log('winner:' + reads); } catch (error) { console.log((host.isAttachmentCurrentnessHostError(error) ? error.code : 'unknown') + ':' + reads); }\n`);
+    return worker(workerPath).finally(() => fs.rmSync(workerPath, { force: true }));
 }
 test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
@@ -59,6 +66,16 @@ test('atomically replaces exact string or null data and advances the exact expec
     rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), 'again'), 'currentness_conflict');
     reset(); assert.deepEqual(host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), null), { sourceRef: ref, revision: 2, freshnessEpoch: 2 });
     assert.equal((snapshot() as { data: string | null }).data, null);
+});
+
+test('observes the canonical Drizzle SQLite run result shape', () => {
+    reset();
+    const result = databaseHost.dbServer.run(sql`UPDATE attachments SET data = ${'shape'} WHERE id = ${'attachment.synthetic.1'}`);
+    assert.equal(Object.getPrototypeOf(result), Object.prototype);
+    assert.deepEqual(Reflect.ownKeys(result), ['changes', 'lastInsertRowid']);
+    const fields = Object.getOwnPropertyDescriptors(result);
+    assert.equal(fields.changes?.enumerable, true); assert.equal(fields.lastInsertRowid?.enumerable, true);
+    assert.equal(result.changes, 1); assert.ok(typeof result.lastInsertRowid === 'number' || typeof result.lastInsertRowid === 'bigint');
 });
 
 test('denies missing, malformed, stale, overflow, and caller-selected patient input without writes', () => {
@@ -183,6 +200,45 @@ test('rejects inherited or non-data expected fields without reads or a transacti
     rejectsWithoutMutation(new Proxy(expected(), { get() { accessorReads += 1; return ref; }, ownKeys() { accessorReads += 1; return []; } }));
     assert.equal(accessorReads, 0); assert.equal(prototypeReads, 0);
     reset(); assert.deepEqual(host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), 'new'), { sourceRef: ref, revision: 2, freshnessEpoch: 2 });
+});
+
+test('binds original Drizzle methods before hostile post-import replacements', () => {
+    reset();
+    const prototype = Object.getPrototypeOf(databaseHost.dbServer) as Record<string, unknown>;
+    const originalGet = Object.getOwnPropertyDescriptor(prototype, 'get');
+    const originalRun = Object.getOwnPropertyDescriptor(prototype, 'run');
+    let hostileCalls = 0;
+    const hostile = new Proxy(() => undefined, { apply() { hostileCalls += 1; throw new Error('synthetic db redirect'); } });
+    try {
+        Object.defineProperty(prototype, 'get', { configurable: true, value: hostile });
+        Object.defineProperty(prototype, 'run', { configurable: true, value: hostile });
+        assert.deepEqual(host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), 'captured'), { sourceRef: ref, revision: 2, freshnessEpoch: 2 });
+    } finally {
+        if (originalGet) Object.defineProperty(prototype, 'get', originalGet); else delete prototype.get;
+        if (originalRun) Object.defineProperty(prototype, 'run', originalRun); else delete prototype.run;
+    }
+    assert.equal(hostileCalls, 0);
+    assert.deepEqual(snapshot(), { patient_id: 'patient.synthetic.1', data: 'captured', document_source_ref: ref, document_revision: 2, document_freshness_epoch: 2 });
+});
+
+test('rolls back every hostile Drizzle run result without reads or a false winner', { timeout: 30_000 }, async () => {
+    const cases = [
+        { expected: 'storage_unavailable', setup: "const result = Object.create({ changes: 1, lastInsertRowid: 1 });" },
+        { expected: 'storage_unavailable', setup: "const result = { lastInsertRowid: 1 }; Object.defineProperty(result, 'changes', { enumerable: true, get() { reads += 1; return 1; } });" },
+        { expected: 'storage_unavailable', setup: "const result = new Proxy({ changes: 1, lastInsertRowid: 1 }, { get() { reads += 1; return 1; }, ownKeys() { reads += 1; return ['changes', 'lastInsertRowid']; } });" },
+        { expected: 'storage_unavailable', setup: "const result = { changes: 1, lastInsertRowid: 1 }; Object.defineProperty(result, 'changes', { enumerable: false, value: 1 });" },
+        { expected: 'storage_unavailable', setup: "const result = { changes: 1, lastInsertRowid: 1, [Symbol('synthetic')]: true };" },
+        { expected: 'storage_unavailable', setup: "const result = Object.assign(Object.create(null), { changes: 1, lastInsertRowid: 1 });" },
+        { expected: 'storage_unavailable', setup: "const result = Object.assign(Object.create({}), { changes: 1, lastInsertRowid: 1 });" },
+        { expected: 'storage_unavailable', setup: "const result = { changes: 1, lastInsertRowid: 1, then() { reads += 1; } };" },
+        { expected: 'storage_unavailable', setup: "const result = { changes: 1, lastInsertRowid: 1, extra: true };" },
+        { expected: 'currentness_conflict', setup: "const result = { changes: 0, lastInsertRowid: 1 };" },
+    ];
+    for (const candidate of cases) {
+        reset(); const before = snapshot();
+        assert.equal(await adversarialWorker(candidate.setup), `${candidate.expected}:0`);
+        assert.deepEqual(snapshot(), before);
+    }
 });
 
 test('leaves the immediate transaction reusable after every denial', () => {

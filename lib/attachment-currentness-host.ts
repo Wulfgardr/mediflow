@@ -11,6 +11,7 @@ const REF = /^[0-9a-f]{64}$/u;
 const MAX = Number.MAX_SAFE_INTEGER;
 const KEYS = ['sourceRef', 'revision', 'freshnessEpoch'] as const;
 const STORED_KEYS = ['id', 'patientId', 'sourceRef', 'revision', 'freshnessEpoch'] as const;
+const RUN_RESULT_KEYS = ['changes', 'lastInsertRowid'] as const;
 const OBJECT_PROTOTYPE = Object.prototype;
 const objectGetPrototypeOf = Object.getPrototypeOf;
 const objectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
@@ -28,6 +29,8 @@ const weakSetHas = Function.call.bind(WeakSet.prototype.has) as (set: WeakSet<ob
 const isProxy = types.isProxy;
 const cryptoRandomBytes = randomBytes;
 const ErrorConstructor = Error;
+const dbServerGet = dbServer.get.bind(dbServer) as typeof dbServer.get;
+const dbServerRun = dbServer.run.bind(dbServer) as typeof dbServer.run;
 const mintedHostErrors = new WeakSet<object>();
 
 export type AttachmentCurrentness = Readonly<{ sourceRef: string; revision: number; freshnessEpoch: number }>;
@@ -90,6 +93,16 @@ function stored(row: unknown, id: string): AttachmentCurrentness & { patientId: 
     } catch { return fail('stored_state_invalid'); }
 }
 
+function runResult(value: unknown): Readonly<{ changes: number; lastInsertRowid: number | bigint }> {
+    const fields = exactOwnDataFields(value, RUN_RESULT_KEYS);
+    if (!fields) fail('storage_unavailable');
+    const { changes, lastInsertRowid } = fields;
+    if (typeof changes.value !== 'number' || !numberIsSafeInteger(changes.value) || changes.value < 0
+        || (typeof lastInsertRowid.value !== 'number' && typeof lastInsertRowid.value !== 'bigint')
+        || (typeof lastInsertRowid.value === 'number' && (!numberIsSafeInteger(lastInsertRowid.value) || lastInsertRowid.value < 0))) fail('storage_unavailable');
+    return objectFreeze({ changes: changes.value, lastInsertRowid: lastInsertRowid.value });
+}
+
 function storage(error: unknown): never {
     if (isAttachmentCurrentnessHostError(error)) throw error;
     return fail('storage_unavailable');
@@ -118,14 +131,14 @@ export function transitionAttachmentContentCurrentness(idValue: unknown, expecte
     const data = replacement(replacementValue);
     try {
         return runDbServerImmediateTransaction(() => {
-            const row = dbServer.get<{ id: unknown; patientId: unknown; sourceRef: unknown; revision: unknown; freshnessEpoch: unknown }>(sql`
+            const row = dbServerGet<{ id: unknown; patientId: unknown; sourceRef: unknown; revision: unknown; freshnessEpoch: unknown }>(sql`
                 SELECT id, patient_id AS patientId, document_source_ref AS sourceRef, document_revision AS revision, document_freshness_epoch AS freshnessEpoch FROM attachments WHERE id = ${id}`);
             if (!row) fail('attachment_missing');
             const storedValue = stored(row, id);
             if (storedValue.sourceRef !== expected.sourceRef || storedValue.revision !== expected.revision || storedValue.freshnessEpoch !== expected.freshnessEpoch) fail('currentness_conflict');
             if (storedValue.revision >= MAX || storedValue.freshnessEpoch >= MAX) fail('currentness_overflow');
-            const result = dbServer.run(sql`UPDATE attachments SET data = ${data}, document_revision = document_revision + 1, document_freshness_epoch = document_freshness_epoch + 1
-                WHERE id = ${id} AND patient_id = ${storedValue.patientId} AND document_source_ref = ${expected.sourceRef} AND document_revision = ${expected.revision} AND document_freshness_epoch = ${expected.freshnessEpoch}`);
+            const result = runResult(dbServerRun(sql`UPDATE attachments SET data = ${data}, document_revision = document_revision + 1, document_freshness_epoch = document_freshness_epoch + 1
+                WHERE id = ${id} AND patient_id = ${storedValue.patientId} AND document_source_ref = ${expected.sourceRef} AND document_revision = ${expected.revision} AND document_freshness_epoch = ${expected.freshnessEpoch}`));
             if (result.changes !== 1) fail('currentness_conflict');
             return objectFreeze({ sourceRef: expected.sourceRef, revision: expected.revision + 1, freshnessEpoch: expected.freshnessEpoch + 1 });
         });
