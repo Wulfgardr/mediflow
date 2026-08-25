@@ -120,6 +120,7 @@ export type ServerSessionProjectionOwner = Readonly<{
     mintPatientInsightLeaseCommitPort(session: ServerSession): PatientInsightLeaseCommitPort;
     mintOcrLeaseCommitPort(session: ServerSession): OcrLeaseCommitPort;
     mintDocumentSynthesisLeaseCommitPort(session: ServerSession): DocumentSynthesisLeaseCommitPort;
+    mintTreatmentReasoningLeaseCommitPort(session: ServerSession): TreatmentReasoningLeaseCommitPort;
     withLeaseCriticalSection<T>(session: ServerSession, callback: (selection: CanonicalPair) => T): T;
     dispose(): void;
 }>;
@@ -127,9 +128,11 @@ export type ServerSessionProjectionOwner = Readonly<{
 declare const patientInsightLeaseCommitRef: unique symbol;
 declare const ocrLeaseCommitRef: unique symbol;
 declare const documentSynthesisLeaseCommitRef: unique symbol;
+declare const treatmentReasoningLeaseCommitRef: unique symbol;
 export type PatientInsightLeaseCommitRef = Readonly<{ readonly [patientInsightLeaseCommitRef]?: never }>;
 export type OcrLeaseCommitRef = Readonly<{ readonly [ocrLeaseCommitRef]?: never }>;
 export type DocumentSynthesisLeaseCommitRef = Readonly<{ readonly [documentSynthesisLeaseCommitRef]?: never }>;
+export type TreatmentReasoningLeaseCommitRef = Readonly<{ readonly [treatmentReasoningLeaseCommitRef]?: never }>;
 type LeaseCommitSnapshot<Ref extends object> = Readonly<{
     currentRef: Ref; stagedRef: Ref | null; generation: number; terminal: boolean;
 }>;
@@ -152,6 +155,13 @@ export type DocumentSynthesisLeaseCommitPort = Readonly<{
     prepare(input: Readonly<{ expected: DocumentSynthesisLeaseCommitRef }>): DocumentSynthesisLeaseCommitRef | null;
     commit(input: Readonly<{ expected: DocumentSynthesisLeaseCommitRef; replacement: DocumentSynthesisLeaseCommitRef }>): boolean;
     abort(input: Readonly<{ replacement: DocumentSynthesisLeaseCommitRef }>): boolean;
+    dispose(): void;
+}>;
+export type TreatmentReasoningLeaseCommitPort = Readonly<{
+    snapshot(): LeaseCommitSnapshot<TreatmentReasoningLeaseCommitRef> | null;
+    prepare(input: Readonly<{ expected: TreatmentReasoningLeaseCommitRef }>): TreatmentReasoningLeaseCommitRef | null;
+    commit(input: Readonly<{ expected: TreatmentReasoningLeaseCommitRef; replacement: TreatmentReasoningLeaseCommitRef }>): boolean;
+    abort(input: Readonly<{ replacement: TreatmentReasoningLeaseCommitRef }>): boolean;
     dispose(): void;
 }>;
 
@@ -281,9 +291,11 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             const patientInsightRefs = new WeakSetConstructor<object>();
             const ocrRefs = new WeakSetConstructor<object>();
             const documentSynthesisRefs = new WeakSetConstructor<object>();
+            const treatmentReasoningRefs = new WeakSetConstructor<object>();
             const patientInsightPorts = new WeakSetConstructor<object>();
             const ocrPorts = new WeakSetConstructor<object>();
             const documentSynthesisPorts = new WeakSetConstructor<object>();
+            const treatmentReasoningPorts = new WeakSetConstructor<object>();
             const reference = (prefix: string) => {
                 let bytes: Uint8Array;
                 try { bytes = sources.entropy(); } catch { return fail('reference_unavailable'); }
@@ -433,7 +445,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     && typeof value.control?.lock === 'function' && typeof value.control.revoke === 'function'
                     && typeof value.control.changeSelection === 'function';
             };
-            const owner: Omit<ServerSessionProjectionOwner, 'mintPatientInsightLeaseCommitPort' | 'mintOcrLeaseCommitPort' | 'mintDocumentSynthesisLeaseCommitPort'> = {
+            const owner: Omit<ServerSessionProjectionOwner, 'mintPatientInsightLeaseCommitPort' | 'mintOcrLeaseCommitPort' | 'mintDocumentSynthesisLeaseCommitPort' | 'mintTreatmentReasoningLeaseCommitPort'> = {
                 snapshotSelectionEpoch(presentedSession) {
                     if (terminal || presentedSession !== session || session.authChannel !== 'web' || peekSession(session.id) !== session) {
                         return fail('session_unavailable');
@@ -597,6 +609,10 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             ObjectDefineProperty(owner, 'mintDocumentSynthesisLeaseCommitPort', { enumerable: false, value(presentedSession: ServerSession) {
                 if (this !== owner) return fail('session_unavailable');
                 return mintLeaseCommitPort<DocumentSynthesisLeaseCommitRef>(presentedSession, documentSynthesisRefs, documentSynthesisPorts) as DocumentSynthesisLeaseCommitPort;
+            } });
+            ObjectDefineProperty(owner, 'mintTreatmentReasoningLeaseCommitPort', { enumerable: false, value(presentedSession: ServerSession) {
+                if (this !== owner) return fail('session_unavailable');
+                return mintLeaseCommitPort<TreatmentReasoningLeaseCommitRef>(presentedSession, treatmentReasoningRefs, treatmentReasoningPorts) as TreatmentReasoningLeaseCommitPort;
             } });
             const completedOwner = ObjectFreeze(owner) as unknown as ServerSessionProjectionOwner;
 
