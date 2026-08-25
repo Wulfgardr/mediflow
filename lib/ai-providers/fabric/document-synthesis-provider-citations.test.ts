@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
+import { types } from 'node:util';
 
 import { captureDocumentSynthesisSourceSet } from './document-synthesis-source-set-contract';
 import { validateDocumentSynthesisProviderCitations } from './document-synthesis-provider-citations';
@@ -15,6 +16,10 @@ function valid(sourceSet = authentic()) { return { sourceSet, citations: [
     { label: 'S1', quote: 'Café', startByte: 0, endByte: 5, quoteSha256: sha('Café') },
     { label: 'S2', quote: '€uro', startByte: 9, endByte: 15, quoteSha256: sha('€uro') },
 ] }; }
+function single(sourceText: string, quote: string, startByte: number, endByte: number) {
+    const sourceSet = available(captureDocumentSynthesisSourceSet({ sources: [source('a', sourceText)], sourceSetEpoch: BigInt(3), revocationGeneration: BigInt(4) })).sourceSet;
+    return { sourceSet, citations: [{ label: 'S1', quote, startByte, endByte, quoteSha256: sha(quote) }] };
+}
 function denied(value: unknown) { const result = validateDocumentSynthesisProviderCitations(value); assert.equal(result.status, 'denied'); assert.equal(result.citations, null); }
 
 test('binds ordered S1..Sn provider citations to an authentic normalized private projection', () => {
@@ -37,6 +42,11 @@ test('denies reordered, missing, duplicate, unknown, ambiguous, quote, offset, a
     for (const value of cases) denied(value);
 });
 
+test('denies lone surrogate aliases before UTF-8 hashing and preserves a valid astral scalar quote', () => {
+    for (const [sourceText, quote] of [['\ufffd', '\ud800'], ['\ufffd', '\udc00'], ['x\ufffdy', 'x\ud800y'], ['x\ufffdy', 'x\udc00y']] as const) denied(single(sourceText, quote, 0, bytes(sourceText).length));
+    available(validateDocumentSynthesisProviderCitations(single('🙂', '🙂', 0, 4)));
+});
+
 test('denies forged source sets, forbidden authority fields, mutation, hostile shapes, and ambient then without reads', () => {
     const input = valid(); const forged = { ...input.sourceSet };
     denied({ ...input, sourceSet: forged }); denied({ ...input, patientRef: 'synthetic' });
@@ -45,17 +55,21 @@ test('denies forged source sets, forbidden authority fields, mutation, hostile s
     const accessor = valid(); Object.defineProperty(accessor.citations[0]!, 'quote', { enumerable: true, get() { reads += 1; return 'Café'; } }); denied(accessor);
     const proxy = new Proxy(valid(), { ownKeys() { traps += 1; return []; }, get() { traps += 1; return null; } }); denied(proxy);
     const nonEnumerable = valid(); Object.defineProperty(nonEnumerable.citations[0]!, 'quote', { enumerable: false, value: 'Café' }); denied(nonEnumerable);
-    const before = Object.getOwnPropertyDescriptor(Object.prototype, 'then'); const freeze = Object.freeze; const create = Object.create; const includes = Array.prototype.includes; const charCodeAt = String.prototype.charCodeAt; const frozenInput = valid();
+    const before = Object.getOwnPropertyDescriptor(Object.prototype, 'then'); const freeze = Object.freeze; const create = Object.create; const includes = Array.prototype.includes; const charCodeAt = String.prototype.charCodeAt; const isProxy = types.isProxy; const frozenInput = valid(); const transparentInput = valid();
     try {
         Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { reads += 1; return undefined; } });
         (Object as { freeze: typeof Object.freeze }).freeze = (() => { throw new Error('poison'); }) as typeof Object.freeze;
         (Object as { create: typeof Object.create }).create = (() => { throw new Error('poison'); }) as typeof Object.create;
         (Array.prototype as { includes: typeof Array.prototype.includes }).includes = (() => { throw new Error('poison'); }) as typeof Array.prototype.includes;
         (String.prototype as { charCodeAt: typeof String.prototype.charCodeAt }).charCodeAt = (() => { throw new Error('poison'); }) as typeof String.prototype.charCodeAt;
+        (types as { isProxy: typeof types.isProxy }).isProxy = (() => false) as typeof types.isProxy;
+        const poisonedProxy = new Proxy(transparentInput, { ownKeys() { traps += 1; return []; }, get() { traps += 1; return null; } }); denied(poisonedProxy);
+        (types as { isProxy: typeof types.isProxy }).isProxy = (() => { throw new Error('poison'); }) as typeof types.isProxy;
         available(validateDocumentSynthesisProviderCitations(frozenInput));
     } finally {
         (Object as { freeze: typeof Object.freeze }).freeze = freeze; (Object as { create: typeof Object.create }).create = create;
         (Array.prototype as { includes: typeof Array.prototype.includes }).includes = includes; (String.prototype as { charCodeAt: typeof String.prototype.charCodeAt }).charCodeAt = charCodeAt;
+        (types as { isProxy: typeof types.isProxy }).isProxy = isProxy;
         if (before) Object.defineProperty(Object.prototype, 'then', before); else delete (Object.prototype as { then?: unknown }).then;
     }
     assert.equal(reads, 0); assert.equal(traps, 0);
