@@ -116,6 +116,40 @@ test('does not mutate a registry resolution and rejects later raw-adapter drift'
     } finally { localProviderRegistry.resolve = originalResolve; }
 });
 
+test('never executes raw adapter methods replaced after binding', async () => {
+    const originalResolve = localProviderRegistry.resolve;
+    const raw = originalResolve.call(localProviderRegistry, { task: 'reasoning', models: { reasoning: 'reasoning-local' }, endpoint: 'http://127.0.0.1:11434', chatTimeoutMs: 1 });
+    localProviderRegistry.resolve = () => raw;
+    try {
+        const result = await service().bind(); assert.equal(result.status, 'available'); if (result.status !== 'available') return;
+        let chatCalls = 0; let listCalls = 0;
+        const mutable = raw.adapter as unknown as { chat(): Promise<never>; listModels(): Promise<never> };
+        mutable.chat = async () => { chatCalls += 1; throw new Error('replacement executed'); };
+        mutable.listModels = async () => { listCalls += 1; throw new Error('replacement executed'); };
+        const bound = resolveDocumentSynthesisProviderBinding(result.token)!;
+        await assert.rejects(() => bound.adapter.chat([]), { code: 'provider_not_local' });
+        await assert.rejects(() => bound.adapter.listModels(), { code: 'provider_not_local' });
+        assert.equal(chatCalls, 0); assert.equal(listCalls, 0);
+    } finally { localProviderRegistry.resolve = originalResolve; }
+});
+
+test('rejects proxy registry resolution shapes before any trap or readiness attestation', async () => {
+    const originalResolve = localProviderRegistry.resolve;
+    const raw = originalResolve.call(localProviderRegistry, { task: 'reasoning', models: { reasoning: 'reasoning-local' }, endpoint: 'http://127.0.0.1:11434', chatTimeoutMs: 1 });
+    for (const candidate of [
+        (traps: { value: number }) => new Proxy(raw, { get() { traps.value += 1; throw new Error('trap'); } }),
+        (traps: { value: number }) => ({ ...raw, adapter: new Proxy(raw.adapter, { get() { traps.value += 1; throw new Error('trap'); } }) }),
+        (traps: { value: number }) => ({ ...raw, receipt: new Proxy(raw.receipt, { get() { traps.value += 1; throw new Error('trap'); } }) }),
+        (traps: { value: number }) => ({ ...raw, manifest: new Proxy(raw.manifest, { get() { traps.value += 1; throw new Error('trap'); } }) }),
+        (traps: { value: number }) => ({ ...raw, fallback: new Proxy(raw.fallback, { get() { traps.value += 1; throw new Error('trap'); } }) }),
+    ]) {
+        const traps = { value: 0 }; let attestations = 0; localProviderRegistry.resolve = () => candidate(traps) as typeof raw;
+        const result = await service(SETTINGS, async () => { attestations += 1; return ATTESTATION; }).bind();
+        assert.equal(result.code, 'provider_invalid'); assert.equal(traps.value, 0); assert.equal(attestations, 0);
+    }
+    localProviderRegistry.resolve = originalResolve;
+});
+
 test('contains dependency failure and ambient thenables without publishing a token', async () => {
     const unavailable = createDocumentSynthesisProviderBindingForTest({ readSettings: async () => Promise.reject(new Error('rejected')), attest: async () => ATTESTATION });
     assert.equal((await unavailable.bind()).code, 'settings_unavailable');
