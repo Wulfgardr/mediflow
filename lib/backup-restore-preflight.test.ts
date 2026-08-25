@@ -31,6 +31,7 @@ const basePayload = {
     sissHandoffs: [],
     patients: [],
     physicianReviewAttestations: [],
+    headlessSoapActiveRoleAttestations: [],
     checkups: [],
     therapies: [],
 };

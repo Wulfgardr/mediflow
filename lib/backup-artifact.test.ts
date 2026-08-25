@@ -89,6 +89,7 @@ const basePayload = {
         },
     ],
     physicianReviewAttestations: [],
+    headlessSoapActiveRoleAttestations: [],
     checkups: [],
     therapies: [],
 };
@@ -131,6 +132,7 @@ test('includes durable review records and replay operations in the authenticated
     assert.equal(artifact.manifest.recordCounts.durableReviewCommandOperations, 0);
     assert.equal(artifact.manifest.recordCounts.durableReviewPatientLinks, 0);
     assert.equal(artifact.manifest.recordCounts.physicianReviewAttestations, 0);
+    assert.equal(artifact.manifest.recordCounts.headlessSoapActiveRoleAttestations, 0);
 });
 
 /* @Codex */
@@ -232,6 +234,88 @@ async function checksumValidAuthorityArtifact(mutate: (artifact: any) => void | 
     artifact.manifest.checksum = await sha256(stableStringify(artifact.payload));
     return artifact;
 }
+
+/* @Codex */
+async function checksumValidHeadlessSoapAttestationArtifact(mutate: (artifact: any) => void | Promise<void>): Promise<Record<string, unknown>> {
+    const artifact = JSON.parse(await serializeBackupArtifact({
+        ...basePayload,
+        headlessSoapActiveRoleAttestations: [{
+            attestationRef: 'soap-attestation-synthetic',
+            actorRef: 'actor-soap-synthetic',
+            schemaVersion: 'mediflow.headless-soap-active-role-attestation.v1',
+            role: 'physician',
+            operationId: 'mediflow.clinical_diary.append_soap.v1',
+            policyVersion: 'clinician_confirmed_single_use.v1',
+            status: 'active',
+            attestationVersion: 1,
+            issuerRef: 'issuer-synthetic',
+            expiresAt: '2026-03-17T09:10:00.000Z',
+            activatedAt: '2026-03-17T08:10:00.000Z',
+            revocationGeneration: 0,
+            revokedAt: null,
+            createdAt: '2026-03-17T08:00:00.000Z',
+            updatedAt: '2026-03-17T08:10:00.000Z',
+        }],
+    }));
+    await mutate(artifact);
+    for (const collection of artifact.manifest.collections) {
+        artifact.manifest.recordCounts[collection] = artifact.payload[collection].length;
+    }
+    artifact.manifest.checksum = await sha256(stableStringify(artifact.payload));
+    return artifact;
+}
+
+test('accepts only exact lifecycle-bound headless SOAP active-role attestation rows', async () => {
+    const artifact = await checksumValidHeadlessSoapAttestationArtifact(() => {});
+    const parsed = await parseBackupArtifact(artifact);
+
+    assert.equal(parsed.payload.headlessSoapActiveRoleAttestations.length, 1);
+    assert.equal(parsed.payload.headlessSoapActiveRoleAttestations[0].operationId, 'mediflow.clinical_diary.append_soap.v1');
+});
+
+test('rejects malformed, duplicated, and lifecycle-invalid headless SOAP active-role attestations', async () => {
+    const mutations: Array<(artifact: any) => void> = [
+        (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].extra = true; },
+        (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].role = 'admin'; },
+        (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].operationId = 'other'; },
+        (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].policyVersion = 'other.v1'; },
+        (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].issuerRef = null; },
+        (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].revocationGeneration = 1; },
+        (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].activatedAt = '2026-03-17T09:11:00.000Z'; },
+        (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].revokedAt = '2026-03-17T08:10:00.000Z'; },
+        (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].status = 'revoked'; artifact.payload.headlessSoapActiveRoleAttestations[0].revokedAt = '2026-03-17T08:09:00.000Z'; artifact.payload.headlessSoapActiveRoleAttestations[0].revocationGeneration = 1; },
+        (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations.push({ ...artifact.payload.headlessSoapActiveRoleAttestations[0] }); },
+    ];
+    for (const mutate of mutations) {
+        const artifact = await checksumValidHeadlessSoapAttestationArtifact(mutate);
+        await assert.rejects(
+            () => parseBackupArtifact(artifact),
+            (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+        );
+    }
+});
+
+test('rejects hostile headless SOAP active-role attestation rows before getters or proxy traps', async () => {
+    const row = (await parseBackupArtifact(await checksumValidHeadlessSoapAttestationArtifact(() => {}))).payload.headlessSoapActiveRoleAttestations[0];
+    let accessorReads = 0;
+    const accessor = { ...row };
+    Object.defineProperty(accessor, 'actorRef', { enumerable: true, get: () => { accessorReads += 1; return row.actorRef; } });
+    let proxyTraps = 0;
+    const proxy = new Proxy(row, {
+        get: (target, key, receiver) => { proxyTraps += 1; return Reflect.get(target, key, receiver); },
+        getOwnPropertyDescriptor: (target, key) => { proxyTraps += 1; return Reflect.getOwnPropertyDescriptor(target, key); },
+        getPrototypeOf: (target) => { proxyTraps += 1; return Reflect.getPrototypeOf(target); },
+        ownKeys: (target) => { proxyTraps += 1; return Reflect.ownKeys(target); },
+    });
+    for (const hostile of [accessor, proxy]) {
+        await assert.rejects(
+            () => createBackupArtifact({ ...basePayload, headlessSoapActiveRoleAttestations: [hostile] }),
+            (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest',
+        );
+    }
+    assert.equal(accessorReads, 0);
+    assert.equal(proxyTraps, 0);
+});
 
 test('rejects a durable review patient link that does not resolve within the artifact', async () => {
     const { record, operation } = await durableReviewLedgerFixture();
@@ -465,9 +549,11 @@ async function legacyArtifact(): Promise<Record<string, any>> {
     delete artifact.payload.durableReviewCommandOperations;
     delete artifact.payload.durableReviewPatientLinks;
     delete artifact.payload.physicianReviewAttestations;
+    delete artifact.payload.headlessSoapActiveRoleAttestations;
     artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'documentDiagnosisProposals');
     artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations' && collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations');
     artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'durableReviewPatientLinks' && collection !== 'physicianReviewAttestations');
+    artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'headlessSoapActiveRoleAttestations');
     delete artifact.manifest.recordCounts.documentDiagnosisProposals;
     delete artifact.manifest.recordCounts.durableReviewRecords;
     delete artifact.manifest.recordCounts.durableReviewOperations;
@@ -475,6 +561,7 @@ async function legacyArtifact(): Promise<Record<string, any>> {
     delete artifact.manifest.recordCounts.durableReviewCommandOperations;
     delete artifact.manifest.recordCounts.durableReviewPatientLinks;
     delete artifact.manifest.recordCounts.physicianReviewAttestations;
+    delete artifact.manifest.recordCounts.headlessSoapActiveRoleAttestations;
     const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(stableStringify(artifact.payload)));
     artifact.manifest.checksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
     return artifact;
@@ -492,6 +579,7 @@ test('accepts an authentic legacy v1 artifact and normalizes missing optional co
     assert.deepEqual(parsed.payload.durableReviewCommandOperations, []);
     assert.deepEqual(parsed.payload.durableReviewPatientLinks, []);
     assert.deepEqual(parsed.payload.physicianReviewAttestations, []);
+    assert.deepEqual(parsed.payload.headlessSoapActiveRoleAttestations, []);
     assert.equal(parsed.manifest.recordCounts.documentDiagnosisProposals, 0);
     assert.equal(parsed.manifest.recordCounts.durableReviewRecords, 0);
     assert.equal(parsed.manifest.recordCounts.durableReviewOperations, 0);
@@ -499,6 +587,7 @@ test('accepts an authentic legacy v1 artifact and normalizes missing optional co
     assert.equal(parsed.manifest.recordCounts.durableReviewCommandOperations, 0);
     assert.equal(parsed.manifest.recordCounts.durableReviewPatientLinks, 0);
     assert.equal(parsed.manifest.recordCounts.physicianReviewAttestations, 0);
+    assert.equal(parsed.manifest.recordCounts.headlessSoapActiveRoleAttestations, 0);
     assert.deepEqual(parsed.manifest.collections, BACKUP_COLLECTIONS);
     assert.equal(parsed.manifest.checksum, normalizedChecksum);
 });
@@ -512,14 +601,17 @@ test('accepts a legacy artifact without durable review collections', async () =>
     delete artifact.payload.durableReviewCommandOperations;
     delete artifact.payload.durableReviewPatientLinks;
     delete artifact.payload.physicianReviewAttestations;
+    delete artifact.payload.headlessSoapActiveRoleAttestations;
     artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'durableReviewRecords' && collection !== 'durableReviewOperations' && collection !== 'durableReviewCommandStates' && collection !== 'durableReviewCommandOperations');
     artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'durableReviewPatientLinks' && collection !== 'physicianReviewAttestations');
+    artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'headlessSoapActiveRoleAttestations');
     delete artifact.manifest.recordCounts.durableReviewRecords;
     delete artifact.manifest.recordCounts.durableReviewOperations;
     delete artifact.manifest.recordCounts.durableReviewCommandStates;
     delete artifact.manifest.recordCounts.durableReviewCommandOperations;
     delete artifact.manifest.recordCounts.durableReviewPatientLinks;
     delete artifact.manifest.recordCounts.physicianReviewAttestations;
+    delete artifact.manifest.recordCounts.headlessSoapActiveRoleAttestations;
     const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(stableStringify(artifact.payload)));
     artifact.manifest.checksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 
@@ -532,6 +624,20 @@ test('accepts a legacy artifact without durable review collections', async () =>
     assert.deepEqual(parsed.payload.durableReviewCommandOperations, []);
     assert.deepEqual(parsed.payload.durableReviewPatientLinks, []);
     assert.deepEqual(parsed.payload.physicianReviewAttestations, []);
+    assert.deepEqual(parsed.payload.headlessSoapActiveRoleAttestations, []);
+});
+
+test('normalizes only an authenticated pre-H2 artifact with the SOAP attestation collection omitted', async () => {
+    const artifact = JSON.parse(await serializeBackupArtifact(basePayload));
+    delete artifact.payload.headlessSoapActiveRoleAttestations;
+    artifact.manifest.collections = artifact.manifest.collections.filter((collection: string) => collection !== 'headlessSoapActiveRoleAttestations');
+    delete artifact.manifest.recordCounts.headlessSoapActiveRoleAttestations;
+    artifact.manifest.checksum = await sha256(stableStringify(artifact.payload));
+
+    const parsed = await parseBackupArtifact(artifact);
+    assert.deepEqual(parsed.payload.headlessSoapActiveRoleAttestations, []);
+    assert.equal(parsed.manifest.recordCounts.headlessSoapActiveRoleAttestations, 0);
+    assert.deepEqual(parsed.manifest.collections, BACKUP_COLLECTIONS);
 });
 
 test('accepts an authority-era artifact without command ledger collections', async () => {
