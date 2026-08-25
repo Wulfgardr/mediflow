@@ -83,6 +83,8 @@ test('rejects partial, drifting, generic, triggered, indexed, and stale attachme
         ['generic', (db) => db.exec('ALTER TABLE attachments ADD COLUMN generic TEXT')],
         ['trigger', (db) => db.exec('CREATE TRIGGER attachments_drift AFTER INSERT ON attachments BEGIN SELECT 1; END')],
         ['index', (db) => db.exec('CREATE INDEX attachments_drift_idx ON attachments(name)')],
+        ['quoted index', (db) => db.exec('CREATE INDEX "attachments_drift_\'; SELECT 1; --" ON attachments(name)')],
+        ['unicode index', (db) => db.exec('CREATE INDEX "attachments_drift_\u2066;()" ON attachments(name)')],
         ['stale', (db) => db.exec('CREATE TABLE attachments_currentness_legacy (id TEXT)')],
     ];
     for (const [name, mutate] of cases) {
@@ -91,6 +93,7 @@ test('rejects partial, drifting, generic, triggered, indexed, and stale attachme
             const db = new Database(current.dbPath); mutate(db); db.close();
             const before = attachmentSnapshot(current.dbPath); const result = bootstrap(current.dataDir);
             assert.notEqual(result.status, 0, name); assert.match(`${result.stdout}${result.stderr}`, /ATTACHMENT_CURRENTNESS_MIGRATION_UNSUPPORTED/u);
+            assert.doesNotMatch(`${result.stdout}${result.stderr}`, /attachments_drift_|CREATE INDEX|SELECT 1/u, name);
             assert.equal(attachmentSnapshot(current.dbPath), before, name);
             const reopened = new Database(current.dbPath); try { reopened.transaction(() => undefined).immediate(); } finally { reopened.close(); }
         } finally { fs.rmSync(current.dataDir, { recursive: true, force: true }); }
