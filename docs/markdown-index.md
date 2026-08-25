@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-08-24
+Ultimo aggiornamento: 2026-08-25
 
 ## 📚 Come usare questo indice
 
@@ -163,6 +163,7 @@ Ultimo aggiornamento: 2026-08-24
 | [docs/adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md](./adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md) | Giunture fabric: ciclo di vita trust paired con revoca host-side, onboarding provider fail-closed per classe di credenziale, decisioni di routing osservabili con fallback negato e contratto di interazione clinica. |
 | [docs/adr/0091-candidato-locale-fabric-admissione-continuita-status.md](./adr/0091-candidato-locale-fabric-admissione-continuita-status.md) | Candidato locale Fabric: admissione provider, continuita fail-closed, stato paired read-only e harness sintetico senza egress o scritture cliniche. |
 | [docs/adr/0092-limite-digest-bound-readiness-ai-locale.md](./adr/0092-limite-digest-bound-readiness-ai-locale.md) | ADR accettato: annotazione distinta da `runtime`, bracket digest best-effort e qualified readiness bloccata. |
+| [docs/adr/0103-headless-clinician-authorized-soap-entry-write.md](./adr/0103-headless-clinician-authorized-soap-entry-write.md) | ADR proposta: una sola append SOAP locale con conferma clinica monouso; non abilita runtime, apply generale o authority Fabric. |
 | [docs/adr/0100-fabric-vs-headless-semantic-plane.md](./adr/0100-fabric-vs-headless-semantic-plane.md) | ADR proposta: separa Fabric host-governed e Headless semantico, con inventari e gate SHA distinti; non abilita runtime, cloud o apply. |
 | [docs/adr/0094-intelligence-fabric-headless-contract-085.md](./adr/0094-intelligence-fabric-headless-contract-085.md) | ADR accettata 0.8.5 per Application Service Layer condiviso, Fabric e AIP ortogonali, catalogo 66/66, authority agentica e disposition progressive. |
 | [docs/adr/0095-broker-projection-e-servizi-host-per-capability.md](./adr/0095-broker-projection-e-servizi-host-per-capability.md) | ADR accettata per lifecycle post-onboarding, broker di projection minimizzate e servizi host capability-specific. |
