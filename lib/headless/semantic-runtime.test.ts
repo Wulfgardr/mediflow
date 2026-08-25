@@ -1,8 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-
 import { createSemanticRuntime } from './semantic-runtime';
-
 /* @Codex */
 const operation = (execute = () => ({ outcome: 'read' as const, resultRef: 'synthetic:record:1' })) => ({
   operationId: 'headless.synthetic.read.v1',
@@ -25,30 +23,19 @@ const plan = (overrides: Record<string, unknown> = {}) => ({
     stage: 'read', idempotencyKey: 'synthetic-idempotency-1', input: { query: 'synthetic' },
   }], ...overrides,
 });
-
 function trapProxy<T extends object>(value: T, throwing = false): { value: T; traps: () => number } {
-  let count = 0;
-  const trap = <R>(fallback: () => R): R => {
-    count += 1;
-    if (throwing) throw new Error('proxy trap must not run');
-    return fallback();
-  };
-  return {
-    value: new Proxy(value, {
-      getPrototypeOf(target) { return trap(() => Reflect.getPrototypeOf(target)); },
-      ownKeys(target) { return trap(() => Reflect.ownKeys(target)); },
-      getOwnPropertyDescriptor(target, property) { return trap(() => Reflect.getOwnPropertyDescriptor(target, property)); },
-      get(target, property, receiver) { return trap(() => Reflect.get(target, property, receiver)); },
-    }),
-    traps: () => count,
-  };
+  let count = 0; const trap = <R>(fallback: () => R): R => { count += 1; if (throwing) throw new Error('proxy trap must not run'); return fallback(); };
+  return { value: new Proxy(value, { getPrototypeOf(target) { return trap(() => Reflect.getPrototypeOf(target)); }, ownKeys(target) { return trap(() => Reflect.ownKeys(target)); }, getOwnPropertyDescriptor(target, property) { return trap(() => Reflect.getOwnPropertyDescriptor(target, property)); }, get(target, property, receiver) { return trap(() => Reflect.get(target, property, receiver)); } }), traps: () => count };
 }
-
-function nonEnumerable<T extends object, K extends keyof T>(value: T, key: K): T {
-  Object.defineProperty(value, key, { ...Object.getOwnPropertyDescriptor(value, key)!, enumerable: false });
-  return value;
+function nonEnumerable<T extends object, K extends keyof T>(value: T, key: K): T { Object.defineProperty(value, key, { ...Object.getOwnPropertyDescriptor(value, key)!, enumerable: false }); return value; }
+type ArrayFault = 'sparse' | 'symbol' | 'extra' | 'non-enumerable' | 'accessor' | 'prototype' | 'iterator' | 'map';
+function malformedArray<T>(item: T, fault: ArrayFault): { value: T[]; reads: () => number } {
+  const value = [item]; let reads = 0;
+  if (fault === 'sparse') value.length = 2; if (fault === 'symbol') Object.defineProperty(value, Symbol('extra'), { value: true }); if (fault === 'extra') Object.defineProperty(value, 'extra', { value: true });
+  if (fault === 'non-enumerable') Object.defineProperty(value, '0', { value: item, enumerable: false }); if (fault === 'accessor') Object.defineProperty(value, '0', { enumerable: true, get() { reads += 1; return item; } });
+  if (fault === 'prototype') Object.setPrototypeOf(value, Object.create(Array.prototype)); if (fault === 'iterator') Object.defineProperty(value, Symbol.iterator, { value() { reads += 1; return Array.prototype[Symbol.iterator].call(this); } }); if (fault === 'map') Object.defineProperty(value, 'map', { value(...args: Parameters<Array<unknown>['map']>) { reads += 1; return Array.prototype.map.apply(this, args); } });
+  return { value, reads: () => reads };
 }
-
 test('executes only a closed, explicitly bound synthetic operation and returns a PHI-safe frozen receipt', () => {
   let calls = 0;
   const runtime = createSemanticRuntime([operation(() => { calls += 1; return { outcome: 'read', resultRef: 'synthetic:record:1' }; })], { maxOperations: 1 });
@@ -135,4 +122,23 @@ test('rejects proxy and non-enumerable boundaries before reflection or host exec
     await new Promise<void>(resolve => setImmediate(resolve));
     assert.deepEqual(unhandled, []);
   } finally { process.off('unhandledRejection', onUnhandled); }
+});
+
+test('denies malformed and over-depth arrays without getters, iterators, maps, proxy traps, or host calls', () => {
+  const faults: readonly ArrayFault[] = ['sparse', 'symbol', 'extra', 'non-enumerable', 'accessor', 'prototype', 'iterator', 'map'];
+  for (const fault of faults) {
+    let calls = 0; const runtime = createSemanticRuntime([operation(() => { calls += 1; return { outcome: 'read', resultRef: 'synthetic:result' }; })]); const action = plan().actions[0]!;
+    const actions = malformedArray(action, fault); assert.equal(runtime.execute(plan({ actions: actions.value }), session()).receipts[0].denialCode, 'invalid_plan'); assert.equal(actions.reads(), 0); assert.equal(calls, 0);
+    const capabilities = malformedArray('capability.synthetic.read.v1', fault); assert.equal(runtime.execute(plan({ requestRef: `capabilities-${fault}` }), session({ authorizedCapabilityIds: capabilities.value })).receipts[0].denialCode, 'invalid_session'); assert.equal(capabilities.reads(), 0); assert.equal(calls, 0);
+    const nested = malformedArray('synthetic', fault); assert.equal(runtime.execute(plan({ requestRef: `input-${fault}`, actions: [{ ...action, idempotencyKey: `input-${fault}`, input: { nested: nested.value } }] }), session()).receipts[0].denialCode, 'invalid_plan'); assert.equal(nested.reads(), 0); assert.equal(calls, 0);
+    const registry = malformedArray(operation(), fault); assert.equal(createSemanticRuntime(registry.value).execute(plan({ requestRef: `registry-${fault}` }), session()).receipts[0].denialCode, 'registry_invalid'); assert.equal(registry.reads(), 0);
+    const result = malformedArray('synthetic:result', fault); const resultRuntime = createSemanticRuntime([operation(() => { calls += 1; return { outcome: 'read', resultRef: result.value as never }; })]); assert.equal(resultRuntime.execute(plan({ requestRef: `result-${fault}`, actions: [{ ...action, idempotencyKey: `result-${fault}` }] }), session()).receipts[0].denialCode, 'host_result_invalid'); assert.equal(result.reads(), 0);
+  }
+  const deep = (leaf: unknown) => { let value = leaf; for (let index = 0; index < 9; index += 1) value = { nested: value }; return value; };
+  for (const throwing of [false, true]) {
+    let calls = 0; const nested = trapProxy({ synthetic: true }, throwing); const runtime = createSemanticRuntime([operation(() => { calls += 1; return { outcome: 'read', resultRef: 'synthetic:result' }; })]);
+    assert.equal(runtime.execute(plan({ requestRef: `deep-${throwing}`, actions: [{ ...plan().actions[0], idempotencyKey: `deep-${throwing}`, input: { deep: deep(nested.value) } }] }), session()).receipts[0].denialCode, 'invalid_plan'); assert.equal(nested.traps(), 0); assert.equal(calls, 0);
+  }
+  let ordinaryCalls = 0; const ordinary = createSemanticRuntime([operation(() => { ordinaryCalls += 1; return { outcome: 'read', resultRef: 'synthetic:result' }; })]);
+  assert.equal(ordinary.execute(plan({ requestRef: 'deep-ordinary', actions: [{ ...plan().actions[0], idempotencyKey: 'deep-ordinary', input: { deep: deep('synthetic') } }] }), session()).receipts[0].denialCode, 'invalid_plan'); assert.equal(ordinaryCalls, 0);
 });
