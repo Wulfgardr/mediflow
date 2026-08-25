@@ -40,6 +40,11 @@ conservativo `documentRevision` e `documentFreshnessEpoch`, anche quando il
 contenuto o il significato risultano uguali. Delete e recreate producono una
 nuova `documentSourceRef`; non riusano quella eliminata.
 
+`documentRevision` e `documentFreshnessEpoch` sono safe integer. Se una
+mutazione accettata deve incrementare uno dei due valori al massimo del tipo,
+fallisce atomicamente prima di ogni mutazione. Non deve mai eseguire wrap,
+reset, saturazione o aggiornamento parziale.
+
 Una migrazione raw che riproduce dati gia canonici deve essere idempotente.
 Alla riesecuzione conserva ogni `documentSourceRef`, `documentRevision` e
 `documentFreshnessEpoch` canonico esistente. Non rigenera l'identita e non
@@ -132,6 +137,8 @@ Fermare il lavoro e mantenere il denial se:
 - un ID attachment o patient, un hash, una versione di review o un dato del
   chiamante diventa currentness canonica;
 - una mutazione accettata non incrementa insieme revision ed epoch;
+- una mutazione al massimo del safe integer esegue wrap, reset, saturazione o
+  un aggiornamento parziale, invece di fallire atomicamente;
 - delete/recreate riusa `documentSourceRef`;
 - una migrazione raw rigenera i valori canonici, incrementa revision o epoch
   durante un replay, oppure fallisce dopo una mutazione parziale;
