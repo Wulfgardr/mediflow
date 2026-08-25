@@ -5,8 +5,10 @@ import { afterEach, test } from 'node:test';
 
 import {
     createServerSessionProjectionOwnerRegistry,
+    disposeDurableReviewCommitPort,
     isServerSessionProjectionOwner,
     ServerSessionProjectionOwnerError,
+    spendDurableReviewCommitPort,
 } from './server-session-projection-owner.ts';
 import { clearAllSessions, createSession, deleteSession, type ServerSession } from './server-session.ts';
 
@@ -79,6 +81,78 @@ test('removes the generic commit turn surface and mints separated closed ports',
     assert.equal(patientInsight.snapshot()!.terminal, true);
     assert.equal(patientInsight.commit(Object.freeze({ expected: patientSnapshot.currentRef, replacement })), false);
     assert.equal(patientInsight.abort(Object.freeze({ replacement })), false);
+});
+
+test('mints a data-only durable review commit port that remains owner-locked until disposal', () => {
+    const { value, owner } = ownerWithSelection();
+    const port = owner.mintDurableReviewCommitPort(value);
+    assert.equal(Object.getPrototypeOf(port), null);
+    assert.equal(Object.isFrozen(port), true);
+    assert.deepEqual(Object.keys(port), []);
+    assert.equal(spendDurableReviewCommitPort(port), true);
+    assert.equal(spendDurableReviewCommitPort(port), false);
+    assert.throws(() => owner.mintDurableReviewCommitPort(value),
+        (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'stale_selection');
+    disposeDurableReviewCommitPort(port);
+    assert.doesNotThrow(() => owner.mintDurableReviewCommitPort(value));
+});
+
+test('durable review commit port rejects forged, cloned, proxied, foreign, expired, stale, logged-out, and disposed values', () => {
+    const first = ownerWithSelection();
+    const port = first.owner.mintDurableReviewCommitPort(first.value);
+    let traps = 0; let thenReads = 0;
+    const proxy = new Proxy(port, { get() { traps += 1; throw new Error('synthetic trap'); } });
+    const thenable = Object.freeze(Object.defineProperty({}, 'then', { enumerable: true, get() { thenReads += 1; return () => undefined; } }));
+    for (const value of [null, Object.freeze(Object.create(null)), Object.freeze({ ...port }), proxy, thenable]) {
+        assert.equal(spendDurableReviewCommitPort(value), false);
+        disposeDurableReviewCommitPort(value);
+    }
+    assert.equal(traps, 0);
+    assert.equal(thenReads, 0);
+    const second = ownerWithSelection();
+    assert.equal(spendDurableReviewCommitPort(second.owner.mintDurableReviewCommitPort(second.value)), true);
+    first.owner.issueSelection({ expectedEpoch: 1, ...PAIR });
+    assert.equal(spendDurableReviewCommitPort(port), false);
+    disposeDurableReviewCommitPort(port);
+
+    const expired = ownerWithSelection(); const expiryPort = expired.owner.mintDurableReviewCommitPort(expired.value);
+    expired.setClock(expired.value.expiresAt);
+    assert.equal(spendDurableReviewCommitPort(expiryPort), false);
+    const loggedOut = ownerWithSelection(); const logoutPort = loggedOut.owner.mintDurableReviewCommitPort(loggedOut.value);
+    deleteSession(loggedOut.value.id);
+    assert.equal(spendDurableReviewCommitPort(logoutPort), false);
+    const disposed = ownerWithSelection(); const disposedPort = disposed.owner.mintDurableReviewCommitPort(disposed.value);
+    disposed.owner.dispose();
+    assert.equal(spendDurableReviewCommitPort(disposedPort), false);
+    const restarted = ownerWithSelection(); const restartedPort = restarted.owner.mintDurableReviewCommitPort(restarted.value);
+    clearAllSessions();
+    assert.equal(spendDurableReviewCommitPort(restartedPort), false);
+});
+
+test('durable review commit port poisons hostile-clock reentry into generic and H1f mint paths', () => {
+    for (const reenter of ['durable', 'patient', 'ocr', 'document', 'treatment', 'dispose'] as const) {
+        let armed = false;
+        const registry = createServerSessionProjectionOwnerRegistry({
+            resolve: (_session, pair) => pair, entropy: () => new Uint8Array(16),
+            clock: () => { if (armed) {
+                armed = false;
+                if (reenter === 'durable') spendDurableReviewCommitPort(port);
+                else if (reenter === 'patient') owner.mintPatientInsightLeaseCommitPort(value);
+                else if (reenter === 'ocr') owner.mintOcrLeaseCommitPort(value);
+                else if (reenter === 'document') owner.mintDocumentSynthesisLeaseCommitPort(value);
+                else if (reenter === 'treatment') owner.mintTreatmentReasoningLeaseCommitPort(value);
+                else owner.dispose();
+            } return 1_000; },
+        });
+        const value = session(); const owner = registry.acquire(value);
+        owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+        const port = owner.mintDurableReviewCommitPort(value);
+        armed = true;
+        assert.equal(spendDurableReviewCommitPort(port), false);
+        assert.equal(spendDurableReviewCommitPort(port), false);
+        disposeDurableReviewCommitPort(port);
+        if (reenter !== 'dispose') assert.doesNotThrow(() => owner.mintDurableReviewCommitPort(value));
+    }
 });
 
 test('Treatment Reasoning port has a private brand and fails closed for stale, expired, replayed, disposed, and foreign authority', () => {

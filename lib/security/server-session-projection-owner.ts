@@ -42,6 +42,7 @@ const dateToISOString = Date.prototype.toISOString;
 const numberToString = Number.prototype.toString;
 const stringPadStart = String.prototype.padStart;
 const WeakSetConstructor = WeakSet;
+const WeakMapConstructor = WeakMap;
 const MapConstructor = Map;
 const SetConstructor = Set;
 const authenticOwners = new WeakSetConstructor<object>();
@@ -58,6 +59,8 @@ const setHas = Set.prototype.has;
 const setDelete = Set.prototype.delete;
 const isProxy = types.isProxy;
 const getOwnPropertyDescriptor = ObjectGetOwnPropertyDescriptor;
+const weakMapGet = WeakMap.prototype.get;
+const weakMapSet = WeakMap.prototype.set;
 const getPrototypeOf = ObjectGetPrototypeOf;
 
 function addOwnerIdentity(registry: WeakSet<object>, owner: object): void {
@@ -96,6 +99,24 @@ function deleteSetValue<T>(registry: Set<T>, value: T): void {
     applyIntrinsic(setDelete, registry, [value]);
 }
 
+type DurableReviewCommitRecord = Readonly<{ spend(): boolean; dispose(): void }>;
+const durableReviewCommitPorts = new WeakMapConstructor<object, DurableReviewCommitRecord>();
+const authenticDurableReviewCommitPorts = new WeakSetConstructor<object>();
+
+function durableReviewCommitRecord(value: unknown): DurableReviewCommitRecord | null {
+    if (typeof value !== 'object' || value === null || isProxy(value)
+        || !hasOwnerIdentity(authenticDurableReviewCommitPorts, value)) return null;
+    return applyIntrinsic(weakMapGet, durableReviewCommitPorts, [value]) ?? null;
+}
+
+export function spendDurableReviewCommitPort(value: unknown): boolean {
+    return durableReviewCommitRecord(value)?.spend() ?? false;
+}
+
+export function disposeDurableReviewCommitPort(value: unknown): void {
+    durableReviewCommitRecord(value)?.dispose();
+}
+
 export type ServerSessionProjectionOwnerErrorCode =
     | 'broker_factory_failed' | 'broker_unavailable' | 'epoch_conflict' | 'input_invalid' | 'lease_expired' | 'owner_disposed'
     | 'owner_acquiring' | 'owner_exists' | 'reference_unavailable' | 'selection_busy' | 'selection_unavailable'
@@ -121,6 +142,7 @@ export type ServerSessionProjectionOwner = Readonly<{
     mintOcrLeaseCommitPort(session: ServerSession): OcrLeaseCommitPort;
     mintDocumentSynthesisLeaseCommitPort(session: ServerSession): DocumentSynthesisLeaseCommitPort;
     mintTreatmentReasoningLeaseCommitPort(session: ServerSession): TreatmentReasoningLeaseCommitPort;
+    mintDurableReviewCommitPort(session: ServerSession): DurableReviewCommitPort;
     withLeaseCriticalSection<T>(session: ServerSession, callback: (selection: CanonicalPair) => T): T;
     dispose(): void;
 }>;
@@ -129,10 +151,12 @@ declare const patientInsightLeaseCommitRef: unique symbol;
 declare const ocrLeaseCommitRef: unique symbol;
 declare const documentSynthesisLeaseCommitRef: unique symbol;
 declare const treatmentReasoningLeaseCommitRef: unique symbol;
+declare const durableReviewCommitPortRef: unique symbol;
 export type PatientInsightLeaseCommitRef = Readonly<{ readonly [patientInsightLeaseCommitRef]?: never }>;
 export type OcrLeaseCommitRef = Readonly<{ readonly [ocrLeaseCommitRef]?: never }>;
 export type DocumentSynthesisLeaseCommitRef = Readonly<{ readonly [documentSynthesisLeaseCommitRef]?: never }>;
 export type TreatmentReasoningLeaseCommitRef = Readonly<{ readonly [treatmentReasoningLeaseCommitRef]?: never }>;
+export type DurableReviewCommitPort = Readonly<{ readonly [durableReviewCommitPortRef]?: never }>;
 type LeaseCommitSnapshot<Ref extends object> = Readonly<{
     currentRef: Ref; stagedRef: Ref | null; generation: number; terminal: boolean;
 }>;
@@ -270,6 +294,9 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             let selection: SelectionState | null = null;
             let selecting = false;
             let leaseCriticalSectionActive = false;
+            let durableReviewOperationActive = false;
+            let durableReviewOperationPoisoned = false;
+            let durableReviewCommitInFlight: object | null = null;
             let creating: SelectionState | null = null;
             let terminal = false;
             let unregisterOwner: (() => void) | null = null;
@@ -283,6 +310,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 const previous = active;
                 active = null;
                 selection = null;
+                durableReviewCommitInFlight = null;
                 reviewContextEpoch += 1;
                 if (previous && revokeActive) revoke(previous);
                 else if (previous) { previous.active = false; previous.unregister = null; }
@@ -328,6 +356,11 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             };
             const rejectLeaseCriticalSectionReentry = () => {
                 if (leaseCriticalSectionActive) fail('selection_busy');
+            };
+            const rejectDurableReviewReentry = () => {
+                if (!durableReviewOperationActive) return false;
+                durableReviewOperationPoisoned = true;
+                return true;
             };
             const mintLeaseCommitPort = <Ref extends object>(presentedSession: ServerSession,
                 refs: WeakSet<object>, ports: WeakSet<object>) => {
@@ -432,6 +465,56 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 addOwnerIdentity(ports, port);
                 return port;
             };
+            const mintDurableReviewCommitPort = (presentedSession: ServerSession): DurableReviewCommitPort => {
+                if (rejectDurableReviewReentry()) return fail('selection_busy');
+                rejectLeaseCriticalSectionReentry();
+                requireCurrentSession(presentedSession);
+                const boundSelection = selection;
+                const boundSelectionEpoch = epoch;
+                const boundReviewContextEpoch = reviewContextEpoch;
+                if (!boundSelection || durableReviewCommitInFlight !== null) return fail('stale_selection');
+                durableReviewOperationActive = true;
+                durableReviewOperationPoisoned = false;
+                try {
+                    if (readClock() >= boundSelection.expiresAt) { expire(); return fail('lease_expired'); }
+                    requireCurrentSession(presentedSession);
+                    if (durableReviewOperationPoisoned || selection !== boundSelection || epoch !== boundSelectionEpoch
+                        || reviewContextEpoch !== boundReviewContextEpoch || durableReviewCommitInFlight !== null) return fail('stale_selection');
+                    const token = ObjectFreeze(ObjectCreate(null));
+                    let spent = false;
+                    let disposed = false;
+                    const current = () => {
+                        if (durableReviewOperationPoisoned || terminal || disposed || durableReviewCommitInFlight !== token
+                            || presentedSession !== session || session.authChannel !== 'web' || selection !== boundSelection
+                            || epoch !== boundSelectionEpoch || reviewContextEpoch !== boundReviewContextEpoch) return false;
+                        let now: number;
+                        try { now = sources.clock(); } catch { return false; }
+                        return !durableReviewOperationPoisoned && NumberIsFinite(now) && now < boundSelection.expiresAt
+                            && !terminal && presentedSession === session && session.authChannel === 'web'
+                            && getSession(session.id) === session && selection === boundSelection && epoch === boundSelectionEpoch
+                            && reviewContextEpoch === boundReviewContextEpoch && durableReviewCommitInFlight === token;
+                    };
+                    const record: DurableReviewCommitRecord = ObjectFreeze({
+                        spend() {
+                            if (rejectDurableReviewReentry() || spent || disposed) return false;
+                            durableReviewOperationActive = true;
+                            durableReviewOperationPoisoned = false;
+                            spent = true;
+                            try { return current(); }
+                            finally { durableReviewOperationActive = false; }
+                        },
+                        dispose() {
+                            if (rejectDurableReviewReentry()) return;
+                            disposed = true;
+                            if (durableReviewCommitInFlight === token) durableReviewCommitInFlight = null;
+                        },
+                    });
+                    durableReviewCommitInFlight = token;
+                    addOwnerIdentity(authenticDurableReviewCommitPorts, token);
+                    applyIntrinsic(weakMapSet, durableReviewCommitPorts, [token, record]);
+                    return token as DurableReviewCommitPort;
+                } finally { durableReviewOperationActive = false; }
+            };
             const candidateControl = (candidate: unknown): TypedBroker['control'] | null => {
                 if (typeof candidate !== 'object' || candidate === null) return null;
                 const descriptor = getOwnPropertyDescriptor(candidate, 'control');
@@ -445,7 +528,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     && typeof value.control?.lock === 'function' && typeof value.control.revoke === 'function'
                     && typeof value.control.changeSelection === 'function';
             };
-            const owner: Omit<ServerSessionProjectionOwner, 'mintPatientInsightLeaseCommitPort' | 'mintOcrLeaseCommitPort' | 'mintDocumentSynthesisLeaseCommitPort' | 'mintTreatmentReasoningLeaseCommitPort'> = {
+            const owner: Omit<ServerSessionProjectionOwner, 'mintPatientInsightLeaseCommitPort' | 'mintOcrLeaseCommitPort' | 'mintDocumentSynthesisLeaseCommitPort' | 'mintTreatmentReasoningLeaseCommitPort' | 'mintDurableReviewCommitPort'> = {
                 snapshotSelectionEpoch(presentedSession) {
                     if (terminal || presentedSession !== session || session.authChannel !== 'web' || peekSession(session.id) !== session) {
                         return fail('session_unavailable');
@@ -600,19 +683,27 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             };
             ObjectDefineProperty(owner, 'mintPatientInsightLeaseCommitPort', { enumerable: false, value(presentedSession: ServerSession) {
                 if (this !== owner) return fail('session_unavailable');
+                if (rejectDurableReviewReentry()) return fail('selection_busy');
                 return mintLeaseCommitPort<PatientInsightLeaseCommitRef>(presentedSession, patientInsightRefs, patientInsightPorts) as PatientInsightLeaseCommitPort;
             } });
             ObjectDefineProperty(owner, 'mintOcrLeaseCommitPort', { enumerable: false, value(presentedSession: ServerSession) {
                 if (this !== owner) return fail('session_unavailable');
+                if (rejectDurableReviewReentry()) return fail('selection_busy');
                 return mintLeaseCommitPort<OcrLeaseCommitRef>(presentedSession, ocrRefs, ocrPorts) as OcrLeaseCommitPort;
             } });
             ObjectDefineProperty(owner, 'mintDocumentSynthesisLeaseCommitPort', { enumerable: false, value(presentedSession: ServerSession) {
                 if (this !== owner) return fail('session_unavailable');
+                if (rejectDurableReviewReentry()) return fail('selection_busy');
                 return mintLeaseCommitPort<DocumentSynthesisLeaseCommitRef>(presentedSession, documentSynthesisRefs, documentSynthesisPorts) as DocumentSynthesisLeaseCommitPort;
             } });
             ObjectDefineProperty(owner, 'mintTreatmentReasoningLeaseCommitPort', { enumerable: false, value(presentedSession: ServerSession) {
                 if (this !== owner) return fail('session_unavailable');
+                if (rejectDurableReviewReentry()) return fail('selection_busy');
                 return mintLeaseCommitPort<TreatmentReasoningLeaseCommitRef>(presentedSession, treatmentReasoningRefs, treatmentReasoningPorts) as TreatmentReasoningLeaseCommitPort;
+            } });
+            ObjectDefineProperty(owner, 'mintDurableReviewCommitPort', { enumerable: false, value(presentedSession: ServerSession) {
+                if (this !== owner) return fail('session_unavailable');
+                return mintDurableReviewCommitPort(presentedSession);
             } });
             const completedOwner = ObjectFreeze(owner) as unknown as ServerSessionProjectionOwner;
 
