@@ -37,7 +37,7 @@ test('issues an opaque handle and consumes it through the same host boundary for
         const consumed = boundary.consume({ documentHandle: issued.documentHandle });
         assert.equal(consumed.status, 'available');
         assert.equal(consumed.metadata?.disposition, disposition);
-        assert.deepEqual(consumed.metadata?.document, { documentHandle: issued.documentHandle, revision: 4, freshness: FRESHNESS });
+        assert.deepEqual({ ...consumed.metadata?.document }, { documentHandle: issued.documentHandle, revision: 4, freshness: FRESHNESS });
         assert.equal(JSON.stringify(consumed).includes(PATIENT_REF), false);
         assert.equal(Object.isFrozen(consumed), true);
     }
@@ -104,7 +104,7 @@ test('rejects hostile host inputs and host source failures without exposing them
         clock: () => Date.parse('2026-08-23T11:00:00.000Z'),
         entropy: () => { throw new Error('synthetic entropy trap'); },
     });
-    assert.deepEqual(entropyFailure.issue(), { status: 'denied', code: 'entropy_unavailable', documentHandle: null });
+    assert.deepEqual({ ...entropyFailure.issue() }, { status: 'denied', code: 'entropy_unavailable', documentHandle: null });
 
     const clockFailure = createDocumentSynthesisAuthorityHandle(authority('deterministic'), {
         clock: () => { throw new Error('synthetic clock trap'); },
@@ -112,4 +112,98 @@ test('rejects hostile host inputs and host source failures without exposing them
     });
     const issued = clockFailure.issue();
     assert.equal(clockFailure.consume({ documentHandle: issued.documentHandle }).code, 'handle_expired');
+});
+
+test('poisons a reentrant issue or consume turn without publishing an available result', () => {
+    let issuing: ReturnType<typeof host> | null = null;
+    issuing = createDocumentSynthesisAuthorityHandle(authority('deterministic'), {
+        clock: () => Date.parse('2026-08-23T11:00:00.000Z'),
+        entropy: () => {
+            assert.equal(issuing?.issue().status, 'denied');
+            return Uint8Array.from({ length: 16 }, (_, index) => index);
+        },
+    });
+    assert.deepEqual({ ...issuing.issue() }, { status: 'denied', code: 'entropy_unavailable', documentHandle: null });
+    assert.equal(issuing.issue().documentHandle, null);
+
+    let consuming: ReturnType<typeof host> | null = null;
+    consuming = createDocumentSynthesisAuthorityHandle(authority('generative'), {
+        clock: () => {
+            assert.equal(consuming?.consume({ documentHandle: consuming.issue().documentHandle }).status, 'denied');
+            return Date.parse('2026-08-23T11:00:00.000Z');
+        },
+        entropy: () => Uint8Array.from({ length: 16 }, (_, index) => index),
+    });
+    const issued = consuming.issue();
+    assert.equal(consuming.consume({ documentHandle: issued.documentHandle }).status, 'denied');
+    assert.equal(consuming.consume({ documentHandle: issued.documentHandle }).status, 'denied');
+});
+
+test('rejects proxy, accessor, non-enumerable, symbol, extra, and custom-prototype inputs before reads', () => {
+    const boundary = host('deterministic');
+    const issued = boundary.issue();
+    let reads = 0;
+    const accessor = {};
+    Object.defineProperty(accessor, 'documentHandle', { enumerable: true, get() { reads += 1; return issued.documentHandle; } });
+    const nonEnumerable = { documentHandle: issued.documentHandle };
+    Object.defineProperty(nonEnumerable, 'documentHandle', { enumerable: false });
+    const symbolic = { documentHandle: issued.documentHandle, [Symbol('synthetic')]: true };
+    const customPrototype = Object.create({ synthetic: true }) as { documentHandle: string };
+    customPrototype.documentHandle = issued.documentHandle ?? '';
+    for (const value of [accessor, nonEnumerable, symbolic, { documentHandle: issued.documentHandle, extra: true }, customPrototype,
+        new Proxy({ documentHandle: issued.documentHandle }, {})]) {
+        assert.equal(boundary.consume(value).code, 'input_invalid');
+    }
+    assert.equal(reads, 0);
+});
+
+test('rejects hostile entropy without observing byteLength, constructor, or Object.prototype.then', async () => {
+    const originalThen = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+    let thenReads = 0;
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { thenReads += 1; return undefined; } });
+    try {
+        for (const entropy of [
+            () => new Proxy(Uint8Array.from({ length: 16 }, (_, index) => index), {}),
+            () => new (class SyntheticEntropy extends Uint8Array {})(16),
+            () => new DataView(new ArrayBuffer(16)),
+            () => {
+                const bytes = new Uint8Array(16);
+                Object.defineProperty(bytes, 'byteLength', { get() { throw new Error('must not read byteLength'); } });
+                return bytes;
+            },
+            () => {
+                const bytes = new Uint8Array(16);
+                Object.defineProperty(bytes, 'constructor', { get() { throw new Error('must not read constructor'); } });
+                return bytes;
+            },
+            () => Promise.reject(new Error('synthetic rejected entropy')),
+            () => ({ then() { throw new Error('must not assimilate'); } }),
+        ]) {
+            const boundary = createDocumentSynthesisAuthorityHandle(authority('deterministic'), {
+                clock: () => Date.parse('2026-08-23T11:00:00.000Z'), entropy,
+            });
+            assert.equal(boundary.issue().status, 'denied');
+        }
+        assert.throws(() => createDocumentSynthesisAuthorityHandle(authority('deterministic'), {
+            clock: () => Date.parse('2026-08-23T11:00:00.000Z'),
+            entropy: async () => Uint8Array.from({ length: 16 }, (_, index) => index),
+        }), DocumentSynthesisAuthorityHandleConfigurationError);
+        assert.equal(thenReads, 0);
+    } finally {
+        if (originalThen) Object.defineProperty(Object.prototype, 'then', originalThen);
+        else delete (Object.prototype as { then?: unknown }).then;
+    }
+    await new Promise((resolve) => setImmediate(resolve));
+});
+
+test('all authority-handle outputs are frozen null-prototype records', () => {
+    const boundary = host('deterministic');
+    const issued = boundary.issue();
+    const available = boundary.consume({ documentHandle: issued.documentHandle });
+    for (const value of [issued, available]) {
+        assert.equal(Object.isFrozen(value), true);
+        assert.equal(Object.getPrototypeOf(value), null);
+    }
+    assert.equal(Object.getPrototypeOf(available.metadata ?? {}), null);
+    assert.equal(Object.getPrototypeOf(available.metadata?.document ?? {}), null);
 });

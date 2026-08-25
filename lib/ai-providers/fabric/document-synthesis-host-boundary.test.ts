@@ -38,13 +38,13 @@ test('deterministic and generative dispositions use the same review-only host bo
 
 test('the boundary denies stale, mismatched revision, and expired document presentations', () => {
     const current = boundary('deterministic');
-    assert.deepEqual(current.present(presentation({ revision: 3 })), {
+    assert.deepEqual({ ...current.present(presentation({ revision: 3 })) }, {
         status: 'denied', code: 'revision_mismatch', metadata: null, writesPerformed: 0, applyPolicy: 'none',
     });
-    assert.deepEqual(current.present(presentation({ freshness: '2026-08-23T11:59:00.000Z' })), {
+    assert.deepEqual({ ...current.present(presentation({ freshness: '2026-08-23T11:59:00.000Z' })) }, {
         status: 'denied', code: 'freshness_mismatch', metadata: null, writesPerformed: 0, applyPolicy: 'none',
     });
-    assert.deepEqual(boundary('generative', Date.parse(freshness)).present(presentation()), {
+    assert.deepEqual({ ...boundary('generative', Date.parse(freshness)).present(presentation()) }, {
         status: 'denied', code: 'handle_expired', metadata: null, writesPerformed: 0, applyPolicy: 'none',
     });
 });
@@ -93,7 +93,7 @@ test('hostile Proxy traps become typed denials or configuration rejection', () =
         ownKeys() { throw new Error('untrusted own keys trap'); },
     });
     for (const value of [prototypeTrap, ownKeysTrap]) {
-        assert.deepEqual(host.present(value), {
+        assert.deepEqual({ ...host.present(value) }, {
             status: 'denied', code: 'input_invalid', metadata: null, writesPerformed: 0, applyPolicy: 'none',
         });
     }
@@ -126,7 +126,62 @@ test('a throwing host clock fails closed without exposing its error', () => {
         receiptRef: 'receipt_0123456789abcdef',
         now: () => { throw new Error('untrusted clock trap'); },
     });
-    assert.deepEqual(host.present(presentation()), {
+    assert.deepEqual({ ...host.present(presentation()) }, {
         status: 'denied', code: 'handle_expired', metadata: null, writesPerformed: 0, applyPolicy: 'none',
     });
+});
+
+test('rejects transparent proxies and structural hostile values before any property reads', () => {
+    const host = boundary('deterministic');
+    let reads = 0;
+    const accessor = {};
+    Object.defineProperty(accessor, 'documentHandle', { enumerable: true, get() { reads += 1; return handle; } });
+    const nonEnumerable = presentation();
+    Object.defineProperty(nonEnumerable, 'revision', { enumerable: false });
+    const symbolic = { ...presentation(), [Symbol('synthetic')]: true };
+    const customPrototype = Object.create({ synthetic: true }) as Record<string, unknown>;
+    Object.assign(customPrototype, presentation());
+    for (const value of [accessor, nonEnumerable, symbolic, { ...presentation(), extra: true }, customPrototype, new Proxy(presentation(), {})]) {
+        assert.equal(host.present(value).code, 'input_invalid');
+    }
+    assert.equal(reads, 0);
+});
+
+test('rejects async and Promise-returning clocks without thenable assimilation or leaked rejection', async () => {
+    const originalThen = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+    let thenReads = 0;
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { thenReads += 1; return undefined; } });
+    try {
+        for (const now of [
+            () => Promise.reject(new Error('synthetic rejected clock')),
+            () => ({ then() { throw new Error('must not assimilate'); } }),
+        ]) {
+            const host = createDocumentSynthesisHostBoundary({
+                document: { handle, revision: 4, freshness }, disposition: 'deterministic',
+                provenanceRef: 'provenance_0123456789abcdef', receiptRef: 'receipt_0123456789abcdef', now,
+            });
+            assert.equal(host.present(presentation()).code, 'handle_expired');
+        }
+        assert.throws(() => createDocumentSynthesisHostBoundary({
+            document: { handle, revision: 4, freshness }, disposition: 'deterministic',
+            provenanceRef: 'provenance_0123456789abcdef', receiptRef: 'receipt_0123456789abcdef',
+            now: async () => Date.parse('2026-08-23T11:00:00.000Z'),
+        }), DocumentSynthesisHostBoundaryConfigurationError);
+        assert.equal(thenReads, 0);
+    } finally {
+        if (originalThen) Object.defineProperty(Object.prototype, 'then', originalThen);
+        else delete (Object.prototype as { then?: unknown }).then;
+    }
+    await new Promise((resolve) => setImmediate(resolve));
+});
+
+test('all host boundary outputs are frozen null-prototype records', () => {
+    const available = boundary('generative').present(presentation());
+    const denied = boundary('generative').present({ ...presentation(), extra: true });
+    for (const result of [available, denied]) {
+        assert.equal(Object.isFrozen(result), true);
+        assert.equal(Object.getPrototypeOf(result), null);
+    }
+    assert.equal(Object.getPrototypeOf(available.metadata ?? {}), null);
+    assert.equal(Object.getPrototypeOf(available.metadata?.document ?? {}), null);
 });

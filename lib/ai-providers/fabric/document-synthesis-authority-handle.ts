@@ -2,6 +2,7 @@
 import 'server-only';
 
 import { createHash } from 'node:crypto';
+import { types } from 'node:util';
 
 import {
     createDocumentSynthesisHostBoundary,
@@ -26,12 +27,19 @@ export type DocumentSynthesisAuthorityHandleResult =
 
 type HostAuthority = Readonly<{ patientRef: string; document: Readonly<{ revision: number; freshness: string }>; disposition: DocumentSynthesisDisposition; provenanceRef: string; receiptRef: string }>;
 type HostSources = Readonly<{ clock: () => unknown; entropy: () => unknown }>;
+type AuthorityState = 'unissued' | 'issuing' | 'issued' | 'consuming' | 'consumed' | 'expired' | 'poisoned';
 
 const OPAQUE_PATIENT_REF = /^[A-Za-z][A-Za-z0-9._:-]{15,159}$/u;
 const OPAQUE_HANDLE = /^dsh_[a-f0-9]{32}$/u;
 const OPAQUE_REFERENCE = /^(?:provenance|receipt)_[A-Za-z0-9._:-]{16,128}$/u;
-const COMMON = Object.freeze({ writesPerformed: 0 as const, applyPolicy: 'none' as const });
+const COMMON = freezeRecord({ writesPerformed: 0 as const, applyPolicy: 'none' as const });
 const productionSources: HostSources = Object.freeze({ clock: () => Date.now(), entropy: () => crypto.getRandomValues(new Uint8Array(16)) });
+const OBJECT_PROTOTYPE = Object.prototype;
+const UINT8_ARRAY_PROTOTYPE = Uint8Array.prototype;
+const UINT8_ARRAY_BYTE_LENGTH = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(UINT8_ARRAY_PROTOTYPE), 'byteLength')?.get;
+const UINT8_ARRAY_SET = UINT8_ARRAY_PROTOTYPE.set;
+const NATIVE_PROMISE_THEN = Promise.prototype.then;
+const ASYNC_FUNCTION_PROTOTYPE = Object.getPrototypeOf(async () => undefined);
 
 export class DocumentSynthesisAuthorityHandleConfigurationError extends Error {
     constructor() {
@@ -40,15 +48,20 @@ export class DocumentSynthesisAuthorityHandleConfigurationError extends Error {
     }
 }
 
+function freezeRecord<T extends Record<string, unknown>>(value: T): Readonly<T> {
+    return Object.freeze(Object.assign(Object.create(null) as T, value));
+}
+
 function exactRecord(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
     try {
-        if (typeof value !== 'object' || value === null || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) return null;
+        if (typeof value !== 'object' || value === null || Array.isArray(value) || types.isProxy(value)
+            || Object.getPrototypeOf(value) !== OBJECT_PROTOTYPE) return null;
         const ownKeys = Reflect.ownKeys(value);
         if (ownKeys.length !== keys.length || !keys.every((key) => ownKeys.includes(key))) return null;
         const snapshot: Record<string, unknown> = {};
         for (const key of keys) {
             const descriptor = Object.getOwnPropertyDescriptor(value, key);
-            if (!descriptor || !('value' in descriptor)) return null;
+            if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return null;
             snapshot[key] = descriptor.value;
         }
         return snapshot;
@@ -73,9 +86,9 @@ function parseAuthority(value: unknown): HostAuthority | null {
         || (record.disposition !== 'deterministic' && record.disposition !== 'generative')
         || typeof record.provenanceRef !== 'string' || !OPAQUE_REFERENCE.test(record.provenanceRef)
         || typeof record.receiptRef !== 'string' || !OPAQUE_REFERENCE.test(record.receiptRef)) return null;
-    return Object.freeze({
+    return freezeRecord({
         patientRef: record.patientRef,
-        document: Object.freeze({ revision, freshness: document.freshness }),
+        document: freezeRecord({ revision, freshness: document.freshness }),
         disposition: record.disposition,
         provenanceRef: record.provenanceRef,
         receiptRef: record.receiptRef,
@@ -85,18 +98,31 @@ function parseAuthority(value: unknown): HostAuthority | null {
 function parseSources(value: unknown): HostSources | null {
     const record = exactRecord(value, ['clock', 'entropy']);
     if (!record || typeof record.clock !== 'function' || typeof record.entropy !== 'function') return null;
+    if (types.isProxy(record.clock) || types.isProxy(record.entropy)
+        || Object.getPrototypeOf(record.clock) === ASYNC_FUNCTION_PROTOTYPE
+        || Object.getPrototypeOf(record.entropy) === ASYNC_FUNCTION_PROTOTYPE) return null;
     return Object.freeze({
         clock: record.clock as () => unknown,
         entropy: record.entropy as () => unknown,
     });
 }
 
+function discardPromise(value: unknown): boolean {
+    if (!types.isPromise(value)) return false;
+    try { void NATIVE_PROMISE_THEN.call(value, undefined, () => undefined); } catch { /* fail closed */ }
+    return true;
+}
+
 function readEntropy(entropy: () => unknown, authority: HostAuthority): string | null {
     try {
         const value = entropy();
-        if (!(value instanceof Uint8Array) || Object.getPrototypeOf(value) !== Uint8Array.prototype
-            || value.byteLength !== 16) return null;
-        const copy = Uint8Array.prototype.slice.call(value);
+        if (discardPromise(value) || typeof value !== 'object' || value === null || types.isProxy(value)
+            || Object.getPrototypeOf(value) !== UINT8_ARRAY_PROTOTYPE
+            || Object.getOwnPropertyDescriptor(value, 'byteLength')
+            || Object.getOwnPropertyDescriptor(value, 'constructor')
+            || !UINT8_ARRAY_BYTE_LENGTH || UINT8_ARRAY_BYTE_LENGTH.call(value) !== 16) return null;
+        const copy = new Uint8Array(16);
+        UINT8_ARRAY_SET.call(copy, value as Uint8Array);
         const binding = [
             authority.patientRef,
             authority.document.revision,
@@ -112,13 +138,13 @@ function readEntropy(entropy: () => unknown, authority: HostAuthority): string |
 }
 
 function issue(handle: string | null): DocumentSynthesisAuthorityHandleIssueResult {
-    return Object.freeze(handle
+    return freezeRecord(handle
         ? { status: 'issued' as const, code: null, documentHandle: handle }
         : { status: 'denied' as const, code: 'entropy_unavailable' as const, documentHandle: null });
 }
 
 function denied(code: DocumentSynthesisAuthorityHandleDenialCode): DocumentSynthesisAuthorityHandleResult {
-    return Object.freeze({ status: 'denied', code, metadata: null, ...COMMON });
+    return freezeRecord({ status: 'denied' as const, code, metadata: null, ...COMMON });
 }
 
 function parseConsumeInput(value: unknown): string | null {
@@ -145,39 +171,52 @@ export function createDocumentSynthesisAuthorityHandle(
     if (!authority || !sources) throw new DocumentSynthesisAuthorityHandleConfigurationError();
 
     let handle: string | null = null;
-    let consumed = false;
-    let expired = false;
+    let state: AuthorityState = 'unissued';
 
     return Object.freeze({
         issue(): DocumentSynthesisAuthorityHandleIssueResult {
-            if (!handle) handle = readEntropy(sources.entropy, authority);
+            if (state === 'issuing' || state === 'consuming') {
+                state = 'poisoned';
+                return issue(null);
+            }
+            if (state === 'poisoned') return issue(null);
+            if (handle) return issue(handle);
+            state = 'issuing';
+            const issuedHandle = readEntropy(sources.entropy, authority);
+            if (state !== 'issuing') return issue(null);
+            if (!issuedHandle) {
+                state = 'unissued';
+                return issue(null);
+            }
+            handle = issuedHandle;
+            state = 'issued';
             return issue(handle);
         },
         consume(value: unknown): DocumentSynthesisAuthorityHandleResult {
+            if (state === 'issuing' || state === 'consuming') {
+                state = 'poisoned';
+                return denied('handle_consumed');
+            }
             const presentedHandle = parseConsumeInput(value);
             if (!presentedHandle) return denied('input_invalid');
             if (!handle || presentedHandle !== handle) return denied('handle_invalid');
-            if (consumed) return denied('handle_consumed');
-            if (expired) return denied('handle_expired');
+            if (state === 'poisoned' || state === 'consumed') return denied('handle_consumed');
+            if (state === 'expired') return denied('handle_expired');
+            state = 'consuming';
 
-            const boundary = createDocumentSynthesisHostBoundary({
-                document: {
-                    handle,
-                    revision: authority.document.revision,
-                    freshness: authority.document.freshness,
-                },
-                disposition: authority.disposition,
-                provenanceRef: authority.provenanceRef,
-                receiptRef: authority.receiptRef,
-                now: sources.clock,
-            });
-            const result = boundary.present({
-                documentHandle: handle,
-                revision: authority.document.revision,
-                freshness: authority.document.freshness,
-            });
-            if (result.status === 'available') consumed = true;
-            if (result.status === 'denied' && result.code === 'handle_expired') expired = true;
+            let result: DocumentSynthesisHostBoundaryResult;
+            try {
+                const boundary = createDocumentSynthesisHostBoundary({
+                    document: { handle, revision: authority.document.revision, freshness: authority.document.freshness },
+                    disposition: authority.disposition, provenanceRef: authority.provenanceRef, receiptRef: authority.receiptRef, now: sources.clock,
+                });
+                result = boundary.present({ documentHandle: handle, revision: authority.document.revision, freshness: authority.document.freshness });
+            } catch {
+                state = 'poisoned';
+                return denied('handle_expired');
+            }
+            if (state !== 'consuming') return denied('handle_consumed');
+            state = result.status === 'available' ? 'consumed' : result.code === 'handle_expired' ? 'expired' : 'issued';
             return result;
         },
     });
