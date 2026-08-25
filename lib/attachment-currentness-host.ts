@@ -10,8 +10,10 @@ import { dbServer, runDbServerImmediateTransaction } from './db-server';
 const REF = /^[0-9a-f]{64}$/u;
 const MAX = Number.MAX_SAFE_INTEGER;
 const KEYS = ['sourceRef', 'revision', 'freshnessEpoch'] as const;
+const STORED_KEYS = ['id', 'patientId', 'sourceRef', 'revision', 'freshnessEpoch'] as const;
 const OBJECT_PROTOTYPE = Object.prototype;
 const objectGetPrototypeOf = Object.getPrototypeOf;
+const objectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const objectGetOwnPropertyDescriptors = Object.getOwnPropertyDescriptors;
 const objectHasOwn = Object.hasOwn;
 const objectDefineProperties = Object.defineProperties;
@@ -43,16 +45,26 @@ function fail(code: AttachmentCurrentnessHostErrorCode): never {
     throw objectFreeze(error);
 }
 
+function exactOwnDataFields(value: unknown, keys: readonly string[]): Record<string, PropertyDescriptor> | null {
+    if (!value || typeof value !== 'object' || arrayIsArray(value) || isProxy(value) || objectGetPrototypeOf(value) !== OBJECT_PROTOTYPE) return null;
+    const fields = objectGetOwnPropertyDescriptors(value);
+    if (reflectOwnKeys(value).length !== keys.length) return null;
+    for (let index = 0; index < keys.length; index += 1) {
+        const key = keys[index]!;
+        if (!objectHasOwn(fields, key)) return null;
+        const field = objectGetOwnPropertyDescriptor(fields, key);
+        if (!field || !objectHasOwn(field, 'value')) return null;
+        const descriptor = field.value;
+        if (!descriptor || typeof descriptor !== 'object' || !objectHasOwn(descriptor, 'value') || !objectHasOwn(descriptor, 'enumerable') || descriptor.enumerable !== true) return null;
+    }
+    return fields;
+}
+
 function currentness(value: unknown): AttachmentCurrentness {
     try {
-        if (!value || typeof value !== 'object' || arrayIsArray(value) || isProxy(value) || objectGetPrototypeOf(value) !== OBJECT_PROTOTYPE) fail('input_invalid');
-        const fields = objectGetOwnPropertyDescriptors(value);
-        if (reflectOwnKeys(value).length !== KEYS.length) fail('input_invalid');
-        for (let index = 0; index < KEYS.length; index += 1) {
-            const descriptor = fields[KEYS[index]!];
-            if (!objectHasOwn(fields, KEYS[index]!) || !descriptor || !('value' in descriptor) || !descriptor.enumerable) fail('input_invalid');
-        }
-        const { sourceRef, revision, freshnessEpoch } = fields as Record<string, PropertyDescriptor>;
+        const fields = exactOwnDataFields(value, KEYS);
+        if (!fields) fail('input_invalid');
+        const { sourceRef, revision, freshnessEpoch } = fields;
         if (typeof sourceRef.value !== 'string' || !regexpTest(REF, sourceRef.value) || typeof revision.value !== 'number' || !numberIsSafeInteger(revision.value) || revision.value < 1 || typeof freshnessEpoch.value !== 'number' || !numberIsSafeInteger(freshnessEpoch.value) || freshnessEpoch.value < 1) fail('input_invalid');
         return objectFreeze({ sourceRef: sourceRef.value, revision: revision.value, freshnessEpoch: freshnessEpoch.value });
     } catch (error) { if (isAttachmentCurrentnessHostError(error)) throw error; return fail('input_invalid'); }
@@ -70,9 +82,11 @@ function replacement(value: unknown): string | null {
 
 function stored(row: unknown, id: string): AttachmentCurrentness & { patientId: string } {
     try {
-        const value = row as { id?: unknown; patientId?: unknown; sourceRef?: unknown; revision?: unknown; freshnessEpoch?: unknown };
-        if (value.id !== id || typeof value.patientId !== 'string' || value.patientId.length === 0 || value.patientId !== stringTrim(value.patientId)) fail('stored_state_invalid');
-        return objectFreeze({ patientId: value.patientId, ...currentness({ sourceRef: value.sourceRef, revision: value.revision, freshnessEpoch: value.freshnessEpoch }) });
+        const fields = exactOwnDataFields(row, STORED_KEYS);
+        if (!fields) fail('stored_state_invalid');
+        const { id: storedId, patientId, sourceRef, revision, freshnessEpoch } = fields;
+        if (storedId.value !== id || typeof patientId.value !== 'string' || patientId.value.length === 0 || patientId.value !== stringTrim(patientId.value)) fail('stored_state_invalid');
+        return objectFreeze({ patientId: patientId.value, ...currentness({ sourceRef: sourceRef.value, revision: revision.value, freshnessEpoch: freshnessEpoch.value }) });
     } catch { return fail('stored_state_invalid'); }
 }
 
