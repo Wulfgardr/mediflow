@@ -138,6 +138,53 @@ test('captures mutable intrinsics before post-import poisoning', () => {
     assert.notDeepEqual(snapshot(), before);
 });
 
+test('rejects inherited or non-data expected fields without reads or a transaction', () => {
+    let accessorReads = 0;
+    let prototypeReads = 0;
+    const inheritedValue = Object.getOwnPropertyDescriptor(Object.prototype, 'value');
+    const prototypeValue = (value: unknown) => {
+        const descriptor = Object.create(null) as PropertyDescriptor;
+        descriptor.configurable = true; descriptor.value = value;
+        Object.defineProperty(Object.prototype, 'value', descriptor);
+    };
+    const prototypeGetter = (getter: () => unknown) => {
+        const descriptor = Object.create(null) as PropertyDescriptor;
+        descriptor.configurable = true; descriptor.get = getter;
+        Object.defineProperty(Object.prototype, 'value', descriptor);
+    };
+    const accessor = () => {
+        const value = { revision: 1, freshnessEpoch: 1 };
+        const descriptor = Object.create(null) as PropertyDescriptor;
+        descriptor.enumerable = true; descriptor.get = () => { accessorReads += 1; return ref; };
+        Object.defineProperty(value, 'sourceRef', descriptor);
+        return value;
+    };
+    const rejectsWithoutMutation = (value: unknown) => {
+        reset(); const before = snapshot();
+        rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', value, 'new'), 'input_invalid');
+        assert.deepEqual(snapshot(), before);
+    };
+    reset(); const poisonedBefore = snapshot();
+    try {
+        prototypeValue(ref); rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', accessor(), 'new'), 'input_invalid');
+        prototypeGetter(() => { prototypeReads += 1; return ref; }); rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', accessor(), 'new'), 'input_invalid');
+        prototypeGetter(() => { prototypeReads += 1; throw new Error('synthetic prototype getter'); }); rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', accessor(), 'new'), 'input_invalid');
+    } finally {
+        if (inheritedValue) Object.defineProperty(Object.prototype, 'value', inheritedValue);
+        else delete (Object.prototype as { value?: unknown }).value;
+    }
+    assert.deepEqual(snapshot(), poisonedBefore);
+    const inherited = Object.create(Object.prototype) as Record<string, unknown>;
+    inherited.revision = 1; inherited.freshnessEpoch = 1;
+    rejectsWithoutMutation(inherited);
+    rejectsWithoutMutation({ ...expected(), [Symbol('synthetic')]: true });
+    const nonEnumerable = { ...expected() }; Object.defineProperty(nonEnumerable, 'sourceRef', { enumerable: false, value: ref }); rejectsWithoutMutation(nonEnumerable);
+    rejectsWithoutMutation(accessor());
+    rejectsWithoutMutation(new Proxy(expected(), { get() { accessorReads += 1; return ref; }, ownKeys() { accessorReads += 1; return []; } }));
+    assert.equal(accessorReads, 0); assert.equal(prototypeReads, 0);
+    reset(); assert.deepEqual(host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), 'new'), { sourceRef: ref, revision: 2, freshnessEpoch: 2 });
+});
+
 test('leaves the immediate transaction reusable after every denial', () => {
     reset(); const before = snapshot();
     rejects(() => host.transitionAttachmentContentCurrentness('attachment.synthetic.1', expected(), { value: 'new' }), 'input_invalid');
