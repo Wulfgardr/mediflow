@@ -35,9 +35,9 @@ import {
     checkAuthHealthRequest,
     changePinRequest,
     loginWithPinRequest,
-    logoutSecuritySession,
     repairLegacyDbRequest,
     rewrapMasterKeyRequest,
+    requestApplicationLockConfirmation,
     setupSecurityRequest,
     type AuthHealthPayload,
     type LoginFailurePayload,
@@ -121,6 +121,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     /* @Codex */
     const masterKeyRef = useRef<CryptoKey | null>(null);
     /* @Codex */
+    const authorityAttemptGenerationRef = useRef(0);
+    /* @Codex */
     const [authHealth, setAuthHealth] = useState<AuthHealthPayload | null>(null);
     /* @Codex */
     const [isRepairing, setIsRepairing] = useState(false);
@@ -135,12 +137,27 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         notifyDbChange();
     };
 
+    /* @Codex */
     const lock = () => {
+        const attemptGeneration = ++authorityAttemptGenerationRef.current;
         setIsLocked(true);
         setAuthErrorMessage(null);
-        // @Codex - clear server session when locking
-        logoutSecuritySession();
-        // setIsAuthenticated(false); // Do not de-auth, just lock screen.
+        clearSecuritySession();
+        setActiveMasterKey(null);
+        setUser(null);
+        setIsAuthenticated(false);
+
+        void requestApplicationLockConfirmation()
+            .then((confirmed) => {
+                if (!confirmed && authorityAttemptGenerationRef.current === attemptGeneration) {
+                    setAuthErrorMessage('Server lock not confirmed.');
+                }
+            })
+            .catch(() => {
+                if (authorityAttemptGenerationRef.current === attemptGeneration) {
+                    setAuthErrorMessage('Server lock not confirmed.');
+                }
+            });
     };
 
     useInactivityLock({
@@ -223,10 +240,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 setRequiresSetup(false);
                 // @Codex - if server session is missing, lock and clear local session
                 if (data.hasSession === false) {
-                    clearSecuritySession();
-                    setActiveMasterKey(null);
-                    setIsAuthenticated(false);
-                    setIsLocked(true);
+                    lock();
                     return;
                 }
                 // If we didn't restore session, we remain unauthenticated (showing lock screen if set)
@@ -265,9 +279,11 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     };
 
     const restoreSession = async (): Promise<boolean> => {
+        const attemptGeneration = ++authorityAttemptGenerationRef.current;
         try {
             const session = await restoreSecuritySession<User>();
             if (!session) return false;
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) return false;
 
             setActiveMasterKey(session.key);
             setUser(session.userData);
@@ -281,12 +297,15 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     };
 
     const login = async (pin: string): Promise<boolean> => {
+        const attemptGeneration = ++authorityAttemptGenerationRef.current;
         try {
             setAuthErrorMessage(null);
             const { response: res, payload } = await loginWithPinRequest(pin);
 
             if (!res.ok) {
-                setAuthErrorMessage(formatLoginFailure((payload as LoginFailurePayload | null) ?? null, res.status));
+                if (authorityAttemptGenerationRef.current === attemptGeneration) {
+                    setAuthErrorMessage(formatLoginFailure((payload as LoginFailurePayload | null) ?? null, res.status));
+                }
                 return false;
             }
 
@@ -300,7 +319,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 role: string;
             } | null;
             if (!data) {
-                setAuthErrorMessage('Errore durante il login.');
+                if (authorityAttemptGenerationRef.current === attemptGeneration) {
+                    setAuthErrorMessage('Errore durante il login.');
+                }
                 return false;
             }
             const { encryptedMasterKey, salt, ...userData } = data;
@@ -316,6 +337,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             }
 
             const masterKey = await unwrapMasterKeyVersioned(encryptedMasterKey, pin, saltBytes);
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) return false;
 
             setActiveMasterKey(masterKey);
             setUser(userData);
@@ -350,7 +372,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
         } catch (e) {
             console.error("Login failed", e);
-            setAuthErrorMessage('Errore durante il login.');
+            if (authorityAttemptGenerationRef.current === attemptGeneration) {
+                setAuthErrorMessage('Errore durante il login.');
+            }
             return false;
         }
     };
@@ -398,6 +422,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     // New handler for Onboarding Wizard
     const handleWizardComplete = async (data: { displayName: string; ambulatoryName: string; pin: string }) => {
+        const attemptGeneration = ++authorityAttemptGenerationRef.current;
         const { displayName, ambulatoryName, pin } = data;
         setFlowError(null);
 
@@ -434,6 +459,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
                 throw new Error(payload?.error || "Setup failed server-side");
             }
+
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) return;
 
             // Set Active
             setActiveMasterKey(masterKey);
