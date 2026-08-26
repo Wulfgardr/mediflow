@@ -29,11 +29,12 @@ const arrayEvery = Function.call.bind(Array.prototype.every) as <T>(values: read
 type CurrentnessObserver = (id: unknown) => unknown;
 
 function exactDataFields(value: unknown, keys: readonly string[], prototype: object | null): Record<string, PropertyDescriptor> | null {
-    if (!value || typeof value !== 'object' || isProxy(value) || objectGetPrototypeOf(value) !== prototype || reflectOwnKeys(value).length !== keys.length) return null;
+    if (!value || typeof value !== 'object' || isProxy(value) || objectGetPrototypeOf(value) !== prototype) return null;
     const fields = objectGetOwnPropertyDescriptors(value);
+    if (reflectOwnKeys(fields).length !== keys.length) return null;
     for (const key of keys) {
-        const field = objectGetOwnPropertyDescriptor(fields, key);
-        if (!field || !objectHasOwn(field, 'value') || !field.enumerable || !objectHasOwn(fields, key)) return null;
+        const field = objectGetOwnPropertyDescriptor(fields, key)?.value;
+        if (!field || typeof field !== 'object' || !objectHasOwn(field, 'value') || !field.enumerable) return null;
     }
     return fields;
 }
