@@ -19,13 +19,14 @@ export type DocumentSynthesisSourceSetCurrentness = Readonly<{
 }>;
 type Capsule = Readonly<{ snapshot(): DocumentSynthesisSourceSetCurrentness | null; transition(sourceSet: unknown): boolean; revoke(): void; dispose(): void }>;
 export type DocumentSynthesisSourceSetCurrentnessAccessor = Readonly<{ snapshot(): DocumentSynthesisSourceSetCurrentness | null }>;
-export type DocumentSynthesisSourceSetProviderInputAccessor = Readonly<{ snapshotPrompt(): string | null }>;
+export type DocumentSynthesisSourceSetExecutionInput = Readonly<{ currentness: DocumentSynthesisSourceSetCurrentness; prompt: string }>;
+export type DocumentSynthesisSourceSetExecutionInputAccessor = Readonly<{ snapshotExecutionInput(): DocumentSynthesisSourceSetExecutionInput | null }>;
 type ProviderInput = Readonly<{ prompt: string }>;
 type CapsuleBinding = Readonly<{
     owner: ServerSessionProjectionOwner;
     session: unknown;
     accessor: DocumentSynthesisSourceSetCurrentnessAccessor;
-    providerInputAccessor: DocumentSynthesisSourceSetProviderInputAccessor;
+    executionInputAccessor: DocumentSynthesisSourceSetExecutionInputAccessor;
 }>;
 
 const OBJECT = Object.prototype;
@@ -63,14 +64,14 @@ export function resolveDocumentSynthesisSourceSetCurrentnessAccessor(value: unkn
     } catch { return null; }
 }
 
-/** Resolves the private provider-input prompt for one branded owner/session capsule only. */
-export function resolveDocumentSynthesisSourceSetProviderInputAccessor(value: unknown, owner: unknown, session: unknown): DocumentSynthesisSourceSetProviderInputAccessor | null {
+/** Resolves one atomic currentness-and-prompt snapshot for a branded owner/session capsule only. */
+export function resolveDocumentSynthesisSourceSetExecutionInputAccessor(value: unknown, owner: unknown, session: unknown): DocumentSynthesisSourceSetExecutionInputAccessor | null {
     if (typeof value !== 'object' || value === null || IsProxy(value)) return null;
     try {
         if (!ReflectApply(weakSetHas, authenticCapsules, [value])) return null;
         const binding = ReflectApply(weakMapGet, capsuleBindings, [value]) as CapsuleBinding | undefined;
         if (!binding || binding.owner !== owner || binding.session !== session) return null;
-        return binding.providerInputAccessor;
+        return binding.executionInputAccessor;
     } catch { return null; }
 }
 
@@ -190,11 +191,16 @@ export function createDocumentSynthesisSourceSetCurrentnessOwner(value: unknown)
             return true;
         } finally { active = false; }
     };
+    const snapshotCurrentness = (): DocumentSynthesisSourceSetCurrentness => sealed({
+        sourceSetEpoch: current.sourceSetEpoch,
+        revocationGeneration: current.revocationGeneration,
+        sources: current.sources,
+    }) as DocumentSynthesisSourceSetCurrentness;
 
     const capsule = sealed({
         snapshot() {
             if (!live()) return null;
-            return sealed({ sourceSetEpoch: current.sourceSetEpoch, revocationGeneration: current.revocationGeneration, sources: current.sources }) as DocumentSynthesisSourceSetCurrentness;
+            return snapshotCurrentness();
         },
         transition(sourceSet: unknown) {
             if (!live()) return false;
@@ -209,13 +215,13 @@ export function createDocumentSynthesisSourceSetCurrentnessOwner(value: unknown)
         dispose() { terminal = true; port.dispose(); },
     }) as Capsule;
     const accessor = sealed({ snapshot: capsule.snapshot }) as DocumentSynthesisSourceSetCurrentnessAccessor;
-    const providerInputAccessor = sealed({
-        snapshotPrompt() {
+    const executionInputAccessor = sealed({
+        snapshotExecutionInput() {
             if (!live()) return null;
-            return currentProviderInput.prompt;
+            return sealed({ currentness: snapshotCurrentness(), prompt: currentProviderInput.prompt }) as DocumentSynthesisSourceSetExecutionInput;
         },
-    }) as DocumentSynthesisSourceSetProviderInputAccessor;
+    }) as DocumentSynthesisSourceSetExecutionInputAccessor;
     ReflectApply(weakSetAdd, authenticCapsules, [capsule]);
-    ReflectApply(weakMapSet, capsuleBindings, [capsule, sealed({ owner: input.owner, session: input.session, accessor, providerInputAccessor }) as CapsuleBinding]);
+    ReflectApply(weakMapSet, capsuleBindings, [capsule, sealed({ owner: input.owner, session: input.session, accessor, executionInputAccessor }) as CapsuleBinding]);
     return capsule;
 }
