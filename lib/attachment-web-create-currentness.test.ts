@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import Database from 'better-sqlite3';
 
+import { buildAttachmentPath } from './attachment-path';
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-web-attachment-create-'));
 const dbPath = path.join(dataDir, 'medical.db');
@@ -25,6 +27,7 @@ try {
 
 const { createWebAttachment } = await import('./attachment-web-create.ts');
 const route = await import('../app/api/attachments/route.ts');
+const detailRoute = await import('../app/api/attachments/[id]/route.ts');
 const requireCurrent = createRequire(import.meta.url);
 const serverAuth = requireCurrent('./security/server-auth') as { requireSession: () => Promise<unknown> };
 
@@ -142,6 +145,46 @@ test('web list response omits every currentness tuple field', async () => {
         const [attachment] = await response.json() as Array<Record<string, unknown>>;
         assert.ok(attachment);
         for (const key of ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch']) assert.equal(key in attachment, false);
+    } finally {
+        serverAuth.requireSession = originalRequireSession;
+    }
+});
+
+test('web detail response preserves the legacy payload projection without currentness', async () => {
+    const attachmentId = 'attachment.synthetic.detail';
+    const attachmentPath = '/private/synthetic/detail.pdf';
+    reset();
+    const db = new Database(dbPath);
+    try {
+        db.prepare(`INSERT INTO attachments (
+            id, patient_id, name, type, size, path, data, summary_snapshot,
+            parse_evidence_artifact_snapshot, ocr_queue_state, ocr_queue_reason,
+            ocr_queue_updated_at, ocr_replay_artifact_snapshot, created_at,
+            document_source_ref, document_revision, document_freshness_epoch
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            .run(
+                attachmentId, patientId, 'detail.pdf', 'application/pdf', 17, attachmentPath, 'synthetic-base64', 'summary',
+                'evidence', 'pending', 'paired_upload', 1, 'replay', 2, 'd'.repeat(64), 1, 1,
+            );
+    } finally {
+        db.close();
+    }
+    const originalRequireSession = serverAuth.requireSession;
+    try {
+        serverAuth.requireSession = async () => session;
+        const response = await detailRoute.GET(new Request(`http://localhost/api/attachments/${attachmentId}`), {
+            params: Promise.resolve({ id: attachmentId }),
+        });
+        assert.equal(response.status, 200);
+        const detail = await response.json() as Record<string, unknown>;
+        assert.deepEqual(Object.keys(detail).sort(), [
+            'createdAt', 'data', 'id', 'name', 'ocrQueueReason', 'ocrQueueState', 'ocrQueueUpdatedAt',
+            'ocrReplayArtifactSnapshot', 'parseEvidenceArtifactSnapshot', 'path', 'patientId', 'size',
+            'summarySnapshot', 'type',
+        ]);
+        assert.equal(detail.data, 'synthetic-base64');
+        assert.equal(detail.path, buildAttachmentPath(attachmentPath, 'detail.pdf', attachmentId));
+        for (const key of ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch']) assert.equal(key in detail, false);
     } finally {
         serverAuth.requireSession = originalRequireSession;
     }
