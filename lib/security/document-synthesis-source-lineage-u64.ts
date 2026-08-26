@@ -8,6 +8,7 @@ const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const ObjectGetPrototypeOf = Object.getPrototypeOf;
 const ObjectIsFrozen = Object.isFrozen;
 const ArrayIsArray = Array.isArray;
+const CanonicalArrayPrototype = Array.prototype;
 const ReflectOwnKeys = Reflect.ownKeys;
 const IsProxy = types.isProxy;
 const StringFrom = String;
@@ -48,7 +49,8 @@ function event(value: unknown): value is object {
 }
 
 function events(value: unknown): value is readonly object[] {
-    if (!ArrayIsArray(value) || IsProxy(value) || !ObjectIsFrozen(value) || ReflectOwnKeys(value).length !== value.length + 1) return false;
+    if (IsProxy(value) || !ArrayIsArray(value) || ObjectGetPrototypeOf(value) !== CanonicalArrayPrototype
+        || !ObjectIsFrozen(value) || ReflectOwnKeys(value).length !== value.length + 1) return false;
     for (let index = 0; index < value.length; index += 1) {
         const descriptor = ObjectGetOwnPropertyDescriptor(value, StringFrom(index));
         if (!descriptor || !descriptor.enumerable || !('value' in descriptor) || !event(descriptor.value)) return false;
