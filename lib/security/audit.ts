@@ -13,6 +13,7 @@ export const AUDIT_EVENT_TYPES = [
     'auth.login.succeeded',
     'auth.login.failed',
     'auth.logout',
+    'auth.lock',
     'patient.created',
     'patient.updated',
     'patient.deleted',

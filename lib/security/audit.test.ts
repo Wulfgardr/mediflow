@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import { AUDIT_APPEND_ONLY_ERROR, ensureAuditSqliteSchema } from './audit-db';
 import {
     AUDIT_SOURCE_SURFACE_HEADER,
+    AUDIT_EVENT_TYPES,
     auditContextFromRequest,
     auditContextFromSession,
     auditSourceSurfaceFromRequest,
@@ -51,6 +52,10 @@ test('sanitizeAuditMetadata keeps only the PHI-safe whitelist', () => {
         flags: ['admin', 'contains_phi_'],
         reasonCode: 'invalid_credentials',
     });
+});
+
+test('audit catalog includes the PHI-safe application lock vocabulary', () => {
+    assert.equal(AUDIT_EVENT_TYPES.includes('auth.lock'), true);
 });
 
 test('audit schema blocks update and delete to preserve append-only semantics', () => {
