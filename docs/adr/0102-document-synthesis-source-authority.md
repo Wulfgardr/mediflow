@@ -41,9 +41,10 @@ scadenza del lease, `documentSourceRef`, `documentRevision`,
 `documentFreshnessEpoch`, `sourceSetEpoch` e `revocationGeneration`.
 
 Il lifecycle e `minted -> burned at begin -> in_flight -> published | denied`.
-Il burn avviene all'inizio e impedisce un secondo consumo. Un timestamp non
-prova la correntezza; la correntezza dipende dai binding ed epoch riletti
-dall'host.
+Il burn avviene all'inizio della sezione autenticata, dopo la validazione della
+forma esterna inerte e il lookup autenticato nello stesso owner, e impedisce un
+secondo consumo. Un timestamp non prova la correntezza; la correntezza dipende
+dai binding ed epoch riletti dall'host.
 
 ### Lineage indipendente del source set
 
@@ -54,32 +55,53 @@ scoped esclusivamente all'`ServerSessionProjectionOwner` autenticato. Non e
 La prima allocazione usa `sourceSetEpoch=1`. Ogni tentativo autenticato di
 capture/ingest che raggiunge l'allocazione del lineage consuma un nuovo valore
 monotono `u64`. Un tentativo negato dopo l'allocazione puo lasciare un gap.
-Nell'owner live `sourceSetEpoch` non puo fare wrap, reset o riuso. La
-`revocationGeneration` parte da `0` e incrementa a ogni revoca live del lineage
-di cattura DS. L'owner deve fare uno snapshot atomico dei due valori e
-rileggerli alla fence finale.
+Nell'owner live `sourceSetEpoch` non puo fare wrap, reset o riuso. Il valore
+iniziale e `revocationGeneration=0` per ogni lineage live di cattura/source set
+DS; `revocationGeneration` incrementa esattamente una volta per ogni distinta
+transizione di revoca osservata dall'owner: una revoca esplicita di una cattura
+`pending` oppure un'invalidazione di selezione, review o currentness documentale
+osservata mentre l'owner resta live. La stessa revoca `latched` osservata di
+nuovo non incrementa il valore. L'owner deve fare uno snapshot atomico dei due
+valori e rileggerli alla fence finale. Non si dichiara alcun callback immediato:
+conta solo la transizione rilevata dall'owner.
 
 `sourceSetEpoch` e `revocationGeneration` non derivano da timestamp, digest, ID
 allegato, `documentRevision`, `documentFreshnessEpoch`, `selectionEpoch` o
 `reviewContextEpoch`. Questi restano binding distinti.
 
-L'overflow di un `u64` e terminale e `fail-closed`. Restart, reset e disposal
-invalidano tutti gli handle e le capsule precedenti. L'host puo ricreare un
-lineage nuovo e `memory-only` perche l'autorita precedente e morta.
+L'overflow di `sourceSetEpoch` o `revocationGeneration` nega in modo terminale
+ed e `fail-closed`. Logout, expiry della sessione, reset, disposal e restart
+distruggono l'owner in memoria e ogni authority: gli handle e le capsule
+precedenti diventano invalidi senza richiedere un incremento osservabile.
+L'host puo ricreare un lineage nuovo e `memory-only` perche l'autorita
+precedente e morta.
 
 ### Ordine I1c di acquisizione
 
-In I1c l'ordine e vincolante:
+Alla frontiera pubblica, prima dell'autenticazione, non si osservano campi della
+projection. In I1c l'ordine e vincolante:
 
 1. validare solo la forma esterna inerte sufficiente a evitare l'osservazione
    dell'attaccante;
-2. autenticare e acquisire l'owner;
-3. consumare e bruciare l'handle;
-4. solo dopo ispezionare e normalizzare la projection e svolgere il lavoro su
-   DB, currentness e source set.
+2. autenticare e acquisire l'owner, quindi risolvere il capture handle nello
+   stesso owner;
+3. consumare e bruciare immediatamente l'handle;
+4. solo dopo validare e normalizzare in modo puro la projection tipizzata
+   esatta;
+5. entrare o proseguire nella fence P4 ed eseguire una sola lettura di
+   currentness vincolata al paziente e all'ambulatorio selezionati, confrontando
+   `documentSourceRef`, `documentRevision` e `documentFreshnessEpoch` memorizzati;
+6. allocare e acquisire uno snapshot atomico di `sourceSetEpoch` e
+   `revocationGeneration`, quindi catturare il source set;
+7. dopo l'unica chiamata asincrona al provider, rileggere il lineage e superare
+   la fence finale P4 su selezione, review e sessione prima di pubblicare il
+   `private terminal ticket`.
 
 Ogni errore dopo il burn lascia l'handle speso. Non si copia la regola OCR
 `resolve-before-burn`: quella semantica non si trasferisce a Document Synthesis.
+Il claim di questo ordine e limitato alla sezione host sincrona nello stesso
+processo (`sync`, senza `await`); la currentness multiprocesso resta fuori da
+questo packet.
 
 Questo addendum non introduce, autorizza o dimostra provider, route,
 persistenza, apply, scritture cliniche o runtime.
@@ -313,13 +335,22 @@ altrimenti corregge l'input.
 
 ### Fence a due fasi e receipt finale
 
-La prima sezione e sincrona: begin, controllo P4 e snapshot delle fonti, burn
-dell'handle e preparazione dell'invocazione. Segue esattamente una chiamata
-asincrona al provider, con cancellazione interna.
+La prima sezione e sincrona e segue I1c: la frontiera pubblica non osserva campi
+della projection prima dell'autenticazione; l'host autentica e acquisisce lo
+stesso owner, risolve il capture handle e lo brucia immediatamente, quindi
+valida e normalizza in modo puro la projection tipizzata. Poi entra o continua
+la fence P4, esegue una sola lettura di currentness vincolata alla coppia
+paziente/ambulatorio selezionata confrontando `documentSourceRef`,
+`documentRevision` e `documentFreshnessEpoch`, poi alloca e acquisisce uno
+snapshot atomico del lineage (`sourceSetEpoch`, `revocationGeneration`) e
+cattura il source set. Il claim per questa sezione e `sync` nello stesso
+processo, senza `await`; la currentness multiprocesso e fuori da questo packet.
+Segue esattamente una chiamata asincrona al provider, con cancellazione interna.
 
-La seconda sezione e sincrona: rilettura completa degli epoch, validazione di
-citazioni e digest. Prima del commit puo precomputare e congelare un payload di
-pubblicazione opaco, privato e non osservabile, trattenuto solo in memoria.
+La seconda sezione e sincrona: rilettura completa del lineage, fence finale P4
+su selezione, review e sessione, validazione di citazioni e digest. Prima del
+commit puo precomputare e congelare un payload di pubblicazione opaco, privato
+e non osservabile, trattenuto solo in memoria come `private terminal ticket`.
 Il payload trattiene direttamente i valori U0 e i riferimenti evidence gia
 congelati; non li clona, serializza o ricostruisce.
 Prima della revalidation riuscita e del commit del lease DS, quel payload non e
