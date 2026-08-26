@@ -13,6 +13,7 @@ const KEYS = ['sourceRef', 'revision', 'freshnessEpoch'] as const;
 const STORED_KEYS = ['id', 'patientId', 'sourceRef', 'revision', 'freshnessEpoch'] as const;
 const RUN_RESULT_KEYS = ['changes', 'lastInsertRowid'] as const;
 const OBJECT_PROTOTYPE = Object.prototype;
+const objectCreate = Object.create;
 const objectGetPrototypeOf = Object.getPrototypeOf;
 const objectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const objectGetOwnPropertyDescriptors = Object.getOwnPropertyDescriptors;
@@ -73,6 +74,16 @@ function currentness(value: unknown): AttachmentCurrentness {
     } catch (error) { if (isAttachmentCurrentnessHostError(error)) throw error; return fail('input_invalid'); }
 }
 
+function frozenNullCurrentness(sourceRef: string, revision: number, freshnessEpoch: number): AttachmentCurrentness {
+    const tuple = objectCreate(null) as { sourceRef: string; revision: number; freshnessEpoch: number };
+    objectDefineProperties(tuple, {
+        sourceRef: { value: sourceRef, enumerable: true },
+        revision: { value: revision, enumerable: true },
+        freshnessEpoch: { value: freshnessEpoch, enumerable: true },
+    });
+    return objectFreeze(tuple);
+}
+
 function attachmentId(value: unknown): string {
     if (typeof value !== 'string' || value.length === 0 || value.length > 256 || value !== stringTrim(value)) fail('input_invalid');
     return value;
@@ -91,6 +102,15 @@ function stored(row: unknown, id: string): AttachmentCurrentness & { patientId: 
         if (storedId.value !== id || typeof patientId.value !== 'string' || patientId.value.length === 0 || patientId.value !== stringTrim(patientId.value)) fail('stored_state_invalid');
         return objectFreeze({ patientId: patientId.value, ...currentness({ sourceRef: sourceRef.value, revision: revision.value, freshnessEpoch: freshnessEpoch.value }) });
     } catch { return fail('stored_state_invalid'); }
+}
+
+function observed(row: unknown): AttachmentCurrentness {
+    try {
+        const value = currentness(row);
+        return frozenNullCurrentness(value.sourceRef, value.revision, value.freshnessEpoch);
+    } catch {
+        return fail('stored_state_invalid');
+    }
 }
 
 function runResult(value: unknown): Readonly<{ changes: number; lastInsertRowid: number | bigint }> {
@@ -121,6 +141,17 @@ export function createHostAttachmentCurrentness(): AttachmentCurrentness {
         }
         if (!regexpTest(REF, sourceRef)) fail('storage_unavailable');
         return objectFreeze({ sourceRef, revision: 1, freshnessEpoch: 1 });
+    } catch (error) { return storage(error); }
+}
+
+/** Reads the exact host-owned currentness tuple for one existing attachment. */
+export function observeHostAttachmentCurrentness(idValue: unknown): AttachmentCurrentness | null {
+    const id = attachmentId(idValue);
+    try {
+        const row = dbServerGet<{ sourceRef: unknown; revision: unknown; freshnessEpoch: unknown }>(sql`
+            SELECT document_source_ref AS sourceRef, document_revision AS revision, document_freshness_epoch AS freshnessEpoch FROM attachments WHERE id = ${id}`);
+        if (row === null || row === undefined) return null;
+        return observed(row);
     } catch (error) { return storage(error); }
 }
 

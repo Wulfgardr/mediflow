@@ -50,12 +50,105 @@ function adversarialWorker(setup: string): Promise<string> {
     fs.writeFileSync(workerPath, `const database = await import('@/lib/db-server');\nconst originalRun = database.dbServer.run.bind(database.dbServer);\nlet reads = 0;\n${setup}\nObject.defineProperty(database.dbServer, 'run', { value: (...args) => { originalRun(...args); return result; } });\nconst host = await import('@/lib/attachment-currentness-host');\ntry { host.transitionAttachmentContentCurrentness('attachment.synthetic.1', { sourceRef: '${ref}', revision: 1, freshnessEpoch: 1 }, 'winner'); console.log('winner:' + reads); } catch (error) { console.log((host.isAttachmentCurrentnessHostError(error) ? error.code : 'unknown') + ':' + reads); }\n`);
     return worker(workerPath).finally(() => fs.rmSync(workerPath, { force: true }));
 }
+function adversarialObserverWorker(setup: string): Promise<string> {
+    const workerPath = path.join(dataDir, 'adversarial-observer-worker.mjs');
+    fs.writeFileSync(workerPath, `const database = await import('@/lib/db-server');
+const ref = '${ref}'; let reads = 0;
+Object.defineProperty(Object.getPrototypeOf(database.dbServer), 'get', { value: () => { ${setup} } });
+const host = await import('@/lib/attachment-currentness-host');
+try { const tuple = host.observeHostAttachmentCurrentness('attachment.synthetic.1'); console.log(JSON.stringify({ tuple, reads })); }
+catch (error) { console.log((host.isAttachmentCurrentnessHostError(error) ? error.code : 'unknown') + ':' + reads); }
+`);
+    return worker(workerPath).finally(() => fs.rmSync(workerPath, { force: true }));
+}
 test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
 test('mints only opaque host source refs with the initial tuple', () => {
     const first = host.createHostAttachmentCurrentness(); const second = host.createHostAttachmentCurrentness();
     assert.match(first.sourceRef, /^[0-9a-f]{64}$/u); assert.notEqual(first.sourceRef, second.sourceRef);
     assert.deepEqual({ revision: first.revision, freshnessEpoch: first.freshnessEpoch }, { revision: 1, freshnessEpoch: 1 });
+});
+
+test('observes one existing attachment as a frozen null-prototype exact tuple without writes', () => {
+    reset(); const before = snapshot();
+    const tuple = host.observeHostAttachmentCurrentness('attachment.synthetic.1');
+    assert.ok(tuple);
+    assert.equal(Object.getPrototypeOf(tuple), null);
+    assert.equal(Object.isFrozen(tuple), true);
+    assert.deepEqual(Reflect.ownKeys(tuple), ['sourceRef', 'revision', 'freshnessEpoch']);
+    assert.deepEqual({ ...tuple }, expected());
+    for (const key of Reflect.ownKeys(tuple)) {
+        const descriptor = Object.getOwnPropertyDescriptor(tuple, key);
+        assert.equal(descriptor?.enumerable, true); assert.equal(descriptor?.configurable, false); assert.equal(descriptor?.writable, false);
+    }
+    assert.throws(() => { (tuple as { revision: number }).revision = 9; }, TypeError);
+    assert.deepEqual(snapshot(), before);
+});
+
+test('observer denies absent, deleted, invalid, malformed, and caller-authority inputs without writes', () => {
+    reset(); const before = snapshot();
+    assert.equal(host.observeHostAttachmentCurrentness('missing.synthetic'), null);
+    const db = new Database(dbPath); db.prepare('DELETE FROM attachments WHERE id = ?').run('attachment.synthetic.1'); db.close();
+    assert.equal(host.observeHostAttachmentCurrentness('attachment.synthetic.1'), null);
+    assert.deepEqual(snapshot(), undefined);
+
+    reset();
+    for (const id of [undefined, '', ' attachment.synthetic.1', 'attachment.synthetic.1 ', 'x'.repeat(257), new Proxy({}, {})]) {
+        const unchanged = snapshot(); rejects(() => host.observeHostAttachmentCurrentness(id), 'input_invalid'); assert.deepEqual(snapshot(), unchanged);
+    }
+    const extraArgument = host.observeHostAttachmentCurrentness as (...args: unknown[]) => unknown;
+    assert.deepEqual({ ...(extraArgument('attachment.synthetic.1', { patientId: 'patient.other', sourceRef: 'b'.repeat(64), revision: 99, freshnessEpoch: 99 }) as Record<string, unknown>) }, expected());
+    assert.deepEqual(snapshot(), before);
+
+    reset(); const malformed = new Database(dbPath); malformed.pragma('ignore_check_constraints = ON'); malformed.prepare("UPDATE attachments SET document_source_ref = 'UPPER'").run(); malformed.close();
+    const malformedBefore = snapshot();
+    assert.throws(() => host.observeHostAttachmentCurrentness('attachment.synthetic.1'), (error: unknown) => host.isAttachmentCurrentnessHostError(error) && error.code === 'stored_state_invalid' && !error.message.includes('attachment.synthetic.1') && !error.message.includes('UPPER'));
+    assert.deepEqual(snapshot(), malformedBefore);
+});
+
+test('observer reads a changed currentness from a fresh host process without leaking a row', { timeout: 30_000 }, async () => {
+    reset();
+    const db = new Database(dbPath); db.prepare('UPDATE attachments SET document_source_ref = ?, document_revision = ?, document_freshness_epoch = ? WHERE id = ?').run('b'.repeat(64), 2, 3, 'attachment.synthetic.1'); db.close();
+    const workerPath = path.join(dataDir, 'observer-worker.mjs');
+    fs.writeFileSync(workerPath, "const host = await import('@/lib/attachment-currentness-host');\nconst tuple = host.observeHostAttachmentCurrentness('attachment.synthetic.1');\nconsole.log(JSON.stringify(tuple));\n");
+    try {
+        assert.equal(await worker(workerPath), JSON.stringify({ sourceRef: 'b'.repeat(64), revision: 2, freshnessEpoch: 3 }));
+    } finally { fs.rmSync(workerPath, { force: true }); }
+});
+
+test('observer keeps captured storage and reflection boundaries after ambient poisoning', () => {
+    reset();
+    const prototype = Object.getPrototypeOf(databaseHost.dbServer) as Record<string, unknown>;
+    const originalGet = Object.getOwnPropertyDescriptor(prototype, 'get');
+    const originalOwnKeys = Reflect.ownKeys;
+    let hostileCalls = 0;
+    try {
+        Object.defineProperty(prototype, 'get', { configurable: true, value: () => { hostileCalls += 1; throw new Error('synthetic db redirect'); } });
+        Reflect.ownKeys = (() => { throw new Error('synthetic reflection poison'); }) as typeof Reflect.ownKeys;
+        const tuple = host.observeHostAttachmentCurrentness('attachment.synthetic.1');
+        assert.ok(tuple); assert.deepEqual({ ...tuple }, expected()); assert.equal(Object.getPrototypeOf(tuple), null);
+    } finally {
+        if (originalGet) Object.defineProperty(prototype, 'get', originalGet); else delete prototype.get;
+        Reflect.ownKeys = originalOwnKeys;
+    }
+    assert.equal(hostileCalls, 0);
+});
+
+test('observer rejects hostile storage rows without accessors, inheritance, coercion, or writes', { timeout: 30_000 }, async () => {
+    const cases = [
+        "return Object.create({ sourceRef: ref, revision: 1, freshnessEpoch: 1 });",
+        "const row = { revision: 1, freshnessEpoch: 1 }; Object.defineProperty(row, 'sourceRef', { enumerable: true, get() { reads += 1; return ref; } }); return row;",
+        "return new Proxy({ sourceRef: ref, revision: 1, freshnessEpoch: 1 }, { get() { reads += 1; return ref; }, ownKeys() { reads += 1; return []; } });",
+        "const row = { sourceRef: ref, revision: 1, freshnessEpoch: 1 }; Object.defineProperty(row, 'sourceRef', { enumerable: false, value: ref }); return row;",
+        "return { sourceRef: ref, revision: 1, freshnessEpoch: 1, [Symbol('synthetic')]: true };",
+        "return Object.assign(Object.create(null), { sourceRef: ref, revision: 1, freshnessEpoch: 1 });",
+        "return Object.assign(Object.create({}), { sourceRef: ref, revision: 1, freshnessEpoch: 1 });",
+        "return { sourceRef: '', revision: 1, freshnessEpoch: 1 };",
+        "return { sourceRef: ref, revision: Number.MAX_SAFE_INTEGER + 1, freshnessEpoch: 1 };",
+    ];
+    reset(); const before = snapshot();
+    for (const setup of cases) assert.equal(await adversarialObserverWorker(setup), 'stored_state_invalid:0');
+    assert.deepEqual(snapshot(), before);
 });
 
 test('atomically replaces exact string or null data and advances the exact expected triple', () => {
