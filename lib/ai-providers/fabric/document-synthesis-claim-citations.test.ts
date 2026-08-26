@@ -35,6 +35,22 @@ test('denies raw source identity and hostile caller shapes without publication o
     const proxy = new Proxy(candidate(), { ownKeys() { traps += 1; return []; }, get() { traps += 1; return null; } }); denied(proxy); const hidden = candidate(); Object.defineProperty(hidden.claims[0]!, 'labels', { enumerable: false, value: ['S1'] }); denied(hidden); const symbol = candidate(); (symbol as Record<PropertyKey, unknown>)[Symbol('synthetic')] = true; denied(symbol); const sparse = candidate(); delete sparse.claims[0]; denied(sparse); assert.equal(reads, 0); assert.equal(traps, 0);
 });
 
+test('returns deep inert arrays and copies validated citations without aliases after return', () => {
+    const input = candidate(); const result = available(bindDocumentSynthesisClaimsToCitations(input)); const arrays = [result.citations, result.claims, result.claims[0]!.labels, result.output.data.medications, result.output.data.diagnoses, result.output.data.problemStatements, result.output.data.therapyCandidates, result.output.data.servicePrescriptions];
+    for (let index = 0; index < arrays.length; index += 1) { const descriptor = Object.getOwnPropertyDescriptor(arrays[index]!, 'toJSON'); assert.equal(descriptor?.value, null); assert.equal(descriptor?.enumerable, false); assert.equal(descriptor?.configurable, false); assert.equal(descriptor?.writable, false); assert.equal(Object.isFrozen(arrays[index]!), true); }
+    assert.notEqual(result.citations[0], input.citations[0]); const retained = result.citations[0]!.quote; input.citations[0]!.quote = 'forged'; assert.equal(result.citations[0]!.quote, retained);
+    const define = Object.defineProperty; const objectToJson = Object.getOwnPropertyDescriptor(Object.prototype, 'toJSON'); const arrayToJson = Object.getOwnPropertyDescriptor(Array.prototype, 'toJSON'); let reads = 0; const poison = () => { reads += 1; throw new Error('inherited toJSON must not run'); }; const baseline = JSON.stringify(result); let data: string | undefined; let objectGetter: string | undefined; let arrayGetter: string | undefined;
+    try {
+        define(Object.prototype, 'toJSON', { configurable: true, value: poison }); data = JSON.stringify(result);
+        define(Object.prototype, 'toJSON', { configurable: true, get() { reads += 1; return poison; } }); objectGetter = JSON.stringify(result);
+        define(Array.prototype, 'toJSON', { configurable: true, get() { reads += 1; return poison; } }); arrayGetter = JSON.stringify(result);
+    } finally {
+        if (objectToJson) define(Object.prototype, 'toJSON', objectToJson); else delete (Object.prototype as Record<string, unknown>).toJSON;
+        if (arrayToJson) define(Array.prototype, 'toJSON', arrayToJson); else delete (Array.prototype as unknown as Record<string, unknown>).toJSON;
+    }
+    assert.equal(data, baseline); assert.equal(objectGetter, baseline); assert.equal(arrayGetter, baseline); assert.equal(reads, 0);
+});
+
 test('keeps the end-to-end source-set to claim digest invariant under post-import intrinsic poisoning', async () => {
     const define = Object.defineProperty; const get = Object.getOwnPropertyDescriptor;
     const targets = [[Object, 'create'], [Object, 'freeze'], [Object, 'getOwnPropertyDescriptor'], [Object, 'getPrototypeOf'], [Object, 'hasOwn'], [Reflect, 'ownKeys'], [Reflect, 'apply'], [Array, 'isArray'], [Array.prototype, 'includes'], [Array.prototype, Symbol.iterator], [String.prototype, 'charCodeAt'], [TextEncoder.prototype, 'encode'], [JSON, 'stringify'], [types, 'isProxy']] as const;
