@@ -16,6 +16,9 @@ export type DocumentSynthesisSourceSetCurrentness = Readonly<{
     revocationGeneration: bigint;
     sources: readonly Source[];
 }>;
+type Capsule = Readonly<{ snapshot(): DocumentSynthesisSourceSetCurrentness | null; transition(sourceSet: unknown): boolean; revoke(): void; dispose(): void }>;
+export type DocumentSynthesisSourceSetCurrentnessAccessor = Readonly<{ snapshot(): DocumentSynthesisSourceSetCurrentness | null }>;
+type CapsuleBinding = Readonly<{ owner: ServerSessionProjectionOwner; session: unknown; accessor: DocumentSynthesisSourceSetCurrentnessAccessor }>;
 
 const OBJECT = Object.prototype;
 const ARRAY = Array.prototype;
@@ -30,12 +33,26 @@ const ArrayIsArray = Array.isArray;
 const IsProxy = types.isProxy;
 const NumberIsSafeInteger = Number.isSafeInteger;
 const MAX_U64 = BigInt('18446744073709551615');
+const WeakSetConstructor = WeakSet; const WeakMapConstructor = WeakMap; const ReflectApply = Reflect.apply;
+const weakSetAdd = WeakSet.prototype.add; const weakSetHas = WeakSet.prototype.has; const weakMapGet = WeakMap.prototype.get; const weakMapSet = WeakMap.prototype.set;
+const authenticCapsules = new WeakSetConstructor<object>();
+const capsuleBindings = new WeakMapConstructor<object, CapsuleBinding>();
 
 export class DocumentSynthesisSourceSetCurrentnessOwnerConfigurationError extends Error {
     constructor() {
         super('Document synthesis source-set currentness owner configuration rejected');
         this.name = 'DocumentSynthesisSourceSetCurrentnessOwnerConfigurationError';
     }
+}
+
+export function resolveDocumentSynthesisSourceSetCurrentnessAccessor(value: unknown, owner: unknown, session: unknown): DocumentSynthesisSourceSetCurrentnessAccessor | null {
+    if (typeof value !== 'object' || value === null || IsProxy(value)) return null;
+    try {
+        if (!ReflectApply(weakSetHas, authenticCapsules, [value])) return null;
+        const binding = ReflectApply(weakMapGet, capsuleBindings, [value]) as CapsuleBinding | undefined;
+        if (!binding || binding.owner !== owner || binding.session !== session) return null;
+        return binding.accessor;
+    } catch { return null; }
 }
 
 function sealed<T extends object>(value: T): Readonly<T> {
@@ -106,12 +123,7 @@ function configuration(value: unknown): Readonly<{ owner: ServerSessionProjectio
  * Its caller can only advance with a newly authentic source-set; it cannot
  * inject source fields, epochs, clocks, revocation callbacks, or a DS port.
  */
-export function createDocumentSynthesisSourceSetCurrentnessOwner(value: unknown): Readonly<{
-    snapshot(): DocumentSynthesisSourceSetCurrentness | null;
-    transition(sourceSet: unknown): boolean;
-    revoke(): void;
-    dispose(): void;
-}> {
+export function createDocumentSynthesisSourceSetCurrentnessOwner(value: unknown): Capsule {
     const input = configuration(value);
     const initial = input && capture(input.sourceSet);
     if (!input || !initial) throw new DocumentSynthesisSourceSetCurrentnessOwnerConfigurationError();
@@ -147,7 +159,7 @@ export function createDocumentSynthesisSourceSetCurrentnessOwner(value: unknown)
         } finally { active = false; }
     };
 
-    return sealed({
+    const capsule = sealed({
         snapshot() {
             if (!live()) return null;
             return sealed({ sourceSetEpoch: current.sourceSetEpoch, revocationGeneration: current.revocationGeneration, sources: current.sources }) as DocumentSynthesisSourceSetCurrentness;
@@ -164,5 +176,9 @@ export function createDocumentSynthesisSourceSetCurrentnessOwner(value: unknown)
         },
         revoke() { terminal = true; port.dispose(); },
         dispose() { terminal = true; port.dispose(); },
-    });
+    }) as Capsule;
+    const accessor = sealed({ snapshot: capsule.snapshot }) as DocumentSynthesisSourceSetCurrentnessAccessor;
+    ReflectApply(weakSetAdd, authenticCapsules, [capsule]);
+    ReflectApply(weakMapSet, capsuleBindings, [capsule, sealed({ owner: input.owner, session: input.session, accessor }) as CapsuleBinding]);
+    return capsule;
 }
