@@ -1,9 +1,8 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
 
-import { attachmentContentCurrentnessPutSchema } from '@/lib/api-schemas/attachments';
-import { parseApiBody } from '@/lib/api-schemas/parse';
-import { getAttachmentPayloadByteSize, isSealedAttachmentValue, resolveMaxAttachmentBytes } from '@/lib/attachment-payload';
+import { parseAttachmentContentCurrentnessPut } from '@/lib/api-schemas/attachments';
+import { getAttachmentPayloadByteSize, resolveMaxAttachmentBytes } from '@/lib/attachment-payload';
 import {
     isAttachmentCurrentnessHostError,
     transitionAttachmentContentCurrentness,
@@ -45,19 +44,18 @@ export async function putAttachmentContent(
     }
 
     const body = await request.json().catch(() => null) as unknown;
-    const parsed = parseApiBody(attachmentContentCurrentnessPutSchema, body, INVALID_PAYLOAD);
-    if (!parsed.ok) return parsed.response;
-    if (!isSealedAttachmentValue(parsed.data.replacement)) {
+    const parsed = parseAttachmentContentCurrentnessPut(body);
+    if (!parsed) {
         return NextResponse.json({ error: INVALID_PAYLOAD }, { status: 400 });
     }
-    const payloadSize = getAttachmentPayloadByteSize(parsed.data.replacement);
+    const payloadSize = getAttachmentPayloadByteSize(parsed.replacement);
     if (!payloadSize.ok) return NextResponse.json({ error: INVALID_PAYLOAD }, { status: 400 });
     if (payloadSize.size > maxBytes) {
         return NextResponse.json({ error: 'Attachment payload too large' }, { status: 413 });
     }
 
     try {
-        const currentness = transitionAttachmentContentCurrentness(id, parsed.data.expected, parsed.data.replacement);
+        const currentness = transitionAttachmentContentCurrentness(id, parsed.expected, parsed.replacement);
         return NextResponse.json(Object.freeze({ outcome: 'replaced', currentness }));
     } catch (error) {
         return mapCurrentnessError(error);
