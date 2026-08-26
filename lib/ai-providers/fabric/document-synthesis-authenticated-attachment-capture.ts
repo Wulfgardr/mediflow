@@ -1,175 +1,52 @@
 /* @Codex */
 import 'server-only';
 
+import { randomBytes } from 'node:crypto';
 import { types } from 'node:util';
+import { sql } from 'drizzle-orm';
 
-import type { ServerSession } from '../../security/server-session';
-import type { ServerSessionProjectionOwner } from '../../security/server-session-projection-owner';
+import { dbServer } from '../../db-server';
+import { acquireAuthenticatedWebSessionProjectionOwnerContext } from '../../security/server-auth';
+import { registerServerSessionResource } from '../../security/server-session';
 
-type SessionContext = Readonly<{ session: ServerSession; owner: ServerSessionProjectionOwner }>;
-type SelectedPair = Readonly<{ patientId: string; ambulatoryId: string }>;
 type Currentness = Readonly<{ documentSourceRef: string; documentRevision: number; documentFreshnessEpoch: number }>;
-type CaptureRecord = Readonly<{
-    selected: true;
-    currentness: Currentness;
-    selectionEpoch: number;
-    reviewContextEpoch: number;
-    scope: 'document_synthesis_attachment_capture';
-    revocationGeneration: number;
-}>;
-type Broker = { records: Map<string, CaptureRecord>; dispose: () => void; publish: (handle: string, record: CaptureRecord) => boolean };
+type RecordState = Readonly<{ selected: true; currentness: Currentness; selectionEpoch: number; reviewContextEpoch: number; scope: 'document_synthesis_attachment_capture'; revocationGeneration: number }>;
+type Broker = { records: Map<string, RecordState>; dispose: () => void; publish: (handle: string, state: RecordState) => boolean };
+type Result = Readonly<{ status: 'available' | 'denied'; code: null | 'input_invalid' | 'unavailable'; captureHandle: string | null; reviewOnly: true; writesPerformed: 0; applyPolicy: 'none' }>;
 
-export type DocumentSynthesisAuthenticatedAttachmentCaptureResult =
-    | Readonly<{ status: 'available'; captureHandle: string }>
-    | Readonly<{ status: 'denied'; captureHandle: null }>;
+const OBJECT = Object.prototype; const KEYS = ['attachmentId'] as const; const ROW_KEYS = ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch'] as const;
+const HANDLE = /^dsc_[a-f0-9]{32}$/u; const SOURCE_REF = /^[0-9a-f]{64}$/u; const MAX_ID = 256;
+const ObjectCreate = Object.create; const ObjectFreeze = Object.freeze; const ObjectAssign = Object.assign; const ObjectHasOwn = Object.hasOwn;
+const ObjectGetPrototypeOf = Object.getPrototypeOf; const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor; const ObjectGetOwnPropertyDescriptors = Object.getOwnPropertyDescriptors;
+const ReflectOwnKeys = Reflect.ownKeys; const ArrayIsArray = Array.isArray; const NumberIsSafeInteger = Number.isSafeInteger; const Uint8ArrayConstructor = Uint8Array;
+const StringTrim = Function.call.bind(String.prototype.trim) as (value: string) => string; const RegExpTest = Function.call.bind(RegExp.prototype.test) as (expression: RegExp, value: string) => boolean;
+const MapConstructor = Map; const WeakMapConstructor = WeakMap; const mapHas = Function.call.bind(Map.prototype.has) as (map: Map<string, unknown>, key: string) => boolean; const mapSet = Function.call.bind(Map.prototype.set) as (map: Map<string, unknown>, key: string, value: unknown) => Map<string, unknown>; const mapClear = Function.call.bind(Map.prototype.clear) as (map: Map<string, unknown>) => void;
+const weakMapGet = Function.call.bind(WeakMap.prototype.get) as <T>(map: WeakMap<object, T>, key: object) => T | undefined; const weakMapSet = Function.call.bind(WeakMap.prototype.set) as <T>(map: WeakMap<object, T>, key: object, value: T) => WeakMap<object, T>; const weakMapDelete = Function.call.bind(WeakMap.prototype.delete) as <T>(map: WeakMap<object, T>, key: object) => boolean;
+const IsProxy = types.isProxy; const IsPromise = types.isPromise; const DbGet = dbServer.get.bind(dbServer); const Entropy = randomBytes;
 
-export type DocumentSynthesisAuthenticatedAttachmentCaptureSources = Readonly<{
-    acquireContext: () => Promise<SessionContext | null>;
-    lookup(selection: SelectedPair, attachmentId: string): unknown;
-    registerSessionResource(sessionId: string, dispose: () => void): (() => void) | null;
-    entropy: () => Uint8Array;
-}>;
+function sealed<T extends Record<string, unknown>>(value: T): Readonly<T> { return ObjectFreeze(ObjectAssign(ObjectCreate(null) as T, value)); }
+function denied(code: 'input_invalid' | 'unavailable'): Result { return sealed({ status: 'denied' as const, code, captureHandle: null, reviewOnly: true as const, writesPerformed: 0 as const, applyPolicy: 'none' as const }); }
+function available(captureHandle: string): Result { return sealed({ status: 'available' as const, code: null, captureHandle, reviewOnly: true as const, writesPerformed: 0 as const, applyPolicy: 'none' as const }); }
+function exact(value: unknown, keys: readonly string[]): Record<string, unknown> | null { try { if (typeof value !== 'object' || value === null || IsProxy(value) || ArrayIsArray(value) || ObjectGetPrototypeOf(value) !== OBJECT || ReflectOwnKeys(value).length !== keys.length) return null; const descriptors = ObjectGetOwnPropertyDescriptors(value); const output = ObjectCreate(null) as Record<string, unknown>; for (const key of keys) { const descriptor = ObjectGetOwnPropertyDescriptor(descriptors, key); if (!descriptor || !ObjectHasOwn(descriptor, 'value')) return null; const field = descriptor.value as PropertyDescriptor; if (!field || field.enumerable !== true || !ObjectHasOwn(field, 'value')) return null; output[key] = field.value; } return output; } catch { return null; } }
+function intent(value: unknown): string | null { const id = exact(value, KEYS)?.attachmentId; return typeof id === 'string' && id.length > 0 && id.length <= MAX_ID && id === StringTrim(id) ? id : null; }
+function currentness(value: unknown): Currentness | null { const row = IsPromise(value) ? null : exact(value, ROW_KEYS); if (!row || typeof row.documentSourceRef !== 'string' || !RegExpTest(SOURCE_REF, row.documentSourceRef) || typeof row.documentRevision !== 'number' || !NumberIsSafeInteger(row.documentRevision) || row.documentRevision < 1 || typeof row.documentFreshnessEpoch !== 'number' || !NumberIsSafeInteger(row.documentFreshnessEpoch) || row.documentFreshnessEpoch < 1) return null; return sealed({ documentSourceRef: row.documentSourceRef, documentRevision: row.documentRevision, documentFreshnessEpoch: row.documentFreshnessEpoch }); }
+function mint(bytes: unknown): string | null { if (!(bytes instanceof Uint8ArrayConstructor) || IsProxy(bytes) || bytes.length !== 16) return null; let value = 'dsc_'; for (let index = 0; index < 16; index += 1) { const byte = bytes[index]; if (typeof byte !== 'number' || !NumberIsSafeInteger(byte) || byte < 0 || byte > 255) return null; value += '0123456789abcdef'[byte >>> 4]! + '0123456789abcdef'[byte & 15]!; } return RegExpTest(HANDLE, value) ? value : null; }
 
-const OBJECT = Object.prototype;
-const KEYS = ['attachmentId'] as const;
-const ROW_KEYS = ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch'] as const;
-const HANDLE = /^dsc_[a-f0-9]{32}$/u;
-const SOURCE_REF = /^[0-9a-f]{64}$/u;
-const MAX_ATTACHMENT_ID_LENGTH = 256;
-const objectCreate = Object.create;
-const objectFreeze = Object.freeze;
-const objectGetPrototypeOf = Object.getPrototypeOf;
-const objectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
-const objectGetOwnPropertyDescriptors = Object.getOwnPropertyDescriptors;
-const reflectOwnKeys = Reflect.ownKeys;
-const stringTrim = Function.call.bind(String.prototype.trim) as (value: string) => string;
-const regexpTest = Function.call.bind(RegExp.prototype.test) as (expression: RegExp, value: string) => boolean;
-const mapHas = Function.call.bind(Map.prototype.has) as (map: Map<string, unknown>, key: string) => boolean;
-const mapSet = Function.call.bind(Map.prototype.set) as (map: Map<string, unknown>, key: string, value: unknown) => Map<string, unknown>;
-const mapClear = Function.call.bind(Map.prototype.clear) as (map: Map<string, unknown>) => void;
-
-function frozen<T extends Record<string, unknown>>(value: T): Readonly<T> {
-    return objectFreeze(Object.assign(objectCreate(null) as T, value));
+const ownerBrokers = new WeakMapConstructor<object, WeakMap<object, Broker>>();
+function brokerFor(context: NonNullable<Awaited<ReturnType<typeof acquireAuthenticatedWebSessionProjectionOwnerContext>>>): Broker {
+    let sessions = weakMapGet(ownerBrokers, context.owner); if (!sessions) { sessions = new WeakMapConstructor<object, Broker>(); weakMapSet(ownerBrokers, context.owner, sessions); }
+    const prior = weakMapGet(sessions, context.session); if (prior) return prior;
+    const records = new MapConstructor<string, RecordState>(); let disposed = false; let unregister: (() => void) | null = null;
+    const dispose = () => { if (disposed) return; disposed = true; mapClear(records); try { unregister?.(); } catch { /* disposal remains final */ } unregister = null; weakMapDelete(sessions!, context.session); };
+    const broker: Broker = { records, dispose, publish(handle, state) { if (disposed || mapHas(records, handle)) return false; let registered: (() => void) | null; try { registered = unregister ?? registerServerSessionResource(context.session.id, dispose); } catch { return false; } if (!registered || disposed || mapHas(records, handle)) return false; unregister = registered; mapSet(records, handle, state); return true; } };
+    weakMapSet(sessions, context.session, broker); return broker;
 }
 
-function denied(): DocumentSynthesisAuthenticatedAttachmentCaptureResult {
-    return frozen({ status: 'denied' as const, captureHandle: null });
-}
-
-function exact(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
-    try {
-        if (typeof value !== 'object' || value === null || Array.isArray(value) || types.isProxy(value)
-            || objectGetPrototypeOf(value) !== OBJECT || reflectOwnKeys(value).length !== keys.length) return null;
-        const descriptors = objectGetOwnPropertyDescriptors(value);
-        const output = objectCreate(null) as Record<string, unknown>;
-        for (const key of keys) {
-            const descriptor = objectGetOwnPropertyDescriptor(descriptors, key);
-            if (!descriptor || !Object.hasOwn(descriptor, 'value')) return null;
-            const field = descriptor.value as PropertyDescriptor;
-            if (!field || field.enumerable !== true || !Object.hasOwn(field, 'value')) return null;
-            output[key] = field.value;
-        }
-        return output;
-    } catch { return null; }
-}
-
-function attachmentIntent(value: unknown): string | null {
-    const input = exact(value, KEYS);
-    const attachmentId = input?.attachmentId;
-    return typeof attachmentId === 'string' && attachmentId.length > 0 && attachmentId.length <= MAX_ATTACHMENT_ID_LENGTH
-        && attachmentId === stringTrim(attachmentId) ? attachmentId : null;
-}
-
-function currentness(value: unknown): Currentness | null {
-    if (types.isPromise(value)) return null;
-    const row = exact(value, ROW_KEYS);
-    if (!row || typeof row.documentSourceRef !== 'string' || !regexpTest(SOURCE_REF, row.documentSourceRef)
-        || typeof row.documentRevision !== 'number' || !Number.isSafeInteger(row.documentRevision) || row.documentRevision < 1
-        || typeof row.documentFreshnessEpoch !== 'number' || !Number.isSafeInteger(row.documentFreshnessEpoch) || row.documentFreshnessEpoch < 1) return null;
-    return frozen({ documentSourceRef: row.documentSourceRef, documentRevision: row.documentRevision, documentFreshnessEpoch: row.documentFreshnessEpoch });
-}
-
-function handle(bytes: unknown): string | null {
-    if (!(bytes instanceof Uint8Array) || bytes.length !== 16) return null;
-    let output = 'dsc_';
-    for (let index = 0; index < bytes.length; index += 1) {
-        const byte = bytes[index];
-        if (typeof byte !== 'number' || !Number.isSafeInteger(byte) || byte < 0 || byte > 255) return null;
-        output += '0123456789abcdef'[byte >>> 4]! + '0123456789abcdef'[byte & 15]!;
-    }
-    return regexpTest(HANDLE, output) ? output : null;
-}
-
-/** Captures only host-owned attachment currentness; no text, route, provider, or preview is exposed here. */
-export function createDocumentSynthesisAuthenticatedAttachmentCapture(sources: DocumentSynthesisAuthenticatedAttachmentCaptureSources): Readonly<{
-    capture(input: unknown): Promise<DocumentSynthesisAuthenticatedAttachmentCaptureResult>;
-}> {
-    const owners = new WeakMap<object, WeakMap<object, Broker>>();
-
-    const brokerFor = (context: SessionContext): Broker => {
-        let sessions = owners.get(context.owner);
-        if (!sessions) { sessions = new WeakMap<object, Broker>(); owners.set(context.owner, sessions); }
-        let broker = sessions.get(context.session);
-        if (broker) return broker;
-        const records = new Map<string, CaptureRecord>();
-        let disposed = false;
-        let unregister: (() => void) | null = null;
-        const dispose = () => {
-            if (disposed) return;
-            disposed = true;
-            mapClear(records);
-            unregister?.();
-            unregister = null;
-            sessions?.delete(context.session);
-        };
-        broker = {
-            records,
-            dispose,
-            publish(captureHandle, record) {
-                if (disposed || mapHas(records, captureHandle)) return false;
-                let registered: (() => void) | null;
-                try { registered = unregister ?? sources.registerSessionResource(context.session.id, dispose); } catch { return false; }
-                if (!registered) return false;
-                unregister = registered;
-                if (disposed || mapHas(records, captureHandle)) return false;
-                mapSet(records, captureHandle, record);
-                return true;
-            },
-        };
-        sessions.set(context.session, broker);
-        return broker;
-    };
-
-    return objectFreeze({
-        async capture(input: unknown): Promise<DocumentSynthesisAuthenticatedAttachmentCaptureResult> {
-            const attachmentId = attachmentIntent(input);
-            if (!attachmentId) return denied();
-            let context: SessionContext | null;
-            try { context = await sources.acquireContext(); } catch { return denied(); }
-            if (!context) return denied();
-            try {
-                const broker = brokerFor(context);
-                return context.owner.withLeaseCriticalSection(context.session, (selection) => {
-                    const row = sources.lookup(selection, attachmentId);
-                    const tuple = currentness(row);
-                    if (!tuple) return denied();
-                    const selectionEpoch = context.owner.snapshotSelectionEpoch(context.session);
-                    const reviewContextEpoch = context.owner.snapshotReviewContextEpoch(context.session);
-                    const captureHandle = handle(sources.entropy());
-                    if (!captureHandle) return denied();
-                    const record = frozen<CaptureRecord>({
-                        selected: true,
-                        currentness: tuple,
-                        selectionEpoch,
-                        reviewContextEpoch,
-                        scope: 'document_synthesis_attachment_capture',
-                        revocationGeneration: 0,
-                    });
-                    return broker.publish(captureHandle, record)
-                        ? frozen({ status: 'available' as const, captureHandle })
-                        : denied();
-                });
-            } catch { return denied(); }
-        },
-    });
+/** Fixed server-only I1b boundary: accepts the sole own-data attachment intent and returns an opaque capture handle. */
+export async function captureDocumentSynthesisAuthenticatedAttachment(input: unknown): Promise<Result> {
+    const attachmentId = intent(input); if (!attachmentId) return denied('input_invalid');
+    let context: Awaited<ReturnType<typeof acquireAuthenticatedWebSessionProjectionOwnerContext>>;
+    try { context = await acquireAuthenticatedWebSessionProjectionOwnerContext(); } catch { return denied('unavailable'); }
+    if (!context) return denied('unavailable');
+    try { const broker = brokerFor(context); return context.owner.withLeaseCriticalSection(context.session, (selection) => { const tuple = currentness(DbGet(sql`SELECT a.document_source_ref AS documentSourceRef, a.document_revision AS documentRevision, a.document_freshness_epoch AS documentFreshnessEpoch FROM attachments AS a INNER JOIN patients_to_ambulatories AS pta ON pta.patient_id = a.patient_id WHERE a.id = ${attachmentId} AND a.patient_id = ${selection.patientId} AND pta.ambulatory_id = ${selection.ambulatoryId} LIMIT 1`)); if (!tuple) return denied('unavailable'); const captureHandle = mint(Entropy(16)); if (!captureHandle) return denied('unavailable'); const state = sealed<RecordState>({ selected: true, currentness: tuple, selectionEpoch: context.owner.snapshotSelectionEpoch(context.session), reviewContextEpoch: context.owner.snapshotReviewContextEpoch(context.session), scope: 'document_synthesis_attachment_capture', revocationGeneration: 0 }); return broker.publish(captureHandle, state) ? available(captureHandle) : denied('unavailable'); }); } catch { return denied('unavailable'); }
 }
