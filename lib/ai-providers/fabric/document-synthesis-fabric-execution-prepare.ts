@@ -67,5 +67,8 @@ export function cancelDocumentSynthesisFabricExecutionPrepare(handoff: unknown):
 /** Burns only an authentic prepared token; C3d3c1 never finalizes it. */
 export function disposeDocumentSynthesisFabricPreparedExecution(token: unknown): void { if (!opaque(token)) return; const entry = ReflectApply(WeakMapGet, prepared, [token]) as Entry | undefined; if (!entry) return; abort(entry); ReflectApply(WeakMapDelete, prepared, [token]); }
 
+/** Atomically burns one prepared token and tail-calls its already validated execution. */
+export function finalizeDocumentSynthesisFabricPreparedExecution(token: unknown): ReturnType<DocumentSynthesisFabricExecutionCapability['finalize']> { if (!opaque(token)) return null; const entry = ReflectApply(WeakMapGet, prepared, [token]) as Entry | undefined; if (!entry || entry.state !== 'prepared') return null; const execution = entry.execution; entry.state = 'aborted'; ReflectApply(WeakMapDelete, prepared, [token]); return execution.finalize(); }
+
 /** Test-only timing seam. It cannot alter provider, prompt, output, or B2ab authority. */
 export function setDocumentSynthesisFabricExecutionPrepareTimeoutForTest(value: unknown): (() => void) | null { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0 || value > 300_000) return null; const prior = timeoutMs; timeoutMs = value; return () => { timeoutMs = prior; }; }
