@@ -2,11 +2,12 @@
 import { NextResponse } from 'next/server';
 
 import { parseAttachmentContentCurrentnessPut } from '@/lib/api-schemas/attachments';
-import { getAttachmentPayloadByteSize, resolveMaxAttachmentBytes } from '@/lib/attachment-payload';
+import { resolveMaxAttachmentBytes } from '@/lib/attachment-payload';
 import {
     isAttachmentCurrentnessHostError,
     transitionAttachmentContentCurrentness,
 } from '@/lib/attachment-currentness-host';
+import { readBoundedJsonBody, utf8ByteLength } from '@/lib/bounded-request-body';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import type { ServerSession } from '@/lib/security/server-session';
 
@@ -38,19 +39,13 @@ export async function putAttachmentContent(
     if (!session) return unauthorizedResponse();
 
     const maxBytes = resolveMaxAttachmentBytes();
-    const contentLength = Number.parseInt(request.headers.get('content-length') ?? '', 10);
-    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
-        return NextResponse.json({ error: 'Attachment payload too large' }, { status: 413 });
-    }
-
-    const body = await request.json().catch(() => null) as unknown;
-    const parsed = parseAttachmentContentCurrentnessPut(body);
+    const body = await readBoundedJsonBody(request, maxBytes);
+    if (!body.ok) return NextResponse.json({ error: body.status === 413 ? 'Attachment payload too large' : INVALID_PAYLOAD }, { status: body.status });
+    const parsed = parseAttachmentContentCurrentnessPut(body.value);
     if (!parsed) {
         return NextResponse.json({ error: INVALID_PAYLOAD }, { status: 400 });
     }
-    const payloadSize = getAttachmentPayloadByteSize(parsed.replacement);
-    if (!payloadSize.ok) return NextResponse.json({ error: INVALID_PAYLOAD }, { status: 400 });
-    if (payloadSize.size > maxBytes) {
+    if (utf8ByteLength(parsed.replacement) > maxBytes) {
         return NextResponse.json({ error: 'Attachment payload too large' }, { status: 413 });
     }
 
