@@ -34,6 +34,17 @@ test('gates unknown sessions and rejects hostile or invalid ids before observati
     assert.equal(calls, 0); assert.equal(getterReads, 0);
 });
 
+test('denies fully and partially non-enumerable sessions before observation', async () => {
+    let calls = 0;
+    const fullyHidden = Object.defineProperties({}, Object.fromEntries(Object.entries(session).map(([key, value]) => [key, { value, enumerable: false }])));
+    const partiallyHidden = { ...session }; Object.defineProperty(partiallyHidden, 'id', { value: session.id, enumerable: false });
+    for (const value of [fullyHidden, partiallyHidden]) {
+        const response = adapter.getAttachmentCurrentness('attachment.synthetic.1', value, () => { calls += 1; return tuple(); });
+        assert.equal(response.status, 401); assert.deepEqual(await body(response), { error: 'Unauthorized' });
+    }
+    assert.equal(calls, 0);
+});
+
 test('observes once, exposes only the exact tuple, and maps null to sanitized 404', async () => {
     let calls = 0;
     const success = adapter.getAttachmentCurrentness('attachment.synthetic.1', session, (id) => { calls += 1; assert.equal(id, 'attachment.synthetic.1'); return tuple(); });
@@ -41,6 +52,21 @@ test('observes once, exposes only the exact tuple, and maps null to sanitized 40
     const missing = adapter.getAttachmentCurrentness('attachment.synthetic.1', session, () => null);
     assert.equal(missing.status, 404); assert.deepEqual(await body(missing), { error: 'Not found' });
     assert.equal(adapter.getAttachmentCurrentness('missing.synthetic', session).status, 404);
+});
+
+test('denies fully and partially non-enumerable observer tuples without getter reads', async () => {
+    let calls = 0; let getterReads = 0;
+    const fullyHidden = Object.defineProperties(Object.create(null), {
+        sourceRef: { value: ref, enumerable: false }, revision: { value: 1, enumerable: false }, freshnessEpoch: { value: 1, enumerable: false },
+    });
+    const partiallyHidden = Object.assign(Object.create(null), { sourceRef: ref, revision: 1, freshnessEpoch: 1 }); Object.defineProperty(partiallyHidden, 'sourceRef', { value: ref, enumerable: false });
+    for (const result of [fullyHidden, partiallyHidden]) {
+        const response = adapter.getAttachmentCurrentness('attachment.synthetic.1', session, () => { calls += 1; return result; });
+        assert.equal(response.status, 503); assert.deepEqual(await body(response), { error: 'Attachment currentness unavailable' });
+    }
+    const accessor = Object.create(null); Object.defineProperty(accessor, 'sourceRef', { enumerable: false, get() { getterReads += 1; return ref; } }); Object.defineProperties(accessor, { revision: { value: 1, enumerable: true }, freshnessEpoch: { value: 1, enumerable: true } });
+    assert.equal(adapter.getAttachmentCurrentness('attachment.synthetic.1', session, () => accessor).status, 503);
+    assert.equal(calls, 2); assert.equal(getterReads, 0);
 });
 
 test('fails closed for hostile observer results and errors without leaking rows or error text', async () => {
