@@ -1,7 +1,9 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { types } from 'node:util';
 
 import { normalizeDocumentSynthesisProviderResponse } from './document-synthesis-provider-response.ts';
 
@@ -12,6 +14,8 @@ const output = () => ({
     },
 });
 const response = (content = JSON.stringify(output())) => ({ content });
+const ObjectDefineProperty = Object.defineProperty;
+const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 
 function denied(value: unknown): void {
     const result = normalizeDocumentSynthesisProviderResponse(value);
@@ -70,7 +74,7 @@ test('rejects canonical JSON whose raw provider content exceeds the bound only t
     const parseOneJsonObject = source.indexOf('function parseOneJsonObject');
     const rawSizeGuard = source.indexOf('if (content.length > MAX_CONTENT_CHARS) return null;', parseOneJsonObject);
     assert.ok(rawSizeGuard > parseOneJsonObject);
-    for (const operation of ['const trimmed = content.trim();', 'duplicateJsonKeys(trimmed)', 'JSON.parse(trimmed)']) {
+    for (const operation of ['const trimmed =', 'duplicateJsonKeys(trimmed)', 'ReflectApply(JSONParse, JSON_OBJECT, [trimmed])']) {
         assert.ok(rawSizeGuard < source.indexOf(operation, parseOneJsonObject));
     }
 });
@@ -102,4 +106,98 @@ test('has no ambient async work or post-return drift for hostile inputs', async 
     } finally { process.off('unhandledRejection', observe); }
     assert.equal(traps, 0);
     assert.deepEqual(unhandled, []);
+});
+
+test('rejects a transparent provider-response proxy without traps after types.isProxy is poisoned post-import', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(types, 'isProxy');
+    assert.ok(descriptor);
+    let traps = 0;
+    const transparent = new Proxy(response(), {
+        getOwnPropertyDescriptor(target, key) { traps += 1; return Reflect.getOwnPropertyDescriptor(target, key); },
+        ownKeys(target) { traps += 1; return Reflect.ownKeys(target); },
+        getPrototypeOf(target) { traps += 1; return Reflect.getPrototypeOf(target); },
+    });
+    Object.defineProperty(types, 'isProxy', { ...descriptor, value: () => false });
+    try {
+        denied(transparent);
+    } finally {
+        Object.defineProperty(types, 'isProxy', descriptor);
+    }
+    assert.equal(traps, 0);
+});
+
+test('uses captured parser intrinsics after post-import poisoning without traps or deferred work', async () => {
+    const original = response();
+    let hostileCalls = 0;
+    const poison = () => { hostileCalls += 1; throw new Error('post-import intrinsic'); };
+    const targets: readonly [object, PropertyKey][] = [
+        [types, 'isProxy'],
+        [Object, 'create'], [Object, 'defineProperty'], [Object, 'freeze'], [Object, 'getOwnPropertyDescriptor'], [Object, 'getPrototypeOf'], [Object, 'hasOwn'],
+        [Reflect, 'apply'], [Reflect, 'ownKeys'], [Array, 'isArray'], [Array.prototype, 'at'], [Array.prototype, 'map'], [Array.prototype, 'pop'], [Array.prototype, 'push'],
+        [String.prototype, 'slice'], [String.prototype, 'trim'], [RegExp.prototype, 'test'], [JSON, 'parse'], [Set.prototype, 'add'], [Set.prototype, 'has'],
+    ];
+    const descriptors: Array<readonly [object, PropertyKey, PropertyDescriptor]> = [];
+    for (let index = 0; index < targets.length; index += 1) {
+        const [target, key] = targets[index]!;
+        const descriptor = ObjectGetOwnPropertyDescriptor(target, key);
+        assert.ok(descriptor);
+        descriptors[index] = [target, key, descriptor];
+    }
+    for (let index = 0; index < descriptors.length; index += 1) {
+        const [target, key, descriptor] = descriptors[index]!;
+        ObjectDefineProperty(target, key, { ...descriptor, value: poison });
+    }
+    let result: ReturnType<typeof normalizeDocumentSynthesisProviderResponse> | undefined;
+    const unhandled: unknown[] = [];
+    const observe = (reason: unknown) => { unhandled[unhandled.length] = reason; };
+    process.on('unhandledRejection', observe);
+    try {
+        result = normalizeDocumentSynthesisProviderResponse(original);
+    } finally {
+        for (let index = descriptors.length - 1; index >= 0; index -= 1) {
+            const [target, key, descriptor] = descriptors[index]!;
+            ObjectDefineProperty(target, key, descriptor);
+        }
+    }
+    try { await new Promise<void>((resolve) => setImmediate(resolve)); } finally { process.off('unhandledRejection', observe); }
+    assert.equal(hostileCalls, 0);
+    assert.deepEqual(unhandled, []);
+    assert.equal(result?.status, 'available');
+});
+
+test('returns an inert JSON-safe output after Object and Array prototype toJSON poisoning', () => {
+    const baseline = normalizeDocumentSynthesisProviderResponse(response());
+    assert.equal(baseline.status, 'available');
+    const expected = JSON.stringify(baseline);
+    const objectToJson = ObjectGetOwnPropertyDescriptor(Object.prototype, 'toJSON');
+    const arrayToJson = ObjectGetOwnPropertyDescriptor(Array.prototype, 'toJSON');
+    let reads = 0;
+    ObjectDefineProperty(Object.prototype, 'toJSON', { configurable: true, get() { reads += 1; throw new Error('object toJSON'); } });
+    ObjectDefineProperty(Array.prototype, 'toJSON', { configurable: true, get() { reads += 1; throw new Error('array toJSON'); } });
+    let rendered: string | undefined;
+    try {
+        rendered = JSON.stringify(baseline);
+    } finally {
+        if (objectToJson) ObjectDefineProperty(Object.prototype, 'toJSON', objectToJson); else Reflect.deleteProperty(Object.prototype, 'toJSON');
+        if (arrayToJson) ObjectDefineProperty(Array.prototype, 'toJSON', arrayToJson); else Reflect.deleteProperty(Array.prototype, 'toJSON');
+    }
+    assert.equal(reads, 0);
+    assert.equal(rendered, expected);
+});
+
+test('does not read a post-import Array iterator in an isolated runtime', () => {
+    const moduleUrl = new URL('./document-synthesis-provider-response.ts', import.meta.url).href;
+    const loaderUrl = new URL('../../../scripts/register-strip-types-loader.mjs', import.meta.url).pathname;
+    const content = JSON.stringify(output());
+    const program = [
+        `const module = await import(${JSON.stringify(moduleUrl)});`,
+        'const descriptor = Object.getOwnPropertyDescriptor(Array.prototype, Symbol.iterator);',
+        'let reads = 0;',
+        "Object.defineProperty(Array.prototype, Symbol.iterator, { ...descriptor, value() { reads += 1; throw new Error('iterator poison'); } });",
+        'let result;',
+        `try { result = module.normalizeDocumentSynthesisProviderResponse({ content: ${JSON.stringify(content)} }); } finally { Object.defineProperty(Array.prototype, Symbol.iterator, descriptor); }`,
+        "if (result.status !== 'available' || reads !== 0) process.exitCode = 1;",
+    ].join('\n');
+    const child = spawnSync(process.execPath, ['--experimental-strip-types', '--import', loaderUrl, '--input-type=module', '--eval', program], { encoding: 'utf8' });
+    assert.equal(child.status, 0, child.stderr || child.stdout);
 });
