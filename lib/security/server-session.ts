@@ -2,6 +2,7 @@
 import 'server-only';
 
 import crypto from 'crypto';
+import { types } from 'node:util';
 
 export const SESSION_COOKIE_NAME = 'mediflow_session';
 const SESSION_TTL_MS = Number(process.env.MEDIFLOW_SESSION_TTL_MS || 1000 * 60 * 60 * 8);
@@ -11,6 +12,7 @@ const DateNow = Date.now;
 const ObjectGetPrototypeOf = Object.getPrototypeOf;
 const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const applyIntrinsic = Reflect.apply;
+const functionToString = Function.prototype.toString;
 const mapGet = Map.prototype.get;
 const mapSet = Map.prototype.set;
 const mapDelete = Map.prototype.delete;
@@ -24,6 +26,7 @@ const setValues = Set.prototype.values;
 const setIteratorNext = ObjectGetPrototypeOf(new SetConstructor().values()).next;
 const setSize = ObjectGetOwnPropertyDescriptor(Set.prototype, 'size')!.get!;
 const arrayPush = Array.prototype.push;
+const isProxy = types.isProxy;
 
 function getMapValue<K, V>(registry: Map<K, V>, key: K): V | undefined {
     return applyIntrinsic(mapGet, registry, [key]);
@@ -73,8 +76,9 @@ function appendArrayValue<T>(target: T[], value: T): void {
     applyIntrinsic(arrayPush, target, [value]);
 }
 
-export type ServerSessionDisposalReason = 'session_deleted' | 'session_expired' | 'sessions_cleared';
+export type ServerSessionDisposalReason = 'session_deleted' | 'session_expired' | 'sessions_cleared' | 'application_locked';
 export type ServerSessionResourceDisposer = (reason: ServerSessionDisposalReason) => void;
+export type ServerSessionCleanupOutcome = 'completed' | 'failed' | 'unknown';
 
 interface ServerSessionResourceRegistration {
     active: boolean;
@@ -93,11 +97,31 @@ export interface ServerSession {
 
 const sessions = new MapConstructor<string, ServerSession>();
 const sessionResources = new MapConstructor<string, Set<ServerSessionResourceRegistration>>();
+const sessionCleanupOutcomes = new MapConstructor<string, Exclude<ServerSessionCleanupOutcome, 'unknown'>>();
 
-function disposeSessionResources(sessionId: string, reason: ServerSessionDisposalReason): void {
+function isSupportedSynchronousDisposer(candidate: unknown): candidate is ServerSessionResourceDisposer {
+    if (typeof candidate !== 'function' || isProxy(candidate)) return false;
+    try {
+        const source = applyIntrinsic(functionToString, candidate, []) as string;
+        return !/^\s*async(?:\s|\()/u.test(source) && !source.includes('[native code]');
+    } catch {
+        return false;
+    }
+}
+
+function recordCleanupOutcome(sessionId: string, failed: boolean): ServerSessionCleanupOutcome {
+    const prior = getMapValue(sessionCleanupOutcomes, sessionId);
+    const outcome = prior === 'failed' || failed ? 'failed' : 'completed';
+    setMapValue(sessionCleanupOutcomes, sessionId, outcome);
+    return outcome;
+}
+
+function disposeSessionResources(sessionId: string, reason: ServerSessionDisposalReason): boolean {
     const registrations = getMapValue(sessionResources, sessionId);
     deleteMapValue(sessionResources, sessionId);
-    if (!registrations) return;
+    if (!registrations) return false;
+
+    let disposalFailed = false;
 
     const iterator = applyIntrinsic(setValues, registrations, []);
     for (let next = nextSetIterator<ServerSessionResourceRegistration>(iterator); !next.done;
@@ -106,22 +130,44 @@ function disposeSessionResources(sessionId: string, reason: ServerSessionDisposa
         if (!registration.active) continue;
         registration.active = false;
         try {
-            registration.dispose(reason);
+            const outcome = registration.dispose(reason);
+            if (outcome !== undefined) disposalFailed = true;
         } catch {
             // Session authority is already removed; cleanup failures stay opaque.
+            disposalFailed = true;
         }
     }
+    return disposalFailed;
 }
 
-function terminateSession(sessionId: string, reason: ServerSessionDisposalReason): void {
+function completeSessionTermination(
+    sessionId: string,
+    sessionBeforeDeletion: ServerSession | null,
+    reason: ServerSessionDisposalReason,
+): Readonly<{
+    sessionBeforeDeletion: ServerSession | null;
+    cleanupOutcome: ServerSessionCleanupOutcome;
+    authorityAbsent: boolean;
+}> {
+    const registrations = getMapValue(sessionResources, sessionId);
+    const disposalFailed = disposeSessionResources(sessionId, reason);
+    const cleanupOutcome = sessionBeforeDeletion || registrations
+        ? recordCleanupOutcome(sessionId, disposalFailed)
+        : getMapValue(sessionCleanupOutcomes, sessionId) ?? 'unknown';
+    return { sessionBeforeDeletion, cleanupOutcome, authorityAbsent: getMapValue(sessions, sessionId) === undefined };
+}
+
+function terminateSession(sessionId: string, reason: ServerSessionDisposalReason) {
+    const sessionBeforeDeletion = getMapValue(sessions, sessionId) ?? null;
     deleteMapValue(sessions, sessionId);
-    disposeSessionResources(sessionId, reason);
+    return completeSessionTermination(sessionId, sessionBeforeDeletion, reason);
 }
 
 export function registerServerSessionResource(
     sessionId: string,
     dispose: ServerSessionResourceDisposer,
 ): (() => void) | null {
+    if (!isSupportedSynchronousDisposer(dispose)) return null;
     const session = getMapValue(sessions, sessionId);
     if (!session) return null;
     if (session.expiresAt <= DateNow()) {
@@ -194,6 +240,15 @@ export function deleteSession(sessionId: string | null | undefined): void {
     terminateSession(sessionId, 'session_deleted');
 }
 
+/* @Codex: WUL-522 application lock keeps deletion and cleanup in one server-only primitive. */
+export function invalidateServerSessionForApplicationLock(sessionId: string): Readonly<{
+    sessionBeforeDeletion: ServerSession | null;
+    cleanupOutcome: ServerSessionCleanupOutcome;
+    authorityAbsent: boolean;
+}> {
+    return terminateSession(sessionId, 'application_locked');
+}
+
 /* @Codex */
 export function invalidateSessionsForUser(userId: string): void {
     if (!userId) return;
@@ -212,9 +267,12 @@ export function invalidateSessionsForUser(userId: string): void {
 /* @Codex */
 export function clearAllSessions(): void {
     const sessionIds: string[] = [];
+    const sessionSnapshots = new MapConstructor<string, ServerSession>();
     const sessionIterator = mapKeysOf(sessions);
     for (let next = nextMapIterator<string>(sessionIterator); !next.done; next = nextMapIterator<string>(sessionIterator)) {
         appendArrayValue(sessionIds, next.value);
+        const session = getMapValue(sessions, next.value);
+        if (session) setMapValue(sessionSnapshots, next.value, session);
     }
     const resourceIterator = mapKeysOf(sessionResources);
     for (let next = nextMapIterator<string>(resourceIterator); !next.done; next = nextMapIterator<string>(resourceIterator)) {
@@ -227,6 +285,6 @@ export function clearAllSessions(): void {
     }
     clearMap(sessions);
     for (let index = 0; index < sessionIds.length; index += 1) {
-        disposeSessionResources(sessionIds[index], 'sessions_cleared');
+        completeSessionTermination(sessionIds[index], getMapValue(sessionSnapshots, sessionIds[index]) ?? null, 'sessions_cleared');
     }
 }
