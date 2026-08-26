@@ -59,6 +59,22 @@ test('keeps the resolved snapshot inert under inherited toJSON and iterator pois
     assert.equal(reads, 0); assert.equal(rendered, body());
 });
 
+test('does not read a post-import Array iterator getter or throw while parsing valid and invalid responses', async () => {
+    const defineProperty = Object.defineProperty; const descriptor = Object.getOwnPropertyDescriptor(Array.prototype, Symbol.iterator)!; const unhandled: unknown[] = []; let reads = 0;
+    const observe = (reason: unknown) => { unhandled[unhandled.length] = reason; }; defineProperty(Array.prototype, Symbol.iterator, { configurable: true, get() { reads += 1; throw new Error('iterator'); } }); process.on('unhandledRejection', observe);
+    let valid: ReturnType<typeof parseDocumentSynthesisProviderEnvelope>; let invalid: ReturnType<typeof parseDocumentSynthesisProviderEnvelope>;
+    try { valid = parseDocumentSynthesisProviderEnvelope(response()); invalid = parseDocumentSynthesisProviderEnvelope(response('broken')); } finally { defineProperty(Array.prototype, Symbol.iterator, descriptor); }
+    await new Promise<void>((resolve) => setImmediate(resolve)); process.off('unhandledRejection', observe); assert.equal(reads, 0); assert.equal(valid!.status, 'available'); assert.equal(invalid!.status, 'denied'); assert.deepEqual(unhandled, []);
+});
+
+test('uses captured WeakMap get and set after poisoning without issuing forged authority or deferred work', async () => {
+    const defineProperty = Object.defineProperty; const get = Object.getOwnPropertyDescriptor(WeakMap.prototype, 'get')!; const set = Object.getOwnPropertyDescriptor(WeakMap.prototype, 'set')!; const unhandled: unknown[] = []; let calls = 0;
+    const observe = (reason: unknown) => { unhandled[unhandled.length] = reason; }; const poison = () => { calls += 1; throw new Error('weakmap'); }; defineProperty(WeakMap.prototype, 'get', { ...get, value: poison }); defineProperty(WeakMap.prototype, 'set', { ...set, value: poison }); process.on('unhandledRejection', observe);
+    let result: ReturnType<typeof parseDocumentSynthesisProviderEnvelope>; let snapshot: ReturnType<typeof resolveDocumentSynthesisProviderEnvelope>; let forged: ReturnType<typeof resolveDocumentSynthesisProviderEnvelope>;
+    try { result = parseDocumentSynthesisProviderEnvelope(response()); snapshot = result.status === 'available' ? resolveDocumentSynthesisProviderEnvelope(result.token) : null; forged = resolveDocumentSynthesisProviderEnvelope({}); } finally { defineProperty(WeakMap.prototype, 'set', set); defineProperty(WeakMap.prototype, 'get', get); }
+    await new Promise<void>((resolve) => setImmediate(resolve)); process.off('unhandledRejection', observe); assert.equal(calls, 0); assert.equal(result!.status, 'available'); assert.notEqual(snapshot, null); assert.equal(forged, null); assert.deepEqual(unhandled, []);
+});
+
 test('uses captured parser and token intrinsics after poisoning without getter, trap, then, or post-return work', async () => {
     const targets: readonly [object, PropertyKey][] = [[types, 'isProxy'], [Object, 'create'], [Object, 'defineProperty'], [Object, 'freeze'], [Object, 'getOwnPropertyDescriptor'], [Object, 'getPrototypeOf'], [Object, 'hasOwn'], [Object, 'setPrototypeOf'], [Reflect, 'apply'], [Reflect, 'ownKeys'], [Array, 'isArray'], [JSON, 'parse'], [String.prototype, 'slice'], [Set.prototype, 'add'], [Set.prototype, 'has']];
     const defineProperty = Object.defineProperty; const descriptors = targets.map(([target, key]) => [target, key, Object.getOwnPropertyDescriptor(target, key)!] as const); let reads = 0; const poison = () => { reads += 1; throw new Error('ambient poison'); };
