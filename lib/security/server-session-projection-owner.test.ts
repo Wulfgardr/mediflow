@@ -97,6 +97,104 @@ test('mints a data-only durable review commit port that remains owner-locked unt
     assert.doesNotThrow(() => owner.mintDurableReviewCommitPort(value));
 });
 
+function assertNoBigIntInDescriptors(value: unknown, seen = new Set<object>()): void {
+    if ((typeof value !== 'object' && typeof value !== 'function') || value === null || seen.has(value)) return;
+    seen.add(value);
+    for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(value))) {
+        if ('value' in descriptor) {
+            assert.notEqual(typeof descriptor.value, 'bigint');
+            assertNoBigIntInDescriptors(descriptor.value, seen);
+        }
+    }
+}
+
+test('Document Synthesis lineage opens, verifies, burns, and exposes neither counters nor serializable authority', () => {
+    const { value, owner } = ownerWithSelection();
+    const port = owner.mintDocumentSynthesisSourceLineagePort(value);
+    assert.equal(Object.getPrototypeOf(port), null); assert.equal(Object.isFrozen(port), true);
+    assert.deepEqual(Object.keys(port), ['open', 'verify', 'burn', 'observeRevocation']);
+    const first = port.open(); const grant = port.open();
+    assert.ok(first); assert.ok(grant); assert.notEqual(first, grant);
+    assert.equal(Object.getPrototypeOf(grant), null); assert.equal(Object.isFrozen(grant), true);
+    assert.equal(JSON.stringify(grant), '{}'); assertNoBigIntInDescriptors([port, first, grant]);
+    const capability = port.verify(grant);
+    assert.ok(capability); assert.notEqual(capability, grant);
+    assert.equal(Object.getPrototypeOf(capability), null); assert.equal(Object.isFrozen(capability), true);
+    assert.equal(JSON.stringify(capability), '{}'); assertNoBigIntInDescriptors(capability);
+    assert.equal(port.verify(grant), null);
+    assert.equal(port.burn(grant), false);
+    assert.equal(port.burn(capability), true);
+    assert.equal(port.burn(capability), false);
+    assert.equal(port.observeRevocation(capability), false);
+});
+
+test('Document Synthesis lineage denies forged, cloned, proxied, accessor, prototype, symbol, and thenable capabilities without traps', () => {
+    const { value, owner } = ownerWithSelection(); const port = owner.mintDocumentSynthesisSourceLineagePort(value);
+    const grant = port.open(); assert.ok(grant);
+    let reads = 0; let traps = 0;
+    const proxy = new Proxy(grant, { get() { traps += 1; throw new Error('synthetic trap'); } });
+    const accessor = Object.freeze(Object.defineProperty({}, 'value', { enumerable: true, get() { reads += 1; return grant; } }));
+    const custom = Object.freeze(Object.create({ grant }));
+    const symbolic = Object.freeze({ [Symbol('synthetic')]: grant });
+    const hidden = Object.freeze(Object.defineProperty({}, 'grant', { value: grant }));
+    const thenable = Object.freeze(Object.defineProperty({}, 'then', { enumerable: true, get() { reads += 1; return () => undefined; } }));
+    for (const forged of [null, Object.freeze(Object.create(null)), Object.freeze({ ...grant}), Object.freeze(structuredClone(grant)), proxy, accessor, custom, symbolic, hidden, thenable]) {
+        assert.equal(port.verify(forged), null); assert.equal(port.burn(forged), false); assert.equal(port.observeRevocation(forged), false);
+    }
+    assert.equal(reads, 0); assert.equal(traps, 0);
+    assert.ok(port.verify(grant), 'forged verification must not consume the authentic grant');
+});
+
+test('Document Synthesis lineage revocation is allocation-bound, repeat-idempotent, and cross-owner/session closed', () => {
+    const first = ownerWithSelection(); const firstPort = first.owner.mintDocumentSynthesisSourceLineagePort(first.value);
+    const grant = firstPort.open(); assert.ok(grant); const capability = firstPort.verify(grant); assert.ok(capability);
+    assert.equal(firstPort.observeRevocation(capability), true);
+    assert.equal(firstPort.observeRevocation(capability), true);
+    assert.equal(firstPort.burn(capability), false);
+    const unaffected = firstPort.open(); assert.ok(unaffected); const unaffectedCapability = firstPort.verify(unaffected); assert.ok(unaffectedCapability);
+    assert.equal(firstPort.burn(unaffectedCapability), true, 'one allocation cannot revoke another allocation target');
+    const second = ownerWithSelection(); const secondPort = second.owner.mintDocumentSynthesisSourceLineagePort(second.value);
+    assert.equal(secondPort.verify(grant), null); assert.equal(secondPort.observeRevocation(capability), false);
+    const live = firstPort.open(); assert.ok(live);
+    deleteSession(first.value.id);
+    assert.equal(firstPort.verify(live), null); assert.equal(firstPort.open(), null);
+    const disposed = ownerWithSelection(); const disposedPort = disposed.owner.mintDocumentSynthesisSourceLineagePort(disposed.value);
+    const pending = disposedPort.open(); assert.ok(pending); disposed.owner.dispose();
+    assert.equal(disposedPort.verify(pending), null); assert.equal(disposedPort.open(), null);
+    const restarted = ownerWithSelection(); const restartedPort = restarted.owner.mintDocumentSynthesisSourceLineagePort(restarted.value);
+    const restartGrant = restartedPort.open(); assert.ok(restartGrant); clearAllSessions();
+    assert.equal(restartedPort.verify(restartGrant), null);
+});
+
+test('Document Synthesis lineage poisons nested owner port operations and leaves no denied publication residue', () => {
+    let armed = false; let nested: unknown = undefined; let calls = 0;
+    const registry = createServerSessionProjectionOwnerRegistry({
+        resolve: (_session, pair) => pair, entropy: () => new Uint8Array(16),
+        clock: () => { if (armed && ++calls === 2) nested = port.open(); return 1_000; },
+    });
+    const value = session(); const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const port = owner.mintDocumentSynthesisSourceLineagePort(value);
+    armed = true; calls = 0;
+    assert.equal(port.open(), null); assert.equal(nested, null);
+    armed = false;
+    const grant = port.open(); assert.ok(grant);
+    const capability = port.verify(grant); assert.ok(capability);
+    assert.equal(port.burn(capability), true);
+});
+
+test('Document Synthesis lineage ignores ambient then while performing synchronous opaque operations', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'then'); let reads = 0;
+    const { value, owner } = ownerWithSelection(); const port = owner.mintDocumentSynthesisSourceLineagePort(value);
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { reads += 1; return undefined; } });
+    try {
+        const grant = port.open(); assert.ok(grant); const capability = port.verify(grant); assert.ok(capability);
+        assert.equal(port.burn(capability), true);
+    } finally {
+        if (descriptor) Object.defineProperty(Object.prototype, 'then', descriptor); else delete (Object.prototype as { then?: unknown }).then;
+    }
+    assert.equal(reads, 0);
+});
+
 test('durable review commit port rejects forged, cloned, proxied, foreign, expired, stale, logged-out, and disposed values', () => {
     const first = ownerWithSelection();
     const port = first.owner.mintDurableReviewCommitPort(first.value);
