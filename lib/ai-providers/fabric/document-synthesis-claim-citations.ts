@@ -16,14 +16,14 @@ export type DocumentSynthesisClaimCitationsResult =
     | (Readonly<{ status: 'denied'; code: 'input_invalid' | 'output_invalid'; output: null; outputSha256: null; citations: null; claims: null }> & Common);
 
 const OBJECT = Object.prototype; const ARRAY = Array.prototype;
-const ObjectCreate = Object.create; const ObjectFreeze = Object.freeze; const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor; const ObjectGetPrototypeOf = Object.getPrototypeOf; const ObjectHasOwn = Object.hasOwn;
+const ObjectCreate = Object.create; const ObjectDefineProperty = Object.defineProperty; const ObjectFreeze = Object.freeze; const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor; const ObjectGetPrototypeOf = Object.getPrototypeOf; const ObjectHasOwn = Object.hasOwn;
 const ReflectOwnKeys = Reflect.ownKeys; const ReflectApply = Reflect.apply; const ArrayIsArray = Array.isArray; const NumberIsSafeInteger = Number.isSafeInteger; const StringConstructor = String; const IsProxy = types.isProxy; const JSON_OBJECT = JSON; const JSONStringify = JSON.stringify;
 const hashMethods = (() => { const probe = createHash('sha256'); const prototype = ObjectGetPrototypeOf(probe); const update = ObjectGetOwnPropertyDescriptor(prototype, 'update')?.value; const digest = ObjectGetOwnPropertyDescriptor(prototype, 'digest')?.value; if (typeof update !== 'function' || typeof digest !== 'function') throw new TypeError('sha256_hash_methods_unavailable'); return ObjectFreeze({ prototype, update, digest }); })();
 const HashPrototype = hashMethods.prototype; const HashUpdate = hashMethods.update; const HashDigest = hashMethods.digest;
 const COMMON = { reviewOnly: true as const, writesPerformed: 0 as const, applyPolicy: 'none' as const };
 
 function sealed<T extends object>(value: T): Readonly<T> { const output = ObjectCreate(null) as T; const keys = ReflectOwnKeys(value); for (let index = 0; index < keys.length; index += 1) { const key = keys[index]; if (typeof key === 'string') (output as Record<string, unknown>)[key] = (value as Record<string, unknown>)[key]; } return ObjectFreeze(output); }
-function sealedList<T>(value: readonly T[]): readonly T[] { const output: T[] = []; for (let index = 0; index < value.length; index += 1) output[index] = value[index]!; return ObjectFreeze(output); }
+function sealedList<T>(value: readonly T[]): readonly T[] { const output: T[] = []; for (let index = 0; index < value.length; index += 1) output[index] = value[index]!; ObjectDefineProperty(output, 'toJSON', { value: null, enumerable: false, configurable: false, writable: false }); return ObjectFreeze(output); }
 function record(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
     try {
         if (!value || typeof value !== 'object' || ArrayIsArray(value) || IsProxy(value) || ObjectGetPrototypeOf(value) !== OBJECT) return null;
@@ -65,6 +65,16 @@ function outputDigest(output: DocumentSynthesisOutput): string | null {
         return typeof digest === 'string' && digest.length === 64 ? digest : null;
     } catch { return null; }
 }
+function copiedCitation(value: unknown): Citation | null {
+    try {
+        if (!value || typeof value !== 'object' || IsProxy(value) || ObjectGetPrototypeOf(value) !== null) return null;
+        const keys = ['label', 'quote', 'startByte', 'endByte', 'quoteSha256']; const found = ReflectOwnKeys(value); if (found.length !== keys.length) return null;
+        const copy = ObjectCreate(null) as Record<string, unknown>;
+        for (let index = 0; index < keys.length; index += 1) { const key = keys[index]!; let present = false; for (let candidate = 0; candidate < found.length; candidate += 1) if (found[candidate] === key) present = true; const descriptor = ObjectGetOwnPropertyDescriptor(value, key); if (!present || !descriptor || !descriptor.enumerable || !ObjectHasOwn(descriptor, 'value')) return null; copy[key] = descriptor.value; }
+        if (typeof copy.label !== 'string' || typeof copy.quote !== 'string' || typeof copy.startByte !== 'number' || typeof copy.endByte !== 'number' || typeof copy.quoteSha256 !== 'string') return null;
+        return sealed({ label: copy.label, quote: copy.quote, startByte: copy.startByte, endByte: copy.endByte, quoteSha256: copy.quoteSha256 }) as Citation;
+    } catch { return null; }
+}
 function claim(value: unknown, expected: string, citations: readonly Citation[]): Claim | null {
     const item = record(value, ['claimPath', 'labels']); const labels = item && array(item.labels, 1, citations.length);
     if (!item || item.claimPath !== expected || !labels) return null;
@@ -82,7 +92,10 @@ export function bindDocumentSynthesisClaimsToCitations(value: unknown): Document
         const normalized = normalizeDocumentSynthesisOutput(input.output); if (normalized.status !== 'available' || sourceIdentity(normalized.value)) return denied('output_invalid');
         const expected = paths(normalized.value); const values = array(input.claims, expected.length, expected.length); if (!values) return denied('input_invalid');
         const claims: Claim[] = []; for (let index = 0; index < expected.length; index += 1) { const mapped = claim(values[index], expected[index]!, validated.citations); if (!mapped) return denied('input_invalid'); claims[index] = mapped; }
+        const rawCitations = array(validated.citations, 1, 32); const citations: Citation[] = [];
+        if (!rawCitations) return denied('input_invalid');
+        for (let index = 0; index < rawCitations.length; index += 1) { const copied = copiedCitation(rawCitations[index]); if (!copied) return denied('input_invalid'); citations[index] = copied; }
         const outputSha256 = outputDigest(normalized.value); if (!outputSha256) return denied('output_invalid');
-        return sealed({ status: 'available' as const, code: null, schemaVersion: DOCUMENT_SYNTHESIS_CLAIM_CITATIONS_SCHEMA_VERSION, output: normalized.value, outputSha256, citations: validated.citations, claims: sealedList(claims), ...COMMON }) as DocumentSynthesisClaimCitationsResult;
+        return sealed({ status: 'available' as const, code: null, schemaVersion: DOCUMENT_SYNTHESIS_CLAIM_CITATIONS_SCHEMA_VERSION, output: normalized.value, outputSha256, citations: sealedList(citations), claims: sealedList(claims), ...COMMON }) as DocumentSynthesisClaimCitationsResult;
     } catch { return denied('input_invalid'); }
 }
