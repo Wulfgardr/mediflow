@@ -144,6 +144,22 @@ authority o puo sostituire l'altra.
 
 ### Schema di pubblicazione e codec delle citazioni
 
+`U0` indica l'esatto ramo `available` congelato emesso da
+`DocumentSynthesisSourceSetValidationResult` dopo la validazione host
+source-bound. I suoi campi hanno questo ordine di enumerazione:
+`status`, `code`, `schemaVersion`, `output`, `outputSha256`, `citations`,
+`claims`, `reviewOnly`, `writesPerformed`, `applyPolicy`,
+`sourceSetDigestSha256`. I valori fissi sono `status=available`, `code=null`,
+`reviewOnly=true`, `writesPerformed=0` e `applyPolicy=none`.
+
+| Valore U0 | Rappresentazione o limite congelato |
+| --- | --- |
+| `schemaVersion`, `output`, `outputSha256`, `citations`, `claims` | Ereditano esattamente il contratto versionato `mediflow.document-synthesis.claim-citations.v1`. `outputSha256` e lower hex canonico di 64 caratteri. |
+| `citations` | Da 1 a 32, nell'ordine validato dall'host. Ogni citation ha, in questo ordine, `label`, `quote`, `startByte`, `endByte`, `quoteSha256`; `quoteSha256` e lower hex canonico di 64 caratteri. |
+| `claims` | Esattamente un claim per ogni canonical output path, fino al limite corrente di 194. Ogni claim ha, in questo ordine, `claimPath`, `labels`; `labels` contiene da 1 a `citationCount` label uniche e in ordine strettamente crescente rispetto alle citazioni. |
+| Offset e testo | `startByte` e `endByte` sono interi sicuri non negativi. Il codec li codifica come gli stessi interi `u64BE`, senza arrotondamento o coercizione. I contratti esistenti hanno gia validato e normalizzato il testo; il codec UTF-8 codifica le esatte stringhe trattenute senza ulteriore normalizzazione. |
+| `sourceSetDigestSha256` | Raw32 dal currentness owner: esattamente 32 interi da 0 a 255, copiati come byte senza rehash o hex. |
+
 La pubblicazione riuscita usa esclusivamente questi tre schema versionati:
 
 - `mediflow.document-synthesis.publication.v1`;
