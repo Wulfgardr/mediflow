@@ -1,6 +1,7 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { createRequire, syncBuiltinESMExports } from 'node:module';
 import { afterEach, test } from 'node:test';
 import { types } from 'node:util';
 
@@ -13,6 +14,7 @@ import { createServerSessionProjectionOwnerRegistry } from '../../security/serve
 import { clearAllSessions, createSession } from '../../security/server-session';
 
 const encoder = new TextEncoder();
+const nodeRequire = createRequire(import.meta.url); const crypto = nodeRequire('node:crypto') as { createHash: typeof createHash };
 const USER = { id: ['synthetic', 'codec', 'user'].join('.'), username: ['synthetic', 'codec', 'clinician'].join('.'), role: 'clinician' }; const PAIR = { patientId: 'patient.synthetic.codec', ambulatoryId: 'ambulatory.synthetic.codec' };
 afterEach(() => clearAllSessions());
 function seal<T extends object>(value: T): Readonly<T> { return Object.freeze(Object.assign(Object.create(null), value)); }
@@ -42,3 +44,7 @@ test('remains synchronous and deterministic after ambient intrinsic poisoning', 
     try { for (const [o, k, d] of saved) define(o, k, { ...d, value: poison }); actual = digestDocumentSynthesisClaimCitations(input); } finally { for (const [o, k, d] of saved) define(o, k, d); }
     assert.deepEqual(actual!, baseline); assert.equal(actual! instanceof Promise, false);
 });
+
+test('uses indexed payload copying after post-import Array iterator poison for authentic U0', async () => { const input = authenticU0(); const baseline = digestDocumentSynthesisClaimCitations(input); const define = Object.defineProperty; const descriptor = Object.getOwnPropertyDescriptor(Array.prototype, Symbol.iterator)!; let calls = 0; let actual: ReturnType<typeof digestDocumentSynthesisClaimCitations>; let unhandled = 0; const listener = () => { unhandled += 1; }; process.on('unhandledRejection', listener); try { define(Array.prototype, Symbol.iterator, { ...descriptor, value() { calls += 1; throw new Error('iterator poison'); } }); actual = digestDocumentSynthesisClaimCitations(input); } finally { define(Array.prototype, Symbol.iterator, descriptor); await new Promise<void>((resolve) => setImmediate(resolve)); process.off('unhandledRejection', listener); } assert.deepEqual(actual!, baseline); assert.equal(calls, 0); assert.equal(unhandled, 0); assert.equal(actual! instanceof Promise, false); });
+
+test('uses captured SHA-256 factory after post-import node crypto replacement for authentic U0', async () => { const input = authenticU0(); const baseline = digestDocumentSynthesisClaimCitations(input); const original = crypto.createHash; let calls = 0; let actual: ReturnType<typeof digestDocumentSynthesisClaimCitations>; let unhandled = 0; const listener = () => { unhandled += 1; }; process.on('unhandledRejection', listener); try { crypto.createHash = (() => { calls += 1; throw new Error('factory poison'); }) as typeof createHash; syncBuiltinESMExports(); actual = digestDocumentSynthesisClaimCitations(input); } finally { crypto.createHash = original; syncBuiltinESMExports(); await new Promise<void>((resolve) => setImmediate(resolve)); process.off('unhandledRejection', listener); } assert.deepEqual(actual!, baseline); assert.equal(calls, 0); assert.equal(unhandled, 0); assert.equal(actual! instanceof Promise, false); });

@@ -1,14 +1,14 @@
 /* @Codex */
 import 'server-only';
 
-import { createHash } from 'node:crypto';
+import { createHash as nodeCreateHash } from 'node:crypto';
 import { types } from 'node:util';
 
 const DOMAIN = 'mediflow.document-synthesis.claim-citations-digest.v1';
 const ARRAY = Array.prototype;
 const ObjectCreate = Object.create; const ObjectDefineProperty = Object.defineProperty; const ObjectFreeze = Object.freeze; const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor; const ObjectGetPrototypeOf = Object.getPrototypeOf; const ObjectHasOwn = Object.hasOwn; const ObjectIsFrozen = Object.isFrozen;
 const ReflectApply = Reflect.apply; const ReflectOwnKeys = Reflect.ownKeys; const ArrayIsArray = Array.isArray; const NumberIsSafeInteger = Number.isSafeInteger; const StringCharCodeAt = String.prototype.charCodeAt; const StringConstructor = String; const TextEncoderEncode = TextEncoder.prototype.encode; const Uint8ArrayConstructor = Uint8Array; const ArrayConstructor = Array; const BigIntConstructor = BigInt; const NumberConstructor = Number; const IsProxy = types.isProxy;
-const encoder = new TextEncoder(); const hashProbe = createHash('sha256'); const HashPrototype = ObjectGetPrototypeOf(hashProbe); const HashUpdate = ObjectGetOwnPropertyDescriptor(HashPrototype, 'update')?.value; const HashDigest = ObjectGetOwnPropertyDescriptor(HashPrototype, 'digest')?.value;
+const CreateHash = nodeCreateHash; const encoder = new TextEncoder(); const hashProbe = CreateHash('sha256'); const HashPrototype = ObjectGetPrototypeOf(hashProbe); const HashUpdate = ObjectGetOwnPropertyDescriptor(HashPrototype, 'update')?.value; const HashDigest = ObjectGetOwnPropertyDescriptor(HashPrototype, 'digest')?.value;
 const U0_KEYS = ['status', 'code', 'schemaVersion', 'output', 'outputSha256', 'citations', 'claims', 'reviewOnly', 'writesPerformed', 'applyPolicy', 'sourceSetDigestSha256'];
 const CITATION_KEYS = ['label', 'quote', 'startByte', 'endByte', 'quoteSha256']; const CLAIM_KEYS = ['claimPath', 'labels'];
 const MAX_U32 = 0xffff_ffff; const BYTE = BigIntConstructor(255); const SHIFT = BigIntConstructor(8);
@@ -59,7 +59,7 @@ function append(target: number[], value: ArrayLike<number>): void { for (let ind
 function u32(value: number): number[] { return [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255]; }
 function u64(value: number): number[] { const output = new ArrayConstructor<number>(8); let current = BigIntConstructor(value); for (let index = 7; index >= 0; index -= 1) { output[index] = NumberConstructor(current & BYTE); current >>= SHIFT; } return output; }
 function digest(payload: ArrayLike<number>): DocumentSynthesisClaimCitationsDigest | null {
-    try { if (typeof HashUpdate !== 'function' || typeof HashDigest !== 'function') return null; const hash = createHash('sha256'); if (IsProxy(hash) || ObjectGetPrototypeOf(hash) !== HashPrototype || ReflectApply(HashUpdate, hash, [new Uint8ArrayConstructor(payload)]) !== hash) return null; const raw = ReflectApply(HashDigest, hash, []); if (!raw || typeof raw !== 'object' || (raw as ArrayLike<unknown>).length !== 32) return null; const output: number[] = []; for (let index = 0; index < 32; index += 1) { const byte = (raw as ArrayLike<unknown>)[index]; if (typeof byte !== 'number' || byte < 0 || byte > 255 || !NumberIsSafeInteger(byte)) return null; output[index] = byte; } return inert(output);
+    try { if (typeof HashUpdate !== 'function' || typeof HashDigest !== 'function') return null; const bytes = new Uint8ArrayConstructor(payload.length); for (let index = 0; index < bytes.length; index += 1) bytes[index] = payload[index]!; const hash = CreateHash('sha256'); if (IsProxy(hash) || ObjectGetPrototypeOf(hash) !== HashPrototype || ReflectApply(HashUpdate, hash, [bytes]) !== hash) return null; const raw = ReflectApply(HashDigest, hash, []); if (!raw || typeof raw !== 'object' || (raw as ArrayLike<unknown>).length !== 32) return null; const output: number[] = []; for (let index = 0; index < 32; index += 1) { const byte = (raw as ArrayLike<unknown>)[index]; if (typeof byte !== 'number' || byte < 0 || byte > 255 || !NumberIsSafeInteger(byte)) return null; output[index] = byte; } return inert(output);
     } catch { return null; }
 }
 function u0(value: unknown): { citations: readonly unknown[]; claims: readonly unknown[] } | null {
