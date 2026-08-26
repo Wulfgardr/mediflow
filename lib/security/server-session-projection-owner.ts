@@ -316,6 +316,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             let durableReviewOperationPoisoned = false;
             let durableReviewCommitInFlight: object | null = null;
             let documentSynthesisLineage = createDocumentSynthesisSourceLineageState();
+            let documentSynthesisLineageTerminal = false;
             let creating: SelectionState | null = null;
             let terminal = false;
             let unregisterOwner: (() => void) | null = null;
@@ -573,7 +574,8 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 const capabilities = new WeakSetConstructor<object>();
                 const currentnessTargets = new WeakSetConstructor<object>();
                 const revocationTargets = new WeakSetConstructor<object>();
-                type LineageRecord = { currentnessTarget: object; revocationTarget: object; state: 'open' | 'verified' | 'burned' | 'revoked'; };
+                type LineageRecord = { sourceSetEpoch: bigint; revocationState: ReturnType<typeof createDocumentSynthesisSourceLineageState>;
+                    currentnessTarget: object; revocationTarget: object; state: 'open' | 'verified' | 'burned' | 'revoked'; };
                 const records = new WeakMapConstructor<object, LineageRecord>();
                 const current = () => {
                     if (terminal || presentedSession !== session || selection !== boundSelection || epoch !== boundSelectionEpoch
@@ -593,7 +595,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 ObjectDefineProperty(port, 'open', { enumerable: true, value(this: unknown) {
                     if (this !== port || !beginLeasePortOperation()) return null;
                     try {
-                        if (!current() || leasePortOperationPoisoned) return null;
+                        if (documentSynthesisLineageTerminal || !current() || leasePortOperationPoisoned) return null;
                         const allocation = allocateDocumentSynthesisSourceSetEpoch(documentSynthesisLineage);
                         if (allocation.status !== 'allocated') return null;
                         documentSynthesisLineage = allocation.state;
@@ -602,7 +604,8 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         if (currentnessTarget === revocationTarget) return null;
                         addOwnerIdentity(grants, grant); addOwnerIdentity(capabilities, currentnessTarget);
                         addOwnerIdentity(currentnessTargets, currentnessTarget); addOwnerIdentity(revocationTargets, revocationTarget);
-                        const entry: LineageRecord = { currentnessTarget, revocationTarget, state: 'open' };
+                        const entry: LineageRecord = { sourceSetEpoch: allocation.sourceSetEpoch,
+                            revocationState: createDocumentSynthesisSourceLineageState(), currentnessTarget, revocationTarget, state: 'open' };
                         applyIntrinsic(weakMapSet, records, [grant, entry]); applyIntrinsic(weakMapSet, records, [currentnessTarget, entry]);
                         return grant as DocumentSynthesisSourceLineageGrant;
                     } finally { endLeasePortOperation(); }
@@ -633,12 +636,12 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         if (!entry || entry.state === 'burned' || !current() || leasePortOperationPoisoned
                             || !hasOwnerIdentity(revocationTargets, entry.revocationTarget)) return false;
                         if (entry.state === 'revoked') return true;
-                        const observed = observeDocumentSynthesisRevocation(documentSynthesisLineage, entry.revocationTarget);
+                        const observed = observeDocumentSynthesisRevocation(entry.revocationState, entry.revocationTarget);
                         if (observed.status === 'invalid' || observed.status === 'exhausted') {
-                            if (observed.status === 'exhausted') documentSynthesisLineage = observed.state;
+                            if (observed.status === 'exhausted') { entry.revocationState = observed.state; documentSynthesisLineageTerminal = true; }
                             return false;
                         }
-                        documentSynthesisLineage = observed.state; entry.state = 'revoked'; return true;
+                        entry.revocationState = observed.state; entry.state = 'revoked'; return true;
                     } finally { endLeasePortOperation(); }
                 } });
                 return ObjectFreeze(port);
