@@ -45,6 +45,45 @@ Il burn avviene all'inizio e impedisce un secondo consumo. Un timestamp non
 prova la correntezza; la correntezza dipende dai binding ed epoch riletti
 dall'host.
 
+### Lineage indipendente del source set
+
+Il lineage del source set di Document Synthesis e indipendente, `memory-only` e
+scoped esclusivamente all'`ServerSessionProjectionOwner` autenticato. Non e
+`session-global`, `static`, `globalThis` o persistente.
+
+La prima allocazione usa `sourceSetEpoch=1`. Ogni tentativo autenticato di
+capture/ingest che raggiunge l'allocazione del lineage consuma un nuovo valore
+monotono `u64`. Un tentativo negato dopo l'allocazione puo lasciare un gap.
+Nell'owner live `sourceSetEpoch` non puo fare wrap, reset o riuso. La
+`revocationGeneration` parte da `0` e incrementa a ogni revoca live del lineage
+di cattura DS. L'owner deve fare uno snapshot atomico dei due valori e
+rileggerli alla fence finale.
+
+`sourceSetEpoch` e `revocationGeneration` non derivano da timestamp, digest, ID
+allegato, `documentRevision`, `documentFreshnessEpoch`, `selectionEpoch` o
+`reviewContextEpoch`. Questi restano binding distinti.
+
+L'overflow di un `u64` e terminale e `fail-closed`. Restart, reset e disposal
+invalidano tutti gli handle e le capsule precedenti. L'host puo ricreare un
+lineage nuovo e `memory-only` perche l'autorita precedente e morta.
+
+### Ordine I1c di acquisizione
+
+In I1c l'ordine e vincolante:
+
+1. validare solo la forma esterna inerte sufficiente a evitare l'osservazione
+   dell'attaccante;
+2. autenticare e acquisire l'owner;
+3. consumare e bruciare l'handle;
+4. solo dopo ispezionare e normalizzare la projection e svolgere il lavoro su
+   DB, currentness e source set.
+
+Ogni errore dopo il burn lascia l'handle speso. Non si copia la regola OCR
+`resolve-before-burn`: quella semantica non si trasferisce a Document Synthesis.
+
+Questo addendum non introduce, autorizza o dimostra provider, route,
+persistenza, apply, scritture cliniche o runtime.
+
 ### Intent di selezione, ingest e preview
 
 L'identificatore di allegato o documento fornito dal client e soltanto un
