@@ -34,6 +34,7 @@ import { notifyDbChange } from '@/lib/live-query';
 import {
     checkAuthHealthRequest,
     changePinRequest,
+    createClientAuthorityNetworkBarrier,
     loginWithPinRequest,
     repairLegacyDbRequest,
     rewrapMasterKeyRequest,
@@ -123,6 +124,11 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     /* @Codex */
     const authorityAttemptGenerationRef = useRef(0);
     /* @Codex */
+    const authorityNetworkBarrierRef = useRef<ReturnType<typeof createClientAuthorityNetworkBarrier> | null>(null);
+    if (authorityNetworkBarrierRef.current === null) {
+        authorityNetworkBarrierRef.current = createClientAuthorityNetworkBarrier();
+    }
+    /* @Codex */
     const [authHealth, setAuthHealth] = useState<AuthHealthPayload | null>(null);
     /* @Codex */
     const [isRepairing, setIsRepairing] = useState(false);
@@ -138,16 +144,27 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     };
 
     /* @Codex */
-    const lock = () => {
-        const attemptGeneration = ++authorityAttemptGenerationRef.current;
-        setIsLocked(true);
-        setAuthErrorMessage(null);
+    const clearClientAuthority = () => {
         clearSecuritySession();
         setActiveMasterKey(null);
         setUser(null);
         setIsAuthenticated(false);
+        setIsLocked(true);
+    };
 
-        void requestApplicationLockConfirmation()
+    /* @Codex */
+    const runAuthorityNetworkRequest = <T,>(request: () => Promise<T>): Promise<T> => {
+        const barrier = authorityNetworkBarrierRef.current;
+        return barrier ? barrier.run(request) : request();
+    };
+
+    /* @Codex */
+    const lock = () => {
+        const attemptGeneration = ++authorityAttemptGenerationRef.current;
+        setAuthErrorMessage(null);
+        clearClientAuthority();
+
+        void runAuthorityNetworkRequest(requestApplicationLockConfirmation)
             .then((confirmed) => {
                 if (!confirmed && authorityAttemptGenerationRef.current === attemptGeneration) {
                     setAuthErrorMessage('Server lock not confirmed.');
@@ -168,10 +185,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     /* @Codex */
     useEffect(() => {
         const handleApiAuthUnavailable = () => {
-            clearSecuritySession();
-            setActiveMasterKey(null);
-            setIsAuthenticated(false);
-            setIsLocked(true);
+            ++authorityAttemptGenerationRef.current;
+            clearClientAuthority();
             setAuthErrorMessage('Sessione scaduta.');
         };
 
@@ -300,7 +315,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         const attemptGeneration = ++authorityAttemptGenerationRef.current;
         try {
             setAuthErrorMessage(null);
-            const { response: res, payload } = await loginWithPinRequest(pin);
+            const { response: res, payload } = await runAuthorityNetworkRequest(() => loginWithPinRequest(pin));
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) return false;
 
             if (!res.ok) {
                 if (authorityAttemptGenerationRef.current === attemptGeneration) {
@@ -350,6 +366,10 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 await persistSecuritySession(masterKey, userData);
             } catch (e) {
                 console.error("Failed to save session", e);
+            }
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) {
+                clearClientAuthority();
+                return false;
             }
 
             // Lazy KDF upgrade: if the stored blob is below the current version,
@@ -434,21 +454,22 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             const saltB64 = btoa(String.fromCharCode(...salt));
 
             // Send to Server
-            const { response: res, payload } = await setupSecurityRequest({
+            const { response: res, payload } = await runAuthorityNetworkRequest(() => setupSecurityRequest({
                 username: 'admin',
                 password: pin,
                 encryptedMasterKey,
                 salt: saltB64,
                 displayName,
                 ambulatoryName
-            });
+            }));
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) return;
 
             /* @Codex */
             if (!res.ok) {
                 if ((res.status === 403 || res.status === 409) && payload?.code === 'SETUP_ALREADY_COMPLETED') {
                     setRequiresSetup(false);
                     const success = await login(pin);
-                    if (!success) {
+                    if (!success && authorityAttemptGenerationRef.current === attemptGeneration + 1) {
                         setIsAuthenticated(false);
                         setIsLocked(true);
                         // Messaggio mostrato inline dalla LockScreen tramite authErrorMessage.
@@ -459,8 +480,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
                 throw new Error(payload?.error || "Setup failed server-side");
             }
-
-            if (authorityAttemptGenerationRef.current !== attemptGeneration) return;
 
             // Set Active
             setActiveMasterKey(masterKey);
@@ -475,6 +494,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 await persistSecuritySession(masterKey, userData);
             } catch (sessionError) {
                 console.error("Failed to save session", sessionError);
+            }
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) {
+                clearClientAuthority();
             }
         } catch (e) {
             console.error("Setup failed", e);

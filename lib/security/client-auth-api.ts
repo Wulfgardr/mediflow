@@ -106,26 +106,48 @@ async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Pro
 export const APPLICATION_LOCK_RECEIPT_SCHEMA_VERSION = 'mediflow.application-lock-receipt.v1' as const;
 
 /* @Codex */
-export type ApplicationLockReceipt = Readonly<{
-    schemaVersion: typeof APPLICATION_LOCK_RECEIPT_SCHEMA_VERSION;
-    state: 'server_invalidation_confirmed';
-}>;
+const lockJsonParse = JSON.parse;
+/* @Codex */
+const lockObjectGetPrototypeOf = Object.getPrototypeOf;
+/* @Codex */
+const lockObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+/* @Codex */
+const lockObjectHasOwn = Object.hasOwn;
+/* @Codex */
+const lockReflectOwnKeys = Reflect.ownKeys;
+/* @Codex */
+const lockObjectPrototype = Object.prototype;
+/* @Codex */
+const lockObjectPrototypeKeys = Object.freeze(lockReflectOwnKeys(lockObjectPrototype).slice());
 
 /* @Codex */
-export function isExactApplicationLockReceipt(value: unknown): value is ApplicationLockReceipt {
+function hasUnchangedObjectPrototype(): boolean {
     try {
-        if (typeof value !== 'object' || value === null || Object.getPrototypeOf(value) !== Object.prototype) {
-            return false;
+        const currentKeys = lockReflectOwnKeys(lockObjectPrototype);
+        if (currentKeys.length !== lockObjectPrototypeKeys.length) return false;
+        for (let index = 0; index < currentKeys.length; index += 1) {
+            if (currentKeys[index] !== lockObjectPrototypeKeys[index]) return false;
         }
+        return true;
+    } catch {
+        return false;
+    }
+}
 
-        const keys = Reflect.ownKeys(value);
+/* @Codex */
+function isExactParsedApplicationLockReceipt(value: unknown): boolean {
+    if (typeof value !== 'object' || value === null || !hasUnchangedObjectPrototype()) return false;
+
+    try {
+        if (lockObjectGetPrototypeOf(value) !== lockObjectPrototype) return false;
+        const keys = lockReflectOwnKeys(value);
         if (keys.length !== 2 || keys[0] !== 'schemaVersion' || keys[1] !== 'state') return false;
 
-        const schemaVersion = Object.getOwnPropertyDescriptor(value, 'schemaVersion');
-        const state = Object.getOwnPropertyDescriptor(value, 'state');
+        const schemaVersion = lockObjectGetOwnPropertyDescriptor(value, 'schemaVersion');
+        const state = lockObjectGetOwnPropertyDescriptor(value, 'state');
         if (!schemaVersion || !state
             || !schemaVersion.enumerable || !state.enumerable
-            || !('value' in schemaVersion) || !('value' in state)) {
+            || !lockObjectHasOwn(schemaVersion, 'value') || !lockObjectHasOwn(state, 'value')) {
             return false;
         }
 
@@ -138,12 +160,51 @@ export function isExactApplicationLockReceipt(value: unknown): value is Applicat
 
 /* @Codex */
 export async function requestApplicationLockConfirmation(): Promise<boolean> {
-    const { response, payload } = await requestJson<unknown>('/api/auth/lock', {
+    const response = await fetch('/api/auth/lock', {
         method: 'POST',
         credentials: 'same-origin',
     });
+    const text = await response.text();
+    if (response.status !== 200 || !text) return false;
 
-    return response.status === 200 && isExactApplicationLockReceipt(payload);
+    let payload: unknown;
+    try {
+        payload = lockJsonParse(text) as unknown;
+    } catch {
+        return false;
+    }
+
+    return isExactParsedApplicationLockReceipt(payload);
+}
+
+/* @Codex */
+export type ClientAuthorityNetworkBarrier = Readonly<{
+    run: <T>(request: () => Promise<T>) => Promise<T>;
+}>;
+
+/* @Codex */
+export function createClientAuthorityNetworkBarrier(): ClientAuthorityNetworkBarrier {
+    let tail = Promise.resolve();
+
+    return Object.freeze({
+        run<T>(request: () => Promise<T>): Promise<T> {
+            const previous = tail;
+            let settleCurrent: () => void = () => undefined;
+            const current = new Promise<void>((resolve) => {
+                settleCurrent = resolve;
+            });
+            tail = previous.then(() => current, () => current);
+
+            return (async () => {
+                await previous;
+                try {
+                    return await request();
+                } finally {
+                    settleCurrent();
+                }
+            })();
+        },
+    });
 }
 
 /* @Codex */
