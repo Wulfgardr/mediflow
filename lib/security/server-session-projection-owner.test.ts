@@ -146,13 +146,19 @@ test('Document Synthesis lineage denies forged, cloned, proxied, accessor, proto
 });
 
 test('Document Synthesis lineage revocation is allocation-bound, repeat-idempotent, and cross-owner/session closed', () => {
+    const source = readFileSync(new URL('./server-session-projection-owner.ts', import.meta.url), 'utf8');
+    assert.match(source, /sourceSetEpoch: allocation\.sourceSetEpoch,\s+revocationState: createDocumentSynthesisSourceLineageState\(\)/u);
+    assert.match(source, /observeDocumentSynthesisRevocation\(entry\.revocationState, entry\.revocationTarget\)/u);
+    assert.doesNotMatch(source, /observeDocumentSynthesisRevocation\(documentSynthesisLineage,/u);
+    assert.match(source, /weakMapSet, records, \[currentnessTarget, entry\]/u);
     const first = ownerWithSelection(); const firstPort = first.owner.mintDocumentSynthesisSourceLineagePort(first.value);
     const grant = firstPort.open(); assert.ok(grant); const capability = firstPort.verify(grant); assert.ok(capability);
     assert.equal(firstPort.observeRevocation(capability), true);
     assert.equal(firstPort.observeRevocation(capability), true);
     assert.equal(firstPort.burn(capability), false);
     const unaffected = firstPort.open(); assert.ok(unaffected); const unaffectedCapability = firstPort.verify(unaffected); assert.ok(unaffectedCapability);
-    assert.equal(firstPort.burn(unaffectedCapability), true, 'one allocation cannot revoke another allocation target');
+    assert.equal(firstPort.observeRevocation(unaffectedCapability), true, 'each allocation begins its own revocation lineage');
+    assert.equal(firstPort.burn(unaffectedCapability), false, 'one allocation cannot revoke another allocation target');
     const second = ownerWithSelection(); const secondPort = second.owner.mintDocumentSynthesisSourceLineagePort(second.value);
     assert.equal(secondPort.verify(grant), null); assert.equal(secondPort.observeRevocation(capability), false);
     const live = firstPort.open(); assert.ok(live);
