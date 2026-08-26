@@ -33,6 +33,25 @@ export const physicianReviewAttestations = sqliteTable('physician_review_attesta
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
+/* @Codex */
+export const headlessSoapActiveRoleAttestations = sqliteTable('headless_soap_active_role_attestations', {
+    attestationRef: text('attestation_ref').primaryKey().notNull(),
+    actorRef: text('actor_ref').references(() => users.id, { onDelete: 'restrict' }).notNull().unique(),
+    schemaVersion: text('schema_version').notNull(),
+    role: text('role').notNull(),
+    operationId: text('operation_id').notNull(),
+    policyVersion: text('policy_version').notNull(),
+    status: text('status').notNull(),
+    attestationVersion: integer('attestation_version').notNull(),
+    issuerRef: text('issuer_ref'),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }),
+    activatedAt: integer('activated_at', { mode: 'timestamp' }),
+    revocationGeneration: integer('revocation_generation').notNull().default(0),
+    revokedAt: integer('revoked_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
 // --- Ambulatories (Multi-Tenant) ---
 export const ambulatories = sqliteTable('ambulatories', {
     id: text('id').primaryKey(),

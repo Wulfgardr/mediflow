@@ -115,6 +115,41 @@ const normalizeSchemaSql = (value: string) => value.toLowerCase().replace(/if\s+
 const PHYSICIAN_REVIEW_ATTESTATIONS_SCHEMA = normalizeSchemaSql(PHYSICIAN_REVIEW_ATTESTATIONS_DDL);
 const PHYSICIAN_REVIEW_ATTESTATIONS_P2A_SCHEMA = normalizeSchemaSql(PHYSICIAN_REVIEW_ATTESTATIONS_P2A_DDL);
 /* @Codex */
+const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_DDL = `
+    CREATE TABLE headless_soap_active_role_attestations (
+        attestation_ref TEXT PRIMARY KEY NOT NULL CHECK (length(attestation_ref) BETWEEN 1 AND 256 AND trim(attestation_ref) = attestation_ref),
+        actor_ref TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE RESTRICT CHECK (length(actor_ref) BETWEEN 1 AND 256 AND trim(actor_ref) = actor_ref),
+        schema_version TEXT NOT NULL CHECK (schema_version = 'mediflow.headless-soap-active-role-attestation.v1'), role TEXT NOT NULL CHECK (role = 'physician'),
+        operation_id TEXT NOT NULL CHECK (operation_id = 'mediflow.clinical_diary.append_soap.v1'), policy_version TEXT NOT NULL CHECK (policy_version = 'clinician_confirmed_single_use.v1'),
+        status TEXT NOT NULL CHECK (status IN ('inactive', 'active', 'revoked')), attestation_version INTEGER NOT NULL CHECK (attestation_version = 1),
+        issuer_ref TEXT, expires_at INTEGER, activated_at INTEGER,
+        revocation_generation INTEGER NOT NULL DEFAULT 0 CHECK (typeof(revocation_generation) = 'integer' AND revocation_generation BETWEEN 0 AND 9007199254740991),
+        revoked_at INTEGER, created_at INTEGER NOT NULL DEFAULT (unixepoch()), updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        CONSTRAINT headless_soap_active_role_attestations_lifecycle_check CHECK (
+            (status = 'inactive' AND issuer_ref IS NULL AND expires_at IS NULL AND activated_at IS NULL AND revoked_at IS NULL AND revocation_generation = 0)
+            OR (status = 'active' AND issuer_ref IS NOT NULL AND length(issuer_ref) BETWEEN 1 AND 256 AND trim(issuer_ref) = issuer_ref AND expires_at IS NOT NULL AND activated_at IS NOT NULL AND revoked_at IS NULL AND revocation_generation = 0)
+            OR (status = 'revoked' AND revoked_at IS NOT NULL AND revocation_generation BETWEEN 1 AND 9007199254740991
+                AND ((issuer_ref IS NULL AND expires_at IS NULL AND activated_at IS NULL)
+                    OR (issuer_ref IS NOT NULL AND length(issuer_ref) BETWEEN 1 AND 256 AND trim(issuer_ref) = issuer_ref AND expires_at IS NOT NULL AND activated_at IS NOT NULL)))
+        ),
+        CONSTRAINT headless_soap_active_role_attestations_timestamp_check CHECK (
+            typeof(created_at) = 'integer' AND created_at BETWEEN 0 AND 8640000000000 AND typeof(updated_at) = 'integer' AND updated_at BETWEEN created_at AND 8640000000000
+            AND (expires_at IS NULL OR (typeof(expires_at) = 'integer' AND expires_at BETWEEN created_at AND 8640000000000))
+            AND (activated_at IS NULL OR (typeof(activated_at) = 'integer' AND activated_at BETWEEN created_at AND 8640000000000 AND (expires_at IS NULL OR activated_at <= expires_at)))
+            AND (revoked_at IS NULL OR (typeof(revoked_at) = 'integer' AND revoked_at BETWEEN created_at AND 8640000000000 AND (activated_at IS NULL OR revoked_at >= activated_at)))
+        )
+    )
+`;
+const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_SCHEMA = normalizeSchemaSql(HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_DDL);
+export type HeadlessSoapActiveRoleAttestationSchemaErrorCode = 'schema_incompatible' | 'schema_unavailable';
+/* @Codex */
+export class HeadlessSoapActiveRoleAttestationSchemaError extends Error {
+    constructor(readonly code: HeadlessSoapActiveRoleAttestationSchemaErrorCode) {
+        super(`Headless SOAP active-role attestation schema ${code === 'schema_incompatible' ? 'is incompatible' : 'is unavailable'}.`);
+        this.name = 'HeadlessSoapActiveRoleAttestationSchemaError';
+    }
+}
+/* @Codex */
 const DURABLE_REVIEW_PATIENT_LINKS_DDL = `
     CREATE TABLE IF NOT EXISTS durable_review_patient_links (
         review_id TEXT PRIMARY KEY NOT NULL REFERENCES durable_review_records(review_id),
@@ -132,6 +167,46 @@ function physicianReviewAttestationSchemaEquals(expected: string): boolean {
 /* @Codex */
 export function hasCanonicalPhysicianReviewAttestationSchema(): boolean {
     return physicianReviewAttestationSchemaEquals(PHYSICIAN_REVIEW_ATTESTATIONS_SCHEMA);
+}
+/* @Codex */
+function headlessSoapActiveRoleAttestationSchemaEquals(expected: string): boolean {
+    try {
+        const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get('headless_soap_active_role_attestations') as { sql?: unknown } | undefined;
+        return typeof row?.sql === 'string' && normalizeSchemaSql(row.sql) === expected;
+    } catch {
+        return false;
+    }
+}
+/* @Codex */
+function hasNoHeadlessSoapActiveRoleAttestationOrphans(): boolean {
+    try {
+        const orphan = sqlite.prepare(`
+            SELECT 1 FROM headless_soap_active_role_attestations AS attestation
+            LEFT JOIN users AS actor ON actor.id = attestation.actor_ref
+            WHERE actor.id IS NULL LIMIT 1
+        `).get();
+        return !orphan;
+    } catch {
+        return false;
+    }
+}
+/* @Codex */
+export function hasCanonicalHeadlessSoapActiveRoleAttestationSchema(): boolean {
+    return headlessSoapActiveRoleAttestationSchemaEquals(HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_SCHEMA)
+        && hasNoHeadlessSoapActiveRoleAttestationOrphans();
+}
+/* @Codex */
+function ensureHeadlessSoapActiveRoleAttestationSchema(): void {
+    let exists: boolean;
+    try {
+        exists = Boolean(sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get('headless_soap_active_role_attestations'));
+        if (!exists) sqlite.prepare(HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_DDL.replace('CREATE TABLE', 'CREATE TABLE IF NOT EXISTS')).run();
+    } catch {
+        throw new HeadlessSoapActiveRoleAttestationSchemaError('schema_unavailable');
+    }
+    if (!hasCanonicalHeadlessSoapActiveRoleAttestationSchema()) {
+        throw new HeadlessSoapActiveRoleAttestationSchemaError('schema_incompatible');
+    }
 }
 /* @Codex */
 export function hasCanonicalDurableReviewPatientLinkSchema(): boolean {
@@ -298,6 +373,8 @@ function applySchemaGuards() {
     } catch (error) {
         console.warn('[MediFlow] Physician review attestation schema check skipped:', error);
     }
+    /* @Codex */
+    ensureHeadlessSoapActiveRoleAttestationSchema();
     /* @Codex */
     try {
         ensureColumn('attachments', 'summary_snapshot', 'summary_snapshot TEXT');

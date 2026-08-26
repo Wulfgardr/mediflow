@@ -9,7 +9,7 @@ read_when:
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-08-22
+Ultimo aggiornamento: 2026-08-25
 
 ## 📚 Policy di consultazione (agent)
 
@@ -51,6 +51,8 @@ Approfondimenti utili:
 - Foundation persistente delle proposte diagnostiche documentali: [ADR 0087](./adr/0087-registro-proposte-diagnostiche-documentali.md)
 - Routing PDF deterministico per pagina: [ADR 0088](./adr/0088-deterministic-pdf-page-router.md)
 - Limite digest-bound della readiness AI locale: [ADR 0092](./adr/0092-limite-digest-bound-readiness-ai-locale.md)
+- Scrittura SOAP Headless autorizzata dal medico: [ADR 0103](./adr/0103-headless-clinician-authorized-soap-entry-write.md)
+- Piani Fabric e Headless semantico: [ADR 0100](./adr/0100-fabric-vs-headless-semantic-plane.md)
 - Contratto Intelligence Fabric e headless 0.8.5: [ADR 0094](./adr/0094-intelligence-fabric-headless-contract-085.md)
 - Broker di projection e servizi host per capability: [ADR 0095](./adr/0095-broker-projection-e-servizi-host-per-capability.md)
 - Owner di sessione, selezione e lifetime del broker: [ADR 0096](./adr/0096-owner-sessione-selezione-e-lifetime-broker.md)
@@ -112,6 +114,9 @@ Approfondimenti utili:
 | Contratto Intelligence Fabric | [docs/adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md](./adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md) | `CANONICAL / ACCEPTED` | Definisce capability, venue, profili egress, policy, ricevute e provenienza fail-closed. |
 | Giunture Intelligence Fabric | [docs/adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md](./adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md) | `CANONICAL / ACCEPTED` | Definisce trust paired, onboarding, routing osservabile e review clinica. |
 | Candidato locale Intelligence Fabric | [docs/adr/0091-candidato-locale-fabric-admissione-continuita-status.md](./adr/0091-candidato-locale-fabric-admissione-continuita-status.md) | `CANONICAL / ACCEPTED` | Limita admissione, continuita, stato paired e harness locale senza AI paired, cloud o scritture cliniche. |
+| Scrittura SOAP Headless autorizzata dal medico | [docs/adr/0103-headless-clinician-authorized-soap-entry-write.md](./adr/0103-headless-clinician-authorized-soap-entry-write.md) | `CANONICAL / ACCEPTED` | Accetta un'eccezione unica, locale e monouso per append SOAP, senza runtime, apply generale o authority Fabric. |
+| Ruolo attivo e step-up SOAP Headless | [docs/adr/0097-active-role-session-and-step-up-authorization.md](./adr/0097-active-role-session-and-step-up-authorization.md) | `CANONICAL / ACCEPTED` | Prerequisito host-owned, inattivo per default, physician-only e limitato alla sola SOAP; non consegna sessione runtime, proof o write. |
+| Piani Fabric e Headless semantico | [docs/adr/0100-fabric-vs-headless-semantic-plane.md](./adr/0100-fabric-vs-headless-semantic-plane.md) | `CANONICAL / PROPOSED` | Separa Fabric governato dall'host e Headless semantico, con inventari e gate SHA distinti; non abilita runtime, cloud o apply. |
 | Intelligence Fabric e controllo headless 0.8.5 | [docs/adr/0094-intelligence-fabric-headless-contract-085.md](./adr/0094-intelligence-fabric-headless-contract-085.md) | `CANONICAL / ACCEPTED` | Definisce un Application Service Layer condiviso, separa Fabric e AIP e classifica le capability senza autorizzare runtime o apply. |
 | Broker projection e servizi host per capability | [docs/adr/0095-broker-projection-e-servizi-host-per-capability.md](./adr/0095-broker-projection-e-servizi-host-per-capability.md) | `CANONICAL / ACCEPTED` | Fissa lifecycle post-onboarding, broker plaintext minimizzato e servizi capability-specific senza autorizzare runtime o apply. |
 | Owner di sessione, selezione e lifetime del broker | [docs/adr/0096-owner-sessione-selezione-e-lifetime-broker.md](./adr/0096-owner-sessione-selezione-e-lifetime-broker.md) | `CANONICAL / ACCEPTED` | Fissa una selezione canonica per sessione medica server, owner volatile e broker per lease senza autorizzare runtime. |
