@@ -2,6 +2,7 @@
 import { types } from 'node:util';
 
 const ObjectCreate = Object.create;
+const ObjectDefineProperty = Object.defineProperty;
 const ObjectFreeze = Object.freeze;
 const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const ObjectGetPrototypeOf = Object.getPrototypeOf;
@@ -9,6 +10,7 @@ const ObjectIsFrozen = Object.isFrozen;
 const ArrayIsArray = Array.isArray;
 const ReflectOwnKeys = Reflect.ownKeys;
 const IsProxy = types.isProxy;
+const StringFrom = String;
 
 /** Pure arithmetic only: these values do not authenticate, authorize, or resolve a source set. */
 const ZERO = BigInt(0); const ONE = BigInt(1);
@@ -24,7 +26,14 @@ type RevocationResult = Readonly<{ status: 'advanced' | 'repeated'; state: Docum
     | Readonly<{ status: 'exhausted'; state: DocumentSynthesisSourceLineageState }> | Readonly<{ status: 'invalid' }>;
 
 function frozen<T extends object>(value: T): Readonly<T> {
-    return ObjectFreeze(Object.assign(ObjectCreate(null), value));
+    const copy = ObjectCreate(null) as T;
+    const keys = ReflectOwnKeys(value);
+    for (let index = 0; index < keys.length; index += 1) {
+        const key = keys[index];
+        const descriptor = ObjectGetOwnPropertyDescriptor(value, key);
+        if (descriptor) ObjectDefineProperty(copy, key, descriptor);
+    }
+    return ObjectFreeze(copy);
 }
 
 function result<T extends object>(value: T): Readonly<T> { return frozen(value); }
@@ -39,9 +48,9 @@ function event(value: unknown): value is object {
 }
 
 function events(value: unknown): value is readonly object[] {
-    if (!ArrayIsArray(value) || !ObjectIsFrozen(value) || ReflectOwnKeys(value).length !== value.length + 1) return false;
+    if (!ArrayIsArray(value) || IsProxy(value) || !ObjectIsFrozen(value) || ReflectOwnKeys(value).length !== value.length + 1) return false;
     for (let index = 0; index < value.length; index += 1) {
-        const descriptor = ObjectGetOwnPropertyDescriptor(value, String(index));
+        const descriptor = ObjectGetOwnPropertyDescriptor(value, StringFrom(index));
         if (!descriptor || !descriptor.enumerable || !('value' in descriptor) || !event(descriptor.value)) return false;
     }
     return true;
@@ -50,9 +59,14 @@ function events(value: unknown): value is readonly object[] {
 function state(value: unknown): value is DocumentSynthesisSourceLineageState {
     if (typeof value !== 'object' || value === null || IsProxy(value) || !ObjectIsFrozen(value)
         || ObjectGetPrototypeOf(value) !== null || ReflectOwnKeys(value).length !== 4) return false;
-    const descriptors = ['nextSourceSetEpoch', 'exhausted', 'revocationGeneration', 'seenRevocationEvents'].map((key) => ObjectGetOwnPropertyDescriptor(value, key));
-    if (descriptors.some((descriptor) => !descriptor || !descriptor.enumerable || !('value' in descriptor))) return false;
-    const [next, exhausted, generation, seen] = descriptors as PropertyDescriptor[];
+    const next = ObjectGetOwnPropertyDescriptor(value, 'nextSourceSetEpoch');
+    const exhausted = ObjectGetOwnPropertyDescriptor(value, 'exhausted');
+    const generation = ObjectGetOwnPropertyDescriptor(value, 'revocationGeneration');
+    const seen = ObjectGetOwnPropertyDescriptor(value, 'seenRevocationEvents');
+    if (!next || !next.enumerable || !('value' in next)
+        || !exhausted || !exhausted.enumerable || !('value' in exhausted)
+        || !generation || !generation.enumerable || !('value' in generation)
+        || !seen || !seen.enumerable || !('value' in seen)) return false;
     return u64(next.value) && typeof exhausted.value === 'boolean' && u64(generation.value) && events(seen.value);
 }
 
@@ -61,8 +75,21 @@ function contains(values: readonly object[], candidate: object): boolean {
     return false;
 }
 
+function copyEvents(eventsToCopy: readonly object[]): object[] {
+    const copy: object[] = [];
+    for (let index = 0; index < eventsToCopy.length; index += 1) {
+        const descriptor = ObjectGetOwnPropertyDescriptor(eventsToCopy, StringFrom(index));
+        if (descriptor && 'value' in descriptor) {
+            ObjectDefineProperty(copy, StringFrom(index), {
+                value: descriptor.value, enumerable: true, configurable: true, writable: true,
+            });
+        }
+    }
+    return copy;
+}
+
 function makeState(nextSourceSetEpoch: bigint, exhausted: boolean, revocationGeneration: bigint, seenRevocationEvents: readonly object[]): DocumentSynthesisSourceLineageState {
-    return frozen({ nextSourceSetEpoch, exhausted, revocationGeneration, seenRevocationEvents: ObjectFreeze([...seenRevocationEvents]) });
+    return frozen({ nextSourceSetEpoch, exhausted, revocationGeneration, seenRevocationEvents: ObjectFreeze(copyEvents(seenRevocationEvents)) });
 }
 
 export function createDocumentSynthesisSourceLineageState(): DocumentSynthesisSourceLineageState {
@@ -97,6 +124,10 @@ export function observeDocumentSynthesisRevocation(value: unknown, identity: unk
     const advanced = advanceDocumentSynthesisRevocationGeneration(value.revocationGeneration);
     if (advanced.status !== 'advanced') return result({ status: 'exhausted', state: makeState(value.nextSourceSetEpoch,
         true, value.revocationGeneration, value.seenRevocationEvents) });
+    const seenRevocationEvents = copyEvents(value.seenRevocationEvents);
+    ObjectDefineProperty(seenRevocationEvents, StringFrom(seenRevocationEvents.length), {
+        value: identity, enumerable: true, configurable: true, writable: true,
+    });
     return result({ status: 'advanced', state: makeState(value.nextSourceSetEpoch, advanced.exhausted,
-        advanced.value, [...value.seenRevocationEvents, identity]) });
+        advanced.value, seenRevocationEvents) });
 }

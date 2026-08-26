@@ -74,3 +74,59 @@ test('rejects hostile input without property reads or thenable observation', () 
     }
     assert.equal(reads, 0);
 });
+
+test('keeps public transitions synchronous and intrinsic-safe after import', async () => {
+    const defineProperty = Object.defineProperty;
+    const assignDescriptor = Object.getOwnPropertyDescriptor(Object, 'assign');
+    const mapDescriptor = Object.getOwnPropertyDescriptor(Array.prototype, 'map');
+    const someDescriptor = Object.getOwnPropertyDescriptor(Array.prototype, 'some');
+    const iteratorDescriptor = Object.getOwnPropertyDescriptor(Array.prototype, Symbol.iterator);
+    assert.ok(assignDescriptor); assert.ok(mapDescriptor); assert.ok(someDescriptor); assert.ok(iteratorDescriptor);
+
+    const calls = { assign: 0, map: 0, some: 0, iterator: 0 };
+    let reads = 0;
+    const hostile = Object.freeze(Object.defineProperty(Object.create(null), 'nextSourceSetEpoch', {
+        enumerable: true,
+        get() { reads += 1; throw new Error('hostile read'); },
+    }));
+    const identity = Object.freeze(Object.create(null));
+    let initial: ReturnType<typeof createDocumentSynthesisSourceLineageState> | undefined;
+    let advancedEpoch: ReturnType<typeof advanceDocumentSynthesisSourceSetEpoch> | undefined;
+    let advancedRevocation: ReturnType<typeof advanceDocumentSynthesisRevocationGeneration> | undefined;
+    let allocation: ReturnType<typeof allocateDocumentSynthesisSourceSetEpoch> | undefined;
+    let revocation: ReturnType<typeof observeDocumentSynthesisRevocation> | undefined;
+    let invalidAllocation: ReturnType<typeof allocateDocumentSynthesisSourceSetEpoch> | undefined;
+    let invalidRevocation: ReturnType<typeof observeDocumentSynthesisRevocation> | undefined;
+
+    try {
+        defineProperty(Object, 'assign', { ...assignDescriptor, value() { calls.assign += 1; throw new Error('assign poisoned'); } });
+        defineProperty(Array.prototype, 'map', { ...mapDescriptor, value() { calls.map += 1; throw new Error('map poisoned'); } });
+        defineProperty(Array.prototype, 'some', { ...someDescriptor, value() { calls.some += 1; throw new Error('some poisoned'); } });
+        defineProperty(Array.prototype, Symbol.iterator, { ...iteratorDescriptor, value() { calls.iterator += 1; throw new Error('iterator poisoned'); } });
+
+        initial = createDocumentSynthesisSourceLineageState();
+        advancedEpoch = advanceDocumentSynthesisSourceSetEpoch(ONE);
+        advancedRevocation = advanceDocumentSynthesisRevocationGeneration(ZERO);
+        allocation = allocateDocumentSynthesisSourceSetEpoch(initial);
+        revocation = observeDocumentSynthesisRevocation(initial, identity);
+        invalidAllocation = allocateDocumentSynthesisSourceSetEpoch(hostile);
+        invalidRevocation = observeDocumentSynthesisRevocation(initial, hostile);
+    } finally {
+        defineProperty(Object, 'assign', assignDescriptor);
+        defineProperty(Array.prototype, 'map', mapDescriptor);
+        defineProperty(Array.prototype, 'some', someDescriptor);
+        defineProperty(Array.prototype, Symbol.iterator, iteratorDescriptor);
+    }
+
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(calls.assign, 0); assert.equal(calls.map, 0); assert.equal(calls.some, 0); assert.equal(calls.iterator, 0);
+    assert.equal(reads, 0);
+    assert.equal(initial?.nextSourceSetEpoch, ONE);
+    assert.equal(advancedEpoch?.status, 'advanced'); assert.equal(advancedRevocation?.status, 'advanced');
+    assert.equal(allocation?.status, 'allocated'); assert.equal(revocation?.status, 'advanced');
+    assert.equal(invalidAllocation?.status, 'invalid'); assert.equal(invalidRevocation?.status, 'invalid');
+    if (advancedEpoch?.status === 'advanced') assert.equal(advancedEpoch.value, ONE);
+    if (advancedRevocation?.status === 'advanced') assert.equal(advancedRevocation.value, ONE);
+    if (allocation?.status === 'allocated') assert.equal(allocation.sourceSetEpoch, ONE);
+    if (revocation?.status === 'advanced') assert.equal(revocation.state.revocationGeneration, ONE);
+});
