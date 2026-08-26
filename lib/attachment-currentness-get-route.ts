@@ -25,8 +25,7 @@ const objectPrototype = Object.prototype;
 const responseJson = NextResponse.json.bind(NextResponse);
 const isProxy = types.isProxy;
 const arrayEvery = Function.call.bind(Array.prototype.every) as <T>(values: readonly T[], predicate: (value: T) => boolean) => boolean;
-
-type CurrentnessObserver = (id: unknown) => unknown;
+const observeAttachmentCurrentness = observeHostAttachmentCurrentness;
 
 function exactDataFields(value: unknown, keys: readonly string[], prototype: object | null): Record<string, PropertyDescriptor> | null {
     if (!value || typeof value !== 'object' || isProxy(value) || objectGetPrototypeOf(value) !== prototype) return null;
@@ -92,11 +91,11 @@ function successResponse(currentness: { sourceRef: string; revision: number; fre
 }
 
 /** Session-injected read adapter; it exposes only a validated currentness tuple. */
-export function getAttachmentCurrentness(id: unknown, session: unknown, observer: CurrentnessObserver = observeHostAttachmentCurrentness): Response {
+export function getAttachmentCurrentness(id: unknown, session: unknown): Response {
     if (!validSession(session)) return unauthorizedResponse();
     if (!validId(id)) return responseJson({ error: 'Invalid attachment id' }, { status: 400 });
     try {
-        const observed = observer(id);
+        const observed = observeAttachmentCurrentness(id);
         if (observed === null) return responseJson({ error: 'Not found' }, { status: 404 });
         const currentness = validCurrentness(observed);
         return currentness ? successResponse(currentness) : unavailableResponse();
