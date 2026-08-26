@@ -24,6 +24,9 @@ const StringSlice = String.prototype.slice;
 const SetConstructor = Set;
 const SetAdd = Set.prototype.add;
 const SetHas = Set.prototype.has;
+const WeakMapGet = WeakMap.prototype.get;
+const WeakMapSet = WeakMap.prototype.set;
+const ROOT_KEYS = ObjectFreeze(['output', 'citations', 'claims'] as const);
 const privateSnapshots = new WeakMap<object, DocumentSynthesisProviderEnvelopeSnapshot>();
 
 type Root = Readonly<{ output: unknown; citations: unknown; claims: unknown }>;
@@ -100,7 +103,8 @@ function rootFrom(text: string): Root | null {
         const keys = ReflectOwnKeys(value);
         if (keys.length !== 3) return null;
         const root = ObjectCreate(null) as Record<string, unknown>;
-        for (const key of ['output', 'citations', 'claims'] as const) {
+        for (let index = 0; index < ROOT_KEYS.length; index += 1) {
+            const key = ROOT_KEYS[index]!;
             const descriptor = ObjectGetOwnPropertyDescriptor(value, key);
             if (!descriptor || !descriptor.enumerable || !ObjectHasOwn(descriptor, 'value')) return null;
             root[key] = descriptor.value;
@@ -132,12 +136,12 @@ export function parseDocumentSynthesisProviderEnvelope(value: unknown): Document
     if (!root) return denied();
     try {
         const isolated = sealed({ output: snapshot(root.output), citations: snapshot(root.citations), claims: snapshot(root.claims) }) as DocumentSynthesisProviderEnvelopeSnapshot;
-        const token = ObjectFreeze(ObjectCreate(null)); privateSnapshots.set(token, isolated);
+        const token = ObjectFreeze(ObjectCreate(null)); ReflectApply(WeakMapSet, privateSnapshots, [token, isolated]);
         return sealed({ status: 'available' as const, code: null, token, reviewOnly: true as const, writesPerformed: 0 as const, applyPolicy: 'none' as const }) as DocumentSynthesisProviderEnvelopeResult;
     } catch { return denied(); }
 }
 
 /** C3d2b handoff: only a same-module opaque token resolves to the inert parsed snapshot. */
 export function resolveDocumentSynthesisProviderEnvelope(token: unknown): DocumentSynthesisProviderEnvelopeSnapshot | null {
-    try { return IsProxy(token) || !token || typeof token !== 'object' ? null : privateSnapshots.get(token) ?? null; } catch { return null; }
+    try { return IsProxy(token) || !token || typeof token !== 'object' ? null : (ReflectApply(WeakMapGet, privateSnapshots, [token]) as DocumentSynthesisProviderEnvelopeSnapshot | undefined) ?? null; } catch { return null; }
 }
