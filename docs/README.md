@@ -51,11 +51,14 @@ Approfondimenti utili:
 - Foundation persistente delle proposte diagnostiche documentali: [ADR 0087](./adr/0087-registro-proposte-diagnostiche-documentali.md)
 - Routing PDF deterministico per pagina: [ADR 0088](./adr/0088-deterministic-pdf-page-router.md)
 - Limite digest-bound della readiness AI locale: [ADR 0092](./adr/0092-limite-digest-bound-readiness-ai-locale.md)
+- Scrittura SOAP Headless autorizzata dal medico: [ADR 0103](./adr/0103-headless-clinician-authorized-soap-entry-write.md)
+- Piani Fabric e Headless semantico: [ADR 0100](./adr/0100-fabric-vs-headless-semantic-plane.md)
 - Contratto Intelligence Fabric e headless 0.8.5: [ADR 0094](./adr/0094-intelligence-fabric-headless-contract-085.md)
 - Broker di projection e servizi host per capability: [ADR 0095](./adr/0095-broker-projection-e-servizi-host-per-capability.md)
 - Owner di sessione, selezione e lifetime del broker: [ADR 0096](./adr/0096-owner-sessione-selezione-e-lifetime-broker.md)
 - Autorita per la decisione terminale di review medica: [ADR 0098](./adr/0098-physician-terminal-review-authority.md)
 - Autorita della sorgente per Document Synthesis: [ADR 0102](./adr/0102-document-synthesis-source-authority.md)
+- Locator OCR e currentness della sorgente documentale: [ADR 0099](./adr/0099-ocr-document-locator-and-source-currentness.md)
 - Closeout secondario dello stack intelligente: [docs/analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md](./analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md)
 - Triage audit esterno V2: [docs/analysis/2026-07-05-audit-esterno-v2-triage.md](./analysis/2026-07-05-audit-esterno-v2-triage.md)
 
@@ -112,11 +115,15 @@ Approfondimenti utili:
 | Contratto Intelligence Fabric | [docs/adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md](./adr/0089-contratto-intelligence-fabric-e-venue-esecutive.md) | `CANONICAL / ACCEPTED` | Definisce capability, venue, profili egress, policy, ricevute e provenienza fail-closed. |
 | Giunture Intelligence Fabric | [docs/adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md](./adr/0090-giunture-fabric-trust-onboarding-routing-interazione.md) | `CANONICAL / ACCEPTED` | Definisce trust paired, onboarding, routing osservabile e review clinica. |
 | Candidato locale Intelligence Fabric | [docs/adr/0091-candidato-locale-fabric-admissione-continuita-status.md](./adr/0091-candidato-locale-fabric-admissione-continuita-status.md) | `CANONICAL / ACCEPTED` | Limita admissione, continuita, stato paired e harness locale senza AI paired, cloud o scritture cliniche. |
+| Scrittura SOAP Headless autorizzata dal medico | [docs/adr/0103-headless-clinician-authorized-soap-entry-write.md](./adr/0103-headless-clinician-authorized-soap-entry-write.md) | `CANONICAL / ACCEPTED` | Accetta un'eccezione unica, locale e monouso per append SOAP, senza runtime, apply generale o authority Fabric. |
+| Ruolo attivo e step-up SOAP Headless | [docs/adr/0097-active-role-session-and-step-up-authorization.md](./adr/0097-active-role-session-and-step-up-authorization.md) | `CANONICAL / ACCEPTED` | Prerequisito host-owned, inattivo per default, physician-only e limitato alla sola SOAP; non consegna sessione runtime, proof o write. |
+| Piani Fabric e Headless semantico | [docs/adr/0100-fabric-vs-headless-semantic-plane.md](./adr/0100-fabric-vs-headless-semantic-plane.md) | `CANONICAL / PROPOSED` | Separa Fabric governato dall'host e Headless semantico, con inventari e gate SHA distinti; non abilita runtime, cloud o apply. |
 | Intelligence Fabric e controllo headless 0.8.5 | [docs/adr/0094-intelligence-fabric-headless-contract-085.md](./adr/0094-intelligence-fabric-headless-contract-085.md) | `CANONICAL / ACCEPTED` | Definisce un Application Service Layer condiviso, separa Fabric e AIP e classifica le capability senza autorizzare runtime o apply. |
 | Broker projection e servizi host per capability | [docs/adr/0095-broker-projection-e-servizi-host-per-capability.md](./adr/0095-broker-projection-e-servizi-host-per-capability.md) | `CANONICAL / ACCEPTED` | Fissa lifecycle post-onboarding, broker plaintext minimizzato e servizi capability-specific senza autorizzare runtime o apply. |
 | Owner di sessione, selezione e lifetime del broker | [docs/adr/0096-owner-sessione-selezione-e-lifetime-broker.md](./adr/0096-owner-sessione-selezione-e-lifetime-broker.md) | `CANONICAL / ACCEPTED` | Fissa una selezione canonica per sessione medica server, owner volatile e broker per lease senza autorizzare runtime. |
 | Autorita per la decisione terminale di review medica | [docs/adr/0098-physician-terminal-review-authority.md](./adr/0098-physician-terminal-review-authority.md) | `CANONICAL / PROPOSED` | Propone una capability locale stretta, con attestazione, gesto monouso e route non registrata fino a otto gate indipendenti. |
 | Autorita della sorgente per Document Synthesis | [docs/adr/0102-document-synthesis-source-authority.md](./adr/0102-document-synthesis-source-authority.md) | `CANONICAL / ACCEPTED` | Fissa source-set host-owned, citazioni con locator validato e receipt finale review-only; non autorizza runtime o persistenza. |
+| Locator OCR e currentness della sorgente documentale | [docs/adr/0099-ocr-document-locator-and-source-currentness.md](./adr/0099-ocr-document-locator-and-source-currentness.md) | `CANONICAL / ACCEPTED` | Accetta `documentSourceRef`, revision ed epoch monotoni, locator OCR volatile monouso e DAG O1a-O5 senza autorizzare runtime o apply. |
 | FAQ pubbliche | [docs/FAQ.md](./FAQ.md) | `SECONDARY` | Sintesi rapida per capire cosa fa oggi MediFlow, quali sono i boundary dichiarati e come orientarsi nel progetto. |
 | Roadmap terminologie/FSE | [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) | `CANONICAL` | Evoluzione codifiche cliniche e compliance documentale (coerente con ADR 0006). |
 | Matrice baseline ufficiale GTW/FSE | [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md) | `CANONICAL` | Gap analysis versionata tra artifact ministeriali `it-fse-support` e stato reale MediFlow. |

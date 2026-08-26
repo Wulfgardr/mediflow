@@ -7,6 +7,10 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 ## ADR piu recente
 
 - [0102-document-synthesis-source-authority.md](./0102-document-synthesis-source-authority.md): fissa il source-set host-owned, le citazioni validate e la receipt review-only per Document Synthesis.
+- [0103-headless-clinician-authorized-soap-entry-write.md](./0103-headless-clinician-authorized-soap-entry-write.md): accetta una sola scrittura SOAP locale a conferma clinica monouso; runtime, Fabric e apply generale restano non implementati.
+- [0097-active-role-session-and-step-up-authorization.md](./0097-active-role-session-and-step-up-authorization.md): accetta il prerequisito host-owned, inattivo per default, physician-only e operation-scoped per la sola SOAP; non consegna runtime, proof o write.
+- [0100-fabric-vs-headless-semantic-plane.md](./0100-fabric-vs-headless-semantic-plane.md): propone piani Fabric e Headless separati, con inventari e gate SHA distinti; non abilita runtime, cloud o apply.
+- [0099-ocr-document-locator-and-source-currentness.md](./0099-ocr-document-locator-and-source-currentness.md): accetta il contratto fail-closed per locator OCR monouso e currentness della sorgente documentale, con DAG O1a-O5, senza autorizzare runtime o apply.
 - [0098-physician-terminal-review-authority.md](./0098-physician-terminal-review-authority.md): propone la capability locale stretta per accept/reject review, con gesto monouso e route assente fino ai gate.
 - [0096-owner-sessione-selezione-e-lifetime-broker.md](./0096-owner-sessione-selezione-e-lifetime-broker.md): fissa owner session-scoped, selezione canonica e broker per lease.
 - [0095-broker-projection-e-servizi-host-per-capability.md](./0095-broker-projection-e-servizi-host-per-capability.md): fissa lifecycle post-onboarding, broker projection e servizi host capability-specific.

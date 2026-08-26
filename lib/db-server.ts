@@ -115,6 +115,41 @@ const normalizeSchemaSql = (value: string) => value.toLowerCase().replace(/if\s+
 const PHYSICIAN_REVIEW_ATTESTATIONS_SCHEMA = normalizeSchemaSql(PHYSICIAN_REVIEW_ATTESTATIONS_DDL);
 const PHYSICIAN_REVIEW_ATTESTATIONS_P2A_SCHEMA = normalizeSchemaSql(PHYSICIAN_REVIEW_ATTESTATIONS_P2A_DDL);
 /* @Codex */
+const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_DDL = `
+    CREATE TABLE headless_soap_active_role_attestations (
+        attestation_ref TEXT PRIMARY KEY NOT NULL CHECK (length(attestation_ref) BETWEEN 1 AND 256 AND trim(attestation_ref) = attestation_ref),
+        actor_ref TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE RESTRICT CHECK (length(actor_ref) BETWEEN 1 AND 256 AND trim(actor_ref) = actor_ref),
+        schema_version TEXT NOT NULL CHECK (schema_version = 'mediflow.headless-soap-active-role-attestation.v1'), role TEXT NOT NULL CHECK (role = 'physician'),
+        operation_id TEXT NOT NULL CHECK (operation_id = 'mediflow.clinical_diary.append_soap.v1'), policy_version TEXT NOT NULL CHECK (policy_version = 'clinician_confirmed_single_use.v1'),
+        status TEXT NOT NULL CHECK (status IN ('inactive', 'active', 'revoked')), attestation_version INTEGER NOT NULL CHECK (attestation_version = 1),
+        issuer_ref TEXT, expires_at INTEGER, activated_at INTEGER,
+        revocation_generation INTEGER NOT NULL DEFAULT 0 CHECK (typeof(revocation_generation) = 'integer' AND revocation_generation BETWEEN 0 AND 9007199254740991),
+        revoked_at INTEGER, created_at INTEGER NOT NULL DEFAULT (unixepoch()), updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        CONSTRAINT headless_soap_active_role_attestations_lifecycle_check CHECK (
+            (status = 'inactive' AND issuer_ref IS NULL AND expires_at IS NULL AND activated_at IS NULL AND revoked_at IS NULL AND revocation_generation = 0)
+            OR (status = 'active' AND issuer_ref IS NOT NULL AND length(issuer_ref) BETWEEN 1 AND 256 AND trim(issuer_ref) = issuer_ref AND expires_at IS NOT NULL AND activated_at IS NOT NULL AND revoked_at IS NULL AND revocation_generation = 0)
+            OR (status = 'revoked' AND revoked_at IS NOT NULL AND revocation_generation BETWEEN 1 AND 9007199254740991
+                AND ((issuer_ref IS NULL AND expires_at IS NULL AND activated_at IS NULL)
+                    OR (issuer_ref IS NOT NULL AND length(issuer_ref) BETWEEN 1 AND 256 AND trim(issuer_ref) = issuer_ref AND expires_at IS NOT NULL AND activated_at IS NOT NULL)))
+        ),
+        CONSTRAINT headless_soap_active_role_attestations_timestamp_check CHECK (
+            typeof(created_at) = 'integer' AND created_at BETWEEN 0 AND 8640000000000 AND typeof(updated_at) = 'integer' AND updated_at BETWEEN created_at AND 8640000000000
+            AND (expires_at IS NULL OR (typeof(expires_at) = 'integer' AND expires_at BETWEEN created_at AND 8640000000000))
+            AND (activated_at IS NULL OR (typeof(activated_at) = 'integer' AND activated_at BETWEEN created_at AND 8640000000000 AND (expires_at IS NULL OR activated_at <= expires_at)))
+            AND (revoked_at IS NULL OR (typeof(revoked_at) = 'integer' AND revoked_at BETWEEN created_at AND 8640000000000 AND (activated_at IS NULL OR revoked_at >= activated_at)))
+        )
+    )
+`;
+const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_SCHEMA = normalizeSchemaSql(HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_DDL);
+export type HeadlessSoapActiveRoleAttestationSchemaErrorCode = 'schema_incompatible' | 'schema_unavailable';
+/* @Codex */
+export class HeadlessSoapActiveRoleAttestationSchemaError extends Error {
+    constructor(readonly code: HeadlessSoapActiveRoleAttestationSchemaErrorCode) {
+        super(`Headless SOAP active-role attestation schema ${code === 'schema_incompatible' ? 'is incompatible' : 'is unavailable'}.`);
+        this.name = 'HeadlessSoapActiveRoleAttestationSchemaError';
+    }
+}
+/* @Codex */
 const DURABLE_REVIEW_PATIENT_LINKS_DDL = `
     CREATE TABLE IF NOT EXISTS durable_review_patient_links (
         review_id TEXT PRIMARY KEY NOT NULL REFERENCES durable_review_records(review_id),
@@ -132,6 +167,46 @@ function physicianReviewAttestationSchemaEquals(expected: string): boolean {
 /* @Codex */
 export function hasCanonicalPhysicianReviewAttestationSchema(): boolean {
     return physicianReviewAttestationSchemaEquals(PHYSICIAN_REVIEW_ATTESTATIONS_SCHEMA);
+}
+/* @Codex */
+function headlessSoapActiveRoleAttestationSchemaEquals(expected: string): boolean {
+    try {
+        const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get('headless_soap_active_role_attestations') as { sql?: unknown } | undefined;
+        return typeof row?.sql === 'string' && normalizeSchemaSql(row.sql) === expected;
+    } catch {
+        return false;
+    }
+}
+/* @Codex */
+function hasNoHeadlessSoapActiveRoleAttestationOrphans(): boolean {
+    try {
+        const orphan = sqlite.prepare(`
+            SELECT 1 FROM headless_soap_active_role_attestations AS attestation
+            LEFT JOIN users AS actor ON actor.id = attestation.actor_ref
+            WHERE actor.id IS NULL LIMIT 1
+        `).get();
+        return !orphan;
+    } catch {
+        return false;
+    }
+}
+/* @Codex */
+export function hasCanonicalHeadlessSoapActiveRoleAttestationSchema(): boolean {
+    return headlessSoapActiveRoleAttestationSchemaEquals(HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_SCHEMA)
+        && hasNoHeadlessSoapActiveRoleAttestationOrphans();
+}
+/* @Codex */
+function ensureHeadlessSoapActiveRoleAttestationSchema(): void {
+    let exists: boolean;
+    try {
+        exists = Boolean(sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get('headless_soap_active_role_attestations'));
+        if (!exists) sqlite.prepare(HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_DDL.replace('CREATE TABLE', 'CREATE TABLE IF NOT EXISTS')).run();
+    } catch {
+        throw new HeadlessSoapActiveRoleAttestationSchemaError('schema_unavailable');
+    }
+    if (!hasCanonicalHeadlessSoapActiveRoleAttestationSchema()) {
+        throw new HeadlessSoapActiveRoleAttestationSchemaError('schema_incompatible');
+    }
 }
 /* @Codex */
 export function hasCanonicalDurableReviewPatientLinkSchema(): boolean {
@@ -161,6 +236,120 @@ function ensureColumn(table: string, columnName: string, columnSql: string) {
     }
 }
 
+/* @Codex */
+const ATTACHMENT_CURRENTNESS_LEGACY_DDL = `
+    CREATE TABLE attachments (
+        id TEXT PRIMARY KEY NOT NULL, patient_id TEXT NOT NULL, name TEXT NOT NULL,
+        type TEXT NOT NULL, size INTEGER NOT NULL, path TEXT NOT NULL, data TEXT,
+        created_at INTEGER DEFAULT (unixepoch()), summary_snapshot TEXT,
+        parse_evidence_artifact_snapshot TEXT, ocr_queue_state TEXT,
+        ocr_queue_reason TEXT, ocr_queue_updated_at INTEGER,
+        ocr_replay_artifact_snapshot TEXT,
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON UPDATE NO ACTION ON DELETE NO ACTION
+    )
+`;
+/* @Codex */
+const ATTACHMENT_CURRENTNESS_CANONICAL_DDL = `
+    CREATE TABLE attachments (
+        id TEXT PRIMARY KEY NOT NULL, patient_id TEXT NOT NULL, name TEXT NOT NULL,
+        type TEXT NOT NULL, size INTEGER NOT NULL, path TEXT NOT NULL, data TEXT,
+        created_at INTEGER DEFAULT (unixepoch()), summary_snapshot TEXT,
+        parse_evidence_artifact_snapshot TEXT, ocr_queue_state TEXT,
+        ocr_queue_reason TEXT, ocr_queue_updated_at INTEGER,
+        ocr_replay_artifact_snapshot TEXT,
+        document_source_ref TEXT NOT NULL UNIQUE CHECK (
+            length(document_source_ref) = 64 AND document_source_ref NOT GLOB '*[^0-9a-f]*'
+        ),
+        document_revision INTEGER NOT NULL CHECK (
+            typeof(document_revision) = 'integer' AND document_revision BETWEEN 1 AND 9007199254740991
+        ),
+        document_freshness_epoch INTEGER NOT NULL CHECK (
+            typeof(document_freshness_epoch) = 'integer' AND document_freshness_epoch BETWEEN 1 AND 9007199254740991
+        ),
+        FOREIGN KEY (patient_id) REFERENCES patients(id) ON UPDATE NO ACTION ON DELETE NO ACTION
+    )
+`;
+/* @Codex */
+const ATTACHMENT_CURRENTNESS_LEGACY_SCHEMA = normalizeSchemaSql(ATTACHMENT_CURRENTNESS_LEGACY_DDL);
+/* @Codex */
+const ATTACHMENT_CURRENTNESS_CANONICAL_SCHEMA = normalizeSchemaSql(ATTACHMENT_CURRENTNESS_CANONICAL_DDL);
+/* @Codex */
+const ATTACHMENT_CURRENTNESS_COLUMNS = [
+    ['id', 'TEXT', 1, null, 1], ['patient_id', 'TEXT', 1, null, 0], ['name', 'TEXT', 1, null, 0],
+    ['type', 'TEXT', 1, null, 0], ['size', 'INTEGER', 1, null, 0], ['path', 'TEXT', 1, null, 0],
+    ['data', 'TEXT', 0, null, 0], ['created_at', 'INTEGER', 0, 'unixepoch()', 0],
+    ['summary_snapshot', 'TEXT', 0, null, 0], ['parse_evidence_artifact_snapshot', 'TEXT', 0, null, 0],
+    ['ocr_queue_state', 'TEXT', 0, null, 0], ['ocr_queue_reason', 'TEXT', 0, null, 0],
+    ['ocr_queue_updated_at', 'INTEGER', 0, null, 0], ['ocr_replay_artifact_snapshot', 'TEXT', 0, null, 0],
+] as const;
+/* @Codex */
+const ATTACHMENT_CURRENTNESS_ERROR = 'ATTACHMENT_CURRENTNESS_MIGRATION_UNSUPPORTED';
+
+/* @Codex */
+function denyAttachmentCurrentnessMigration(): never {
+    throw new Error(ATTACHMENT_CURRENTNESS_ERROR);
+}
+/* @Codex */
+function attachmentCurrentnessSchemaMatches(expected: string, canonical: boolean): boolean {
+    const table = sqlite.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'table' AND lower(name) = 'attachments'").get() as { name?: unknown; sql?: unknown } | undefined;
+    const columns = sqlite.prepare('PRAGMA table_xinfo(attachments)').all() as Array<{ name?: unknown; type?: unknown; notnull?: unknown; dflt_value?: unknown; pk?: unknown; hidden?: unknown }>;
+    const expectedColumns = canonical
+        ? [...ATTACHMENT_CURRENTNESS_COLUMNS, ['document_source_ref', 'TEXT', 1, null, 0], ['document_revision', 'INTEGER', 1, null, 0], ['document_freshness_epoch', 'INTEGER', 1, null, 0]]
+        : ATTACHMENT_CURRENTNESS_COLUMNS;
+    const foreignKeys = sqlite.prepare('PRAGMA foreign_key_list(attachments)').all() as Array<Record<string, unknown>>;
+    const indexes = sqlite.prepare('PRAGMA index_list(attachments)').all() as Array<{ name?: unknown; unique?: unknown; origin?: unknown; partial?: unknown }>;
+    const expectedIndexes = canonical ? 3 : 2;
+    const hasExpectedIndexes = indexes.length === expectedIndexes && indexes.every((index) => {
+        if (typeof index.name !== 'string' || (index.unique !== 0 && index.unique !== 1) || index.partial !== 0) return false;
+        const keys = (sqlite.prepare('SELECT name, "desc", coll, "key" FROM pragma_index_xinfo(?)').all(index.name) as Array<{ name?: unknown; desc?: unknown; coll?: unknown; key?: unknown }>)
+            .filter((row) => row.key === 1);
+        const key = keys.length === 1 && keys[0].desc === 0 && keys[0].coll === 'BINARY' ? keys[0].name : null;
+        return (index.name === 'attachments_patient_idx' && index.origin === 'c' && index.unique === 0 && key === 'patient_id')
+            || (index.origin === 'pk' && index.unique === 1 && key === 'id')
+            || (canonical && index.origin === 'u' && index.unique === 1 && key === 'document_source_ref');
+    });
+    return table?.name === 'attachments' && typeof table.sql === 'string' && normalizeSchemaSql(table.sql) === expected
+        && columns.length === expectedColumns.length && columns.every((column, index) => {
+            const field = expectedColumns[index];
+            return column.name === field[0] && column.type === field[1] && column.notnull === field[2]
+                && column.dflt_value === field[3] && column.pk === field[4] && column.hidden === 0;
+        }) && foreignKeys.length === 1 && foreignKeys[0].id === 0 && foreignKeys[0].seq === 0
+        && foreignKeys[0].table === 'patients' && foreignKeys[0].from === 'patient_id' && foreignKeys[0].to === 'id'
+        && foreignKeys[0].on_update === 'NO ACTION' && foreignKeys[0].on_delete === 'NO ACTION' && foreignKeys[0].match === 'NONE'
+        && hasExpectedIndexes;
+}
+/* @Codex */
+function upgradeLegacyAttachmentCurrentness(): void {
+    try {
+        const stale = sqlite.prepare("SELECT 1 FROM sqlite_master WHERE lower(name) = 'attachments_currentness_legacy' LIMIT 1").get();
+        const trigger = sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND lower(tbl_name) = 'attachments' LIMIT 1").get();
+        if (stale || trigger) denyAttachmentCurrentnessMigration();
+        if (attachmentCurrentnessSchemaMatches(ATTACHMENT_CURRENTNESS_CANONICAL_SCHEMA, true)) {
+            const invalid = sqlite.prepare(`SELECT 1 FROM attachments WHERE typeof(document_source_ref) != 'text'
+                OR length(document_source_ref) != 64 OR document_source_ref GLOB '*[^0-9a-f]*'
+                OR typeof(document_revision) != 'integer' OR document_revision NOT BETWEEN 1 AND 9007199254740991
+                OR typeof(document_freshness_epoch) != 'integer' OR document_freshness_epoch NOT BETWEEN 1 AND 9007199254740991 LIMIT 1`).get();
+            if (invalid) denyAttachmentCurrentnessMigration();
+            return;
+        }
+        if (!attachmentCurrentnessSchemaMatches(ATTACHMENT_CURRENTNESS_LEGACY_SCHEMA, false)) denyAttachmentCurrentnessMigration();
+        if (sqlite.prepare('SELECT 1 FROM attachments AS attachment LEFT JOIN patients AS patient ON patient.id = attachment.patient_id WHERE patient.id IS NULL LIMIT 1').get()) denyAttachmentCurrentnessMigration();
+        sqlite.exec('ALTER TABLE attachments RENAME TO attachments_currentness_legacy');
+        sqlite.exec(ATTACHMENT_CURRENTNESS_CANONICAL_DDL);
+        sqlite.exec(`INSERT INTO attachments (id, patient_id, name, type, size, path, data, created_at, summary_snapshot,
+            parse_evidence_artifact_snapshot, ocr_queue_state, ocr_queue_reason, ocr_queue_updated_at, ocr_replay_artifact_snapshot,
+            document_source_ref, document_revision, document_freshness_epoch)
+            SELECT id, patient_id, name, type, size, path, data, created_at, summary_snapshot,
+            parse_evidence_artifact_snapshot, ocr_queue_state, ocr_queue_reason, ocr_queue_updated_at, ocr_replay_artifact_snapshot,
+            lower(hex(randomblob(32))), 1, 1 FROM attachments_currentness_legacy`);
+        sqlite.exec('DROP TABLE attachments_currentness_legacy');
+        sqlite.exec('CREATE INDEX attachments_patient_idx ON attachments(patient_id)');
+    } catch (error) {
+        if (error instanceof Error && error.message === ATTACHMENT_CURRENTNESS_ERROR) throw error;
+        denyAttachmentCurrentnessMigration();
+    }
+}
+
 // Schema guards run on every (re)open so older DB files gain the tables and
 // columns the current code expects (re-applied after a repair swaps the file).
 function applySchemaGuards() {
@@ -184,6 +373,8 @@ function applySchemaGuards() {
     } catch (error) {
         console.warn('[MediFlow] Physician review attestation schema check skipped:', error);
     }
+    /* @Codex */
+    ensureHeadlessSoapActiveRoleAttestationSchema();
     /* @Codex */
     try {
         ensureColumn('attachments', 'summary_snapshot', 'summary_snapshot TEXT');
@@ -675,7 +866,10 @@ function applySchemaGuardsSerially(): void {
     // BEGIN IMMEDIATE lets SQLite arbitrate one schema writer while the other
     // workers wait under busy_timeout, preventing concurrent check-then-ALTER
     // races and duplicate-column warnings.
-    sqlite.transaction(applySchemaGuards).immediate();
+    sqlite.transaction(() => {
+        applySchemaGuards();
+        upgradeLegacyAttachmentCurrentness();
+    }).immediate();
 }
 
 applySchemaGuardsSerially();
