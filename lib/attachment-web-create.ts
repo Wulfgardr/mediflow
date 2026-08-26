@@ -1,7 +1,6 @@
 /* @Codex */
 import 'server-only';
 
-import { types } from 'node:util';
 import { NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
@@ -18,40 +17,12 @@ import { attachments, patients } from './schema';
 import { unauthorizedResponse } from './security/server-auth';
 import type { ServerSession } from './security/server-session';
 
-const KEYS = ['sourceRef', 'revision', 'freshnessEpoch'] as const;
-const SOURCE_REF = /^[0-9a-f]{64}$/u;
-const objectGetPrototypeOf = Object.getPrototypeOf;
-const objectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
-const objectHasOwn = Object.hasOwn;
-const reflectOwnKeys = Reflect.ownKeys;
-const arrayIsArray = Array.isArray;
-const numberIsSafeInteger = Number.isSafeInteger;
-const regexpTest = Function.call.bind(RegExp.prototype.test) as (expression: RegExp, value: string) => boolean;
-const isProxy = types.isProxy;
-
-type InitialCurrentness = Readonly<{ sourceRef: string; revision: 1; freshnessEpoch: 1 }>;
-
-function readInitialCurrentness(value: unknown): InitialCurrentness | null {
-    try {
-        if (!value || typeof value !== 'object' || arrayIsArray(value) || isProxy(value)
-            || objectGetPrototypeOf(value) !== Object.prototype || reflectOwnKeys(value).length !== KEYS.length) return null;
-        const descriptors = KEYS.map((key) => objectGetOwnPropertyDescriptor(value, key));
-        if (descriptors.some((descriptor) => !descriptor || !objectHasOwn(descriptor, 'value') || descriptor.enumerable !== true)) return null;
-        const [sourceRef, revision, freshnessEpoch] = descriptors.map((descriptor) => descriptor!.value);
-        if (typeof sourceRef !== 'string' || !regexpTest(SOURCE_REF, sourceRef)
-            || revision !== 1 || !numberIsSafeInteger(revision)
-            || freshnessEpoch !== 1 || !numberIsSafeInteger(freshnessEpoch)) return null;
-        return Object.freeze({ sourceRef, revision, freshnessEpoch });
-    } catch {
-        return null;
-    }
-}
+const mintHostAttachmentCurrentness = createHostAttachmentCurrentness;
 
 /** Creates one web attachment with active-patient validation and initial currentness in one transaction. */
 export async function createWebAttachment(
     request: Request,
     session: ServerSession | null,
-    mintCurrentness: () => unknown = createHostAttachmentCurrentness,
 ): Promise<Response> {
     if (!session) return unauthorizedResponse();
     try {
@@ -72,12 +43,11 @@ export async function createWebAttachment(
         }
 
         const id = body.id || uuidv4();
-        const created = dbServer.transaction((tx): 'created' | 'missing' | 'invalid' => {
+        const created = dbServer.transaction((tx): 'created' | 'missing' => {
             const patient = tx.select({ id: patients.id }).from(patients)
                 .where(and(eq(patients.id, body.patientId), activePatients())).get();
             if (!patient) return 'missing';
-            const currentness = readInitialCurrentness(mintCurrentness());
-            if (!currentness) return 'invalid';
+            const currentness = mintHostAttachmentCurrentness();
             tx.insert(attachments).values({
                 id,
                 patientId: body.patientId,
@@ -99,7 +69,6 @@ export async function createWebAttachment(
             return 'created';
         });
         if (created === 'missing') return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
-        if (created === 'invalid') return NextResponse.json({ error: 'Create Failed' }, { status: 500 });
         return NextResponse.json({ id }, { status: 201 });
     } catch {
         return NextResponse.json({ error: 'Create Failed' }, { status: 500 });
