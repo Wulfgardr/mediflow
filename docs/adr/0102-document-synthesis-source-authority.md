@@ -30,9 +30,10 @@ L'application host autenticato e l'unico issuer di:
 - etichette `S1`...`Sn`;
 - receipt finale e provenance finale.
 
-Il chiamante non puo fornire riferimenti a paziente, documento o sorgente, ID,
-digest, provider, citazioni, receipt o provenance. Questi valori non possono
-entrare da body, path, query, cookie, UI, cache, projection o AIP/Mini.
+Fuori dalle frontiere di acquisizione definite sotto, il chiamante non puo
+fornire riferimenti a paziente, documento o sorgente, ID, digest, provider,
+citazioni, receipt o provenance. Questi valori non possono entrare da body,
+path, query, cookie, UI, cache, projection o AIP/Mini come authority.
 
 Il source-set handle e opaco, memory-only e legato a sessione autenticata,
 selezione paziente canonica, `selectionEpoch`, `reviewContextEpoch`, identita e
@@ -43,6 +44,39 @@ Il lifecycle e `minted -> burned at begin -> in_flight -> published | denied`.
 Il burn avviene all'inizio e impedisce un secondo consumo. Un timestamp non
 prova la correntezza; la correntezza dipende dai binding ed epoch riletti
 dall'host.
+
+### Intent di selezione, ingest e preview
+
+L'identificatore di allegato o documento fornito dal client e soltanto un
+intent di selezione non autorevole alla frontiera di acquisizione autenticata.
+L'host deve risolverlo sotto la sessione corrente, il paziente canonico
+selezionato e una currentness monotona dell'allegato. L'intent non diventa mai
+`documentSourceRef`, digest, receipt o provenance e non dimostra contenuto,
+provenienza o correttezza clinica.
+
+Solo dopo una risoluzione riuscita, un ingest broker autenticato e separato
+puo accettare una volta la projection client-decrypted minimizzata e tipizzata:
+
+```text
+{ sourceKind, sourceText }
+```
+
+Il broker ne copia il valore in memoria e lo lega a un capture handle opaco,
+broker-owned e non trasferibile. L'handle trattiene soltanto binding host-owned:
+riferimento opaco, revisione, freshness, epoch, scopo, scadenza e revoca.
+Non espone owner, sessione o testo. Logout, revoca, scadenza, reselection,
+revisione o freshness incompatibile invalidano la cattura e il preview.
+
+La route di preview capability-specific accetta soltanto il capture handle
+opaco e, se necessario, una correlazione di richiesta. Non accetta testo,
+identificatore di allegato, ID paziente, revisione, freshness, provider o
+prompt. Cattura e preview sono due frontiere di authority distinte anche quando
+una composizione locale le richiama in sequenza.
+
+`sourceSetAuthority=application_host` dichiara soltanto che l'host possiede il
+set catturato e ha validato lo scope del digest dell'input provider. Non
+dichiara plaintext, digest o provenienza dell'allegato originale, ne verita
+clinica.
 
 ### Cattura, ordine e limiti del source set
 
