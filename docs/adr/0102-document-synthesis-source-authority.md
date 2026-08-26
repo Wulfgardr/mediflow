@@ -142,6 +142,102 @@ del registry, che e gia nidificata nella Fabric resolution receipt. Una receipt
 finale puo legare entrambe come evidence distinte. Nessuna delle due concede
 authority o puo sostituire l'altra.
 
+### Schema di pubblicazione e codec delle citazioni
+
+`U0` indica l'esatto ramo `available` congelato emesso da
+`DocumentSynthesisSourceSetValidationResult` dopo la validazione host
+source-bound. I suoi campi hanno questo ordine di enumerazione:
+`status`, `code`, `schemaVersion`, `output`, `outputSha256`, `citations`,
+`claims`, `reviewOnly`, `writesPerformed`, `applyPolicy`,
+`sourceSetDigestSha256`. I valori fissi sono `status=available`, `code=null`,
+`reviewOnly=true`, `writesPerformed=0` e `applyPolicy=none`.
+
+| Valore U0 | Rappresentazione o limite congelato |
+| --- | --- |
+| `schemaVersion`, `output`, `outputSha256`, `citations`, `claims` | Ereditano esattamente il contratto versionato `mediflow.document-synthesis.claim-citations.v1`. `outputSha256` e lower hex canonico di 64 caratteri. |
+| `citations` | Da 1 a 32, nell'ordine validato dall'host. Ogni citation ha, in questo ordine, `label`, `quote`, `startByte`, `endByte`, `quoteSha256`; `quoteSha256` e lower hex canonico di 64 caratteri. |
+| `claims` | Esattamente un claim per ogni canonical output path, fino al limite corrente di 194. Ogni claim ha, in questo ordine, `claimPath`, `labels`; `labels` contiene da 1 a `citationCount` label uniche e in ordine strettamente crescente rispetto alle citazioni. |
+| Offset e testo | `startByte` e `endByte` sono interi sicuri non negativi. Il codec li codifica come gli stessi interi `u64BE`, senza arrotondamento o coercizione. I contratti esistenti hanno gia validato e normalizzato il testo; il codec UTF-8 codifica le esatte stringhe trattenute senza ulteriore normalizzazione. |
+| `sourceSetDigestSha256` | Raw32 dal currentness owner: esattamente 32 interi da 0 a 255, copiati come byte senza rehash o hex. |
+
+La pubblicazione riuscita usa esclusivamente questi tre schema versionati:
+
+- `mediflow.document-synthesis.publication.v1`;
+- `mediflow.document-synthesis.publication-receipt.v1`;
+- `mediflow.document-synthesis.publication-provenance.v1`.
+
+Ogni record ha esattamente i campi sotto indicati, nello stesso ordine di
+enumerazione. Un campo mancante, aggiunto, duplicato o riordinato nega. Questo
+ordine definisce la forma del record, non una serializzazione JSON e non un
+input per JCS.
+
+| Record | Campi ordinati e valori congelati |
+| --- | --- |
+| Publication | `schemaVersion`, `output`, `citations`, `claims`, `receipt`, `provenance` |
+| Receipt | `schemaVersion`, `capability`, `outputSha256`, `claimCitationsDigestSha256`, `sourceSetDigestSha256`, `providerBindingReceipt`, `reviewOnly`, `applyPolicy`, `writesPerformed` |
+| Provenance | `schemaVersion`, `capability`, `sourceSetAuthority`, `inputDigestScope`, `citationSupport`, `modelCausality`, `fabricProvenance` |
+
+Il record Publication ha `schemaVersion=mediflow.document-synthesis.publication.v1`.
+`output`, `outputSha256`, `citations` e `claims` sono gli esatti valori U0
+gia validati. La pubblicazione non li normalizza, riordina, serializza,
+ricostruisce o ricalcola. `outputSha256` mantiene la sua rappresentazione U0;
+`sourceSetDigestSha256` e il digest raw32 U0, copiato senza hex, decoding o
+rehash.
+
+La receipt ha `schemaVersion=mediflow.document-synthesis.publication-receipt.v1`,
+`capability=document_synthesis`, `reviewOnly=true`, `applyPolicy=none` e
+`writesPerformed=0`. `providerBindingReceipt` e l'esatto riferimento trattenuto
+alla `DocumentSynthesisProviderBindingReceipt` host-owned gia emessa. Non e una
+copia, un clone, una proiezione JSON o una receipt ricostruita. Il digest
+`claimCitationsDigestSha256` e raw32.
+
+La provenance ha
+`schemaVersion=mediflow.document-synthesis.publication-provenance.v1`,
+`capability=document_synthesis`, `sourceSetAuthority=application_host`,
+`inputDigestScope=ordered_normalized_provider_projection_set`,
+`citationSupport=provider_declared_host_membership_and_locator_validated` e
+`modelCausality=not_established`. `fabricProvenance` e l'esatto
+`FabricProvenanceRecord` gia trattenuto dal Fabric. Questa ADR non ne congela
+di nuovo i campi o lo schema. Il suo campo `receipt` deve essere lo stesso
+riferimento trattenuto alla `FabricResolutionReceipt` del Fabric, senza clone,
+ricostruzione o sostituzione. Nessuna evidence, receipt o provenance concede
+authority.
+
+`claimCitationsDigestSha256` usa il codec binario domain-separated
+`mediflow.document-synthesis.claim-citations-digest.v1`. Il payload e l'esatta
+concatenazione seguente:
+
+```text
+u32BE(byteLength(domainTag)) || utf8(domainTag) || u16BE(1)
+|| u16BE(citationCount)
+|| per ogni citation U0 ordinata:
+   u32BE(byteLength(label)) || utf8(label)
+   || u32BE(byteLength(quote)) || utf8(quote)
+   || u64BE(startByte) || u64BE(endByte)
+   || raw32(decodeLowerHex(quoteSha256))
+|| u16BE(claimCount)
+|| per ogni claim U0 ordinato:
+   u32BE(byteLength(claimPath)) || utf8(claimPath)
+   || u16BE(labelCount)
+   || per ogni label del claim, nell'ordine U0:
+      u32BE(byteLength(label)) || utf8(label)
+```
+
+`domainTag` e la stringa esatta del nome codec. Ogni `u32BE` della lunghezza e
+l'unsigned big-endian del numero di byte UTF-8, seguito subito da quegli stessi
+byte senza terminatore o padding. Versione e conteggi usano `u16BE` unsigned;
+offset e estremi usano `u64BE` unsigned. SHA-256 restituisce raw32 dei soli byte
+del payload concatenato. Il codec non usa JSON, JCS, un master digest, un digest
+di pubblicazione o un digest del plaintext originale.
+
+Prima dell'hash, l'host rifiuta Unicode o UTF-8 non validi, stringhe vuote dove
+U0 richiede label, quote o claim path non vuoti, `quoteSha256` che non sia lower
+hex canonico di 64 caratteri e i cui 32 byte decodificati non coincidano con la
+citazione U0, overflow di conteggi, lunghezze o interi, e valori fuori dai limiti
+U0. Rifiuta inoltre qualunque drift di ordine, cardinalita o duplicato nelle
+citazioni, nei claim o nelle label dei claim. Il codec non ordina, deduplica o
+altrimenti corregge l'input.
+
 ### Fence a due fasi e receipt finale
 
 La prima sezione e sincrona: begin, controllo P4 e snapshot delle fonti, burn
@@ -151,6 +247,8 @@ asincrona al provider, con cancellazione interna.
 La seconda sezione e sincrona: rilettura completa degli epoch, validazione di
 citazioni e digest. Prima del commit puo precomputare e congelare un payload di
 pubblicazione opaco, privato e non osservabile, trattenuto solo in memoria.
+Il payload trattiene direttamente i valori U0 e i riferimenti evidence gia
+congelati; non li clona, serializza o ricostruisce.
 Prima della revalidation riuscita e del commit del lease DS, quel payload non e
 una receipt o provenance emessa e non puo essere restituito, risolto, loggato,
 persistito, ispezionato o usato come authority. Il commit del lease DS resta
@@ -158,11 +256,12 @@ l'ultima operazione. Le sezioni protette non accettano `Promise` o thenable. Non
 eseguono DB, persistenza o scritture cliniche.
 
 Solo dopo la rilettura riuscita e il commit, la pubblicazione seleziona e
-restituisce il riferimento immutabile precompilato come receipt e provenance
-finali. Dopo il commit non avvengono hashing, cloning, freezing, callback,
-logging, cleanup, persistenza o altro lavoro fallibile. La receipt lega i digest
-di output, citazioni, source set e provider-binding receipt. Dichiara
-`review-only`, `applyPolicy=none` e `writesPerformed=0`.
+restituisce il riferimento immutabile precompilato nello schema congelato come
+receipt e provenance finali. Dopo il commit non avvengono hashing, cloning,
+freezing, callback, logging, cleanup, persistenza o altro lavoro fallibile. La
+receipt lega il digest U0 dell'output, il digest delle citazioni e dei claim, il
+source set raw32 e la provider-binding receipt. Dichiara `review-only`,
+`applyPolicy=none` e `writesPerformed=0`.
 
 I gate avversari sono obbligatori e deterministici. Se durante la chiamata
 asincrona cambiano revoca, selezione, review, revisione documento, freshness,
@@ -207,17 +306,22 @@ Fermare la promozione se:
 - un timestamp viene presentato come prova di correntezza;
 - il provider riceve un riferimento canonico o il plaintext originale;
 - una citazione non localizzabile in modo univoco viene pubblicata;
+- una pubblicazione cambia ordine, cardinalita o valori U0, o il codec ordina,
+  deduplica, ricalcola o serializza JSON per correggere tali valori;
+- `claimCitationsDigestSha256` non usa il codec raw32 domain-separated fissato,
+  oppure una receipt o provenance ricostruisce una evidence trattenuta;
 - un digest della projection viene usato come digest dell'allegato originale;
 - la receipt manca di revalidation, binding o `writesPerformed=0`;
 - la composizione usa `221758c3` come base integrata o dichiara uno SHA combinato.
 
 ## Non-obiettivi e stato di delivery
 
-Questa ADR non aggiunge runtime, route, UI, schema, migrazioni, DB,
+Questa ADR non aggiunge runtime, route, UI, schema persistente, migrazioni, DB,
 persistenza, log, provider, invocazioni live, cloud, egress, cancellazione
 caller-supplied, review persistente, apply o scritture cliniche. Non prova
 plaintext originale, authority del provider, entailment, correttezza clinica o
-causalita del modello.
+causalita del modello. Non introduce JCS, un master digest, un digest della
+pubblicazione o del plaintext originale.
 
 Lo stato e `Accepted`. Un packet downstream delimitato richiede un gate
 precedente accettato e una base esatta; non richiede una nuova autorizzazione
