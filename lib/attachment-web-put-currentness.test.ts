@@ -19,7 +19,7 @@ for (const name of fs.readdirSync(path.join(root, 'drizzle')).filter((file) => f
 migrationDb.close();
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 const requireCurrent = createRequire(import.meta.url);
-const route = requireCurrent('../app/api/attachments/[id]/content/route') as typeof import('../app/api/attachments/[id]/content/route');
+const adapter = requireCurrent('./attachment-content-cas-route') as typeof import('./attachment-content-cas-route');
 const attachmentSchemas = requireCurrent('./api-schemas/attachments') as typeof import('./api-schemas/attachments');
 const boundedBody = requireCurrent('./bounded-request-body') as typeof import('./bounded-request-body');
 
@@ -69,7 +69,7 @@ function chunkedRequest(chunks: Uint8Array[], metrics: { delivered: number; pull
 }
 
 async function invoke(payload: unknown, id = 'attachment.synthetic.1', authenticated = true, headers: HeadersInit = {}) {
-    return route.putAttachmentContent(request(payload, headers), id, authenticated ? session : null);
+    return adapter.putAttachmentContent(request(payload, headers), id, authenticated ? session : null);
 }
 
 async function json(response: Response) {
@@ -209,27 +209,27 @@ test('bounded reader cancels before unbounded JSON allocation and rejects duplic
     try {
         reset(); const before = snapshot();
         const declaredMetrics = { delivered: 0, pulls: 0, cancelled: 0 };
-        const declared = await route.putAttachmentContent(chunkedRequest([new Uint8Array(8)], declaredMetrics, { 'content-length': '33' }), 'attachment.synthetic.1', session);
+        const declared = await adapter.putAttachmentContent(chunkedRequest([new Uint8Array(8)], declaredMetrics, { 'content-length': '33' }), 'attachment.synthetic.1', session);
         assert.equal(declared.status, 413); assert.ok(declaredMetrics.pulls <= 1); assert.equal(declaredMetrics.cancelled, 1); assert.deepEqual(snapshot(), before);
 
         const chunkMetrics = { delivered: 0, pulls: 0, cancelled: 0 };
         const chunks = Array.from({ length: 8 }, () => new Uint8Array(8));
-        const chunked = await route.putAttachmentContent(chunkedRequest(chunks, chunkMetrics), 'attachment.synthetic.1', session);
+        const chunked = await adapter.putAttachmentContent(chunkedRequest(chunks, chunkMetrics), 'attachment.synthetic.1', session);
         assert.equal(chunked.status, 413); assert.ok(chunkMetrics.delivered <= 40); assert.equal(chunkMetrics.cancelled, 1); assert.deepEqual(snapshot(), before);
 
         const hostileMetrics = { delivered: 0, pulls: 0, cancelled: 0 };
-        const hostile = await route.putAttachmentContent(chunkedRequest([new Uint8Array(4096)], hostileMetrics), 'attachment.synthetic.1', session);
+        const hostile = await adapter.putAttachmentContent(chunkedRequest([new Uint8Array(4096)], hostileMetrics), 'attachment.synthetic.1', session);
         assert.equal(hostile.status, 413); assert.equal(hostileMetrics.pulls, 1); assert.equal(hostileMetrics.cancelled, 1); assert.deepEqual(snapshot(), before);
 
         const malformed = await boundedBody.readBoundedJsonBody(chunkedRequest([new Uint8Array([0xff])], { delivered: 0, pulls: 0, cancelled: 0 }), 32);
         assert.deepEqual(malformed, { ok: false, status: 400 });
         const failedStream = new ReadableStream<Uint8Array>({ start(controller) { controller.error(new Error('synthetic stream failure')); } });
-        const failed = await route.putAttachmentContent(new Request('http://localhost/api/attachments/attachment.synthetic.1/content', {
+        const failed = await adapter.putAttachmentContent(new Request('http://localhost/api/attachments/attachment.synthetic.1/content', {
             method: 'PUT', headers: { 'content-type': 'application/json' }, body: failedStream, duplex: 'half',
         } as RequestInit & { duplex: 'half' }), 'attachment.synthetic.1', session);
         assert.equal(failed.status, 400); assert.deepEqual(snapshot(), before);
         process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES = '1024';
-        const duplicate = await route.putAttachmentContent(new Request('http://localhost/api/attachments/attachment.synthetic.1/content', {
+        const duplicate = await adapter.putAttachmentContent(new Request('http://localhost/api/attachments/attachment.synthetic.1/content', {
             method: 'PUT', headers: { 'content-type': 'application/json' }, body: `{"expected":${JSON.stringify(expected())},"expected":${JSON.stringify(expected())},"replacement":"${sealed}"}`,
         }), 'attachment.synthetic.1', session);
         assert.equal(duplicate.status, 400); assert.deepEqual(snapshot(), before);
@@ -239,16 +239,19 @@ test('bounded reader cancels before unbounded JSON allocation and rejects duplic
     }
 });
 
-test('contains no direct database writer or metadata fallback and delegates once', () => {
+test('route exports only the allowed PUT symbol and adapter owns the one CAS delegation', () => {
     const source = fs.readFileSync(path.join(root, 'app/api/attachments/[id]/content/route.ts'), 'utf8');
+    const adapterSource = fs.readFileSync(path.join(root, 'lib/attachment-content-cas-route.ts'), 'utf8');
+    assert.match(source, /export async function PUT\(/u);
+    assert.doesNotMatch(source, /export (?!async function PUT\b)/u);
     assert.doesNotMatch(source, /dbServer|runDbServerImmediateTransaction|attachmentUpdateSchema|ocrQueueState|provider|apply|request\.json/iu);
-    assert.equal((source.match(/transitionAttachmentContentCurrentness\(/gu) ?? []).length, 1);
-    assert.doesNotMatch(source, /error\.message|json\([^\n]*error\.code/iu);
+    assert.equal((adapterSource.match(/transitionAttachmentContentCurrentness\(/gu) ?? []).length, 1);
+    assert.doesNotMatch(adapterSource, /error\.message|json\([^\n]*error\.code/iu);
 });
 
 test('two process-level route contenders produce one receipt and one conflict', { timeout: 30_000 }, async () => {
     reset(); const workerPath = path.join(dataDir, 'route-worker.mjs');
-    fs.writeFileSync(workerPath, `const route = await import('@/app/api/attachments/[id]/content/route');\nconst operatorLabel = 'synthetic';\nconst response = await route.putAttachmentContent(new Request('http://localhost/api/attachments/attachment.synthetic.1/content', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expected: { sourceRef: '${ref}', revision: 1, freshnessEpoch: 1 }, replacement: '${sealed}' }) }), 'attachment.synthetic.1', { id: 'session.synthetic', userId: 'user.synthetic', username: operatorLabel, role: 'admin', authChannel: 'web', createdAt: 1, expiresAt: 2 });\nconsole.log(response.status);\n`);
+    fs.writeFileSync(workerPath, `const adapter = await import('@/lib/attachment-content-cas-route');\nconst operatorLabel = 'synthetic';\nconst response = await adapter.putAttachmentContent(new Request('http://localhost/api/attachments/attachment.synthetic.1/content', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expected: { sourceRef: '${ref}', revision: 1, freshnessEpoch: 1 }, replacement: '${sealed}' }) }), 'attachment.synthetic.1', { id: 'session.synthetic', userId: 'user.synthetic', username: operatorLabel, role: 'admin', authChannel: 'web', createdAt: 1, expiresAt: 2 });\nconsole.log(response.status);\n`);
     try {
         assert.deepEqual((await Promise.all([routeWorker(), routeWorker()])).sort(), ['200', '409']);
         assert.deepEqual(snapshot(), { patient_id: 'patient.synthetic.1', data: sealed, document_source_ref: ref, document_revision: 2, document_freshness_epoch: 2 });
