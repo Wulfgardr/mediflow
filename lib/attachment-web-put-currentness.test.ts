@@ -20,6 +20,7 @@ migrationDb.close();
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 const requireCurrent = createRequire(import.meta.url);
 const route = requireCurrent('../app/api/attachments/[id]/content/route') as typeof import('../app/api/attachments/[id]/content/route');
+const attachmentSchemas = requireCurrent('./api-schemas/attachments') as typeof import('./api-schemas/attachments');
 
 const ref = 'a'.repeat(64);
 const sealed = 'ENC:c3ludGhldGlj:cmVwbGFjZW1lbnQ=';
@@ -71,6 +72,54 @@ function routeWorker(workerPath = path.join(dataDir, 'route-worker.mjs')): Promi
 }
 
 test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
+
+test('descriptor-first request schema rejects ambient and exotic shapes without reads', () => {
+    const valid = () => ({ expected: expected(), replacement: sealed });
+    const rejects = (value: unknown) => assert.equal(attachmentSchemas.parseAttachmentContentCurrentnessPut(value), null);
+    let getterReads = 0;
+    let proxyReads = 0;
+    const rootAccessor = { replacement: sealed } as Record<string, unknown>;
+    Object.defineProperty(rootAccessor, 'expected', { enumerable: true, get() { getterReads += 1; return expected(); } });
+    const nestedAccessor = { expected: { revision: 1, freshnessEpoch: 1 }, replacement: sealed } as { expected: Record<string, unknown>; replacement: string };
+    Object.defineProperty(nestedAccessor.expected, 'sourceRef', { enumerable: true, get() { getterReads += 1; return ref; } });
+    const nonEnumerable = valid(); Object.defineProperty(nonEnumerable, 'replacement', { enumerable: false, value: sealed });
+    const inherited = Object.create(Object.prototype) as Record<string, unknown>; inherited.replacement = sealed;
+    const customPrototype = Object.create({ expected: expected() }) as Record<string, unknown>; customPrototype.replacement = sealed;
+    const nullPrototype = Object.assign(Object.create(null), valid());
+    const proxy = new Proxy(valid(), { get() { proxyReads += 1; return undefined; }, ownKeys() { proxyReads += 1; return []; } });
+    rejects(rootAccessor); rejects(nestedAccessor); rejects(nonEnumerable); rejects(inherited); rejects(customPrototype); rejects(nullPrototype); rejects(proxy);
+    rejects({ ...valid(), then() { getterReads += 1; } });
+    rejects({ ...valid(), [Symbol('synthetic')]: true });
+    const toJson = valid(); Object.defineProperty(toJson, 'toJSON', { enumerable: true, get() { getterReads += 1; return () => valid(); } }); rejects(toJson);
+    assert.equal(getterReads, 0); assert.equal(proxyReads, 0);
+
+    const inheritedExpected = Object.getOwnPropertyDescriptor(Object.prototype, 'expected');
+    const inheritedReplacement = Object.getOwnPropertyDescriptor(Object.prototype, 'replacement');
+    const inheritedValue = Object.getOwnPropertyDescriptor(Object.prototype, 'value');
+    const inheritedThen = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+    try {
+        Object.defineProperty(Object.prototype, 'expected', { configurable: true, get() { getterReads += 1; return expected(); } });
+        rejects({ replacement: sealed });
+        Object.defineProperty(Object.prototype, 'replacement', { configurable: true, get() { getterReads += 1; return sealed; } });
+        rejects({ expected: expected() });
+        Object.defineProperty(Object.prototype, 'value', { configurable: true, get() { getterReads += 1; return sealed; } });
+        assert.deepEqual(attachmentSchemas.parseAttachmentContentCurrentnessPut(valid()), valid());
+        Object.defineProperty(Object.prototype, 'then', { configurable: true, value: () => { getterReads += 1; } });
+        rejects(valid());
+    } finally {
+        if (inheritedExpected) Object.defineProperty(Object.prototype, 'expected', inheritedExpected); else delete (Object.prototype as Record<string, unknown>).expected;
+        if (inheritedReplacement) Object.defineProperty(Object.prototype, 'replacement', inheritedReplacement); else delete (Object.prototype as Record<string, unknown>).replacement;
+        if (inheritedValue) Object.defineProperty(Object.prototype, 'value', inheritedValue); else delete (Object.prototype as Record<string, unknown>).value;
+        if (inheritedThen) Object.defineProperty(Object.prototype, 'then', inheritedThen); else delete (Object.prototype as Record<string, unknown>).then;
+    }
+    const originalTest = RegExp.prototype.test;
+    try {
+        RegExp.prototype.test = (() => true) as typeof RegExp.prototype.test;
+        rejects({ expected: { sourceRef: 'plaintext', revision: 1, freshnessEpoch: 1 }, replacement: 'plaintext' });
+        assert.deepEqual(attachmentSchemas.parseAttachmentContentCurrentnessPut(valid()), valid());
+    } finally { RegExp.prototype.test = originalTest; }
+    assert.equal(getterReads, 0);
+});
 
 test('authenticated route replaces only sealed data and returns a sanitized currentness receipt', async () => {
     reset();
