@@ -3,6 +3,7 @@ import 'server-only';
 
 import { types } from 'node:util';
 
+import { buildDocumentSynthesisMultiSourcePrompt } from './document-synthesis-multi-source-prompt';
 import { composeDocumentSynthesisProviderProjection } from './document-synthesis-source-set-contract';
 import {
     isServerSessionProjectionOwner,
@@ -18,7 +19,14 @@ export type DocumentSynthesisSourceSetCurrentness = Readonly<{
 }>;
 type Capsule = Readonly<{ snapshot(): DocumentSynthesisSourceSetCurrentness | null; transition(sourceSet: unknown): boolean; revoke(): void; dispose(): void }>;
 export type DocumentSynthesisSourceSetCurrentnessAccessor = Readonly<{ snapshot(): DocumentSynthesisSourceSetCurrentness | null }>;
-type CapsuleBinding = Readonly<{ owner: ServerSessionProjectionOwner; session: unknown; accessor: DocumentSynthesisSourceSetCurrentnessAccessor }>;
+export type DocumentSynthesisSourceSetProviderInputAccessor = Readonly<{ snapshotPrompt(): string | null }>;
+type ProviderInput = Readonly<{ prompt: string }>;
+type CapsuleBinding = Readonly<{
+    owner: ServerSessionProjectionOwner;
+    session: unknown;
+    accessor: DocumentSynthesisSourceSetCurrentnessAccessor;
+    providerInputAccessor: DocumentSynthesisSourceSetProviderInputAccessor;
+}>;
 
 const OBJECT = Object.prototype;
 const ARRAY = Array.prototype;
@@ -33,7 +41,7 @@ const ArrayIsArray = Array.isArray;
 const IsProxy = types.isProxy;
 const NumberIsSafeInteger = Number.isSafeInteger;
 const MAX_U64 = BigInt('18446744073709551615');
-const WeakSetConstructor = WeakSet; const WeakMapConstructor = WeakMap; const ReflectApply = Reflect.apply;
+const WeakSetConstructor = WeakSet; const WeakMapConstructor = WeakMap; const MapConstructor = Map; const ReflectApply = Reflect.apply;
 const weakSetAdd = WeakSet.prototype.add; const weakSetHas = WeakSet.prototype.has; const weakMapGet = WeakMap.prototype.get; const weakMapSet = WeakMap.prototype.set;
 const authenticCapsules = new WeakSetConstructor<object>();
 const capsuleBindings = new WeakMapConstructor<object, CapsuleBinding>();
@@ -52,6 +60,17 @@ export function resolveDocumentSynthesisSourceSetCurrentnessAccessor(value: unkn
         const binding = ReflectApply(weakMapGet, capsuleBindings, [value]) as CapsuleBinding | undefined;
         if (!binding || binding.owner !== owner || binding.session !== session) return null;
         return binding.accessor;
+    } catch { return null; }
+}
+
+/** Resolves the private provider-input prompt for one branded owner/session capsule only. */
+export function resolveDocumentSynthesisSourceSetProviderInputAccessor(value: unknown, owner: unknown, session: unknown): DocumentSynthesisSourceSetProviderInputAccessor | null {
+    if (typeof value !== 'object' || value === null || IsProxy(value)) return null;
+    try {
+        if (!ReflectApply(weakSetHas, authenticCapsules, [value])) return null;
+        const binding = ReflectApply(weakMapGet, capsuleBindings, [value]) as CapsuleBinding | undefined;
+        if (!binding || binding.owner !== owner || binding.session !== session) return null;
+        return binding.providerInputAccessor;
     } catch { return null; }
 }
 
@@ -112,6 +131,15 @@ function capture(value: unknown): DocumentSynthesisSourceSetCurrentness | null {
     } catch { return null; }
 }
 
+function providerInput(value: unknown): ProviderInput | null {
+    try {
+        const result = buildDocumentSynthesisMultiSourcePrompt(value);
+        return result.status === 'available' && typeof result.prompt === 'string'
+            ? sealed({ prompt: result.prompt }) as ProviderInput
+            : null;
+    } catch { return null; }
+}
+
 function configuration(value: unknown): Readonly<{ owner: ServerSessionProjectionOwner; session: unknown; sourceSet: unknown }> | null {
     const input = record(value, ['owner', 'session', 'sourceSet'], OBJECT);
     if (!input || IsProxy(input.session) || !isServerSessionProjectionOwner(input.owner)) return null;
@@ -126,35 +154,39 @@ function configuration(value: unknown): Readonly<{ owner: ServerSessionProjectio
 export function createDocumentSynthesisSourceSetCurrentnessOwner(value: unknown): Capsule {
     const input = configuration(value);
     const initial = input && capture(input.sourceSet);
-    if (!input || !initial) throw new DocumentSynthesisSourceSetCurrentnessOwnerConfigurationError();
+    const initialProviderInput = input && providerInput(input.sourceSet);
+    if (!input || !initial || !initialProviderInput) throw new DocumentSynthesisSourceSetCurrentnessOwnerConfigurationError();
 
     let port: DocumentSynthesisLeaseCommitPort;
     try { port = input.owner.mintDocumentSynthesisLeaseCommitPort(input.session as Parameters<ServerSessionProjectionOwner['mintDocumentSynthesisLeaseCommitPort']>[0]); }
     catch { throw new DocumentSynthesisSourceSetCurrentnessOwnerConfigurationError(); }
     let current = initial;
-    let lineage = new Map<string, Source>();
+    let currentProviderInput = initialProviderInput;
+    let lineage = new MapConstructor<string, Source>();
     let terminal = false;
     let active = false;
     let reentered = false;
 
-    const preservesLineage = (next: DocumentSynthesisSourceSetCurrentness): boolean => {
-        const nextLineage = new Map(lineage);
+    const continuedLineage = (next: DocumentSynthesisSourceSetCurrentness): Map<string, Source> | null => {
+        const nextLineage = new MapConstructor(lineage);
         for (const source of next.sources) {
             const previous = nextLineage.get(source.documentSourceRef);
-            if (previous && (source.documentRevision < previous.documentRevision || source.documentFreshnessEpoch < previous.documentFreshnessEpoch)) return false;
+            if (previous && (source.documentRevision < previous.documentRevision || source.documentFreshnessEpoch < previous.documentFreshnessEpoch)) return null;
             nextLineage.set(source.documentSourceRef, source);
         }
-        lineage = nextLineage;
-        return true;
+        return nextLineage;
     };
-    if (!preservesLineage(initial)) throw new DocumentSynthesisSourceSetCurrentnessOwnerConfigurationError();
+    const initialLineage = continuedLineage(initial);
+    if (!initialLineage) throw new DocumentSynthesisSourceSetCurrentnessOwnerConfigurationError();
+    lineage = initialLineage;
 
     const live = (): boolean => {
-        if (terminal || active) { reentered = active; return false; }
-        active = true;
+        if (terminal || active) { if (active) reentered = true; return false; }
+        active = true; reentered = false;
         try {
             const snapshot = port.snapshot();
-            if (!snapshot || reentered) { terminal = true; return false; }
+            if (!snapshot) { terminal = true; return false; }
+            if (reentered) return false;
             return true;
         } finally { active = false; }
     };
@@ -167,18 +199,23 @@ export function createDocumentSynthesisSourceSetCurrentnessOwner(value: unknown)
         transition(sourceSet: unknown) {
             if (!live()) return false;
             const next = capture(sourceSet);
-            if (!next || next.sourceSetEpoch <= current.sourceSetEpoch || next.revocationGeneration < current.revocationGeneration || !preservesLineage(next)) {
-                terminal = true;
-                return false;
-            }
-            current = next;
+            const nextProviderInput = providerInput(sourceSet);
+            const nextLineage = next && nextProviderInput ? continuedLineage(next) : null;
+            if (!next || !nextProviderInput || !nextLineage || next.sourceSetEpoch <= current.sourceSetEpoch || next.revocationGeneration < current.revocationGeneration || reentered) return false;
+            current = next; currentProviderInput = nextProviderInput; lineage = nextLineage;
             return true;
         },
         revoke() { terminal = true; port.dispose(); },
         dispose() { terminal = true; port.dispose(); },
     }) as Capsule;
     const accessor = sealed({ snapshot: capsule.snapshot }) as DocumentSynthesisSourceSetCurrentnessAccessor;
+    const providerInputAccessor = sealed({
+        snapshotPrompt() {
+            if (!live()) return null;
+            return currentProviderInput.prompt;
+        },
+    }) as DocumentSynthesisSourceSetProviderInputAccessor;
     ReflectApply(weakSetAdd, authenticCapsules, [capsule]);
-    ReflectApply(weakMapSet, capsuleBindings, [capsule, sealed({ owner: input.owner, session: input.session, accessor }) as CapsuleBinding]);
+    ReflectApply(weakMapSet, capsuleBindings, [capsule, sealed({ owner: input.owner, session: input.session, accessor, providerInputAccessor }) as CapsuleBinding]);
     return capsule;
 }
