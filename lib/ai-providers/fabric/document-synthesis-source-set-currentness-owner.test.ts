@@ -6,9 +6,10 @@ import { captureDocumentSynthesisSourceSet } from './document-synthesis-source-s
 import {
     createDocumentSynthesisSourceSetCurrentnessOwner,
     DocumentSynthesisSourceSetCurrentnessOwnerConfigurationError,
+    resolveDocumentSynthesisSourceSetCurrentnessAccessor,
 } from './document-synthesis-source-set-currentness-owner.ts';
 import { createServerSessionProjectionOwnerRegistry } from '../../security/server-session-projection-owner.ts';
-import { clearAllSessions, createSession, deleteSession, type ServerSession } from '../../security/server-session.ts';
+import { clearAllSessions, createSession, deleteSession } from '../../security/server-session.ts';
 
 const USER = { id: ['synthetic', 'currentness', 'user'].join('-'), username: ['synthetic', 'currentness', 'clinician'].join('-'), role: 'clinician' };
 const PAIR = { patientId: 'patient.synthetic.currentness', ambulatoryId: 'ambulatory.synthetic.currentness' };
@@ -46,6 +47,20 @@ test('captures only host-minted C3c2 currentness under the live Document Synthes
     assert.deepEqual(Object.keys(snapshot!.sources[0]!), ['label', 'documentSourceRef', 'documentRevision', 'documentFreshnessEpoch']);
     assert.deepEqual(Object.keys(capsule), ['snapshot', 'transition', 'revoke', 'dispose']);
     assert.equal(capsule instanceof Promise, false);
+});
+
+test('resolves only its branded same-owner capsule without ambient, proxy, thenable, or deferred access', () => {
+    const first = ownerWithSelection(); const second = ownerWithSelection(); const capsule = createDocumentSynthesisSourceSetCurrentnessOwner(Object.freeze({ owner: first.owner, session: first.session, sourceSet: sourceSet() }));
+    const accessor = resolveDocumentSynthesisSourceSetCurrentnessAccessor(capsule, first.owner, first.session);
+    assert.ok(accessor); assert.equal(accessor instanceof Promise, false); assert.ok(accessor.snapshot());
+    assert.equal(resolveDocumentSynthesisSourceSetCurrentnessAccessor(capsule, second.owner, second.session), null);
+    let reads = 0; let traps = 0;
+    const forged = Object.freeze({ snapshot() { reads += 1; return null; }, transition() { reads += 1; return false; }, revoke() { reads += 1; }, dispose() { reads += 1; } });
+    const proxied = new Proxy(capsule, { get() { traps += 1; throw new Error('trap'); } });
+    const prior = Object.getOwnPropertyDescriptor(globalThis, 'WeakSet');
+    try { Object.defineProperty(globalThis, 'WeakSet', { configurable: true, value: class { } }); for (const value of [forged, Object.freeze({ ...capsule }), proxied, Object.freeze({ then() {} })]) assert.equal(resolveDocumentSynthesisSourceSetCurrentnessAccessor(value, first.owner, first.session), null); assert.ok(resolveDocumentSynthesisSourceSetCurrentnessAccessor(capsule, first.owner, first.session)); }
+    finally { Object.defineProperty(globalThis, 'WeakSet', prior!); }
+    assert.equal(reads, 0); assert.equal(traps, 0);
 });
 
 test('requires a strictly increasing source-set epoch and nondecreasing revocation generation', () => {
