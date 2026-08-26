@@ -9,7 +9,6 @@ import {
     type DocumentSynthesisLeaseCommitPort,
     type ServerSessionProjectionOwner,
 } from '../../security/server-session-projection-owner';
-import type { ServerSession } from '../../security/server-session';
 
 type Source = Readonly<{ label: string; documentSourceRef: string; documentRevision: bigint; documentFreshnessEpoch: bigint }>;
 export type DocumentSynthesisSourceSetCurrentness = Readonly<{
@@ -96,10 +95,10 @@ function capture(value: unknown): DocumentSynthesisSourceSetCurrentness | null {
     } catch { return null; }
 }
 
-function configuration(value: unknown): Readonly<{ owner: ServerSessionProjectionOwner; session: ServerSession; sourceSet: unknown }> | null {
+function configuration(value: unknown): Readonly<{ owner: ServerSessionProjectionOwner; session: unknown; sourceSet: unknown }> | null {
     const input = record(value, ['owner', 'session', 'sourceSet'], OBJECT);
     if (!input || IsProxy(input.session) || !isServerSessionProjectionOwner(input.owner)) return null;
-    return sealed({ owner: input.owner, session: input.session as ServerSession, sourceSet: input.sourceSet });
+    return sealed({ owner: input.owner, session: input.session, sourceSet: input.sourceSet });
 }
 
 /**
@@ -118,12 +117,25 @@ export function createDocumentSynthesisSourceSetCurrentnessOwner(value: unknown)
     if (!input || !initial) throw new DocumentSynthesisSourceSetCurrentnessOwnerConfigurationError();
 
     let port: DocumentSynthesisLeaseCommitPort;
-    try { port = input.owner.mintDocumentSynthesisLeaseCommitPort(input.session); }
+    try { port = input.owner.mintDocumentSynthesisLeaseCommitPort(input.session as Parameters<ServerSessionProjectionOwner['mintDocumentSynthesisLeaseCommitPort']>[0]); }
     catch { throw new DocumentSynthesisSourceSetCurrentnessOwnerConfigurationError(); }
     let current = initial;
+    let lineage = new Map<string, Source>();
     let terminal = false;
     let active = false;
     let reentered = false;
+
+    const preservesLineage = (next: DocumentSynthesisSourceSetCurrentness): boolean => {
+        const nextLineage = new Map(lineage);
+        for (const source of next.sources) {
+            const previous = nextLineage.get(source.documentSourceRef);
+            if (previous && (source.documentRevision < previous.documentRevision || source.documentFreshnessEpoch < previous.documentFreshnessEpoch)) return false;
+            nextLineage.set(source.documentSourceRef, source);
+        }
+        lineage = nextLineage;
+        return true;
+    };
+    if (!preservesLineage(initial)) throw new DocumentSynthesisSourceSetCurrentnessOwnerConfigurationError();
 
     const live = (): boolean => {
         if (terminal || active) { reentered = active; return false; }
@@ -143,7 +155,7 @@ export function createDocumentSynthesisSourceSetCurrentnessOwner(value: unknown)
         transition(sourceSet: unknown) {
             if (!live()) return false;
             const next = capture(sourceSet);
-            if (!next || next.sourceSetEpoch <= current.sourceSetEpoch || next.revocationGeneration < current.revocationGeneration) {
+            if (!next || next.sourceSetEpoch <= current.sourceSetEpoch || next.revocationGeneration < current.revocationGeneration || !preservesLineage(next)) {
                 terminal = true;
                 return false;
             }
