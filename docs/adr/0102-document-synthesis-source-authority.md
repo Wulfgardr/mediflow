@@ -130,6 +130,17 @@ Prima dell'hash l'host rifiuta overflow dei prefissi, UTF-8 o Unicode invalidi,
 valori vuoti quando tag, etichetta o `documentSourceRef` devono essere non
 vuoti, e byte oltre i limiti di campo, sorgente o aggregato gia definiti. I
 digest restano 32 byte raw, non hex. Nessun campo puo dipendere dall'ordine JSON.
+Questo codec resta invariato: questa ADR non introduce JCS, un master digest o
+un digest del plaintext originale.
+
+### Evidence di provider-binding
+
+La `provider-binding receipt` e l'esatta receipt emessa dall'host, con schema
+`mediflow.document-synthesis.provider-binding.v1`, per il binding autenticato
+di Document Synthesis. E distinta dalla `ProviderSelectionReceipt`
+del registry, che e gia nidificata nella Fabric resolution receipt. Una receipt
+finale puo legare entrambe come evidence distinte. Nessuna delle due concede
+authority o puo sostituire l'altra.
 
 ### Fence a due fasi e receipt finale
 
@@ -138,21 +149,27 @@ dell'handle e preparazione dell'invocazione. Segue esattamente una chiamata
 asincrona al provider, con cancellazione interna.
 
 La seconda sezione e sincrona: rilettura completa degli epoch, validazione di
-citazioni e digest, preparazione di un payload receipt non osservabile e commit
-con il lease DS come ultima operazione. Le sezioni protette non accettano
-`Promise` o thenable. Non eseguono DB, persistenza o scritture cliniche.
+citazioni e digest. Prima del commit puo precomputare e congelare un payload di
+pubblicazione opaco, privato e non osservabile, trattenuto solo in memoria.
+Prima della revalidation riuscita e del commit del lease DS, quel payload non e
+una receipt o provenance emessa e non puo essere restituito, risolto, loggato,
+persistito, ispezionato o usato come authority. Il commit del lease DS resta
+l'ultima operazione. Le sezioni protette non accettano `Promise` o thenable. Non
+eseguono DB, persistenza o scritture cliniche.
 
-Solo dopo la rilettura e il commit l'host crea e restituisce receipt e
-provenance finali. La receipt lega i digest di output, citazioni, source set e
-provider-binding receipt. Dichiara `review-only`, `applyPolicy=none` e
-`writesPerformed=0`.
+Solo dopo la rilettura riuscita e il commit, la pubblicazione seleziona e
+restituisce il riferimento immutabile precompilato come receipt e provenance
+finali. Dopo il commit non avvengono hashing, cloning, freezing, callback,
+logging, cleanup, persistenza o altro lavoro fallibile. La receipt lega i digest
+di output, citazioni, source set e provider-binding receipt. Dichiara
+`review-only`, `applyPolicy=none` e `writesPerformed=0`.
 
 I gate avversari sono obbligatori e deterministici. Se durante la chiamata
 asincrona cambiano revoca, selezione, review, revisione documento, freshness,
 source set o expiry, l'operazione abortisce o termina negata. Un completamento
 tardivo puo essere osservato per la denial, ma non e mai pubblicato. La
-revalidation finale e il commit-last devono riuscire prima di creare o
-restituire receipt o provenance; un failure iniettato prima del commit prova
+revalidation finale e il commit-last devono riuscire prima della pubblicazione
+o restituzione di receipt o provenance; un failure iniettato prima del commit prova
 `receipt: null`.
 
 ### Riconciliazione dell'integrazione
