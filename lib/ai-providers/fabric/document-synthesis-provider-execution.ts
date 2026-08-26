@@ -7,16 +7,15 @@ import { types } from 'node:util';
 import { buildDocumentSynthesisExtractionPrompt } from '@/lib/ai-task-contract-prompts';
 import type { DocumentSynthesisOutput } from './document-synthesis-output-contract';
 import { resolveDocumentSynthesisHostProjection, type DocumentSynthesisHostProjection } from './document-synthesis-host-projection';
-import { resolveDocumentSynthesisProviderBinding } from './document-synthesis-provider-binding';
+import { claimDocumentSynthesisProviderBindingForExecution, type DocumentSynthesisProviderBindingReceipt } from './document-synthesis-provider-binding';
 import { normalizeDocumentSynthesisProviderResponse } from './document-synthesis-provider-response';
 
 const TIMEOUT_MS = 300_000;
 const OBJECT = Object.prototype;
-const consumedTokens = new WeakSet<object>();
 const COMMON = Object.freeze({ reviewOnly: true as const, writesPerformed: 0 as const, applyPolicy: 'none' as const, fallback: 'denied' as const });
 
 type DenialCode = 'input_invalid' | 'binding_invalid' | 'binding_consumed' | 'provider_unavailable' | 'provider_timeout' | 'output_invalid';
-type Receipt = Readonly<{ capability: 'document_synthesis'; task: 'reasoning'; provider: 'ollama'; model: string; venue: 'local_process'; endpointClass: 'loopback'; egress: 'none'; runtimeReadiness: 'required'; fallback: 'none' }>;
+type Receipt = DocumentSynthesisProviderBindingReceipt;
 type Provenance = Readonly<{ sourceAuthority: 'not_bound'; modelDigestCausality: 'not_established' }>;
 export type DocumentSynthesisProviderExecutionResult = Readonly<{ status: 'available'; code: null; output: DocumentSynthesisOutput; outputSha256: string; receipt: Receipt; provenance: Provenance } & typeof COMMON>
     | Readonly<{ status: 'denied'; code: DenialCode; output: null; outputSha256: null; receipt: null; provenance: null } & typeof COMMON>;
@@ -55,10 +54,6 @@ function denied(code: DenialCode): DocumentSynthesisProviderExecutionResult {
     return frozen({ status: 'denied' as const, code, output: null, outputSha256: null, receipt: null, provenance: null, ...COMMON }) as DocumentSynthesisProviderExecutionResult;
 }
 
-function receipt(model: string): Receipt {
-    return frozen({ capability: 'document_synthesis' as const, task: 'reasoning' as const, provider: 'ollama' as const, model, venue: 'local_process' as const, endpointClass: 'loopback' as const, egress: 'none' as const, runtimeReadiness: 'required' as const, fallback: 'none' as const }) as Receipt;
-}
-
 /** Host-only, one-shot execution of a previously sealed local provider binding. */
 export async function executeDocumentSynthesisProvider(value: unknown): Promise<DocumentSynthesisProviderExecutionResult> {
     const input = record(value, ['projection', 'providerToken']);
@@ -66,10 +61,9 @@ export async function executeDocumentSynthesisProvider(value: unknown): Promise<
     if (!input || !source) return denied('input_invalid');
 
     const token = input.providerToken;
-    const resolution = resolveDocumentSynthesisProviderBinding(token);
-    if (!resolution || typeof token !== 'object' || token === null) return denied('binding_invalid');
-    if (consumedTokens.has(token)) return denied('binding_consumed');
-    consumedTokens.add(token);
+    const binding = claimDocumentSynthesisProviderBindingForExecution(token);
+    if (!binding) return denied('binding_invalid');
+    const resolution = binding.resolution;
 
     const signal = AbortSignal.timeout(TIMEOUT_MS);
     let onAbort: (() => void) | undefined;
@@ -101,7 +95,7 @@ export async function executeDocumentSynthesisProvider(value: unknown): Promise<
         code: null,
         output,
         outputSha256: createHash('sha256').update(JSON.stringify(output), 'utf8').digest('hex'),
-        receipt: receipt(resolution.receipt.model),
+        receipt: binding.receipt,
         provenance: frozen({ sourceAuthority: 'not_bound' as const, modelDigestCausality: 'not_established' as const }) as Provenance,
         ...COMMON,
     }) as DocumentSynthesisProviderExecutionResult;

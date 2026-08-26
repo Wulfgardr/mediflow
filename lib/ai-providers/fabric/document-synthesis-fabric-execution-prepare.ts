@@ -5,14 +5,14 @@ import { types } from 'node:util';
 
 import { resolveDocumentSynthesisFabricExecutionHandoff, type DocumentSynthesisFabricExecutionCapability } from './document-synthesis-fabric-admission';
 import { parseDocumentSynthesisProviderEnvelope } from './document-synthesis-provider-envelope';
-import { resolveDocumentSynthesisProviderBinding } from './document-synthesis-provider-binding';
+import { claimDocumentSynthesisProviderBindingForExecution, type DocumentSynthesisProviderBindingReceipt } from './document-synthesis-provider-binding';
 
 export type DocumentSynthesisFabricPreparedExecutionToken = object;
 type DenialCode = 'input_invalid' | 'handoff_unavailable' | 'binding_invalid' | 'provider_unavailable' | 'provider_timeout' | 'response_invalid' | 'validation_denied' | 'canceled';
 export type DocumentSynthesisFabricExecutionPrepareResult = Readonly<{ status: 'available'; code: null; preparedToken: DocumentSynthesisFabricPreparedExecutionToken; reviewOnly: true; writesPerformed: 0; applyPolicy: 'none'; fallback: 'denied_by_contract' }>
     | Readonly<{ status: 'denied'; code: DenialCode; preparedToken: null; reviewOnly: true; writesPerformed: 0; applyPolicy: 'none'; fallback: 'denied_by_contract' }>;
 
-type Entry = { state: 'running' | 'prepared' | 'aborted'; handoff: object; execution: DocumentSynthesisFabricExecutionCapability; controller: AbortController; timer: ReturnType<typeof setTimeout> | null; settle: ((outcome: Outcome) => void) | null; validation: unknown; envelope: object | null };
+type Entry = { state: 'running' | 'prepared' | 'aborted'; handoff: object; execution: DocumentSynthesisFabricExecutionCapability; controller: AbortController; timer: ReturnType<typeof setTimeout> | null; settle: ((outcome: Outcome) => void) | null; validation: unknown; envelope: object | null; receipt: DocumentSynthesisProviderBindingReceipt | null };
 type Outcome = Readonly<{ kind: 'response'; value: unknown }> | Readonly<{ kind: 'failure' | 'timeout' }>;
 const OBJECT = Object.prototype; const ObjectAssign = Object.assign; const ObjectCreate = Object.create; const ObjectFreeze = Object.freeze; const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor; const ObjectGetPrototypeOf = Object.getPrototypeOf; const ObjectHasOwn = Object.hasOwn; const ReflectApply = Reflect.apply; const ReflectOwnKeys = Reflect.ownKeys; const IsProxy = types.isProxy;
 const WeakMapConstructor = WeakMap; const WeakMapGet = WeakMap.prototype.get; const WeakMapSet = WeakMap.prototype.set; const WeakMapDelete = WeakMap.prototype.delete; const PromiseConstructor = Promise; const PromiseThen = Promise.prototype.then; const AbortControllerConstructor = AbortController; const SetTimeout = setTimeout; const ClearTimeout = clearTimeout;
@@ -26,7 +26,7 @@ function abort(entry: Entry): void { if (entry.state === 'aborted') return; entr
 function responseContent(value: unknown): object | null {
     try { if (!value || typeof value !== 'object' || IsProxy(value) || ObjectGetPrototypeOf(value) !== OBJECT || ReflectOwnKeys(value).length !== 2) return null; const content = ObjectGetOwnPropertyDescriptor(value, 'content'); const stats = ObjectGetOwnPropertyDescriptor(value, 'stats'); if (!content || !stats || !content.enumerable || !stats.enumerable || !ObjectHasOwn(content, 'value') || !ObjectHasOwn(stats, 'value') || typeof content.value !== 'string') return null; return ObjectFreeze({ content: content.value }); } catch { return null; }
 }
-function invoke(entry: Entry, binding: NonNullable<ReturnType<typeof resolveDocumentSynthesisProviderBinding>>, prompt: string): Promise<Outcome> {
+function invoke(entry: Entry, binding: NonNullable<ReturnType<typeof claimDocumentSynthesisProviderBindingForExecution>>['resolution'], prompt: string): Promise<Outcome> {
     let resolveOutcome!: (value: Outcome) => void;
     const outcome = new PromiseConstructor<Outcome>((resolve) => { resolveOutcome = resolve; }); entry.settle = resolveOutcome;
     entry.timer = SetTimeout(() => { if (entry.state === 'running') { try { entry.controller.abort(); } catch { /* Internal timeout only. */ } resolveOutcome(frozen({ kind: 'timeout' as const })); } }, timeoutMs);
@@ -44,11 +44,12 @@ export async function prepareDocumentSynthesisFabricExecution(handoff: unknown):
     const retained = ReflectApply(WeakMapGet, handoffs, [handoff]) as Entry | undefined;
     if (retained) { abort(retained); return denied('canceled'); }
     const admission = resolveDocumentSynthesisFabricExecutionHandoff(handoff); if (!admission) return denied('handoff_unavailable');
-    const entry: Entry = { state: 'running', handoff, execution: admission.execution, controller: new AbortControllerConstructor(), timer: null, settle: null, validation: null, envelope: null };
+    const entry: Entry = { state: 'running', handoff, execution: admission.execution, controller: new AbortControllerConstructor(), timer: null, settle: null, validation: null, envelope: null, receipt: null };
     ReflectApply(WeakMapSet, handoffs, [handoff, entry]);
-    const binding = resolveDocumentSynthesisProviderBinding(admission.providerToken); if (!binding) { abort(entry); return denied('binding_invalid'); }
+    const binding = claimDocumentSynthesisProviderBindingForExecution(admission.providerToken); if (!binding) { abort(entry); return denied('binding_invalid'); }
+    entry.receipt = binding.receipt;
     const input = entry.execution.takeProviderInput(); if (!input) { abort(entry); return denied('input_invalid'); }
-    const settled = await invoke(entry, binding, input.prompt);
+    const settled = await invoke(entry, binding.resolution, input.prompt);
     if (entry.timer !== null) { ClearTimeout(entry.timer); entry.timer = null; } entry.settle = null;
     if (entry.state !== 'running') return denied('canceled');
     if (settled.kind === 'timeout') { abort(entry); return denied('provider_timeout'); }
