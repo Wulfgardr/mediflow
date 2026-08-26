@@ -34,7 +34,6 @@ const session = {
     id: 'session.synthetic', userId: 'user.synthetic', username: sessionUsername, role: 'admin',
     authChannel: 'web', createdAt: 1, expiresAt: Number.MAX_SAFE_INTEGER,
 } as const;
-const sourceRef = 'a'.repeat(64);
 
 function reset(): void {
     const db = new Database(dbPath);
@@ -73,55 +72,51 @@ function payload(overrides: Record<string, unknown> = {}): Record<string, unknow
     };
 }
 
-function initial(ref = sourceRef): { sourceRef: string; revision: 1; freshnessEpoch: 1 } {
-    return { sourceRef: ref, revision: 1, freshnessEpoch: 1 };
+async function invoke(requestValue: Request, sessionValue: unknown = session, extra?: unknown): Promise<Response> {
+    return (createWebAttachment as (...args: unknown[]) => Promise<Response>)(requestValue, sessionValue, extra);
 }
 
 test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
-test('web creation mints exactly once after validation and persists the exact initial host tuple', async () => {
+test('web creation persists a production lower-hex initial host tuple', async () => {
     reset();
-    let mints = 0;
-    const response = await createWebAttachment(request(payload({ id: 'attachment.synthetic.currentness' })), session, () => {
-        mints += 1;
-        return initial();
-    });
+    const response = await invoke(request(payload({ id: 'attachment.synthetic.currentness' })));
 
     assert.equal(response.status, 201);
     assert.deepEqual(await response.json(), { id: 'attachment.synthetic.currentness' });
-    assert.equal(mints, 1);
-    assert.deepEqual(rows(), [{
-        id: 'attachment.synthetic.currentness',
-        patient_id: patientId,
-        document_source_ref: sourceRef,
-        document_revision: 1,
-        document_freshness_epoch: 1,
-    }]);
+    const [created] = rows();
+    assert.equal(created?.id, 'attachment.synthetic.currentness');
+    assert.equal(created?.patient_id, patientId);
+    assert.match(created?.document_source_ref as string, /^[0-9a-f]{64}$/u);
+    assert.equal(created?.document_revision, 1);
+    assert.equal(created?.document_freshness_epoch, 1);
 });
 
-test('web creation denies absent auth, invalid input, currentness injection, and missing patients before minting', async () => {
+test('web creation denies absent auth, invalid input, currentness injection, and missing patients', async () => {
     const rejected = [
         { session: null, body: payload() },
         { session, body: payload({ size: -1 }) },
-        { session, body: payload({ documentSourceRef: sourceRef }) },
+        { session, body: payload({ documentSourceRef: 'a'.repeat(64) }) },
         { session, body: payload({ documentRevision: 1 }) },
         { session, body: payload({ documentFreshnessEpoch: 1 }) },
         { session, body: payload({ patientId: 'patient.synthetic.missing' }) },
     ];
     for (const item of rejected) {
         reset();
-        let mints = 0;
-        const response = await createWebAttachment(request(item.body), item.session, () => {
-            mints += 1;
-            return initial();
-        });
+        const response = await invoke(request(item.body), item.session);
         assert.ok([400, 401, 404].includes(response.status));
-        assert.equal(mints, 0);
         assert.deepEqual(rows(), []);
     }
 });
 
-test('web creation does not mint for a soft-deleted patient', async () => {
+test('extra JavaScript mint callbacks are ignored for missing and soft-deleted patients', async () => {
+    let extraCalls = 0;
+    const extra = () => { extraCalls += 1; };
+    reset();
+    const missing = await invoke(request(payload({ patientId: 'patient.synthetic.missing' })), session, extra);
+    assert.equal(missing.status, 404);
+    assert.deepEqual(rows(), []);
+
     reset();
     const db = new Database(dbPath);
     try {
@@ -129,19 +124,15 @@ test('web creation does not mint for a soft-deleted patient', async () => {
     } finally {
         db.close();
     }
-    let mints = 0;
-    const response = await createWebAttachment(request(payload()), session, () => {
-        mints += 1;
-        return initial();
-    });
-    assert.equal(response.status, 404);
-    assert.equal(mints, 0);
+    const deleted = await invoke(request(payload()), session, extra);
+    assert.equal(deleted.status, 404);
     assert.deepEqual(rows(), []);
+    assert.equal(extraCalls, 0);
 });
 
 test('web list response omits every currentness tuple field', async () => {
     reset();
-    const created = await createWebAttachment(request(payload({ id: 'attachment.synthetic.list' })), session, () => initial());
+    const created = await invoke(request(payload({ id: 'attachment.synthetic.list' })));
     assert.equal(created.status, 201);
     const originalRequireSession = serverAuth.requireSession;
     try {
@@ -156,46 +147,18 @@ test('web list response omits every currentness tuple field', async () => {
     }
 });
 
-test('web creation rejects hostile host tuples without invoking accessors or inserting', async () => {
-    const accessor = {} as Record<string, unknown>;
-    let getterReads = 0;
-    for (const [key, value] of Object.entries(initial())) {
-        Object.defineProperty(accessor, key, { enumerable: true, get() { getterReads += 1; return value; } });
-    }
-    const inherited = Object.create(initial());
-    const nonEnumerable = initial(); Object.defineProperty(nonEnumerable, 'sourceRef', { enumerable: false, value: sourceRef });
-    const custom = Object.assign(Object.create({}), initial());
-    const symbol = { ...initial(), [Symbol('synthetic')]: true };
-    const proxy = new Proxy(initial(), {});
-    const hostile: unknown[] = [
-        null, accessor, inherited, nonEnumerable, custom, symbol, proxy,
-        initial(''), { ...initial(), revision: Number.MAX_SAFE_INTEGER + 1 }, { ...initial(), freshnessEpoch: 2 },
-    ];
-    for (const value of hostile) {
-        reset();
-        const response = await createWebAttachment(request(payload()), session, () => value);
-        assert.equal(response.status, 500);
-        assert.deepEqual(await response.json(), { error: 'Create Failed' });
-        assert.deepEqual(rows(), []);
-    }
-    assert.equal(getterReads, 0);
-});
-
-test('web creation keeps collision and storage failures atomic, and concurrent host refs unique', async () => {
+test('web creation rolls back a duplicate id and generates unique host refs concurrently', async () => {
     reset();
-    const first = await createWebAttachment(request(payload({ id: 'attachment.synthetic.first' })), session, () => initial());
+    const first = await invoke(request(payload({ id: 'attachment.synthetic.first' })));
     assert.equal(first.status, 201);
-    const collision = await createWebAttachment(request(payload({ id: 'attachment.synthetic.second' })), session, () => initial());
+    const collision = await invoke(request(payload({ id: 'attachment.synthetic.first' })));
     assert.equal(collision.status, 500);
     assert.deepEqual(await collision.json(), { error: 'Create Failed' });
-    const storage = await createWebAttachment(request(payload({ id: 'attachment.synthetic.third' })), session, () => { throw new Error('synthetic storage'); });
-    assert.equal(storage.status, 500);
-    assert.deepEqual(await storage.json(), { error: 'Create Failed' });
     assert.equal(rows().length, 1);
 
     reset();
     const responses = await Promise.all(Array.from({ length: 8 }, (_, index) =>
-        createWebAttachment(request(payload({ id: `attachment.synthetic.concurrent.${index}` })), session),
+        invoke(request(payload({ id: `attachment.synthetic.concurrent.${index}` }))),
     ));
     assert.deepEqual(responses.map((response) => response.status), Array(8).fill(201));
     const created = rows();
