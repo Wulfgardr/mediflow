@@ -23,6 +23,13 @@ function bootstrapDatabase(): { sqlite: Database.Database; db: BetterSQLite3Data
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-cascade-'));
     const sqlite = new Database(path.join(dir, 'medical.db'));
     const migrationsDir = path.join(ROOT_DIR, 'drizzle');
+    /* @Codex */
+    sqlite.exec(`CREATE TABLE durable_review_records (
+        id TEXT PRIMARY KEY NOT NULL, patient_ref TEXT NOT NULL, review_id TEXT NOT NULL UNIQUE, review_revision INTEGER NOT NULL,
+        receipt_ref TEXT NOT NULL, provenance_ref TEXT NOT NULL, receipt_binding TEXT NOT NULL, provenance_binding TEXT NOT NULL,
+        presentation_version TEXT NOT NULL, sealed_ciphertext TEXT NOT NULL, sealed_digest TEXT NOT NULL,
+        created_at INTEGER DEFAULT (unixepoch())
+    )`);
     const migrationFiles = fs
         .readdirSync(migrationsDir)
         .filter((file) => file.endsWith('.sql'))
@@ -34,23 +41,15 @@ function bootstrapDatabase(): { sqlite: Database.Database; db: BetterSQLite3Data
         if (sql.trim().length === 0) continue;
         sqlite.exec(sql);
     }
-    // @Codex: db-server owns this runtime table; the cascade fixture must
-    // materialize its parent before exercising the migrated patient-link table.
+    /* @Codex */
     sqlite.exec(`
-        CREATE TABLE IF NOT EXISTS durable_review_records (
-            id TEXT PRIMARY KEY NOT NULL,
-            patient_ref TEXT NOT NULL,
-            review_id TEXT NOT NULL UNIQUE,
-            review_revision INTEGER NOT NULL,
-            receipt_ref TEXT NOT NULL,
-            provenance_ref TEXT NOT NULL,
-            receipt_binding TEXT NOT NULL,
-            provenance_binding TEXT NOT NULL,
-            presentation_version TEXT NOT NULL,
-            sealed_ciphertext TEXT NOT NULL,
-            sealed_digest TEXT NOT NULL,
-            created_at INTEGER DEFAULT (unixepoch())
-        )
+        ALTER TABLE attachments ADD COLUMN document_source_ref TEXT NOT NULL DEFAULT '${'0'.repeat(64)}'
+            CHECK (length(document_source_ref) = 64 AND document_source_ref NOT GLOB '*[^0-9a-f]*');
+        ALTER TABLE attachments ADD COLUMN document_revision INTEGER NOT NULL DEFAULT 1
+            CHECK (typeof(document_revision) = 'integer' AND document_revision BETWEEN 1 AND 9007199254740991);
+        ALTER TABLE attachments ADD COLUMN document_freshness_epoch INTEGER NOT NULL DEFAULT 1
+            CHECK (typeof(document_freshness_epoch) = 'integer' AND document_freshness_epoch BETWEEN 1 AND 9007199254740991);
+        CREATE UNIQUE INDEX attachments_document_source_ref_unique ON attachments(document_source_ref);
     `);
     sqlite.pragma('foreign_keys = ON');
     return { sqlite, db: drizzle(sqlite) };
@@ -67,6 +66,7 @@ function insertPatientWithChildren(sqlite: Database.Database, patientId: string)
     ).run(patientId);
     /* @Codex */
     const digest = (value: string): string => createHash('sha256').update(value).digest('hex');
+    const currentnessRef = digest(patientId);
     const patientRef = `ptr_${digest(`synthetic:patient:${suffix}`).slice(0, 32)}`;
     const reviewId = `review_${digest(`synthetic:review:${suffix}`).slice(0, 32)}`;
     const receiptRef = `receipt_${digest(`synthetic:receipt:${suffix}`).slice(0, 32)}`;
@@ -122,8 +122,8 @@ function insertPatientWithChildren(sqlite: Database.Database, patientId: string)
         "INSERT INTO entries (id, patient_id, type, date, content) VALUES (?, ?, 'note', 1, 'Nota di test')"
     ).run(`en-${suffix}`, patientId);
     sqlite.prepare(
-        "INSERT INTO attachments (id, patient_id, name, type, size, path) VALUES (?, ?, 'referto.pdf', 'application/pdf', 1, '/tmp/referto.pdf')"
-    ).run(`at-${suffix}`, patientId);
+        "INSERT INTO attachments (id, patient_id, name, type, size, path, document_source_ref, document_revision, document_freshness_epoch) VALUES (?, ?, 'referto.pdf', 'application/pdf', 1, '/tmp/referto.pdf', ?, 1, 1)"
+    ).run(`at-${suffix}`, patientId, currentnessRef);
     sqlite.prepare(
         "INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, 'amb-test')"
     ).run(patientId);
