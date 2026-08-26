@@ -103,8 +103,47 @@ async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Pro
 }
 
 /* @Codex */
-export function logoutSecuritySession(): void {
-    void fetch('/api/auth/logout', { method: 'POST' });
+export const APPLICATION_LOCK_RECEIPT_SCHEMA_VERSION = 'mediflow.application-lock-receipt.v1' as const;
+
+/* @Codex */
+export type ApplicationLockReceipt = Readonly<{
+    schemaVersion: typeof APPLICATION_LOCK_RECEIPT_SCHEMA_VERSION;
+    state: 'server_invalidation_confirmed';
+}>;
+
+/* @Codex */
+export function isExactApplicationLockReceipt(value: unknown): value is ApplicationLockReceipt {
+    try {
+        if (typeof value !== 'object' || value === null || Object.getPrototypeOf(value) !== Object.prototype) {
+            return false;
+        }
+
+        const keys = Reflect.ownKeys(value);
+        if (keys.length !== 2 || keys[0] !== 'schemaVersion' || keys[1] !== 'state') return false;
+
+        const schemaVersion = Object.getOwnPropertyDescriptor(value, 'schemaVersion');
+        const state = Object.getOwnPropertyDescriptor(value, 'state');
+        if (!schemaVersion || !state
+            || !schemaVersion.enumerable || !state.enumerable
+            || !('value' in schemaVersion) || !('value' in state)) {
+            return false;
+        }
+
+        return schemaVersion.value === APPLICATION_LOCK_RECEIPT_SCHEMA_VERSION
+            && state.value === 'server_invalidation_confirmed';
+    } catch {
+        return false;
+    }
+}
+
+/* @Codex */
+export async function requestApplicationLockConfirmation(): Promise<boolean> {
+    const { response, payload } = await requestJson<unknown>('/api/auth/lock', {
+        method: 'POST',
+        credentials: 'same-origin',
+    });
+
+    return response.status === 200 && isExactApplicationLockReceipt(payload);
 }
 
 /* @Codex */
