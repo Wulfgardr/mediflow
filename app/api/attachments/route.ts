@@ -4,8 +4,10 @@ import { attachments, patients } from '@/lib/schema';
 import { activePatients } from '@/lib/patient-lifecycle';
 import { and, asc, eq, desc, type SQL } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
+import { types } from 'node:util';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+import type { ServerSession } from '@/lib/security/server-session';
 import { buildAttachmentPath } from '@/lib/attachment-path';
 /* @Codex */
 import { getAttachmentPayloadByteSize, resolveMaxAttachmentBytes } from '@/lib/attachment-payload';
@@ -15,6 +17,41 @@ import { parseListParams } from '@/lib/list-query-params';
 import { attachmentCreateSchema } from '@/lib/api-schemas/attachments';
 /* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
+import { createHostAttachmentCurrentness } from '@/lib/attachment-currentness-host';
+
+const HOST_CURRENTNESS_KEYS = ['sourceRef', 'revision', 'freshnessEpoch'] as const;
+const HOST_SOURCE_REF = /^[0-9a-f]{64}$/u;
+const objectGetPrototypeOf = Object.getPrototypeOf;
+const objectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const objectHasOwn = Object.hasOwn;
+const reflectOwnKeys = Reflect.ownKeys;
+const arrayIsArray = Array.isArray;
+const numberIsSafeInteger = Number.isSafeInteger;
+const regexpTest = Function.call.bind(RegExp.prototype.test) as (expression: RegExp, value: string) => boolean;
+const isProxy = types.isProxy;
+
+type InitialAttachmentCurrentness = Readonly<{
+    sourceRef: string;
+    revision: 1;
+    freshnessEpoch: 1;
+}>;
+
+/* @Codex: accept only the exact, host-generated initial tuple before persistence. */
+function readInitialHostCurrentness(value: unknown): InitialAttachmentCurrentness | null {
+    try {
+        if (!value || typeof value !== 'object' || arrayIsArray(value) || isProxy(value)
+            || objectGetPrototypeOf(value) !== Object.prototype || reflectOwnKeys(value).length !== HOST_CURRENTNESS_KEYS.length) return null;
+        const descriptors = HOST_CURRENTNESS_KEYS.map((key) => objectGetOwnPropertyDescriptor(value, key));
+        if (descriptors.some((descriptor) => !descriptor || !objectHasOwn(descriptor, 'value') || descriptor.enumerable !== true)) return null;
+        const [sourceRef, revision, freshnessEpoch] = descriptors.map((descriptor) => descriptor!.value);
+        if (typeof sourceRef !== 'string' || !regexpTest(HOST_SOURCE_REF, sourceRef)
+            || revision !== 1 || !numberIsSafeInteger(revision)
+            || freshnessEpoch !== 1 || !numberIsSafeInteger(freshnessEpoch)) return null;
+        return Object.freeze({ sourceRef, revision, freshnessEpoch });
+    } catch {
+        return null;
+    }
+}
 
 // Only plaintext columns are sortable (name/path/data are ENC:). size/type are
 // plaintext metadata and safe to sort on.
@@ -98,6 +135,15 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     /* @Codex */
     const session = await requireSession();
+    return createWebAttachment(request, session);
+}
+
+/** Web-only attachment creation boundary; session and currentness stay host-owned. */
+export async function createWebAttachment(
+    request: Request,
+    session: ServerSession | null,
+    mintCurrentness: () => unknown = createHostAttachmentCurrentness,
+) {
     if (!session) return unauthorizedResponse();
 
     try {
@@ -132,6 +178,11 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Attachment payload too large' }, { status: 413 });
         }
 
+        const currentness = readInitialHostCurrentness(mintCurrentness());
+        if (!currentness) {
+            return NextResponse.json({ error: 'Create Failed' }, { status: 500 });
+        }
+
         // Note: The actual file upload is handled separately (usually).
         // This endpoint likely stores the metadata of the attachment.
         // If the 'path' doesn't exist, we might need a separate upload endpoint
@@ -153,7 +204,10 @@ export async function POST(request: Request) {
             ocrQueueState: isDocumentOcrQueueState(body.ocrQueueState) ? body.ocrQueueState : null,
             ocrQueueReason: isDocumentOcrQueueReason(body.ocrQueueReason) ? body.ocrQueueReason : null,
             ocrQueueUpdatedAt: isDocumentOcrQueueState(body.ocrQueueState) ? new Date() : null,
-            createdAt: new Date()
+            createdAt: new Date(),
+            documentSourceRef: currentness.sourceRef,
+            documentRevision: currentness.revision,
+            documentFreshnessEpoch: currentness.freshnessEpoch,
         });
 
         return NextResponse.json({ id: newId }, { status: 201 });
