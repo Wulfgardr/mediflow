@@ -5,7 +5,7 @@ import { types } from 'node:util';
 
 import { resolveDocumentSynthesisFabricExecutionHandoff, type DocumentSynthesisFabricExecutionCapability } from './document-synthesis-fabric-admission';
 import { parseDocumentSynthesisProviderEnvelope } from './document-synthesis-provider-envelope';
-import { claimDocumentSynthesisProviderBindingForExecution, type DocumentSynthesisProviderBindingReceipt } from './document-synthesis-provider-binding';
+import { claimDocumentSynthesisProviderBindingForExecution, type DocumentSynthesisProviderBindingExecutionClaim, type DocumentSynthesisProviderBindingReceipt } from './document-synthesis-provider-binding';
 
 export type DocumentSynthesisFabricPreparedExecutionToken = object;
 type DenialCode = 'input_invalid' | 'handoff_unavailable' | 'binding_invalid' | 'provider_unavailable' | 'provider_timeout' | 'response_invalid' | 'validation_denied' | 'canceled';
@@ -26,7 +26,7 @@ function abort(entry: Entry): void { if (entry.state === 'aborted') return; entr
 function responseContent(value: unknown): object | null {
     try { if (!value || typeof value !== 'object' || IsProxy(value) || ObjectGetPrototypeOf(value) !== OBJECT || ReflectOwnKeys(value).length !== 2) return null; const content = ObjectGetOwnPropertyDescriptor(value, 'content'); const stats = ObjectGetOwnPropertyDescriptor(value, 'stats'); if (!content || !stats || !content.enumerable || !stats.enumerable || !ObjectHasOwn(content, 'value') || !ObjectHasOwn(stats, 'value') || typeof content.value !== 'string') return null; return ObjectFreeze({ content: content.value }); } catch { return null; }
 }
-function invoke(entry: Entry, binding: NonNullable<ReturnType<typeof claimDocumentSynthesisProviderBindingForExecution>>['resolution'], prompt: string): Promise<Outcome> {
+function invoke(entry: Entry, binding: DocumentSynthesisProviderBindingExecutionClaim['resolution'], prompt: string): Promise<Outcome> {
     let resolveOutcome!: (value: Outcome) => void;
     const outcome = new PromiseConstructor<Outcome>((resolve) => { resolveOutcome = resolve; }); entry.settle = resolveOutcome;
     entry.timer = SetTimeout(() => { if (entry.state === 'running') { try { entry.controller.abort(); } catch { /* Internal timeout only. */ } resolveOutcome(frozen({ kind: 'timeout' as const })); } }, timeoutMs);
@@ -46,7 +46,7 @@ export async function prepareDocumentSynthesisFabricExecution(handoff: unknown):
     const admission = resolveDocumentSynthesisFabricExecutionHandoff(handoff); if (!admission) return denied('handoff_unavailable');
     const entry: Entry = { state: 'running', handoff, execution: admission.execution, controller: new AbortControllerConstructor(), timer: null, settle: null, validation: null, envelope: null, receipt: null };
     ReflectApply(WeakMapSet, handoffs, [handoff, entry]);
-    const binding = claimDocumentSynthesisProviderBindingForExecution(admission.providerToken); if (!binding) { abort(entry); return denied('binding_invalid'); }
+    const binding = claimDocumentSynthesisProviderBindingForExecution(admission.providerToken); if (!binding || binding.status !== 'claimed') { abort(entry); return denied('binding_invalid'); }
     entry.receipt = binding.receipt;
     const input = entry.execution.takeProviderInput(); if (!input) { abort(entry); return denied('input_invalid'); }
     const settled = await invoke(entry, binding.resolution, input.prompt);

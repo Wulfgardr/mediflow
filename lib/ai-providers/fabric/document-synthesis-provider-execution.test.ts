@@ -60,7 +60,7 @@ test('consumes a valid token before async work, including concurrent replay', as
     const bound = await token(async () => { calls += 1; await new Promise<void>((resolve) => { release = resolve; }); return { content: JSON.stringify(output()), stats: { latency: 0, tokensIn: 0, tokensOut: 0 } }; });
     try {
         const first = executeDocumentSynthesisProvider(input(bound.value));
-        const second = await executeDocumentSynthesisProvider(input(bound.value)); denied(second, 'binding_invalid'); assert.equal(calls, 1);
+        const second = await executeDocumentSynthesisProvider(input(bound.value)); denied(second, 'binding_consumed'); assert.equal(calls, 1);
         release(); assert.equal((await first).status, 'available');
     } finally { bound.restore(); }
 });

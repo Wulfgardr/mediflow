@@ -63,6 +63,7 @@ export async function executeDocumentSynthesisProvider(value: unknown): Promise<
     const token = input.providerToken;
     const binding = claimDocumentSynthesisProviderBindingForExecution(token);
     if (!binding) return denied('binding_invalid');
+    if (binding.status === 'spent') return denied('binding_consumed');
     const resolution = binding.resolution;
 
     const signal = AbortSignal.timeout(TIMEOUT_MS);
