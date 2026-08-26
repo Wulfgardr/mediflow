@@ -1,5 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { copyFileSync, unlinkSync } from 'node:fs';
 import { afterEach, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -11,13 +12,17 @@ import {
     DocumentSynthesisSourceSetCurrentnessOwnerConfigurationError,
     resolveDocumentSynthesisSourceSetCurrentnessAccessor,
     resolveDocumentSynthesisSourceSetExecutionInputAccessor,
+    resolveDocumentSynthesisSourceSetValidation,
 } from './document-synthesis-source-set-currentness-owner.ts';
+import { parseDocumentSynthesisProviderEnvelope } from './document-synthesis-provider-envelope.ts';
+import { bindDocumentSynthesisProviderEnvelope } from './document-synthesis-provider-envelope-binding.ts';
 import { createServerSessionProjectionOwnerRegistry } from '../../security/server-session-projection-owner.ts';
 import { clearAllSessions, createSession, deleteSession } from '../../security/server-session.ts';
 
 const USER = { id: ['synthetic', 'currentness', 'user'].join('-'), username: ['synthetic', 'currentness', 'clinician'].join('-'), role: 'clinician' };
 const PAIR = { patientId: 'patient.synthetic.currentness', ambulatoryId: 'ambulatory.synthetic.currentness' };
 const n = (value: number | string) => BigInt(value);
+const sha = (value: string) => createHash('sha256').update(new TextEncoder().encode(value)).digest('hex');
 
 afterEach(() => clearAllSessions());
 
@@ -36,6 +41,17 @@ function prompt(sourceSetValue: ReturnType<typeof sourceSet>): string {
     assert.equal(result.status, 'available');
     if (result.status !== 'available') throw new Error('expected synthetic prompt');
     return result.prompt;
+}
+
+function envelope(sourceText: string) {
+    const result = parseDocumentSynthesisProviderEnvelope({ content: JSON.stringify({
+        output: { schemaVersion: 'mediflow.ai.extract.v1', task: 'document_synthesis', summary: 'Synthetic summary', data: { qualityLevel: 'green', medications: [], diagnoses: [], problemStatements: [], therapyCandidates: [], servicePrescriptions: [] } },
+        citations: [{ label: 'S1', quote: sourceText, startByte: 0, endByte: new TextEncoder().encode(sourceText).length, quoteSha256: sha(sourceText) }],
+        claims: [{ claimPath: 'summary', labels: ['S1'] }, { claimPath: 'data.qualityLevel', labels: ['S1'] }],
+    }) });
+    assert.equal(result.status, 'available');
+    if (result.status !== 'available') throw new Error('expected synthetic envelope');
+    return result.token;
 }
 
 function ownerWithSelection(clock: () => number = () => 1_000) {
@@ -66,7 +82,7 @@ test('resolves only its branded same-owner capsule into one atomic execution-inp
     assert.ok(accessor); assert.equal(accessor instanceof Promise, false); assert.ok(accessor.snapshot());
     const executionInput = resolveDocumentSynthesisSourceSetExecutionInputAccessor(capsule, first.owner, first.session);
     assert.ok(executionInput); assert.equal(executionInput instanceof Promise, false); assert.deepEqual(Object.keys(executionInput), ['snapshotExecutionInput']); assert.equal(Object.getPrototypeOf(executionInput), null); assert.equal(Object.isFrozen(executionInput), true);
-    const snapshot = executionInput.snapshotExecutionInput(); assert.ok(snapshot); assert.equal(Object.getPrototypeOf(snapshot), null); assert.equal(Object.isFrozen(snapshot), true); assert.deepEqual(Object.keys(snapshot), ['currentness', 'prompt']); assert.equal(snapshot.prompt, prompt(sourceSet())); assert.equal(snapshot.currentness.sourceSetEpoch, n(3));
+    const snapshot = executionInput.snapshotExecutionInput(); assert.ok(snapshot); assert.equal(Object.getPrototypeOf(snapshot), null); assert.equal(Object.isFrozen(snapshot), true); assert.deepEqual(Object.keys(snapshot), ['currentness', 'prompt', 'validationToken']); assert.equal(snapshot.prompt, prompt(sourceSet())); assert.equal(snapshot.currentness.sourceSetEpoch, n(3)); assert.equal(Object.getPrototypeOf(snapshot.validationToken), null); assert.equal(Object.isFrozen(snapshot.validationToken), true); assert.deepEqual(Object.keys(snapshot.validationToken), []);
     assert.equal(resolveDocumentSynthesisSourceSetCurrentnessAccessor(capsule, second.owner, second.session), null);
     assert.equal(resolveDocumentSynthesisSourceSetExecutionInputAccessor(capsule, second.owner, second.session), null);
     let reads = 0; let traps = 0;
@@ -123,6 +139,34 @@ test('atomically binds each returned currentness-and-prompt pair to one exact au
     assert.deepEqual(executionInput.snapshotExecutionInput(), betaInput);
     assert.equal(capsule.transition(Object.freeze({})), false);
     assert.deepEqual(executionInput.snapshotExecutionInput(), betaInput);
+});
+
+test('binds each opaque snapshot token only to its privately retained authentic C3c2 source set', () => {
+    const first = ownerWithSelection(); const second = ownerWithSelection();
+    const alpha = sourceSet(n(3), n(5), n(7), n(11), 'document.synthetic.currentness', 'Alpha source text');
+    const beta = sourceSet(n(4), n(5), n(7), n(11), 'document.synthetic.currentness', 'Beta source text');
+    const capsule = createDocumentSynthesisSourceSetCurrentnessOwner(Object.freeze({ owner: first.owner, session: first.session, sourceSet: alpha }));
+    const accessor = resolveDocumentSynthesisSourceSetExecutionInputAccessor(capsule, first.owner, first.session); assert.ok(accessor);
+    const alphaInput = accessor.snapshotExecutionInput(); assert.ok(alphaInput); assert.equal(capsule.transition(beta), true);
+    const alphaEnvelope = envelope('Alpha source text'); assert.equal(bindDocumentSynthesisProviderEnvelope({ sourceSet: alpha, envelopeToken: alphaEnvelope }).status, 'available');
+    const alphaResult = resolveDocumentSynthesisSourceSetValidation({ validationToken: alphaInput.validationToken, envelopeToken: alphaEnvelope }, capsule, first.owner, first.session);
+    assert.equal(alphaResult.status, 'available'); assert.deepEqual(alphaResult.sourceSetDigestSha256, alpha.sourceSetDigestSha256); assert.notStrictEqual(alphaResult.sourceSetDigestSha256, alpha.sourceSetDigestSha256); assert.equal('sourceSet' in alphaResult, false); assert.equal('sources' in alphaResult, false);
+    assert.equal(resolveDocumentSynthesisSourceSetValidation({ validationToken: alphaInput.validationToken, envelopeToken: envelope('Alpha source text') }, capsule, first.owner, first.session).status, 'denied');
+    const betaInput = accessor.snapshotExecutionInput(); assert.ok(betaInput);
+    assert.equal(resolveDocumentSynthesisSourceSetValidation({ validationToken: betaInput.validationToken, envelopeToken: envelope('Beta source text') }, capsule, second.owner, second.session).status, 'denied');
+    const betaResult = resolveDocumentSynthesisSourceSetValidation({ validationToken: betaInput.validationToken, envelopeToken: envelope('Beta source text') }, capsule, first.owner, first.session);
+    assert.equal(betaResult.status, 'available'); assert.deepEqual(betaResult.sourceSetDigestSha256, beta.sourceSetDigestSha256); assert.notDeepEqual(betaResult.sourceSetDigestSha256, alphaResult.sourceSetDigestSha256);
+});
+
+test('denies malformed, cloned, hostile, expired, and revoked validation tokens before binding work', () => {
+    const state = ownerWithSelection(); const capsule = createDocumentSynthesisSourceSetCurrentnessOwner(Object.freeze({ owner: state.owner, session: state.session, sourceSet: sourceSet() }));
+    const accessor = resolveDocumentSynthesisSourceSetExecutionInputAccessor(capsule, state.owner, state.session); assert.ok(accessor); const input = accessor.snapshotExecutionInput(); assert.ok(input);
+    let reads = 0; let traps = 0;
+    const accessorValue = {}; Object.defineProperty(accessorValue, 'validationToken', { enumerable: true, get() { reads += 1; return input.validationToken; } }); Object.defineProperty(accessorValue, 'envelopeToken', { enumerable: true, value: envelope('Synthetic source text') });
+    const proxied = new Proxy({ validationToken: input.validationToken, envelopeToken: envelope('Synthetic source text') }, { ownKeys() { traps += 1; return []; } });
+    for (const value of [{ validationToken: { ...input.validationToken }, envelopeToken: envelope('Synthetic source text') }, { validationToken: structuredClone(input.validationToken), envelopeToken: envelope('Synthetic source text') }, accessorValue, proxied, { validationToken: input.validationToken, envelopeToken: envelope('Synthetic source text'), then() {} }]) assert.equal(resolveDocumentSynthesisSourceSetValidation(value, capsule, state.owner, state.session).status, 'denied');
+    assert.equal(reads, 0); assert.equal(traps, 0);
+    capsule.revoke(); assert.equal(resolveDocumentSynthesisSourceSetValidation({ validationToken: input.validationToken, envelopeToken: envelope('Synthetic source text') }, capsule, state.owner, state.session).status, 'denied');
 });
 
 test('requires a strictly increasing source-set epoch and nondecreasing revocation generation', () => {
