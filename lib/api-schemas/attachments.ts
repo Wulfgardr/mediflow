@@ -26,7 +26,7 @@ export const attachmentCreateSchema = z.object({
     parseEvidenceArtifactSnapshot: optionalTextSchema,
     ocrQueueState: ocrQueueStateSchema,
     ocrQueueReason: ocrQueueReasonSchema,
-});
+}).strict();
 
 export const attachmentUpdateSchema = z.object({
     summarySnapshot: optionalTextSchema,

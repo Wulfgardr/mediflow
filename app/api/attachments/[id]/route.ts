@@ -15,6 +15,23 @@ import { attachmentUpdateSchema } from '@/lib/api-schemas/attachments';
 /* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
 
+const ATTACHMENT_DETAIL_RESPONSE_COLUMNS = {
+    id: attachments.id,
+    patientId: attachments.patientId,
+    name: attachments.name,
+    type: attachments.type,
+    size: attachments.size,
+    path: attachments.path,
+    data: attachments.data,
+    summarySnapshot: attachments.summarySnapshot,
+    parseEvidenceArtifactSnapshot: attachments.parseEvidenceArtifactSnapshot,
+    ocrQueueState: attachments.ocrQueueState,
+    ocrQueueReason: attachments.ocrQueueReason,
+    ocrQueueUpdatedAt: attachments.ocrQueueUpdatedAt,
+    ocrReplayArtifactSnapshot: attachments.ocrReplayArtifactSnapshot,
+    createdAt: attachments.createdAt,
+} as const;
+
 /* STREAM B: full attachment retrieval INCLUDING the base64 `data` blob. The list
    endpoint (GET /api/attachments?metadata=true) omits the blob; this by-id read is
    how the facade fetches the actual payload on demand. */
@@ -27,7 +44,7 @@ export async function GET(
 
     try {
         const { id } = await params;
-        const row = await dbServer.select().from(attachments).where(eq(attachments.id, id)).get();
+        const row = await dbServer.select(ATTACHMENT_DETAIL_RESPONSE_COLUMNS).from(attachments).where(eq(attachments.id, id)).get();
         if (!row) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
