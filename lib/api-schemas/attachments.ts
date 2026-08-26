@@ -33,6 +33,19 @@ export const attachmentUpdateSchema = z.object({
     ocrQueueState: ocrQueueStateSchema,
 });
 
+/* @Codex: data-only web CAS boundary; no attachment, patient, or authority is client-owned. */
+const attachmentCurrentnessSchema = z.object({
+    sourceRef: z.string().regex(/^[0-9a-f]{64}$/u),
+    revision: z.number().int().safe().min(1),
+    freshnessEpoch: z.number().int().safe().min(1),
+}).strict();
+
+/* @Codex */
+export const attachmentContentCurrentnessPutSchema = z.object({
+    expected: attachmentCurrentnessSchema,
+    replacement: z.string().min(1),
+}).strict();
+
 export const attachmentOcrReplaySchema = z.object({
     ocrText: z.string(),
     documentSha256: requiredTextSchema,
@@ -40,4 +53,6 @@ export const attachmentOcrReplaySchema = z.object({
 
 export type AttachmentCreatePayload = z.infer<typeof attachmentCreateSchema>;
 export type AttachmentUpdatePayload = z.infer<typeof attachmentUpdateSchema>;
+/* @Codex */
+export type AttachmentContentCurrentnessPutPayload = z.infer<typeof attachmentContentCurrentnessPutSchema>;
 export type AttachmentOcrReplayPayload = z.infer<typeof attachmentOcrReplaySchema>;
