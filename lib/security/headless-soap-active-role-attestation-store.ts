@@ -36,9 +36,17 @@ const INSERT_ATTESTATION = `INSERT INTO headless_soap_active_role_attestations (
  attestation_ref, actor_ref, schema_version, role, operation_id, policy_version, status, attestation_version,
  issuer_ref, expires_at, activated_at, revocation_generation, revoked_at, created_at, updated_at
 ) VALUES (?, ?, ?, ?, ?, ?, 'inactive', 1, NULL, NULL, NULL, 0, NULL, unixepoch(), unixepoch())`;
+const REVOKE_ATTESTATION = `UPDATE headless_soap_active_role_attestations
+ SET status = 'revoked', revocation_generation = 1, revoked_at = unixepoch(), updated_at = unixepoch()
+ WHERE actor_ref = ? AND attestation_ref = ? AND schema_version = ? AND role = ? AND operation_id = ?
+ AND policy_version = ? AND status = 'inactive' AND attestation_version = 1 AND issuer_ref IS NULL
+ AND expires_at IS NULL AND activated_at IS NULL AND revocation_generation = 0 AND revoked_at IS NULL`;
 const rowKeys = ['attestationRef', 'actorRef', 'schemaVersion', 'role', 'operationId', 'policyVersion', 'status', 'attestationVersion', 'issuerRef', 'expiresAt', 'activatedAt', 'revocationGeneration', 'revokedAt', 'createdAt', 'updatedAt'] as const;
+const expectedKeys = ['attestationRef', 'attestationVersion', 'revocationGeneration'] as const;
 
-export type HeadlessSoapActiveRoleAttestationV1 = Readonly<{ attestationRef: string; actorRef: string; schemaVersion: typeof SCHEMA_VERSION; role: typeof ROLE; operationId: typeof OPERATION_ID; policyVersion: typeof POLICY_VERSION; status: 'inactive'; attestationVersion: 1; issuerRef: null; expiresAt: null; activatedAt: null; revocationGeneration: 0; revokedAt: null; createdAt: Date; updatedAt: Date }>;
+type Lifecycle = { status: 'inactive'; revocationGeneration: 0; revokedAt: null } | { status: 'revoked'; revocationGeneration: 1; revokedAt: Date };
+export type HeadlessSoapActiveRoleAttestationV1 = Readonly<{ attestationRef: string; actorRef: string; schemaVersion: typeof SCHEMA_VERSION; role: typeof ROLE; operationId: typeof OPERATION_ID; policyVersion: typeof POLICY_VERSION; attestationVersion: 1; issuerRef: null; expiresAt: null; activatedAt: null; createdAt: Date; updatedAt: Date } & Lifecycle>;
+export type HeadlessSoapActiveRoleAttestationRevokeExpected = Readonly<{ attestationRef: string; attestationVersion: 1; revocationGeneration: 0 }>;
 export type HeadlessSoapActiveRoleAttestationStoreErrorCode = 'actor_invalid' | 'actor_missing' | 'attestation_conflict' | 'attestation_missing' | 'schema_incompatible' | 'storage_unavailable' | 'stored_state_invalid';
 export type HeadlessSoapActiveRoleAttestationStoreError = Error & Readonly<{ code: HeadlessSoapActiveRoleAttestationStoreErrorCode }>;
 
@@ -86,10 +94,20 @@ function canonicalActor(actorRef: string): void {
     const row = exactRecord(rows[0], ['id']);
     if (rows.length !== 1 || !row || row.id !== actorRef) return fail('stored_state_invalid');
 }
+function expected(value: unknown): HeadlessSoapActiveRoleAttestationRevokeExpected | null {
+    const candidate = exactRecord(value, expectedKeys);
+    if (!candidate || typeof candidate.attestationRef !== 'string' || !invoke(regexpTest, refPattern, candidate.attestationRef)
+        || candidate.attestationVersion !== 1 || candidate.revocationGeneration !== 0) return null;
+    return objectFreeze(objectAssign(objectCreate(null), { attestationRef: candidate.attestationRef, attestationVersion: 1 as const, revocationGeneration: 0 as const })) as HeadlessSoapActiveRoleAttestationRevokeExpected;
+}
 function record(value: unknown): HeadlessSoapActiveRoleAttestationV1 {
     const row = exactRecord(value, rowKeys);
-    if (!row || !actor(row.actorRef) || row.schemaVersion !== SCHEMA_VERSION || row.role !== ROLE || row.operationId !== OPERATION_ID || row.policyVersion !== POLICY_VERSION || row.status !== 'inactive' || row.attestationVersion !== 1 || row.issuerRef !== null || row.expiresAt !== null || row.activatedAt !== null || row.revocationGeneration !== 0 || row.revokedAt !== null || !seconds(row.createdAt) || !seconds(row.updatedAt) || row.updatedAt < row.createdAt || typeof row.attestationRef !== 'string' || !invoke(regexpTest, refPattern, row.attestationRef)) return fail('stored_state_invalid');
-    return objectFreeze(objectAssign(objectCreate(null), { attestationRef: row.attestationRef, actorRef: row.actorRef, schemaVersion: SCHEMA_VERSION, role: ROLE, operationId: OPERATION_ID, policyVersion: POLICY_VERSION, status: 'inactive' as const, attestationVersion: 1 as const, issuerRef: null, expiresAt: null, activatedAt: null, revocationGeneration: 0 as const, revokedAt: null, createdAt: date(row.createdAt), updatedAt: date(row.updatedAt) })) as HeadlessSoapActiveRoleAttestationV1;
+    const revokedAt = row?.revokedAt;
+    const inactive = row?.status === 'inactive' && row.revocationGeneration === 0 && row.revokedAt === null;
+    const revoked = row?.status === 'revoked' && row.revocationGeneration === 1 && seconds(revokedAt);
+    if (!row || !actor(row.actorRef) || row.schemaVersion !== SCHEMA_VERSION || row.role !== ROLE || row.operationId !== OPERATION_ID || row.policyVersion !== POLICY_VERSION || row.attestationVersion !== 1 || row.issuerRef !== null || row.expiresAt !== null || row.activatedAt !== null || (!inactive && !revoked) || !seconds(row.createdAt) || !seconds(row.updatedAt) || row.updatedAt < row.createdAt || (revoked && (revokedAt as number) < row.createdAt) || typeof row.attestationRef !== 'string' || !invoke(regexpTest, refPattern, row.attestationRef)) return fail('stored_state_invalid');
+    const lifecycle: Lifecycle = inactive ? { status: 'inactive', revocationGeneration: 0, revokedAt: null } : { status: 'revoked', revocationGeneration: 1, revokedAt: date(revokedAt as number) };
+    return objectFreeze(objectAssign(objectCreate(null), { attestationRef: row.attestationRef, actorRef: row.actorRef, schemaVersion: SCHEMA_VERSION, role: ROLE, operationId: OPERATION_ID, policyVersion: POLICY_VERSION, attestationVersion: 1 as const, issuerRef: null, expiresAt: null, activatedAt: null, createdAt: date(row.createdAt), updatedAt: date(row.updatedAt) }, lifecycle)) as HeadlessSoapActiveRoleAttestationV1;
 }
 function readExact(actorRef: string): HeadlessSoapActiveRoleAttestationV1 {
     canonicalActor(actorRef); const row = get(SELECT_ATTESTATION, actorRef);
@@ -118,6 +136,21 @@ export function createHeadlessSoapActiveRoleAttestationStore() {
                     return readExact(actorRef);
                 }
                 return fail('attestation_conflict');
+            }); } catch (error) { return storage(error); }
+        },
+        revoke(actorRef: unknown, current: unknown): HeadlessSoapActiveRoleAttestationV1 {
+            if (!actor(actorRef) || !expected(current)) return fail('actor_invalid');
+            const currentExpected = expected(current)!;
+            try { return transaction(() => {
+                if (!canonicalSchema()) return fail('schema_incompatible');
+                const before = readExact(actorRef);
+                if (before.status !== 'inactive' || before.attestationRef !== currentExpected.attestationRef || before.attestationVersion !== currentExpected.attestationVersion || before.revocationGeneration !== currentExpected.revocationGeneration) return fail('attestation_conflict');
+                const result = exactRecord(run(REVOKE_ATTESTATION, [actorRef, currentExpected.attestationRef, SCHEMA_VERSION, ROLE, OPERATION_ID, POLICY_VERSION]), ['changes', 'lastInsertRowid']);
+                if (!result || (typeof result.lastInsertRowid !== 'number' && typeof result.lastInsertRowid !== 'bigint')) return fail('storage_unavailable');
+                if (result.changes !== 1) return fail('attestation_conflict');
+                const revoked = readExact(actorRef);
+                if (revoked.status !== 'revoked' || revoked.revocationGeneration !== 1 || revoked.revokedAt === null) return fail('stored_state_invalid');
+                return revoked;
             }); } catch (error) { return storage(error); }
         }, read,
     }));

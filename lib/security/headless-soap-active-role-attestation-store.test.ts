@@ -15,12 +15,13 @@ const { createHeadlessSoapActiveRoleAttestationStore, isHeadlessSoapActiveRoleAt
 const ACTOR_A = 'synthetic-soap-attestation-actor-a';
 const ACTOR_B = 'synthetic-soap-attestation-actor-b';
 const ACTOR_C = 'synthetic-soap-attestation-actor-c';
+const ACTOR_D = 'synthetic-soap-attestation-actor-d';
 function db() { return new Database(path.join(dataDir, 'medical.db')); }
 function user(id: string): void {
     const database = db();
     try { database.prepare("INSERT INTO users (id, username, password_hash, encrypted_master_key, salt) VALUES (?, ?, 'synthetic-hash', 'synthetic-key', 'synthetic-salt')").run(id, `${id}-user`); } finally { database.close(); }
 }
-user(ACTOR_A); user(ACTOR_B); user(ACTOR_C);
+user(ACTOR_A); user(ACTOR_B); user(ACTOR_C); user(ACTOR_D);
 function hasCode(code: string) { return (error: unknown) => isHeadlessSoapActiveRoleAttestationStoreError(error) && error.code === code; }
 
 test('creates a host-generated fixed inactive SOAP attestation for one canonical actor', () => {
@@ -58,6 +59,30 @@ test('serializes duplicate creation, persists across a new store, and returns di
     assert.equal([one, two].filter((item) => item.status === 'rejected').length, 1);
     assert.deepEqual(createHeadlessSoapActiveRoleAttestationStore().read(ACTOR_B), store.read(ACTOR_B));
     assert.notEqual(store.read(ACTOR_A).attestationRef, store.read(ACTOR_B).attestationRef);
+});
+
+test('revokes only the exact current inactive attestation under transactional CAS', async () => {
+    const store = createHeadlessSoapActiveRoleAttestationStore();
+    const current = store.read(ACTOR_B);
+    assert.equal(current.status, 'inactive');
+    const expected = { attestationRef: current.attestationRef, attestationVersion: 1, revocationGeneration: 0 };
+    const revoked = store.revoke(ACTOR_B, expected);
+    assert.equal(revoked.status, 'revoked'); assert.equal(revoked.revocationGeneration, 1); assert.ok(revoked.revokedAt instanceof Date); assert.equal(revoked.revokedAt.getTime() % 1000, 0);
+    assert.deepEqual(store.read(ACTOR_B), revoked);
+    assert.throws(() => store.revoke(ACTOR_B, expected), hasCode('attestation_conflict'));
+    assert.throws(() => store.revoke(ACTOR_A, expected), hasCode('attestation_conflict'));
+    let traps = 0;
+    const proxy = new Proxy(expected, { ownKeys() { traps++; return []; } });
+    for (const invalid of [null, { ...expected, role: 'physician' }, { ...expected, revocationGeneration: 1 }, proxy]) assert.throws(() => store.revoke(ACTOR_A, invalid), hasCode('actor_invalid'));
+    assert.equal(traps, 0);
+    const contender = store.createInactive(ACTOR_D);
+    const winner = { attestationRef: contender.attestationRef, attestationVersion: 1, revocationGeneration: 0 };
+    const results = await Promise.allSettled([Promise.resolve().then(() => store.revoke(ACTOR_D, winner)), Promise.resolve().then(() => store.revoke(ACTOR_D, winner))]);
+    assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
+    assert.equal(results.filter((result) => result.status === 'rejected').length, 1);
+    const database = db(); database.pragma('ignore_check_constraints = ON');
+    try { database.prepare('UPDATE headless_soap_active_role_attestations SET revocation_generation = 9007199254740991 WHERE actor_ref = ?').run(ACTOR_B); } finally { database.pragma('ignore_check_constraints = OFF'); database.close(); }
+    assert.throws(() => store.read(ACTOR_B), hasCode('stored_state_invalid'));
 });
 
 test('uses captured SQL and intrinsics after hostile post-import mutation', async () => {
