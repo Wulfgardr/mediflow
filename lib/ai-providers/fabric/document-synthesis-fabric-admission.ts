@@ -89,4 +89,4 @@ export function resolveDocumentSynthesisFabricExecutionHandoff(handoff: unknown)
 }
 
 /** Cancels pending or in-flight work and burns every retained opaque handoff. */
-export function disposeDocumentSynthesisFabricAdmission(token: unknown): void { try { if (typeof token !== 'object' || token === null || IsProxy(token)) return; const entry = apply(weakMapGet, admissions, [token]) as Entry | undefined; if (entry && entry.state !== 'finalized') forget(token, entry); } catch { /* Opaque cancellation stays fail-closed. */ } }
+export function disposeDocumentSynthesisFabricAdmission(token: unknown): void { try { if (typeof token !== 'object' || token === null || IsProxy(token)) return; const entry = apply(weakMapGet, admissions, [token]) as Entry | undefined; if (entry) { if (entry.state === 'finalized') { entry.lease.dispose(); return; } forget(token, entry); } } catch { /* Opaque cancellation stays fail-closed. */ } }
