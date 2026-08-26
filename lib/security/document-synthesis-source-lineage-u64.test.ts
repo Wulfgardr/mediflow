@@ -13,9 +13,9 @@ import {
 
 function assertFrozenNull(value: object): void { assert.equal(Object.isFrozen(value), true); assert.equal(Object.getPrototypeOf(value), null); }
 const ZERO = BigInt(0); const ONE = BigInt(1); const TWO = BigInt(2); const THREE = BigInt(3);
-function stateAt(nextSourceSetEpoch: bigint, revocationGeneration = ZERO) {
+function stateAt(nextSourceSetEpoch: bigint, revocationGeneration = ZERO, seenRevocationEvents: unknown = Object.freeze([])) {
     return Object.freeze(Object.assign(Object.create(null), { nextSourceSetEpoch, exhausted: false,
-        revocationGeneration, seenRevocationEvents: Object.freeze([]) }));
+        revocationGeneration, seenRevocationEvents }));
 }
 
 test('starts at one and permits caller-managed gaps without reuse', () => {
@@ -71,6 +71,36 @@ test('rejects hostile input without property reads or thenable observation', () 
     for (const value of [proxy, accessor, thenable, sparse, symbolic, hidden, Object.freeze({}), Object.freeze({ nextSourceSetEpoch: ONE })]) {
         assert.equal(allocateDocumentSynthesisSourceSetEpoch(value).status, 'invalid');
         assert.equal(observeDocumentSynthesisRevocation(createDocumentSynthesisSourceLineageState(), value).status, 'invalid');
+    }
+    assert.equal(reads, 0);
+});
+
+test('rejects revoked, proxied, and noncanonical nested event arrays before reflection', () => {
+    let reads = 0;
+    const identity = Object.freeze(Object.create(null));
+    const revoked = Proxy.revocable(Object.freeze([]), {}); revoked.revoke();
+    const throwingProxy = new Proxy(Object.freeze([]), {
+        get() { reads += 1; throw new Error('nested get trap'); },
+        getPrototypeOf() { reads += 1; throw new Error('nested prototype trap'); },
+        isExtensible() { reads += 1; throw new Error('nested extensible trap'); },
+        ownKeys() { reads += 1; throw new Error('nested keys trap'); },
+    });
+    const customPrototype = Object.create(Array.prototype);
+    Object.defineProperty(customPrototype, 'then', { get() { reads += 1; throw new Error('inherited then trap'); } });
+    Object.defineProperty(customPrototype, Symbol.iterator, { get() { reads += 1; throw new Error('inherited iterator trap'); } });
+    const customPrototypeArray: object[] = [];
+    Object.setPrototypeOf(customPrototypeArray, customPrototype); Object.freeze(customPrototypeArray);
+    const nullPrototypeArray: object[] = [];
+    Object.setPrototypeOf(nullPrototypeArray, null); Object.freeze(nullPrototypeArray);
+
+    for (const seenRevocationEvents of [revoked.proxy, throwingProxy, customPrototypeArray, nullPrototypeArray]) {
+        const candidate = stateAt(ONE, ZERO, seenRevocationEvents);
+        let allocation: ReturnType<typeof allocateDocumentSynthesisSourceSetEpoch> | undefined;
+        let observation: ReturnType<typeof observeDocumentSynthesisRevocation> | undefined;
+        assert.doesNotThrow(() => { allocation = allocateDocumentSynthesisSourceSetEpoch(candidate); });
+        assert.doesNotThrow(() => { observation = observeDocumentSynthesisRevocation(candidate, identity); });
+        assert.equal(allocation?.status, 'invalid'); assertFrozenNull(allocation as object);
+        assert.equal(observation?.status, 'invalid'); assertFrozenNull(observation as object);
     }
     assert.equal(reads, 0);
 });
