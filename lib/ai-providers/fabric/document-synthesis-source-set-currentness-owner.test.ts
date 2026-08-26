@@ -16,9 +16,9 @@ const n = (value: number | string) => BigInt(value);
 
 afterEach(() => clearAllSessions());
 
-function sourceSet(epoch = n(3), revoked = n(5), revision = n(7)) {
+function sourceSet(epoch = n(3), revoked = n(5), revision = n(7), freshness = n(11), reference = 'document.synthetic.currentness') {
     const result = captureDocumentSynthesisSourceSet({
-        sources: [{ documentSourceRef: 'document.synthetic.currentness', documentRevision: revision, documentFreshnessEpoch: n(11), sourceText: 'Synthetic source text' }],
+        sources: [{ documentSourceRef: reference, documentRevision: revision, documentFreshnessEpoch: freshness, sourceText: 'Synthetic source text' }],
         sourceSetEpoch: epoch, revocationGeneration: revoked,
     });
     assert.equal(result.status, 'available');
@@ -59,6 +59,31 @@ test('requires a strictly increasing source-set epoch and nondecreasing revocati
     assert.equal(noRevocationRollback.transition(sourceSet(n(4), n(4))), false);
     assert.equal(noRevocationRollback.snapshot(), null);
 });
+
+test('terminally rejects regressed source lineage, including reintroduced and mixed sources', () => {
+    const terminal = (capsule: ReturnType<typeof createDocumentSynthesisSourceSetCurrentnessOwner>, stale: ReturnType<typeof sourceSet>, retry: ReturnType<typeof sourceSet>) => {
+        assert.equal(capsule.transition(stale), false); assert.equal(capsule.snapshot(), null); assert.equal(capsule.transition(retry), false);
+    };
+    const revision = ownerWithSelection(); const revisionCapsule = createDocumentSynthesisSourceSetCurrentnessOwner(Object.freeze({ owner: revision.owner, session: revision.session, sourceSet: sourceSet() }));
+    terminal(revisionCapsule, sourceSet(n(4), n(5), n(6)), sourceSet(n(5), n(5), n(8)));
+    const freshness = ownerWithSelection(); const freshnessCapsule = createDocumentSynthesisSourceSetCurrentnessOwner(Object.freeze({ owner: freshness.owner, session: freshness.session, sourceSet: sourceSet() }));
+    terminal(freshnessCapsule, sourceSet(n(4), n(5), n(7), n(10)), sourceSet(n(5), n(5), n(8)));
+    const aba = ownerWithSelection(); const abaCapsule = createDocumentSynthesisSourceSetCurrentnessOwner(Object.freeze({ owner: aba.owner, session: aba.session, sourceSet: sourceSet() }));
+    assert.equal(abaCapsule.transition(sourceSet(n(4), n(5), n(1), n(1), 'document.synthetic.currentness.b')), true);
+    terminal(abaCapsule, sourceSet(n(5), n(5), n(6), n(10)), sourceSet(n(6), n(5), n(8)));
+    const mixed = ownerWithSelection(); const mixedCapsule = createDocumentSynthesisSourceSetCurrentnessOwner(Object.freeze({ owner: mixed.owner, session: mixed.session, sourceSet: sourceSet() }));
+    assert.equal(mixedCapsule.transition(captureMixed(n(4), n(8), n(12))), true);
+    terminal(mixedCapsule, captureMixed(n(5), n(7), n(13)), sourceSet(n(6), n(5), n(9)));
+});
+
+function captureMixed(epoch: bigint, firstRevision: bigint, secondFreshness: bigint) {
+    const result = captureDocumentSynthesisSourceSet({ sources: [
+        { documentSourceRef: 'document.synthetic.currentness', documentRevision: firstRevision, documentFreshnessEpoch: n(11), sourceText: 'Synthetic source text A' },
+        { documentSourceRef: 'document.synthetic.currentness.b', documentRevision: n(1), documentFreshnessEpoch: secondFreshness, sourceText: 'Synthetic source text B' },
+    ], sourceSetEpoch: epoch, revocationGeneration: n(5) });
+    assert.equal(result.status, 'available'); if (result.status !== 'available') throw new Error('expected synthetic source set');
+    return result.sourceSet;
+}
 
 test('fails closed after revocation, disposal, reselection, expiry, logout, and restart', () => {
     const state = ownerWithSelection();
