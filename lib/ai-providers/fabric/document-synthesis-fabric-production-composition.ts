@@ -15,6 +15,8 @@ type Configuration = Readonly<{ owner: object; session: object; capsule: object 
 export type DocumentSynthesisFabricProductionComposition = Readonly<{ execute(): Promise<Publication> }>;
 
 const OBJECT = Object.prototype; const ObjectAssign = Object.assign; const ObjectCreate = Object.create; const ObjectFreeze = Object.freeze; const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor; const ObjectGetPrototypeOf = Object.getPrototypeOf; const ObjectHasOwn = Object.hasOwn; const ObjectIsFrozen = Object.isFrozen; const ReflectOwnKeys = Reflect.ownKeys; const IsProxy = types.isProxy;
+const ProcessExecArgv = process.execArgv; const ProcessExecArgvLength = ProcessExecArgv.length; const StringStartsWith = String.prototype.startsWith;
+const TEST_HARNESS = (() => { for (let index = 0; index < ProcessExecArgvLength; index += 1) { const argument = ProcessExecArgv[index]; if (argument === '--test' || (typeof argument === 'string' && (StringStartsWith.call(argument, '--test=') || StringStartsWith.call(argument, '--test-')))) return true; } return false; })();
 
 function frozen<T extends Record<string, unknown>>(value: T): Readonly<T> { return ObjectFreeze(ObjectAssign(ObjectCreate(null) as T, value)); }
 function configuration(value: unknown): Configuration | null {
@@ -43,4 +45,4 @@ function create(configurationValue: unknown, bind: Binding): DocumentSynthesisFa
 export const createDocumentSynthesisFabricProductionComposition = (value: unknown): DocumentSynthesisFabricProductionComposition | null => create(value, bindDocumentSynthesisProvider);
 
 /** Test-only dependency seam; production cannot supply provider, endpoint, prompt, or execution options. */
-export function createDocumentSynthesisFabricProductionCompositionForTest(value: unknown, dependencies: unknown): DocumentSynthesisFabricProductionComposition | null { const bind = testBinding(dependencies); return bind ? create(value, bind) : null; }
+export function createDocumentSynthesisFabricProductionCompositionForTest(value: unknown, dependencies: unknown): DocumentSynthesisFabricProductionComposition | null { if (!TEST_HARNESS) return null; const bind = testBinding(dependencies); return bind ? create(value, bind) : null; }
