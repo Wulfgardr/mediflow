@@ -115,6 +115,9 @@ test('network attachment create accepts the real paired projection and applies s
     assert.equal(row?.ocrQueueReason, 'paired_upload');
     assert.ok(row?.ocrQueueUpdatedAt);
     assert.ok(row?.createdAt);
+    assert.match(row?.documentSourceRef ?? '', /^[0-9a-f]{64}$/u);
+    assert.equal(row?.documentRevision, 1);
+    assert.equal(row?.documentFreshnessEpoch, 1);
 
     const audit = dbServer.select().from(auditEvents)
         .where(and(eq(auditEvents.eventType, 'attachment.created'), eq(auditEvents.subjectRef, result.value.id)))
@@ -144,6 +147,9 @@ test('network attachment create rejects every field outside the allowlist', asyn
         ocrReplayArtifactSnapshot: 'ENC:aXY=:cmVwbGF5',
         ocrQueueUpdatedAt: new Date().toISOString(),
         createdAt: new Date().toISOString(),
+        documentSourceRef: 'a'.repeat(64),
+        documentRevision: 1,
+        documentFreshnessEpoch: 1,
         updatedAt: new Date().toISOString(),
         unexpectedFutureField: 'anything',
     };
@@ -229,4 +235,20 @@ test('network attachment create returns 404 when the patient is outside scope or
 
     const count = dbServer.select().from(attachments).all().length;
     assert.equal(count, 0);
+});
+
+test('concurrent network creates persist distinct host currentness tuples', async () => {
+    resetDatabase();
+    const results = await Promise.all(Array.from({ length: 8 }, () =>
+        createNetworkScopedAttachment(makeContext(), validCreateBody()),
+    ));
+    assert.ok(results.every((result) => result.status === 201));
+    const rows = dbServer.select({
+        sourceRef: attachments.documentSourceRef,
+        revision: attachments.documentRevision,
+        freshnessEpoch: attachments.documentFreshnessEpoch,
+    }).from(attachments).all();
+    assert.equal(rows.length, 8);
+    assert.equal(new Set(rows.map((row) => row.sourceRef)).size, 8);
+    assert.ok(rows.every((row) => row.revision === 1 && row.freshnessEpoch === 1));
 });
