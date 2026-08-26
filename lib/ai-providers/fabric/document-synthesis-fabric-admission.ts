@@ -13,11 +13,12 @@ import type { DocumentSynthesisSourceSetValidationResult } from './document-synt
 export type DocumentSynthesisFabricAdmissionToken = object;
 export type DocumentSynthesisFabricExecutionHandoff = object;
 export type DocumentSynthesisFabricAdmissionResult = Readonly<{ status: 'available' | 'denied'; code: null | 'input_invalid' | 'binding_invalid' | 'source_unavailable' | 'resolution_invalid'; token: DocumentSynthesisFabricAdmissionToken | null; reviewOnly: true; writesPerformed: 0; applyPolicy: 'none'; fallback: 'denied_by_contract' }>;
+export type DocumentSynthesisFabricCommittedMetadata = Readonly<{ receipt: FabricResolutionReceipt; provenance: FabricProvenanceRecord }>;
+export type DocumentSynthesisFabricExecutionCapability = Readonly<{ takeProviderInput(): Readonly<{ prompt: string }> | null; validateProviderEnvelope(envelopeToken: unknown): DocumentSynthesisSourceSetValidationResult; finalize(): DocumentSynthesisFabricCommittedMetadata | null; abort(): void }>;
 export type DocumentSynthesisFabricExecutionAdmission = Readonly<{
-    providerToken: DocumentSynthesisProviderBindingToken; receipt: FabricResolutionReceipt; provenance: FabricProvenanceRecord;
-    takeProviderInput(): Readonly<{ prompt: string }> | null; validateProviderEnvelope(envelopeToken: unknown): DocumentSynthesisSourceSetValidationResult; finalize(): boolean; abort(): void;
+    providerToken: DocumentSynthesisProviderBindingToken; execution: DocumentSynthesisFabricExecutionCapability;
 }>;
-type Entry = { state: 'pending' | 'in_flight' | 'handoff_taken' | 'finalized' | 'aborted'; lease: DocumentSynthesisSourceSetLease; leaseToken: object; executionToken: DocumentSynthesisSourceSetExecution | null; handoff: object | null; execution: DocumentSynthesisFabricExecutionAdmission };
+type Entry = { state: 'pending' | 'in_flight' | 'handoff_taken' | 'finalized' | 'aborted'; lease: DocumentSynthesisSourceSetLease; leaseToken: object; executionToken: DocumentSynthesisSourceSetExecution | null; handoff: object | null; prepared: DocumentSynthesisFabricCommittedMetadata; execution: DocumentSynthesisFabricExecutionAdmission };
 const OBJECT = Object.prototype; const ObjectAssign = Object.assign; const ObjectCreate = Object.create; const ObjectFreeze = Object.freeze; const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor; const ObjectGetPrototypeOf = Object.getPrototypeOf; const ObjectIsFrozen = Object.isFrozen; const ObjectHasOwn = Object.hasOwn; const ReflectOwnKeys = Reflect.ownKeys; const IsProxy = types.isProxy;
 const WeakMapConstructor = WeakMap; const weakMapGet = WeakMap.prototype.get; const weakMapSet = WeakMap.prototype.set; const weakMapDelete = WeakMap.prototype.delete; const apply = Reflect.apply;
 const admissions = new WeakMapConstructor<object, Entry>(); const handoffs = new WeakMapConstructor<object, Entry>(); const COMMON = ObjectFreeze({ reviewOnly: true as const, writesPerformed: 0 as const, applyPolicy: 'none' as const, fallback: 'denied_by_contract' as const });
@@ -42,9 +43,10 @@ export function admitDocumentSynthesisFabric(value: unknown): DocumentSynthesisF
     let provenance: FabricProvenanceRecord; try { provenance = buildProvenanceRecord(resolved, ['context_minimization']); } catch { lease.dispose(); return denied('resolution_invalid'); }
     const token = ObjectFreeze(ObjectCreate(null)) as DocumentSynthesisFabricAdmissionToken; const entry = {} as Entry;
     const abort = () => { if (entry.state === 'finalized' || entry.state === 'aborted') return; forget(token, entry); };
-    const finalize = () => { if (entry.state !== 'handoff_taken' || !entry.executionToken) return false; entry.state = 'finalized'; const result = entry.lease.consume(entry.executionToken); if (!result) entry.lease.dispose(); apply(weakMapDelete, admissions, [token]); if (entry.handoff) apply(weakMapDelete, handoffs, [entry.handoff]); return result; };
+    const finalize = (): DocumentSynthesisFabricCommittedMetadata | null => { if (entry.state !== 'handoff_taken' || !entry.executionToken) return null; entry.state = 'finalized'; if (!entry.lease.consume(entry.executionToken)) { entry.lease.dispose(); apply(weakMapDelete, admissions, [token]); if (entry.handoff) apply(weakMapDelete, handoffs, [entry.handoff]); return null; } return entry.prepared; };
     const validateProviderEnvelope = (envelopeToken: unknown) => { if (entry.state !== 'handoff_taken' || !entry.executionToken) { abort(); return validationDenied; } const result = entry.lease.validateProviderEnvelope(ObjectFreeze({ executionToken: entry.executionToken, envelopeToken })); if (result.status !== 'available') abort(); return result; };
-    entry.state = 'pending'; entry.lease = lease; entry.leaseToken = leaseToken; entry.executionToken = null; entry.handoff = null; entry.execution = frozen({ providerToken: providerToken as DocumentSynthesisProviderBindingToken, receipt: resolved.receipt, provenance, takeProviderInput: () => entry.state === 'handoff_taken' && entry.executionToken ? entry.lease.takeProviderInput(entry.executionToken) : null, validateProviderEnvelope, finalize, abort }) as DocumentSynthesisFabricExecutionAdmission;
+    const capability = frozen({ takeProviderInput: () => entry.state === 'handoff_taken' && entry.executionToken ? entry.lease.takeProviderInput(entry.executionToken) : null, validateProviderEnvelope, finalize, abort }) as DocumentSynthesisFabricExecutionCapability;
+    entry.state = 'pending'; entry.lease = lease; entry.leaseToken = leaseToken; entry.executionToken = null; entry.handoff = null; entry.prepared = frozen({ receipt: resolved.receipt, provenance }) as DocumentSynthesisFabricCommittedMetadata; entry.execution = frozen({ providerToken: providerToken as DocumentSynthesisProviderBindingToken, execution: capability }) as DocumentSynthesisFabricExecutionAdmission;
     apply(weakMapSet, admissions, [token, entry]); return frozen({ status: 'available' as const, code: null, token, ...COMMON });
 }
 
@@ -59,4 +61,4 @@ export function resolveDocumentSynthesisFabricExecutionHandoff(handoff: unknown)
 }
 
 /** Cancels pending or in-flight work and burns every retained opaque handoff. */
-export function disposeDocumentSynthesisFabricAdmission(token: unknown): void { try { if (typeof token !== 'object' || token === null || IsProxy(token)) return; const entry = apply(weakMapGet, admissions, [token]) as Entry | undefined; if (entry) forget(token, entry); } catch { /* Opaque cancellation stays fail-closed. */ } }
+export function disposeDocumentSynthesisFabricAdmission(token: unknown): void { try { if (typeof token !== 'object' || token === null || IsProxy(token)) return; const entry = apply(weakMapGet, admissions, [token]) as Entry | undefined; if (entry && entry.state !== 'finalized') forget(token, entry); } catch { /* Opaque cancellation stays fail-closed. */ } }
