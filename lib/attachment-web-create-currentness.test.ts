@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import Database from 'better-sqlite3';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -22,7 +23,10 @@ try {
     migrationDb.close();
 }
 
-const { createWebAttachment } = await import('../app/api/attachments/route.ts');
+const { createWebAttachment } = await import('./attachment-web-create.ts');
+const route = await import('../app/api/attachments/route.ts');
+const requireCurrent = createRequire(import.meta.url);
+const serverAuth = requireCurrent('./security/server-auth') as { requireSession: () => Promise<unknown> };
 
 const patientId = 'patient.synthetic.currentness';
 const sessionUsername = ['synthetic', 'web'].join('.');
@@ -114,6 +118,41 @@ test('web creation denies absent auth, invalid input, currentness injection, and
         assert.ok([400, 401, 404].includes(response.status));
         assert.equal(mints, 0);
         assert.deepEqual(rows(), []);
+    }
+});
+
+test('web creation does not mint for a soft-deleted patient', async () => {
+    reset();
+    const db = new Database(dbPath);
+    try {
+        db.prepare('UPDATE patients SET deleted_at = unixepoch() WHERE id = ?').run(patientId);
+    } finally {
+        db.close();
+    }
+    let mints = 0;
+    const response = await createWebAttachment(request(payload()), session, () => {
+        mints += 1;
+        return initial();
+    });
+    assert.equal(response.status, 404);
+    assert.equal(mints, 0);
+    assert.deepEqual(rows(), []);
+});
+
+test('web list response omits every currentness tuple field', async () => {
+    reset();
+    const created = await createWebAttachment(request(payload({ id: 'attachment.synthetic.list' })), session, () => initial());
+    assert.equal(created.status, 201);
+    const originalRequireSession = serverAuth.requireSession;
+    try {
+        serverAuth.requireSession = async () => session;
+        const response = await route.GET(new Request('http://localhost/api/attachments'));
+        assert.equal(response.status, 200);
+        const [attachment] = await response.json() as Array<Record<string, unknown>>;
+        assert.ok(attachment);
+        for (const key of ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch']) assert.equal(key in attachment, false);
+    } finally {
+        serverAuth.requireSession = originalRequireSession;
     }
 });
 
