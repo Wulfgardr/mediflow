@@ -1,67 +1,45 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { afterEach, test } from 'node:test';
 
+import { parseDocumentSynthesisProviderEnvelope } from './document-synthesis-provider-envelope.ts';
 import { captureDocumentSynthesisSourceSet } from './document-synthesis-source-set-contract.ts';
 import { createDocumentSynthesisSourceSetCurrentnessOwner } from './document-synthesis-source-set-currentness-owner.ts';
 import { createDocumentSynthesisSourceSetLease, DocumentSynthesisSourceSetLeaseConfigurationError } from './document-synthesis-source-set-lease.ts';
 import { createServerSessionProjectionOwnerRegistry } from '../../security/server-session-projection-owner.ts';
 import { clearAllSessions, createSession, deleteSession } from '../../security/server-session.ts';
 
-const USER = { id: ['synthetic', 'lease', 'user'].join('.'), username: ['synthetic', 'lease', 'clinician'].join('.'), role: 'clinician' };
-const PAIR = { patientId: 'patient.synthetic.lease', ambulatoryId: 'ambulatory.synthetic.lease' };
-const n = (value: number) => BigInt(value);
+const USER = { id: ['synthetic', 'lease', 'user'].join('.'), username: ['synthetic', 'lease', 'clinician'].join('.'), role: 'clinician' }; const PAIR = { patientId: 'patient.synthetic.lease', ambulatoryId: 'ambulatory.synthetic.lease' }; const n = (value: number) => BigInt(value);
 afterEach(() => clearAllSessions());
+function source(epoch = 3, revision = 7, freshness = 11, sourceText = 'Synthetic source.') { const result = captureDocumentSynthesisSourceSet({ sourceSetEpoch: n(epoch), revocationGeneration: n(5), sources: [{ documentSourceRef: 'document.synthetic.lease', documentRevision: n(revision), documentFreshnessEpoch: n(freshness), sourceText }] }); assert.equal(result.status, 'available'); if (result.status !== 'available') throw new Error('synthetic source unavailable'); return result.sourceSet; }
+function envelope(sourceText = 'Synthetic source.') { const quoteSha256 = createHash('sha256').update(new TextEncoder().encode(sourceText)).digest('hex'); const result = parseDocumentSynthesisProviderEnvelope({ content: JSON.stringify({ output: { schemaVersion: 'mediflow.ai.extract.v1', task: 'document_synthesis', summary: 'Synthetic summary', data: { qualityLevel: 'green', medications: [], diagnoses: [], problemStatements: [], therapyCandidates: [], servicePrescriptions: [] } }, citations: [{ label: 'S1', quote: sourceText, startByte: 0, endByte: new TextEncoder().encode(sourceText).length, quoteSha256 }], claims: [{ claimPath: 'summary', labels: ['S1'] }, { claimPath: 'data.qualityLevel', labels: ['S1'] }] }) }); assert.equal(result.status, 'available'); if (result.status !== 'available') throw new Error('synthetic envelope unavailable'); return result.token; }
+function fixture(clock: () => number = () => 1_000) { let entropy = 0; const registry = createServerSessionProjectionOwnerRegistry({ clock, entropy: () => Uint8Array.from({ length: 16 }, (_, index) => (entropy += 1) + index), resolve: (_session, pair) => Object.freeze({ ...pair }) }); const session = createSession(USER, 'web'); const owner = registry.acquire(session); owner.issueSelection({ expectedEpoch: 0, ...PAIR }); const capsule = createDocumentSynthesisSourceSetCurrentnessOwner(Object.freeze({ owner, session, sourceSet: source() })); return { session, owner, capsule, lease: () => createDocumentSynthesisSourceSetLease(Object.freeze({ owner, session, capsule })) }; }
+function begun(state: ReturnType<typeof fixture>) { const lease = state.lease(); const issue = lease.issue(); assert.ok(issue); const execution = lease.beginExecution(issue); assert.ok(execution); return { lease, issue, execution }; }
 
-function source(epoch = 3, revision = 7, freshness = 11) {
-    const result = captureDocumentSynthesisSourceSet({ sourceSetEpoch: n(epoch), revocationGeneration: n(5), sources: [{ documentSourceRef: 'document.synthetic.lease', documentRevision: n(revision), documentFreshnessEpoch: n(freshness), sourceText: 'Synthetic source.' }] });
-    assert.equal(result.status, 'available'); if (result.status !== 'available') throw new Error('synthetic source unavailable'); return result.sourceSet;
-}
-function fixture(clock: () => number = () => 1_000) {
-    let entropy = 0;
-    const registry = createServerSessionProjectionOwnerRegistry({ clock, entropy: () => Uint8Array.from({ length: 16 }, (_, index) => (entropy += 1) + index), resolve: (_session, pair) => Object.freeze({ ...pair }) });
-    const session = createSession(USER, 'web'); const owner = registry.acquire(session); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
-    const capsule = createDocumentSynthesisSourceSetCurrentnessOwner(Object.freeze({ owner, session, sourceSet: source() }));
-    return { session, owner, capsule, lease: () => createDocumentSynthesisSourceSetLease(Object.freeze({ owner, session, capsule })) };
-}
-
-test('issues a same-process opaque token and burns it before granting one execution', () => {
-    const state = fixture(); const lease = state.lease(); const token = lease.issue();
-    assert.ok(token); assert.equal(Object.getPrototypeOf(token), null); assert.equal(Object.isFrozen(token), true); assert.deepEqual(Reflect.ownKeys(token), []);
-    assert.equal(lease.consume(token), true); assert.equal(lease.consume(token), false); assert.equal(lease.issue(), null);
+test('mints opaque issue and execution tokens, exposes only frozen prompt, and requires validation before commit', () => {
+    const state = fixture(); const { lease, issue, execution } = begun(state); assert.deepEqual(Reflect.ownKeys(issue), []); assert.deepEqual(Reflect.ownKeys(execution), []); assert.equal(lease.consume(execution), false); assert.equal(lease.takeProviderInput(execution), null);
+    const fresh = begun(fixture()); const prompt = fresh.lease.takeProviderInput(fresh.execution); assert.ok(prompt); assert.equal(Object.getPrototypeOf(prompt), null); assert.equal(Object.isFrozen(prompt), true); assert.deepEqual(Reflect.ownKeys(prompt), ['prompt']); assert.equal(prompt.prompt.includes('Synthetic source.'), true); assert.equal(fresh.lease.validateProviderEnvelope(Object.freeze({ executionToken: fresh.execution, envelopeToken: envelope() })).status, 'available'); assert.equal(fresh.lease.consume(fresh.execution), true); assert.equal(fresh.lease.consume(fresh.execution), false);
 });
 
-test('has no source, provider, authority, or residue on invalid configuration or issue denial', () => {
-    const state = fixture();
-    for (const value of [Object.freeze({ owner: state.owner, session: state.session, capsule: state.capsule, sourceSet: source() }), Object.freeze({ owner: state.owner, session: state.session, capsule: { ...state.capsule } })]) assert.throws(() => createDocumentSynthesisSourceSetLease(value), DocumentSynthesisSourceSetLeaseConfigurationError);
-    state.capsule.revoke(); const lease = state.lease(); assert.equal(lease.issue(), null); assert.equal(Reflect.ownKeys(lease).includes('sourceSet'), false);
+test('denies alpha after beta before bind and retains alpha private input while beta prevents commit', () => {
+    const before = fixture(); const lease = before.lease(); const issue = lease.issue(); assert.ok(issue); assert.equal(before.capsule.transition(source(4, 7, 11, 'Beta source.')), true); assert.equal(lease.beginExecution(issue), null);
+    const after = fixture(); const active = begun(after); const input = active.lease.takeProviderInput(active.execution); assert.ok(input); assert.equal(after.capsule.transition(source(4, 7, 11, 'Beta source.')), true); assert.equal(input.prompt.includes('Synthetic source.'), true); assert.equal(active.lease.validateProviderEnvelope(Object.freeze({ executionToken: active.execution, envelopeToken: envelope() })).status, 'available'); assert.equal(active.lease.consume(active.execution), false);
 });
 
-test('revalidates immediately and burns denials for source drift, revoke, selection, expiry, logout, dispose, and restart', () => {
-    const stale = fixture(); const staleLease = stale.lease(); const staleToken = staleLease.issue(); assert.ok(staleToken); assert.equal(stale.capsule.transition(source(4, 8)), true); assert.equal(staleLease.consume(staleToken), false); assert.equal(staleLease.consume(staleToken), false);
-    const cases: Array<(state: ReturnType<typeof fixture>) => void> = [
-        (state) => state.capsule.revoke(),
-        (state) => state.owner.issueSelection({ expectedEpoch: 1, ...PAIR }),
-        (state) => { state.session.expiresAt = 1_000; },
-        (state) => deleteSession(state.session.id),
-        (state) => state.capsule.dispose(),
-        () => clearAllSessions(),
-    ];
-    for (const change of cases) { const state = fixture(); const lease = state.lease(); const token = lease.issue(); assert.ok(token); change(state); assert.equal(lease.consume(token), false); assert.equal(lease.consume(token), false); }
+test('binds validation to alpha only and burns validation, foreign, cloned, and cross-lease tokens', () => {
+    const state = fixture(); const active = begun(state); assert.ok(active.lease.takeProviderInput(active.execution)); const beta = envelope('Beta source.'); assert.equal(active.lease.validateProviderEnvelope(Object.freeze({ executionToken: active.execution, envelopeToken: beta })).status, 'denied'); assert.equal(active.lease.validateProviderEnvelope(Object.freeze({ executionToken: active.execution, envelopeToken: envelope() })).status, 'denied');
+    const first = begun(fixture()); const second = begun(fixture()); assert.equal(second.lease.beginExecution(first.issue), null); assert.equal(first.lease.takeProviderInput(Object.freeze({ ...first.execution })), null); assert.ok(first.lease.takeProviderInput(first.execution)); assert.equal(first.lease.validateProviderEnvelope(Object.freeze({ executionToken: first.execution, envelopeToken: new Proxy(envelope(), {}) })).status, 'denied'); assert.equal(first.lease.consume(first.execution), false);
 });
 
-test('rejects foreign, proxy, accessor, hidden, symbol, thenable, and reentrant inputs without caller reads or post-return work', async () => {
-    const state = fixture(); const foreign = fixture(); let reads = 0; let traps = 0;
-    const accessor = Object.freeze(Object.defineProperty({ owner: state.owner, session: state.session, capsule: state.capsule }, 'owner', { enumerable: true, get() { reads += 1; return state.owner; } }));
-    const proxy = new Proxy(Object.freeze({ owner: state.owner, session: state.session, capsule: state.capsule }), { get() { traps += 1; throw new Error('trap'); } });
-    for (const value of [accessor, proxy, Object.freeze({ owner: state.owner, session: state.session, capsule: state.capsule, [Symbol('x')]: true }), Object.freeze(Object.defineProperty({ owner: state.owner, session: state.session, capsule: state.capsule }, 'hidden', { value: true })), Object.freeze({ owner: state.owner, session: state.session, capsule: state.capsule, then() {} }), Object.freeze({ owner: foreign.owner, session: state.session, capsule: state.capsule })]) assert.throws(() => createDocumentSynthesisSourceSetLease(value), DocumentSynthesisSourceSetLeaseConfigurationError);
-    const descriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'then'); Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { reads += 1; return undefined; } });
-    const lease = state.lease(); const token = lease.issue(); assert.ok(token); assert.equal(lease.consume(new Proxy(token, { get() { traps += 1; throw new Error('trap'); } })), false); if (descriptor) Object.defineProperty(Object.prototype, 'then', descriptor); else delete (Object.prototype as { then?: unknown }).then; assert.equal(reads, 0); assert.equal(traps, 0);
-    await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(lease.consume(token), true);
+test('fails closed for lifecycle loss, proxies, accessors, symbols, thenables, ambient then, and reentry without deferred work', async () => {
+    const state = fixture(); let reads = 0; let traps = 0; const invalid = Object.freeze(Object.defineProperty({ owner: state.owner, session: state.session, capsule: state.capsule }, 'owner', { enumerable: true, get() { reads += 1; return state.owner; } })); assert.throws(() => createDocumentSynthesisSourceSetLease(invalid), DocumentSynthesisSourceSetLeaseConfigurationError);
+    const proxy = new Proxy(Object.freeze({ owner: state.owner, session: state.session, capsule: state.capsule }), { get() { traps += 1; throw new Error('trap'); } }); for (const value of [proxy, Object.freeze({ owner: state.owner, session: state.session, capsule: state.capsule, [Symbol('x')]: true }), Object.freeze({ owner: state.owner, session: state.session, capsule: state.capsule, then() {} })]) assert.throws(() => createDocumentSynthesisSourceSetLease(value), DocumentSynthesisSourceSetLeaseConfigurationError);
+    const descriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'then'); Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { reads += 1; return undefined; } }); const active = begun(state); assert.equal(active.lease.takeProviderInput(new Proxy(active.execution, { get() { traps += 1; throw new Error('trap'); } })), null); if (descriptor) Object.defineProperty(Object.prototype, 'then', descriptor); else delete (Object.prototype as { then?: unknown }).then; assert.equal(reads, 0); assert.equal(traps, 0); await new Promise<void>((resolve) => setImmediate(resolve));
+    const cases: Array<(value: ReturnType<typeof fixture>) => void> = [(value) => value.capsule.revoke(), (value) => value.owner.issueSelection({ expectedEpoch: 1, ...PAIR }), (value) => { value.session.expiresAt = 1_000; }, (value) => deleteSession(value.session.id), (value) => value.capsule.dispose(), () => clearAllSessions()]; for (const change of cases) { const current = fixture(); const currentActive = begun(current); assert.ok(currentActive.lease.takeProviderInput(currentActive.execution)); assert.equal(currentActive.lease.validateProviderEnvelope(Object.freeze({ executionToken: currentActive.execution, envelopeToken: envelope() })).status, 'available'); change(current); assert.equal(currentActive.lease.consume(currentActive.execution), false); }
 });
 
-test('poisons host-clock reentry without deferred work', async () => {
-    let lease: ReturnType<ReturnType<typeof fixture>['lease']> | null = null; let armed = false;
-    const state = fixture(() => { if (armed) lease?.issue(); return 1_000; }); lease = state.lease(); armed = true;
-    assert.equal(lease.issue(), null); await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(lease.issue(), null);
+test('disposal and host-clock reentry burn every outstanding token', async () => {
+    const active = begun(fixture()); active.lease.dispose(); assert.equal(active.lease.takeProviderInput(active.execution), null); assert.equal(active.lease.consume(active.execution), false);
+    let lease: ReturnType<ReturnType<typeof fixture>['lease']> | null = null; let armed = false; const state = fixture(() => { if (armed) lease?.issue(); return 1_000; }); lease = state.lease(); armed = true; assert.equal(lease.issue(), null); await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(lease.issue(), null);
 });
