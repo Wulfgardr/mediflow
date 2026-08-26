@@ -14,12 +14,13 @@ const storeModule = await import('./headless-soap-active-role-attestation-store.
 const { createHeadlessSoapActiveRoleAttestationStore, isHeadlessSoapActiveRoleAttestationStoreError } = storeModule;
 const ACTOR_A = 'synthetic-soap-attestation-actor-a';
 const ACTOR_B = 'synthetic-soap-attestation-actor-b';
+const ACTOR_C = 'synthetic-soap-attestation-actor-c';
 function db() { return new Database(path.join(dataDir, 'medical.db')); }
 function user(id: string): void {
     const database = db();
     try { database.prepare("INSERT INTO users (id, username, password_hash, encrypted_master_key, salt) VALUES (?, ?, 'synthetic-hash', 'synthetic-key', 'synthetic-salt')").run(id, `${id}-user`); } finally { database.close(); }
 }
-user(ACTOR_A); user(ACTOR_B);
+user(ACTOR_A); user(ACTOR_B); user(ACTOR_C);
 function hasCode(code: string) { return (error: unknown) => isHeadlessSoapActiveRoleAttestationStoreError(error) && error.code === code; }
 
 test('creates a host-generated fixed inactive SOAP attestation for one canonical actor', () => {
@@ -57,6 +58,33 @@ test('serializes duplicate creation, persists across a new store, and returns di
     assert.equal([one, two].filter((item) => item.status === 'rejected').length, 1);
     assert.deepEqual(createHeadlessSoapActiveRoleAttestationStore().read(ACTOR_B), store.read(ACTOR_B));
     assert.notEqual(store.read(ACTOR_A).attestationRef, store.read(ACTOR_B).attestationRef);
+});
+
+test('uses captured SQL and intrinsics after hostile post-import mutation', async () => {
+    const { dbServer } = await import('../db-server.ts');
+    const objectApi = Object as unknown as { getPrototypeOf: typeof Object.getPrototypeOf; getOwnPropertyDescriptors: typeof Object.getOwnPropertyDescriptors };
+    const original = { getPrototypeOf: Object.getPrototypeOf, getOwnPropertyDescriptors: Object.getOwnPropertyDescriptors, ownKeys: Reflect.ownKeys, now: Date.now, error: Error, insert: dbServer.insert, ownInsert: Object.prototype.hasOwnProperty.call(dbServer, 'insert'), then: Object.getOwnPropertyDescriptor(Object.prototype, 'then'), toJSON: Object.getOwnPropertyDescriptor(Object.prototype, 'toJSON') };
+    let hostileCalls = 0;
+    try {
+        objectApi.getPrototypeOf = (() => { hostileCalls++; return null; }) as typeof Object.getPrototypeOf;
+        objectApi.getOwnPropertyDescriptors = (() => { hostileCalls++; return {}; }) as typeof Object.getOwnPropertyDescriptors;
+        Reflect.ownKeys = (() => { hostileCalls++; return []; }) as typeof Reflect.ownKeys;
+        Date.now = () => { hostileCalls++; return 0; };
+        globalThis.Error = (() => { hostileCalls++; return new original.error('hostile'); }) as typeof Error;
+        Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { hostileCalls++; return undefined; } });
+        Object.defineProperty(Object.prototype, 'toJSON', { configurable: true, get() { hostileCalls++; return undefined; } });
+        (dbServer as unknown as { insert: unknown }).insert = () => { hostileCalls++; throw new original.error('hostile'); };
+        assert.equal(createHeadlessSoapActiveRoleAttestationStore().createInactive(ACTOR_C).actorRef, ACTOR_C);
+        assert.throws(() => createHeadlessSoapActiveRoleAttestationStore().read('missing-after-poison'), hasCode('actor_missing'));
+    } finally {
+        objectApi.getPrototypeOf = original.getPrototypeOf; objectApi.getOwnPropertyDescriptors = original.getOwnPropertyDescriptors;
+        Reflect.ownKeys = original.ownKeys; Date.now = original.now; globalThis.Error = original.error;
+        if (original.then) Object.defineProperty(Object.prototype, 'then', original.then); else delete (Object.prototype as { then?: unknown }).then;
+        if (original.toJSON) Object.defineProperty(Object.prototype, 'toJSON', original.toJSON); else delete (Object.prototype as { toJSON?: unknown }).toJSON;
+        if (original.ownInsert) (dbServer as unknown as { insert: unknown }).insert = original.insert;
+        else delete (dbServer as unknown as { insert?: unknown }).insert;
+    }
+    assert.equal(hostileCalls, 0);
 });
 
 test('fails closed for corrupt rows and emits neither thenables nor raw storage errors', () => {
