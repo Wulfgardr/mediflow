@@ -43,3 +43,25 @@ test('disposal and host-clock reentry burn every outstanding token', async () =>
     const active = begun(fixture()); active.lease.dispose(); assert.equal(active.lease.takeProviderInput(active.execution), null); assert.equal(active.lease.consume(active.execution), false);
     let lease: ReturnType<ReturnType<typeof fixture>['lease']> | null = null; let armed = false; const state = fixture(() => { if (armed) lease?.issue(); return 1_000; }); lease = state.lease(); armed = true; assert.equal(lease.issue(), null); await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(lease.issue(), null);
 });
+
+test('poisons the authentic port for active nested lease calls and keeps every closed replay inert', () => {
+    const nested = [
+        (lease: ReturnType<ReturnType<typeof fixture>['lease']>, issue: object, execution: object) => lease.issue(),
+        (lease: ReturnType<ReturnType<typeof fixture>['lease']>, issue: object, execution: object) => lease.beginExecution(issue),
+        (lease: ReturnType<ReturnType<typeof fixture>['lease']>, issue: object, execution: object) => lease.takeProviderInput(execution),
+        (lease: ReturnType<ReturnType<typeof fixture>['lease']>, issue: object, execution: object) => lease.validateProviderEnvelope(Object.freeze({ executionToken: execution, envelopeToken: envelope() })),
+        (lease: ReturnType<ReturnType<typeof fixture>['lease']>, issue: object, execution: object) => lease.consume(execution),
+        (lease: ReturnType<ReturnType<typeof fixture>['lease']>, _issue: object, _execution: object) => lease.dispose(),
+    ] as const;
+    for (const invoke of nested) {
+        let lease: ReturnType<ReturnType<typeof fixture>['lease']> | null = null; let issue: object | null = null; let execution: object | null = null; let armed = false; let portReads = 0;
+        const state = fixture(() => { if (armed) { portReads += 1; invoke(lease!, issue!, execution!); } return 1_000; }); lease = state.lease(); issue = lease.issue(); assert.ok(issue); execution = lease.beginExecution(issue); assert.ok(execution); assert.ok(lease.takeProviderInput(execution)); assert.equal(lease.validateProviderEnvelope(Object.freeze({ executionToken: execution, envelopeToken: envelope() })).status, 'available'); armed = true;
+        assert.equal(lease.consume(execution), false); assert.ok(portReads > 0); const closedReads = portReads; assert.equal(lease.issue(), null); assert.equal(lease.beginExecution(issue), null); assert.equal(lease.takeProviderInput(execution), null); assert.equal(lease.validateProviderEnvelope(Object.freeze({ executionToken: execution, envelopeToken: envelope() })).status, 'denied'); assert.equal(lease.consume(execution), false); lease.dispose(); assert.equal(portReads, closedReads);
+    }
+});
+
+test('poisons a late currentness clock reentry before the owner port can commit', () => {
+    let lease: ReturnType<ReturnType<typeof fixture>['lease']> | null = null; let execution: object | null = null; let armed = false; let portReads = 0; let nested = 0;
+    const state = fixture(() => { if (armed && (portReads += 1) === 2) { nested += 1; lease?.takeProviderInput(execution); } return 1_000; }); lease = state.lease(); const issue = lease.issue(); assert.ok(issue); execution = lease.beginExecution(issue); assert.ok(execution); assert.ok(lease.takeProviderInput(execution)); assert.equal(lease.validateProviderEnvelope(Object.freeze({ executionToken: execution, envelopeToken: envelope() })).status, 'available'); armed = true;
+    assert.equal(lease.consume(execution), false); assert.equal(nested, 1); assert.equal(lease.consume(execution), false);
+});
