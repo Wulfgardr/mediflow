@@ -12,8 +12,6 @@ import type Database from 'better-sqlite3';
 // reported (never thrown, never deleted) so the operator can repair, and FK is
 // still enabled afterwards because SQLite only enforces it on subsequent writes.
 
-type ForeignKeyViolationRow = { table: string };
-
 const SQLITE_LOCK_RETRY_MS = 50;
 const SQLITE_LOCK_TIMEOUT_MS = 5000;
 const sqliteLockWaiter = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
@@ -47,22 +45,15 @@ export function initSqlitePragmas(connection: Database.Database): void {
     connection.pragma('synchronous = NORMAL');
 
     try {
-        const violations = connection.pragma('foreign_key_check') as ForeignKeyViolationRow[];
+        const violations = connection.pragma('foreign_key_check') as unknown[];
         if (violations.length > 0) {
-            const perTable = new Map<string, number>();
-            for (const row of violations) {
-                perTable.set(row.table, (perTable.get(row.table) ?? 0) + 1);
-            }
-            const summary = Array.from(perTable.entries())
-                .map(([table, count]) => `${table}=${count}`)
-                .join(', ');
             console.warn(
                 `[MediFlow] foreign_key_check found ${violations.length} pre-existing violation(s) before enabling FK enforcement. ` +
-                    `Per-table counts: ${summary}. Existing data is left untouched; FK is enforced on future writes only.`,
+                    'Existing data is left untouched; FK is enforced on future writes only.',
             );
         }
-    } catch (error) {
-        console.warn('[MediFlow] foreign_key_check skipped:', error);
+    } catch {
+        console.warn('[MediFlow] foreign_key_check skipped. Existing data is left untouched; FK is enforced on future writes only.');
     }
 
     connection.pragma('foreign_keys = ON');

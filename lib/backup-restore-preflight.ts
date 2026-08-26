@@ -8,6 +8,7 @@ import {
 
 /* @Codex */
 export type BackupRestorePreflightCheckId =
+    | 'artifact-document-currentness'
     | 'artifact-json'
     | 'artifact-format'
     | 'artifact-version'
@@ -84,6 +85,11 @@ function fail(
 
 function artifactFailureToCheck(error: BackupArtifactError): BackupRestorePreflightCheck {
     const map: Record<BackupArtifactErrorCode, BackupRestorePreflightCheck> = {
+        'backup-document-currentness-unsupported': fail(
+            'artifact-document-currentness',
+            'BACKUP_DOCUMENT_CURRENTNESS_UNSUPPORTED',
+            'Riesporta il backup da una sorgente che conserva la currentness documentale.',
+        ),
         'invalid-json': fail(
             'artifact-json',
             error.message,

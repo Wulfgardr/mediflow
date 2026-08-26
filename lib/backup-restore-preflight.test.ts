@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { serializeBackupArtifact } from './backup-artifact';
+import { serializeBackupArtifact, stableStringify } from './backup-artifact';
 import { runBackupRestorePreflight } from './backup-restore-preflight';
 
 const basePayload = {
@@ -31,6 +31,7 @@ const basePayload = {
     sissHandoffs: [],
     patients: [],
     physicianReviewAttestations: [],
+    headlessSoapActiveRoleAttestations: [],
     checkups: [],
     therapies: [],
 };
@@ -118,4 +119,22 @@ test('runBackupRestorePreflight fails when the target database is not writable',
     assert.equal(result.ok, false);
     assert.equal(result.checks.some((check) => check.id === 'target-db-writable' && check.status === 'fail'), true);
     assert.match(result.error ?? '', /scrivibile/i);
+});
+
+test('preflight sanitizes missing document currentness before restore', async () => {
+    const artifact = JSON.parse(await serializeBackupArtifact({
+        ...basePayload, patients: [{ id: 'patient.synthetic.currentness' }], attachments: [{
+            id: 'attachment.synthetic.currentness', patientId: 'patient.synthetic.currentness',
+            documentSourceRef: 'a'.repeat(64), documentRevision: 1, documentFreshnessEpoch: 1,
+        }],
+    }));
+    delete artifact.payload.attachments[0].documentFreshnessEpoch;
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(stableStringify(artifact.payload)));
+    artifact.manifest.checksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    const { artifact: parsed, result } = await runBackupRestorePreflight(artifact, createDeps());
+    assert.equal(parsed, null); assert.equal(result.ok, false);
+    assert.deepEqual(result.checks.find((check) => check.id === 'artifact-document-currentness'), {
+        id: 'artifact-document-currentness', status: 'fail', message: 'BACKUP_DOCUMENT_CURRENTNESS_UNSUPPORTED',
+        remediation: 'Riesporta il backup da una sorgente che conserva la currentness documentale.',
+    });
 });

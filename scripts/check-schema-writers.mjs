@@ -83,8 +83,9 @@ export function parseTables(source) {
     .map((match) => ({ symbol: match[1], table: match[2] }));
 }
 
-export function writesTable(source, symbol) {
-  return new RegExp(`\\.(?:insert|update|delete)\\(\\s*${symbol}\\b`).test(source);
+export function writesTable(source, symbol, table = '') {
+  return new RegExp(`\\.(?:insert|update|delete)\\(\\s*${symbol}\\b`).test(source)
+    || (table !== '' && new RegExp(`\\bINSERT\\s+INTO\\s+${table}\\b`, 'i').test(source));
 }
 
 function isTestFile(file) {
@@ -96,7 +97,7 @@ function findWriters(tables, files) {
   return new Map(tables.map((entry) => {
     const writers = [...sources]
       .filter(([file]) => !isTestFile(file) && !infrastructure.has(file))
-      .filter(([, source]) => writesTable(source, entry.symbol))
+      .filter(([, source]) => writesTable(source, entry.symbol, entry.table))
       .map(([file]) => file);
     return [entry.table, writers];
   }));
@@ -170,18 +171,20 @@ function selfTest() {
     'await db.insert(alpha).values(row);',
     'await tx.update( alpha ).set(row);',
     'await db.delete(alpha).where(eq(alpha.id, id));',
+    'const result = run("INSERT INTO alpha (id) VALUES (?)");',
   ];
   for (const sample of positives) {
-    if (!writesTable(sample, 'alpha')) failures.push(`writesTable: missed a write in ${JSON.stringify(sample)}`);
+    if (!writesTable(sample, 'alpha', 'alpha')) failures.push(`writesTable: missed a write in ${JSON.stringify(sample)}`);
   }
 
   const negatives = [
     'await db.select().from(alpha);',
     'await db.insert(alphaBeta).values(row);',
     'const alpha = 1;',
+    'const query = "INSERT INTO alphabet (id) VALUES (?)";',
   ];
   for (const sample of negatives) {
-    if (writesTable(sample, 'alpha')) failures.push(`writesTable: false positive on ${JSON.stringify(sample)}`);
+    if (writesTable(sample, 'alpha', 'alpha')) failures.push(`writesTable: false positive on ${JSON.stringify(sample)}`);
   }
 
   for (const entry of allowlist) {

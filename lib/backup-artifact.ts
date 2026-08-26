@@ -21,6 +21,7 @@ export const BACKUP_COLLECTIONS = [
     'observations',
     'patients',
     'physicianReviewAttestations',
+    'headlessSoapActiveRoleAttestations',
     'prostheticPrescriptions',
     'serviceCatalogEntries',
     'servicePrescriptionItems',
@@ -41,8 +42,12 @@ const DURABLE_REVIEW_AUTHORITY_COLLECTIONS = new Set<BackupCollectionName>([
     'durableReviewPatientLinks',
     'physicianReviewAttestations',
 ]);
+/* @Codex Artifacts created before H2a-S have no SOAP active-role attestation rows. */
+const PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS = BACKUP_COLLECTIONS.filter(
+    (collection) => collection !== 'headlessSoapActiveRoleAttestations',
+);
 /* @Codex Artifacts created before durable review authority was added have no such collections. */
-const PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS = BACKUP_COLLECTIONS.filter(
+const PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS = PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS.filter(
     (collection) => !DURABLE_REVIEW_AUTHORITY_COLLECTIONS.has(collection),
 );
 /* @Codex */
@@ -53,7 +58,9 @@ const LEGACY_OMITTED_COLLECTION_SETS: readonly (readonly BackupCollectionName[])
 ];
 /* @Codex v1 recognizes both the authority-era and pre-authority collection generations. */
 const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
+    PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS,
     ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => BACKUP_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
+    ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
     ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
 ];
 const PATIENT_DEPENDENT_COLLECTIONS: readonly BackupCollectionName[] = [
@@ -74,6 +81,7 @@ const DURABLE_PATIENT = /^ptr_[0-9a-f]{32}$/;
 const DURABLE_RECEIPT = /^receipt_[0-9a-f]{32}$/;
 const DURABLE_PROVENANCE = /^provenance_[0-9a-f]{32}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
+const DOCUMENT_SOURCE_REF = /^[0-9a-f]{64}$/;
 const SEALED_CIPHERTEXT = /^ENC:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}$/;
 const IDEMPOTENCY_KEY = /^idem_[a-z0-9]{16,160}$/;
 const DURABLE_RECORD_KEYS = ['patientRef', 'reviewId', 'reviewRevision', 'receiptRef', 'provenanceRef', 'receiptBinding', 'provenanceBinding', 'presentationVersion', 'sealedCiphertext', 'sealedDigest'] as const;
@@ -85,6 +93,12 @@ const PHYSICIAN_REVIEW_ATTESTATION_KEYS = ['actorRef', 'schemaVersion', 'capabil
 const PHYSICIAN_REVIEW_ATTESTATION_SCHEMA = 'mediflow.physician-review-attestation.v1';
 const PHYSICIAN_REVIEW_CAPABILITY = 'physician_terminal_review';
 const PHYSICIAN_REVIEW_POLICY = 'physician_terminal_review.v1';
+const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_KEYS = ['attestationRef', 'actorRef', 'schemaVersion', 'role', 'operationId', 'policyVersion', 'status', 'attestationVersion', 'issuerRef', 'expiresAt', 'activatedAt', 'revocationGeneration', 'revokedAt', 'createdAt', 'updatedAt'] as const;
+const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_SCHEMA = 'mediflow.headless-soap-active-role-attestation.v1';
+const HEADLESS_SOAP_ACTIVE_ROLE_ROLE = 'physician';
+const HEADLESS_SOAP_ACTIVE_ROLE_OPERATION = 'mediflow.clinical_diary.append_soap.v1';
+const HEADLESS_SOAP_ACTIVE_ROLE_POLICY = 'clinician_confirmed_single_use.v1';
+const BACKUP_ARTIFACT_ROOT_KEYS = ['format', 'version', 'manifest', 'payload'] as const;
 
 export interface BackupArtifactManifest {
     scope: typeof BACKUP_ARTIFACT_SCOPE;
@@ -103,6 +117,7 @@ export interface BackupArtifact {
 }
 
 export type BackupArtifactErrorCode =
+    | 'backup-document-currentness-unsupported'
     | 'invalid-json'
     | 'invalid-format'
     | 'unsupported-version'
@@ -193,6 +208,13 @@ function timestampMilliseconds(value: unknown): number | null {
     return Number.isFinite(date.getTime()) && date.toISOString() === value ? date.getTime() : null;
 }
 
+/* @Codex H2a-S persists whole Unix seconds and serializes only canonical, non-negative ISO timestamps. */
+function headlessSoapTimestampMilliseconds(value: unknown, serialized: boolean): number | null {
+    if (serialized && typeof value !== 'string') return null;
+    const milliseconds = timestampMilliseconds(value);
+    return milliseconds === null || milliseconds < 0 || milliseconds % 1000 !== 0 ? null : milliseconds;
+}
+
 /* @Codex */
 function assertDurableReviewAuthorityRows(
     payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
@@ -235,6 +257,56 @@ function assertDurableReviewAuthorityRows(
             || (revokedAt !== null && revokedAt < createdAt)) {
             throw new BackupArtifactError('invalid-manifest', 'physicianReviewAttestations contains an invalid authority record.');
         }
+        actorRefs.add(attestation.actorRef);
+    }
+}
+
+/* @Codex H2a-S backup accounting validates only persistent attestation facts; it never restores a session or grant. */
+function assertHeadlessSoapActiveRoleAttestationRows(
+    payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
+    serialized: boolean,
+): void {
+    const attestationRefs = new Set<string>();
+    const actorRefs = new Set<string>();
+    for (const attestation of payload.headlessSoapActiveRoleAttestations ?? []) {
+        if (!hasExactKeys(attestation, HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_KEYS)) {
+            throw new BackupArtifactError('invalid-manifest', 'headless SOAP active-role attestations contain an invalid authority record.');
+        }
+        const createdAt = headlessSoapTimestampMilliseconds(attestation.createdAt, serialized);
+        const updatedAt = headlessSoapTimestampMilliseconds(attestation.updatedAt, serialized);
+        const expiresAt = attestation.expiresAt === null ? null : headlessSoapTimestampMilliseconds(attestation.expiresAt, serialized);
+        const activatedAt = attestation.activatedAt === null ? null : headlessSoapTimestampMilliseconds(attestation.activatedAt, serialized);
+        const revokedAt = attestation.revokedAt === null ? null : headlessSoapTimestampMilliseconds(attestation.revokedAt, serialized);
+        const hasValidIssuer = typeof attestation.issuerRef === 'string'
+            && attestation.issuerRef.trim() === attestation.issuerRef
+            && attestation.issuerRef.length >= 1 && attestation.issuerRef.length <= 256;
+        const inactive = attestation.status === 'inactive'
+            && attestation.issuerRef === null && expiresAt === null && activatedAt === null && revokedAt === null
+            && attestation.revocationGeneration === 0;
+        const active = attestation.status === 'active'
+            && hasValidIssuer && expiresAt !== null && activatedAt !== null && revokedAt === null
+            && attestation.revocationGeneration === 0;
+        const revoked = attestation.status === 'revoked'
+            && revokedAt !== null && typeof attestation.revocationGeneration === 'number'
+            && Number.isSafeInteger(attestation.revocationGeneration) && attestation.revocationGeneration >= 1
+            && ((attestation.issuerRef === null && expiresAt === null && activatedAt === null)
+                || (hasValidIssuer && expiresAt !== null && activatedAt !== null));
+        if (typeof attestation.attestationRef !== 'string' || attestation.attestationRef.trim() !== attestation.attestationRef || attestation.attestationRef.length < 1 || attestation.attestationRef.length > 256 || attestationRefs.has(attestation.attestationRef)
+            || typeof attestation.actorRef !== 'string' || attestation.actorRef.trim() !== attestation.actorRef || attestation.actorRef.length < 1 || attestation.actorRef.length > 256 || actorRefs.has(attestation.actorRef)
+            || attestation.schemaVersion !== HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_SCHEMA
+            || attestation.role !== HEADLESS_SOAP_ACTIVE_ROLE_ROLE
+            || attestation.operationId !== HEADLESS_SOAP_ACTIVE_ROLE_OPERATION
+            || attestation.policyVersion !== HEADLESS_SOAP_ACTIVE_ROLE_POLICY
+            || attestation.attestationVersion !== 1
+            || typeof attestation.revocationGeneration !== 'number' || !Number.isSafeInteger(attestation.revocationGeneration) || attestation.revocationGeneration < 0
+            || (!inactive && !active && !revoked)
+            || createdAt === null || updatedAt === null || updatedAt < createdAt
+            || (expiresAt !== null && expiresAt < createdAt)
+            || (activatedAt !== null && (activatedAt < createdAt || (expiresAt !== null && activatedAt > expiresAt)))
+            || (revokedAt !== null && (revokedAt < createdAt || (activatedAt !== null && revokedAt < activatedAt)))) {
+            throw new BackupArtifactError('invalid-manifest', 'headless SOAP active-role attestations contain an invalid authority record.');
+        }
+        attestationRefs.add(attestation.attestationRef);
         actorRefs.add(attestation.actorRef);
     }
 }
@@ -376,9 +448,30 @@ function parseAssignedAmbulatoryMemberships(value: unknown): Array<{ ambulatoryI
     });
 }
 
+/* @Codex Backups carry only already-host-minted attachment currentness; they never mint, default, or rebase it. */
+function assertAttachmentCurrentnessRows(rows: readonly BackupRecord[]): void {
+    const sourceRefs = new Set<string>();
+    for (const row of rows) {
+        try {
+            if (!row || typeof row !== 'object' || Array.isArray(row) || types.isProxy(row) || Object.getPrototypeOf(row) !== Object.prototype) throw new Error();
+            const descriptors = Object.getOwnPropertyDescriptors(row);
+            const tuple = ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch'].map((key) => descriptors[key]);
+            if (tuple.some((descriptor) => !descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value'))) throw new Error();
+            const [sourceRef, revision, freshnessEpoch] = tuple.map((descriptor) => descriptor!.value);
+            if (typeof sourceRef !== 'string' || !DOCUMENT_SOURCE_REF.test(sourceRef) || sourceRefs.has(sourceRef)
+                || typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 1
+                || typeof freshnessEpoch !== 'number' || !Number.isSafeInteger(freshnessEpoch) || freshnessEpoch < 1) throw new Error();
+            sourceRefs.add(sourceRef);
+        } catch {
+            throw new BackupArtifactError('backup-document-currentness-unsupported', 'BACKUP_DOCUMENT_CURRENTNESS_UNSUPPORTED');
+        }
+    }
+}
+
 async function assertCollectionReferences(
     payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
     patientDependentCollections: readonly BackupCollectionName[] = PATIENT_DEPENDENT_COLLECTIONS,
+    serialized = false,
 ): Promise<void> {
     const ambulatoryIds = new Set(
         (payload.ambulatories ?? [])
@@ -395,6 +488,8 @@ async function assertCollectionReferences(
             .map((item) => item.id)
             .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
     );
+
+    assertAttachmentCurrentnessRows(payload.attachments ?? []);
 
     for (const patient of payload.patients ?? []) {
         if (typeof patient.ambulatoryId === 'string' && patient.ambulatoryId.trim().length > 0 && !ambulatoryIds.has(patient.ambulatoryId)) {
@@ -463,6 +558,15 @@ async function assertCollectionReferences(
 
     await assertDurableReviewLedger(payload);
     assertDurableReviewAuthorityRows(payload, durableReviewIds, patientIds);
+    assertHeadlessSoapActiveRoleAttestationRows(payload, serialized);
+}
+
+/* @Codex Backup producers canonicalize the H2a-S collection after exact-row validation. */
+function sortHeadlessSoapActiveRoleAttestations(rows: BackupRecord[]): BackupRecord[] {
+    return [...rows].sort((left, right) => {
+        const byAttestation = String(left.attestationRef).localeCompare(String(right.attestationRef));
+        return byAttestation === 0 ? String(left.actorRef).localeCompare(String(right.actorRef)) : byAttestation;
+    });
 }
 
 export async function createBackupArtifact(payload: BackupDataset, createdAt = new Date()): Promise<BackupArtifact> {
@@ -470,13 +574,17 @@ export async function createBackupArtifact(payload: BackupDataset, createdAt = n
     const currentPayload = { ...createEmptyDataset(), ...payload } as BackupDataset;
     assertCollectionSet(currentPayload as Record<string, unknown>);
     await assertCollectionReferences(currentPayload);
+    const canonicalPayload = {
+        ...currentPayload,
+        headlessSoapActiveRoleAttestations: sortHeadlessSoapActiveRoleAttestations(currentPayload.headlessSoapActiveRoleAttestations),
+    } as BackupDataset;
 
     const recordCounts = createEmptyCounts();
     for (const collection of BACKUP_COLLECTIONS) {
-        recordCounts[collection] = currentPayload[collection]?.length ?? 0;
+        recordCounts[collection] = canonicalPayload[collection]?.length ?? 0;
     }
 
-    const payloadSnapshot = normalizeJson(currentPayload);
+    const payloadSnapshot = normalizeJson(canonicalPayload);
     const checksum = await sha256Hex(stableStringify(payloadSnapshot));
 
     return {
@@ -490,7 +598,7 @@ export async function createBackupArtifact(payload: BackupDataset, createdAt = n
             collections: [...BACKUP_COLLECTIONS],
             recordCounts,
         },
-        payload: currentPayload,
+        payload: canonicalPayload,
     };
 }
 
@@ -500,8 +608,11 @@ export async function serializeBackupArtifact(payload: BackupDataset, createdAt 
 }
 
 export async function parseBackupArtifact(value: unknown): Promise<BackupArtifact> {
-    if (!value || typeof value !== 'object') {
+    if (!value || typeof value !== 'object' || types.isProxy(value)) {
         throw new BackupArtifactError('invalid-json', 'Backup artifact must be a JSON object.');
+    }
+    if (!hasExactKeys(value, BACKUP_ARTIFACT_ROOT_KEYS)) {
+        throw new BackupArtifactError('invalid-manifest', 'Backup artifact root is invalid.');
     }
 
     const artifact = value as Partial<BackupArtifact> & { manifest?: Partial<BackupArtifactManifest>; payload?: Record<string, unknown> };
@@ -545,7 +656,7 @@ export async function parseBackupArtifact(value: unknown): Promise<BackupArtifac
     }
 
     assertCollectionCounts(payload, manifest.recordCounts as Record<string, unknown>, expectedCollections);
-    await assertCollectionReferences(payload as Partial<Record<BackupCollectionName, BackupRecord[]>>, expectedPatientDependentCollections);
+    await assertCollectionReferences(payload as Partial<Record<BackupCollectionName, BackupRecord[]>>, expectedPatientDependentCollections, true);
 
     const createdAt = new Date(manifest.createdAt);
     if (Number.isNaN(createdAt.getTime())) {

@@ -34,6 +34,7 @@ const BACKUP_TABLES = {
     observations: 'observations',
     patients: 'patients',
     physicianReviewAttestations: 'physician_review_attestations',
+    headlessSoapActiveRoleAttestations: 'headless_soap_active_role_attestations',
     prostheticPrescriptions: 'prosthetic_prescriptions',
     serviceCatalogEntries: 'service_catalog_entries',
     servicePrescriptionItems: 'service_prescription_items',
@@ -250,10 +251,18 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
         created_at: now + 22,
         updated_at: now + 22,
     });
+    insertRow(db, 'headless_soap_active_role_attestations', {
+        attestation_ref: 'w7-soap-attestation', actor_ref: actorRef,
+        schema_version: 'mediflow.headless-soap-active-role-attestation.v1', role: 'physician',
+        operation_id: 'mediflow.clinical_diary.append_soap.v1', policy_version: 'clinician_confirmed_single_use.v1',
+        status: 'active', attestation_version: 1, issuer_ref: 'w7-soap-issuer', expires_at: now + 60,
+        activated_at: now + 26, revocation_generation: 0, revoked_at: null, created_at: now + 26, updated_at: now + 26,
+    });
     insertRow(db, 'attachments', {
         id: 'w7-attachment', patient_id: 'w7-patient', type: 'application/pdf', size: 128,
         ...(await sealed('attachments', ['name', 'path', 'data', 'summary_snapshot', 'parse_evidence_artifact_snapshot', 'ocr_replay_artifact_snapshot'])),
         ocr_queue_state: 'ocr_done', ocr_queue_reason: 'synthetic', ocr_queue_updated_at: now + 22, created_at: now + 22,
+        document_source_ref: 'a'.repeat(64), document_revision: 7, document_freshness_epoch: 11,
     });
     insertRow(db, 'conversations', { id: 'w7-conversation', title: await seal('conversations.title'), updated_at: now + 23, is_archived: 1, is_deleted: 1, created_at: now + 23 });
     insertRow(db, 'messages', {
@@ -354,16 +363,48 @@ test('blocks current and legacy empty artifacts before clearing a target command
     }
 });
 
+test('rolls back a SOAP attestation restore when its local actor is absent', async () => {
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-soap-attestation-fk-'));
+    const targetDataDir = path.join(workDir, 'target');
+    const artifactPath = path.join(workDir, 'missing-actor.mediflow');
+    try {
+        prepareDatabase(targetDataDir);
+        const payload = createEmptyDataset();
+        payload.headlessSoapActiveRoleAttestations = [{
+            attestationRef: 'soap-attestation-missing-actor', actorRef: 'absent-synthetic-actor',
+            schemaVersion: 'mediflow.headless-soap-active-role-attestation.v1', role: 'physician',
+            operationId: 'mediflow.clinical_diary.append_soap.v1', policyVersion: 'clinician_confirmed_single_use.v1',
+            status: 'inactive', attestationVersion: 1, issuerRef: null, expiresAt: null, activatedAt: null,
+            revocationGeneration: 0, revokedAt: null, createdAt: '2026-08-26T08:00:00.000Z', updatedAt: '2026-08-26T08:00:00.000Z',
+        }];
+        fs.writeFileSync(artifactPath, await serializeBackupArtifact(payload));
+
+        const targetDb = new Database(path.join(targetDataDir, 'medical.db'));
+        try {
+            insertRow(targetDb, 'ambulatories', { id: 'preserved-on-rollback', name: 'Synthetic rollback sentinel', created_at: 1_783_000_000 });
+            assert.throws(() => restoreArtifact(targetDataDir, artifactPath));
+            assert.equal(readOrderedRows(targetDb, 'ambulatories').some((row) => row.id === 'preserved-on-rollback'), true);
+            assert.equal(readOrderedRows(targetDb, 'headless_soap_active_role_attestations').length, 0);
+        } finally {
+            targetDb.close();
+        }
+    } finally {
+        fs.rmSync(workDir, { recursive: true, force: true });
+    }
+});
+
 test('scheduled backup restores every clinical table and preserves ciphertext bytes', async () => {
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-roundtrip-'));
     const sourceDataDir = path.join(workDir, 'source');
     const targetDataDir = path.join(workDir, 'target');
     const backupDir = path.join(workDir, 'backups');
+    const restoredBackupDir = path.join(workDir, 'restored-backups');
 
     try {
         prepareDatabase(sourceDataDir);
         prepareDatabase(targetDataDir);
         fs.mkdirSync(backupDir, { recursive: true });
+        fs.mkdirSync(restoredBackupDir, { recursive: true });
 
         const sourceDb = new Database(path.join(sourceDataDir, 'medical.db'));
         const targetDb = new Database(path.join(targetDataDir, 'medical.db'));
@@ -436,6 +477,15 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
                     }
                 }
             }
+            const reexport = JSON.parse(runNode(['scripts/run-scheduled-backup.mjs'], {
+                MEDIFLOW_DATA_DIR: targetDataDir,
+                MEDIFLOW_BACKUP_DEST_DIR: restoredBackupDir,
+                MEDIFLOW_BACKUP_FORCE: '1',
+            })) as { ok: boolean; artifactPath?: string; message?: string };
+            assert.equal(reexport.ok, true, reexport.message); assert.ok(reexport.artifactPath);
+            const restoredArtifact = await parseBackupArtifact(JSON.parse(fs.readFileSync(reexport.artifactPath, 'utf8')));
+            assert.deepEqual(restoredArtifact.payload.attachments.map(({ documentSourceRef, documentRevision, documentFreshnessEpoch }) => ({ documentSourceRef, documentRevision, documentFreshnessEpoch })),
+                artifact.payload.attachments.map(({ documentSourceRef, documentRevision, documentFreshnessEpoch }) => ({ documentSourceRef, documentRevision, documentFreshnessEpoch })));
             assert.ok(encryptedFieldCount >= 50, 'fixture must exercise the complete encrypted clinical surface');
         } finally {
             sourceDb.close();

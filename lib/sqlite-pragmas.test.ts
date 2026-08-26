@@ -86,12 +86,12 @@ test('initSqlitePragmas reports pre-existing FK violations without throwing or d
         // and must leave the orphan row intact.
         db.pragma('foreign_keys = OFF');
         db.exec(`
-            CREATE TABLE parent (id TEXT PRIMARY KEY);
-            CREATE TABLE child (
+            CREATE TABLE "parent; SELECT private_data -- α" (id TEXT PRIMARY KEY);
+            CREATE TABLE "child patient_秘密" (
                 id TEXT PRIMARY KEY,
-                parent_id TEXT REFERENCES parent(id)
+                parent_id TEXT REFERENCES "parent; SELECT private_data -- α"(id)
             );
-            INSERT INTO child (id, parent_id) VALUES ('c1', 'missing-parent');
+            INSERT INTO "child patient_秘密" (id, parent_id) VALUES ('c1', 'missing-parent'), ('c2', 'missing-parent');
         `);
 
         const warnings: string[] = [];
@@ -108,14 +108,43 @@ test('initSqlitePragmas reports pre-existing FK violations without throwing or d
         // FK is enabled for future writes.
         assert.equal(Number(db.pragma('foreign_keys', { simple: true })), 1);
         // The pre-existing orphan row is NOT deleted.
-        const remaining = db.prepare('SELECT COUNT(*) AS n FROM child').get() as { n: number };
-        assert.equal(remaining.n, 1);
-        // A structured warning naming the offending table was emitted.
-        assert.ok(
-            warnings.some((w) => w.includes('foreign_key_check') && w.includes('child')),
-            `expected a foreign_key_check warning mentioning "child", got: ${JSON.stringify(warnings)}`,
-        );
+        const remaining = db.prepare('SELECT COUNT(*) AS n FROM "child patient_秘密"').get() as { n: number };
+        assert.equal(remaining.n, 2);
+        assert.deepEqual(warnings, [
+            '[MediFlow] foreign_key_check found 2 pre-existing violation(s) before enabling FK enforcement. Existing data is left untouched; FK is enforced on future writes only.',
+        ]);
+        assert.doesNotMatch(warnings.join('\n'), /private_data|child patient|秘密|α|SELECT/i);
     } finally {
         db.close();
     }
+});
+
+test('initSqlitePragmas never reflects a hostile foreign_key_check error', () => {
+    let proxyTraps = 0;
+    const hostileError = new Proxy(Object.create(null), {
+        get() { proxyTraps += 1; throw new Error('private SQLite error'); },
+        getOwnPropertyDescriptor() { proxyTraps += 1; throw new Error('private SQLite descriptor'); },
+        ownKeys() { proxyTraps += 1; throw new Error('private SQLite keys'); },
+    });
+    const calls: string[] = [];
+    const warnings: string[] = [];
+    const connection = {
+        pragma(statement: string) {
+            calls.push(statement);
+            if (statement === 'foreign_key_check') throw hostileError;
+            return undefined;
+        },
+    } as unknown as Database.Database;
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => { warnings.push(args.join(' ')); };
+    try {
+        assert.doesNotThrow(() => initSqlitePragmas(connection));
+    } finally {
+        console.warn = originalWarn;
+    }
+    assert.equal(proxyTraps, 0);
+    assert.ok(calls.includes('foreign_keys = ON'));
+    assert.deepEqual(warnings, [
+        '[MediFlow] foreign_key_check skipped. Existing data is left untouched; FK is enforced on future writes only.',
+    ]);
 });

@@ -1,0 +1,43 @@
+{
+  "schema": "mediflow.capability-mapping.plane-inventory.v1",
+  "plane": "headless",
+  "inventoryVersion": 1,
+  "status": "candidate_not_integrated",
+  "applyPolicy": "none",
+  "claimCeiling": "P1 referential Headless semantic roster; manual-only and not grantable; not runtime, integration, release, or transport authority evidence",
+  "adr": {
+    "ref": "54b56c2bb4a9eb1bd76f198fc58457ebd7623e5b:docs/adr/0100-fabric-vs-headless-semantic-plane.md",
+    "gitBlob": "e9abf64d566ff54d7d767f03580ea911bc6ef32e"
+  },
+  "semanticSource": {
+    "ref": "b25ace437fda8d89b402c63cba2adb38295f188c:docs/capability-mapping/nodes/web-mini-crosswalk.v1.json",
+    "gitBlob": "79e8078c1b7ed244653a32d6fce2dd1ef83ff281",
+    "expectedCount": 66,
+    "observedCount": 66
+  },
+  "nonSemanticEvidence": [
+    {
+      "population": "aip_transport_only",
+      "ref": "b25ace437fda8d89b402c63cba2adb38295f188c:docs/capability-mapping/nodes/aip-inventory.v1.json",
+      "gitBlob": "3c455efc7194c2bffc32b3bc74933290c1522126",
+      "expectedCount": 109
+    },
+    {
+      "population": "surface_evidence_only",
+      "ref": "b25ace437fda8d89b402c63cba2adb38295f188c:docs/capability-mapping/coverage-receipt.v1.json",
+      "gitBlob": "3c4f08430fa0c8f9c2f7660c1c1dadb33eb85c14",
+      "expectedCount": 177
+    }
+  ],
+  "rowPolicy": {
+    "identityKind": "canonical_application_function",
+    "authority": "not_grantable",
+    "manualDisposition": "manual_only",
+    "stage": "unresolved",
+    "applyPolicy": "none",
+    "transport": "not_selected",
+    "provider": "not_selected",
+    "venue": "not_selected",
+    "fallback": "denied"
+  }
+}
