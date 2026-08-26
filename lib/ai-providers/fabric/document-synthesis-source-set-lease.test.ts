@@ -1,6 +1,7 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { afterEach, test } from 'node:test';
 
 import { parseDocumentSynthesisProviderEnvelope } from './document-synthesis-provider-envelope.ts';
@@ -64,4 +65,11 @@ test('poisons a late currentness clock reentry before the owner port can commit'
     let lease: ReturnType<ReturnType<typeof fixture>['lease']> | null = null; let execution: object | null = null; let armed = false; let portReads = 0; let nested = 0;
     const state = fixture(() => { if (armed && (portReads += 1) === 2) { nested += 1; lease?.takeProviderInput(execution); } return 1_000; }); lease = state.lease(); const issue = lease.issue(); assert.ok(issue); execution = lease.beginExecution(issue); assert.ok(execution); assert.ok(lease.takeProviderInput(execution)); assert.equal(lease.validateProviderEnvelope(Object.freeze({ executionToken: execution, envelopeToken: envelope() })).status, 'available'); armed = true;
     assert.equal(lease.consume(execution), false); assert.equal(nested, 1); assert.equal(lease.consume(execution), false);
+});
+
+test('marks nested late-commit disposal as reentry and keeps the closed port inert', async () => {
+    let lease: ReturnType<ReturnType<typeof fixture>['lease']> | null = null; let execution: object | null = null; let armed = false; let portReads = 0; let nested = 0;
+    const state = fixture(() => { if (armed && (portReads += 1) === 2) { nested += 1; lease?.dispose(); } return 1_000; }); lease = state.lease(); const issue = lease.issue(); assert.ok(issue); execution = lease.beginExecution(issue); assert.ok(execution); assert.ok(lease.takeProviderInput(execution)); assert.equal(lease.validateProviderEnvelope(Object.freeze({ executionToken: execution, envelopeToken: envelope() })).status, 'available'); armed = true;
+    assert.equal(lease.consume(execution), false); assert.equal(nested, 1); const closedReads = portReads; assert.equal(lease.consume(execution), false); lease.dispose(); assert.equal(portReads, closedReads);
+    const source = await readFile('lib/ai-providers/fabric/document-synthesis-source-set-lease.ts', 'utf8'); assert.match(source, /if \(active\) \{ reentered = true; close\(\); return false; \}/u); assert.match(source, /dispose\(\) \{ if \(active\) reentered = true; close\(\); \}/u); assert.match(source, /const close = \(\) => \{ if \(closed\) return; closed = true; try \{ port\.dispose\(\); \} catch/u);
 });
