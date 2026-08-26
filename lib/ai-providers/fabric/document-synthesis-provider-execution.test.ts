@@ -14,13 +14,13 @@ const ATTESTATION = { authorityPlane: 'clinical_application', provider: 'ollama'
 const projection = { schemaVersion: 'mediflow.document-synthesis.host-projection.v1', sourceKind: 'ocr_text', sourceText: 'Synthetic OCR text.', classification: 'review_required', rationale: 'ocr_text_normalized' };
 const output = () => ({ schemaVersion: 'mediflow.ai.extract.v1', task: 'document_synthesis', summary: 'Synthetic review.', data: { qualityLevel: 'green', medications: [], diagnoses: [], problemStatements: [], therapyCandidates: [], servicePrescriptions: [] } });
 
-async function token(chat: OllamaProviderAdapter['chat']): Promise<{ value: object; restore(): void }> {
+async function token(chat: OllamaProviderAdapter['chat']): Promise<{ value: object; receipt: object; restore(): void }> {
     const original = OllamaProviderAdapter.prototype.chat;
     OllamaProviderAdapter.prototype.chat = chat;
     const result = await createDocumentSynthesisProviderBindingForTest({ readSettings: async () => SETTINGS, attest: async () => ATTESTATION }).bind();
     assert.equal(result.status, 'available');
     if (result.status !== 'available') throw new Error('binding unavailable');
-    return { value: result.token, restore() { OllamaProviderAdapter.prototype.chat = original; } };
+    return { value: result.token, receipt: result.receipt, restore() { OllamaProviderAdapter.prototype.chat = original; } };
 }
 
 function input(providerToken: object, value: object = projection) { return { projection: value, providerToken }; }
@@ -38,7 +38,8 @@ test('executes exactly the fixed prompt through a valid one-shot binding and sea
         assert.deepEqual(calls[0]?.[0], [{ role: 'user', content: buildDocumentSynthesisExtractionPrompt(projection.sourceText) }]);
         assert.equal(calls[0]?.[1] instanceof AbortSignal, true); assert.equal(calls[0]?.[2], 1400); assert.deepEqual(calls[0]?.[3], { responseFormat: 'json' });
         assert.equal(result.outputSha256, hash(result.output));
-        assert.deepEqual({ ...result.receipt }, { capability: 'document_synthesis', task: 'reasoning', provider: 'ollama', model: 'reasoning-local', venue: 'local_process', endpointClass: 'loopback', egress: 'none', runtimeReadiness: 'required', fallback: 'none' });
+        assert.equal(result.receipt, bound.receipt);
+        assert.deepEqual({ ...result.receipt }, { schemaVersion: 'mediflow.document-synthesis.provider-binding.v1', capability: 'document_synthesis', registryTask: 'reasoning', provider: 'ollama', model: 'reasoning-local', venue: 'local_process', egress: 'none', runtimeReadiness: 'required', fallback: 'none' });
         assert.deepEqual({ ...result.provenance }, { sourceAuthority: 'not_bound', modelDigestCausality: 'not_established' });
         assert.equal(result.reviewOnly, true); assert.equal(result.writesPerformed, 0); assert.equal(result.applyPolicy, 'none'); assert.equal(result.fallback, 'denied');
     } finally { bound.restore(); }
@@ -59,7 +60,7 @@ test('consumes a valid token before async work, including concurrent replay', as
     const bound = await token(async () => { calls += 1; await new Promise<void>((resolve) => { release = resolve; }); return { content: JSON.stringify(output()), stats: { latency: 0, tokensIn: 0, tokensOut: 0 } }; });
     try {
         const first = executeDocumentSynthesisProvider(input(bound.value));
-        const second = await executeDocumentSynthesisProvider(input(bound.value)); denied(second, 'binding_consumed'); assert.equal(calls, 1);
+        const second = await executeDocumentSynthesisProvider(input(bound.value)); denied(second, 'binding_invalid'); assert.equal(calls, 1);
         release(); assert.equal((await first).status, 'available');
     } finally { bound.restore(); }
 });

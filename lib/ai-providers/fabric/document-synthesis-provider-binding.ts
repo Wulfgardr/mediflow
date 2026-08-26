@@ -19,17 +19,20 @@ export const DOCUMENT_SYNTHESIS_PROVIDER_READINESS_SCHEMA_VERSION = 'mediflow.do
 const SETTING_KEYS = ['aiProvider', 'aiModel_reasoning', 'aiModel', 'aiUrl', 'ollamaUrl'] as const;
 const OBJECT = Object.prototype;
 const TIMEOUT_MS = 300_000;
-const privateBindings = new WeakMap<object, LocalProviderResolution>();
 
 type SettingKey = typeof SETTING_KEYS[number];
 type SettingsSnapshot = Readonly<Partial<Record<SettingKey, string>>>;
 type SettingsReader = () => Promise<unknown> | unknown;
 type Attestor = (endpoint: string, model: string, signal: AbortSignal) => Promise<OllamaLocalAttestation>;
 export type DocumentSynthesisProviderBindingToken = object;
+export type DocumentSynthesisProviderBindingReceipt = Readonly<{ schemaVersion: typeof DOCUMENT_SYNTHESIS_PROVIDER_BINDING_SCHEMA_VERSION; capability: 'document_synthesis'; registryTask: 'reasoning'; provider: 'ollama'; model: string; venue: 'local_process'; egress: 'none'; fallback: 'none'; runtimeReadiness: 'required' }>;
+export type DocumentSynthesisProviderBindingExecutionClaim = Readonly<{ resolution: LocalProviderResolution; receipt: DocumentSynthesisProviderBindingReceipt }>;
+type PrivateBinding = Readonly<{ resolution: LocalProviderResolution; receipt: DocumentSynthesisProviderBindingReceipt }>;
+const privateBindings = new WeakMap<object, PrivateBinding>();
 
 export type DocumentSynthesisProviderBindingResult = Readonly<{
     status: 'available'; code: null;
-    receipt: Readonly<{ schemaVersion: typeof DOCUMENT_SYNTHESIS_PROVIDER_BINDING_SCHEMA_VERSION; capability: 'document_synthesis'; registryTask: 'reasoning'; provider: 'ollama'; model: string; venue: 'local_process'; egress: 'none'; fallback: 'none'; runtimeReadiness: 'required' }>;
+    receipt: DocumentSynthesisProviderBindingReceipt;
     readiness: Readonly<{ schemaVersion: typeof DOCUMENT_SYNTHESIS_PROVIDER_READINESS_SCHEMA_VERSION; state: 'available_unqualified'; modelAttestation: 'observed_not_causal' }>;
     token: DocumentSynthesisProviderBindingToken;
 }> | Readonly<{
@@ -177,8 +180,10 @@ function createBinding(dependenciesValue: unknown): Readonly<{ bind(): Promise<D
                 try { attestation = await dependencies.attest(resolved.endpoint, resolved.model, AbortSignal.timeout(TIMEOUT_MS)); } catch { return denied('provider_unready'); }
                 if (!attestationMatches(attestation, resolved.model)) return denied('model_unavailable');
                 const sealed = sealResolution(resolved); if (!sealed) return denied('provider_invalid');
-                const token = Object.freeze(Object.create(null)); privateBindings.set(token, sealed);
-                return frozen({ status: 'available' as const, code: null, receipt: frozen({ schemaVersion: DOCUMENT_SYNTHESIS_PROVIDER_BINDING_SCHEMA_VERSION, capability: 'document_synthesis' as const, registryTask: 'reasoning' as const, provider: 'ollama' as const, model: resolved.model, venue: 'local_process' as const, egress: 'none' as const, fallback: 'none' as const, runtimeReadiness: 'required' as const }), readiness: frozen({ schemaVersion: DOCUMENT_SYNTHESIS_PROVIDER_READINESS_SCHEMA_VERSION, state: 'available_unqualified' as const, modelAttestation: 'observed_not_causal' as const }), token });
+                const receipt = frozen({ schemaVersion: DOCUMENT_SYNTHESIS_PROVIDER_BINDING_SCHEMA_VERSION, capability: 'document_synthesis' as const, registryTask: 'reasoning' as const, provider: 'ollama' as const, model: resolved.model, venue: 'local_process' as const, egress: 'none' as const, fallback: 'none' as const, runtimeReadiness: 'required' as const }) as DocumentSynthesisProviderBindingReceipt;
+                const token = Object.freeze(Object.create(null));
+                privateBindings.set(token, frozen({ resolution: sealed, receipt }) as PrivateBinding);
+                return frozen({ status: 'available' as const, code: null, receipt, readiness: frozen({ schemaVersion: DOCUMENT_SYNTHESIS_PROVIDER_READINESS_SCHEMA_VERSION, state: 'available_unqualified' as const, modelAttestation: 'observed_not_causal' as const }), token });
             } finally { binding = false; }
         },
     });
@@ -191,7 +196,17 @@ export const bindDocumentSynthesisProvider = (): Promise<DocumentSynthesisProvid
 
 /** Narrow internal handoff for C3b. A forged or transformed token has no provider authority. */
 export function resolveDocumentSynthesisProviderBinding(token: unknown): LocalProviderResolution | null {
-    try { return typeof token === 'object' && token !== null && !types.isProxy(token) ? privateBindings.get(token) ?? null : null; } catch { return null; }
+    try { return typeof token === 'object' && token !== null && !types.isProxy(token) ? privateBindings.get(token)?.resolution ?? null : null; } catch { return null; }
+}
+
+/** Single server-only execution claim. It burns the authentic binding before any provider work. */
+export function claimDocumentSynthesisProviderBindingForExecution(token: unknown): DocumentSynthesisProviderBindingExecutionClaim | null {
+    try {
+        if (typeof token !== 'object' || token === null || types.isProxy(token)) return null;
+        const binding = privateBindings.get(token); if (!binding) return null;
+        privateBindings.delete(token);
+        return frozen({ resolution: binding.resolution, receipt: binding.receipt }) as DocumentSynthesisProviderBindingExecutionClaim;
+    } catch { return null; }
 }
 
 /** Test-only dependency seam; it is not used by the host-owned production binding. */

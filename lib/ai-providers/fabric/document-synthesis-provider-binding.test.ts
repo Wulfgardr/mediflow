@@ -1,8 +1,10 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
+    claimDocumentSynthesisProviderBindingForExecution,
     createDocumentSynthesisProviderBindingForTest,
     resolveDocumentSynthesisProviderBinding,
 } from './document-synthesis-provider-binding.ts';
@@ -96,11 +98,68 @@ test('fails closed for hostile settings, provider/model/endpoint/task drift, and
 
 test('does not accept forged, cloned, proxied, or cross-module token values', async () => {
     const result = await service().bind(); assert.equal(result.status, 'available'); if (result.status !== 'available') return;
-    const sameModule = await import('./document-synthesis-provider-binding.ts');
-    for (const token of [{}, { ...result.token }, new Proxy(result.token, {}), Object.create(null), sameModule]) {
+    for (const token of [{}, { ...result.token }, new Proxy(result.token, {}), Object.create(null)]) {
         assert.equal(resolveDocumentSynthesisProviderBinding(token), null);
+        assert.equal(claimDocumentSynthesisProviderBindingForExecution(token), null);
+    }
+    const replacements = [
+        ["import 'server-only';", ''],
+        ["'drizzle-orm'", `'${import.meta.resolve('drizzle-orm')}'`],
+        ["'@/lib/ai-model-selection'", `'${new URL('../../ai-model-selection.ts', import.meta.url).href}'`],
+        ["'@/lib/db-server'", `'${new URL('../../db-server.ts', import.meta.url).href}'`],
+        ["'@/lib/schema'", `'${new URL('../../schema.ts', import.meta.url).href}'`],
+        ["'../base-url'", `'${new URL('../base-url.ts', import.meta.url).href}'`],
+        ["'../ollama-locality'", `'${new URL('../ollama-locality.ts', import.meta.url).href}'`],
+        ["'../ollama'", `'${new URL('../ollama.ts', import.meta.url).href}'`],
+        ["'../registry'", `'${new URL('../registry.ts', import.meta.url).href}'`],
+        ["'../provider'", `'${new URL('../provider.ts', import.meta.url).href}'`],
+    ] as const;
+    let source = readFileSync(new URL('./document-synthesis-provider-binding.ts', import.meta.url), 'utf8');
+    for (const [from, to] of replacements) source = source.replaceAll(from, to);
+    const typescript = await import('typescript');
+    const code = typescript.transpileModule(source, { compilerOptions: { module: typescript.ModuleKind.ESNext, target: typescript.ScriptTarget.ESNext } }).outputText;
+    const foreign = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`) as typeof import('./document-synthesis-provider-binding.ts');
+    const foreignResult = await foreign.createDocumentSynthesisProviderBindingForTest({ readSettings: async () => SETTINGS, attest: async () => ATTESTATION }).bind();
+    assert.equal(foreignResult.status, 'available'); if (foreignResult.status === 'available') {
+        assert.equal(resolveDocumentSynthesisProviderBinding(foreignResult.token), null);
+        assert.equal(claimDocumentSynthesisProviderBindingForExecution(foreignResult.token), null);
+        assert.equal(foreign.claimDocumentSynthesisProviderBindingForExecution(result.token), null);
     }
     assert.notEqual(resolveDocumentSynthesisProviderBinding(result.token), null);
+});
+
+test('claims the exact frozen binding receipt once without consulting hostile token properties', async () => {
+    const result = await service().bind(); assert.equal(result.status, 'available'); if (result.status !== 'available') return;
+    const resolved = resolveDocumentSynthesisProviderBinding(result.token);
+    assert.ok(resolved);
+    const first = claimDocumentSynthesisProviderBindingForExecution(result.token);
+    assert.ok(first);
+    assert.equal(first.resolution, resolved);
+    assert.equal(first.receipt, result.receipt);
+    assert.equal(Object.getPrototypeOf(first.receipt), null);
+    assert.equal(Object.isFrozen(first.receipt), true);
+    assert.notEqual(first.resolution, null);
+    assert.equal(resolveDocumentSynthesisProviderBinding(result.token), null);
+    assert.equal(claimDocumentSynthesisProviderBindingForExecution(result.token), null);
+    let traps = 0;
+    let thenReads = 0;
+    const hostile = new Proxy(Object.create(null), {
+        get() { traps += 1; throw new Error('trap'); },
+        getOwnPropertyDescriptor() { traps += 1; throw new Error('trap'); },
+        getPrototypeOf() { traps += 1; throw new Error('trap'); },
+    });
+    const priorThen = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { thenReads += 1; return undefined; } });
+    try {
+        assert.equal(claimDocumentSynthesisProviderBindingForExecution(hostile), null);
+        assert.equal(claimDocumentSynthesisProviderBindingForExecution({ ...result.token }), null);
+        assert.equal(claimDocumentSynthesisProviderBindingForExecution(structuredClone(result.token)), null);
+    } finally {
+        if (priorThen) Object.defineProperty(Object.prototype, 'then', priorThen);
+        else delete (Object.prototype as { then?: unknown }).then;
+    }
+    assert.equal(traps, 0);
+    assert.equal(thenReads, 0);
 });
 
 test('does not mutate a registry resolution and rejects later raw-adapter drift', async () => {
