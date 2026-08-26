@@ -21,6 +21,7 @@ process.env.MEDIFLOW_DATA_DIR = dataDir;
 const requireCurrent = createRequire(import.meta.url);
 const route = requireCurrent('../app/api/attachments/[id]/content/route') as typeof import('../app/api/attachments/[id]/content/route');
 const attachmentSchemas = requireCurrent('./api-schemas/attachments') as typeof import('./api-schemas/attachments');
+const boundedBody = requireCurrent('./bounded-request-body') as typeof import('./bounded-request-body');
 
 const ref = 'a'.repeat(64);
 const sealed = 'ENC:c3ludGhldGlj:cmVwbGFjZW1lbnQ=';
@@ -48,6 +49,23 @@ function request(payload: unknown, headers: HeadersInit = {}) {
     return new Request('http://localhost/api/attachments/attachment.synthetic.1/content', {
         method: 'PUT', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(payload),
     });
+}
+
+function chunkedRequest(chunks: Uint8Array[], metrics: { delivered: number; pulls: number; cancelled: number }, headers: HeadersInit = {}) {
+    const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+            metrics.pulls += 1;
+            const chunk = chunks.shift();
+            if (!chunk) { controller.close(); return; }
+            metrics.delivered += chunk.byteLength;
+            controller.enqueue(chunk);
+        },
+        cancel() { metrics.cancelled += 1; },
+    });
+    const init = {
+        method: 'PUT', headers: { 'content-type': 'application/json', ...headers }, body: stream, duplex: 'half',
+    } as RequestInit & { duplex: 'half' };
+    return new Request('http://localhost/api/attachments/attachment.synthetic.1/content', init);
 }
 
 async function invoke(payload: unknown, id = 'attachment.synthetic.1', authenticated = true, headers: HeadersInit = {}) {
@@ -129,6 +147,17 @@ test('authenticated route replaces only sealed data and returns a sanitized curr
     assert.deepEqual(snapshot(), { patient_id: 'patient.synthetic.1', data: sealed, document_source_ref: ref, document_revision: 2, document_freshness_epoch: 2 });
 });
 
+test('post-import regex poisoning cannot admit plaintext through the route', async () => {
+    reset(); const before = snapshot(); const originalTest = RegExp.prototype.test;
+    try {
+        RegExp.prototype.test = (() => true) as typeof RegExp.prototype.test;
+        const rejected = await invoke({ expected: expected(), replacement: 'plaintext' });
+        assert.equal(rejected.status, 400); assert.deepEqual(snapshot(), before);
+        const accepted = await invoke({ expected: expected(), replacement: sealed });
+        assert.equal(accepted.status, 200);
+    } finally { RegExp.prototype.test = originalTest; }
+});
+
 test('denies unauthenticated, malformed, extra, plaintext, null, and injected inputs without mutation', async () => {
     const invalid = [
         { expected: expected(), replacement: null },
@@ -174,9 +203,45 @@ test('enforces declared and chunked payload limits before any host write', async
     }
 });
 
+test('bounded reader cancels before unbounded JSON allocation and rejects duplicate keys', async () => {
+    const configured = process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES;
+    process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES = '32';
+    try {
+        reset(); const before = snapshot();
+        const declaredMetrics = { delivered: 0, pulls: 0, cancelled: 0 };
+        const declared = await route.putAttachmentContent(chunkedRequest([new Uint8Array(8)], declaredMetrics, { 'content-length': '33' }), 'attachment.synthetic.1', session);
+        assert.equal(declared.status, 413); assert.ok(declaredMetrics.pulls <= 1); assert.equal(declaredMetrics.cancelled, 1); assert.deepEqual(snapshot(), before);
+
+        const chunkMetrics = { delivered: 0, pulls: 0, cancelled: 0 };
+        const chunks = Array.from({ length: 8 }, () => new Uint8Array(8));
+        const chunked = await route.putAttachmentContent(chunkedRequest(chunks, chunkMetrics), 'attachment.synthetic.1', session);
+        assert.equal(chunked.status, 413); assert.ok(chunkMetrics.delivered <= 40); assert.equal(chunkMetrics.cancelled, 1); assert.deepEqual(snapshot(), before);
+
+        const hostileMetrics = { delivered: 0, pulls: 0, cancelled: 0 };
+        const hostile = await route.putAttachmentContent(chunkedRequest([new Uint8Array(4096)], hostileMetrics), 'attachment.synthetic.1', session);
+        assert.equal(hostile.status, 413); assert.equal(hostileMetrics.pulls, 1); assert.equal(hostileMetrics.cancelled, 1); assert.deepEqual(snapshot(), before);
+
+        const malformed = await boundedBody.readBoundedJsonBody(chunkedRequest([new Uint8Array([0xff])], { delivered: 0, pulls: 0, cancelled: 0 }), 32);
+        assert.deepEqual(malformed, { ok: false, status: 400 });
+        const failedStream = new ReadableStream<Uint8Array>({ start(controller) { controller.error(new Error('synthetic stream failure')); } });
+        const failed = await route.putAttachmentContent(new Request('http://localhost/api/attachments/attachment.synthetic.1/content', {
+            method: 'PUT', headers: { 'content-type': 'application/json' }, body: failedStream, duplex: 'half',
+        } as RequestInit & { duplex: 'half' }), 'attachment.synthetic.1', session);
+        assert.equal(failed.status, 400); assert.deepEqual(snapshot(), before);
+        process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES = '1024';
+        const duplicate = await route.putAttachmentContent(new Request('http://localhost/api/attachments/attachment.synthetic.1/content', {
+            method: 'PUT', headers: { 'content-type': 'application/json' }, body: `{"expected":${JSON.stringify(expected())},"expected":${JSON.stringify(expected())},"replacement":"${sealed}"}`,
+        }), 'attachment.synthetic.1', session);
+        assert.equal(duplicate.status, 400); assert.deepEqual(snapshot(), before);
+    } finally {
+        if (configured === undefined) delete process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES;
+        else process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES = configured;
+    }
+});
+
 test('contains no direct database writer or metadata fallback and delegates once', () => {
     const source = fs.readFileSync(path.join(root, 'app/api/attachments/[id]/content/route.ts'), 'utf8');
-    assert.doesNotMatch(source, /dbServer|runDbServerImmediateTransaction|attachmentUpdateSchema|ocrQueueState|provider|apply/iu);
+    assert.doesNotMatch(source, /dbServer|runDbServerImmediateTransaction|attachmentUpdateSchema|ocrQueueState|provider|apply|request\.json/iu);
     assert.equal((source.match(/transitionAttachmentContentCurrentness\(/gu) ?? []).length, 1);
     assert.doesNotMatch(source, /error\.message|json\([^\n]*error\.code/iu);
 });
