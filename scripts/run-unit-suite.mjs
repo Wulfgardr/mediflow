@@ -20,19 +20,25 @@ function syntheticDataDir(value) {
 function run(args, env) {
   const result = spawnSync(node, args, { cwd: root, env, stdio: 'inherit' });
   if (result.error) throw result.error;
-  if (result.signal) process.kill(process.pid, result.signal);
-  return result.status ?? 1;
+  return { signal: result.signal, status: result.status ?? 1 };
 }
 
 const explicit = syntheticDataDir(process.env.MEDIFLOW_DATA_DIR);
 const dataDir = explicit ?? fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-unit-suite-'));
 const env = { ...process.env, MEDIFLOW_DATA_DIR: dataDir };
 let exitCode = 1;
+let signal = null;
 try {
   const bootstrap = run(['scripts/prepare-e2e-db.mjs'], env);
-  if (bootstrap !== 0) process.exitCode = bootstrap;
-  else exitCode = run(unitArgs, env);
+  signal = bootstrap.signal;
+  if (!signal && bootstrap.status !== 0) exitCode = bootstrap.status;
+  else if (!signal) {
+    const unit = run(unitArgs, env);
+    signal = unit.signal;
+    exitCode = unit.status;
+  }
 } finally {
   if (!explicit) fs.rmSync(dataDir, { recursive: true, force: true });
 }
+if (signal) process.kill(process.pid, signal);
 if (!process.exitCode) process.exitCode = exitCode;
