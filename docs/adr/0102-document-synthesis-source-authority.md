@@ -70,11 +70,16 @@ allegato, `documentRevision`, `documentFreshnessEpoch`, `selectionEpoch` o
 `reviewContextEpoch`. Questi restano binding distinti.
 
 L'overflow di `sourceSetEpoch` o `revocationGeneration` nega in modo terminale
-ed e `fail-closed`. Logout, expiry della sessione, reset, disposal e restart
-distruggono l'owner in memoria e ogni authority: gli handle e le capsule
-precedenti diventano invalidi senza richiedere un incremento osservabile.
+ed e `fail-closed`. Logout, `lock confermato dal server`, expiry della sessione,
+reset, disposal e restart distruggono l'owner in memoria e ogni authority: gli
+handle e le capsule precedenti diventano invalidi senza richiedere un incremento
+osservabile.
 L'host puo ricreare un lineage nuovo e `memory-only` perche l'autorita
 precedente e morta.
+
+Il `lock confermato dal server` e un invariante richiesto ereditato da ADR 0096;
+questa regola non e evidenza del runtime corrente. Un lock UI
+plain/local/fire-and-forget non dimostra il `lock confermato dal server`.
 
 ### Ordine I1c di acquisizione
 
@@ -125,8 +130,9 @@ puo accettare una volta la projection client-decrypted minimizzata e tipizzata:
 Il broker ne copia il valore in memoria e lo lega a un capture handle opaco,
 broker-owned e non trasferibile. L'handle trattiene soltanto binding host-owned:
 riferimento opaco, revisione, freshness, epoch, scopo, scadenza e revoca.
-Non espone owner, sessione o testo. Logout, revoca, scadenza, reselection,
-revisione o freshness incompatibile invalidano la cattura e il preview.
+Non espone owner, sessione o testo. Logout, `lock confermato dal server`, revoca,
+scadenza, reselection, revisione o freshness incompatibile invalidano la cattura
+e il preview.
 
 La route di preview capability-specific accetta soltanto il capture handle
 opaco e, se necessario, una correlazione di richiesta. Non accetta testo,
@@ -369,7 +375,8 @@ source set raw32 e la provider-binding receipt. Dichiara `review-only`,
 
 I gate avversari sono obbligatori e deterministici. Se durante la chiamata
 asincrona cambiano revoca, selezione, review, revisione documento, freshness,
-source set o expiry, l'operazione abortisce o termina negata. Un completamento
+source set o expiry, oppure si osserva `lock confermato dal server`, l'operazione
+abortisce o termina negata. Un completamento
 tardivo puo essere osservato per la denial, ma non e mai pubblicato. La
 revalidation finale e il commit-last devono riuscire prima della pubblicazione
 o restituzione di receipt o provenance; un failure iniettato prima del commit prova
