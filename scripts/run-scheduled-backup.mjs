@@ -3,6 +3,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
 
 import { normalizeRowDates } from './scheduled-backup-date-fields.mjs';
@@ -38,6 +39,7 @@ const BACKUP_TABLES = {
   observations: 'observations',
   patients: 'patients',
   physicianReviewAttestations: 'physician_review_attestations',
+  headlessSoapActiveRoleAttestations: 'headless_soap_active_role_attestations',
   prostheticPrescriptions: 'prosthetic_prescriptions',
   serviceCatalogEntries: 'service_catalog_entries',
   servicePrescriptionItems: 'service_prescription_items',
@@ -126,11 +128,22 @@ async function sha256Hex(value) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function serializeBackupArtifact(payload, createdAt = new Date()) {
-  const payloadSnapshot = normalizeJson(payload);
+export function canonicalizeHeadlessSoapActiveRoleAttestations(payload) {
+  return {
+    ...payload,
+    headlessSoapActiveRoleAttestations: [...(payload.headlessSoapActiveRoleAttestations || [])].sort((left, right) => {
+      const primary = String(left.attestationRef).localeCompare(String(right.attestationRef));
+      return primary === 0 ? String(left.actorRef).localeCompare(String(right.actorRef)) : primary;
+    }),
+  };
+}
+
+export async function serializeBackupArtifact(payload, createdAt = new Date()) {
+  const canonicalPayload = canonicalizeHeadlessSoapActiveRoleAttestations(payload);
+  const payloadSnapshot = normalizeJson(canonicalPayload);
   const checksum = await sha256Hex(stableStringify(payloadSnapshot));
   const recordCounts = Object.fromEntries(
-    Object.keys(BACKUP_TABLES).map((collection) => [collection, payload[collection]?.length ?? 0]),
+    Object.keys(BACKUP_TABLES).map((collection) => [collection, canonicalPayload[collection]?.length ?? 0]),
   );
   const artifact = {
     format: BACKUP_ARTIFACT_FORMAT,
@@ -143,7 +156,7 @@ async function serializeBackupArtifact(payload, createdAt = new Date()) {
       collections: Object.keys(BACKUP_TABLES),
       recordCounts,
     },
-    payload,
+    payload: canonicalPayload,
   };
   return JSON.stringify(normalizeJson(artifact), null, 2);
 }
@@ -535,4 +548,6 @@ async function main() {
   }
 }
 
-await main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  await main();
+}

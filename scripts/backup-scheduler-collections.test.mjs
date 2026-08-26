@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import { serializeBackupArtifact } from './run-scheduled-backup.mjs';
 
 const ROOT_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 
@@ -72,4 +73,21 @@ test('scheduled backup runner does not keep a duplicated local collection list',
   const localCollections = findVariableInitializer(runnerSource, 'BACKUP_COLLECTIONS');
 
   assert.equal(localCollections, undefined);
+});
+
+test('scheduled backup canonicalizes SOAP attestations before artifact checksum', async () => {
+  const first = {
+    attestationRef: 'soap-attestation-z', actorRef: 'actor-z', schemaVersion: 'mediflow.headless-soap-active-role-attestation.v1',
+    role: 'physician', operationId: 'mediflow.clinical_diary.append_soap.v1', policyVersion: 'clinician_confirmed_single_use.v1',
+    status: 'inactive', attestationVersion: 1, issuerRef: null, expiresAt: null, activatedAt: null,
+    revocationGeneration: 0, revokedAt: null, createdAt: '2026-08-26T08:00:00.000Z', updatedAt: '2026-08-26T08:00:00.000Z',
+  };
+  const second = { ...first, attestationRef: 'soap-attestation-a', actorRef: 'actor-a' };
+  const createdAt = new Date('2026-08-26T08:00:00.000Z');
+  const forward = JSON.parse(await serializeBackupArtifact({ headlessSoapActiveRoleAttestations: [first, second] }, createdAt));
+  const reverse = JSON.parse(await serializeBackupArtifact({ headlessSoapActiveRoleAttestations: [second, first] }, createdAt));
+
+  assert.deepEqual(forward.payload.headlessSoapActiveRoleAttestations.map((row) => row.attestationRef), ['soap-attestation-a', 'soap-attestation-z']);
+  assert.deepEqual(forward.payload, reverse.payload);
+  assert.equal(forward.manifest.checksum, reverse.manifest.checksum);
 });
