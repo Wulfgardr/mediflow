@@ -26,9 +26,20 @@ type SettingsReader = () => Promise<unknown> | unknown;
 type Attestor = (endpoint: string, model: string, signal: AbortSignal) => Promise<OllamaLocalAttestation>;
 export type DocumentSynthesisProviderBindingToken = object;
 export type DocumentSynthesisProviderBindingReceipt = Readonly<{ schemaVersion: typeof DOCUMENT_SYNTHESIS_PROVIDER_BINDING_SCHEMA_VERSION; capability: 'document_synthesis'; registryTask: 'reasoning'; provider: 'ollama'; model: string; venue: 'local_process'; egress: 'none'; fallback: 'none'; runtimeReadiness: 'required' }>;
-export type DocumentSynthesisProviderBindingExecutionClaim = Readonly<{ resolution: LocalProviderResolution; receipt: DocumentSynthesisProviderBindingReceipt }>;
+export type DocumentSynthesisProviderBindingExecutionClaim = Readonly<{ status: 'claimed'; resolution: LocalProviderResolution; receipt: DocumentSynthesisProviderBindingReceipt }>;
+export type DocumentSynthesisProviderBindingExecutionClaimResult = DocumentSynthesisProviderBindingExecutionClaim | Readonly<{ status: 'spent' }>;
 type PrivateBinding = Readonly<{ resolution: LocalProviderResolution; receipt: DocumentSynthesisProviderBindingReceipt }>;
-const privateBindings = new WeakMap<object, PrivateBinding>();
+const ReflectApply = Reflect.apply;
+const WeakMapConstructor = WeakMap;
+const WeakMapGet = WeakMap.prototype.get;
+const WeakMapSet = WeakMap.prototype.set;
+const WeakMapDelete = WeakMap.prototype.delete;
+const WeakSetConstructor = WeakSet;
+const WeakSetAdd = WeakSet.prototype.add;
+const WeakSetHas = WeakSet.prototype.has;
+const privateBindings = new WeakMapConstructor<object, PrivateBinding>();
+const spentBindings = new WeakSetConstructor<object>();
+const SPENT_CLAIM = frozen({ status: 'spent' as const }) as Extract<DocumentSynthesisProviderBindingExecutionClaimResult, { status: 'spent' }>;
 
 export type DocumentSynthesisProviderBindingResult = Readonly<{
     status: 'available'; code: null;
@@ -182,7 +193,7 @@ function createBinding(dependenciesValue: unknown): Readonly<{ bind(): Promise<D
                 const sealed = sealResolution(resolved); if (!sealed) return denied('provider_invalid');
                 const receipt = frozen({ schemaVersion: DOCUMENT_SYNTHESIS_PROVIDER_BINDING_SCHEMA_VERSION, capability: 'document_synthesis' as const, registryTask: 'reasoning' as const, provider: 'ollama' as const, model: resolved.model, venue: 'local_process' as const, egress: 'none' as const, fallback: 'none' as const, runtimeReadiness: 'required' as const }) as DocumentSynthesisProviderBindingReceipt;
                 const token = Object.freeze(Object.create(null));
-                privateBindings.set(token, frozen({ resolution: sealed, receipt }) as PrivateBinding);
+                ReflectApply(WeakMapSet, privateBindings, [token, frozen({ resolution: sealed, receipt }) as PrivateBinding]);
                 return frozen({ status: 'available' as const, code: null, receipt, readiness: frozen({ schemaVersion: DOCUMENT_SYNTHESIS_PROVIDER_READINESS_SCHEMA_VERSION, state: 'available_unqualified' as const, modelAttestation: 'observed_not_causal' as const }), token });
             } finally { binding = false; }
         },
@@ -196,16 +207,18 @@ export const bindDocumentSynthesisProvider = (): Promise<DocumentSynthesisProvid
 
 /** Narrow internal handoff for C3b. A forged or transformed token has no provider authority. */
 export function resolveDocumentSynthesisProviderBinding(token: unknown): LocalProviderResolution | null {
-    try { return typeof token === 'object' && token !== null && !types.isProxy(token) ? privateBindings.get(token)?.resolution ?? null : null; } catch { return null; }
+    try { return typeof token === 'object' && token !== null && !types.isProxy(token) ? (ReflectApply(WeakMapGet, privateBindings, [token]) as PrivateBinding | undefined)?.resolution ?? null : null; } catch { return null; }
 }
 
 /** Single server-only execution claim. It burns the authentic binding before any provider work. */
-export function claimDocumentSynthesisProviderBindingForExecution(token: unknown): DocumentSynthesisProviderBindingExecutionClaim | null {
+export function claimDocumentSynthesisProviderBindingForExecution(token: unknown): DocumentSynthesisProviderBindingExecutionClaimResult | null {
     try {
         if (typeof token !== 'object' || token === null || types.isProxy(token)) return null;
-        const binding = privateBindings.get(token); if (!binding) return null;
-        privateBindings.delete(token);
-        return frozen({ resolution: binding.resolution, receipt: binding.receipt }) as DocumentSynthesisProviderBindingExecutionClaim;
+        if (ReflectApply(WeakSetHas, spentBindings, [token])) return SPENT_CLAIM;
+        const binding = ReflectApply(WeakMapGet, privateBindings, [token]) as PrivateBinding | undefined; if (!binding) return null;
+        ReflectApply(WeakSetAdd, spentBindings, [token]);
+        if (!ReflectApply(WeakMapDelete, privateBindings, [token])) return SPENT_CLAIM;
+        return frozen({ status: 'claimed' as const, resolution: binding.resolution, receipt: binding.receipt }) as DocumentSynthesisProviderBindingExecutionClaim;
     } catch { return null; }
 }
 

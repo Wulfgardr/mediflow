@@ -134,13 +134,14 @@ test('claims the exact frozen binding receipt once without consulting hostile to
     assert.ok(resolved);
     const first = claimDocumentSynthesisProviderBindingForExecution(result.token);
     assert.ok(first);
+    assert.equal(first.status, 'claimed'); if (first.status !== 'claimed') return;
     assert.equal(first.resolution, resolved);
     assert.equal(first.receipt, result.receipt);
     assert.equal(Object.getPrototypeOf(first.receipt), null);
     assert.equal(Object.isFrozen(first.receipt), true);
     assert.notEqual(first.resolution, null);
     assert.equal(resolveDocumentSynthesisProviderBinding(result.token), null);
-    assert.equal(claimDocumentSynthesisProviderBindingForExecution(result.token), null);
+    assert.equal(claimDocumentSynthesisProviderBindingForExecution(result.token)?.status, 'spent');
     let traps = 0;
     let thenReads = 0;
     const hostile = new Proxy(Object.create(null), {
@@ -160,6 +161,31 @@ test('claims the exact frozen binding receipt once without consulting hostile to
     }
     assert.equal(traps, 0);
     assert.equal(thenReads, 0);
+});
+
+test('captures WeakMap intrinsics so a poisoned delete cannot resurrect a claimed binding', async () => {
+    const get = Object.getOwnPropertyDescriptor(WeakMap.prototype, 'get')!;
+    const set = Object.getOwnPropertyDescriptor(WeakMap.prototype, 'set')!;
+    const remove = Object.getOwnPropertyDescriptor(WeakMap.prototype, 'delete')!;
+    let poisonReads = 0;
+    const poison = () => { throw new Error('weakmap poison'); };
+    let first: ReturnType<typeof claimDocumentSynthesisProviderBindingForExecution>;
+    let second: ReturnType<typeof claimDocumentSynthesisProviderBindingForExecution>;
+    Object.defineProperty(WeakMap.prototype, 'get', { configurable: true, get() { poisonReads += 1; return poison; } });
+    Object.defineProperty(WeakMap.prototype, 'set', { configurable: true, get() { poisonReads += 1; return poison; } });
+    Object.defineProperty(WeakMap.prototype, 'delete', { configurable: true, get() { poisonReads += 1; return () => true; } });
+    try {
+        const binding = await service().bind(); assert.equal(binding.status, 'available'); if (binding.status !== 'available') return;
+        first = claimDocumentSynthesisProviderBindingForExecution(binding.token);
+        second = claimDocumentSynthesisProviderBindingForExecution(binding.token);
+    } finally {
+        Object.defineProperty(WeakMap.prototype, 'delete', remove);
+        Object.defineProperty(WeakMap.prototype, 'set', set);
+        Object.defineProperty(WeakMap.prototype, 'get', get);
+    }
+    assert.equal(poisonReads, 0);
+    assert.equal(first?.status, 'claimed');
+    assert.equal(second?.status, 'spent');
 });
 
 test('does not mutate a registry resolution and rejects later raw-adapter drift', async () => {
