@@ -16,8 +16,8 @@ const u64 = (value: unknown): value is bigint => typeof value === 'bigint' && va
 
 /** Process-local P2a state; callers supply primitive ordering data only. */
 /* @Codex */
-export function createWebAuthControlRecord(initialFence: unknown, successorFactory: unknown, initialGeneration: unknown = BigInt(0)) {
-    if (!text(initialFence) || typeof successorFactory !== 'function' || !u64(initialGeneration)) throw new TypeError('invalid trusted control seam');
+export function createWebAuthControlRecord(initialFence: unknown, initialGeneration: unknown = BigInt(0)) {
+    if (!text(initialFence) || !u64(initialGeneration)) throw new TypeError('invalid trusted control state');
     let fence = initialFence; let generation = initialGeneration; let pending: Pending | null = null; let activeSessionId: string | null = null; let clock = 0;
     const used = new Set<string>([fence]); const entries = new Map<string, Entry>();
     const tick = (value: unknown): number | null => { if (!time(value)) return null; clock = Math.max(clock, value); if (pending && clock - pending.createdAt >= PENDING_TTL_MS) pending = null; return clock; };
@@ -26,11 +26,9 @@ export function createWebAuthControlRecord(initialFence: unknown, successorFacto
         const entry = entries.get(key);
         return !entry ? null : entry.fingerprint === fingerprint && entry.requestFence === requestFence && at - entry.createdAt < REPLAY_TTL_MS ? entry : false;
     };
-    const next = (expectedFence: string, expectedGeneration: bigint, expectedPending: Pending | null): string | null => {
-        if (expectedGeneration === MAX_U64) return null;
-        let value: unknown; try { value = (successorFactory as () => unknown)(); } catch { return null; }
-        return text(value) && !used.has(value) && fence === expectedFence && generation === expectedGeneration && pending === expectedPending ? value : null;
-    };
+    const successor = (value: unknown): string | null => text(value) ? value : null;
+    const next = (value: string, expectedFence: string, expectedGeneration: bigint, expectedPending: Pending | null): string | null =>
+        expectedGeneration === MAX_U64 || used.has(value) || fence !== expectedFence || generation !== expectedGeneration || pending !== expectedPending ? null : value;
     const advance = (value: string): Readonly<{ ok: true; fence: string; generation: bigint }> => { fence = value; used.add(value); generation += BigInt(1); return Object.freeze({ ok: true, fence, generation }); };
     return Object.freeze({
         begin(kind: unknown, operation: unknown, key: unknown, fingerprint: unknown, at: unknown): Result {
@@ -41,20 +39,23 @@ export function createWebAuthControlRecord(initialFence: unknown, successorFacto
             pending = Object.freeze({ operation, fingerprint, generation, createdAt: current }); entries.set(key, Object.freeze({ kind: 'begin', requestFence: fence, fence, fingerprint, generation, createdAt: current }));
             return Object.freeze({ ok: true, fence, generation });
         },
-        finalizeAuth(expectedFence: unknown, operation: unknown, expectedGeneration: unknown, fingerprint: unknown, sessionId: unknown, at: unknown): Result {
-            if (tick(at) === null || !text(expectedFence) || !text(operation) || !u64(expectedGeneration) || !text(fingerprint) || !text(sessionId)) return denied;
+        finalizeAuth(expectedFence: unknown, operation: unknown, expectedGeneration: unknown, fingerprint: unknown, sessionId: unknown, successorFence: unknown, at: unknown): Result {
+            const successorFenceValue = successor(successorFence);
+            if (!successorFenceValue || !text(expectedFence) || !text(operation) || !u64(expectedGeneration) || !text(fingerprint) || !text(sessionId) || tick(at) === null) return denied;
             const match = pending;
             if (!match || activeSessionId || fence !== expectedFence || generation !== expectedGeneration || match.operation !== operation || match.fingerprint !== fingerprint || match.generation !== generation) return denied;
-            const successor = next(fence, generation, match); if (!successor) return denied;
-            activeSessionId = sessionId; pending = null; return advance(successor);
+            const nextFence = next(successorFenceValue, fence, generation, match); if (!nextFence) return denied;
+            activeSessionId = sessionId; pending = null; return advance(nextFence);
         },
-        advanceLock(expectedFence: unknown, key: unknown, fingerprint: unknown, at: unknown): Result | Readonly<{ ok: true; fence: string; generation: bigint; detachedSessionId: string | null }> {
-            const current = tick(at); if (current === null || !text(expectedFence) || !text(key) || !text(fingerprint)) return denied;
+        advanceLock(expectedFence: unknown, key: unknown, fingerprint: unknown, successorFence: unknown, at: unknown): Result | Readonly<{ ok: true; fence: string; generation: bigint; detachedSessionId: string | null }> {
+            const successorFenceValue = successor(successorFence);
+            if (!successorFenceValue || !text(expectedFence) || !text(key) || !text(fingerprint)) return denied;
+            const current = tick(at); if (current === null) return denied;
             const prior = replay(key, fingerprint, expectedFence, current);
-            if (prior) return prior.kind === 'lock' ? Object.freeze({ ok: true, fence: prior.fence, generation: prior.generation, detachedSessionId: prior.detachedSessionId }) : denied;
+            if (prior) return prior.kind === 'lock' && prior.fence === successorFenceValue ? Object.freeze({ ok: true, fence: prior.fence, generation: prior.generation, detachedSessionId: prior.detachedSessionId }) : denied;
             if (prior === false || entries.size >= IDEMPOTENCY_CAP || fence !== expectedFence) return denied;
-            const match = pending; const successor = next(fence, generation, match); if (!successor) return denied;
-            const detachedSessionId = activeSessionId; pending = null; activeSessionId = null; const result = advance(successor);
+            const match = pending; const nextFence = next(successorFenceValue, fence, generation, match); if (!nextFence) return denied;
+            const detachedSessionId = activeSessionId; pending = null; activeSessionId = null; const result = advance(nextFence);
             entries.set(key, { kind: 'lock', requestFence: expectedFence, fence: result.fence, fingerprint, generation: result.generation, detachedSessionId, receipt: 'pending', createdAt: current });
             return Object.freeze({ ...result, detachedSessionId });
         },
@@ -64,10 +65,11 @@ export function createWebAuthControlRecord(initialFence: unknown, successorFacto
             if (prior === null || prior === false || prior.kind !== 'lock') return denied;
             prior.receipt = 'confirmed'; return Object.freeze({ ok: true, fence: prior.fence, generation: prior.generation, receipt: 'confirmed' });
         },
-        disposeBoundSession(expectedFence: unknown, sessionId: unknown, at: unknown): Result {
-            if (tick(at) === null || !text(expectedFence) || !text(sessionId) || fence !== expectedFence || activeSessionId !== sessionId) return denied;
-            const successor = next(fence, generation, pending); if (!successor) return denied;
-            activeSessionId = null; pending = null; return advance(successor);
+        disposeBoundSession(expectedFence: unknown, sessionId: unknown, successorFence: unknown, at: unknown): Result {
+            const successorFenceValue = successor(successorFence);
+            if (!successorFenceValue || !text(expectedFence) || !text(sessionId) || tick(at) === null || fence !== expectedFence || activeSessionId !== sessionId) return denied;
+            const nextFence = next(successorFenceValue, fence, generation, pending); if (!nextFence) return denied;
+            activeSessionId = null; pending = null; return advance(nextFence);
         },
         snapshot(): Readonly<{ fence: string; generation: bigint; pending: boolean; active: boolean }> { return Object.freeze({ fence, generation, pending: pending !== null, active: activeSessionId !== null }); },
     });
