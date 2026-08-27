@@ -266,6 +266,86 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertFalse(locked.2); XCTAssertTrue(locked.3)
     }
 
+    /* @Codex */
+    func testLateLoginAfterPairingClearCannotRestoreOperatorState() async {
+        let gate = LifecycleLoadGate(["login:1"])
+        let source = LifecycleMockDataSource(
+            loginResult: HomeBaseLoginResult(
+                sessionCookie: "sid=stale", encryptedMasterKey: nil, salt: nil, id: "stale-user"),
+            loadGate: gate
+        )
+        let model = await makeModel(source: source)
+        await MainActor.run {
+            model.password = String(repeating: "1", count: 4)
+            model.pairedClientId = "paired-client"
+            model.pairedClientToken = "paired-token"
+        }
+
+        let login = Task { await model.login() }
+        await gate.wait(for: "login:1")
+        await model.clearPairing()
+        await gate.release("login:1")
+        await login.value
+
+        let state = await MainActor.run { (model.operatorIdentity, model.connectionState, model.clinicalWorkspaceConnection) }
+        XCTAssertNil(state.0)
+        XCTAssertEqual(state.1, .notLoaded)
+        XCTAssertNil(state.2)
+    }
+
+    /* @Codex */
+    func testLateLoginAfterConnectionChangeCannotInstallOperatorState() async {
+        let gate = LifecycleLoadGate(["login:1"])
+        let source = LifecycleMockDataSource(
+            loginResult: HomeBaseLoginResult(
+                sessionCookie: "sid=stale", encryptedMasterKey: nil, salt: nil, id: "stale-user"),
+            loadGate: gate
+        )
+        let model = await makeModel(source: source)
+        await MainActor.run {
+            model.password = String(repeating: "1", count: 4)
+            model.pairedClientId = "paired-client"
+            model.pairedClientToken = "paired-token"
+        }
+
+        let login = Task { await model.login() }
+        await gate.wait(for: "login:1")
+        await MainActor.run { model.serverURL = "https://localhost:3444" }
+        await gate.release("login:1")
+        await login.value
+
+        let state = await MainActor.run { (model.operatorIdentity, model.clinicalWorkspaceConnection) }
+        XCTAssertNil(state.0)
+        XCTAssertNil(state.1)
+    }
+
+    /* @Codex */
+    func testOlderLoginCannotReplaceNewerOperatorState() async {
+        let gate = LifecycleLoadGate(["login:1"])
+        let source = LifecycleMockDataSource(
+            loginResults: [
+                HomeBaseLoginResult(sessionCookie: "sid=old", encryptedMasterKey: nil, salt: nil, id: "old-user"),
+                HomeBaseLoginResult(sessionCookie: "sid=new", encryptedMasterKey: nil, salt: nil, id: "new-user"),
+            ],
+            loadGate: gate
+        )
+        let model = await makeModel(source: source)
+        await MainActor.run {
+            model.password = String(repeating: "1", count: 4)
+            model.pairedClientId = "paired-client"
+            model.pairedClientToken = "paired-token"
+        }
+
+        let older = Task { await model.login() }
+        await gate.wait(for: "login:1")
+        await model.login()
+        await gate.release("login:1")
+        await older.value
+
+        let identity = await model.operatorIdentity
+        XCTAssertEqual(identity?.userId, "new-user")
+    }
+
     func testScopeRoundTripInvalidatesCapturedPatientLoad() async {
         let gate = LifecycleLoadGate(["patient:1"])
         let source = LifecycleMockDataSource(
@@ -751,7 +831,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     private let revisions: [NetworkRevisionSummary]
     private var patientFetchCount = 0
     private var revisionFetchCount = 0
-    private let loginResult: HomeBaseLoginResult
+    private let loginResults: [HomeBaseLoginResult]
     private let pinChangeError: HomeBaseClientError?
     private let logoutError: HomeBaseClientError?
     private(set) var lastUpdate: UpdateCall?
@@ -762,12 +842,14 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     private(set) var includeDiagnosesRequests: [Bool] = []
     private(set) var pinChangeCalls: [PinChangeCall] = []
     private(set) var logoutCalls = 0
+    private var loginCalls = 0
 
     init(
         summaries: [HomeBasePatientSummary] = [],
         details: [String: HomeBasePatientDetail] = [:],
         loginResult: HomeBaseLoginResult = HomeBaseLoginResult(
             sessionCookie: "sid=test", encryptedMasterKey: nil, salt: nil),
+        loginResults: [HomeBaseLoginResult] = [],
         pinChangeError: HomeBaseClientError? = nil,
         logoutError: HomeBaseClientError? = nil,
         loadGate: LifecycleLoadGate? = nil,
@@ -779,7 +861,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     ) {
         self.summaries = summaries
         self.details = details
-        self.loginResult = loginResult
+        self.loginResults = loginResults.isEmpty ? [loginResult] : loginResults
         self.pinChangeError = pinChangeError
         self.logoutError = logoutError
         self.loadGate = loadGate
@@ -805,8 +887,12 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         }
     }
 
-    func login(username: String?, password: String) async throws -> HomeBaseLoginResult {
-        loginResult
+    func login(username: String?, password: String, credentials: HomeBasePairedCredentials) async throws -> HomeBaseLoginResult {
+        let index = min(loginCalls, loginResults.count - 1)
+        loginCalls += 1
+        let result = loginResults[index]
+        await loadGate?.pause("login:\(loginCalls)")
+        return result
     }
 
     func changePin(
