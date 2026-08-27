@@ -378,12 +378,17 @@ test('retires one exact ACTIVE cell through its retained control ticket', () => 
     assert.equal(active.control.retireTicket(active.ticket, 'dispose'), 0);
 
     const source = readFileSync(fileURLToPath(new URL('./server-session.ts', import.meta.url)), 'utf8');
-    const body = source.slice(source.indexOf('export function retireActiveWebServerSession'), source.indexOf('/** Resolves only one exact ACTIVE'));
-    const successfulCas = body.indexOf('if (commitPreparedAuthControlRetirement(preparedRetirement) === 2) {');
-    const retiredFlip = body.indexOf("cell.state = 'RETIRED';", successfulCas);
-    assert.ok(successfulCas >= 0 && retiredFlip > successfulCas);
-    assert.equal(body.slice(successfulCas + 'if (commitPreparedAuthControlRetirement(preparedRetirement) === 2) {'.length, retiredFlip).trim(), '');
-    assert.doesNotMatch(body.slice(retiredFlip + "cell.state = 'RETIRED';".length, body.indexOf('return true;', retiredFlip)), /\w+\s*\(/u);
+    const body = source.slice(source.indexOf('export function retireActiveWebServerSession'), source.indexOf('/** Canonically publishes a prepared session'));
+    const finalCas = 'const retirementResult = commitPreparedAuthControlRetirement(preparedRetirement);';
+    const finalCasOffset = body.indexOf(finalCas);
+    const postCas = body.slice(finalCasOffset + finalCas.length);
+    const retiredFlip = postCas.indexOf("cell.state = 'RETIRED';");
+    assert.ok(finalCasOffset >= 0 && retiredFlip >= 0);
+    assert.doesNotMatch(postCas, /\b(?:try|catch|finally)\b/u);
+    assert.doesNotMatch(postCas, /\.retirement\b/u);
+    assert.doesNotMatch(postCas, /\b(?:DateNow|armedWebSessionCellsById|sessions|preparedWebSessionReservations|armedWebSessionPortRecords)\b/u);
+    assert.deepEqual([...postCas.matchAll(/\b(?!if\b)([A-Za-z_$][\w$]*)\s*\(/gu)].map((match) => match[1]), []);
+    assert.match(postCas, /cell\.state = 'RETIRED';\s*webSessionCellLifecyclePoisoned = false;\s*webSessionCellLifecycle = 'idle';\s*return true;/u);
 });
 
 test('retirement denies hostile inputs, stale control, and module copies without observation', async () => {
