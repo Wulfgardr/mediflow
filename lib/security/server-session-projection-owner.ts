@@ -413,6 +413,8 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             };
             const mintLeaseCommitPort = <Ref extends object>(presentedSession: ServerSession,
                 refs: WeakSet<object>, ports: WeakSet<object>) => {
+                if (!beginLeasePortOperation()) return fail('selection_busy');
+                try {
                 rejectLeaseCriticalSectionReentry();
                 requireCurrentSession(presentedSession);
                 const boundSelection = selection;
@@ -421,7 +423,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 if (!boundSelection) return fail('stale_selection');
                 if (readClock() >= boundSelection.expiresAt) { expire(); return fail('lease_expired'); }
                 requireCurrentSession(presentedSession);
-                if (selection !== boundSelection || epoch !== boundSelectionEpoch || reviewContextEpoch !== boundReviewContextEpoch) {
+                if (selection !== boundSelection || epoch !== boundSelectionEpoch || reviewContextEpoch !== boundReviewContextEpoch || leasePortOperationPoisoned) {
                     return fail('stale_selection');
                 }
                 const mintRef = (): Ref => {
@@ -527,6 +529,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 });
                 addOwnerIdentity(ports, port);
                 return port;
+                } finally { endLeasePortOperation(); }
             };
             const mintDurableReviewCommitPort = (presentedSession: ServerSession): DurableReviewCommitPort => {
                 if (!beginLeasePortOperation()) return fail('selection_busy');
@@ -586,12 +589,19 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 } finally { durableReviewOperationActive = false; endLeasePortOperation(); }
             };
             const mintDocumentSynthesisSourceLineagePort = (presentedSession: ServerSession): DocumentSynthesisSourceLineagePort => {
+                if (!beginLeasePortOperation()) return fail('selection_busy');
+                try {
                 rejectLeaseCriticalSectionReentry();
                 requireCurrentSession(presentedSession);
                 const boundSelection = selection;
                 const boundSelectionEpoch = epoch;
                 const boundReviewContextEpoch = reviewContextEpoch;
                 if (!boundSelection) return fail('stale_selection');
+                if (readClock() >= boundSelection.expiresAt) { expire(); return fail('lease_expired'); }
+                requireCurrentSession(presentedSession);
+                if (selection !== boundSelection || epoch !== boundSelectionEpoch || reviewContextEpoch !== boundReviewContextEpoch || leasePortOperationPoisoned) {
+                    return fail('stale_selection');
+                }
                 const grants = new WeakSetConstructor<object>();
                 const capabilities = new WeakSetConstructor<object>();
                 const currentnessTargets = new WeakSetConstructor<object>();
@@ -600,7 +610,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     currentnessTarget: object; revocationTarget: object; state: 'open' | 'verified' | 'burned' | 'revoked'; };
                 const records = new WeakMapConstructor<object, LineageRecord>();
                 const current = () => {
-                    if (terminal || presentedSession !== session || selection !== boundSelection || epoch !== boundSelectionEpoch
+                    if (terminal || presentedSession !== session || session.authChannel !== 'web' || selection !== boundSelection || epoch !== boundSelectionEpoch
                         || reviewContextEpoch !== boundReviewContextEpoch || getSession(session.id) !== session) return false;
                     let now: number;
                     try { now = sources.clock(); } catch { return false; }
@@ -667,6 +677,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     } finally { endLeasePortOperation(); }
                 } });
                 return ObjectFreeze(port);
+                } finally { endLeasePortOperation(); }
             };
             const mintDocumentSynthesisAttachmentCapturePort = (presentedSession: ServerSession): DocumentSynthesisAttachmentCapturePort => {
                 if (!beginLeasePortOperation()) return fail('selection_busy');
@@ -685,7 +696,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 const captures = new WeakSetConstructor<object>(); const grants = new WeakSetConstructor<object>();
                 const evidence = new WeakSetConstructor<object>(); const records = new WeakMapConstructor<object, Entry>();
                 const current = () => {
-                    if (terminal || presentedSession !== session || selection !== boundSelection || epoch !== boundSelectionEpoch
+                    if (terminal || presentedSession !== session || session.authChannel !== 'web' || selection !== boundSelection || epoch !== boundSelectionEpoch
                         || reviewContextEpoch !== boundReviewContextEpoch || getSession(session.id) !== session) return false;
                     let now: number; try { now = sources.clock(); } catch { return false; }
                     return NumberIsFinite(now) && now < boundSelection.expiresAt && !terminal && presentedSession === session
@@ -723,6 +734,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     }
                     entry.revocationState = observed.state; entry.state = 'revoked'; return true;
                 };
+                const burnEntry = (entry: Entry) => { revokeEntry(entry); entry.state = 'revoked'; };
                 const port = ObjectCreate(null) as DocumentSynthesisAttachmentCapturePort;
                 ObjectDefineProperty(port, 'observeCurrentness', { enumerable: true, value(this: unknown, value: unknown) {
                     if (this !== port || !beginLeasePortOperation()) return null;
@@ -751,8 +763,8 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     if (this !== port || !beginLeasePortOperation()) return null;
                     try {
                         const entry = entryFor(value);
-                        if (!entry || !hasOwnerIdentity(captures, value as object) || entry.state !== 'captured' || !current()
-                            || leasePortOperationPoisoned || !currentnessIsLive(entry)) return null;
+                        if (!entry || !hasOwnerIdentity(captures, value as object) || entry.state !== 'captured') return null;
+                        if (!current() || leasePortOperationPoisoned || !currentnessIsLive(entry)) { burnEntry(entry); return null; }
                         const grant = opaque(); entry.grant = grant; entry.state = 'ingested'; addOwnerIdentity(grants, grant);
                         applyIntrinsic(weakMapSet, records, [grant, entry]); return grant as DocumentSynthesisAttachmentIngestGrant;
                     } finally { endLeasePortOperation(); }
@@ -762,16 +774,16 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     try {
                         const request = frozenExact(value, ['grant', 'observedCurrentness', 'projection']);
                         const entry = request ? entryFor(request.grant) : null;
-                        if (!entry || !hasOwnerIdentity(grants, request!.grant as object) || entry.state !== 'ingested' || entry.grant !== request!.grant
-                            || !current() || leasePortOperationPoisoned) return null;
+                        if (!entry || !hasOwnerIdentity(grants, request!.grant as object) || entry.state !== 'ingested' || entry.grant !== request!.grant) return null;
+                        if (!current() || leasePortOperationPoisoned) { burnEntry(entry); return null; }
                         const observed = parsedCurrentness(request!.observedCurrentness);
                         const projection = frozenExact(request!.projection, ['sourceKind', 'sourceText']);
                         if (!observed || !projection || (projection.sourceKind !== 'native_text' && projection.sourceKind !== 'ocr_text')
                             || typeof projection.sourceText !== 'string' || projection.sourceText.length > 12_000 || !matches(observed, entry.currentness)
                             || !currentnessIsLive(entry)
-                            || !current() || leasePortOperationPoisoned || documentSynthesisLineageTerminal) return null;
+                            || !current() || leasePortOperationPoisoned || documentSynthesisLineageTerminal) { burnEntry(entry); return null; }
                         const allocation = allocateDocumentSynthesisSourceSetEpoch(documentSynthesisLineage);
-                        if (allocation.status !== 'allocated') { if (allocation.status === 'exhausted') documentSynthesisLineageTerminal = true; return null; }
+                        if (allocation.status !== 'allocated') { if (allocation.status === 'exhausted') documentSynthesisLineageTerminal = true; burnEntry(entry); return null; }
                         documentSynthesisLineage = allocation.state;
                         if (!current() || leasePortOperationPoisoned) { revokeEntry(entry); return null; }
                         const retained = opaque(); entry.projection = ObjectFreeze({ sourceKind: projection.sourceKind,

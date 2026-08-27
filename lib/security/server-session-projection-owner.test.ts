@@ -289,24 +289,46 @@ test('Document Synthesis attachment capture poisons reentry before minting autho
     let armed = false; let nested = false;
     const registry = createServerSessionProjectionOwnerRegistry({
         resolve: (_session, pair) => pair, entropy: () => new Uint8Array(16),
-        clock: () => { if (armed) { armed = false; assert.throws(() => owner.mintDocumentSynthesisAttachmentCapturePort(value),
-            (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'selection_busy'); nested = true; } return 1_000; },
+        clock: () => { if (armed) { armed = false;
+            for (const mint of [() => owner.mintDocumentSynthesisAttachmentCapturePort(value), () => owner.mintPatientInsightLeaseCommitPort(value),
+                () => owner.mintOcrLeaseCommitPort(value), () => owner.mintDocumentSynthesisLeaseCommitPort(value),
+                () => owner.mintDocumentSynthesisSourceLineagePort(value)]) {
+                assert.throws(mint, (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'selection_busy');
+            } nested = true; } return 1_000; },
     });
     const value = session(); const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
     const port = owner.mintDocumentSynthesisAttachmentCapturePort(value);
     armed = true; assert.equal(port.observeCurrentness(currentness()), null); assert.equal(nested, true);
     const capture = port.observeCurrentness(currentness()); assert.ok(capture);
     armed = true; nested = false; assert.equal(port.begin(capture), null); assert.equal(nested, true);
-    const grant = port.begin(capture); assert.ok(grant);
-    const input = Object.freeze({ grant, observedCurrentness: currentness(), projection: projection() });
+    const retryCapture = port.observeCurrentness(currentness(2, 2)); assert.ok(retryCapture); const grant = port.begin(retryCapture); assert.ok(grant);
+    const input = Object.freeze({ grant, observedCurrentness: currentness(2, 2), projection: projection() });
     armed = true; nested = false; assert.equal(port.retain(input), null); assert.equal(nested, true);
-    const retained = port.retain(input); assert.ok(retained);
+    const finalCapture = port.observeCurrentness(currentness(3, 3)); assert.ok(finalCapture); const finalGrant = port.begin(finalCapture); assert.ok(finalGrant);
+    const retained = port.retain(Object.freeze({ grant: finalGrant, observedCurrentness: currentness(3, 3), projection: projection() })); assert.ok(retained);
     armed = true; nested = false; assert.equal(port.observeRevocation(retained), false); assert.equal(nested, true);
     assert.equal(port.observeRevocation(retained), true);
     armed = true; nested = false;
     assert.throws(() => owner.mintDocumentSynthesisAttachmentCapturePort(value),
         (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'stale_selection');
     assert.equal(nested, true); assert.ok(owner.mintDocumentSynthesisAttachmentCapturePort(value));
+});
+
+test('Document Synthesis attachment capture burns expired, invalid-retain, and channel-drift authority', () => {
+    const expired = ownerWithSelection(); const expiryPort = expired.owner.mintDocumentSynthesisAttachmentCapturePort(expired.value);
+    const expiryCapture = expiryPort.observeCurrentness(currentness()); assert.ok(expiryCapture); expired.setClock(expired.value.expiresAt);
+    assert.equal(expiryPort.begin(expiryCapture), null); expired.setClock(1_000); assert.equal(expiryPort.begin(expiryCapture), null);
+
+    const invalid = ownerWithSelection(); const invalidPort = invalid.owner.mintDocumentSynthesisAttachmentCapturePort(invalid.value);
+    const capture = invalidPort.observeCurrentness(currentness()); assert.ok(capture); const grant = invalidPort.begin(capture); assert.ok(grant);
+    assert.equal(invalidPort.retain(Object.freeze({ grant, observedCurrentness: currentness(),
+        projection: Object.freeze({ sourceKind: 'invalid', sourceText: 'synthetic' }) } as never)), null);
+    assert.equal(invalidPort.retain(Object.freeze({ grant, observedCurrentness: currentness(), projection: projection() })), null);
+
+    const channel = ownerWithSelection(); const channelPort = channel.owner.mintDocumentSynthesisAttachmentCapturePort(channel.value);
+    const channelCapture = channelPort.observeCurrentness(currentness()); assert.ok(channelCapture);
+    (channel.value as { authChannel: ServerSession['authChannel'] }).authChannel = 'native'; assert.equal(channelPort.begin(channelCapture), null);
+    (channel.value as { authChannel: ServerSession['authChannel'] }).authChannel = 'web'; assert.equal(channelPort.begin(channelCapture), null);
 });
 
 test('Document Synthesis attachment capture latches duplicate, rollback, and ABA currentness across ports', () => {
