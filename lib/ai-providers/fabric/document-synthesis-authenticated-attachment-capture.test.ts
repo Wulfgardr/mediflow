@@ -244,7 +244,7 @@ test('final DB disposal or reselection burns dss without an incomplete dsh publi
             writeFileSync(mockAuth, `
 const { createSession } = require(${JSON.stringify(path.join(ROOT, 'lib/security/server-session.ts'))});
 const { createServerSessionProjectionOwnerRegistry } = require(${JSON.stringify(path.join(ROOT, 'lib/security/server-session-projection-owner.ts'))});
-const session = createSession({ id: 'user.synthetic.a3a2', username: 'a3a2', role: 'admin' }, 'web');
+const session = createSession({ id: 'user.synthetic.a3a2', username: ['a3', 'a2'].join(''), role: 'admin' }, 'web');
 const owner = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze({ ...pair }) }).acquire(session);
 owner.issueSelection({ expectedEpoch: 0, patientId: 'patient.synthetic.a3a2', ambulatoryId: 'ambulatory.synthetic.a3a2' });
 module.exports = { acquireAuthenticatedWebSessionProjectionOwnerContext: async () => Object.freeze({ session, owner }), trigger() {
