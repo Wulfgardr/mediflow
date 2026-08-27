@@ -1,6 +1,7 @@
 /* @Codex */
 
 import crypto from 'node:crypto';
+import { types } from 'node:util';
 
 const apply = Reflect.apply;
 const ObjectConstructor = Object;
@@ -9,6 +10,11 @@ const freeze = Object.freeze;
 const MapConstructor = Map;
 const SetConstructor = Set;
 const WeakMapConstructor = WeakMap;
+const BufferPrototype = Buffer.prototype;
+const getPrototypeOfIntrinsic = Object.getPrototypeOf;
+const isBufferIntrinsic = Buffer.isBuffer;
+const isProxyIntrinsic = types.isProxy;
+const byteLengthIntrinsic = ObjectConstructor.getOwnPropertyDescriptor(ObjectConstructor.getPrototypeOf(Uint8Array.prototype), 'byteLength')?.get;
 const mapGetIntrinsic = Map.prototype.get;
 const mapSetIntrinsic = Map.prototype.set;
 const mapSizeIntrinsic = ObjectConstructor.getOwnPropertyDescriptor(Map.prototype, 'size')?.get;
@@ -17,8 +23,8 @@ const setDeleteIntrinsic = Set.prototype.delete;
 const setHasIntrinsic = Set.prototype.has;
 const weakMapGetIntrinsic = WeakMap.prototype.get;
 const weakMapSetIntrinsic = WeakMap.prototype.set;
+const weakMapDeleteIntrinsic = WeakMap.prototype.delete;
 const randomBytesIntrinsic = crypto.randomBytes;
-const bufferToStringIntrinsic = Buffer.prototype.toString;
 const isSafeInteger = Number.isSafeInteger;
 const max = Math.max;
 const bigint = BigInt;
@@ -36,7 +42,7 @@ type Entry = Begin | Lock;
 type Result = Readonly<{ ok: false }> | Readonly<{ ok: true; fence: string; generation: bigint }>;
 type ControlState = {
     fence: string; generation: bigint; pending: Pending | null; activeSessionId: string | null; clock: number;
-    used: Set<string>; reserved: Set<string>; entries: Map<string, Entry>; issuing: boolean; poisoned: boolean;
+    used: Set<string>; reserved: Set<string>; entries: Map<string, Entry>;
 };
 type TicketBinding = {
     lifecycle: 'prepared' | 'active' | 'retired' | 'denied'; owner: ControlState; pending: Pending;
@@ -57,15 +63,28 @@ const setHas = (set: Set<string>, value: string): boolean => apply(setHasIntrins
 const weakMapGet = <Value>(map: WeakMap<object, Value>, key: unknown): Value | undefined =>
     (typeof key === 'object' && key !== null) || typeof key === 'function' ? apply(weakMapGetIntrinsic, map, [key]) as Value | undefined : undefined;
 const weakMapSet = <Value>(map: WeakMap<object, Value>, key: object, value: Value): void => { apply(weakMapSetIntrinsic, map, [key, value]); };
+const weakMapDelete = (map: WeakMap<object, unknown>, key: object): boolean => apply(weakMapDeleteIntrinsic, map, [key]) as boolean;
 const text = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 256;
 const time = (value: unknown): value is number => typeof value === 'number' && isSafeInteger(value) && value >= 0;
 const u64 = (value: unknown): value is bigint => typeof value === 'bigint' && value >= ZERO && value <= MAX_U64;
 const ticketBindings = new WeakMapConstructor<object, TicketBinding>();
+let ticketOperationActive = false;
+let ticketOperationPoisoned = false;
+const enterTicketOperation = (): boolean => {
+    if (ticketOperationActive) { ticketOperationPoisoned = true; return false; }
+    ticketOperationActive = true; ticketOperationPoisoned = false; return true;
+};
+const leaveTicketOperation = (): void => { ticketOperationActive = false; ticketOperationPoisoned = false; };
 const opaque = <Value>(): Value => apply(freeze, ObjectConstructor, [apply(ObjectCreate, ObjectConstructor, [null])]) as Value;
 const retireReason = (value: unknown): value is RetireReason => value === 'lock' || value === 'dispose' || value === 'expired' || value === 'delete' || value === 'clear';
-const successorFence = (): string => {
-    const bytes = apply(randomBytesIntrinsic, crypto, [32]) as Buffer;
-    return apply(bufferToStringIntrinsic, bytes, ['hex']) as string;
+const successorFence = (): string | null => {
+    const bytes = apply(randomBytesIntrinsic, crypto, [32]) as unknown;
+    if (typeof bytes !== 'object' || bytes === null || apply(isProxyIntrinsic, types, [bytes])
+        || !apply(isBufferIntrinsic, Buffer, [bytes]) || apply(getPrototypeOfIntrinsic, ObjectConstructor, [bytes]) !== BufferPrototype
+        || apply(byteLengthIntrinsic!, bytes, []) !== 32) return null;
+    const digits = '0123456789abcdef'; let output = '';
+    for (let index = 0; index < 32; index += 1) { const byte = (bytes as Buffer)[index]!; output += digits[byte >> 4]! + digits[byte & 15]!; }
+    return output;
 };
 
 /** Process-local P2a state; callers supply primitive ordering data only. */
@@ -73,7 +92,7 @@ const successorFence = (): string => {
 export function createWebAuthControlRecord(initialFence: unknown, initialGeneration: unknown = ZERO) {
     if (!text(initialFence) || !u64(initialGeneration)) throw new TypeError('invalid trusted control state');
     const state: ControlState = { fence: initialFence, generation: initialGeneration, pending: null, activeSessionId: null, clock: 0,
-        used: new SetConstructor<string>(), reserved: new SetConstructor<string>(), entries: new MapConstructor<string, Entry>(), issuing: false, poisoned: false };
+        used: new SetConstructor<string>(), reserved: new SetConstructor<string>(), entries: new MapConstructor<string, Entry>() };
     setAdd(state.used, state.fence);
     const tick = (value: unknown): number | null => { if (!time(value)) return null; state.clock = max(state.clock, value); if (state.pending && state.clock - state.pending.createdAt >= PENDING_TTL_MS) state.pending = null; return state.clock; };
     const replay = (key: unknown, fingerprint: unknown, requestFence: unknown, at: number): Entry | null | false => {
@@ -135,28 +154,33 @@ export function createWebAuthControlRecord(initialFence: unknown, initialGenerat
             state.activeSessionId = null; state.pending = null; return advance(nextFence, output);
         },
         prepareAuthControlTicket(expectedFence: unknown, operation: unknown, expectedGeneration: unknown, fingerprint: unknown, sessionId: unknown, at: unknown): AuthControlTicket | null {
-            if (state.issuing) { state.poisoned = true; return null; }
-            state.issuing = true;
-            let activateFence: string | null = null; let retireFence: string | null = null; let reservedActivate = false; let reservedRetire = false;
+            if (!enterTicketOperation()) return null;
+            let activateFence: string | null = null; let retireFence: string | null = null; let ticket: AuthControlTicket | null = null; let bound = false; let published = false;
             try {
                 if (!text(expectedFence) || !text(operation) || !u64(expectedGeneration) || !text(fingerprint) || !text(sessionId) || tick(at) === null) return null;
                 const match = state.pending;
                 if (!match || state.activeSessionId || expectedGeneration >= MAX_TICKET_START || state.fence !== expectedFence || state.generation !== expectedGeneration
                     || match.operation !== operation || match.fingerprint !== fingerprint || match.generation !== state.generation) return null;
                 activateFence = successorFence(); retireFence = successorFence();
-                if (state.poisoned || state.pending !== match || state.fence !== expectedFence || state.generation !== expectedGeneration
+                if (ticketOperationPoisoned || !activateFence || !retireFence || state.pending !== match || state.fence !== expectedFence || state.generation !== expectedGeneration
                     || state.activeSessionId || activateFence === retireFence || setHas(state.used, activateFence) || setHas(state.used, retireFence)
                     || setHas(state.reserved, activateFence) || setHas(state.reserved, retireFence)) return null;
-                const ticket = opaque<AuthControlTicket>();
+                if (ticketOperationPoisoned) return null;
+                ticket = opaque<AuthControlTicket>();
                 const binding: TicketBinding = { lifecycle: 'prepared', owner: state, pending: match, fence: expectedFence,
                     generation: expectedGeneration, sessionId, activateFence, retireFence, retiredReason: null };
-                setAdd(state.reserved, activateFence); reservedActivate = true; setAdd(state.reserved, retireFence); reservedRetire = true;
-                weakMapSet(ticketBindings, ticket, binding); reservedActivate = false; reservedRetire = false;
+                setAdd(state.reserved, activateFence); if (ticketOperationPoisoned) return null;
+                setAdd(state.reserved, retireFence); if (ticketOperationPoisoned) return null;
+                bound = true; weakMapSet(ticketBindings, ticket, binding); if (ticketOperationPoisoned) return null;
+                published = true;
                 return ticket;
             } catch { return null; }
             finally {
-                try { if (reservedActivate && activateFence) setDelete(state.reserved, activateFence); if (reservedRetire && retireFence) setDelete(state.reserved, retireFence); } catch { /* fail closed */ }
-                state.issuing = false; state.poisoned = false;
+                if (!published) {
+                    try { if (bound && ticket) weakMapDelete(ticketBindings, ticket); } catch { /* unreachable ticket remains denied */ }
+                    try { if (activateFence) setDelete(state.reserved, activateFence); if (retireFence) setDelete(state.reserved, retireFence); } catch { /* fail closed */ }
+                }
+                leaveTicketOperation();
             }
         },
         snapshot(): Readonly<{ fence: string; generation: bigint; pending: boolean; active: boolean }> { return frozen({ fence: state.fence, generation: state.generation, pending: state.pending !== null, active: state.activeSessionId !== null }); },
@@ -171,44 +195,66 @@ function denyTicket(binding: TicketBinding): void {
 /** Commits the exact prepared P2b ticket without exposing record or session authority. */
 /* @Codex */
 export function commitAuthControlTicket(ticket: unknown): boolean {
-    const binding = weakMapGet(ticketBindings, ticket);
-    if (!binding || binding.lifecycle !== 'prepared') return false;
-    const state = binding.owner;
+    if (!enterTicketOperation()) return false;
+    let binding: TicketBinding | undefined; let addedUsed = false;
     try {
+        binding = weakMapGet(ticketBindings, ticket);
+        if (ticketOperationPoisoned || !binding || binding.lifecycle !== 'prepared') { leaveTicketOperation(); return false; }
+        const state = binding.owner;
         if (state.pending !== binding.pending || state.activeSessionId !== null || state.fence !== binding.fence || state.generation !== binding.generation
             || !setHas(state.reserved, binding.activateFence) || !setHas(state.reserved, binding.retireFence)
-            || setHas(state.used, binding.activateFence) || setHas(state.used, binding.retireFence)) { denyTicket(binding); return false; }
-        if (!setDelete(state.reserved, binding.activateFence)) { denyTicket(binding); return false; }
-        setAdd(state.used, binding.activateFence);
-    } catch { denyTicket(binding); return false; }
+            || setHas(state.used, binding.activateFence) || setHas(state.used, binding.retireFence) || ticketOperationPoisoned) throw new Error('ticket denied');
+        if (!setDelete(state.reserved, binding.activateFence) || ticketOperationPoisoned) throw new Error('ticket denied');
+        addedUsed = true; setAdd(state.used, binding.activateFence); if (ticketOperationPoisoned) throw new Error('ticket denied');
+    } catch {
+        if (binding?.lifecycle === 'prepared') { if (addedUsed) try { setDelete(binding.owner.used, binding.activateFence); } catch { /* fail closed */ } denyTicket(binding); }
+        leaveTicketOperation(); return false;
+    }
+    const state = binding.owner;
     state.activeSessionId = binding.sessionId;
     state.pending = null;
     state.fence = binding.activateFence;
     state.generation = binding.generation + ONE;
     binding.lifecycle = 'active';
+    ticketOperationActive = false; ticketOperationPoisoned = false;
     return true;
 }
 
 /** Retires the exact active binding once; exact same-reason replay is receipt-only. */
 /* @Codex */
 export function retireAuthControlTicket(ticket: unknown, reason: unknown): 0 | 1 | 2 {
-    const binding = weakMapGet(ticketBindings, ticket);
-    if (!binding || !retireReason(reason)) return 0;
-    if (binding.lifecycle === 'retired') return binding.retiredReason === reason ? 2 : 0;
-    if (binding.lifecycle !== 'active') return 0;
-    const state = binding.owner;
+    if (!enterTicketOperation()) return 0;
+    let binding: TicketBinding | undefined; let addedUsed = false; let removedReservation = false;
     try {
+        binding = weakMapGet(ticketBindings, ticket);
+        if (ticketOperationPoisoned || !binding) { leaveTicketOperation(); return 0; }
+        if (binding.lifecycle === 'prepared') { denyTicket(binding); leaveTicketOperation(); return 0; }
+        if (!retireReason(reason)) { leaveTicketOperation(); return 0; }
+        if (binding.lifecycle === 'retired') { const replay = binding.retiredReason === reason ? 2 : 0; leaveTicketOperation(); return replay; }
+        if (binding.lifecycle !== 'active') { leaveTicketOperation(); return 0; }
+        const state = binding.owner;
         if (state.pending !== null || state.activeSessionId !== binding.sessionId || state.fence !== binding.activateFence || state.generation !== binding.generation + ONE
-            || !setHas(state.reserved, binding.retireFence) || setHas(state.used, binding.retireFence)) { denyTicket(binding); return 0; }
-        if (!setDelete(state.reserved, binding.retireFence)) { denyTicket(binding); return 0; }
-        setAdd(state.used, binding.retireFence);
-    } catch { denyTicket(binding); return 0; }
+            || !setHas(state.reserved, binding.retireFence) || setHas(state.used, binding.retireFence) || ticketOperationPoisoned) throw new Error('ticket denied');
+        removedReservation = true; if (!setDelete(state.reserved, binding.retireFence)) throw new Error('ticket denied');
+        if (ticketOperationPoisoned) throw new Error('ticket denied');
+        addedUsed = true; setAdd(state.used, binding.retireFence); if (ticketOperationPoisoned) throw new Error('ticket denied');
+    } catch {
+        if (binding && (binding.lifecycle === 'active' || binding.lifecycle === 'prepared')) {
+            const preserveActive = binding.lifecycle === 'active' && ticketOperationPoisoned;
+            if (addedUsed) try { setDelete(binding.owner.used, binding.retireFence); } catch { /* fail closed */ }
+            if (preserveActive && removedReservation) try { setAdd(binding.owner.reserved, binding.retireFence); } catch { /* fail closed */ }
+            if (!preserveActive) denyTicket(binding);
+        }
+        leaveTicketOperation(); return 0;
+    }
+    const state = binding.owner;
     binding.retiredReason = reason;
     state.activeSessionId = null;
     state.pending = null;
     state.fence = binding.retireFence;
     state.generation = binding.generation + ONE + ONE;
     binding.lifecycle = 'retired';
+    ticketOperationActive = false; ticketOperationPoisoned = false;
     return 1;
 }
 export const WEB_AUTH_PENDING_TTL_MS = PENDING_TTL_MS;
