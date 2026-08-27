@@ -71,8 +71,7 @@ function assertCanonicalProductionImporter(files: readonly string[], target: str
     assert.equal(realpathSync(target), realTarget, 'the canonical module must resolve to one realpath');
     const importPattern = new RegExp(`(?:from\\s*['\"][^'\"]*${TARGET_BASENAME}|import\\s*\\(\\s*['\"][^'\"]*${TARGET_BASENAME}|export\\s+(?:\\*|\\{[^}]*\\})\\s+from\\s*['\"][^'\"]*${TARGET_BASENAME}|require\\(\\s*['\"][^'\"]*${TARGET_BASENAME})`, 'u');
     const importers = files.filter((file) => realpathSync(file) !== realTarget && importPattern.test(readFileSync(file, 'utf8')));
-    assert.deepEqual(importers.map((file) => realpathSync(file)), [realpathSync(EXCHANGE)],
-        `only the canonical A3a3 exchange may import the sink: ${importers.join(', ')}`);
+    assert.deepEqual(importers, [], `the legacy A3a3 sink must have no production importer: ${importers.join(', ')}`);
     assert.doesNotMatch(readFileSync(path.join(ROOT, 'package.json'), 'utf8'), new RegExp(TARGET_BASENAME, 'u'));
 }
 
@@ -157,17 +156,17 @@ test('rejects accessor descriptors despite Object.prototype field pollution', ()
     assert.equal(reads, 0); assert.ok(intakeDocumentSynthesisA3a2SealedEvidence(evidence('Synthetic descriptor recovery')));
 });
 
-test('keeps the canonical module deep-internal with one realpath and one fixed production importer', () => {
+test('keeps the canonical legacy module deep-internal with one realpath and no production importer', () => {
     const production = sourceFiles(ROOT);
     assertCanonicalProductionImporter(production, TARGET);
     const symbolReferences = sourceFiles(ROOT, true).filter((file) => readFileSync(file, 'utf8').includes('intakeDocumentSynthesisA3a2SealedEvidence')).map((file) => realpathSync(file)).sort();
-    assert.deepEqual(symbolReferences, [realpathSync(TARGET), realpathSync(TEST), realpathSync(EXCHANGE), realpathSync(EXCHANGE_TEST)].sort(),
-        'only the canonical sink, allowlisted tests, and the fixed A3a3 exchange may name the sink');
+    assert.deepEqual(symbolReferences, [realpathSync(TARGET), realpathSync(TEST), realpathSync(EXCHANGE_TEST)].sort(),
+        'only the canonical sink and allowlisted tests may name the legacy sink');
     const directory = mkdtempSync(path.join(os.tmpdir(), 'mediflow-a3b1-import-graph-'));
     try {
         const secondImporter = path.join(directory, 'second-production-importer.ts');
         writeFileSync(secondImporter, `import * as intake from './${TARGET_BASENAME}'; void intake;\n`);
-        assert.throws(() => assertCanonicalProductionImporter([TARGET, EXCHANGE, secondImporter], TARGET), /only the canonical A3a3 exchange/u);
+        assert.throws(() => assertCanonicalProductionImporter([TARGET, EXCHANGE, secondImporter], TARGET), /must have no production importer/u);
     } finally {
         rmSync(directory, { recursive: true, force: true });
     }

@@ -20,7 +20,7 @@ const NODE_24 = [process.env.MEDIFLOW_STRIP_TYPES_NODE, process.execPath, path.j
 
 if (!NODE_24) throw new Error('Document Synthesis attachment capture tests require Node 24.19.0.');
 
-test('exports only the fixed capture, projection-ingest, owner-seal, handoff, and A3a3 exchange boundaries', () => {
+test('exports only the fixed capture, projection-ingest, owner-seal, handoff, and A3c3 exchange boundaries', () => {
     const source = readFileSync(TARGET, 'utf8');
     assert.equal((source.match(/^export /gmu) ?? []).length, 5);
     assert.match(source, /export async function captureDocumentSynthesisAuthenticatedAttachment/u);
@@ -60,7 +60,9 @@ const makeFencedContext = () => { const base = makeContext('patient.synthetic.ca
   snapshotSelectionEpoch: (session) => base.owner.snapshotSelectionEpoch(session),
   snapshotReviewContextEpoch: (session) => base.owner.snapshotReviewContextEpoch(session) + (process.env.FENCE_EXCHANGE === 'review' ? 1 : 0),
   mintDocumentSynthesisAttachmentCapturePort: (session) => base.owner.mintDocumentSynthesisAttachmentCapturePort(session),
-  mintDocumentSynthesisSealedEvidencePort: (session) => base.owner.mintDocumentSynthesisSealedEvidencePort(session),
+  mintDocumentSynthesisSealedEvidenceDisposalPort: (session) => base.owner.mintDocumentSynthesisSealedEvidenceDisposalPort(session),
+  mintDocumentSynthesisExecutionCapsulePort: (session) => base.owner.mintDocumentSynthesisExecutionCapsulePort(session),
+  mintDocumentSynthesisExecutionCapsuleIdentityPort: (session) => base.owner.mintDocumentSynthesisExecutionCapsuleIdentityPort(session),
   withLeaseCriticalSection(session, callback) {
     if (process.env.FENCE_EXCHANGE === 'expiry') throw new ServerSessionProjectionOwnerError('lease_expired');
     if (process.env.FENCE_EXCHANGE === 'throw') throw new Error('synthetic P4 denial');
@@ -143,9 +145,9 @@ let handleTraps = 0; const boxed = Object(handoffResult.handoffHandle); const pr
 for (const hostileHandle of [boxed, proxied, Object.freeze({ then() { handleTraps += 1; } })]) assert.equal(await exchange(hostileHandle), null);
 assert.equal(handleTraps, 0); assert.equal(await exchange('dsh_' + 'f'.repeat(32)), null, 'a well-formed forged handle is denied');
 assert.equal(await exchange(handoffResult.handoffHandle), null, 'another authenticated session cannot consume the handoff');
-const authenticSourceSet = await exchange(handoffResult.handoffHandle); assert.ok(authenticSourceSet);
-assert.equal(Object.getPrototypeOf(authenticSourceSet), null); assert.equal(Object.isFrozen(authenticSourceSet), true); assert.deepEqual(Reflect.ownKeys(authenticSourceSet), []);
-assert.equal('providerProjection' in authenticSourceSet, false); assert.equal('sourceSetDigestSha256' in authenticSourceSet, false); assert.equal('then' in authenticSourceSet, false);
+const capsuleIdentity = await exchange(handoffResult.handoffHandle); assert.ok(capsuleIdentity);
+assert.equal(Object.getPrototypeOf(capsuleIdentity), null); assert.equal(Object.isFrozen(capsuleIdentity), true); assert.deepEqual(Reflect.ownKeys(capsuleIdentity), []);
+assert.equal('providerProjection' in capsuleIdentity, false); assert.equal('sourceSetDigestSha256' in capsuleIdentity, false); assert.equal('then' in capsuleIdentity, false);
 assert.equal(await exchange(handoffResult.handoffHandle), null, 'the exact handoff is one-use');
 assert.deepEqual({ ...await handoff(sourceSetSeal.sourceSetSealHandle) }, { status: 'denied', code: 'unavailable', handoffHandle: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
 assert.deepEqual({ ...await seal(projection.projectionHandle) }, { status: 'denied', code: 'unavailable', sourceSetSealHandle: null });
@@ -213,57 +215,6 @@ await new Promise((resolve) => setImmediate(resolve)); assert.deepEqual(unhandle
     }
 });
 
-test('burns the handoff before canonical intake denial, throw, or same-handle reentry', () => {
-    for (const mode of ['deny', 'throw', 'reenter']) {
-        const directory = mkdtempSync(path.join(os.tmpdir(), `mediflow-a3a3-${mode}-`));
-        const mockAuth = path.join(directory, 'mock-server-auth.cjs'); const mockDb = path.join(directory, 'mock-db.cjs');
-        const mockSink = path.join(directory, 'mock-sink.cjs'); const worker = path.join(directory, 'exchange.cjs');
-        try {
-            writeFileSync(mockAuth, `
-const { createSession } = require(${JSON.stringify(path.join(ROOT, 'lib/security/server-session.ts'))});
-const { createServerSessionProjectionOwnerRegistry } = require(${JSON.stringify(path.join(ROOT, 'lib/security/server-session-projection-owner.ts'))});
-const session = createSession({ id: 'user.synthetic.a3a3', username: ['a3', 'a3'].join(''), role: 'admin' }, 'web');
-const owner = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze({ ...pair }) }).acquire(session);
-owner.issueSelection({ expectedEpoch: 0, patientId: 'patient.synthetic.a3a3', ambulatoryId: 'ambulatory.synthetic.a3a3' });
-module.exports = { acquireAuthenticatedWebSessionProjectionOwnerContext: async () => Object.freeze({ session, owner }) };
-`);
-            writeFileSync(mockDb, `module.exports = { dbServer: { get: () => ({ documentSourceRef: '${'a'.repeat(64)}', documentRevision: 1, documentFreshnessEpoch: 1 }) } };`);
-            writeFileSync(mockSink, `
-module.exports = { intakeDocumentSynthesisA3a2SealedEvidence() {
-  globalThis.__A3A3_SINK_CALLS = (globalThis.__A3A3_SINK_CALLS ?? 0) + 1;
-  if (${JSON.stringify(mode)} === 'throw') throw new Error('synthetic sink throw');
-  if (${JSON.stringify(mode)} === 'reenter') globalThis.__a3a3Inner = globalThis.__a3a3Exchange(globalThis.__a3a3Handle);
-  return null;
-} };
-`);
-            writeFileSync(worker, `
-(async () => {
-const assert = require('node:assert/strict'); const { registerHooks } = require('node:module'); const { pathToFileURL } = require('node:url');
-const target = ${JSON.stringify(TARGET)}; const auth = ${JSON.stringify(mockAuth)}; const db = ${JSON.stringify(mockDb)}; const sink = ${JSON.stringify(mockSink)};
-registerHooks({ resolve(specifier, context, nextResolve) {
-  if (context.parentURL === pathToFileURL(target).href && specifier === '../../security/server-auth') return { shortCircuit: true, url: pathToFileURL(auth).href, format: 'commonjs' };
-  if (context.parentURL === pathToFileURL(target).href && specifier === '../../db-server') return { shortCircuit: true, url: pathToFileURL(db).href, format: 'commonjs' };
-  if (context.parentURL === pathToFileURL(target).href && specifier === './document-synthesis-authentic-source-set-intake') return { shortCircuit: true, url: pathToFileURL(sink).href, format: 'commonjs' };
-  return nextResolve(specifier, context);
-} });
-const api = require(target); const unhandled = []; process.on('unhandledRejection', (value) => unhandled.push(value));
-const capture = await api.captureDocumentSynthesisAuthenticatedAttachment({ attachmentId: 'attachment.synthetic.a3a3' });
-const projection = await api.ingestDocumentSynthesisAuthenticatedAttachmentProjection(capture.captureHandle, { sourceKind: 'native_text', sourceText: 'Synthetic A3a3' });
-const seal = await api.sealDocumentSynthesisAuthenticatedAttachmentSourceSet(projection.projectionHandle);
-const handoff = await api.handoffDocumentSynthesisAuthenticatedAttachmentSourceSet(seal.sourceSetSealHandle); assert.equal(handoff.status, 'available');
-globalThis.__a3a3Exchange = api.exchangeDocumentSynthesisAuthenticatedAttachmentHandoff; globalThis.__a3a3Handle = handoff.handoffHandle;
-assert.equal(await api.exchangeDocumentSynthesisAuthenticatedAttachmentHandoff(handoff.handoffHandle), null);
-if (${JSON.stringify(mode)} === 'reenter') assert.equal(await globalThis.__a3a3Inner, null);
-assert.equal(await api.exchangeDocumentSynthesisAuthenticatedAttachmentHandoff(handoff.handoffHandle), null);
-await new Promise((resolve) => setImmediate(resolve)); assert.equal(globalThis.__A3A3_SINK_CALLS, 1); assert.deepEqual(unhandled, []);
-})().catch((error) => { console.error(error); process.exitCode = 1; });
-`);
-            const child: ReturnType<typeof spawnSync> = spawnSync(NODE_24, ['--experimental-strip-types', '--import', RUNNER, worker], { cwd: ROOT, encoding: 'utf8' });
-            assert.equal(child.status, 0, `${mode}\n${child.stdout}\n${child.stderr}`);
-        } finally { rmSync(directory, { recursive: true, force: true }); }
-    }
-});
-
 test('post-callback fence failures leave no projection publication or fixed-entropy collision', () => {
     for (const mode of ['clock', 'currentness', 'expiry', 'channel']) {
         const directory = mkdtempSync(path.join(os.tmpdir(), `mediflow-i1b2-fence-${mode}-`));
@@ -328,7 +279,7 @@ test('captures every runtime intrinsic before the boundary is called', () => {
     const source = readFileSync(TARGET, 'utf8');
     for (const token of [
         'ObjectAssign = Object.assign', 'ObjectHasOwn = Object.hasOwn', 'ArrayIsArray = Array.isArray',
-        'NumberIsSafeInteger = Number.isSafeInteger', 'MapConstructor = Map', 'WeakMapConstructor = WeakMap',
+        'NumberIsSafeInteger = Number.isSafeInteger', 'MapConstructor = Map', 'WeakMapConstructor = WeakMap', 'mapForEach',
         'DbGet = dbServer.get.bind(dbServer)', 'Entropy = randomBytes', "'input_invalid'", "'unavailable'",
         'reviewOnly: true', "applyPolicy: 'none'", 'mintDocumentSynthesisAttachmentCapturePort', 'observeCurrentness',
         'attachmentCapturePort', 'attachmentCaptureCapability', 'resolveDocumentSynthesisHostProjection', "'dsp_'", 'mapDelete', 'retain(', 'sameCurrentness',
@@ -394,7 +345,7 @@ await Promise.resolve();
     }
 });
 
-test('post-begin entropy or DB failures burn the owner grant without a dsh record', () => {
+test('post-burn entropy or DB failures discard the owner seal without a dsh record', () => {
     for (const mode of ['entropy', 'db']) {
         const directory = mkdtempSync(path.join(os.tmpdir(), `mediflow-a3a2-post-begin-${mode}-`));
         const mockAuth = path.join(directory, 'mock-server-auth.cjs'); const mockDb = path.join(directory, 'mock-db.cjs'); const mockCrypto = path.join(directory, 'mock-crypto.mjs'); const worker = path.join(directory, 'handoff.cjs');
@@ -408,7 +359,7 @@ base.issueSelection({ expectedEpoch: 0, patientId: 'patient.synthetic.postbegin'
 module.exports = { acquireAuthenticatedWebSessionProjectionOwnerContext: async () => Object.freeze({ session, owner: base }) };
 `);
             writeFileSync(mockDb, `
-let reads = 0; module.exports = { dbServer: { get() { reads += 1; if (${JSON.stringify(mode)} === 'db' && reads === 3) throw new Error('db'); return { documentSourceRef: '${'f'.repeat(64)}', documentRevision: 1, documentFreshnessEpoch: 1 }; } } };
+let reads = 0; module.exports = { dbServer: { get() { reads += 1; if (${JSON.stringify(mode)} === 'db' && reads === 3) throw new Error('db'); return { documentSourceRef: reads <= 3 ? '${'f'.repeat(64)}' : '${'0'.repeat(64)}', documentRevision: 1, documentFreshnessEpoch: 1 }; } } };
 `);
             writeFileSync(mockCrypto, `export const randomBytes = () => { if (${JSON.stringify(mode)} === 'entropy' && process.env.THROW_A3A2_ENTROPY === '1') throw new Error('entropy'); return new Uint8Array(16).fill(77); };`);
             writeFileSync(worker, `
@@ -419,6 +370,8 @@ registerHooks({ resolve(specifier, context, nextResolve) { if (context.parentURL
 const { captureDocumentSynthesisAuthenticatedAttachment: capture, ingestDocumentSynthesisAuthenticatedAttachmentProjection: ingest, sealDocumentSynthesisAuthenticatedAttachmentSourceSet: seal, handoffDocumentSynthesisAuthenticatedAttachmentSourceSet: handoff } = require(target); const unhandled = []; process.on('unhandledRejection', (reason) => unhandled.push(reason));
 const captured = await capture({ attachmentId: 'attachment.synthetic.postbegin' }); assert.equal(captured.status, 'available'); const projected = await ingest(captured.captureHandle, { sourceKind: 'native_text', sourceText: 'Synthetic post begin' }); assert.equal(projected.status, 'available'); const sealed = await seal(projected.projectionHandle); assert.equal(sealed.status, 'available'); if (${JSON.stringify(mode)} === 'entropy') process.env.THROW_A3A2_ENTROPY = '1'; const denied = await handoff(sealed.sourceSetSealHandle);
 assert.deepEqual({ ...denied }, { status: 'denied', code: 'unavailable', handoffHandle: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' }); assert.equal((await handoff(sealed.sourceSetSealHandle)).status, 'denied'); await new Promise((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
+delete process.env.THROW_A3A2_ENTROPY; const retryCapture = await capture({ attachmentId: 'attachment.synthetic.postbegin.retry' }); const retryProjection = await ingest(retryCapture.captureHandle, { sourceKind: 'native_text', sourceText: 'Synthetic retry' }); const retrySeal = await seal(retryProjection.projectionHandle); const retryHandoff = await handoff(retrySeal.sourceSetSealHandle);
+assert.equal(retryHandoff.handoffHandle, 'dsh_' + '4d'.repeat(16), 'a denied pre-publication handoff leaves no fixed-entropy collision');
 })().catch((error) => { console.error(error); process.exitCode = 1; });
 `);
             const child: ReturnType<typeof spawnSync> = spawnSync(NODE_24, ['--experimental-strip-types', '--import', RUNNER, worker], { cwd: ROOT, encoding: 'utf8' });
@@ -427,26 +380,28 @@ assert.deepEqual({ ...denied }, { status: 'denied', code: 'unavailable', handoff
     }
 });
 
-test('burns dss before the A3a2 handoff, rereads host currentness immediately before one final consume, and exposes no evidence', () => {
+test('burns dss before A3a2 currentness, stores only the exact seal and disposal port, and exposes no evidence', () => {
     const source = readFileSync(TARGET, 'utf8');
     const handoff = source.slice(source.indexOf('export async function handoffDocumentSynthesisAuthenticatedAttachmentSourceSet'));
 
-    assert.ok(handoff.indexOf('mapDelete(broker.records, sourceSetSealHandle)') < handoff.indexOf('mintDocumentSynthesisSealedEvidencePort'));
+    assert.ok(handoff.indexOf('mapDelete(broker.records, sourceSetSealHandle)') < handoff.indexOf('DbGet('));
     assert.equal((handoff.match(/DbGet\(/gu) ?? []).length, 1);
-    assert.equal((handoff.match(/\.consume\(/gu) ?? []).length, 1);
-    assert.ok(handoff.indexOf('const latest = currentness(DbGet(') < handoff.indexOf('const evidence = prepared.port.consume(prepared.grant)'));
-    assert.ok(handoff.indexOf('const evidence = prepared.port.consume(prepared.grant)') < handoff.indexOf('const state = sealed<HandoffRecord>({ selected: true'));
-    assert.ok(handoff.indexOf('const state = sealed<HandoffRecord>({ selected: true') < handoff.indexOf('broker.publish(prepared.handoffHandle, state)'));
-    assert.doesNotMatch(handoff, /evidence: null|mapDelete\(broker\.records, prepared\.handoffHandle\)/u);
-    assert.doesNotMatch(handoff, /providerProjection|sourceSetDigestSha256|raw32/u);
+    assert.equal((handoff.match(/\.begin\(|\.consume\(/gu) ?? []).length, 0);
+    assert.ok(handoff.indexOf('mintDocumentSynthesisSealedEvidenceDisposalPort') < handoff.indexOf('DbGet('));
+    assert.ok(handoff.indexOf('const state = sealed<HandoffRecord>({ selected: true') < handoff.indexOf('broker.publish(prepared.handoffHandle, prepared.state)'));
+    assert.match(handoff, /seal: record\.seal, disposal/u);
+    assert.match(source, /mapForEach\(records,[\s\S]*?document_synthesis_attachment_handoff[\s\S]*?discard\(record\)/u);
+    assert.doesNotMatch(handoff, /DocumentSynthesisSealedEvidencePort|evidence: null|providerProjection|sourceSetDigestSha256|raw32/u);
 });
 
-test('validates the session-scoped A3a3 record, burns dsh, then tail-calls the only authentic intake', () => {
+test('burns dsh before A3c1 promotion and A3c2 retention, then returns the identity directly', () => {
     const source = readFileSync(TARGET, 'utf8');
     const exchange = source.slice(source.indexOf('export async function exchangeDocumentSynthesisAuthenticatedAttachmentHandoff'));
-    assert.equal((exchange.match(/intakeDocumentSynthesisA3a2SealedEvidence\(/gu) ?? []).length, 1);
+    assert.equal((source.match(/intakeDocumentSynthesisA3a2SealedEvidence/gu) ?? []).length, 0);
     assert.ok(exchange.indexOf("record.scope !== 'document_synthesis_attachment_handoff'") < exchange.indexOf('mapDelete(broker.records, handoffHandle)'));
     assert.ok(exchange.indexOf('mapDelete(broker.records, handoffHandle)') < exchange.indexOf('withLeaseCriticalSection'));
-    assert.ok(exchange.indexOf('mapDelete(broker.records, handoffHandle)') < exchange.indexOf('return intakeDocumentSynthesisA3a2SealedEvidence(record.evidence)'));
+    assert.ok(exchange.indexOf('mapDelete(broker.records, handoffHandle)') < exchange.indexOf('mintDocumentSynthesisExecutionCapsulePort'));
+    assert.ok(exchange.indexOf('const capsule = capsulePort.promote(record.seal)') < exchange.indexOf('return identityPort.retain(capsule)'));
+    assert.doesNotMatch(exchange.slice(exchange.indexOf('mapDelete(broker.records, handoffHandle)')), /\bawait\b/u);
     assert.doesNotMatch(exchange, /providerProjection|sourceSetDigestSha256|resolver|legacy|factory|setTimeout|setImmediate|queueMicrotask/u);
 });

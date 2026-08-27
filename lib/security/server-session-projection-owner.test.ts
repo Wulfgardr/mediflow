@@ -462,12 +462,13 @@ test('Document Synthesis sealed evidence disposal avoids ambient callbacks and p
 
 test('Document Synthesis sealed evidence disposal remains private to the owner before A3c3', () => {
     const ownerSource = new URL('./server-session-projection-owner.ts', import.meta.url);
+    const exchangeSource = new URL('../ai-providers/fabric/document-synthesis-authenticated-attachment-capture.ts', import.meta.url);
     const root = new URL('../../', import.meta.url);
     const references = ['app', 'components', 'lib', 'packages', 'scripts'].flatMap((directory) => {
         try { return productionTypeScriptFiles(new URL(`${directory}/`, root)); } catch { return []; }
     }).filter((file) => readFileSync(file, 'utf8').includes('DocumentSynthesisSealedEvidenceDisposalPort'))
         .map((file) => file.href).sort();
-    assert.deepEqual(references, [ownerSource.href]);
+    assert.deepEqual(references, [exchangeSource.href, ownerSource.href].sort());
 });
 
 function documentSynthesisExecutionCapsuleIdentityRecord(onClock: (() => void) | null = null) {
@@ -606,12 +607,13 @@ test('Document Synthesis execution capsule identity ignores ambient then and poi
 
 test('Document Synthesis execution capsule identity remains private to the owner before A3c3', () => {
     const ownerSource = new URL('./server-session-projection-owner.ts', import.meta.url);
+    const exchangeSource = new URL('../ai-providers/fabric/document-synthesis-authenticated-attachment-capture.ts', import.meta.url);
     const root = new URL('../../', import.meta.url);
     const references = ['app', 'components', 'lib', 'packages', 'scripts'].flatMap((directory) => {
         try { return productionTypeScriptFiles(new URL(`${directory}/`, root)); } catch { return []; }
     }).filter((file) => readFileSync(file, 'utf8').includes('DocumentSynthesisExecutionCapsuleIdentity'))
         .map((file) => file.href).sort();
-    assert.deepEqual(references, [ownerSource.href]);
+    assert.deepEqual(references, [exchangeSource.href, ownerSource.href].sort());
 });
 
 test('Document Synthesis execution capsule rejects hostile, foreign, and drifted seals without observing them', () => {
