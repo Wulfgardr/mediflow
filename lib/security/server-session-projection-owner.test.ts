@@ -1,7 +1,7 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { afterEach, test } from 'node:test';
 
 import {
@@ -23,11 +23,11 @@ function session(channel: ServerSession['authChannel'] = 'web') {
     return createSession(USER, channel);
 }
 
-function ownerWithSelection(now = 1_000) {
+function ownerWithSelection(now = 1_000, onClock: (() => void) | null = null) {
     let clock = now;
     let entropy = 0;
     const registry = createServerSessionProjectionOwnerRegistry({
-        clock: () => clock,
+        clock: () => { onClock?.(); return clock; },
         entropy: () => Uint8Array.from({ length: 16 }, (_, index) => (entropy += 1) + index),
         resolve: (_session, pair) => Object.freeze({ ...pair }),
     });
@@ -43,6 +43,14 @@ function currentness(documentRevision = 1, documentFreshnessEpoch = 1, documentS
 
 function projection(sourceKind: 'native_text' | 'ocr_text' = 'native_text') {
     return Object.freeze({ sourceKind, sourceText: 'Synthetic source.' });
+}
+
+function productionTypeScriptFiles(directory: URL): URL[] {
+    return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+        const target = new URL(`${entry.name}${entry.isDirectory() ? '/' : ''}`, directory);
+        if (entry.isDirectory()) return productionTypeScriptFiles(target);
+        return /\.(?:[cm]?[jt]sx?)$/u.test(entry.name) && !/\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(entry.name) ? [target] : [];
+    });
 }
 
 test('keeps authentic owner identity private to the registry', () => {
@@ -350,13 +358,20 @@ test('Document Synthesis sealed evidence burns at begin after a later allocation
     assert.equal(revoked.owner.mintDocumentSynthesisSealedEvidencePort(revoked.value).begin(revokedSeal), null);
 });
 
-function sealedDocumentSynthesisRecord() {
-    const fixture = ownerWithSelection(); const capturePort = fixture.owner.mintDocumentSynthesisAttachmentCapturePort(fixture.value);
+function sealedDocumentSynthesisRecord(onClock: (() => void) | null = null) {
+    const fixture = ownerWithSelection(1_000, onClock); const capturePort = fixture.owner.mintDocumentSynthesisAttachmentCapturePort(fixture.value);
     const capture = capturePort.observeCurrentness(currentness()); assert.ok(capture);
     const grant = capturePort.begin(capture); assert.ok(grant);
     const retained = capturePort.retain(Object.freeze({ grant, observedCurrentness: currentness(), projection: projection() })); assert.ok(retained);
     const seal = capturePort.sealRetainedProjection(retained); assert.ok(seal);
     return { ...fixture, capturePort, seal, capsules: fixture.owner.mintDocumentSynthesisExecutionCapsulePort(fixture.value) };
+}
+
+function documentSynthesisExecutionCapsuleIdentityRecord(onClock: (() => void) | null = null) {
+    const fixture = sealedDocumentSynthesisRecord(onClock);
+    const capsule = fixture.capsules.promote(fixture.seal); assert.ok(capsule);
+    return { ...fixture, capsule,
+        identities: fixture.owner.mintDocumentSynthesisExecutionCapsuleIdentityPort(fixture.value) };
 }
 
 test('Document Synthesis execution capsule promotes one authentic seal into a frozen zero-field inert value', () => {
@@ -369,6 +384,131 @@ test('Document Synthesis execution capsule promotes one authentic seal into a fr
     assert.equal(JSON.stringify(capsule), '{}'); assertNoBigIntInDescriptors([capsules, capsule]);
     assert.equal(capsules.promote(seal), null); assert.equal(capsules.promote(capsule), null);
     assert.equal(owner.mintDocumentSynthesisSealedEvidencePort(value).begin(seal), null);
+});
+
+test('Document Synthesis execution capsule identity retains and consumes one exact capsule reference', () => {
+    const record = documentSynthesisExecutionCapsuleIdentityRecord();
+    assert.equal(Object.getPrototypeOf(record.identities), null); assert.equal(Object.isFrozen(record.identities), true);
+    assert.deepEqual(Object.keys(record.identities), ['retain', 'consume']);
+    const token = record.identities.retain(record.capsule); assert.ok(token);
+    assert.equal(Object.getPrototypeOf(token), null); assert.equal(Object.isFrozen(token), true);
+    assert.deepEqual(Object.keys(token), []); assert.deepEqual(Object.getOwnPropertySymbols(token), []);
+    assert.equal(JSON.stringify(token), '{}'); assertNoBigIntInDescriptors([record.identities, token]);
+    assert.equal(record.identities.retain(record.capsule), null);
+    assert.equal(record.identities.consume(token), record.capsule);
+    assert.equal(record.identities.consume(token), null);
+});
+
+test('Document Synthesis execution capsule identity rejects forged, foreign, and hostile values without observation', () => {
+    const record = documentSynthesisExecutionCapsuleIdentityRecord(); let reads = 0; let traps = 0;
+    const proxy = new Proxy(record.capsule, { get() { traps += 1; throw new Error('synthetic trap'); },
+        ownKeys() { traps += 1; throw new Error('synthetic trap'); } });
+    const accessor = Object.freeze(Object.defineProperty({}, 'capsule', { enumerable: true, get() { reads += 1; return record.capsule; } }));
+    const nonEnumerable = Object.freeze(Object.defineProperty({}, 'capsule', { enumerable: false, value: record.capsule }));
+    const symbol = Object.freeze({ [Symbol('capsule')]: record.capsule });
+    const thenable = Object.freeze(Object.defineProperty({}, 'then', { enumerable: true, get() { reads += 1; return () => undefined; } }));
+    for (const forged of [null, Object.freeze({ ...record.capsule }), structuredClone(record.capsule),
+        Object.freeze(Object.create(record.capsule)), proxy, accessor, nonEnumerable, symbol, thenable]) {
+        assert.equal(record.identities.retain(forged), null);
+    }
+    const foreign = documentSynthesisExecutionCapsuleIdentityRecord(); assert.equal(foreign.identities.retain(record.capsule), null);
+    const token = record.identities.retain(record.capsule); assert.ok(token);
+    const tokenProxy = new Proxy(token, { get() { traps += 1; throw new Error('synthetic trap'); } });
+    for (const forged of [Object.freeze({ ...token }), structuredClone(token), tokenProxy, accessor, nonEnumerable, symbol, thenable]) {
+        assert.equal(record.identities.consume(forged), null);
+    }
+    assert.equal(reads, 0); assert.equal(traps, 0); assert.equal(record.identities.consume(token), record.capsule);
+});
+
+test('Document Synthesis execution capsule identity burns on currentness, lineage, selection, and session drift', () => {
+    const source = documentSynthesisExecutionCapsuleIdentityRecord(); const sourceToken = source.identities.retain(source.capsule); assert.ok(sourceToken);
+    assert.ok(source.capturePort.observeCurrentness(currentness(2, 2))); assert.equal(source.identities.consume(sourceToken), null);
+
+    const lineage = documentSynthesisExecutionCapsuleIdentityRecord(); const lineageToken = lineage.identities.retain(lineage.capsule); assert.ok(lineageToken);
+    const lineagePort = lineage.owner.mintDocumentSynthesisSourceLineagePort(lineage.value);
+    const lineageGrant = lineagePort.open(); assert.ok(lineageGrant); const lineageCapability = lineagePort.verify(lineageGrant); assert.ok(lineageCapability);
+    assert.equal(lineagePort.observeRevocation(lineageCapability), true); assert.equal(lineage.identities.consume(lineageToken), null);
+
+    const selection = documentSynthesisExecutionCapsuleIdentityRecord(); const selectionToken = selection.identities.retain(selection.capsule); assert.ok(selectionToken);
+    selection.owner.issueSelection({ expectedEpoch: 1, ...PAIR }); assert.equal(selection.identities.consume(selectionToken), null);
+    const freshPort = selection.owner.mintDocumentSynthesisExecutionCapsuleIdentityPort(selection.value);
+    assert.equal(freshPort.retain(selection.capsule), null, 'a new post-reselection port cannot adopt the old capsule');
+    const unclaimed = documentSynthesisExecutionCapsuleIdentityRecord(); unclaimed.owner.issueSelection({ expectedEpoch: 1, ...PAIR });
+    const postReselection = unclaimed.owner.mintDocumentSynthesisExecutionCapsuleIdentityPort(unclaimed.value);
+    assert.equal(postReselection.retain(unclaimed.capsule), null, 'an unclaimed old capsule remains bound to its original selection');
+    const expiry = documentSynthesisExecutionCapsuleIdentityRecord(); const expiryToken = expiry.identities.retain(expiry.capsule); assert.ok(expiryToken);
+    expiry.setClock(expiry.value.expiresAt); assert.equal(expiry.identities.consume(expiryToken), null);
+    const logout = documentSynthesisExecutionCapsuleIdentityRecord(); const logoutToken = logout.identities.retain(logout.capsule); assert.ok(logoutToken);
+    deleteSession(logout.value.id); assert.equal(logout.identities.consume(logoutToken), null);
+    const disposed = documentSynthesisExecutionCapsuleIdentityRecord(); const disposedToken = disposed.identities.retain(disposed.capsule); assert.ok(disposedToken);
+    disposed.owner.dispose(); assert.equal(disposed.identities.consume(disposedToken), null);
+
+    const foreign = documentSynthesisExecutionCapsuleIdentityRecord(); const foreignToken = foreign.identities.retain(foreign.capsule); assert.ok(foreignToken);
+    const other = documentSynthesisExecutionCapsuleIdentityRecord(); assert.equal(other.identities.consume(foreignToken), null);
+    assert.equal(foreign.identities.consume(foreignToken), foreign.capsule);
+    const restart = documentSynthesisExecutionCapsuleIdentityRecord(); const restartToken = restart.identities.retain(restart.capsule); assert.ok(restartToken);
+    deleteSession(restart.value.id); const restarted = documentSynthesisExecutionCapsuleIdentityRecord();
+    assert.equal(restarted.identities.consume(restartToken), null); assert.equal(restart.identities.consume(restartToken), null);
+    const channel = documentSynthesisExecutionCapsuleIdentityRecord(); const channelToken = channel.identities.retain(channel.capsule); assert.ok(channelToken);
+    channel.value.authChannel = 'native'; assert.equal(channel.identities.consume(channelToken), null); channel.value.authChannel = 'web';
+    assert.equal(channel.identities.retain(channel.capsule), null, 'denial terminalizes the exact A3c1 capsule');
+});
+
+test('Document Synthesis execution capsule identity poisons retain, consume, and disposal reentry without residue', () => {
+    let nested: (() => void) | null = null;
+    const retain = documentSynthesisExecutionCapsuleIdentityRecord(() => nested?.());
+    nested = () => { retain.identities.consume(Object.freeze(Object.create(null))); };
+    assert.equal(retain.identities.retain(retain.capsule), null); nested = null;
+    assert.equal(retain.identities.retain(retain.capsule), null);
+
+    const consume = documentSynthesisExecutionCapsuleIdentityRecord(() => nested?.());
+    const token = consume.identities.retain(consume.capsule); assert.ok(token);
+    nested = () => { consume.identities.retain(consume.capsule); };
+    assert.equal(consume.identities.consume(token), null); nested = null;
+    assert.equal(consume.identities.consume(token), null); assert.equal(consume.identities.retain(consume.capsule), null);
+
+    const disposal = documentSynthesisExecutionCapsuleIdentityRecord(() => nested?.());
+    const disposalToken = disposal.identities.retain(disposal.capsule); assert.ok(disposalToken);
+    nested = () => { disposal.owner.dispose(); };
+    assert.equal(disposal.identities.consume(disposalToken), null); nested = null;
+    assert.equal(disposal.identities.consume(disposalToken), null);
+});
+
+test('Document Synthesis execution capsule identity ignores ambient then and poisoned object registries', () => {
+    const record = documentSynthesisExecutionCapsuleIdentityRecord(); let reads = 0;
+    const descriptors = {
+        then: Object.getOwnPropertyDescriptor(Object.prototype, 'then'), create: Object.getOwnPropertyDescriptor(Object, 'create'),
+        freeze: Object.getOwnPropertyDescriptor(Object, 'freeze'), get: Object.getOwnPropertyDescriptor(WeakMap.prototype, 'get'),
+        set: Object.getOwnPropertyDescriptor(WeakMap.prototype, 'set'), remove: Object.getOwnPropertyDescriptor(WeakMap.prototype, 'delete'),
+        has: Object.getOwnPropertyDescriptor(WeakSet.prototype, 'has'), add: Object.getOwnPropertyDescriptor(WeakSet.prototype, 'add'),
+    };
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { reads += 1; return undefined; } });
+    Object.defineProperty(Object, 'create', { configurable: true, value() { throw new Error('synthetic create trap'); } });
+    Object.defineProperty(Object, 'freeze', { configurable: true, value() { throw new Error('synthetic freeze trap'); } });
+    for (const [prototype, method] of [[WeakMap.prototype, 'get'], [WeakMap.prototype, 'set'], [WeakMap.prototype, 'delete'],
+        [WeakSet.prototype, 'has'], [WeakSet.prototype, 'add']] as const) {
+        Object.defineProperty(prototype, method, { configurable: true, value() { throw new Error('synthetic registry trap'); } });
+    }
+    let token: unknown;
+    try { token = record.identities.retain(record.capsule); assert.ok(token); assert.equal(record.identities.consume(token), record.capsule); }
+    finally {
+        if (descriptors.then) Object.defineProperty(Object.prototype, 'then', descriptors.then); else delete (Object.prototype as { then?: unknown }).then;
+        Object.defineProperty(Object, 'create', descriptors.create!); Object.defineProperty(Object, 'freeze', descriptors.freeze!);
+        Object.defineProperty(WeakMap.prototype, 'get', descriptors.get!); Object.defineProperty(WeakMap.prototype, 'set', descriptors.set!);
+        Object.defineProperty(WeakMap.prototype, 'delete', descriptors.remove!); Object.defineProperty(WeakSet.prototype, 'has', descriptors.has!);
+        Object.defineProperty(WeakSet.prototype, 'add', descriptors.add!);
+    }
+    assert.equal(reads, 0);
+});
+
+test('Document Synthesis execution capsule identity remains private to the owner before A3c3', () => {
+    const ownerSource = new URL('./server-session-projection-owner.ts', import.meta.url);
+    const root = new URL('../../', import.meta.url);
+    const references = ['app', 'components', 'lib', 'packages', 'scripts'].flatMap((directory) => {
+        try { return productionTypeScriptFiles(new URL(`${directory}/`, root)); } catch { return []; }
+    }).filter((file) => readFileSync(file, 'utf8').includes('DocumentSynthesisExecutionCapsuleIdentity'))
+        .map((file) => file.href).sort();
+    assert.deepEqual(references, [ownerSource.href]);
 });
 
 test('Document Synthesis execution capsule rejects hostile, foreign, and drifted seals without observing them', () => {

@@ -167,6 +167,7 @@ export type ServerSessionProjectionOwner = Readonly<{
     mintDocumentSynthesisAttachmentCapturePort(session: ServerSession): DocumentSynthesisAttachmentCapturePort;
     mintDocumentSynthesisSealedEvidencePort(session: ServerSession): DocumentSynthesisSealedEvidencePort;
     mintDocumentSynthesisExecutionCapsulePort(session: ServerSession): DocumentSynthesisExecutionCapsulePort;
+    mintDocumentSynthesisExecutionCapsuleIdentityPort(session: ServerSession): DocumentSynthesisExecutionCapsuleIdentityPort;
     withLeaseCriticalSection<T>(session: ServerSession, callback: (selection: CanonicalPair) => T): T;
     dispose(): void;
 }>;
@@ -209,6 +210,12 @@ declare const documentSynthesisExecutionCapsuleRef: unique symbol;
 export type DocumentSynthesisExecutionCapsule = Readonly<{ readonly [documentSynthesisExecutionCapsuleRef]?: never }>;
 export type DocumentSynthesisExecutionCapsulePort = Readonly<{
     promote(value: unknown): DocumentSynthesisExecutionCapsule | null;
+}>;
+declare const documentSynthesisExecutionCapsuleIdentityRef: unique symbol;
+export type DocumentSynthesisExecutionCapsuleIdentity = Readonly<{ readonly [documentSynthesisExecutionCapsuleIdentityRef]?: never }>;
+export type DocumentSynthesisExecutionCapsuleIdentityPort = Readonly<{
+    retain(value: unknown): DocumentSynthesisExecutionCapsuleIdentity | null;
+    consume(value: unknown): DocumentSynthesisExecutionCapsule | null;
 }>;
 export type DocumentSynthesisAttachmentCurrentness = Readonly<{
     documentSourceRef: string; documentRevision: number; documentFreshnessEpoch: number;
@@ -380,8 +387,12 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 state: 'sealed' | 'begun' | 'promoted' | 'burned'; revoked: boolean; };
             const documentSynthesisSealedEvidence = new WeakMapConstructor<object, SealedEvidenceRecord>();
             const documentSynthesisSealCaptures = new WeakMapConstructor<object, Readonly<{ records: WeakMap<object, object>; seals: WeakSet<object> }>>();
-            type ExecutionCapsuleRecord = Readonly<{ sealedEvidence: DocumentSynthesisSealedEvidence }>;
+            type ExecutionCapsuleRecord = Readonly<{
+                sealedEvidence: SealedEvidenceRecord; selection: SelectionState; selectionEpoch: number; reviewContextEpoch: number;
+            }>;
             const documentSynthesisExecutionCapsules = new WeakMapConstructor<object, ExecutionCapsuleRecord>();
+            const claimedDocumentSynthesisExecutionCapsules = new WeakSetConstructor<object>();
+            const documentSynthesisExecutionCapsuleIdentities = new WeakMapConstructor<object, object>();
             let creating: SelectionState | null = null;
             let terminal = false;
             let unregisterOwner: (() => void) | null = null;
@@ -1042,9 +1053,74 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                                 || documentSynthesisLineage.revocationGeneration !== entry.lineageRevocationGeneration) { consume(entry); return null; }
                             const capsule = ObjectFreeze(ObjectCreate(null));
                             consume(entry);
-                            applyIntrinsic(weakMapSet, documentSynthesisExecutionCapsules, [capsule, ObjectFreeze({ sealedEvidence: entry })]);
+                            applyIntrinsic(weakMapSet, documentSynthesisExecutionCapsules, [capsule, ObjectFreeze({ sealedEvidence: entry,
+                                selection: boundSelection, selectionEpoch: boundSelectionEpoch, reviewContextEpoch: boundReviewContextEpoch })]);
                             return capsule as DocumentSynthesisExecutionCapsule;
                         } catch { return null; } finally { endLeasePortOperation(); }
+                    } });
+                    return ObjectFreeze(port);
+                } finally { endLeasePortOperation(); }
+            };
+            const mintDocumentSynthesisExecutionCapsuleIdentityPort = (presentedSession: ServerSession): DocumentSynthesisExecutionCapsuleIdentityPort => {
+                if (!beginLeasePortOperation()) return fail('selection_busy');
+                try {
+                    rejectLeaseCriticalSectionReentry(); requireCurrentSession(presentedSession);
+                    const boundSelection = selection; const boundSelectionEpoch = epoch; const boundReviewContextEpoch = reviewContextEpoch;
+                    if (!boundSelection) return fail('stale_selection');
+                    if (readClock() >= boundSelection.expiresAt) { expire(); return fail('lease_expired'); }
+                    if (selection !== boundSelection || epoch !== boundSelectionEpoch || reviewContextEpoch !== boundReviewContextEpoch
+                        || leasePortOperationPoisoned) return fail('stale_selection');
+                    const current = () => {
+                        if (terminal || presentedSession !== session || session.authChannel !== 'web' || selection !== boundSelection
+                            || epoch !== boundSelectionEpoch || reviewContextEpoch !== boundReviewContextEpoch || getSession(session.id) !== session) return false;
+                        let now: number; try { now = sources.clock(); } catch { return false; }
+                        return NumberIsFinite(now) && now < boundSelection.expiresAt && !terminal && presentedSession === session
+                            && session.authChannel === 'web' && getSession(session.id) === session && selection === boundSelection
+                            && epoch === boundSelectionEpoch && reviewContextEpoch === boundReviewContextEpoch;
+                    };
+                    const capsuleEntry = (value: unknown) => {
+                        if (typeof value !== 'object' || value === null || isProxy(value)) return null;
+                        return applyIntrinsic(weakMapGet, documentSynthesisExecutionCapsules, [value]) ?? null;
+                    };
+                    const entryIsCurrent = (entry: ExecutionCapsuleRecord) => {
+                        if (entry.selection !== boundSelection || entry.selectionEpoch !== boundSelectionEpoch
+                            || entry.reviewContextEpoch !== boundReviewContextEpoch) return false;
+                        const sealed = entry.sealedEvidence;
+                        const latest = getMapValue(documentSynthesisAttachmentCurrentness, sealed.currentness.documentSourceRef);
+                        return current() && !leasePortOperationPoisoned && !sealed.revoked && !documentSynthesisLineageTerminal
+                            && !!latest && !latest.terminal && latest.generation === sealed.currentnessGeneration
+                            && latest.documentRevision === sealed.currentness.documentRevision
+                            && latest.documentFreshnessEpoch === sealed.currentness.documentFreshnessEpoch
+                            && documentSynthesisLineage.nextSourceSetEpoch === sealed.nextSourceSetEpoch
+                            && documentSynthesisLineage.revocationGeneration === sealed.lineageRevocationGeneration;
+                    };
+                    const terminalize = (capsule: object) => {
+                        applyIntrinsic(weakMapDelete, documentSynthesisExecutionCapsules, [capsule]);
+                    };
+                    const port = ObjectCreate(null) as DocumentSynthesisExecutionCapsuleIdentityPort;
+                    ObjectDefineProperty(port, 'retain', { enumerable: true, value(this: unknown, value: unknown) {
+                        if (this !== port || !beginLeasePortOperation()) return null;
+                        try {
+                            const entry = capsuleEntry(value);
+                            if (!entry || hasOwnerIdentity(claimedDocumentSynthesisExecutionCapsules, value as object)) return null;
+                            if (!entryIsCurrent(entry)) { terminalize(value as object); return null; }
+                            const identity = ObjectFreeze(ObjectCreate(null));
+                            addOwnerIdentity(claimedDocumentSynthesisExecutionCapsules, value as object);
+                            applyIntrinsic(weakMapSet, documentSynthesisExecutionCapsuleIdentities, [identity, value as object]);
+                            return identity as DocumentSynthesisExecutionCapsuleIdentity;
+                        } finally { endLeasePortOperation(); }
+                    } });
+                    ObjectDefineProperty(port, 'consume', { enumerable: true, value(this: unknown, value: unknown) {
+                        if (this !== port || !beginLeasePortOperation()) return null;
+                        try {
+                            if (typeof value !== 'object' || value === null || isProxy(value)) return null;
+                            const capsule = applyIntrinsic(weakMapGet, documentSynthesisExecutionCapsuleIdentities, [value]) ?? null;
+                            if (!capsule) return null;
+                            applyIntrinsic(weakMapDelete, documentSynthesisExecutionCapsuleIdentities, [value]);
+                            const entry = capsuleEntry(capsule);
+                            if (!entry || !entryIsCurrent(entry)) { terminalize(capsule); return null; }
+                            return capsule as DocumentSynthesisExecutionCapsule;
+                        } finally { endLeasePortOperation(); }
                     } });
                     return ObjectFreeze(port);
                 } finally { endLeasePortOperation(); }
@@ -1062,7 +1138,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     && typeof value.control?.lock === 'function' && typeof value.control.revoke === 'function'
                     && typeof value.control.changeSelection === 'function';
             };
-            const owner: Omit<ServerSessionProjectionOwner, 'mintPatientInsightLeaseCommitPort' | 'mintOcrLeaseCommitPort' | 'mintDocumentSynthesisLeaseCommitPort' | 'mintTreatmentReasoningLeaseCommitPort' | 'mintDurableReviewCommitPort' | 'mintDocumentSynthesisSourceLineagePort' | 'mintDocumentSynthesisAttachmentCapturePort' | 'mintDocumentSynthesisSealedEvidencePort' | 'mintDocumentSynthesisExecutionCapsulePort'> = {
+            const owner: Omit<ServerSessionProjectionOwner, 'mintPatientInsightLeaseCommitPort' | 'mintOcrLeaseCommitPort' | 'mintDocumentSynthesisLeaseCommitPort' | 'mintTreatmentReasoningLeaseCommitPort' | 'mintDurableReviewCommitPort' | 'mintDocumentSynthesisSourceLineagePort' | 'mintDocumentSynthesisAttachmentCapturePort' | 'mintDocumentSynthesisSealedEvidencePort' | 'mintDocumentSynthesisExecutionCapsulePort' | 'mintDocumentSynthesisExecutionCapsuleIdentityPort'> = {
                 snapshotSelectionEpoch(presentedSession) {
                     if (terminal || presentedSession !== session || session.authChannel !== 'web' || peekSession(session.id) !== session) {
                         return fail('session_unavailable');
@@ -1258,6 +1334,11 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 if (this !== owner) return fail('session_unavailable');
                 if (rejectDurableReviewReentry()) return fail('selection_busy');
                 return mintDocumentSynthesisExecutionCapsulePort(presentedSession);
+            } });
+            ObjectDefineProperty(owner, 'mintDocumentSynthesisExecutionCapsuleIdentityPort', { enumerable: false, value(presentedSession: ServerSession) {
+                if (this !== owner) return fail('session_unavailable');
+                if (rejectDurableReviewReentry()) return fail('selection_busy');
+                return mintDocumentSynthesisExecutionCapsuleIdentityPort(presentedSession);
             } });
             const completedOwner = ObjectFreeze(owner) as unknown as ServerSessionProjectionOwner;
 
