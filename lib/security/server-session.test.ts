@@ -23,6 +23,7 @@ import {
     prepareStagedWebServerSession,
     peekSession,
     registerServerSessionResource,
+    resolveActiveWebServerSession,
     stageWebServerSession,
     tombstoneArmedWebServerSession,
 } from './server-session';
@@ -322,6 +323,167 @@ test('atomically splices one exact control CAS into an inert Web session cell', 
     assert.ok(successfulCas >= 0 && activeFlip > successfulCas);
     assert.equal(body.slice(successfulCas + 'if (commitPreparedAuthControlActivation(preparedActivation) === 1) {'.length, activeFlip).trim(), '');
     assert.doesNotMatch(body.slice(activeFlip, body.indexOf('return true;', activeFlip)), /\w+\s*\(/u);
+});
+
+test('the trusted ACTIVE resolver returns only the exact P3 cell without legacy publication or sliding expiry', () => {
+    const armed = armedControlActivation();
+    assert.equal(resolveActiveWebServerSession(armed.sessionId), null);
+    assert.equal(activateArmedWebServerSession(armed.port, armed.ticket), true);
+
+    const session = resolveActiveWebServerSession(armed.sessionId);
+    assert.ok(session);
+    const expiry = session.expiresAt;
+    assert.equal(session.id, armed.sessionId);
+    assert.equal(session.authChannel, 'web');
+    assert.equal(resolveActiveWebServerSession(armed.sessionId), session);
+    assert.equal(session.expiresAt, expiry);
+    assert.equal(Object.isFrozen(session), true);
+    assert.equal(Object.getPrototypeOf(session), Object.prototype);
+    const mutations: ReadonlyArray<readonly [keyof typeof session, unknown]> = [
+        ['id', 'other-id'], ['userId', 'other-user'], ['username', 'other-name'], ['role', 'administrator'],
+        ['authChannel', 'native'], ['createdAt', 0], ['expiresAt', expiry + 1],
+    ];
+    for (const [key, value] of mutations) {
+        const descriptor = Object.getOwnPropertyDescriptor(session, key);
+        assert.deepEqual({ enumerable: descriptor?.enumerable, configurable: descriptor?.configurable, writable: descriptor && 'writable' in descriptor ? descriptor.writable : undefined },
+            { enumerable: true, configurable: false, writable: false });
+        assert.throws(() => { (session as unknown as Record<string, unknown>)[key] = value; }, TypeError);
+        assert.throws(() => Object.defineProperty(session, key, { value }), TypeError);
+        assert.throws(() => { delete (session as unknown as Record<string, unknown>)[key]; }, TypeError);
+    }
+    assert.throws(() => Object.setPrototypeOf(session, null), TypeError);
+    assert.equal(resolveActiveWebServerSession(armed.sessionId), session);
+    assert.deepEqual({ id: session.id, userId: session.userId, username: session.username, role: session.role,
+        authChannel: session.authChannel, createdAt: session.createdAt, expiresAt: session.expiresAt },
+    { id: armed.sessionId, userId: 'atomic-user', username: SYNTHETIC_USERNAME, role: 'clinician',
+        authChannel: 'web', createdAt: session.createdAt, expiresAt: expiry });
+    assert.equal(getSession(armed.sessionId), null);
+    assert.equal(peekSession(armed.sessionId), null);
+});
+
+test('the trusted ACTIVE resolver denies tombstones, wrong IDs, hostile values, and module copies without observation', async (t) => {
+    const active = armedControlActivation(); assert.equal(activateArmedWebServerSession(active.port, active.ticket), true);
+    const tombstone = armedControlActivation(); assert.equal(tombstoneArmedWebServerSession(tombstone.port), true);
+    let observed = 0;
+    const boxed = new String(active.sessionId);
+    const proxy = new Proxy(boxed, {
+        get() { observed += 1; throw new Error('synthetic get'); },
+        getOwnPropertyDescriptor() { observed += 1; throw new Error('synthetic descriptor'); },
+        ownKeys() { observed += 1; throw new Error('synthetic keys'); },
+    });
+    const thenable = Object.create(null); Object.defineProperty(thenable, 'then', {
+        enumerable: true, get() { observed += 1; throw new Error('synthetic then'); },
+    });
+    for (const value of [null, undefined, '', 'wrong-session-id', Object.freeze({ id: active.sessionId }),
+        boxed, structuredClone(boxed), proxy, thenable, { ...boxed }]) {
+        assert.equal(resolveActiveWebServerSession(value), null);
+    }
+    assert.equal(resolveActiveWebServerSession(tombstone.sessionId), null);
+    const rejected = Promise.reject(new Error('synthetic rejected input')); rejected.catch(() => undefined);
+    assert.equal(resolveActiveWebServerSession(rejected), null);
+
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const cached = nodeRequire.cache[modulePath]; let restarted: typeof import('./server-session') | undefined;
+    try {
+        delete nodeRequire.cache[modulePath]; restarted = nodeRequire(modulePath) as typeof import('./server-session');
+        assert.equal(restarted.resolveActiveWebServerSession(active.sessionId), null);
+        restarted.clearAllSessions();
+    } finally { if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(observed, 0);
+});
+
+test('the trusted ACTIVE resolver denies expiry and lifecycle reentry without mutating or cleaning the cell', async (t) => {
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const cached = nodeRequire.cache[modulePath]; const ttl = process.env.MEDIFLOW_SESSION_TTL_MS; const originalNow = Date.now;
+    let isolated: typeof import('./server-session') | undefined; let now = 1_000; let trigger = false; let nested = () => undefined;
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    try {
+        process.env.MEDIFLOW_SESSION_TTL_MS = '10';
+        Date.now = () => { if (trigger) { trigger = false; nested(); } return now; };
+        delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
+        const activate = () => {
+            const staged = isolated!.stageWebServerSession({ id: 'active-isolated', username: SYNTHETIC_USERNAME, role: 'clinician' });
+            const prepared = isolated!.prepareStagedWebServerSession(staged); assert.ok(prepared);
+            const sessionId = isolated!.getPreparedWebServerSessionId(prepared); assert.ok(sessionId);
+            const port = isolated!.armPreparedWebServerSession(prepared); assert.ok(port);
+            const control = authControlApi().create(`f-${sessionId}`); control.begin('login', 'op', 'key', 'fp', 0);
+            const ticket = control.prepareTicket(`f-${sessionId}`, 'op', BigInt(0), 'fp', sessionId, now); assert.ok(ticket);
+            assert.equal(isolated!.activateArmedWebServerSession(port, ticket), true);
+            return sessionId;
+        };
+
+        const expiredId = activate(); const exact = isolated.resolveActiveWebServerSession(expiredId); assert.ok(exact);
+        now = exact.expiresAt;
+        assert.equal(isolated.resolveActiveWebServerSession(expiredId), null);
+        now = exact.createdAt;
+        assert.equal(isolated.resolveActiveWebServerSession(expiredId), exact, 'expiry denial performs no direct mutation or cleanup');
+        assert.equal(isolated.getSession(expiredId), null);
+
+        for (const operation of ['delete', 'invalidate', 'clear'] as const) {
+            const sessionId = activate();
+            nested = () => {
+                if (operation === 'delete') isolated!.deleteSession(sessionId);
+                else if (operation === 'invalidate') isolated!.invalidateSessionsForUser('active-isolated');
+                else isolated!.clearAllSessions();
+            };
+            trigger = true;
+            assert.equal(isolated.resolveActiveWebServerSession(sessionId), null);
+            assert.equal(trigger, false);
+            assert.ok(isolated.resolveActiveWebServerSession(sessionId), 'direct lifecycle calls are denial observations, not ACTIVE cleanup');
+        }
+        await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
+    } finally {
+        Date.now = originalNow; isolated?.clearAllSessions();
+        if (ttl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = ttl;
+        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
+    }
+});
+
+test('the trusted ACTIVE resolver denies lookup reentry and legacy Map collision with captured intrinsics', async (t) => {
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const cached = nodeRequire.cache[modulePath]; const originalGet = Map.prototype.get; const originalSet = Map.prototype.set;
+    let isolated: typeof import('./server-session') | undefined; let sessionId = ''; let mode: 'idle' | 'nested' | 'collision' = 'idle';
+    let nestedResult: unknown; let poisonedCalls = 0;
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    Map.prototype.get = function (key: unknown) {
+        const prior = Reflect.apply(originalGet, this, [key]);
+        if (key === sessionId && mode === 'nested') { mode = 'idle'; nestedResult = isolated?.resolveActiveWebServerSession(sessionId); }
+        if (key === sessionId && mode === 'collision') {
+            mode = 'idle'; Reflect.apply(originalSet, this, [key, Object.freeze({ id: sessionId })]);
+        }
+        return prior;
+    };
+    try {
+        delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
+        const staged = isolated.stageWebServerSession({ id: 'lookup-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+        const prepared = isolated.prepareStagedWebServerSession(staged); assert.ok(prepared);
+        sessionId = isolated.getPreparedWebServerSessionId(prepared) ?? ''; assert.ok(sessionId);
+        const port = isolated.armPreparedWebServerSession(prepared); assert.ok(port);
+        const control = authControlApi().create('lookup-fence'); control.begin('login', 'op', 'key', 'fp', 0);
+        const ticket = control.prepareTicket('lookup-fence', 'op', BigInt(0), 'fp', sessionId, 1); assert.ok(ticket);
+        assert.equal(isolated.activateArmedWebServerSession(port, ticket), true);
+
+        mode = 'nested'; assert.equal(isolated.resolveActiveWebServerSession(sessionId), null); assert.equal(nestedResult, null);
+        assert.ok(isolated.resolveActiveWebServerSession(sessionId));
+        mode = 'collision'; assert.equal(isolated.resolveActiveWebServerSession(sessionId), null);
+
+        const originals = { mapGet: Map.prototype.get, dateNow: Date.now, then: Object.getOwnPropertyDescriptor(Object.prototype, 'then') };
+        Map.prototype.get = (() => { poisonedCalls += 1; throw new Error('ambient map get'); }) as typeof Map.prototype.get;
+        Date.now = () => { poisonedCalls += 1; throw new Error('ambient clock'); };
+        Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { poisonedCalls += 1; throw new Error('ambient then'); } });
+        try { assert.equal(isolated.resolveActiveWebServerSession(sessionId), null, 'the legacy collision remains fail-closed'); }
+        finally {
+            Map.prototype.get = originals.mapGet; Date.now = originals.dateNow;
+            if (originals.then) Object.defineProperty(Object.prototype, 'then', originals.then); else delete (Object.prototype as { then?: unknown }).then;
+        }
+        await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(poisonedCalls, 0); assert.deepEqual(unhandled, []);
+    } finally {
+        Map.prototype.get = originalGet; isolated?.clearAllSessions();
+        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
+    }
 });
 
 test('activation burns crossed, hostile, copied, and cross-module inputs without observation', async (t) => {
