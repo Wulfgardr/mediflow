@@ -42,7 +42,7 @@ type ControlState = {
     used: FenceTable; reserved: FenceTable; entries: Map<string, Entry>;
 };
 type TicketBinding = {
-    lifecycle: 'prepared' | 'activation_prepared' | 'active' | 'retired' | 'denied'; owner: ControlState; pending: Pending;
+    lifecycle: 'prepared' | 'activation_prepared' | 'active' | 'retirement_prepared' | 'retired' | 'denied'; owner: ControlState; pending: Pending;
     fence: string; generation: bigint; sessionId: string; activateFence: string; retireFence: string;
     retiredReason: RetireReason | null;
 };
@@ -53,6 +53,11 @@ declare const preparedAuthControlActivationBrand: unique symbol;
 export type PreparedAuthControlActivation = { readonly [preparedAuthControlActivationBrand]: never };
 type PreparedAuthControlActivationRecord = {
     lifecycle: 'prepared' | 'committed' | 'denied'; capability: PreparedAuthControlActivation; binding: TicketBinding;
+};
+declare const preparedAuthControlRetirementBrand: unique symbol;
+export type PreparedAuthControlRetirement = { readonly [preparedAuthControlRetirementBrand]: never };
+type PreparedAuthControlRetirementRecord = {
+    lifecycle: 'prepared' | 'committed' | 'denied'; capability: PreparedAuthControlRetirement; binding: TicketBinding; reason: RetireReason;
 };
 const denied = freeze({ ok: false } as const);
 const frozen = <Value>(value: Value): Readonly<Value> => apply(freeze, ObjectConstructor, [value]) as Readonly<Value>;
@@ -71,6 +76,7 @@ const time = (value: unknown): value is number => typeof value === 'number' && i
 const u64 = (value: unknown): value is bigint => typeof value === 'bigint' && value >= ZERO && value <= MAX_U64;
 const ticketBindings = new WeakMapConstructor<object, TicketBinding>();
 let preparedAuthControlActivation: PreparedAuthControlActivationRecord | null = null;
+let preparedAuthControlRetirement: PreparedAuthControlRetirementRecord | null = null;
 let ticketOperationActive = false;
 let ticketOperationPoisoned = false;
 const enterTicketOperation = (): boolean => {
@@ -269,6 +275,85 @@ export function abortPreparedAuthControlActivation(prepared: unknown): boolean {
     if (!activation) return false;
     const exact = prepared === activation.capability && activation.lifecycle === 'prepared';
     denyPreparedAuthControlActivation(activation);
+    return exact;
+}
+
+function denyPreparedAuthControlRetirement(record: PreparedAuthControlRetirementRecord): void {
+    if (record.lifecycle !== 'prepared') return;
+    record.lifecycle = 'denied';
+    if (preparedAuthControlRetirement === record) preparedAuthControlRetirement = null;
+    if (record.binding.lifecycle === 'retirement_prepared') denyTicket(record.binding);
+}
+
+/** Resolves one active ticket, session, and reason before the fallible-free retirement CAS. */
+/* @Codex */
+export function prepareAuthControlRetirement(ticket: unknown, exactSessionId: unknown, exactReason: unknown): PreparedAuthControlRetirement | null {
+    if (!enterTicketOperation()) return null;
+    let binding: TicketBinding | undefined;
+    try {
+        binding = weakMapGet(ticketBindings, ticket);
+        if (!binding || binding.lifecycle !== 'active' || !text(exactSessionId) || binding.sessionId !== exactSessionId
+            || !retireReason(exactReason) || ticketOperationPoisoned) {
+            if (binding?.lifecycle === 'retirement_prepared' && preparedAuthControlRetirement?.binding === binding) denyPreparedAuthControlRetirement(preparedAuthControlRetirement);
+            else if (binding?.lifecycle === 'active') denyTicket(binding);
+            return null;
+        }
+        if (preparedAuthControlRetirement) {
+            denyPreparedAuthControlRetirement(preparedAuthControlRetirement);
+            denyTicket(binding);
+            return null;
+        }
+        const state = binding.owner;
+        if (state.pending !== null || state.activeSessionId !== binding.sessionId || state.fence !== binding.activateFence
+            || state.generation !== binding.generation + ONE || !tableHas(state.reserved, binding.retireFence)
+            || tableHas(state.used, binding.retireFence) || binding.retiredReason !== null) {
+            denyTicket(binding);
+            return null;
+        }
+        const capability = opaque<PreparedAuthControlRetirement>();
+        const record: PreparedAuthControlRetirementRecord = { lifecycle: 'prepared', capability, binding, reason: exactReason };
+        preparedAuthControlRetirement = record;
+        binding.lifecycle = 'retirement_prepared';
+        if (ticketOperationPoisoned) { denyPreparedAuthControlRetirement(record); return null; }
+        return capability;
+    } catch {
+        if (!binding) { try { binding = weakMapGet(ticketBindings, ticket); } catch { /* unresolved input remains denied */ } }
+        if (binding?.lifecycle === 'retirement_prepared' && preparedAuthControlRetirement?.binding === binding) denyPreparedAuthControlRetirement(preparedAuthControlRetirement);
+        else if (binding?.lifecycle === 'active') denyTicket(binding);
+        return null;
+    } finally { leaveTicketOperation(); }
+}
+
+/** Performs only the exact prepared lexical retirement CAS; no registry or caller work is entered. */
+/* @Codex */
+export function commitPreparedAuthControlRetirement(prepared: unknown): 0 | 2 {
+    const retirement = preparedAuthControlRetirement;
+    preparedAuthControlRetirement = null;
+    if (!retirement) return 0;
+    const binding = retirement.binding;
+    const state = binding.owner;
+    if (prepared !== retirement.capability || retirement.lifecycle !== 'prepared' || binding.lifecycle !== 'retirement_prepared'
+        || state.pending !== null || state.activeSessionId !== binding.sessionId || state.fence !== binding.activateFence
+        || state.generation !== binding.generation + ONE || state.reserved[binding.retireFence] !== true
+        || state.used[binding.retireFence] === true || binding.retiredReason !== null) {
+        retirement.lifecycle = 'denied'; binding.lifecycle = 'denied';
+        delete state.reserved[binding.activateFence]; delete state.reserved[binding.retireFence];
+        return 0;
+    }
+    delete state.reserved[binding.retireFence]; state.used[binding.retireFence] = true;
+    binding.retiredReason = retirement.reason; state.activeSessionId = null; state.pending = null;
+    state.fence = binding.retireFence; state.generation = binding.generation + ONE + ONE;
+    binding.lifecycle = 'retired'; retirement.lifecycle = 'committed';
+    return 2;
+}
+
+/** Burns one exact prepared retirement without reviving control authority. */
+/* @Codex */
+export function abortPreparedAuthControlRetirement(prepared: unknown): boolean {
+    const retirement = preparedAuthControlRetirement;
+    if (!retirement) return false;
+    const exact = prepared === retirement.capability && retirement.lifecycle === 'prepared';
+    denyPreparedAuthControlRetirement(retirement);
     return exact;
 }
 
