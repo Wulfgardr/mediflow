@@ -23,12 +23,7 @@ function evidence(sourceText = 'Synthetic A3a2 source text'): object {
     return Object.freeze(Object.assign(Object.create(null), { providerProjection: projection, sourceSetDigestSha256: digest }));
 }
 
-function cloneExact(value: object): object {
-    const input = value as { providerProjection: { label: 'S1'; sourceText: string }; sourceSetDigestSha256: readonly number[] };
-    return evidence(input.providerProjection.sourceText.replace(/^/, ''));
-}
-
-function runPreImportReentry(kind: 'isProxy' | 'weakMapSet'): unknown {
+function runPreImportReentry(kind: 'isProxy' | 'weakMapSet' | 'weakSetHas' | 'weakSetAdd'): unknown {
     const script = `
 import { types } from 'node:util';
 const exact = (text) => Object.freeze(Object.assign(Object.create(null), {
@@ -41,9 +36,12 @@ let unhandled = 0; process.on('unhandledRejection', () => { unhandled += 1; });
 if (${JSON.stringify(kind)} === 'isProxy') {
   const original = types.isProxy;
   types.isProxy = (value) => { if (intake && !fired) { fired = true; innerResult = intake(inner); } return original(value); };
-} else {
+} else if (${JSON.stringify(kind)} === 'weakMapSet') {
   const original = WeakMap.prototype.set;
   WeakMap.prototype.set = function (key, value) { const result = Reflect.apply(original, this, [key, value]); if (intake && !fired) { fired = true; innerResult = intake(inner); } return result; };
+} else {
+  const method = ${JSON.stringify(kind)} === 'weakSetHas' ? 'has' : 'add'; const original = WeakSet.prototype[method];
+  WeakSet.prototype[method] = function (...args) { const result = Reflect.apply(original, this, args); if (intake && !fired) { fired = true; innerResult = intake(inner); } return result; };
 }
 ({ intakeDocumentSynthesisA3a2SealedEvidence: intake } = await import(${JSON.stringify(pathToFileURL(TARGET).href)}));
 const outerResult = intake(outer);
@@ -87,7 +85,7 @@ test('mints an opaque zero-field token for one exact sealed A3a2 evidence identi
     for (const forbidden of ['then', 'toJSON', 'id', 'counter', 'digest', 'projection']) assert.equal(forbidden in token, false);
     assert.equal(token instanceof Promise, false);
     assert.equal(intakeDocumentSynthesisA3a2SealedEvidence(input), null, 'the consumed identity cannot be retried');
-    assert.ok(intakeDocumentSynthesisA3a2SealedEvidence(cloneExact(input)), 'a separate exact identity is a separate packet');
+    assert.ok(intakeDocumentSynthesisA3a2SealedEvidence(evidence()), 'a separate exact identity is a separate packet');
 });
 
 test('denies and consumes every hostile evidence shape without observing accessors or proxy traps', () => {
@@ -132,10 +130,28 @@ test('uses captured intrinsics and has no asynchronous or post-publication work'
     assert.equal(intakeDocumentSynthesisA3a2SealedEvidence(input), null);
 });
 
-test('poisons the outer intake when pre-import IsProxy or WeakMap.set reenters', () => {
+test('poisons the outer intake when pre-import IsProxy, WeakMap, or WeakSet reenters', () => {
     const denied = { outer: true, inner: true, outerReplay: true, innerReplay: true, recovery: true, unhandled: 0 };
     assert.deepEqual(runPreImportReentry('isProxy'), denied);
     assert.deepEqual(runPreImportReentry('weakMapSet'), denied);
+    assert.deepEqual(runPreImportReentry('weakSetHas'), denied);
+    assert.deepEqual(runPreImportReentry('weakSetAdd'), denied);
+});
+
+test('rejects accessor descriptors despite Object.prototype field pollution', () => {
+    let reads = 0;
+    const projection = Object.freeze(Object.assign(Object.create(null), { label: 'S1' as const, sourceText: 'Synthetic polluted descriptor' }));
+    const input = Object.create(null); Object.defineProperties(input, {
+        providerProjection: { enumerable: true, get() { reads += 1; return null; } },
+        sourceSetDigestSha256: { enumerable: true, value: Object.freeze(Array.from({ length: 32 }, (_, index) => index)) },
+    }); Object.freeze(input);
+    try {
+        Object.defineProperty(Object.prototype, 'writable', { configurable: true, value: false });
+        Object.defineProperty(Object.prototype, 'value', { configurable: true, value: projection });
+        assert.equal(intakeDocumentSynthesisA3a2SealedEvidence(input), null);
+        assert.equal(intakeDocumentSynthesisA3a2SealedEvidence(input), null);
+    } finally { delete (Object.prototype as { writable?: unknown }).writable; delete (Object.prototype as { value?: unknown }).value; }
+    assert.equal(reads, 0); assert.ok(intakeDocumentSynthesisA3a2SealedEvidence(evidence('Synthetic descriptor recovery')));
 });
 
 test('keeps the canonical module deep-internal with one realpath and no production importers', () => {
