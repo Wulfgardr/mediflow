@@ -23,6 +23,7 @@ import {
     prepareStagedWebServerSession,
     peekSession,
     registerServerSessionResource,
+    retireActiveWebServerSession,
     resolveActiveWebServerSession,
     stageWebServerSession,
     tombstoneArmedWebServerSession,
@@ -41,6 +42,7 @@ function authControlApi() {
             [key: string]: unknown;
         };
         prepareAuthControlActivation(ticket: unknown, sessionId: string): unknown;
+        [key: string]: unknown;
     };
     const create = (fence: string) => {
         const record = api.createWebAuthControlRecord(fence);
@@ -50,6 +52,9 @@ function authControlApi() {
             prepareTicket: (...args: [string, string, bigint, string, string, number]) => (
                 record[['prepareAuth', 'ControlTicket'].join('')] as (...values: unknown[]) => unknown
             )(...args),
+            retireTicket: (ticket: unknown, reason: unknown) => (
+                api[['retireAuth', 'ControlTicket'].join('')] as (value: unknown, cause: unknown) => 0 | 1 | 2
+            )(ticket, reason),
         };
     };
     return { create, prepareActivation: api.prepareAuthControlActivation };
@@ -361,7 +366,107 @@ test('the trusted ACTIVE resolver returns only the exact P3 cell without legacy 
     assert.equal(peekSession(armed.sessionId), null);
 });
 
-test('the trusted ACTIVE resolver denies tombstones, wrong IDs, hostile values, and module copies without observation', async (t) => {
+test('retires one exact ACTIVE cell through its retained control ticket', () => {
+    const active = armedControlActivation(); assert.equal(activateArmedWebServerSession(active.port, active.ticket), true);
+    assert.equal(retireActiveWebServerSession(active.sessionId, 'unknown'), false);
+    assert.ok(resolveActiveWebServerSession(active.sessionId));
+    assert.equal(retireActiveWebServerSession(active.sessionId, 'lock'), true);
+    assert.equal(resolveActiveWebServerSession(active.sessionId), null);
+    assert.equal(getSession(active.sessionId), null); assert.equal(peekSession(active.sessionId), null);
+    assert.equal(retireActiveWebServerSession(active.sessionId, 'lock'), false);
+    assert.equal(active.control.retireTicket(active.ticket, 'lock'), 2);
+    assert.equal(active.control.retireTicket(active.ticket, 'dispose'), 0);
+
+    const source = readFileSync(fileURLToPath(new URL('./server-session.ts', import.meta.url)), 'utf8');
+    const body = source.slice(source.indexOf('export function retireActiveWebServerSession'), source.indexOf('/** Resolves only one exact ACTIVE'));
+    const successfulCas = body.indexOf('if (commitPreparedAuthControlRetirement(preparedRetirement) === 2) {');
+    const retiredFlip = body.indexOf("cell.state = 'RETIRED';", successfulCas);
+    assert.ok(successfulCas >= 0 && retiredFlip > successfulCas);
+    assert.equal(body.slice(successfulCas + 'if (commitPreparedAuthControlRetirement(preparedRetirement) === 2) {'.length, retiredFlip).trim(), '');
+    assert.doesNotMatch(body.slice(retiredFlip + "cell.state = 'RETIRED';".length, body.indexOf('return true;', retiredFlip)), /\w+\s*\(/u);
+});
+
+test('retirement denies hostile inputs, stale control, and module copies without observation', async () => {
+    const active = armedControlActivation(); assert.equal(activateArmedWebServerSession(active.port, active.ticket), true);
+    let observed = 0;
+    const boxed = new String(active.sessionId);
+    const proxy = new Proxy(boxed, { get: () => { observed += 1; throw new Error('synthetic get'); }, ownKeys: () => { observed += 1; throw new Error('synthetic keys'); } });
+    const thenable = Object.create(null); Object.defineProperty(thenable, 'then', { get: () => { observed += 1; throw new Error('synthetic then'); } });
+    const rejected = Promise.reject(new Error('synthetic retirement input')); rejected.catch(() => undefined);
+    for (const value of [null, undefined, '', 'wrong-session', boxed, proxy, thenable, rejected, { id: active.sessionId }]) {
+        assert.equal(retireActiveWebServerSession(value, 'lock'), false);
+    }
+    assert.ok(resolveActiveWebServerSession(active.sessionId));
+
+    const stale = armedControlActivation(); assert.equal(activateArmedWebServerSession(stale.port, stale.ticket), true);
+    assert.equal(stale.control.retireTicket(stale.ticket, 'lock'), 1);
+    assert.equal(retireActiveWebServerSession(stale.sessionId, 'lock'), false);
+    assert.equal(resolveActiveWebServerSession(stale.sessionId), null);
+
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const cached = nodeRequire.cache[modulePath];
+    try {
+        delete nodeRequire.cache[modulePath];
+        const restarted = nodeRequire(modulePath) as typeof import('./server-session');
+        assert.equal(restarted.retireActiveWebServerSession(active.sessionId, 'lock'), false);
+        restarted.clearAllSessions();
+    } finally { if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
+    const poisoned = armedControlActivation(); assert.equal(activateArmedWebServerSession(poisoned.port, poisoned.ticket), true);
+    const originals = { mapGet: Map.prototype.get, weakGet: WeakMap.prototype.get, apply: Reflect.apply, then: Object.getOwnPropertyDescriptor(Object.prototype, 'then') };
+    const fail = () => { throw new Error('ambient intrinsic'); };
+    try {
+        Map.prototype.get = fail as typeof Map.prototype.get; WeakMap.prototype.get = fail as typeof WeakMap.prototype.get; Reflect.apply = fail;
+        Object.defineProperty(Object.prototype, 'then', { configurable: true, get: fail });
+        assert.equal(retireActiveWebServerSession(poisoned.sessionId, 'lock'), true);
+    } finally {
+        Map.prototype.get = originals.mapGet; WeakMap.prototype.get = originals.weakGet; Reflect.apply = originals.apply;
+        if (originals.then) Object.defineProperty(Object.prototype, 'then', originals.then); else delete (Object.prototype as { then?: unknown }).then;
+    }
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(observed, 0);
+});
+
+test('retirement poisons clock and lifecycle reentry and denies expiry without drift', async (t) => {
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const cached = nodeRequire.cache[modulePath]; const originalNow = Date.now; const originalTtl = process.env.MEDIFLOW_SESSION_TTL_MS;
+    let isolated: typeof import('./server-session') | undefined; let now = 1_000; let trigger = false; let nestedCalls = 0;
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    process.env.MEDIFLOW_SESSION_TTL_MS = '10'; Date.now = () => { if (trigger) { trigger = false; nestedCalls += 1; nested(); } return now; };
+    let nested: () => void = () => undefined;
+    const make = () => {
+        const staged = isolated!.stageWebServerSession({ id: `retire-${nestedCalls}-${now}`, username: ['synthetic', 'retire'].join('-'), role: 'clinician' });
+        const prepared = isolated!.prepareStagedWebServerSession(staged); assert.ok(prepared);
+        const sessionId = isolated!.getPreparedWebServerSessionId(prepared); assert.ok(sessionId);
+        const port = isolated!.armPreparedWebServerSession(prepared); assert.ok(port);
+        const control = authControlApi().create(`retire-fence-${sessionId}`); control.begin('login', 'op', `key-${sessionId}`, `fp-${sessionId}`, 0);
+        const ticket = control.prepareTicket(`retire-fence-${sessionId}`, 'op', BigInt(0), `fp-${sessionId}`, sessionId, now); assert.ok(ticket);
+        assert.equal(isolated!.activateArmedWebServerSession(port, ticket), true);
+        return { sessionId, port };
+    };
+    try {
+        delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
+        for (const operation of ['lookup', 'delete', 'clear'] as const) {
+            const current = make();
+            nested = () => operation === 'lookup' ? isolated!.resolveActiveWebServerSession(current.sessionId)
+                : operation === 'delete' ? isolated!.deleteSession(current.sessionId) : isolated!.clearAllSessions();
+            trigger = true;
+            assert.equal(isolated.retireActiveWebServerSession(current.sessionId, 'lock'), false);
+            assert.equal(isolated.resolveActiveWebServerSession(current.sessionId), null);
+        }
+        const expired = make(); now += 20;
+        assert.equal(isolated.retireActiveWebServerSession(expired.sessionId, 'expired'), false);
+        assert.equal(isolated.resolveActiveWebServerSession(expired.sessionId), null);
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        assert.equal(nestedCalls, 3); assert.deepEqual(unhandled, []);
+    } finally {
+        trigger = false; Date.now = originalNow; isolated?.clearAllSessions();
+        if (originalTtl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = originalTtl;
+        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
+    }
+});
+
+test('the trusted ACTIVE resolver denies tombstones, wrong IDs, hostile values, and module copies without observation', async () => {
     const active = armedControlActivation(); assert.equal(activateArmedWebServerSession(active.port, active.ticket), true);
     const tombstone = armedControlActivation(); assert.equal(tombstoneArmedWebServerSession(tombstone.port), true);
     let observed = 0;

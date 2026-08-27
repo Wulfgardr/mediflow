@@ -6,8 +6,11 @@ import { types } from 'node:util';
 
 import {
     abortPreparedAuthControlActivation,
+    abortPreparedAuthControlRetirement,
     commitPreparedAuthControlActivation,
+    commitPreparedAuthControlRetirement,
     prepareAuthControlActivation,
+    prepareAuthControlRetirement,
 } from './web-auth-control-record';
 
 export const SESSION_COOKIE_NAME = 'mediflow_session';
@@ -103,6 +106,7 @@ function appendArrayValue<T>(target: T[], value: T): void {
 export type ServerSessionDisposalReason = 'session_deleted' | 'session_expired' | 'sessions_cleared' | 'application_locked';
 export type ServerSessionResourceDisposer = (reason: ServerSessionDisposalReason) => void;
 export type ServerSessionCleanupOutcome = 'completed' | 'failed' | 'unknown';
+export type WebServerSessionRetirementReason = 'lock' | 'dispose' | 'expired' | 'delete' | 'clear';
 
 interface ServerSessionResourceRegistration {
     active: boolean;
@@ -146,9 +150,11 @@ interface PreparedWebSessionRecord {
 }
 
 interface ArmedWebSessionCellRecord {
-    state: 'ARMED_ACTIVATE' | 'ACTIVE' | 'TOMBSTONE';
+    state: 'ARMED_ACTIVATE' | 'ACTIVE' | 'ARMED_RETIRE' | 'RETIRED' | 'TOMBSTONE';
     session: ServerSession;
     next: ArmedWebSessionCellRecord | null;
+    activationTicket: unknown | null;
+    retirement: unknown | null;
 }
 
 const sessions = new MapConstructor<string, ServerSession>();
@@ -377,9 +383,21 @@ function armedWebSessionCellRecord(port: unknown): ArmedWebSessionCellRecord | n
     } catch { return null; }
 }
 
+function isWebServerSessionRetirementReason(value: unknown): value is WebServerSessionRetirementReason {
+    return value === 'lock' || value === 'dispose' || value === 'expired' || value === 'delete' || value === 'clear';
+}
+
 function tombstoneArmedWebSessionCellRecord(record: ArmedWebSessionCellRecord): boolean {
     if (record.state !== 'ARMED_ACTIVATE') return false;
+    record.activationTicket = null;
+    record.retirement = null;
     record.state = 'TOMBSTONE';
+    return true;
+}
+
+function retireArmedWebSessionCellRecord(record: ArmedWebSessionCellRecord): boolean {
+    if (record.state !== 'ACTIVE' && record.state !== 'ARMED_RETIRE') return false;
+    record.state = 'RETIRED';
     return true;
 }
 
@@ -574,7 +592,7 @@ export function armPreparedWebServerSession(capability: unknown): ArmedWebServer
         }
         ObjectFreeze(session);
         const port = ObjectFreeze(ObjectCreate(null)) as ArmedWebServerSessionPort;
-        cell = { state: 'ARMED_ACTIVATE', session, next: armedWebSessionCellHead };
+        cell = { state: 'ARMED_ACTIVATE', session, next: armedWebSessionCellHead, activationTicket: null, retirement: null };
         armedWebSessionCellHead = cell;
         armedWebSessionCellsById[session.id] = cell;
         setWeakMapValue(armedWebSessionPortRecords, port, cell);
@@ -635,6 +653,8 @@ export function activateArmedWebServerSession(port: unknown, ticket: unknown): b
         return false;
     }
     if (!beginWebSessionCellLifecycle(port)) {
+        const deniedCell = armedWebSessionCellRecord(port);
+        if (deniedCell) tombstoneArmedWebSessionCellRecord(deniedCell);
         abortPreparedAuthControlActivation(preparedActivation);
         return false;
     }
@@ -653,8 +673,9 @@ export function activateArmedWebServerSession(port: unknown, ticket: unknown): b
             webSessionCellLifecycle = 'idle';
             return false;
         }
+        cell.activationTicket = ticket;
     } catch {
-        if (cell) cell.state = 'TOMBSTONE';
+        if (cell) tombstoneArmedWebSessionCellRecord(cell);
         try { abortPreparedAuthControlActivation(preparedActivation); } catch { /* prepared P2 denial stays terminal */ }
         webSessionCellLifecyclePoisoned = false;
         webSessionCellLifecycle = 'idle';
@@ -666,10 +687,67 @@ export function activateArmedWebServerSession(port: unknown, ticket: unknown): b
         webSessionCellLifecycle = 'idle';
         return true;
     }
+    cell.activationTicket = null;
+    cell.retirement = null;
     cell.state = 'TOMBSTONE';
     webSessionCellLifecyclePoisoned = false;
     webSessionCellLifecycle = 'idle';
     return false;
+}
+
+/** Retires one exact ACTIVE Web cell through its privately retained P2 ticket. */
+/* @Codex */
+export function retireActiveWebServerSession(sessionId: unknown, reason: unknown): boolean {
+    if (typeof sessionId !== 'string' || !sessionId || !isWebServerSessionRetirementReason(reason)) return false;
+    const cell = armedWebSessionCellsById[sessionId];
+    if (!cell || cell.state !== 'ACTIVE' || cell.session.id !== sessionId || !cell.activationTicket) return false;
+    const session = cell.session;
+    const ticket = cell.activationTicket;
+    const preparedRetirement = prepareAuthControlRetirement(ticket, sessionId, reason);
+    if (!preparedRetirement) {
+        if (cell.state === 'ACTIVE' && armedWebSessionCellsById[sessionId] === cell && cell.session === session) {
+            retireArmedWebSessionCellRecord(cell);
+        }
+        return false;
+    }
+    if (!beginWebSessionCellLifecycle(sessionId)) {
+        if (cell.state === 'ACTIVE' && armedWebSessionCellsById[sessionId] === cell && cell.session === session) {
+            retireArmedWebSessionCellRecord(cell);
+        }
+        abortPreparedAuthControlRetirement(preparedRetirement);
+        return false;
+    }
+    try {
+        const exact = armedWebSessionCellsById[sessionId] === cell && cell.state === 'ACTIVE'
+            && cell.session === session && cell.activationTicket === ticket && session.id === sessionId
+            && session.authChannel === 'web' && session.expiresAt > DateNow();
+        if (webSessionCellLifecyclePoisoned || !exact) {
+            retireArmedWebSessionCellRecord(cell);
+            abortPreparedAuthControlRetirement(preparedRetirement);
+            return false;
+        }
+        cell.retirement = preparedRetirement;
+        cell.state = 'ARMED_RETIRE';
+        if (webSessionCellLifecyclePoisoned || armedWebSessionCellsById[sessionId] !== cell
+            || cell.state !== 'ARMED_RETIRE' || cell.session !== session || cell.activationTicket !== ticket) {
+            cell.state = 'RETIRED';
+            abortPreparedAuthControlRetirement(preparedRetirement);
+            cell.retirement = null;
+            return false;
+        }
+        if (commitPreparedAuthControlRetirement(preparedRetirement) === 2) {
+            cell.state = 'RETIRED';
+            return true;
+        }
+        cell.state = 'RETIRED';
+        cell.retirement = null;
+        return false;
+    } catch {
+        if (cell.state === 'ACTIVE' || cell.state === 'ARMED_RETIRE') cell.state = 'RETIRED';
+        try { abortPreparedAuthControlRetirement(preparedRetirement); } catch { /* terminal denial remains */ }
+        cell.retirement = null;
+        return false;
+    } finally { endWebSessionCellLifecycle(); }
 }
 
 /** Canonically publishes a prepared session only for server-local compatibility callers. */
