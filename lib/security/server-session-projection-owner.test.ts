@@ -350,6 +350,90 @@ test('Document Synthesis sealed evidence burns at begin after a later allocation
     assert.equal(revoked.owner.mintDocumentSynthesisSealedEvidencePort(revoked.value).begin(revokedSeal), null);
 });
 
+function sealedDocumentSynthesisRecord() {
+    const fixture = ownerWithSelection(); const capturePort = fixture.owner.mintDocumentSynthesisAttachmentCapturePort(fixture.value);
+    const capture = capturePort.observeCurrentness(currentness()); assert.ok(capture);
+    const grant = capturePort.begin(capture); assert.ok(grant);
+    const retained = capturePort.retain(Object.freeze({ grant, observedCurrentness: currentness(), projection: projection() })); assert.ok(retained);
+    const seal = capturePort.sealRetainedProjection(retained); assert.ok(seal);
+    return { ...fixture, capturePort, seal, capsules: fixture.owner.mintDocumentSynthesisExecutionCapsulePort(fixture.value) };
+}
+
+test('Document Synthesis execution capsule promotes one authentic seal into a frozen zero-field inert value', () => {
+    const { owner, value, seal, capsules } = sealedDocumentSynthesisRecord();
+    assert.equal(Object.getPrototypeOf(capsules), null); assert.equal(Object.isFrozen(capsules), true);
+    assert.deepEqual(Object.keys(capsules), ['promote']);
+    const capsule = capsules.promote(seal); assert.ok(capsule);
+    assert.equal(Object.getPrototypeOf(capsule), null); assert.equal(Object.isFrozen(capsule), true);
+    assert.deepEqual(Object.keys(capsule), []); assert.deepEqual(Object.getOwnPropertySymbols(capsule), []);
+    assert.equal(JSON.stringify(capsule), '{}'); assertNoBigIntInDescriptors([capsules, capsule]);
+    assert.equal(capsules.promote(seal), null); assert.equal(capsules.promote(capsule), null);
+    assert.equal(owner.mintDocumentSynthesisSealedEvidencePort(value).begin(seal), null);
+});
+
+test('Document Synthesis execution capsule rejects hostile, foreign, and drifted seals without observing them', () => {
+    const hostile = sealedDocumentSynthesisRecord(); let reads = 0; let traps = 0;
+    const proxy = new Proxy(hostile.seal, { get() { traps += 1; throw new Error('synthetic trap'); } });
+    const accessor = Object.freeze(Object.defineProperty({}, 'seal', { enumerable: true, get() { reads += 1; return hostile.seal; } }));
+    const thenable = Object.freeze(Object.defineProperty({}, 'then', { enumerable: true, get() { reads += 1; return () => undefined; } }));
+    for (const forged of [null, Object.freeze({ ...hostile.seal }), structuredClone(hostile.seal), proxy, accessor, thenable]) {
+        assert.equal(hostile.capsules.promote(forged), null);
+    }
+    assert.equal(reads, 0); assert.equal(traps, 0);
+    const foreign = sealedDocumentSynthesisRecord(); assert.equal(foreign.capsules.promote(hostile.seal), null);
+    assert.ok(hostile.capsules.promote(hostile.seal));
+
+    const currentnessDrift = sealedDocumentSynthesisRecord();
+    assert.ok(currentnessDrift.capturePort.observeCurrentness(currentness(2, 2)));
+    assert.equal(currentnessDrift.capsules.promote(currentnessDrift.seal), null);
+    const reselection = sealedDocumentSynthesisRecord(); reselection.owner.issueSelection({ expectedEpoch: 1, ...PAIR });
+    assert.equal(reselection.capsules.promote(reselection.seal), null);
+    const expiry = sealedDocumentSynthesisRecord(); expiry.setClock(expiry.value.expiresAt);
+    assert.equal(expiry.capsules.promote(expiry.seal), null);
+    const logout = sealedDocumentSynthesisRecord(); deleteSession(logout.value.id);
+    assert.equal(logout.capsules.promote(logout.seal), null);
+    const disposal = sealedDocumentSynthesisRecord(); disposal.owner.dispose();
+    assert.equal(disposal.capsules.promote(disposal.seal), null);
+});
+
+test('Document Synthesis execution capsule promotion does not read ambient then', () => {
+    const record = sealedDocumentSynthesisRecord(); const descriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'then'); let reads = 0;
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { reads += 1; return undefined; } });
+    try { assert.ok(record.capsules.promote(record.seal)); } finally {
+        if (descriptor) Object.defineProperty(Object.prototype, 'then', descriptor); else delete (Object.prototype as { then?: unknown }).then;
+    }
+    assert.equal(reads, 0);
+});
+
+test('Document Synthesis execution capsule uses captured WeakMap intrinsics after prototype poisoning', () => {
+    const record = sealedDocumentSynthesisRecord(); const set = Object.getOwnPropertyDescriptor(WeakMap.prototype, 'set');
+    const remove = Object.getOwnPropertyDescriptor(WeakMap.prototype, 'delete');
+    Object.defineProperty(WeakMap.prototype, 'set', { configurable: true, value() { throw new Error('synthetic set trap'); } });
+    Object.defineProperty(WeakMap.prototype, 'delete', { configurable: true, value() { throw new Error('synthetic delete trap'); } });
+    try { assert.ok(record.capsules.promote(record.seal)); } finally {
+        Object.defineProperty(WeakMap.prototype, 'set', set!); Object.defineProperty(WeakMap.prototype, 'delete', remove!);
+    }
+    assert.equal(record.capsules.promote(record.seal), null);
+});
+
+test('Document Synthesis execution capsule burns when its clock changes the authenticated channel', () => {
+    let mutateChannel = false; let value: ServerSession | null = null;
+    const registry = createServerSessionProjectionOwnerRegistry({
+        clock: () => { if (mutateChannel && value) value.authChannel = 'native'; return 1_000; },
+        entropy: () => Uint8Array.from({ length: 16 }, (_, index) => index + 1),
+        resolve: (_session, pair) => Object.freeze({ ...pair }),
+    });
+    value = session(); const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const capturePort = owner.mintDocumentSynthesisAttachmentCapturePort(value);
+    const capture = capturePort.observeCurrentness(currentness()); assert.ok(capture);
+    const grant = capturePort.begin(capture); assert.ok(grant);
+    const retained = capturePort.retain(Object.freeze({ grant, observedCurrentness: currentness(), projection: projection() })); assert.ok(retained);
+    const seal = capturePort.sealRetainedProjection(retained); assert.ok(seal);
+    const capsules = owner.mintDocumentSynthesisExecutionCapsulePort(value); mutateChannel = true;
+    assert.equal(capsules.promote(seal), null);
+    assert.equal(capsules.promote(seal), null);
+});
+
 test('Document Synthesis retain accepts only pre-canonical source text without hostile observation', () => {
     const retain = (sourceText: unknown) => {
         const { value, owner } = ownerWithSelection(); const port = owner.mintDocumentSynthesisAttachmentCapturePort(value);
