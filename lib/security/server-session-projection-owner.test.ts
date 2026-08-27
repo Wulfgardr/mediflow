@@ -329,6 +329,18 @@ test('Document Synthesis attachment capture burns expired, invalid-retain, and c
     const channelCapture = channelPort.observeCurrentness(currentness()); assert.ok(channelCapture);
     (channel.value as { authChannel: ServerSession['authChannel'] }).authChannel = 'native'; assert.equal(channelPort.begin(channelCapture), null);
     (channel.value as { authChannel: ServerSession['authChannel'] }).authChannel = 'web'; assert.equal(channelPort.begin(channelCapture), null);
+
+    let drift = false; const hostileValue = session();
+    const hostileRegistry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair, entropy: () => new Uint8Array(16),
+        clock: () => { if (drift) (hostileValue as { authChannel: ServerSession['authChannel'] }).authChannel = 'native'; return 1_000; } });
+    const hostileOwner = hostileRegistry.acquire(hostileValue); hostileOwner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const hostilePort = hostileOwner.mintDocumentSynthesisAttachmentCapturePort(hostileValue); const hostileCapture = hostilePort.observeCurrentness(currentness(2, 2)); assert.ok(hostileCapture);
+    drift = true; assert.equal(hostilePort.begin(hostileCapture), null); drift = false; (hostileValue as { authChannel: ServerSession['authChannel'] }).authChannel = 'web'; assert.equal(hostilePort.begin(hostileCapture), null);
+    const retry = hostilePort.observeCurrentness(currentness(3, 3)); assert.ok(retry); const hostileGrant = hostilePort.begin(retry); assert.ok(hostileGrant);
+    drift = true; assert.equal(hostilePort.retain(Object.freeze({ grant: hostileGrant, observedCurrentness: currentness(3, 3), projection: projection() })), null);
+    drift = false; (hostileValue as { authChannel: ServerSession['authChannel'] }).authChannel = 'web'; assert.equal(hostilePort.retain(Object.freeze({ grant: hostileGrant, observedCurrentness: currentness(3, 3), projection: projection() })), null);
+    const lineage = hostileOwner.mintDocumentSynthesisSourceLineagePort(hostileValue); drift = true; assert.equal(lineage.open(), null);
+    drift = false; (hostileValue as { authChannel: ServerSession['authChannel'] }).authChannel = 'web'; assert.ok(lineage.open());
 });
 
 test('Document Synthesis attachment capture latches duplicate, rollback, and ABA currentness across ports', () => {
