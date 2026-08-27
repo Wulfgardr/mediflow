@@ -79,6 +79,13 @@ let preparedAuthControlActivation: PreparedAuthControlActivationRecord | null = 
 let preparedAuthControlRetirement: PreparedAuthControlRetirementRecord | null = null;
 let ticketOperationActive = false;
 let ticketOperationPoisoned = false;
+let currentBindingObservationActive = false;
+let currentBindingObservationPoisoned = false;
+const enterCurrentBindingObservation = (): boolean => {
+    if (currentBindingObservationActive) { currentBindingObservationPoisoned = true; return false; }
+    currentBindingObservationActive = true; currentBindingObservationPoisoned = false; return true;
+};
+const leaveCurrentBindingObservation = (): void => { currentBindingObservationActive = false; currentBindingObservationPoisoned = false; };
 const enterTicketOperation = (): boolean => {
     if (ticketOperationActive) { ticketOperationPoisoned = true; return false; }
     ticketOperationActive = true; ticketOperationPoisoned = false; return true;
@@ -281,16 +288,19 @@ export function abortPreparedAuthControlActivation(prepared: unknown): boolean {
 /** Observes one exact ACTIVE ticket/session binding without spending or exposing it. */
 /* @Codex */
 export function isCurrentAuthControlSessionBinding(ticket: unknown, exactSessionId: unknown): boolean {
-    if (!text(exactSessionId)) return false;
+    if (!enterCurrentBindingObservation()) return false;
     try {
+        if (!text(exactSessionId)) return false;
         const binding = weakMapGet(ticketBindings, ticket);
-        if (!binding || binding.lifecycle !== 'active' || binding.sessionId !== exactSessionId || binding.retiredReason !== null) return false;
+        if (currentBindingObservationPoisoned || !binding || binding.lifecycle !== 'active'
+            || binding.sessionId !== exactSessionId || binding.retiredReason !== null) return false;
         const state = binding.owner;
-        return state.pending === null && state.activeSessionId === binding.sessionId
+        const current = state.pending === null && state.activeSessionId === binding.sessionId
             && state.fence === binding.activateFence && state.generation === binding.generation + ONE
             && state.reserved[binding.activateFence] !== true && state.used[binding.activateFence] === true
             && state.reserved[binding.retireFence] === true && state.used[binding.retireFence] !== true;
-    } catch { return false; }
+        return !currentBindingObservationPoisoned && current;
+    } catch { return false; } finally { leaveCurrentBindingObservation(); }
 }
 
 function denyPreparedAuthControlRetirement(record: PreparedAuthControlRetirementRecord): void {
