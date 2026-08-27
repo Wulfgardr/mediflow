@@ -35,6 +35,14 @@ function ownerWithSelection(now = 1_000) {
     return { registry, value, owner, setClock: (next: number) => { clock = next; } };
 }
 
+function currentness(documentRevision = 1, documentFreshnessEpoch = 1) {
+    return Object.freeze({ documentSourceRef: 'document-source.synthetic.01', documentRevision, documentFreshnessEpoch });
+}
+
+function projection(sourceKind: 'native_text' | 'ocr_text' = 'native_text') {
+    return Object.freeze({ sourceKind, sourceText: 'Synthetic normalized source.' });
+}
+
 test('keeps authentic owner identity private to the registry', () => {
     const { registry, value, owner } = ownerWithSelection();
     const lookalike = Object.freeze({ ...owner });
@@ -199,6 +207,94 @@ test('Document Synthesis lineage ignores ambient then while performing synchrono
         if (descriptor) Object.defineProperty(Object.prototype, 'then', descriptor); else delete (Object.prototype as { then?: unknown }).then;
     }
     assert.equal(reads, 0);
+});
+
+test('Document Synthesis attachment capture retains owner-private evidence through a burned opaque grant', () => {
+    const { value, owner } = ownerWithSelection();
+    const port = owner.mintDocumentSynthesisAttachmentCapturePort(value);
+    assert.equal(Object.getPrototypeOf(port), null); assert.equal(Object.isFrozen(port), true);
+    assert.deepEqual(Object.keys(port), ['observeCurrentness', 'begin', 'retain', 'observeRevocation']);
+    const capture = port.observeCurrentness(currentness()); assert.ok(capture);
+    assert.equal(Object.getPrototypeOf(capture), null); assert.equal(Object.isFrozen(capture), true);
+    const grant = port.begin(capture); assert.ok(grant); assert.equal(port.begin(capture), null);
+    const retained = port.retain(Object.freeze({ grant, observedCurrentness: currentness(), projection: projection('ocr_text') }));
+    assert.ok(retained); assert.equal(Object.getPrototypeOf(retained), null); assert.equal(Object.isFrozen(retained), true);
+    assert.deepEqual(Object.keys(retained), []); assert.equal(JSON.stringify(retained), '{}');
+    assertNoBigIntInDescriptors([port, capture, grant, retained]);
+    assert.equal(port.retain(Object.freeze({ grant, observedCurrentness: currentness(), projection: projection() })), null);
+    assert.equal(port.observeRevocation(retained), true); assert.equal(port.observeRevocation(retained), true);
+});
+
+test('Document Synthesis attachment capture closes replay, stale currentness, foreign authority, and lifecycle changes', () => {
+    const first = ownerWithSelection(); const port = first.owner.mintDocumentSynthesisAttachmentCapturePort(first.value);
+    const stale = port.observeCurrentness(currentness()); assert.ok(stale);
+    const fresh = port.observeCurrentness(currentness(2, 2)); assert.ok(fresh);
+    assert.equal(port.begin(stale), null);
+    const grant = port.begin(fresh); assert.ok(grant);
+    assert.equal(port.retain(Object.freeze({ grant, observedCurrentness: currentness(), projection: projection() })), null);
+    const second = ownerWithSelection(); const foreign = second.owner.mintDocumentSynthesisAttachmentCapturePort(second.value);
+    assert.equal(foreign.begin(fresh), null); assert.equal(foreign.observeRevocation(grant), false);
+    const reselection = port.observeCurrentness(currentness(3, 3)); assert.ok(reselection);
+    first.owner.issueSelection({ expectedEpoch: 1, ...PAIR });
+    assert.equal(port.begin(reselection), null);
+
+    const expired = ownerWithSelection(); const expiryPort = expired.owner.mintDocumentSynthesisAttachmentCapturePort(expired.value);
+    const expiryCapture = expiryPort.observeCurrentness(currentness()); assert.ok(expiryCapture);
+    expired.setClock(expired.value.expiresAt); assert.equal(expiryPort.begin(expiryCapture), null);
+    const loggedOut = ownerWithSelection(); const logoutPort = loggedOut.owner.mintDocumentSynthesisAttachmentCapturePort(loggedOut.value);
+    const logoutCapture = logoutPort.observeCurrentness(currentness()); assert.ok(logoutCapture); deleteSession(loggedOut.value.id);
+    assert.equal(logoutPort.begin(logoutCapture), null);
+    const disposed = ownerWithSelection(); const disposePort = disposed.owner.mintDocumentSynthesisAttachmentCapturePort(disposed.value);
+    const disposeCapture = disposePort.observeCurrentness(currentness()); assert.ok(disposeCapture); disposed.owner.dispose();
+    assert.equal(disposePort.begin(disposeCapture), null);
+    const restarted = ownerWithSelection(); const restartPort = restarted.owner.mintDocumentSynthesisAttachmentCapturePort(restarted.value);
+    const restartCapture = restartPort.observeCurrentness(currentness()); assert.ok(restartCapture); clearAllSessions();
+    assert.equal(restartPort.begin(restartCapture), null);
+    assert.equal(createServerSessionProjectionOwnerRegistry().lookup(first.value.id), null);
+});
+
+test('Document Synthesis attachment capture denies hostile data without observation or deferred work', async () => {
+    const { value, owner } = ownerWithSelection(); const port = owner.mintDocumentSynthesisAttachmentCapturePort(value);
+    let reads = 0; let traps = 0; let unhandled = 0;
+    const capture = port.observeCurrentness(currentness()); assert.ok(capture);
+    const captureProxy = new Proxy(capture, { get() { traps += 1; throw new Error('synthetic trap'); } });
+    for (const forged of [Object.freeze(Object.create(null)), Object.freeze({ ...capture }), structuredClone(capture), captureProxy,
+        Object.freeze(Object.create({ capture })), Object.freeze({ [Symbol('x')]: capture }),
+        Object.freeze(Object.defineProperty({}, 'capture', { value: capture })), Object.freeze({ then() {} })]) {
+        assert.equal(port.begin(forged), null); assert.equal(port.observeRevocation(forged), false);
+    }
+    const grant = port.begin(capture); assert.ok(grant);
+    const accessor = Object.freeze(Object.defineProperty({}, 'documentSourceRef', { enumerable: true, get() { reads += 1; return 'x'; } }));
+    const proxy = new Proxy(Object.freeze({ grant, observedCurrentness: currentness(), projection: projection() }), {
+        get() { traps += 1; throw new Error('synthetic trap'); }, ownKeys() { traps += 1; throw new Error('synthetic trap'); },
+    });
+    const descriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+    const onUnhandled = () => { unhandled += 1; };
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { reads += 1; return undefined; } }); process.on('unhandledRejection', onUnhandled);
+    try {
+        for (const hostile of [accessor, proxy, Object.freeze({ grant, observedCurrentness: currentness(), projection: projection(), extra: true }),
+            Object.freeze(Object.create(null)), Object.freeze({ grant, observedCurrentness: currentness(), projection: projection(), [Symbol('x')]: true }),
+            Object.freeze(Object.defineProperty({ grant, observedCurrentness: currentness(), projection: projection() }, 'hidden', { value: true })),
+            Object.freeze({ grant, observedCurrentness: currentness(), projection: Object.freeze({ sourceKind: 'native_text', sourceText: 'x', then() {} }) })]) {
+            assert.equal(port.retain(hostile as never), null);
+        }
+    } finally {
+        if (descriptor) Object.defineProperty(Object.prototype, 'then', descriptor); else delete (Object.prototype as { then?: unknown }).then;
+    }
+    await new Promise<void>((resolve) => setImmediate(resolve)); process.off('unhandledRejection', onUnhandled);
+    assert.equal(reads, 0); assert.equal(traps, 0); assert.equal(unhandled, 0);
+});
+
+test('Document Synthesis attachment capture poisons reentry before minting authority', () => {
+    let armed = false; let nested: unknown;
+    const registry = createServerSessionProjectionOwnerRegistry({
+        resolve: (_session, pair) => pair, entropy: () => new Uint8Array(16),
+        clock: () => { if (armed) { armed = false; nested = port.observeCurrentness(currentness()); } return 1_000; },
+    });
+    const value = session(); const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const port = owner.mintDocumentSynthesisAttachmentCapturePort(value);
+    armed = true; assert.equal(port.observeCurrentness(currentness()), null); assert.equal(nested, null);
+    assert.ok(port.observeCurrentness(currentness()));
 });
 
 test('durable review commit port rejects forged, cloned, proxied, foreign, expired, stale, logged-out, and disposed values', () => {
