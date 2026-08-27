@@ -8,9 +8,18 @@ import { sql } from 'drizzle-orm';
 import { dbServer } from '../../db-server';
 import { acquireAuthenticatedWebSessionProjectionOwnerContext } from '../../security/server-auth';
 import { registerServerSessionResource } from '../../security/server-session';
+import type {
+    DocumentSynthesisAttachmentCaptureCapability,
+    DocumentSynthesisAttachmentCapturePort,
+} from '../../security/server-session-projection-owner';
 
 type Currentness = Readonly<{ documentSourceRef: string; documentRevision: number; documentFreshnessEpoch: number }>;
-type RecordState = Readonly<{ selected: true; currentness: Currentness; selectionEpoch: number; reviewContextEpoch: number; scope: 'document_synthesis_attachment_capture'; revocationGeneration: number }>;
+type RecordState = Readonly<{
+    selected: true; currentness: Currentness; selectionEpoch: number; reviewContextEpoch: number;
+    scope: 'document_synthesis_attachment_capture'; revocationGeneration: number;
+    attachmentCapturePort: DocumentSynthesisAttachmentCapturePort;
+    attachmentCaptureCapability: DocumentSynthesisAttachmentCaptureCapability;
+}>;
 type Broker = { records: Map<string, RecordState>; dispose: () => void; publish: (handle: string, state: RecordState) => boolean };
 type Result = Readonly<{ status: 'available' | 'denied'; code: null | 'input_invalid' | 'unavailable'; captureHandle: string | null; reviewOnly: true; writesPerformed: 0; applyPolicy: 'none' }>;
 
@@ -30,6 +39,7 @@ function available(captureHandle: string): Result { return sealed({ status: 'ava
 function exact(value: unknown, keys: readonly string[]): Record<string, unknown> | null { try { if (typeof value !== 'object' || value === null || IsProxy(value) || ArrayIsArray(value) || ObjectGetPrototypeOf(value) !== OBJECT || ReflectOwnKeys(value).length !== keys.length) return null; const descriptors = ObjectGetOwnPropertyDescriptors(value); const output = ObjectCreate(null) as Record<string, unknown>; for (const key of keys) { const descriptor = ObjectGetOwnPropertyDescriptor(descriptors, key); if (!descriptor || !ObjectHasOwn(descriptor, 'value')) return null; const field = descriptor.value as PropertyDescriptor; if (!field || field.enumerable !== true || !ObjectHasOwn(field, 'value')) return null; output[key] = field.value; } return output; } catch { return null; } }
 function intent(value: unknown): string | null { const id = exact(value, KEYS)?.attachmentId; return typeof id === 'string' && id.length > 0 && id.length <= MAX_ID && id === StringTrim(id) ? id : null; }
 function currentness(value: unknown): Currentness | null { const row = IsPromise(value) ? null : exact(value, ROW_KEYS); if (!row || typeof row.documentSourceRef !== 'string' || !RegExpTest(SOURCE_REF, row.documentSourceRef) || typeof row.documentRevision !== 'number' || !NumberIsSafeInteger(row.documentRevision) || row.documentRevision < 1 || typeof row.documentFreshnessEpoch !== 'number' || !NumberIsSafeInteger(row.documentFreshnessEpoch) || row.documentFreshnessEpoch < 1) return null; return sealed({ documentSourceRef: row.documentSourceRef, documentRevision: row.documentRevision, documentFreshnessEpoch: row.documentFreshnessEpoch }); }
+function ownerCurrentness(value: Currentness): Readonly<{ documentSourceRef: string; documentRevision: number; documentFreshnessEpoch: number }> { return ObjectFreeze({ documentSourceRef: value.documentSourceRef, documentRevision: value.documentRevision, documentFreshnessEpoch: value.documentFreshnessEpoch }); }
 function mint(bytes: unknown): string | null { if (!(bytes instanceof Uint8ArrayConstructor) || IsProxy(bytes) || bytes.length !== 16) return null; let value = 'dsc_'; for (let index = 0; index < 16; index += 1) { const byte = bytes[index]; if (typeof byte !== 'number' || !NumberIsSafeInteger(byte) || byte < 0 || byte > 255) return null; value += '0123456789abcdef'[byte >>> 4]! + '0123456789abcdef'[byte & 15]!; } return RegExpTest(HANDLE, value) ? value : null; }
 
 const ownerBrokers = new WeakMapConstructor<object, WeakMap<object, Broker>>();
@@ -48,5 +58,5 @@ export async function captureDocumentSynthesisAuthenticatedAttachment(input: unk
     let context: Awaited<ReturnType<typeof acquireAuthenticatedWebSessionProjectionOwnerContext>>;
     try { context = await acquireAuthenticatedWebSessionProjectionOwnerContext(); } catch { return denied('unavailable'); }
     if (!context) return denied('unavailable');
-    try { const broker = brokerFor(context); return context.owner.withLeaseCriticalSection(context.session, (selection) => { const tuple = currentness(DbGet(sql`SELECT a.document_source_ref AS documentSourceRef, a.document_revision AS documentRevision, a.document_freshness_epoch AS documentFreshnessEpoch FROM attachments AS a INNER JOIN patients_to_ambulatories AS pta ON pta.patient_id = a.patient_id WHERE a.id = ${attachmentId} AND a.patient_id = ${selection.patientId} AND pta.ambulatory_id = ${selection.ambulatoryId} LIMIT 1`)); if (!tuple) return denied('unavailable'); const captureHandle = mint(Entropy(16)); if (!captureHandle) return denied('unavailable'); const state = sealed<RecordState>({ selected: true, currentness: tuple, selectionEpoch: context.owner.snapshotSelectionEpoch(context.session), reviewContextEpoch: context.owner.snapshotReviewContextEpoch(context.session), scope: 'document_synthesis_attachment_capture', revocationGeneration: 0 }); return broker.publish(captureHandle, state) ? available(captureHandle) : denied('unavailable'); }); } catch { return denied('unavailable'); }
+    try { const broker = brokerFor(context); const attachmentCapturePort = context.owner.mintDocumentSynthesisAttachmentCapturePort(context.session); return context.owner.withLeaseCriticalSection(context.session, (selection) => { const tuple = currentness(DbGet(sql`SELECT a.document_source_ref AS documentSourceRef, a.document_revision AS documentRevision, a.document_freshness_epoch AS documentFreshnessEpoch FROM attachments AS a INNER JOIN patients_to_ambulatories AS pta ON pta.patient_id = a.patient_id WHERE a.id = ${attachmentId} AND a.patient_id = ${selection.patientId} AND pta.ambulatory_id = ${selection.ambulatoryId} LIMIT 1`)); if (!tuple) return denied('unavailable'); const attachmentCaptureCapability = attachmentCapturePort.observeCurrentness(ownerCurrentness(tuple)); if (!attachmentCaptureCapability) return denied('unavailable'); const captureHandle = mint(Entropy(16)); if (!captureHandle) return denied('unavailable'); const state = sealed<RecordState>({ selected: true, currentness: tuple, selectionEpoch: context.owner.snapshotSelectionEpoch(context.session), reviewContextEpoch: context.owner.snapshotReviewContextEpoch(context.session), scope: 'document_synthesis_attachment_capture', revocationGeneration: 0, attachmentCapturePort, attachmentCaptureCapability }); return broker.publish(captureHandle, state) ? available(captureHandle) : denied('unavailable'); }); } catch { return denied('unavailable'); }
 }
