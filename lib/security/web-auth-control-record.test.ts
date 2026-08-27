@@ -108,3 +108,69 @@ test('constructor accepts only inert primitive initial state', () => {
     assert.throws(() => createWebAuthControlRecord('f0', () => { called = true; return BigInt(0); }));
     assert.equal(called, false);
 });
+
+test('keeps P2a transitions atomic after post-import intrinsic poison', async (t) => {
+    const zero = BigInt(0);
+    const SetIntrinsic = Set;
+    const MapIntrinsic = Map;
+    const originals = {
+        add: SetIntrinsic.prototype.add, has: SetIntrinsic.prototype.has, get: MapIntrinsic.prototype.get, mapSet: MapIntrinsic.prototype.set,
+        size: Object.getOwnPropertyDescriptor(MapIntrinsic.prototype, 'size')!, freeze: Object.freeze,
+        safeInteger: Number.isSafeInteger, max: Math.max, setGlobal: Object.getOwnPropertyDescriptor(globalThis, 'Set')!,
+        map: Object.getOwnPropertyDescriptor(globalThis, 'Map')!, bigint: Object.getOwnPropertyDescriptor(globalThis, 'BigInt')!,
+    };
+    const fail = () => { throw new Error('post-import poison'); };
+    const auth = control().record;
+    const locked = control().record;
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+    process.on('unhandledRejection', onUnhandled);
+    t.after(() => process.off('unhandledRejection', onUnhandled));
+    let thrown: unknown;
+    let begin: unknown; let completed: unknown; let disposed: unknown; let lock: unknown; let constructed: ReturnType<typeof createWebAuthControlRecord> | undefined;
+    try {
+        SetIntrinsic.prototype.add = fail as typeof SetIntrinsic.prototype.add;
+        SetIntrinsic.prototype.has = fail as typeof SetIntrinsic.prototype.has;
+        MapIntrinsic.prototype.get = fail as typeof MapIntrinsic.prototype.get;
+        MapIntrinsic.prototype.set = fail as typeof MapIntrinsic.prototype.set;
+        Object.defineProperty(MapIntrinsic.prototype, 'size', { configurable: true, get: fail });
+        Object.freeze = fail as typeof Object.freeze;
+        Number.isSafeInteger = fail;
+        Math.max = fail;
+        Object.defineProperty(globalThis, 'Set', { configurable: true, value: fail });
+        Object.defineProperty(globalThis, 'Map', { configurable: true, value: fail });
+        Object.defineProperty(globalThis, 'BigInt', { configurable: true, value: fail });
+        try {
+            constructed = createWebAuthControlRecord('c0');
+            begin = auth.begin('login', 'op', 'key', 'fp', 0);
+            completed = auth.finalizeAuth('f0', 'op', zero, 'fp', 'web', 'f1', 1);
+            disposed = auth.disposeBoundSession('f1', 'web', 'f2', 2);
+            lock = locked.advanceLock('f0', 'lock', 'lock-fp', 'f1', 0);
+        } catch (error) { thrown = error; }
+    } finally {
+        SetIntrinsic.prototype.add = originals.add;
+        SetIntrinsic.prototype.has = originals.has;
+        MapIntrinsic.prototype.get = originals.get;
+        MapIntrinsic.prototype.set = originals.mapSet;
+        Object.defineProperty(MapIntrinsic.prototype, 'size', originals.size);
+        Object.freeze = originals.freeze;
+        Number.isSafeInteger = originals.safeInteger;
+        Math.max = originals.max;
+        Object.defineProperty(globalThis, 'Set', originals.setGlobal);
+        Object.defineProperty(globalThis, 'Map', originals.map);
+        Object.defineProperty(globalThis, 'BigInt', originals.bigint);
+    }
+    assert.equal(thrown, undefined);
+    assert.deepEqual(begin, { ok: true, fence: 'f0', generation: BigInt(0) });
+    assert.deepEqual(completed, { ok: true, fence: 'f1', generation: BigInt(1) });
+    assert.deepEqual(disposed, { ok: true, fence: 'f2', generation: BigInt(2) });
+    assert.deepEqual(lock, { ok: true, fence: 'f1', generation: BigInt(1), detachedSessionId: null });
+    assert.deepEqual(constructed?.snapshot(), { fence: 'c0', generation: BigInt(0), pending: false, active: false });
+    assert.deepEqual(auth.snapshot(), { fence: 'f2', generation: BigInt(2), pending: false, active: false });
+    assert.deepEqual(locked.snapshot(), { fence: 'f1', generation: BigInt(1), pending: false, active: false });
+    assert.equal(Object.isFrozen(completed), true);
+    assert.equal(Object.isFrozen(lock), true);
+    assert.equal(auth.begin('login', 'retry', 'retry-key', 'retry-fp', 3).ok, true, 'the completed disposal leaves a valid retry state');
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.deepEqual(unhandled, []);
+});
