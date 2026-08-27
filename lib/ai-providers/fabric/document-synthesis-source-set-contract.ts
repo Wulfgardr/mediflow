@@ -4,15 +4,14 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
 
+import { digestDocumentSynthesisSourceSet } from '../../security/document-synthesis-source-set-digest';
+
 const OBJECT = Object.prototype;
 const ARRAY = Array.prototype;
-const DOMAIN = 'mediflow.document-synthesis.source-set-digest.v1';
 const MAX_UNITS = 12_000;
 const MAX_SOURCE_BYTES = 36_000;
 const MAX_SET_BYTES = 1_152_000;
 const ZERO = BigInt(0);
-const BYTE = BigInt(255);
-const SHIFT = BigInt(8);
 const MAX_U64 = BigInt('18446744073709551615');
 const encoder = new TextEncoder();
 const ObjectCreate = Object.create;
@@ -30,9 +29,7 @@ const StringConstructor = String;
 const StringReplace = String.prototype.replace;
 const StringNormalize = String.prototype.normalize;
 const StringTrim = String.prototype.trim;
-const ArrayConstructor = Array;
 const Uint8ArrayConstructor = Uint8Array;
-const NumberConstructor = Number;
 const NumberIsSafeInteger = Number.isSafeInteger;
 const TextEncoderEncode = TextEncoder.prototype.encode;
 const WeakSetConstructor = WeakSet;
@@ -66,7 +63,6 @@ function sealed<T extends object>(value: T): Readonly<T> {
 function sealedList<T>(value: readonly T[]): readonly T[] { const output: T[] = []; for (let index = 0; index < value.length; index += 1) output[index] = value[index]!; ObjectDefineProperty(output, 'toJSON', { value: null, enumerable: false, configurable: false, writable: false }); return ObjectFreeze(output); }
 function bytes(value: Uint8Array | readonly number[]): Bytes { const output: number[] = []; for (let index = 0; index < value.length; index += 1) output[index] = value[index]!; return sealedList(output); }
 function encode(value: string): Uint8Array { return ReflectApply(TextEncoderEncode, encoder, [value]) as Uint8Array; }
-function append(target: number[], value: ArrayLike<number>): void { for (let index = 0; index < value.length; index += 1) target[target.length] = value[index]!; }
 function deniedProjection(): DocumentSynthesisProjectionResult { return sealed({ status: 'denied' as const, code: 'input_invalid' as const, projection: null }); }
 function deniedSourceSet(): DocumentSynthesisSourceSetResult { return sealed({ status: 'denied' as const, code: 'input_invalid' as const, sourceSet: null }); }
 
@@ -124,8 +120,6 @@ function unicode(value: unknown, normalizeLineEndings: boolean, trim: boolean, l
 
 function integer(value: unknown): value is bigint { return typeof value === 'bigint' && value >= ZERO && value <= MAX_U64; }
 function digest(value: Uint8Array | readonly number[]): Bytes { const copy = new Uint8ArrayConstructor(value.length); for (let index = 0; index < value.length; index += 1) copy[index] = value[index]!; return bytes(createHash('sha256').update(copy).digest()); }
-function u32(value: number): number[] { const output = new ArrayConstructor<number>(4); output[0] = (value >>> 24) & 255; output[1] = (value >>> 16) & 255; output[2] = (value >>> 8) & 255; output[3] = value & 255; return output; }
-function u64(value: bigint): number[] { const output = new ArrayConstructor<number>(8); for (let index = 7; index >= 0; index -= 1) { output[index] = NumberConstructor(value & BYTE); value >>= SHIFT; } return output; }
 function compare(a: ParsedProjection, b: ParsedProjection): number {
     const left = encode(a.documentSourceRef); const right = encode(b.documentSourceRef); const length = left.length < right.length ? left.length : right.length;
     for (let index = 0; index < length; index += 1) if (left[index] !== right[index]) return left[index] - right[index];
@@ -165,10 +159,11 @@ export function captureDocumentSynthesisSourceSet(value: unknown): DocumentSynth
         for (let index = 0; index < sourceValues.length; index += 1) { const item = parse(sourceValues[index]); if (!item) return deniedSourceSet(); total += item.sourceBytes.length; for (let prior = 0; prior < ordered.length; prior += 1) if (ordered[prior]!.documentSourceRef === item.documentSourceRef) return deniedSourceSet(); let position = ordered.length; while (position > 0 && compare(item, ordered[position - 1]!) < 0) { ordered[position] = ordered[position - 1]!; position -= 1; } ordered[position] = item; }
         if (total > MAX_SET_BYTES) return deniedSourceSet();
         const sources: Source[] = []; for (let index = 0; index < ordered.length; index += 1) { const item = projection(ordered[index]!); sources[index] = sealed({ label: `S${index + 1}`, documentSourceRef: item.documentSourceRef, documentRevision: item.documentRevision, documentFreshnessEpoch: item.documentFreshnessEpoch, sourceText: item.sourceText, sourceByteLength: item.sourceByteLength, projectionDigestSha256: item.projectionDigestSha256 }) as Source; }
-        const payload: number[] = []; const domain = encode(DOMAIN); append(payload, u32(domain.length)); append(payload, domain); payload[payload.length] = 0; payload[payload.length] = 1; payload[payload.length] = sources.length; append(payload, u64(input.sourceSetEpoch)); append(payload, u64(input.revocationGeneration));
-        for (let index = 0; index < sources.length; index += 1) { const item = sources[index]!; const label = encode(item.label); const reference = encode(item.documentSourceRef); append(payload, u32(label.length)); append(payload, label); append(payload, u32(reference.length)); append(payload, reference); append(payload, u64(item.documentRevision)); append(payload, u64(item.documentFreshnessEpoch)); append(payload, item.projectionDigestSha256); }
-        const digestPayloadBytes = bytes(payload);
-        const sourceSet = sealed({ sourceSetEpoch: input.sourceSetEpoch, revocationGeneration: input.revocationGeneration, sources: sealedList(sources), digestPayloadBytes, sourceSetDigestSha256: digest(digestPayloadBytes) });
+        const digestSources: unknown[] = [];
+        for (let index = 0; index < sources.length; index += 1) { const item = sources[index]!; digestSources[index] = { label: item.label, documentSourceRef: item.documentSourceRef, documentRevision: item.documentRevision, documentFreshnessEpoch: item.documentFreshnessEpoch, sourceByteLength: item.sourceByteLength, projectionDigestSha256: item.projectionDigestSha256 }; }
+        const coded = digestDocumentSynthesisSourceSet({ sources: digestSources, sourceSetEpoch: input.sourceSetEpoch, revocationGeneration: input.revocationGeneration });
+        if (coded.status !== 'available') return deniedSourceSet();
+        const sourceSet = sealed({ sourceSetEpoch: input.sourceSetEpoch, revocationGeneration: input.revocationGeneration, sources: sealedList(sources), digestPayloadBytes: coded.digestPayloadBytes, sourceSetDigestSha256: coded.sourceSetDigestSha256 });
         const snapshot: ProviderSource[] = []; for (let index = 0; index < sources.length; index += 1) { const item = sources[index]!; snapshot[index] = sealed({ label: item.label, sourceText: item.sourceText }) as ProviderSource; }
         addSourceSetIdentity(sourceSet);
         setProviderSources(sourceSet, sealedList(snapshot));
