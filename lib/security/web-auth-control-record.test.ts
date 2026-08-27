@@ -9,8 +9,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
 
 import {
+    abortPreparedAuthControlActivation,
     commitAuthControlTicket,
+    commitPreparedAuthControlActivation,
     createWebAuthControlRecord,
+    prepareAuthControlActivation,
     retireAuthControlTicket,
 } from './web-auth-control-record.ts';
 
@@ -212,6 +215,106 @@ test('commits one opaque ticket for the exact pending control and session bindin
     assert.deepEqual(first.snapshot(), { fence: first.snapshot().fence, generation: BigInt(1), pending: false, active: true });
     assert.equal(commitAuthControlTicket(ticket), false, 'activation ticket is single-use');
     assert.equal(other.snapshot().active, false, 'the ticket cannot mutate another control record');
+});
+
+test('prepares one exact activation and commits it through a lexical final CAS', () => {
+    const { record } = control(); record.begin('login', 'op', 'key', 'fp', 0);
+    const ticket = record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', '__proto__', 1); assert.ok(ticket);
+    const prepared = prepareAuthControlActivation(ticket, '__proto__'); assert.ok(prepared);
+    assert.deepEqual([Object.getPrototypeOf(prepared), Object.isFrozen(prepared), Reflect.ownKeys(prepared)], [null, true, []]);
+    assert.equal(commitAuthControlTicket(ticket), false, 'legacy direct commit cannot bypass a prepared activation');
+    assert.equal(commitPreparedAuthControlActivation(prepared), 1);
+    assert.deepEqual(record.snapshot(), { fence: record.snapshot().fence, generation: BigInt(1), pending: false, active: true });
+    assert.equal(commitPreparedAuthControlActivation(prepared), 0);
+    assert.equal(abortPreparedAuthControlActivation(prepared), false);
+    assert.equal(retireAuthControlTicket(ticket, 'lock'), 1, 'the original ticket remains the retirement binding');
+
+    const source = readFileSync(fileURLToPath(new URL('./web-auth-control-record.ts', import.meta.url)), 'utf8');
+    const body = source.slice(source.indexOf('export function commitPreparedAuthControlActivation'), source.indexOf('export function abortPreparedAuthControlActivation'));
+    assert.doesNotMatch(body, /weakMap|mapGet|mapSet|tableHas|tableAdd|tableDelete|Reflect|apply\(|Object\.|Promise|then|callback/u);
+});
+
+test('activation preparation denies wrong, stale, replayed, and colliding bindings without residue', () => {
+    const wrong = control().record; wrong.begin('login', 'op', 'key', 'fp', 0);
+    const wrongTicket = wrong.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web-1', 1); assert.ok(wrongTicket);
+    assert.equal(prepareAuthControlActivation(wrongTicket, 'web-2'), null);
+    assert.equal(commitAuthControlTicket(wrongTicket), false);
+
+    const stale = control().record; stale.begin('login', 'op', 'key', 'fp', 0);
+    const staleTicket = stale.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web-stale', 1); assert.ok(staleTicket);
+    stale.advanceLock('f0', 'lock', 'lock-fp', 'f-stale', 2);
+    assert.equal(prepareAuthControlActivation(staleTicket, 'web-stale'), null);
+
+    const first = control('first').record; first.begin('login', 'op-a', 'key-a', 'fp-a', 0);
+    const second = control('second').record; second.begin('setup', 'op-b', 'key-b', 'fp-b', 0);
+    const firstTicket = first.prepareAuthControlTicket('first', 'op-a', BigInt(0), 'fp-a', 'web-a', 1);
+    const secondTicket = second.prepareAuthControlTicket('second', 'op-b', BigInt(0), 'fp-b', 'web-b', 1); assert.ok(firstTicket && secondTicket);
+    const firstPrepared = prepareAuthControlActivation(firstTicket, 'web-a'); assert.ok(firstPrepared);
+    assert.equal(prepareAuthControlActivation(secondTicket, 'web-b'), null, 'a concurrent prepared activation denies both reservations');
+    assert.equal(commitPreparedAuthControlActivation(firstPrepared), 0);
+    assert.equal(commitAuthControlTicket(secondTicket), false);
+    const replayTicket = first.prepareAuthControlTicket('first', 'op-a', BigInt(0), 'fp-a', 'web-a', 2); assert.ok(replayTicket);
+    const replayPrepared = prepareAuthControlActivation(replayTicket, 'web-a'); assert.ok(replayPrepared);
+    assert.equal(prepareAuthControlActivation(replayTicket, 'web-a'), null, 'double prepare is terminal');
+    assert.equal(commitPreparedAuthControlActivation(replayPrepared), 0);
+    const secondRetry = second.prepareAuthControlTicket('second', 'op-b', BigInt(0), 'fp-b', 'web-b', 2); assert.ok(secondRetry);
+    const secondPrepared = prepareAuthControlActivation(secondRetry, 'web-b'); assert.ok(secondPrepared);
+    assert.equal(abortPreparedAuthControlActivation(secondPrepared), true);
+    assert.equal(abortPreparedAuthControlActivation(secondPrepared), false);
+});
+
+test('activation capabilities reject hostile and cross-module values without ambient work', async () => {
+    let observed = 0; const proxy = new Proxy({}, { get: () => { observed += 1; throw new Error('get'); }, ownKeys: () => { observed += 1; throw new Error('keys'); } });
+    const accessor = Object.create(null); Object.defineProperty(accessor, 'then', { get: () => { observed += 1; throw new Error('then'); } });
+    const rejected = Promise.reject(new Error('hostile')); rejected.catch(() => undefined);
+    const hostile = [null, {}, Object.create(null), proxy, accessor, Promise.resolve(), rejected, { then() { observed += 1; } }];
+    for (const value of hostile) { assert.equal(prepareAuthControlActivation(value, 'web'), null); assert.equal(commitPreparedAuthControlActivation(value), 0); assert.equal(abortPreparedAuthControlActivation(value), false); }
+
+    const record = control().record; record.begin('login', 'op', 'key', 'fp', 0);
+    const ticket = record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 1); assert.ok(ticket);
+    const prepared = prepareAuthControlActivation(ticket, 'web'); assert.ok(prepared);
+    const restarted = await freshModule('web-auth-activation-restart');
+    assert.equal(restarted.prepareAuthControlActivation(ticket, 'web'), null);
+    assert.equal(restarted.commitPreparedAuthControlActivation(prepared), 0);
+    const fail = () => { throw new Error('ambient poison'); }; const get = WeakMap.prototype.get; const reflectApply = Reflect.apply;
+    const thenDescriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+    try {
+        WeakMap.prototype.get = fail as typeof get; Reflect.apply = fail as typeof Reflect.apply;
+        Object.defineProperty(Object.prototype, 'then', { configurable: true, get: fail });
+        assert.equal(commitPreparedAuthControlActivation(prepared), 1);
+    } finally {
+        WeakMap.prototype.get = get; Reflect.apply = reflectApply;
+        if (thenDescriptor) Object.defineProperty(Object.prototype, 'then', thenDescriptor); else delete (Object.prototype as { then?: unknown }).then;
+    }
+    const terminal = record.snapshot();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(observed, 0); assert.deepEqual(record.snapshot(), terminal);
+
+    const denied = control('denied').record; denied.begin('login', 'op', 'key', 'fp', 0);
+    const deniedTicket = denied.prepareAuthControlTicket('denied', 'op', BigInt(0), 'fp', 'denied-web', 1); assert.ok(deniedTicket);
+    const deniedPrepared = prepareAuthControlActivation(deniedTicket, 'denied-web'); assert.ok(deniedPrepared);
+    assert.equal(commitPreparedAuthControlActivation(proxy), 0); assert.equal(commitPreparedAuthControlActivation(deniedPrepared), 0); assert.equal(observed, 0);
+});
+
+test('activation preparation survives pre-import WeakMap reentry and apply-then-throw fail closed', async () => {
+    const originalGet = WeakMap.prototype.get; let target = ''; let failAfterApply = false; let nested = () => undefined;
+    WeakMap.prototype.get = function (this: WeakMap<object, unknown>, key: object) {
+        if (target === 'get') { target = ''; nested(); }
+        const result = Reflect.apply(originalGet, this, [key]);
+        if (failAfterApply) { failAfterApply = false; throw new Error('apply-then-throw'); }
+        return result;
+    };
+    let isolated: typeof import('./web-auth-control-record.ts');
+    try { isolated = await freshModule('web-auth-activation-weakmap'); } finally { WeakMap.prototype.get = originalGet; }
+    const record = isolated.createWebAuthControlRecord('f0'); record.begin('login', 'op', 'key', 'fp', 0);
+    const first = record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 1); assert.ok(first);
+    let nestedResult: unknown; target = 'get'; nested = () => { nestedResult = isolated.prepareAuthControlActivation(first, 'web'); };
+    assert.equal(isolated.prepareAuthControlActivation(first, 'web'), null); assert.equal(nestedResult, null); assert.equal(isolated.commitAuthControlTicket(first), false);
+    const second = record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 2); assert.ok(second);
+    failAfterApply = true; assert.equal(isolated.prepareAuthControlActivation(second, 'web'), null); assert.equal(isolated.commitAuthControlTicket(second), false);
+    const retry = record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 3); assert.ok(retry);
+    const prepared = isolated.prepareAuthControlActivation(retry, 'web'); assert.ok(prepared); assert.equal(isolated.commitPreparedAuthControlActivation(prepared), 1);
+    const terminal = record.snapshot(); await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(record.snapshot(), terminal);
 });
 
 test('retires the exact active ticket once and exposes only same-reason replay', () => {
