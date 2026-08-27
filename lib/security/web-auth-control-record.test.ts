@@ -1,8 +1,15 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import crypto from 'node:crypto';
+import { createRequire } from 'node:module';
 import test from 'node:test';
 
-import { createWebAuthControlRecord } from './web-auth-control-record.ts';
+import {
+    commitAuthControlTicket,
+    createWebAuthControlRecord,
+    retireAuthControlTicket,
+} from './web-auth-control-record.ts';
 
 const MAX = BigInt('18446744073709551615');
 function control(fence = 'f0', generation = BigInt(0)) {
@@ -122,12 +129,14 @@ test('keeps P2a transitions atomic after post-import intrinsic poison', async (t
     const fail = () => { throw new Error('post-import poison'); };
     const auth = control().record;
     const locked = control().record;
+    const ticketRecord = control().record; ticketRecord.begin('login', 'ticket-op', 'ticket-key', 'ticket-fp', 0);
+    const ticket = ticketRecord.prepareAuthControlTicket('f0', 'ticket-op', BigInt(0), 'ticket-fp', 'ticket-web', 1); assert.ok(ticket);
     const unhandled: unknown[] = [];
     const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
     process.on('unhandledRejection', onUnhandled);
     t.after(() => process.off('unhandledRejection', onUnhandled));
     let thrown: unknown;
-    let begin: unknown; let completed: unknown; let disposed: unknown; let lock: unknown; let constructed: ReturnType<typeof createWebAuthControlRecord> | undefined;
+    let begin: unknown; let completed: unknown; let disposed: unknown; let lock: unknown; let ticketCommit: unknown; let ticketRetire: unknown; let constructed: ReturnType<typeof createWebAuthControlRecord> | undefined;
     try {
         SetIntrinsic.prototype.add = fail as typeof SetIntrinsic.prototype.add;
         SetIntrinsic.prototype.has = fail as typeof SetIntrinsic.prototype.has;
@@ -146,6 +155,7 @@ test('keeps P2a transitions atomic after post-import intrinsic poison', async (t
             completed = auth.finalizeAuth('f0', 'op', zero, 'fp', 'web', 'f1', 1);
             disposed = auth.disposeBoundSession('f1', 'web', 'f2', 2);
             lock = locked.advanceLock('f0', 'lock', 'lock-fp', 'f1', 0);
+            ticketCommit = commitAuthControlTicket(ticket); ticketRetire = retireAuthControlTicket(ticket, 'lock');
         } catch (error) { thrown = error; }
     } finally {
         SetIntrinsic.prototype.add = originals.add;
@@ -165,6 +175,7 @@ test('keeps P2a transitions atomic after post-import intrinsic poison', async (t
     assert.deepEqual(completed, { ok: true, fence: 'f1', generation: BigInt(1) });
     assert.deepEqual(disposed, { ok: true, fence: 'f2', generation: BigInt(2) });
     assert.deepEqual(lock, { ok: true, fence: 'f1', generation: BigInt(1), detachedSessionId: null });
+    assert.equal(ticketCommit, true); assert.equal(ticketRetire, 1);
     assert.deepEqual(constructed?.snapshot(), { fence: 'c0', generation: BigInt(0), pending: false, active: false });
     assert.deepEqual(auth.snapshot(), { fence: 'f2', generation: BigInt(2), pending: false, active: false });
     assert.deepEqual(locked.snapshot(), { fence: 'f1', generation: BigInt(1), pending: false, active: false });
@@ -173,4 +184,103 @@ test('keeps P2a transitions atomic after post-import intrinsic poison', async (t
     assert.equal(auth.begin('login', 'retry', 'retry-key', 'retry-fp', 3).ok, true, 'the completed disposal leaves a valid retry state');
     await new Promise<void>((resolve) => setImmediate(resolve));
     assert.deepEqual(unhandled, []);
+});
+
+test('commits one opaque ticket for the exact pending control and session binding', () => {
+    const first = control().record;
+    const other = control('other').record;
+    assert.equal(first.begin('login', 'op', 'key', 'fp', 0).ok, true);
+    assert.equal(other.begin('login', 'op', 'key', 'fp', 0).ok, true);
+
+    const ticket = first.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web-1', 1);
+    assert.ok(ticket);
+    assert.equal(Object.getPrototypeOf(ticket), null);
+    assert.equal(Object.isFrozen(ticket), true);
+    assert.deepEqual(Reflect.ownKeys(ticket), []);
+    assert.equal(commitAuthControlTicket(ticket), true);
+    assert.deepEqual(first.snapshot(), { fence: first.snapshot().fence, generation: BigInt(1), pending: false, active: true });
+    assert.equal(commitAuthControlTicket(ticket), false, 'activation ticket is single-use');
+    assert.equal(other.snapshot().active, false, 'the ticket cannot mutate another control record');
+});
+
+test('retires the exact active ticket once and exposes only same-reason replay', () => {
+    const { record } = control();
+    record.begin('setup', 'op', 'key', 'fp', 0);
+    const ticket = record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web-1', 1);
+    assert.ok(ticket);
+    assert.equal(retireAuthControlTicket(ticket, 'lock'), 0, 'a prepared ticket cannot retire authority');
+    assert.equal(commitAuthControlTicket(ticket), true);
+    const activeFence = record.snapshot().fence;
+    assert.equal(retireAuthControlTicket(ticket, 'unknown'), 0);
+    assert.deepEqual(record.snapshot(), { fence: activeFence, generation: BigInt(1), pending: false, active: true });
+    assert.equal(retireAuthControlTicket(ticket, 'lock'), 1);
+    assert.deepEqual(record.snapshot(), { fence: record.snapshot().fence, generation: BigInt(2), pending: false, active: false });
+    assert.equal(retireAuthControlTicket(ticket, 'lock'), 2);
+    assert.equal(retireAuthControlTicket(ticket, 'dispose'), 0);
+    assert.equal(commitAuthControlTicket(ticket), false);
+});
+
+test('denies stale, expired, wrapped, restarted, and hostile tickets without observation', async (t) => {
+    const stale = control().record;
+    stale.begin('login', 'op', 'key', 'fp', 0);
+    const staleTicket = stale.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 1);
+    assert.ok(staleTicket);
+    assert.equal(stale.advanceLock('f0', 'lock', 'lock-fp', 'legacy-f1', 2).ok, true);
+    assert.equal(commitAuthControlTicket(staleTicket), false);
+    assert.equal(stale.snapshot().active, false);
+
+    const expired = control().record; expired.begin('login', 'op', 'key', 'fp', 0);
+    assert.equal(expired.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 120_000), null);
+    const nearWrap = control('near-max', MAX - BigInt(1)).record;
+    nearWrap.begin('login', 'op', 'key', 'fp', 0);
+    assert.equal(nearWrap.prepareAuthControlTicket('near-max', 'op', MAX - BigInt(1), 'fp', 'web', 1), null);
+
+    let observed = 0;
+    const proxy = new Proxy({}, { get: () => { observed += 1; throw new Error('get'); }, ownKeys: () => { observed += 1; throw new Error('keys'); } });
+    const accessor = Object.create(null); Object.defineProperty(accessor, 'then', { get: () => { observed += 1; throw new Error('then'); } });
+    const rejected = Promise.reject(new Error('hostile')); rejected.catch(() => undefined);
+    const hostile = [null, undefined, {}, Object.create(null), proxy, accessor, Promise.resolve(), rejected, { then() { observed += 1; } }];
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    for (let index = 0; index < hostile.length; index += 1) {
+        assert.equal(commitAuthControlTicket(hostile[index]), false);
+        assert.equal(retireAuthControlTicket(hostile[index], 'lock'), 0);
+    }
+    const live = control().record; live.begin('login', 'op', 'key', 'fp', 0);
+    const ticket = live.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 1); assert.ok(ticket);
+    const clone = Object.assign(Object.create(null), ticket);
+    assert.equal(commitAuthControlTicket(clone), false);
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./web-auth-control-record.ts'); const cached = nodeRequire.cache[modulePath];
+    let restarted: typeof import('./web-auth-control-record.ts') | undefined;
+    try { delete nodeRequire.cache[modulePath]; restarted = nodeRequire(modulePath) as typeof import('./web-auth-control-record.ts'); assert.equal(restarted.commitAuthControlTicket(ticket), false); }
+    finally { if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
+    assert.equal(commitAuthControlTicket(ticket), true);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(observed, 0); assert.deepEqual(unhandled, []);
+});
+
+test('keeps the ticket module private to its canonical future server-session importer', () => {
+    const paths = execFileSync('rg', ['-l', 'web-auth-control-record|prepareAuthControlTicket|commitAuthControlTicket|retireAuthControlTicket', '-g', '*.ts', '.'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map((path) => path.replace(/^\.\//u, ''));
+    assert.equal(paths.includes('lib/security/web-auth-control-record.test.ts'), true);
+    assert.equal(paths.includes('lib/security/web-auth-control-record.ts'), true);
+    assert.equal(paths.every((path) => path === 'lib/security/server-session.ts' || path.endsWith('web-auth-control-record.ts') || path.endsWith('web-auth-control-record.test.ts')), true);
+});
+
+test('entropy collision and same-record reentry deny before ticket publication and permit a clean retry', async () => {
+    const original = crypto.randomBytes; let calls = 0; let entered = false; let nested: unknown;
+    let record: ReturnType<typeof createWebAuthControlRecord> | null = null;
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./web-auth-control-record.ts'); const cached = nodeRequire.cache[modulePath];
+    try {
+        crypto.randomBytes = (() => {
+            calls += 1;
+            if (!entered && record) { entered = true; nested = record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 1); }
+            return Buffer.alloc(32, calls <= 2 ? 7 : calls);
+        }) as typeof crypto.randomBytes;
+        delete nodeRequire.cache[modulePath]; const isolated = nodeRequire(modulePath) as typeof import('./web-auth-control-record.ts');
+        record = isolated.createWebAuthControlRecord('f0'); record.begin('login', 'op', 'key', 'fp', 0);
+        assert.equal(record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 1), null);
+        assert.equal(nested, null);
+        const retry = record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 2);
+        assert.ok(retry); assert.equal(isolated.commitAuthControlTicket(retry), true); assert.equal(isolated.retireAuthControlTicket(retry, 'lock'), 1);
+    } finally { crypto.randomBytes = original; if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
 });
