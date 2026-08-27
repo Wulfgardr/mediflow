@@ -499,22 +499,27 @@ scrittura clinica.
 
 #### Autorita, burn e capsule
 
-L'handoff autenticato DS e monouso: il `ServerSessionProjectionOwner` lo
-risolve e lo brucia nello stesso closure prima di preparare qualsiasi capsule.
-Il token autentico conserva soltanto l'identita opaca della capsule e si
-risolve una sola volta. Dopo il burn non conserva, espone o ricostruisce owner,
-sessione, sorgenti, projection, prompt, lease o contatori. Un errore, una
-negazione o una reentry dopo il burn non riabilitano l'handoff.
+A3c1 definisce soltanto la primitiva di capsule nel
+`ServerSessionProjectionOwner`: l'owner promuove il proprio record sigillato e
+ne trattiene lo stato privato in una capsule di esecuzione `memory-only`,
+owner-bound e session-bound. La forma osservabile della capsule ha zero campi.
+A3c1 non compone l'handoff DS e non minta, trattiene o consuma token o identita
+autentici.
 
-Lo stesso `ServerSessionProjectionOwner` promuove il record sigillato a una
-capsule di esecuzione `memory-only`, owner-bound e session-bound. La forma
-osservabile della capsule ha zero campi. Il record privato dell'owner conserva
-la projection privata, il digest, la currentness documentale, il lineage e i
-binding di selezione, review, sessione, lease e revoca. Conserva quindi
-`documentSourceRef`, revisione e freshness, gli epoch di selezione e review,
-`sourceSetEpoch` e `revocationGeneration` solo come stato privato dell'owner.
-Nessuno di questi valori attraversa il token autentico, la capsule pubblica,
-una route, la UI, cache, log o provider.
+Il record privato dell'owner conserva la projection privata, il digest, la
+currentness documentale, il lineage e i binding di selezione, review, sessione,
+lease e revoca. Conserva quindi `documentSourceRef`, revisione e freshness,
+gli epoch di selezione e review, `sourceSetEpoch` e `revocationGeneration` solo
+come stato privato dell'owner. Nessuno di questi valori attraversa la capsule,
+un token, una route, la UI, cache, log o provider.
+
+A3c2 definisce il trattenimento e il consume monouso dell'identita opaca di
+una capsule gia esistente. Non promuove un record, non alloca o prealloca
+un'identita e non puo esistere prima della capsule. In A3c3, lo scambio
+autenticato risolve e brucia prima l'handoff DS; lo stesso owner promuove poi
+il record sigillato con A3c1 e l'intake canonico minta il token autentico A3c2.
+Il token conserva soltanto quell'identita opaca e si risolve una sola volta.
+Un errore, una negazione o una reentry dopo il burn non riabilitano l'handoff.
 
 La capsule non e authority. Non puo da sola invocare il provider, pubblicare,
 applicare, risolvere una nuova sessione o selezione, leggere una sorgente o
@@ -564,13 +569,14 @@ ricostruire la capsule da dati osservabili.
 | Packet | Confine unico | Stop immediato | Claim ceiling |
 | --- | --- | --- | --- |
 | A3c0 | Questo addendum: burn, capsule owner-bound, resolver privato e lifecycle. | La capsule, il token o un registry diventano authority o state globale. | Solo contratto; nessun runtime o provider. |
-| A3c1 | Bruciare l'handoff autenticato e mintare l'identita opaca una sola volta. | Il token puo essere risolto due volte o conserva binding privati. | Una identity inerte, non una capability. |
-| A3c2 | Promuovere il record sigillato nel closure del `ServerSessionProjectionOwner`. | Owner, sessione, projection, digest o contatori escono dal closure. | Capsule `memory-only`, owner/session-bound. |
-| A3c3 | Esporre a C3c2 proiezione/prompt minimi e opaque currentness witness. | C3c2 osserva source ref, epoch, contatori o digest. | Dati minimi, senza authority o currentness provata. |
-| A3c4 | Issuance della lease DS e una sola chiamata provider. | Retry, fallback, seconda chiamata o invocazione dalla capsule. | Una chiamata candidata, non una pubblicazione. |
-| A3c5 | Revalidation finale owner-side di tutti i binding e del witness. | Drift, revoca o expiry arriva al commit. | Denial fail-closed o precondizione per commit. |
-| A3c6 | Commit-last della lease DS e pubblicazione dello schema gia congelato. | Qualunque lavoro fallibile segue il commit o la receipt precede il commit. | Receipt review-only esistente; nessun apply. |
-| A3c7 | Disposal terminale su denial, logout, expiry, drift e restart. | Un token, lease o capsule sopravvive o riacquista validita. | Distruzione `memory-only`, non revoca persistente. |
+| A3c1 | Primitiva di capsule nel `ServerSessionProjectionOwner`: record sigillato trattenuto, forma zero-field. | La primitiva compone DS handoff/token o espone stato privato. | Capsule `memory-only`, owner/session-bound; nessuna identity. |
+| A3c2 | Trattenimento e consume monouso dell'identita opaca di una capsule esistente. | Il token precede, alloca o prealloca l'identita della capsule, o risolve due volte. | Identity inerte, non una capability. |
+| A3c3 | Migrare lo scambio autenticato: burn DSH, promozione owner A3c1, poi intake canonico A3c2. | Il burn non precede la promozione, o un chiamante compone owner/capsule/token. | Un solo percorso owner-side; nessuna autorita nuova. |
+| A3c4 | Adapter opaco C3c2 per proiezione/prompt minimi e currentness witness. | C3c2 osserva source ref, epoch, contatori o digest. | Dati minimi, senza authority o currentness provata. |
+| A3c5a | Lease DS capsule-backed e revalidation finale owner-side. | Drift, revoca o expiry arriva al commit. | Denial fail-closed o precondizione per commit. |
+| A3c5b | Migrazione Fabric admission, solo se necessaria al percorso capsule-backed. | Admissione amplia authority, fallback o provider call. | Composizione candidata, non una nuova admissione. |
+| A3c6 | Composizione produzione token-only e pubblicazione commit-last. | Qualunque lavoro fallibile segue il commit, il token non e capsule-backed o la receipt precede il commit. | Receipt review-only esistente; nessun apply. |
+| A3c7 | Rimuovere la superficie C3c2 caller-shaped e aggiungere disposal/import guard terminali. | Un input caller-shaped, token, lease o capsule sopravvive o riacquista validita. | Distruzione `memory-only`, non revoca persistente. |
 
 Ogni packet e depth-first: il successivo resta `HOLD` finche il precedente non
 e accettato, integrato su una base esatta e verificato indipendentemente. Ogni
