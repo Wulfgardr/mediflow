@@ -366,6 +366,10 @@ export function activateStagedWebServerSession(capsule: unknown): ServerSession 
         revokeStagedWebSession(record);
         return null;
     }
+    if (getMapValue(sessions, sessionId)) {
+        revokeStagedWebSession(record);
+        return null;
+    }
     const session: ServerSession = {
         id: sessionId,
         userId: record.userId,
@@ -418,7 +422,6 @@ export function peekSession(sessionId: string | null | undefined): ServerSession
 }
 
 export function deleteSession(sessionId: string | null | undefined): void {
-    if (abortStagedWebServerSession(sessionId)) return;
     if (!sessionId) return;
     terminateSession(sessionId, 'session_deleted');
 }

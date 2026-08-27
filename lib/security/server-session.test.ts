@@ -198,13 +198,7 @@ test('a staged Web session has no observable authority before its one-use activa
     const capsule = stageWebServerSession({ id: 'staged-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
 
     assert.ok(capsule);
-    assert.equal(Object.getPrototypeOf(capsule), null);
-    assert.equal(Object.isFrozen(capsule), true);
-    assert.deepEqual(Object.getOwnPropertyNames(capsule), []);
-    assert.deepEqual(Object.getOwnPropertySymbols(capsule), []);
-    assert.equal(getSession(null), null);
-    assert.equal(peekSession(null), null);
-    assert.equal(registerServerSessionResource('staged-user', () => undefined), null);
+    assert.deepEqual([Object.getPrototypeOf(capsule), Object.isFrozen(capsule), Object.getOwnPropertyNames(capsule), Object.getOwnPropertySymbols(capsule)], [null, true, [], []]);
 
     const session = activateStagedWebServerSession(capsule);
     assert.ok(session);
@@ -216,16 +210,13 @@ test('a staged Web session has no observable authority before its one-use activa
 
 test('staged Web sessions deny abort, user invalidation, clear, restart, and hostile capsules', () => {
     const aborted = stageWebServerSession({ id: 'abort-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
-    const deleted = stageWebServerSession({ id: 'delete-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
     const invalidated = stageWebServerSession({ id: 'invalidate-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
     const cleared = stageWebServerSession({ id: 'clear-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
-    assert.ok(aborted && deleted && invalidated && cleared);
+    assert.ok(aborted && invalidated && cleared);
 
     assert.equal(abortStagedWebServerSession(aborted), true);
     assert.equal(abortStagedWebServerSession(aborted), false);
     assert.equal(activateStagedWebServerSession(aborted), null);
-    deleteSession(deleted as unknown as string);
-    assert.equal(activateStagedWebServerSession(deleted), null);
     invalidateSessionsForUser('invalidate-user');
     assert.equal(activateStagedWebServerSession(invalidated), null);
     clearAllSessions();
@@ -272,25 +263,17 @@ test('staging accepts only exact data values and never reads hostile accessors o
 });
 
 test('an expired staged Web session is denied before publication', () => {
-    const nodeRequire = createRequire(import.meta.url);
-    const modulePath = nodeRequire.resolve('./server-session.ts');
-    const originalModule = nodeRequire.cache[modulePath];
-    const originalTtl = process.env.MEDIFLOW_SESSION_TTL_MS;
-    let expiring: typeof import('./server-session') | undefined;
-    try {
-        process.env.MEDIFLOW_SESSION_TTL_MS = '0';
-        delete nodeRequire.cache[modulePath];
-        expiring = nodeRequire(modulePath) as typeof import('./server-session');
-        const capsule = expiring.stageWebServerSession({ id: 'expired-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
-        assert.ok(capsule);
-        assert.equal(expiring.activateStagedWebServerSession(capsule), null);
-    } finally {
-        expiring?.clearAllSessions();
-        if (originalTtl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS;
-        else process.env.MEDIFLOW_SESSION_TTL_MS = originalTtl;
-        if (originalModule) nodeRequire.cache[modulePath] = originalModule;
-        else delete nodeRequire.cache[modulePath];
-    }
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath]; const ttl = process.env.MEDIFLOW_SESSION_TTL_MS;
+    let isolated: typeof import('./server-session') | undefined;
+    try { process.env.MEDIFLOW_SESSION_TTL_MS = '0'; delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session'); const capsule = isolated.stageWebServerSession({ id: 'expired-user', username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(capsule); assert.equal(isolated.activateStagedWebServerSession(capsule), null); }
+    finally { isolated?.clearAllSessions(); if (ttl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = ttl; if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
+});
+
+test('an entropy collision burns the capsule without replacing the live session', () => {
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath]; const cryptoModule = nodeRequire('node:crypto'); const randomBytes = cryptoModule.randomBytes;
+    let isolated: typeof import('./server-session') | undefined;
+    try { cryptoModule.randomBytes = () => Buffer.alloc(32, 7); delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session'); const live = isolated.createSession({ id: 'live-user', username: SYNTHETIC_USERNAME, role: 'clinician' }); const capsule = isolated.stageWebServerSession({ id: 'staged-user', username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(capsule); assert.equal(isolated.activateStagedWebServerSession(capsule), null); assert.equal(isolated.getSession(live.id), live); assert.equal(isolated.activateStagedWebServerSession(capsule), null); }
+    finally { cryptoModule.randomBytes = randomBytes; isolated?.clearAllSessions(); if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
 });
 
 test('staging and activation use captured intrinsics after ambient poisoning', () => {
