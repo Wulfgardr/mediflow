@@ -234,6 +234,56 @@ digest restano 32 byte raw, non hex. Nessun campo puo dipendere dall'ordine JSON
 Questo codec resta invariato: questa ADR non introduce JCS, un master digest o
 un digest del plaintext originale.
 
+### Addendum A1b0: sigillo opaco owner-bound
+
+Questo addendum chiude `HOLD_CONTRACT` A1b. Conserva il codec del source set e
+i ceiling di questa ADR. Non introduce un secondo confine di authority.
+
+Il sigillo A1b e un'evidence opaca, owner-bound e `memory-only`. Non e uno
+snapshot primitivo dei contatori. Il record privato nello stesso closure
+dell'owner autentico lega allocazione, owner, sessione, paziente e ambulatorio
+selezionati, `selectionEpoch`, `reviewContextEpoch`, lifecycle e revoca. I
+valori raw `sourceSetEpoch`, `revocationGeneration` e ogni `bigint` restano nel
+closure: non attraversano il grafo di oggetti pubblico e non entrano in route,
+UI, cache, projection o provider.
+
+Solo l'owner autentico cattura il set e costruisce digest e sigillo. Per il
+digest usa senza variazioni il codec binario domain-separated
+`mediflow.document-synthesis.source-set-digest.v1` gia definito qui e SHA-256.
+Non usa HMAC, chiavi, un nuovo domain, JSON o JCS. L'evidence pubblica puo
+esporre soltanto la projection provider minimizzata gia canonica e
+`sourceSetDigestSha256` raw32. Non espone contatori, byte del payload del digest
+o identita della sorgente.
+
+Il sigillo prova soltanto che l'owner ha trattenuto un'evidence. Non e
+authority. Chiamante e provider non possono fornire o sostituire contatori,
+digest, identita della sorgente, receipt, provenance o apply. Non possono
+fornire un callback che rilegga tali valori. Importare authority Fabric nel
+modulo security e accettare callback o contatori del chiamante sono vietati:
+sposterebbero la decisione fuori dall'owner autentico e renderebbero il sigillo
+un input di authority.
+
+L'handle esterno resta bruciato al begin secondo I1c. Dopo il provider, il
+record privato esegue una sola revalidation e un solo consume finali. La
+revalidation deve rileggere atomicamente tutti i binding e il lineage prima del
+consume. Revoca, reselection, expiry, logout, `lock confermato dal server`,
+disposal, restart, overflow, reentry o drift negano e bruciano il record. Non
+esiste retry, riuso o seconda pubblicazione dopo una denial. Il sigillo non
+consente pubblicazione, apply, provider invocation o altra azione.
+
+La consegna procede in profondita:
+
+| Slice | Confine unico | Stop immediato |
+| --- | --- | --- |
+| A1b0 | Questo addendum contrattuale. | Il testo modifica codec, ceiling o authority esistente. |
+| A1b1 | Estrarre il kernel puro del codec esistente in un modulo neutro, security-owned. | I byte o la semantica non sono byte-for-byte equivalenti, oppure il kernel acquisisce authority. |
+| A1b2 | Comporre il sigillo opaco nel closure dell'owner. | Il sigillo espone contatori o accetta input di authority. |
+| A3 | Migrare i consumer Fabric e C3c2, poi rimuovere i contatori caller-supplied. | Un consumer conserva contatori caller-supplied o ottiene authority dal sigillo. |
+
+Ogni packet resta sotto circa 300 LOC e conserva un solo confine. Se un packet
+eccede il limite o introduce un secondo confine, resta `HOLD` e richiede una
+nuova suddivisione. A1b0 non implementa A1b1, A1b2 o A3.
+
 ### Evidence di provider-binding
 
 La `provider-binding receipt` e l'esatta receipt emessa dall'host, con schema
