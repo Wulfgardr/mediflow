@@ -723,6 +723,27 @@ export function abortStagedWebServerSession(capsule: unknown): boolean {
     return Boolean(record && revokeStagedWebSession(record));
 }
 
+/** Resolves only one exact ACTIVE P3 Web cell without publishing it to the legacy session map. */
+/* @Codex */
+export function resolveActiveWebServerSession(sessionId: unknown): ServerSession | null {
+    if (!beginWebSessionCellLifecycle(sessionId)) return null;
+    try {
+        if (typeof sessionId !== 'string' || !sessionId) return null;
+        const cell = armedWebSessionCellsById[sessionId];
+        const visibleSession = getMapValue(sessions, sessionId);
+        if (webSessionCellLifecyclePoisoned || visibleSession || !cell || cell.state !== 'ACTIVE') return null;
+        const session = cell.session;
+        const expiry = session.expiresAt;
+        const now = DateNow();
+        if (webSessionCellLifecyclePoisoned || armedWebSessionCellsById[sessionId] !== cell
+            || cell.state !== 'ACTIVE' || cell.session !== session || session.id !== sessionId
+            || session.authChannel !== 'web' || session.expiresAt !== expiry || expiry <= now
+            || getMapValue(sessions, sessionId)) return null;
+        return session;
+    } catch { return null; }
+    finally { endWebSessionCellLifecycle(); }
+}
+
 export function getSession(sessionId: string | null | undefined): ServerSession | null {
     if (!sessionId) return null;
     const session = getMapValue(sessions, sessionId);
