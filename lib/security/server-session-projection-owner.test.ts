@@ -40,7 +40,7 @@ function currentness(documentRevision = 1, documentFreshnessEpoch = 1) {
 }
 
 function projection(sourceKind: 'native_text' | 'ocr_text' = 'native_text') {
-    return Object.freeze({ sourceKind, sourceText: 'Synthetic normalized source.' });
+    return Object.freeze({ sourceKind, sourceText: 'Synthetic source.' });
 }
 
 test('keeps authentic owner identity private to the registry', () => {
@@ -286,15 +286,55 @@ test('Document Synthesis attachment capture denies hostile data without observat
 });
 
 test('Document Synthesis attachment capture poisons reentry before minting authority', () => {
-    let armed = false; let nested: unknown;
+    let armed = false; let nested = false;
     const registry = createServerSessionProjectionOwnerRegistry({
         resolve: (_session, pair) => pair, entropy: () => new Uint8Array(16),
-        clock: () => { if (armed) { armed = false; nested = port.observeCurrentness(currentness()); } return 1_000; },
+        clock: () => { if (armed) { armed = false; assert.throws(() => owner.mintDocumentSynthesisAttachmentCapturePort(value),
+            (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'selection_busy'); nested = true; } return 1_000; },
     });
     const value = session(); const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0, ...PAIR });
     const port = owner.mintDocumentSynthesisAttachmentCapturePort(value);
-    armed = true; assert.equal(port.observeCurrentness(currentness()), null); assert.equal(nested, null);
-    assert.ok(port.observeCurrentness(currentness()));
+    armed = true; assert.equal(port.observeCurrentness(currentness()), null); assert.equal(nested, true);
+    const capture = port.observeCurrentness(currentness()); assert.ok(capture);
+    armed = true; nested = false; assert.equal(port.begin(capture), null); assert.equal(nested, true);
+    const grant = port.begin(capture); assert.ok(grant);
+    const input = Object.freeze({ grant, observedCurrentness: currentness(), projection: projection() });
+    armed = true; nested = false; assert.equal(port.retain(input), null); assert.equal(nested, true);
+    const retained = port.retain(input); assert.ok(retained);
+    armed = true; nested = false; assert.equal(port.observeRevocation(retained), false); assert.equal(nested, true);
+    assert.equal(port.observeRevocation(retained), true);
+    armed = true; nested = false;
+    assert.throws(() => owner.mintDocumentSynthesisAttachmentCapturePort(value),
+        (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'stale_selection');
+    assert.equal(nested, true); assert.ok(owner.mintDocumentSynthesisAttachmentCapturePort(value));
+});
+
+test('Document Synthesis attachment capture latches duplicate, rollback, and ABA currentness across ports', () => {
+    const { value, owner } = ownerWithSelection(); const first = owner.mintDocumentSynthesisAttachmentCapturePort(value);
+    const initial = first.observeCurrentness(currentness()); assert.ok(initial);
+    const second = owner.mintDocumentSynthesisAttachmentCapturePort(value); const newer = second.observeCurrentness(currentness(2, 2)); assert.ok(newer);
+    assert.equal(first.begin(initial), null, 'newer owner observation invalidates an older capture');
+    assert.equal(first.observeCurrentness(currentness(2, 2)), null, 'duplicate latches the source');
+    assert.equal(second.begin(newer), null, 'latch revokes newer capability use');
+    assert.equal(second.observeCurrentness(currentness(3, 3)), null, 'latched source cannot reset');
+
+    const rollback = ownerWithSelection(); const port = rollback.owner.mintDocumentSynthesisAttachmentCapturePort(rollback.value);
+    assert.ok(port.observeCurrentness(currentness(3, 3)));
+    assert.equal(port.observeCurrentness(currentness(2, 4)), null);
+    assert.equal(port.observeCurrentness(currentness(4, 4)), null);
+});
+
+test('Document Synthesis attachment capture ignores a poisoned Set iterator and rejects mint at lease expiry', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(Set.prototype, Symbol.iterator); let reads = 0;
+    const { value, owner } = ownerWithSelection(); const port = owner.mintDocumentSynthesisAttachmentCapturePort(value);
+    Object.defineProperty(Set.prototype, Symbol.iterator, { configurable: true, get() { reads += 1; throw new Error('synthetic iterator'); } });
+    try { assert.ok(port.observeCurrentness(currentness())); } finally {
+        if (descriptor) Object.defineProperty(Set.prototype, Symbol.iterator, descriptor); else delete (Set.prototype as { [Symbol.iterator]?: unknown })[Symbol.iterator];
+    }
+    assert.equal(reads, 0);
+    const expired = ownerWithSelection(); expired.setClock(expired.value.expiresAt);
+    assert.throws(() => expired.owner.mintDocumentSynthesisAttachmentCapturePort(expired.value),
+        (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'lease_expired');
 });
 
 test('durable review commit port rejects forged, cloned, proxied, foreign, expired, stale, logged-out, and disposed values', () => {

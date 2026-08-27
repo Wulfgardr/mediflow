@@ -183,13 +183,13 @@ export type DocumentSynthesisProjectionEvidenceCapability = Readonly<{ readonly 
 export type DocumentSynthesisAttachmentCurrentness = Readonly<{
     documentSourceRef: string; documentRevision: number; documentFreshnessEpoch: number;
 }>;
-export type DocumentSynthesisNormalizedProjection = Readonly<{ sourceKind: 'native_text' | 'ocr_text'; sourceText: string }>;
+export type DocumentSynthesisProjectionCandidate = Readonly<{ sourceKind: 'native_text' | 'ocr_text'; sourceText: string }>;
 export type DocumentSynthesisAttachmentCapturePort = Readonly<{
     observeCurrentness(input: DocumentSynthesisAttachmentCurrentness): DocumentSynthesisAttachmentCaptureCapability | null;
     begin(value: unknown): DocumentSynthesisAttachmentIngestGrant | null;
     retain(input: Readonly<{
         grant: DocumentSynthesisAttachmentIngestGrant; observedCurrentness: DocumentSynthesisAttachmentCurrentness;
-        projection: DocumentSynthesisNormalizedProjection;
+        projection: DocumentSynthesisProjectionCandidate;
     }>): DocumentSynthesisProjectionEvidenceCapability | null;
     observeRevocation(value: unknown): boolean;
 }>;
@@ -337,6 +337,8 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             let durableReviewCommitInFlight: object | null = null;
             let documentSynthesisLineage = createDocumentSynthesisSourceLineageState();
             let documentSynthesisLineageTerminal = false;
+            type AttachmentCurrentnessState = { documentRevision: number; documentFreshnessEpoch: number; generation: number; terminal: boolean };
+            const documentSynthesisAttachmentCurrentness = new MapConstructor<string, AttachmentCurrentnessState>();
             let creating: SelectionState | null = null;
             let terminal = false;
             let unregisterOwner: (() => void) | null = null;
@@ -667,18 +669,21 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 return ObjectFreeze(port);
             };
             const mintDocumentSynthesisAttachmentCapturePort = (presentedSession: ServerSession): DocumentSynthesisAttachmentCapturePort => {
-                rejectLeaseCriticalSectionReentry();
-                requireCurrentSession(presentedSession);
+                if (!beginLeasePortOperation()) return fail('selection_busy');
+                try {
+                rejectLeaseCriticalSectionReentry(); requireCurrentSession(presentedSession);
                 const boundSelection = selection; const boundSelectionEpoch = epoch; const boundReviewContextEpoch = reviewContextEpoch;
                 if (!boundSelection) return fail('stale_selection');
-                type Entry = { currentness: DocumentSynthesisAttachmentCurrentness; capture: object; grant: object | null; evidence: object | null;
-                    projection: DocumentSynthesisNormalizedProjection | null; sourceSetEpoch: bigint | null; revocationGeneration: bigint | null;
+                if (readClock() >= boundSelection.expiresAt) { expire(); return fail('lease_expired'); }
+                requireCurrentSession(presentedSession);
+                if (selection !== boundSelection || epoch !== boundSelectionEpoch || reviewContextEpoch !== boundReviewContextEpoch
+                    || leasePortOperationPoisoned) return fail('stale_selection');
+                type Entry = { currentness: DocumentSynthesisAttachmentCurrentness; currentnessGeneration: number; capture: object; grant: object | null; evidence: object | null;
+                    projection: DocumentSynthesisProjectionCandidate | null; sourceSetEpoch: bigint | null; revocationGeneration: bigint | null;
                     revocationState: ReturnType<typeof createDocumentSynthesisSourceLineageState>; revocationTarget: object;
                     state: 'captured' | 'ingested' | 'retained' | 'revoked'; };
                 const captures = new WeakSetConstructor<object>(); const grants = new WeakSetConstructor<object>();
                 const evidence = new WeakSetConstructor<object>(); const records = new WeakMapConstructor<object, Entry>();
-                const currentnessBySource = new MapConstructor<string, DocumentSynthesisAttachmentCurrentness>();
-                const entriesBySource = new MapConstructor<string, Set<Entry>>();
                 const current = () => {
                     if (terminal || presentedSession !== session || selection !== boundSelection || epoch !== boundSelectionEpoch
                         || reviewContextEpoch !== boundReviewContextEpoch || getSession(session.id) !== session) return false;
@@ -703,6 +708,12 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 const matches = (left: DocumentSynthesisAttachmentCurrentness | undefined, right: DocumentSynthesisAttachmentCurrentness) => !!left
                     && left.documentSourceRef === right.documentSourceRef && left.documentRevision === right.documentRevision
                     && left.documentFreshnessEpoch === right.documentFreshnessEpoch;
+                const currentnessIsLive = (entry: Entry) => {
+                    const latest = getMapValue(documentSynthesisAttachmentCurrentness, entry.currentness.documentSourceRef);
+                    return !!latest && !latest.terminal && latest.generation === entry.currentnessGeneration
+                        && latest.documentRevision === entry.currentness.documentRevision
+                        && latest.documentFreshnessEpoch === entry.currentness.documentFreshnessEpoch;
+                };
                 const revokeEntry = (entry: Entry): boolean => {
                     if (entry.state === 'revoked') return true;
                     const observed = observeDocumentSynthesisRevocation(entry.revocationState, entry.revocationTarget);
@@ -718,20 +729,21 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     try {
                         const observed = parsedCurrentness(value);
                         if (!observed || !current() || leasePortOperationPoisoned || documentSynthesisLineageTerminal) return null;
-                        const prior = getMapValue(currentnessBySource, observed.documentSourceRef);
-                        if (prior && !matches(prior, observed)) {
-                            setMapValue(currentnessBySource, observed.documentSourceRef, observed);
-                            const entries = getMapValue(entriesBySource, observed.documentSourceRef);
-                            if (entries) for (const entry of entries) revokeEntry(entry);
-                        } else if (!prior) setMapValue(currentnessBySource, observed.documentSourceRef, observed);
-                        if (!current() || leasePortOperationPoisoned || !matches(getMapValue(currentnessBySource, observed.documentSourceRef)!, observed)) return null;
+                        let state = getMapValue(documentSynthesisAttachmentCurrentness, observed.documentSourceRef);
+                        if (state) {
+                            if (state.terminal || observed.documentRevision <= state.documentRevision
+                                || observed.documentFreshnessEpoch <= state.documentFreshnessEpoch) { state.terminal = true; state.generation += 1; return null; }
+                            if (!current() || leasePortOperationPoisoned) return null;
+                            state.documentRevision = observed.documentRevision; state.documentFreshnessEpoch = observed.documentFreshnessEpoch; state.generation += 1;
+                        } else { if (!current() || leasePortOperationPoisoned) return null;
+                            state = { documentRevision: observed.documentRevision, documentFreshnessEpoch: observed.documentFreshnessEpoch, generation: 1, terminal: false };
+                            setMapValue(documentSynthesisAttachmentCurrentness, observed.documentSourceRef, state); }
+                        if (leasePortOperationPoisoned || state.terminal) return null;
                         const capture = opaque(); const revocationTarget = opaque();
-                        const entry: Entry = { currentness: observed, capture, grant: null, evidence: null, projection: null,
+                        const entry: Entry = { currentness: observed, currentnessGeneration: state.generation, capture, grant: null, evidence: null, projection: null,
                             sourceSetEpoch: null, revocationGeneration: null,
                             revocationState: createDocumentSynthesisSourceLineageState(), revocationTarget, state: 'captured' };
-                        let entries = getMapValue(entriesBySource, observed.documentSourceRef);
-                        if (!entries) { entries = new SetConstructor<Entry>(); setMapValue(entriesBySource, observed.documentSourceRef, entries); }
-                        addSetValue(entries, entry); addOwnerIdentity(captures, capture); applyIntrinsic(weakMapSet, records, [capture, entry]);
+                        addOwnerIdentity(captures, capture); applyIntrinsic(weakMapSet, records, [capture, entry]);
                         return capture as DocumentSynthesisAttachmentCaptureCapability;
                     } finally { endLeasePortOperation(); }
                 } });
@@ -740,7 +752,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     try {
                         const entry = entryFor(value);
                         if (!entry || !hasOwnerIdentity(captures, value as object) || entry.state !== 'captured' || !current()
-                            || leasePortOperationPoisoned || !matches(getMapValue(currentnessBySource, entry.currentness.documentSourceRef)!, entry.currentness)) return null;
+                            || leasePortOperationPoisoned || !currentnessIsLive(entry)) return null;
                         const grant = opaque(); entry.grant = grant; entry.state = 'ingested'; addOwnerIdentity(grants, grant);
                         applyIntrinsic(weakMapSet, records, [grant, entry]); return grant as DocumentSynthesisAttachmentIngestGrant;
                     } finally { endLeasePortOperation(); }
@@ -755,8 +767,8 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         const observed = parsedCurrentness(request!.observedCurrentness);
                         const projection = frozenExact(request!.projection, ['sourceKind', 'sourceText']);
                         if (!observed || !projection || (projection.sourceKind !== 'native_text' && projection.sourceKind !== 'ocr_text')
-                            || typeof projection.sourceText !== 'string' || !matches(observed, entry.currentness)
-                            || !matches(getMapValue(currentnessBySource, entry.currentness.documentSourceRef)!, entry.currentness)
+                            || typeof projection.sourceText !== 'string' || projection.sourceText.length > 12_000 || !matches(observed, entry.currentness)
+                            || !currentnessIsLive(entry)
                             || !current() || leasePortOperationPoisoned || documentSynthesisLineageTerminal) return null;
                         const allocation = allocateDocumentSynthesisSourceSetEpoch(documentSynthesisLineage);
                         if (allocation.status !== 'allocated') { if (allocation.status === 'exhausted') documentSynthesisLineageTerminal = true; return null; }
@@ -779,6 +791,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     } finally { endLeasePortOperation(); }
                 } });
                 return ObjectFreeze(port);
+                } finally { endLeasePortOperation(); }
             };
             const candidateControl = (candidate: unknown): TypedBroker['control'] | null => {
                 if (typeof candidate !== 'object' || candidate === null) return null;
