@@ -54,10 +54,34 @@ test('unknown account and wrong PIN share a sanitized credential denial', async 
         assert.equal(wrong.kind, 'denied');
         assert.equal(unknown.failureClass, 'invalid_credentials');
         assert.equal(wrong.failureClass, 'invalid_credentials');
+        assert.equal(unknown.status, wrong.status);
+        assert.equal(unknown.status, 401);
         assert.equal(unknown.body.code, wrong.body.code);
         assert.equal(audits.length, 2);
         assert.equal(JSON.stringify(audits).includes(PIN) || JSON.stringify(audits).includes(hash), false);
     } finally { sqlite.close(); }
+});
+
+test('transparent and throwing proxies deny before reflection or dependency observation', async () => {
+    let traps = 0; let calls = 0;
+    const transparent = new Proxy({ username: USERNAME, pin: PIN }, {});
+    const throwing = new Proxy({ username: USERNAME, pin: PIN }, {
+        get: () => { traps += 1; throw new Error('proxy trap'); },
+        getPrototypeOf: () => { traps += 1; throw new Error('proxy trap'); },
+        ownKeys: () => { traps += 1; throw new Error('proxy trap'); },
+    });
+    const dependencies = {
+        get db() { calls += 1; throw new Error('database observed'); },
+        compare: async () => { calls += 1; return true; },
+        writeAuditEvent: async () => { calls += 1; return 'audit'; },
+    } as HostCredentialVerifierDependencies;
+    for (const input of [transparent, throwing]) {
+        const result = await verifyHostCredentials(input, dependencies);
+        assert.equal(result.kind, 'denied');
+        assert.equal(result.failureClass, 'invalid_credentials');
+        assert.equal(result.status, 401);
+    }
+    assert.equal(traps, 0); assert.equal(calls, 0);
 });
 
 test('active locks deny before compare and a valid PIN resets the persisted lock state', async () => {

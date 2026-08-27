@@ -2,6 +2,7 @@
 import 'server-only';
 
 import bcrypt from 'bcryptjs';
+import { types } from 'node:util';
 import { and, eq } from 'drizzle-orm';
 
 import type { dbServer as dbServerType } from '@/lib/db-server';
@@ -51,11 +52,13 @@ const invalid = (): Denied => ({
     status: 401,
     body: createInvalidCredentialsPayload(),
 });
+const isProxy = types.isProxy;
 
 /** Rejects descriptor-bearing or non-canonical caller objects before dependencies are read. */
 function readCredential(value: unknown): Credential | null {
     if (!value || typeof value !== 'object') return null;
     try {
+        if (isProxy(value)) return null;
         if (Object.getPrototypeOf(value) !== Object.prototype) return null;
         const fields = Object.getOwnPropertyDescriptors(value);
         if (Reflect.ownKeys(fields).length !== 2) return null;
