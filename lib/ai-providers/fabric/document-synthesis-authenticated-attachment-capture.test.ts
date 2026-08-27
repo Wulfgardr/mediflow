@@ -137,6 +137,66 @@ assert.deepEqual({ ...poisonedResult }, { ...missing });
     }
 });
 
+test('post-callback fence failures leave no projection publication or fixed-entropy collision', () => {
+    for (const mode of ['clock', 'currentness', 'expiry', 'channel']) {
+        const directory = mkdtempSync(path.join(os.tmpdir(), `mediflow-i1b2-fence-${mode}-`));
+        const mockAuth = path.join(directory, 'mock-server-auth.cjs'); const mockCrypto = path.join(directory, 'mock-crypto.mjs'); const worker = path.join(directory, 'fence.cjs');
+        try {
+            writeFileSync(mockCrypto, 'export const randomBytes = () => new Uint8Array(16).fill(90);\n');
+            writeFileSync(mockAuth, `
+const { createSession } = require(${JSON.stringify(path.join(ROOT, 'lib/security/server-session.ts'))});
+const { createServerSessionProjectionOwnerRegistry, ServerSessionProjectionOwnerError } = require(${JSON.stringify(path.join(ROOT, 'lib/security/server-session-projection-owner.ts'))});
+const session = createSession({ id: 'user.synthetic.fence', username: ['fen', 'ce'].join(''), role: 'admin' }, 'web');
+const base = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze({ ...pair }) }).acquire(session);
+base.issueSelection({ expectedEpoch: 0, patientId: 'patient.synthetic.fence', ambulatoryId: 'ambulatory.synthetic.fence' });
+let failNext = false; const code = { clock: 'selection_unavailable', currentness: 'stale_selection', expiry: 'lease_expired', channel: 'session_unavailable' }[process.env.FENCE_MODE];
+const owner = Object.freeze({
+  snapshotSelectionEpoch: (value) => base.snapshotSelectionEpoch(value),
+  snapshotReviewContextEpoch: (value) => base.snapshotReviewContextEpoch(value),
+  mintDocumentSynthesisAttachmentCapturePort: (value) => base.mintDocumentSynthesisAttachmentCapturePort(value),
+  withLeaseCriticalSection(value, callback) {
+    const inject = failNext; failNext = false;
+    return base.withLeaseCriticalSection(value, (selection) => { const result = callback(selection); if (inject) throw new ServerSessionProjectionOwnerError(code); return result; });
+  },
+});
+let calls = 0;
+module.exports = { acquireAuthenticatedWebSessionProjectionOwnerContext: async () => { calls += 1; failNext = calls === 2; return Object.freeze({ session, owner }); } };
+`);
+            writeFileSync(worker, `
+(async () => {
+const assert = require('node:assert/strict'); const fs = require('node:fs'); const path = require('node:path');
+const { registerHooks } = require('node:module'); const { pathToFileURL } = require('node:url');
+const target = ${JSON.stringify(TARGET)}; const mockAuth = ${JSON.stringify(mockAuth)}; const mockCrypto = ${JSON.stringify(mockCrypto)};
+registerHooks({ resolve(specifier, context, nextResolve) {
+  if (context.parentURL === pathToFileURL(target).href && specifier === '../../security/server-auth') return { shortCircuit: true, url: pathToFileURL(mockAuth).href, format: 'commonjs' };
+  if (context.parentURL === pathToFileURL(target).href && specifier === 'node:crypto') return { shortCircuit: true, url: pathToFileURL(mockCrypto).href, format: 'module' };
+  return nextResolve(specifier, context);
+} });
+const Database = require(${JSON.stringify(path.join(ROOT, 'node_modules/better-sqlite3'))}); fs.mkdirSync(process.env.MEDIFLOW_DATA_DIR, { recursive: true });
+const bootstrap = new Database(path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db'));
+for (const file of fs.readdirSync(${JSON.stringify(path.join(ROOT, 'drizzle'))}).filter((name) => name.endsWith('.sql')).sort()) bootstrap.exec(fs.readFileSync(path.join(${JSON.stringify(path.join(ROOT, 'drizzle'))}, file), 'utf8').replace(/^-->\\s+statement-breakpoint\\s*$/gmu, ''));
+bootstrap.close(); const { dbServer } = require(${JSON.stringify(path.join(ROOT, 'lib/db-server.ts'))}); const { sql } = require(${JSON.stringify(path.join(ROOT, 'node_modules/drizzle-orm'))});
+dbServer.run(sql.raw("INSERT INTO ambulatories (id, name, type) VALUES ('ambulatory.synthetic.fence', 'Synthetic fence', 'test')"));
+dbServer.run(sql.raw("INSERT INTO patients (id, first_name, last_name, tax_code) VALUES ('patient.synthetic.fence', 'Fence', 'Synthetic', 'FENCESYNTHETIC01')"));
+dbServer.run(sql.raw("INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES ('patient.synthetic.fence', 'ambulatory.synthetic.fence')"));
+dbServer.run(sql.raw("INSERT INTO attachments (id, patient_id, name, type, size, path, document_source_ref, document_revision, document_freshness_epoch) VALUES ('attachment.synthetic.fence.1', 'patient.synthetic.fence', 'one.pdf', 'application/pdf', 1, 'one.pdf', '${'c'.repeat(64)}', 1, 1), ('attachment.synthetic.fence.2', 'patient.synthetic.fence', 'two.pdf', 'application/pdf', 1, 'two.pdf', '${'d'.repeat(64)}', 1, 1)"));
+const { captureDocumentSynthesisAuthenticatedAttachment: capture, ingestDocumentSynthesisAuthenticatedAttachmentProjection: ingest } = require(target);
+const first = await capture({ attachmentId: 'attachment.synthetic.fence.1' }); assert.equal(first.status, 'available');
+const failed = await ingest(first.captureHandle, { sourceKind: 'native_text', sourceText: 'Failed synthetic projection' });
+assert.deepEqual({ ...failed }, { status: 'denied', code: 'unavailable', projectionHandle: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
+const fresh = await capture({ attachmentId: 'attachment.synthetic.fence.2' }); assert.equal(fresh.captureHandle, first.captureHandle);
+const success = await ingest(fresh.captureHandle, { sourceKind: 'native_text', sourceText: 'Fresh synthetic projection' });
+assert.equal(success.status, 'available'); assert.equal(success.projectionHandle, 'dsp_' + '5a'.repeat(16));
+assert.deepEqual({ ...await ingest(fresh.captureHandle, { sourceKind: 'native_text', sourceText: 'replay' }) }, { ...failed });
+assert.equal((await ingest(success.projectionHandle, { sourceKind: 'native_text', sourceText: 'cross-stage' })).code, 'input_invalid');
+})().catch((error) => { console.error(error); process.exitCode = 1; });
+`);
+            const result: ReturnType<typeof spawnSync> = spawnSync(NODE_24, ['--experimental-strip-types', '--import', RUNNER, worker], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, FENCE_MODE: mode, MEDIFLOW_DATA_DIR: path.join(directory, 'data') } });
+            assert.equal(result.status, 0, `${mode}\n${result.stdout}\n${result.stderr}`);
+        } finally { rmSync(directory, { recursive: true, force: true }); }
+    }
+});
+
 test('captures every runtime intrinsic before the boundary is called', () => {
     const source = readFileSync(TARGET, 'utf8');
     for (const token of [
@@ -154,5 +214,10 @@ test('burns the capture before projection observation and reads currentness once
 
     assert.ok(ingest.indexOf('mapDelete(broker.records, captureHandle)') < ingest.indexOf('projectionCandidate(projection)'));
     assert.equal((ingest.match(/DbGet\(/gu) ?? []).length, 1);
+    assert.ok(ingest.indexOf('projectionCandidate(projection)') < ingest.indexOf('DbGet('));
+    assert.ok(ingest.indexOf('DbGet(') < ingest.indexOf('attachmentCapturePort.begin'));
     assert.ok(ingest.indexOf('const projectionHandle = mint(Entropy(16), \'dsp_\')') > ingest.indexOf('attachmentCapturePort.retain'));
+    assert.equal((ingest.match(/broker\.publish\(/gu) ?? []).length, 1);
+    assert.ok(ingest.indexOf('const prepared = context.owner.withLeaseCriticalSection') < ingest.indexOf('broker.publish(prepared.projectionHandle, prepared.state)'));
+    assert.doesNotMatch(ingest.slice(ingest.indexOf('const prepared = context.owner.withLeaseCriticalSection')), /\bawait\b/u);
 });

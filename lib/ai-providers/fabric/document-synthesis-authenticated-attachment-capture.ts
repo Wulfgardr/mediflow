@@ -24,6 +24,7 @@ type CaptureRecord = Readonly<{
     attachmentCaptureCapability: DocumentSynthesisAttachmentCaptureCapability;
 }>;
 type ProjectionRecord = Readonly<{ selected: true; scope: 'document_synthesis_attachment_projection'; evidence: DocumentSynthesisProjectionEvidenceCapability }>;
+type PreparedProjectionPublication = Readonly<{ projectionHandle: string; state: ProjectionRecord; result: ProjectionResult }>;
 type RecordState = CaptureRecord | ProjectionRecord;
 type Broker = { records: Map<string, RecordState>; dispose: () => void; publish: (handle: string, state: RecordState) => boolean };
 type Result = Readonly<{ status: 'available' | 'denied'; code: null | 'input_invalid' | 'unavailable'; captureHandle: string | null; reviewOnly: true; writesPerformed: 0; applyPolicy: 'none' }>;
@@ -78,23 +79,28 @@ export async function ingestDocumentSynthesisAuthenticatedAttachmentProjection(c
     let context: Awaited<ReturnType<typeof acquireAuthenticatedWebSessionProjectionOwnerContext>>;
     try { context = await acquireAuthenticatedWebSessionProjectionOwnerContext(); } catch { return projectionDenied('unavailable'); }
     if (!context) return projectionDenied('unavailable');
-    let captured: CaptureRecord | null = null; let grant: DocumentSynthesisAttachmentIngestGrant | null = null; let evidence: DocumentSynthesisProjectionEvidenceCapability | null = null;
+    let captured: CaptureRecord | null = null; let grant: DocumentSynthesisAttachmentIngestGrant | null = null; let evidence: DocumentSynthesisProjectionEvidenceCapability | null = null; let failureCode: 'input_invalid' | 'unavailable' = 'unavailable';
     try {
         const broker = brokerFor(context); const record = mapGet(broker.records, captureHandle);
         if (!record || record.scope !== 'document_synthesis_attachment_capture' || !mapDelete(broker.records, captureHandle)) return projectionDenied('unavailable');
         captured = record;
-        return context.owner.withLeaseCriticalSection(context.session, (selection) => {
-            grant = captured!.attachmentCapturePort.begin(captured!.attachmentCaptureCapability);
-            if (!grant) return projectionDenied('unavailable');
+        const prepared = context.owner.withLeaseCriticalSection(context.session, (selection): PreparedProjectionPublication | null => {
+            if (context.owner.snapshotSelectionEpoch(context.session) !== captured!.selectionEpoch
+                || context.owner.snapshotReviewContextEpoch(context.session) !== captured!.reviewContextEpoch) return null;
             const candidate = projectionCandidate(projection);
-            if (!candidate) { revoke(captured!.attachmentCapturePort, grant); return projectionDenied('input_invalid'); }
+            if (!candidate) { failureCode = 'input_invalid'; return null; }
             const latest = currentness(DbGet(sql`SELECT a.document_source_ref AS documentSourceRef, a.document_revision AS documentRevision, a.document_freshness_epoch AS documentFreshnessEpoch FROM attachments AS a INNER JOIN patients_to_ambulatories AS pta ON pta.patient_id = a.patient_id WHERE a.document_source_ref = ${captured!.currentness.documentSourceRef} AND a.document_revision = ${captured!.currentness.documentRevision} AND a.document_freshness_epoch = ${captured!.currentness.documentFreshnessEpoch} AND a.patient_id = ${selection.patientId} AND pta.ambulatory_id = ${selection.ambulatoryId} LIMIT 1`));
-            if (!latest || !sameCurrentness(captured!.currentness, latest)) { revoke(captured!.attachmentCapturePort, grant); return projectionDenied('unavailable'); }
+            if (!latest || !sameCurrentness(captured!.currentness, latest)) return null;
+            grant = captured!.attachmentCapturePort.begin(captured!.attachmentCaptureCapability);
+            if (!grant) return null;
             evidence = captured!.attachmentCapturePort.retain(ObjectFreeze({ grant, observedCurrentness: ownerCurrentness(latest), projection: candidate }));
-            if (!evidence) return projectionDenied('unavailable');
+            if (!evidence) return null;
             const projectionHandle = mint(Entropy(16), 'dsp_');
-            if (!projectionHandle || !broker.publish(projectionHandle, sealed<ProjectionRecord>({ selected: true, scope: 'document_synthesis_attachment_projection', evidence }))) { revoke(captured!.attachmentCapturePort, evidence); return projectionDenied('unavailable'); }
-            return projectionAvailable(projectionHandle);
+            if (!projectionHandle) return null;
+            return sealed<PreparedProjectionPublication>({ projectionHandle, state: sealed<ProjectionRecord>({ selected: true, scope: 'document_synthesis_attachment_projection', evidence }), result: projectionAvailable(projectionHandle) });
         });
+        if (!prepared) { revoke(captured.attachmentCapturePort, evidence ?? grant ?? captured.attachmentCaptureCapability); return projectionDenied(failureCode); }
+        if (!broker.publish(prepared.projectionHandle, prepared.state)) { revoke(captured.attachmentCapturePort, prepared.state.evidence); return projectionDenied('unavailable'); }
+        return prepared.result;
     } catch { if (captured) revoke(captured.attachmentCapturePort, evidence ?? grant ?? captured.attachmentCaptureCapability); return projectionDenied('unavailable'); }
 }
