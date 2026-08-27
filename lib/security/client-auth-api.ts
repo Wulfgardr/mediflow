@@ -119,6 +119,14 @@ const lockReflectOwnKeys = Reflect.ownKeys;
 const lockObjectPrototype = Object.prototype;
 /* @Codex */
 const lockObjectPrototypeKeys = Object.freeze(lockReflectOwnKeys(lockObjectPrototype).slice());
+/* @Codex */
+const forbiddenLockObjectPrototypeKeys = Object.freeze(['then', 'value', 'schemaVersion', 'state'] as const);
+
+/* @Codex */
+function hasForbiddenObjectPrototypeDescriptor(): boolean {
+    try { return forbiddenLockObjectPrototypeKeys.some((key) => lockObjectGetOwnPropertyDescriptor(lockObjectPrototype, key) !== undefined); }
+    catch { return true; }
+}
 
 /* @Codex */
 function hasUnchangedObjectPrototype(): boolean {
@@ -136,7 +144,7 @@ function hasUnchangedObjectPrototype(): boolean {
 
 /* @Codex */
 function isExactParsedApplicationLockReceipt(value: unknown): boolean {
-    if (typeof value !== 'object' || value === null || !hasUnchangedObjectPrototype()) return false;
+    if (typeof value !== 'object' || value === null || hasForbiddenObjectPrototypeDescriptor() || !hasUnchangedObjectPrototype()) return false;
 
     try {
         if (lockObjectGetPrototypeOf(value) !== lockObjectPrototype) return false;
@@ -184,6 +192,7 @@ export type ClientAuthorityNetworkBarrier = Readonly<{
 
 /* @Codex */
 export function createClientAuthorityNetworkBarrier(): ClientAuthorityNetworkBarrier {
+    // HOLD_UNBOUNDED_AUTHORITY_QUEUE_PROTOCOL: serializes client starts only; server cookie protocol remains separately held.
     let tail = Promise.resolve();
 
     return Object.freeze({

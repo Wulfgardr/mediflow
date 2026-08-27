@@ -1,5 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
@@ -46,16 +47,11 @@ test('application lock confirmation rejects malformed parsed records and transpo
     } finally { globalThis.fetch = originalFetch; }
 });
 
-test('application lock confirmation fails closed when Object.prototype is polluted', async () => {
-    const originalFetch = globalThis.fetch;
-    assert.equal(Object.getOwnPropertyDescriptor(Object.prototype, 'then'), undefined);
-    Object.defineProperty(Object.prototype, 'then', { configurable: true, value: undefined });
-    try {
-        globalThis.fetch = async () => new Response(JSON.stringify(confirmedReceipt), { status: 200 });
-        assert.equal(await requestApplicationLockConfirmation(), false);
-    } finally {
-        delete (Object.prototype as { then?: unknown }).then;
-        globalThis.fetch = originalFetch;
+test('application lock confirmation rejects forbidden Object.prototype keys present before import', () => {
+    const source = readFileSync(new URL('./client-auth-api.ts', import.meta.url), 'utf8');
+    for (const key of ['then', 'value', 'schemaVersion', 'state']) {
+        const script = `import ts from 'typescript'; const output = ts.transpileModule(${JSON.stringify(source)}, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText; Object.defineProperty(Object.prototype, ${JSON.stringify(key)}, { configurable: true, value: undefined }); globalThis.fetch = async () => new Response(${JSON.stringify(JSON.stringify(confirmedReceipt))}, { status: 200 }); const api = await import('data:text/javascript;base64,' + Buffer.from(output).toString('base64')); if (await api.requestApplicationLockConfirmation()) process.exitCode = 1;`;
+        execFileSync(process.execPath, ['--input-type=module', '--eval', script]);
     }
 });
 
@@ -101,7 +97,11 @@ test('security provider clears stale persisted authority and fences stale auth p
         /await persistSecuritySession\(masterKey, userData\);[\s\S]*?clearClientAuthority\(\);/,
         /setupSecurityRequest[\s\S]*?authorityAttemptGenerationRef\.current !== attemptGeneration[\s\S]*?SETUP_ALREADY_COMPLETED/,
         /handleApiAuthUnavailable[\s\S]*?\+\+authorityAttemptGenerationRef\.current[\s\S]*?clearClientAuthority\(\);/,
+        /checkAuthStatus[\s\S]*?if \(!data\)[\s\S]*?clearClientAuthority\(\);[\s\S]*?if \(!res\.ok\)[\s\S]*?clearClientAuthority\(\);[\s\S]*?if \(data\?\.status === 'error' \|\| data\?\.error\)[\s\S]*?clearClientAuthority\(\);[\s\S]*?if \(!data\.isSetup\)[\s\S]*?clearClientAuthority\(\);[\s\S]*?catch \(e\)[\s\S]*?clearClientAuthority\(\);/,
+        /wrapMasterKeyVersioned\(masterKey, pin, salt\);[\s\S]*?authorityAttemptGenerationRef\.current !== attemptGeneration[\s\S]*?runAuthorityNetworkRequest\(\(\) => setupSecurityRequest/,
     ]) assert.match(source, pattern);
     assert.doesNotMatch(source, /logoutSecuritySession|\/api\/auth\/logout/);
     assert.doesNotMatch(authApiSource, /export function isExactApplicationLockReceipt/);
+    assert.match(authApiSource, /forbiddenLockObjectPrototypeKeys = Object\.freeze\(\['then', 'value', 'schemaVersion', 'state'\]/);
+    assert.match(authApiSource, /hasUnchangedObjectPrototype\(\)/);
 });
