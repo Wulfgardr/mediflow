@@ -14,6 +14,8 @@ import type {
     DocumentSynthesisAttachmentIngestGrant,
     DocumentSynthesisAttachmentCapturePort,
     DocumentSynthesisProjectionEvidenceCapability,
+    DocumentSynthesisSealedEvidence,
+    DocumentSynthesisSealedEvidencePort,
     DocumentSynthesisSourceSetSealCapability,
 } from '../../security/server-session-projection-owner';
 
@@ -24,19 +26,22 @@ type CaptureRecord = Readonly<{
     attachmentCapturePort: DocumentSynthesisAttachmentCapturePort;
     attachmentCaptureCapability: DocumentSynthesisAttachmentCaptureCapability;
 }>;
-type ProjectionRecord = Readonly<{ selected: true; scope: 'document_synthesis_attachment_projection'; evidence: DocumentSynthesisProjectionEvidenceCapability;
+type ProjectionRecord = Readonly<{ selected: true; currentness: Currentness; scope: 'document_synthesis_attachment_projection'; evidence: DocumentSynthesisProjectionEvidenceCapability;
     attachmentCapturePort: DocumentSynthesisAttachmentCapturePort }>;
-type SourceSetSealRecord = Readonly<{ selected: true; scope: 'document_synthesis_attachment_source_set_seal'; seal: DocumentSynthesisSourceSetSealCapability }>;
+type SourceSetSealRecord = Readonly<{ selected: true; currentness: Currentness; scope: 'document_synthesis_attachment_source_set_seal'; seal: DocumentSynthesisSourceSetSealCapability }>;
+type HandoffRecord = { selected: true; scope: 'document_synthesis_attachment_handoff'; evidence: DocumentSynthesisSealedEvidence | null };
 type PreparedProjectionPublication = Readonly<{ projectionHandle: string; state: ProjectionRecord; result: ProjectionResult }>;
 type PreparedSourceSetSealPublication = Readonly<{ sourceSetSealHandle: string; state: SourceSetSealRecord; result: SourceSetSealResult }>;
-type RecordState = CaptureRecord | ProjectionRecord | SourceSetSealRecord;
+type PreparedHandoffPublication = Readonly<{ handoffHandle: string; state: HandoffRecord; result: HandoffResult; port: DocumentSynthesisSealedEvidencePort; grant: object; patientId: string; ambulatoryId: string }>;
+type RecordState = CaptureRecord | ProjectionRecord | SourceSetSealRecord | HandoffRecord;
 type Broker = { records: Map<string, RecordState>; dispose: () => void; publish: (handle: string, state: RecordState) => boolean };
 type Result = Readonly<{ status: 'available' | 'denied'; code: null | 'input_invalid' | 'unavailable'; captureHandle: string | null; reviewOnly: true; writesPerformed: 0; applyPolicy: 'none' }>;
 type ProjectionResult = Readonly<{ status: 'available' | 'denied'; code: null | 'input_invalid' | 'unavailable'; projectionHandle: string | null; reviewOnly: true; writesPerformed: 0; applyPolicy: 'none' }>;
 type SourceSetSealResult = Readonly<{ status: 'available' | 'denied'; code: null | 'input_invalid' | 'unavailable'; sourceSetSealHandle: string | null }>;
+type HandoffResult = Readonly<{ status: 'available' | 'denied'; code: null | 'input_invalid' | 'unavailable'; handoffHandle: string | null; reviewOnly: true; writesPerformed: 0; applyPolicy: 'none' }>;
 
 const OBJECT = Object.prototype; const KEYS = ['attachmentId'] as const; const PROJECTION_KEYS = ['sourceKind', 'sourceText'] as const; const ROW_KEYS = ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch'] as const;
-const HANDLE = /^dsc_[a-f0-9]{32}$/u; const PROJECTION_HANDLE = /^dsp_[a-f0-9]{32}$/u; const SOURCE_SET_SEAL_HANDLE = /^dss_[a-f0-9]{32}$/u; const SOURCE_REF = /^[0-9a-f]{64}$/u; const MAX_ID = 256;
+const HANDLE = /^dsc_[a-f0-9]{32}$/u; const PROJECTION_HANDLE = /^dsp_[a-f0-9]{32}$/u; const SOURCE_SET_SEAL_HANDLE = /^dss_[a-f0-9]{32}$/u; const HANDOFF_HANDLE = /^dsh_[a-f0-9]{32}$/u; const SOURCE_REF = /^[0-9a-f]{64}$/u; const MAX_ID = 256;
 const ObjectCreate = Object.create; const ObjectFreeze = Object.freeze; const ObjectAssign = Object.assign; const ObjectHasOwn = Object.hasOwn;
 const ObjectGetPrototypeOf = Object.getPrototypeOf; const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor; const ObjectGetOwnPropertyDescriptors = Object.getOwnPropertyDescriptors;
 const ReflectOwnKeys = Reflect.ownKeys; const ArrayIsArray = Array.isArray; const NumberIsSafeInteger = Number.isSafeInteger; const Uint8ArrayConstructor = Uint8Array;
@@ -52,12 +57,14 @@ function projectionDenied(code: 'input_invalid' | 'unavailable'): ProjectionResu
 function projectionAvailable(projectionHandle: string): ProjectionResult { return sealed({ status: 'available' as const, code: null, projectionHandle, reviewOnly: true as const, writesPerformed: 0 as const, applyPolicy: 'none' as const }); }
 function sourceSetSealDenied(code: 'input_invalid' | 'unavailable'): SourceSetSealResult { return sealed({ status: 'denied' as const, code, sourceSetSealHandle: null }); }
 function sourceSetSealAvailable(sourceSetSealHandle: string): SourceSetSealResult { return sealed({ status: 'available' as const, code: null, sourceSetSealHandle }); }
+function handoffDenied(code: 'input_invalid' | 'unavailable'): HandoffResult { return sealed({ status: 'denied' as const, code, handoffHandle: null, reviewOnly: true as const, writesPerformed: 0 as const, applyPolicy: 'none' as const }); }
+function handoffAvailable(handoffHandle: string): HandoffResult { return sealed({ status: 'available' as const, code: null, handoffHandle, reviewOnly: true as const, writesPerformed: 0 as const, applyPolicy: 'none' as const }); }
 function exact(value: unknown, keys: readonly string[]): Record<string, unknown> | null { try { if (typeof value !== 'object' || value === null || IsProxy(value) || ArrayIsArray(value) || ObjectGetPrototypeOf(value) !== OBJECT || ReflectOwnKeys(value).length !== keys.length) return null; const descriptors = ObjectGetOwnPropertyDescriptors(value); const output = ObjectCreate(null) as Record<string, unknown>; for (const key of keys) { const descriptor = ObjectGetOwnPropertyDescriptor(descriptors, key); if (!descriptor || !ObjectHasOwn(descriptor, 'value')) return null; const field = descriptor.value as PropertyDescriptor; if (!field || field.enumerable !== true || !ObjectHasOwn(field, 'value')) return null; output[key] = field.value; } return output; } catch { return null; } }
 function intent(value: unknown): string | null { const id = exact(value, KEYS)?.attachmentId; return typeof id === 'string' && id.length > 0 && id.length <= MAX_ID && id === StringTrim(id) ? id : null; }
 function currentness(value: unknown): Currentness | null { const row = IsPromise(value) ? null : exact(value, ROW_KEYS); if (!row || typeof row.documentSourceRef !== 'string' || !RegExpTest(SOURCE_REF, row.documentSourceRef) || typeof row.documentRevision !== 'number' || !NumberIsSafeInteger(row.documentRevision) || row.documentRevision < 1 || typeof row.documentFreshnessEpoch !== 'number' || !NumberIsSafeInteger(row.documentFreshnessEpoch) || row.documentFreshnessEpoch < 1) return null; return sealed({ documentSourceRef: row.documentSourceRef, documentRevision: row.documentRevision, documentFreshnessEpoch: row.documentFreshnessEpoch }); }
 function ownerCurrentness(value: Currentness): Readonly<{ documentSourceRef: string; documentRevision: number; documentFreshnessEpoch: number }> { return ObjectFreeze({ documentSourceRef: value.documentSourceRef, documentRevision: value.documentRevision, documentFreshnessEpoch: value.documentFreshnessEpoch }); }
 function sameCurrentness(left: Currentness, right: Currentness): boolean { return left.documentSourceRef === right.documentSourceRef && left.documentRevision === right.documentRevision && left.documentFreshnessEpoch === right.documentFreshnessEpoch; }
-function mint(bytes: unknown, prefix: 'dsc_' | 'dsp_' | 'dss_'): string | null { if (!(bytes instanceof Uint8ArrayConstructor) || IsProxy(bytes) || bytes.length !== 16) return null; let value = prefix; for (let index = 0; index < 16; index += 1) { const byte = bytes[index]; if (typeof byte !== 'number' || !NumberIsSafeInteger(byte) || byte < 0 || byte > 255) return null; value += '0123456789abcdef'[byte >>> 4]! + '0123456789abcdef'[byte & 15]!; } return RegExpTest(prefix === 'dsc_' ? HANDLE : prefix === 'dsp_' ? PROJECTION_HANDLE : SOURCE_SET_SEAL_HANDLE, value) ? value : null; }
+function mint(bytes: unknown, prefix: 'dsc_' | 'dsp_' | 'dss_' | 'dsh_'): string | null { if (!(bytes instanceof Uint8ArrayConstructor) || IsProxy(bytes) || bytes.length !== 16) return null; let value = prefix; for (let index = 0; index < 16; index += 1) { const byte = bytes[index]; if (typeof byte !== 'number' || !NumberIsSafeInteger(byte) || byte < 0 || byte > 255) return null; value += '0123456789abcdef'[byte >>> 4]! + '0123456789abcdef'[byte & 15]!; } return RegExpTest(prefix === 'dsc_' ? HANDLE : prefix === 'dsp_' ? PROJECTION_HANDLE : prefix === 'dss_' ? SOURCE_SET_SEAL_HANDLE : HANDOFF_HANDLE, value) ? value : null; }
 function projectionCandidate(value: unknown): Readonly<{ sourceKind: 'native_text' | 'ocr_text'; sourceText: string }> | null { const input = exact(value, PROJECTION_KEYS); if (!input) return null; try { const normalized = resolveDocumentSynthesisHostProjection(ObjectFreeze({ sourceKind: input.sourceKind, sourceText: input.sourceText })); return ObjectFreeze({ sourceKind: normalized.sourceKind, sourceText: normalized.sourceText }); } catch { return null; } }
 function revoke(port: DocumentSynthesisAttachmentCapturePort, value: unknown): void { try { port.observeRevocation(value); } catch { /* denial remains terminal */ } }
 
@@ -104,7 +111,7 @@ export async function ingestDocumentSynthesisAuthenticatedAttachmentProjection(c
             if (!evidence) return null;
             const projectionHandle = mint(Entropy(16), 'dsp_');
             if (!projectionHandle) return null;
-            return sealed<PreparedProjectionPublication>({ projectionHandle, state: sealed<ProjectionRecord>({ selected: true, scope: 'document_synthesis_attachment_projection', evidence, attachmentCapturePort: captured!.attachmentCapturePort }), result: projectionAvailable(projectionHandle) });
+            return sealed<PreparedProjectionPublication>({ projectionHandle, state: sealed<ProjectionRecord>({ selected: true, currentness: captured!.currentness, scope: 'document_synthesis_attachment_projection', evidence, attachmentCapturePort: captured!.attachmentCapturePort }), result: projectionAvailable(projectionHandle) });
         });
         if (!prepared) { revoke(captured.attachmentCapturePort, evidence ?? grant ?? captured.attachmentCaptureCapability); return projectionDenied(failureCode); }
         if (!broker.publish(prepared.projectionHandle, prepared.state)) { revoke(captured.attachmentCapturePort, prepared.state.evidence); return projectionDenied('unavailable'); }
@@ -129,7 +136,7 @@ export async function sealDocumentSynthesisAuthenticatedAttachmentSourceSet(proj
             const sourceSetSealHandle = mint(Entropy(16), 'dss_');
             if (!sourceSetSealHandle) { revoke(record.attachmentCapturePort, seal); unpublished.seal = null; unpublished.port = null; return null; }
             const value = sealed<PreparedSourceSetSealPublication>({ sourceSetSealHandle,
-                state: sealed<SourceSetSealRecord>({ selected: true, scope: 'document_synthesis_attachment_source_set_seal', seal }),
+                state: sealed<SourceSetSealRecord>({ selected: true, currentness: record.currentness, scope: 'document_synthesis_attachment_source_set_seal', seal }),
                 result: sourceSetSealAvailable(sourceSetSealHandle) });
             return value;
         });
@@ -144,5 +151,35 @@ export async function sealDocumentSynthesisAuthenticatedAttachmentSourceSet(proj
     } catch {
         if (unpublished.seal && unpublished.port) revoke(unpublished.port, unpublished.seal);
         return sourceSetSealDenied('unavailable');
+    }
+}
+
+/** Fixed server-only A3a2 boundary: burns the external seal before retaining owner-private evidence behind an opaque handoff. */
+export async function handoffDocumentSynthesisAuthenticatedAttachmentSourceSet(sourceSetSealHandle: unknown): Promise<HandoffResult> {
+    if (typeof sourceSetSealHandle !== 'string' || !RegExpTest(SOURCE_SET_SEAL_HANDLE, sourceSetSealHandle)) return handoffDenied('input_invalid');
+    let context: Awaited<ReturnType<typeof acquireAuthenticatedWebSessionProjectionOwnerContext>>;
+    try { context = await acquireAuthenticatedWebSessionProjectionOwnerContext(); } catch { return handoffDenied('unavailable'); }
+    if (!context) return handoffDenied('unavailable');
+    let broker: Broker | null = null; let prepared: PreparedHandoffPublication | null = null;
+    try {
+        broker = brokerFor(context); const record = mapGet(broker.records, sourceSetSealHandle);
+        if (!record || record.scope !== 'document_synthesis_attachment_source_set_seal' || !mapDelete(broker.records, sourceSetSealHandle)) return handoffDenied('unavailable');
+        const selection = context.owner.withLeaseCriticalSection(context.session, (value) => sealed({ patientId: value.patientId, ambulatoryId: value.ambulatoryId }));
+        if (!selection) return handoffDenied('unavailable');
+        const port = context.owner.mintDocumentSynthesisSealedEvidencePort(context.session); const grant = port.begin(record.seal);
+        const handoffHandle = grant && mint(Entropy(16), 'dsh_');
+        if (!grant || !handoffHandle) { if (grant) port.consume(grant); return handoffDenied('unavailable'); }
+        const state = ObjectCreate(null) as HandoffRecord; state.selected = true; state.scope = 'document_synthesis_attachment_handoff'; state.evidence = null;
+        if (!broker.publish(handoffHandle, state)) { port.consume(grant); return handoffDenied('unavailable'); }
+        prepared = sealed<PreparedHandoffPublication>({ handoffHandle, state, result: handoffAvailable(handoffHandle), port, grant,
+            patientId: selection.patientId as string, ambulatoryId: selection.ambulatoryId as string });
+        const latest = currentness(DbGet(sql`SELECT a.document_source_ref AS documentSourceRef, a.document_revision AS documentRevision, a.document_freshness_epoch AS documentFreshnessEpoch FROM attachments AS a INNER JOIN patients_to_ambulatories AS pta ON pta.patient_id = a.patient_id WHERE a.document_source_ref = ${record.currentness.documentSourceRef} AND a.document_revision = ${record.currentness.documentRevision} AND a.document_freshness_epoch = ${record.currentness.documentFreshnessEpoch} AND a.patient_id = ${prepared.patientId} AND pta.ambulatory_id = ${prepared.ambulatoryId} LIMIT 1`));
+        const evidence = prepared.port.consume(prepared.grant);
+        if (!latest || !sameCurrentness(record.currentness, latest) || !evidence) { mapDelete(broker.records, prepared.handoffHandle); return handoffDenied('unavailable'); }
+        prepared.state.evidence = evidence;
+        return prepared.result;
+    } catch {
+        if (prepared && broker) mapDelete(broker.records, prepared.handoffHandle);
+        return handoffDenied('unavailable');
     }
 }
