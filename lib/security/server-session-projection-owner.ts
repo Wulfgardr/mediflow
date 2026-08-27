@@ -1228,7 +1228,9 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                             const providerProjection = ObjectCreate(null) as DocumentSynthesisProviderProjection['providerProjection'];
                             ObjectDefineProperty(providerProjection, 'schemaVersion', { enumerable: true,
                                 value: 'mediflow.document-synthesis.provider-projection.v1' });
-                            ObjectDefineProperty(providerProjection, 'sources', { enumerable: true, value: ObjectFreeze([ObjectFreeze(source)]) });
+                            const sourceList = [ObjectFreeze(source)];
+                            ObjectDefineProperty(sourceList, 'toJSON', { value: null });
+                            ObjectDefineProperty(providerProjection, 'sources', { enumerable: true, value: ObjectFreeze(sourceList) });
                             witness = ObjectFreeze(ObjectCreate(null));
                             const witnessRecord = ObjectFreeze({ execution: entry, currentness: sealed.currentness,
                                 currentnessGeneration: sealed.currentnessGeneration, sourceSetDigestSha256: sealed.sourceSetDigestSha256 });
