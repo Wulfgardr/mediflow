@@ -482,6 +482,110 @@ function documentSynthesisExecutionCapsuleIdentityRecord(onClock: (() => void) |
         identities: fixture.owner.mintDocumentSynthesisExecutionCapsuleIdentityPort(fixture.value) };
 }
 
+function documentSynthesisProviderProjectionRecord(onClock: (() => void) | null = null) {
+    const fixture = documentSynthesisExecutionCapsuleIdentityRecord(onClock);
+    const identity = fixture.identities.retain(fixture.capsule); assert.ok(identity);
+    return { ...fixture, identity, provider: fixture.owner.mintDocumentSynthesisProviderProjectionPort(fixture.value) };
+}
+
+test('Document Synthesis provider projection consumes one identity into minimal S1 and an inert witness', () => {
+    const record = documentSynthesisProviderProjectionRecord();
+    assert.equal(Object.getPrototypeOf(record.provider), null); assert.equal(Object.isFrozen(record.provider), true);
+    assert.deepEqual(Object.keys(record.provider), ['consume']);
+    const output = record.provider.consume(record.identity); assert.ok(output);
+    assert.equal(Object.getPrototypeOf(output), null); assert.equal(Object.isFrozen(output), true);
+    assert.deepEqual(Object.keys(output), ['providerProjection', 'witness']);
+    assert.deepEqual({ ...output.providerProjection, sources: output.providerProjection.sources.map((source) => ({ ...source })) }, {
+        schemaVersion: 'mediflow.document-synthesis.provider-projection.v1', sources: [{ label: 'S1', sourceText: 'Synthetic source.' }],
+    });
+    assert.equal(Object.getPrototypeOf(output.providerProjection), null); assert.equal(Object.isFrozen(output.providerProjection), true);
+    assert.equal(Object.isFrozen(output.providerProjection.sources), true); assert.equal(Object.getPrototypeOf(output.providerProjection.sources[0]), null);
+    assert.equal(Object.isFrozen(output.providerProjection.sources[0]), true); assert.equal(Object.getPrototypeOf(output.witness), null);
+    assert.equal(Object.isFrozen(output.witness), true); assert.deepEqual(Reflect.ownKeys(output.witness), []);
+    assert.equal(JSON.stringify(output.witness), '{}'); assert.equal(record.provider.consume(record.identity), null);
+    assert.equal(record.identities.consume(record.identity), null); assert.equal(record.identities.retain(record.capsule), null);
+    assert.equal(Reflect.set(output.providerProjection.sources[0], 'sourceText', 'changed'), false);
+    assert.throws(() => Object.defineProperty(output.witness, 'authority', { value: true }));
+    const serialized = JSON.stringify(output);
+    for (const forbidden of ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch', 'selectionEpoch', 'reviewContextEpoch',
+        'sourceSetEpoch', 'revocationGeneration', 'sourceSetDigestSha256', 'sessionRef', 'leaseRef']) assert.equal(serialized.includes(forbidden), false);
+});
+
+test('Document Synthesis provider projection rejects hostile, foreign, copied, and replayed identities without observation', async () => {
+    const record = documentSynthesisProviderProjectionRecord(); let reads = 0; let traps = 0;
+    const proxy = new Proxy(record.identity, { get() { traps += 1; throw new Error('synthetic trap'); }, ownKeys() { traps += 1; throw new Error('synthetic trap'); } });
+    const accessor = Object.freeze(Object.defineProperty({}, 'identity', { enumerable: true, get() { reads += 1; return record.identity; } }));
+    const thenable = Object.freeze(Object.defineProperty({}, 'then', { enumerable: true, get() { reads += 1; return () => undefined; } }));
+    for (const hostile of [null, Object.freeze({ ...record.identity }), structuredClone(record.identity), Object.freeze(Object.create(record.identity)),
+        proxy, accessor, thenable, Object.freeze({ [Symbol('identity')]: record.identity })]) assert.equal(record.provider.consume(hostile), null);
+    const foreign = documentSynthesisProviderProjectionRecord(); assert.equal(foreign.provider.consume(record.identity), null);
+    const copyUrl = new URL('./server-session-projection-owner.ts', import.meta.url); copyUrl.search = 'copy=a3c4-provider';
+    const moduleCopy = await import(copyUrl.href); const copyRegistry = moduleCopy.createServerSessionProjectionOwnerRegistry({
+        clock: () => 1_000, entropy: () => new Uint8Array(16), resolve: (_session: ServerSession, pair: typeof PAIR) => Object.freeze({ ...pair }),
+    });
+    const copiedSession = session(); const copiedOwner = copyRegistry.acquire(copiedSession); copiedOwner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    assert.equal(copiedOwner.mintDocumentSynthesisProviderProjectionPort(copiedSession).consume(record.identity), null);
+    const output = record.provider.consume(record.identity); assert.ok(output); assert.equal(record.provider.consume(output.witness), null);
+    assert.equal(record.provider.consume(Object.freeze(Object.create(null))), null); assert.equal(reads, 0); assert.equal(traps, 0);
+});
+
+test('Document Synthesis provider projection terminalizes currentness, lineage, selection, session, and lifecycle drift', () => {
+    const cases: readonly ((record: ReturnType<typeof documentSynthesisProviderProjectionRecord>) => void)[] = [
+        (record) => { assert.ok(record.capturePort.observeCurrentness(currentness(2, 2))); },
+        (record) => { const lineage = record.owner.mintDocumentSynthesisSourceLineagePort(record.value); const grant = lineage.open();
+            assert.ok(grant); const capability = lineage.verify(grant); assert.ok(capability); assert.equal(lineage.observeRevocation(capability), true); },
+        (record) => { record.owner.issueSelection({ expectedEpoch: 1, ...PAIR }); },
+        (record) => { record.setClock(record.value.expiresAt); },
+        (record) => { deleteSession(record.value.id); },
+        (record) => { record.owner.dispose(); },
+        () => { clearAllSessions(); },
+    ];
+    for (const mutate of cases) {
+        const record = documentSynthesisProviderProjectionRecord(); mutate(record);
+        assert.equal(record.provider.consume(record.identity), null); assert.equal(record.provider.consume(record.identity), null);
+        assert.equal(record.identities.consume(record.identity), null);
+    }
+});
+
+test('Document Synthesis provider projection poisons reentry and ignores ambient then without post-return work', async () => {
+    let nested: (() => void) | null = null; let inner: unknown = 'not-called'; let reads = 0;
+    const record = documentSynthesisProviderProjectionRecord(() => nested?.());
+    const descriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'then'); const unhandled: unknown[] = [];
+    process.on('unhandledRejection', (value) => unhandled.push(value));
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { reads += 1; return undefined; } });
+    nested = () => { inner = record.provider.consume(record.identity); };
+    try { assert.equal(record.provider.consume(record.identity), null); } finally {
+        if (descriptor) Object.defineProperty(Object.prototype, 'then', descriptor); else delete (Object.prototype as { then?: unknown }).then;
+    }
+    nested = null; assert.equal(inner, null); assert.equal(record.provider.consume(record.identity), null); assert.equal(reads, 0);
+    await new Promise((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
+});
+
+test('Document Synthesis provider projection rolls back captured witness publication reentry and throw', () => {
+    const script = `
+const assert = (await import('node:assert/strict')).default; const sessionModule = await import(${JSON.stringify(SESSION_TARGET.href)});
+const originalSet = WeakMap.prototype.set; let hook = null; let observed = null; let traps = 0;
+WeakMap.prototype.set = function (key, value) { const result = Reflect.apply(originalSet, this, [key, value]);
+  if (hook && value && typeof value === 'object' && Reflect.ownKeys(value).includes('execution')) {
+    traps += 1; observed = key; const active = hook; hook = null; active(); throw new Error('synthetic post-set'); }
+  return result; };
+const ownerModule = await import(${JSON.stringify(OWNER_TARGET.href)} + '?a3c4-postset');
+const value = sessionModule.createSession({ id: ['synthetic', 'user'].join('-'), username: ['synthetic', 'clinician'].join('-'), role: 'clinician' }, 'web');
+const registry = ownerModule.createServerSessionProjectionOwnerRegistry({ clock: () => 1_000, entropy: () => new Uint8Array(16).fill(7),
+  resolve: (_session, pair) => Object.freeze({ ...pair }) }); const owner = registry.acquire(value);
+owner.issueSelection({ expectedEpoch: 0, patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' });
+const capture = owner.mintDocumentSynthesisAttachmentCapturePort(value); const current = Object.freeze({ documentSourceRef: 'document-source.synthetic.01', documentRevision: 1, documentFreshnessEpoch: 1 });
+const observedCurrent = capture.observeCurrentness(current); const grant = capture.begin(observedCurrent); const retained = capture.retain(Object.freeze({ grant, observedCurrentness: current, projection: Object.freeze({ sourceKind: 'native_text', sourceText: 'Synthetic source.' }) }));
+const seal = capture.sealRetainedProjection(retained); const capsule = owner.mintDocumentSynthesisExecutionCapsulePort(value).promote(seal);
+const identities = owner.mintDocumentSynthesisExecutionCapsuleIdentityPort(value); const identity = identities.retain(capsule);
+const provider = owner.mintDocumentSynthesisProviderProjectionPort(value); let inner = 'not-called'; hook = () => { inner = provider.consume(identity); };
+assert.equal(provider.consume(identity), null); assert.equal(inner, null); assert.equal(provider.consume(identity), null); assert.equal(provider.consume(observed), null);
+assert.equal(identities.consume(identity), null); assert.equal(traps, 1); process.stdout.write('ok');`;
+    const result = spawnSync(process.execPath, ['--experimental-strip-types', '--import', RUNNER.pathname,
+        '--conditions=react-server', '--input-type=module', '--eval', script], { encoding: 'utf8' });
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`); assert.equal(result.stdout, 'ok');
+});
+
 test('Document Synthesis execution capsule promotes one authentic seal into a frozen zero-field inert value', () => {
     const { owner, value, seal, capsules } = sealedDocumentSynthesisRecord();
     assert.equal(Object.getPrototypeOf(capsules), null); assert.equal(Object.isFrozen(capsules), true);
