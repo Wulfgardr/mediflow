@@ -20,10 +20,11 @@ const NODE_24 = [process.env.MEDIFLOW_STRIP_TYPES_NODE, process.execPath, path.j
 
 if (!NODE_24) throw new Error('Document Synthesis attachment capture tests require Node 24.19.0.');
 
-test('exports only the fixed capture boundary and no production composition', () => {
+test('exports only the fixed capture and projection-ingest boundaries with no production composition', () => {
     const source = readFileSync(TARGET, 'utf8');
-    assert.equal((source.match(/^export /gmu) ?? []).length, 1);
+    assert.equal((source.match(/^export /gmu) ?? []).length, 2);
     assert.match(source, /export async function captureDocumentSynthesisAuthenticatedAttachment/u);
+    assert.match(source, /export async function ingestDocumentSynthesisAuthenticatedAttachmentProjection/u);
     assert.doesNotMatch(source, /createDocumentSynthesisAuthenticatedAttachmentCapture|Sources|acquireContext:|lookup\(|entropy:|export (?:type|interface|const|class|\{)/u);
     assert.match(source, /withLeaseCriticalSection[\s\S]*?INNER JOIN patients_to_ambulatories/u);
     assert.doesNotMatch(source, /production\.ts/u);
@@ -49,12 +50,11 @@ const makeContext = (patientId) => {
 const primary = makeContext('patient.synthetic.capture');
 const other = makeContext('patient.synthetic.other');
 const poisoned = makeContext('patient.synthetic.capture');
-const contexts = [primary, primary, primary, other, other, poisoned];
+const contexts = [primary, primary, primary, primary, other, other, other, poisoned];
 let calls = 0;
 module.exports = {
   acquireAuthenticatedWebSessionProjectionOwnerContext: async () => {
     const context = contexts[calls++] ?? null;
-    if (calls === 5) deleteSession(other.session.id);
     return context;
   },
 };
@@ -88,14 +88,23 @@ dbServer.run(sql.raw("INSERT INTO ambulatories (id, name, type) VALUES ('ambulat
 dbServer.run(sql.raw("INSERT INTO patients (id, first_name, last_name, tax_code) VALUES ('patient.synthetic.capture', 'First', 'Synthetic', 'CAPTUREFIRST00001'), ('patient.synthetic.other', 'Other', 'Synthetic', 'CAPTUREOTHER00002')"));
 dbServer.run(sql.raw("INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES ('patient.synthetic.capture', 'ambulatory.synthetic.capture'), ('patient.synthetic.other', 'ambulatory.synthetic.capture')"));
 dbServer.run(sql.raw("INSERT INTO attachments (id, patient_id, name, type, size, path, document_source_ref, document_revision, document_freshness_epoch) VALUES ('attachment.synthetic.capture', 'patient.synthetic.capture', 'capture.pdf', 'application/pdf', 1, 'capture.pdf', '${'a'.repeat(64)}', 7, 11), ('attachment.synthetic.other', 'patient.synthetic.other', 'other.pdf', 'application/pdf', 1, 'other.pdf', '${'b'.repeat(64)}', 5, 13)"));
-const { captureDocumentSynthesisAuthenticatedAttachment: capture } = require(target);
+const { captureDocumentSynthesisAuthenticatedAttachment: capture, ingestDocumentSynthesisAuthenticatedAttachmentProjection: ingest } = require(target);
 const first = await capture({ attachmentId: 'attachment.synthetic.capture' });
 assert.equal(first.status, 'available');
 assert.equal(first.code, null);
 assert.match(first.captureHandle, /^dsc_[0-9a-f]{32}$/u);
 assert.deepEqual({ reviewOnly: first.reviewOnly, writesPerformed: first.writesPerformed, applyPolicy: first.applyPolicy }, { reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
+const projection = await ingest(first.captureHandle, { sourceKind: 'native_text', sourceText: 'Synthetic projection' });
+assert.deepEqual({ ...projection, projectionHandle: typeof projection.projectionHandle === 'string' ? 'opaque' : projection.projectionHandle }, { status: 'available', code: null, projectionHandle: 'opaque', reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
+assert.match(projection.projectionHandle, /^dsp_[0-9a-f]{32}$/u); assert.equal(Object.getPrototypeOf(projection), null); assert.equal(Object.isFrozen(projection), true);
+assert.deepEqual({ ...await ingest(first.captureHandle, { sourceKind: 'native_text', sourceText: 'replay' }) }, { status: 'denied', code: 'unavailable', projectionHandle: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
+assert.deepEqual({ ...await ingest(projection.projectionHandle, { sourceKind: 'native_text', sourceText: 'wrong stage' }) }, { status: 'denied', code: 'input_invalid', projectionHandle: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
 const replay = await capture({ attachmentId: 'attachment.synthetic.capture' });
 assert.deepEqual({ ...replay }, { status: 'denied', code: 'unavailable', captureHandle: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
+const invalidCapture = await capture({ attachmentId: 'attachment.synthetic.other' }); assert.match(invalidCapture.captureHandle, /^dsc_[0-9a-f]{32}$/u);
+let projectionTraps = 0; const hostileProjection = new Proxy({ sourceKind: 'native_text', sourceText: 'synthetic' }, { get() { projectionTraps += 1; throw new Error('trap'); }, ownKeys() { projectionTraps += 1; throw new Error('trap'); } });
+assert.deepEqual({ ...await ingest(invalidCapture.captureHandle, hostileProjection) }, { status: 'denied', code: 'input_invalid', projectionHandle: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' }); assert.equal(projectionTraps, 0);
+assert.deepEqual({ ...await ingest(invalidCapture.captureHandle, { sourceKind: 'native_text', sourceText: 'replay' }) }, { status: 'denied', code: 'unavailable', projectionHandle: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
 let traps = 0;
 const hostile = new Proxy({ attachmentId: 'attachment.synthetic.capture' }, { get() { traps += 1; throw new Error('trap'); }, ownKeys() { traps += 1; throw new Error('trap'); } });
 const hostileResult = await capture(hostile);
@@ -135,6 +144,15 @@ test('captures every runtime intrinsic before the boundary is called', () => {
         'NumberIsSafeInteger = Number.isSafeInteger', 'MapConstructor = Map', 'WeakMapConstructor = WeakMap',
         'DbGet = dbServer.get.bind(dbServer)', 'Entropy = randomBytes', "'input_invalid'", "'unavailable'",
         'reviewOnly: true', "applyPolicy: 'none'", 'mintDocumentSynthesisAttachmentCapturePort', 'observeCurrentness',
-        'attachmentCapturePort', 'attachmentCaptureCapability',
+        'attachmentCapturePort', 'attachmentCaptureCapability', 'resolveDocumentSynthesisHostProjection', "'dsp_'", 'mapDelete', 'retain(', 'sameCurrentness',
     ]) assert.match(source, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
+});
+
+test('burns the capture before projection observation and reads currentness once in the ingest P4 turn', () => {
+    const source = readFileSync(TARGET, 'utf8');
+    const ingest = source.slice(source.indexOf('export async function ingestDocumentSynthesisAuthenticatedAttachmentProjection'));
+
+    assert.ok(ingest.indexOf('mapDelete(broker.records, captureHandle)') < ingest.indexOf('projectionCandidate(projection)'));
+    assert.equal((ingest.match(/DbGet\(/gu) ?? []).length, 1);
+    assert.ok(ingest.indexOf('const projectionHandle = mint(Entropy(16), \'dsp_\')') > ingest.indexOf('attachmentCapturePort.retain'));
 });
