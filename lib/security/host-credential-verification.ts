@@ -142,6 +142,7 @@ export async function verifyHostCredentials(
         if (!username || !credential.pin) return deny(username, dependencies);
         const user = await db.select().from(users).where(eq(users.username, username)).get();
         const now = dependencies.now?.() ?? new Date();
+        if (!(now instanceof Date) || Number.isNaN(now.getTime())) return invalid();
         if (!user || !user.passwordHash) return deny(username, dependencies);
         const activeLockout = isLockoutActive(user, now);
         if (activeLockout) return deny(
