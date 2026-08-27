@@ -14,6 +14,7 @@ import {
     activateArmedWebServerSession,
     activateStagedWebServerSession,
     clearAllSessions,
+    cleanupRetiredWebServerSession,
     commitPreparedWebServerSession,
     createSession,
     deleteSession,
@@ -538,13 +539,96 @@ test('ACTIVE resource port has no callback surface or production importer before
     const mint = source.slice(source.indexOf('export function mintActiveWebSessionResourcePort'), source.indexOf('export function releaseActiveWebSessionResourcePort'));
     const release = source.slice(source.indexOf('export function releaseActiveWebSessionResourcePort'), source.indexOf('export function getSession'));
     const use = source.slice(source.indexOf('export function beginActiveWebSessionResourceUse'), source.indexOf('export function getSession'));
+    const cleanup = source.slice(source.indexOf('export function cleanupRetiredWebServerSession'));
     assert.match(mint, /\(session: unknown\): ActiveWebSessionResourcePort \| null/u); assert.match(release, /\(port: unknown\): boolean/u);
     assert.match(use, /export function beginActiveWebSessionResourceUse\(port: unknown\): ActiveWebSessionResourceUse \| null/u);
     assert.match(use, /export function commitActiveWebSessionResourceUse\(use: unknown\): boolean/u);
     assert.match(use, /export function abortActiveWebSessionResourceUse\(use: unknown\): boolean/u);
     assert.doesNotMatch(`${mint}\n${release}\n${use}`, /\b(?:callback|dispose|Promise|async|then|setTimeout|setImmediate|queueMicrotask|nextTick|payload|effect|method)\b/u);
-    const paths = execFileSync('rg', ['-l', 'mintActiveWebSessionResourcePort|releaseActiveWebSessionResourcePort|beginActiveWebSessionResourceUse|commitActiveWebSessionResourceUse|abortActiveWebSessionResourceUse', '-g', '*.ts', '.'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map((value) => value.replace(/^\.\//u, ''));
+    assert.doesNotMatch(cleanup, /\b(?:DateNow|Promise|async|then|setTimeout|setImmediate|queueMicrotask|nextTick)\b/u);
+    const paths = execFileSync('rg', ['-l', 'mintActiveWebSessionResourcePort|releaseActiveWebSessionResourcePort|beginActiveWebSessionResourceUse|commitActiveWebSessionResourceUse|abortActiveWebSessionResourceUse|cleanupRetiredWebServerSession', '-g', '*.ts', '.'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map((value) => value.replace(/^\.\//u, ''));
     assert.deepEqual(paths.sort(), ['lib/security/server-session.test.ts', 'lib/security/server-session.ts']);
+});
+
+test('compacts one exact RETIRED Web cell into a replay-stable PHI-safe tombstone receipt', () => {
+    const active = activeResourceFixture();
+    const pendingUse = beginActiveWebSessionResourceUse(active.port); assert.ok(pendingUse);
+    assert.equal(retireActiveWebServerSession(active.sessionId, 'dispose'), true);
+
+    const receipt = cleanupRetiredWebServerSession(active.sessionId, 'dispose');
+    assert.equal(Object.getPrototypeOf(receipt), null);
+    assert.equal(Object.isFrozen(receipt), true);
+    assert.deepEqual(Reflect.ownKeys(receipt), ['outcome']);
+    assert.deepEqual(Object.getOwnPropertyDescriptor(receipt, 'outcome'), {
+        value: 'completed', enumerable: true, configurable: false, writable: false,
+    });
+    assert.equal(cleanupRetiredWebServerSession(active.sessionId, 'dispose'), receipt);
+    assert.equal(cleanupRetiredWebServerSession(active.sessionId, 'lock').outcome, 'denied');
+    assert.equal(commitActiveWebSessionResourceUse(pendingUse), false);
+    assert.equal(abortActiveWebSessionResourceUse(pendingUse), false);
+    assert.equal(releaseActiveWebSessionResourcePort(active.port), false);
+    assert.equal(mintActiveWebSessionResourcePort(active.session), null);
+    assert.equal(resolveActiveWebServerSession(active.sessionId), null);
+});
+
+test('RETIRED cleanup fails terminally on captured WeakMap apply-then-throw and reentry', async (t) => {
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const cached = nodeRequire.cache[modulePath]; const originalDelete = WeakMap.prototype.delete;
+    let isolated: typeof import('./server-session') | undefined; let mode: 'idle' | 'throw' | 'reenter' = 'idle';
+    let currentId = ''; let nestedOutcome = ''; const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason); process.on('unhandledRejection', onUnhandled);
+    t.after(() => process.off('unhandledRejection', onUnhandled));
+    WeakMap.prototype.delete = function (key: object) {
+        const result = Reflect.apply(originalDelete, this, [key]);
+        if (mode === 'throw') { mode = 'idle'; throw new Error('synthetic post-delete failure'); }
+        if (mode === 'reenter') { mode = 'idle'; nestedOutcome = isolated!.cleanupRetiredWebServerSession(currentId, 'dispose').outcome; }
+        return result;
+    };
+    const make = () => {
+        const staged = isolated!.stageWebServerSession({ id: `cleanup-${currentId || 'first'}`, username: SYNTHETIC_USERNAME, role: 'clinician' });
+        const prepared = isolated!.prepareStagedWebServerSession(staged); assert.ok(prepared);
+        currentId = isolated!.getPreparedWebServerSessionId(prepared) ?? ''; const port = isolated!.armPreparedWebServerSession(prepared); assert.ok(port);
+        const control = authControlApi().create(`cleanup-${currentId}`); control.begin('login', 'op', `key-${currentId}`, `fp-${currentId}`, 0);
+        const ticket = control.prepareTicket(`cleanup-${currentId}`, 'op', BigInt(0), `fp-${currentId}`, currentId, 1); assert.ok(ticket);
+        assert.equal(isolated!.activateArmedWebServerSession(port, ticket), true); const session = isolated!.resolveActiveWebServerSession(currentId); assert.ok(session);
+        const resource = isolated!.mintActiveWebSessionResourcePort(session); assert.ok(resource); const use = isolated!.beginActiveWebSessionResourceUse(resource); assert.ok(use);
+        assert.equal(isolated!.retireActiveWebServerSession(currentId, 'dispose'), true); return { session, resource, use };
+    };
+    try {
+        delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
+        const first = make(); mode = 'throw'; const failed = isolated.cleanupRetiredWebServerSession(currentId, 'dispose'); assert.equal(failed.outcome, 'failed');
+        assert.equal(isolated.cleanupRetiredWebServerSession(currentId, 'dispose'), failed);
+        assert.equal(isolated.commitActiveWebSessionResourceUse(first.use), false); assert.equal(isolated.releaseActiveWebSessionResourcePort(first.resource), false);
+        assert.equal(isolated.mintActiveWebSessionResourcePort(first.session), null);
+        currentId = 'second'; make(); mode = 'reenter'; assert.equal(isolated.cleanupRetiredWebServerSession(currentId, 'dispose').outcome, 'failed');
+        assert.equal(nestedOutcome, 'denied'); await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
+    } finally { mode = 'idle'; WeakMap.prototype.delete = originalDelete; isolated?.clearAllSessions();
+        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
+});
+
+test('RETIRED cleanup denies hostile and cross-module inputs without observation or later work', async (t) => {
+    const active = activeResourceFixture(); let observed = 0;
+    const proxy = new Proxy(Object.create(null), { get: () => { observed += 1; throw new Error('get'); }, ownKeys: () => { observed += 1; throw new Error('keys'); } });
+    const accessor = Object.create(null); Object.defineProperty(accessor, 'then', { get: () => { observed += 1; throw new Error('then'); } });
+    const rejected = Promise.reject(new Error('synthetic cleanup input')); rejected.catch(() => undefined);
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    for (const value of [null, undefined, '', {}, proxy, accessor, Promise.resolve(), rejected, '__proto__']) {
+        assert.equal(cleanupRetiredWebServerSession(value, 'dispose').outcome, 'denied');
+    }
+    assert.equal(cleanupRetiredWebServerSession(active.sessionId, 'dispose').outcome, 'denied');
+    assert.equal(retireActiveWebServerSession(active.sessionId, 'dispose'), true);
+    const originalThen = Object.getOwnPropertyDescriptor(Object.prototype, 'then'); const originalWeakDelete = WeakMap.prototype.delete;
+    try { WeakMap.prototype.delete = (() => { observed += 1; throw new Error('ambient delete'); }) as typeof WeakMap.prototype.delete;
+        Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { observed += 1; throw new Error('ambient then'); } });
+        assert.equal(cleanupRetiredWebServerSession(active.sessionId, 'dispose').outcome, 'completed'); }
+    finally { WeakMap.prototype.delete = originalWeakDelete;
+        if (originalThen) Object.defineProperty(Object.prototype, 'then', originalThen); else delete (Object.prototype as { then?: unknown }).then; }
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath];
+    try { delete nodeRequire.cache[modulePath]; const restarted = nodeRequire(modulePath) as typeof import('./server-session');
+        assert.equal(restarted.cleanupRetiredWebServerSession(active.sessionId, 'dispose').outcome, 'denied'); restarted.clearAllSessions(); }
+    finally { if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
+    await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(observed, 0); assert.deepEqual(unhandled, []);
 });
 
 test('retires one exact ACTIVE cell through its retained control ticket', () => {

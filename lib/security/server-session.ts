@@ -42,6 +42,7 @@ const setIteratorNext = ObjectGetPrototypeOf(new SetConstructor().values()).next
 const setSize = ObjectGetOwnPropertyDescriptor(Set.prototype, 'size')!.get!;
 const weakMapGet = WeakMap.prototype.get;
 const weakMapSet = WeakMap.prototype.set;
+const weakMapDelete = WeakMap.prototype.delete;
 const cryptoRandomBytes = crypto.randomBytes;
 const bufferToString = Buffer.prototype.toString;
 const arrayPush = Array.prototype.push;
@@ -99,6 +100,10 @@ function setWeakMapValue<K extends object, V>(registry: WeakMap<K, V>, key: K, v
     applyIntrinsic(weakMapSet, registry, [key, value]);
 }
 
+function deleteWeakMapValue<K extends object, V>(registry: WeakMap<K, V>, key: K): boolean {
+    return applyIntrinsic(weakMapDelete, registry, [key]);
+}
+
 function appendArrayValue<T>(target: T[], value: T): void {
     applyIntrinsic(arrayPush, target, [value]);
 }
@@ -107,6 +112,25 @@ export type ServerSessionDisposalReason = 'session_deleted' | 'session_expired' 
 export type ServerSessionResourceDisposer = (reason: ServerSessionDisposalReason) => void;
 export type ServerSessionCleanupOutcome = 'completed' | 'failed' | 'unknown';
 export type WebServerSessionRetirementReason = 'lock' | 'dispose' | 'expired' | 'delete' | 'clear';
+export type WebServerSessionRetirementCleanupOutcome = 'completed' | 'failed' | 'denied';
+export type WebServerSessionRetirementCleanupReceipt = Readonly<{
+    outcome: WebServerSessionRetirementCleanupOutcome;
+}>;
+
+function createWebServerSessionRetirementCleanupReceipt(
+    outcome: WebServerSessionRetirementCleanupOutcome,
+): WebServerSessionRetirementCleanupReceipt {
+    const receipt = ObjectCreate(null) as { outcome: WebServerSessionRetirementCleanupOutcome };
+    receipt.outcome = outcome;
+    return ObjectFreeze(receipt);
+}
+
+const completedWebSessionRetirementCleanupReceipt = createWebServerSessionRetirementCleanupReceipt('completed');
+const failedWebSessionRetirementCleanupReceipt = createWebServerSessionRetirementCleanupReceipt('failed');
+const deniedWebSessionRetirementCleanupReceipt = createWebServerSessionRetirementCleanupReceipt('denied');
+const retiredWebSessionSentinel = ObjectFreeze({
+    id: '', userId: '', username: '', role: '', authChannel: 'web' as const, createdAt: 0, expiresAt: 0,
+});
 
 interface ServerSessionResourceRegistration {
     active: boolean;
@@ -154,29 +178,35 @@ interface PreparedWebSessionRecord {
 }
 
 interface ArmedWebSessionCellRecord {
-    state: 'ARMED_ACTIVATE' | 'ACTIVE' | 'ARMED_RETIRE' | 'RETIRED' | 'TOMBSTONE';
+    state: 'ARMED_ACTIVATE' | 'ACTIVE' | 'ARMED_RETIRE' | 'RETIRED' | 'TOMBSTONE'
+        | 'RETIRED_CLEANUP' | 'RETIRED_TOMBSTONE';
+    sessionId: string;
     session: ServerSession;
     next: ArmedWebSessionCellRecord | null;
     activationTicket: unknown | null;
     retirement: unknown | null;
+    retirementReason: WebServerSessionRetirementReason | null;
+    cleanupReceipt: WebServerSessionRetirementCleanupReceipt | null;
     resourcePortsRevoked: boolean;
+    resourcePortHead: ActiveWebSessionResourcePortRecord | null;
 }
 
 interface ActiveWebSessionResourcePortRecord {
     active: boolean;
     revoked: boolean;
-    cell: ArmedWebSessionCellRecord;
-    session: ServerSession;
-    registry: Set<ActiveWebSessionResourcePortRecord>;
-    uses: Set<ActiveWebSessionResourceUseRecord>;
+    cell: ArmedWebSessionCellRecord | null;
+    session: ServerSession | null;
+    next: ActiveWebSessionResourcePortRecord | null;
+    useHead: ActiveWebSessionResourceUseRecord | null;
 }
 
 interface ActiveWebSessionResourceUseRecord {
     active: boolean;
-    port: ActiveWebSessionResourcePort;
-    owner: ActiveWebSessionResourcePortRecord;
-    cell: ArmedWebSessionCellRecord;
-    session: ServerSession;
+    port: ActiveWebSessionResourcePort | null;
+    owner: ActiveWebSessionResourcePortRecord | null;
+    cell: ArmedWebSessionCellRecord | null;
+    session: ServerSession | null;
+    next: ActiveWebSessionResourceUseRecord | null;
 }
 
 const sessions = new MapConstructor<string, ServerSession>();
@@ -190,7 +220,6 @@ const preparedWebSessionReservations = new MapConstructor<string, PreparedWebSes
 const armedWebSessionPortRecords = new WeakMapConstructor<object, ArmedWebSessionCellRecord>();
 const activeWebSessionCellsBySession = new WeakMapConstructor<ServerSession, ArmedWebSessionCellRecord>();
 const activeWebSessionResourcePortRecords = new WeakMapConstructor<object, ActiveWebSessionResourcePortRecord>();
-const activeWebSessionResourcePortsByCell = new WeakMapConstructor<ArmedWebSessionCellRecord, Set<ActiveWebSessionResourcePortRecord>>();
 const activeWebSessionResourceUseRecords = new WeakMapConstructor<object, ActiveWebSessionResourceUseRecord>();
 const armedWebSessionCellsById = ObjectCreate(null) as Record<string, ArmedWebSessionCellRecord | undefined>;
 let armedWebSessionCellHead: ArmedWebSessionCellRecord | null = null;
@@ -427,8 +456,9 @@ function activeWebSessionResourceUseRecord(use: unknown): ActiveWebSessionResour
 
 function activeWebSessionResourceUseIsLive(record: ActiveWebSessionResourceUseRecord): boolean {
     const owner = record.owner;
-    return record.active && owner.active && !owner.revoked
-        && getWeakMapValue(activeWebSessionResourcePortRecords, record.port) === owner
+    const port = record.port;
+    return record.active && owner !== null && port !== null && owner.active && !owner.revoked
+        && getWeakMapValue(activeWebSessionResourcePortRecords, port) === owner
         && owner.cell === record.cell && owner.session === record.session
         && activeWebSessionResourceIsLive(owner);
 }
@@ -436,42 +466,29 @@ function activeWebSessionResourceUseIsLive(record: ActiveWebSessionResourceUseRe
 function burnActiveWebSessionResourceUse(record: ActiveWebSessionResourceUseRecord): boolean {
     if (!record.active) return false;
     record.active = false;
-    try { deleteSetValue(record.owner.uses, record); } catch { /* terminal use denial remains */ }
     return true;
 }
 
 function activeWebSessionResourceIsLive(record: ActiveWebSessionResourcePortRecord): boolean {
+    if (!record.active || record.revoked || !record.cell || !record.session) return false;
     const cell = record.cell; const session = record.session; const sessionId = session.id; const expiry = session.expiresAt;
     const now = DateNow();
-    return !webSessionCellLifecyclePoisoned && record.active && !record.revoked && !cell.resourcePortsRevoked
+    return !webSessionCellLifecyclePoisoned && !cell.resourcePortsRevoked
         && cell.state === 'ACTIVE' && cell.session === session
         && armedWebSessionCellsById[sessionId] === cell && session.id === sessionId && session.authChannel === 'web'
         && expiry > now && getMapValue(sessions, sessionId) === undefined;
 }
 
 function revokeActiveWebSessionResourceUses(record: ActiveWebSessionResourcePortRecord): void {
-    try {
-        const iterator = applyIntrinsic(setValues, record.uses, []);
-        for (let next = nextSetIterator<ActiveWebSessionResourceUseRecord>(iterator); !next.done;
-            next = nextSetIterator<ActiveWebSessionResourceUseRecord>(iterator)) {
-            next.value.active = false;
-            try { deleteSetValue(record.uses, next.value); } catch { /* terminal use denial remains */ }
-        }
-    } catch { /* terminal use denial remains */ }
+    for (let use = record.useHead; use; use = use.next) use.active = false;
 }
 
 function revokeActiveWebSessionResourcePortsForCell(cell: ArmedWebSessionCellRecord): void {
     cell.resourcePortsRevoked = true;
-    try {
-        const resources = getWeakMapValue(activeWebSessionResourcePortsByCell, cell);
-        if (!resources) return;
-        const iterator = applyIntrinsic(setValues, resources, []);
-        for (let next = nextSetIterator<ActiveWebSessionResourcePortRecord>(iterator); !next.done;
-            next = nextSetIterator<ActiveWebSessionResourcePortRecord>(iterator)) {
-            next.value.revoked = true;
-            revokeActiveWebSessionResourceUses(next.value);
-        }
-    } catch { /* terminal resource denial remains */ }
+    for (let resource = cell.resourcePortHead; resource; resource = resource.next) {
+        resource.revoked = true;
+        revokeActiveWebSessionResourceUses(resource);
+    }
 }
 
 function releaseActiveWebSessionResourceRecord(record: ActiveWebSessionResourcePortRecord): boolean {
@@ -479,7 +496,6 @@ function releaseActiveWebSessionResourceRecord(record: ActiveWebSessionResourceP
     record.active = false;
     record.revoked = true;
     revokeActiveWebSessionResourceUses(record);
-    try { deleteSetValue(record.registry, record); } catch { /* revoked authority remains terminal */ }
     return true;
 }
 
@@ -501,6 +517,66 @@ function retireArmedWebSessionCellRecord(record: ArmedWebSessionCellRecord): boo
     revokeActiveWebSessionResourcePortsForCell(record);
     record.state = 'RETIRED';
     return true;
+}
+
+function unlinkArmedWebSessionCellRecord(record: ArmedWebSessionCellRecord): boolean {
+    let previous: ArmedWebSessionCellRecord | null = null;
+    let current = armedWebSessionCellHead;
+    while (current && current !== record) {
+        previous = current;
+        current = current.next;
+    }
+    if (!current) return false;
+    if (previous) previous.next = current.next;
+    else armedWebSessionCellHead = current.next;
+    current.next = null;
+    return true;
+}
+
+function compactRetiredWebSessionCellRecord(
+    record: ArmedWebSessionCellRecord,
+    session: ServerSession,
+): WebServerSessionRetirementCleanupReceipt {
+    let failed = false;
+    record.state = 'RETIRED_CLEANUP';
+    record.cleanupReceipt = failedWebSessionRetirementCleanupReceipt;
+    record.resourcePortsRevoked = true;
+    let resource = record.resourcePortHead;
+    record.resourcePortHead = null;
+    while (resource) {
+        const nextResource = resource.next;
+        let use = resource.useHead;
+        resource.active = false;
+        resource.revoked = true;
+        resource.useHead = null;
+        resource.next = null;
+        while (use) {
+            const nextUse = use.next;
+            use.active = false;
+            use.port = null;
+            use.owner = null;
+            use.cell = null;
+            use.session = null;
+            use.next = null;
+            use = nextUse;
+        }
+        resource.cell = null;
+        resource.session = null;
+        resource = nextResource;
+    }
+    try {
+        if (!deleteWeakMapValue(activeWebSessionCellsBySession, session)) failed = true;
+    } catch { failed = true; }
+    if (!unlinkArmedWebSessionCellRecord(record) || webSessionCellLifecyclePoisoned) failed = true;
+    record.session = retiredWebSessionSentinel;
+    record.activationTicket = null;
+    record.retirement = null;
+    record.next = null;
+    record.cleanupReceipt = failed
+        ? failedWebSessionRetirementCleanupReceipt
+        : completedWebSessionRetirementCleanupReceipt;
+    record.state = 'RETIRED_TOMBSTONE';
+    return record.cleanupReceipt;
 }
 
 function denyNestedWebSessionCellInput(value: unknown): void {
@@ -701,8 +777,9 @@ export function armPreparedWebServerSession(capability: unknown): ArmedWebServer
         ObjectFreeze(session);
         const port = ObjectFreeze(ObjectCreate(null)) as ArmedWebServerSessionPort;
         cell = {
-            state: 'ARMED_ACTIVATE', session, next: armedWebSessionCellHead,
-            activationTicket: null, retirement: null, resourcePortsRevoked: false,
+            state: 'ARMED_ACTIVATE', sessionId: session.id, session, next: armedWebSessionCellHead,
+            activationTicket: null, retirement: null, retirementReason: null, cleanupReceipt: null,
+            resourcePortsRevoked: false, resourcePortHead: null,
         };
         armedWebSessionCellHead = cell;
         armedWebSessionCellsById[session.id] = cell;
@@ -815,6 +892,7 @@ export function retireActiveWebServerSession(sessionId: unknown, reason: unknown
     if (!cell || cell.state !== 'ACTIVE' || cell.session.id !== sessionId || !cell.activationTicket) return false;
     const session = cell.session;
     const ticket = cell.activationTicket;
+    cell.retirementReason = reason;
     const preparedRetirement = prepareAuthControlRetirement(ticket, sessionId, reason);
     if (!preparedRetirement) {
         if (cell.state === 'ACTIVE' && armedWebSessionCellsById[sessionId] === cell && cell.session === session) {
@@ -963,12 +1041,12 @@ export function mintActiveWebSessionResourcePort(session: unknown): ActiveWebSes
             || exactSession.authChannel !== 'web' || exactSession.expiresAt !== expiry || expiry <= now
             || getMapValue(sessions, sessionId)) return null;
         const port = ObjectFreeze(ObjectCreate(null)) as ActiveWebSessionResourcePort;
-        const registry = getWeakMapValue(activeWebSessionResourcePortsByCell, cell)
-            ?? new SetConstructor<ActiveWebSessionResourcePortRecord>();
-        record = { active: true, revoked: false, cell, session: exactSession, registry, uses: new SetConstructor() };
+        record = {
+            active: true, revoked: false, cell, session: exactSession,
+            next: cell.resourcePortHead, useHead: null,
+        };
+        cell.resourcePortHead = record;
         setWeakMapValue(activeWebSessionResourcePortRecords, port, record);
-        addSetValue(registry, record);
-        setWeakMapValue(activeWebSessionResourcePortsByCell, cell, registry);
         if (webSessionCellLifecyclePoisoned || cell.state !== 'ACTIVE' || cell.resourcePortsRevoked || cell.session !== exactSession
             || armedWebSessionCellsById[sessionId] !== cell || exactSession.expiresAt !== expiry
             || getMapValue(sessions, sessionId)) {
@@ -1003,9 +1081,12 @@ export function beginActiveWebSessionResourceUse(port: unknown): ActiveWebSessio
         const owner = activeWebSessionResourceRecord(port);
         if (webSessionCellLifecyclePoisoned || !owner || !activeWebSessionResourceIsLive(owner)) return null;
         const use = ObjectFreeze(ObjectCreate(null)) as ActiveWebSessionResourceUse;
-        record = { active: true, port: port as ActiveWebSessionResourcePort, owner, cell: owner.cell, session: owner.session };
+        record = {
+            active: true, port: port as ActiveWebSessionResourcePort, owner,
+            cell: owner.cell, session: owner.session, next: owner.useHead,
+        };
+        owner.useHead = record;
         setWeakMapValue(activeWebSessionResourceUseRecords, use, record);
-        addSetValue(owner.uses, record);
         if (webSessionCellLifecyclePoisoned || !activeWebSessionResourceIsLive(owner)) {
             burnActiveWebSessionResourceUse(record);
             return null;
@@ -1137,4 +1218,44 @@ export function clearAllSessions(): void {
     for (let index = 0; index < sessionIds.length; index += 1) {
         completeSessionTermination(sessionIds[index], getMapValue(sessionSnapshots, sessionIds[index]) ?? null, 'sessions_cleared');
     }
+}
+
+/** Compacts one exact RETIRED Web cell into its terminal owner-private tombstone. */
+/* @Codex */
+export function cleanupRetiredWebServerSession(
+    sessionId: unknown,
+    reason: unknown,
+): WebServerSessionRetirementCleanupReceipt {
+    if (typeof sessionId !== 'string' || !sessionId || !isWebServerSessionRetirementReason(reason)) {
+        return deniedWebSessionRetirementCleanupReceipt;
+    }
+    const cell = armedWebSessionCellsById[sessionId];
+    if (!cell) return deniedWebSessionRetirementCleanupReceipt;
+    if (cell.state === 'RETIRED_CLEANUP') {
+        beginWebSessionCellLifecycle(sessionId);
+        return deniedWebSessionRetirementCleanupReceipt;
+    }
+    if (cell.state === 'RETIRED_TOMBSTONE') {
+        return cell.sessionId === sessionId && cell.retirementReason === reason && cell.cleanupReceipt
+            ? cell.cleanupReceipt
+            : deniedWebSessionRetirementCleanupReceipt;
+    }
+    if (cell.state !== 'RETIRED' || cell.sessionId !== sessionId || cell.session.id !== sessionId
+        || cell.retirementReason !== reason || !beginWebSessionCellLifecycle(sessionId)) {
+        return deniedWebSessionRetirementCleanupReceipt;
+    }
+    try {
+        if (webSessionCellLifecyclePoisoned || armedWebSessionCellsById[sessionId] !== cell
+            || cell.state !== 'RETIRED' || cell.sessionId !== sessionId || cell.session.id !== sessionId
+            || cell.retirementReason !== reason) return deniedWebSessionRetirementCleanupReceipt;
+        return compactRetiredWebSessionCellRecord(cell, cell.session);
+    } catch {
+        cell.session = retiredWebSessionSentinel;
+        cell.activationTicket = null;
+        cell.retirement = null;
+        cell.next = null;
+        cell.cleanupReceipt = failedWebSessionRetirementCleanupReceipt;
+        cell.state = 'RETIRED_TOMBSTONE';
+        return failedWebSessionRetirementCleanupReceipt;
+    } finally { endWebSessionCellLifecycle(); }
 }
