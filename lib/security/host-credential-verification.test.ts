@@ -127,6 +127,39 @@ test('hostile input shapes deny before reflection, reads, or dependency observat
     assert.equal(traps, 0); assert.equal(reads, 0); assert.equal(calls, 0);
 });
 
+test('descriptor-map prototype pollution denies unrelated keys and cannot override own descriptors', async () => {
+    const unhandled: unknown[] = []; const onUnhandled = (error: unknown) => unhandled.push(error);
+    const priorUsername = Object.getOwnPropertyDescriptor(Object.prototype, 'username');
+    const priorPin = Object.getOwnPropertyDescriptor(Object.prototype, 'pin');
+    let calls = 0; let traps = 0; process.on('unhandledRejection', onUnhandled);
+    try {
+        const poisoned = new Proxy({ enumerable: true, value: USERNAME }, { get: () => { traps += 1; throw new Error('descriptor observed'); } });
+        Object.defineProperty(Object.prototype, 'username', { configurable: true, value: poisoned });
+        Object.defineProperty(Object.prototype, 'pin', { configurable: true, value: poisoned });
+        const denied = await verifyHostCredentials({ unrelatedA: 'synthetic', unrelatedB: 'synthetic' }, {
+            get db() { calls += 1; throw new Error('database observed'); },
+            compare: async () => { calls += 1; return true; },
+            writeAuditEvent: async () => { calls += 1; return 'audit'; },
+        } as HostCredentialVerifierDependencies);
+        assert.equal(denied.kind, 'denied'); assert.equal(denied.failureClass, 'invalid_credentials'); assert.equal(denied.status, 401);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        assert.equal(traps, 0); assert.equal(calls, 0); assert.deepEqual(unhandled, []);
+        const user = { id: 'synthetic-user-1', username: USERNAME, displayName: null, ambulatoryName: null, role: 'admin', passwordHash: 'synthetic-hash', encryptedMasterKey: 'synthetic-key', salt: 'synthetic-salt', failedLoginAttempts: 0, firstFailedLoginAt: null, lockedUntil: null };
+        const db = {
+            select: () => ({ from: () => ({ where: () => ({ get: () => user }) }) }),
+            update: () => ({ set: () => ({ where: () => ({ run: () => ({ changes: 1 }) }) }) }),
+        } as unknown as HostCredentialVerifierDependencies['db'];
+        const verified = await verifyHostCredentials({ username: USERNAME, pin: PIN }, { db, compare: async () => true, writeAuditEvent: async () => 'audit' });
+        assert.equal(verified.kind, 'verified'); assert.equal(verified.account.username, USERNAME);
+    } finally {
+        if (priorUsername) Object.defineProperty(Object.prototype, 'username', priorUsername);
+        else Reflect.deleteProperty(Object.prototype, 'username');
+        if (priorPin) Object.defineProperty(Object.prototype, 'pin', priorPin);
+        else Reflect.deleteProperty(Object.prototype, 'pin');
+        process.off('unhandledRejection', onUnhandled);
+    }
+});
+
 test('fifth failure locks exactly, while a stale window restarts at one', async () => {
     const { sqlite, db } = makeDatabase(); const now = new Date('2026-08-27T12:00:00.000Z');
     try {
