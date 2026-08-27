@@ -213,7 +213,7 @@ test('Document Synthesis attachment capture retains owner-private evidence throu
     const { value, owner } = ownerWithSelection();
     const port = owner.mintDocumentSynthesisAttachmentCapturePort(value);
     assert.equal(Object.getPrototypeOf(port), null); assert.equal(Object.isFrozen(port), true);
-    assert.deepEqual(Object.keys(port), ['observeCurrentness', 'begin', 'retain', 'observeRevocation']);
+    assert.deepEqual(Object.keys(port), ['observeCurrentness', 'begin', 'retain', 'sealRetainedProjection', 'observeRevocation']);
     const capture = port.observeCurrentness(currentness()); assert.ok(capture);
     assert.equal(Object.getPrototypeOf(capture), null); assert.equal(Object.isFrozen(capture), true);
     const grant = port.begin(capture); assert.ok(grant); assert.equal(port.begin(capture), null);
@@ -222,7 +222,13 @@ test('Document Synthesis attachment capture retains owner-private evidence throu
     assert.deepEqual(Object.keys(retained), []); assert.equal(JSON.stringify(retained), '{}');
     assertNoBigIntInDescriptors([port, capture, grant, retained]);
     assert.equal(port.retain(Object.freeze({ grant, observedCurrentness: currentness(), projection: projection() })), null);
-    assert.equal(port.observeRevocation(retained), true); assert.equal(port.observeRevocation(retained), true);
+    const seal = port.sealRetainedProjection(retained); assert.ok(seal);
+    assert.equal(Object.getPrototypeOf(seal), null); assert.equal(Object.isFrozen(seal), true);
+    assert.deepEqual(Object.keys(seal), []); assert.equal(JSON.stringify(seal), '{}');
+    assertNoBigIntInDescriptors([port, capture, grant, retained, seal]);
+    assert.equal(port.sealRetainedProjection(retained), null);
+    assert.equal(port.observeRevocation(retained), false);
+    assert.equal(port.observeRevocation(seal), true); assert.equal(port.observeRevocation(seal), true);
 });
 
 test('Document Synthesis attachment capture closes replay, stale currentness, foreign authority, and lifecycle changes', () => {
