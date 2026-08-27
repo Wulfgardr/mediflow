@@ -20,7 +20,9 @@ public enum HomeBaseClinicalListLimit {
 // Sendable (not an `actor` protocol) so both the HTTP actor and a future serial-actor
 // local adapter can conform and cross actor boundaries as an existential.
 public protocol HomeBasePatientsDataSource: Sendable {
-    func login(username: String?, password: String) async throws -> HomeBaseLoginResult
+    func login(
+        username: String?, password: String, credentials: HomeBasePairedCredentials
+    ) async throws -> HomeBaseLoginResult
 
     func changePin(
         currentPin: String, newPin: String, encryptedMasterKey: String, salt: String,

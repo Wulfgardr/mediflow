@@ -22,10 +22,18 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         let ambulatoryName: String?
     }
     @Published private(set) var operatorIdentity: OperatorIdentity?
-    @Published var serverURL = HomeBasePairedSettings.defaultServerURL
-    @Published var tlsPin = ""
-    @Published var pairedClientId = ""
-    @Published var pairedClientToken = ""
+    @Published var serverURL = HomeBasePairedSettings.defaultServerURL {
+        didSet { invalidateLoginIfChanged(oldValue, serverURL) }
+    }
+    @Published var tlsPin = "" {
+        didSet { invalidateLoginIfChanged(oldValue, tlsPin) }
+    }
+    @Published var pairedClientId = "" {
+        didSet { invalidateLoginIfChanged(oldValue, pairedClientId) }
+    }
+    @Published var pairedClientToken = "" {
+        didSet { invalidateLoginIfChanged(oldValue, pairedClientToken) }
+    }
     @Published var username = ""
     @Published var password = ""
     @Published var ambulatoryId = "" {
@@ -277,6 +285,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     private let automaticActions: AppleFoundationLaunchOverrides.AutomaticActions
     private var didPerformAutomaticActions = false
     private var sessionCookie: String?
+    /* @Codex */
+    private var loginGeneration: UInt = 0
     private var newEntryDraftId = UUID().uuidString
     /* @Codex */
     private var newTherapyDrugCatalogTask: Task<Void, Never>?
@@ -679,11 +689,21 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             errorMessage = "Inserisci il PIN operatore."
             return
         }
+        guard let credentials = pairedCredentials else {
+            errorMessage = "Inserisci le credenziali paired rilasciate dal Mac."
+            return
+        }
+        let generation = beginLoginGeneration()
+        let client = makeClient()
+        let username = self.username.trimmedOrNil
+        let password = self.password
         await runTask {
-            let result = try await self.makeClient().login(
-                username: self.username.trimmedOrNil,
-                password: self.password
+            let result = try await client.login(
+                username: username,
+                password: password,
+                credentials: credentials
             )
+            guard self.loginGeneration == generation else { return }
             self.sessionCookie = result.sessionCookie
             self.operatorIdentity = result.id.map {
                 OperatorIdentity(
@@ -692,7 +712,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
                     ambulatoryName: result.ambulatoryName
                 )
             }
-            self.unlockFieldCrypto(with: result, pin: self.password)
+            self.unlockFieldCrypto(with: result, pin: password)
             self.resetCatalogAvailability()
             self.statusMessage = self.masterKey == nil
                 ? "Sessione operatore attiva. Cifratura campi non disponibile."
@@ -750,6 +770,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     func lockSessionNow() async {
+        invalidateLoginGeneration()
         let operationID = beginExclusiveOperation()
         errorMessage = nil
         pendingConflict = nil
@@ -3180,6 +3201,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
     }
 
     func clearPairing() async {
+        invalidateLoginGeneration()
         let operationID = beginExclusiveOperation()
         defer { finishExclusiveOperation(operationID) }
         errorMessage = nil
@@ -3239,6 +3261,23 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         let clientToken = pairedClientToken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clientId.isEmpty, !clientToken.isEmpty else { return nil }
         return HomeBasePairedCredentials(clientId: clientId, clientToken: clientToken)
+    }
+
+    /* @Codex */
+    private func beginLoginGeneration() -> UInt {
+        loginGeneration &+= 1
+        return loginGeneration
+    }
+
+    /* @Codex */
+    private func invalidateLoginGeneration() {
+        loginGeneration &+= 1
+    }
+
+    /* @Codex */
+    private func invalidateLoginIfChanged(_ oldValue: String, _ newValue: String) {
+        guard oldValue != newValue else { return }
+        invalidateLoginGeneration()
     }
 
     /* @Codex */
