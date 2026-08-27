@@ -3,8 +3,12 @@ import 'server-only';
 
 import { types } from 'node:util';
 
-import { authenticateNetworkPairedClient } from '@/lib/network-home-base-server';
-import type { StoredNetworkPairedClient } from '@/lib/network-pairing-model';
+import { authenticateNetworkPairedClient, loadNetworkPairingState } from '@/lib/network-home-base-server';
+import {
+    NETWORK_PAIRED_CLIENT_ID_HEADER,
+    NETWORK_PAIRED_CLIENT_TOKEN_HEADER,
+    type StoredNetworkPairedClient,
+} from '@/lib/network-pairing-model';
 
 export type NativeBootstrapAdmission = object;
 
@@ -13,9 +17,11 @@ export type NativeBootstrapRouteBinding = Readonly<{
     clientPlatform: StoredNetworkPairedClient['clientPlatform'];
 }>;
 
-type AdmissionEntry = NativeBootstrapRouteBinding;
+type AdmissionEntry = NativeBootstrapRouteBinding & Readonly<{ tokenHash: string }>;
 
 const RequestConstructor = Request;
+const RequestPrototype = RequestConstructor.prototype;
+const HeadersPrototype = Headers.prototype;
 const ObjectPrototype = Object.prototype;
 const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
@@ -29,6 +35,8 @@ const weakMapDelete = WeakMap.prototype.delete;
 const apply = Reflect.apply;
 const IsProxy = types.isProxy;
 const admissions = new WeakMap<object, AdmissionEntry>();
+const RequestHeadersGetter = ObjectGetOwnPropertyDescriptor(RequestPrototype, 'headers')?.get ?? null;
+const HeadersGet = HeadersPrototype.get;
 
 function safeGet<K extends WeakKey, V>(map: WeakMap<K, V>, key: K): V | undefined {
     return apply(weakMapGet, map, [key]);
@@ -43,7 +51,7 @@ function safeDelete<K extends WeakKey, V>(map: WeakMap<K, V>, key: K): boolean {
 }
 
 /* The single caller input is a fixed-key, ordinary data envelope. */
-function requestFromEnvelope(value: unknown): Request | null {
+function canonicalPairedRequest(value: unknown): Request | null {
     try {
         if (!value || typeof value !== 'object' || IsProxy(value)) return null;
         const prototype = ObjectGetPrototypeOf(value);
@@ -54,16 +62,29 @@ function requestFromEnvelope(value: unknown): Request | null {
         const descriptor = ObjectGetOwnPropertyDescriptor(value, 'request');
         if (!descriptor || !('value' in descriptor) || !descriptor.enumerable) return null;
         const request = descriptor.value;
-        return !IsProxy(request) && request instanceof RequestConstructor ? request : null;
+        if (!request || typeof request !== 'object' || IsProxy(request)) return null;
+        if (ObjectGetOwnPropertyNames(request).length !== 0 || ObjectGetOwnPropertySymbols(request).length !== 0) return null;
+        if (ObjectGetPrototypeOf(request) !== RequestPrototype || ObjectGetOwnPropertyDescriptor(request, 'headers') || !RequestHeadersGetter) return null;
+        const headers = apply(RequestHeadersGetter, request, []) as Headers;
+        if (IsProxy(headers) || ObjectGetPrototypeOf(headers) !== HeadersPrototype || ObjectGetOwnPropertyDescriptor(headers, 'get')) return null;
+        const clientId = apply(HeadersGet, headers, [NETWORK_PAIRED_CLIENT_ID_HEADER]);
+        const pairedClientToken = apply(HeadersGet, headers, [NETWORK_PAIRED_CLIENT_TOKEN_HEADER]);
+        if (typeof clientId !== 'string' || typeof pairedClientToken !== 'string') return null;
+        return new RequestConstructor('https://127.0.0.1/native-bootstrap', {
+            headers: {
+                [NETWORK_PAIRED_CLIENT_ID_HEADER]: clientId,
+                [NETWORK_PAIRED_CLIENT_TOKEN_HEADER]: pairedClientToken,
+            },
+        });
     } catch {
         return null;
     }
 }
 
-function bindingFromPairedClient(client: StoredNetworkPairedClient | null): NativeBootstrapRouteBinding | null {
-    if (!client || typeof client.clientId !== 'string') return null;
+function entryFromPairedClient(client: StoredNetworkPairedClient | null): AdmissionEntry | null {
+    if (!client || typeof client.clientId !== 'string' || typeof client.tokenHash !== 'string') return null;
     if (client.clientPlatform !== 'macos' && client.clientPlatform !== 'ios' && client.clientPlatform !== 'ipados') return null;
-    return ObjectFreeze({ clientId: client.clientId, clientPlatform: client.clientPlatform });
+    return ObjectFreeze({ clientId: client.clientId, clientPlatform: client.clientPlatform, tokenHash: client.tokenHash });
 }
 
 /**
@@ -72,26 +93,31 @@ function bindingFromPairedClient(client: StoredNetworkPairedClient | null): Nati
  */
 /* @Codex */
 export async function admitNativeBootstrap(value: unknown): Promise<NativeBootstrapAdmission | null> {
-    const request = requestFromEnvelope(value);
+    const request = canonicalPairedRequest(value);
     if (!request) return null;
 
-    const binding = bindingFromPairedClient(await authenticateNetworkPairedClient(request));
-    if (!binding) return null;
+    const entry = entryFromPairedClient(await authenticateNetworkPairedClient(request));
+    if (!entry) return null;
 
     const token = ObjectFreeze(ObjectCreate(null));
-    safeSet(admissions, token, binding);
+    safeSet(admissions, token, entry);
     return token as NativeBootstrapAdmission;
 }
 
 /** Consume exactly once before a later route packet is assembled. */
 /* @Codex */
-export function consumeNativeBootstrapAdmission(value: unknown): NativeBootstrapRouteBinding | null {
+export async function consumeNativeBootstrapAdmission(value: unknown): Promise<NativeBootstrapRouteBinding | null> {
     try {
         if (!value || typeof value !== 'object' || IsProxy(value)) return null;
-        const binding = safeGet(admissions, value);
-        if (!binding) return null;
+        const entry = safeGet(admissions, value);
+        if (!entry) return null;
         safeDelete(admissions, value);
-        return binding;
+        const current = (await loadNetworkPairingState()).clients.find((client) =>
+            client.clientId === entry.clientId
+            && client.clientPlatform === entry.clientPlatform
+            && client.tokenHash === entry.tokenHash
+        );
+        return current ? ObjectFreeze({ clientId: entry.clientId, clientPlatform: entry.clientPlatform }) : null;
     } catch {
         return null;
     }

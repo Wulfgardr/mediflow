@@ -27,23 +27,15 @@ const { admitNativeBootstrap, consumeNativeBootstrapAdmission } = await import('
 
 const clientId = 'synthetic-native-bootstrap-client';
 const token = 'synthetic-native-bootstrap-token';
-dbServer.insert(settings).values({
-    key: NETWORK_PAIRING_STATE_KEY,
-    value: serializeNetworkPairingState({
-        intents: [],
-        clients: [{
-            clientId,
-            deviceName: 'Dispositivo sintetico',
-            clientPlatform: 'ipados',
-            appVersion: null,
-            grantedCapabilities: [],
-            pairedAt: '2026-08-27T08:00:00.000Z',
-            lastSeenAt: null,
-            sourceIntentId: 'synthetic-intent',
-            tokenHash: hashNetworkPairedClientToken(token),
-        }],
-    }),
-}).run();
+function syntheticClient(id = clientId, value = token) {
+    return { clientId: id, deviceName: 'Dispositivo sintetico', clientPlatform: 'ipados' as const, appVersion: null, grantedCapabilities: [], pairedAt: '2026-08-27T08:00:00.000Z', lastSeenAt: null, sourceIntentId: `intent-${id}`, tokenHash: hashNetworkPairedClientToken(value) };
+}
+
+function writeClients(clients: ReturnType<typeof syntheticClient>[]): void {
+    dbServer.insert(settings).values({ key: NETWORK_PAIRING_STATE_KEY, value: serializeNetworkPairingState({ intents: [], clients }) }).onConflictDoUpdate({ target: settings.key, set: { value: serializeNetworkPairingState({ intents: [], clients }) } }).run();
+}
+
+writeClients([syntheticClient()]);
 
 function pairedRequest(sourceSurface: string): Request {
     return new Request('https://127.0.0.1/api/native-bootstrap', {
@@ -64,18 +56,18 @@ test('native bootstrap trusts the persisted paired client, not source-surface me
     assert.ok(webMarked);
     assert.ok(nativeMarked);
     assert.equal(sourceOnly, null);
-    assert.deepEqual(consumeNativeBootstrapAdmission(webMarked), { clientId, clientPlatform: 'ipados' });
-    assert.deepEqual(consumeNativeBootstrapAdmission(nativeMarked), { clientId, clientPlatform: 'ipados' });
+    assert.deepEqual(await consumeNativeBootstrapAdmission(webMarked), { clientId, clientPlatform: 'ipados' });
+    assert.deepEqual(await consumeNativeBootstrapAdmission(nativeMarked), { clientId, clientPlatform: 'ipados' });
 });
 
 test('native bootstrap artifacts are process-local, opaque, and one-use', async () => {
     const admission = await admitNativeBootstrap({ request: pairedRequest('native') });
     assert.ok(admission);
     assert.equal(Object.getPrototypeOf(admission), null);
-    assert.equal(consumeNativeBootstrapAdmission({}), null);
-    assert.equal(consumeNativeBootstrapAdmission({ ...admission }), null);
-    assert.deepEqual(consumeNativeBootstrapAdmission(admission), { clientId, clientPlatform: 'ipados' });
-    assert.equal(consumeNativeBootstrapAdmission(admission), null);
+    assert.equal(await consumeNativeBootstrapAdmission({}), null);
+    assert.equal(await consumeNativeBootstrapAdmission({ ...admission }), null);
+    assert.deepEqual(await consumeNativeBootstrapAdmission(admission), { clientId, clientPlatform: 'ipados' });
+    assert.equal(await consumeNativeBootstrapAdmission(admission), null);
 });
 
 test('native bootstrap denies hostile or expanded caller envelopes before reading them', async () => {
@@ -97,4 +89,49 @@ test('native bootstrap denies hostile or expanded caller envelopes before readin
     Object.defineProperty(hidden, 'request', { value: pairedRequest('native') });
     assert.equal(await admitNativeBootstrap(hidden), null);
     assert.equal(observed, false);
+});
+
+test('native bootstrap rejects forged or overridden Request headers without reading the override', async () => {
+    const forged = Object.create(Request.prototype);
+    const overridden = pairedRequest('native');
+    let observed = false;
+    Object.defineProperty(overridden, 'headers', { configurable: true, get: () => { observed = true; throw new Error('must not read'); } });
+    const ownHeaders = pairedRequest('native');
+    Object.defineProperty(ownHeaders, 'headers', { configurable: true, value: new Headers() });
+    const thenable = pairedRequest('native');
+    Object.defineProperty(thenable, 'then', { configurable: true, get: () => { observed = true; throw new Error('must not read'); } });
+    assert.equal(await admitNativeBootstrap({ request: forged }), null);
+    assert.equal(await admitNativeBootstrap({ request: overridden }), null);
+    assert.equal(await admitNativeBootstrap({ request: ownHeaders }), null);
+    assert.equal(await admitNativeBootstrap({ request: thenable }), null);
+    assert.equal(observed, false);
+});
+
+test('native bootstrap burns before revalidation and denies revoked, rotated, or cross-client state', async () => {
+    const revoked = await admitNativeBootstrap({ request: pairedRequest('native') });
+    assert.ok(revoked);
+    writeClients([]);
+    assert.equal(await consumeNativeBootstrapAdmission(revoked), null);
+    assert.equal(await consumeNativeBootstrapAdmission(revoked), null);
+
+    writeClients([syntheticClient()]);
+    const rotated = await admitNativeBootstrap({ request: pairedRequest('native') });
+    assert.ok(rotated);
+    writeClients([syntheticClient(clientId, 'rotated-token')]);
+    assert.equal(await consumeNativeBootstrapAdmission(rotated), null);
+
+    writeClients([syntheticClient()]);
+    const crossClient = await admitNativeBootstrap({ request: pairedRequest('native') });
+    assert.ok(crossClient);
+    writeClients([syntheticClient('other-client', 'other-token')]);
+    assert.equal(await consumeNativeBootstrapAdmission(crossClient), null);
+});
+
+test('native bootstrap burns an admission when state reload fails without rejecting', async () => {
+    writeClients([syntheticClient()]);
+    const admission = await admitNativeBootstrap({ request: pairedRequest('native') });
+    assert.ok(admission);
+    dbServer.$client.close();
+    assert.equal(await consumeNativeBootstrapAdmission(admission), null);
+    assert.equal(await consumeNativeBootstrapAdmission(admission), null);
 });
