@@ -29,10 +29,10 @@ type CaptureRecord = Readonly<{
 type ProjectionRecord = Readonly<{ selected: true; currentness: Currentness; scope: 'document_synthesis_attachment_projection'; evidence: DocumentSynthesisProjectionEvidenceCapability;
     attachmentCapturePort: DocumentSynthesisAttachmentCapturePort }>;
 type SourceSetSealRecord = Readonly<{ selected: true; currentness: Currentness; scope: 'document_synthesis_attachment_source_set_seal'; seal: DocumentSynthesisSourceSetSealCapability }>;
-type HandoffRecord = { selected: true; scope: 'document_synthesis_attachment_handoff'; evidence: DocumentSynthesisSealedEvidence | null };
+type HandoffRecord = Readonly<{ selected: true; scope: 'document_synthesis_attachment_handoff'; evidence: DocumentSynthesisSealedEvidence }>;
 type PreparedProjectionPublication = Readonly<{ projectionHandle: string; state: ProjectionRecord; result: ProjectionResult }>;
 type PreparedSourceSetSealPublication = Readonly<{ sourceSetSealHandle: string; state: SourceSetSealRecord; result: SourceSetSealResult }>;
-type PreparedHandoffPublication = Readonly<{ handoffHandle: string; state: HandoffRecord; result: HandoffResult; port: DocumentSynthesisSealedEvidencePort; grant: object; patientId: string; ambulatoryId: string }>;
+type PreparedHandoffPublication = Readonly<{ handoffHandle: string; result: HandoffResult; port: DocumentSynthesisSealedEvidencePort; grant: object; patientId: string; ambulatoryId: string }>;
 type RecordState = CaptureRecord | ProjectionRecord | SourceSetSealRecord | HandoffRecord;
 type Broker = { records: Map<string, RecordState>; dispose: () => void; publish: (handle: string, state: RecordState) => boolean };
 type Result = Readonly<{ status: 'available' | 'denied'; code: null | 'input_invalid' | 'unavailable'; captureHandle: string | null; reviewOnly: true; writesPerformed: 0; applyPolicy: 'none' }>;
@@ -160,7 +160,7 @@ export async function handoffDocumentSynthesisAuthenticatedAttachmentSourceSet(s
     let context: Awaited<ReturnType<typeof acquireAuthenticatedWebSessionProjectionOwnerContext>>;
     try { context = await acquireAuthenticatedWebSessionProjectionOwnerContext(); } catch { return handoffDenied('unavailable'); }
     if (!context) return handoffDenied('unavailable');
-    let broker: Broker | null = null; let prepared: PreparedHandoffPublication | null = null;
+    let broker: Broker | null = null;
     try {
         broker = brokerFor(context); const record = mapGet(broker.records, sourceSetSealHandle);
         if (!record || record.scope !== 'document_synthesis_attachment_source_set_seal' || !mapDelete(broker.records, sourceSetSealHandle)) return handoffDenied('unavailable');
@@ -169,17 +169,14 @@ export async function handoffDocumentSynthesisAuthenticatedAttachmentSourceSet(s
         const port = context.owner.mintDocumentSynthesisSealedEvidencePort(context.session); const grant = port.begin(record.seal);
         const handoffHandle = grant && mint(Entropy(16), 'dsh_');
         if (!grant || !handoffHandle) { if (grant) port.consume(grant); return handoffDenied('unavailable'); }
-        const state = ObjectCreate(null) as HandoffRecord; state.selected = true; state.scope = 'document_synthesis_attachment_handoff'; state.evidence = null;
-        if (!broker.publish(handoffHandle, state)) { port.consume(grant); return handoffDenied('unavailable'); }
-        prepared = sealed<PreparedHandoffPublication>({ handoffHandle, state, result: handoffAvailable(handoffHandle), port, grant,
+        const prepared = sealed<PreparedHandoffPublication>({ handoffHandle, result: handoffAvailable(handoffHandle), port, grant,
             patientId: selection.patientId as string, ambulatoryId: selection.ambulatoryId as string });
         const latest = currentness(DbGet(sql`SELECT a.document_source_ref AS documentSourceRef, a.document_revision AS documentRevision, a.document_freshness_epoch AS documentFreshnessEpoch FROM attachments AS a INNER JOIN patients_to_ambulatories AS pta ON pta.patient_id = a.patient_id WHERE a.document_source_ref = ${record.currentness.documentSourceRef} AND a.document_revision = ${record.currentness.documentRevision} AND a.document_freshness_epoch = ${record.currentness.documentFreshnessEpoch} AND a.patient_id = ${prepared.patientId} AND pta.ambulatory_id = ${prepared.ambulatoryId} LIMIT 1`));
         const evidence = prepared.port.consume(prepared.grant);
-        if (!latest || !sameCurrentness(record.currentness, latest) || !evidence) { mapDelete(broker.records, prepared.handoffHandle); return handoffDenied('unavailable'); }
-        prepared.state.evidence = evidence;
-        return prepared.result;
+        if (!latest || !sameCurrentness(record.currentness, latest) || !evidence) return handoffDenied('unavailable');
+        const state = sealed<HandoffRecord>({ selected: true, scope: 'document_synthesis_attachment_handoff', evidence });
+        return broker.publish(prepared.handoffHandle, state) ? prepared.result : handoffDenied('unavailable');
     } catch {
-        if (prepared && broker) mapDelete(broker.records, prepared.handoffHandle);
         return handoffDenied('unavailable');
     }
 }
