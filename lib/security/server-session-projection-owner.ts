@@ -169,6 +169,7 @@ export type ServerSessionProjectionOwner = Readonly<{
     mintDocumentSynthesisSealedEvidenceDisposalPort(session: ServerSession): DocumentSynthesisSealedEvidenceDisposalPort;
     mintDocumentSynthesisExecutionCapsulePort(session: ServerSession): DocumentSynthesisExecutionCapsulePort;
     mintDocumentSynthesisExecutionCapsuleIdentityPort(session: ServerSession): DocumentSynthesisExecutionCapsuleIdentityPort;
+    mintDocumentSynthesisProviderProjectionPort(session: ServerSession): DocumentSynthesisProviderProjectionPort;
     withLeaseCriticalSection<T>(session: ServerSession, callback: (selection: CanonicalPair) => T): T;
     dispose(): void;
 }>;
@@ -217,6 +218,18 @@ export type DocumentSynthesisExecutionCapsuleIdentity = Readonly<{ readonly [doc
 export type DocumentSynthesisExecutionCapsuleIdentityPort = Readonly<{
     retain(value: unknown): DocumentSynthesisExecutionCapsuleIdentity | null;
     consume(value: unknown): DocumentSynthesisExecutionCapsule | null;
+}>;
+declare const documentSynthesisProviderCurrentnessWitnessRef: unique symbol;
+export type DocumentSynthesisProviderCurrentnessWitness = Readonly<{ readonly [documentSynthesisProviderCurrentnessWitnessRef]?: never }>;
+export type DocumentSynthesisProviderProjection = Readonly<{
+    providerProjection: Readonly<{
+        schemaVersion: 'mediflow.document-synthesis.provider-projection.v1';
+        sources: readonly [Readonly<{ label: 'S1'; sourceText: string }>];
+    }>;
+    witness: DocumentSynthesisProviderCurrentnessWitness;
+}>;
+export type DocumentSynthesisProviderProjectionPort = Readonly<{
+    consume(value: unknown): DocumentSynthesisProviderProjection | null;
 }>;
 export type DocumentSynthesisAttachmentCurrentness = Readonly<{
     documentSourceRef: string; documentRevision: number; documentFreshnessEpoch: number;
@@ -408,6 +421,9 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             const documentSynthesisExecutionCapsules = new WeakMapConstructor<object, ExecutionCapsuleRecord>();
             const claimedDocumentSynthesisExecutionCapsules = new WeakSetConstructor<object>();
             const documentSynthesisExecutionCapsuleIdentities = new WeakMapConstructor<object, object>();
+            type ProviderCurrentnessWitnessRecord = Readonly<{ execution: ExecutionCapsuleRecord;
+                currentness: DocumentSynthesisAttachmentCurrentness; currentnessGeneration: number; sourceSetDigestSha256: readonly number[] }>;
+            const documentSynthesisProviderCurrentnessWitnesses = new WeakMapConstructor<object, ProviderCurrentnessWitnessRecord>();
             let creating: SelectionState | null = null;
             let terminal = false;
             let unregisterOwner: (() => void) | null = null;
@@ -1170,6 +1186,70 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     return ObjectFreeze(port);
                 } finally { endLeasePortOperation(); }
             };
+            const mintDocumentSynthesisProviderProjectionPort = (presentedSession: ServerSession): DocumentSynthesisProviderProjectionPort => {
+                if (!beginLeasePortOperation()) return fail('selection_busy');
+                try {
+                    rejectLeaseCriticalSectionReentry(); requireCurrentSession(presentedSession);
+                    const boundSelection = selection; const boundSelectionEpoch = epoch; const boundReviewContextEpoch = reviewContextEpoch;
+                    if (!boundSelection) return fail('stale_selection');
+                    if (readClock() >= boundSelection.expiresAt) { expire(); return fail('lease_expired'); }
+                    if (selection !== boundSelection || epoch !== boundSelectionEpoch || reviewContextEpoch !== boundReviewContextEpoch
+                        || leasePortOperationPoisoned) return fail('stale_selection');
+                    const entryIsCurrent = (entry: ExecutionCapsuleRecord) => {
+                        const sealed = entry.sealedEvidence;
+                        if (entry.selection !== boundSelection || entry.selectionEpoch !== boundSelectionEpoch
+                            || entry.reviewContextEpoch !== boundReviewContextEpoch || terminal || presentedSession !== session
+                            || session.authChannel !== 'web' || selection !== boundSelection || epoch !== boundSelectionEpoch
+                            || reviewContextEpoch !== boundReviewContextEpoch || getSession(session.id) !== session) return false;
+                        let now: number; try { now = sources.clock(); } catch { return false; }
+                        const latest = getMapValue(documentSynthesisAttachmentCurrentness, sealed.currentness.documentSourceRef);
+                        return NumberIsFinite(now) && now < boundSelection.expiresAt && !terminal && presentedSession === session
+                            && session.authChannel === 'web' && getSession(session.id) === session && selection === boundSelection
+                            && epoch === boundSelectionEpoch && reviewContextEpoch === boundReviewContextEpoch && !leasePortOperationPoisoned
+                            && !sealed.revoked && !documentSynthesisLineageTerminal && !!latest && !latest.terminal
+                            && latest.generation === sealed.currentnessGeneration && latest.documentRevision === sealed.currentness.documentRevision
+                            && latest.documentFreshnessEpoch === sealed.currentness.documentFreshnessEpoch
+                            && documentSynthesisLineage.nextSourceSetEpoch === sealed.nextSourceSetEpoch
+                            && documentSynthesisLineage.revocationGeneration === sealed.lineageRevocationGeneration;
+                    };
+                    const port = ObjectCreate(null) as DocumentSynthesisProviderProjectionPort;
+                    ObjectDefineProperty(port, 'consume', { enumerable: true, value(this: unknown, value: unknown) {
+                        if (this !== port || !beginLeasePortOperation()) return null;
+                        let capsule: object | null = null; let witness: object | null = null;
+                        try {
+                            if (typeof value !== 'object' || value === null || isProxy(value)) return null;
+                            capsule = applyIntrinsic(weakMapGet, documentSynthesisExecutionCapsuleIdentities, [value]) ?? null;
+                            if (!capsule || !applyIntrinsic(weakMapDelete, documentSynthesisExecutionCapsuleIdentities, [value])) return null;
+                            const entry = applyIntrinsic(weakMapGet, documentSynthesisExecutionCapsules, [capsule]) ?? null;
+                            if (!entry || !applyIntrinsic(weakMapDelete, documentSynthesisExecutionCapsules, [capsule]) || !entryIsCurrent(entry)) return null;
+                            const sealed = entry.sealedEvidence; const source = ObjectCreate(null) as { label: 'S1'; sourceText: string };
+                            ObjectDefineProperty(source, 'label', { enumerable: true, value: 'S1' });
+                            ObjectDefineProperty(source, 'sourceText', { enumerable: true, value: sealed.projection.sourceText });
+                            const providerProjection = ObjectCreate(null) as DocumentSynthesisProviderProjection['providerProjection'];
+                            ObjectDefineProperty(providerProjection, 'schemaVersion', { enumerable: true,
+                                value: 'mediflow.document-synthesis.provider-projection.v1' });
+                            ObjectDefineProperty(providerProjection, 'sources', { enumerable: true, value: ObjectFreeze([ObjectFreeze(source)]) });
+                            witness = ObjectFreeze(ObjectCreate(null));
+                            const witnessRecord = ObjectFreeze({ execution: entry, currentness: sealed.currentness,
+                                currentnessGeneration: sealed.currentnessGeneration, sourceSetDigestSha256: sealed.sourceSetDigestSha256 });
+                            applyIntrinsic(weakMapSet, documentSynthesisProviderCurrentnessWitnesses, [witness, witnessRecord]);
+                            if (leasePortOperationPoisoned || !entryIsCurrent(entry)
+                                || applyIntrinsic(weakMapGet, documentSynthesisProviderCurrentnessWitnesses, [witness]) !== witnessRecord) {
+                                applyIntrinsic(weakMapDelete, documentSynthesisProviderCurrentnessWitnesses, [witness]); return null;
+                            }
+                            const output = ObjectCreate(null) as DocumentSynthesisProviderProjection;
+                            ObjectDefineProperty(output, 'providerProjection', { enumerable: true, value: ObjectFreeze(providerProjection) });
+                            ObjectDefineProperty(output, 'witness', { enumerable: true, value: witness });
+                            return ObjectFreeze(output);
+                        } catch {
+                            if (witness) try { applyIntrinsic(weakMapDelete, documentSynthesisProviderCurrentnessWitnesses, [witness]); } catch { /* terminal denial */ }
+                            if (capsule) try { applyIntrinsic(weakMapDelete, documentSynthesisExecutionCapsules, [capsule]); } catch { /* terminal denial */ }
+                            return null;
+                        } finally { endLeasePortOperation(); }
+                    } });
+                    return ObjectFreeze(port);
+                } finally { endLeasePortOperation(); }
+            };
             const candidateControl = (candidate: unknown): TypedBroker['control'] | null => {
                 if (typeof candidate !== 'object' || candidate === null) return null;
                 const descriptor = getOwnPropertyDescriptor(candidate, 'control');
@@ -1183,7 +1263,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     && typeof value.control?.lock === 'function' && typeof value.control.revoke === 'function'
                     && typeof value.control.changeSelection === 'function';
             };
-            const owner: Omit<ServerSessionProjectionOwner, 'mintPatientInsightLeaseCommitPort' | 'mintOcrLeaseCommitPort' | 'mintDocumentSynthesisLeaseCommitPort' | 'mintTreatmentReasoningLeaseCommitPort' | 'mintDurableReviewCommitPort' | 'mintDocumentSynthesisSourceLineagePort' | 'mintDocumentSynthesisAttachmentCapturePort' | 'mintDocumentSynthesisSealedEvidencePort' | 'mintDocumentSynthesisSealedEvidenceDisposalPort' | 'mintDocumentSynthesisExecutionCapsulePort' | 'mintDocumentSynthesisExecutionCapsuleIdentityPort'> = {
+            const owner: Omit<ServerSessionProjectionOwner, 'mintPatientInsightLeaseCommitPort' | 'mintOcrLeaseCommitPort' | 'mintDocumentSynthesisLeaseCommitPort' | 'mintTreatmentReasoningLeaseCommitPort' | 'mintDurableReviewCommitPort' | 'mintDocumentSynthesisSourceLineagePort' | 'mintDocumentSynthesisAttachmentCapturePort' | 'mintDocumentSynthesisSealedEvidencePort' | 'mintDocumentSynthesisSealedEvidenceDisposalPort' | 'mintDocumentSynthesisExecutionCapsulePort' | 'mintDocumentSynthesisExecutionCapsuleIdentityPort' | 'mintDocumentSynthesisProviderProjectionPort'> = {
                 snapshotSelectionEpoch(presentedSession) {
                     if (terminal || presentedSession !== session || session.authChannel !== 'web' || peekSession(session.id) !== session) {
                         return fail('session_unavailable');
@@ -1389,6 +1469,11 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 if (this !== owner) return fail('session_unavailable');
                 if (rejectDurableReviewReentry()) return fail('selection_busy');
                 return mintDocumentSynthesisExecutionCapsuleIdentityPort(presentedSession);
+            } });
+            ObjectDefineProperty(owner, 'mintDocumentSynthesisProviderProjectionPort', { enumerable: false, value(presentedSession: ServerSession) {
+                if (this !== owner) return fail('session_unavailable');
+                if (rejectDurableReviewReentry()) return fail('selection_busy');
+                return mintDocumentSynthesisProviderProjectionPort(presentedSession);
             } });
             const completedOwner = ObjectFreeze(owner) as unknown as ServerSessionProjectionOwner;
 
