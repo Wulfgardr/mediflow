@@ -218,8 +218,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                     }
                 });
                 setRequiresSetup(false);
-                setIsAuthenticated(false);
-                setIsLocked(true);
+                clearClientAuthority();
                 return;
             }
             /* @Codex */
@@ -230,8 +229,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                     error: data.error ?? { code: 'AUTH_CHECK_HTTP', message: `Errore server (HTTP ${res.status}).` }
                 });
                 setRequiresSetup(false);
-                setIsAuthenticated(false);
-                setIsLocked(true);
+                clearClientAuthority();
                 return;
             }
 
@@ -239,8 +237,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             if (data?.status === 'error' || data?.error) {
                 setAuthHealth(data);
                 setRequiresSetup(false);
-                setIsAuthenticated(false);
-                setIsLocked(true);
+                clearClientAuthority();
                 return;
             }
             /* @Codex */
@@ -248,8 +245,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
             // If setup is missing on server, force setup flow regardless of session
             if (!data.isSetup) {
+                clearClientAuthority();
                 setRequiresSetup(true);
-                setIsAuthenticated(false);
             } else {
                 // Setup exists.
                 setRequiresSetup(false);
@@ -269,8 +266,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 error: { code: 'AUTH_CHECK_FAILED', message: 'Impossibile verificare lo stato di sicurezza.' }
             });
             setRequiresSetup(false);
-            setIsAuthenticated(false);
-            setIsLocked(true);
+            clearClientAuthority();
         }
     };
 
@@ -452,6 +448,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             const masterKey = await generateMasterKey();
             const encryptedMasterKey = await wrapMasterKeyVersioned(masterKey, pin, salt);
             const saltB64 = btoa(String.fromCharCode(...salt));
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) return;
 
             // Send to Server
             const { response: res, payload } = await runAuthorityNetworkRequest(() => setupSecurityRequest({
