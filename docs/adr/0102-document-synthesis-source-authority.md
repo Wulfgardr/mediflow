@@ -488,3 +488,109 @@ Lo stato e `Accepted`. Un packet downstream delimitato richiede un gate
 precedente accettato e una base esatta; non richiede una nuova autorizzazione
 utente per ogni fase. Questa decisione non autorizza runtime, azioni remote,
 egress, persistenza o scritture cliniche.
+
+### Addendum A3c0: capsule di esecuzione owner-bound
+
+Questo addendum e `Accepted`. Chiude soltanto il contratto A3c0 per il
+passaggio dalla cattura autenticata alla futura esecuzione Document Synthesis.
+Conserva senza variazioni i codec, i limiti, `U0` e gli schemi di pubblicazione
+di questa ADR. Non implementa un provider, una route, persistenza, apply o una
+scrittura clinica.
+
+#### Autorita, burn e capsule
+
+L'handoff autenticato DS e monouso: il `ServerSessionProjectionOwner` lo
+risolve e lo brucia nello stesso closure prima di preparare qualsiasi capsule.
+Il token autentico conserva soltanto l'identita opaca della capsule e si
+risolve una sola volta. Dopo il burn non conserva, espone o ricostruisce owner,
+sessione, sorgenti, projection, prompt, lease o contatori. Un errore, una
+negazione o una reentry dopo il burn non riabilitano l'handoff.
+
+Lo stesso `ServerSessionProjectionOwner` promuove il record sigillato a una
+capsule di esecuzione `memory-only`, owner-bound e session-bound. La forma
+osservabile della capsule ha zero campi. Il record privato dell'owner conserva
+la projection privata, il digest, la currentness documentale, il lineage e i
+binding di selezione, review, sessione, lease e revoca. Conserva quindi
+`documentSourceRef`, revisione e freshness, gli epoch di selezione e review,
+`sourceSetEpoch` e `revocationGeneration` solo come stato privato dell'owner.
+Nessuno di questi valori attraversa il token autentico, la capsule pubblica,
+una route, la UI, cache, log o provider.
+
+La capsule non e authority. Non puo da sola invocare il provider, pubblicare,
+applicare, risolvere una nuova sessione o selezione, leggere una sorgente o
+aprire un lease. Solo il closure del medesimo owner puo eseguire una futura
+operazione, dopo le riletture richieste. Una identity opaca prova al massimo
+l'appartenenza a quel closure; non e una capability trasferibile.
+
+#### Proiezione minima e fence finale
+
+Per C3c2 l'owner consegna soltanto la proiezione minimizzata e il prompt
+derivato, piu un opaque currentness witness. C3c2 non riceve ref di sorgente
+raw, revisioni, epoch, contatori, digest, owner, sessione, lease, revoca o
+lineage. Il witness non si deserializza in questi valori e non autorizza alcuna
+azione; torna al solo owner per una singola verifica interna.
+
+Prima dell'unica chiamata provider, l'owner verifica admissione e binding
+privati, emette una sola lease DS e cattura il witness. Dopo la risposta,
+l'owner riesegue una revalidation completa di selezione, review, sessione,
+lease, revoca, currentness documentale e lineage. Solo la revalidation riuscita
+puo raggiungere il commit della lease DS, che e l'ultima operazione. Esiste
+esattamente una chiamata provider per capsule; non esistono retry, fallback,
+seconda emissione, seconda pubblicazione o invocazione dal chiamante.
+
+Denial, disposal, logout, expiry, reselection, review drift, document drift,
+lineage drift e restart sono terminali per capsule, token e lease. Il primo
+evento osservato brucia lo stato privato; completamenti tardivi possono essere
+scartati per la denial, ma non possono essere pubblicati. Restart distrugge
+tutto lo stato `memory-only`: nessuna identita precedente riprende validita.
+
+#### Posizionamento del resolver e identita
+
+Un eventuale registry di identita vive solo nei moduli canonici che possiedono
+il `ServerSessionProjectionOwner` e la capsule. Indica esclusivamente identita
+opache e non contiene authority, sessioni, projection, prompt, sorgenti,
+currentness, digest, lease, contatori o stato di revoca. Tutti i binding e ogni
+decisione di authority restano nel closure dell'owner.
+
+Sono vietati `globalThis`, campi `static`, singleton session-global e registry
+globale per identita o stato DS. Sono inoltre rifiutati i pattern sibling di
+`dda97ec`: contatori process-globali, provenance sintetica e input
+caller-supplied per `owner`, `session`, `sourceSet`, sorgente o contatori. Un
+modulo chiamante non puo sostituire l'owner, derivare metadati host-owned o
+ricostruire la capsule da dati osservabili.
+
+#### Packet A3 in profondita
+
+| Packet | Confine unico | Stop immediato | Claim ceiling |
+| --- | --- | --- | --- |
+| A3c0 | Questo addendum: burn, capsule owner-bound, resolver privato e lifecycle. | La capsule, il token o un registry diventano authority o state globale. | Solo contratto; nessun runtime o provider. |
+| A3c1 | Bruciare l'handoff autenticato e mintare l'identita opaca una sola volta. | Il token puo essere risolto due volte o conserva binding privati. | Una identity inerte, non una capability. |
+| A3c2 | Promuovere il record sigillato nel closure del `ServerSessionProjectionOwner`. | Owner, sessione, projection, digest o contatori escono dal closure. | Capsule `memory-only`, owner/session-bound. |
+| A3c3 | Esporre a C3c2 proiezione/prompt minimi e opaque currentness witness. | C3c2 osserva source ref, epoch, contatori o digest. | Dati minimi, senza authority o currentness provata. |
+| A3c4 | Issuance della lease DS e una sola chiamata provider. | Retry, fallback, seconda chiamata o invocazione dalla capsule. | Una chiamata candidata, non una pubblicazione. |
+| A3c5 | Revalidation finale owner-side di tutti i binding e del witness. | Drift, revoca o expiry arriva al commit. | Denial fail-closed o precondizione per commit. |
+| A3c6 | Commit-last della lease DS e pubblicazione dello schema gia congelato. | Qualunque lavoro fallibile segue il commit o la receipt precede il commit. | Receipt review-only esistente; nessun apply. |
+| A3c7 | Disposal terminale su denial, logout, expiry, drift e restart. | Un token, lease o capsule sopravvive o riacquista validita. | Distruzione `memory-only`, non revoca persistente. |
+
+Ogni packet e depth-first: il successivo resta `HOLD` finche il precedente non
+e accettato, integrato su una base esatta e verificato indipendentemente. Ogni
+packet resta sotto circa 300 LOC, usa fixture sintetiche e non amplia il claim
+ceiling della riga precedente. Un contratto aperto su ownership, witness,
+revalidation o commit-last blocca la promozione.
+
+#### Falsificatori A3c0
+
+Fermare la promozione se:
+
+- il burn avviene dopo osservazione o preparazione della capsule;
+- un token autentico risolve piu di una volta o porta binding privati;
+- C3c2 riceve un ref raw, una revisione, epoch, contatore o digest;
+- capsule, witness, receipt o registry invocano provider, publish o apply;
+- la revalidation finale omette selezione, review, sessione, lease, revoca,
+  currentness o lineage;
+- il commit della lease non e l'ultima operazione, oppure avviene piu di una
+  chiamata provider;
+- un registry DS usa stato `globalThis`, `static` o session-global, o il
+  chiamante fornisce owner, sessione, source set, sorgente o contatori;
+- denial, disposal, logout, expiry, reselection, review/document/lineage drift
+  o restart non rendono terminale la capsule.
