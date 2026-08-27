@@ -11,6 +11,9 @@ const SetConstructor = Set;
 const DateNow = Date.now;
 const ObjectGetPrototypeOf = Object.getPrototypeOf;
 const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
+const ObjectGetOwnPropertySymbols = Object.getOwnPropertySymbols;
+const ObjectFreeze = Object.freeze;
 const applyIntrinsic = Reflect.apply;
 const functionToString = Function.prototype.toString;
 const mapGet = Map.prototype.get;
@@ -95,7 +98,13 @@ export interface ServerSession {
     expiresAt: number;
 }
 
+export type NativeServerSessionBinding = Readonly<{
+    clientId: string;
+    clientPlatform: 'macos' | 'ios' | 'ipados';
+}>;
+
 const sessions = new MapConstructor<string, ServerSession>();
+const nativeSessionBindings = new WeakMap<ServerSession, NativeServerSessionBinding>();
 const sessionResources = new MapConstructor<string, Set<ServerSessionResourceRegistration>>();
 const sessionCleanupOutcomes = new MapConstructor<string, Exclude<ServerSessionCleanupOutcome, 'unknown'>>();
 
@@ -204,6 +213,44 @@ export function createSession(
     };
     setMapValue(sessions, session.id, session);
     return session;
+}
+
+/* @Codex: native authority is server-tagged and bound to the admitted paired client. */
+export function createNativeServerSession(
+    user: { id: string; username: string; role: string }, binding: NativeServerSessionBinding,
+): ServerSession {
+    if (!isNativeBinding(binding)) throw new Error('invalid native session binding');
+    const session = createSession(user, 'native');
+    nativeSessionBindings.set(session, ObjectFreeze({ clientId: binding.clientId, clientPlatform: binding.clientPlatform }));
+    return session;
+}
+
+/** Compatibility accepts only the exact process-local native session and its admitted pair. */
+/* @Codex */
+export function isPairedNativeServerSession(
+    session: unknown, binding: unknown,
+): session is ServerSession {
+    if (!isNativeBinding(binding) || !isExactStoredSession(session)) return false;
+    const tagged = nativeSessionBindings.get(session);
+    return Boolean(tagged && tagged.clientId === binding.clientId && tagged.clientPlatform === binding.clientPlatform);
+}
+
+function isNativeBinding(value: unknown): value is NativeServerSessionBinding {
+    try {
+        if (!value || typeof value !== 'object' || isProxy(value) || ObjectGetPrototypeOf(value) !== Object.prototype) return false;
+        if (ObjectGetOwnPropertySymbols(value).length || ObjectGetOwnPropertyNames(value).length !== 2) return false;
+        const clientId = ObjectGetOwnPropertyDescriptor(value, 'clientId'); const clientPlatform = ObjectGetOwnPropertyDescriptor(value, 'clientPlatform');
+        return Boolean(clientId && clientPlatform && 'value' in clientId && 'value' in clientPlatform && clientId.enumerable && clientPlatform.enumerable
+            && typeof clientId.value === 'string' && (clientPlatform.value === 'macos' || clientPlatform.value === 'ios' || clientPlatform.value === 'ipados'));
+    } catch { return false; }
+}
+
+function isExactStoredSession(value: unknown): value is ServerSession {
+    try {
+        if (!value || typeof value !== 'object' || isProxy(value) || ObjectGetPrototypeOf(value) !== Object.prototype) return false;
+        const id = ObjectGetOwnPropertyDescriptor(value, 'id');
+        return Boolean(id && 'value' in id && typeof id.value === 'string' && getMapValue(sessions, id.value) === value);
+    } catch { return false; }
 }
 
 export function getSession(sessionId: string | null | undefined): ServerSession | null {
