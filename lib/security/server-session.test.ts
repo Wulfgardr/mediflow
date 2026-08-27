@@ -14,11 +14,14 @@ import {
     deleteSession,
     getSession,
     getPreparedWebServerSessionId,
+    getArmedWebServerSessionId,
     invalidateSessionsForUser,
+    armPreparedWebServerSession,
     prepareStagedWebServerSession,
     peekSession,
     registerServerSessionResource,
     stageWebServerSession,
+    tombstoneArmedWebServerSession,
 } from './server-session';
 
 const SYNTHETIC_USERNAME = `synthetic-${randomUUID()}`;
@@ -234,6 +237,150 @@ test('a prepared Web session commits without exposing authority', () => {
     assert.equal(getSession(session.id), session);
     assert.equal(getPreparedWebServerSessionId(prepared), null);
     assert.equal(commitPreparedWebServerSession(prepared), false);
+});
+
+test('an armed Web session cell burns its prepared capability without exposing authority', () => {
+    const prepared = prepareStagedWebServerSession(stageWebServerSession({
+        id: 'armed-user', username: SYNTHETIC_USERNAME, role: 'clinician',
+    }));
+    assert.ok(prepared);
+    const sessionId = getPreparedWebServerSessionId(prepared);
+    assert.ok(sessionId);
+
+    const port = armPreparedWebServerSession(prepared);
+
+    assert.ok(port);
+    assert.deepEqual([
+        Object.getPrototypeOf(port), Object.isFrozen(port),
+        Object.getOwnPropertyNames(port), Object.getOwnPropertySymbols(port),
+    ], [null, true, [], []]);
+    assert.equal(getPreparedWebServerSessionId(prepared), null);
+    assert.equal(commitPreparedWebServerSession(prepared), false);
+    assert.equal(abortPreparedWebServerSession(prepared), false);
+    assert.equal(getArmedWebServerSessionId(port), sessionId);
+    assert.equal(getSession(sessionId), null);
+    assert.equal(peekSession(sessionId), null);
+    assert.equal(armPreparedWebServerSession(prepared), null);
+
+    const nodeRequire = createRequire(import.meta.url); const cryptoModule = nodeRequire('node:crypto'); const randomBytes = cryptoModule.randomBytes;
+    try {
+        cryptoModule.randomBytes = () => Buffer.from(sessionId, 'hex');
+        assert.throws(() => createSession({ id: 'collision-user', username: SYNTHETIC_USERNAME, role: 'clinician' }));
+    } finally { cryptoModule.randomBytes = randomBytes; }
+});
+
+test('an armed Web session cell becomes a terminal tombstone on denial, logout, clear, and expiry', () => {
+    const arm = (userId: string) => armPreparedWebServerSession(prepareStagedWebServerSession(
+        stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }),
+    ));
+    const denied = arm('armed-denied'); const invalidated = arm('armed-invalidated'); const cleared = arm('armed-cleared');
+    assert.ok(denied && invalidated && cleared);
+
+    assert.equal(tombstoneArmedWebServerSession(denied), true);
+    assert.equal(tombstoneArmedWebServerSession(denied), false);
+    assert.equal(getArmedWebServerSessionId(denied), null);
+    invalidateSessionsForUser('armed-invalidated');
+    assert.equal(getArmedWebServerSessionId(invalidated), null);
+    clearAllSessions();
+    assert.equal(getArmedWebServerSessionId(cleared), null);
+
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const cached = nodeRequire.cache[modulePath]; const ttl = process.env.MEDIFLOW_SESSION_TTL_MS; const originalNow = Date.now;
+    let isolated: typeof import('./server-session') | undefined; let now = 1_000;
+    try {
+        process.env.MEDIFLOW_SESSION_TTL_MS = '1'; Date.now = () => now; delete nodeRequire.cache[modulePath];
+        isolated = nodeRequire(modulePath) as typeof import('./server-session');
+        const port = isolated.armPreparedWebServerSession(isolated.prepareStagedWebServerSession(
+            isolated.stageWebServerSession({ id: 'armed-expired', username: SYNTHETIC_USERNAME, role: 'clinician' }),
+        ));
+        assert.ok(port); now += 2;
+        assert.equal(isolated.getArmedWebServerSessionId(port), null);
+        assert.equal(isolated.tombstoneArmedWebServerSession(port), false);
+    } finally {
+        Date.now = originalNow; isolated?.clearAllSessions();
+        if (ttl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = ttl;
+        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
+    }
+});
+
+test('armed Web session ports reject hostile shapes and module copies without observation', async (t) => {
+    const prepared = prepareStagedWebServerSession(stageWebServerSession({
+        id: 'armed-hostile', username: SYNTHETIC_USERNAME, role: 'clinician',
+    }));
+    const port = armPreparedWebServerSession(prepared); assert.ok(port);
+    let observed = 0;
+    const proxy = new Proxy(port, { get: () => { observed += 1; throw new Error('get'); }, ownKeys: () => { observed += 1; throw new Error('keys'); } });
+    const accessor = Object.create(null); Object.defineProperty(accessor, 'then', { get: () => { observed += 1; throw new Error('then'); } });
+    const rejected = Promise.reject(new Error('hostile')); rejected.catch(() => undefined);
+    const hostile = [Object.assign(Object.create(null), port), proxy, accessor, Promise.resolve(), rejected, { then() { observed += 1; } }];
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    for (const value of hostile) {
+        assert.equal(getArmedWebServerSessionId(value), null);
+        assert.equal(tombstoneArmedWebServerSession(value), false);
+    }
+    const thenDescriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+    try {
+        Object.defineProperty(Object.prototype, 'then', { configurable: true, get: () => { observed += 1; throw new Error('ambient then'); } });
+        assert.equal(typeof getArmedWebServerSessionId(port), 'string');
+    } finally {
+        if (thenDescriptor) Object.defineProperty(Object.prototype, 'then', thenDescriptor); else delete (Object.prototype as { then?: unknown }).then;
+    }
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath];
+    try {
+        delete nodeRequire.cache[modulePath]; const restarted = nodeRequire(modulePath) as typeof import('./server-session');
+        assert.equal(restarted.getArmedWebServerSessionId(port), null);
+        assert.equal(restarted.tombstoneArmedWebServerSession(port), false);
+        restarted.clearAllSessions();
+    } finally { if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(observed, 0); assert.deepEqual(unhandled, []);
+});
+
+test('the armed-cell lifecycle guard burns reentrant and apply-then-throw preparations without later drift', async () => {
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath];
+    const weak = { get: WeakMap.prototype.get, set: WeakMap.prototype.set }; let target = ''; let failSet = false; let nested = () => undefined;
+    const wrap = (name: string, original: (...args: never[]) => unknown) => function (this: unknown, ...args: never[]) {
+        if (target === name) { target = ''; nested(); }
+        const result = Reflect.apply(original, this, args); if (name === 'set' && failSet) throw new Error('apply-then-throw'); return result;
+    };
+    WeakMap.prototype.get = wrap('get', weak.get) as typeof weak.get;
+    WeakMap.prototype.set = wrap('set', weak.set) as typeof weak.set;
+    let isolated: typeof import('./server-session');
+    try { delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session'); }
+    finally { WeakMap.prototype.get = weak.get; WeakMap.prototype.set = weak.set; }
+    try {
+        const first = isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({ id: 'armed-first', username: SYNTHETIC_USERNAME, role: 'clinician' }));
+        const second = isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({ id: 'armed-second', username: SYNTHETIC_USERNAME, role: 'clinician' }));
+        assert.ok(first && second);
+        let nestedPort: ReturnType<typeof isolated.armPreparedWebServerSession> | undefined;
+        target = 'set'; nested = () => { nestedPort = isolated.armPreparedWebServerSession(second); };
+        assert.equal(isolated.armPreparedWebServerSession(first), null);
+        assert.equal(nestedPort, null);
+        assert.equal(isolated.commitPreparedWebServerSession(first), false);
+        assert.equal(isolated.commitPreparedWebServerSession(second), false);
+
+        const mutated = isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({ id: 'armed-mutated', username: SYNTHETIC_USERNAME, role: 'clinician' }));
+        assert.ok(mutated); const mutatedId = isolated.getPreparedWebServerSessionId(mutated); assert.ok(mutatedId);
+        failSet = true; assert.equal(isolated.armPreparedWebServerSession(mutated), null); failSet = false;
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        assert.equal(isolated.commitPreparedWebServerSession(mutated), false);
+        const cryptoModule = nodeRequire('node:crypto'); const randomBytes = cryptoModule.randomBytes;
+        try { cryptoModule.randomBytes = () => Buffer.from(mutatedId, 'hex'); assert.throws(() => isolated.createSession({ id: 'reuse', username: SYNTHETIC_USERNAME, role: 'clinician' })); }
+        finally { cryptoModule.randomBytes = randomBytes; }
+
+        const fresh = isolated.armPreparedWebServerSession(isolated.prepareStagedWebServerSession(
+            isolated.stageWebServerSession({ id: 'armed-fresh', username: SYNTHETIC_USERNAME, role: 'clinician' }),
+        ));
+        assert.ok(fresh);
+        target = 'get'; nested = () => { isolated.tombstoneArmedWebServerSession(fresh); };
+        assert.equal(isolated.getArmedWebServerSessionId(fresh), null);
+        assert.equal(isolated.tombstoneArmedWebServerSession(fresh), false);
+        await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(isolated.getArmedWebServerSessionId(fresh), null);
+    } finally {
+        isolated.clearAllSessions();
+        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
+    }
 });
 
 test('prepared Web session abort, deletion, user invalidation, clear, and hostile copies publish nothing', () => {

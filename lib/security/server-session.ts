@@ -122,6 +122,8 @@ declare const stagedWebSessionCapsule: unique symbol;
 export type StagedWebServerSession = { readonly [stagedWebSessionCapsule]: never };
 declare const preparedWebSessionCapability: unique symbol;
 export type PreparedWebServerSession = { readonly [preparedWebSessionCapability]: never };
+declare const armedWebSessionPort: unique symbol;
+export type ArmedWebServerSessionPort = { readonly [armedWebSessionPort]: never };
 
 interface StagedWebSessionRecord {
     active: boolean;
@@ -137,6 +139,12 @@ interface PreparedWebSessionRecord {
     session: ServerSession;
 }
 
+interface ArmedWebSessionCellRecord {
+    state: 'ARMED_ACTIVATE' | 'TOMBSTONE';
+    session: ServerSession;
+    next: ArmedWebSessionCellRecord | null;
+}
+
 const sessions = new MapConstructor<string, ServerSession>();
 const nativeSessionBindings = new WeakMap<ServerSession, NativeServerSessionBinding>();
 const sessionResources = new MapConstructor<string, Set<ServerSessionResourceRegistration>>();
@@ -145,8 +153,13 @@ const stagedWebSessionRecords = new WeakMapConstructor<object, StagedWebSessionR
 const stagedWebSessions = new SetConstructor<StagedWebSessionRecord>();
 const preparedWebSessionRecords = new WeakMapConstructor<object, PreparedWebSessionRecord>();
 const preparedWebSessionReservations = new MapConstructor<string, PreparedWebSessionRecord>();
+const armedWebSessionPortRecords = new WeakMapConstructor<object, ArmedWebSessionCellRecord>();
+const armedWebSessionCellsById = ObjectCreate(null) as Record<string, ArmedWebSessionCellRecord | undefined>;
+let armedWebSessionCellHead: ArmedWebSessionCellRecord | null = null;
 let webSessionPrepareInProgress = false;
 let webSessionPreparePoisoned = false;
+let webSessionCellLifecycle: 'idle' | 'active' | 'cleanup' = 'idle';
+let webSessionCellLifecyclePoisoned = false;
 
 function isSupportedSynchronousDisposer(candidate: unknown): candidate is ServerSessionResourceDisposer {
     if (typeof candidate !== 'function' || isProxy(candidate)) return false;
@@ -251,7 +264,8 @@ export function createSession(
         createdAt: now,
         expiresAt: now + SESSION_TTL_MS
     };
-    if (getMapValue(sessions, session.id) || getMapValue(preparedWebSessionReservations, session.id)) {
+    if (getMapValue(sessions, session.id) || getMapValue(preparedWebSessionReservations, session.id)
+        || armedWebSessionCellsById[session.id]) {
         throw new Error('server session id unavailable');
     }
     setMapValue(sessions, session.id, session);
@@ -349,6 +363,69 @@ function preparedWebSessionRecord(capability: unknown): PreparedWebSessionRecord
     } catch { return null; }
 }
 
+function armedWebSessionCellRecord(port: unknown): ArmedWebSessionCellRecord | null {
+    try {
+        if (!port || typeof port !== 'object' || isProxy(port) || ObjectGetPrototypeOf(port) !== null) return null;
+        if (ObjectGetOwnPropertySymbols(port).length || ObjectGetOwnPropertyNames(port).length) return null;
+        return getWeakMapValue(armedWebSessionPortRecords, port) ?? null;
+    } catch { return null; }
+}
+
+function tombstoneArmedWebSessionCellRecord(record: ArmedWebSessionCellRecord): boolean {
+    if (record.state !== 'ARMED_ACTIVATE') return false;
+    record.state = 'TOMBSTONE';
+    return true;
+}
+
+function denyNestedWebSessionCellInput(value: unknown): void {
+    const prepared = preparedWebSessionRecord(value);
+    if (prepared) revokePreparedWebSession(prepared);
+    const cell = armedWebSessionCellRecord(value);
+    if (cell) tombstoneArmedWebSessionCellRecord(cell);
+}
+
+function beginWebSessionCellLifecycle(value: unknown): boolean {
+    if (webSessionCellLifecycle === 'idle') {
+        webSessionCellLifecycle = 'active';
+        webSessionCellLifecyclePoisoned = false;
+        return true;
+    }
+    webSessionCellLifecyclePoisoned = true;
+    if (webSessionCellLifecycle === 'active') {
+        webSessionCellLifecycle = 'cleanup';
+        try { denyNestedWebSessionCellInput(value); } catch { /* denial remains terminal */ }
+        finally { webSessionCellLifecycle = 'active'; }
+    }
+    return false;
+}
+
+function endWebSessionCellLifecycle(): void {
+    webSessionCellLifecyclePoisoned = false;
+    webSessionCellLifecycle = 'idle';
+}
+
+function poisonWebSessionCellLifecycle(): void {
+    if (webSessionCellLifecycle !== 'idle') webSessionCellLifecyclePoisoned = true;
+}
+
+function tombstoneArmedWebSessionCellForId(sessionId: string): void {
+    poisonWebSessionCellLifecycle();
+    const record = armedWebSessionCellsById[sessionId];
+    if (record) tombstoneArmedWebSessionCellRecord(record);
+}
+
+function tombstoneArmedWebSessionCellsForUser(userId: string): void {
+    poisonWebSessionCellLifecycle();
+    for (let record = armedWebSessionCellHead; record; record = record.next) {
+        if (record.session.userId === userId) tombstoneArmedWebSessionCellRecord(record);
+    }
+}
+
+function tombstoneAllArmedWebSessionCells(): void {
+    poisonWebSessionCellLifecycle();
+    for (let record = armedWebSessionCellHead; record; record = record.next) tombstoneArmedWebSessionCellRecord(record);
+}
+
 function revokePreparedWebSession(record: PreparedWebSessionRecord): boolean {
     const wasActive = record.active;
     record.active = false;
@@ -426,7 +503,8 @@ export function prepareStagedWebServerSession(capsule: unknown): PreparedWebServ
             revokeStagedWebSession(record);
             return null;
         }
-        if (getMapValue(sessions, sessionId) || getMapValue(preparedWebSessionReservations, sessionId)) {
+        if (getMapValue(sessions, sessionId) || getMapValue(preparedWebSessionReservations, sessionId)
+            || armedWebSessionCellsById[sessionId]) {
             revokeStagedWebSession(record);
             return null;
         }
@@ -472,6 +550,68 @@ export function getPreparedWebServerSessionId(capability: unknown): string | nul
         return null;
     }
     return record.session.id;
+}
+
+/** Burns one prepared capability into its final inert, non-resolvable session cell. */
+/* @Codex */
+export function armPreparedWebServerSession(capability: unknown): ArmedWebServerSessionPort | null {
+    if (!beginWebSessionCellLifecycle(capability)) return null;
+    let cell: ArmedWebSessionCellRecord | null = null;
+    try {
+        const prepared = preparedWebSessionRecord(capability);
+        if (webSessionCellLifecyclePoisoned || !prepared || !prepared.active) return null;
+        const session = prepared.session;
+        if (session.expiresAt <= DateNow() || getMapValue(preparedWebSessionReservations, session.id) !== prepared
+            || getMapValue(sessions, session.id) || armedWebSessionCellsById[session.id]) {
+            revokePreparedWebSession(prepared);
+            return null;
+        }
+        const port = ObjectFreeze(ObjectCreate(null)) as ArmedWebServerSessionPort;
+        cell = { state: 'ARMED_ACTIVATE', session, next: armedWebSessionCellHead };
+        armedWebSessionCellHead = cell;
+        armedWebSessionCellsById[session.id] = cell;
+        setWeakMapValue(armedWebSessionPortRecords, port, cell);
+        const burned = revokePreparedWebSession(prepared);
+        if (webSessionCellLifecyclePoisoned || !burned) {
+            tombstoneArmedWebSessionCellRecord(cell);
+            return null;
+        }
+        return port;
+    } catch {
+        if (cell) tombstoneArmedWebSessionCellRecord(cell);
+        const prepared = preparedWebSessionRecord(capability);
+        if (prepared) revokePreparedWebSession(prepared);
+        return null;
+    } finally { endWebSessionCellLifecycle(); }
+}
+
+/** Returns only the exact private ID of an authentic armed cell; it grants no session authority. */
+/* @Codex */
+export function getArmedWebServerSessionId(port: unknown): string | null {
+    if (!beginWebSessionCellLifecycle(port)) return null;
+    try {
+        const cell = armedWebSessionCellRecord(port);
+        if (webSessionCellLifecyclePoisoned || !cell || cell.state !== 'ARMED_ACTIVATE'
+            || armedWebSessionCellsById[cell.session.id] !== cell) return null;
+        if (cell.session.expiresAt <= DateNow()) {
+            tombstoneArmedWebSessionCellRecord(cell);
+            return null;
+        }
+        return cell.session.id;
+    } catch { return null; }
+    finally { endWebSessionCellLifecycle(); }
+}
+
+/** Converts an authentic armed cell to its terminal, non-reactivatable tombstone. */
+/* @Codex */
+export function tombstoneArmedWebServerSession(port: unknown): boolean {
+    if (!beginWebSessionCellLifecycle(port)) return false;
+    try {
+        const cell = armedWebSessionCellRecord(port);
+        if (webSessionCellLifecyclePoisoned || !cell || armedWebSessionCellsById[cell.session.id] !== cell) return false;
+        return tombstoneArmedWebSessionCellRecord(cell);
+    } catch { return false; }
+    finally { endWebSessionCellLifecycle(); }
 }
 
 /** Canonically publishes a prepared session only for server-local compatibility callers. */
@@ -557,6 +697,7 @@ export function peekSession(sessionId: string | null | undefined): ServerSession
 
 export function deleteSession(sessionId: string | null | undefined): void {
     if (!sessionId) return;
+    tombstoneArmedWebSessionCellForId(sessionId);
     revokePreparedWebSessionForId(sessionId);
     terminateSession(sessionId, 'session_deleted');
 }
@@ -567,6 +708,7 @@ export function invalidateServerSessionForApplicationLock(sessionId: string): Re
     cleanupOutcome: ServerSessionCleanupOutcome;
     authorityAbsent: boolean;
 }> {
+    tombstoneArmedWebSessionCellForId(sessionId);
     revokePreparedWebSessionForId(sessionId);
     return terminateSession(sessionId, 'application_locked');
 }
@@ -575,6 +717,7 @@ export function invalidateServerSessionForApplicationLock(sessionId: string): Re
 export function invalidateSessionsForUser(userId: string): void {
     if (!userId) return;
 
+    tombstoneArmedWebSessionCellsForUser(userId);
     revokeStagedWebSessionsForUser(userId);
     revokePreparedWebSessionsForUser(userId);
 
@@ -591,6 +734,7 @@ export function invalidateSessionsForUser(userId: string): void {
 
 /* @Codex */
 export function clearAllSessions(): void {
+    tombstoneAllArmedWebSessionCells();
     revokeAllStagedWebSessions();
     revokeAllPreparedWebSessions();
     const sessionIds: string[] = [];
