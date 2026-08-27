@@ -7,6 +7,10 @@ import { sql } from 'drizzle-orm';
 
 import { dbServer } from '../../db-server';
 import { resolveDocumentSynthesisHostProjection } from './document-synthesis-host-projection';
+import {
+    intakeDocumentSynthesisA3a2SealedEvidence,
+    type DocumentSynthesisAuthenticSourceSetToken,
+} from './document-synthesis-authentic-source-set-intake';
 import { acquireAuthenticatedWebSessionProjectionOwnerContext } from '../../security/server-auth';
 import { registerServerSessionResource } from '../../security/server-session';
 import type {
@@ -29,7 +33,8 @@ type CaptureRecord = Readonly<{
 type ProjectionRecord = Readonly<{ selected: true; currentness: Currentness; scope: 'document_synthesis_attachment_projection'; evidence: DocumentSynthesisProjectionEvidenceCapability;
     attachmentCapturePort: DocumentSynthesisAttachmentCapturePort }>;
 type SourceSetSealRecord = Readonly<{ selected: true; currentness: Currentness; scope: 'document_synthesis_attachment_source_set_seal'; seal: DocumentSynthesisSourceSetSealCapability }>;
-type HandoffRecord = Readonly<{ selected: true; scope: 'document_synthesis_attachment_handoff'; evidence: DocumentSynthesisSealedEvidence }>;
+type HandoffRecord = Readonly<{ selected: true; selectionEpoch: number; reviewContextEpoch: number;
+    scope: 'document_synthesis_attachment_handoff'; evidence: DocumentSynthesisSealedEvidence }>;
 type PreparedProjectionPublication = Readonly<{ projectionHandle: string; state: ProjectionRecord; result: ProjectionResult }>;
 type PreparedSourceSetSealPublication = Readonly<{ sourceSetSealHandle: string; state: SourceSetSealRecord; result: SourceSetSealResult }>;
 type PreparedHandoffPublication = Readonly<{ handoffHandle: string; result: HandoffResult; port: DocumentSynthesisSealedEvidencePort; grant: object; patientId: string; ambulatoryId: string }>;
@@ -165,7 +170,8 @@ export async function handoffDocumentSynthesisAuthenticatedAttachmentSourceSet(s
     try {
         broker = brokerFor(context); const record = mapGet(broker.records, sourceSetSealHandle);
         if (!record || record.scope !== 'document_synthesis_attachment_source_set_seal' || !mapDelete(broker.records, sourceSetSealHandle)) return handoffDenied('unavailable');
-        const selection = context.owner.withLeaseCriticalSection(context.session, (value) => sealed({ patientId: value.patientId, ambulatoryId: value.ambulatoryId }));
+        const selection = context.owner.withLeaseCriticalSection(context.session, (value) => sealed({ patientId: value.patientId, ambulatoryId: value.ambulatoryId,
+            selectionEpoch: context.owner.snapshotSelectionEpoch(context.session), reviewContextEpoch: context.owner.snapshotReviewContextEpoch(context.session) }));
         if (!selection) return handoffDenied('unavailable');
         const port = context.owner.mintDocumentSynthesisSealedEvidencePort(context.session); const grant = port.begin(record.seal);
         if (!grant) return handoffDenied('unavailable');
@@ -177,10 +183,30 @@ export async function handoffDocumentSynthesisAuthenticatedAttachmentSourceSet(s
             const latest = currentness(DbGet(sql`SELECT a.document_source_ref AS documentSourceRef, a.document_revision AS documentRevision, a.document_freshness_epoch AS documentFreshnessEpoch FROM attachments AS a INNER JOIN patients_to_ambulatories AS pta ON pta.patient_id = a.patient_id WHERE a.document_source_ref = ${record.currentness.documentSourceRef} AND a.document_revision = ${record.currentness.documentRevision} AND a.document_freshness_epoch = ${record.currentness.documentFreshnessEpoch} AND a.patient_id = ${prepared.patientId} AND pta.ambulatory_id = ${prepared.ambulatoryId} LIMIT 1`));
             const evidence = prepared.port.consume(prepared.grant); spent = true;
             if (!latest || !sameCurrentness(record.currentness, latest) || !evidence) return handoffDenied('unavailable');
-            const state = sealed<HandoffRecord>({ selected: true, scope: 'document_synthesis_attachment_handoff', evidence });
+            const state = sealed<HandoffRecord>({ selected: true, selectionEpoch: selection.selectionEpoch as number,
+                reviewContextEpoch: selection.reviewContextEpoch as number, scope: 'document_synthesis_attachment_handoff', evidence });
             return broker.publish(prepared.handoffHandle, state) ? prepared.result : handoffDenied('unavailable');
         } finally { if (!spent) burn(port, grant); }
     } catch {
         return handoffDenied('unavailable');
     }
+}
+
+/** Fixed server-only A3a3 exchange: burns one session-bound handoff before the sole authentic intake. */
+export async function exchangeDocumentSynthesisAuthenticatedAttachmentHandoff(
+    handoffHandle: unknown,
+): Promise<DocumentSynthesisAuthenticSourceSetToken | null> {
+    if (typeof handoffHandle !== 'string' || !RegExpTest(HANDOFF_HANDLE, handoffHandle)) return null;
+    let context: Awaited<ReturnType<typeof acquireAuthenticatedWebSessionProjectionOwnerContext>>;
+    try { context = await acquireAuthenticatedWebSessionProjectionOwnerContext(); } catch { return null; }
+    if (!context) return null;
+    try {
+        const broker = brokerFor(context);
+        const record = mapGet(broker.records, handoffHandle);
+        if (!record || record.scope !== 'document_synthesis_attachment_handoff') return null;
+        const current = context.owner.withLeaseCriticalSection(context.session, () => context.owner.snapshotSelectionEpoch(context.session) === record.selectionEpoch
+            && context.owner.snapshotReviewContextEpoch(context.session) === record.reviewContextEpoch);
+        if (current !== true || !mapDelete(broker.records, handoffHandle)) return null;
+        return intakeDocumentSynthesisA3a2SealedEvidence(record.evidence);
+    } catch { return null; }
 }
