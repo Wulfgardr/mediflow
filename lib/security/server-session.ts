@@ -908,9 +908,11 @@ export function retireActiveWebServerSession(sessionId: unknown, reason: unknown
         return false;
     }
     try {
+        const now = DateNow();
         const exact = armedWebSessionCellsById[sessionId] === cell && cell.state === 'ACTIVE'
             && cell.session === session && cell.activationTicket === ticket && session.id === sessionId
-            && session.authChannel === 'web' && session.expiresAt > DateNow();
+            && session.authChannel === 'web'
+            && (reason === 'expired' ? session.expiresAt <= now : session.expiresAt > now);
         if (webSessionCellLifecyclePoisoned || !exact) {
             retireArmedWebSessionCellRecord(cell);
             abortPreparedAuthControlRetirement(preparedRetirement);
