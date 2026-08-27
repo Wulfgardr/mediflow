@@ -2,7 +2,10 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
-import { createRequire } from 'node:module';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
 
 import {
@@ -16,6 +19,11 @@ function control(fence = 'f0', generation = BigInt(0)) {
     let next = 0;
     const issued = () => `f${++next}`;
     return { record: createWebAuthControlRecord(fence, generation), issued };
+}
+async function freshModule(label: string) {
+    const directory = mkdtempSync(join(tmpdir(), `mediflow-${label}-`)); const target = join(directory, 'web-auth-control-record.ts');
+    writeFileSync(target, readFileSync(fileURLToPath(new URL('./web-auth-control-record.ts', import.meta.url))));
+    try { return await import(pathToFileURL(target).href); } finally { rmSync(directory, { recursive: true, force: true }); }
 }
 
 test('holds one pending, commits an exact auth CAS, and permits only one active Web binding', () => {
@@ -204,11 +212,14 @@ test('commits one opaque ticket for the exact pending control and session bindin
 });
 
 test('retires the exact active ticket once and exposes only same-reason replay', () => {
+    const burned = control().record; burned.begin('setup', 'op', 'key', 'fp', 0);
+    const burnedTicket = burned.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web-1', 1); assert.ok(burnedTicket);
+    assert.equal(retireAuthControlTicket(burnedTicket, 'unknown'), 0, 'every prepared retirement burns the ticket without changing authority');
+    assert.equal(commitAuthControlTicket(burnedTicket), false);
     const { record } = control();
     record.begin('setup', 'op', 'key', 'fp', 0);
     const ticket = record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web-1', 1);
     assert.ok(ticket);
-    assert.equal(retireAuthControlTicket(ticket, 'lock'), 0, 'a prepared ticket cannot retire authority');
     assert.equal(commitAuthControlTicket(ticket), true);
     const activeFence = record.snapshot().fence;
     assert.equal(retireAuthControlTicket(ticket, 'unknown'), 0);
@@ -250,10 +261,8 @@ test('denies stale, expired, wrapped, restarted, and hostile tickets without obs
     const ticket = live.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 1); assert.ok(ticket);
     const clone = Object.assign(Object.create(null), ticket);
     assert.equal(commitAuthControlTicket(clone), false);
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./web-auth-control-record.ts'); const cached = nodeRequire.cache[modulePath];
-    let restarted: typeof import('./web-auth-control-record.ts') | undefined;
-    try { delete nodeRequire.cache[modulePath]; restarted = nodeRequire(modulePath) as typeof import('./web-auth-control-record.ts'); assert.equal(restarted.commitAuthControlTicket(ticket), false); }
-    finally { if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
+    const restarted = await freshModule('web-auth-restart');
+    assert.equal(restarted.commitAuthControlTicket(ticket), false);
     assert.equal(commitAuthControlTicket(ticket), true);
     await new Promise<void>((resolve) => setImmediate(resolve));
     assert.equal(observed, 0); assert.deepEqual(unhandled, []);
@@ -267,20 +276,50 @@ test('keeps the ticket module private to its canonical future server-session imp
 });
 
 test('entropy collision and same-record reentry deny before ticket publication and permit a clean retry', async () => {
-    const original = crypto.randomBytes; let calls = 0; let entered = false; let nested: unknown;
+    const original = crypto.randomBytes; let calls = 0; let entered = false; let nested: unknown; let output: unknown;
     let record: ReturnType<typeof createWebAuthControlRecord> | null = null;
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./web-auth-control-record.ts'); const cached = nodeRequire.cache[modulePath];
     try {
         crypto.randomBytes = (() => {
             calls += 1;
             if (!entered && record) { entered = true; nested = record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 1); }
+            if (output !== undefined) { if (output instanceof Error) throw output; return output; }
             return Buffer.alloc(32, calls <= 2 ? 7 : calls);
-        }) as typeof crypto.randomBytes;
-        delete nodeRequire.cache[modulePath]; const isolated = nodeRequire(modulePath) as typeof import('./web-auth-control-record.ts');
-        record = isolated.createWebAuthControlRecord('f0'); record.begin('login', 'op', 'key', 'fp', 0);
-        assert.equal(record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 1), null);
+        }) as unknown as typeof crypto.randomBytes;
+        const isolated = await freshModule('web-auth-entropy');
+        const isolatedRecord = isolated.createWebAuthControlRecord('f0'); record = isolatedRecord; isolatedRecord.begin('login', 'op', 'key', 'fp', 0);
+        assert.equal(isolatedRecord.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 1), null);
         assert.equal(nested, null);
-        const retry = record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 2);
+        const hostileToString = { toString() { throw new Error('must not encode'); } };
+        for (output of [Buffer.alloc(31), Buffer.alloc(33), new Uint8Array(32), new Proxy(Buffer.alloc(32), {}), Promise.resolve(Buffer.alloc(32)), hostileToString, new Error('entropy')]) {
+            assert.equal(isolatedRecord.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 2), null);
+        }
+        output = undefined;
+        const retry = isolatedRecord.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 2);
         assert.ok(retry); assert.equal(isolated.commitAuthControlTicket(retry), true); assert.equal(isolated.retireAuthControlTicket(retry, 'lock'), 1);
-    } finally { crypto.randomBytes = original; if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
+    } finally { crypto.randomBytes = original; }
+});
+
+test('poisons prepare, commit, and retire reentry from captured collection intrinsics', async () => {
+    const set = { has: Set.prototype.has, add: Set.prototype.add, delete: Set.prototype.delete };
+    const weak = { get: WeakMap.prototype.get, set: WeakMap.prototype.set, delete: WeakMap.prototype.delete };
+    let target = ''; let nested = () => {}; let failWeakSet = false;
+    const hook = (name: string, original: (...args: never[]) => unknown) => function (this: unknown, ...args: never[]) {
+        if (target === name) { target = ''; nested(); } const result = Reflect.apply(original, this, args);
+        if (name === 'weakSet' && failWeakSet) throw new Error('weak set failure'); return result;
+    };
+    Set.prototype.has = hook('setHas', set.has) as typeof set.has; Set.prototype.add = hook('setAdd', set.add) as typeof set.add; Set.prototype.delete = hook('setDelete', set.delete) as typeof set.delete;
+    WeakMap.prototype.get = hook('weakGet', weak.get) as typeof weak.get; WeakMap.prototype.set = hook('weakSet', weak.set) as typeof weak.set; WeakMap.prototype.delete = hook('weakDelete', weak.delete) as typeof weak.delete;
+    let isolated: typeof import('./web-auth-control-record.ts');
+    try { isolated = await freshModule('web-auth-collections'); }
+    finally { Set.prototype.has = set.has; Set.prototype.add = set.add; Set.prototype.delete = set.delete; WeakMap.prototype.get = weak.get; WeakMap.prototype.set = weak.set; WeakMap.prototype.delete = weak.delete; }
+    for (const name of ['weakGet', 'setHas', 'setDelete', 'setAdd']) {
+        const record = isolated.createWebAuthControlRecord(`f-${name}`); record.begin('login', 'op', `key-${name}`, 'fp', 0);
+        const ticket = record.prepareAuthControlTicket(`f-${name}`, 'op', BigInt(0), 'fp', 'web', 1); assert.ok(ticket);
+        target = name; nested = () => { isolated.commitAuthControlTicket(ticket); }; assert.equal(isolated.commitAuthControlTicket(ticket), false); assert.equal(record.snapshot().active, false);
+    }
+    const prepared = isolated.createWebAuthControlRecord('prepare'); prepared.begin('login', 'op', 'key', 'fp', 0);
+    target = 'weakSet'; nested = () => { prepared.prepareAuthControlTicket('prepare', 'op', BigInt(0), 'fp', 'web', 1); }; assert.equal(prepared.prepareAuthControlTicket('prepare', 'op', BigInt(0), 'fp', 'web', 1), null);
+    target = 'weakDelete'; failWeakSet = true; nested = () => { prepared.prepareAuthControlTicket('prepare', 'op', BigInt(0), 'fp', 'web', 1); }; assert.equal(prepared.prepareAuthControlTicket('prepare', 'op', BigInt(0), 'fp', 'web', 1), null); failWeakSet = false;
+    const active = prepared.prepareAuthControlTicket('prepare', 'op', BigInt(0), 'fp', 'web', 2); assert.ok(active); assert.equal(isolated.commitAuthControlTicket(active), true);
+    target = 'setHas'; nested = () => { isolated.retireAuthControlTicket(active, 'lock'); }; assert.equal(isolated.retireAuthControlTicket(active, 'lock'), 0); assert.equal(isolated.retireAuthControlTicket(active, 'lock'), 1);
 });
