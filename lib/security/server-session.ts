@@ -572,6 +572,7 @@ export function armPreparedWebServerSession(capability: unknown): ArmedWebServer
             revokePreparedWebSession(prepared);
             return null;
         }
+        ObjectFreeze(session);
         const port = ObjectFreeze(ObjectCreate(null)) as ArmedWebServerSessionPort;
         cell = { state: 'ARMED_ACTIVATE', session, next: armedWebSessionCellHead };
         armedWebSessionCellHead = cell;

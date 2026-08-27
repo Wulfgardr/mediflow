@@ -337,6 +337,26 @@ test('the trusted ACTIVE resolver returns only the exact P3 cell without legacy 
     assert.equal(session.authChannel, 'web');
     assert.equal(resolveActiveWebServerSession(armed.sessionId), session);
     assert.equal(session.expiresAt, expiry);
+    assert.equal(Object.isFrozen(session), true);
+    assert.equal(Object.getPrototypeOf(session), Object.prototype);
+    const mutations: ReadonlyArray<readonly [keyof typeof session, unknown]> = [
+        ['id', 'other-id'], ['userId', 'other-user'], ['username', 'other-name'], ['role', 'administrator'],
+        ['authChannel', 'native'], ['createdAt', 0], ['expiresAt', expiry + 1],
+    ];
+    for (const [key, value] of mutations) {
+        const descriptor = Object.getOwnPropertyDescriptor(session, key);
+        assert.deepEqual({ enumerable: descriptor?.enumerable, configurable: descriptor?.configurable, writable: descriptor && 'writable' in descriptor ? descriptor.writable : undefined },
+            { enumerable: true, configurable: false, writable: false });
+        assert.throws(() => { (session as unknown as Record<string, unknown>)[key] = value; }, TypeError);
+        assert.throws(() => Object.defineProperty(session, key, { value }), TypeError);
+        assert.throws(() => { delete (session as unknown as Record<string, unknown>)[key]; }, TypeError);
+    }
+    assert.throws(() => Object.setPrototypeOf(session, null), TypeError);
+    assert.equal(resolveActiveWebServerSession(armed.sessionId), session);
+    assert.deepEqual({ id: session.id, userId: session.userId, username: session.username, role: session.role,
+        authChannel: session.authChannel, createdAt: session.createdAt, expiresAt: session.expiresAt },
+    { id: armed.sessionId, userId: 'atomic-user', username: SYNTHETIC_USERNAME, role: 'clinician',
+        authChannel: 'web', createdAt: session.createdAt, expiresAt: expiry });
     assert.equal(getSession(armed.sessionId), null);
     assert.equal(peekSession(armed.sessionId), null);
 });
