@@ -67,6 +67,7 @@ function sameCurrentness(left: Currentness, right: Currentness): boolean { retur
 function mint(bytes: unknown, prefix: 'dsc_' | 'dsp_' | 'dss_' | 'dsh_'): string | null { if (!(bytes instanceof Uint8ArrayConstructor) || IsProxy(bytes) || bytes.length !== 16) return null; let value = prefix; for (let index = 0; index < 16; index += 1) { const byte = bytes[index]; if (typeof byte !== 'number' || !NumberIsSafeInteger(byte) || byte < 0 || byte > 255) return null; value += '0123456789abcdef'[byte >>> 4]! + '0123456789abcdef'[byte & 15]!; } return RegExpTest(prefix === 'dsc_' ? HANDLE : prefix === 'dsp_' ? PROJECTION_HANDLE : prefix === 'dss_' ? SOURCE_SET_SEAL_HANDLE : HANDOFF_HANDLE, value) ? value : null; }
 function projectionCandidate(value: unknown): Readonly<{ sourceKind: 'native_text' | 'ocr_text'; sourceText: string }> | null { const input = exact(value, PROJECTION_KEYS); if (!input) return null; try { const normalized = resolveDocumentSynthesisHostProjection(ObjectFreeze({ sourceKind: input.sourceKind, sourceText: input.sourceText })); return ObjectFreeze({ sourceKind: normalized.sourceKind, sourceText: normalized.sourceText }); } catch { return null; } }
 function revoke(port: DocumentSynthesisAttachmentCapturePort, value: unknown): void { try { port.observeRevocation(value); } catch { /* denial remains terminal */ } }
+function burn(port: DocumentSynthesisSealedEvidencePort, grant: object): void { try { port.consume(grant); } catch { /* a retry is idempotent at the owner boundary */ } }
 
 const ownerBrokers = new WeakMapConstructor<object, WeakMap<object, Broker>>();
 function brokerFor(context: NonNullable<Awaited<ReturnType<typeof acquireAuthenticatedWebSessionProjectionOwnerContext>>>): Broker {
@@ -167,15 +168,18 @@ export async function handoffDocumentSynthesisAuthenticatedAttachmentSourceSet(s
         const selection = context.owner.withLeaseCriticalSection(context.session, (value) => sealed({ patientId: value.patientId, ambulatoryId: value.ambulatoryId }));
         if (!selection) return handoffDenied('unavailable');
         const port = context.owner.mintDocumentSynthesisSealedEvidencePort(context.session); const grant = port.begin(record.seal);
-        const handoffHandle = grant && mint(Entropy(16), 'dsh_');
-        if (!grant || !handoffHandle) { if (grant) port.consume(grant); return handoffDenied('unavailable'); }
-        const prepared = sealed<PreparedHandoffPublication>({ handoffHandle, result: handoffAvailable(handoffHandle), port, grant,
-            patientId: selection.patientId as string, ambulatoryId: selection.ambulatoryId as string });
-        const latest = currentness(DbGet(sql`SELECT a.document_source_ref AS documentSourceRef, a.document_revision AS documentRevision, a.document_freshness_epoch AS documentFreshnessEpoch FROM attachments AS a INNER JOIN patients_to_ambulatories AS pta ON pta.patient_id = a.patient_id WHERE a.document_source_ref = ${record.currentness.documentSourceRef} AND a.document_revision = ${record.currentness.documentRevision} AND a.document_freshness_epoch = ${record.currentness.documentFreshnessEpoch} AND a.patient_id = ${prepared.patientId} AND pta.ambulatory_id = ${prepared.ambulatoryId} LIMIT 1`));
-        const evidence = prepared.port.consume(prepared.grant);
-        if (!latest || !sameCurrentness(record.currentness, latest) || !evidence) return handoffDenied('unavailable');
-        const state = sealed<HandoffRecord>({ selected: true, scope: 'document_synthesis_attachment_handoff', evidence });
-        return broker.publish(prepared.handoffHandle, state) ? prepared.result : handoffDenied('unavailable');
+        if (!grant) return handoffDenied('unavailable');
+        let spent = false;
+        try {
+            const handoffHandle = mint(Entropy(16), 'dsh_'); if (!handoffHandle) return handoffDenied('unavailable');
+            const prepared = sealed<PreparedHandoffPublication>({ handoffHandle, result: handoffAvailable(handoffHandle), port, grant,
+                patientId: selection.patientId as string, ambulatoryId: selection.ambulatoryId as string });
+            const latest = currentness(DbGet(sql`SELECT a.document_source_ref AS documentSourceRef, a.document_revision AS documentRevision, a.document_freshness_epoch AS documentFreshnessEpoch FROM attachments AS a INNER JOIN patients_to_ambulatories AS pta ON pta.patient_id = a.patient_id WHERE a.document_source_ref = ${record.currentness.documentSourceRef} AND a.document_revision = ${record.currentness.documentRevision} AND a.document_freshness_epoch = ${record.currentness.documentFreshnessEpoch} AND a.patient_id = ${prepared.patientId} AND pta.ambulatory_id = ${prepared.ambulatoryId} LIMIT 1`));
+            const evidence = prepared.port.consume(prepared.grant); spent = true;
+            if (!latest || !sameCurrentness(record.currentness, latest) || !evidence) return handoffDenied('unavailable');
+            const state = sealed<HandoffRecord>({ selected: true, scope: 'document_synthesis_attachment_handoff', evidence });
+            return broker.publish(prepared.handoffHandle, state) ? prepared.result : handoffDenied('unavailable');
+        } finally { if (!spent) burn(port, grant); }
     } catch {
         return handoffDenied('unavailable');
     }
