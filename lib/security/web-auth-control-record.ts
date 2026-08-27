@@ -278,6 +278,21 @@ export function abortPreparedAuthControlActivation(prepared: unknown): boolean {
     return exact;
 }
 
+/** Observes one exact ACTIVE ticket/session binding without spending or exposing it. */
+/* @Codex */
+export function isCurrentAuthControlSessionBinding(ticket: unknown, exactSessionId: unknown): boolean {
+    if (!text(exactSessionId)) return false;
+    try {
+        const binding = weakMapGet(ticketBindings, ticket);
+        if (!binding || binding.lifecycle !== 'active' || binding.sessionId !== exactSessionId || binding.retiredReason !== null) return false;
+        const state = binding.owner;
+        return state.pending === null && state.activeSessionId === binding.sessionId
+            && state.fence === binding.activateFence && state.generation === binding.generation + ONE
+            && state.reserved[binding.activateFence] !== true && state.used[binding.activateFence] === true
+            && state.reserved[binding.retireFence] === true && state.used[binding.retireFence] !== true;
+    } catch { return false; }
+}
+
 function denyPreparedAuthControlRetirement(record: PreparedAuthControlRetirementRecord): void {
     if (record.lifecycle !== 'prepared') return;
     record.lifecycle = 'denied';
