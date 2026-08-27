@@ -364,8 +364,111 @@ function sealedDocumentSynthesisRecord(onClock: (() => void) | null = null) {
     const grant = capturePort.begin(capture); assert.ok(grant);
     const retained = capturePort.retain(Object.freeze({ grant, observedCurrentness: currentness(), projection: projection() })); assert.ok(retained);
     const seal = capturePort.sealRetainedProjection(retained); assert.ok(seal);
-    return { ...fixture, capturePort, seal, capsules: fixture.owner.mintDocumentSynthesisExecutionCapsulePort(fixture.value) };
+    return { ...fixture, capturePort, capture, grant, retained, seal,
+        capsules: fixture.owner.mintDocumentSynthesisExecutionCapsulePort(fixture.value) };
 }
+
+test('Document Synthesis sealed evidence disposal burns one exact seal and every capture alias', () => {
+    const record = sealedDocumentSynthesisRecord();
+    const disposal = record.owner.mintDocumentSynthesisSealedEvidenceDisposalPort(record.value);
+    const evidence = record.owner.mintDocumentSynthesisSealedEvidencePort(record.value);
+    const evidenceGrant = evidence.begin(record.seal); assert.ok(evidenceGrant);
+    assert.equal(Object.getPrototypeOf(disposal), null); assert.equal(Object.isFrozen(disposal), true);
+    assert.deepEqual(Object.keys(disposal), ['discard']);
+    assert.equal(disposal.discard(record.seal), true);
+    for (const alias of [record.capture, record.grant, record.retained, record.seal]) {
+        assert.equal(record.capturePort.observeRevocation(alias), false);
+    }
+    assert.equal(evidence.consume(evidenceGrant), null);
+    assert.equal(record.capsules.promote(record.seal), null);
+    assert.equal(record.owner.mintDocumentSynthesisSealedEvidencePort(record.value).begin(record.seal), null);
+    assert.equal(disposal.discard(record.seal), false);
+});
+
+test('Document Synthesis sealed evidence disposal remains burn-only after owner lifecycle drift', () => {
+    const cases: readonly ((record: ReturnType<typeof sealedDocumentSynthesisRecord>) => void)[] = [
+        (record) => { assert.ok(record.capturePort.observeCurrentness(currentness(2, 2))); },
+        (record) => {
+            const lineage = record.owner.mintDocumentSynthesisSourceLineagePort(record.value);
+            const grant = lineage.open(); assert.ok(grant); const capability = lineage.verify(grant); assert.ok(capability);
+            assert.equal(lineage.observeRevocation(capability), true);
+        },
+        (record) => { record.owner.issueSelection({ expectedEpoch: 1, ...PAIR }); },
+        (record) => { record.setClock(record.value.expiresAt); },
+        (record) => { deleteSession(record.value.id); },
+        () => { clearAllSessions(); },
+        (record) => { record.owner.dispose(); },
+    ];
+    for (const drift of cases) {
+        const record = sealedDocumentSynthesisRecord();
+        const disposal = record.owner.mintDocumentSynthesisSealedEvidenceDisposalPort(record.value);
+        drift(record);
+        assert.equal(disposal.discard(record.seal), true);
+        assert.equal(disposal.discard(record.seal), false);
+        for (const alias of [record.capture, record.grant, record.retained, record.seal]) {
+            assert.equal(record.capturePort.observeRevocation(alias), false);
+        }
+    }
+});
+
+test('Document Synthesis sealed evidence disposal rejects hostile and foreign seals without observation', async () => {
+    const record = sealedDocumentSynthesisRecord(); const disposal = record.owner.mintDocumentSynthesisSealedEvidenceDisposalPort(record.value);
+    let reads = 0; let traps = 0;
+    const proxy = new Proxy(record.seal, { get() { traps += 1; throw new Error('synthetic trap'); },
+        ownKeys() { traps += 1; throw new Error('synthetic trap'); } });
+    const accessor = Object.freeze(Object.defineProperty({}, 'seal', { enumerable: true, get() { reads += 1; return record.seal; } }));
+    const thenable = Object.freeze(Object.defineProperty({}, 'then', { enumerable: true, get() { reads += 1; return () => undefined; } }));
+    for (const forged of [null, Object.freeze({ ...record.seal }), structuredClone(record.seal),
+        Object.freeze(Object.create(record.seal)), proxy, accessor, Object.freeze({ [Symbol('seal')]: record.seal }),
+        Object.freeze(Object.defineProperty({}, 'seal', { value: record.seal })), thenable]) {
+        assert.equal(disposal.discard(forged), false);
+    }
+    const foreign = sealedDocumentSynthesisRecord();
+    assert.equal(foreign.owner.mintDocumentSynthesisSealedEvidenceDisposalPort(foreign.value).discard(record.seal), false);
+    const copyUrl = new URL('./server-session-projection-owner.ts', import.meta.url); copyUrl.search = 'copy=sealed-evidence-disposal';
+    const moduleCopy = await import(copyUrl.href);
+    const copyRegistry = moduleCopy.createServerSessionProjectionOwnerRegistry({
+        clock: () => 1_000, entropy: () => new Uint8Array(16),
+        resolve: (_session: ServerSession, pair: typeof PAIR) => Object.freeze({ ...pair }),
+    });
+    const copyOwner = copyRegistry.acquire(record.value); copyOwner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    assert.equal(copyOwner.mintDocumentSynthesisSealedEvidenceDisposalPort(record.value).discard(record.seal), false);
+    assert.equal(reads, 0); assert.equal(traps, 0); assert.equal(disposal.discard(record.seal), true);
+});
+
+test('Document Synthesis sealed evidence disposal avoids ambient callbacks and poisoned registries', () => {
+    let nested = 0; let reads = 0;
+    const record = sealedDocumentSynthesisRecord(() => { nested += 1; });
+    const disposal = record.owner.mintDocumentSynthesisSealedEvidenceDisposalPort(record.value);
+    nested = 0;
+    const descriptors = {
+        then: Object.getOwnPropertyDescriptor(Object.prototype, 'then'), get: Object.getOwnPropertyDescriptor(WeakMap.prototype, 'get'),
+        remove: Object.getOwnPropertyDescriptor(WeakMap.prototype, 'delete'), weakRemove: Object.getOwnPropertyDescriptor(WeakSet.prototype, 'delete'),
+        iterator: Object.getOwnPropertyDescriptor(Array.prototype, Symbol.iterator),
+    };
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { reads += 1; record.owner.dispose(); return undefined; } });
+    Object.defineProperty(WeakMap.prototype, 'get', { configurable: true, value() { nested += 1; disposal.discard(record.seal); throw new Error('synthetic get trap'); } });
+    Object.defineProperty(WeakMap.prototype, 'delete', { configurable: true, value() { nested += 1; record.owner.dispose(); throw new Error('synthetic delete trap'); } });
+    Object.defineProperty(WeakSet.prototype, 'delete', { configurable: true, value() { nested += 1; throw new Error('synthetic weak-set trap'); } });
+    Object.defineProperty(Array.prototype, Symbol.iterator, { configurable: true, value() { nested += 1; throw new Error('synthetic iterator trap'); } });
+    try { assert.equal(disposal.discard(record.seal), true); } finally {
+        if (descriptors.then) Object.defineProperty(Object.prototype, 'then', descriptors.then); else delete (Object.prototype as { then?: unknown }).then;
+        Object.defineProperty(WeakMap.prototype, 'get', descriptors.get!); Object.defineProperty(WeakMap.prototype, 'delete', descriptors.remove!);
+        Object.defineProperty(WeakSet.prototype, 'delete', descriptors.weakRemove!);
+        Object.defineProperty(Array.prototype, Symbol.iterator, descriptors.iterator!);
+    }
+    assert.equal(reads, 0); assert.equal(nested, 0); assert.equal(disposal.discard(record.seal), false);
+});
+
+test('Document Synthesis sealed evidence disposal remains private to the owner before A3c3', () => {
+    const ownerSource = new URL('./server-session-projection-owner.ts', import.meta.url);
+    const root = new URL('../../', import.meta.url);
+    const references = ['app', 'components', 'lib', 'packages', 'scripts'].flatMap((directory) => {
+        try { return productionTypeScriptFiles(new URL(`${directory}/`, root)); } catch { return []; }
+    }).filter((file) => readFileSync(file, 'utf8').includes('DocumentSynthesisSealedEvidenceDisposalPort'))
+        .map((file) => file.href).sort();
+    assert.deepEqual(references, [ownerSource.href]);
+});
 
 function documentSynthesisExecutionCapsuleIdentityRecord(onClock: (() => void) | null = null) {
     const fixture = sealedDocumentSynthesisRecord(onClock);

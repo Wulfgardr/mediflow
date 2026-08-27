@@ -166,6 +166,7 @@ export type ServerSessionProjectionOwner = Readonly<{
     mintDocumentSynthesisSourceLineagePort(session: ServerSession): DocumentSynthesisSourceLineagePort;
     mintDocumentSynthesisAttachmentCapturePort(session: ServerSession): DocumentSynthesisAttachmentCapturePort;
     mintDocumentSynthesisSealedEvidencePort(session: ServerSession): DocumentSynthesisSealedEvidencePort;
+    mintDocumentSynthesisSealedEvidenceDisposalPort(session: ServerSession): DocumentSynthesisSealedEvidenceDisposalPort;
     mintDocumentSynthesisExecutionCapsulePort(session: ServerSession): DocumentSynthesisExecutionCapsulePort;
     mintDocumentSynthesisExecutionCapsuleIdentityPort(session: ServerSession): DocumentSynthesisExecutionCapsuleIdentityPort;
     withLeaseCriticalSection<T>(session: ServerSession, callback: (selection: CanonicalPair) => T): T;
@@ -234,6 +235,9 @@ export type DocumentSynthesisAttachmentCapturePort = Readonly<{
 export type DocumentSynthesisSealedEvidencePort = Readonly<{
     begin(value: unknown): DocumentSynthesisSealedEvidenceGrant | null;
     consume(value: unknown): DocumentSynthesisSealedEvidence | null;
+}>;
+export type DocumentSynthesisSealedEvidenceDisposalPort = Readonly<{
+    discard(value: unknown): boolean;
 }>;
 type LeaseCommitSnapshot<Ref extends object> = Readonly<{
     currentRef: Ref; stagedRef: Ref | null; generation: number; terminal: boolean;
@@ -386,7 +390,18 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 projection: DocumentSynthesisProjectionCandidate; sourceSetDigestSha256: readonly number[]; seal: object | null;
                 state: 'sealed' | 'begun' | 'promoted' | 'burned'; revoked: boolean; };
             const documentSynthesisSealedEvidence = new WeakMapConstructor<object, SealedEvidenceRecord>();
-            const documentSynthesisSealCaptures = new WeakMapConstructor<object, Readonly<{ records: WeakMap<object, object>; seals: WeakSet<object> }>>();
+            const documentSynthesisSealCaptures = new WeakMapConstructor<object, () => void>();
+            const terminateDocumentSynthesisSeal = (value: unknown, state: 'promoted' | 'burned'): SealedEvidenceRecord | null => {
+                if (typeof value !== 'object' || value === null || isProxy(value)) return null;
+                const entry = applyIntrinsic(weakMapGet, documentSynthesisSealedEvidence, [value]);
+                if (!entry || entry.seal !== value || (entry.state !== 'sealed' && entry.state !== 'begun')) return null;
+                entry.state = state; entry.seal = null;
+                applyIntrinsic(weakMapDelete, documentSynthesisSealedEvidence, [value]);
+                const discardCaptureAliases = applyIntrinsic(weakMapGet, documentSynthesisSealCaptures, [value]);
+                if (discardCaptureAliases) discardCaptureAliases();
+                applyIntrinsic(weakMapDelete, documentSynthesisSealCaptures, [value]);
+                return entry;
+            };
             type ExecutionCapsuleRecord = Readonly<{
                 sealedEvidence: SealedEvidenceRecord; selection: SelectionState; selectionEpoch: number; reviewContextEpoch: number;
             }>;
@@ -900,7 +915,8 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                             || documentSynthesisLineageTerminal || entry.state !== 'sealed'
                             || finalSourceSetEpoch !== sourceSetEpoch || finalRevocationGeneration !== revocationGeneration
                             || finalNextSourceSetEpoch !== nextSourceSetEpoch || finalLineageRevocationGeneration !== lineageRevocationGeneration) { burnEntry(entry); return null; }
-                        const seal = opaque();
+                        const seal = opaque(); const captureAlias = entry.capture; const grantAlias = entry.grant;
+                        const evidenceAlias = value as object;
                         entry.seal = seal; entry.evidence = null; entry.projection = null; entry.sourceSetEpoch = null; entry.revocationGeneration = null;
                         entry.nextSourceSetEpoch = null; entry.lineageRevocationGeneration = null;
                         addOwnerIdentity(seals, seal); applyIntrinsic(weakMapSet, records, [seal, entry]);
@@ -911,7 +927,17 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                             sourceSetEpoch, revocationGeneration, nextSourceSetEpoch, lineageRevocationGeneration,
                             projection, sourceSetDigestSha256: digest.sourceSetDigestSha256, seal, state: 'sealed', revoked: false,
                         }]);
-                        applyIntrinsic(weakMapSet, documentSynthesisSealCaptures, [seal, { records: records as unknown as WeakMap<object, object>, seals }]);
+                        applyIntrinsic(weakMapSet, documentSynthesisSealCaptures, [seal, () => {
+                            entry.state = 'burned'; entry.seal = null; entry.grant = null; entry.evidence = null; entry.projection = null;
+                            entry.sourceSetEpoch = null; entry.revocationGeneration = null; entry.nextSourceSetEpoch = null;
+                            entry.lineageRevocationGeneration = null; entry.sourceSetDigestSha256 = null;
+                            applyIntrinsic(weakMapDelete, records, [captureAlias]);
+                            if (grantAlias) applyIntrinsic(weakMapDelete, records, [grantAlias]);
+                            applyIntrinsic(weakMapDelete, records, [evidenceAlias]); applyIntrinsic(weakMapDelete, records, [seal]);
+                            deleteOwnerIdentity(captures, captureAlias);
+                            if (grantAlias) deleteOwnerIdentity(grants, grantAlias);
+                            deleteOwnerIdentity(evidence, evidenceAlias); deleteOwnerIdentity(seals, seal);
+                        }]);
                         return seal as DocumentSynthesisSourceSetSealCapability;
                     } catch {
                         const entry = entryFor(value);
@@ -960,13 +986,8 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         return applyIntrinsic(weakMapGet, records, [value]) ?? null;
                     };
                     const burn = (entry: SealedEvidenceRecord, grant: object | null) => {
-                        const seal = entry.seal; entry.state = 'burned'; entry.seal = null;
-                        if (seal) {
-                            applyIntrinsic(weakMapDelete, documentSynthesisSealedEvidence, [seal]);
-                            const capture = applyIntrinsic(weakMapGet, documentSynthesisSealCaptures, [seal]);
-                            if (capture) { applyIntrinsic(weakMapDelete, capture.records, [seal]); deleteOwnerIdentity(capture.seals, seal); }
-                            applyIntrinsic(weakMapDelete, documentSynthesisSealCaptures, [seal]);
-                        }
+                        const seal = entry.seal;
+                        if (!seal || !terminateDocumentSynthesisSeal(seal, 'burned')) { entry.state = 'burned'; entry.seal = null; }
                         if (grant) applyIntrinsic(weakMapDelete, records, [grant]);
                     };
                     const port = ObjectCreate(null) as DocumentSynthesisSealedEvidencePort;
@@ -1010,6 +1031,24 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     return ObjectFreeze(port);
                 } finally { endLeasePortOperation(); }
             };
+            const mintDocumentSynthesisSealedEvidenceDisposalPort = (presentedSession: ServerSession): DocumentSynthesisSealedEvidenceDisposalPort => {
+                if (!beginLeasePortOperation()) return fail('selection_busy');
+                try {
+                    rejectLeaseCriticalSectionReentry(); requireCurrentSession(presentedSession);
+                    const boundSelection = selection; const boundSelectionEpoch = epoch; const boundReviewContextEpoch = reviewContextEpoch;
+                    if (!boundSelection) return fail('stale_selection');
+                    if (readClock() >= boundSelection.expiresAt) { expire(); return fail('lease_expired'); }
+                    if (terminal || selection !== boundSelection || epoch !== boundSelectionEpoch
+                        || reviewContextEpoch !== boundReviewContextEpoch || leasePortOperationPoisoned) return fail('stale_selection');
+                    const port = ObjectCreate(null) as DocumentSynthesisSealedEvidenceDisposalPort;
+                    ObjectDefineProperty(port, 'discard', { enumerable: true, value(this: unknown, value: unknown) {
+                        if (this !== port || !beginLeasePortOperation()) return false;
+                        try { return terminateDocumentSynthesisSeal(value, 'burned') !== null; }
+                        catch { return false; } finally { endLeasePortOperation(); }
+                    } });
+                    return ObjectFreeze(port);
+                } finally { endLeasePortOperation(); }
+            };
             const mintDocumentSynthesisExecutionCapsulePort = (presentedSession: ServerSession): DocumentSynthesisExecutionCapsulePort => {
                 if (!beginLeasePortOperation()) return fail('selection_busy');
                 try {
@@ -1032,12 +1071,8 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         return applyIntrinsic(weakMapGet, documentSynthesisSealedEvidence, [value]) ?? null;
                     };
                     const consume = (entry: SealedEvidenceRecord) => {
-                        const seal = entry.seal; entry.state = 'promoted'; entry.seal = null;
-                        if (!seal) return;
-                        applyIntrinsic(weakMapDelete, documentSynthesisSealedEvidence, [seal]);
-                        const capture = applyIntrinsic(weakMapGet, documentSynthesisSealCaptures, [seal]);
-                        if (capture) { applyIntrinsic(weakMapDelete, capture.records, [seal]); deleteOwnerIdentity(capture.seals, seal); }
-                        applyIntrinsic(weakMapDelete, documentSynthesisSealCaptures, [seal]);
+                        const seal = entry.seal;
+                        if (!seal || !terminateDocumentSynthesisSeal(seal, 'promoted')) { entry.state = 'promoted'; entry.seal = null; }
                     };
                     const port = ObjectCreate(null) as DocumentSynthesisExecutionCapsulePort;
                     ObjectDefineProperty(port, 'promote', { enumerable: true, value(this: unknown, value: unknown) {
@@ -1138,7 +1173,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     && typeof value.control?.lock === 'function' && typeof value.control.revoke === 'function'
                     && typeof value.control.changeSelection === 'function';
             };
-            const owner: Omit<ServerSessionProjectionOwner, 'mintPatientInsightLeaseCommitPort' | 'mintOcrLeaseCommitPort' | 'mintDocumentSynthesisLeaseCommitPort' | 'mintTreatmentReasoningLeaseCommitPort' | 'mintDurableReviewCommitPort' | 'mintDocumentSynthesisSourceLineagePort' | 'mintDocumentSynthesisAttachmentCapturePort' | 'mintDocumentSynthesisSealedEvidencePort' | 'mintDocumentSynthesisExecutionCapsulePort' | 'mintDocumentSynthesisExecutionCapsuleIdentityPort'> = {
+            const owner: Omit<ServerSessionProjectionOwner, 'mintPatientInsightLeaseCommitPort' | 'mintOcrLeaseCommitPort' | 'mintDocumentSynthesisLeaseCommitPort' | 'mintTreatmentReasoningLeaseCommitPort' | 'mintDurableReviewCommitPort' | 'mintDocumentSynthesisSourceLineagePort' | 'mintDocumentSynthesisAttachmentCapturePort' | 'mintDocumentSynthesisSealedEvidencePort' | 'mintDocumentSynthesisSealedEvidenceDisposalPort' | 'mintDocumentSynthesisExecutionCapsulePort' | 'mintDocumentSynthesisExecutionCapsuleIdentityPort'> = {
                 snapshotSelectionEpoch(presentedSession) {
                     if (terminal || presentedSession !== session || session.authChannel !== 'web' || peekSession(session.id) !== session) {
                         return fail('session_unavailable');
@@ -1329,6 +1364,11 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 if (this !== owner) return fail('session_unavailable');
                 if (rejectDurableReviewReentry()) return fail('selection_busy');
                 return mintDocumentSynthesisSealedEvidencePort(presentedSession);
+            } });
+            ObjectDefineProperty(owner, 'mintDocumentSynthesisSealedEvidenceDisposalPort', { enumerable: false, value(presentedSession: ServerSession) {
+                if (this !== owner) return fail('session_unavailable');
+                if (rejectDurableReviewReentry()) return fail('selection_busy');
+                return mintDocumentSynthesisSealedEvidenceDisposalPort(presentedSession);
             } });
             ObjectDefineProperty(owner, 'mintDocumentSynthesisExecutionCapsulePort', { enumerable: false, value(presentedSession: ServerSession) {
                 if (this !== owner) return fail('session_unavailable');
