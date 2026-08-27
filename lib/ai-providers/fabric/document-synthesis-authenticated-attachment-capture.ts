@@ -14,6 +14,7 @@ import type {
     DocumentSynthesisAttachmentIngestGrant,
     DocumentSynthesisAttachmentCapturePort,
     DocumentSynthesisProjectionEvidenceCapability,
+    DocumentSynthesisSourceSetSealCapability,
 } from '../../security/server-session-projection-owner';
 
 type Currentness = Readonly<{ documentSourceRef: string; documentRevision: number; documentFreshnessEpoch: number }>;
@@ -23,15 +24,19 @@ type CaptureRecord = Readonly<{
     attachmentCapturePort: DocumentSynthesisAttachmentCapturePort;
     attachmentCaptureCapability: DocumentSynthesisAttachmentCaptureCapability;
 }>;
-type ProjectionRecord = Readonly<{ selected: true; scope: 'document_synthesis_attachment_projection'; evidence: DocumentSynthesisProjectionEvidenceCapability }>;
+type ProjectionRecord = Readonly<{ selected: true; scope: 'document_synthesis_attachment_projection'; evidence: DocumentSynthesisProjectionEvidenceCapability;
+    attachmentCapturePort: DocumentSynthesisAttachmentCapturePort }>;
+type SourceSetSealRecord = Readonly<{ selected: true; scope: 'document_synthesis_attachment_source_set_seal'; seal: DocumentSynthesisSourceSetSealCapability }>;
 type PreparedProjectionPublication = Readonly<{ projectionHandle: string; state: ProjectionRecord; result: ProjectionResult }>;
-type RecordState = CaptureRecord | ProjectionRecord;
+type PreparedSourceSetSealPublication = Readonly<{ sourceSetSealHandle: string; state: SourceSetSealRecord; result: SourceSetSealResult }>;
+type RecordState = CaptureRecord | ProjectionRecord | SourceSetSealRecord;
 type Broker = { records: Map<string, RecordState>; dispose: () => void; publish: (handle: string, state: RecordState) => boolean };
 type Result = Readonly<{ status: 'available' | 'denied'; code: null | 'input_invalid' | 'unavailable'; captureHandle: string | null; reviewOnly: true; writesPerformed: 0; applyPolicy: 'none' }>;
 type ProjectionResult = Readonly<{ status: 'available' | 'denied'; code: null | 'input_invalid' | 'unavailable'; projectionHandle: string | null; reviewOnly: true; writesPerformed: 0; applyPolicy: 'none' }>;
+type SourceSetSealResult = Readonly<{ status: 'available' | 'denied'; code: null | 'input_invalid' | 'unavailable'; sourceSetSealHandle: string | null }>;
 
 const OBJECT = Object.prototype; const KEYS = ['attachmentId'] as const; const PROJECTION_KEYS = ['sourceKind', 'sourceText'] as const; const ROW_KEYS = ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch'] as const;
-const HANDLE = /^dsc_[a-f0-9]{32}$/u; const PROJECTION_HANDLE = /^dsp_[a-f0-9]{32}$/u; const SOURCE_REF = /^[0-9a-f]{64}$/u; const MAX_ID = 256;
+const HANDLE = /^dsc_[a-f0-9]{32}$/u; const PROJECTION_HANDLE = /^dsp_[a-f0-9]{32}$/u; const SOURCE_SET_SEAL_HANDLE = /^dss_[a-f0-9]{32}$/u; const SOURCE_REF = /^[0-9a-f]{64}$/u; const MAX_ID = 256;
 const ObjectCreate = Object.create; const ObjectFreeze = Object.freeze; const ObjectAssign = Object.assign; const ObjectHasOwn = Object.hasOwn;
 const ObjectGetPrototypeOf = Object.getPrototypeOf; const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor; const ObjectGetOwnPropertyDescriptors = Object.getOwnPropertyDescriptors;
 const ReflectOwnKeys = Reflect.ownKeys; const ArrayIsArray = Array.isArray; const NumberIsSafeInteger = Number.isSafeInteger; const Uint8ArrayConstructor = Uint8Array;
@@ -45,12 +50,14 @@ function denied(code: 'input_invalid' | 'unavailable'): Result { return sealed({
 function available(captureHandle: string): Result { return sealed({ status: 'available' as const, code: null, captureHandle, reviewOnly: true as const, writesPerformed: 0 as const, applyPolicy: 'none' as const }); }
 function projectionDenied(code: 'input_invalid' | 'unavailable'): ProjectionResult { return sealed({ status: 'denied' as const, code, projectionHandle: null, reviewOnly: true as const, writesPerformed: 0 as const, applyPolicy: 'none' as const }); }
 function projectionAvailable(projectionHandle: string): ProjectionResult { return sealed({ status: 'available' as const, code: null, projectionHandle, reviewOnly: true as const, writesPerformed: 0 as const, applyPolicy: 'none' as const }); }
+function sourceSetSealDenied(code: 'input_invalid' | 'unavailable'): SourceSetSealResult { return sealed({ status: 'denied' as const, code, sourceSetSealHandle: null }); }
+function sourceSetSealAvailable(sourceSetSealHandle: string): SourceSetSealResult { return sealed({ status: 'available' as const, code: null, sourceSetSealHandle }); }
 function exact(value: unknown, keys: readonly string[]): Record<string, unknown> | null { try { if (typeof value !== 'object' || value === null || IsProxy(value) || ArrayIsArray(value) || ObjectGetPrototypeOf(value) !== OBJECT || ReflectOwnKeys(value).length !== keys.length) return null; const descriptors = ObjectGetOwnPropertyDescriptors(value); const output = ObjectCreate(null) as Record<string, unknown>; for (const key of keys) { const descriptor = ObjectGetOwnPropertyDescriptor(descriptors, key); if (!descriptor || !ObjectHasOwn(descriptor, 'value')) return null; const field = descriptor.value as PropertyDescriptor; if (!field || field.enumerable !== true || !ObjectHasOwn(field, 'value')) return null; output[key] = field.value; } return output; } catch { return null; } }
 function intent(value: unknown): string | null { const id = exact(value, KEYS)?.attachmentId; return typeof id === 'string' && id.length > 0 && id.length <= MAX_ID && id === StringTrim(id) ? id : null; }
 function currentness(value: unknown): Currentness | null { const row = IsPromise(value) ? null : exact(value, ROW_KEYS); if (!row || typeof row.documentSourceRef !== 'string' || !RegExpTest(SOURCE_REF, row.documentSourceRef) || typeof row.documentRevision !== 'number' || !NumberIsSafeInteger(row.documentRevision) || row.documentRevision < 1 || typeof row.documentFreshnessEpoch !== 'number' || !NumberIsSafeInteger(row.documentFreshnessEpoch) || row.documentFreshnessEpoch < 1) return null; return sealed({ documentSourceRef: row.documentSourceRef, documentRevision: row.documentRevision, documentFreshnessEpoch: row.documentFreshnessEpoch }); }
 function ownerCurrentness(value: Currentness): Readonly<{ documentSourceRef: string; documentRevision: number; documentFreshnessEpoch: number }> { return ObjectFreeze({ documentSourceRef: value.documentSourceRef, documentRevision: value.documentRevision, documentFreshnessEpoch: value.documentFreshnessEpoch }); }
 function sameCurrentness(left: Currentness, right: Currentness): boolean { return left.documentSourceRef === right.documentSourceRef && left.documentRevision === right.documentRevision && left.documentFreshnessEpoch === right.documentFreshnessEpoch; }
-function mint(bytes: unknown, prefix: 'dsc_' | 'dsp_'): string | null { if (!(bytes instanceof Uint8ArrayConstructor) || IsProxy(bytes) || bytes.length !== 16) return null; let value = prefix; for (let index = 0; index < 16; index += 1) { const byte = bytes[index]; if (typeof byte !== 'number' || !NumberIsSafeInteger(byte) || byte < 0 || byte > 255) return null; value += '0123456789abcdef'[byte >>> 4]! + '0123456789abcdef'[byte & 15]!; } return RegExpTest(prefix === 'dsc_' ? HANDLE : PROJECTION_HANDLE, value) ? value : null; }
+function mint(bytes: unknown, prefix: 'dsc_' | 'dsp_' | 'dss_'): string | null { if (!(bytes instanceof Uint8ArrayConstructor) || IsProxy(bytes) || bytes.length !== 16) return null; let value = prefix; for (let index = 0; index < 16; index += 1) { const byte = bytes[index]; if (typeof byte !== 'number' || !NumberIsSafeInteger(byte) || byte < 0 || byte > 255) return null; value += '0123456789abcdef'[byte >>> 4]! + '0123456789abcdef'[byte & 15]!; } return RegExpTest(prefix === 'dsc_' ? HANDLE : prefix === 'dsp_' ? PROJECTION_HANDLE : SOURCE_SET_SEAL_HANDLE, value) ? value : null; }
 function projectionCandidate(value: unknown): Readonly<{ sourceKind: 'native_text' | 'ocr_text'; sourceText: string }> | null { const input = exact(value, PROJECTION_KEYS); if (!input) return null; try { const normalized = resolveDocumentSynthesisHostProjection(ObjectFreeze({ sourceKind: input.sourceKind, sourceText: input.sourceText })); return ObjectFreeze({ sourceKind: normalized.sourceKind, sourceText: normalized.sourceText }); } catch { return null; } }
 function revoke(port: DocumentSynthesisAttachmentCapturePort, value: unknown): void { try { port.observeRevocation(value); } catch { /* denial remains terminal */ } }
 
@@ -97,10 +104,45 @@ export async function ingestDocumentSynthesisAuthenticatedAttachmentProjection(c
             if (!evidence) return null;
             const projectionHandle = mint(Entropy(16), 'dsp_');
             if (!projectionHandle) return null;
-            return sealed<PreparedProjectionPublication>({ projectionHandle, state: sealed<ProjectionRecord>({ selected: true, scope: 'document_synthesis_attachment_projection', evidence }), result: projectionAvailable(projectionHandle) });
+            return sealed<PreparedProjectionPublication>({ projectionHandle, state: sealed<ProjectionRecord>({ selected: true, scope: 'document_synthesis_attachment_projection', evidence, attachmentCapturePort: captured!.attachmentCapturePort }), result: projectionAvailable(projectionHandle) });
         });
         if (!prepared) { revoke(captured.attachmentCapturePort, evidence ?? grant ?? captured.attachmentCaptureCapability); return projectionDenied(failureCode); }
         if (!broker.publish(prepared.projectionHandle, prepared.state)) { revoke(captured.attachmentCapturePort, prepared.state.evidence); return projectionDenied('unavailable'); }
         return prepared.result;
     } catch { if (captured) revoke(captured.attachmentCapturePort, evidence ?? grant ?? captured.attachmentCaptureCapability); return projectionDenied('unavailable'); }
+}
+
+/** Fixed server-only A1b2 boundary: burns a projection handle, then publishes an opaque owner-private source-set seal. */
+export async function sealDocumentSynthesisAuthenticatedAttachmentSourceSet(projectionHandle: unknown): Promise<SourceSetSealResult> {
+    if (typeof projectionHandle !== 'string' || !RegExpTest(PROJECTION_HANDLE, projectionHandle)) return sourceSetSealDenied('input_invalid');
+    const unpublished: { seal: DocumentSynthesisSourceSetSealCapability | null; port: DocumentSynthesisAttachmentCapturePort | null } = { seal: null, port: null };
+    try {
+        const context = await acquireAuthenticatedWebSessionProjectionOwnerContext();
+        if (!context) return sourceSetSealDenied('unavailable');
+        const broker = brokerFor(context); const record = mapGet(broker.records, projectionHandle);
+        if (!record || record.scope !== 'document_synthesis_attachment_projection' || !mapDelete(broker.records, projectionHandle)) return sourceSetSealDenied('unavailable');
+        const prepared = context.owner.withLeaseCriticalSection(context.session, (): PreparedSourceSetSealPublication | null => {
+            const seal = record.attachmentCapturePort.sealRetainedProjection(record.evidence);
+            if (!seal) return null;
+            unpublished.seal = seal;
+            unpublished.port = record.attachmentCapturePort;
+            const sourceSetSealHandle = mint(Entropy(16), 'dss_');
+            if (!sourceSetSealHandle) { revoke(record.attachmentCapturePort, seal); unpublished.seal = null; unpublished.port = null; return null; }
+            const value = sealed<PreparedSourceSetSealPublication>({ sourceSetSealHandle,
+                state: sealed<SourceSetSealRecord>({ selected: true, scope: 'document_synthesis_attachment_source_set_seal', seal }),
+                result: sourceSetSealAvailable(sourceSetSealHandle) });
+            return value;
+        });
+        if (!prepared) return sourceSetSealDenied('unavailable');
+        if (!broker.publish(prepared.sourceSetSealHandle, prepared.state)) {
+            revoke(record.attachmentCapturePort, prepared.state.seal); unpublished.seal = null; unpublished.port = null;
+            return sourceSetSealDenied('unavailable');
+        }
+        unpublished.seal = null;
+        unpublished.port = null;
+        return prepared.result;
+    } catch {
+        if (unpublished.seal && unpublished.port) revoke(unpublished.port, unpublished.seal);
+        return sourceSetSealDenied('unavailable');
+    }
 }

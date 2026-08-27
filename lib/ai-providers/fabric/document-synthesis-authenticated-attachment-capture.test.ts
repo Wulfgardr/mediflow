@@ -20,11 +20,12 @@ const NODE_24 = [process.env.MEDIFLOW_STRIP_TYPES_NODE, process.execPath, path.j
 
 if (!NODE_24) throw new Error('Document Synthesis attachment capture tests require Node 24.19.0.');
 
-test('exports only the fixed capture and projection-ingest boundaries with no production composition', () => {
+test('exports only the fixed capture, projection-ingest, and owner-seal boundaries with no production composition', () => {
     const source = readFileSync(TARGET, 'utf8');
-    assert.equal((source.match(/^export /gmu) ?? []).length, 2);
+    assert.equal((source.match(/^export /gmu) ?? []).length, 3);
     assert.match(source, /export async function captureDocumentSynthesisAuthenticatedAttachment/u);
     assert.match(source, /export async function ingestDocumentSynthesisAuthenticatedAttachmentProjection/u);
+    assert.match(source, /export async function sealDocumentSynthesisAuthenticatedAttachmentSourceSet/u);
     assert.doesNotMatch(source, /createDocumentSynthesisAuthenticatedAttachmentCapture|Sources|acquireContext:|lookup\(|entropy:|export (?:type|interface|const|class|\{)/u);
     assert.match(source, /withLeaseCriticalSection[\s\S]*?INNER JOIN patients_to_ambulatories/u);
     assert.doesNotMatch(source, /production\.ts/u);
@@ -50,7 +51,7 @@ const makeContext = (patientId) => {
 const primary = makeContext('patient.synthetic.capture');
 const other = makeContext('patient.synthetic.other');
 const poisoned = makeContext('patient.synthetic.capture');
-const contexts = [primary, primary, primary, primary, other, other, other, poisoned];
+const contexts = [primary, primary, primary, primary, other, other, other, other, poisoned];
 let calls = 0;
 module.exports = {
   acquireAuthenticatedWebSessionProjectionOwnerContext: async () => {
@@ -88,7 +89,7 @@ dbServer.run(sql.raw("INSERT INTO ambulatories (id, name, type) VALUES ('ambulat
 dbServer.run(sql.raw("INSERT INTO patients (id, first_name, last_name, tax_code) VALUES ('patient.synthetic.capture', 'First', 'Synthetic', 'CAPTUREFIRST00001'), ('patient.synthetic.other', 'Other', 'Synthetic', 'CAPTUREOTHER00002')"));
 dbServer.run(sql.raw("INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES ('patient.synthetic.capture', 'ambulatory.synthetic.capture'), ('patient.synthetic.other', 'ambulatory.synthetic.capture')"));
 dbServer.run(sql.raw("INSERT INTO attachments (id, patient_id, name, type, size, path, document_source_ref, document_revision, document_freshness_epoch) VALUES ('attachment.synthetic.capture', 'patient.synthetic.capture', 'capture.pdf', 'application/pdf', 1, 'capture.pdf', '${'a'.repeat(64)}', 7, 11), ('attachment.synthetic.other', 'patient.synthetic.other', 'other.pdf', 'application/pdf', 1, 'other.pdf', '${'b'.repeat(64)}', 5, 13)"));
-const { captureDocumentSynthesisAuthenticatedAttachment: capture, ingestDocumentSynthesisAuthenticatedAttachmentProjection: ingest } = require(target);
+const { captureDocumentSynthesisAuthenticatedAttachment: capture, ingestDocumentSynthesisAuthenticatedAttachmentProjection: ingest, sealDocumentSynthesisAuthenticatedAttachmentSourceSet: seal } = require(target);
 const first = await capture({ attachmentId: 'attachment.synthetic.capture' });
 assert.equal(first.status, 'available');
 assert.equal(first.code, null);
@@ -97,8 +98,13 @@ assert.deepEqual({ reviewOnly: first.reviewOnly, writesPerformed: first.writesPe
 const projection = await ingest(first.captureHandle, { sourceKind: 'native_text', sourceText: 'Synthetic projection' });
 assert.deepEqual({ ...projection, projectionHandle: typeof projection.projectionHandle === 'string' ? 'opaque' : projection.projectionHandle }, { status: 'available', code: null, projectionHandle: 'opaque', reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
 assert.match(projection.projectionHandle, /^dsp_[0-9a-f]{32}$/u); assert.equal(Object.getPrototypeOf(projection), null); assert.equal(Object.isFrozen(projection), true);
+const sourceSetSeal = await seal(projection.projectionHandle);
+assert.deepEqual({ ...sourceSetSeal, sourceSetSealHandle: typeof sourceSetSeal.sourceSetSealHandle === 'string' ? 'opaque' : sourceSetSeal.sourceSetSealHandle }, { status: 'available', code: null, sourceSetSealHandle: 'opaque' });
+assert.match(sourceSetSeal.sourceSetSealHandle, /^dss_[0-9a-f]{32}$/u); assert.equal(Object.getPrototypeOf(sourceSetSeal), null); assert.equal(Object.isFrozen(sourceSetSeal), true);
+assert.deepEqual({ ...await seal(projection.projectionHandle) }, { status: 'denied', code: 'unavailable', sourceSetSealHandle: null });
+assert.deepEqual({ ...await seal(sourceSetSeal.sourceSetSealHandle) }, { status: 'denied', code: 'input_invalid', sourceSetSealHandle: null });
 assert.deepEqual({ ...await ingest(first.captureHandle, { sourceKind: 'native_text', sourceText: 'replay' }) }, { status: 'denied', code: 'unavailable', projectionHandle: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
-assert.deepEqual({ ...await ingest(projection.projectionHandle, { sourceKind: 'native_text', sourceText: 'wrong stage' }) }, { status: 'denied', code: 'input_invalid', projectionHandle: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
+assert.deepEqual({ ...await ingest(sourceSetSeal.sourceSetSealHandle, { sourceKind: 'native_text', sourceText: 'wrong stage' }) }, { status: 'denied', code: 'input_invalid', projectionHandle: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
 const replay = await capture({ attachmentId: 'attachment.synthetic.capture' });
 assert.deepEqual({ ...replay }, { status: 'denied', code: 'unavailable', captureHandle: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
 const invalidCapture = await capture({ attachmentId: 'attachment.synthetic.other' }); assert.match(invalidCapture.captureHandle, /^dsc_[0-9a-f]{32}$/u);
@@ -210,7 +216,8 @@ test('captures every runtime intrinsic before the boundary is called', () => {
 
 test('burns the capture before projection observation and reads currentness once in the ingest P4 turn', () => {
     const source = readFileSync(TARGET, 'utf8');
-    const ingest = source.slice(source.indexOf('export async function ingestDocumentSynthesisAuthenticatedAttachmentProjection'));
+    const ingest = source.slice(source.indexOf('export async function ingestDocumentSynthesisAuthenticatedAttachmentProjection'),
+        source.indexOf('export async function sealDocumentSynthesisAuthenticatedAttachmentSourceSet'));
 
     assert.ok(ingest.indexOf('mapDelete(broker.records, captureHandle)') < ingest.indexOf('projectionCandidate(projection)'));
     assert.equal((ingest.match(/DbGet\(/gu) ?? []).length, 1);

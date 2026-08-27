@@ -1,7 +1,7 @@
 /* @Codex */
 import 'server-only';
 
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { types } from 'node:util';
 import { createTypedProjectionBroker, ProjectionBrokerError, type TypedProjectionBrokerConfig } from '../typed-projection-broker';
 import { bindProjectionBrokerToServerSession } from './server-session-projection-broker';
@@ -11,6 +11,7 @@ import {
     createDocumentSynthesisSourceLineageState,
     observeDocumentSynthesisRevocation,
 } from './document-synthesis-source-lineage-u64';
+import { digestDocumentSynthesisSourceSet } from './document-synthesis-source-set-digest';
 
 type TypedBroker = ReturnType<typeof createTypedProjectionBroker>;
 type ActiveBinding = {
@@ -43,6 +44,11 @@ const NumberIsSafeInteger = Number.isSafeInteger;
 const DateNow = Date.now;
 const DateConstructor = Date;
 const Uint8ArrayConstructor = Uint8Array;
+const TextEncoderConstructor = TextEncoder;
+const textEncoder = new TextEncoderConstructor();
+const textEncoderEncode = TextEncoder.prototype.encode;
+const CreateHash = createHash;
+const BigIntConstructor = BigInt;
 const dateToISOString = Date.prototype.toISOString;
 const numberToString = Number.prototype.toString;
 const stringPadStart = String.prototype.padStart;
@@ -66,6 +72,7 @@ const isProxy = types.isProxy;
 const getOwnPropertyDescriptor = ObjectGetOwnPropertyDescriptor;
 const weakMapGet = WeakMap.prototype.get;
 const weakMapSet = WeakMap.prototype.set;
+const weakMapDelete = WeakMap.prototype.delete;
 const getPrototypeOf = ObjectGetPrototypeOf;
 
 function addOwnerIdentity(registry: WeakSet<object>, owner: object): void {
@@ -177,9 +184,11 @@ export type DocumentSynthesisSourceLineagePort = Readonly<{
 declare const documentSynthesisAttachmentCaptureRef: unique symbol;
 declare const documentSynthesisAttachmentIngestGrantRef: unique symbol;
 declare const documentSynthesisProjectionEvidenceRef: unique symbol;
+declare const documentSynthesisSourceSetSealRef: unique symbol;
 export type DocumentSynthesisAttachmentCaptureCapability = Readonly<{ readonly [documentSynthesisAttachmentCaptureRef]?: never }>;
 export type DocumentSynthesisAttachmentIngestGrant = Readonly<{ readonly [documentSynthesisAttachmentIngestGrantRef]?: never }>;
 export type DocumentSynthesisProjectionEvidenceCapability = Readonly<{ readonly [documentSynthesisProjectionEvidenceRef]?: never }>;
+export type DocumentSynthesisSourceSetSealCapability = Readonly<{ readonly [documentSynthesisSourceSetSealRef]?: never }>;
 export type DocumentSynthesisAttachmentCurrentness = Readonly<{
     documentSourceRef: string; documentRevision: number; documentFreshnessEpoch: number;
 }>;
@@ -191,6 +200,7 @@ export type DocumentSynthesisAttachmentCapturePort = Readonly<{
         grant: DocumentSynthesisAttachmentIngestGrant; observedCurrentness: DocumentSynthesisAttachmentCurrentness;
         projection: DocumentSynthesisProjectionCandidate;
     }>): DocumentSynthesisProjectionEvidenceCapability | null;
+    sealRetainedProjection(value: unknown): DocumentSynthesisSourceSetSealCapability | null;
     observeRevocation(value: unknown): boolean;
 }>;
 type LeaseCommitSnapshot<Ref extends object> = Readonly<{
@@ -689,12 +699,13 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 requireCurrentSession(presentedSession);
                 if (selection !== boundSelection || epoch !== boundSelectionEpoch || reviewContextEpoch !== boundReviewContextEpoch
                     || leasePortOperationPoisoned) return fail('stale_selection');
-                type Entry = { currentness: DocumentSynthesisAttachmentCurrentness; currentnessGeneration: number; capture: object; grant: object | null; evidence: object | null;
+                type Entry = { currentness: DocumentSynthesisAttachmentCurrentness; currentnessGeneration: number; capture: object; grant: object | null; evidence: object | null; seal: object | null;
                     projection: DocumentSynthesisProjectionCandidate | null; sourceSetEpoch: bigint | null; revocationGeneration: bigint | null;
+                    sourceSetDigestSha256: readonly number[] | null;
                     revocationState: ReturnType<typeof createDocumentSynthesisSourceLineageState>; revocationTarget: object;
-                    state: 'captured' | 'ingested' | 'retained' | 'revoked'; };
+                    state: 'captured' | 'ingested' | 'retained' | 'sealed' | 'revoked'; };
                 const captures = new WeakSetConstructor<object>(); const grants = new WeakSetConstructor<object>();
-                const evidence = new WeakSetConstructor<object>(); const records = new WeakMapConstructor<object, Entry>();
+                const evidence = new WeakSetConstructor<object>(); const seals = new WeakSetConstructor<object>(); const records = new WeakMapConstructor<object, Entry>();
                 const current = () => {
                     if (terminal || presentedSession !== session || session.authChannel !== 'web' || selection !== boundSelection || epoch !== boundSelectionEpoch
                         || reviewContextEpoch !== boundReviewContextEpoch || getSession(session.id) !== session) return false;
@@ -752,8 +763,8 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                             setMapValue(documentSynthesisAttachmentCurrentness, observed.documentSourceRef, state); }
                         if (leasePortOperationPoisoned || state.terminal) return null;
                         const capture = opaque(); const revocationTarget = opaque();
-                        const entry: Entry = { currentness: observed, currentnessGeneration: state.generation, capture, grant: null, evidence: null, projection: null,
-                            sourceSetEpoch: null, revocationGeneration: null,
+                        const entry: Entry = { currentness: observed, currentnessGeneration: state.generation, capture, grant: null, evidence: null, seal: null, projection: null,
+                            sourceSetEpoch: null, revocationGeneration: null, sourceSetDigestSha256: null,
                             revocationState: createDocumentSynthesisSourceLineageState(), revocationTarget, state: 'captured' };
                         addOwnerIdentity(captures, capture); applyIntrinsic(weakMapSet, records, [capture, entry]);
                         return capture as DocumentSynthesisAttachmentCaptureCapability;
@@ -793,12 +804,46 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         return retained as DocumentSynthesisProjectionEvidenceCapability;
                     } finally { endLeasePortOperation(); }
                 } });
+                ObjectDefineProperty(port, 'sealRetainedProjection', { enumerable: true, value(this: unknown, value: unknown) {
+                    if (this !== port || !beginLeasePortOperation()) return null;
+                    try {
+                        const entry = entryFor(value);
+                        if (!entry || !hasOwnerIdentity(evidence, value as object) || entry.state !== 'retained' || entry.evidence !== value
+                            || !current() || leasePortOperationPoisoned || !currentnessIsLive(entry) || documentSynthesisLineageTerminal
+                            || entry.sourceSetEpoch === null || entry.revocationGeneration === null) { if (entry) burnEntry(entry); return null; }
+                        const sourceSetEpoch = entry.sourceSetEpoch; const revocationGeneration = entry.revocationGeneration;
+                        const seal = opaque();
+                        entry.state = 'sealed'; entry.seal = seal; entry.evidence = null;
+                        addOwnerIdentity(seals, seal); applyIntrinsic(weakMapSet, records, [seal, entry]);
+                        applyIntrinsic(weakMapDelete, records, [value as object]);
+                        const projection = entry.projection;
+                        entry.projection = null; entry.sourceSetEpoch = null; entry.revocationGeneration = null;
+                        if (!projection) { burnEntry(entry); return null; }
+                        const projectionBytes = applyIntrinsic(textEncoderEncode, textEncoder, [projection.sourceText]) as Uint8Array;
+                        const projectionDigest = CreateHash('sha256').update(projectionBytes).digest();
+                        const raw32: number[] = [];
+                        for (let index = 0; index < projectionDigest.length; index += 1) raw32[index] = projectionDigest[index]!;
+                        const sourceSet = ObjectFreeze({ sources: ObjectFreeze([ObjectFreeze({ label: 'S1', documentSourceRef: entry.currentness.documentSourceRef,
+                            documentRevision: BigIntConstructor(entry.currentness.documentRevision), documentFreshnessEpoch: BigIntConstructor(entry.currentness.documentFreshnessEpoch),
+                            sourceByteLength: projectionBytes.length, projectionDigestSha256: ObjectFreeze(raw32) })]), sourceSetEpoch, revocationGeneration });
+                        const digest = digestDocumentSynthesisSourceSet(sourceSet);
+                        if (digest.status !== 'available' || !current() || leasePortOperationPoisoned || !currentnessIsLive(entry)
+                            || documentSynthesisLineageTerminal || entry.state !== 'sealed' || entry.seal !== seal) { burnEntry(entry); return null; }
+                        entry.sourceSetDigestSha256 = digest.sourceSetDigestSha256;
+                        return seal as DocumentSynthesisSourceSetSealCapability;
+                    } catch {
+                        const entry = entryFor(value);
+                        if (entry) burnEntry(entry);
+                        return null;
+                    } finally { endLeasePortOperation(); }
+                } });
                 ObjectDefineProperty(port, 'observeRevocation', { enumerable: true, value(this: unknown, value: unknown) {
                     if (this !== port || !beginLeasePortOperation()) return false;
                     try {
                         const entry = entryFor(value);
                         if (!entry || !current() || leasePortOperationPoisoned || (!hasOwnerIdentity(captures, value as object)
-                            && !hasOwnerIdentity(grants, value as object) && !hasOwnerIdentity(evidence, value as object))) return false;
+                            && !hasOwnerIdentity(grants, value as object) && !hasOwnerIdentity(evidence, value as object)
+                            && !hasOwnerIdentity(seals, value as object))) return false;
                         return revokeEntry(entry);
                     } finally { endLeasePortOperation(); }
                 } });
