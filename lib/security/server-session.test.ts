@@ -383,6 +383,50 @@ test('the armed-cell lifecycle guard burns reentrant and apply-then-throw prepar
     }
 });
 
+test('armed Web session ID lookup revalidates after hostile clock reentry', async (t) => {
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const cached = nodeRequire.cache[modulePath]; const originalNow = Date.now; let trigger = false; let nested = () => undefined;
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    Date.now = () => { if (trigger) { trigger = false; nested(); } return 1_000; };
+    let isolated: typeof import('./server-session');
+    try { delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session'); }
+    finally { Date.now = originalNow; }
+    try {
+        for (const operation of ['tombstone', 'delete', 'clear', 'arm'] as const) {
+            const prepared = isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({
+                id: `clock-${operation}`, username: SYNTHETIC_USERNAME, role: 'clinician',
+            }));
+            const port = isolated.armPreparedWebServerSession(prepared); assert.ok(port);
+            const sessionId = isolated.getArmedWebServerSessionId(port); assert.ok(sessionId);
+            const nestedPrepared = operation === 'arm' ? isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({
+                id: 'clock-nested-arm', username: SYNTHETIC_USERNAME, role: 'clinician',
+            })) : null;
+            if (operation === 'arm') assert.ok(nestedPrepared);
+            let nestedResult: unknown;
+            nested = () => {
+                if (operation === 'tombstone') nestedResult = isolated.tombstoneArmedWebServerSession(port);
+                else if (operation === 'delete') nestedResult = isolated.deleteSession(sessionId);
+                else if (operation === 'clear') nestedResult = isolated.clearAllSessions();
+                else nestedResult = isolated.armPreparedWebServerSession(nestedPrepared);
+            };
+            trigger = true;
+
+            assert.equal(isolated.getArmedWebServerSessionId(port), null);
+            assert.equal(trigger, false);
+            assert.equal(operation === 'arm' ? nestedResult : isolated.getArmedWebServerSessionId(port), null);
+            assert.equal(isolated.tombstoneArmedWebServerSession(port), false);
+            if (nestedPrepared) assert.equal(isolated.commitPreparedWebServerSession(nestedPrepared), false);
+            await new Promise<void>((resolve) => setImmediate(resolve));
+            assert.equal(isolated.getArmedWebServerSessionId(port), null);
+        }
+        assert.deepEqual(unhandled, []);
+    } finally {
+        isolated.clearAllSessions();
+        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
+    }
+});
+
 test('prepared Web session abort, deletion, user invalidation, clear, and hostile copies publish nothing', () => {
     const aborted = prepareStagedWebServerSession(stageWebServerSession({ id: 'prepared-abort', username: SYNTHETIC_USERNAME, role: 'clinician' }));
     const deleted = prepareStagedWebServerSession(stageWebServerSession({ id: 'prepared-delete', username: SYNTHETIC_USERNAME, role: 'clinician' }));
