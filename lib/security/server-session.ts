@@ -724,6 +724,8 @@ export function retireActiveWebServerSession(sessionId: unknown, reason: unknown
         if (webSessionCellLifecyclePoisoned || !exact) {
             retireArmedWebSessionCellRecord(cell);
             abortPreparedAuthControlRetirement(preparedRetirement);
+            webSessionCellLifecyclePoisoned = false;
+            webSessionCellLifecycle = 'idle';
             return false;
         }
         cell.retirement = preparedRetirement;
@@ -733,21 +735,29 @@ export function retireActiveWebServerSession(sessionId: unknown, reason: unknown
             cell.state = 'RETIRED';
             abortPreparedAuthControlRetirement(preparedRetirement);
             cell.retirement = null;
+            webSessionCellLifecyclePoisoned = false;
+            webSessionCellLifecycle = 'idle';
             return false;
         }
-        if (commitPreparedAuthControlRetirement(preparedRetirement) === 2) {
-            cell.state = 'RETIRED';
-            return true;
-        }
-        cell.state = 'RETIRED';
-        cell.retirement = null;
-        return false;
     } catch {
         if (cell.state === 'ACTIVE' || cell.state === 'ARMED_RETIRE') cell.state = 'RETIRED';
         try { abortPreparedAuthControlRetirement(preparedRetirement); } catch { /* terminal denial remains */ }
         cell.retirement = null;
+        webSessionCellLifecyclePoisoned = false;
+        webSessionCellLifecycle = 'idle';
         return false;
-    } finally { endWebSessionCellLifecycle(); }
+    }
+    const retirementResult = commitPreparedAuthControlRetirement(preparedRetirement);
+    if (retirementResult === 2) {
+        cell.state = 'RETIRED';
+        webSessionCellLifecyclePoisoned = false;
+        webSessionCellLifecycle = 'idle';
+        return true;
+    }
+    cell.state = 'RETIRED';
+    webSessionCellLifecyclePoisoned = false;
+    webSessionCellLifecycle = 'idle';
+    return false;
 }
 
 /** Canonically publishes a prepared session only for server-local compatibility callers. */
