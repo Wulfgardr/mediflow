@@ -42,7 +42,7 @@ test('uses the fixed server boundary with an isolated database, session, and sel
     try {
         writeFileSync(mockAuth, `
 const { createSession, deleteSession } = require(${JSON.stringify(path.join(ROOT, 'lib/security/server-session.ts'))});
-const { createServerSessionProjectionOwnerRegistry } = require(${JSON.stringify(path.join(ROOT, 'lib/security/server-session-projection-owner.ts'))});
+const { createServerSessionProjectionOwnerRegistry, ServerSessionProjectionOwnerError } = require(${JSON.stringify(path.join(ROOT, 'lib/security/server-session-projection-owner.ts'))});
 const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze({ ...pair }) });
 const makeContext = (patientId) => {
   const session = createSession({ id: 'user.synthetic.capture', username: ['cap', 'ture'].join(''), role: 'admin' }, 'web');
@@ -55,6 +55,20 @@ const other = makeContext('patient.synthetic.other');
 const poisoned = makeContext('patient.synthetic.capture');
 const disposable = makeContext('patient.synthetic.capture');
 const reselected = makeContext('patient.synthetic.capture');
+const recovery = makeContext('patient.synthetic.capture');
+const makeFencedContext = () => { const base = makeContext('patient.synthetic.capture'); const owner = Object.freeze({
+  snapshotSelectionEpoch: (session) => base.owner.snapshotSelectionEpoch(session),
+  snapshotReviewContextEpoch: (session) => base.owner.snapshotReviewContextEpoch(session) + (process.env.FENCE_EXCHANGE === 'review' ? 1 : 0),
+  mintDocumentSynthesisAttachmentCapturePort: (session) => base.owner.mintDocumentSynthesisAttachmentCapturePort(session),
+  mintDocumentSynthesisSealedEvidencePort: (session) => base.owner.mintDocumentSynthesisSealedEvidencePort(session),
+  withLeaseCriticalSection(session, callback) {
+    if (process.env.FENCE_EXCHANGE === 'expiry') throw new ServerSessionProjectionOwnerError('lease_expired');
+    if (process.env.FENCE_EXCHANGE === 'throw') throw new Error('synthetic P4 denial');
+    if (process.env.FENCE_EXCHANGE === 'reentry') { globalThis.__a3a3FenceInner = globalThis.__a3a3FenceExchange(globalThis.__a3a3FenceHandle); throw new Error('synthetic P4 reentry denial'); }
+    return base.owner.withLeaseCriticalSection(session, callback);
+  },
+}); return Object.freeze({ session: base.session, owner }); };
+const fenced = Object.freeze({ review: makeFencedContext(), expiry: makeFencedContext(), throw: makeFencedContext(), reentry: makeFencedContext() });
 const contexts = [primary, primary, primary, primary, primary, other, primary, primary, primary, primary,
   other, other, other, other, other, null, null, null, null, null,
   disposable, disposable, disposable, disposable, disposable];
@@ -71,6 +85,8 @@ module.exports = {
       if (process.env.DISPOSE_CONTEXT === '1' && !disposed) { disposed = true; disposable.owner.dispose(); deleteSession(disposable.session.id); }
       return disposable;
     }
+    if (process.env.FORCE_CONTEXT === 'recovery') return recovery;
+    if (process.env.FORCE_CONTEXT?.startsWith('fenced_')) return fenced[process.env.FORCE_CONTEXT.slice(7)];
     const context = contexts[calls++] ?? null;
     return context;
   },
@@ -106,6 +122,7 @@ dbServer.run(sql.raw("INSERT INTO patients (id, first_name, last_name, tax_code)
 dbServer.run(sql.raw("INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES ('patient.synthetic.capture', 'ambulatory.synthetic.capture'), ('patient.synthetic.other', 'ambulatory.synthetic.capture')"));
 dbServer.run(sql.raw("INSERT INTO attachments (id, patient_id, name, type, size, path, document_source_ref, document_revision, document_freshness_epoch) VALUES ('attachment.synthetic.capture', 'patient.synthetic.capture', 'capture.pdf', 'application/pdf', 1, 'capture.pdf', '${'a'.repeat(64)}', 7, 11), ('attachment.synthetic.other', 'patient.synthetic.other', 'other.pdf', 'application/pdf', 1, 'other.pdf', '${'b'.repeat(64)}', 5, 13)"));
 const { captureDocumentSynthesisAuthenticatedAttachment: capture, ingestDocumentSynthesisAuthenticatedAttachmentProjection: ingest, sealDocumentSynthesisAuthenticatedAttachmentSourceSet: seal, handoffDocumentSynthesisAuthenticatedAttachmentSourceSet: handoff, exchangeDocumentSynthesisAuthenticatedAttachmentHandoff: exchange } = require(target);
+const unhandled = []; process.on('unhandledRejection', (reason) => unhandled.push(reason));
 const first = await capture({ attachmentId: 'attachment.synthetic.capture' });
 assert.equal(first.status, 'available');
 assert.equal(first.code, null);
@@ -164,12 +181,25 @@ process.env.FORCE_CONTEXT = 'reselected';
 const reselectedCapture = await capture({ attachmentId: 'attachment.synthetic.capture' }); const reselectedProjection = await ingest(reselectedCapture.captureHandle, { sourceKind: 'native_text', sourceText: 'Synthetic reselected projection' });
 const reselectedSeal = await seal(reselectedProjection.projectionHandle); const reselectedHandoff = await handoff(reselectedSeal.sourceSetSealHandle); assert.equal(reselectedHandoff.status, 'available');
 process.env.RESELECT_CONTEXT = '1'; assert.equal(await exchange(reselectedHandoff.handoffHandle), null, 'reselection denies the old handoff');
+assert.equal(await exchange(reselectedHandoff.handoffHandle), null, 'reselection denial burns the old handoff');
 process.env.FORCE_CONTEXT = 'disposable'; delete process.env.RESELECT_CONTEXT;
 const disposableCapture = await capture({ attachmentId: 'attachment.synthetic.capture' }); assert.equal(disposableCapture.status, 'available');
 const disposableProjection = await ingest(disposableCapture.captureHandle, { sourceKind: 'native_text', sourceText: 'Synthetic disposable projection' }); assert.equal(disposableProjection.status, 'available');
 const disposableSeal = await seal(disposableProjection.projectionHandle); assert.equal(disposableSeal.status, 'available');
 const disposableHandoff = await handoff(disposableSeal.sourceSetSealHandle); assert.equal(disposableHandoff.status, 'available');
 process.env.DISPOSE_CONTEXT = '1'; assert.equal(await exchange(disposableHandoff.handoffHandle), null, 'session disposal clears the handoff broker');
+process.env.FORCE_CONTEXT = 'fenced'; delete process.env.DISPOSE_CONTEXT;
+const makeFencedHandoff = async (label) => { const captured = await capture({ attachmentId: 'attachment.synthetic.capture' }); const projected = await ingest(captured.captureHandle, { sourceKind: 'native_text', sourceText: label }); const sealed = await seal(projected.projectionHandle); return handoff(sealed.sourceSetSealHandle); };
+for (const mode of ['review', 'expiry', 'throw', 'reentry']) {
+  process.env.FORCE_CONTEXT = 'fenced_' + mode;
+  const candidate = await makeFencedHandoff('Synthetic fenced ' + mode); assert.equal(candidate.status, 'available', 'handoff setup for ' + mode);
+  globalThis.__a3a3FenceExchange = exchange; globalThis.__a3a3FenceHandle = candidate.handoffHandle; process.env.FENCE_EXCHANGE = mode;
+  assert.equal(await exchange(candidate.handoffHandle), null); if (mode === 'reentry') assert.equal(await globalThis.__a3a3FenceInner, null);
+  delete process.env.FENCE_EXCHANGE; assert.equal(await exchange(candidate.handoffHandle), null, 'a denied authentic handoff stays burned');
+}
+process.env.FORCE_CONTEXT = 'recovery'; const independent = await capture({ attachmentId: 'attachment.synthetic.capture' }); const independentProjection = await ingest(independent.captureHandle, { sourceKind: 'native_text', sourceText: 'Synthetic independent recovery' });
+const independentSeal = await seal(independentProjection.projectionHandle); const independentHandoff = await handoff(independentSeal.sourceSetSealHandle); assert.ok(await exchange(independentHandoff.handoffHandle), 'an independent fresh handoff remains usable');
+await new Promise((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
 })().catch((error) => { console.error(error); process.exitCode = 1; });
 `);
         const result = spawnSync(NODE_24, ['--experimental-strip-types', '--import', RUNNER, worker], {
@@ -415,8 +445,8 @@ test('validates the session-scoped A3a3 record, burns dsh, then tail-calls the o
     const source = readFileSync(TARGET, 'utf8');
     const exchange = source.slice(source.indexOf('export async function exchangeDocumentSynthesisAuthenticatedAttachmentHandoff'));
     assert.equal((exchange.match(/intakeDocumentSynthesisA3a2SealedEvidence\(/gu) ?? []).length, 1);
-    assert.ok(exchange.indexOf("record.scope !== 'document_synthesis_attachment_handoff'") < exchange.indexOf('withLeaseCriticalSection'));
-    assert.ok(exchange.indexOf('withLeaseCriticalSection') < exchange.indexOf('mapDelete(broker.records, handoffHandle)'));
+    assert.ok(exchange.indexOf("record.scope !== 'document_synthesis_attachment_handoff'") < exchange.indexOf('mapDelete(broker.records, handoffHandle)'));
+    assert.ok(exchange.indexOf('mapDelete(broker.records, handoffHandle)') < exchange.indexOf('withLeaseCriticalSection'));
     assert.ok(exchange.indexOf('mapDelete(broker.records, handoffHandle)') < exchange.indexOf('return intakeDocumentSynthesisA3a2SealedEvidence(record.evidence)'));
     assert.doesNotMatch(exchange, /providerProjection|sourceSetDigestSha256|resolver|legacy|factory|setTimeout|setImmediate|queueMicrotask/u);
 });
