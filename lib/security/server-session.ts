@@ -1224,6 +1224,59 @@ export function clearAllSessions(): void {
     }
 }
 
+function retireServerSessionForFixedCause(
+    sessionId: unknown,
+    webReason: WebServerSessionRetirementReason,
+    legacyReason: ServerSessionDisposalReason,
+    requireExpired: boolean,
+): WebServerSessionRetirementCleanupReceipt {
+    if (typeof sessionId !== 'string' || !sessionId) return deniedWebSessionRetirementCleanupReceipt;
+
+    // P3 ownership is authoritative even when a legacy Map entry collides with it.
+    if (armedWebSessionCellsById[sessionId]) {
+        return dispatchActiveWebServerSessionRetirement(sessionId, webReason);
+    }
+
+    try {
+        const session = getMapValue(sessions, sessionId);
+        if (!session) return deniedWebSessionRetirementCleanupReceipt;
+        if (session.authChannel === 'system') return deniedWebSessionRetirementCleanupReceipt;
+        if (requireExpired) {
+            const now = DateNow();
+            if (getMapValue(sessions, sessionId) !== session || session.expiresAt > now) {
+                return deniedWebSessionRetirementCleanupReceipt;
+            }
+        }
+        const result = terminateSession(sessionId, legacyReason);
+        if (!result.authorityAbsent || result.cleanupOutcome === 'failed') {
+            return failedWebSessionRetirementCleanupReceipt;
+        }
+        return result.cleanupOutcome === 'completed'
+            ? completedWebSessionRetirementCleanupReceipt
+            : deniedWebSessionRetirementCleanupReceipt;
+    } catch {
+        return failedWebSessionRetirementCleanupReceipt;
+    }
+}
+
+/** Retires one exact Web or legacy session for a server-owned logout/delete cause. */
+/* @Codex */
+export function retireServerSessionForLogout(sessionId: unknown): WebServerSessionRetirementCleanupReceipt {
+    return retireServerSessionForFixedCause(sessionId, 'delete', 'session_deleted', false);
+}
+
+/** Retires one exact Web or legacy session for a server-owned lock/dispose cause. */
+/* @Codex */
+export function retireServerSessionForApplicationLock(sessionId: unknown): WebServerSessionRetirementCleanupReceipt {
+    return retireServerSessionForFixedCause(sessionId, 'lock', 'application_locked', false);
+}
+
+/** Retires one exact Web or legacy session only after server-owned expiry observation. */
+/* @Codex */
+export function retireExpiredServerSession(sessionId: unknown): WebServerSessionRetirementCleanupReceipt {
+    return retireServerSessionForFixedCause(sessionId, 'expired', 'session_expired', true);
+}
+
 /** Compacts one exact RETIRED Web cell into its terminal owner-private tombstone. */
 /* @Codex */
 export function cleanupRetiredWebServerSession(
