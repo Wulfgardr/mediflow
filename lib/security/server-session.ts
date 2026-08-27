@@ -134,6 +134,8 @@ declare const preparedWebSessionCapability: unique symbol;
 export type PreparedWebServerSession = { readonly [preparedWebSessionCapability]: never };
 declare const armedWebSessionPort: unique symbol;
 export type ArmedWebServerSessionPort = { readonly [armedWebSessionPort]: never };
+declare const activeWebSessionResourcePort: unique symbol;
+export type ActiveWebSessionResourcePort = { readonly [activeWebSessionResourcePort]: never };
 
 interface StagedWebSessionRecord {
     active: boolean;
@@ -157,6 +159,13 @@ interface ArmedWebSessionCellRecord {
     retirement: unknown | null;
 }
 
+interface ActiveWebSessionResourcePortRecord {
+    active: boolean;
+    cell: ArmedWebSessionCellRecord;
+    session: ServerSession;
+    registry: Set<ActiveWebSessionResourcePortRecord>;
+}
+
 const sessions = new MapConstructor<string, ServerSession>();
 const nativeSessionBindings = new WeakMap<ServerSession, NativeServerSessionBinding>();
 const sessionResources = new MapConstructor<string, Set<ServerSessionResourceRegistration>>();
@@ -166,6 +175,9 @@ const stagedWebSessions = new SetConstructor<StagedWebSessionRecord>();
 const preparedWebSessionRecords = new WeakMapConstructor<object, PreparedWebSessionRecord>();
 const preparedWebSessionReservations = new MapConstructor<string, PreparedWebSessionRecord>();
 const armedWebSessionPortRecords = new WeakMapConstructor<object, ArmedWebSessionCellRecord>();
+const activeWebSessionCellsBySession = new WeakMapConstructor<ServerSession, ArmedWebSessionCellRecord>();
+const activeWebSessionResourcePortRecords = new WeakMapConstructor<object, ActiveWebSessionResourcePortRecord>();
+const activeWebSessionResourcePortsByCell = new WeakMapConstructor<ArmedWebSessionCellRecord, Set<ActiveWebSessionResourcePortRecord>>();
 const armedWebSessionCellsById = ObjectCreate(null) as Record<string, ArmedWebSessionCellRecord | undefined>;
 let armedWebSessionCellHead: ArmedWebSessionCellRecord | null = null;
 let webSessionPrepareInProgress = false;
@@ -383,6 +395,21 @@ function armedWebSessionCellRecord(port: unknown): ArmedWebSessionCellRecord | n
     } catch { return null; }
 }
 
+function activeWebSessionResourceRecord(port: unknown): ActiveWebSessionResourcePortRecord | null {
+    try {
+        if (!port || typeof port !== 'object' || isProxy(port) || ObjectGetPrototypeOf(port) !== null) return null;
+        if (ObjectGetOwnPropertySymbols(port).length || ObjectGetOwnPropertyNames(port).length) return null;
+        return getWeakMapValue(activeWebSessionResourcePortRecords, port) ?? null;
+    } catch { return null; }
+}
+
+function releaseActiveWebSessionResourceRecord(record: ActiveWebSessionResourcePortRecord): boolean {
+    if (!record.active) return false;
+    record.active = false;
+    try { deleteSetValue(record.registry, record); } catch { /* revoked authority remains terminal */ }
+    return true;
+}
+
 function isWebServerSessionRetirementReason(value: unknown): value is WebServerSessionRetirementReason {
     return value === 'lock' || value === 'dispose' || value === 'expired' || value === 'delete' || value === 'clear';
 }
@@ -596,6 +623,7 @@ export function armPreparedWebServerSession(capability: unknown): ArmedWebServer
         armedWebSessionCellHead = cell;
         armedWebSessionCellsById[session.id] = cell;
         setWeakMapValue(armedWebSessionPortRecords, port, cell);
+        setWeakMapValue(activeWebSessionCellsBySession, session, cell);
         const burned = revokePreparedWebSession(prepared);
         if (webSessionCellLifecyclePoisoned || !burned) {
             tombstoneArmedWebSessionCellRecord(cell);
@@ -830,6 +858,55 @@ export function resolveActiveWebServerSession(sessionId: unknown): ServerSession
             || getMapValue(sessions, sessionId)) return null;
         return session;
     } catch { return null; }
+    finally { endWebSessionCellLifecycle(); }
+}
+
+/** Mints one callback-free resource identity for the exact process-local ACTIVE Web session. */
+/* @Codex */
+export function mintActiveWebSessionResourcePort(session: unknown): ActiveWebSessionResourcePort | null {
+    if (!beginWebSessionCellLifecycle(session)) return null;
+    let record: ActiveWebSessionResourcePortRecord | null = null;
+    try {
+        if (!session || typeof session !== 'object' || isProxy(session)) return null;
+        const cell = getWeakMapValue(activeWebSessionCellsBySession, session as ServerSession);
+        if (webSessionCellLifecyclePoisoned || !cell || cell.state !== 'ACTIVE' || cell.session !== session) return null;
+        const exactSession = cell.session;
+        const sessionId = exactSession.id;
+        const expiry = exactSession.expiresAt;
+        const now = DateNow();
+        if (webSessionCellLifecyclePoisoned || cell.state !== 'ACTIVE' || cell.session !== exactSession
+            || armedWebSessionCellsById[sessionId] !== cell || exactSession.id !== sessionId
+            || exactSession.authChannel !== 'web' || exactSession.expiresAt !== expiry || expiry <= now
+            || getMapValue(sessions, sessionId)) return null;
+        const port = ObjectFreeze(ObjectCreate(null)) as ActiveWebSessionResourcePort;
+        const registry = getWeakMapValue(activeWebSessionResourcePortsByCell, cell)
+            ?? new SetConstructor<ActiveWebSessionResourcePortRecord>();
+        record = { active: true, cell, session: exactSession, registry };
+        setWeakMapValue(activeWebSessionResourcePortRecords, port, record);
+        addSetValue(registry, record);
+        setWeakMapValue(activeWebSessionResourcePortsByCell, cell, registry);
+        if (webSessionCellLifecyclePoisoned || cell.state !== 'ACTIVE' || cell.session !== exactSession
+            || armedWebSessionCellsById[sessionId] !== cell || exactSession.expiresAt !== expiry
+            || getMapValue(sessions, sessionId)) {
+            releaseActiveWebSessionResourceRecord(record);
+            return null;
+        }
+        return port;
+    } catch {
+        if (record) releaseActiveWebSessionResourceRecord(record);
+        return null;
+    } finally { endWebSessionCellLifecycle(); }
+}
+
+/** Releases one exact resource identity without invoking consumer code. */
+/* @Codex */
+export function releaseActiveWebSessionResourcePort(port: unknown): boolean {
+    if (!beginWebSessionCellLifecycle(port)) return false;
+    try {
+        const record = activeWebSessionResourceRecord(port);
+        if (webSessionCellLifecyclePoisoned || !record || !record.active) return false;
+        return releaseActiveWebSessionResourceRecord(record);
+    } catch { return false; }
     finally { endWebSessionCellLifecycle(); }
 }
 
