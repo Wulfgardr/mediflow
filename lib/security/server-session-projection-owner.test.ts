@@ -1,5 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { afterEach, test } from 'node:test';
@@ -16,6 +17,9 @@ import { digestDocumentSynthesisSourceSet } from './document-synthesis-source-se
 
 const USER = { id: ['synthetic', 'user'].join('-'), username: ['synthetic', 'clinician'].join('-'), role: 'clinician' };
 const PAIR = { patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' };
+const OWNER_TARGET = new URL('./server-session-projection-owner.ts', import.meta.url);
+const SESSION_TARGET = new URL('./server-session.ts', import.meta.url);
+const RUNNER = new URL('../../scripts/register-strip-types-loader.mjs', import.meta.url);
 
 afterEach(() => clearAllSessions());
 
@@ -576,6 +580,68 @@ test('Document Synthesis execution capsule identity poisons retain, consume, and
     nested = () => { disposal.owner.dispose(); };
     assert.equal(disposal.identities.consume(disposalToken), null); nested = null;
     assert.equal(disposal.identities.consume(disposalToken), null);
+});
+
+test('Document Synthesis execution capsule identity rolls back a captured post-set throw or reentry', () => {
+    for (const mode of ['before', 'throw', 'reenter']) {
+        const script = `
+const assert = (await import('node:assert/strict')).default;
+const { setImmediate: later } = await import('node:timers');
+const sessionModule = await import(${JSON.stringify(SESSION_TARGET.href)});
+const originalSet = WeakMap.prototype.set; let hook = null; let traps = 0;
+WeakMap.prototype.set = function (key, value) {
+  const matches = hook && Object.getPrototypeOf(key) === null && Reflect.ownKeys(key).length === 0
+    && Object.getPrototypeOf(value) === null && Reflect.ownKeys(value).length === 0;
+  if (matches && ${JSON.stringify(mode)} === 'before') { traps += 1; const active = hook; hook = null; active(key); }
+  const result = Reflect.apply(originalSet, this, [key, value]);
+  if (matches && hook) {
+    traps += 1; const active = hook; hook = null; active(key);
+  }
+  return result;
+};
+const ownerModule = await import(${JSON.stringify(OWNER_TARGET.href)} + '?postset=' + ${JSON.stringify(mode)});
+const value = sessionModule.createSession({ id: ['synthetic', 'user'].join('-'), username: ['synthetic', 'clinician'].join('-'), role: 'clinician' }, 'web');
+const registry = ownerModule.createServerSessionProjectionOwnerRegistry({ clock: () => 1_000,
+  entropy: () => new Uint8Array(16).fill(7), resolve: (_session, pair) => Object.freeze({ ...pair }) });
+const owner = registry.acquire(value); owner.issueSelection({ expectedEpoch: 0,
+  patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' });
+const capture = owner.mintDocumentSynthesisAttachmentCapturePort(value);
+const currentness = Object.freeze({ documentSourceRef: 'document-source.synthetic.01', documentRevision: 1, documentFreshnessEpoch: 1 });
+const observed = capture.observeCurrentness(currentness); const grant = capture.begin(observed);
+const retained = capture.retain(Object.freeze({ grant, observedCurrentness: currentness,
+  projection: Object.freeze({ sourceKind: 'native_text', sourceText: 'Synthetic source.' }) }));
+const seal = capture.sealRetainedProjection(retained);
+const capsule = owner.mintDocumentSynthesisExecutionCapsulePort(value).promote(seal);
+const identities = owner.mintDocumentSynthesisExecutionCapsuleIdentityPort(value);
+const probe = owner.mintDocumentSynthesisExecutionCapsuleIdentityPort(value);
+let observedIdentity = null; let nested = null; let ambientReads = 0; const unhandled = [];
+const priorThen = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { ambientReads += 1; return undefined; } });
+process.on('unhandledRejection', (reason) => unhandled.push(reason));
+hook = (identity) => { observedIdentity = identity; if (${JSON.stringify(mode)} !== 'reenter') throw new Error('set'); nested = probe.consume(identity); };
+let outer = 'threw'; try { outer = identities.retain(capsule); } catch { outer = 'threw'; }
+if (priorThen) Object.defineProperty(Object.prototype, 'then', priorThen); else delete Object.prototype.then;
+await new Promise((resolve) => later(resolve));
+assert.equal(outer, null); assert.equal(nested, null); assert.ok(observedIdentity); assert.equal(probe.consume(observedIdentity), null);
+assert.equal(identities.retain(capsule), null); assert.equal(traps, 1); assert.equal(ambientReads, 0); assert.deepEqual(unhandled, []);
+process.stdout.write(JSON.stringify({ mode: ${JSON.stringify(mode)}, traps, ambientReads, unhandled: unhandled.length }));
+`;
+        const result = spawnSync(process.execPath, ['--experimental-strip-types', '--import', RUNNER.pathname,
+            '--conditions=react-server', '--input-type=module', '--eval', script], { encoding: 'utf8' });
+        assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+        assert.deepEqual(JSON.parse(result.stdout), { mode, traps: 1, ambientReads: 0, unhandled: 0 });
+    }
+});
+
+test('Document Synthesis execution capsule identity terminalizes post-set session drift', () => {
+    let armed = false; let clocks = 0;
+    const record = documentSynthesisExecutionCapsuleIdentityRecord(() => {
+        if (armed && (clocks += 1) === 2) record.value.authChannel = 'native';
+    });
+    armed = true;
+    assert.equal(record.identities.retain(record.capsule), null);
+    record.value.authChannel = 'web';
+    assert.equal(record.identities.retain(record.capsule), null);
 });
 
 test('Document Synthesis execution capsule identity ignores ambient then and poisoned object registries', () => {

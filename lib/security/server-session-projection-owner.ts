@@ -1140,8 +1140,18 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                             if (!entry || hasOwnerIdentity(claimedDocumentSynthesisExecutionCapsules, value as object)) return null;
                             if (!entryIsCurrent(entry)) { terminalize(value as object); return null; }
                             const identity = ObjectFreeze(ObjectCreate(null));
-                            addOwnerIdentity(claimedDocumentSynthesisExecutionCapsules, value as object);
-                            applyIntrinsic(weakMapSet, documentSynthesisExecutionCapsuleIdentities, [identity, value as object]);
+                            let published = false;
+                            try {
+                                addOwnerIdentity(claimedDocumentSynthesisExecutionCapsules, value as object);
+                                applyIntrinsic(weakMapSet, documentSynthesisExecutionCapsuleIdentities, [identity, value as object]);
+                                published = !leasePortOperationPoisoned && capsuleEntry(value) === entry && entryIsCurrent(entry);
+                            } catch { /* rollback below */ }
+                            if (!published) {
+                                try { applyIntrinsic(weakMapDelete, documentSynthesisExecutionCapsuleIdentities, [identity]); } catch { /* terminal denial */ }
+                                try { deleteOwnerIdentity(claimedDocumentSynthesisExecutionCapsules, value as object); } catch { /* terminal denial */ }
+                                try { terminalize(value as object); } catch { /* terminal denial */ }
+                                return null;
+                            }
                             return identity as DocumentSynthesisExecutionCapsuleIdentity;
                         } finally { endLeasePortOperation(); }
                     } });
