@@ -615,7 +615,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     let now: number;
                     try { now = sources.clock(); } catch { return false; }
                     return NumberIsFinite(now) && now < boundSelection.expiresAt && !terminal && presentedSession === session
-                        && getSession(session.id) === session && selection === boundSelection && epoch === boundSelectionEpoch
+                        && session.authChannel === 'web' && getSession(session.id) === session && selection === boundSelection && epoch === boundSelectionEpoch
                         && reviewContextEpoch === boundReviewContextEpoch;
                 };
                 const object = () => ObjectFreeze(ObjectCreate(null));
@@ -700,7 +700,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         || reviewContextEpoch !== boundReviewContextEpoch || getSession(session.id) !== session) return false;
                     let now: number; try { now = sources.clock(); } catch { return false; }
                     return NumberIsFinite(now) && now < boundSelection.expiresAt && !terminal && presentedSession === session
-                        && getSession(session.id) === session && selection === boundSelection && epoch === boundSelectionEpoch
+                        && session.authChannel === 'web' && getSession(session.id) === session && selection === boundSelection && epoch === boundSelectionEpoch
                         && reviewContextEpoch === boundReviewContextEpoch;
                 };
                 const opaque = () => ObjectFreeze(ObjectCreate(null));
