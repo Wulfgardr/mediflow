@@ -701,6 +701,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     || leasePortOperationPoisoned) return fail('stale_selection');
                 type Entry = { currentness: DocumentSynthesisAttachmentCurrentness; currentnessGeneration: number; capture: object; grant: object | null; evidence: object | null; seal: object | null;
                     projection: DocumentSynthesisProjectionCandidate | null; sourceSetEpoch: bigint | null; revocationGeneration: bigint | null;
+                    nextSourceSetEpoch: bigint | null; lineageRevocationGeneration: bigint | null;
                     sourceSetDigestSha256: readonly number[] | null;
                     revocationState: ReturnType<typeof createDocumentSynthesisSourceLineageState>; revocationTarget: object;
                     state: 'captured' | 'ingested' | 'retained' | 'sealed' | 'revoked'; };
@@ -764,7 +765,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         if (leasePortOperationPoisoned || state.terminal) return null;
                         const capture = opaque(); const revocationTarget = opaque();
                         const entry: Entry = { currentness: observed, currentnessGeneration: state.generation, capture, grant: null, evidence: null, seal: null, projection: null,
-                            sourceSetEpoch: null, revocationGeneration: null, sourceSetDigestSha256: null,
+                            sourceSetEpoch: null, revocationGeneration: null, nextSourceSetEpoch: null, lineageRevocationGeneration: null, sourceSetDigestSha256: null,
                             revocationState: createDocumentSynthesisSourceLineageState(), revocationTarget, state: 'captured' };
                         addOwnerIdentity(captures, capture); applyIntrinsic(weakMapSet, records, [capture, entry]);
                         return capture as DocumentSynthesisAttachmentCaptureCapability;
@@ -799,7 +800,8 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         if (!current() || leasePortOperationPoisoned) { revokeEntry(entry); return null; }
                         const retained = opaque(); entry.projection = ObjectFreeze({ sourceKind: projection.sourceKind,
                             sourceText: projection.sourceText }); entry.sourceSetEpoch = allocation.sourceSetEpoch;
-                        entry.revocationGeneration = allocation.state.revocationGeneration; entry.evidence = retained; entry.state = 'retained'; addOwnerIdentity(evidence, retained);
+                        entry.revocationGeneration = allocation.state.revocationGeneration; entry.nextSourceSetEpoch = allocation.state.nextSourceSetEpoch;
+                        entry.lineageRevocationGeneration = allocation.state.revocationGeneration; entry.evidence = retained; entry.state = 'retained'; addOwnerIdentity(evidence, retained);
                         applyIntrinsic(weakMapSet, records, [retained, entry]);
                         return retained as DocumentSynthesisProjectionEvidenceCapability;
                     } finally { endLeasePortOperation(); }
@@ -810,14 +812,13 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         const entry = entryFor(value);
                         if (!entry || !hasOwnerIdentity(evidence, value as object) || entry.state !== 'retained' || entry.evidence !== value
                             || !current() || leasePortOperationPoisoned || !currentnessIsLive(entry) || documentSynthesisLineageTerminal
-                            || entry.sourceSetEpoch === null || entry.revocationGeneration === null) { if (entry) burnEntry(entry); return null; }
+                            || entry.sourceSetEpoch === null || entry.revocationGeneration === null || entry.nextSourceSetEpoch === null
+                            || entry.lineageRevocationGeneration === null) { if (entry) burnEntry(entry); return null; }
                         const sourceSetEpoch = entry.sourceSetEpoch; const revocationGeneration = entry.revocationGeneration;
-                        const seal = opaque();
-                        entry.state = 'sealed'; entry.seal = seal; entry.evidence = null;
-                        addOwnerIdentity(seals, seal); applyIntrinsic(weakMapSet, records, [seal, entry]);
-                        applyIntrinsic(weakMapDelete, records, [value as object]);
+                        const nextSourceSetEpoch = entry.nextSourceSetEpoch;
+                        const lineageRevocationGeneration = entry.lineageRevocationGeneration;
+                        entry.state = 'sealed';
                         const projection = entry.projection;
-                        entry.projection = null; entry.sourceSetEpoch = null; entry.revocationGeneration = null;
                         if (!projection) { burnEntry(entry); return null; }
                         const projectionBytes = applyIntrinsic(textEncoderEncode, textEncoder, [projection.sourceText]) as Uint8Array;
                         const projectionDigest = CreateHash('sha256').update(projectionBytes).digest();
@@ -827,8 +828,19 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                             documentRevision: BigIntConstructor(entry.currentness.documentRevision), documentFreshnessEpoch: BigIntConstructor(entry.currentness.documentFreshnessEpoch),
                             sourceByteLength: projectionBytes.length, projectionDigestSha256: ObjectFreeze(raw32) })]), sourceSetEpoch, revocationGeneration });
                         const digest = digestDocumentSynthesisSourceSet(sourceSet);
+                        const finalSourceSetEpoch = entry.sourceSetEpoch;
+                        const finalRevocationGeneration = entry.revocationGeneration;
+                        const finalNextSourceSetEpoch = documentSynthesisLineage.nextSourceSetEpoch;
+                        const finalLineageRevocationGeneration = documentSynthesisLineage.revocationGeneration;
                         if (digest.status !== 'available' || !current() || leasePortOperationPoisoned || !currentnessIsLive(entry)
-                            || documentSynthesisLineageTerminal || entry.state !== 'sealed' || entry.seal !== seal) { burnEntry(entry); return null; }
+                            || documentSynthesisLineageTerminal || entry.state !== 'sealed'
+                            || finalSourceSetEpoch !== sourceSetEpoch || finalRevocationGeneration !== revocationGeneration
+                            || finalNextSourceSetEpoch !== nextSourceSetEpoch || finalLineageRevocationGeneration !== lineageRevocationGeneration) { burnEntry(entry); return null; }
+                        const seal = opaque();
+                        entry.seal = seal; entry.evidence = null; entry.projection = null; entry.sourceSetEpoch = null; entry.revocationGeneration = null;
+                        entry.nextSourceSetEpoch = null; entry.lineageRevocationGeneration = null;
+                        addOwnerIdentity(seals, seal); applyIntrinsic(weakMapSet, records, [seal, entry]);
+                        applyIntrinsic(weakMapDelete, records, [value as object]);
                         entry.sourceSetDigestSha256 = digest.sourceSetDigestSha256;
                         return seal as DocumentSynthesisSourceSetSealCapability;
                     } catch {
