@@ -593,11 +593,15 @@ export function getArmedWebServerSessionId(port: unknown): string | null {
         const cell = armedWebSessionCellRecord(port);
         if (webSessionCellLifecyclePoisoned || !cell || cell.state !== 'ARMED_ACTIVATE'
             || armedWebSessionCellsById[cell.session.id] !== cell) return null;
-        if (cell.session.expiresAt <= DateNow()) {
+        const session = cell.session;
+        const sessionId = session.id;
+        const now = DateNow();
+        if (webSessionCellLifecyclePoisoned || cell.state !== 'ARMED_ACTIVATE' || cell.session !== session
+            || session.id !== sessionId || armedWebSessionCellsById[sessionId] !== cell || session.expiresAt <= now) {
             tombstoneArmedWebSessionCellRecord(cell);
             return null;
         }
-        return cell.session.id;
+        return sessionId;
     } catch { return null; }
     finally { endWebSessionCellLifecycle(); }
 }
