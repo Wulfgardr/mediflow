@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, test } from 'node:test';
 
 import {
+    abortActiveWebSessionResourceUse,
     abortPreparedWebServerSession,
     abortStagedWebServerSession,
     activateArmedWebServerSession,
@@ -22,6 +23,8 @@ import {
     invalidateSessionsForUser,
     mintActiveWebSessionResourcePort,
     armPreparedWebServerSession,
+    beginActiveWebSessionResourceUse,
+    commitActiveWebSessionResourceUse,
     prepareStagedWebServerSession,
     peekSession,
     registerServerSessionResource,
@@ -427,13 +430,120 @@ test('ACTIVE resource mint denies expiry and lifecycle reentry without releasing
         if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
 });
 
+function activeResourceFixture() {
+    const active = armedControlActivation();
+    assert.equal(activateArmedWebServerSession(active.port, active.ticket), true);
+    const session = resolveActiveWebServerSession(active.sessionId); assert.ok(session);
+    const port = mintActiveWebSessionResourcePort(session); assert.ok(port);
+    return { ...active, session, port };
+}
+
+test('ACTIVE resource uses are opaque, one-use, and commit-last without consumer effects', async () => {
+    const active = activeResourceFixture();
+    const first = beginActiveWebSessionResourceUse(active.port); assert.ok(first);
+    assert.equal(Object.getPrototypeOf(first), null); assert.equal(Object.isFrozen(first), true);
+    assert.deepEqual(Reflect.ownKeys(first), []);
+
+    let observed = 0;
+    const proxy = new Proxy(Object.create(null), { get: () => { observed += 1; throw new Error('get'); }, ownKeys: () => { observed += 1; throw new Error('keys'); } });
+    const accessor = Object.create(null); Object.defineProperty(accessor, 'then', { get: () => { observed += 1; throw new Error('then'); } });
+    const rejected = Promise.reject(new Error('synthetic rejected use')); rejected.catch(() => undefined);
+    const clone = structuredClone(first); const spread = { ...first };
+    for (const value of [null, undefined, {}, proxy, accessor, Promise.resolve(), rejected, clone, spread]) {
+        assert.equal(commitActiveWebSessionResourceUse(value), false);
+        assert.equal(abortActiveWebSessionResourceUse(value), false);
+    }
+    assert.equal(observed, 0);
+
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath];
+    try { delete nodeRequire.cache[modulePath]; const secondary = nodeRequire(modulePath) as typeof import('./server-session');
+        assert.equal(secondary.commitActiveWebSessionResourceUse(first), false); assert.equal(secondary.abortActiveWebSessionResourceUse(first), false); secondary.clearAllSessions();
+    } finally { if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
+
+    const originals = { weakGet: WeakMap.prototype.get, setDelete: Set.prototype.delete };
+    const fail = () => { throw new Error('ambient collection poison'); };
+    try { WeakMap.prototype.get = fail as typeof WeakMap.prototype.get; Set.prototype.delete = fail as typeof Set.prototype.delete;
+        assert.equal(commitActiveWebSessionResourceUse(first), true);
+    } finally { WeakMap.prototype.get = originals.weakGet; Set.prototype.delete = originals.setDelete; }
+    assert.equal(commitActiveWebSessionResourceUse(first), false);
+    assert.equal(abortActiveWebSessionResourceUse(first), false);
+
+    const second = beginActiveWebSessionResourceUse(active.port); assert.ok(second);
+    assert.equal(abortActiveWebSessionResourceUse(second), true);
+    assert.equal(commitActiveWebSessionResourceUse(second), false);
+    assert.equal(abortActiveWebSessionResourceUse(second), false);
+
+    const released = activeResourceFixture(); const releasedUse = beginActiveWebSessionResourceUse(released.port); assert.ok(releasedUse);
+    assert.equal(releaseActiveWebSessionResourcePort(released.port), true);
+    assert.equal(commitActiveWebSessionResourceUse(releasedUse), false);
+    assert.equal(beginActiveWebSessionResourceUse(released.port), null);
+
+    const retired = activeResourceFixture(); const retiredUse = beginActiveWebSessionResourceUse(retired.port); assert.ok(retiredUse);
+    assert.equal(retireActiveWebServerSession(retired.sessionId, 'dispose'), true);
+    assert.equal(commitActiveWebSessionResourceUse(retiredUse), false);
+    assert.equal(abortActiveWebSessionResourceUse(retiredUse), false);
+    assert.equal(beginActiveWebSessionResourceUse(retired.port), null);
+    assert.equal(releaseActiveWebSessionResourcePort(retired.port), true);
+    assert.equal(releaseActiveWebSessionResourcePort(retired.port), false);
+});
+
+test('resource cleanup and expiry burn uses and deny new use without changing resolver semantics', async (t) => {
+    for (const cleanup of ['delete', 'invalidate', 'clear'] as const) {
+        const active = activeResourceFixture(); const use = beginActiveWebSessionResourceUse(active.port); assert.ok(use);
+        if (cleanup === 'delete') deleteSession(active.sessionId);
+        else if (cleanup === 'invalidate') invalidateSessionsForUser('atomic-user');
+        else clearAllSessions();
+        assert.equal(commitActiveWebSessionResourceUse(use), false);
+        assert.equal(abortActiveWebSessionResourceUse(use), false);
+        assert.equal(beginActiveWebSessionResourceUse(active.port), null);
+        assert.equal(releaseActiveWebSessionResourcePort(active.port), true);
+    }
+
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const cached = nodeRequire.cache[modulePath]; const originalNow = Date.now; const originalTtl = process.env.MEDIFLOW_SESSION_TTL_MS;
+    let isolated: typeof import('./server-session') | undefined; let now = 1_000; let trigger = false; let nested = () => undefined;
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    try {
+        process.env.MEDIFLOW_SESSION_TTL_MS = '10'; Date.now = () => { if (trigger) { trigger = false; nested(); } return now; }; delete nodeRequire.cache[modulePath];
+        isolated = nodeRequire(modulePath) as typeof import('./server-session');
+        const staged = isolated.stageWebServerSession({ id: 'use-expiry', username: SYNTHETIC_USERNAME, role: 'clinician' });
+        const prepared = isolated.prepareStagedWebServerSession(staged); assert.ok(prepared);
+        const id = isolated.getPreparedWebServerSessionId(prepared); assert.ok(id);
+        const armed = isolated.armPreparedWebServerSession(prepared); assert.ok(armed);
+        const control = authControlApi().create('use-expiry-fence'); control.begin('login', 'op', 'key', 'fp', 0);
+        const ticket = control.prepareTicket('use-expiry-fence', 'op', BigInt(0), 'fp', id, now); assert.ok(ticket);
+        assert.equal(isolated.activateArmedWebServerSession(armed, ticket), true);
+        const session = isolated.resolveActiveWebServerSession(id); assert.ok(session);
+        const port = isolated.mintActiveWebSessionResourcePort(session); assert.ok(port);
+        const reentryUse = isolated.beginActiveWebSessionResourceUse(port); assert.ok(reentryUse);
+        nested = () => { isolated?.commitActiveWebSessionResourceUse(reentryUse); }; trigger = true;
+        assert.equal(isolated.commitActiveWebSessionResourceUse(reentryUse), false);
+        const use = isolated.beginActiveWebSessionResourceUse(port); assert.ok(use); now = session.expiresAt;
+        assert.equal(isolated.commitActiveWebSessionResourceUse(use), false);
+        assert.equal(isolated.abortActiveWebSessionResourceUse(use), false);
+        assert.equal(isolated.beginActiveWebSessionResourceUse(port), null);
+        isolated.releaseActiveWebSessionResourcePort(port); isolated.clearAllSessions();
+    } finally {
+        Date.now = originalNow;
+        if (originalTtl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = originalTtl;
+        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
+    }
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.deepEqual(unhandled, []);
+});
+
 test('ACTIVE resource port has no callback surface or production importer before adoption', () => {
     const source = readFileSync(fileURLToPath(new URL('./server-session.ts', import.meta.url)), 'utf8');
     const mint = source.slice(source.indexOf('export function mintActiveWebSessionResourcePort'), source.indexOf('export function releaseActiveWebSessionResourcePort'));
     const release = source.slice(source.indexOf('export function releaseActiveWebSessionResourcePort'), source.indexOf('export function getSession'));
+    const use = source.slice(source.indexOf('export function beginActiveWebSessionResourceUse'), source.indexOf('export function getSession'));
     assert.match(mint, /\(session: unknown\): ActiveWebSessionResourcePort \| null/u); assert.match(release, /\(port: unknown\): boolean/u);
-    assert.doesNotMatch(`${mint}\n${release}`, /\b(?:callback|dispose|Promise|async|then|setTimeout|setImmediate|queueMicrotask|nextTick)\b/u);
-    const paths = execFileSync('rg', ['-l', 'mintActiveWebSessionResourcePort|releaseActiveWebSessionResourcePort', '-g', '*.ts', '.'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map((value) => value.replace(/^\.\//u, ''));
+    assert.match(use, /export function beginActiveWebSessionResourceUse\(port: unknown\): ActiveWebSessionResourceUse \| null/u);
+    assert.match(use, /export function commitActiveWebSessionResourceUse\(use: unknown\): boolean/u);
+    assert.match(use, /export function abortActiveWebSessionResourceUse\(use: unknown\): boolean/u);
+    assert.doesNotMatch(`${mint}\n${release}\n${use}`, /\b(?:callback|dispose|Promise|async|then|setTimeout|setImmediate|queueMicrotask|nextTick|payload|effect|method)\b/u);
+    const paths = execFileSync('rg', ['-l', 'mintActiveWebSessionResourcePort|releaseActiveWebSessionResourcePort|beginActiveWebSessionResourceUse|commitActiveWebSessionResourceUse|abortActiveWebSessionResourceUse', '-g', '*.ts', '.'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map((value) => value.replace(/^\.\//u, ''));
     assert.deepEqual(paths.sort(), ['lib/security/server-session.test.ts', 'lib/security/server-session.ts']);
 });
 
