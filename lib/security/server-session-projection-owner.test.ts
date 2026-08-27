@@ -35,8 +35,8 @@ function ownerWithSelection(now = 1_000) {
     return { registry, value, owner, setClock: (next: number) => { clock = next; } };
 }
 
-function currentness(documentRevision = 1, documentFreshnessEpoch = 1) {
-    return Object.freeze({ documentSourceRef: 'document-source.synthetic.01', documentRevision, documentFreshnessEpoch });
+function currentness(documentRevision = 1, documentFreshnessEpoch = 1, documentSourceRef = 'document-source.synthetic.01') {
+    return Object.freeze({ documentSourceRef, documentRevision, documentFreshnessEpoch });
 }
 
 function projection(sourceKind: 'native_text' | 'ocr_text' = 'native_text') {
@@ -229,6 +229,23 @@ test('Document Synthesis attachment capture retains owner-private evidence throu
     assert.equal(port.sealRetainedProjection(retained), null);
     assert.equal(port.observeRevocation(retained), false);
     assert.equal(port.observeRevocation(seal), true); assert.equal(port.observeRevocation(seal), true);
+});
+
+test('Document Synthesis attachment seal rereads private source and revocation lineage snapshots at its final fence', () => {
+    const source = readFileSync(new URL('./server-session-projection-owner.ts', import.meta.url), 'utf8');
+    assert.match(source, /const finalSourceSetEpoch = entry\.sourceSetEpoch;\s+const finalRevocationGeneration = entry\.revocationGeneration;/u);
+    assert.match(source, /finalSourceSetEpoch !== sourceSetEpoch \|\| finalRevocationGeneration !== revocationGeneration/u);
+    assert.match(source, /finalNextSourceSetEpoch !== nextSourceSetEpoch \|\| finalLineageRevocationGeneration !== lineageRevocationGeneration/u);
+
+    const { value, owner } = ownerWithSelection(); const port = owner.mintDocumentSynthesisAttachmentCapturePort(value);
+    const firstCapture = port.observeCurrentness(currentness(1, 1, 'document-source.synthetic.a')); assert.ok(firstCapture);
+    const firstGrant = port.begin(firstCapture); assert.ok(firstGrant);
+    const firstEvidence = port.retain(Object.freeze({ grant: firstGrant, observedCurrentness: currentness(1, 1, 'document-source.synthetic.a'), projection: projection() })); assert.ok(firstEvidence);
+    const secondCapture = port.observeCurrentness(currentness(1, 1, 'document-source.synthetic.b')); assert.ok(secondCapture);
+    const secondGrant = port.begin(secondCapture); assert.ok(secondGrant);
+    const secondEvidence = port.retain(Object.freeze({ grant: secondGrant, observedCurrentness: currentness(1, 1, 'document-source.synthetic.b'), projection: projection('ocr_text') })); assert.ok(secondEvidence);
+    assert.equal(port.sealRetainedProjection(firstEvidence), null, 'a subsequent authentic source allocation drifts the first lineage snapshot');
+    assert.ok(port.sealRetainedProjection(secondEvidence));
 });
 
 test('Document Synthesis attachment capture closes replay, stale currentness, foreign authority, and lifecycle changes', () => {
