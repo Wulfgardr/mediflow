@@ -116,6 +116,9 @@ test('denies ABA fences, collisions, and wraps without advancing generation', ()
     assert.equal(record.advanceLock('f0', 'key-2', 'fp', 'f0', 1).ok, false, 'used fence cannot be reused');
     const wrapped = createWebAuthControlRecord('max', MAX);
     assert.equal(wrapped.advanceLock('max', 'key', 'fp', 'next', 0).ok, false);
+    const lexical = createWebAuthControlRecord('__proto__');
+    assert.equal(lexical.advanceLock('__proto__', 'key', 'fp', 'constructor', 0).ok, true);
+    assert.equal(lexical.advanceLock('constructor', 'other', 'fp', '__proto__', 1).ok, false, 'null-prototype tombstones retain special string keys');
 });
 
 test('constructor accepts only inert primitive initial state', () => {
@@ -299,27 +302,27 @@ test('entropy collision and same-record reentry deny before ticket publication a
     } finally { crypto.randomBytes = original; }
 });
 
-test('poisons prepare, commit, and retire reentry from captured collection intrinsics', async () => {
-    const set = { has: Set.prototype.has, add: Set.prototype.add, delete: Set.prototype.delete };
-    const weak = { get: WeakMap.prototype.get, set: WeakMap.prototype.set, delete: WeakMap.prototype.delete };
-    let target = ''; let nested = () => {}; let failWeakSet = false;
+test('keeps lexical fence tables exact across WeakMap reentry and mutate-then-throw', async () => {
+    const entropy = crypto.randomBytes; const weak = { get: WeakMap.prototype.get, set: WeakMap.prototype.set, delete: WeakMap.prototype.delete }; let entropyCalls = 0;
+    let target = ''; let nested = () => {}; let failWeakSet = false; let failWeakDelete = false;
     const hook = (name: string, original: (...args: never[]) => unknown) => function (this: unknown, ...args: never[]) {
         if (target === name) { target = ''; nested(); } const result = Reflect.apply(original, this, args);
-        if (name === 'weakSet' && failWeakSet) throw new Error('weak set failure'); return result;
+        if ((name === 'weakSet' && failWeakSet) || (name === 'weakDelete' && failWeakDelete)) throw new Error(`${name} failure`); return result;
     };
-    Set.prototype.has = hook('setHas', set.has) as typeof set.has; Set.prototype.add = hook('setAdd', set.add) as typeof set.add; Set.prototype.delete = hook('setDelete', set.delete) as typeof set.delete;
     WeakMap.prototype.get = hook('weakGet', weak.get) as typeof weak.get; WeakMap.prototype.set = hook('weakSet', weak.set) as typeof weak.set; WeakMap.prototype.delete = hook('weakDelete', weak.delete) as typeof weak.delete;
+    crypto.randomBytes = (() => Buffer.alloc(32, entropyCalls++ % 2 === 0 ? 1 : 2)) as typeof crypto.randomBytes;
     let isolated: typeof import('./web-auth-control-record.ts');
     try { isolated = await freshModule('web-auth-collections'); }
-    finally { Set.prototype.has = set.has; Set.prototype.add = set.add; Set.prototype.delete = set.delete; WeakMap.prototype.get = weak.get; WeakMap.prototype.set = weak.set; WeakMap.prototype.delete = weak.delete; }
-    for (const name of ['weakGet', 'setHas', 'setDelete', 'setAdd']) {
-        const record = isolated.createWebAuthControlRecord(`f-${name}`); record.begin('login', 'op', `key-${name}`, 'fp', 0);
-        const ticket = record.prepareAuthControlTicket(`f-${name}`, 'op', BigInt(0), 'fp', 'web', 1); assert.ok(ticket);
-        target = name; nested = () => { isolated.commitAuthControlTicket(ticket); }; assert.equal(isolated.commitAuthControlTicket(ticket), false); assert.equal(record.snapshot().active, false);
-    }
+    finally { WeakMap.prototype.get = weak.get; WeakMap.prototype.set = weak.set; WeakMap.prototype.delete = weak.delete; crypto.randomBytes = entropy; }
     const prepared = isolated.createWebAuthControlRecord('prepare'); prepared.begin('login', 'op', 'key', 'fp', 0);
     target = 'weakSet'; nested = () => { prepared.prepareAuthControlTicket('prepare', 'op', BigInt(0), 'fp', 'web', 1); }; assert.equal(prepared.prepareAuthControlTicket('prepare', 'op', BigInt(0), 'fp', 'web', 1), null);
-    target = 'weakDelete'; failWeakSet = true; nested = () => { prepared.prepareAuthControlTicket('prepare', 'op', BigInt(0), 'fp', 'web', 1); }; assert.equal(prepared.prepareAuthControlTicket('prepare', 'op', BigInt(0), 'fp', 'web', 1), null); failWeakSet = false;
-    const active = prepared.prepareAuthControlTicket('prepare', 'op', BigInt(0), 'fp', 'web', 2); assert.ok(active); assert.equal(isolated.commitAuthControlTicket(active), true);
-    target = 'setHas'; nested = () => { isolated.retireAuthControlTicket(active, 'lock'); }; assert.equal(isolated.retireAuthControlTicket(active, 'lock'), 0); assert.equal(isolated.retireAuthControlTicket(active, 'lock'), 1);
+    failWeakSet = true; failWeakDelete = true; assert.equal(prepared.prepareAuthControlTicket('prepare', 'op', BigInt(0), 'fp', 'web', 1), null); failWeakSet = false; failWeakDelete = false;
+    assert.deepEqual(prepared.snapshot(), { fence: 'prepare', generation: BigInt(0), pending: true, active: false });
+    const active = prepared.prepareAuthControlTicket('prepare', 'op', BigInt(0), 'fp', 'web', 2); assert.ok(active);
+    target = 'weakGet'; nested = () => { isolated.commitAuthControlTicket(active); }; assert.equal(isolated.commitAuthControlTicket(active), false); assert.equal(isolated.commitAuthControlTicket(active), true);
+    target = 'weakGet'; nested = () => { isolated.retireAuthControlTicket(active, 'lock'); }; assert.equal(isolated.retireAuthControlTicket(active, 'lock'), 0);
+    assert.equal(isolated.retireAuthControlTicket(active, 'lock'), 1);
+    const moduleUrl = new URL('./web-auth-control-record.ts', import.meta.url).href;
+    execFileSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', `const m=await import(${JSON.stringify(moduleUrl)});const r=m.createWebAuthControlRecord('f');r.begin('login','op','key','fp',0);const t=r.prepareAuthControlTicket('f','op',0n,'fp','web',1);if(!t||!m.commitAuthControlTicket(t))process.exit(2);const d=Set.prototype.delete;Set.prototype.delete=function(...a){Reflect.apply(d,this,a);throw Error('mutate-then-throw')};let out;try{out=m.retireAuthControlTicket(t,'lock')}finally{Set.prototype.delete=d}if(out!==1)process.exit(3);`]);
+    const terminal = prepared.snapshot(); await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(prepared.snapshot(), terminal);
 });
