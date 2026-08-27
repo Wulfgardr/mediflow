@@ -120,6 +120,8 @@ export type NativeServerSessionBinding = Readonly<{
 
 declare const stagedWebSessionCapsule: unique symbol;
 export type StagedWebServerSession = { readonly [stagedWebSessionCapsule]: never };
+declare const preparedWebSessionCapability: unique symbol;
+export type PreparedWebServerSession = { readonly [preparedWebSessionCapability]: never };
 
 interface StagedWebSessionRecord {
     active: boolean;
@@ -130,12 +132,21 @@ interface StagedWebSessionRecord {
     expiresAt: number;
 }
 
+interface PreparedWebSessionRecord {
+    active: boolean;
+    session: ServerSession;
+}
+
 const sessions = new MapConstructor<string, ServerSession>();
 const nativeSessionBindings = new WeakMap<ServerSession, NativeServerSessionBinding>();
 const sessionResources = new MapConstructor<string, Set<ServerSessionResourceRegistration>>();
 const sessionCleanupOutcomes = new MapConstructor<string, Exclude<ServerSessionCleanupOutcome, 'unknown'>>();
 const stagedWebSessionRecords = new WeakMapConstructor<object, StagedWebSessionRecord>();
 const stagedWebSessions = new SetConstructor<StagedWebSessionRecord>();
+const preparedWebSessionRecords = new WeakMapConstructor<object, PreparedWebSessionRecord>();
+const preparedWebSessionReservations = new MapConstructor<string, PreparedWebSessionRecord>();
+let webSessionPrepareInProgress = false;
+let webSessionPreparePoisoned = false;
 
 function isSupportedSynchronousDisposer(candidate: unknown): candidate is ServerSessionResourceDisposer {
     if (typeof candidate !== 'function' || isProxy(candidate)) return false;
@@ -240,6 +251,9 @@ export function createSession(
         createdAt: now,
         expiresAt: now + SESSION_TTL_MS
     };
+    if (getMapValue(sessions, session.id) || getMapValue(preparedWebSessionReservations, session.id)) {
+        throw new Error('server session id unavailable');
+    }
     setMapValue(sessions, session.id, session);
     return session;
 }
@@ -327,6 +341,44 @@ function revokeAllStagedWebSessions(): void {
         next = nextSetIterator<StagedWebSessionRecord>(iterator)) revokeStagedWebSession(next.value);
 }
 
+function preparedWebSessionRecord(capability: unknown): PreparedWebSessionRecord | null {
+    try {
+        if (!capability || typeof capability !== 'object' || isProxy(capability) || ObjectGetPrototypeOf(capability) !== null) return null;
+        if (ObjectGetOwnPropertySymbols(capability).length || ObjectGetOwnPropertyNames(capability).length) return null;
+        return getWeakMapValue(preparedWebSessionRecords, capability) ?? null;
+    } catch { return null; }
+}
+
+function revokePreparedWebSession(record: PreparedWebSessionRecord): boolean {
+    const wasActive = record.active;
+    record.active = false;
+    try {
+        if (getMapValue(preparedWebSessionReservations, record.session.id) === record) {
+            deleteMapValue(preparedWebSessionReservations, record.session.id);
+        }
+        return wasActive;
+    } catch { return false; }
+}
+
+function revokePreparedWebSessionsForUser(userId: string): void {
+    const iterator = mapValuesOf(preparedWebSessionReservations);
+    for (let next = nextMapIterator<PreparedWebSessionRecord>(iterator); !next.done;
+        next = nextMapIterator<PreparedWebSessionRecord>(iterator)) {
+        if (next.value.session.userId === userId) revokePreparedWebSession(next.value);
+    }
+}
+
+function revokeAllPreparedWebSessions(): void {
+    const iterator = mapValuesOf(preparedWebSessionReservations);
+    for (let next = nextMapIterator<PreparedWebSessionRecord>(iterator); !next.done;
+        next = nextMapIterator<PreparedWebSessionRecord>(iterator)) revokePreparedWebSession(next.value);
+}
+
+function revokePreparedWebSessionForId(sessionId: string): void {
+    const record = getMapValue(preparedWebSessionReservations, sessionId);
+    if (record) revokePreparedWebSession(record);
+}
+
 /** Stages only exact host-owned Web user data; the capsule has no observable session fields. */
 /* @Codex */
 export function stageWebServerSession(user: unknown): StagedWebServerSession | null {
@@ -348,9 +400,17 @@ export function stageWebServerSession(user: unknown): StagedWebServerSession | n
     } catch { return null; }
 }
 
-/** Publishes a staged Web session once; no callback or asynchronous work follows publication. */
+/** Consumes a staged Web capsule into one private, unpublishable Web-session reservation. */
 /* @Codex */
-export function activateStagedWebServerSession(capsule: unknown): ServerSession | null {
+export function prepareStagedWebServerSession(capsule: unknown): PreparedWebServerSession | null {
+    if (webSessionPrepareInProgress) {
+        webSessionPreparePoisoned = true;
+        const nestedRecord = stagedWebSessionRecord(capsule);
+        if (nestedRecord) revokeStagedWebSession(nestedRecord);
+        return null;
+    }
+    webSessionPrepareInProgress = true;
+    try {
     const record = stagedWebSessionRecord(capsule);
     if (!record || !record.active) return null;
     if (record.expiresAt <= DateNow()) {
@@ -358,31 +418,105 @@ export function activateStagedWebServerSession(capsule: unknown): ServerSession 
         return null;
     }
 
-    let sessionId: string;
+    let preparedRecord: PreparedWebSessionRecord | null = null;
     try {
         const bytes = applyIntrinsic(cryptoRandomBytes, crypto, [32]) as Buffer;
-        sessionId = applyIntrinsic(bufferToString, bytes, ['hex']) as string;
+        const sessionId = applyIntrinsic(bufferToString, bytes, ['hex']) as string;
+        if (webSessionPreparePoisoned || !record.active || record.expiresAt <= DateNow()) {
+            revokeStagedWebSession(record);
+            return null;
+        }
+        if (getMapValue(sessions, sessionId) || getMapValue(preparedWebSessionReservations, sessionId)) {
+            revokeStagedWebSession(record);
+            return null;
+        }
+        const capability = ObjectFreeze(ObjectCreate(null)) as PreparedWebServerSession;
+        preparedRecord = {
+            active: true,
+            session: {
+                id: sessionId,
+                userId: record.userId,
+                username: record.username,
+                role: record.role,
+                authChannel: 'web',
+                createdAt: record.createdAt,
+                expiresAt: record.expiresAt,
+            },
+        };
+        setWeakMapValue(preparedWebSessionRecords, capability, preparedRecord);
+        setMapValue(preparedWebSessionReservations, sessionId, preparedRecord);
+        if (!revokeStagedWebSession(record)) {
+            revokePreparedWebSession(preparedRecord);
+            return null;
+        }
+        return capability;
     } catch {
+        if (preparedRecord) revokePreparedWebSession(preparedRecord);
         revokeStagedWebSession(record);
         return null;
     }
-    if (getMapValue(sessions, sessionId)) {
-        revokeStagedWebSession(record);
-        return null;
+    } finally {
+        webSessionPrepareInProgress = false;
+        webSessionPreparePoisoned = false;
     }
-    const session: ServerSession = {
-        id: sessionId,
-        userId: record.userId,
-        username: record.username,
-        role: record.role,
-        authChannel: 'web',
-        createdAt: record.createdAt,
-        expiresAt: record.expiresAt,
-    };
+}
 
-    revokeStagedWebSession(record);
-    try { setMapValue(sessions, session.id, session); } catch { return null; }
-    return session;
+/** Returns only the reserved ID to the holder of the exact private capability. */
+/* @Codex */
+export function getPreparedWebServerSessionId(capability: unknown): string | null {
+    const record = preparedWebSessionRecord(capability);
+    if (!record || !record.active) return null;
+    if (record.session.expiresAt <= DateNow() || getMapValue(preparedWebSessionReservations, record.session.id) !== record
+        || getMapValue(sessions, record.session.id)) {
+        revokePreparedWebSession(record);
+        return null;
+    }
+    return record.session.id;
+}
+
+/** Canonically publishes a prepared session only for server-local compatibility callers. */
+function commitPreparedWebServerSessionInternally(capability: unknown, returnSession: true): ServerSession | null;
+function commitPreparedWebServerSessionInternally(capability: unknown, returnSession: false): boolean;
+function commitPreparedWebServerSessionInternally(capability: unknown, returnSession: boolean): ServerSession | boolean | null {
+    const deniedResult = returnSession ? null : false;
+    const record = preparedWebSessionRecord(capability);
+    if (!record || !record.active) return deniedResult;
+    try {
+        const session = record.session;
+        if (record.session.expiresAt <= DateNow() || getMapValue(preparedWebSessionReservations, record.session.id) !== record
+            || getMapValue(sessions, record.session.id)) {
+            revokePreparedWebSession(record);
+            return deniedResult;
+        }
+        const terminalResult = returnSession ? session : true;
+        record.active = false;
+        deleteMapValue(preparedWebSessionReservations, record.session.id);
+        setMapValue(sessions, session.id, session);
+        return terminalResult;
+    } catch {
+        revokePreparedWebSession(record);
+        return deniedResult;
+    }
+}
+
+/** Commits a prepared Web session once without exposing session authority. */
+/* @Codex */
+export function commitPreparedWebServerSession(capability: unknown): boolean {
+    return commitPreparedWebServerSessionInternally(capability, false);
+}
+
+/** Aborts a private prepared Web-session reservation without publication. */
+/* @Codex */
+export function abortPreparedWebServerSession(capability: unknown): boolean {
+    const record = preparedWebSessionRecord(capability);
+    return Boolean(record && revokePreparedWebSession(record));
+}
+
+/** Compatibility wrapper for callers that do not need an external terminal turn. */
+/* @Codex */
+export function activateStagedWebServerSession(capsule: unknown): ServerSession | null {
+    const capability = prepareStagedWebServerSession(capsule);
+    return capability ? commitPreparedWebServerSessionInternally(capability, true) : null;
 }
 
 /** Aborts a pending Web session without ever publishing it. */
@@ -423,6 +557,7 @@ export function peekSession(sessionId: string | null | undefined): ServerSession
 
 export function deleteSession(sessionId: string | null | undefined): void {
     if (!sessionId) return;
+    revokePreparedWebSessionForId(sessionId);
     terminateSession(sessionId, 'session_deleted');
 }
 
@@ -432,6 +567,7 @@ export function invalidateServerSessionForApplicationLock(sessionId: string): Re
     cleanupOutcome: ServerSessionCleanupOutcome;
     authorityAbsent: boolean;
 }> {
+    revokePreparedWebSessionForId(sessionId);
     return terminateSession(sessionId, 'application_locked');
 }
 
@@ -440,6 +576,7 @@ export function invalidateSessionsForUser(userId: string): void {
     if (!userId) return;
 
     revokeStagedWebSessionsForUser(userId);
+    revokePreparedWebSessionsForUser(userId);
 
     const sessionIds: string[] = [];
     const iterator = mapValuesOf(sessions);
@@ -455,6 +592,7 @@ export function invalidateSessionsForUser(userId: string): void {
 /* @Codex */
 export function clearAllSessions(): void {
     revokeAllStagedWebSessions();
+    revokeAllPreparedWebSessions();
     const sessionIds: string[] = [];
     const sessionSnapshots = new MapConstructor<string, ServerSession>();
     const sessionIterator = mapKeysOf(sessions);

@@ -5,13 +5,17 @@ import { createRequire } from 'node:module';
 import { afterEach, test } from 'node:test';
 
 import {
+    abortPreparedWebServerSession,
     abortStagedWebServerSession,
     activateStagedWebServerSession,
     clearAllSessions,
+    commitPreparedWebServerSession,
     createSession,
     deleteSession,
     getSession,
+    getPreparedWebServerSessionId,
     invalidateSessionsForUser,
+    prepareStagedWebServerSession,
     peekSession,
     registerServerSessionResource,
     stageWebServerSession,
@@ -208,6 +212,90 @@ test('a staged Web session has no observable authority before its one-use activa
     assert.equal(activateStagedWebServerSession(capsule), null);
 });
 
+test('a prepared Web session commits without exposing authority', () => {
+    const staged = stageWebServerSession({ id: 'prepared-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    assert.ok(staged);
+    const prepared = prepareStagedWebServerSession(staged);
+
+    assert.ok(prepared);
+    assert.deepEqual([Object.getPrototypeOf(prepared), Object.isFrozen(prepared), Object.getOwnPropertyNames(prepared), Object.getOwnPropertySymbols(prepared)], [null, true, [], []]);
+    const sessionId = getPreparedWebServerSessionId(prepared);
+    assert.ok(sessionId);
+    assert.equal(getSession(sessionId), null);
+    const originalBoolean = globalThis.Boolean; let committed = false;
+    try { globalThis.Boolean = (() => { throw new Error('ambient Boolean must not run'); }) as unknown as BooleanConstructor; committed = commitPreparedWebServerSession(prepared); }
+    finally { globalThis.Boolean = originalBoolean; }
+    assert.equal(committed, true);
+    assert.equal(typeof committed, 'boolean');
+    const session = getSession(sessionId);
+    assert.ok(session);
+    assert.equal(session.id, sessionId);
+    assert.equal(session.authChannel, 'web');
+    assert.equal(getSession(session.id), session);
+    assert.equal(getPreparedWebServerSessionId(prepared), null);
+    assert.equal(commitPreparedWebServerSession(prepared), false);
+});
+
+test('prepared Web session abort, deletion, user invalidation, clear, and hostile copies publish nothing', () => {
+    const aborted = prepareStagedWebServerSession(stageWebServerSession({ id: 'prepared-abort', username: SYNTHETIC_USERNAME, role: 'clinician' }));
+    const deleted = prepareStagedWebServerSession(stageWebServerSession({ id: 'prepared-delete', username: SYNTHETIC_USERNAME, role: 'clinician' }));
+    const invalidated = prepareStagedWebServerSession(stageWebServerSession({ id: 'prepared-invalidate', username: SYNTHETIC_USERNAME, role: 'clinician' }));
+    const cleared = prepareStagedWebServerSession(stageWebServerSession({ id: 'prepared-clear', username: SYNTHETIC_USERNAME, role: 'clinician' }));
+    assert.ok(aborted && deleted && invalidated && cleared);
+
+    assert.equal(abortPreparedWebServerSession(aborted), true);
+    assert.equal(abortPreparedWebServerSession(aborted), false);
+    const deletedId = getPreparedWebServerSessionId(deleted); assert.ok(deletedId); deleteSession(deletedId);
+    invalidateSessionsForUser('prepared-invalidate');
+    clearAllSessions();
+    for (const prepared of [aborted, deleted, invalidated, cleared]) assert.equal(commitPreparedWebServerSession(prepared), false);
+    const copied = Object.assign(Object.create(null), cleared);
+    const proxied = new Proxy(cleared, {});
+    assert.equal(getPreparedWebServerSessionId(copied), null);
+    assert.equal(commitPreparedWebServerSession(proxied), false);
+});
+
+test('a reservation denies colliding live, native, and direct staged publication without overwriting', () => {
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath]; const cryptoModule = nodeRequire('node:crypto'); const randomBytes = cryptoModule.randomBytes;
+    let isolated: typeof import('./server-session') | undefined;
+    try {
+        cryptoModule.randomBytes = () => Buffer.alloc(32, 7); delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
+        const prepared = isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({ id: 'reserved-user', username: SYNTHETIC_USERNAME, role: 'clinician' }));
+        assert.ok(prepared); const sessionId = isolated.getPreparedWebServerSessionId(prepared); assert.ok(sessionId);
+        assert.throws(() => isolated!.createSession({ id: 'live-user', username: SYNTHETIC_USERNAME, role: 'clinician' }), /unavailable/u);
+        assert.throws(() => isolated!.createNativeServerSession({ id: 'native-user', username: SYNTHETIC_USERNAME, role: 'clinician' }, { clientId: 'synthetic-client', clientPlatform: 'macos' }), /unavailable/u);
+        assert.equal(isolated.activateStagedWebServerSession(isolated.stageWebServerSession({ id: 'direct-user', username: SYNTHETIC_USERNAME, role: 'clinician' })), null);
+        assert.equal(isolated.getSession(sessionId), null);
+        assert.equal(isolated.commitPreparedWebServerSession(prepared), true); assert.equal(isolated.getSession(sessionId)?.id, sessionId);
+    } finally { cryptoModule.randomBytes = randomBytes; isolated?.clearAllSessions(); if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
+});
+
+test('entropy reentry cannot resurrect or duplicate staged Web reservations', () => {
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath]; const cryptoModule = nodeRequire('node:crypto'); const randomBytes = cryptoModule.randomBytes;
+    let isolated: typeof import('./server-session') | undefined; let first: ReturnType<typeof stageWebServerSession> = null; let second: ReturnType<typeof stageWebServerSession> = null;
+    try {
+        let entered = false; let same: ReturnType<typeof prepareStagedWebServerSession> | undefined; let other: ReturnType<typeof prepareStagedWebServerSession> | undefined;
+        cryptoModule.randomBytes = () => { if (!entered && isolated && first && second) { entered = true; same = isolated.prepareStagedWebServerSession(first); other = isolated.prepareStagedWebServerSession(second); } return Buffer.alloc(32, 9); };
+        delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
+        first = isolated.stageWebServerSession({ id: 'reentry-first', username: SYNTHETIC_USERNAME, role: 'clinician' }); second = isolated.stageWebServerSession({ id: 'reentry-second', username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(first && second);
+        assert.equal(isolated.prepareStagedWebServerSession(first), null);
+        assert.equal(same, null); assert.equal(other, null);
+        assert.equal(isolated.activateStagedWebServerSession(second), null);
+        assert.equal(isolated.getSession(Buffer.alloc(32, 9).toString('hex')), null);
+        const fresh = isolated.stageWebServerSession({ id: 'reentry-fresh', username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(fresh); assert.ok(isolated.commitPreparedWebServerSession(isolated.prepareStagedWebServerSession(fresh)));
+    } finally { cryptoModule.randomBytes = randomBytes; isolated?.clearAllSessions(); if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
+});
+
+test('a prepared session survives unrelated creation and remains private across a module copy', () => {
+    const prepared = prepareStagedWebServerSession(stageWebServerSession({ id: 'prepared-copy', username: SYNTHETIC_USERNAME, role: 'clinician' }));
+    assert.ok(prepared); const sessionId = getPreparedWebServerSessionId(prepared); assert.ok(sessionId);
+    const unrelated = syntheticSession(); assert.notEqual(unrelated.id, sessionId); assert.equal(getSession(sessionId), null);
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath]; let restarted: typeof import('./server-session') | undefined;
+    try { delete nodeRequire.cache[modulePath]; restarted = nodeRequire(modulePath) as typeof import('./server-session'); assert.equal(restarted.getPreparedWebServerSessionId(prepared), null); assert.equal(restarted.commitPreparedWebServerSession(prepared), false); }
+    finally { restarted?.clearAllSessions(); if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
+    assert.equal(commitPreparedWebServerSession(prepared), true); assert.equal(getSession(sessionId)?.id, sessionId);
+});
+
 test('staged Web sessions deny abort, user invalidation, clear, restart, and hostile capsules', () => {
     const aborted = stageWebServerSession({ id: 'abort-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
     const invalidated = stageWebServerSession({ id: 'invalidate-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
@@ -262,11 +350,12 @@ test('staging accepts only exact data values and never reads hostile accessors o
     assert.equal(stageWebServerSession({ id: 'extra-user', username: SYNTHETIC_USERNAME, role: 'clinician', authChannel: 'native' }), null);
 });
 
-test('an expired staged Web session is denied before publication', () => {
+test('an expired prepared Web session releases its reservation before publication', () => {
     const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath]; const ttl = process.env.MEDIFLOW_SESSION_TTL_MS;
     let isolated: typeof import('./server-session') | undefined;
-    try { process.env.MEDIFLOW_SESSION_TTL_MS = '0'; delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session'); const capsule = isolated.stageWebServerSession({ id: 'expired-user', username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(capsule); assert.equal(isolated.activateStagedWebServerSession(capsule), null); }
-    finally { isolated?.clearAllSessions(); if (ttl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = ttl; if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
+    const originalNow = Date.now; let now = 1_000;
+    try { process.env.MEDIFLOW_SESSION_TTL_MS = '1'; Date.now = () => now; delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session'); const prepared = isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({ id: 'expired-user', username: SYNTHETIC_USERNAME, role: 'clinician' })); assert.ok(prepared); const sessionId = isolated.getPreparedWebServerSessionId(prepared); assert.ok(sessionId); now += 2; assert.equal(isolated.commitPreparedWebServerSession(prepared), false); assert.equal(isolated.getPreparedWebServerSessionId(prepared), null); assert.equal(isolated.getSession(sessionId), null); }
+    finally { Date.now = originalNow; isolated?.clearAllSessions(); if (ttl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = ttl; if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
 });
 
 test('an entropy collision burns the capsule without replacing the live session', () => {
@@ -398,6 +487,7 @@ test('keeps session state isolated from post-load ambient intrinsics', () => {
     const distantFuture = now + 1000 * 60 * 60 * 24 * 365;
     let poisonedCalls = 0;
     let live: ReturnType<typeof createSession> | undefined;
+    let preparedId: string | null = null; let preparedCommit: ReturnType<typeof commitPreparedWebServerSession> | undefined;
     let expiryAfterZero = 0; let expiryAfterInfinity = 0; let expiryAfterFuture = 0;
     let deleted = false; let invalidated = false; let cleared = false; let expiredRemainsClosed = false;
     let disposerCalls = 0; let disposerReason: string | undefined;
@@ -428,6 +518,9 @@ test('keeps session state isolated from post-load ambient intrinsics', () => {
         Object.getOwnPropertyDescriptor = poison as typeof Object.getOwnPropertyDescriptor;
         arrayPrototype.push = poison as typeof arrayPrototype.push;
         arrayPrototype[Symbol.iterator] = poison as typeof arrayPrototype[typeof Symbol.iterator];
+
+        const prepared = prepareStagedWebServerSession(stageWebServerSession({ id: 'poisoned-prepared', username: SYNTHETIC_USERNAME, role: 'clinician' }));
+        if (prepared) { preparedId = getPreparedWebServerSessionId(prepared); preparedCommit = commitPreparedWebServerSession(prepared); }
 
         live = syntheticSession();
         assert.equal(getSession(live.id), live);
@@ -496,6 +589,8 @@ test('keeps session state isolated from post-load ambient intrinsics', () => {
     assert.ok(expiryAfterZero > now);
     assert.ok(expiryAfterInfinity > now);
     assert.ok(expiryAfterFuture > now && expiryAfterFuture < distantFuture);
+    assert.ok(preparedId);
+    assert.equal(preparedCommit, true);
     assert.equal(deleted, true);
     assert.equal(invalidated, true);
     assert.equal(cleared, true);
