@@ -62,6 +62,7 @@ const SetConstructor = Set;
 const authenticOwners = new WeakSetConstructor<object>();
 const weakSetAdd = WeakSet.prototype.add;
 const weakSetHas = WeakSet.prototype.has;
+const weakSetDelete = WeakSet.prototype.delete;
 const applyIntrinsic = Reflect.apply;
 const ownKeysIntrinsic = Reflect.ownKeys;
 const mapGet = Map.prototype.get;
@@ -84,6 +85,10 @@ function addOwnerIdentity(registry: WeakSet<object>, owner: object): void {
 
 function hasOwnerIdentity(registry: WeakSet<object>, candidate: object): boolean {
     return applyIntrinsic(weakSetHas, registry, [candidate]);
+}
+
+function deleteOwnerIdentity(registry: WeakSet<object>, candidate: object): void {
+    applyIntrinsic(weakSetDelete, registry, [candidate]);
 }
 
 function getMapValue<K, V>(registry: Map<K, V>, key: K): V | undefined {
@@ -368,6 +373,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 projection: DocumentSynthesisProjectionCandidate; sourceSetDigestSha256: readonly number[]; seal: object | null;
                 state: 'sealed' | 'begun' | 'burned'; revoked: boolean; };
             const documentSynthesisSealedEvidence = new WeakMapConstructor<object, SealedEvidenceRecord>();
+            const documentSynthesisSealCaptures = new WeakMapConstructor<object, Readonly<{ records: WeakMap<object, object>; seals: WeakSet<object> }>>();
             let creating: SelectionState | null = null;
             let terminal = false;
             let unregisterOwner: (() => void) | null = null;
@@ -722,7 +728,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     nextSourceSetEpoch: bigint | null; lineageRevocationGeneration: bigint | null;
                     sourceSetDigestSha256: readonly number[] | null;
                     revocationTarget: object;
-                    state: 'captured' | 'ingested' | 'retained' | 'sealed' | 'revoked'; };
+                    state: 'captured' | 'ingested' | 'retained' | 'sealed' | 'burned' | 'revoked'; };
                 const captures = new WeakSetConstructor<object>(); const grants = new WeakSetConstructor<object>();
                 const evidence = new WeakSetConstructor<object>(); const seals = new WeakSetConstructor<object>(); const records = new WeakMapConstructor<object, Entry>();
                 const current = () => {
@@ -757,6 +763,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 };
                 const revokeEntry = (entry: Entry): boolean => {
                     if (entry.state === 'revoked') return true;
+                    if (entry.state === 'burned') return false;
                     const observed = observeDocumentSynthesisRevocation(documentSynthesisLineage, entry.revocationTarget);
                     if (observed.status === 'invalid' || observed.status === 'exhausted') {
                         if (observed.status === 'exhausted') { documentSynthesisLineage = observed.state; documentSynthesisLineageTerminal = true; }
@@ -767,7 +774,11 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     if (sealed) sealed.revoked = true;
                     entry.state = 'revoked'; return true;
                 };
-                const burnEntry = (entry: Entry) => { revokeEntry(entry); entry.state = 'revoked'; };
+                const burnEntry = (entry: Entry) => {
+                    const sealed = entry.seal ? applyIntrinsic(weakMapGet, documentSynthesisSealedEvidence, [entry.seal]) : null;
+                    if (sealed) sealed.revoked = true;
+                    entry.state = 'burned';
+                };
                 const canonicalSourceText = (value: unknown): value is string => {
                     if (typeof value !== 'string' || value.length === 0 || value.length > 12_000) return false;
                     for (let index = 0; index < value.length; index += 1) {
@@ -831,7 +842,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         const allocation = allocateDocumentSynthesisSourceSetEpoch(documentSynthesisLineage);
                         if (allocation.status !== 'allocated') { if (allocation.status === 'exhausted') documentSynthesisLineageTerminal = true; burnEntry(entry); return null; }
                         documentSynthesisLineage = allocation.state;
-                        if (!current() || leasePortOperationPoisoned) { revokeEntry(entry); return null; }
+                        if (!current() || leasePortOperationPoisoned) { burnEntry(entry); return null; }
                         const retained = opaque(); entry.projection = ObjectFreeze({ sourceKind: projection.sourceKind,
                             sourceText: projection.sourceText }); entry.sourceSetEpoch = allocation.sourceSetEpoch;
                         entry.revocationGeneration = allocation.state.revocationGeneration; entry.nextSourceSetEpoch = allocation.state.nextSourceSetEpoch;
@@ -881,6 +892,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                             sourceSetEpoch, revocationGeneration, nextSourceSetEpoch, lineageRevocationGeneration,
                             projection, sourceSetDigestSha256: digest.sourceSetDigestSha256, seal, state: 'sealed', revoked: false,
                         }]);
+                        applyIntrinsic(weakMapSet, documentSynthesisSealCaptures, [seal, { records: records as unknown as WeakMap<object, object>, seals }]);
                         return seal as DocumentSynthesisSourceSetSealCapability;
                     } catch {
                         const entry = entryFor(value);
@@ -930,7 +942,12 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     };
                     const burn = (entry: SealedEvidenceRecord, grant: object | null) => {
                         const seal = entry.seal; entry.state = 'burned'; entry.seal = null;
-                        if (seal) applyIntrinsic(weakMapDelete, documentSynthesisSealedEvidence, [seal]);
+                        if (seal) {
+                            applyIntrinsic(weakMapDelete, documentSynthesisSealedEvidence, [seal]);
+                            const capture = applyIntrinsic(weakMapGet, documentSynthesisSealCaptures, [seal]);
+                            if (capture) { applyIntrinsic(weakMapDelete, capture.records, [seal]); deleteOwnerIdentity(capture.seals, seal); }
+                            applyIntrinsic(weakMapDelete, documentSynthesisSealCaptures, [seal]);
+                        }
                         if (grant) applyIntrinsic(weakMapDelete, records, [grant]);
                     };
                     const port = ObjectCreate(null) as DocumentSynthesisSealedEvidencePort;

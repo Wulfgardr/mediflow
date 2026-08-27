@@ -266,6 +266,10 @@ test('Document Synthesis sealed evidence consumes one owner-bound seal into only
     assert.equal(output.providerProjection.label, 'S1'); assert.equal(output.providerProjection.sourceText, 'Synthetic source.');
     assert.equal(Object.isFrozen(output.sourceSetDigestSha256), true); assert.equal(output.sourceSetDigestSha256.length, 32);
     assertNoBigIntInDescriptors(output); assert.equal(evidencePort.consume(evidenceGrant), null); assert.equal(evidencePort.begin(seal), null);
+    assert.equal(capturePort.observeRevocation(seal), false);
+    const laterCapture = capturePort.observeCurrentness(currentness(1, 1, 'document-source.synthetic.later')); assert.ok(laterCapture);
+    const laterGrant = capturePort.begin(laterCapture); assert.ok(laterGrant); const laterRetained = capturePort.retain(Object.freeze({ grant: laterGrant, observedCurrentness: currentness(1, 1, 'document-source.synthetic.later'), projection: projection() })); assert.ok(laterRetained);
+    const laterSeal = capturePort.sealRetainedProjection(laterRetained); assert.ok(laterSeal); assert.ok(owner.mintDocumentSynthesisSealedEvidencePort(value).begin(laterSeal));
     const projectionDigest = Array.from(createHash('sha256').update(new TextEncoder().encode('Synthetic source.')).digest());
     const expected = digestDocumentSynthesisSourceSet(Object.freeze({ sourceSetEpoch: BigInt(1), revocationGeneration: BigInt(0), sources: Object.freeze([
         Object.freeze({ label: 'S1', documentSourceRef: 'document-source.synthetic.01', documentRevision: BigInt(1),
