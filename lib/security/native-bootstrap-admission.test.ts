@@ -127,11 +127,13 @@ test('native bootstrap burns before revalidation and denies revoked, rotated, or
     assert.equal(await consumeNativeBootstrapAdmission(crossClient), null);
 });
 
-test('native bootstrap burns an admission when state reload fails without rejecting', async () => {
+test('native bootstrap denies closed-state admission and burns reload failure without rejecting', async () => {
     writeClients([syntheticClient()]);
     const admission = await admitNativeBootstrap({ request: pairedRequest('native') });
     assert.ok(admission);
     dbServer.$client.close();
     assert.equal(await consumeNativeBootstrapAdmission(admission), null);
     assert.equal(await consumeNativeBootstrapAdmission(admission), null);
+    assert.equal(await admitNativeBootstrap({ request: pairedRequest('native') }), null);
+    assert.equal(await admitNativeBootstrap({ request: pairedRequest('native') }), null);
 });

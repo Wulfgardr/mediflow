@@ -96,7 +96,12 @@ export async function admitNativeBootstrap(value: unknown): Promise<NativeBootst
     const request = canonicalPairedRequest(value);
     if (!request) return null;
 
-    const entry = entryFromPairedClient(await authenticateNetworkPairedClient(request));
+    let entry: AdmissionEntry | null;
+    try {
+        entry = entryFromPairedClient(await authenticateNetworkPairedClient(request));
+    } catch {
+        return null;
+    }
     if (!entry) return null;
 
     const token = ObjectFreeze(ObjectCreate(null));
