@@ -280,13 +280,46 @@ await Promise.resolve();
     }
 });
 
+test('post-begin entropy or DB failures burn the owner grant without a dsh record', () => {
+    for (const mode of ['entropy', 'db']) {
+        const directory = mkdtempSync(path.join(os.tmpdir(), `mediflow-a3a2-post-begin-${mode}-`));
+        const mockAuth = path.join(directory, 'mock-server-auth.cjs'); const mockDb = path.join(directory, 'mock-db.cjs'); const mockCrypto = path.join(directory, 'mock-crypto.mjs'); const worker = path.join(directory, 'handoff.cjs');
+        try {
+            writeFileSync(mockAuth, `
+const { createSession } = require(${JSON.stringify(path.join(ROOT, 'lib/security/server-session.ts'))});
+const { createServerSessionProjectionOwnerRegistry } = require(${JSON.stringify(path.join(ROOT, 'lib/security/server-session-projection-owner.ts'))});
+const session = createSession({ id: 'user.synthetic.postbegin', username: ['post', 'begin'].join(''), role: 'admin' }, 'web');
+const base = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze({ ...pair }) }).acquire(session);
+base.issueSelection({ expectedEpoch: 0, patientId: 'patient.synthetic.postbegin', ambulatoryId: 'ambulatory.synthetic.postbegin' });
+module.exports = { acquireAuthenticatedWebSessionProjectionOwnerContext: async () => Object.freeze({ session, owner: base }) };
+`);
+            writeFileSync(mockDb, `
+let reads = 0; module.exports = { dbServer: { get() { reads += 1; if (${JSON.stringify(mode)} === 'db' && reads === 3) throw new Error('db'); return { documentSourceRef: '${'f'.repeat(64)}', documentRevision: 1, documentFreshnessEpoch: 1 }; } } };
+`);
+            writeFileSync(mockCrypto, `export const randomBytes = () => { if (${JSON.stringify(mode)} === 'entropy' && process.env.THROW_A3A2_ENTROPY === '1') throw new Error('entropy'); return new Uint8Array(16).fill(77); };`);
+            writeFileSync(worker, `
+(async () => {
+const assert = require('node:assert/strict'); const { registerHooks } = require('node:module'); const { pathToFileURL } = require('node:url');
+const target = ${JSON.stringify(TARGET)}; const auth = ${JSON.stringify(mockAuth)}; const db = ${JSON.stringify(mockDb)}; const crypto = ${JSON.stringify(mockCrypto)};
+registerHooks({ resolve(specifier, context, nextResolve) { if (context.parentURL === pathToFileURL(target).href && specifier === '../../security/server-auth') return { shortCircuit: true, url: pathToFileURL(auth).href, format: 'commonjs' }; if (context.parentURL === pathToFileURL(target).href && specifier === '../../db-server') return { shortCircuit: true, url: pathToFileURL(db).href, format: 'commonjs' }; if (context.parentURL === pathToFileURL(target).href && specifier === 'node:crypto') return { shortCircuit: true, url: pathToFileURL(crypto).href, format: 'module' }; return nextResolve(specifier, context); } });
+const { captureDocumentSynthesisAuthenticatedAttachment: capture, ingestDocumentSynthesisAuthenticatedAttachmentProjection: ingest, sealDocumentSynthesisAuthenticatedAttachmentSourceSet: seal, handoffDocumentSynthesisAuthenticatedAttachmentSourceSet: handoff } = require(target); const unhandled = []; process.on('unhandledRejection', (reason) => unhandled.push(reason));
+const captured = await capture({ attachmentId: 'attachment.synthetic.postbegin' }); assert.equal(captured.status, 'available'); const projected = await ingest(captured.captureHandle, { sourceKind: 'native_text', sourceText: 'Synthetic post begin' }); assert.equal(projected.status, 'available'); const sealed = await seal(projected.projectionHandle); assert.equal(sealed.status, 'available'); if (${JSON.stringify(mode)} === 'entropy') process.env.THROW_A3A2_ENTROPY = '1'; const denied = await handoff(sealed.sourceSetSealHandle);
+assert.deepEqual({ ...denied }, { status: 'denied', code: 'unavailable', handoffHandle: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' }); assert.equal((await handoff(sealed.sourceSetSealHandle)).status, 'denied'); await new Promise((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
+})().catch((error) => { console.error(error); process.exitCode = 1; });
+`);
+            const child: ReturnType<typeof spawnSync> = spawnSync(NODE_24, ['--experimental-strip-types', '--import', RUNNER, worker], { cwd: ROOT, encoding: 'utf8' });
+            assert.equal(child.status, 0, `${mode}\n${child.stdout}\n${child.stderr}`);
+        } finally { rmSync(directory, { recursive: true, force: true }); }
+    }
+});
+
 test('burns dss before the A3a2 handoff, rereads host currentness immediately before one final consume, and exposes no evidence', () => {
     const source = readFileSync(TARGET, 'utf8');
     const handoff = source.slice(source.indexOf('export async function handoffDocumentSynthesisAuthenticatedAttachmentSourceSet'));
 
     assert.ok(handoff.indexOf('mapDelete(broker.records, sourceSetSealHandle)') < handoff.indexOf('mintDocumentSynthesisSealedEvidencePort'));
     assert.equal((handoff.match(/DbGet\(/gu) ?? []).length, 1);
-    assert.equal((handoff.match(/\.consume\(/gu) ?? []).length, 2);
+    assert.equal((handoff.match(/\.consume\(/gu) ?? []).length, 1);
     assert.ok(handoff.indexOf('const latest = currentness(DbGet(') < handoff.indexOf('const evidence = prepared.port.consume(prepared.grant)'));
     assert.ok(handoff.indexOf('const evidence = prepared.port.consume(prepared.grant)') < handoff.indexOf("const state = sealed<HandoffRecord>({ selected: true, scope: 'document_synthesis_attachment_handoff', evidence })"));
     assert.ok(handoff.indexOf("const state = sealed<HandoffRecord>({ selected: true, scope: 'document_synthesis_attachment_handoff', evidence })") < handoff.indexOf('broker.publish(prepared.handoffHandle, state)'));
