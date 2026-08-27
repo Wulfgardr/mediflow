@@ -155,11 +155,10 @@ test('Document Synthesis lineage denies forged, cloned, proxied, accessor, proto
     assert.ok(port.verify(grant), 'forged verification must not consume the authentic grant');
 });
 
-test('Document Synthesis lineage revocation is allocation-bound, repeat-idempotent, and cross-owner/session closed', () => {
+test('Document Synthesis lineage revocation is owner-wide, repeat-idempotent, and cross-owner/session closed', () => {
     const source = readFileSync(new URL('./server-session-projection-owner.ts', import.meta.url), 'utf8');
-    assert.match(source, /sourceSetEpoch: allocation\.sourceSetEpoch,\s+revocationState: createDocumentSynthesisSourceLineageState\(\)/u);
-    assert.match(source, /observeDocumentSynthesisRevocation\(entry\.revocationState, entry\.revocationTarget\)/u);
-    assert.doesNotMatch(source, /observeDocumentSynthesisRevocation\(documentSynthesisLineage,/u);
+    assert.match(source, /observeDocumentSynthesisRevocation\(documentSynthesisLineage, entry\.revocationTarget\)/u);
+    assert.doesNotMatch(source, /entry\.revocationState/u);
     assert.match(source, /weakMapSet, records, \[currentnessTarget, entry\]/u);
     const first = ownerWithSelection(); const firstPort = first.owner.mintDocumentSynthesisSourceLineagePort(first.value);
     const grant = firstPort.open(); assert.ok(grant); const capability = firstPort.verify(grant); assert.ok(capability);
@@ -167,8 +166,8 @@ test('Document Synthesis lineage revocation is allocation-bound, repeat-idempote
     assert.equal(firstPort.observeRevocation(capability), true);
     assert.equal(firstPort.burn(capability), false);
     const unaffected = firstPort.open(); assert.ok(unaffected); const unaffectedCapability = firstPort.verify(unaffected); assert.ok(unaffectedCapability);
-    assert.equal(firstPort.observeRevocation(unaffectedCapability), true, 'each allocation begins its own revocation lineage');
-    assert.equal(firstPort.burn(unaffectedCapability), false, 'one allocation cannot revoke another allocation target');
+    assert.equal(firstPort.observeRevocation(unaffectedCapability), true, 'a distinct target advances the owner-wide lineage once');
+    assert.equal(firstPort.burn(unaffectedCapability), false, 'a revoked target cannot be replayed');
     const second = ownerWithSelection(); const secondPort = second.owner.mintDocumentSynthesisSourceLineagePort(second.value);
     assert.equal(secondPort.verify(grant), null); assert.equal(secondPort.observeRevocation(capability), false);
     const live = firstPort.open(); assert.ok(live);
@@ -268,9 +267,9 @@ test('Document Synthesis sealed evidence consumes one owner-bound seal into only
     assert.equal(Object.isFrozen(output.sourceSetDigestSha256), true); assert.equal(output.sourceSetDigestSha256.length, 32);
     assertNoBigIntInDescriptors(output); assert.equal(evidencePort.consume(evidenceGrant), null); assert.equal(evidencePort.begin(seal), null);
     const projectionDigest = Array.from(createHash('sha256').update(new TextEncoder().encode('Synthetic source.')).digest());
-    const expected = digestDocumentSynthesisSourceSet(Object.freeze({ sourceSetEpoch: 1n, revocationGeneration: 0n, sources: Object.freeze([
-        Object.freeze({ label: 'S1', documentSourceRef: 'document-source.synthetic.01', documentRevision: 1n,
-            documentFreshnessEpoch: 1n, sourceByteLength: 17, projectionDigestSha256: Object.freeze(projectionDigest) }),
+    const expected = digestDocumentSynthesisSourceSet(Object.freeze({ sourceSetEpoch: BigInt(1), revocationGeneration: BigInt(0), sources: Object.freeze([
+        Object.freeze({ label: 'S1', documentSourceRef: 'document-source.synthetic.01', documentRevision: BigInt(1),
+            documentFreshnessEpoch: BigInt(1), sourceByteLength: 17, projectionDigestSha256: Object.freeze(projectionDigest) }),
     ]) }));
     assert.equal(expected.status, 'available'); assert.deepEqual(output.sourceSetDigestSha256, expected.sourceSetDigestSha256);
 });
@@ -323,6 +322,46 @@ test('Document Synthesis sealed evidence burns on final selection, expiry, logou
         if (descriptor) Object.defineProperty(Object.prototype, 'then', descriptor); else delete (Object.prototype as { then?: unknown }).then;
     }
     assert.equal(reads, 0);
+});
+
+test('Document Synthesis sealed evidence burns at begin after a later allocation or unrelated owner-wide revocation', () => {
+    const fixture = ownerWithSelection(); const capturePort = fixture.owner.mintDocumentSynthesisAttachmentCapturePort(fixture.value);
+    const capture = capturePort.observeCurrentness(currentness(1, 1, 'document-source.synthetic.first')); assert.ok(capture);
+    const grant = capturePort.begin(capture); assert.ok(grant);
+    const retained = capturePort.retain(Object.freeze({ grant, observedCurrentness: currentness(1, 1, 'document-source.synthetic.first'), projection: projection() })); assert.ok(retained);
+    const seal = capturePort.sealRetainedProjection(retained); assert.ok(seal);
+    const laterCapture = capturePort.observeCurrentness(currentness(1, 1, 'document-source.synthetic.second')); assert.ok(laterCapture);
+    const laterGrant = capturePort.begin(laterCapture); assert.ok(laterGrant);
+    const laterEvidence = capturePort.retain(Object.freeze({ grant: laterGrant,
+        observedCurrentness: currentness(1, 1, 'document-source.synthetic.second'), projection: projection() })); assert.ok(laterEvidence);
+    assert.equal(fixture.owner.mintDocumentSynthesisSealedEvidencePort(fixture.value).begin(seal), null);
+    assert.equal(fixture.owner.mintDocumentSynthesisSealedEvidencePort(fixture.value).begin(seal), null);
+
+    const revoked = ownerWithSelection(); const revokedPort = revoked.owner.mintDocumentSynthesisAttachmentCapturePort(revoked.value);
+    const revokedCapture = revokedPort.observeCurrentness(currentness()); assert.ok(revokedCapture); const revokedGrant = revokedPort.begin(revokedCapture); assert.ok(revokedGrant);
+    const revokedEvidence = revokedPort.retain(Object.freeze({ grant: revokedGrant, observedCurrentness: currentness(), projection: projection() })); assert.ok(revokedEvidence);
+    const revokedSeal = revokedPort.sealRetainedProjection(revokedEvidence); assert.ok(revokedSeal);
+    const lineage = revoked.owner.mintDocumentSynthesisSourceLineagePort(revoked.value); const lineageGrant = lineage.open(); assert.ok(lineageGrant);
+    const lineageCapability = lineage.verify(lineageGrant); assert.ok(lineageCapability); assert.equal(lineage.observeRevocation(lineageCapability), true);
+    assert.equal(revoked.owner.mintDocumentSynthesisSealedEvidencePort(revoked.value).begin(revokedSeal), null);
+});
+
+test('Document Synthesis retain accepts only pre-canonical source text without hostile observation', () => {
+    const retain = (sourceText: unknown) => {
+        const { value, owner } = ownerWithSelection(); const port = owner.mintDocumentSynthesisAttachmentCapturePort(value);
+        const capture = port.observeCurrentness(currentness()); assert.ok(capture); const grant = port.begin(capture); assert.ok(grant);
+        return port.retain(Object.freeze({ grant, observedCurrentness: currentness(), projection: Object.freeze({ sourceKind: 'native_text', sourceText }) } as never));
+    };
+    for (const text of ['  synthetic', 'synthetic  ', 'synthetic\r\ntext', 'synthetic\u0000text', 'e\u0301', '\ud800']) assert.equal(retain(text), null);
+    let reads = 0; let traps = 0;
+    const accessor = Object.freeze(Object.defineProperty({ sourceKind: 'native_text' }, 'sourceText', { enumerable: true, get() { reads += 1; return 'Synthetic source.'; } }));
+    const proxy = new Proxy(Object.freeze({ sourceKind: 'native_text', sourceText: 'Synthetic source.' }), { get() { traps += 1; throw new Error('synthetic trap'); } });
+    for (const projectionValue of [accessor, proxy]) {
+        const { value, owner } = ownerWithSelection(); const port = owner.mintDocumentSynthesisAttachmentCapturePort(value);
+        const capture = port.observeCurrentness(currentness()); assert.ok(capture); const grant = port.begin(capture); assert.ok(grant);
+        assert.equal(port.retain(Object.freeze({ grant, observedCurrentness: currentness(), projection: projectionValue } as never)), null);
+    }
+    assert.equal(reads, 0); assert.equal(traps, 0); assert.ok(retain('Synthetic source.'));
 });
 
 test('Document Synthesis attachment capture closes replay, stale currentness, foreign authority, and lifecycle changes', () => {
