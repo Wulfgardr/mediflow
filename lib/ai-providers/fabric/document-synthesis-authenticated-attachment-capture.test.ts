@@ -215,6 +215,43 @@ await new Promise((resolve) => setImmediate(resolve)); assert.deepEqual(unhandle
     }
 });
 
+test('discards exactly once when dsh deletion mutates then throws, but preserves an ordinary false deletion', () => {
+    for (const mode of ['throw', 'false']) {
+        const directory = mkdtempSync(path.join(os.tmpdir(), `mediflow-a3c3-delete-${mode}-`));
+        const mockAuth = path.join(directory, 'mock-server-auth.cjs'); const mockDb = path.join(directory, 'mock-db.cjs'); const worker = path.join(directory, 'worker.cjs');
+        try {
+            writeFileSync(mockAuth, `
+const { createSession } = require(${JSON.stringify(path.join(ROOT, 'lib/security/server-session.ts'))});
+const { createServerSessionProjectionOwnerRegistry } = require(${JSON.stringify(path.join(ROOT, 'lib/security/server-session-projection-owner.ts'))});
+const session = createSession({ id: 'user.synthetic.delete', username: ['delete', 'fence'].join(''), role: 'admin' }, 'web');
+const base = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze({ ...pair }) }).acquire(session);
+base.issueSelection({ expectedEpoch: 0, patientId: 'patient.synthetic.delete', ambulatoryId: 'ambulatory.synthetic.delete' }); globalThis.__deleteFence = { discards: 0, capsules: 0, identities: 0 };
+const owner = Object.freeze({ snapshotSelectionEpoch: (value) => base.snapshotSelectionEpoch(value), snapshotReviewContextEpoch: (value) => base.snapshotReviewContextEpoch(value), withLeaseCriticalSection: (value, callback) => base.withLeaseCriticalSection(value, callback), mintDocumentSynthesisAttachmentCapturePort: (value) => base.mintDocumentSynthesisAttachmentCapturePort(value),
+  mintDocumentSynthesisSealedEvidenceDisposalPort(value) { const port = base.mintDocumentSynthesisSealedEvidenceDisposalPort(value); return Object.freeze({ discard(seal) { globalThis.__deleteFence.discards += 1; return port.discard(seal); } }); },
+  mintDocumentSynthesisExecutionCapsulePort(value) { globalThis.__deleteFence.capsules += 1; return base.mintDocumentSynthesisExecutionCapsulePort(value); },
+  mintDocumentSynthesisExecutionCapsuleIdentityPort(value) { globalThis.__deleteFence.identities += 1; return base.mintDocumentSynthesisExecutionCapsuleIdentityPort(value); } });
+module.exports = { acquireAuthenticatedWebSessionProjectionOwnerContext: async () => Object.freeze({ session, owner }) };
+`);
+            writeFileSync(mockDb, `module.exports = { dbServer: { get: () => ({ documentSourceRef: '${'a'.repeat(64)}', documentRevision: 1, documentFreshnessEpoch: 1 }) } };`);
+            writeFileSync(worker, `
+(async () => {
+const assert = require('node:assert/strict'); const { registerHooks } = require('node:module'); const { pathToFileURL } = require('node:url'); const target = ${JSON.stringify(TARGET)}; const authPath = ${JSON.stringify(mockAuth)}; const dbPath = ${JSON.stringify(mockDb)};
+registerHooks({ resolve(specifier, context, nextResolve) { if (context.parentURL === pathToFileURL(target).href && specifier === '../../security/server-auth') return { shortCircuit: true, url: pathToFileURL(authPath).href, format: 'commonjs' }; if (context.parentURL === pathToFileURL(target).href && specifier === '../../db-server') return { shortCircuit: true, url: pathToFileURL(dbPath).href, format: 'commonjs' }; return nextResolve(specifier, context); } });
+const originalDelete = Map.prototype.delete; let deleteMode = ''; Map.prototype.delete = function (key) { if (deleteMode === 'false' && typeof key === 'string' && key.startsWith('dsh_')) { deleteMode = ''; return false; } const result = Reflect.apply(originalDelete, this, [key]); if (deleteMode === 'throw' && typeof key === 'string' && key.startsWith('dsh_')) { deleteMode = ''; throw new Error('synthetic apply-then-throw'); } return result; };
+const api = require(target); Map.prototype.delete = originalDelete; const stats = () => ({ ...globalThis.__deleteFence }); const unhandled = []; process.on('unhandledRejection', (value) => unhandled.push(value));
+const captured = await api.captureDocumentSynthesisAuthenticatedAttachment({ attachmentId: 'attachment.synthetic.delete' }); const projected = await api.ingestDocumentSynthesisAuthenticatedAttachmentProjection(captured.captureHandle, { sourceKind: 'native_text', sourceText: 'Synthetic delete fence' }); const sealed = await api.sealDocumentSynthesisAuthenticatedAttachmentSourceSet(projected.projectionHandle); const handoff = await api.handoffDocumentSynthesisAuthenticatedAttachmentSourceSet(sealed.sourceSetSealHandle); assert.equal(handoff.status, 'available');
+deleteMode = ${JSON.stringify(mode)}; assert.equal(await api.exchangeDocumentSynthesisAuthenticatedAttachmentHandoff(handoff.handoffHandle), null);
+if (${JSON.stringify(mode)} === 'throw') { assert.deepEqual(stats(), { discards: 1, capsules: 0, identities: 0 }); assert.equal(await api.exchangeDocumentSynthesisAuthenticatedAttachmentHandoff(handoff.handoffHandle), null); }
+else { assert.deepEqual(stats(), { discards: 0, capsules: 0, identities: 0 }); const identity = await api.exchangeDocumentSynthesisAuthenticatedAttachmentHandoff(handoff.handoffHandle); assert.ok(identity); assert.deepEqual(Reflect.ownKeys(identity), []); assert.deepEqual(stats(), { discards: 0, capsules: 1, identities: 1 }); }
+await new Promise((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
+})().catch((error) => { console.error(error); process.exitCode = 1; });
+`);
+            const child: ReturnType<typeof spawnSync> = spawnSync(NODE_24, ['--experimental-strip-types', '--import', RUNNER, worker], { cwd: ROOT, encoding: 'utf8' });
+            assert.equal(child.status, 0, `${mode}\n${child.stdout}\n${child.stderr}`);
+        } finally { rmSync(directory, { recursive: true, force: true }); }
+    }
+});
+
 test('post-callback fence failures leave no projection publication or fixed-entropy collision', () => {
     for (const mode of ['clock', 'currentness', 'expiry', 'channel']) {
         const directory = mkdtempSync(path.join(os.tmpdir(), `mediflow-i1b2-fence-${mode}-`));

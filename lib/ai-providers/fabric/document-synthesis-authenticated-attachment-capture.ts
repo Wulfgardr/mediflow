@@ -201,9 +201,9 @@ export async function exchangeDocumentSynthesisAuthenticatedAttachmentHandoff(
     try {
         const broker = brokerFor(context);
         const record = mapGet(broker.records, handoffHandle);
-        if (!record || record.scope !== 'document_synthesis_attachment_handoff'
-            || !mapDelete(broker.records, handoffHandle)) return null;
+        if (!record || record.scope !== 'document_synthesis_attachment_handoff') return null;
         recordForDisposal = record;
+        if (!mapDelete(broker.records, handoffHandle)) { recordForDisposal = null; return null; }
         const capsulePort: DocumentSynthesisExecutionCapsulePort = context.owner.mintDocumentSynthesisExecutionCapsulePort(context.session);
         const identityPort: DocumentSynthesisExecutionCapsuleIdentityPort = context.owner.mintDocumentSynthesisExecutionCapsuleIdentityPort(context.session);
         const current = context.owner.withLeaseCriticalSection(context.session, () => context.owner.snapshotSelectionEpoch(context.session) === record.selectionEpoch
