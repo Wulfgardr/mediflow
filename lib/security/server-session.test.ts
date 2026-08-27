@@ -699,10 +699,10 @@ test('retirement denies hostile inputs, stale control, and module copies without
 test('retirement poisons clock and lifecycle reentry and denies expiry without drift', async (t) => {
     const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
     const cached = nodeRequire.cache[modulePath]; const originalNow = Date.now; const originalTtl = process.env.MEDIFLOW_SESSION_TTL_MS;
-    let isolated: typeof import('./server-session') | undefined; let now = 1_000; let trigger = false; let nestedCalls = 0;
+    let isolated: typeof import('./server-session') | undefined; let now = 1_000; let trigger = false; let nestedCalls = 0; let clockReads = 0;
     const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
     process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
-    process.env.MEDIFLOW_SESSION_TTL_MS = '10'; Date.now = () => { if (trigger) { trigger = false; nestedCalls += 1; nested(); } return now; };
+    process.env.MEDIFLOW_SESSION_TTL_MS = '10'; Date.now = () => { clockReads += 1; if (trigger) { trigger = false; nestedCalls += 1; nested(); } return now; };
     let nested: () => void = () => undefined;
     const make = () => {
         const staged = isolated!.stageWebServerSession({ id: `retire-${nestedCalls}-${now}`, username: ['synthetic', 'retire'].join('-'), role: 'clinician' });
@@ -712,23 +712,45 @@ test('retirement poisons clock and lifecycle reentry and denies expiry without d
         const control = authControlApi().create(`retire-fence-${sessionId}`); control.begin('login', 'op', `key-${sessionId}`, `fp-${sessionId}`, 0);
         const ticket = control.prepareTicket(`retire-fence-${sessionId}`, 'op', BigInt(0), `fp-${sessionId}`, sessionId, now); assert.ok(ticket);
         assert.equal(isolated!.activateArmedWebServerSession(port, ticket), true);
-        return { sessionId, port };
+        return { sessionId, port, control, ticket };
     };
     try {
         delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
-        for (const operation of ['lookup', 'delete', 'clear'] as const) {
+        for (const operation of ['lookup', 'retire', 'delete', 'lock', 'clear'] as const) {
             const current = make();
             nested = () => operation === 'lookup' ? isolated!.resolveActiveWebServerSession(current.sessionId)
-                : operation === 'delete' ? isolated!.deleteSession(current.sessionId) : isolated!.clearAllSessions();
-            trigger = true;
+                : operation === 'retire' ? isolated!.retireActiveWebServerSession(current.sessionId, 'lock')
+                    : operation === 'delete' ? isolated!.deleteSession(current.sessionId)
+                        : operation === 'lock' ? isolated!.invalidateServerSessionForApplicationLock(current.sessionId) : isolated!.clearAllSessions();
+            clockReads = 0; trigger = true;
             assert.equal(isolated.retireActiveWebServerSession(current.sessionId, 'lock'), false);
+            assert.equal(clockReads, 1);
             assert.equal(isolated.resolveActiveWebServerSession(current.sessionId), null);
         }
-        const expired = make(); now += 20;
-        assert.equal(isolated.retireActiveWebServerSession(expired.sessionId, 'expired'), false);
-        assert.equal(isolated.resolveActiveWebServerSession(expired.sessionId), null);
+        const boundary = make(); now += 10; clockReads = 0;
+        assert.equal(isolated.retireActiveWebServerSession(boundary.sessionId, 'expired'), true);
+        assert.equal(clockReads, 1); assert.equal(boundary.control.retireTicket(boundary.ticket, 'expired'), 2);
+        assert.equal(isolated.retireActiveWebServerSession(boundary.sessionId, 'expired'), false);
+        assert.equal(boundary.control.retireTicket(boundary.ticket, 'lock'), 0);
+
+        const live = make(); clockReads = 0;
+        assert.equal(isolated.retireActiveWebServerSession(live.sessionId, 'expired'), false);
+        assert.equal(clockReads, 1); assert.equal(isolated.resolveActiveWebServerSession(live.sessionId), null);
+
+        const expiredWrongReason = make(); now += 10; clockReads = 0;
+        assert.equal(isolated.retireActiveWebServerSession(expiredWrongReason.sessionId, 'lock'), false);
+        assert.equal(clockReads, 1); assert.equal(isolated.resolveActiveWebServerSession(expiredWrongReason.sessionId), null);
+
+        const past = make(); now += 11; clockReads = 0;
+        assert.equal(isolated.retireActiveWebServerSession(past.sessionId, 'expired'), true);
+        assert.equal(clockReads, 1); assert.equal(past.control.retireTicket(past.ticket, 'expired'), 2);
+
+        const expiredReentry = make(); now += 10;
+        nested = () => isolated!.clearAllSessions(); clockReads = 0; trigger = true;
+        assert.equal(isolated.retireActiveWebServerSession(expiredReentry.sessionId, 'expired'), false);
+        assert.equal(clockReads, 1); assert.equal(isolated.resolveActiveWebServerSession(expiredReentry.sessionId), null);
         await new Promise<void>((resolve) => setImmediate(resolve));
-        assert.equal(nestedCalls, 3); assert.deepEqual(unhandled, []);
+        assert.equal(nestedCalls, 6); assert.deepEqual(unhandled, []);
     } finally {
         trigger = false; Date.now = originalNow; isolated?.clearAllSessions();
         if (originalTtl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = originalTtl;
