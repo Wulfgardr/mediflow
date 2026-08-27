@@ -5,6 +5,8 @@ import { createRequire } from 'node:module';
 import { afterEach, test } from 'node:test';
 
 import {
+    abortStagedWebServerSession,
+    activateStagedWebServerSession,
     clearAllSessions,
     createSession,
     deleteSession,
@@ -12,6 +14,7 @@ import {
     invalidateSessionsForUser,
     peekSession,
     registerServerSessionResource,
+    stageWebServerSession,
 } from './server-session';
 
 const SYNTHETIC_USERNAME = `synthetic-${randomUUID()}`;
@@ -189,6 +192,148 @@ test('disposal cannot register a new resource on the terminated session', () => 
     deleteSession(session.id);
 
     assert.equal(nestedRegistration, null);
+});
+
+test('a staged Web session has no observable authority before its one-use activation', () => {
+    const capsule = stageWebServerSession({ id: 'staged-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+
+    assert.ok(capsule);
+    assert.equal(Object.getPrototypeOf(capsule), null);
+    assert.equal(Object.isFrozen(capsule), true);
+    assert.deepEqual(Object.getOwnPropertyNames(capsule), []);
+    assert.deepEqual(Object.getOwnPropertySymbols(capsule), []);
+    assert.equal(getSession(null), null);
+    assert.equal(peekSession(null), null);
+    assert.equal(registerServerSessionResource('staged-user', () => undefined), null);
+
+    const session = activateStagedWebServerSession(capsule);
+    assert.ok(session);
+    assert.equal(session.authChannel, 'web');
+    assert.equal(session.userId, 'staged-user');
+    assert.equal(getSession(session.id), session);
+    assert.equal(activateStagedWebServerSession(capsule), null);
+});
+
+test('staged Web sessions deny abort, user invalidation, clear, restart, and hostile capsules', () => {
+    const aborted = stageWebServerSession({ id: 'abort-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    const deleted = stageWebServerSession({ id: 'delete-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    const invalidated = stageWebServerSession({ id: 'invalidate-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    const cleared = stageWebServerSession({ id: 'clear-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    assert.ok(aborted && deleted && invalidated && cleared);
+
+    assert.equal(abortStagedWebServerSession(aborted), true);
+    assert.equal(abortStagedWebServerSession(aborted), false);
+    assert.equal(activateStagedWebServerSession(aborted), null);
+    deleteSession(deleted as unknown as string);
+    assert.equal(activateStagedWebServerSession(deleted), null);
+    invalidateSessionsForUser('invalidate-user');
+    assert.equal(activateStagedWebServerSession(invalidated), null);
+    clearAllSessions();
+    assert.equal(activateStagedWebServerSession(cleared), null);
+
+    const copied = Object.assign(Object.create(null), cleared);
+    const proxied = new Proxy(cleared, {});
+    const forged = Object.freeze(Object.create(null));
+    assert.equal(activateStagedWebServerSession(copied), null);
+    assert.equal(activateStagedWebServerSession(proxied), null);
+    assert.equal(activateStagedWebServerSession(forged), null);
+
+    const nodeRequire = createRequire(import.meta.url);
+    const modulePath = nodeRequire.resolve('./server-session.ts');
+    const originalModule = nodeRequire.cache[modulePath];
+    try {
+        const restartCapsule = stageWebServerSession({ id: 'restart-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+        assert.ok(restartCapsule);
+        delete nodeRequire.cache[modulePath];
+        const restarted = nodeRequire(modulePath) as typeof import('./server-session');
+        assert.equal(restarted.activateStagedWebServerSession(restartCapsule), null);
+        restarted.clearAllSessions();
+    } finally {
+        if (originalModule) nodeRequire.cache[modulePath] = originalModule;
+        else delete nodeRequire.cache[modulePath];
+    }
+});
+
+test('staging accepts only exact data values and never reads hostile accessors or thenables', () => {
+    let accessorReads = 0;
+    const accessorUser = Object.create(Object.prototype, {
+        id: { enumerable: true, get: () => { accessorReads += 1; return 'hostile'; } },
+        username: { enumerable: true, value: SYNTHETIC_USERNAME },
+        role: { enumerable: true, value: 'clinician' },
+    });
+    const thenable = Object.create(null, {
+        then: { enumerable: true, get: () => { accessorReads += 1; throw new Error('must not assimilate'); } },
+    });
+
+    assert.equal(stageWebServerSession(accessorUser), null);
+    assert.equal(stageWebServerSession(thenable), null);
+    assert.equal(accessorReads, 0);
+    assert.equal(stageWebServerSession({ id: 'extra-user', username: SYNTHETIC_USERNAME, role: 'clinician', authChannel: 'native' }), null);
+});
+
+test('an expired staged Web session is denied before publication', () => {
+    const nodeRequire = createRequire(import.meta.url);
+    const modulePath = nodeRequire.resolve('./server-session.ts');
+    const originalModule = nodeRequire.cache[modulePath];
+    const originalTtl = process.env.MEDIFLOW_SESSION_TTL_MS;
+    let expiring: typeof import('./server-session') | undefined;
+    try {
+        process.env.MEDIFLOW_SESSION_TTL_MS = '0';
+        delete nodeRequire.cache[modulePath];
+        expiring = nodeRequire(modulePath) as typeof import('./server-session');
+        const capsule = expiring.stageWebServerSession({ id: 'expired-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+        assert.ok(capsule);
+        assert.equal(expiring.activateStagedWebServerSession(capsule), null);
+    } finally {
+        expiring?.clearAllSessions();
+        if (originalTtl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS;
+        else process.env.MEDIFLOW_SESSION_TTL_MS = originalTtl;
+        if (originalModule) nodeRequire.cache[modulePath] = originalModule;
+        else delete nodeRequire.cache[modulePath];
+    }
+});
+
+test('staging and activation use captured intrinsics after ambient poisoning', () => {
+    const weakMapPrototype = WeakMap.prototype;
+    const bufferPrototype = Buffer.prototype;
+    const originals = {
+        weakMapGet: weakMapPrototype.get,
+        weakMapSet: weakMapPrototype.set,
+        objectCreate: Object.create,
+        objectFreeze: Object.freeze,
+        objectGetOwnPropertyNames: Object.getOwnPropertyNames,
+        objectGetOwnPropertySymbols: Object.getOwnPropertySymbols,
+        bufferToString: bufferPrototype.toString,
+    };
+    const user = { id: 'intrinsics-user', username: SYNTHETIC_USERNAME, role: 'clinician' };
+    let poisonedCalls = 0;
+    let session: ReturnType<typeof activateStagedWebServerSession>;
+    const poison = () => { poisonedCalls += 1; throw new Error('synthetic ambient intrinsic'); };
+
+    try {
+        weakMapPrototype.get = poison as typeof weakMapPrototype.get;
+        weakMapPrototype.set = poison as typeof weakMapPrototype.set;
+        Object.create = poison as typeof Object.create;
+        Object.freeze = poison as typeof Object.freeze;
+        Object.getOwnPropertyNames = poison as typeof Object.getOwnPropertyNames;
+        Object.getOwnPropertySymbols = poison as typeof Object.getOwnPropertySymbols;
+        bufferPrototype.toString = poison as typeof bufferPrototype.toString;
+
+        const capsule = stageWebServerSession(user);
+        session = activateStagedWebServerSession(capsule);
+    } finally {
+        weakMapPrototype.get = originals.weakMapGet;
+        weakMapPrototype.set = originals.weakMapSet;
+        Object.create = originals.objectCreate;
+        Object.freeze = originals.objectFreeze;
+        Object.getOwnPropertyNames = originals.objectGetOwnPropertyNames;
+        Object.getOwnPropertySymbols = originals.objectGetOwnPropertySymbols;
+        bufferPrototype.toString = originals.bufferToString;
+    }
+
+    assert.ok(session);
+    assert.equal(getSession(session.id), session);
+    assert.equal(poisonedCalls, 0);
 });
 
 test('does not trust global registry pointers across module wrappers', () => {
