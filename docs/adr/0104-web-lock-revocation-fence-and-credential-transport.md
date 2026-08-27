@@ -78,10 +78,12 @@ tardiva puo sovrascrivere il browser con un ID ormai morto sul server: il solo
 esito ammesso e disponibilita fail-closed con nuovo login. Non puo ricreare
 authority. Una risposta lock tardiva non puo eliminare un cookie piu nuovo.
 
-Un control noto e valido, senza sessione attiva ma con l'operazione pending
-corrispondente, puo confermare dopo l'avanzamento del fence. Control sconosciuto,
-mancante, stantio o con fence non corrispondente non puo confermare. Il body
-della receipt v1 resta invariato; il fence successivo e soltanto l'ETag.
+Solo la richiesta lock puo restituire una receipt confirmed dopo avere avanzato
+il fence e invalidato una login/setup pending sul medesimo control/fence. La
+login/setup tardiva cosi invalidata non puo mai confermare o committare sessione
+o authority. Control sconosciuto, mancante, stantio o con fence non corrispondente
+non puo confermare. Il body della receipt v1 resta invariato; il fence successivo
+e soltanto l'ETag.
 
 La conferma di invalidazione e separata dalla persistenza audit. Un fallimento
 audit non ripristina sessione, pending o authority e non modifica la receipt
