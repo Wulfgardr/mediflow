@@ -7,19 +7,17 @@ import { sql } from 'drizzle-orm';
 
 import { dbServer } from '../../db-server';
 import { resolveDocumentSynthesisHostProjection } from './document-synthesis-host-projection';
-import {
-    intakeDocumentSynthesisA3a2SealedEvidence,
-    type DocumentSynthesisAuthenticSourceSetToken,
-} from './document-synthesis-authentic-source-set-intake';
 import { acquireAuthenticatedWebSessionProjectionOwnerContext } from '../../security/server-auth';
 import { registerServerSessionResource } from '../../security/server-session';
 import type {
     DocumentSynthesisAttachmentCaptureCapability,
     DocumentSynthesisAttachmentIngestGrant,
     DocumentSynthesisAttachmentCapturePort,
+    DocumentSynthesisExecutionCapsuleIdentity,
+    DocumentSynthesisExecutionCapsuleIdentityPort,
+    DocumentSynthesisExecutionCapsulePort,
     DocumentSynthesisProjectionEvidenceCapability,
-    DocumentSynthesisSealedEvidence,
-    DocumentSynthesisSealedEvidencePort,
+    DocumentSynthesisSealedEvidenceDisposalPort,
     DocumentSynthesisSourceSetSealCapability,
 } from '../../security/server-session-projection-owner';
 
@@ -33,11 +31,12 @@ type CaptureRecord = Readonly<{
 type ProjectionRecord = Readonly<{ selected: true; currentness: Currentness; scope: 'document_synthesis_attachment_projection'; evidence: DocumentSynthesisProjectionEvidenceCapability;
     attachmentCapturePort: DocumentSynthesisAttachmentCapturePort }>;
 type SourceSetSealRecord = Readonly<{ selected: true; currentness: Currentness; scope: 'document_synthesis_attachment_source_set_seal'; seal: DocumentSynthesisSourceSetSealCapability }>;
+type AbandonedSeal = Readonly<{ seal: DocumentSynthesisSourceSetSealCapability; disposal: DocumentSynthesisSealedEvidenceDisposalPort }>;
 type HandoffRecord = Readonly<{ selected: true; selectionEpoch: number; reviewContextEpoch: number;
-    scope: 'document_synthesis_attachment_handoff'; evidence: DocumentSynthesisSealedEvidence }>;
+    scope: 'document_synthesis_attachment_handoff'; seal: DocumentSynthesisSourceSetSealCapability; disposal: DocumentSynthesisSealedEvidenceDisposalPort }>;
 type PreparedProjectionPublication = Readonly<{ projectionHandle: string; state: ProjectionRecord; result: ProjectionResult }>;
 type PreparedSourceSetSealPublication = Readonly<{ sourceSetSealHandle: string; state: SourceSetSealRecord; result: SourceSetSealResult }>;
-type PreparedHandoffPublication = Readonly<{ handoffHandle: string; result: HandoffResult; port: DocumentSynthesisSealedEvidencePort; grant: object; patientId: string; ambulatoryId: string }>;
+type PreparedHandoffPublication = Readonly<{ handoffHandle: string; state: HandoffRecord; result: HandoffResult }>;
 type RecordState = CaptureRecord | ProjectionRecord | SourceSetSealRecord | HandoffRecord;
 type Broker = { records: Map<string, RecordState>; dispose: () => void; publish: (handle: string, state: RecordState) => boolean };
 type Result = Readonly<{ status: 'available' | 'denied'; code: null | 'input_invalid' | 'unavailable'; captureHandle: string | null; reviewOnly: true; writesPerformed: 0; applyPolicy: 'none' }>;
@@ -51,7 +50,7 @@ const ObjectCreate = Object.create; const ObjectFreeze = Object.freeze; const Ob
 const ObjectGetPrototypeOf = Object.getPrototypeOf; const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor; const ObjectGetOwnPropertyDescriptors = Object.getOwnPropertyDescriptors;
 const ReflectOwnKeys = Reflect.ownKeys; const ArrayIsArray = Array.isArray; const NumberIsSafeInteger = Number.isSafeInteger; const Uint8ArrayConstructor = Uint8Array;
 const StringTrim = Function.call.bind(String.prototype.trim) as (value: string) => string; const RegExpTest = Function.call.bind(RegExp.prototype.test) as (expression: RegExp, value: string) => boolean;
-const MapConstructor = Map; const WeakMapConstructor = WeakMap; const mapGet = Function.call.bind(Map.prototype.get) as <T>(map: Map<string, T>, key: string) => T | undefined; const mapHas = Function.call.bind(Map.prototype.has) as (map: Map<string, unknown>, key: string) => boolean; const mapSet = Function.call.bind(Map.prototype.set) as (map: Map<string, unknown>, key: string, value: unknown) => Map<string, unknown>; const mapDelete = Function.call.bind(Map.prototype.delete) as (map: Map<string, unknown>, key: string) => boolean; const mapClear = Function.call.bind(Map.prototype.clear) as (map: Map<string, unknown>) => void;
+const MapConstructor = Map; const WeakMapConstructor = WeakMap; const mapGet = Function.call.bind(Map.prototype.get) as <T>(map: Map<string, T>, key: string) => T | undefined; const mapHas = Function.call.bind(Map.prototype.has) as (map: Map<string, unknown>, key: string) => boolean; const mapSet = Function.call.bind(Map.prototype.set) as (map: Map<string, unknown>, key: string, value: unknown) => Map<string, unknown>; const mapDelete = Function.call.bind(Map.prototype.delete) as (map: Map<string, unknown>, key: string) => boolean; const mapClear = Function.call.bind(Map.prototype.clear) as (map: Map<string, unknown>) => void; const mapForEach = Function.call.bind(Map.prototype.forEach) as <T>(map: Map<string, T>, callback: (value: T) => void) => void;
 const weakMapGet = Function.call.bind(WeakMap.prototype.get) as <T>(map: WeakMap<object, T>, key: object) => T | undefined; const weakMapSet = Function.call.bind(WeakMap.prototype.set) as <T>(map: WeakMap<object, T>, key: object, value: T) => WeakMap<object, T>; const weakMapDelete = Function.call.bind(WeakMap.prototype.delete) as <T>(map: WeakMap<object, T>, key: object) => boolean;
 const IsProxy = types.isProxy; const IsPromise = types.isPromise; const DbGet = dbServer.get.bind(dbServer); const Entropy = randomBytes;
 
@@ -72,14 +71,14 @@ function sameCurrentness(left: Currentness, right: Currentness): boolean { retur
 function mint(bytes: unknown, prefix: 'dsc_' | 'dsp_' | 'dss_' | 'dsh_'): string | null { if (!(bytes instanceof Uint8ArrayConstructor) || IsProxy(bytes) || bytes.length !== 16) return null; let value = prefix; for (let index = 0; index < 16; index += 1) { const byte = bytes[index]; if (typeof byte !== 'number' || !NumberIsSafeInteger(byte) || byte < 0 || byte > 255) return null; value += '0123456789abcdef'[byte >>> 4]! + '0123456789abcdef'[byte & 15]!; } return RegExpTest(prefix === 'dsc_' ? HANDLE : prefix === 'dsp_' ? PROJECTION_HANDLE : prefix === 'dss_' ? SOURCE_SET_SEAL_HANDLE : HANDOFF_HANDLE, value) ? value : null; }
 function projectionCandidate(value: unknown): Readonly<{ sourceKind: 'native_text' | 'ocr_text'; sourceText: string }> | null { const input = exact(value, PROJECTION_KEYS); if (!input) return null; try { const normalized = resolveDocumentSynthesisHostProjection(ObjectFreeze({ sourceKind: input.sourceKind, sourceText: input.sourceText })); return ObjectFreeze({ sourceKind: normalized.sourceKind, sourceText: normalized.sourceText }); } catch { return null; } }
 function revoke(port: DocumentSynthesisAttachmentCapturePort, value: unknown): void { try { port.observeRevocation(value); } catch { /* denial remains terminal */ } }
-function burn(port: DocumentSynthesisSealedEvidencePort, grant: object): void { try { port.consume(grant); } catch { /* a retry is idempotent at the owner boundary */ } }
+function discard(record: AbandonedSeal): void { try { record.disposal.discard(record.seal); } catch { /* burn-only disposal remains final */ } }
 
 const ownerBrokers = new WeakMapConstructor<object, WeakMap<object, Broker>>();
 function brokerFor(context: NonNullable<Awaited<ReturnType<typeof acquireAuthenticatedWebSessionProjectionOwnerContext>>>): Broker {
     let sessions = weakMapGet(ownerBrokers, context.owner); if (!sessions) { sessions = new WeakMapConstructor<object, Broker>(); weakMapSet(ownerBrokers, context.owner, sessions); }
     const prior = weakMapGet(sessions, context.session); if (prior) return prior;
     const records = new MapConstructor<string, RecordState>(); let disposed = false; let unregister: (() => void) | null = null;
-    const dispose = () => { if (disposed) return; disposed = true; mapClear(records); try { unregister?.(); } catch { /* disposal remains final */ } unregister = null; weakMapDelete(sessions!, context.session); };
+    const dispose = () => { if (disposed) return; disposed = true; mapForEach(records, (record) => { if (record.scope === 'document_synthesis_attachment_handoff') discard(record); }); mapClear(records); try { unregister?.(); } catch { /* disposal remains final */ } unregister = null; weakMapDelete(sessions!, context.session); };
     const broker: Broker = { records, dispose, publish(handle, state) { if (disposed || mapHas(records, handle)) return false; let registered: (() => void) | null; try { registered = unregister ?? registerServerSessionResource(context.session.id, dispose); } catch { return false; } if (!registered || disposed || mapHas(records, handle)) return false; unregister = registered; mapSet(records, handle, state); return true; } };
     weakMapSet(sessions, context.session, broker); return broker;
 }
@@ -160,54 +159,59 @@ export async function sealDocumentSynthesisAuthenticatedAttachmentSourceSet(proj
     }
 }
 
-/** Fixed server-only A3a2 boundary: burns the external seal before retaining owner-private evidence behind an opaque handoff. */
+/** Fixed server-only A3a2 boundary: burns the external dss handle before retaining its exact owner seal behind an opaque handoff. */
 export async function handoffDocumentSynthesisAuthenticatedAttachmentSourceSet(sourceSetSealHandle: unknown): Promise<HandoffResult> {
     if (typeof sourceSetSealHandle !== 'string' || !RegExpTest(SOURCE_SET_SEAL_HANDLE, sourceSetSealHandle)) return handoffDenied('input_invalid');
     let context: Awaited<ReturnType<typeof acquireAuthenticatedWebSessionProjectionOwnerContext>>;
     try { context = await acquireAuthenticatedWebSessionProjectionOwnerContext(); } catch { return handoffDenied('unavailable'); }
     if (!context) return handoffDenied('unavailable');
-    let broker: Broker | null = null;
+    let unpublished: AbandonedSeal | null = null;
     try {
-        broker = brokerFor(context); const record = mapGet(broker.records, sourceSetSealHandle);
-        if (!record || record.scope !== 'document_synthesis_attachment_source_set_seal' || !mapDelete(broker.records, sourceSetSealHandle)) return handoffDenied('unavailable');
-        const selection = context.owner.withLeaseCriticalSection(context.session, (value) => sealed({ patientId: value.patientId, ambulatoryId: value.ambulatoryId,
-            selectionEpoch: context.owner.snapshotSelectionEpoch(context.session), reviewContextEpoch: context.owner.snapshotReviewContextEpoch(context.session) }));
-        if (!selection) return handoffDenied('unavailable');
-        const port = context.owner.mintDocumentSynthesisSealedEvidencePort(context.session); const grant = port.begin(record.seal);
-        if (!grant) return handoffDenied('unavailable');
-        let spent = false;
-        try {
-            const handoffHandle = mint(Entropy(16), 'dsh_'); if (!handoffHandle) return handoffDenied('unavailable');
-            const prepared = sealed<PreparedHandoffPublication>({ handoffHandle, result: handoffAvailable(handoffHandle), port, grant,
-                patientId: selection.patientId as string, ambulatoryId: selection.ambulatoryId as string });
-            const latest = currentness(DbGet(sql`SELECT a.document_source_ref AS documentSourceRef, a.document_revision AS documentRevision, a.document_freshness_epoch AS documentFreshnessEpoch FROM attachments AS a INNER JOIN patients_to_ambulatories AS pta ON pta.patient_id = a.patient_id WHERE a.document_source_ref = ${record.currentness.documentSourceRef} AND a.document_revision = ${record.currentness.documentRevision} AND a.document_freshness_epoch = ${record.currentness.documentFreshnessEpoch} AND a.patient_id = ${prepared.patientId} AND pta.ambulatory_id = ${prepared.ambulatoryId} LIMIT 1`));
-            const evidence = prepared.port.consume(prepared.grant); spent = true;
-            if (!latest || !sameCurrentness(record.currentness, latest) || !evidence) return handoffDenied('unavailable');
-            const state = sealed<HandoffRecord>({ selected: true, selectionEpoch: selection.selectionEpoch as number,
-                reviewContextEpoch: selection.reviewContextEpoch as number, scope: 'document_synthesis_attachment_handoff', evidence });
-            return broker.publish(prepared.handoffHandle, state) ? prepared.result : handoffDenied('unavailable');
-        } finally { if (!spent) burn(port, grant); }
-    } catch {
-        return handoffDenied('unavailable');
-    }
+        const broker = brokerFor(context); const record = mapGet(broker.records, sourceSetSealHandle);
+        if (!record || record.scope !== 'document_synthesis_attachment_source_set_seal') return handoffDenied('unavailable');
+        const disposal = context.owner.mintDocumentSynthesisSealedEvidenceDisposalPort(context.session);
+        if (!mapDelete(broker.records, sourceSetSealHandle)) return handoffDenied('unavailable');
+        unpublished = sealed<AbandonedSeal>({ seal: record.seal, disposal });
+        const state = sealed<HandoffRecord>({ selected: true, selectionEpoch: context.owner.snapshotSelectionEpoch(context.session),
+            reviewContextEpoch: context.owner.snapshotReviewContextEpoch(context.session), scope: 'document_synthesis_attachment_handoff', seal: record.seal, disposal });
+        const prepared = context.owner.withLeaseCriticalSection(context.session, (selection): PreparedHandoffPublication | null => {
+            const latest = currentness(DbGet(sql`SELECT a.document_source_ref AS documentSourceRef, a.document_revision AS documentRevision, a.document_freshness_epoch AS documentFreshnessEpoch FROM attachments AS a INNER JOIN patients_to_ambulatories AS pta ON pta.patient_id = a.patient_id WHERE a.document_source_ref = ${record.currentness.documentSourceRef} AND a.document_revision = ${record.currentness.documentRevision} AND a.document_freshness_epoch = ${record.currentness.documentFreshnessEpoch} AND a.patient_id = ${selection.patientId} AND pta.ambulatory_id = ${selection.ambulatoryId} LIMIT 1`));
+            if (!latest || !sameCurrentness(record.currentness, latest)
+                || context.owner.snapshotSelectionEpoch(context.session) !== state.selectionEpoch
+                || context.owner.snapshotReviewContextEpoch(context.session) !== state.reviewContextEpoch) return null;
+            const handoffHandle = mint(Entropy(16), 'dsh_'); if (!handoffHandle) return null;
+            return sealed<PreparedHandoffPublication>({ handoffHandle, state, result: handoffAvailable(handoffHandle) });
+        });
+        if (!prepared || !broker.publish(prepared.handoffHandle, prepared.state)) return handoffDenied('unavailable');
+        unpublished = null;
+        return prepared.result;
+    } catch { return handoffDenied('unavailable'); }
+    finally { if (unpublished) discard(unpublished); }
 }
 
-/** Fixed server-only A3a3 exchange: burns one session-bound handoff before the sole authentic intake. */
+/** Fixed server-only A3c3 exchange: burns one session-bound handoff before exact capsule promotion and identity retention. */
 export async function exchangeDocumentSynthesisAuthenticatedAttachmentHandoff(
     handoffHandle: unknown,
-): Promise<DocumentSynthesisAuthenticSourceSetToken | null> {
+): Promise<DocumentSynthesisExecutionCapsuleIdentity | null> {
     if (typeof handoffHandle !== 'string' || !RegExpTest(HANDOFF_HANDLE, handoffHandle)) return null;
     let context: Awaited<ReturnType<typeof acquireAuthenticatedWebSessionProjectionOwnerContext>>;
     try { context = await acquireAuthenticatedWebSessionProjectionOwnerContext(); } catch { return null; }
     if (!context) return null;
+    let recordForDisposal: HandoffRecord | null = null;
     try {
         const broker = brokerFor(context);
         const record = mapGet(broker.records, handoffHandle);
         if (!record || record.scope !== 'document_synthesis_attachment_handoff'
             || !mapDelete(broker.records, handoffHandle)) return null;
+        recordForDisposal = record;
+        const capsulePort: DocumentSynthesisExecutionCapsulePort = context.owner.mintDocumentSynthesisExecutionCapsulePort(context.session);
+        const identityPort: DocumentSynthesisExecutionCapsuleIdentityPort = context.owner.mintDocumentSynthesisExecutionCapsuleIdentityPort(context.session);
         const current = context.owner.withLeaseCriticalSection(context.session, () => context.owner.snapshotSelectionEpoch(context.session) === record.selectionEpoch
             && context.owner.snapshotReviewContextEpoch(context.session) === record.reviewContextEpoch);
-        if (current !== true) return null;
-        return intakeDocumentSynthesisA3a2SealedEvidence(record.evidence);
-    } catch { return null; }
+        if (current !== true) { discard(record); recordForDisposal = null; return null; }
+        const capsule = capsulePort.promote(record.seal);
+        if (!capsule) { discard(record); recordForDisposal = null; return null; }
+        recordForDisposal = null;
+        return identityPort.retain(capsule);
+    } catch { if (recordForDisposal) discard(recordForDisposal); return null; }
 }
