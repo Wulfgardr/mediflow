@@ -14,6 +14,7 @@ import {
 } from './server-session-projection-owner.ts';
 import { clearAllSessions, createSession, deleteSession, type ServerSession } from './server-session.ts';
 import { digestDocumentSynthesisSourceSet } from './document-synthesis-source-set-digest.ts';
+import { buildDocumentSynthesisMultiSourcePromptFromProjection } from '../ai-providers/fabric/document-synthesis-multi-source-prompt.ts';
 
 const USER = { id: ['synthetic', 'user'].join('-'), username: ['synthetic', 'clinician'].join('-'), role: 'clinician' };
 const PAIR = { patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' };
@@ -509,6 +510,42 @@ test('Document Synthesis provider projection consumes one identity into minimal 
     const serialized = JSON.stringify(output);
     for (const forbidden of ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch', 'selectionEpoch', 'reviewContextEpoch',
         'sourceSetEpoch', 'revocationGeneration', 'sourceSetDigestSha256', 'sessionRef', 'leaseRef']) assert.equal(serialized.includes(forbidden), false);
+});
+
+test('Document Synthesis owner projection satisfies the exact prompt-list shape without granting structural authority', () => {
+    const record = documentSynthesisProviderProjectionRecord(); const output = record.provider.consume(record.identity); assert.ok(output);
+    const descriptor = Object.getOwnPropertyDescriptor(output.providerProjection.sources, 'toJSON');
+    assert.deepEqual(descriptor, { configurable: false, enumerable: false, writable: false, value: null });
+    assert.deepEqual(Reflect.ownKeys(output.providerProjection.sources), ['0', 'length', 'toJSON']);
+    const fromOwner = buildDocumentSynthesisMultiSourcePromptFromProjection(output.providerProjection); assert.equal(fromOwner.status, 'available');
+    const forgedSource = Object.freeze(Object.assign(Object.create(null), { label: 'S1', sourceText: 'Synthetic source.' }));
+    const forgedSources = [forgedSource]; Object.defineProperty(forgedSources, 'toJSON', { value: null }); Object.freeze(forgedSources);
+    const forgedProjection = Object.create(null); Object.defineProperty(forgedProjection, 'schemaVersion', { enumerable: true,
+        value: 'mediflow.document-synthesis.provider-projection.v1' }); Object.defineProperty(forgedProjection, 'sources', { enumerable: true, value: forgedSources }); Object.freeze(forgedProjection);
+    const fromForged = buildDocumentSynthesisMultiSourcePromptFromProjection(forgedProjection); assert.equal(fromForged.status, 'available');
+    assert.equal(fromOwner.prompt, fromForged.prompt); assert.equal('authority' in fromForged, false); assert.equal('witness' in fromForged, false);
+    const noncanonical = Object.freeze(Object.assign(Object.create(null), { schemaVersion: forgedProjection.schemaVersion,
+        sources: Object.freeze([forgedSource]) }));
+    assert.equal(buildDocumentSynthesisMultiSourcePromptFromProjection(noncanonical).status, 'denied');
+    assert.equal(Reflect.set(output.providerProjection.sources, '0', forgedSource), false);
+    const serialized = JSON.stringify(output); for (const forbidden of ['documentSourceRef', 'sourceSetDigestSha256', 'selectionEpoch', 'leaseRef']) {
+        assert.equal(serialized.includes(forbidden), false);
+    }
+});
+
+test('Document Synthesis owner projection uses captured array and object intrinsics for the compatibility marker', () => {
+    const record = documentSynthesisProviderProjectionRecord(); const define = Object.defineProperty;
+    const targets = [[Object, 'create'], [Object, 'freeze'], [Object, 'defineProperty'], [globalThis, 'Array']] as const;
+    const descriptors = targets.map(([target, key]) => [target, key, Object.getOwnPropertyDescriptor(target, key)] as const);
+    let calls = 0; const poison = () => { calls += 1; throw new Error('synthetic poison'); }; let output: unknown = null;
+    try {
+        for (const [target, key, descriptor] of descriptors) define(target, key, { ...descriptor, value: poison });
+        output = record.provider.consume(record.identity);
+    } finally {
+        for (let index = descriptors.length - 1; index >= 0; index -= 1) define(descriptors[index]![0], descriptors[index]![1], descriptors[index]![2]!);
+    }
+    assert.equal(calls, 0); assert.ok(output); assert.equal(buildDocumentSynthesisMultiSourcePromptFromProjection(
+        (output as NonNullable<ReturnType<typeof record.provider.consume>>).providerProjection).status, 'available');
 });
 
 test('Document Synthesis provider projection rejects hostile, foreign, copied, and replayed identities without observation', async () => {
