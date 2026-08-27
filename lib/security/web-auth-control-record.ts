@@ -8,7 +8,6 @@ const ObjectConstructor = Object;
 const ObjectCreate = Object.create;
 const freeze = Object.freeze;
 const MapConstructor = Map;
-const SetConstructor = Set;
 const WeakMapConstructor = WeakMap;
 const BufferPrototype = Buffer.prototype;
 const getPrototypeOfIntrinsic = Object.getPrototypeOf;
@@ -18,9 +17,6 @@ const byteLengthIntrinsic = ObjectConstructor.getOwnPropertyDescriptor(ObjectCon
 const mapGetIntrinsic = Map.prototype.get;
 const mapSetIntrinsic = Map.prototype.set;
 const mapSizeIntrinsic = ObjectConstructor.getOwnPropertyDescriptor(Map.prototype, 'size')?.get;
-const setAddIntrinsic = Set.prototype.add;
-const setDeleteIntrinsic = Set.prototype.delete;
-const setHasIntrinsic = Set.prototype.has;
 const weakMapGetIntrinsic = WeakMap.prototype.get;
 const weakMapSetIntrinsic = WeakMap.prototype.set;
 const weakMapDeleteIntrinsic = WeakMap.prototype.delete;
@@ -40,9 +36,10 @@ type Begin = Readonly<{ kind: 'begin'; requestFence: string; fence: string; fing
 type Lock = { kind: 'lock'; requestFence: string; fence: string; fingerprint: string; generation: bigint; detachedSessionId: string | null; receipt: 'pending' | 'confirmed'; createdAt: number };
 type Entry = Begin | Lock;
 type Result = Readonly<{ ok: false }> | Readonly<{ ok: true; fence: string; generation: bigint }>;
+type FenceTable = { [key: string]: true | undefined };
 type ControlState = {
     fence: string; generation: bigint; pending: Pending | null; activeSessionId: string | null; clock: number;
-    used: Set<string>; reserved: Set<string>; entries: Map<string, Entry>;
+    used: FenceTable; reserved: FenceTable; entries: Map<string, Entry>;
 };
 type TicketBinding = {
     lifecycle: 'prepared' | 'active' | 'retired' | 'denied'; owner: ControlState; pending: Pending;
@@ -57,9 +54,9 @@ const frozen = <Value>(value: Value): Readonly<Value> => apply(freeze, ObjectCon
 const mapGet = <Value>(map: Map<string, Value>, key: string): Value | undefined => apply(mapGetIntrinsic, map, [key]) as Value | undefined;
 const mapSet = <Value>(map: Map<string, Value>, key: string, value: Value): void => { apply(mapSetIntrinsic, map, [key, value]); };
 const mapSize = (map: Map<string, unknown>): number => apply(mapSizeIntrinsic!, map, []) as number;
-const setAdd = (set: Set<string>, value: string): void => { apply(setAddIntrinsic, set, [value]); };
-const setDelete = (set: Set<string>, value: string): boolean => apply(setDeleteIntrinsic, set, [value]) as boolean;
-const setHas = (set: Set<string>, value: string): boolean => apply(setHasIntrinsic, set, [value]) as boolean;
+const tableHas = (table: FenceTable, value: string): boolean => table[value] === true;
+const tableAdd = (table: FenceTable, value: string): void => { table[value] = true; };
+const tableDelete = (table: FenceTable, value: string): void => { delete table[value]; };
 const weakMapGet = <Value>(map: WeakMap<object, Value>, key: unknown): Value | undefined =>
     (typeof key === 'object' && key !== null) || typeof key === 'function' ? apply(weakMapGetIntrinsic, map, [key]) as Value | undefined : undefined;
 const weakMapSet = <Value>(map: WeakMap<object, Value>, key: object, value: Value): void => { apply(weakMapSetIntrinsic, map, [key, value]); };
@@ -92,8 +89,8 @@ const successorFence = (): string | null => {
 export function createWebAuthControlRecord(initialFence: unknown, initialGeneration: unknown = ZERO) {
     if (!text(initialFence) || !u64(initialGeneration)) throw new TypeError('invalid trusted control state');
     const state: ControlState = { fence: initialFence, generation: initialGeneration, pending: null, activeSessionId: null, clock: 0,
-        used: new SetConstructor<string>(), reserved: new SetConstructor<string>(), entries: new MapConstructor<string, Entry>() };
-    setAdd(state.used, state.fence);
+        used: apply(ObjectCreate, ObjectConstructor, [null]) as FenceTable, reserved: apply(ObjectCreate, ObjectConstructor, [null]) as FenceTable, entries: new MapConstructor<string, Entry>() };
+    tableAdd(state.used, state.fence);
     const tick = (value: unknown): number | null => { if (!time(value)) return null; state.clock = max(state.clock, value); if (state.pending && state.clock - state.pending.createdAt >= PENDING_TTL_MS) state.pending = null; return state.clock; };
     const replay = (key: unknown, fingerprint: unknown, requestFence: unknown, at: number): Entry | null | false => {
         if (!text(key) || !text(fingerprint) || !text(requestFence)) return false;
@@ -102,8 +99,8 @@ export function createWebAuthControlRecord(initialFence: unknown, initialGenerat
     };
     const successor = (value: unknown): string | null => text(value) ? value : null;
     const next = (value: string, expectedFence: string, expectedGeneration: bigint, expectedPending: Pending | null): string | null =>
-        expectedGeneration === MAX_U64 || setHas(state.used, value) || state.fence !== expectedFence || state.generation !== expectedGeneration || state.pending !== expectedPending ? null : value;
-    const advance = (value: string, output: Readonly<{ ok: true; fence: string; generation: bigint }>): Result => { state.fence = value; setAdd(state.used, value); state.generation += ONE; return output; };
+        expectedGeneration === MAX_U64 || tableHas(state.used, value) || state.fence !== expectedFence || state.generation !== expectedGeneration || state.pending !== expectedPending ? null : value;
+    const advance = (value: string, output: Readonly<{ ok: true; fence: string; generation: bigint }>): Result => { state.fence = value; tableAdd(state.used, value); state.generation += ONE; return output; };
     return frozen({
         begin(kind: unknown, operation: unknown, key: unknown, fingerprint: unknown, at: unknown): Result {
             const current = tick(at); if (current === null || (kind !== 'login' && kind !== 'setup') || !text(operation) || !text(key) || !text(fingerprint)) return denied;
@@ -136,7 +133,7 @@ export function createWebAuthControlRecord(initialFence: unknown, initialGenerat
             const detachedSessionId = state.activeSessionId; const nextGeneration = state.generation + ONE;
             const entry: Lock = { kind: 'lock', requestFence: expectedFence, fence: nextFence, fingerprint, generation: nextGeneration, detachedSessionId, receipt: 'pending', createdAt: current };
             const output = frozen({ ok: true as const, fence: nextFence, generation: nextGeneration, detachedSessionId });
-            state.pending = null; state.activeSessionId = null; state.fence = nextFence; setAdd(state.used, nextFence); state.generation = nextGeneration; mapSet(state.entries, key, entry);
+            state.pending = null; state.activeSessionId = null; state.fence = nextFence; tableAdd(state.used, nextFence); state.generation = nextGeneration; mapSet(state.entries, key, entry);
             return output;
         },
         finalizeLock(expectedFence: unknown, key: unknown, fingerprint: unknown, at: unknown): Result | Readonly<{ ok: true; fence: string; generation: bigint; receipt: 'confirmed' }> {
@@ -163,14 +160,13 @@ export function createWebAuthControlRecord(initialFence: unknown, initialGenerat
                     || match.operation !== operation || match.fingerprint !== fingerprint || match.generation !== state.generation) return null;
                 activateFence = successorFence(); retireFence = successorFence();
                 if (ticketOperationPoisoned || !activateFence || !retireFence || state.pending !== match || state.fence !== expectedFence || state.generation !== expectedGeneration
-                    || state.activeSessionId || activateFence === retireFence || setHas(state.used, activateFence) || setHas(state.used, retireFence)
-                    || setHas(state.reserved, activateFence) || setHas(state.reserved, retireFence)) return null;
+                    || state.activeSessionId || activateFence === retireFence || tableHas(state.used, activateFence) || tableHas(state.used, retireFence)
+                    || tableHas(state.reserved, activateFence) || tableHas(state.reserved, retireFence)) return null;
                 if (ticketOperationPoisoned) return null;
                 ticket = opaque<AuthControlTicket>();
                 const binding: TicketBinding = { lifecycle: 'prepared', owner: state, pending: match, fence: expectedFence,
                     generation: expectedGeneration, sessionId, activateFence, retireFence, retiredReason: null };
-                setAdd(state.reserved, activateFence); if (ticketOperationPoisoned) return null;
-                setAdd(state.reserved, retireFence); if (ticketOperationPoisoned) return null;
+                tableAdd(state.reserved, activateFence); tableAdd(state.reserved, retireFence);
                 bound = true; weakMapSet(ticketBindings, ticket, binding); if (ticketOperationPoisoned) return null;
                 published = true;
                 return ticket;
@@ -178,7 +174,7 @@ export function createWebAuthControlRecord(initialFence: unknown, initialGenerat
             finally {
                 if (!published) {
                     try { if (bound && ticket) weakMapDelete(ticketBindings, ticket); } catch { /* unreachable ticket remains denied */ }
-                    try { if (activateFence) setDelete(state.reserved, activateFence); if (retireFence) setDelete(state.reserved, retireFence); } catch { /* fail closed */ }
+                    if (activateFence) tableDelete(state.reserved, activateFence); if (retireFence) tableDelete(state.reserved, retireFence);
                 }
                 leaveTicketOperation();
             }
@@ -189,28 +185,28 @@ export function createWebAuthControlRecord(initialFence: unknown, initialGenerat
 
 function denyTicket(binding: TicketBinding): void {
     binding.lifecycle = 'denied';
-    try { setDelete(binding.owner.reserved, binding.activateFence); setDelete(binding.owner.reserved, binding.retireFence); } catch { /* fail closed */ }
+    tableDelete(binding.owner.reserved, binding.activateFence); tableDelete(binding.owner.reserved, binding.retireFence);
 }
 
 /** Commits the exact prepared P2b ticket without exposing record or session authority. */
 /* @Codex */
 export function commitAuthControlTicket(ticket: unknown): boolean {
     if (!enterTicketOperation()) return false;
-    let binding: TicketBinding | undefined; let addedUsed = false;
+    let binding: TicketBinding | undefined;
     try {
         binding = weakMapGet(ticketBindings, ticket);
         if (ticketOperationPoisoned || !binding || binding.lifecycle !== 'prepared') { leaveTicketOperation(); return false; }
         const state = binding.owner;
         if (state.pending !== binding.pending || state.activeSessionId !== null || state.fence !== binding.fence || state.generation !== binding.generation
-            || !setHas(state.reserved, binding.activateFence) || !setHas(state.reserved, binding.retireFence)
-            || setHas(state.used, binding.activateFence) || setHas(state.used, binding.retireFence) || ticketOperationPoisoned) throw new Error('ticket denied');
-        if (!setDelete(state.reserved, binding.activateFence) || ticketOperationPoisoned) throw new Error('ticket denied');
-        addedUsed = true; setAdd(state.used, binding.activateFence); if (ticketOperationPoisoned) throw new Error('ticket denied');
+            || !tableHas(state.reserved, binding.activateFence) || !tableHas(state.reserved, binding.retireFence)
+            || tableHas(state.used, binding.activateFence) || tableHas(state.used, binding.retireFence) || ticketOperationPoisoned) throw new Error('ticket denied');
     } catch {
-        if (binding?.lifecycle === 'prepared') { if (addedUsed) try { setDelete(binding.owner.used, binding.activateFence); } catch { /* fail closed */ } denyTicket(binding); }
+        if (binding?.lifecycle === 'prepared') denyTicket(binding);
         leaveTicketOperation(); return false;
     }
     const state = binding.owner;
+    tableDelete(state.reserved, binding.activateFence);
+    tableAdd(state.used, binding.activateFence);
     state.activeSessionId = binding.sessionId;
     state.pending = null;
     state.fence = binding.activateFence;
@@ -224,7 +220,7 @@ export function commitAuthControlTicket(ticket: unknown): boolean {
 /* @Codex */
 export function retireAuthControlTicket(ticket: unknown, reason: unknown): 0 | 1 | 2 {
     if (!enterTicketOperation()) return 0;
-    let binding: TicketBinding | undefined; let addedUsed = false; let removedReservation = false;
+    let binding: TicketBinding | undefined;
     try {
         binding = weakMapGet(ticketBindings, ticket);
         if (ticketOperationPoisoned || !binding) { leaveTicketOperation(); return 0; }
@@ -234,20 +230,14 @@ export function retireAuthControlTicket(ticket: unknown, reason: unknown): 0 | 1
         if (binding.lifecycle !== 'active') { leaveTicketOperation(); return 0; }
         const state = binding.owner;
         if (state.pending !== null || state.activeSessionId !== binding.sessionId || state.fence !== binding.activateFence || state.generation !== binding.generation + ONE
-            || !setHas(state.reserved, binding.retireFence) || setHas(state.used, binding.retireFence) || ticketOperationPoisoned) throw new Error('ticket denied');
-        removedReservation = true; if (!setDelete(state.reserved, binding.retireFence)) throw new Error('ticket denied');
-        if (ticketOperationPoisoned) throw new Error('ticket denied');
-        addedUsed = true; setAdd(state.used, binding.retireFence); if (ticketOperationPoisoned) throw new Error('ticket denied');
+            || !tableHas(state.reserved, binding.retireFence) || tableHas(state.used, binding.retireFence) || ticketOperationPoisoned) throw new Error('ticket denied');
     } catch {
-        if (binding && (binding.lifecycle === 'active' || binding.lifecycle === 'prepared')) {
-            const preserveActive = binding.lifecycle === 'active' && ticketOperationPoisoned;
-            if (addedUsed) try { setDelete(binding.owner.used, binding.retireFence); } catch { /* fail closed */ }
-            if (preserveActive && removedReservation) try { setAdd(binding.owner.reserved, binding.retireFence); } catch { /* fail closed */ }
-            if (!preserveActive) denyTicket(binding);
-        }
+        if (binding?.lifecycle === 'prepared') denyTicket(binding);
         leaveTicketOperation(); return 0;
     }
     const state = binding.owner;
+    tableDelete(state.reserved, binding.retireFence);
+    tableAdd(state.used, binding.retireFence);
     binding.retiredReason = reason;
     state.activeSessionId = null;
     state.pending = null;
