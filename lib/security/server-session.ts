@@ -186,6 +186,7 @@ interface ArmedWebSessionCellRecord {
     activationTicket: unknown | null;
     retirement: unknown | null;
     retirementReason: WebServerSessionRetirementReason | null;
+    retirementCommitted: boolean;
     cleanupReceipt: WebServerSessionRetirementCleanupReceipt | null;
     resourcePortsRevoked: boolean;
     resourcePortHead: ActiveWebSessionResourcePortRecord | null;
@@ -537,7 +538,7 @@ function compactRetiredWebSessionCellRecord(
     record: ArmedWebSessionCellRecord,
     session: ServerSession,
 ): WebServerSessionRetirementCleanupReceipt {
-    let failed = false;
+    let failed = !record.retirementCommitted;
     record.state = 'RETIRED_CLEANUP';
     record.cleanupReceipt = failedWebSessionRetirementCleanupReceipt;
     record.resourcePortsRevoked = true;
@@ -779,7 +780,7 @@ export function armPreparedWebServerSession(capability: unknown): ArmedWebServer
         cell = {
             state: 'ARMED_ACTIVATE', sessionId: session.id, session, next: armedWebSessionCellHead,
             activationTicket: null, retirement: null, retirementReason: null, cleanupReceipt: null,
-            resourcePortsRevoked: false, resourcePortHead: null,
+            retirementCommitted: false, resourcePortsRevoked: false, resourcePortHead: null,
         };
         armedWebSessionCellHead = cell;
         armedWebSessionCellsById[session.id] = cell;
@@ -941,6 +942,7 @@ export function retireActiveWebServerSession(sessionId: unknown, reason: unknown
     }
     const retirementResult = commitPreparedAuthControlRetirement(preparedRetirement);
     if (retirementResult === 2) {
+        cell.retirementCommitted = true;
         cell.state = 'RETIRED';
         webSessionCellLifecyclePoisoned = false;
         webSessionCellLifecycle = 'idle';
@@ -1260,4 +1262,17 @@ export function cleanupRetiredWebServerSession(
         cell.state = 'RETIRED_TOMBSTONE';
         return failedWebSessionRetirementCleanupReceipt;
     } finally { endWebSessionCellLifecycle(); }
+}
+
+/** Retires and terminally compacts one exact ACTIVE Web session by controlled reason. */
+/* @Codex */
+export function dispatchActiveWebServerSessionRetirement(
+    sessionId: unknown,
+    reason: unknown,
+): WebServerSessionRetirementCleanupReceipt {
+    if (typeof sessionId !== 'string' || !sessionId || !isWebServerSessionRetirementReason(reason)) {
+        return deniedWebSessionRetirementCleanupReceipt;
+    }
+    retireActiveWebServerSession(sessionId, reason);
+    return cleanupRetiredWebServerSession(sessionId, reason);
 }

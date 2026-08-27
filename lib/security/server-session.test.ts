@@ -18,6 +18,7 @@ import {
     commitPreparedWebServerSession,
     createSession,
     deleteSession,
+    dispatchActiveWebServerSessionRetirement,
     getSession,
     getPreparedWebServerSessionId,
     getArmedWebServerSessionId,
@@ -49,6 +50,7 @@ function authControlApi() {
             [key: string]: unknown;
         };
         prepareAuthControlActivation(ticket: unknown, sessionId: string): unknown;
+        prepareAuthControlRetirement(ticket: unknown, sessionId: string, reason: string): unknown;
         [key: string]: unknown;
     };
     const create = (fence: string) => {
@@ -64,7 +66,11 @@ function authControlApi() {
             )(ticket, reason),
         };
     };
-    return { create, prepareActivation: api.prepareAuthControlActivation };
+    return {
+        create,
+        prepareActivation: api.prepareAuthControlActivation,
+        prepareRetirement: api.prepareAuthControlRetirement,
+    };
 }
 
 afterEach(() => clearAllSessions());
@@ -540,13 +546,16 @@ test('ACTIVE resource port has no callback surface or production importer before
     const release = source.slice(source.indexOf('export function releaseActiveWebSessionResourcePort'), source.indexOf('export function getSession'));
     const use = source.slice(source.indexOf('export function beginActiveWebSessionResourceUse'), source.indexOf('export function getSession'));
     const cleanup = source.slice(source.indexOf('export function cleanupRetiredWebServerSession'));
+    const dispatch = source.slice(source.indexOf('export function dispatchActiveWebServerSessionRetirement'));
     assert.match(mint, /\(session: unknown\): ActiveWebSessionResourcePort \| null/u); assert.match(release, /\(port: unknown\): boolean/u);
     assert.match(use, /export function beginActiveWebSessionResourceUse\(port: unknown\): ActiveWebSessionResourceUse \| null/u);
     assert.match(use, /export function commitActiveWebSessionResourceUse\(use: unknown\): boolean/u);
     assert.match(use, /export function abortActiveWebSessionResourceUse\(use: unknown\): boolean/u);
     assert.doesNotMatch(`${mint}\n${release}\n${use}`, /\b(?:callback|dispose|Promise|async|then|setTimeout|setImmediate|queueMicrotask|nextTick|payload|effect|method)\b/u);
     assert.doesNotMatch(cleanup, /\b(?:DateNow|Promise|async|then|setTimeout|setImmediate|queueMicrotask|nextTick)\b/u);
-    const paths = execFileSync('rg', ['-l', 'mintActiveWebSessionResourcePort|releaseActiveWebSessionResourcePort|beginActiveWebSessionResourceUse|commitActiveWebSessionResourceUse|abortActiveWebSessionResourceUse|cleanupRetiredWebServerSession', '-g', '*.ts', '.'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map((value) => value.replace(/^\.\//u, ''));
+    assert.match(dispatch, /retireActiveWebServerSession\(sessionId, reason\);\s*return cleanupRetiredWebServerSession\(sessionId, reason\);/u);
+    assert.doesNotMatch(dispatch, /\b(?:callback|ticket|owner|session:|Promise|async|then|setTimeout|setImmediate|queueMicrotask|nextTick)\b/u);
+    const paths = execFileSync('rg', ['-l', 'mintActiveWebSessionResourcePort|releaseActiveWebSessionResourcePort|beginActiveWebSessionResourceUse|commitActiveWebSessionResourceUse|abortActiveWebSessionResourceUse|cleanupRetiredWebServerSession|dispatchActiveWebServerSessionRetirement', '-g', '*.ts', '.'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map((value) => value.replace(/^\.\//u, ''));
     assert.deepEqual(paths.sort(), ['lib/security/server-session.test.ts', 'lib/security/server-session.ts']);
 });
 
@@ -571,7 +580,68 @@ test('compacts one exact RETIRED Web cell into a replay-stable PHI-safe tombston
     assert.equal(resolveActiveWebServerSession(active.sessionId), null);
 });
 
-test('RETIRED cleanup fails terminally on captured WeakMap apply-then-throw and reentry', async (t) => {
+test('dispatches one reason-bound ACTIVE retirement into a stable cleanup receipt', () => {
+    const active = activeResourceFixture();
+    const pendingUse = beginActiveWebSessionResourceUse(active.port); assert.ok(pendingUse);
+
+    const receipt = dispatchActiveWebServerSessionRetirement(active.sessionId, 'dispose');
+    assert.equal(receipt.outcome, 'completed');
+    assert.equal(dispatchActiveWebServerSessionRetirement(active.sessionId, 'dispose'), receipt);
+    assert.equal(dispatchActiveWebServerSessionRetirement(active.sessionId, 'lock').outcome, 'denied');
+    assert.equal(commitActiveWebSessionResourceUse(pendingUse), false);
+    assert.equal(releaseActiveWebSessionResourcePort(active.port), false);
+    assert.equal(resolveActiveWebServerSession(active.sessionId), null);
+});
+
+test('dispatch reports failed after an uncommitted P2 retirement and scrubs B1/B2 state', () => {
+    const active = activeResourceFixture();
+    const pendingUse = beginActiveWebSessionResourceUse(active.port); assert.ok(pendingUse);
+    assert.equal(active.control.retireTicket(active.ticket, 'dispose'), 1, 'external P2 drift precedes dispatch');
+
+    const failed = dispatchActiveWebServerSessionRetirement(active.sessionId, 'dispose');
+    assert.equal(failed.outcome, 'failed');
+    assert.equal(dispatchActiveWebServerSessionRetirement(active.sessionId, 'dispose'), failed);
+    assert.equal(dispatchActiveWebServerSessionRetirement(active.sessionId, 'lock').outcome, 'denied');
+    assert.equal(commitActiveWebSessionResourceUse(pendingUse), false);
+    assert.equal(abortActiveWebSessionResourceUse(pendingUse), false);
+    assert.equal(releaseActiveWebSessionResourcePort(active.port), false);
+    assert.equal(mintActiveWebSessionResourcePort(active.session), null);
+    assert.equal(resolveActiveWebServerSession(active.sessionId), null);
+});
+
+test('dispatch denies hostile and cross-module inputs without observation or later work', async (t) => {
+    const active = activeResourceFixture(); let observed = 0;
+    const proxy = new Proxy(Object.create(null), {
+        get() { observed += 1; throw new Error('get'); },
+        ownKeys() { observed += 1; throw new Error('keys'); },
+    });
+    const accessor = Object.create(null);
+    Object.defineProperty(accessor, 'then', { get() { observed += 1; throw new Error('then'); } });
+    const rejected = Promise.reject(new Error('synthetic dispatch input')); rejected.catch(() => undefined);
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    for (const value of [null, undefined, '', {}, proxy, accessor, Promise.resolve(), rejected, '__proto__']) {
+        assert.equal(dispatchActiveWebServerSessionRetirement(value, 'dispose').outcome, 'denied');
+        assert.equal(dispatchActiveWebServerSessionRetirement(active.sessionId, value).outcome, 'denied');
+    }
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const cached = nodeRequire.cache[modulePath]; const originalThen = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+    try {
+        delete nodeRequire.cache[modulePath]; const restarted = nodeRequire(modulePath) as typeof import('./server-session');
+        assert.equal(restarted.dispatchActiveWebServerSessionRetirement(active.sessionId, 'dispose').outcome, 'denied');
+        Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { observed += 1; throw new Error('ambient then'); } });
+        assert.equal(dispatchActiveWebServerSessionRetirement(active.sessionId, 'dispose').outcome, 'completed');
+        restarted.clearAllSessions();
+    } finally {
+        if (originalThen) Object.defineProperty(Object.prototype, 'then', originalThen);
+        else delete (Object.prototype as { then?: unknown }).then;
+        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
+    }
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(observed, 0); assert.deepEqual(unhandled, []);
+});
+
+test('dispatch cleanup fails terminally on captured WeakMap apply-then-throw and reentry', async (t) => {
     const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
     const cached = nodeRequire.cache[modulePath]; const originalDelete = WeakMap.prototype.delete;
     let isolated: typeof import('./server-session') | undefined; let mode: 'idle' | 'throw' | 'reenter' = 'idle';
@@ -581,7 +651,7 @@ test('RETIRED cleanup fails terminally on captured WeakMap apply-then-throw and 
     WeakMap.prototype.delete = function (key: object) {
         const result = Reflect.apply(originalDelete, this, [key]);
         if (mode === 'throw') { mode = 'idle'; throw new Error('synthetic post-delete failure'); }
-        if (mode === 'reenter') { mode = 'idle'; nestedOutcome = isolated!.cleanupRetiredWebServerSession(currentId, 'dispose').outcome; }
+        if (mode === 'reenter') { mode = 'idle'; nestedOutcome = isolated!.dispatchActiveWebServerSessionRetirement(currentId, 'dispose').outcome; }
         return result;
     };
     const make = () => {
@@ -592,15 +662,15 @@ test('RETIRED cleanup fails terminally on captured WeakMap apply-then-throw and 
         const ticket = control.prepareTicket(`cleanup-${currentId}`, 'op', BigInt(0), `fp-${currentId}`, currentId, 1); assert.ok(ticket);
         assert.equal(isolated!.activateArmedWebServerSession(port, ticket), true); const session = isolated!.resolveActiveWebServerSession(currentId); assert.ok(session);
         const resource = isolated!.mintActiveWebSessionResourcePort(session); assert.ok(resource); const use = isolated!.beginActiveWebSessionResourceUse(resource); assert.ok(use);
-        assert.equal(isolated!.retireActiveWebServerSession(currentId, 'dispose'), true); return { session, resource, use };
+        return { session, resource, use };
     };
     try {
         delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
-        const first = make(); mode = 'throw'; const failed = isolated.cleanupRetiredWebServerSession(currentId, 'dispose'); assert.equal(failed.outcome, 'failed');
-        assert.equal(isolated.cleanupRetiredWebServerSession(currentId, 'dispose'), failed);
+        const first = make(); mode = 'throw'; const failed = isolated.dispatchActiveWebServerSessionRetirement(currentId, 'dispose'); assert.equal(failed.outcome, 'failed');
+        assert.equal(isolated.dispatchActiveWebServerSessionRetirement(currentId, 'dispose'), failed);
         assert.equal(isolated.commitActiveWebSessionResourceUse(first.use), false); assert.equal(isolated.releaseActiveWebSessionResourcePort(first.resource), false);
         assert.equal(isolated.mintActiveWebSessionResourcePort(first.session), null);
-        currentId = 'second'; make(); mode = 'reenter'; assert.equal(isolated.cleanupRetiredWebServerSession(currentId, 'dispose').outcome, 'failed');
+        currentId = 'second'; make(); mode = 'reenter'; assert.equal(isolated.dispatchActiveWebServerSessionRetirement(currentId, 'dispose').outcome, 'failed');
         assert.equal(nestedOutcome, 'denied'); await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
     } finally { mode = 'idle'; WeakMap.prototype.delete = originalDelete; isolated?.clearAllSessions();
         if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
@@ -653,7 +723,8 @@ test('retires one exact ACTIVE cell through its retained control ticket', () => 
     assert.doesNotMatch(postCas, /\.retirement\b/u);
     assert.doesNotMatch(postCas, /\b(?:DateNow|armedWebSessionCellsById|sessions|preparedWebSessionReservations|armedWebSessionPortRecords)\b/u);
     assert.deepEqual([...postCas.matchAll(/\b(?!if\b)([A-Za-z_$][\w$]*)\s*\(/gu)].map((match) => match[1]), []);
-    assert.match(postCas, /cell\.state = 'RETIRED';\s*webSessionCellLifecyclePoisoned = false;\s*webSessionCellLifecycle = 'idle';\s*return true;/u);
+    assert.match(postCas, /cell\.retirementCommitted = true;\s*cell\.state = 'RETIRED';\s*webSessionCellLifecyclePoisoned = false;\s*webSessionCellLifecycle = 'idle';\s*return true;/u);
+    assert.equal((source.match(/cell\.retirementCommitted = true;/gu) ?? []).length, 1);
 });
 
 test('retirement denies hostile inputs, stale control, and module copies without observation', async () => {
@@ -723,7 +794,9 @@ test('retirement poisons clock and lifecycle reentry and denies expiry without d
                     : operation === 'delete' ? isolated!.deleteSession(current.sessionId)
                         : operation === 'lock' ? isolated!.invalidateServerSessionForApplicationLock(current.sessionId) : isolated!.clearAllSessions();
             clockReads = 0; trigger = true;
-            assert.equal(isolated.retireActiveWebServerSession(current.sessionId, 'lock'), false);
+            const failed = isolated.dispatchActiveWebServerSessionRetirement(current.sessionId, 'lock');
+            assert.equal(failed.outcome, 'failed');
+            assert.equal(isolated.dispatchActiveWebServerSessionRetirement(current.sessionId, 'lock'), failed);
             assert.equal(clockReads, 1);
             assert.equal(isolated.resolveActiveWebServerSession(current.sessionId), null);
         }
@@ -749,8 +822,22 @@ test('retirement poisons clock and lifecycle reentry and denies expiry without d
         nested = () => isolated!.clearAllSessions(); clockReads = 0; trigger = true;
         assert.equal(isolated.retireActiveWebServerSession(expiredReentry.sessionId, 'expired'), false);
         assert.equal(clockReads, 1); assert.equal(isolated.resolveActiveWebServerSession(expiredReentry.sessionId), null);
+
+        const dispatchReentry = make();
+        nested = () => { isolated!.dispatchActiveWebServerSessionRetirement(dispatchReentry.sessionId, 'lock'); };
+        clockReads = 0; trigger = true;
+        const dispatchFailed = isolated.dispatchActiveWebServerSessionRetirement(dispatchReentry.sessionId, 'lock');
+        assert.equal(dispatchFailed.outcome, 'failed'); assert.equal(clockReads, 1);
+        assert.equal(isolated.dispatchActiveWebServerSessionRetirement(dispatchReentry.sessionId, 'lock'), dispatchFailed);
+
+        const casZero = make();
+        nested = () => { authControlApi().prepareRetirement(casZero.ticket, casZero.sessionId, 'lock'); };
+        clockReads = 0; trigger = true;
+        const casZeroFailed = isolated.dispatchActiveWebServerSessionRetirement(casZero.sessionId, 'lock');
+        assert.equal(casZeroFailed.outcome, 'failed'); assert.equal(clockReads, 1);
+        assert.equal(isolated.dispatchActiveWebServerSessionRetirement(casZero.sessionId, 'lock'), casZeroFailed);
         await new Promise<void>((resolve) => setImmediate(resolve));
-        assert.equal(nestedCalls, 6); assert.deepEqual(unhandled, []);
+        assert.equal(nestedCalls, 8); assert.deepEqual(unhandled, []);
     } finally {
         trigger = false; Date.now = originalNow; isolated?.clearAllSessions();
         if (originalTtl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = originalTtl;
