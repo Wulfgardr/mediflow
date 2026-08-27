@@ -1,5 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { afterEach, test } from 'node:test';
 
@@ -11,6 +12,7 @@ import {
     spendDurableReviewCommitPort,
 } from './server-session-projection-owner.ts';
 import { clearAllSessions, createSession, deleteSession, type ServerSession } from './server-session.ts';
+import { digestDocumentSynthesisSourceSet } from './document-synthesis-source-set-digest.ts';
 
 const USER = { id: ['synthetic', 'user'].join('-'), username: ['synthetic', 'clinician'].join('-'), role: 'clinician' };
 const PAIR = { patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' };
@@ -246,6 +248,81 @@ test('Document Synthesis attachment seal rereads private source and revocation l
     const secondEvidence = port.retain(Object.freeze({ grant: secondGrant, observedCurrentness: currentness(1, 1, 'document-source.synthetic.b'), projection: projection('ocr_text') })); assert.ok(secondEvidence);
     assert.equal(port.sealRetainedProjection(firstEvidence), null, 'a subsequent authentic source allocation drifts the first lineage snapshot');
     assert.ok(port.sealRetainedProjection(secondEvidence));
+});
+
+test('Document Synthesis sealed evidence consumes one owner-bound seal into only the canonical provider projection and raw32 digest', () => {
+    const { value, owner } = ownerWithSelection(); const capturePort = owner.mintDocumentSynthesisAttachmentCapturePort(value);
+    const capture = capturePort.observeCurrentness(currentness()); assert.ok(capture);
+    const grant = capturePort.begin(capture); assert.ok(grant);
+    const retained = capturePort.retain(Object.freeze({ grant, observedCurrentness: currentness(), projection: projection('ocr_text') })); assert.ok(retained);
+    const seal = capturePort.sealRetainedProjection(retained); assert.ok(seal);
+    const evidencePort = owner.mintDocumentSynthesisSealedEvidencePort(value);
+    assert.equal(Object.getPrototypeOf(evidencePort), null); assert.equal(Object.isFrozen(evidencePort), true);
+    assert.deepEqual(Object.keys(evidencePort), ['begin', 'consume']);
+    const evidenceGrant = evidencePort.begin(seal); assert.ok(evidenceGrant);
+    const output = evidencePort.consume(evidenceGrant); assert.ok(output);
+    assert.equal(Object.getPrototypeOf(output), null); assert.equal(Object.isFrozen(output), true);
+    assert.deepEqual(Object.keys(output), ['providerProjection', 'sourceSetDigestSha256']);
+    assert.equal(Object.getPrototypeOf(output.providerProjection), null); assert.equal(Object.isFrozen(output.providerProjection), true);
+    assert.equal(output.providerProjection.label, 'S1'); assert.equal(output.providerProjection.sourceText, 'Synthetic source.');
+    assert.equal(Object.isFrozen(output.sourceSetDigestSha256), true); assert.equal(output.sourceSetDigestSha256.length, 32);
+    assertNoBigIntInDescriptors(output); assert.equal(evidencePort.consume(evidenceGrant), null); assert.equal(evidencePort.begin(seal), null);
+    const projectionDigest = Array.from(createHash('sha256').update(new TextEncoder().encode('Synthetic source.')).digest());
+    const expected = digestDocumentSynthesisSourceSet(Object.freeze({ sourceSetEpoch: 1n, revocationGeneration: 0n, sources: Object.freeze([
+        Object.freeze({ label: 'S1', documentSourceRef: 'document-source.synthetic.01', documentRevision: 1n,
+            documentFreshnessEpoch: 1n, sourceByteLength: 17, projectionDigestSha256: Object.freeze(projectionDigest) }),
+    ]) }));
+    assert.equal(expected.status, 'available'); assert.deepEqual(output.sourceSetDigestSha256, expected.sourceSetDigestSha256);
+});
+
+test('Document Synthesis sealed evidence burns hostile, stale, revoked, cross-owner, and lineage-drift authority without observation', () => {
+    const makeSeal = () => {
+        const fixture = ownerWithSelection(); const capturePort = fixture.owner.mintDocumentSynthesisAttachmentCapturePort(fixture.value);
+        const capture = capturePort.observeCurrentness(currentness()); assert.ok(capture); const grant = capturePort.begin(capture); assert.ok(grant);
+        const retained = capturePort.retain(Object.freeze({ grant, observedCurrentness: currentness(), projection: projection() })); assert.ok(retained);
+        const seal = capturePort.sealRetainedProjection(retained); assert.ok(seal);
+        return { ...fixture, capturePort, seal, evidencePort: fixture.owner.mintDocumentSynthesisSealedEvidencePort(fixture.value) };
+    };
+    const hostile = makeSeal(); let reads = 0; let traps = 0;
+    const proxy = new Proxy(hostile.seal, { get() { traps += 1; throw new Error('synthetic trap'); } });
+    const accessor = Object.freeze(Object.defineProperty({}, 'seal', { enumerable: true, get() { reads += 1; return hostile.seal; } }));
+    const thenable = Object.freeze(Object.defineProperty({}, 'then', { enumerable: true, get() { reads += 1; return () => undefined; } }));
+    for (const forged of [null, Object.freeze({ ...hostile.seal }), structuredClone(hostile.seal), proxy, accessor,
+        Object.freeze(Object.create({ seal: hostile.seal })), Object.freeze({ [Symbol('synthetic')]: hostile.seal }),
+        Object.freeze(Object.defineProperty({}, 'seal', { value: hostile.seal })), thenable]) assert.equal(hostile.evidencePort.begin(forged), null);
+    assert.equal(reads, 0); assert.equal(traps, 0); assert.ok(hostile.evidencePort.begin(hostile.seal));
+    const foreign = ownerWithSelection(); assert.equal(foreign.owner.mintDocumentSynthesisSealedEvidencePort(foreign.value).begin(hostile.seal), null);
+    const revoked = makeSeal(); const revokedGrant = revoked.evidencePort.begin(revoked.seal); assert.ok(revokedGrant);
+    assert.equal(revoked.capturePort.observeRevocation(revoked.seal), true); assert.equal(revoked.evidencePort.consume(revokedGrant), null);
+    const stale = makeSeal(); const staleGrant = stale.evidencePort.begin(stale.seal); assert.ok(staleGrant);
+    assert.ok(stale.capturePort.observeCurrentness(currentness(2, 2))); assert.equal(stale.evidencePort.consume(staleGrant), null);
+    const drift = makeSeal(); const driftGrant = drift.evidencePort.begin(drift.seal); assert.ok(driftGrant);
+    const other = drift.capturePort.observeCurrentness(currentness(1, 1, 'document-source.synthetic.other')); assert.ok(other);
+    const otherGrant = drift.capturePort.begin(other); assert.ok(otherGrant);
+    assert.ok(drift.capturePort.retain(Object.freeze({ grant: otherGrant, observedCurrentness: currentness(1, 1, 'document-source.synthetic.other'), projection: projection() })));
+    assert.equal(drift.evidencePort.consume(driftGrant), null);
+});
+
+test('Document Synthesis sealed evidence burns on final selection, expiry, logout, disposal, restart, and ambient-then drift', () => {
+    const make = () => {
+        const fixture = ownerWithSelection(); const capturePort = fixture.owner.mintDocumentSynthesisAttachmentCapturePort(fixture.value);
+        const capture = capturePort.observeCurrentness(currentness()); assert.ok(capture); const ingest = capturePort.begin(capture); assert.ok(ingest);
+        const retained = capturePort.retain(Object.freeze({ grant: ingest, observedCurrentness: currentness(), projection: projection() })); assert.ok(retained);
+        const seal = capturePort.sealRetainedProjection(retained); assert.ok(seal); const evidence = fixture.owner.mintDocumentSynthesisSealedEvidencePort(fixture.value);
+        const grant = evidence.begin(seal); assert.ok(grant); return { ...fixture, evidence, grant };
+    };
+    const reselection = make(); reselection.owner.issueSelection({ expectedEpoch: 1, ...PAIR });
+    assert.equal(reselection.evidence.consume(reselection.grant), null); assert.equal(reselection.evidence.consume(reselection.grant), null);
+    const expiry = make(); expiry.setClock(expiry.value.expiresAt); assert.equal(expiry.evidence.consume(expiry.grant), null);
+    const logout = make(); deleteSession(logout.value.id); assert.equal(logout.evidence.consume(logout.grant), null);
+    const disposal = make(); disposal.owner.dispose(); assert.equal(disposal.evidence.consume(disposal.grant), null);
+    const restart = make(); clearAllSessions(); assert.equal(restart.evidence.consume(restart.grant), null);
+    const ambient = make(); const descriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'then'); let reads = 0;
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { reads += 1; return undefined; } });
+    try { assert.ok(ambient.evidence.consume(ambient.grant)); } finally {
+        if (descriptor) Object.defineProperty(Object.prototype, 'then', descriptor); else delete (Object.prototype as { then?: unknown }).then;
+    }
+    assert.equal(reads, 0);
 });
 
 test('Document Synthesis attachment capture closes replay, stale currentness, foreign authority, and lifecycle changes', () => {
