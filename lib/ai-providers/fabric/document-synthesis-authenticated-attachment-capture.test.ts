@@ -49,7 +49,7 @@ const makeContext = (patientId) => {
 const primary = makeContext('patient.synthetic.capture');
 const other = makeContext('patient.synthetic.other');
 const poisoned = makeContext('patient.synthetic.capture');
-const contexts = [primary, primary, other, other, other, poisoned];
+const contexts = [primary, primary, primary, other, other, poisoned];
 let calls = 0;
 module.exports = {
   acquireAuthenticatedWebSessionProjectionOwnerContext: async () => {
@@ -94,6 +94,8 @@ assert.equal(first.status, 'available');
 assert.equal(first.code, null);
 assert.match(first.captureHandle, /^dsc_[0-9a-f]{32}$/u);
 assert.deepEqual({ reviewOnly: first.reviewOnly, writesPerformed: first.writesPerformed, applyPolicy: first.applyPolicy }, { reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
+const replay = await capture({ attachmentId: 'attachment.synthetic.capture' });
+assert.deepEqual({ ...replay }, { status: 'denied', code: 'unavailable', captureHandle: null, reviewOnly: true, writesPerformed: 0, applyPolicy: 'none' });
 let traps = 0;
 const hostile = new Proxy({ attachmentId: 'attachment.synthetic.capture' }, { get() { traps += 1; throw new Error('trap'); }, ownKeys() { traps += 1; throw new Error('trap'); } });
 const hostileResult = await capture(hostile);
@@ -132,6 +134,7 @@ test('captures every runtime intrinsic before the boundary is called', () => {
         'ObjectAssign = Object.assign', 'ObjectHasOwn = Object.hasOwn', 'ArrayIsArray = Array.isArray',
         'NumberIsSafeInteger = Number.isSafeInteger', 'MapConstructor = Map', 'WeakMapConstructor = WeakMap',
         'DbGet = dbServer.get.bind(dbServer)', 'Entropy = randomBytes', "'input_invalid'", "'unavailable'",
-        'reviewOnly: true', "applyPolicy: 'none'",
+        'reviewOnly: true', "applyPolicy: 'none'", 'mintDocumentSynthesisAttachmentCapturePort', 'observeCurrentness',
+        'attachmentCapturePort', 'attachmentCaptureCapability',
     ]) assert.match(source, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
 });
