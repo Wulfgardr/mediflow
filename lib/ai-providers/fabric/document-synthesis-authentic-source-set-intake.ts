@@ -2,22 +2,20 @@
 import 'server-only';
 
 import { types } from 'node:util';
-
 declare const documentSynthesisAuthenticSourceSetTokenRef: unique symbol;
 
 /** Opaque, process-local evidence identity; it deliberately exposes no data or consumer operation. */
 export type DocumentSynthesisAuthenticSourceSetToken = Readonly<{ readonly [documentSynthesisAuthenticSourceSetTokenRef]: never }>;
-
 type AuthenticSourceSetRecord = Readonly<{
     providerProjection: Readonly<{ label: 'S1'; sourceText: string }>;
     sourceSetDigestSha256: readonly number[];
 }>;
-
 const ARRAY_PROTOTYPE = Array.prototype;
 const ObjectCreate = Object.create;
 const ObjectFreeze = Object.freeze;
 const ObjectGetPrototypeOf = Object.getPrototypeOf;
 const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const ObjectHasOwn = Object.hasOwn;
 const ObjectIsFrozen = Object.isFrozen;
 const ReflectOwnKeys = Reflect.ownKeys;
 const ReflectApply = Reflect.apply;
@@ -34,14 +32,12 @@ const weakMapSet = WeakMap.prototype.set;
 const weakMapDelete = WeakMap.prototype.delete;
 const weakSetHas = WeakSet.prototype.has;
 const weakSetAdd = WeakSet.prototype.add;
-
 const EVIDENCE_KEYS = ['providerProjection', 'sourceSetDigestSha256'] as const;
 const PROJECTION_KEYS = ['label', 'sourceText'] as const;
 const authenticSourceSets = new WeakMapConstructor<object, AuthenticSourceSetRecord>();
 const burnedEvidence = new WeakSetConstructor<object>();
 let active = false;
 let reentryPoisoned = false;
-
 function exactRecord(value: unknown, keys: readonly string[], prototype: object | null): Record<string, unknown> | null {
     try {
         if (typeof value !== 'object' || value === null || IsProxy(value) || ObjectGetPrototypeOf(value) !== prototype || !ObjectIsFrozen(value)) return null;
@@ -51,7 +47,8 @@ function exactRecord(value: unknown, keys: readonly string[], prototype: object 
         for (let index = 0; index < keys.length; index += 1) {
             const key = keys[index]!;
             const descriptor = ObjectGetOwnPropertyDescriptor(value, key);
-            if (!descriptor || descriptor.enumerable !== true || descriptor.configurable !== false || descriptor.writable !== false || !('value' in descriptor)) return null;
+            if (!descriptor || !ObjectHasOwn(descriptor, 'enumerable') || !ObjectHasOwn(descriptor, 'configurable') || !ObjectHasOwn(descriptor, 'writable') || !ObjectHasOwn(descriptor, 'value')
+                || descriptor.enumerable !== true || descriptor.configurable !== false || descriptor.writable !== false) return null;
             output[key] = descriptor.value;
         }
         for (let index = 0; index < ownKeys.length; index += 1) {
@@ -60,7 +57,6 @@ function exactRecord(value: unknown, keys: readonly string[], prototype: object 
         return output;
     } catch { return null; }
 }
-
 function copyEvidence(value: object): AuthenticSourceSetRecord | null {
     const input = exactRecord(value, EVIDENCE_KEYS, null);
     if (!input) return null;
@@ -73,12 +69,14 @@ function copyEvidence(value: object): AuthenticSourceSetRecord | null {
         const copiedDigest = new ArrayConstructor(32) as number[];
         for (let index = 0; index < 32; index += 1) {
             const descriptor = ObjectGetOwnPropertyDescriptor(suppliedDigest, StringConstructor(index));
-            if (!descriptor || descriptor.enumerable !== true || descriptor.configurable !== false || descriptor.writable !== false || !('value' in descriptor)
+            if (!descriptor || !ObjectHasOwn(descriptor, 'enumerable') || !ObjectHasOwn(descriptor, 'configurable') || !ObjectHasOwn(descriptor, 'writable') || !ObjectHasOwn(descriptor, 'value')
+                || descriptor.enumerable !== true || descriptor.configurable !== false || descriptor.writable !== false
                 || typeof descriptor.value !== 'number' || !NumberIsSafeInteger(descriptor.value) || descriptor.value < 0 || descriptor.value > 255) return null;
             copiedDigest[index] = descriptor.value;
         }
         const length = ObjectGetOwnPropertyDescriptor(suppliedDigest, 'length');
-        if (!length || length.enumerable !== false || length.configurable !== false || length.writable !== false || length.value !== 32) return null;
+        if (!length || !ObjectHasOwn(length, 'enumerable') || !ObjectHasOwn(length, 'configurable') || !ObjectHasOwn(length, 'writable') || !ObjectHasOwn(length, 'value')
+            || length.enumerable !== false || length.configurable !== false || length.writable !== false || length.value !== 32) return null;
         for (let index = 0; index < ownKeys.length; index += 1) {
             const key = ownKeys[index]; if (key !== 'length' && (typeof key !== 'string' || !RegExpTest(/^(?:[0-9]|[12][0-9]|3[01])$/u, key))) return null;
         }
@@ -88,16 +86,20 @@ function copyEvidence(value: object): AuthenticSourceSetRecord | null {
         })) as AuthenticSourceSetRecord;
     } catch { return null; }
 }
-
 /** A3a2-only deep sink: one exact sealed evidence identity becomes one opaque local token, or a generic denial. */
 export function intakeDocumentSynthesisA3a2SealedEvidence(evidence: unknown): DocumentSynthesisAuthenticSourceSetToken | null {
     if (typeof evidence !== 'object' || evidence === null) return null;
-    if (ReflectApply(weakSetHas, burnedEvidence, [evidence])) return null;
-    ReflectApply(weakSetAdd, burnedEvidence, [evidence]);
-    if (active) { reentryPoisoned = true; return null; }
+    if (active) {
+        reentryPoisoned = true;
+        try { ReflectApply(weakSetAdd, burnedEvidence, [evidence]); } catch { /* fail closed */ }
+        return null;
+    }
     active = true;
     reentryPoisoned = false;
     try {
+        if (ReflectApply(weakSetHas, burnedEvidence, [evidence])) return null;
+        ReflectApply(weakSetAdd, burnedEvidence, [evidence]);
+        if (reentryPoisoned) return null;
         const record = copyEvidence(evidence);
         if (!record || reentryPoisoned) return null;
         const token = ObjectFreeze(ObjectCreate(null)) as DocumentSynthesisAuthenticSourceSetToken;
