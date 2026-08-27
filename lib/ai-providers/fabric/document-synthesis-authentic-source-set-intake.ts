@@ -31,6 +31,7 @@ const IsProxy = types.isProxy;
 const WeakMapConstructor = WeakMap;
 const WeakSetConstructor = WeakSet;
 const weakMapSet = WeakMap.prototype.set;
+const weakMapDelete = WeakMap.prototype.delete;
 const weakSetHas = WeakSet.prototype.has;
 const weakSetAdd = WeakSet.prototype.add;
 
@@ -93,15 +94,22 @@ export function intakeDocumentSynthesisA3a2SealedEvidence(evidence: unknown): Do
     if (typeof evidence !== 'object' || evidence === null) return null;
     if (ReflectApply(weakSetHas, burnedEvidence, [evidence])) return null;
     ReflectApply(weakSetAdd, burnedEvidence, [evidence]);
-    if (reentryPoisoned) return null;
     if (active) { reentryPoisoned = true; return null; }
     active = true;
+    reentryPoisoned = false;
     try {
         const record = copyEvidence(evidence);
-        if (!record) { active = false; return null; }
+        if (!record || reentryPoisoned) return null;
         const token = ObjectFreeze(ObjectCreate(null)) as DocumentSynthesisAuthenticSourceSetToken;
-        active = false;
-        ReflectApply(weakMapSet, authenticSourceSets, [token, record]);
-        return token;
-    } catch { active = false; return null; }
+        try {
+            ReflectApply(weakMapSet, authenticSourceSets, [token, record]);
+            if (reentryPoisoned) { ReflectApply(weakMapDelete, authenticSourceSets, [token]); return null; }
+            return token;
+        } catch {
+            try { ReflectApply(weakMapDelete, authenticSourceSets, [token]); } catch { /* fail closed */ }
+            return null;
+        }
+    } catch {
+        return null;
+    } finally { active = false; reentryPoisoned = false; }
 }

@@ -1,8 +1,10 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, realpathSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 
 import {
@@ -24,6 +26,33 @@ function evidence(sourceText = 'Synthetic A3a2 source text'): object {
 function cloneExact(value: object): object {
     const input = value as { providerProjection: { label: 'S1'; sourceText: string }; sourceSetDigestSha256: readonly number[] };
     return evidence(input.providerProjection.sourceText.replace(/^/, ''));
+}
+
+function runPreImportReentry(kind: 'isProxy' | 'weakMapSet'): unknown {
+    const script = `
+import { types } from 'node:util';
+const exact = (text) => Object.freeze(Object.assign(Object.create(null), {
+  providerProjection: Object.freeze(Object.assign(Object.create(null), { label: 'S1', sourceText: text })),
+  sourceSetDigestSha256: Object.freeze(Array.from({ length: 32 }, (_, index) => index)),
+}));
+const outer = exact('Synthetic outer'); const inner = exact('Synthetic inner');
+let intake = null; let innerResult = null; let fired = false;
+let unhandled = 0; process.on('unhandledRejection', () => { unhandled += 1; });
+if (${JSON.stringify(kind)} === 'isProxy') {
+  const original = types.isProxy;
+  types.isProxy = (value) => { if (intake && !fired) { fired = true; innerResult = intake(inner); } return original(value); };
+} else {
+  const original = WeakMap.prototype.set;
+  WeakMap.prototype.set = function (key, value) { const result = Reflect.apply(original, this, [key, value]); if (intake && !fired) { fired = true; innerResult = intake(inner); } return result; };
+}
+({ intakeDocumentSynthesisA3a2SealedEvidence: intake } = await import(${JSON.stringify(pathToFileURL(TARGET).href)}));
+const outerResult = intake(outer);
+await new Promise((resolve) => setImmediate(resolve));
+process.stdout.write(JSON.stringify({ outer: outerResult === null, inner: innerResult === null, outerReplay: intake(outer) === null, innerReplay: intake(inner) === null, recovery: intake(exact('Synthetic recovery')) !== null, unhandled }));
+`;
+    const result = spawnSync(process.execPath, ['--experimental-strip-types', '--import', path.join(ROOT, 'scripts/register-strip-types-loader.mjs'), '--conditions=react-server', '--input-type=module', '--eval', script], { cwd: ROOT, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    return JSON.parse(result.stdout) as unknown;
 }
 
 function sourceFiles(directory: string, includeTests = false): string[] {
@@ -103,6 +132,12 @@ test('uses captured intrinsics and has no asynchronous or post-publication work'
     assert.equal(intakeDocumentSynthesisA3a2SealedEvidence(input), null);
 });
 
+test('poisons the outer intake when pre-import IsProxy or WeakMap.set reenters', () => {
+    const denied = { outer: true, inner: true, outerReplay: true, innerReplay: true, recovery: true, unhandled: 0 };
+    assert.deepEqual(runPreImportReentry('isProxy'), denied);
+    assert.deepEqual(runPreImportReentry('weakMapSet'), denied);
+});
+
 test('keeps the canonical module deep-internal with one realpath and no production importers', () => {
     const production = sourceFiles(ROOT);
     assertZeroProductionImporters(production, TARGET);
@@ -124,6 +159,8 @@ test('keeps the canonical module deep-internal with one realpath and no producti
     const sink = source.slice(source.indexOf('export function intakeDocumentSynthesisA3a2SealedEvidence'));
     assert.ok(sink.indexOf('weakSetAdd') < sink.indexOf('const record = copyEvidence'), 'burn precedes validation and copying');
     assert.ok(sink.indexOf('const record = copyEvidence') < sink.indexOf('const token ='), 'copy precedes token construction');
-    assert.match(sink, /ReflectApply\(weakMapSet, authenticSourceSets, \[token, record\]\);\n        return token;/u);
+    const publication = sink.indexOf('ReflectApply(weakMapSet, authenticSourceSets, [token, record])');
+    assert.ok(publication < sink.indexOf('if (reentryPoisoned)', publication) && sink.indexOf('if (reentryPoisoned)', publication) < sink.indexOf('return token', publication), 'publication rechecks reentry before returning');
+    assert.match(sink, /weakMapDelete/u);
     assert.doesNotMatch(sink, /async|Promise|console\.|setTimeout|setImmediate/u);
 });
