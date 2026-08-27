@@ -346,6 +346,64 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(identity?.userId, "new-user")
     }
 
+    /* @Codex */
+    func testStaleLoginFailuresCannotClearNewerState() async throws {
+        let pin = String(repeating: "1", count: 4)
+        let key = SymmetricKey(data: Data(repeating: 3, count: 32))
+        let salt = Data(repeating: 4, count: 16)
+        let wrapped = try XCTUnwrap(CryptoService.wrapMasterKeyVersioned(
+            key, pin: pin, salt: salt, version: CryptoService.currentKdfVersion))
+        for staleFailure in [HomeBaseClientError.httpStatus(401, "stale"), .transport(.timeout)] {
+            let gate = LifecycleLoadGate(["login:1"])
+            let source = LifecycleMockDataSource(
+                loginResults: [
+                    HomeBaseLoginResult(sessionCookie: "sid=old", encryptedMasterKey: nil, salt: nil, id: "old-user"),
+                    HomeBaseLoginResult(sessionCookie: "sid=new", encryptedMasterKey: wrapped, salt: salt.base64EncodedString(), id: "new-user"),
+                ], loginErrors: [staleFailure, nil], loadGate: gate)
+            let model = await makeModel(source: source)
+            await MainActor.run {
+                model.password = pin; model.pairedClientId = "paired-client"; model.pairedClientToken = "paired-token"
+            }
+            let older = Task { await model.login() }
+            await gate.wait(for: "login:1")
+            await model.login()
+            await gate.release("login:1"); await older.value
+            await model.changePin(currentPin: pin, newPin: "2222")
+            let identity = await model.operatorIdentity?.userId
+            let loginCalls = await source.loginCalls
+            let logoutCalls = await source.logoutCalls
+            let pinChangeCalls = await source.pinChangeCalls
+            XCTAssertEqual(identity, "new-user")
+            XCTAssertEqual(loginCalls, 2)
+            XCTAssertEqual(logoutCalls, 0)
+            XCTAssertEqual(pinChangeCalls.count, 1)
+        }
+    }
+
+    /* @Codex */
+    func testCurrentLogin401StillClearsAuthState() async {
+        let source = LifecycleMockDataSource(loginErrors: [.httpStatus(401, "current")])
+        let model = await makeModel(source: source)
+        await MainActor.run {
+            model.password = String(repeating: "1", count: 4)
+            model.pairedClientId = "paired-client"; model.pairedClientToken = "paired-token"
+        }
+        await model.configurePairedOnlineForTests(
+            masterKey: SymmetricKey(data: Data(repeating: 9, count: 32)))
+        let connectionBeforeLogin = await model.clinicalWorkspaceConnection
+        XCTAssertNotNil(connectionBeforeLogin)
+        await model.login()
+        let identity = await model.operatorIdentity
+        let state = await model.connectionState
+        let connection = await model.clinicalWorkspaceConnection
+        await model.changePin(currentPin: "1111", newPin: "2222")
+        let pinChangeCalls = await source.pinChangeCalls
+        XCTAssertNil(identity)
+        XCTAssertEqual(state, .sessionExpired)
+        XCTAssertNil(connection)
+        XCTAssertTrue(pinChangeCalls.isEmpty)
+    }
+
     func testScopeRoundTripInvalidatesCapturedPatientLoad() async {
         let gate = LifecycleLoadGate(["patient:1"])
         let source = LifecycleMockDataSource(
@@ -833,6 +891,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     private var revisionFetchCount = 0
     private let loginResults: [HomeBaseLoginResult]
     private let pinChangeError: HomeBaseClientError?
+    private let loginErrors: [HomeBaseClientError?]
     private let logoutError: HomeBaseClientError?
     private(set) var lastUpdate: UpdateCall?
     private(set) var lastCreate: HomeBasePatientCreatePayload?
@@ -842,7 +901,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     private(set) var includeDiagnosesRequests: [Bool] = []
     private(set) var pinChangeCalls: [PinChangeCall] = []
     private(set) var logoutCalls = 0
-    private var loginCalls = 0
+    private(set) var loginCalls = 0
 
     init(
         summaries: [HomeBasePatientSummary] = [],
@@ -850,6 +909,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         loginResult: HomeBaseLoginResult = HomeBaseLoginResult(
             sessionCookie: "sid=test", encryptedMasterKey: nil, salt: nil),
         loginResults: [HomeBaseLoginResult] = [],
+        loginErrors: [HomeBaseClientError?] = [],
         pinChangeError: HomeBaseClientError? = nil,
         logoutError: HomeBaseClientError? = nil,
         loadGate: LifecycleLoadGate? = nil,
@@ -862,6 +922,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         self.summaries = summaries
         self.details = details
         self.loginResults = loginResults.isEmpty ? [loginResult] : loginResults
+        self.loginErrors = loginErrors
         self.pinChangeError = pinChangeError
         self.logoutError = logoutError
         self.loadGate = loadGate
@@ -892,6 +953,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         loginCalls += 1
         let result = loginResults[index]
         await loadGate?.pause("login:\(loginCalls)")
+        if loginErrors.indices.contains(index), let error = loginErrors[index] { throw error }
         return result
     }
 

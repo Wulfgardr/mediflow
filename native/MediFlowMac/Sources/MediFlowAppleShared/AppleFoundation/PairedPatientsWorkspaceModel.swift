@@ -697,7 +697,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         let client = makeClient()
         let username = self.username.trimmedOrNil
         let password = self.password
-        await runTask {
+        await runTask({
             let result = try await client.login(
                 username: username,
                 password: password,
@@ -717,7 +717,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
             self.statusMessage = self.masterKey == nil
                 ? "Sessione operatore attiva. Cifratura campi non disponibile."
                 : "Sessione operatore attiva."
-        }
+        }, canApplyFailure: { self.loginGeneration == generation })
     }
 
     func changePin(currentPin: String, newPin: String) async {
@@ -4136,7 +4136,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         cancelEditingObservation()
     }
 
-    private func runTask(_ operation: @escaping () async throws -> Void) async {
+    private func runTask(
+        _ operation: @escaping () async throws -> Void,
+        canApplyFailure: @escaping () -> Bool = { true }
+    ) async {
         let operationID = beginExclusiveOperation()
         errorMessage = nil
         pendingConflict = nil
@@ -4144,6 +4147,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject {
         do {
             try await operation()
         } catch {
+            guard canApplyFailure() else { return }
             if case HomeBaseClientError.httpStatus(let status, _) = error,
                status == 401 {
                 invalidatePatientLoadContext()
