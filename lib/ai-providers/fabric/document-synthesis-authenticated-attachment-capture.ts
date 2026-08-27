@@ -203,10 +203,11 @@ export async function exchangeDocumentSynthesisAuthenticatedAttachmentHandoff(
     try {
         const broker = brokerFor(context);
         const record = mapGet(broker.records, handoffHandle);
-        if (!record || record.scope !== 'document_synthesis_attachment_handoff') return null;
+        if (!record || record.scope !== 'document_synthesis_attachment_handoff'
+            || !mapDelete(broker.records, handoffHandle)) return null;
         const current = context.owner.withLeaseCriticalSection(context.session, () => context.owner.snapshotSelectionEpoch(context.session) === record.selectionEpoch
             && context.owner.snapshotReviewContextEpoch(context.session) === record.reviewContextEpoch);
-        if (current !== true || !mapDelete(broker.records, handoffHandle)) return null;
+        if (current !== true) return null;
         return intakeDocumentSynthesisA3a2SealedEvidence(record.evidence);
     } catch { return null; }
 }
