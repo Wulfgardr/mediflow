@@ -4,6 +4,12 @@ import 'server-only';
 import crypto from 'crypto';
 import { types } from 'node:util';
 
+import {
+    abortPreparedAuthControlActivation,
+    commitPreparedAuthControlActivation,
+    prepareAuthControlActivation,
+} from './web-auth-control-record';
+
 export const SESSION_COOKIE_NAME = 'mediflow_session';
 const SESSION_TTL_MS = Number(process.env.MEDIFLOW_SESSION_TTL_MS || 1000 * 60 * 60 * 8);
 const MapConstructor = Map;
@@ -140,7 +146,7 @@ interface PreparedWebSessionRecord {
 }
 
 interface ArmedWebSessionCellRecord {
-    state: 'ARMED_ACTIVATE' | 'TOMBSTONE';
+    state: 'ARMED_ACTIVATE' | 'ACTIVE' | 'TOMBSTONE';
     session: ServerSession;
     next: ArmedWebSessionCellRecord | null;
 }
@@ -616,6 +622,53 @@ export function tombstoneArmedWebServerSession(port: unknown): boolean {
         return tombstoneArmedWebSessionCellRecord(cell);
     } catch { return false; }
     finally { endWebSessionCellLifecycle(); }
+}
+
+/** Atomically splices one exact P2 CAS into its already-installed inert P3 cell. */
+/* @Codex */
+export function activateArmedWebServerSession(port: unknown, ticket: unknown): boolean {
+    const sessionId = getArmedWebServerSessionId(port);
+    const preparedActivation = prepareAuthControlActivation(ticket, sessionId);
+    if (!sessionId || !preparedActivation) {
+        tombstoneArmedWebServerSession(port);
+        return false;
+    }
+    if (!beginWebSessionCellLifecycle(port)) {
+        abortPreparedAuthControlActivation(preparedActivation);
+        return false;
+    }
+    let cell: ArmedWebSessionCellRecord | null = null;
+    try {
+        cell = armedWebSessionCellRecord(port);
+        const session = cell?.session ?? null;
+        const visibleSession = getMapValue(sessions, sessionId);
+        const now = DateNow();
+        if (webSessionCellLifecyclePoisoned || !cell || cell.state !== 'ARMED_ACTIVATE'
+            || armedWebSessionCellsById[sessionId] !== cell || !session || cell.session !== session
+            || session.id !== sessionId || session.authChannel !== 'web' || session.expiresAt <= now || visibleSession) {
+            if (cell) cell.state = 'TOMBSTONE';
+            abortPreparedAuthControlActivation(preparedActivation);
+            webSessionCellLifecyclePoisoned = false;
+            webSessionCellLifecycle = 'idle';
+            return false;
+        }
+    } catch {
+        if (cell) cell.state = 'TOMBSTONE';
+        try { abortPreparedAuthControlActivation(preparedActivation); } catch { /* prepared P2 denial stays terminal */ }
+        webSessionCellLifecyclePoisoned = false;
+        webSessionCellLifecycle = 'idle';
+        return false;
+    }
+    if (commitPreparedAuthControlActivation(preparedActivation) === 1) {
+        cell.state = 'ACTIVE';
+        webSessionCellLifecyclePoisoned = false;
+        webSessionCellLifecycle = 'idle';
+        return true;
+    }
+    cell.state = 'TOMBSTONE';
+    webSessionCellLifecyclePoisoned = false;
+    webSessionCellLifecycle = 'idle';
+    return false;
 }
 
 /** Canonically publishes a prepared session only for server-local compatibility callers. */

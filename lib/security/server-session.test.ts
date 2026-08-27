@@ -1,12 +1,15 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { afterEach, test } from 'node:test';
 
 import {
     abortPreparedWebServerSession,
     abortStagedWebServerSession,
+    activateArmedWebServerSession,
     activateStagedWebServerSession,
     clearAllSessions,
     commitPreparedWebServerSession,
@@ -27,6 +30,29 @@ import {
 const SYNTHETIC_USERNAME = `synthetic-${randomUUID()}`;
 const TARGET_USERNAME = ['synthetic', 'target'].join('-');
 const OTHER_USERNAME = ['synthetic', 'other'].join('-');
+const AUTH_CONTROL_MODULE_PATH = ['./web-auth-control', '-record.ts'].join('');
+
+function authControlApi() {
+    const api = createRequire(import.meta.url)(AUTH_CONTROL_MODULE_PATH) as {
+        createWebAuthControlRecord(fence: string): {
+            begin(kind: string, operation: string, key: string, fingerprint: string, at: number): { ok: boolean };
+            snapshot(): { fence: string; generation: bigint; pending: boolean; active: boolean };
+            [key: string]: unknown;
+        };
+        prepareAuthControlActivation(ticket: unknown, sessionId: string): unknown;
+    };
+    const create = (fence: string) => {
+        const record = api.createWebAuthControlRecord(fence);
+        return {
+            begin: record.begin,
+            snapshot: record.snapshot,
+            prepareTicket: (...args: [string, string, bigint, string, string, number]) => (
+                record[['prepareAuth', 'ControlTicket'].join('')] as (...values: unknown[]) => unknown
+            )(...args),
+        };
+    };
+    return { create, prepareActivation: api.prepareAuthControlActivation };
+}
 
 afterEach(() => clearAllSessions());
 
@@ -267,6 +293,153 @@ test('an armed Web session cell burns its prepared capability without exposing a
         cryptoModule.randomBytes = () => Buffer.from(sessionId, 'hex');
         assert.throws(() => createSession({ id: 'collision-user', username: SYNTHETIC_USERNAME, role: 'clinician' }));
     } finally { cryptoModule.randomBytes = randomBytes; }
+});
+
+function armedControlActivation() {
+    const staged = stageWebServerSession({ id: 'atomic-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    const prepared = prepareStagedWebServerSession(staged); assert.ok(prepared);
+    const sessionId = getPreparedWebServerSessionId(prepared); assert.ok(sessionId);
+    const port = armPreparedWebServerSession(prepared); assert.ok(port);
+    const control = authControlApi().create('f0'); control.begin('login', 'op', 'key', 'fp', 0);
+    const ticket = control.prepareTicket('f0', 'op', BigInt(0), 'fp', sessionId, 1); assert.ok(ticket);
+    return { control, port, sessionId, ticket };
+}
+
+test('atomically splices one exact control CAS into an inert Web session cell', () => {
+    const { control, port, sessionId, ticket } = armedControlActivation();
+
+    assert.equal(activateArmedWebServerSession(port, ticket), true);
+    assert.deepEqual(control.snapshot(), { fence: control.snapshot().fence, generation: BigInt(1), pending: false, active: true });
+    assert.equal(getArmedWebServerSessionId(port), null, 'ACTIVE is no longer an armed capability');
+    assert.equal(getSession(sessionId), null, 'P3b2b does not migrate the resolver');
+    assert.equal(peekSession(sessionId), null);
+    assert.equal(activateArmedWebServerSession(port, ticket), false, 'lost-response replay cannot duplicate activation');
+
+    const source = readFileSync(fileURLToPath(new URL('./server-session.ts', import.meta.url)), 'utf8');
+    const body = source.slice(source.indexOf('export function activateArmedWebServerSession'), source.indexOf('/** Canonically publishes'));
+    const successfulCas = body.indexOf('if (commitPreparedAuthControlActivation(preparedActivation) === 1) {');
+    const activeFlip = body.indexOf("cell.state = 'ACTIVE';", successfulCas);
+    assert.ok(successfulCas >= 0 && activeFlip > successfulCas);
+    assert.equal(body.slice(successfulCas + 'if (commitPreparedAuthControlActivation(preparedActivation) === 1) {'.length, activeFlip).trim(), '');
+    assert.doesNotMatch(body.slice(activeFlip, body.indexOf('return true;', activeFlip)), /\w+\s*\(/u);
+});
+
+test('activation burns crossed, hostile, copied, and cross-module inputs without observation', async (t) => {
+    const first = armedControlActivation(); const second = armedControlActivation(); let observed = 0;
+    const proxy = new Proxy(first.port, { get: () => { observed += 1; throw new Error('get'); }, ownKeys: () => { observed += 1; throw new Error('keys'); } });
+    const accessor = Object.create(null); Object.defineProperty(accessor, 'then', { get: () => { observed += 1; throw new Error('then'); } });
+    const rejected = Promise.reject(new Error('hostile')); rejected.catch(() => undefined);
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+
+    assert.equal(activateArmedWebServerSession(first.port, second.ticket), false);
+    for (const value of [Object.assign(Object.create(null), first.port), proxy, accessor, Promise.resolve(), rejected, { then() { observed += 1; } }]) {
+        assert.equal(activateArmedWebServerSession(value, first.ticket), false);
+    }
+    assert.equal(activateArmedWebServerSession(second.port, first.ticket), false);
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath];
+    try {
+        delete nodeRequire.cache[modulePath]; const restarted = nodeRequire(modulePath) as typeof import('./server-session');
+        assert.equal(restarted.activateArmedWebServerSession(second.port, second.ticket), false);
+        restarted.clearAllSessions();
+    } finally { if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(observed, 0); assert.deepEqual(unhandled, []);
+});
+
+test('activation denies clock reentry, CAS drift, and ambient collection poison without post-return drift', async (t) => {
+    const nodeRequire = createRequire(import.meta.url); const sessionPath = nodeRequire.resolve('./server-session.ts');
+    const authPath = nodeRequire.resolve(AUTH_CONTROL_MODULE_PATH); const cachedSession = nodeRequire.cache[sessionPath]; const cachedAuth = nodeRequire.cache[authPath];
+    const originalNow = Date.now; const ttl = process.env.MEDIFLOW_SESSION_TTL_MS; let now = 1_000;
+    let armed = false; let clockCalls = 0; let nested = () => undefined;
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    process.env.MEDIFLOW_SESSION_TTL_MS = '1';
+    Date.now = () => { clockCalls += 1; if (armed && clockCalls === 2) nested(); return now; };
+    delete nodeRequire.cache[sessionPath]; delete nodeRequire.cache[authPath];
+    const isolated = nodeRequire(sessionPath) as typeof import('./server-session');
+    const auth = authControlApi();
+    const fixture = () => {
+        clockCalls = 0; armed = false;
+        const prepared = isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({ id: 'clock-user', username: SYNTHETIC_USERNAME, role: 'clinician' })); assert.ok(prepared);
+        const sessionId = isolated.getPreparedWebServerSessionId(prepared); assert.ok(sessionId);
+        const port = isolated.armPreparedWebServerSession(prepared); assert.ok(port);
+        const control = auth.create('f0'); control.begin('login', 'op', 'key', 'fp', 0);
+        const ticket = control.prepareTicket('f0', 'op', BigInt(0), 'fp', sessionId, 1); assert.ok(ticket);
+        clockCalls = 0; armed = true; return { control, port, sessionId, ticket };
+    };
+    try {
+        for (const operation of ['tombstone', 'delete', 'logout', 'clear', 'arm'] as const) {
+            const current = fixture(); const nestedPrepared = operation === 'arm' ? isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({ id: 'nested', username: SYNTHETIC_USERNAME, role: 'clinician' })) : null;
+            clockCalls = 0; armed = true; nested = () => {
+                if (operation === 'tombstone') isolated.tombstoneArmedWebServerSession(current.port);
+                else if (operation === 'delete') isolated.deleteSession(current.sessionId);
+                else if (operation === 'logout') isolated.invalidateSessionsForUser('clock-user');
+                else if (operation === 'clear') isolated.clearAllSessions();
+                else isolated.armPreparedWebServerSession(nestedPrepared);
+            };
+            assert.equal(isolated.activateArmedWebServerSession(current.port, current.ticket), false);
+            assert.equal(isolated.getArmedWebServerSessionId(current.port), null);
+            await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(isolated.getArmedWebServerSessionId(current.port), null);
+        }
+        const drift = fixture();
+        const other = auth.create('other'); other.begin('login', 'other-op', 'other-key', 'other-fp', 0);
+        const otherTicket = other.prepareTicket('other', 'other-op', BigInt(0), 'other-fp', 'other-session', 1); assert.ok(otherTicket);
+        clockCalls = 0; armed = true; nested = () => { auth.prepareActivation(otherTicket, 'other-session'); };
+        assert.equal(isolated.activateArmedWebServerSession(drift.port, drift.ticket), false);
+        assert.equal(isolated.getArmedWebServerSessionId(drift.port), null);
+        const expired = fixture(); armed = false; now += 1;
+        assert.equal(isolated.activateArmedWebServerSession(expired.port, expired.ticket), false);
+        assert.equal(isolated.getArmedWebServerSessionId(expired.port), null);
+        const fail = () => { throw new Error('ambient collection poison'); };
+        const originals = { get: WeakMap.prototype.get, set: WeakMap.prototype.set, mapGet: Map.prototype.get, apply: Reflect.apply };
+        const clean = fixture(); clockCalls = 0; armed = false;
+        try { WeakMap.prototype.get = fail as typeof WeakMap.prototype.get; WeakMap.prototype.set = fail as typeof WeakMap.prototype.set; Map.prototype.get = fail as typeof Map.prototype.get; Reflect.apply = fail as typeof Reflect.apply; assert.equal(isolated.activateArmedWebServerSession(clean.port, clean.ticket), true); }
+        finally { WeakMap.prototype.get = originals.get; WeakMap.prototype.set = originals.set; Map.prototype.get = originals.mapGet; Reflect.apply = originals.apply; }
+        assert.equal(isolated.getSession(clean.sessionId), null);
+        await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
+    } finally {
+        armed = false; Date.now = originalNow; isolated.clearAllSessions();
+        if (ttl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = ttl;
+        if (cachedSession) nodeRequire.cache[sessionPath] = cachedSession; else delete nodeRequire.cache[sessionPath];
+        if (cachedAuth) nodeRequire.cache[authPath] = cachedAuth; else delete nodeRequire.cache[authPath];
+    }
+});
+
+test('activation tombstones lookup reentry and a captured WeakMap mutate-then-throw', async () => {
+    const nodeRequire = createRequire(import.meta.url); const sessionPath = nodeRequire.resolve('./server-session.ts');
+    const authPath = nodeRequire.resolve(AUTH_CONTROL_MODULE_PATH); const cachedSession = nodeRequire.cache[sessionPath]; const cachedAuth = nodeRequire.cache[authPath];
+    const originalGet = WeakMap.prototype.get; let trigger = false; let failAfterApply = false; let nested: () => void = () => undefined;
+    WeakMap.prototype.get = function (this: WeakMap<object, unknown>, key: object) {
+        if (trigger) { trigger = false; nested(); }
+        const result = Reflect.apply(originalGet, this, [key]);
+        if (failAfterApply) { failAfterApply = false; throw new Error('mutate-then-throw'); }
+        return result;
+    };
+    delete nodeRequire.cache[sessionPath]; delete nodeRequire.cache[authPath];
+    const isolated = nodeRequire(sessionPath) as typeof import('./server-session');
+    try {
+        const fixture = () => {
+            const staged = isolated.stageWebServerSession({ id: 'lookup-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+            const prepared = isolated.prepareStagedWebServerSession(staged); assert.ok(prepared);
+            const sessionId = isolated.getPreparedWebServerSessionId(prepared); assert.ok(sessionId);
+            const port = isolated.armPreparedWebServerSession(prepared); assert.ok(port);
+            const control = authControlApi().create('f0'); control.begin('login', 'op', 'key', 'fp', 0);
+            const ticket = control.prepareTicket('f0', 'op', BigInt(0), 'fp', sessionId, 1); assert.ok(ticket);
+            return { port, sessionId, ticket };
+        };
+        const reentered = fixture(); nested = () => isolated.deleteSession(reentered.sessionId); trigger = true;
+        assert.equal(isolated.activateArmedWebServerSession(reentered.port, reentered.ticket), false);
+        assert.equal(isolated.getArmedWebServerSessionId(reentered.port), null);
+        const thrown = fixture(); failAfterApply = true;
+        assert.equal(isolated.activateArmedWebServerSession(thrown.port, thrown.ticket), false);
+        assert.equal(isolated.getArmedWebServerSessionId(thrown.port), null);
+        await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(isolated.getArmedWebServerSessionId(thrown.port), null);
+    } finally {
+        WeakMap.prototype.get = originalGet; isolated.clearAllSessions();
+        if (cachedSession) nodeRequire.cache[sessionPath] = cachedSession; else delete nodeRequire.cache[sessionPath];
+        if (cachedAuth) nodeRequire.cache[authPath] = cachedAuth; else delete nodeRequire.cache[authPath];
+    }
 });
 
 test('an armed Web session cell becomes a terminal tombstone on denial, logout, clear, and expiry', () => {
