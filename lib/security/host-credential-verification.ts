@@ -53,6 +53,7 @@ const invalid = (): Denied => ({
     body: createInvalidCredentialsPayload(),
 });
 const isProxy = types.isProxy;
+const hasOwn = Object.hasOwn;
 
 /** Rejects descriptor-bearing or non-canonical caller objects before dependencies are read. */
 function readCredential(value: unknown): Credential | null {
@@ -62,6 +63,7 @@ function readCredential(value: unknown): Credential | null {
         if (Object.getPrototypeOf(value) !== Object.prototype) return null;
         const fields = Object.getOwnPropertyDescriptors(value);
         if (Reflect.ownKeys(fields).length !== 2) return null;
+        if (!hasOwn(fields, 'username') || !hasOwn(fields, 'pin')) return null;
         const username = fields.username;
         const pin = fields.pin;
         if (
