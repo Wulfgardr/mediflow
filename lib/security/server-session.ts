@@ -8,7 +8,10 @@ export const SESSION_COOKIE_NAME = 'mediflow_session';
 const SESSION_TTL_MS = Number(process.env.MEDIFLOW_SESSION_TTL_MS || 1000 * 60 * 60 * 8);
 const MapConstructor = Map;
 const SetConstructor = Set;
+const WeakMapConstructor = WeakMap;
 const DateNow = Date.now;
+const ObjectCreate = Object.create;
+const ObjectPrototype = Object.prototype;
 const ObjectGetPrototypeOf = Object.getPrototypeOf;
 const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
@@ -28,6 +31,10 @@ const setDelete = Set.prototype.delete;
 const setValues = Set.prototype.values;
 const setIteratorNext = ObjectGetPrototypeOf(new SetConstructor().values()).next;
 const setSize = ObjectGetOwnPropertyDescriptor(Set.prototype, 'size')!.get!;
+const weakMapGet = WeakMap.prototype.get;
+const weakMapSet = WeakMap.prototype.set;
+const cryptoRandomBytes = crypto.randomBytes;
+const bufferToString = Buffer.prototype.toString;
 const arrayPush = Array.prototype.push;
 const isProxy = types.isProxy;
 
@@ -75,6 +82,14 @@ function setSizeOf<T>(registry: Set<T>): number {
     return applyIntrinsic(setSize, registry, []);
 }
 
+function getWeakMapValue<K extends object, V>(registry: WeakMap<K, V>, key: K): V | undefined {
+    return applyIntrinsic(weakMapGet, registry, [key]);
+}
+
+function setWeakMapValue<K extends object, V>(registry: WeakMap<K, V>, key: K, value: V): void {
+    applyIntrinsic(weakMapSet, registry, [key, value]);
+}
+
 function appendArrayValue<T>(target: T[], value: T): void {
     applyIntrinsic(arrayPush, target, [value]);
 }
@@ -103,10 +118,24 @@ export type NativeServerSessionBinding = Readonly<{
     clientPlatform: 'macos' | 'ios' | 'ipados';
 }>;
 
+declare const stagedWebSessionCapsule: unique symbol;
+export type StagedWebServerSession = { readonly [stagedWebSessionCapsule]: never };
+
+interface StagedWebSessionRecord {
+    active: boolean;
+    userId: string;
+    username: string;
+    role: string;
+    createdAt: number;
+    expiresAt: number;
+}
+
 const sessions = new MapConstructor<string, ServerSession>();
 const nativeSessionBindings = new WeakMap<ServerSession, NativeServerSessionBinding>();
 const sessionResources = new MapConstructor<string, Set<ServerSessionResourceRegistration>>();
 const sessionCleanupOutcomes = new MapConstructor<string, Exclude<ServerSessionCleanupOutcome, 'unknown'>>();
+const stagedWebSessionRecords = new WeakMapConstructor<object, StagedWebSessionRecord>();
+const stagedWebSessions = new SetConstructor<StagedWebSessionRecord>();
 
 function isSupportedSynchronousDisposer(candidate: unknown): candidate is ServerSessionResourceDisposer {
     if (typeof candidate !== 'function' || isProxy(candidate)) return false;
@@ -253,6 +282,112 @@ function isExactStoredSession(value: unknown): value is ServerSession {
     } catch { return false; }
 }
 
+function isStrictWebSessionUser(value: unknown): value is { id: string; username: string; role: string } {
+    try {
+        if (!value || typeof value !== 'object' || isProxy(value) || ObjectGetPrototypeOf(value) !== ObjectPrototype) return false;
+        if (ObjectGetOwnPropertySymbols(value).length || ObjectGetOwnPropertyNames(value).length !== 3) return false;
+        const id = ObjectGetOwnPropertyDescriptor(value, 'id');
+        const username = ObjectGetOwnPropertyDescriptor(value, 'username');
+        const role = ObjectGetOwnPropertyDescriptor(value, 'role');
+        return Boolean(
+            id && username && role
+            && 'value' in id && 'value' in username && 'value' in role
+            && id.enumerable && username.enumerable && role.enumerable
+            && typeof id.value === 'string' && typeof username.value === 'string' && typeof role.value === 'string',
+        );
+    } catch { return false; }
+}
+
+function stagedWebSessionRecord(capsule: unknown): StagedWebSessionRecord | null {
+    try {
+        if (!capsule || typeof capsule !== 'object' || isProxy(capsule) || ObjectGetPrototypeOf(capsule) !== null) return null;
+        if (ObjectGetOwnPropertySymbols(capsule).length || ObjectGetOwnPropertyNames(capsule).length) return null;
+        return getWeakMapValue(stagedWebSessionRecords, capsule) ?? null;
+    } catch { return null; }
+}
+
+function revokeStagedWebSession(record: StagedWebSessionRecord): boolean {
+    if (!record.active) return false;
+    record.active = false;
+    deleteSetValue(stagedWebSessions, record);
+    return true;
+}
+
+function revokeStagedWebSessionsForUser(userId: string): void {
+    const iterator = applyIntrinsic(setValues, stagedWebSessions, []);
+    for (let next = nextSetIterator<StagedWebSessionRecord>(iterator); !next.done;
+        next = nextSetIterator<StagedWebSessionRecord>(iterator)) {
+        if (next.value.userId === userId) revokeStagedWebSession(next.value);
+    }
+}
+
+function revokeAllStagedWebSessions(): void {
+    const iterator = applyIntrinsic(setValues, stagedWebSessions, []);
+    for (let next = nextSetIterator<StagedWebSessionRecord>(iterator); !next.done;
+        next = nextSetIterator<StagedWebSessionRecord>(iterator)) revokeStagedWebSession(next.value);
+}
+
+/** Stages only exact host-owned Web user data; the capsule has no observable session fields. */
+/* @Codex */
+export function stageWebServerSession(user: unknown): StagedWebServerSession | null {
+    if (!isStrictWebSessionUser(user)) return null;
+    try {
+        const now = DateNow();
+        const capsule = ObjectFreeze(ObjectCreate(null)) as StagedWebServerSession;
+        const record: StagedWebSessionRecord = {
+            active: true,
+            userId: user.id,
+            username: user.username,
+            role: user.role,
+            createdAt: now,
+            expiresAt: now + SESSION_TTL_MS,
+        };
+        setWeakMapValue(stagedWebSessionRecords, capsule, record);
+        addSetValue(stagedWebSessions, record);
+        return capsule;
+    } catch { return null; }
+}
+
+/** Publishes a staged Web session once; no callback or asynchronous work follows publication. */
+/* @Codex */
+export function activateStagedWebServerSession(capsule: unknown): ServerSession | null {
+    const record = stagedWebSessionRecord(capsule);
+    if (!record || !record.active) return null;
+    if (record.expiresAt <= DateNow()) {
+        revokeStagedWebSession(record);
+        return null;
+    }
+
+    let sessionId: string;
+    try {
+        const bytes = applyIntrinsic(cryptoRandomBytes, crypto, [32]) as Buffer;
+        sessionId = applyIntrinsic(bufferToString, bytes, ['hex']) as string;
+    } catch {
+        revokeStagedWebSession(record);
+        return null;
+    }
+    const session: ServerSession = {
+        id: sessionId,
+        userId: record.userId,
+        username: record.username,
+        role: record.role,
+        authChannel: 'web',
+        createdAt: record.createdAt,
+        expiresAt: record.expiresAt,
+    };
+
+    revokeStagedWebSession(record);
+    try { setMapValue(sessions, session.id, session); } catch { return null; }
+    return session;
+}
+
+/** Aborts a pending Web session without ever publishing it. */
+/* @Codex */
+export function abortStagedWebServerSession(capsule: unknown): boolean {
+    const record = stagedWebSessionRecord(capsule);
+    return Boolean(record && revokeStagedWebSession(record));
+}
+
 export function getSession(sessionId: string | null | undefined): ServerSession | null {
     if (!sessionId) return null;
     const session = getMapValue(sessions, sessionId);
@@ -283,6 +418,7 @@ export function peekSession(sessionId: string | null | undefined): ServerSession
 }
 
 export function deleteSession(sessionId: string | null | undefined): void {
+    if (abortStagedWebServerSession(sessionId)) return;
     if (!sessionId) return;
     terminateSession(sessionId, 'session_deleted');
 }
@@ -300,6 +436,8 @@ export function invalidateServerSessionForApplicationLock(sessionId: string): Re
 export function invalidateSessionsForUser(userId: string): void {
     if (!userId) return;
 
+    revokeStagedWebSessionsForUser(userId);
+
     const sessionIds: string[] = [];
     const iterator = mapValuesOf(sessions);
     for (let next = nextMapIterator<ServerSession>(iterator); !next.done; next = nextMapIterator<ServerSession>(iterator)) {
@@ -313,6 +451,7 @@ export function invalidateSessionsForUser(userId: string): void {
 
 /* @Codex */
 export function clearAllSessions(): void {
+    revokeAllStagedWebSessions();
     const sessionIds: string[] = [];
     const sessionSnapshots = new MapConstructor<string, ServerSession>();
     const sessionIterator = mapKeysOf(sessions);
