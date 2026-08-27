@@ -409,11 +409,19 @@ test('keeps current-binding lookup read-only through captured intrinsic poison a
     };
     try { isolated = await freshModule('web-auth-current-binding-reentry'); } finally { WeakMap.prototype.get = originalGet; }
     const record = isolated.createWebAuthControlRecord('reentry'); record.begin('login', 'op', 'key', 'fp', 0);
-    isolatedTicket.value = record.prepareAuthControlTicket('reentry', 'op', BigInt(0), 'fp', 'web-reentry', 1); assert.ok(isolatedTicket.value);
-    const activation = isolated.prepareAuthControlActivation(isolatedTicket.value, 'web-reentry'); assert.ok(activation);
+    const outerTicket = record.prepareAuthControlTicket('reentry', 'op', BigInt(0), 'fp', 'web-reentry', 1); assert.ok(outerTicket); isolatedTicket.value = outerTicket;
+    const activation = isolated.prepareAuthControlActivation(outerTicket, 'web-reentry'); assert.ok(activation);
     assert.equal(isolated.commitPreparedAuthControlActivation(activation), 1); const before = record.snapshot();
-    armed = true; assert.equal(isolated.isCurrentAuthControlSessionBinding(isolatedTicket.value, 'web-reentry'), true); assert.equal(nested, true);
-    failAfterApply = true; assert.equal(isolated.isCurrentAuthControlSessionBinding(isolatedTicket.value, 'web-reentry'), false);
+    armed = true; assert.equal(isolated.isCurrentAuthControlSessionBinding(outerTicket, 'web-reentry'), false); assert.equal(nested, false);
+    assert.equal(isolated.isCurrentAuthControlSessionBinding(outerTicket, 'web-reentry'), true, 'reentry denial is recoverable');
+    const other = isolated.createWebAuthControlRecord('reentry-other'); other.begin('login', 'op', 'key', 'fp', 0);
+    const otherTicket = other.prepareAuthControlTicket('reentry-other', 'op', BigInt(0), 'fp', 'web-other', 1); assert.ok(otherTicket);
+    const otherActivation = isolated.prepareAuthControlActivation(otherTicket, 'web-other'); assert.ok(otherActivation);
+    assert.equal(isolated.commitPreparedAuthControlActivation(otherActivation), 1); isolatedTicket.value = otherTicket;
+    armed = true; assert.equal(isolated.isCurrentAuthControlSessionBinding(outerTicket, 'web-reentry'), false); assert.equal(nested, false, 'cross-ticket reentry denies');
+    assert.equal(isolated.isCurrentAuthControlSessionBinding(outerTicket, 'web-reentry'), true); assert.equal(isolated.isCurrentAuthControlSessionBinding(otherTicket, 'web-other'), true);
+    isolatedTicket.value = Object.create(null); armed = true; assert.equal(isolated.isCurrentAuthControlSessionBinding(outerTicket, 'web-reentry'), false); assert.equal(nested, false, 'hostile nested probe poisons outer');
+    isolatedTicket.value = outerTicket; failAfterApply = true; assert.equal(isolated.isCurrentAuthControlSessionBinding(outerTicket, 'web-reentry'), false);
     const apply = Reflect.apply; const get = WeakMap.prototype.get; const then = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
     try {
         Reflect.apply = (() => { throw new Error('poisoned apply'); }) as typeof Reflect.apply;
