@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 
 const CONTROL_RECORD = ['web-auth-control', '-record'].join('');
+const USER = Object.freeze({ id: 'synthetic-web-issuer-user', username: ['synthetic', 'clinician'].join('-'), role: 'clinician' });
 
 async function fresh(label: string) {
     const directory = mkdtempSync(join(tmpdir(), `mediflow-${label}-`));
@@ -20,7 +21,11 @@ async function fresh(label: string) {
         .replace("from './server-session';", "from './server-session.ts';"));
     writeFileSync(join(directory, 'web-auth-session-issuer.ts'), read('web-auth-session-issuer.ts')
         .replace("from './web-auth-control-owner';", "from './web-auth-control-owner.ts';"));
-    try { return await import(pathToFileURL(join(directory, 'web-auth-session-issuer.ts')).href); }
+    try {
+        const issuer = await import(pathToFileURL(join(directory, 'web-auth-session-issuer.ts')).href);
+        const session = await import(pathToFileURL(join(directory, 'server-session.ts')).href);
+        return { ...issuer, session };
+    }
     finally { rmSync(directory, { recursive: true, force: true }); }
 }
 
@@ -43,7 +48,25 @@ test('mints one opaque login/setup attempt, burns it once, and leaves no second 
     const retry = issuer.begin('setup');
     opaque(retry);
     assert.equal(issuer.abort(retry), true);
-    assert.equal(typeof (issuer as { issue?: unknown }).issue, 'undefined');
+    assert.equal(typeof (issuer as { issue?: unknown }).issue, 'function');
+});
+
+test('issues an exact data-only user through the P3 activation splice', async () => {
+    const stack = await fresh('p3b2-issue'); const attempt = stack.begin('login'); assert.ok(attempt);
+    const result = stack.issue(attempt, USER); assert.ok(result);
+    assert.deepEqual(Object.keys(result), ['ok', 'sessionId']); assert.equal(result.ok, true);
+    assert.equal(Object.getPrototypeOf(result), null); assert.equal(Object.isFrozen(result), true);
+    assert.equal(stack.session.resolveActiveWebServerSession(result.sessionId)?.userId, USER.id);
+    assert.equal(stack.issue(attempt, USER), null);
+    const logout = ['retireServerSession', 'ForLogout'].join(''); assert.equal((stack.session as unknown as Record<string, (id: string) => { outcome: string }>)[logout](result.sessionId).outcome, 'completed');
+    assert.equal(stack.session.resolveActiveWebServerSession(result.sessionId), null);
+});
+
+test('burns issue before hostile input and leaves owner control retryable', async () => {
+    const stack = await fresh('p3b2-hostile'); const attempt = stack.begin('login'); assert.ok(attempt); let reads = 0;
+    const hostile = new Proxy({}, { get() { reads += 1; throw new Error('synthetic'); }, ownKeys() { reads += 1; throw new Error('synthetic'); } });
+    assert.equal(stack.issue(attempt, hostile), null); assert.equal(reads, 0);
+    const retry = stack.begin('setup'); assert.ok(retry); assert.equal(stack.abort(retry), true);
 });
 
 test('rejects hostile, cloned, foreign, and cross-module capabilities without traps', async () => {
@@ -59,7 +82,8 @@ test('rejects hostile, cloned, foreign, and cross-module capabilities without tr
     }
     assert.equal(traps.count, 0);
     assert.equal(second.abort(attempt), false);
-    assert.equal(first.abort(attempt), true);
+    assert.equal(second.issue(attempt, USER), null); const result = first.issue(attempt, USER); assert.ok(result);
+    assert.equal(second.session.resolveActiveWebServerSession(result.sessionId), null);
 });
 
 test('poisons owner reentry and rolls back an issuer WeakMap apply-then-throw', async () => {
@@ -80,31 +104,51 @@ test('poisons owner reentry and rolls back an issuer WeakMap apply-then-throw', 
         const retry = issuer.begin('setup');
         assert.ok(retry);
         assert.equal(issuer.abort(retry), true);
+
+        const stack = await fresh('p3b2-issue-reentry'); issuer = stack; const attempt = issuer.begin('login'); assert.ok(attempt);
+        trigger = true; assert.equal(issuer.issue(attempt, USER), null); assert.equal(nested, null); trigger = false;
+        const clean = issuer.begin('setup'); assert.ok(clean); assert.equal(issuer.abort(clean), true);
     } finally { Date.now = originalNow; }
 
     const originalSet = WeakMap.prototype.set;
-    let calls = 0;
+    let beginCalls = 0;
     let throwAfterApply = false;
     WeakMap.prototype.set = function (...args: Parameters<typeof originalSet>) {
         const result = Reflect.apply(originalSet, this, args);
-        if (throwAfterApply && ++calls === 2) throw new Error('synthetic apply then throw');
+        if (throwAfterApply && ++beginCalls === 2) throw new Error('synthetic apply then throw');
         return result;
     };
     try {
         issuer = await fresh('p3b1-weakmap');
-        calls = 0; throwAfterApply = true;
+        beginCalls = 0; throwAfterApply = true;
         assert.equal(issuer.begin('login'), null);
         throwAfterApply = false;
         const retry = issuer.begin('setup');
         assert.ok(retry);
         assert.equal(issuer.abort(retry), true);
     } finally { WeakMap.prototype.set = originalSet; }
+
+    const originalDelete = WeakMap.prototype.delete; let failDelete = false;
+    WeakMap.prototype.delete = function (...args: Parameters<typeof originalDelete>) {
+        const result = Reflect.apply(originalDelete, this, args); if (failDelete) { failDelete = false; throw new Error('synthetic apply then throw'); } return result;
+    };
+    try {
+        const stack = await fresh('p3b2-weakmap-delete'); failDelete = true; const attempt = stack.begin('login'); assert.ok(attempt);
+        assert.equal(stack.issue(attempt, USER), null); const retry = stack.begin('setup'); assert.ok(retry); assert.equal(stack.abort(retry), true);
+    } finally { WeakMap.prototype.delete = originalDelete; }
+
+    const stageSet = WeakMap.prototype.set; let calls = 0; let target = 0; let failSet = false;
+    WeakMap.prototype.set = function (...args: Parameters<typeof stageSet>) {
+        const result = Reflect.apply(stageSet, this, args); if (failSet && ++calls === target) throw new Error('synthetic apply then throw'); return result;
+    };
+    try {
+        for (target of [3, 4, 5, 6, 7]) { const stack = await fresh(`p3b2-set-${target}`); calls = 0; failSet = true; const attempt = stack.begin('login'); assert.ok(attempt); assert.equal(stack.issue(attempt, USER), null); failSet = false; const retry = stack.begin('setup'); assert.ok(retry); assert.equal(stack.abort(retry), true); }
+    } finally { WeakMap.prototype.set = stageSet; }
 });
 
-test('keeps P3b1 below the boundary: opaque lifecycle only, no session activation imports', () => {
+test('keeps P3b2 synchronous and outside route, cookie, and provider authority', () => {
     const source = readFileSync(new URL('./web-auth-session-issuer.ts', import.meta.url), 'utf8');
-    assert.doesNotMatch(source, /server-session|stageWebServerSession|prepareStaged|armPrepared|activatePrepared|sessionId|route|cookie|provider|native|database|globalThis/iu);
-    assert.doesNotMatch(source, /\bawait\b|\bPromise\b|export function issue\b/u);
-    assert.match(source, /beginWebAuth/u);
-    assert.match(source, /cancelWebAuth/u);
+    assert.match(source, /stageWebServerSession|prepareStaged|armPrepared|activatePrepared/u);
+    assert.doesNotMatch(source, /route|cookie|provider|native|database|globalThis|\bawait\b|\bPromise\b/iu);
+    assert.match(source, /export function issue\b/u);
 });
