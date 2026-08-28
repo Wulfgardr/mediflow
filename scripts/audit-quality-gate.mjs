@@ -506,13 +506,102 @@ function exactArguments(call, expected) {
     });
 }
 
+function isNullOrUndefined(expression) {
+    const value = unwrap(expression);
+    return value.kind === ts.SyntaxKind.NullKeyword || ts.isIdentifier(value) && value.text === 'undefined';
+}
+
+function exactNamedImport(statement, moduleName, exportName) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)
+        || statement.moduleSpecifier.text !== moduleName || !statement.importClause
+        || statement.importClause.isTypeOnly || statement.importClause.name
+        || !statement.importClause.namedBindings || !ts.isNamedImports(statement.importClause.namedBindings)) return false;
+    const [element] = statement.importClause.namedBindings.elements;
+    return statement.importClause.namedBindings.elements.length === 1 && !element.isTypeOnly
+        && (element.propertyName?.text ?? element.name.text) === exportName && element.name.text === exportName;
+}
+
+function exactCookieLookup(expression, cookieStore, sessionCookieName) {
+    const value = unwrap(expression);
+    return ts.isCallExpression(value) && !value.questionDotToken && ts.isPropertyAccessExpression(value.expression)
+        && !value.expression.questionDotToken && ts.isIdentifier(value.expression.expression)
+        && value.expression.expression.text === cookieStore && value.expression.name.text === 'get'
+        && exactArguments(value, [{ identifier: sessionCookieName }]);
+}
+
+function validateExactServiceOwnedLogoutRoute(sourceFile, spec) {
+    const delegated = spec.modes.delegated;
+    const [cookiesImport, serviceImport, sessionImport, handler] = sourceFile.statements;
+    const problems = [];
+    if (sourceFile.statements.length !== 4
+        || !exactNamedImport(cookiesImport, 'next/headers', 'cookies')
+        || !exactNamedImport(serviceImport, delegated.serviceModule, delegated.serviceExport)
+        || !exactNamedImport(sessionImport, '@/lib/security/server-session', 'SESSION_COOKIE_NAME')
+        || !handler || !ts.isFunctionDeclaration(handler) || !handler.name || handler.name.text !== delegated.handler
+        || !ts.getModifiers(handler)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
+        problems.push('logout route must expose only the exact cookies, service, and session-cookie imports plus POST');
+        return problems;
+    }
+    const [request] = handler.parameters;
+    const statements = handler.body ? [...handler.body.statements] : [];
+    const cookieDeclaration = statements[0] && ts.isVariableStatement(statements[0]) ? statements[0] : null;
+    const [cookie] = cookieDeclaration?.declarationList.declarations ?? [];
+    const cookieBinding = cookie && ts.isIdentifier(cookie.name) ? cookie.name.text : null;
+    const cookieInitialized = Boolean(cookie?.initializer && isNullOrUndefined(cookie.initializer));
+    const cookieIsLet = Boolean(cookieDeclaration?.declarationList.flags & ts.NodeFlags.Let);
+    const acquisition = statements[1] && ts.isTryStatement(statements[1]) ? statements[1] : null;
+    const acquisitionStatements = acquisition?.tryBlock ? [...acquisition.tryBlock.statements] : [];
+    const cookieStoreDeclaration = acquisitionStatements[0] && ts.isVariableStatement(acquisitionStatements[0])
+        ? acquisitionStatements[0] : null;
+    const [cookieStore] = cookieStoreDeclaration?.declarationList.declarations ?? [];
+    const cookieStoreBinding = cookieStore && ts.isIdentifier(cookieStore.name) ? cookieStore.name.text : null;
+    const cookieStoreInitializer = cookieStore?.initializer && unwrap(cookieStore.initializer);
+    const cookiesCall = cookieStoreInitializer && ts.isAwaitExpression(cookieStoreInitializer)
+        ? unwrap(cookieStoreInitializer.expression) : null;
+    const read = acquisitionStatements[1] && ts.isExpressionStatement(acquisitionStatements[1])
+        ? unwrap(acquisitionStatements[1].expression) : null;
+    const returnStatement = statements[2] && ts.isReturnStatement(statements[2]) ? statements[2] : null;
+    const delegateCall = returnStatement?.expression && unwrap(returnStatement.expression);
+    const exactDelegate = Boolean(delegateCall && ts.isCallExpression(delegateCall) && !delegateCall.questionDotToken
+        && ts.isIdentifier(delegateCall.expression) && delegateCall.expression.text === delegated.serviceExport
+        && exactArguments(delegateCall, [{ identifier: cookieBinding ?? '' }, { identifier: request?.name && ts.isIdentifier(request.name) ? request.name.text : '' }]));
+    const exactRead = Boolean(read && ts.isBinaryExpression(read) && read.operatorToken.kind === ts.SyntaxKind.EqualsToken
+        && ts.isIdentifier(read.left) && read.left.text === cookieBinding
+        && exactCookieLookup(read.right, cookieStoreBinding ?? '', 'SESSION_COOKIE_NAME'));
+    if (handler.parameters.length !== 1 || !request || !ts.isIdentifier(request.name) || request.name.text !== 'request'
+        || statements.length !== 3 || !cookieBinding || !cookieInitialized || !cookieIsLet
+        || !acquisition || acquisition.finallyBlock || !acquisition.catchClause || acquisition.catchClause.variableDeclaration
+        || acquisition.catchClause.block.statements.length !== 0 || acquisitionStatements.length !== 2
+        || !cookieStoreBinding || !cookieStoreDeclaration || !(cookieStoreDeclaration.declarationList.flags & ts.NodeFlags.Const)
+        || !cookiesCall || !ts.isCallExpression(cookiesCall) || cookiesCall.questionDotToken || !ts.isIdentifier(cookiesCall.expression)
+        || cookiesCall.expression.text !== 'cookies' || cookiesCall.arguments.length !== 0 || !exactRead || !exactDelegate) {
+        problems.push('POST must deny cookie acquisition failure and directly return the exact service-owned response');
+    }
+    return problems;
+}
+
+function moduleScopeBindingExists(sourceFile, name) {
+    return sourceFile.statements.some((statement) => {
+        if (ts.isImportDeclaration(statement) && statement.importClause) {
+            if (statement.importClause.name?.text === name) return true;
+            const bindings = statement.importClause.namedBindings;
+            return bindings && ts.isNamedImports(bindings) && bindings.elements.some((element) => element.name.text === name);
+        }
+        if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement) || ts.isEnumDeclaration(statement)
+            || ts.isModuleDeclaration(statement)) && statement.name.getText(sourceFile) === name) return true;
+        return ts.isVariableStatement(statement) && statement.declarationList.declarations.some((declaration) =>
+            ts.isIdentifier(declaration.name) && declaration.name.text === name);
+    });
+}
+
 function exactNoStoreResponseFactory(sourceFile) {
     const factory = namedFunction(sourceFile, 'empty');
     const parameter = factory?.parameters.length === 1 && ts.isIdentifier(factory.parameters[0].name)
         ? factory.parameters[0].name.text : null;
     const statement = factory?.body?.statements.length === 1 ? factory.body.statements[0] : null;
     const response = statement && ts.isReturnStatement(statement) && statement.expression && unwrap(statement.expression);
-    if (!parameter || !response || !ts.isNewExpression(response) || !ts.isIdentifier(response.expression)
+    if (parameter !== 'status' || moduleScopeBindingExists(sourceFile, 'Response')
+        || !response || !ts.isNewExpression(response) || !ts.isIdentifier(response.expression)
         || response.expression.text !== 'Response' || response.arguments?.length !== 2
         || unwrap(response.arguments[0]).kind !== ts.SyntaxKind.NullKeyword) return false;
     const options = objectLiteral(response.arguments[1]);
@@ -523,9 +612,23 @@ function exactNoStoreResponseFactory(sourceFile) {
     const headers = headersProperty?.initializer && objectLiteral(headersProperty.initializer);
     const headerProperties = exactPropertyAssignments(headers, ['Cache-Control']);
     const cacheControl = headerProperties?.get('Cache-Control')?.initializer && unwrap(headerProperties.get('Cache-Control').initializer);
-    return Boolean(options && options.properties.length === 2 && statusProperty && headersProperty)
-        && statusProperty.name.text === parameter
-        && ts.isStringLiteral(cacheControl) && cacheControl.text === 'no-store';
+    let responseConstructors = 0;
+    const visit = (node) => {
+        if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'Response') responseConstructors += 1;
+        ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+    return Boolean(options && options.properties.length === 2 && statusProperty && headersProperty && cacheControl)
+        && statusProperty.name.text === parameter && ts.isStringLiteral(cacheControl) && cacheControl.text === 'no-store'
+        && responseConstructors === 1;
+}
+
+function exactEmptyStatusReturn(statement) {
+    const expression = statement.expression && unwrap(statement.expression);
+    return Boolean(expression && ts.isCallExpression(expression) && !expression.questionDotToken
+        && ts.isIdentifier(expression.expression) && expression.expression.text === 'empty'
+        && expression.arguments.length === 1 && ts.isNumericLiteral(unwrap(expression.arguments[0]))
+        && [204, 401, 409].includes(Number(unwrap(expression.arguments[0]).text)));
 }
 
 function directAwaitedExpressionStatement(owner, call) {
@@ -613,7 +716,7 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
         });
     }
     if (!serviceSource) return ['delegated logout owner source is missing'];
-    problems.push(...validateDelegatedRouteAudit({ spec: delegated, routeSource, serviceSource }));
+    problems.push(...validateExactServiceOwnedLogoutRoute(route.sourceFile, spec));
     const handler = namedFunction(route.sourceFile, delegated.handler, true);
     const delegate = importedBinding(route.sourceFile, route.checker, delegated.serviceModule, delegated.serviceExport);
     const routeCalls = handler && delegate ? bindingCalls(handler, route.checker, delegate.symbol) : [];
@@ -642,9 +745,13 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
     const auditOwner = auditProperty && ts.isFunctionLike(auditProperty.initializer) ? auditProperty.initializer : null;
     const sourcesAreConst = sourcesDeclaration && ts.isVariableDeclarationList(sourcesDeclaration.parent)
         && Boolean(sourcesDeclaration.parent.flags & ts.NodeFlags.Const);
+    const ownerReturns = owner ? directReturnStatements(owner) : [];
     if (!owner || !writer || !hash || !writerBinding || !sourcesAreConst || !sourceProperties || !auditOwner
         || !exactNoStoreResponseFactory(service.sourceFile)) problems.push('delegated service writer or no-store response factory is missing, shadowed, or unreachable');
     if (!owner || !writer || !hash || !writerBinding || !auditOwner) return problems;
+    if (localBindingExists(owner, 'empty') || ownerReturns.length === 0 || ownerReturns.some((statement) => !exactEmptyStatusReturn(statement))) {
+        problems.push('all delegated service terminal statuses must return through the exact no-store response factory');
+    }
 
     const sourceParameter = owner.parameters.find((parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === 'sources');
     if (!sourceParameter?.initializer || !ts.isIdentifier(unwrap(sourceParameter.initializer))
@@ -677,7 +784,6 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
         && alwaysTerminates(statement.thenStatement));
     if (!completedGuard || !auditCall || retireCalls[0].getStart() > completedGuard.getStart()
         || completedGuard.getStart() > auditCall.getStart()) problems.push('completed retirement must be checked before audit');
-    const ownerReturns = directReturnStatements(owner);
     const terminal204 = ownerReturns.filter((statement) => {
         const expression = statement.expression && unwrap(statement.expression);
         return ts.isCallExpression(expression) && ts.isIdentifier(expression.expression)
