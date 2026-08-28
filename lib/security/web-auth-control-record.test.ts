@@ -22,6 +22,7 @@ import {
     retireAuthControlTicket,
 } from './web-auth-control-record.ts';
 import {
+    allowedGenericLoaderExpressions,
     inventoryModuleImports,
     moduleImportBypassFixtures,
     repositoryTypeScriptSources,
@@ -29,14 +30,8 @@ import {
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const validateControlImports = (sources: Readonly<Record<string, string>>) => {
-    const allowedUnresolved = new Set([
-        'lib/ai-providers/fabric/document-synthesis-provider-binding.test.ts', 'lib/ai-providers/fabric/document-synthesis-provider-envelope.test.ts',
-        'lib/ai-providers/fabric/document-synthesis-source-set-currentness-owner.test.ts', 'lib/pm2-manager.test.ts',
-        'lib/security/web-auth-control-owner.test.ts', 'lib/security/web-auth-control-record.test.ts', 'lib/security/web-auth-session-issuer.test.ts',
-        'scripts/benchmark-clinical-entities.ts', 'scripts/benchmark-redaction.ts',
-    ]);
     const uses = Object.entries(sources).flatMap(([file, source]) => inventoryModuleImports({
-        file, source, target: 'lib/security/web-auth-control-record', repositoryRoot: ROOT, allowUnresolvedFiles: allowedUnresolved,
+        file, source, target: 'lib/security/web-auth-control-record', repositoryRoot: ROOT, allowUnresolvedExpressions: allowedGenericLoaderExpressions,
     })); const errors: string[] = [];
     const production = new Map([
         ['lib/security/server-session.ts', { runtime: new Set(['abortPreparedAuthControlActivation', 'abortPreparedAuthControlRetirement', 'commitPreparedAuthControlActivation', 'commitPreparedAuthControlRetirement', 'prepareAuthControlActivation', 'prepareAuthControlRetirement']), types: new Set<string>() }],
@@ -702,6 +697,11 @@ test('keeps the current-binding predicate private until the server-session retai
     }
     const unresolvedRequire = ['req', 'uire(pick());'].join('');
     assert.ok(validateControlImports({ 'lib/security/extra.ts': unresolvedRequire }).errors.includes('lib/security/extra.ts:unsupported-expression:*'));
+    const benchmark = repositoryTypeScript()['scripts/benchmark-redaction.ts']; assert.ok(benchmark);
+    const errors = validateControlImports({
+        'scripts/benchmark-redaction.ts': `${benchmark}\nconst suffix=pick();import('./web-auth-control-record'+suffix);`,
+    }).errors;
+    for (const form of ['unsupported-expression', 'module-path', 'dynamic']) assert.ok(errors.includes(`scripts/benchmark-redaction.ts:${form}:*`), form);
     assert.notDeepEqual(validateControlImports({ 'lib/security/web-auth-logout-server.ts': "import { createWebAuthControlRecord } from '../../lib/security/web-auth-control-record.ts';" }).errors, []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/extra.ts': "import { createWebAuthControlRecord } from './web-auth-control-record';" }).errors, []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/extra.test.ts': "import { createWebAuthControlRecord } from './web-auth-control-record.ts';" }).errors, []);

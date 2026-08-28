@@ -13,10 +13,26 @@ type Options = Readonly<{
     repositoryRoot: string;
     source: string;
     target: string;
-    allowUnresolvedFiles?: ReadonlySet<string>;
+    allowUnresolvedExpressions?: ReadonlySet<string>;
 }>;
 
 const EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs'] as const;
+const fingerprint = (file: string, form: string, expressionKind: string, statementKind: string, expression: string) =>
+    [file, form, expressionKind, statementKind, expression].join('|');
+export const allowedGenericLoaderExpressions: ReadonlySet<string> = new Set([
+    fingerprint('lib/ai-providers/fabric/document-synthesis-provider-binding.test.ts', 'dynamic', 'TemplateExpression', 'VariableStatement', "`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`"),
+    fingerprint('lib/ai-providers/fabric/document-synthesis-provider-envelope.test.ts', 'dynamic', 'TemplateExpression', 'VariableStatement', "`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`"),
+    fingerprint('lib/ai-providers/fabric/document-synthesis-source-set-currentness-owner.test.ts', 'dynamic', 'Identifier', 'VariableStatement', 'foreignPath'),
+    fingerprint('lib/pm2-manager.test.ts', 'require', 'Identifier', 'VariableStatement', 'managerPath'),
+    fingerprint('lib/pm2-manager.test.ts', 'require', 'Identifier', 'ExpressionStatement', 'managerPath'),
+    fingerprint('lib/security/web-auth-control-owner.test.ts', 'dynamic', 'PropertyAccessExpression', 'VariableStatement', "pathToFileURL(join(directory, 'web-auth-control-owner.ts')).href"),
+    fingerprint('lib/security/web-auth-control-owner.test.ts', 'dynamic', 'PropertyAccessExpression', 'VariableStatement', "pathToFileURL(join(directory, 'server-session.ts')).href"),
+    fingerprint('lib/security/web-auth-control-record.test.ts', 'dynamic', 'PropertyAccessExpression', 'ReturnStatement', 'pathToFileURL(target).href'),
+    fingerprint('lib/security/web-auth-session-issuer.test.ts', 'dynamic', 'PropertyAccessExpression', 'VariableStatement', "pathToFileURL(join(directory, 'web-auth-session-issuer.ts')).href"),
+    fingerprint('lib/security/web-auth-session-issuer.test.ts', 'dynamic', 'PropertyAccessExpression', 'VariableStatement', "pathToFileURL(join(directory, 'server-session.ts')).href"),
+    fingerprint('scripts/benchmark-clinical-entities.ts', 'dynamic', 'PropertyAccessExpression', 'VariableStatement', 'pathToFileURL(adapterModule).href'),
+    fingerprint('scripts/benchmark-redaction.ts', 'dynamic', 'PropertyAccessExpression', 'VariableStatement', 'pathToFileURL(adapterModule).href'),
+]);
 const normalizeIdentity = (value: string) => path.normalize(value).normalize('NFC').toLocaleLowerCase('en-US');
 const safeRealpath = (value: string) => {
     try { return realpathSync.native(value); } catch { return null; }
@@ -35,7 +51,15 @@ const decode = (value: string) => {
 export function inventoryModuleImports(options: Options): ModuleImportUse[] {
     const { file, repositoryRoot, source, target } = options;
     const uses: ModuleImportUse[] = []; const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+    const printer = ts.createPrinter({ removeComments: true });
     const add = (form: string, symbol = '*', typeOnly = false) => uses.push({ file, form, symbol, typeOnly });
+    const unresolved: Array<Readonly<{
+        fingerprint: string;
+        form: string;
+        invalid: boolean;
+        symbols: readonly string[];
+        typeOnly: boolean;
+    }>> = [];
     const declarations = new Map<string, ts.VariableDeclaration[]>();
     const loaderWrappers = new Map<string, Readonly<{ kind: 'dynamic' | 'require'; parameter: number }>>();
     const collect = (node: ts.Node): void => {
@@ -163,10 +187,18 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
         if (!ts.isVariableDeclaration(parent) || !ts.isObjectBindingPattern(parent.name)) return ['*'];
         return parent.name.elements.map((element) => element.propertyName?.getText(ast) ?? element.name.getText(ast));
     };
+    const stableKind = (node: ts.Node) => ts.isVariableStatement(node) ? 'VariableStatement' : ts.SyntaxKind[node.kind];
+    const unresolvedFingerprint = (expression: ts.Expression, form: string) => {
+        let statement: ts.Node = expression;
+        while (statement.parent && !ts.isStatement(statement)) statement = statement.parent;
+        return fingerprint(file, form, stableKind(expression), stableKind(statement), printer.printNode(ts.EmitHint.Expression, expression, ast));
+    };
     const record = (expression: ts.Expression, form: string, symbols: readonly string[] = ['*'], typeOnly = false) => {
         const found = relation(expression);
-        if (found.unresolved && options.allowUnresolvedFiles?.has(file)) return;
-        if (found.unresolved) add('unsupported-expression', '*', typeOnly);
+        if (found.unresolved) {
+            unresolved.push({ fingerprint: unresolvedFingerprint(expression, form), form, invalid: found.invalid, symbols, typeOnly });
+            return;
+        }
         if (!found.target && !found.invalid) return;
         if (found.invalid) add('module-path', '*', typeOnly); for (const symbol of symbols) add(form, symbol, typeOnly);
     };
@@ -198,7 +230,21 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
         }
         ts.forEachChild(node, visit);
     };
-    visit(ast); return uses;
+    visit(ast);
+    const counts = new Map<string, number>();
+    for (const item of unresolved) counts.set(item.fingerprint, (counts.get(item.fingerprint) ?? 0) + 1);
+    for (const item of unresolved) {
+        if (options.allowUnresolvedExpressions?.has(item.fingerprint) && counts.get(item.fingerprint) === 1) continue;
+        add('unsupported-expression', '*', item.typeOnly);
+        if (item.invalid) {
+            add('module-path', '*', item.typeOnly);
+            for (const symbol of item.symbols) add(item.form, symbol, item.typeOnly);
+        }
+    }
+    for (const allowed of options.allowUnresolvedExpressions ?? []) {
+        if (allowed.startsWith(`${file}|`) && counts.get(allowed) !== 1) add(counts.has(allowed) ? 'allowlist-duplicate' : 'allowlist-drift');
+    }
+    return uses;
 }
 
 export const repositoryTypeScriptSources = (root: string): Record<string, string> => {
