@@ -49,7 +49,8 @@ const validateControlImports = (sources: Readonly<Record<string, string>>) => {
             if (!((use.form === 'named' && !use.typeOnly && ownTest.has(use.symbol)) || (use.form === 'import-type' && use.typeOnly))) errors.push(`${use.file}:${use.form}:${use.symbol}`);
             continue;
         }
-        if (use.file === 'lib/security/web-auth-logout-server.test.ts') {
+        if (use.file === 'lib/security/web-auth-logout-server.test.ts'
+            || use.file === 'lib/security/web-auth-application-lock-server.test.ts') {
             if (use.form !== 'named' || use.typeOnly || use.symbol !== 'createWebAuthControlRecord') errors.push(`${use.file}:${use.form}:${use.symbol}`);
             continue;
         }
@@ -59,6 +60,9 @@ const validateControlImports = (sources: Readonly<Record<string, string>>) => {
     const logout = uses.filter((use) => use.file === 'lib/security/web-auth-logout-server.test.ts' && !use.typeOnly);
     if ('lib/security/web-auth-logout-server.test.ts' in sources
         && (logout.length !== 1 || logout[0]?.form !== 'named' || logout[0]?.symbol !== 'createWebAuthControlRecord')) errors.push('logout-test:fixture');
+    const lock = uses.filter((use) => use.file === 'lib/security/web-auth-application-lock-server.test.ts' && !use.typeOnly);
+    if ('lib/security/web-auth-application-lock-server.test.ts' in sources
+        && (lock.length !== 1 || lock[0]?.form !== 'named' || lock[0]?.symbol !== 'createWebAuthControlRecord')) errors.push('lock-test:fixture');
     const sessionTestBridge = uses.filter((use) => use.file === 'lib/security/server-session.test.ts' && use.form === 'require' && !use.typeOnly);
     if ('lib/security/server-session.test.ts' in sources && sessionTestBridge.length !== 1) errors.push('server-session-test:fixture');
     return { errors, uses };

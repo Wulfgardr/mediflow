@@ -76,6 +76,14 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
             'dispatchActiveWebServerSessionRetirement', 'getPreparedWebServerSessionId',
             'prepareStagedWebServerSession', 'resolveActiveWebServerSession', 'stageWebServerSession',
         ])],
+        ['lib/security/web-auth-application-lock-server.ts', new Set([
+            'dispatchActiveWebServerSessionRetirement', 'resolveActiveWebServerSession', 'SESSION_COOKIE_NAME',
+        ])],
+        ['lib/security/web-auth-application-lock-server.test.ts', new Set([
+            'activateArmedWebServerSession', 'armPreparedWebServerSession', 'clearAllSessions',
+            'dispatchActiveWebServerSessionRetirement', 'getPreparedWebServerSessionId',
+            'prepareStagedWebServerSession', 'resolveActiveWebServerSession', 'stageWebServerSession',
+        ])],
     ]);
     for (const use of uses) {
         if (use.form === 'import-type' && use.typeOnly && use.file === 'lib/security/server-session.test.ts') continue;
@@ -618,6 +626,8 @@ test('inventories exact session imports by AST and closes the logout authority b
     const valid = {
         'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession as resolve, dispatchActiveWebServerSessionRetirement, SESSION_COOKIE_NAME } from '@/lib/security/server-session';",
         'lib/security/web-auth-logout-server.test.ts': "import { activateArmedWebServerSession, armPreparedWebServerSession, clearAllSessions, dispatchActiveWebServerSessionRetirement as dispatch, getPreparedWebServerSessionId, prepareStagedWebServerSession, resolveActiveWebServerSession, stageWebServerSession } from './server-session.ts';",
+        'lib/security/web-auth-application-lock-server.ts': "import { resolveActiveWebServerSession as resolve, dispatchActiveWebServerSessionRetirement, SESSION_COOKIE_NAME } from '@/lib/security/server-session';",
+        'lib/security/web-auth-application-lock-server.test.ts': "import { activateArmedWebServerSession, armPreparedWebServerSession, clearAllSessions, dispatchActiveWebServerSessionRetirement as dispatch, getPreparedWebServerSessionId, prepareStagedWebServerSession, resolveActiveWebServerSession, stageWebServerSession } from './server-session.ts';",
         'lib/security/literal.ts': "// import deleteSession from './server-session'; const text = 'clearAllSessions'; const regex = /retireWebP3SessionsForUser/u; test('createNativeServerSession', () => undefined);",
         'lib/security/types.ts': "import type { ServerSession as Session } from './server-session';",
     };
