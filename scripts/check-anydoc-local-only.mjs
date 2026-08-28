@@ -57,63 +57,108 @@ function parseSource(source, worker) {
     return ts.createSourceFile(worker ? 'anydoc-worker.mjs' : 'anydoc-guard-input.tsx', source, ts.ScriptTarget.Latest, true, worker ? ts.ScriptKind.JS : ts.ScriptKind.TSX);
 }
 
-function constantBindings(sourceFile) {
-    const bindings = new Map();
+function isLexicalScope(node) {
+    return ts.isSourceFile(node) || ts.isBlock(node) || ts.isCaseBlock(node)
+        || ts.isForStatement(node) || ts.isForInStatement(node) || ts.isForOfStatement(node);
+}
+
+function declarationIndex(sourceFile) {
+    const index = new Map();
     const visit = (node) => {
-        if (
-            ts.isVariableDeclaration(node)
-            && ts.isIdentifier(node.name)
-            && node.initializer
-            && (node.parent.flags & ts.NodeFlags.Const) !== 0
-        ) bindings.set(node.name.text, bindings.has(node.name.text) ? undefined : node.initializer);
+        if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer && (node.parent.flags & ts.NodeFlags.Const) !== 0) {
+            let scope = node.parent;
+            while (scope && !isLexicalScope(scope)) scope = scope.parent;
+            if (scope) {
+                const byName = index.get(scope) ?? new Map();
+                const declarations = byName.get(node.name.text) ?? [];
+                declarations.push(node);
+                byName.set(node.name.text, declarations);
+                index.set(scope, byName);
+            }
+        }
         ts.forEachChild(node, visit);
     };
     visit(sourceFile);
-    return bindings;
+    return index;
 }
 
-function constantString(node, bindings, seen = new Set()) {
-    if (!node) return undefined;
-    if (ts.isStringLiteralLike(node)) return node.text;
-    if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isNonNullExpression(node)) return constantString(node.expression, bindings, seen);
-    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
-        const left = constantString(node.left, bindings, seen);
-        const right = constantString(node.right, bindings, seen);
-        return left === undefined || right === undefined ? undefined : left + right;
-    }
-    if (ts.isTemplateExpression(node)) {
-        let value = node.head.text;
-        for (const span of node.templateSpans) {
-            const expression = constantString(span.expression, bindings, seen);
-            if (expression === undefined) return undefined;
-            value += expression + span.literal.text;
-        }
-        return value;
-    }
-    if (ts.isIdentifier(node) && !seen.has(node.text)) {
-        const initializer = bindings.get(node.text);
-        if (!initializer) return undefined;
-        return constantString(initializer, bindings, new Set([...seen, node.text]));
+function resolveConst(identifier, index) {
+    for (let scope = identifier.parent; scope; scope = scope.parent) {
+        const declarations = index.get(scope)?.get(identifier.text) ?? [];
+        const visible = declarations.filter((declaration) => declaration.pos < identifier.pos).at(-1);
+        if (visible) return visible;
     }
     return undefined;
 }
 
-function propertyName(node, bindings) {
-    if (ts.isIdentifier(node)) return node.text;
-    if (ts.isComputedPropertyName(node)) return constantString(node.expression, bindings);
-    return constantString(node, bindings);
+function constantValue(node, index, seen = new Set()) {
+    if (!node) return undefined;
+    if (ts.isStringLiteralLike(node)) return node.text;
+    if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isNonNullExpression(node)) return constantValue(node.expression, index, seen);
+    if (ts.isArrayLiteralExpression(node)) {
+        const values = node.elements.map((element) => constantValue(element, index, seen));
+        return values.every((value) => typeof value === 'string') ? values : undefined;
+    }
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+        const left = constantValue(node.left, index, seen);
+        const right = constantValue(node.right, index, seen);
+        return typeof left === 'string' && typeof right === 'string' ? left + right : undefined;
+    }
+    if (ts.isTemplateExpression(node)) {
+        let value = node.head.text;
+        for (const span of node.templateSpans) {
+            const expression = constantValue(span.expression, index, seen);
+            if (typeof expression !== 'string') return undefined;
+            value += expression + span.literal.text;
+        }
+        return value;
+    }
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'join') {
+        const values = constantValue(node.expression.expression, index, seen);
+        const separator = node.arguments.length === 0 ? ',' : constantValue(node.arguments[0], index, seen);
+        return Array.isArray(values) && typeof separator === 'string' ? values.join(separator) : undefined;
+    }
+    if (ts.isIdentifier(node)) {
+        const declaration = resolveConst(node, index);
+        if (!declaration || seen.has(declaration)) return undefined;
+        return constantValue(declaration.initializer, index, new Set([...seen, declaration]));
+    }
+    return undefined;
 }
 
-const NETWORK_MODULES = new Set(['http', 'https', 'net', 'tls', 'node:http', 'node:https', 'node:net', 'node:tls']);
-const FORBIDDEN_IDENTIFIERS = new Set([
-    'fetch', 'WebSocket', 'XMLHttpRequest', 'require', 'eval', 'Function', 'env',
+function constantString(node, index) {
+    const value = constantValue(node, index);
+    return typeof value === 'string' ? value : undefined;
+}
+
+function propertyName(node, index) {
+    if (ts.isIdentifier(node)) return node.text;
+    if (ts.isComputedPropertyName(node)) return constantString(node.expression, index);
+    return constantString(node, index);
+}
+
+const ALLOWED_PROCESS_PROPERTIES = new Set(['stdin', 'stdout', 'exitCode']);
+const FORBIDDEN_WORKER_ROOTS = new Set([
+    'Object', 'Reflect', 'Proxy', 'globalThis', 'global', 'window', 'self', 'console',
+    'fetch', 'WebSocket', 'XMLHttpRequest', 'require', 'createRequire', 'module', 'exports',
+    'eval', 'Function', 'Deno', 'Bun', 'navigator', 'env',
     'FIRECRAWL_API_KEY', 'FIRECRAWL_API_URL', 'NAPI_RS_NATIVE_LIBRARY_PATH',
 ]);
-const FORBIDDEN_CONSTANTS = new Set([...FORBIDDEN_IDENTIFIERS, 'http', 'https', 'net', 'tls']);
+const FORBIDDEN_PROPERTIES = new Set(['constructor', '__proto__', 'prototype', 'getBuiltinModule', 'binding', 'mainModule', 'env']);
+const FORBIDDEN_CONSTANTS = new Set([...FORBIDDEN_WORKER_ROOTS, 'http', 'https', 'net', 'tls', 'node:http', 'node:https', 'node:net', 'node:tls']);
+
+function hasValueImportBinding(node) {
+    const clause = node.importClause;
+    if (!clause || clause.isTypeOnly) return false;
+    if (clause.name) return true;
+    if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings)) return true;
+    return Boolean(clause.namedBindings && ts.isNamedImports(clause.namedBindings)
+        && clause.namedBindings.elements.some((element) => !element.isTypeOnly));
+}
 
 function analyzeSource(source, worker) {
     const sourceFile = parseSource(source, worker);
-    const bindings = constantBindings(sourceFile);
+    const declarations = declarationIndex(sourceFile);
     const issues = new Set();
     let nativeImports = 0;
     let staticImports = 0;
@@ -123,16 +168,14 @@ function analyzeSource(source, worker) {
         if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
             staticImports += 1;
             const specifier = node.moduleSpecifier.text;
-            const namedImports = node.importClause?.namedBindings;
-            const hasTypeSyntax = node.importClause?.isTypeOnly === true
-                || (namedImports && ts.isNamedImports(namedImports) && namedImports.elements.some((element) => element.isTypeOnly));
-            if (worker && hasTypeSyntax) issues.add('type-only import syntax is forbidden in the worker');
-            if (specifier === ANYDOC_NATIVE_SUBPATH) nativeImports += 1;
+            if (specifier === ANYDOC_NATIVE_SUBPATH && hasValueImportBinding(node)) nativeImports += 1;
             else if (specifier.startsWith('@firecrawl/anydoc')) issues.add('package root or CLI import is forbidden');
-            if (worker && NETWORK_MODULES.has(specifier)) issues.add('network module import is forbidden');
+            if (worker && (!hasValueImportBinding(node) || node.attributes || node.assertClause)) issues.add('worker import must have a value binding and no attributes');
         }
+        if (worker && (ts.isExportDeclaration(node) || ts.isExportAssignment(node))) issues.add('worker exports are forbidden');
+        if (worker && ts.canHaveModifiers(node) && ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) issues.add('worker export modifier is forbidden');
         if (ts.isExportDeclaration(node) && node.moduleSpecifier) {
-            const specifier = constantString(node.moduleSpecifier, bindings);
+            const specifier = constantString(node.moduleSpecifier, declarations);
             if (specifier?.startsWith('@firecrawl/anydoc')) issues.add('AnyDoc re-export is forbidden');
         }
         if (ts.isCallExpression(node)) {
@@ -141,25 +184,32 @@ function analyzeSource(source, worker) {
             if (worker && dynamicImport) issues.add('dynamic import is forbidden');
             if (worker && requireCall) issues.add('require is forbidden');
             if (dynamicImport || requireCall) {
-                const specifier = constantString(node.arguments[0], bindings);
+                const specifier = constantString(node.arguments[0], declarations);
                 if (specifier?.startsWith('@firecrawl/anydoc')) issues.add('computed AnyDoc package loading is forbidden');
             }
         }
-        if (worker && ts.isIdentifier(node) && FORBIDDEN_IDENTIFIERS.has(node.text)) issues.add(`${node.text} is forbidden`);
+        if (worker && ts.isIdentifier(node) && FORBIDDEN_WORKER_ROOTS.has(node.text)) issues.add(`${node.text} is forbidden`);
+        if (worker && ts.isIdentifier(node) && node.text === 'process') {
+            const allowed = ts.isPropertyAccessExpression(node.parent)
+                && node.parent.expression === node
+                && ALLOWED_PROCESS_PROPERTIES.has(node.parent.name.text);
+            if (!allowed) issues.add('process root access is forbidden');
+        }
         if (worker && (ts.isElementAccessExpression(node) || ts.isComputedPropertyName(node))) issues.add('computed property access is forbidden');
+        if (worker && ts.isPropertyAccessExpression(node) && FORBIDDEN_PROPERTIES.has(node.name.text)) issues.add(`${node.name.text} property is forbidden`);
+        if (worker && ts.isMetaProperty(node)) issues.add('import.meta is forbidden');
         if (worker && ts.isPropertyAssignment(node)) {
-            const name = propertyName(node.name, bindings);
-            const value = constantString(node.initializer, bindings);
+            const name = propertyName(node.name, declarations);
+            const value = constantString(node.initializer, declarations);
             if (name === 'ocr' && value === 'hosted') issues.add('hosted OCR option is forbidden');
         }
-        const constant = constantString(node, bindings);
+        const constant = constantString(node, declarations);
         const isAcceptedImport = worker
             && ts.isStringLiteral(node)
             && ts.isImportDeclaration(node.parent)
             && node.parent.moduleSpecifier === node
             && node.text === ANYDOC_NATIVE_SUBPATH;
         if (!isAcceptedImport && constant?.startsWith('@firecrawl/anydoc')) issues.add('AnyDoc package reference is forbidden outside the exact static import');
-        if (worker && constant && NETWORK_MODULES.has(constant)) issues.add('network module reference is forbidden');
         if (worker && constant && FORBIDDEN_CONSTANTS.has(constant)) issues.add(`${constant} constant is forbidden`);
         if (worker && constant && /^(?:https?|wss?):/u.test(constant)) issues.add('network URL is forbidden');
         ts.forEachChild(node, visit);
