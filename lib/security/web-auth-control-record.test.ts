@@ -15,6 +15,7 @@ import {
     commitPreparedAuthControlActivation,
     commitPreparedAuthControlRetirement,
     createWebAuthControlRecord,
+    isCurrentAuthControlSessionBinding,
     prepareAuthControlActivation,
     prepareAuthControlRetirement,
     retireAuthControlTicket,
@@ -338,6 +339,109 @@ test('prepares one exact retirement and commits it through a lexical final CAS',
     const source = readFileSync(fileURLToPath(new URL('./web-auth-control-record.ts', import.meta.url)), 'utf8');
     const body = source.slice(source.indexOf('export function commitPreparedAuthControlRetirement'), source.indexOf('export function abortPreparedAuthControlRetirement'));
     assert.doesNotMatch(body, /weakMap|mapGet|mapSet|tableHas|tableAdd|tableDelete|Reflect|apply\(|Object\.|Promise|then|callback|enterTicket|leaveTicket/u);
+});
+
+test('observes only the exact current ACTIVE ticket and never burns it', () => {
+    const record = control('current').record; record.begin('login', 'op', 'key', 'fp', 0);
+    const ticket = record.prepareAuthControlTicket('current', 'op', BigInt(0), 'fp', 'web-current', 1); assert.ok(ticket);
+    assert.equal(isCurrentAuthControlSessionBinding(ticket, 'web-current'), false, 'prepared is not ACTIVE');
+    const activation = prepareAuthControlActivation(ticket, 'web-current'); assert.ok(activation);
+    assert.equal(isCurrentAuthControlSessionBinding(ticket, 'web-current'), false, 'activation-prepared is not ACTIVE');
+    assert.equal(commitPreparedAuthControlActivation(activation), 1);
+    const active = record.snapshot();
+    assert.equal(isCurrentAuthControlSessionBinding(ticket, 'web-current'), true);
+    assert.equal(isCurrentAuthControlSessionBinding(ticket, 'web-current'), true, 'predicate is non-burning');
+    assert.equal(isCurrentAuthControlSessionBinding(ticket, 'web-other'), false);
+    assert.deepEqual(record.snapshot(), active);
+    const retirement = prepareAuthControlRetirement(ticket, 'web-current', 'lock'); assert.ok(retirement);
+    assert.equal(isCurrentAuthControlSessionBinding(ticket, 'web-current'), false, 'reserved retirement is not current');
+    assert.equal(abortPreparedAuthControlRetirement(retirement), true);
+    assert.equal(isCurrentAuthControlSessionBinding(ticket, 'web-current'), false, 'aborted ticket stays terminal');
+
+    const stale = control('stale-current').record; stale.begin('login', 'op', 'key', 'fp', 0);
+    const staleTicket = stale.prepareAuthControlTicket('stale-current', 'op', BigInt(0), 'fp', 'web-stale', 1); assert.ok(staleTicket);
+    const staleActivation = prepareAuthControlActivation(staleTicket, 'web-stale'); assert.ok(staleActivation);
+    assert.equal(commitPreparedAuthControlActivation(staleActivation), 1);
+    const staleFence = stale.snapshot().fence;
+    assert.equal(stale.advanceLock(staleFence, 'lock', 'lock-fp', 'stale-next', 2).ok, true);
+    assert.equal(isCurrentAuthControlSessionBinding(staleTicket, 'web-stale'), false, 'fence, generation, and active-session drift deny');
+
+    const retired = control('retired-current').record; retired.begin('login', 'op', 'key', 'fp', 0);
+    const retiredTicket = retired.prepareAuthControlTicket('retired-current', 'op', BigInt(0), 'fp', 'web-retired', 1); assert.ok(retiredTicket);
+    const retiredActivation = prepareAuthControlActivation(retiredTicket, 'web-retired'); assert.ok(retiredActivation);
+    assert.equal(commitPreparedAuthControlActivation(retiredActivation), 1);
+    assert.equal(retireAuthControlTicket(retiredTicket, 'expired'), 1);
+    assert.equal(isCurrentAuthControlSessionBinding(retiredTicket, 'web-retired'), false);
+    assert.equal(retireAuthControlTicket(retiredTicket, 'expired'), 2, 'retirement replay remains receipt-only');
+    assert.equal(isCurrentAuthControlSessionBinding(retiredTicket, 'web-retired'), false);
+});
+
+test('denies forged and hostile current-binding probes without observation or drift', async (t) => {
+    const record = control('hostile-current').record; record.begin('login', 'op', 'key', 'fp', 0);
+    const ticket = record.prepareAuthControlTicket('hostile-current', 'op', BigInt(0), 'fp', 'web-hostile', 1); assert.ok(ticket);
+    const activation = prepareAuthControlActivation(ticket, 'web-hostile'); assert.ok(activation);
+    assert.equal(commitPreparedAuthControlActivation(activation), 1);
+    const before = record.snapshot(); let reads = 0; let traps = 0;
+    const accessor = Object.create(null); Object.defineProperty(accessor, 'then', { get() { reads += 1; throw new Error('then'); } });
+    const proxy = new Proxy(Object.create(null), { get() { traps += 1; throw new Error('get'); }, ownKeys() { traps += 1; throw new Error('keys'); } });
+    const rejected = Promise.reject(new Error('synthetic hostile current binding')); rejected.catch(() => undefined);
+    const hostile = [null, undefined, {}, Object.create(null), { ...ticket }, proxy, accessor, Promise.resolve(), rejected, { then() { reads += 1; } }];
+    const hostileIds = [null, undefined, {}, proxy, accessor, Promise.resolve(), { then() { reads += 1; } }];
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    for (const value of hostile) assert.equal(isCurrentAuthControlSessionBinding(value, 'web-hostile'), false);
+    for (const value of hostileIds) assert.equal(isCurrentAuthControlSessionBinding(ticket, value), false);
+    const restarted = await freshModule('web-auth-current-binding-restart');
+    assert.equal(restarted.isCurrentAuthControlSessionBinding(ticket, 'web-hostile'), false);
+    assert.equal(reads, 0); assert.equal(traps, 0); assert.deepEqual(record.snapshot(), before);
+    assert.equal(isCurrentAuthControlSessionBinding(ticket, 'web-hostile'), true, 'hostile probes do not burn the authentic ticket');
+    await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []); assert.deepEqual(record.snapshot(), before);
+});
+
+test('keeps current-binding lookup read-only through captured intrinsic poison and reentry', async () => {
+    const originalGet = WeakMap.prototype.get; let armed = false; let failAfterApply = false; let nested: unknown;
+    let isolated: typeof import('./web-auth-control-record.ts'); const isolatedTicket: { value: unknown } = { value: null };
+    WeakMap.prototype.get = function (this: WeakMap<object, unknown>, key: object) {
+        if (armed) { armed = false; nested = isolated.isCurrentAuthControlSessionBinding(isolatedTicket.value, 'web-reentry'); }
+        const value = Reflect.apply(originalGet, this, [key]);
+        if (failAfterApply) { failAfterApply = false; throw new Error('synthetic get failure'); }
+        return value;
+    };
+    try { isolated = await freshModule('web-auth-current-binding-reentry'); } finally { WeakMap.prototype.get = originalGet; }
+    const record = isolated.createWebAuthControlRecord('reentry'); record.begin('login', 'op', 'key', 'fp', 0);
+    const outerTicket = record.prepareAuthControlTicket('reentry', 'op', BigInt(0), 'fp', 'web-reentry', 1); assert.ok(outerTicket); isolatedTicket.value = outerTicket;
+    const activation = isolated.prepareAuthControlActivation(outerTicket, 'web-reentry'); assert.ok(activation);
+    assert.equal(isolated.commitPreparedAuthControlActivation(activation), 1); const before = record.snapshot();
+    armed = true; assert.equal(isolated.isCurrentAuthControlSessionBinding(outerTicket, 'web-reentry'), false); assert.equal(nested, false);
+    assert.equal(isolated.isCurrentAuthControlSessionBinding(outerTicket, 'web-reentry'), true, 'reentry denial is recoverable');
+    const other = isolated.createWebAuthControlRecord('reentry-other'); other.begin('login', 'op', 'key', 'fp', 0);
+    const otherTicket = other.prepareAuthControlTicket('reentry-other', 'op', BigInt(0), 'fp', 'web-other', 1); assert.ok(otherTicket);
+    const otherActivation = isolated.prepareAuthControlActivation(otherTicket, 'web-other'); assert.ok(otherActivation);
+    assert.equal(isolated.commitPreparedAuthControlActivation(otherActivation), 1); isolatedTicket.value = otherTicket;
+    armed = true; assert.equal(isolated.isCurrentAuthControlSessionBinding(outerTicket, 'web-reentry'), false); assert.equal(nested, false, 'cross-ticket reentry denies');
+    assert.equal(isolated.isCurrentAuthControlSessionBinding(outerTicket, 'web-reentry'), true); assert.equal(isolated.isCurrentAuthControlSessionBinding(otherTicket, 'web-other'), true);
+    isolatedTicket.value = Object.create(null); armed = true; assert.equal(isolated.isCurrentAuthControlSessionBinding(outerTicket, 'web-reentry'), false); assert.equal(nested, false, 'hostile nested probe poisons outer');
+    isolatedTicket.value = outerTicket; failAfterApply = true; assert.equal(isolated.isCurrentAuthControlSessionBinding(outerTicket, 'web-reentry'), false);
+    const apply = Reflect.apply; const get = WeakMap.prototype.get; const then = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+    try {
+        Reflect.apply = (() => { throw new Error('poisoned apply'); }) as typeof Reflect.apply;
+        WeakMap.prototype.get = (() => { throw new Error('poisoned get'); }) as typeof WeakMap.prototype.get;
+        Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { throw new Error('ambient then'); } });
+        assert.equal(isolated.isCurrentAuthControlSessionBinding(isolatedTicket.value, 'web-reentry'), false, 'a captured hostile lookup intrinsic fails closed');
+    } finally {
+        Reflect.apply = apply; WeakMap.prototype.get = get;
+        if (then) Object.defineProperty(Object.prototype, 'then', then); else delete (Object.prototype as { then?: unknown }).then;
+    }
+    await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(record.snapshot(), before);
+});
+
+test('keeps the current-binding predicate private until the server-session retained-ticket packet', () => {
+    const paths = execFileSync('rg', ['-l', 'isCurrentAuthControlSessionBinding', '-g', '*.ts', '.'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map((path) => path.replace(/^\.\//u, ''));
+    assert.deepEqual(paths.sort(), ['lib/security/web-auth-control-record.test.ts', 'lib/security/web-auth-control-record.ts']);
+    const source = readFileSync(fileURLToPath(new URL('./web-auth-control-record.ts', import.meta.url)), 'utf8');
+    const start = source.indexOf('export function isCurrentAuthControlSessionBinding');
+    const body = source.slice(start, source.indexOf('/** Resolves one active ticket', start));
+    assert.doesNotMatch(body, /async|await|Promise|callback|ticketBindings\.(?:set|delete)|weakMapSet|weakMapDelete|tableAdd|tableDelete|enterTicketOperation|leaveTicketOperation/u);
 });
 
 test('retirement preparation burns wrong, colliding, replayed, and aborted bindings', () => {
