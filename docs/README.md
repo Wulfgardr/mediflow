@@ -51,6 +51,7 @@ Approfondimenti utili:
 - Foundation persistente delle proposte diagnostiche documentali: [ADR 0087](./adr/0087-registro-proposte-diagnostiche-documentali.md)
 - Routing PDF deterministico per pagina: [ADR 0088](./adr/0088-deterministic-pdf-page-router.md)
 - Limite digest-bound della readiness AI locale: [ADR 0092](./adr/0092-limite-digest-bound-readiness-ai-locale.md)
+- Lifecycle Web P3 per logout, PIN e setup: [ADR 0106](./adr/0106-web-auth-logout-pin-setup-lifecycle.md)
 - Assunzione di integrita del processo per l'auth web H1a: [ADR 0105](./adr/0105-web-auth-process-integrity-assumption.md)
 - Fence di revoca Web lock e trasporto credenziali: [ADR 0104](./adr/0104-web-lock-revocation-fence-and-credential-transport.md)
 - Scrittura SOAP Headless autorizzata dal medico: [ADR 0103](./adr/0103-headless-clinician-authorized-soap-entry-write.md)
@@ -96,6 +97,7 @@ Approfondimenti utili:
 | Stato completo del sistema | [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | `CANONICAL` | Lettura unificata corrente: prodotto, runtime, boundary, AI/document intelligence, Apple clients e governance della repository pubblica. |
 | Visione architetturale stabile | [ARCHITECTURE.md](../ARCHITECTURE.md) | `CANONICAL` | Confini e principi che cambiano raramente. |
 | Sicurezza e redazione dati | [SECURITY.md](../SECURITY.md) | `CANONICAL` | Policy di sicurezza, threat model, logging rules. |
+| Lifecycle Web P3 per logout, PIN e setup | [docs/adr/0106-web-auth-logout-pin-setup-lifecycle.md](./adr/0106-web-auth-logout-pin-setup-lifecycle.md) | `CANONICAL / ACCEPTED` | Prevale sul lifecycle P3 incompatibile: logout esatto senza mutare cookie, retirement user-scoped dopo CAS PIN e setup commit-last; non prova runtime o reset PIN. |
 | Integrita del processo per l'auth web H1a | [docs/adr/0105-web-auth-process-integrity-assumption.md](./adr/0105-web-auth-process-integrity-assumption.md) | `CANONICAL / ACCEPTED` | Fissa l'assunzione process-global, il residuo di disponibilita e i gate H1b/security; non prova la catena auth completa. |
 | Intended purpose e claims guard clinico | [docs/adr/0065-intended-purpose-and-claims-guard.md](./adr/0065-intended-purpose-and-claims-guard.md) | `CANONICAL` | Fissa `WUL-279`: claim consentiti/esclusi su AI, SISS/FSE, cloud, diagnosi, triage, prescrizione e automazione, con guard `check:claims`. |
 | Voice visit capture Fluid-style | [docs/adr/0072-voice-visit-capture-fluid-boundary.md](./adr/0072-voice-visit-capture-fluid-boundary.md) | `CANONICAL / PROPOSED` | Propone `WUL-419`: boundary per visite registrabili on-device, senza raw audio/schema/API/UI runtime in questa slice e con trascrizione/bozza sempre PHI review-first. |
