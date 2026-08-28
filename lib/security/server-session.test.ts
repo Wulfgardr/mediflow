@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, test } from 'node:test';
+import ts from 'typescript';
 
 import {
     abortActiveWebSessionResourceUse,
@@ -62,6 +63,30 @@ const TARGET_USERNAME = ['synthetic', 'target'].join('-');
 const OTHER_USERNAME = ['synthetic', 'other'].join('-');
 const AUTH_CONTROL_MODULE_PATH = './web-auth-control-record.ts';
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+const RESOURCE_PORT_PRIMITIVES = new Set([
+    'abortActiveWebSessionResourceUse', 'beginActiveWebSessionResourceUse', 'commitActiveWebSessionResourceUse',
+    'mintActiveWebSessionResourcePort', 'releaseActiveWebSessionResourcePort',
+]);
+const PROJECTION_OWNER_FILES = [
+    'lib/security/server-session-projection-owner.ts', 'lib/security/server-session-projection-owner.test.ts',
+] as const;
+
+const hasExactProjectionOwnerResourceImport = (source: string) => {
+    const ast = ts.createSourceFile(PROJECTION_OWNER_FILES[0], source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    let matchingDeclarations = 0; let exact = true;
+    for (const statement of ast.statements) {
+        if (!ts.isImportDeclaration(statement) || !statement.importClause) continue;
+        const bindings = statement.importClause.namedBindings;
+        if (!bindings || !ts.isNamedImports(bindings)) continue;
+        const resources = bindings.elements.filter((item) => RESOURCE_PORT_PRIMITIVES.has(item.propertyName?.text ?? item.name.text));
+        if (resources.length === 0) continue;
+        matchingDeclarations += 1;
+        exact &&= ts.isStringLiteral(statement.moduleSpecifier) && statement.moduleSpecifier.text === './server-session'
+            && !statement.importClause.isTypeOnly && resources.length === RESOURCE_PORT_PRIMITIVES.size
+            && resources.every((item) => !item.propertyName && !item.isTypeOnly && RESOURCE_PORT_PRIMITIVES.has(item.name.text));
+    }
+    return matchingDeclarations === 1 && exact;
+};
 
 const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
     const errors: string[] = []; const uses = Object.entries(sources).flatMap(([file, source]) => inventoryModuleImports({
@@ -100,6 +125,16 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
         if (runtime.some((use) => use.form !== 'named') || runtime.length !== exact.size
             || runtime.some((use) => !exact.has(use.symbol)) || [...exact].some((symbol) => !runtime.some((use) => use.symbol === symbol))) errors.push(`${file}:authority`);
     }
+    const resourceUses = uses.filter((use) => RESOURCE_PORT_PRIMITIVES.has(use.symbol));
+    for (const use of resourceUses) {
+        if (use.file === 'lib/security/server-session.test.ts') continue;
+        if (!PROJECTION_OWNER_FILES.includes(use.file as typeof PROJECTION_OWNER_FILES[number])) errors.push(`${use.file}:resource-owner`);
+        if (use.form !== 'named' || use.typeOnly) errors.push(`${use.file}:resource-form`);
+    }
+    const ownerAdopters = PROJECTION_OWNER_FILES.filter((file) => resourceUses.some((use) => use.file === file));
+    if (ownerAdopters.length !== 0 && ownerAdopters.length !== PROJECTION_OWNER_FILES.length) errors.push('projection-owner:resource-pair');
+    if (ownerAdopters.includes(PROJECTION_OWNER_FILES[0])
+        && !hasExactProjectionOwnerResourceImport(sources[PROJECTION_OWNER_FILES[0]] ?? '')) errors.push(`${PROJECTION_OWNER_FILES[0]}:resource-shape`);
     const ownReloads = uses.filter((use) => use.file === 'lib/security/server-session.test.ts' && use.form === 'require' && !use.typeOnly);
     if ('lib/security/server-session.test.ts' in sources && ownReloads.length !== 30) errors.push('lib/security/server-session.test.ts:reload-count');
     return { errors, uses };
@@ -747,6 +782,38 @@ test('inventories exact session imports by AST and closes the logout authority b
     assert.deepEqual(validateSessionImports({ 'lib/pdfjs-server.ts': pdfjs }).errors, []);
     assert.ok(validateSessionImports({ 'lib/pdfjs-server.ts': pdfjs.replace('return import(specifier);', 'return import(specifier); ') }).errors.includes('lib/pdfjs-server.ts:reserved-loader-allowlist-drift'));
     assert.ok(validateSessionImports({ 'lib/pdfjs-server.ts': `${pdfjs}\nconst duplicate=new Function('specifier','return import(specifier);');` }).errors.includes('lib/pdfjs-server.ts:reserved-loader-allowlist-duplicate'));
+});
+
+test('observes no owner resource import now and permits only the exact future owner pair', () => {
+    const production = 'lib/security/server-session-projection-owner.ts';
+    const ownerTest = 'lib/security/server-session-projection-owner.test.ts';
+    const current = validateSessionImports(typescriptSources());
+    assert.deepEqual(current.uses.filter((use) => PROJECTION_OWNER_FILES.includes(use.file as typeof PROJECTION_OWNER_FILES[number])
+        && RESOURCE_PORT_PRIMITIVES.has(use.symbol)), []);
+    const exact = "import { getSession, abortActiveWebSessionResourceUse, beginActiveWebSessionResourceUse, commitActiveWebSessionResourceUse, mintActiveWebSessionResourcePort, releaseActiveWebSessionResourcePort, type ServerSession } from './server-session';";
+    const paired = { [production]: exact, [ownerTest]: "import { commitActiveWebSessionResourceUse } from './server-session';" };
+    assert.deepEqual(validateSessionImports(paired).errors, []);
+    assert.notDeepEqual(validateSessionImports({ [production]: exact }).errors, []);
+    assert.notDeepEqual(validateSessionImports({ [ownerTest]: paired[ownerTest] }).errors, []);
+    assert.notDeepEqual(validateSessionImports({ ...paired, 'lib/security/third.ts': "import { commitActiveWebSessionResourceUse } from './server-session';" }).errors, []);
+    assert.notDeepEqual(validateSessionImports({ ...paired,
+        [production]: exact.replace('mintActiveWebSessionResourcePort', 'mintActiveWebSessionResourcePort as mint') }).errors, []);
+    assert.notDeepEqual(validateSessionImports({ ...paired,
+        [ownerTest]: "import type { commitActiveWebSessionResourceUse } from './server-session';" }).errors, []);
+    const mixed = [
+        "await import('./server-session?shadow#copy');", "await import('./server-session#copy');",
+        "await import('./%73erver-session');", "await import('./SERVER-SESSION');",
+        "import * as hidden from './nested/../server-session';", "const load=require;load('./server-session');",
+        "export { commitActiveWebSessionResourceUse } from './server-session';",
+        "await import('./server-session', { with: { type: 'json' } });",
+        "const target='./server-'+'session';await import(target);",
+        "const escaped='./server-'+'\\x73ession';await import(escaped);",
+        "const load=(value:string)=>import(value);load('./server-session');",
+        "const suffix=pick();await import('./server-session'+suffix);",
+    ];
+    for (const bypass of mixed) {
+        assert.notDeepEqual(validateSessionImports({ ...paired, [production]: `${exact}\n${bypass}` }).errors, [], bypass);
+    }
 });
 
 test('Node runtime resolves every inventory alias that the AST gate denies', () => {
