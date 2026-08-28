@@ -4,10 +4,14 @@ import crypto from 'node:crypto';
 import { types } from 'node:util';
 import {
     abortPreparedAuthControlTicket,
-    commitAuthControlTicket,
     createWebAuthControlRecord,
     type AuthControlTicket,
 } from './web-auth-control-record';
+import {
+    activateArmedWebServerSession,
+    getArmedWebServerSessionId,
+    tombstoneArmedWebServerSession,
+} from './server-session';
 
 export type WebAuthKind = 'login' | 'setup';
 declare const webAuthAttemptBrand: unique symbol;
@@ -23,7 +27,7 @@ type AttemptBinding = {
 };
 type ActivationBinding = {
     lifecycle: 'prepared' | 'finished' | 'cancelled'; attempt: AttemptBinding;
-    ticket: AuthControlTicket; capability: WebAuthActivation;
+    ticket: AuthControlTicket; capability: WebAuthActivation; sessionId: string;
 };
 
 const apply = Reflect.apply;
@@ -49,11 +53,13 @@ let control: ControlRecord | null = null;
 let operationActive = false;
 let operationPoisoned = false;
 let recordBeginTurn: ControlRecord | null = null;
+let activationSplicePort: unknown | null = null;
 
 function enter(): boolean {
     if (operationActive) {
         operationPoisoned = true;
         try { recordBeginTurn?.begin(null, null, null, null, null); } catch { /* outer turn remains poisoned */ }
+        try { if (activationSplicePort) tombstoneArmedWebServerSession(activationSplicePort); } catch { /* outer turn remains poisoned */ }
         return false;
     }
     operationActive = true; operationPoisoned = false; return true;
@@ -95,6 +101,16 @@ function cancelExact(binding: AttemptBinding): void {
     const current = now();
     if (current !== null) cancelAt(binding, current);
 }
+function denyPrepared(binding: AttemptBinding | undefined, activation: ActivationBinding | undefined, armedPort?: unknown): void {
+    const ownedActivation = activation?.lifecycle === 'prepared' ? activation
+        : binding?.activation?.lifecycle === 'prepared' ? binding.activation : undefined;
+    const ownedBinding = ownedActivation?.attempt ?? binding;
+    if (ownedActivation) ownedActivation.lifecycle = 'cancelled';
+    if (ownedBinding && (ownedBinding.lifecycle === 'pending' || ownedBinding.lifecycle === 'prepared')) ownedBinding.lifecycle = 'cancelled';
+    if (armedPort !== undefined) { try { tombstoneArmedWebServerSession(armedPort); } catch { /* denial remains terminal */ } }
+    if (ownedActivation) { try { abortPreparedAuthControlTicket(ownedActivation.ticket); } catch { /* denial remains terminal */ } }
+    if (ownedBinding) { try { cancelExact(ownedBinding); } catch { /* denial remains terminal */ } }
+}
 
 /** Starts one owner-generated login/setup operation; no caller metadata enters P2. */
 /* @Codex */
@@ -131,7 +147,7 @@ export function prepareWebAuthActivation(attempt: unknown, exactSessionId: unkno
         raw = binding.control.prepareAuthControlTicket(binding.fence, binding.operation, binding.generation, binding.fingerprint, exactSessionId, at);
         if (!raw || operationPoisoned) { if (raw) abortPreparedAuthControlTicket(raw); return null; }
         capability = opaque<WebAuthActivation>();
-        const activation: ActivationBinding = { lifecycle: 'prepared', attempt: binding, ticket: raw, capability };
+        const activation: ActivationBinding = { lifecycle: 'prepared', attempt: binding, ticket: raw, capability, sessionId: exactSessionId };
         set(activations, capability, activation);
         if (operationPoisoned) { try { drop(activations, capability); } catch { /* unreachable capability remains private */ } abortPreparedAuthControlTicket(raw); return null; }
         binding.activation = activation; binding.lifecycle = 'prepared'; return capability;
@@ -161,15 +177,32 @@ export function cancelWebAuth(attempt: unknown): boolean {
     finally { leave(); }
 }
 
-/** Commits only the exact prepared ticket; P3 owns the future caller of this seam. */
+/** Atomically splices one exact owner ticket into its pre-armed P3 Web cell. */
 /* @Codex */
-export function finishWebAuth(attempt: unknown, activated: unknown): boolean {
+export function activatePreparedWebAuthSession(attempt: unknown, activated: unknown, armedPort: unknown): boolean {
     if (!enter()) return false;
+    let binding: AttemptBinding | undefined; let activation: ActivationBinding | undefined;
     try {
-        const binding = get(attempts, attempt); const activation = get(activations, activated);
-        if (operationPoisoned || !binding || binding.lifecycle !== 'prepared' || !activation || activation.lifecycle !== 'prepared' || activation.attempt !== binding) return false;
-        if (!commitAuthControlTicket(activation.ticket)) return false;
+        binding = get(attempts, attempt); activation = get(activations, activated);
+        if (operationPoisoned || !binding || binding.lifecycle !== 'prepared' || !activation
+            || activation.lifecycle !== 'prepared' || activation.attempt !== binding || binding.activation !== activation) {
+            denyPrepared(binding, activation, armedPort); return false;
+        }
+        activationSplicePort = armedPort;
+        const sessionId = getArmedWebServerSessionId(armedPort);
+        if (operationPoisoned || sessionId !== activation.sessionId) {
+            denyPrepared(binding, activation, armedPort); return false;
+        }
+        const committed = activateArmedWebServerSession(armedPort, activation.ticket);
+        if (!committed || operationPoisoned) {
+            denyPrepared(binding, activation, armedPort); return false;
+        }
         activation.lifecycle = 'finished'; binding.lifecycle = 'finished'; return true;
-    } catch { return false; }
-    finally { leave(); }
+    } catch {
+        denyPrepared(binding, activation, armedPort);
+        return false;
+    } finally {
+        activationSplicePort = null; recordBeginTurn = null;
+        operationActive = false; operationPoisoned = false;
+    }
 }
