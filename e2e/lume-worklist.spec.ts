@@ -26,6 +26,7 @@ const WORKLIST_CASES: WorklistCase[] = (['giorno', 'grafite'] as const).flatMap(
   WORKLIST_VIEWPORTS.map((viewport) => ({ register, ...viewport })),
 );
 
+const MENU_COLLISION_VIEWPORTS: Omit<WorklistCase, 'register'>[] = [{ viewport: 'compact-transition', width: 640, height: 1024 }, { viewport: 'rail-boundary', width: 701, height: 900 }];
 async function setRegister(page: Page, register: WorklistCase['register']): Promise<void> {
   await page.evaluate((nextRegister) => {
     const theme = nextRegister === 'grafite' ? 'dark' : 'light';
@@ -63,9 +64,56 @@ async function resolvedFontFamily(locator: Locator): Promise<string> {
   return locator.evaluate((element) => getComputedStyle(element).fontFamily);
 }
 
+/* @Codex WUL-560 L6A: the patient lens exposes one focal action while the
+   other four remain keyboard-reachable in a single disclosure menu. */
+async function assertLensActionContract(page: Page): Promise<void> {
+  const lens = page.getByTestId('lume-patient-lens');
+  const primary = lens.getByRole('link', { name: 'Apri scheda paziente', exact: true });
+  const trigger = lens.getByRole('button', { name: 'Altre azioni paziente', exact: true });
+
+  await expect(primary).toBeVisible();
+  await expect(lens.locator('[data-lume-action="primary"]')).toHaveCount(1);
+  await expect(trigger).toBeVisible();
+  await expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('menu', { name: 'Azioni paziente' })).toHaveCount(0);
+
+  await trigger.focus();
+  await trigger.press('Enter');
+  const menu = page.getByRole('menu', { name: 'Azioni paziente' });
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await expect(menu).toBeVisible();
+
+  const items = menu.getByRole('menuitem');
+  await expect(items).toHaveCount(4);
+  await expect(items.nth(0)).toHaveText('Quadro');
+  await expect(items.nth(1)).toHaveText('Nuova voce');
+  await expect(items.nth(2)).toHaveText('Documenti');
+  await expect(items.nth(3)).toHaveText('Prepara SISS');
+  await expect(items.nth(0)).toBeFocused();
+
+  const menuGeometry = await menu.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
+  });
+  expect(menuGeometry.left).toBeGreaterThanOrEqual(-1);
+  expect(menuGeometry.right).toBeLessThanOrEqual(await page.evaluate(() => innerWidth + 1));
+  expect(menuGeometry.top).toBeGreaterThanOrEqual(-1);
+  expect(menuGeometry.bottom).toBeLessThanOrEqual(await page.evaluate(() => innerHeight + 1));
+
+  await page.keyboard.press('End');
+  await expect(items.nth(3)).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(items.nth(0)).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+}
+
 async function assertWorklistContract(page: Page): Promise<void> {
-  const list = page.getByRole('list', { name: 'Elenco pazienti in carico', exact: true });
-  const listItems = list.getByRole('listitem');
+  const list = page.getByRole('listbox', { name: 'Elenco pazienti in carico', exact: true });
+  const listItems = list.getByRole('option');
   const rows = list.getByTestId('lume-patient-row');
   await expect(list).toBeVisible();
   await expect(listItems).toHaveCount(3);
@@ -91,11 +139,11 @@ async function assertWorklistContract(page: Page): Promise<void> {
   expect(new Set(codeFamilies)).toEqual(new Set([registerFamily]));
   expect(new Set(whenFamilies)).toEqual(new Set([registerFamily]));
 
-  await expect(firstRow).toHaveAttribute('aria-pressed', 'true');
-  await expect(secondRow).toHaveAttribute('aria-pressed', 'false');
+  await expect(firstRow).toHaveAttribute('aria-selected', 'true');
+  await expect(secondRow).toHaveAttribute('aria-selected', 'false');
   await secondRow.click();
-  await expect(firstRow).toHaveAttribute('aria-pressed', 'false');
-  await expect(secondRow).toHaveAttribute('aria-pressed', 'true');
+  await expect(firstRow).toHaveAttribute('aria-selected', 'false');
+  await expect(secondRow).toHaveAttribute('aria-selected', 'true');
 
   const rowSurfaces = await Promise.all([firstRow, secondRow].map((row) => row.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -136,8 +184,7 @@ async function assertWorklistContract(page: Page): Promise<void> {
 
   const lens = page.getByTestId('lume-patient-lens');
   expect(await resolvedFontFamily(lens.getByTestId('lume-patient-atoms'))).toBe(registerFamily);
-  await expect(lens.locator('[data-lume-action="primary"]')).toHaveCount(1);
-  await expect(lens.locator('[data-lume-action="quiet"]')).toHaveCount(4);
+  await assertLensActionContract(page);
 
   const search = page.getByRole('searchbox', { name: 'Cerca nella lista pazienti', exact: true });
   await search.fill('nessun caso sintetico corrispondente');
@@ -296,3 +343,104 @@ for (const worklistCase of WORKLIST_CASES) {
     });
   });
 }
+
+test('L6A mantiene quattro azioni nell’overflow mobile accessibile', async ({ page }) => {
+  await openSyntheticWorklist(page, {
+    register: 'giorno', viewport: 'phone', width: 390, height: 844,
+  });
+  await assertLensActionContract(page);
+});
+for (const register of ['giorno', 'grafite'] as const) {
+  for (const viewport of MENU_COLLISION_VIEWPORTS) {
+    test(`L6A contiene il menu senza scroll a ${viewport.width}px in registro ${register}`, async ({ page }) => {
+      await openSyntheticWorklist(page, { register, ...viewport });
+      expect(await page.evaluate(() => scrollY)).toBe(0);
+      const lens = page.getByTestId('lume-patient-lens'); const trigger = lens.getByRole('button', { name: 'Altre azioni paziente', exact: true });
+      await trigger.evaluate((element) => (element as HTMLElement).click());
+      const menu = page.getByRole('menu', { name: 'Azioni paziente', exact: true });
+      await expect(menu).toBeVisible();
+      const fitsViewport = await menu.evaluate((element, size) => {
+        const box = element.getBoundingClientRect();
+        return box.top >= 8 && box.bottom <= size.height - 8 && box.left >= 8 && box.right <= size.width - 8;
+      }, viewport);
+      expect(await page.evaluate(() => scrollY)).toBe(0);
+      expect(fitsViewport).toBe(true);
+    });
+  }
+}
+
+test('la worklist virtuale attraversa l’indice completo e apre la sola Scheda', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const marker = `VirtualK1${Date.now().toString().slice(-8)}`;
+  const consoleErrors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+  await page.evaluate(async (fixtureMarker) => {
+    const responses = await Promise.all(Array.from({ length: 120 }, async (_, index) => {
+      const response = await fetch('/api/patients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: `Caso ${String(index + 1).padStart(3, '0')}`,
+          lastName: fixtureMarker,
+          taxCode: `${fixtureMarker.slice(-8)}${String(index).padStart(3, '0')}`,
+          birthDate: '1972-04-12T00:00:00.000Z',
+        }),
+      });
+      if (!response.ok) throw new Error(`Fixture virtuale ${index + 1}: HTTP ${response.status}`);
+    }));
+    await Promise.all(responses);
+  }, marker);
+  await page.goto('/?area=incarico');
+
+  const listbox = page.getByRole('listbox', { name: 'Elenco pazienti in carico', exact: true });
+  await expect(listbox).toBeVisible();
+  const search = page.getByRole('searchbox', { name: 'Cerca nella lista pazienti', exact: true });
+  await search.fill(marker);
+  await expect(page.getByText('120 risultati', { exact: true })).toBeVisible();
+
+  const firstRow = page.getByRole('option').first();
+  await firstRow.focus();
+  await firstRow.press('End');
+  const lastRow = page.locator('[data-patient-index="119"]');
+  await expect(lastRow).toBeFocused();
+  await expect(lastRow).toHaveAttribute('aria-selected', 'true');
+  await expect(lastRow).toHaveAttribute('data-patient-index', '119');
+
+  await page.keyboard.press('PageUp');
+  await expect.poll(() => page.evaluate(() => Number(document.activeElement?.getAttribute('data-patient-index'))))
+    .toBeLessThan(119);
+  const pageUpIndex = await page.evaluate(() => Number(document.activeElement?.getAttribute('data-patient-index')));
+  expect(pageUpIndex).toBeGreaterThanOrEqual(0);
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(() => page.evaluate(() => Number(document.activeElement?.getAttribute('data-patient-index'))))
+    .toBe(pageUpIndex - 1);
+  await page.keyboard.press('j');
+  await page.keyboard.press('k');
+  await page.keyboard.press('Home');
+  await expect(page.locator('[data-patient-index="0"]')).toBeFocused();
+  await page.keyboard.press('PageDown');
+  await expect.poll(() => page.evaluate(() => Number(document.activeElement?.getAttribute('data-patient-index'))))
+    .toBeGreaterThan(0);
+  const pageDownIndex = await page.evaluate(() => Number(document.activeElement?.getAttribute('data-patient-index')));
+  await assertNoHorizontalOverflow(page, [
+    { label: 'documento worklist virtuale', selector: 'document' },
+    { label: 'worklist virtuale', selector: '[data-testid="lume-worklist"]' },
+    { label: 'lista virtuale', selector: '[data-testid="lume-patient-list"]' },
+  ]);
+  await page.screenshot({ path: '/tmp/lume-worklist-k1-1440x900.png', animations: 'disabled' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator(`[data-patient-index="${pageDownIndex}"]`)).toBeFocused();
+  await assertNoHorizontalOverflow(page, [
+    { label: 'documento worklist virtuale narrow', selector: 'document' },
+    { label: 'worklist virtuale narrow', selector: '[data-testid="lume-worklist"]' },
+    { label: 'lista virtuale narrow', selector: '[data-testid="lume-patient-list"]' },
+  ]);
+  await page.screenshot({ path: '/tmp/lume-worklist-k1-390x844.png', animations: 'disabled' });
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('lume-scheda-header')).toBeVisible();
+  expect(consoleErrors).toEqual([]);
+});

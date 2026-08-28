@@ -44,6 +44,7 @@ import { classifyObservationRange, toNumericValue } from '@/lib/observation-rang
 import { resolveStaticTerminology } from '@/lib/terminology';
 import { projectFollowupSuggestions } from '@/lib/patient-followup-projection';
 import { deriveOpenLoopProjection, type OpenLoop } from '@/lib/patient-open-loops';
+import { buildPatientModuleRailGroups } from '@/lib/patient-module-rail-mapping';
 import FollowupSuggestions from '@/components/followup-suggestions';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
@@ -503,22 +504,24 @@ export default function PatientDetailPage() {
     });
     const openLoopCount = openLoopProjection.groups.reduce((total, group) => total + group.loops.length, 0)
         + openLoopProjection.standaloneLoops.length;
-    /* @Codex LUME-104/68: il rail segue l'ordine clinico della superficie unica. */
+    /* @Codex WUL-560 L7B / D-WebRail-01: ordine raggruppato esplicito; ogni
+       oggetto conserva href, label e meta del caller senza binding inferiti. */
     const workspaceNavItems: Kree8WorkspaceNavItem[] = [
-        { href: '#attenzione', label: 'Attenzione', meta: String(reviewQueueSummary.attentionCount + openLoopCount) },
         { href: '#quadro', label: 'Quadro' },
+        { href: '#attenzione', label: 'Attenzione', meta: String(reviewQueueSummary.attentionCount + openLoopCount) },
         { href: '#identita', label: 'Identità' },
-        { href: '#timeline', label: 'Timeline', meta: String(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length) },
-        { href: '#diario', label: 'Diario', meta: String(nonScaleEntries.length) },
+        { href: '#parametri', label: 'Parametri', meta: workspace ? String(workspace.observationsCount) : undefined },
         { href: '#terapie', label: 'Terapie', meta: workspace ? String(workspace.activeTherapiesCount) : undefined },
         { href: '#prestazioni', label: 'Prestazioni', meta: prestazioniCount !== undefined ? String(prestazioniCount) : undefined },
-        { href: '#parametri', label: 'Parametri', meta: workspace ? String(workspace.observationsCount) : undefined },
         { href: '#protesica', label: 'Protesica', meta: protesicaCount !== undefined ? String(protesicaCount) : undefined },
-        { href: '#siss', label: 'SISS/FSE' },
-        { href: '#documenti', label: 'Documenti', meta: String(attachmentItems.length) },
         { href: '#scale', label: 'Scale' },
+        { href: '#documenti', label: 'Documenti', meta: String(attachmentItems.length) },
+        { href: '#siss', label: 'SISS/FSE' },
+        { href: '#timeline', label: 'Timeline', meta: String(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length) },
+        { href: '#diario', label: 'Diario', meta: String(nonScaleEntries.length) },
         { href: '#follow-up', label: 'Follow-up', meta: workspace ? String(workspace.pendingCheckupsCount) : undefined },
     ];
+    const workspaceNavGroups = buildPatientModuleRailGroups(workspaceNavItems);
 
     /* @Codex Validates against the FSE and builds the bundle, or returns null
        when the export must not proceed.
@@ -614,14 +617,14 @@ export default function PatientDetailPage() {
             eyebrow="Scheda clinica"
             title={`${patient.lastName} ${patient.firstName}`}
             subtitle=""
-            backHref={`/patients/${id}`}
-            backLabel="Quadro paziente"
+            backHref="/?area=incarico"
+            backLabel="Pazienti"
             patientAtoms={[
                 patient.taxCode ? `Codice ${patient.taxCode}` : 'Codice non disponibile',
                 ageLabel,
                 `Aggiornato ${updatedLabel}`,
             ]}
-            navItems={workspaceNavItems}
+            navGroups={workspaceNavGroups}
             primaryAction={{ href: `/patients/${id}/entries/new`, label: 'Nuova voce', icon: Plus }}
             headerActions={(
                 <PatientSheetActionsMenu

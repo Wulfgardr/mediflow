@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mini — studio della faccia headless di MediFlow</title>
+<style>
+/* ============================================================
+   Studio d'interfaccia per «Mini», la CLI headless per agenti.
+   File autonomo, nessuna dipendenza, nessun font remoto.
+   Dati esclusivamente sintetici, nessun dato reale.
+   Riferimento: docs/design/2026-08-21-mini-headless-agent-cli.md
+   ============================================================ */
+
+:root {
+  /* Registro Guardia: Mini vive di notte */
+  --canvas: #0c0e12;
+  --field: #14171d;
+  --focal: #1a1e26;
+  --chrome: #090b0e;
+  --ink: #e3e8ee;
+  --ink-muted: #8792a3;
+  --ink-faint: #5b6678;
+  --minerale: #7fa0bc;
+  --warning: #cfa35f;
+  --critical: #d98a7d;
+  --success: #85a291;
+  --warning-tint: rgba(207, 163, 95, 0.12);
+  --critical-tint: rgba(217, 138, 125, 0.11);
+  --success-tint: rgba(133, 162, 145, 0.11);
+  --border: rgba(227, 232, 238, 0.09);
+  --border-chrome: rgba(227, 232, 238, 0.04);
+  --shadow-overlay: 0 24px 56px rgba(0, 0, 0, 0.55);
+  --focus-ring: 0 0 0 2px var(--canvas), 0 0 0 4px var(--minerale);
+
+  --voce: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  --registro: ui-monospace, "SF Mono", "IBM Plex Mono", "Cascadia Mono", Menlo, monospace;
+
+  --dur: 210ms;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+::selection { background: color-mix(in srgb, var(--minerale) 30%, transparent); }
+
+html { scrollbar-color: color-mix(in srgb, var(--ink-muted) 40%, transparent) transparent; }
+
+body {
+  font-family: var(--voce);
+  background:
+    radial-gradient(1100px 500px at 70% -10%, rgba(127, 160, 188, 0.05), transparent 60%),
+    var(--canvas);
+  color: var(--ink);
+  min-height: 100vh;
+  padding: 40px clamp(16px, 4vw, 56px) 48px;
+}
+
+button:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 10px; }
+svg { display: block; flex: none; }
+
+.intestazione { max-width: 1240px; margin: 0 auto 26px; display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
+.intestazione h1 { font-size: 22px; font-weight: 650; letter-spacing: -0.025em; }
+.intestazione p { font-size: 13px; color: var(--ink-muted); max-width: 62ch; }
+.intestazione .mf {
+  margin-left: auto;
+  font-family: var(--registro);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.scena {
+  max-width: 1240px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 264px;
+  gap: 28px;
+  align-items: start;
+}
+@media (max-width: 980px) { .scena { grid-template-columns: 1fr; } }
+
+/* ── finestra terminale ───────────────────────────────────── */
+
+.terminale {
+  background: var(--field);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-overlay);
+  overflow: hidden;
+}
+.barra-finestra {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border-chrome);
+}
+.barra-finestra .luci { display: flex; gap: 6px; }
+.barra-finestra .luci i { width: 11px; height: 11px; border-radius: 50%; background: var(--ink-faint); opacity: 0.55; }
+.barra-finestra .titolo {
+  font-family: var(--registro);
+  font-size: 11.5px;
+  color: var(--ink-muted);
+}
+.barra-finestra .lease {
+  margin-left: auto;
+  font-family: var(--registro);
+  font-size: 10.5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  color: var(--success);
+  background: var(--success-tint);
+}
+
+.trascritto { padding: 20px 22px 24px; font-family: var(--registro); font-size: 12.75px; line-height: 1.65; }
+
+.blocco { padding: 14px 0; border-bottom: 1px solid var(--border-chrome); }
+.blocco:last-child { border-bottom: 0; padding-bottom: 2px; }
+
+.cmd { display: flex; gap: 9px; align-items: baseline; }
+.cmd::before { content: "$"; color: var(--minerale); font-weight: 600; }
+.cmd code { color: var(--ink); }
+.cmd code b { color: var(--minerale); font-weight: 600; }
+
+.out { margin-top: 8px; padding-left: 17px; color: var(--ink-muted); }
+.out .voce-riga {
+  font-family: var(--voce);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  margin: 10px 0 4px;
+}
+.out .ok { color: var(--success); }
+.out .warn { color: var(--warning); }
+.out .crit { color: var(--critical); }
+.out .dim { color: var(--ink-faint); }
+.out .val { color: var(--ink); }
+.out pre {
+  font-family: inherit;
+  white-space: pre;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.out table { border-collapse: collapse; width: 100%; }
+.out td { padding: 2px 14px 2px 0; vertical-align: baseline; white-space: nowrap; }
+.out td.k { color: var(--ink-faint); }
+.out td.v { color: var(--ink); }
+.out td.mut { color: var(--ink-muted); }
+
+.prov {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.prov b { color: var(--ink-muted); font-weight: 500; }
+
+.negato {
+  margin-top: 8px;
+  margin-left: 17px;
+  border-radius: 12px;
+  background: var(--critical-tint);
+  padding: 10px 14px;
+}
+.negato .esito { color: var(--critical); font-weight: 600; }
+.negato .azione { display: block; margin-top: 4px; color: var(--ink-muted); }
+.negato .azione b { color: var(--ink); font-weight: 600; }
+.negato .exit { display: block; margin-top: 4px; font-size: 11px; color: var(--ink-faint); }
+
+.artefatto {
+  margin-top: 8px;
+  margin-left: 17px;
+  border-radius: 12px;
+  background: var(--success-tint);
+  padding: 10px 14px;
+}
+.artefatto .path { color: var(--ink); }
+.artefatto .link { display: block; margin-top: 4px; color: var(--minerale); }
+.artefatto .scope { display: block; margin-top: 4px; font-size: 11px; color: var(--ink-muted); }
+
+/* ── note laterali ─────────────────────────────────────────── */
+
+.note { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 40px; }
+.nota {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 13px 15px;
+}
+.nota h2 { font-size: 12.5px; font-weight: 650; letter-spacing: -0.01em; display: flex; align-items: center; gap: 7px; }
+.nota h2 svg { color: var(--minerale); }
+.nota p { margin-top: 5px; font-size: 12px; line-height: 1.55; color: var(--ink-muted); }
+.nota p b { color: var(--ink); font-weight: 550; }
+
+.piede {
+  max-width: 1240px;
+  margin: 26px auto 0;
+  font-size: 11px;
+  color: var(--ink-faint);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.piede a { color: var(--ink-muted); text-decoration-color: var(--border); }
+</style>
+</head>
+<body>
+
+<header class="intestazione">
+  <h1>Mini</h1>
+  <p>La faccia headless di MediFlow: identità concessa dall'operatore, lease contestuale per paziente, stadi fail-closed. Trascrizione di una sessione tipo.</p>
+  <span class="mf">studio · dati sintetici · guardia</span>
+</header>
+
+<div class="scena">
+
+  <section class="terminale" aria-label="Finestra terminale con la sessione Mini">
+    <div class="barra-finestra">
+      <div class="luci"><i></i><i></i><i></i></div>
+      <span class="titolo">agente@home-base — mediflow mini</span>
+      <span class="lease">lease LS-9931 · PT-2481 · 27 min</span>
+    </div>
+
+    <div class="trascritto">
+
+      <div class="blocco">
+        <p class="cmd"><code><b>mf login</b> --intent PI-7F3K</code></p>
+        <div class="out">
+          <p><span class="ok">✔</span> Identità <span class="val">infermeria-casa3</span> accettata · stadio massimo: <span class="val">preview</span> · lease: <span class="val">30 min</span></p>
+          <p class="dim">credenziali in &lt;data&gt;/agent-keys/infermeria-casa3 (0600) · revoca: mediflow mini revoke infermeria-casa3</p>
+        </div>
+      </div>
+
+      <div class="blocco">
+        <p class="cmd"><code><b>mf whoami</b></code></p>
+        <div class="out">
+          <table>
+            <tr><td class="k">identità</td><td class="v">infermeria-casa3</td><td class="mut">agente · concesso da l.pegollo</td></tr>
+            <tr><td class="k">lease</td><td class="v">PT-2481</td><td class="mut">scade tra 27 min · stadio preview</td></tr>
+            <tr><td class="k">perimetro</td><td class="v">45 capability</td><td class="mut">12 oltre observe → denied_by_contract</td></tr>
+          </table>
+          <p class="prov"><b>provenance</b> venue=localhost/home-base · protocollo 1.11.0 · 2026-08-21T14:32Z</p>
+        </div>
+      </div>
+
+      <div class="blocco">
+        <p class="cmd"><code><b>mf patient search</b> "rossi"</code></p>
+        <div class="out">
+          <p>3 corrispondenze · <span class="dim">riferimenti soltanto: nessuna anagrafica piena nell'output</span></p>
+          <pre>PT-2481   Rossi M.   1948   ADI dal 2024-03
+PT-2507   Rossi L.   1952   follow-up cardiologico
+PT-2612   Rossi B.   1939   archiviato 2025-11</pre>
+        </div>
+      </div>
+
+      <div class="blocco">
+        <p class="cmd"><code><b>mf open-loops</b> PT-2481</code></p>
+        <div class="out">
+          <p class="voce-riga">Attenzione · 3 loop aperti · <span class="warn">+1 dall'ultima lettura</span></p>
+          <table>
+            <tr><td class="k">GLI-114</td><td class="v">Glicemia capillare da ripetere</td><td class="mut">richiesta 18/08 · scade 25/08</td><td class="warn">▲ warning</td></tr>
+            <tr><td class="k">VIS-092</td><td class="v">Visita di conferma ADI</td><td class="mut">programmata 27/08</td><td class="dim">· neutro</td></tr>
+            <tr><td class="k">FAR-061</td><td class="v">Terapia da riconciliare post-dimissione</td><td class="mut">aperto 12/08</td><td class="crit">● critical</td></tr>
+          </table>
+          <p class="prov"><b>provenance</b> source=mediflow.agent.patient_open_loops.v1 · freshness=ora · lease=LS-9931</p>
+        </div>
+      </div>
+
+      <div class="blocco">
+        <p class="cmd"><code><b>mf apply</b> DRF-118</code></p>
+        <div class="negato">
+          <span class="esito">negato:</span> apply richiede autorità umana sul lease LS-9931 (stadio massimo: preview)
+          <span class="azione">azione → chiedi all'operatore: <b>mediflow mini approve DRF-118</b></span>
+          <span class="exit">exit 2 · negato dal contratto, distinto da un errore</span>
+        </div>
+      </div>
+
+      <div class="blocco">
+        <p class="cmd"><code><b>mf open-loops</b> PT-2481 <b>--artifact</b> html</code></p>
+        <div class="artefatto">
+          artefatto scritto · <span class="path">/tmp/artefatti/LS-9931-open-loops.html</span>
+          <span class="link">deep-link autenticato → /patients/2481?ctx=LS-9931</span>
+          <span class="scope">scope: solo PT-2481 · watermark lease LS-9931 · apribile offline</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <aside class="note" aria-label="Principi della sessione">
+    <div class="nota">
+      <h2>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+        Identità concessa
+      </h2>
+      <p>L'agente non usa né il token API né la sessione dell'operatore: riceve un'identità dedicata, revocabile in un comando.</p>
+    </div>
+    <div class="nota">
+      <h2>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        Lease contestuale
+      </h2>
+      <p>Ogni lavoro vive dentro un lease a tempo, ancorato a un paziente. Il banner resta visibile per tutta la sessione.</p>
+    </div>
+    <div class="nota">
+      <h2>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h6l2-7 4 14 2-7h6"/></svg>
+        Delta prima dei conteggi
+      </h2>
+      <p>L'output dice cosa è cambiato (+1 dall'ultima lettura), non solo quante voci ci sono.</p>
+    </div>
+    <div class="nota">
+      <h2>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Zero PHI nel canale debole
+      </h2>
+      <p>Riferimenti e iniziali nei comandi e negli elenchi; il dato pieno viaggia solo nell'artefatto richiesto esplicitamente.</p>
+    </div>
+    <div class="nota">
+      <h2>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg>
+        Negato ≠ errore
+      </h2>
+      <p>Il diniego nomina il motivo esatto (<b>denied_by_contract</b>) e l'azione di recupero. Exit code distinti.</p>
+    </div>
+    <div class="nota">
+      <h2>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+        Artefatti a scope chiuso
+      </h2>
+      <p>Ciò che l'agente mostra all'operatore esiste dentro il lease: deep-link autenticato o HTML self-contained con watermark.</p>
+    </div>
+  </aside>
+</div>
+
+<p class="piede">Studio d'interfaccia, non target consegnato · contratto: <a href="../../design/2026-08-21-mini-headless-agent-cli.md">docs/design/2026-08-21-mini-headless-agent-cli.md</a> · implementazione subordinata alla promozione dell'ADR 0093.</p>
+
+</body>
+</html>

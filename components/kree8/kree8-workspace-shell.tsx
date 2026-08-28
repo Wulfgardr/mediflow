@@ -3,8 +3,8 @@
 /* @Codex */
 
 import Link from 'next/link';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, FolderOpen, type LucideIcon } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { ArrowLeft, ChevronRight, FolderOpen, type LucideIcon } from 'lucide-react';
 
 // WUL-297: Privacy Mode is always reachable from the workspace header.
 import PrivacyBlur from '@/components/privacy-blur';
@@ -17,6 +17,23 @@ export type Kree8WorkspaceNavItem = {
   meta?: string;
 };
 
+/* @Codex WUL-560 L7A: the group vocabulary is closed here; callers may only
+   bind existing sections in the separate mapping packet. */
+export const KREE8_CLINICAL_RAIL_GROUPS = [
+  { id: 'quadro-decisioni', label: 'Quadro e decisioni' },
+  { id: 'terapie-prescrizioni', label: 'Terapie e prescrizioni' },
+  { id: 'documenti-prove', label: 'Documenti e prove' },
+  { id: 'diario-follow-up', label: 'Diario e follow-up' },
+] as const;
+
+type Kree8ClinicalRailDefinition = typeof KREE8_CLINICAL_RAIL_GROUPS;
+export type Kree8WorkspaceNavGroups = readonly [
+  Kree8ClinicalRailDefinition[0] & { items: readonly Kree8WorkspaceNavItem[] },
+  Kree8ClinicalRailDefinition[1] & { items: readonly Kree8WorkspaceNavItem[] },
+  Kree8ClinicalRailDefinition[2] & { items: readonly Kree8WorkspaceNavItem[] },
+  Kree8ClinicalRailDefinition[3] & { items: readonly Kree8WorkspaceNavItem[] },
+];
+
 type Kree8WorkspaceShellProps = {
   variant?: 'default' | 'clinical';
   eyebrow: string;
@@ -28,6 +45,7 @@ type Kree8WorkspaceShellProps = {
   patientAtoms?: string[];
   statusLabel?: string;
   navItems?: Kree8WorkspaceNavItem[];
+  navGroups?: Kree8WorkspaceNavGroups;
   primaryAction?: { href: string; label: string; icon: LucideIcon };
   headerActions?: ReactNode;
   children: ReactNode;
@@ -44,6 +62,7 @@ export function Kree8WorkspaceShell({
   patientAtoms = [],
   statusLabel,
   navItems = [],
+  navGroups,
   primaryAction,
   headerActions,
   children,
@@ -57,7 +76,12 @@ export function Kree8WorkspaceShell({
      aria-current stantio invece di ereditarlo. */
   const activeHrefRef = useRef<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const navKey = navItems.map((item) => item.href).join('|');
+  const railId = useId();
+  const [openGroups, setOpenGroups] = useState<Partial<Record<Kree8ClinicalRailDefinition[number]['id'], boolean>>>({
+    'quadro-decisioni': true,
+  });
+  const renderedNavItems = navGroups ? navGroups.flatMap((group) => group.items) : navItems;
+  const navKey = renderedNavItems.map((item) => item.href).join('|');
   const PrimaryActionIcon = primaryAction?.icon;
 
   /* Lume focal locus + scrollspy (WUL-55, F2c). Un solo effetto governa la vita
@@ -268,9 +292,51 @@ export function Kree8WorkspaceShell({
           )}
         </header>
 
-        {navItems.length > 0 ? (
-          <nav className={styles.sectionRail} aria-label="Sezioni della vista">
-            {navItems.map((item) => (
+        {renderedNavItems.length > 0 ? (
+          <nav
+            className={`${styles.sectionRail} ${navGroups ? styles.groupedSectionRail : ''}`}
+            aria-label="Sezioni della vista"
+            data-rail-mode={navGroups ? 'grouped' : 'unmapped'}
+          >
+            {navGroups ? navGroups.map((group) => {
+              const activeItem = group.items.find((item) => item.href === activeHref);
+              const expanded = openGroups[group.id] === true;
+              const panelId = `${railId}-${group.id}`;
+              return (
+                <div className={styles.sectionGroup} key={group.id}>
+                  <button
+                    type="button"
+                    className={styles.sectionGroupButton}
+                    aria-controls={panelId}
+                    aria-expanded={expanded}
+                    onClick={() => setOpenGroups((current) => ({ ...current, [group.id]: !expanded }))}
+                  >
+                    <span>{group.label}</span>
+                    <ChevronRight className={styles.sectionGroupChevron} size={14} aria-hidden="true" />
+                  </button>
+                  <ul id={panelId} className={styles.sectionGroupItems} hidden={!expanded}>
+                    {group.items.map((item) => (
+                      <li key={item.href}>
+                        <a
+                          href={item.href}
+                          className={styles.sectionLink}
+                          aria-current={expanded && item.href === activeHref ? 'location' : undefined}
+                        >
+                          <span>{item.label}</span>
+                          {item.meta ? <small>{item.meta}</small> : null}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                  {!expanded && activeItem ? (
+                    <a href={activeItem.href} className={`${styles.sectionLink} ${styles.sectionActivePeek}`} aria-current="location">
+                      <span>{activeItem.label}</span>
+                      {activeItem.meta ? <small>{activeItem.meta}</small> : null}
+                    </a>
+                  ) : null}
+                </div>
+              );
+            }) : navItems.map((item) => (
               <a
                 key={item.href}
                 href={item.href}

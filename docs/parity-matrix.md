@@ -228,7 +228,7 @@ La mappa registra i controlli esercitati nel closeout.
 | Web | Agenda | nome AX `Agenda` | Cambia area cockpit | Chrome produzione |
 | Web | Pazienti | nome AX `Pazienti N` | Carica worklist | Chrome produzione |
 | Web | Diario | `lume-diario` | Carica feed globale | Chrome produzione |
-| Web | Scheda | `lume-quadro` | Carica paziente e aggregati | Chrome produzione |
+| Web | Scheda | `lume-scheda-header` | Carica paziente e aggregati | E2E candidato locale D1/D2 — SHA esatti |
 | Web | Evidence Stack | tile documento | Mostra stati e avvia curation | E2E 2/2 |
 | Apple | Sezione clinica | `clinical-workspace-section-*-button` | Seleziona area | Audit automatico |
 | Apple | Lista pazienti | `patients-selection-list` | Seleziona dettaglio | Audit automatico |

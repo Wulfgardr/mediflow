@@ -48,6 +48,10 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  /* @Codex The Filo inset belongs inside the feed width: content-box padding
+     otherwise pushes active entries past the reflow viewport. */
+  box-sizing: border-box;
+  width: 100%;
   min-width: 0;
   padding: 13px 2px 4px 34px;
 }

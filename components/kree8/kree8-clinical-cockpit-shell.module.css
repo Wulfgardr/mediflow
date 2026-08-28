@@ -126,7 +126,7 @@
 
 @media (max-width: 1024px) {
   .shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto 1fr;
     padding: 10px;
     gap: 10px;
@@ -273,15 +273,20 @@
   .rail {
     display: flex;
     flex-wrap: wrap;
-    padding: 5px 6px;
-    gap: 4px;
+    /* @Codex Keep the 44px controls while the brand and two destination rows
+       stay inside the compact composition's 150px vertical budget. */
+    padding: 2px 6px;
+    gap: 2px 4px;
     overflow: visible;
     scroll-snap-type: none;
   }
 
   .brand {
     flex: 1 1 100%;
-    padding: 4px 6px;
+    min-height: 44px;
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    padding: 0 4px;
   }
 
   .navItem {
@@ -291,6 +296,10 @@
     width: auto;
     padding: 8px 10px;
   }
+}
+
+@media (max-width: 360px) {
+  .brandWord { display: none; }
 }
 
 .navSelected {
@@ -536,6 +545,11 @@
 
 .toolChip:active { transform: scale(0.97); }
 
+.toolChipKbd {
+  color: var(--ink-muted);
+  font: 600 10px/1 var(--lume-font-mono);
+}
+
 .toolChipMuted {
   background: transparent;
   color: var(--ink-muted);
@@ -622,7 +636,7 @@
   }
 
   .search {
-    flex: 1 0 100%;
+    flex: 1 1 calc(100% - 52px);
     min-height: 42px;
   }
 
@@ -631,10 +645,20 @@
   }
 
   .toolChip {
+    order: 1;
     flex: 1 1 calc(50% - 4px);
     justify-content: center;
     white-space: nowrap;
   }
+
+  .commandToolChip {
+    order: 0;
+    flex: 0 0 44px;
+    padding-inline: 0;
+    font-size: 0;
+  }
+
+  .commandToolChip .toolChipKbd { display: none; }
 
   .aiButton {
     flex: 1 0 100%;
@@ -759,4 +783,20 @@
   font-weight: 600;
   border-color: var(--ink);
   background: var(--surface-soft);
+}
+
+/* @Codex WUL-UIUX: target tattili 44pt su pointer coarse; focus visibile
+   anche per le sub-tab del paziente. */
+.subareaTab:focus-visible,
+.subareaTabActive:focus-visible {
+  outline: none;
+  box-shadow: var(--lume-focus-ring);
+}
+
+@media (pointer: coarse) {
+  .subareaTab,
+  .toolChip,
+  .navItem {
+    min-height: 44px;
+  }
 }
