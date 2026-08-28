@@ -1650,11 +1650,18 @@ test('the trusted ACTIVE resolver retires exact expiry after leaving its lifecyc
     const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
     const cached = nodeRequire.cache[modulePath]; const ttl = process.env.MEDIFLOW_SESSION_TTL_MS; const originalNow = Date.now;
     let isolated: typeof import('./server-session') | undefined; let now = 1_000; let trigger = false; let nested = () => undefined;
+    let expiryClock: 'stable' | 'rollback' | 'throw' = 'stable'; let expiryClockReads = 0;
     const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
     process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
     try {
         process.env.MEDIFLOW_SESSION_TTL_MS = '10';
-        Date.now = () => { if (trigger) { trigger = false; nested(); } return now; };
+        Date.now = () => {
+            if (expiryClock !== 'stable' && ++expiryClockReads === 2) {
+                if (expiryClock === 'throw') throw new Error('synthetic expiry clock reread');
+                return 0;
+            }
+            if (trigger) { trigger = false; nested(); } return now;
+        };
         delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
         const activate = () => {
             const staged = isolated!.stageWebServerSession({ id: 'active-isolated', username: SYNTHETIC_USERNAME, role: 'clinician' });
@@ -1664,19 +1671,24 @@ test('the trusted ACTIVE resolver retires exact expiry after leaving its lifecyc
             const control = authControlApi().create(`f-${sessionId}`); control.begin('login', 'op', 'key', 'fp', 0);
             const ticket = control.prepareTicket(`f-${sessionId}`, 'op', BigInt(0), 'fp', sessionId, now); assert.ok(ticket);
             assert.equal(isolated!.activateArmedWebServerSession(port, ticket), true);
-            return sessionId;
+            return { sessionId, control };
         };
 
-        const expiredId = activate(); const exact = isolated.resolveActiveWebServerSession(expiredId); assert.ok(exact);
-        now = exact.expiresAt;
-        assert.equal(isolated.resolveActiveWebServerSession(expiredId), null);
-        now = exact.createdAt;
-        assert.equal(isolated.resolveActiveWebServerSession(expiredId), null, 'expiry observation terminally retires the exact P3 cell');
-        assert.equal(isolated.retireExpiredServerSession(expiredId).outcome, 'completed', 'lost cleanup receipt remains replay-stable');
-        assert.equal(isolated.getSession(expiredId), null);
+        for (const clock of ['rollback', 'throw'] as const) {
+            const expired = activate(); const exact = isolated.resolveActiveWebServerSession(expired.sessionId); assert.ok(exact);
+            const resource = isolated.mintActiveWebSessionResourcePort(exact); assert.ok(resource);
+            const use = isolated.beginActiveWebSessionResourceUse(resource); assert.ok(use);
+            now = exact.expiresAt; expiryClock = clock; expiryClockReads = 0;
+            assert.equal(isolated.resolveActiveWebServerSession(expired.sessionId), null); expiryClock = 'stable';
+            assert.equal(expiryClockReads, 1); assert.equal(expired.control.snapshot().active, false);
+            assert.equal(isolated.commitActiveWebSessionResourceUse(use), false);
+            assert.equal(isolated.releaseActiveWebSessionResourcePort(resource), false);
+            const receipt = isolated.retireExpiredServerSession(expired.sessionId); assert.equal(receipt.outcome, 'completed');
+            assert.equal(isolated.retireExpiredServerSession(expired.sessionId), receipt);
+        }
 
         for (const operation of ['delete', 'invalidate', 'clear'] as const) {
-            const sessionId = activate();
+            const { sessionId } = activate();
             nested = () => {
                 if (operation === 'delete') isolated!.deleteSession(sessionId);
                 else if (operation === 'invalidate') isolated!.invalidateSessionsForUser('active-isolated');
@@ -1689,7 +1701,7 @@ test('the trusted ACTIVE resolver retires exact expiry after leaving its lifecyc
         }
         await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
     } finally {
-        Date.now = originalNow; isolated?.clearAllSessions();
+        expiryClock = 'stable'; Date.now = originalNow; isolated?.clearAllSessions();
         if (ttl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = ttl;
         if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
     }
