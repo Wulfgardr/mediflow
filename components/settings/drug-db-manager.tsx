@@ -124,7 +124,7 @@ export default function DrugDbManager() {
                                 accept=".csv"
                                 onChange={handleFileUpload}
                                 disabled={!datasetVersion.trim() || !downloadedAt || !sourceUrl.trim()}
-                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/30 dark:file:text-indigo-300 transition-colors cursor-pointer"
+                                className="block w-full text-sm text-[color:var(--lume-ink)] file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/30 dark:file:text-indigo-300 transition-colors cursor-pointer"
                             />
                         </label>
                     </div>

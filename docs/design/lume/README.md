@@ -68,6 +68,8 @@ Gli studi in [mockups/](./mockups/) sono apribili nel browser e non hanno dipend
 | [lume-campi.html](./mockups/lume-campi.html) | Campi e densità dell'informazione. |
 | [lume-voce.html](./mockups/lume-voce.html) | Ruoli tipografici di Voce e Registro. |
 | [lume-impostazioni.html](./mockups/lume-impostazioni.html) | Applicazione del linguaggio alle impostazioni. |
+| [lume-un-fuoco-una-risposta.html](./mockups/lume-un-fuoco-una-risposta.html) | Studio di consolidamento web: testata unica, rail a 4 gruppi, delta prima dei conteggi, stati azionabili, palette ⌘K. |
+| [mini-sessione.html](./mockups/mini-sessione.html) | Studio della CLI headless «Mini»: sessione tipo con lease, provenance, diniego onesto e artefatti a scope chiuso. |
 
 ## CURRENT EVIDENCE: catture runtime
 

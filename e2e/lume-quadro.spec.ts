@@ -61,6 +61,13 @@ async function setRegister(page: Page, register: QuadroCase['register']): Promis
   }, register);
 }
 
+async function openPatientActionsMenu(lens: Locator): Promise<Locator> {
+  await lens.getByRole('button', { name: 'Altre azioni paziente', exact: true }).click();
+  const menu = lens.page().getByRole('menu', { name: 'Azioni paziente', exact: true });
+  await expect(menu).toBeVisible();
+  return menu;
+}
+
 async function openSyntheticQuadro(page: Page, quadroCase: QuadroCase): Promise<Locator> {
   await page.setViewportSize({ width: quadroCase.width, height: quadroCase.height });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
@@ -68,8 +75,9 @@ async function openSyntheticQuadro(page: Page, quadroCase: QuadroCase): Promise<
   await page.waitForLoadState('domcontentloaded');
   await setRegister(page, quadroCase.register);
   await page.getByRole('button', { name: /Pazienti/ }).click();
-  await expect(page.getByTestId('lume-patient-lens')).toBeVisible();
-  await page.getByRole('button', { name: 'Quadro', exact: true }).click();
+  const lens = page.getByTestId('lume-patient-lens');
+  await expect(lens).toBeVisible();
+  await (await openPatientActionsMenu(lens)).getByRole('menuitem', { name: 'Quadro', exact: true }).click();
   const quadro = page.getByTestId('lume-quadro');
   await expect(quadro).toBeVisible();
   return quadro;
@@ -181,30 +189,18 @@ async function assertReflowStack(quadro: Locator): Promise<void> {
   expect(sections[3].top).toBeGreaterThanOrEqual(sections[2].bottom - 1);
 }
 
-test('quadro live usa il paziente selezionato dal database sintetico', async ({ page }) => {
+test('la navigazione Quadro del paziente selezionato converge sulla Scheda', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const patient = await createLivePatientFixture(page);
 
   await page.goto(`/?area=incarico&paziente=${patient.id}`);
   const lens = page.getByTestId('lume-patient-lens');
   await expect(lens.getByRole('heading', { name: patient.name, level: 2 })).toBeVisible();
-  await lens.getByRole('button', { name: 'Quadro', exact: true }).click();
+  await (await openPatientActionsMenu(lens)).getByRole('menuitem', { name: 'Quadro', exact: true }).click();
 
-  const quadro = page.getByTestId('lume-quadro');
-  await expect(page.getByTestId('lume-frame-canvas')).toHaveAttribute('data-lume-context', 'scheda');
-  await expect(quadro.getByRole('heading', { name: patient.name, level: 1 })).toBeVisible();
-  await expect(quadro.getByRole('list', { name: 'Diagnosi', exact: true })).toContainText(
-    'QC00Controllo sintetico del Quadro',
-  );
-  await expect(quadro.getByTestId('lume-quadro-metric-value')).toHaveCount(4);
-  await expect(quadro.getByTestId('lume-quadro-metric-value').first()).not.toHaveText('in attesa');
-  await assertIbmPlexMono(quadro.getByTestId('lume-quadro-metric-value'), 'Valori metrici live');
-  await assertIbmPlexMono(quadro.getByTestId('lume-quadro-atom'), 'Atomi della testata live');
-  await assertSingleFocalShadow(page);
-  await expect(quadro.locator('[data-lume-action="primary"]')).toHaveAttribute(
-    'href',
-    `/patients/${patient.id}/modules`,
-  );
+  await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`));
+  await expect(page.getByTestId('lume-scheda-header')).toHaveCount(1);
+  await expect(page.getByTestId('lume-quadro')).toHaveCount(0);
 });
 
 for (const quadroCase of QUADRO_CASES) {

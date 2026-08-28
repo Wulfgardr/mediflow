@@ -21,10 +21,11 @@ const DIARY_CASES: DiaryCase[] = (['giorno', 'grafite'] as const).flatMap((regis
 );
 
 const FIXTURE_PREFIX = 'Diario Filo sintetico';
+const createdPatientIds: string[] = [];
 
 async function createPatient(page: Page): Promise<string> {
   const marker = Date.now().toString().slice(-8);
-  return page.evaluate(async ({ marker: suffix }) => {
+  const patientId = await page.evaluate(async ({ marker: suffix }) => {
     const response = await fetch('/api/patients', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -41,6 +42,46 @@ async function createPatient(page: Page): Promise<string> {
     if (!response.ok) throw new Error(`Creazione paziente diario fallita: ${response.status}`);
     return (await response.json() as { id: string }).id;
   }, { marker });
+  createdPatientIds.push(patientId);
+  return patientId;
+}
+
+/* @Codex The global diary lists non-deleted entries independently from the
+   patient list. Delete each synthetic entry before its patient so a serial
+   retry starts from the asserted zero-entry state. */
+async function cleanupCreatedPatients(page: Page): Promise<void> {
+  for (const patientId of createdPatientIds.splice(0).reverse()) {
+    const entriesResponse = await page.evaluate(async (id) => {
+      const response = await fetch(`/api/entries?patientId=${encodeURIComponent(id)}&includeDeleted=true`);
+      if (!response.ok) throw new Error(`Lettura cleanup diario fallita: ${response.status}`);
+      return await response.json() as Array<{ id: string; version: number; deletedAt?: string | null }>;
+    }, patientId);
+
+    for (const entry of entriesResponse.filter((candidate) => !candidate.deletedAt)) {
+      await page.evaluate(async (candidate) => {
+        const response = await fetch(`/api/entries/${encodeURIComponent(candidate.id)}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ version: candidate.version }),
+        });
+        if (!response.ok) throw new Error(`Cleanup voce diario fallito: ${response.status}`);
+      }, entry);
+    }
+
+    const patient = await page.evaluate(async (id) => {
+      const response = await fetch(`/api/patients/${encodeURIComponent(id)}`);
+      if (!response.ok) throw new Error(`Lettura cleanup paziente fallita: ${response.status}`);
+      return await response.json() as { version: number };
+    }, patientId);
+    await page.evaluate(async ({ id, version }) => {
+      const response = await fetch(`/api/patients/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version }),
+      });
+      if (!response.ok) throw new Error(`Cleanup paziente diario fallito: ${response.status}`);
+    }, { id: patientId, version: patient.version });
+  }
 }
 
 async function createEntry(
@@ -240,6 +281,10 @@ async function assertReflowStack(diary: Locator): Promise<void> {
 }
 
 test.describe.serial('Diario globale Lume', () => {
+  test.afterEach(async ({ page }) => {
+    await cleanupCreatedPatients(page);
+  });
+
   test('Filo assente con zero o una voce, unico con una sequenza reale', async ({ page }) => {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     await page.goto('/diary');
