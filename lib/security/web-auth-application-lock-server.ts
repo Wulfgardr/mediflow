@@ -69,8 +69,11 @@ function exactRecord(value: unknown, keys: readonly string[], prototype: object 
 }
 
 function exactBearer(cookie: unknown): string | null {
-    const record = exactRecord(cookie, ['name', 'value'], ObjectPrototype, false);
+    const record = exactRecord(cookie, ['name', 'value'], ObjectPrototype, false)
+        ?? exactRecord(cookie, ['name', 'value', 'path'], ObjectPrototype, false);
+    const path = record ? ObjectGetOwnPropertyDescriptor(record, 'path') : null;
     if (!record || record.name !== SESSION_COOKIE_NAME || typeof record.value !== 'string'
+        || (path && path.value !== '/')
         || !SESSION_ID.test(record.value)) return null;
     return record.value;
 }
