@@ -29,6 +29,7 @@ const ObjectFreeze = Object.freeze;
 const applyIntrinsic = Reflect.apply;
 const functionToString = Function.prototype.toString;
 const mapGet = Map.prototype.get;
+const mapHas = Map.prototype.has;
 const mapSet = Map.prototype.set;
 const mapDelete = Map.prototype.delete;
 const mapClear = Map.prototype.clear;
@@ -50,6 +51,10 @@ const isProxy = types.isProxy;
 
 function getMapValue<K, V>(registry: Map<K, V>, key: K): V | undefined {
     return applyIntrinsic(mapGet, registry, [key]);
+}
+
+function hasMapValue<K, V>(registry: Map<K, V>, key: K): boolean {
+    return applyIntrinsic(mapHas, registry, [key]);
 }
 
 function setMapValue<K, V>(registry: Map<K, V>, key: K, value: V): void {
@@ -1142,8 +1147,13 @@ export function resolveActiveWebServerSession(sessionId: unknown): ServerSession
         const now = DateNow();
         if (webSessionCellLifecyclePoisoned || armedWebSessionCellsById[sessionId] !== cell
             || cell.state !== 'ACTIVE' || cell.session !== session || session.id !== sessionId
-            || session.authChannel !== 'web' || session.expiresAt !== expiry
-            || getMapValue(sessions, sessionId)) return null;
+            || session.authChannel !== 'web' || session.expiresAt !== expiry) return null;
+        const finalVisibleSession = getMapValue(sessions, sessionId);
+        const finalVisibleSessionPresent = hasMapValue(sessions, sessionId);
+        if (webSessionCellLifecyclePoisoned || finalVisibleSession || finalVisibleSessionPresent
+            || armedWebSessionCellsById[sessionId] !== cell
+            || cell.state !== 'ACTIVE' || cell.session !== session || session.id !== sessionId
+            || session.authChannel !== 'web' || session.expiresAt !== expiry) return null;
         if (expiry <= now) {
             retireObservedExpiry = true;
             return null;
