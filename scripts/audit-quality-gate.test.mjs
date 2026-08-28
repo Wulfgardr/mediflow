@@ -78,6 +78,7 @@ test('main checks the four real writer contracts and rejects a mutated service',
     const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-audit-wiring-'));
     const requiredFiles = [
         ...gateSource.matchAll(/\broute:\s*'([^']+)'/g).map((match) => match[1]),
+        ...gateSource.matchAll(/\bownerFile:\s*'([^']+)'/g).map((match) => match[1]),
         'lib/security/audit-db.ts',
         'lib/security/audit.ts',
         'lib/siss-audit.ts',
@@ -347,9 +348,10 @@ export declare function writeAuditEvent(input: Record<string, unknown>): Promise
         .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')), []);
 }
 
-test('accepts the current inline logout and the exact service-owned delegated terminal audit', () => {
-    const inline = fs.readFileSync(path.join(process.cwd(), 'app/api/auth/logout/route.ts'), 'utf8');
-    assert.deepEqual(validateLogoutAuditModes({ spec: logoutSpec, routeSource: inline }), []);
+test('accepts the current exact service-owned delegated terminal audit', () => {
+    const route = fs.readFileSync(path.join(process.cwd(), 'app/api/auth/logout/route.ts'), 'utf8');
+    const service = fs.readFileSync(path.join(process.cwd(), 'lib/security/web-auth-logout-server.ts'), 'utf8');
+    assert.deepEqual(validateLogoutAuditModes({ spec: logoutSpec, routeSource: route, serviceSource: service }), []);
     assertLogoutSemanticClean(logoutRoute, logoutService);
     assert.deepEqual(validateLogoutAuditModes({ spec: logoutSpec, routeSource: logoutRoute, serviceSource: logoutService }), []);
 });
