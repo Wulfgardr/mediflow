@@ -23,8 +23,11 @@ function bootstrapDatabase(): void {
 bootstrapDatabase();
 const { POST: setup } = await import('../../app/api/auth/setup/route.ts');
 const { POST: login } = await import('../../app/api/auth/login/route.ts');
+const { dbServer } = await import('../db-server.ts');
+const { users } = await import('../schema.ts');
 const { listAuditEvents } = await import('./audit.ts');
 const { clearAllSessions, getSession } = await import('./server-session.ts');
+const { completeExactWebP3Logout } = await import('./web-auth-logout-server.ts');
 
 const USERNAME = 'synthetic-web-admin'; const PIN = '2468';
 const WRAPPED_KEY = 'synthetic-wrapped-key'; const SALT = 'synthetic-salt';
@@ -64,8 +67,18 @@ test('setup emits a web session despite forged native, paired, token, and cookie
         ambulatoryName: 'Synthetic Ambulatory',
     }));
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { success: true });
-    assert.equal(getSession(sessionId(response))?.authChannel, 'web');
+    const body = await response.json() as Record<string, unknown>;
+    assert.deepEqual(Object.keys(body).sort(), ['id', 'success']);
+    assert.equal(body.success, true);
+    assert.match(String(body.id), /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu);
+    assert.deepEqual(await dbServer.select({ id: users.id }).from(users).limit(1), [{ id: body.id }]);
+    const id = sessionId(response);
+    assert.equal(getSession(id), null);
+    const logout = await completeExactWebP3Logout(
+        { name: 'mediflow_session', value: id },
+        new Request('http://127.0.0.1/api/auth/logout', { method: 'POST' }),
+    );
+    assert.equal(logout.status, 204);
 });
 test('login delegates credentials, preserves its Web contract, and records Web authority', async () => {
     const response = await login(forgedRequest('/api/auth/login', { username: USERNAME, password: PIN }));
@@ -95,7 +108,10 @@ test('routes make Web authority literal, do not read source-surface, and retain 
     assert.match(loginSource, /beginWebAuthSession\('login'\)/u);
     assert.match(loginSource, /issueWebAuthSession\(attempt,\s*\{[\s\S]*?id:\s*user\.id[\s\S]*?\}\);/u);
     assert.doesNotMatch(loginSource, /createSession\(/u);
-    assert.match(setupSource, /createSession\([\s\S]*?'web',\s*\)/u);
+    assert.match(setupSource, /beginWebAuthSession\('setup'\)/u);
+    assert.match(setupSource, /issueWebAuthSession\(attempt,[\s\S]*?id:\s*userId[\s\S]*?\)/u);
+    assert.match(setupSource, /const session = issueWebAuthSession[\s\S]*?if \(!session\)[\s\S]*?response\.cookies\.set/u);
+    assert.doesNotMatch(setupSource, /createSession\(/u);
     assert.doesNotMatch(loginSource, /auditSourceSurfaceFromRequest|sourceSurface === 'native'/u);
     assert.doesNotMatch(setupSource, /auditSourceSurfaceFromRequest|sourceSurface === 'native'/u);
     assert.match(loginSource, /const session = issueWebAuthSession[\s\S]*?try\s*\{\s*await writeAuditEvent[\s\S]*?catch/u);
