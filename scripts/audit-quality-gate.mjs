@@ -22,7 +22,8 @@ const REQUIRED_ROUTE_AUDIT = [
                     handler: 'POST', serviceModule: '@/lib/security/web-auth-logout-server', serviceExport: 'completeExactWebP3Logout',
                     ownerFile: 'lib/security/web-auth-logout-server.ts', ownerName: 'completeExactWebP3Logout',
                     writerModule: './audit', writerExport: 'writeAuditEvent', hashExport: 'hashAuditRef',
-                    eventType: 'auth.logout', sourcesName: 'productionSources',
+                    retireModule: './server-session', retireExport: 'dispatchActiveWebServerSessionRetirement',
+                    eventType: 'auth.logout', sourcesName: 'productionSources', receiptValidator: 'completedReceipt',
                 },
             },
         }],
@@ -499,6 +500,49 @@ function directStatement(owner, node) {
     return current.parent === owner.body && ts.isStatement(current) ? current : null;
 }
 
+function isUnconditionalOwnerCall(owner, call) {
+    let child = call;
+    for (let parent = child.parent; parent && parent !== owner; child = parent, parent = parent.parent) {
+        if (ts.isFunctionLike(parent) || ts.isIfStatement(parent) || ts.isConditionalExpression(parent)
+            || ts.isIterationStatement(parent, false) || ts.isSwitchStatement(parent)) return false;
+        if (ts.isBinaryExpression(parent) && parent.operatorToken.kind !== ts.SyntaxKind.EqualsToken) return false;
+        if (!ts.isExpressionStatement(parent)) continue;
+        if (parent.parent === owner.body) return true;
+        return Boolean(ts.isBlock(parent.parent) && parent.parent.parent && ts.isTryStatement(parent.parent.parent)
+            && parent.parent.parent.tryBlock === parent.parent && parent.parent.parent.parent === owner.body);
+    }
+    return false;
+}
+
+function isExactCompletedReceiptValidator(sourceFile, checker, name) {
+    const validator = namedFunction(sourceFile, name);
+    const exactRecord = namedFunction(sourceFile, 'exactRecord');
+    if (!validator || !exactRecord || validator.parameters.length !== 1
+        || !ts.isIdentifier(validator.parameters[0].name) || validator.parameters[0].name.text !== 'value'
+        || validator.body?.statements.length !== 2) return null;
+    const [declarationStatement, returnStatement] = validator.body.statements;
+    const declaration = ts.isVariableStatement(declarationStatement)
+        && Boolean(declarationStatement.declarationList.flags & ts.NodeFlags.Const)
+        && declarationStatement.declarationList.declarations.length === 1
+        ? declarationStatement.declarationList.declarations[0] : null;
+    const initializer = declaration?.initializer && unwrap(declaration.initializer);
+    const returned = ts.isReturnStatement(returnStatement) && returnStatement.expression
+        ? unwrap(returnStatement.expression) : null;
+    const left = returned && ts.isBinaryExpression(returned) ? unwrap(returned.left) : null;
+    if (!declaration || !ts.isIdentifier(declaration.name) || declaration.name.text !== 'record'
+        || !initializer || !ts.isCallExpression(initializer) || !ts.isIdentifier(initializer.expression)
+        || checker.getSymbolAtLocation(initializer.expression) !== checker.getSymbolAtLocation(exactRecord.name)
+        || initializer.arguments.length !== 4 || initializer.arguments[0].getText(sourceFile) !== 'value'
+        || initializer.arguments[1].getText(sourceFile) !== "['outcome']"
+        || unwrap(initializer.arguments[2]).kind !== ts.SyntaxKind.NullKeyword
+        || unwrap(initializer.arguments[3]).kind !== ts.SyntaxKind.TrueKeyword
+        || !returned || !ts.isBinaryExpression(returned) || returned.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken
+        || !left || !ts.isPropertyAccessExpression(left) || !left.questionDotToken
+        || !ts.isIdentifier(left.expression) || left.expression.text !== 'record' || left.name.text !== 'outcome'
+        || !ts.isStringLiteral(unwrap(returned.right)) || unwrap(returned.right).text !== 'completed') return null;
+    return validator;
+}
+
 function exactPropertyAssignments(literal, allowedNames) {
     if (!literal || literal.properties.some((item) => !ts.isPropertyAssignment(item)
         || ts.isComputedPropertyName(item.name)
@@ -714,7 +758,9 @@ function auditLiteralSyntaxIsExactAndSafe(root) {
             && node.elements.some((item) => ts.isSpreadElement(item))) {
             safe = false;
             return;
-        } else if (ts.isPropertyAccessExpression(node) && forbidden.test(node.name.text)) {
+        } else if (ts.isPropertyAccessExpression(node)
+            && (forbidden.test(node.name.text)
+                || (ts.isIdentifier(node.expression) && node.expression.text === 'session' && node.name.text === 'id'))) {
             safe = false;
             return;
         } else if (ts.isElementAccessExpression(node)) {
@@ -724,6 +770,9 @@ function auditLiteralSyntaxIsExactAndSafe(root) {
                 return;
             }
         } else if (ts.isStringLiteral(node) && forbidden.test(node.text)) {
+            safe = false;
+            return;
+        } else if (ts.isIdentifier(node) && forbidden.test(node.text)) {
             safe = false;
             return;
         }
@@ -771,17 +820,21 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
     const writer = importedName(service.sourceFile, delegated.writerModule, delegated.writerExport);
     const hash = importedName(service.sourceFile, delegated.writerModule, delegated.hashExport);
     const writerBinding = importedBinding(service.sourceFile, service.checker, delegated.writerModule, delegated.writerExport);
+    const retireBinding = importedBinding(service.sourceFile, service.checker, delegated.retireModule, delegated.retireExport);
     const sourcesDeclaration = service.sourceFile.statements.flatMap((statement) => ts.isVariableStatement(statement)
         ? [...statement.declarationList.declarations] : []).find((declaration) =>
         ts.isIdentifier(declaration.name) && declaration.name.text === delegated.sourcesName);
     const sources = exactFrozenObjectLiteral(sourcesDeclaration?.initializer, service.sourceFile);
     const sourceProperties = exactPropertyAssignments(sources, ['resolve', 'retire', 'audit']);
+    const retireProperty = sourceProperties?.get('retire');
+    const retireInitializer = retireProperty?.initializer && unwrap(retireProperty.initializer);
     const auditProperty = sourceProperties?.get('audit');
     const auditOwner = auditProperty && ts.isFunctionLike(auditProperty.initializer) ? auditProperty.initializer : null;
     const sourcesAreConst = sourcesDeclaration && ts.isVariableDeclarationList(sourcesDeclaration.parent)
         && Boolean(sourcesDeclaration.parent.flags & ts.NodeFlags.Const);
     const ownerReturns = owner ? directReturnStatements(owner) : [];
-    if (!owner || !writer || !hash || !writerBinding || !sourcesAreConst || !sourceProperties || !auditOwner
+    if (!owner || !writer || !hash || !writerBinding || !retireBinding || !sourcesAreConst || !sourceProperties || !auditOwner
+        || !exactIdentifierBinding(service.checker, retireInitializer, retireBinding.symbol)
         || !exactNoStoreResponseFactory(service.sourceFile)) problems.push('delegated service writer or no-store response factory is missing, shadowed, or unreachable');
     if (!owner || !writer || !hash || !writerBinding || !auditOwner) return problems;
     if (localBindingExists(owner, 'empty') || ownerReturns.length === 0 || ownerReturns.some((statement) => !exactEmptyStatusReturn(statement))) {
@@ -820,15 +873,20 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
         : retireCalls[0]?.parent && ts.isBinaryExpression(retireCalls[0].parent)
             && retireCalls[0].parent.operatorToken.kind === ts.SyntaxKind.EqualsToken
             && ts.isIdentifier(retireCalls[0].parent.left) ? retireCalls[0].parent.left.text : null;
+    const receiptValidator = isExactCompletedReceiptValidator(
+        service.sourceFile, service.checker, delegated.receiptValidator,
+    );
+    const receiptValidatorSymbol = receiptValidator?.name && service.checker.getSymbolAtLocation(receiptValidator.name);
     const completedGuard = owner.body?.statements.find((statement) => ts.isIfStatement(statement)
         && ts.isPrefixUnaryExpression(unwrap(statement.expression))
         && unwrap(statement.expression).operator === ts.SyntaxKind.ExclamationToken
         && ts.isCallExpression(unwrap(statement.expression).operand)
-        && ts.isIdentifier(unwrap(statement.expression).operand.expression)
-        && unwrap(statement.expression).operand.expression.text === 'completedReceipt'
+        && exactIdentifierBinding(service.checker, unwrap(statement.expression).operand.expression, receiptValidatorSymbol)
         && exactArguments(unwrap(statement.expression).operand, [{ identifier: retirement ?? '' }])
         && alwaysTerminates(statement.thenStatement));
-    if (!completedGuard || !auditCall || retireCalls[0].getStart() > completedGuard.getStart()
+    if (!receiptValidator || localBindingExists(owner, delegated.receiptValidator)
+        || !completedGuard || !auditCall || !isUnconditionalOwnerCall(owner, retireCalls[0])
+        || !isUnconditionalOwnerCall(owner, auditCall) || retireCalls[0].getStart() > completedGuard.getStart()
         || completedGuard.getStart() > auditCall.getStart()) problems.push('completed retirement must be checked before audit');
     const terminal204 = ownerReturns.filter((statement) => {
         const expression = statement.expression && unwrap(statement.expression);
