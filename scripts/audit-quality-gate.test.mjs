@@ -337,6 +337,7 @@ test('rejects mixed, missing, unreachable, reordered, floating, and raw delegate
 });
 
 test('rejects delegated logout 204 bypasses, hidden writers, and ambiguous audit objects', () => {
+    const writerStatement = "        await writeAuditEvent({ eventType: 'auth.logout', subjectRef: hashAuditRef(sessionId) });";
     const mutations = [
         [logoutRoute.replace(
             '    const receipt = await completeExactWebP3Logout(request);',
@@ -379,6 +380,16 @@ test('rejects delegated logout 204 bypasses, hidden writers, and ambiguous audit
             "        await writeAuditEvent({ eventType: 'auth.logout'",
             "        return; await writeAuditEvent({ eventType: 'auth.logout'",
         )],
+        [logoutRoute, logoutService.replace(writerStatement,
+            "        if (_request.url.endsWith('/skip')) return;\n" + writerStatement)],
+        [logoutRoute, logoutService.replace(writerStatement,
+            "        if (_request.url.endsWith('/write')) " + writerStatement.trim())],
+        [logoutRoute, logoutService.replace(writerStatement,
+            "        await (_request.url.endsWith('/write') ? writeAuditEvent({ eventType: 'auth.logout', subjectRef: hashAuditRef(sessionId) }) : Promise.resolve());")],
+        [logoutRoute, logoutService.replace(writerStatement,
+            "        await (_request.url.endsWith('/write') && writeAuditEvent({ eventType: 'auth.logout', subjectRef: hashAuditRef(sessionId) }));")],
+        [logoutRoute, logoutService.replace(writerStatement,
+            "        try { await writeAuditEvent({ eventType: 'auth.logout', subjectRef: hashAuditRef(sessionId) }); } finally {}")],
         [logoutRoute, logoutService.replace(
             'subjectRef: hashAuditRef(sessionId)',
             "subjectRef: hashAuditRef(sessionId), redactedMetadata: { ...{ reasonCode: 'logout' } }",
