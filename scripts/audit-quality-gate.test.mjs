@@ -503,6 +503,10 @@ test('V5B rejects conditional retirement, forged authority, alternate writers, a
             'try { await sources.audit(session, sessionId, request); } catch {}',
             'try { await sources.audit(session, sessionId, request); } catch {} finally {}',
         )],
+        ['catch binding drift', logoutService.replace(
+            'try { await sources.audit(session, sessionId, request); } catch {}',
+            'try { await sources.audit(session, sessionId, request); } catch (error) {}',
+        )],
         ['deferred audit', logoutService.replace(
             'try { await sources.audit(session, sessionId, request); } catch {}',
             'queueMicrotask(async () => { try { await sources.audit(session, sessionId, request); } catch {} });',
