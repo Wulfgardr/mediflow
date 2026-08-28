@@ -26,9 +26,7 @@ const ObjectGetPrototypeOf = Object.getPrototypeOf;
 const ObjectPrototype = Object.prototype;
 const ReflectApply = Reflect.apply;
 const ReflectOwnKeys = Reflect.ownKeys;
-const PromiseConstructor = Promise;
 const PromisePrototype = Promise.prototype;
-const PromiseResolve = Promise.resolve;
 const PromiseThen = PromisePrototype.then;
 const TypesIsProxy = types.isProxy;
 const TypesIsPromise = types.isPromise;
@@ -74,14 +72,11 @@ function isNativePromise(value: unknown): value is Promise<unknown> {
     }
 }
 
-function discardPromise(value: unknown): void {
-    if (!isPromiseObject(value)) return;
+function discardNativePromise(value: Promise<unknown>): void {
     try {
-        const observed = ReflectApply(PromiseResolve, PromiseConstructor, [value]) as Promise<unknown>;
-        const settled = ReflectApply(PromiseThen, observed, [() => undefined, () => undefined]) as Promise<unknown>;
-        ReflectApply(PromiseThen, settled, [() => undefined, () => undefined]);
+        ReflectApply(PromiseThen, value, [() => undefined, () => undefined]);
     } catch {
-        // A hostile non-native Promise is denied; cleanup remains best effort and opaque.
+        // The already-validated native Promise remains fail-closed if observation fails.
     }
 }
 
@@ -205,10 +200,11 @@ export async function acquireAuthenticatedWebSessionProjectionOwnerContext(): Pr
         if (!ambientThenSafe()) return null;
 
         const cookiePromise = cookies();
-        if (!ambientThenSafe()) { discardPromise(cookiePromise); return null; }
-        if (!isNativePromise(cookiePromise)) { discardPromise(cookiePromise); return null; }
+        const nativeCookiePromise = isNativePromise(cookiePromise) ? cookiePromise : null;
+        if (!ambientThenSafe()) { if (nativeCookiePromise) discardNativePromise(nativeCookiePromise); return null; }
+        if (!nativeCookiePromise) return null;
 
-        const cookieStore = await cookiePromise;
+        const cookieStore = await nativeCookiePromise;
         if (!ambientThenSafe() || (typeof cookieStore !== 'object' && typeof cookieStore !== 'function') || cookieStore === null) return null;
 
         const cookieGet = (cookieStore as { get?: unknown }).get;
