@@ -16,6 +16,7 @@ import {
     clearAllSessions,
     cleanupRetiredWebServerSession,
     commitPreparedWebServerSession,
+    createNativeServerSession,
     createSession,
     deleteSession,
     dispatchActiveWebServerSessionRetirement,
@@ -31,10 +32,15 @@ import {
     peekSession,
     registerServerSessionResource,
     releaseActiveWebSessionResourcePort,
+    retireExpiredServerSession,
     retireActiveWebServerSession,
+    retireServerSessionForApplicationLock,
+    retireServerSessionForLogout,
+    retireServerSessionsForUser,
     resolveActiveWebServerSession,
     stageWebServerSession,
     tombstoneArmedWebServerSession,
+    type WebServerSessionRetirementCleanupReceipt,
 } from './server-session';
 
 const SYNTHETIC_USERNAME = `synthetic-${randomUUID()}`;
@@ -314,8 +320,8 @@ test('an armed Web session cell burns its prepared capability without exposing a
     } finally { cryptoModule.randomBytes = randomBytes; }
 });
 
-function armedControlActivation() {
-    const staged = stageWebServerSession({ id: 'atomic-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+function armedControlActivation(userId = 'atomic-user') {
+    const staged = stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' });
     const prepared = prepareStagedWebServerSession(staged); assert.ok(prepared);
     const sessionId = getPreparedWebServerSessionId(prepared); assert.ok(sessionId);
     const port = armPreparedWebServerSession(prepared); assert.ok(port);
@@ -437,8 +443,8 @@ test('ACTIVE resource mint denies expiry and lifecycle reentry without releasing
         if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
 });
 
-function activeResourceFixture() {
-    const active = armedControlActivation();
+function activeResourceFixture(userId = 'atomic-user') {
+    const active = armedControlActivation(userId);
     assert.equal(activateArmedWebServerSession(active.port, active.ticket), true);
     const session = resolveActiveWebServerSession(active.sessionId); assert.ok(session);
     const port = mintActiveWebSessionResourcePort(session); assert.ok(port);
@@ -591,6 +597,422 @@ test('dispatches one reason-bound ACTIVE retirement into a stable cleanup receip
     assert.equal(commitActiveWebSessionResourceUse(pendingUse), false);
     assert.equal(releaseActiveWebSessionResourcePort(active.port), false);
     assert.equal(resolveActiveWebServerSession(active.sessionId), null);
+});
+
+test('fixed-cause adapters retire one exact P3 session without accepting caller authority', () => {
+    const logout = activeResourceFixture();
+    const logoutReceipt = retireServerSessionForLogout(logout.sessionId);
+    assert.equal(logoutReceipt.outcome, 'completed');
+    assert.equal(retireServerSessionForLogout(logout.sessionId), logoutReceipt, 'lost response replays one receipt');
+    assert.equal(retireServerSessionForApplicationLock(logout.sessionId).outcome, 'denied');
+
+    const locked = activeResourceFixture();
+    assert.equal(retireServerSessionForApplicationLock(locked.sessionId).outcome, 'completed');
+    const expired = activeResourceFixture();
+    assert.equal(retireExpiredServerSession(expired.sessionId).outcome, 'failed');
+    assert.equal(resolveActiveWebServerSession(expired.sessionId), null, 'wrong expiry timing fails closed');
+});
+
+test('fixed-cause adapters preserve legacy Web and native cleanup while leaving system authority untouched', () => {
+    const events: string[] = [];
+    const logout = syntheticSession();
+    registerServerSessionResource(logout.id, (reason) => { events.push(`logout:${reason}`); });
+    const logoutReceipt = retireServerSessionForLogout(logout.id);
+    assert.equal(logoutReceipt.outcome, 'completed'); assert.equal(getSession(logout.id), null);
+
+    const locked = createNativeServerSession(
+        { id: 'native-lock', username: SYNTHETIC_USERNAME, role: 'clinician' },
+        { clientId: 'synthetic-client', clientPlatform: 'macos' },
+    );
+    registerServerSessionResource(locked.id, (reason) => { events.push(`lock:${reason}`); });
+    assert.equal(retireServerSessionForApplicationLock(locked.id).outcome, 'completed');
+    assert.equal(getSession(locked.id), null);
+
+    const expired = syntheticSession();
+    registerServerSessionResource(expired.id, (reason) => { events.push(`expired:${reason}`); });
+    expired.expiresAt = 0;
+    assert.equal(retireExpiredServerSession(expired.id).outcome, 'completed');
+    assert.equal(getSession(expired.id), null);
+
+    const live = syntheticSession();
+    assert.equal(retireExpiredServerSession(live.id).outcome, 'denied'); assert.equal(peekSession(live.id), live);
+    const system = createSession({ id: 'system', username: SYNTHETIC_USERNAME, role: 'system' }, 'system');
+    assert.equal(retireServerSessionForLogout(system.id).outcome, 'denied'); assert.equal(peekSession(system.id), system);
+    assert.deepEqual(events, ['logout:session_deleted', 'lock:application_locked', 'expired:session_expired']);
+    assert.equal(Object.getPrototypeOf(logoutReceipt), null); assert.equal(Object.isFrozen(logoutReceipt), true);
+    assert.deepEqual(Reflect.ownKeys(logoutReceipt), ['outcome']);
+});
+
+test('fixed-cause adapters deny hostile and cross-module IDs without observation or later work', async (t) => {
+    const active = activeResourceFixture(); let observed = 0;
+    const proxy = new Proxy(Object.create(null), {
+        get: () => { observed += 1; throw new Error('get'); },
+        ownKeys: () => { observed += 1; throw new Error('keys'); },
+    });
+    const accessor = Object.create(null);
+    Object.defineProperty(accessor, 'then', { get() { observed += 1; throw new Error('then'); } });
+    const rejected = Promise.reject(new Error('synthetic adapter input')); rejected.catch(() => undefined);
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    for (const value of [null, undefined, '', {}, proxy, accessor, Promise.resolve(), rejected, '__proto__']) {
+        assert.equal(retireServerSessionForLogout(value).outcome, 'denied');
+        assert.equal(retireServerSessionForApplicationLock(value).outcome, 'denied');
+        assert.equal(retireExpiredServerSession(value).outcome, 'denied');
+    }
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const cached = nodeRequire.cache[modulePath]; const originalThen = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+    try {
+        delete nodeRequire.cache[modulePath]; const restarted = nodeRequire(modulePath) as typeof import('./server-session');
+        assert.equal(restarted.retireServerSessionForLogout(active.sessionId).outcome, 'denied');
+        Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { observed += 1; throw new Error('ambient then'); } });
+        assert.equal(retireServerSessionForLogout(active.sessionId).outcome, 'completed');
+        restarted.clearAllSessions();
+    } finally {
+        if (originalThen) Object.defineProperty(Object.prototype, 'then', originalThen);
+        else delete (Object.prototype as { then?: unknown }).then;
+        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
+    }
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(observed, 0); assert.deepEqual(unhandled, []);
+    const paths = execFileSync('rg', ['-l', 'retireServerSessionForLogout|retireServerSessionForApplicationLock|retireExpiredServerSession', '-g', '*.ts', '.'], { encoding: 'utf8' })
+        .trim().split('\n').filter(Boolean).map((value) => value.replace(/^\.\//u, '')).sort();
+    assert.deepEqual(paths, ['lib/security/server-session.test.ts', 'lib/security/server-session.ts']);
+});
+
+test('fixed-cause P3 ownership wins over a colliding legacy Map entry and CAS drift stays terminal', async (t) => {
+    const drifted = activeResourceFixture();
+    assert.equal(drifted.control.retireTicket(drifted.ticket, 'delete'), 1);
+    const failed = retireServerSessionForLogout(drifted.sessionId);
+    assert.equal(failed.outcome, 'failed'); assert.equal(retireServerSessionForLogout(drifted.sessionId), failed);
+
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const cached = nodeRequire.cache[modulePath]; const originalGet = Map.prototype.get; const originalSet = Map.prototype.set;
+    let isolated: typeof import('./server-session') | undefined; let sessionId = ''; let collide = false;
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    Map.prototype.get = function (key: unknown) {
+        const prior = Reflect.apply(originalGet, this, [key]);
+        if (collide && key === sessionId) {
+            collide = false; Reflect.apply(originalSet, this, [key, Object.freeze({ id: sessionId })]);
+        }
+        return prior;
+    };
+    try {
+        delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
+        const staged = isolated.stageWebServerSession({ id: 'collision', username: SYNTHETIC_USERNAME, role: 'clinician' });
+        const prepared = isolated.prepareStagedWebServerSession(staged); assert.ok(prepared);
+        sessionId = isolated.getPreparedWebServerSessionId(prepared) ?? ''; const port = isolated.armPreparedWebServerSession(prepared); assert.ok(port);
+        const control = authControlApi().create('fixed-collision'); control.begin('login', 'op', 'key', 'fp', 0);
+        const ticket = control.prepareTicket('fixed-collision', 'op', BigInt(0), 'fp', sessionId, 1); assert.ok(ticket);
+        assert.equal(isolated.activateArmedWebServerSession(port, ticket), true);
+        const session = isolated.resolveActiveWebServerSession(sessionId); assert.ok(session);
+        collide = true; assert.equal(isolated.mintActiveWebSessionResourcePort(session), null);
+        assert.equal(isolated.retireServerSessionForLogout(sessionId).outcome, 'completed');
+        assert.ok(isolated.peekSession(sessionId), 'P3 dispatch never falls back to deleting the colliding Map entry');
+        await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
+    } finally {
+        collide = false; Map.prototype.get = originalGet; isolated?.clearAllSessions();
+        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
+    }
+});
+
+test('user-scoped retirement snapshots P3 targets before mutation and preserves legacy cleanup', () => {
+    const active = activeResourceFixture('bulk-user');
+    const retired = activeResourceFixture('bulk-user');
+    assert.equal(retireActiveWebServerSession(retired.sessionId, 'dispose'), true);
+    const other = activeResourceFixture('other-user');
+    const armedStaged = stageWebServerSession({ id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    assert.ok(armedStaged); const armedPrepared = prepareStagedWebServerSession(armedStaged); assert.ok(armedPrepared);
+    const armedSessionId = getPreparedWebServerSessionId(armedPrepared); assert.ok(armedSessionId);
+    const armedPort = armPreparedWebServerSession(armedPrepared); assert.ok(armedPort);
+    const armedControl = authControlApi().create('bulk-armed'); armedControl.begin('login', 'op', 'key', 'fp', 0);
+    const armedTicket = armedControl.prepareTicket('bulk-armed', 'op', BigInt(0), 'fp', armedSessionId, 1); assert.ok(armedTicket);
+    const staged = stageWebServerSession({ id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    assert.ok(staged);
+    const prepared = prepareStagedWebServerSession(stageWebServerSession({ id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' }));
+    assert.ok(prepared);
+    const legacy = createSession({ id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    const native = createNativeServerSession(
+        { id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' },
+        { clientId: 'bulk-client', clientPlatform: 'macos' },
+    );
+    const system = createSession({ id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'system' }, 'system');
+    const events: string[] = [];
+    registerServerSessionResource(legacy.id, (reason) => { events.push(`web:${reason}`); });
+    registerServerSessionResource(native.id, (reason) => { events.push(`native:${reason}`); });
+
+    const receipt = retireServerSessionsForUser('bulk-user');
+    assert.equal(receipt.outcome, 'completed');
+    assert.strictEqual(retireServerSessionsForUser('bulk-user'), receipt, 'lost response replay is stable');
+    assert.equal(resolveActiveWebServerSession(active.sessionId), null);
+    assert.equal(resolveActiveWebServerSession(retired.sessionId), null);
+    assert.equal(activateArmedWebServerSession(armedPort, armedTicket), false, 'retained ticket cannot resurrect armed authority');
+    assert.equal(getArmedWebServerSessionId(armedPort), null);
+    assert.equal(getSession(legacy.id), null); assert.equal(getSession(native.id), null);
+    assert.strictEqual(peekSession(system.id), system, 'system authority is outside the Web/native bulk');
+    assert.equal(abortStagedWebServerSession(staged), false);
+    assert.equal(getPreparedWebServerSessionId(prepared), null);
+    assert.deepEqual(events, ['web:session_deleted', 'native:session_deleted']);
+    assert.ok(resolveActiveWebServerSession(other.sessionId));
+    assert.equal(Object.getPrototypeOf(receipt), null); assert.equal(Object.isFrozen(receipt), true);
+    assert.deepEqual(Reflect.ownKeys(receipt), ['outcome']);
+});
+
+test('user-scoped retirement preserves P3 ownership over a colliding legacy Map entry', () => {
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const cached = nodeRequire.cache[modulePath]; const originalValues = Map.prototype.values; const originalSet = Map.prototype.set;
+    let isolated: typeof import('./server-session') | undefined; let sessionId = ''; let collide = false; let injected = false;
+    try {
+        Map.prototype.values = function () {
+            if (collide && !injected) {
+                injected = true;
+                Reflect.apply(originalSet, this, [sessionId, Object.freeze({
+                    id: sessionId, userId: 'collision-user', username: SYNTHETIC_USERNAME, role: 'clinician',
+                    authChannel: 'web', createdAt: 0, expiresAt: Date.now() + 60_000,
+                })]);
+            }
+            return Reflect.apply(originalValues, this, []);
+        };
+        delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
+        const staged = isolated.stageWebServerSession({ id: 'collision-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+        assert.ok(staged); const prepared = isolated.prepareStagedWebServerSession(staged); assert.ok(prepared);
+        sessionId = isolated.getPreparedWebServerSessionId(prepared) ?? ''; const port = isolated.armPreparedWebServerSession(prepared); assert.ok(port);
+        const control = authControlApi().create('bulk-collision'); control.begin('login', 'op', 'key', 'fp', 0);
+        const ticket = control.prepareTicket('bulk-collision', 'op', BigInt(0), 'fp', sessionId, 1); assert.ok(ticket);
+        assert.equal(isolated.activateArmedWebServerSession(port, ticket), true);
+        assert.ok(isolated.resolveActiveWebServerSession(sessionId));
+        collide = true;
+        assert.equal(isolated.retireServerSessionsForUser('collision-user').outcome, 'completed');
+        assert.equal(isolated.resolveActiveWebServerSession(sessionId), null);
+        assert.ok(isolated.peekSession(sessionId), 'P3 retirement must not fall back to the colliding Map entry');
+    } finally {
+        collide = false; Map.prototype.values = originalValues; isolated?.clearAllSessions();
+        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
+    }
+});
+
+test('user-scoped retirement attempts every target and aggregates the worst outcome', () => {
+    const failed = activeResourceFixture('bulk-failure');
+    const healthy = activeResourceFixture('bulk-failure');
+    assert.equal(failed.control.retireTicket(failed.ticket, 'delete'), 1);
+    const receipt = retireServerSessionsForUser('bulk-failure');
+    assert.equal(receipt.outcome, 'failed');
+    assert.equal(resolveActiveWebServerSession(healthy.sessionId), null, 'later target was attempted');
+    assert.equal(resolveActiveWebServerSession(failed.sessionId), null);
+
+    const throwing = createSession({ id: 'bulk-failure', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    const later = createSession({ id: 'bulk-failure', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    registerServerSessionResource(throwing.id, () => { throw new Error('synthetic cleanup failure'); });
+    const second = retireServerSessionsForUser('bulk-failure');
+    assert.equal(second.outcome, 'failed');
+    assert.equal(getSession(throwing.id), null); assert.equal(getSession(later.id), null);
+});
+
+test('user-scoped retirement resists hostile IDs and legacy list mutation', async (t) => {
+    const active = activeResourceFixture('hostile-user'); let observed = 0;
+    const proxy = new Proxy(Object.create(null), { get() { observed += 1; throw new Error('get'); }, ownKeys() { observed += 1; throw new Error('keys'); } });
+    const accessor = Object.create(null);
+    Object.defineProperty(accessor, 'then', { get() { observed += 1; throw new Error('then'); } });
+    const rejected = Promise.reject(new Error('synthetic rejected bulk input')); rejected.catch(() => undefined);
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    for (const value of [null, undefined, '', {}, Object.create(null), proxy, accessor, Promise.resolve(), rejected]) {
+        assert.equal(retireServerSessionsForUser(value).outcome, 'denied');
+    }
+    assert.equal(retireServerSessionsForUser('__proto__').outcome, 'completed');
+    const first = createSession({ id: 'mutation-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    const second = createSession({ id: 'mutation-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    let nestedOutcome: WebServerSessionRetirementCleanupReceipt['outcome'] | null = null;
+    registerServerSessionResource(first.id, () => { nestedOutcome = retireServerSessionsForUser('mutation-user').outcome; });
+    const outer = retireServerSessionsForUser('mutation-user');
+    assert.equal(outer.outcome, 'denied'); assert.equal(nestedOutcome, 'denied');
+    assert.equal(getSession(first.id), null); assert.equal(getSession(second.id), null);
+    assert.ok(resolveActiveWebServerSession(active.sessionId));
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { observed += 1; throw new Error('ambient then'); } });
+    try { assert.equal(retireServerSessionsForUser('missing-user').outcome, 'completed'); }
+    finally { delete (Object.prototype as { then?: unknown }).then; }
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(observed, 0); assert.deepEqual(unhandled, []);
+});
+
+test('user retirement turn fences same-user issuance while preserving system and cross-user authority', async (t) => {
+    const userId = 'retirement-turn-user';
+    const victim = createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' });
+    const staged = stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(staged);
+    const prepared = prepareStagedWebServerSession(stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' })); assert.ok(prepared);
+    const armed = armedControlActivation(userId); assert.ok(armed.port);
+    let nestedOutcome: WebServerSessionRetirementCleanupReceipt['outcome'] | null = null;
+    let webDenied = false; let nativeDenied = false; let stagedDenied = false; let preparedDenied = false; let armedDenied = false;
+    let otherSessionId: string | null = null; let systemSessionId: string | null = null;
+    let hostileReads = 0; let hostileDenied = false; let hostileStageDenied = false;
+    const hostileUser = Object.create(null);
+    Object.defineProperty(hostileUser, 'id', { enumerable: true, get() { hostileReads += 1; return userId; } });
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    registerServerSessionResource(victim.id, () => {
+        hostileStageDenied = stageWebServerSession(hostileUser as { id: string; username: string; role: string }) === null;
+        try { createSession(hostileUser as { id: string; username: string; role: string }); } catch { hostileDenied = true; }
+        try { createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }); } catch { webDenied = true; }
+        try { createNativeServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }, { clientId: 'turn-client', clientPlatform: 'ios' }); } catch { nativeDenied = true; }
+        nestedOutcome = retireServerSessionsForUser(userId).outcome;
+        stagedDenied = stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }) === null;
+        preparedDenied = prepareStagedWebServerSession(staged) === null && commitPreparedWebServerSession(prepared) === false;
+        armedDenied = activateArmedWebServerSession(armed.port, armed.ticket) === false;
+        otherSessionId = createSession({ id: 'retirement-turn-other', username: SYNTHETIC_USERNAME, role: 'clinician' }).id;
+        systemSessionId = createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'system' }, 'system').id;
+    });
+
+    const originalThen = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { throw new Error('ambient then'); } });
+    try {
+        const receipt = retireServerSessionsForUser(userId);
+        assert.equal(receipt.outcome, 'denied');
+        assert.equal(nestedOutcome, 'denied'); assert.equal(webDenied, true); assert.equal(nativeDenied, true);
+        assert.equal(hostileDenied, true); assert.equal(hostileStageDenied, true); assert.equal(hostileReads, 0);
+        assert.equal(stagedDenied, true); assert.equal(preparedDenied, true); assert.equal(armedDenied, true);
+        assert.equal(getSession(victim.id), null);
+        assert.ok(otherSessionId);
+        assert.equal(getSession(otherSessionId)?.userId, 'retirement-turn-other');
+        assert.ok(systemSessionId); assert.equal(getSession(systemSessionId)?.authChannel, 'system');
+        const retry = createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' });
+        assert.equal(getSession(retry.id), retry); deleteSession(retry.id);
+        const throwing = createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }); let throwingDenied = false;
+        registerServerSessionResource(throwing.id, () => {
+            try { createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }); } catch { throwingDenied = true; }
+            throw new Error('synthetic apply-then-throw');
+        });
+        assert.equal(retireServerSessionsForUser(userId).outcome, 'failed'); assert.equal(throwingDenied, true); assert.equal(getSession(throwing.id), null);
+        const retryAfterThrow = createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }); deleteSession(retryAfterThrow.id);
+    } finally {
+        if (originalThen) Object.defineProperty(Object.prototype, 'then', originalThen);
+        else delete (Object.prototype as { then?: unknown }).then;
+    }
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.deepEqual(unhandled, []);
+});
+
+test('publication rollback removes apply-then-throw authority and poisons the enclosing user turn', async (t) => {
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const cached = nodeRequire.cache[modulePath];
+    const originals = {
+        mapGet: Map.prototype.get, mapSet: Map.prototype.set,
+        weakSet: WeakMap.prototype.set, setAdd: Set.prototype.add,
+    };
+    let failMapSet = false; let failWeakSet = false; let failSetAdd = false;
+    let failMapGetKey: string | null = null; let capturedCapsule: object | null = null;
+    let capturedMapSession: { id: string } | null = null; let capturedNativeSession: { id: string } | null = null;
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    Map.prototype.get = function (key: unknown) {
+        const result = Reflect.apply(originals.mapGet, this, [key]);
+        if (key === failMapGetKey) { failMapGetKey = null; throw new Error('synthetic post-map-get failure'); }
+        return result;
+    };
+    Map.prototype.set = function (key: unknown, value: unknown) {
+        const result = Reflect.apply(originals.mapSet, this, [key, value]);
+        if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype
+            && typeof (value as { id?: unknown }).id === 'string') capturedMapSession = value as { id: string };
+        if (failMapSet) { failMapSet = false; throw new Error('synthetic post-map-set failure'); }
+        return result;
+    };
+    WeakMap.prototype.set = function (key: object, value: unknown) {
+        const result = Reflect.apply(originals.weakSet, this, [key, value]);
+        if (Object.getPrototypeOf(key) === null && Reflect.ownKeys(key).length === 0) capturedCapsule = key;
+        if (Object.getPrototypeOf(key) === Object.prototype && typeof (key as { id?: unknown }).id === 'string') {
+            capturedNativeSession = key as { id: string };
+        }
+        if (failWeakSet) { failWeakSet = false; throw new Error('synthetic post-weak-set failure'); }
+        return result;
+    };
+    Set.prototype.add = function (value: unknown) {
+        const result = Reflect.apply(originals.setAdd, this, [value]);
+        if (failSetAdd) { failSetAdd = false; throw new Error('synthetic post-set-add failure'); }
+        return result;
+    };
+    let isolated: typeof import('./server-session');
+    try { delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session'); }
+    finally {
+        Map.prototype.get = originals.mapGet; Map.prototype.set = originals.mapSet;
+        WeakMap.prototype.set = originals.weakSet; Set.prototype.add = originals.setAdd;
+    }
+
+    try {
+        failMapSet = true;
+        assert.throws(() => isolated.createSession({ id: 'rollback-web', username: SYNTHETIC_USERNAME, role: 'clinician' }));
+        const failedWebSession = capturedMapSession as { id: string } | null;
+        assert.equal(failMapSet, false); assert.ok(failedWebSession);
+        assert.equal(isolated.getSession(failedWebSession.id), null);
+
+        failWeakSet = true; capturedNativeSession = null;
+        assert.throws(() => isolated.createNativeServerSession(
+            { id: 'rollback-native', username: SYNTHETIC_USERNAME, role: 'clinician' },
+            { clientId: 'rollback-client', clientPlatform: 'ios' },
+        ));
+        const failedNativeSession = capturedNativeSession as { id: string } | null;
+        assert.equal(failWeakSet, false); assert.ok(failedNativeSession);
+        assert.equal(isolated.getSession(failedNativeSession.id), null);
+        assert.equal(isolated.isPairedNativeServerSession(failedNativeSession, { clientId: 'rollback-client', clientPlatform: 'ios' }), false);
+
+        const prepared = isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({
+            id: 'rollback-prepared', username: SYNTHETIC_USERNAME, role: 'clinician',
+        }));
+        assert.ok(prepared); const preparedId = isolated.getPreparedWebServerSessionId(prepared); assert.ok(preparedId);
+        failMapSet = true;
+        assert.equal(isolated.commitPreparedWebServerSession(prepared), false);
+        assert.equal(isolated.getSession(preparedId), null); assert.equal(isolated.commitPreparedWebServerSession(prepared), false);
+
+        failWeakSet = true; capturedCapsule = null;
+        assert.equal(isolated.stageWebServerSession({ id: 'rollback-stage-weak', username: SYNTHETIC_USERNAME, role: 'clinician' }), null);
+        assert.ok(capturedCapsule); assert.equal(isolated.prepareStagedWebServerSession(capturedCapsule), null);
+
+        failSetAdd = true; capturedCapsule = null;
+        assert.equal(isolated.stageWebServerSession({ id: 'rollback-stage-set', username: SYNTHETIC_USERNAME, role: 'clinician' }), null);
+        assert.ok(capturedCapsule); assert.equal(isolated.prepareStagedWebServerSession(capturedCapsule), null);
+
+        const turnUser = 'rollback-turn';
+        const victim = isolated.createSession({ id: turnUser, username: SYNTHETIC_USERNAME, role: 'clinician' });
+        const turnStaged = isolated.stageWebServerSession({ id: turnUser, username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(turnStaged);
+        const turnPrepared = isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({
+            id: turnUser, username: SYNTHETIC_USERNAME, role: 'clinician',
+        })); assert.ok(turnPrepared);
+        let nestedDenied = false; let nativeDenied = false; let stagedDenied = false;
+        isolated.registerServerSessionResource(victim.id, () => {
+            failMapGetKey = turnUser;
+            failMapSet = true;
+            try { isolated.createSession({ id: turnUser, username: SYNTHETIC_USERNAME, role: 'clinician' }); }
+            catch { nestedDenied = true; }
+            assert.equal(failMapSet, true, 'same-user Web issuance must deny before its captured Map.set');
+            failMapSet = false; failWeakSet = true;
+            try {
+                isolated.createNativeServerSession(
+                    { id: turnUser, username: SYNTHETIC_USERNAME, role: 'clinician' },
+                    { clientId: 'turn-client', clientPlatform: 'ios' },
+                );
+            } catch { nativeDenied = true; }
+            assert.equal(failWeakSet, true, 'same-user native issuance must deny before its captured WeakMap.set');
+            failWeakSet = false; failSetAdd = true;
+            stagedDenied = isolated.stageWebServerSession({ id: turnUser, username: SYNTHETIC_USERNAME, role: 'clinician' }) === null;
+            assert.equal(failSetAdd, true, 'same-user staging must deny before its captured Set.add');
+            failSetAdd = false;
+            assert.equal(isolated.commitPreparedWebServerSession(turnPrepared), false);
+        });
+        assert.equal(isolated.retireServerSessionsForUser(turnUser).outcome, 'denied');
+        assert.equal(nestedDenied, true); assert.equal(nativeDenied, true); assert.equal(stagedDenied, true);
+        assert.equal(failMapGetKey, turnUser);
+        assert.equal(isolated.prepareStagedWebServerSession(turnStaged), null);
+        assert.equal(isolated.commitPreparedWebServerSession(turnPrepared), false);
+        assert.equal(isolated.getSession(victim.id), null);
+
+        const other = isolated.createSession({ id: 'rollback-other', username: SYNTHETIC_USERNAME, role: 'clinician' });
+        const system = isolated.createSession({ id: turnUser, username: SYNTHETIC_USERNAME, role: 'system' }, 'system');
+        assert.strictEqual(isolated.getSession(other.id), other); assert.strictEqual(isolated.getSession(system.id), system);
+        const retry = isolated.createSession({ id: turnUser, username: SYNTHETIC_USERNAME, role: 'clinician' });
+        assert.strictEqual(isolated.getSession(retry.id), retry);
+        await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
+    } finally {
+        failMapGetKey = null; isolated.clearAllSessions();
+        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
+    }
 });
 
 test('dispatch reports failed after an uncommitted P2 retirement and scrubs B1/B2 state', () => {
