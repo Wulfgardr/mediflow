@@ -25,6 +25,7 @@ import {
     allowedGenericLoaderExpressions,
     inventoryModuleImports,
     moduleImportBypassFixtures,
+    reservedLoaderBindingFixtures,
     repositoryTypeScriptSources,
     unsafeLoaderIdentityFixtures,
 } from './module-import-inventory.test-support.ts';
@@ -706,7 +707,11 @@ test('keeps the current-binding predicate private until the server-session retai
     assert.deepEqual(validateControlImports({ 'scripts/benchmark-redaction.ts': benchmark }).errors, []);
     for (const fixture of unsafeLoaderIdentityFixtures('../lib/security/web-auth-control-record')) {
         const aliasErrors = validateControlImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
-        assert.ok(aliasErrors.includes('scripts/benchmark-redaction.ts:unsafe-loader:*'), fixture);
+        assert.ok(aliasErrors.includes('scripts/benchmark-redaction.ts:reserved-loader-identity:*'), fixture);
+    }
+    for (const fixture of reservedLoaderBindingFixtures) {
+        const bindingErrors = validateControlImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
+        assert.equal(bindingErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:reserved-loader-identity:*').length, 1, fixture);
     }
     assert.notDeepEqual(validateControlImports({ 'lib/security/web-auth-logout-server.ts': "import { createWebAuthControlRecord } from '../../lib/security/web-auth-control-record.ts';" }).errors, []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/extra.ts': "import { createWebAuthControlRecord } from './web-auth-control-record';" }).errors, []);

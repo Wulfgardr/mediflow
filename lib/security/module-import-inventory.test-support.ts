@@ -42,6 +42,8 @@ const allowedUnsafeLoaderExpressions: ReadonlySet<string> = new Set([
     fingerprint('lib/backup-restore-preflight.ts', 'unsafe:require', 'CallExpression', 'ReturnStatement', "require('./data-dir')"),
     fingerprint('lib/pdfjs-server.ts', 'unsafe:Function', 'NewExpression', 'VariableStatement', "new Function('specifier', 'return import(specifier);')"),
 ]);
+// Controller policy: these spellings are reserved loader identities even when a local binding shadows the global.
+const RESERVED_LOADER_IDENTITIES: ReadonlySet<string> = new Set(['eval', 'Function', 'require']);
 const normalizeIdentity = (value: string) => path.normalize(value).normalize('NFC').toLocaleLowerCase('en-US');
 const safeRealpath = (value: string) => {
     try { return realpathSync.native(value); } catch { return null; }
@@ -230,7 +232,8 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
     const declarationName = (node: ts.Identifier) => {
         const parent = node.parent;
         return ((ts.isVariableDeclaration(parent) || ts.isParameter(parent) || ts.isFunctionDeclaration(parent)
-            || ts.isFunctionExpression(parent) || ts.isClassDeclaration(parent) || ts.isBindingElement(parent)) && parent.name === node)
+            || ts.isFunctionExpression(parent) || ts.isClassDeclaration(parent) || ts.isBindingElement(parent)
+            || ts.isImportClause(parent) || ts.isImportSpecifier(parent) || ts.isNamespaceImport(parent)) && parent.name === node)
             || ((ts.isPropertyAssignment(parent) || ts.isMethodDeclaration(parent) || ts.isGetAccessorDeclaration(parent)
                 || ts.isSetAccessorDeclaration(parent)) && parent.name === node);
     };
@@ -243,26 +246,26 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
     const globalObject = (input: ts.Expression) => ts.isIdentifier(input) && ['global', 'globalThis', 'self', 'window'].includes(input.text);
     const unsafeIdentityVisit = (node: ts.Node): void => {
         if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && !node.questionDotToken
-            && ['eval', 'Function', 'require'].includes(node.expression.text)) {
+            && RESERVED_LOADER_IDENTITIES.has(node.expression.text)) {
             unsafeLoaderCandidates.push(unsafeLoaderFingerprint(node.expression.text, node));
         } else if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'Function') {
             unsafeLoaderCandidates.push(unsafeLoaderFingerprint('Function', node));
         }
         if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) && globalObject(node.expression)
-            && ['eval', 'Function', 'require'].includes(memberKey(node) ?? '')) add('unsafe-loader');
+            && RESERVED_LOADER_IDENTITIES.has(memberKey(node) ?? '')) add('reserved-loader-identity');
         if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer && globalObject(unwrap(node.initializer))) {
             for (const element of node.name.elements) {
                 const name = element.propertyName ?? element.name;
-                if (ts.isIdentifier(name) && ['eval', 'Function', 'require'].includes(name.text)) add('unsafe-loader');
+                if (ts.isIdentifier(name) && RESERVED_LOADER_IDENTITIES.has(name.text)) add('reserved-loader-identity');
             }
         }
-        if (ts.isIdentifier(node) && ['eval', 'Function', 'require'].includes(node.text) && !inTypePosition(node) && !declarationName(node)) {
+        if (ts.isIdentifier(node) && RESERVED_LOADER_IDENTITIES.has(node.text) && !inTypePosition(node) && !declarationName(node)) {
             const parent = node.parent; const directCall = ts.isCallExpression(parent) && parent.expression === node && !parent.questionDotToken;
             const directFunctionNew = node.text === 'Function' && ts.isNewExpression(parent) && parent.expression === node;
             const propertyName = (ts.isPropertyAccessExpression(parent) && parent.name === node)
                 || ((ts.isPropertyAssignment(parent) || ts.isMethodDeclaration(parent) || ts.isGetAccessorDeclaration(parent)
                     || ts.isSetAccessorDeclaration(parent)) && parent.name === node);
-            if (!directCall && !directFunctionNew && !propertyName && !safeFixedMember(node)) add('unsafe-loader');
+            if (!directCall && !directFunctionNew && !propertyName && !safeFixedMember(node)) add('reserved-loader-identity');
         }
         ts.forEachChild(node, unsafeIdentityVisit);
     };
@@ -294,10 +297,10 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
     const unsafeLoaderCounts = new Map<string, number>();
     for (const item of unsafeLoaderCandidates) unsafeLoaderCounts.set(item, (unsafeLoaderCounts.get(item) ?? 0) + 1);
     for (const item of unsafeLoaderCandidates) {
-        if (!allowedUnsafeLoaderExpressions.has(item) || unsafeLoaderCounts.get(item) !== 1) add('unsafe-loader');
+        if (!allowedUnsafeLoaderExpressions.has(item) || unsafeLoaderCounts.get(item) !== 1) add('reserved-loader-identity');
     }
     for (const allowed of allowedUnsafeLoaderExpressions) {
-        if (allowed.startsWith(`${file}|`) && unsafeLoaderCounts.get(allowed) !== 1) add(unsafeLoaderCounts.has(allowed) ? 'unsafe-loader-duplicate' : 'unsafe-loader-drift');
+        if (allowed.startsWith(`${file}|`) && unsafeLoaderCounts.get(allowed) !== 1) add(unsafeLoaderCounts.has(allowed) ? 'reserved-loader-allowlist-duplicate' : 'reserved-loader-allowlist-drift');
     }
     const counts = new Map<string, number>();
     for (const item of unresolved) counts.set(item.fingerprint, (counts.get(item.fingerprint) ?? 0) + 1);
@@ -343,4 +346,11 @@ export const unsafeLoaderIdentityFixtures = (specifier: string): readonly string
     "globalThis['ev'+'al']('1');", "const make=globalThis['Fun'+'ction'];", `globalThis['req'+'uire'](${JSON.stringify(specifier)});`,
     "eval?.('1');", `require?.(${JSON.stringify(specifier)});`, 'const run=require;', "eval('1');",
     "new Function('return 1');", `require(${JSON.stringify(`${specifier}-not-allowlisted`)});`,
+]);
+
+export const reservedLoaderBindingFixtures: readonly string[] = Object.freeze([
+    'const require=()=>undefined;require();',
+    'function invoke(Function:()=>void){Function();}',
+    "import require from './synthetic-safe';require();",
+    "import {synthetic as eval} from './synthetic-safe';eval();",
 ]);
