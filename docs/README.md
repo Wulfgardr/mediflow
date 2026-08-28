@@ -9,7 +9,7 @@ read_when:
 
 Questo file è il punto di ingresso unico: dove leggere, cosa aggiornare e quale documento prevale.
 
-Ultimo aggiornamento: 2026-08-22
+Ultimo aggiornamento: 2026-08-28
 
 ## 📚 Policy di consultazione (agent)
 
@@ -56,6 +56,7 @@ Approfondimenti utili:
 - Owner di sessione, selezione e lifetime del broker: [ADR 0096](./adr/0096-owner-sessione-selezione-e-lifetime-broker.md)
 - Autorita per la decisione terminale di review medica: [ADR 0098](./adr/0098-physician-terminal-review-authority.md)
 - Locator OCR e currentness della sorgente documentale: [ADR 0099](./adr/0099-ocr-document-locator-and-source-currentness.md)
+- Estrazione locale unica degli allegati con AnyDoc: [ADR 0107](./adr/0107-anydoc-local-attachment-extraction.md)
 - Closeout secondario dello stack intelligente: [docs/analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md](./analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md)
 - Triage audit esterno V2: [docs/analysis/2026-07-05-audit-esterno-v2-triage.md](./analysis/2026-07-05-audit-esterno-v2-triage.md)
 
@@ -117,6 +118,7 @@ Approfondimenti utili:
 | Owner di sessione, selezione e lifetime del broker | [docs/adr/0096-owner-sessione-selezione-e-lifetime-broker.md](./adr/0096-owner-sessione-selezione-e-lifetime-broker.md) | `CANONICAL / ACCEPTED` | Fissa una selezione canonica per sessione medica server, owner volatile e broker per lease senza autorizzare runtime. |
 | Autorita per la decisione terminale di review medica | [docs/adr/0098-physician-terminal-review-authority.md](./adr/0098-physician-terminal-review-authority.md) | `CANONICAL / PROPOSED` | Propone una capability locale stretta, con attestazione, gesto monouso e route non registrata fino a otto gate indipendenti. |
 | Locator OCR e currentness della sorgente documentale | [docs/adr/0099-ocr-document-locator-and-source-currentness.md](./adr/0099-ocr-document-locator-and-source-currentness.md) | `CANONICAL / ACCEPTED` | Accetta `documentSourceRef`, revision ed epoch monotoni, locator OCR volatile monouso e DAG O1a-O5 senza autorizzare runtime o apply. |
+| Estrazione locale unica degli allegati con AnyDoc | [docs/adr/0107-anydoc-local-attachment-extraction.md](./adr/0107-anydoc-local-attachment-extraction.md) | `CANONICAL / PROPOSED` | Propone AnyDoc come unica corsia automatica locale, disabilita i provider OCR e blocca scansioni e immagini senza produrre candidati. |
 | FAQ pubbliche | [docs/FAQ.md](./FAQ.md) | `SECONDARY` | Sintesi rapida per capire cosa fa oggi MediFlow, quali sono i boundary dichiarati e come orientarsi nel progetto. |
 | Roadmap terminologie/FSE | [docs/FSE2-terminology-roadmap.md](./FSE2-terminology-roadmap.md) | `CANONICAL` | Evoluzione codifiche cliniche e compliance documentale (coerente con ADR 0006). |
 | Matrice baseline ufficiale GTW/FSE | [docs/fse-gtw-baseline-alignment.md](./fse-gtw-baseline-alignment.md) | `CANONICAL` | Gap analysis versionata tra artifact ministeriali `it-fse-support` e stato reale MediFlow. |
