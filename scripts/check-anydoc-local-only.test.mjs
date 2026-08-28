@@ -49,6 +49,11 @@ test('dynamic, require, computed and template package loading fail', () => {
 test('hosted OCR, Firecrawl variables, native override and network use fail', () => {
     const forbiddenSources = [
         `${validWorker}\nconst options = { ocr: 'hosted' };`,
+        `${validWorker}\nconst ocr = 'hosted'; const options = { ocr };`,
+        `${validWorker}\nconst ocr = ['host', 'ed'].join(''); const options = { ocr };`,
+        `${validWorker}\nconst options = { get ocr() { return 'hosted'; } };`,
+        `${validWorker}\nconst options = { ocr() { return 'hosted'; } };`,
+        `${validWorker}\nconst options = JSON.parse('{"ocr":"hosted"}');`,
         `${validWorker}\nprocess.env.FIRECRAWL_API_KEY;`,
         `${validWorker}\nprocess.env.FIRECRAWL_API_URL;`,
         `${validWorker}\nprocess.env.NAPI_RS_NATIVE_LIBRARY_PATH;`,

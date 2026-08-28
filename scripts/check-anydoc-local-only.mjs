@@ -141,7 +141,7 @@ const ALLOWED_PROCESS_PROPERTIES = new Set(['stdin', 'stdout', 'exitCode']);
 const FORBIDDEN_WORKER_ROOTS = new Set([
     'Object', 'Reflect', 'Proxy', 'globalThis', 'global', 'window', 'self', 'console',
     'fetch', 'WebSocket', 'XMLHttpRequest', 'require', 'createRequire', 'module', 'exports',
-    'eval', 'Function', 'Deno', 'Bun', 'navigator', 'env',
+    'eval', 'Function', 'JSON', 'Deno', 'Bun', 'navigator', 'env',
     'FIRECRAWL_API_KEY', 'FIRECRAWL_API_URL', 'NAPI_RS_NATIVE_LIBRARY_PATH',
 ]);
 const FORBIDDEN_PROPERTIES = new Set(['constructor', '__proto__', 'prototype', 'getBuiltinModule', 'binding', 'mainModule', 'env']);
@@ -202,6 +202,13 @@ function analyzeSource(source, worker) {
             const name = propertyName(node.name, declarations);
             const value = constantString(node.initializer, declarations);
             if (name === 'ocr' && value === 'hosted') issues.add('hosted OCR option is forbidden');
+        }
+        if (worker && ts.isShorthandPropertyAssignment(node)) {
+            const value = constantString(node.name, declarations);
+            if (node.name.text === 'ocr' && value === 'hosted') issues.add('hosted OCR shorthand is forbidden');
+        }
+        if (worker && (ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node) || ts.isMethodDeclaration(node))) {
+            issues.add('accessor and method declarations are forbidden in the worker');
         }
         const constant = constantString(node, declarations);
         const isAcceptedImport = worker
