@@ -727,12 +727,14 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
     const event = auditProperties?.get('eventType');
     const subject = auditProperties?.get('subjectRef');
     const subjectValue = subject && unwrap(subject.initializer);
-    const writerStatement = writerCalls.direct[0]
-        && directAwaitedExpressionStatement(auditOwner, writerCalls.direct[0]);
+    const writerCall = writerCalls.direct[0];
+    const writerStatement = writerCall && directAwaitedExpressionStatement(auditOwner, writerCall);
+    const exactWriterCallee = writerCall && !writerCall.questionDotToken
+        && ts.isIdentifier(writerCall.expression) && writerCall.expression.text === writer;
     const auditStatements = ts.isBlock(auditOwner.body) ? [...auditOwner.body.statements] : [];
     if (localBindingExists(auditOwner, writer) || localBindingExists(auditOwner, hash)
-        || allWriterCalls.length !== 1 || writerCalls.all.length !== 1 || writerCalls.direct.length !== 1 || !isAwaited(writerCalls.direct[0])
-        || !writerStatement || auditStatements.length !== 1 || auditStatements[0] !== writerStatement
+        || allWriterCalls.length !== 1 || writerCalls.all.length !== 1 || writerCalls.direct.length !== 1 || !isAwaited(writerCall)
+        || !exactWriterCallee || !writerStatement || auditStatements.length !== 1 || auditStatements[0] !== writerStatement
         || !auditProperties || !event || !ts.isStringLiteral(event.initializer) || event.initializer.text !== delegated.eventType) {
         problems.push('delegated writer must await exactly one auth.logout event');
     }
