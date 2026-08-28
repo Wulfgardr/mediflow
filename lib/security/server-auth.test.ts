@@ -143,12 +143,35 @@ serialTest('unsafe pre-entry Object.prototype.then denies before cookies without
 
 serialTest('requires a same-realm native cookie Promise and consumes native rejection', { concurrency: false }, async () => {
     class CookiePromise<T> extends Promise<T> {}
-    const invalid: unknown[] = [new CookiePromise((resolve) => resolve(cookieStore)), new Proxy(Promise.resolve(cookieStore), {}), Object.create(Promise.prototype), { get then() { throw new Error('thenable read'); } }];
+    let subclassThenReads = 0; let foreignThenReads = 0; let proxyTraps = 0; let thenableReads = 0;
+    const subclass = new CookiePromise<never>((_, reject) => reject(new Error('synthetic subclass rejection')));
+    void Promise.prototype.then.call(subclass, undefined, () => undefined);
+    Object.defineProperty(subclass, 'then', { configurable: true, get() { subclassThenReads += 1; throw new Error('subclass then read'); } });
+    const foreign = runInNewContext(`(() => {
+        const promise = Promise.reject(new Error('synthetic foreign rejection'));
+        Promise.prototype.then.call(promise, undefined, () => undefined);
+        Object.defineProperty(promise, 'then', { configurable: true, get() { foreignThenRead(); throw new Error('foreign then read'); } });
+        return promise;
+    })()`, { foreignThenRead: () => { foreignThenReads += 1; } });
+    const proxyTarget = Promise.reject(new Error('synthetic proxy target rejection'));
+    void Promise.prototype.then.call(proxyTarget, undefined, () => undefined);
+    const proxy = new Proxy(proxyTarget, {
+        get() { proxyTraps += 1; throw new Error('proxy read'); },
+        getPrototypeOf() { proxyTraps += 1; throw new Error('proxy prototype'); },
+        ownKeys() { proxyTraps += 1; throw new Error('proxy keys'); },
+    });
+    const invalid: unknown[] = [subclass, foreign, proxy, Object.create(Promise.prototype), { get then() { thenableReads += 1; throw new Error('thenable read'); } }];
     for (const value of invalid) {
-        reset(); state.cookieResult = value; const result = await noUnhandled(acquire); assert.equal(result.value, null); assert.deepEqual(result.unhandled, []); assert.equal(state.cookieGetCalls, 0);
+        reset(); state.cookieResult = value; const result = await noUnhandled(acquire); assert.equal(result.value, null); assert.deepEqual(result.unhandled, []);
+        assert.deepEqual([state.cookieGetCalls, state.resolveCalls, state.acquireCalls], [0, 0, 0]);
     }
+    assert.deepEqual([subclassThenReads, foreignThenReads, proxyTraps, thenableReads], [0, 0, 0, 0]);
     reset(); state.cookieResult = Promise.reject(new Error('synthetic cookie failure')); const rejected = await noUnhandled(acquire);
     assert.equal(rejected.value, null); assert.deepEqual(rejected.unhandled, []); assert.equal(state.cookieGetCalls, 0);
+    reset(); state.cookieResult = Promise.reject(new Error('synthetic cleanup failure'));
+    state.onCookies = () => { Object.defineProperty(Object.prototype, 'then', { configurable: true, value: () => undefined, writable: true }); };
+    const cleanup = await noUnhandled(async () => { try { return await acquire(); } finally { restoreThen(); } });
+    assert.equal(cleanup.value, null); assert.deepEqual(cleanup.unhandled, []); assert.deepEqual([state.cookieGetCalls, state.resolveCalls, state.acquireCalls], [0, 0, 0]);
 });
 
 serialTest('fails closed for missing, expired, user-missing and database failure states', { concurrency: false }, async () => {
@@ -271,9 +294,9 @@ serialTest('uses captured construction intrinsics and keeps public requireSessio
     let thenReads = 0;
     const factories: Array<() => unknown> = [
         () => runInNewContext('Promise.resolve({})'),
-        () => runInNewContext('Promise.reject(new Error("synthetic rejection"))'),
+        () => runInNewContext('(() => { const promise = Promise.reject(new Error("synthetic rejection")); Promise.prototype.then.call(promise, undefined, () => undefined); return promise; })()'),
         () => new CookiePromise((resolve) => resolve(cookieStore)),
-        () => new CookiePromise((_, reject) => reject(new Error('synthetic subclass rejection'))),
+        () => { const promise = new CookiePromise((_, reject) => reject(new Error('synthetic subclass rejection'))); void Promise.prototype.then.call(promise, undefined, () => undefined); return promise; },
         () => new Proxy(Promise.resolve(cookieStore), {}),
         () => new Proxy(Promise.resolve(cookieStore), { get() { throw new Error('proxy read'); } }),
         () => Object.create(Promise.prototype),
