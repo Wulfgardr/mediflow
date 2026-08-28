@@ -1539,6 +1539,102 @@ export function retireServerSessionsForUser(userId: unknown): WebServerSessionRe
     }
 }
 
+/** Retires only one user's P3 Web authority and its uncommitted P3 Web work. */
+/* @Codex */
+export function retireWebP3SessionsForUser(userId: unknown): WebServerSessionRetirementCleanupReceipt {
+    if (typeof userId !== 'string' || !userId) return deniedWebSessionRetirementCleanupReceipt;
+    const turn = beginUserRetirementTurn(userId);
+    if (!turn) return deniedWebSessionRetirementCleanupReceipt;
+
+    const targets: Array<{
+        cell: ArmedWebSessionCellRecord;
+        sessionId: string;
+        state: 'ARMED_ACTIVATE' | 'ACTIVE' | 'RETIRED';
+        reason: WebServerSessionRetirementReason;
+    }> = [];
+
+    try {
+        // This registry contains only P3 cells. Do not enumerate the legacy session map here.
+        for (let record = armedWebSessionCellHead; record;) {
+            const next = record.next;
+            const isTarget = (record.state === 'ARMED_ACTIVATE' || record.state === 'ACTIVE' || record.state === 'RETIRED')
+                && armedWebSessionCellsById[record.sessionId] === record
+                && record.session.id === record.sessionId
+                && record.session.userId === userId
+                && record.session.authChannel === 'web';
+            if (isTarget) {
+                const reason = record.state === 'RETIRED' && record.retirementReason
+                    ? record.retirementReason
+                    : 'delete';
+                appendArrayValue(targets, { cell: record, sessionId: record.sessionId, state: record.state, reason });
+            }
+            record = next;
+        }
+
+        let outcome: WebServerSessionRetirementCleanupOutcome = 'completed';
+        for (let index = 0; index < targets.length; index += 1) {
+            const target = targets[index];
+            let receipt: WebServerSessionRetirementCleanupReceipt;
+            try {
+                const current = armedWebSessionCellsById[target.sessionId];
+                if (current !== target.cell || current.state !== target.state) {
+                    receipt = deniedWebSessionRetirementCleanupReceipt;
+                } else if (target.state === 'ARMED_ACTIVATE') {
+                    receipt = tombstoneArmedWebSessionCellRecord(current)
+                        ? completedWebSessionRetirementCleanupReceipt
+                        : deniedWebSessionRetirementCleanupReceipt;
+                } else {
+                    receipt = dispatchActiveWebServerSessionRetirement(target.sessionId, target.reason);
+                }
+            } catch {
+                receipt = failedWebSessionRetirementCleanupReceipt;
+            }
+            outcome = worseWebServerSessionRetirementOutcome(outcome, receipt.outcome);
+        }
+
+        try { revokeStagedWebSessionsForUser(userId); } catch { outcome = 'failed'; }
+        try { revokePreparedWebSessionsForUser(userId); } catch { outcome = 'failed'; }
+
+        // A same-user P3 authority that appears during cleanup keeps this invocation fail-closed.
+        for (let record = armedWebSessionCellHead; record; record = record.next) {
+            if ((record.state === 'ARMED_ACTIVATE' || record.state === 'ACTIVE')
+                && armedWebSessionCellsById[record.sessionId] === record
+                && record.session.id === record.sessionId && record.session.userId === userId
+                && record.session.authChannel === 'web') {
+                outcome = worseWebServerSessionRetirementOutcome(outcome, 'denied');
+                break;
+            }
+        }
+        const stagedIterator = applyIntrinsic(setValues, stagedWebSessions, []);
+        for (let next = nextSetIterator<StagedWebSessionRecord>(stagedIterator); !next.done;
+            next = nextSetIterator<StagedWebSessionRecord>(stagedIterator)) {
+            if (next.value.active && next.value.userId === userId) {
+                outcome = worseWebServerSessionRetirementOutcome(outcome, 'denied');
+                break;
+            }
+        }
+        const preparedIterator = mapValuesOf(preparedWebSessionReservations);
+        for (let next = nextMapIterator<PreparedWebSessionRecord>(preparedIterator); !next.done;
+            next = nextMapIterator<PreparedWebSessionRecord>(preparedIterator)) {
+            if (next.value.active && next.value.session.userId === userId) {
+                outcome = worseWebServerSessionRetirementOutcome(outcome, 'denied');
+                break;
+            }
+        }
+
+        const finalOutcome = turn.poisoned
+            ? worseWebServerSessionRetirementOutcome(outcome, 'denied')
+            : outcome;
+        return finalOutcome === 'failed'
+            ? failedWebSessionRetirementCleanupReceipt
+            : finalOutcome === 'denied'
+                ? deniedWebSessionRetirementCleanupReceipt
+                : completedWebSessionRetirementCleanupReceipt;
+    } finally {
+        endUserRetirementTurn(userId, turn);
+    }
+}
+
 /** Compacts one exact RETIRED Web cell into its terminal owner-private tombstone. */
 /* @Codex */
 export function cleanupRetiredWebServerSession(
