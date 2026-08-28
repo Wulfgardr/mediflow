@@ -682,6 +682,19 @@ test('inventories exact session imports by AST and closes the logout authority b
         'lib/security/server-session.test.ts': sessionSource.replace('const cryptoModule = nodeRequire', "nodeRequire('./server-session.ts'); const cryptoModule = nodeRequire"),
     }).errors;
     assert.ok(extraOwnReload.includes('lib/security/server-session.test.ts:reload-count'));
+    const protectedResolve = "nodeRequire.resolve('./server-session.ts')";
+    const protectedResolveDrift = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace(protectedResolve, `(nodeRequire.resolve)('./server-session.ts')`),
+    }).errors;
+    assert.ok(protectedResolveDrift.includes('lib/security/server-session.test.ts:protected-loader-allowlist-drift'));
+    const protectedResolveDuplicate = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace(`const modulePath = ${protectedResolve}`, `const duplicatePath = ${protectedResolve}; const modulePath = ${protectedResolve}`),
+    }).errors;
+    assert.ok(protectedResolveDuplicate.includes('lib/security/server-session.test.ts:protected-loader-allowlist-duplicate'));
+    const protectedCacheDuplicate = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace('const cached = nodeRequire.cache[modulePath]', 'const duplicateCached = nodeRequire.cache[modulePath]; const cached = nodeRequire.cache[modulePath]'),
+    }).errors;
+    assert.ok(protectedCacheDuplicate.includes('lib/security/server-session.test.ts:protected-loader-allowlist-duplicate'));
     const pm2 = typescriptSources()['lib/pm2-manager.ts']; assert.ok(pm2);
     assert.deepEqual(validateSessionImports({ 'lib/pm2-manager.ts': pm2 }).errors, []);
     assert.ok(validateSessionImports({ 'lib/pm2-manager.ts': pm2.replace("require('pm2')", "require('pm2-drift')") }).errors.includes('lib/pm2-manager.ts:reserved-loader-allowlist-drift'));
@@ -694,13 +707,17 @@ test('inventories exact session imports by AST and closes the logout authority b
 
 test('Node runtime resolves every inventory alias that the AST gate denies', () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'mediflow-session-inventory-runtime-'));
-    const target = path.join(directory, 'server-session.mjs'); const upper = path.join(directory, 'SERVER-SESSION.mjs'); const extension = path.join(directory, 'server-session.js');
+    const target = path.join(directory, 'server-session.mjs'); const commonjs = path.join(directory, 'server-session.cjs');
+    const upper = path.join(directory, 'SERVER-SESSION.mjs'); const extension = path.join(directory, 'server-session.js');
     try {
         writeFileSync(target, "export const marker='session-inventory-runtime';\n");
+        writeFileSync(commonjs, "module.exports={marker:'session-inventory-runtime'};\n");
         if (process.platform !== 'darwin') symlinkSync(target, upper);
         symlinkSync(target, extension);
         const canonical = pathToFileURL(target).href; const encoded = canonical.replace('server-session', '%73erver-session');
+        const metaUrl = ['import', 'meta', 'url'].join('.');
         const script = `
+            import {createRequire} from 'node:module';
             const expected='session-inventory-runtime';
             const verify=async(specifier)=>{const loaded=await import(specifier);if(loaded.marker!==expected)throw Error(specifier)};
             await verify(${JSON.stringify(`${canonical}?query=1`)});await verify(${JSON.stringify(`${canonical}#hash`)});
@@ -709,6 +726,8 @@ test('Node runtime resolves every inventory alias that the AST gate denies', () 
             await eval(${JSON.stringify(`import(${JSON.stringify(canonical)})`)}).then((loaded)=>{if(loaded.marker!==expected)throw Error('eval')});
             const generated=new Function(${JSON.stringify(`return import(${JSON.stringify(canonical)})`)});if((await generated()).marker!==expected)throw Error('Function');
             const load=(specifier)=>import(specifier);if((await load(${JSON.stringify(canonical)})).marker!==expected)throw Error('loader');
+            const nodeRequire=createRequire?.(${metaUrl});const required=nodeRequire(${JSON.stringify(commonjs)});if(required.marker!==expected)throw Error('optional-createRequire');
+            const resolved=nodeRequire.resolve(${JSON.stringify(commonjs)});if(nodeRequire.cache[resolved]?.exports.marker!==expected)throw Error('require-cache');
         `;
         execFileSync(process.execPath, ['--input-type=module', '--eval', script], { stdio: 'pipe' });
     } finally { rmSync(directory, { recursive: true, force: true }); }
