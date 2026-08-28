@@ -13,6 +13,7 @@ import {
     type LocalExtractionResult,
 } from './anydoc-local-extraction-contract';
 
+const WORKER_DIRECTORY = fileURLToPath(new URL('../../../scripts/', import.meta.url));
 const WORKER_PATH = fileURLToPath(new URL('../../../scripts/anydoc-local-extraction-worker.mjs', import.meta.url));
 const WORKER_TIMEOUT_MS = 15_000;
 const MAX_DIAGNOSTIC_BYTES = 16 * 1024;
@@ -40,6 +41,7 @@ function sourceEvidence(attachmentId: string, bytes: Buffer) {
 async function runWorker(bytes: Buffer): Promise<{ signal?: AnyDocLocalFailureSignal; markdown?: string }> {
     return await new Promise((resolve) => {
         const child = spawn(process.execPath, [WORKER_PATH], {
+            cwd: WORKER_DIRECTORY,
             env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
             stdio: ['pipe', 'pipe', 'pipe'],
             windowsHide: true,
@@ -84,7 +86,7 @@ async function runWorker(bytes: Buffer): Promise<{ signal?: AnyDocLocalFailureSi
 
 /** Converts one host-resolved byte snapshot without accepting caller-supplied digest, path, version, or parser options. */
 export async function extractAnyDocLocalBytes(attachmentId: unknown, input: unknown): Promise<LocalExtractionResult> {
-    if (!validAttachmentId(attachmentId) || !(input instanceof Uint8Array) || types.isProxy(input)) return deniedSource();
+    if (!validAttachmentId(attachmentId) || types.isProxy(input) || !(input instanceof Uint8Array)) return deniedSource();
     let bytes: Buffer;
     try { bytes = Buffer.from(input); } catch { return deniedSource(); }
     if (bytes.byteLength < 1 || bytes.byteLength > ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES) return deniedSource();

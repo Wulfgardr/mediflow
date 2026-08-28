@@ -1,11 +1,13 @@
 /* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { extractAnyDocLocalBytes } from './anydoc-local-extraction-runner';
 import { ANYDOC_LOCAL_EXTRACTION_MAX_MARKDOWN_BYTES, ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES } from './anydoc-local-extraction-contract';
 
 const SYNTHETIC_RTF = Buffer.from('{\\rtf1\\ansi Synthetic discharge note.}', 'utf8');
+const RUNNER_SOURCE = readFileSync(new URL('./anydoc-local-extraction-runner.ts', import.meta.url), 'utf8');
 
 test('binds successful extraction evidence to the exact copied source bytes', async () => {
     const result = await extractAnyDocLocalBytes('synthetic-attachment-rtf', SYNTHETIC_RTF);
@@ -52,6 +54,12 @@ test('does not inherit provider, native override or Node option variables', asyn
     }
 });
 
+test('pins child cwd to the owned worker directory without ambient input', () => {
+    assert.match(RUNNER_SOURCE, /const WORKER_DIRECTORY = fileURLToPath\(new URL\('\.\.\/\.\.\/\.\.\/scripts\/', import\.meta\.url\)\);/u);
+    assert.match(RUNNER_SOURCE, /cwd: WORKER_DIRECTORY,/u);
+    assert.doesNotMatch(RUNNER_SOURCE, /cwd:\s*(?:process\.cwd|process\.env)/u);
+});
+
 test('maps an unsupported byte snapshot to review-required without candidate output', async () => {
     const result = await extractAnyDocLocalBytes('synthetic-attachment-unsupported', Buffer.from([0, 1, 2, 3]));
 
@@ -80,6 +88,23 @@ test('denies proxy, empty, oversized and invalid attachment inputs without throw
         assert.equal(result.writes, 0);
         assert.equal(result.apply, 'none');
     }
+});
+
+test('denies a typed-array proxy before instanceof can invoke its prototype trap', async () => {
+    let prototypeTrapReads = 0;
+    const proxy = new Proxy(SYNTHETIC_RTF, {
+        getPrototypeOf() {
+            prototypeTrapReads += 1;
+            throw new Error('synthetic-prototype-trap');
+        },
+    });
+
+    let result: Awaited<ReturnType<typeof extractAnyDocLocalBytes>> | undefined;
+    await assert.doesNotReject(async () => { result = await extractAnyDocLocalBytes('synthetic-attachment-prototype-proxy', proxy); });
+    assert.ok(result);
+    assert.equal(result.status, 'denied');
+    if (result.status === 'denied') assert.equal(result.field, 'source');
+    assert.equal(prototypeTrapReads, 0);
 });
 
 test('fails closed when extracted Markdown crosses the output cap', async () => {
