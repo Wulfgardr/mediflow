@@ -15,48 +15,48 @@ export type LocalExtractionFailureDetail =
     | 'io_failure' | 'empty_extraction';
 
 export interface LocalAttachmentByteSource {
-    attachmentId: string;
-    sourceSha256: string;
-    byteLength: number;
+    readonly attachmentId: string;
+    readonly sourceSha256: string;
+    readonly byteLength: number;
 }
 export interface LocalExtractionReceipt {
-    receiptId: string;
-    parser: 'anydoc-local';
-    outcome: 'extracted' | `review_required:${LocalExtractionFailureDetail}`;
-    sourceSha256: string;
-    sourceByteLength: number;
-    markdownSha256?: string;
-    markdownByteLength: number;
+    readonly receiptId: string;
+    readonly parser: 'anydoc-local';
+    readonly outcome: 'extracted' | `review_required:${LocalExtractionFailureDetail}`;
+    readonly sourceSha256: string;
+    readonly sourceByteLength: number;
+    readonly markdownSha256?: string;
+    readonly markdownByteLength: number;
 }
 interface LocalExtractionBase {
-    schemaVersion: typeof ANYDOC_LOCAL_EXTRACTION_SCHEMA_VERSION;
-    provenance: LocalAttachmentByteSource;
-    receipt: LocalExtractionReceipt;
-    review: 'required';
-    writes: 0;
-    apply: 'none';
+    readonly schemaVersion: typeof ANYDOC_LOCAL_EXTRACTION_SCHEMA_VERSION;
+    readonly provenance: LocalAttachmentByteSource;
+    readonly receipt: LocalExtractionReceipt;
+    readonly review: 'required';
+    readonly writes: 0;
+    readonly apply: 'none';
 }
 export interface LocalExtractionSuccess extends LocalExtractionBase {
-    status: 'extracted';
-    markdown: string;
-    candidateUse: 'review_only';
+    readonly status: 'extracted';
+    readonly markdown: string;
+    readonly candidateUse: 'review_only';
 }
 export interface LocalExtractionFailure extends LocalExtractionBase {
-    status: 'review_required';
-    reason: 'unsupported_local_extraction';
-    detail: LocalExtractionFailureDetail;
-    markdown: '';
-    candidateUse: 'blocked';
+    readonly status: 'review_required';
+    readonly reason: 'unsupported_local_extraction';
+    readonly detail: LocalExtractionFailureDetail;
+    readonly markdown: '';
+    readonly candidateUse: 'blocked';
 }
 export interface LocalExtractionDenial {
-    schemaVersion: typeof ANYDOC_LOCAL_EXTRACTION_SCHEMA_VERSION;
-    status: 'denied';
-    reason: 'invalid_contract_input';
-    field: 'source' | 'signal' | 'markdown';
-    review: 'required';
-    writes: 0;
-    apply: 'none';
-    candidateUse: 'blocked';
+    readonly schemaVersion: typeof ANYDOC_LOCAL_EXTRACTION_SCHEMA_VERSION;
+    readonly status: 'denied';
+    readonly reason: 'invalid_contract_input';
+    readonly field: 'source' | 'signal' | 'markdown';
+    readonly review: 'required';
+    readonly writes: 0;
+    readonly apply: 'none';
+    readonly candidateUse: 'blocked';
 }
 export type LocalExtractionResult = LocalExtractionSuccess | LocalExtractionFailure | LocalExtractionDenial;
 
@@ -67,7 +67,7 @@ const DETAILS: Record<AnyDocLocalFailureSignal, LocalExtractionFailureDetail> = 
 const SOURCE_KEYS = ['attachmentId', 'sourceSha256', 'byteLength'] as const;
 
 function deny(field: LocalExtractionDenial['field']): LocalExtractionDenial {
-    return { schemaVersion: ANYDOC_LOCAL_EXTRACTION_SCHEMA_VERSION, status: 'denied', reason: 'invalid_contract_input', field, review: 'required', writes: 0, apply: 'none', candidateUse: 'blocked' };
+    return Object.freeze({ schemaVersion: ANYDOC_LOCAL_EXTRACTION_SCHEMA_VERSION, status: 'denied', reason: 'invalid_contract_input', field, review: 'required', writes: 0, apply: 'none', candidateUse: 'blocked' });
 }
 function canonicalSource(value: unknown): LocalAttachmentByteSource | undefined {
     if (typeof value !== 'object' || value === null || types.isProxy(value)) return undefined;
@@ -85,7 +85,7 @@ function canonicalSource(value: unknown): LocalAttachmentByteSource | undefined 
     if (typeof attachmentId !== 'string' || attachmentId.length < 1 || attachmentId.length > 200) return undefined;
     if (typeof sourceSha256 !== 'string' || !/^[a-f0-9]{64}$/u.test(sourceSha256)) return undefined;
     if (!Number.isSafeInteger(byteLength) || byteLength < 1 || byteLength > ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES) return undefined;
-    return { attachmentId, sourceSha256, byteLength };
+    return Object.freeze({ attachmentId, sourceSha256, byteLength });
 }
 function sha256(value: string): string { return createHash('sha256').update(value).digest('hex'); }
 function minimize(markdown: string): string {
@@ -94,14 +94,14 @@ function minimize(markdown: string): string {
 function receipt(source: LocalAttachmentByteSource, outcome: LocalExtractionReceipt['outcome'], markdown = ''): LocalExtractionReceipt {
     const markdownSha256 = markdown ? sha256(markdown) : undefined;
     const markdownByteLength = Buffer.byteLength(markdown, 'utf8');
-    return {
+    return Object.freeze({
         receiptId: sha256([ANYDOC_LOCAL_EXTRACTION_SCHEMA_VERSION, outcome, source.attachmentId, source.sourceSha256, source.byteLength, markdownSha256 ?? 'no-markdown'].join('|')),
         parser: 'anydoc-local', outcome, sourceSha256: source.sourceSha256, sourceByteLength: source.byteLength,
         ...(markdownSha256 ? { markdownSha256 } : {}), markdownByteLength,
-    };
+    });
 }
 function failure(source: LocalAttachmentByteSource, detail: LocalExtractionFailureDetail): LocalExtractionFailure {
-    return { schemaVersion: ANYDOC_LOCAL_EXTRACTION_SCHEMA_VERSION, provenance: source, receipt: receipt(source, `review_required:${detail}`), review: 'required', writes: 0, apply: 'none', status: 'review_required', reason: 'unsupported_local_extraction', detail, markdown: '', candidateUse: 'blocked' };
+    return Object.freeze({ schemaVersion: ANYDOC_LOCAL_EXTRACTION_SCHEMA_VERSION, provenance: source, receipt: receipt(source, `review_required:${detail}`), review: 'required', writes: 0, apply: 'none', status: 'review_required', reason: 'unsupported_local_extraction', detail, markdown: '', candidateUse: 'blocked' });
 }
 
 export function mapAnyDocLocalFailure(sourceInput: unknown, signal: unknown): LocalExtractionFailure | LocalExtractionDenial {
@@ -116,5 +116,5 @@ export function buildAnyDocLocalExtraction(sourceInput: unknown, markdownInput: 
     if (typeof markdownInput !== 'string' || Buffer.byteLength(markdownInput, 'utf8') > ANYDOC_LOCAL_EXTRACTION_MAX_MARKDOWN_BYTES) return deny('markdown');
     const markdown = minimize(markdownInput);
     if (!markdown) return failure(source, 'empty_extraction');
-    return { schemaVersion: ANYDOC_LOCAL_EXTRACTION_SCHEMA_VERSION, provenance: source, receipt: receipt(source, 'extracted', markdown), review: 'required', writes: 0, apply: 'none', status: 'extracted', markdown, candidateUse: 'review_only' };
+    return Object.freeze({ schemaVersion: ANYDOC_LOCAL_EXTRACTION_SCHEMA_VERSION, provenance: source, receipt: receipt(source, 'extracted', markdown), review: 'required', writes: 0, apply: 'none', status: 'extracted', markdown, candidateUse: 'review_only' });
 }
