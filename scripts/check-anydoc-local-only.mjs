@@ -197,6 +197,7 @@ function analyzeSource(source, worker) {
         }
         if (worker && (ts.isElementAccessExpression(node) || ts.isComputedPropertyName(node))) issues.add('computed property access is forbidden');
         if (worker && ts.isPropertyAccessExpression(node) && FORBIDDEN_PROPERTIES.has(node.name.text)) issues.add(`${node.name.text} property is forbidden`);
+        if (worker && ts.isPropertyAccessExpression(node) && node.name.text === 'ocr') issues.add('ocr property access and assignment are forbidden');
         if (worker && ts.isMetaProperty(node)) issues.add('import.meta is forbidden');
         if (worker && ts.isPropertyAssignment(node)) {
             const name = propertyName(node.name, declarations);
@@ -209,6 +210,9 @@ function analyzeSource(source, worker) {
         }
         if (worker && (ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node) || ts.isMethodDeclaration(node))) {
             issues.add('accessor and method declarations are forbidden in the worker');
+        }
+        if (worker && ts.isPropertyDeclaration(node) && propertyName(node.name, declarations) === 'ocr') {
+            issues.add('ocr class property is forbidden');
         }
         const constant = constantString(node, declarations);
         const isAcceptedImport = worker
