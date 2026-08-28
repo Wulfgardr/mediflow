@@ -2,11 +2,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import path, { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
+import ts from 'typescript';
 
 import {
     abortPreparedAuthControlTicket,
@@ -21,6 +22,62 @@ import {
     prepareAuthControlRetirement,
     retireAuthControlTicket,
 } from './web-auth-control-record.ts';
+
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+type ControlImport = Readonly<{ file: string; form: string; symbol: string; typeOnly: boolean }>;
+const controlImports = (file: string, source: string): ControlImport[] => {
+    const result: ControlImport[] = []; const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+    const target = path.join(ROOT, 'lib/security/web-auth-control-record');
+    const matches = (node: ts.Expression | undefined) => ts.isStringLiteral(node ?? ast) && path.resolve(
+        path.dirname(path.join(ROOT, file)), (node as ts.StringLiteral).text.startsWith('@/')
+            ? path.relative(path.dirname(path.join(ROOT, file)), path.join(ROOT, (node as ts.StringLiteral).text.slice(2)))
+            : (node as ts.StringLiteral).text,
+    ).replace(/\.(?:[cm]?[jt]sx?)$/u, '') === target;
+    const add = (form: string, symbol: string, typeOnly = false) => result.push({ file, form, symbol, typeOnly });
+    const visit = (node: ts.Node): void => {
+        if (ts.isImportDeclaration(node) && matches(node.moduleSpecifier)) {
+            const clause = node.importClause;
+            if (!clause) add('side-effect', '*');
+            else {
+                if (clause.name) add('default', 'default', clause.isTypeOnly);
+                if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings)) add('namespace', '*', clause.isTypeOnly);
+                if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) for (const item of clause.namedBindings.elements) add('named', item.propertyName?.text ?? item.name.text, clause.isTypeOnly || item.isTypeOnly);
+            }
+        } else if (ts.isExportDeclaration(node) && matches(node.moduleSpecifier)) add('re-export', '*', node.isTypeOnly);
+        else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference) && matches(node.moduleReference.expression)) add('require', node.name.text, node.isTypeOnly);
+        else if (ts.isCallExpression(node) && node.arguments.length === 1 && matches(node.arguments[0])) {
+            if (node.expression.kind === ts.SyntaxKind.ImportKeyword) add('dynamic', '*');
+            else if (ts.isIdentifier(node.expression) && node.expression.text === 'require') add('require', '*');
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(ast); return result;
+};
+const validateControlImports = (sources: Readonly<Record<string, string>>) => {
+    const uses = Object.entries(sources).flatMap(([file, source]) => controlImports(file, source)); const errors: string[] = [];
+    const production = new Map([
+        ['lib/security/server-session.ts', new Set(['abortPreparedAuthControlActivation', 'abortPreparedAuthControlRetirement', 'commitPreparedAuthControlActivation', 'commitPreparedAuthControlRetirement', 'prepareAuthControlActivation', 'prepareAuthControlRetirement'])],
+        ['lib/security/web-auth-control-owner.ts', new Set(['abortPreparedAuthControlTicket', 'createWebAuthControlRecord', 'AuthControlTicket'])],
+    ]);
+    for (const use of uses) {
+        if (use.form !== 'named') errors.push(`${use.file}:${use.form}`);
+        if (use.file.endsWith('.test.ts')) continue;
+        const allowed = production.get(use.file);
+        if (!allowed || use.form !== 'named' || !allowed.has(use.symbol)) errors.push(`${use.file}:${use.form}:${use.symbol}`);
+    }
+    const logout = uses.filter((use) => use.file === 'lib/security/web-auth-logout-server.test.ts' && !use.typeOnly);
+    if ('lib/security/web-auth-logout-server.test.ts' in sources
+        && (logout.length !== 1 || logout[0]?.form !== 'named' || logout[0]?.symbol !== 'createWebAuthControlRecord')) errors.push('logout-test:fixture');
+    return { errors, uses };
+};
+let repositorySourceCache: Record<string, string> | undefined;
+const controlSourceFiles = (directory: string): string[] => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const absolute = path.join(directory, entry.name);
+    if (entry.isDirectory() && !['.git', '.next', 'node_modules'].includes(entry.name)) return controlSourceFiles(absolute);
+    return entry.isFile() && /\.[cm]?tsx?$/u.test(entry.name) ? [absolute] : [];
+});
+const repositoryTypeScript = () => repositorySourceCache ??= Object.fromEntries(controlSourceFiles(ROOT)
+    .flatMap((absolute) => { const source = readFileSync(absolute, 'utf8'); return source.includes('web-auth-control-record') ? [[path.relative(ROOT, absolute), source]] : []; }));
 
 const MAX = BigInt('18446744073709551615');
 function control(fence = 'f0', generation = BigInt(0)) {
@@ -632,8 +689,23 @@ test('keeps current-binding lookup read-only through captured intrinsic poison a
 });
 
 test('keeps the current-binding predicate private until the server-session retained-ticket packet', () => {
-    const paths = execFileSync('rg', ['-l', 'isCurrentAuthControlSessionBinding', '-g', '*.ts', '.'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map((path) => path.replace(/^\.\//u, ''));
-    assert.deepEqual(paths.sort(), ['lib/security/web-auth-control-record.test.ts', 'lib/security/web-auth-control-record.ts']);
+    assert.deepEqual(validateControlImports(repositoryTypeScript()).errors, []);
+    const positive = validateControlImports({
+        'lib/security/web-auth-logout-server.test.ts': "import { createWebAuthControlRecord as fixture } from '@/lib/security/web-auth-control-record.js';",
+        'lib/security/literal.ts': "// import control from './web-auth-control-record'; const value = 'createWebAuthControlRecord'; const regex = /commitAuthControlTicket/u;",
+    });
+    assert.deepEqual(positive.errors, []); assert.equal(positive.uses[0]?.symbol, 'createWebAuthControlRecord');
+    const rejected = [
+        "import { commitAuthControlTicket as createWebAuthControlRecord } from './web-auth-control-record';",
+        "import control from './web-auth-control-record';",
+        "import * as control from './web-auth-control-record';",
+        "export { createWebAuthControlRecord } from './web-auth-control-record';",
+        ['const control = req', "uire('./web-auth-control-record');"].join(''),
+        "const control = await import('./web-auth-control-record');",
+    ];
+    for (const source of rejected) assert.notDeepEqual(validateControlImports({ 'lib/security/web-auth-logout-server.test.ts': source }).errors, []);
+    assert.notDeepEqual(validateControlImports({ 'lib/security/web-auth-logout-server.ts': "import { createWebAuthControlRecord } from '../../lib/security/web-auth-control-record.ts';" }).errors, []);
+    assert.notDeepEqual(validateControlImports({ 'lib/security/extra.ts': "import { createWebAuthControlRecord } from './web-auth-control-record';" }).errors, []);
     const source = readFileSync(fileURLToPath(new URL('./web-auth-control-record.ts', import.meta.url)), 'utf8');
     const start = source.indexOf('export function isCurrentAuthControlSessionBinding');
     const body = source.slice(start, source.indexOf('/** Resolves one active ticket', start));
@@ -798,10 +870,7 @@ test('denies stale, expired, wrapped, restarted, and hostile tickets without obs
 });
 
 test('keeps the ticket module private to its canonical future server-session importer', () => {
-    const paths = execFileSync('rg', ['-l', 'web-auth-control-record|prepareAuthControlTicket|commitAuthControlTicket|retireAuthControlTicket', '-g', '*.ts', '.'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map((path) => path.replace(/^\.\//u, ''));
-    assert.equal(paths.includes('lib/security/web-auth-control-record.test.ts'), true);
-    assert.equal(paths.includes('lib/security/web-auth-control-record.ts'), true);
-    assert.equal(paths.every((path) => path === 'lib/security/server-session.ts' || path === 'lib/security/web-auth-control-owner.ts' || path === 'lib/security/web-auth-control-owner.test.ts' || path.endsWith('web-auth-control-record.ts') || path.endsWith('web-auth-control-record.test.ts')), true);
+    assert.deepEqual(validateControlImports(repositoryTypeScript()).errors, []);
 });
 
 test('entropy collision and same-record reentry deny before ticket publication and permit a clean retry', async () => {

@@ -1,11 +1,12 @@
 /* @Codex */
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, test } from 'node:test';
+import ts from 'typescript';
 
 import {
     abortActiveWebSessionResourceUse,
@@ -48,6 +49,76 @@ const SYNTHETIC_USERNAME = `synthetic-${randomUUID()}`;
 const TARGET_USERNAME = ['synthetic', 'target'].join('-');
 const OTHER_USERNAME = ['synthetic', 'other'].join('-');
 const AUTH_CONTROL_MODULE_PATH = ['./web-auth-control', '-record.ts'].join('');
+const REPOSITORY_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+
+type ImportUse = Readonly<{ file: string; form: string; symbol: string; typeOnly: boolean }>;
+const moduleKey = (file: string, specifier: string) => {
+    const absolute = specifier.startsWith('@/')
+        ? path.join(REPOSITORY_ROOT, specifier.slice(2))
+        : path.resolve(path.dirname(path.join(REPOSITORY_ROOT, file)), specifier);
+    return absolute.replace(/\.(?:[cm]?[jt]sx?)$/u, '');
+};
+const importUses = (file: string, source: string, target: string): ImportUse[] => {
+    const uses: ImportUse[] = []; const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+    const add = (form: string, symbol: string, typeOnly = false) => uses.push({ file, form, symbol, typeOnly });
+    const matches = (value: ts.Expression | undefined) => ts.isStringLiteral(value ?? ast)
+        && moduleKey(file, (value as ts.StringLiteral).text) === path.join(REPOSITORY_ROOT, target);
+    const namedFromBinding = (node: ts.CallExpression) => {
+        let parent: ts.Node = node.parent; if (ts.isAwaitExpression(parent)) parent = parent.parent;
+        if (!ts.isVariableDeclaration(parent) || !ts.isObjectBindingPattern(parent.name)) return ['*'];
+        return parent.name.elements.map((element) => element.propertyName?.getText(ast) ?? element.name.getText(ast));
+    };
+    const visit = (node: ts.Node): void => {
+        if (ts.isImportDeclaration(node) && matches(node.moduleSpecifier)) {
+            const clause = node.importClause;
+            if (!clause) add('side-effect', '*');
+            else {
+                if (clause.name) add('default', 'default', clause.isTypeOnly);
+                if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings)) add('namespace', '*', clause.isTypeOnly);
+                if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) for (const item of clause.namedBindings.elements) {
+                    add('named', item.propertyName?.text ?? item.name.text, clause.isTypeOnly || item.isTypeOnly);
+                }
+            }
+        } else if (ts.isExportDeclaration(node) && matches(node.moduleSpecifier)) add('re-export', '*', node.isTypeOnly);
+        else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)
+            && matches(node.moduleReference.expression)) add('require', node.name.text, node.isTypeOnly);
+        else if (ts.isCallExpression(node) && node.arguments.length === 1 && matches(node.arguments[0])) {
+            if (node.expression.kind === ts.SyntaxKind.ImportKeyword) for (const symbol of namedFromBinding(node)) add('dynamic', symbol);
+            else if (ts.isIdentifier(node.expression) && node.expression.text === 'require') add('require', '*');
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(ast); return uses;
+};
+const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
+    const errors: string[] = []; const uses = Object.entries(sources).flatMap(([file, source]) => importUses(file, source, 'lib/security/server-session'));
+    const logout = new Set(['lib/security/web-auth-logout-server.ts', 'lib/security/web-auth-logout-server.test.ts']);
+    const exact = new Set(['resolveActiveWebServerSession', 'dispatchActiveWebServerSessionRetirement']);
+    for (const use of uses) {
+        const provenDynamic = use.form === 'dynamic' && use.file === 'lib/security/web-auth-channel-cutover.test.ts'
+            && ['clearAllSessions', 'getSession'].includes(use.symbol);
+        if (use.form !== 'named' && !provenDynamic) errors.push(`${use.file}:${use.form}`);
+        if (!use.typeOnly && use.symbol === 'dispatchActiveWebServerSessionRetirement'
+            && use.file !== 'lib/security/server-session.test.ts' && !logout.has(use.file)) errors.push(`${use.file}:dispatch`);
+    }
+    for (const file of logout) {
+        if (!(file in sources)) continue;
+        const runtime = uses.filter((use) => use.file === file && !use.typeOnly);
+        if (runtime.some((use) => use.form !== 'named') || runtime.length !== exact.size
+            || runtime.some((use) => !exact.has(use.symbol)) || [...exact].some((symbol) => !runtime.some((use) => use.symbol === symbol))) errors.push(`${file}:authority`);
+    }
+    return { errors, uses };
+};
+const sourceFiles = (directory: string): string[] => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const absolute = path.join(directory, entry.name);
+    if (entry.isDirectory() && !['.git', '.next', 'node_modules'].includes(entry.name)) return sourceFiles(absolute);
+    return entry.isFile() && /\.[cm]?tsx?$/u.test(entry.name) ? [absolute] : [];
+});
+const typescriptSources = () => Object.fromEntries(sourceFiles(REPOSITORY_ROOT)
+    .flatMap((absolute) => {
+        const relative = path.relative(REPOSITORY_ROOT, absolute);
+        const source = readFileSync(absolute, 'utf8'); return source.includes('server-session') ? [[relative, source]] : [];
+    }));
 
 function authControlApi() {
     const api = createRequire(import.meta.url)(AUTH_CONTROL_MODULE_PATH) as {
@@ -562,8 +633,29 @@ test('ACTIVE resource port has no callback surface or production importer before
     assert.doesNotMatch(cleanup, /\b(?:DateNow|Promise|async|then|setTimeout|setImmediate|queueMicrotask|nextTick)\b/u);
     assert.match(dispatch, /retireActiveWebServerSession\(sessionId, reason\);\s*return cleanupRetiredWebServerSession\(sessionId, reason\);/u);
     assert.doesNotMatch(dispatch, /\b(?:callback|ticket|owner|session:|Promise|async|then|setTimeout|setImmediate|queueMicrotask|nextTick)\b/u);
-    const paths = execFileSync('rg', ['-l', 'mintActiveWebSessionResourcePort|releaseActiveWebSessionResourcePort|beginActiveWebSessionResourceUse|commitActiveWebSessionResourceUse|abortActiveWebSessionResourceUse|cleanupRetiredWebServerSession|dispatchActiveWebServerSessionRetirement', '-g', '*.ts', '.'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map((value) => value.replace(/^\.\//u, ''));
-    assert.deepEqual(paths.sort(), ['lib/security/server-session.test.ts', 'lib/security/server-session.ts']);
+});
+
+test('inventories exact session imports by AST and closes the logout authority boundary', () => {
+    assert.deepEqual(validateSessionImports(typescriptSources()).errors, []);
+    const valid = {
+        'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession as resolve, dispatchActiveWebServerSessionRetirement } from '@/lib/security/server-session.ts';",
+        'lib/security/web-auth-logout-server.test.ts': "import { dispatchActiveWebServerSessionRetirement as dispatch, resolveActiveWebServerSession } from './server-session.js';",
+        'lib/security/literal.ts': "// import deleteSession from './server-session'; const text = 'clearAllSessions'; const regex = /retireWebP3SessionsForUser/u; test('createNativeServerSession', () => undefined);",
+        'lib/security/types.ts': "import type { ServerSession as Session } from './server-session';",
+    };
+    const accepted = validateSessionImports(valid);
+    assert.deepEqual(accepted.errors, []); assert.equal(accepted.uses.find((use) => use.symbol === 'ServerSession')?.typeOnly, true);
+    const rejected: Array<Record<string, string>> = [
+        { 'lib/security/web-auth-logout-server.ts': "import { deleteSession as dispatch } from './server-session';" },
+        { 'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession, dispatchActiveWebServerSessionRetirement, createSession, createNativeServerSession, deleteSession, invalidateSessionsForUser, retireWebP3SessionsForUser, clearAllSessions } from '../../lib/security/server-session';" },
+        { 'lib/security/web-auth-logout-server.ts': "import session from './server-session';" },
+        { 'lib/security/web-auth-logout-server.ts': "import * as session from './server-session';" },
+        { 'lib/security/web-auth-logout-server.ts': "export { resolveActiveWebServerSession } from './server-session';" },
+        { 'lib/security/web-auth-logout-server.ts': ['const session = req', "uire('./server-session');"].join('') },
+        { 'lib/security/web-auth-logout-server.ts': "const session = await import('./server-session');" },
+        { 'lib/security/extra.ts': "import { dispatchActiveWebServerSessionRetirement as dispatch } from './server-session';" },
+    ];
+    for (const source of rejected) assert.notDeepEqual(validateSessionImports(source).errors, []);
 });
 
 test('compacts one exact RETIRED Web cell into a replay-stable PHI-safe tombstone receipt', () => {
@@ -675,9 +767,6 @@ test('fixed-cause adapters deny hostile and cross-module IDs without observation
     }
     await new Promise<void>((resolve) => setImmediate(resolve));
     assert.equal(observed, 0); assert.deepEqual(unhandled, []);
-    const paths = execFileSync('rg', ['-l', 'retireServerSessionForLogout|retireServerSessionForApplicationLock|retireExpiredServerSession', '-g', '*.ts', '.'], { encoding: 'utf8' })
-        .trim().split('\n').filter(Boolean).map((value) => value.replace(/^\.\//u, '')).sort();
-    assert.deepEqual(paths, ['lib/security/server-session.test.ts', 'lib/security/server-session.ts']);
 });
 
 test('fixed-cause P3 ownership wins over a colliding legacy Map entry and CAS drift stays terminal', async (t) => {
