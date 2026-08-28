@@ -39,7 +39,7 @@ type Result = Readonly<{ ok: false }> | Readonly<{ ok: true; fence: string; gene
 type FenceTable = { [key: string]: true | undefined };
 type ControlState = {
     fence: string; generation: bigint; pending: Pending | null; activeSessionId: string | null; clock: number;
-    used: FenceTable; reserved: FenceTable; entries: Map<string, Entry>;
+    ticketedPending: Pending | null; used: FenceTable; reserved: FenceTable; entries: Map<string, Entry>;
 };
 type TicketBinding = {
     lifecycle: 'prepared' | 'activation_prepared' | 'active' | 'retirement_prepared' | 'retired' | 'denied'; owner: ControlState; pending: Pending;
@@ -107,7 +107,7 @@ const successorFence = (): string | null => {
 /* @Codex */
 export function createWebAuthControlRecord(initialFence: unknown, initialGeneration: unknown = ZERO) {
     if (!text(initialFence) || !u64(initialGeneration)) throw new TypeError('invalid trusted control state');
-    const state: ControlState = { fence: initialFence, generation: initialGeneration, pending: null, activeSessionId: null, clock: 0,
+    const state: ControlState = { fence: initialFence, generation: initialGeneration, pending: null, activeSessionId: null, clock: 0, ticketedPending: null,
         used: apply(ObjectCreate, ObjectConstructor, [null]) as FenceTable, reserved: apply(ObjectCreate, ObjectConstructor, [null]) as FenceTable, entries: new MapConstructor<string, Entry>() };
     tableAdd(state.used, state.fence);
     const tick = (value: unknown): number | null => { if (!time(value)) return null; state.clock = max(state.clock, value); if (state.pending && state.clock - state.pending.createdAt >= PENDING_TTL_MS) state.pending = null; return state.clock; };
@@ -120,6 +120,7 @@ export function createWebAuthControlRecord(initialFence: unknown, initialGenerat
     const next = (value: string, expectedFence: string, expectedGeneration: bigint, expectedPending: Pending | null): string | null =>
         expectedGeneration === MAX_U64 || tableHas(state.used, value) || state.fence !== expectedFence || state.generation !== expectedGeneration || state.pending !== expectedPending ? null : value;
     const advance = (value: string, output: Readonly<{ ok: true; fence: string; generation: bigint }>): Result => { state.fence = value; tableAdd(state.used, value); state.generation += ONE; return output; };
+    let pendingCancellationActive = false; let pendingCancellationPoisoned = false;
     return frozen({
         begin(kind: unknown, operation: unknown, key: unknown, fingerprint: unknown, at: unknown): Result {
             const current = tick(at); if (current === null || (kind !== 'login' && kind !== 'setup') || !text(operation) || !text(key) || !text(fingerprint)) return denied;
@@ -131,6 +132,23 @@ export function createWebAuthControlRecord(initialFence: unknown, initialGenerat
             const output = frozen({ ok: true as const, fence: state.fence, generation: state.generation });
             mapSet(state.entries, key, preparedEntry); state.pending = preparedPending;
             return output;
+        },
+        cancelPendingAuth(expectedFence: unknown, operation: unknown, expectedGeneration: unknown, fingerprint: unknown, at: unknown): 0 | 1 {
+            if (pendingCancellationActive) { pendingCancellationPoisoned = true; return 0; }
+            pendingCancellationActive = true; pendingCancellationPoisoned = false;
+            try {
+                if (!text(expectedFence) || !text(operation) || !u64(expectedGeneration) || !text(fingerprint) || !time(at)) return 0;
+                const match = state.pending;
+                if (!match || state.ticketedPending === match || state.activeSessionId !== null || state.fence !== expectedFence
+                    || state.generation !== expectedGeneration || match.operation !== operation || match.fingerprint !== fingerprint
+                    || match.generation !== expectedGeneration) return 0;
+                const current = state.clock >= at ? state.clock : at;
+                if (pendingCancellationPoisoned || state.pending !== match || state.ticketedPending === match) return 0;
+                state.clock = current;
+                if (current - match.createdAt >= PENDING_TTL_MS) { state.pending = null; return 0; }
+                state.pending = null; return 1;
+            } catch { return 0; }
+            finally { pendingCancellationActive = false; pendingCancellationPoisoned = false; }
         },
         finalizeAuth(expectedFence: unknown, operation: unknown, expectedGeneration: unknown, fingerprint: unknown, sessionId: unknown, successorFence: unknown, at: unknown): Result {
             const successorFenceValue = successor(successorFence);
@@ -187,6 +205,7 @@ export function createWebAuthControlRecord(initialFence: unknown, initialGenerat
                     generation: expectedGeneration, sessionId, activateFence, retireFence, retiredReason: null };
                 tableAdd(state.reserved, activateFence); tableAdd(state.reserved, retireFence);
                 bound = true; weakMapSet(ticketBindings, ticket, binding); if (ticketOperationPoisoned) return null;
+                state.ticketedPending = match;
                 published = true;
                 return ticket;
             } catch { return null; }
