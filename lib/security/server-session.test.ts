@@ -1695,23 +1695,42 @@ test('the trusted ACTIVE resolver retires exact expiry after leaving its lifecyc
     }
 });
 
-test('the trusted ACTIVE resolver denies lookup reentry and legacy Map collision with captured intrinsics', async (t) => {
+test('the trusted ACTIVE resolver revalidates final-get collision, reentry, and throw before expiry retirement', async (t) => {
     const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
     const cached = nodeRequire.cache[modulePath]; const originalGet = Map.prototype.get; const originalSet = Map.prototype.set;
-    let isolated: typeof import('./server-session') | undefined; let sessionId = ''; let mode: 'idle' | 'nested' | 'collision' = 'idle';
-    let nestedResult: unknown; let poisonedCalls = 0;
+    const originalDelete = Map.prototype.delete; const originalNow = Date.now; const ttl = process.env.MEDIFLOW_SESSION_TTL_MS;
+    let isolated: typeof import('./server-session') | undefined; let sessionId = ''; let now = 1_000; let targetReads = 0;
+    let mode: 'idle' | 'nested' | 'collision' | 'final-collision' | 'final-reentry' | 'final-throw' = 'idle';
+    let nestedResult: unknown; let poisonedCalls = 0; let registry: Map<unknown, unknown> | null = null;
+    let replacementCollision: unknown = null;
     const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
     process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
     Map.prototype.get = function (key: unknown) {
         const prior = Reflect.apply(originalGet, this, [key]);
         if (key === sessionId && mode === 'nested') { mode = 'idle'; nestedResult = isolated?.resolveActiveWebServerSession(sessionId); }
         if (key === sessionId && mode === 'collision') {
-            mode = 'idle'; Reflect.apply(originalSet, this, [key, Object.freeze({ id: sessionId })]);
+            mode = 'idle'; registry = this as Map<unknown, unknown>;
+            Reflect.apply(originalSet, this, [key, Object.freeze({ id: sessionId })]);
+        }
+        if (key === sessionId && mode.startsWith('final-') && ++targetReads === 2) {
+            const action = mode; mode = 'idle';
+            if (action === 'final-collision') {
+                registry = this as Map<unknown, unknown>;
+                Reflect.apply(originalSet, this, [key, Object.freeze({ id: sessionId })]);
+                replacementCollision = Object.freeze({ id: sessionId, replacement: true });
+                Reflect.apply(originalSet, this, [key, replacementCollision]);
+            } else if (action === 'final-reentry') {
+                nestedResult = isolated?.resolveActiveWebServerSession(sessionId);
+            } else {
+                throw new Error('synthetic final-get apply-then-throw');
+            }
         }
         return prior;
     };
     try {
+        process.env.MEDIFLOW_SESSION_TTL_MS = '10'; Date.now = () => now;
         delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
+        Map.prototype.get = originalGet;
         const staged = isolated.stageWebServerSession({ id: 'lookup-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
         const prepared = isolated.prepareStagedWebServerSession(staged); assert.ok(prepared);
         sessionId = isolated.getPreparedWebServerSessionId(prepared) ?? ''; assert.ok(sessionId);
@@ -1722,6 +1741,22 @@ test('the trusted ACTIVE resolver denies lookup reentry and legacy Map collision
 
         mode = 'nested'; assert.equal(isolated.resolveActiveWebServerSession(sessionId), null); assert.equal(nestedResult, null);
         const session = isolated.resolveActiveWebServerSession(sessionId); assert.ok(session);
+        now = session.expiresAt; targetReads = 0; mode = 'final-collision';
+        assert.equal(isolated.resolveActiveWebServerSession(sessionId), null); assert.equal(targetReads, 2); assert.ok(registry);
+        assert.equal(Reflect.apply(originalGet, registry, [sessionId]), replacementCollision);
+        Reflect.apply(originalDelete, registry, [sessionId]); now = session.createdAt;
+        assert.equal(isolated.resolveActiveWebServerSession(sessionId), session, 'a replaced final-get collision cannot retire P3');
+
+        now = session.expiresAt; targetReads = 0; mode = 'final-reentry';
+        assert.equal(isolated.resolveActiveWebServerSession(sessionId), null); assert.equal(nestedResult, null);
+        now = session.createdAt; assert.equal(isolated.resolveActiveWebServerSession(sessionId), session);
+
+        now = session.expiresAt; targetReads = 0; mode = 'final-throw'; let thrownResult: unknown = 'unset';
+        assert.doesNotThrow(() => { thrownResult = isolated!.resolveActiveWebServerSession(sessionId); });
+        assert.equal(thrownResult, null); now = session.createdAt;
+        assert.equal(isolated.resolveActiveWebServerSession(sessionId), session);
+        assert.equal(control.snapshot().active, true, 'denied observations preserve exact P2/P3 retry authority');
+
         const resource = isolated.mintActiveWebSessionResourcePort(session); assert.ok(resource);
         mode = 'collision'; assert.equal(isolated.mintActiveWebSessionResourcePort(session), null);
 
@@ -1737,9 +1772,14 @@ test('the trusted ACTIVE resolver denies lookup reentry and legacy Map collision
             Map.prototype.get = originals.mapGet; Date.now = originals.dateNow;
             if (originals.then) Object.defineProperty(Object.prototype, 'then', originals.then); else delete (Object.prototype as { then?: unknown }).then;
         }
+        assert.ok(registry); Reflect.apply(originalDelete, registry, [sessionId]);
+        now = session.expiresAt; assert.equal(isolated.resolveActiveWebServerSession(sessionId), null, 'an exact retry retires once');
+        now = session.createdAt; assert.equal(isolated.resolveActiveWebServerSession(sessionId), null);
+        assert.equal(isolated.retireExpiredServerSession(sessionId).outcome, 'completed', 'the exact cleanup receipt replays');
         await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(poisonedCalls, 0); assert.deepEqual(unhandled, []);
     } finally {
-        Map.prototype.get = originalGet; isolated?.clearAllSessions();
+        mode = 'idle'; Map.prototype.get = originalGet; Date.now = originalNow; isolated?.clearAllSessions();
+        if (ttl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = ttl;
         if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
     }
 });
