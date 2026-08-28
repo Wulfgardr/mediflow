@@ -614,3 +614,20 @@ test('V5C requires the owner session id to be the exact const bearer binding', (
     }
     assert.deepEqual(observed, mutations.map(([name]) => [name, ['owner session id must be the exact const bearer binding']]));
 });
+
+test('V5D rejects for-in and for-of targets bound to the owner session id', () => {
+    const mutations = [
+        ['for-of target', "for (sessionId of ['forged']) {}"],
+        ['for-in target', 'for (sessionId in { forged: true }) {}'],
+        ['destructured for-of target', "for ([sessionId] of [['forged']]) {}"],
+        ['destructured for-in target', 'for ([sessionId] in { forged: true }) {}'],
+    ];
+    const observed = mutations.map(([name, write]) => {
+        const service = logoutService.replace('const sessionId = exactBearer(cookie);', `const sessionId = exactBearer(cookie); ${write}`);
+        assert.equal(ts.createSourceFile('service.ts', service, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS).parseDiagnostics.length, 0, name);
+        let findings;
+        assert.doesNotThrow(() => { findings = validateLogoutAuditModes({ spec: logoutSpec, routeSource: logoutRoute, serviceSource: service }); }, name);
+        return [name, findings];
+    });
+    assert.deepEqual(observed, mutations.map(([name]) => [name, ['owner session id must be the exact const bearer binding']]));
+});

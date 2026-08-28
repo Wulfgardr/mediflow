@@ -620,7 +620,9 @@ function bindingIsWritten(root, checker, binding) {
         const update = (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
             && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(node.operator)
             && containsBinding(node.operand);
-        if (assignment || update) found = true;
+        const iteration = (ts.isForInStatement(node) || ts.isForOfStatement(node))
+            && containsBinding(node.initializer);
+        if (assignment || update || iteration) found = true;
         else if (!found) ts.forEachChild(node, visit);
     };
     visit(root);
