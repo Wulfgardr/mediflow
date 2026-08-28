@@ -36,9 +36,11 @@ import {
     retireActiveWebServerSession,
     retireServerSessionForApplicationLock,
     retireServerSessionForLogout,
+    retireServerSessionsForUser,
     resolveActiveWebServerSession,
     stageWebServerSession,
     tombstoneArmedWebServerSession,
+    type WebServerSessionRetirementCleanupReceipt,
 } from './server-session';
 
 const SYNTHETIC_USERNAME = `synthetic-${randomUUID()}`;
@@ -318,8 +320,8 @@ test('an armed Web session cell burns its prepared capability without exposing a
     } finally { cryptoModule.randomBytes = randomBytes; }
 });
 
-function armedControlActivation() {
-    const staged = stageWebServerSession({ id: 'atomic-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+function armedControlActivation(userId = 'atomic-user') {
+    const staged = stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' });
     const prepared = prepareStagedWebServerSession(staged); assert.ok(prepared);
     const sessionId = getPreparedWebServerSessionId(prepared); assert.ok(sessionId);
     const port = armPreparedWebServerSession(prepared); assert.ok(port);
@@ -441,8 +443,8 @@ test('ACTIVE resource mint denies expiry and lifecycle reentry without releasing
         if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
 });
 
-function activeResourceFixture() {
-    const active = armedControlActivation();
+function activeResourceFixture(userId = 'atomic-user') {
+    const active = armedControlActivation(userId);
     assert.equal(activateArmedWebServerSession(active.port, active.ticket), true);
     const session = resolveActiveWebServerSession(active.sessionId); assert.ok(session);
     const port = mintActiveWebSessionResourcePort(session); assert.ok(port);
@@ -712,6 +714,115 @@ test('fixed-cause P3 ownership wins over a colliding legacy Map entry and CAS dr
         collide = false; Map.prototype.get = originalGet; isolated?.clearAllSessions();
         if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
     }
+});
+
+test('user-scoped retirement snapshots P3 targets before mutation and preserves legacy cleanup', () => {
+    const active = activeResourceFixture('bulk-user');
+    const retired = activeResourceFixture('bulk-user');
+    assert.equal(retireActiveWebServerSession(retired.sessionId, 'dispose'), true);
+    const other = activeResourceFixture('other-user');
+    const staged = stageWebServerSession({ id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    assert.ok(staged);
+    const prepared = prepareStagedWebServerSession(stageWebServerSession({ id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' }));
+    assert.ok(prepared);
+    const legacy = createSession({ id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    const native = createNativeServerSession(
+        { id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' },
+        { clientId: 'bulk-client', clientPlatform: 'macos' },
+    );
+    const events: string[] = [];
+    registerServerSessionResource(legacy.id, (reason) => { events.push(`web:${reason}`); });
+    registerServerSessionResource(native.id, (reason) => { events.push(`native:${reason}`); });
+
+    const receipt = retireServerSessionsForUser('bulk-user');
+    assert.equal(receipt.outcome, 'completed');
+    assert.strictEqual(retireServerSessionsForUser('bulk-user'), receipt, 'lost response replay is stable');
+    assert.equal(resolveActiveWebServerSession(active.sessionId), null);
+    assert.equal(resolveActiveWebServerSession(retired.sessionId), null);
+    assert.equal(getSession(legacy.id), null); assert.equal(getSession(native.id), null);
+    assert.equal(abortStagedWebServerSession(staged), false);
+    assert.equal(getPreparedWebServerSessionId(prepared), null);
+    assert.deepEqual(events, ['web:session_deleted', 'native:session_deleted']);
+    assert.ok(resolveActiveWebServerSession(other.sessionId));
+    assert.equal(Object.getPrototypeOf(receipt), null); assert.equal(Object.isFrozen(receipt), true);
+    assert.deepEqual(Reflect.ownKeys(receipt), ['outcome']);
+});
+
+test('user-scoped retirement preserves P3 ownership over a colliding legacy Map entry', () => {
+    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
+    const cached = nodeRequire.cache[modulePath]; const originalValues = Map.prototype.values; const originalSet = Map.prototype.set;
+    let isolated: typeof import('./server-session') | undefined; let sessionId = ''; let collide = false; let injected = false;
+    try {
+        Map.prototype.values = function () {
+            if (collide && !injected) {
+                injected = true;
+                Reflect.apply(originalSet, this, [sessionId, Object.freeze({
+                    id: sessionId, userId: 'collision-user', username: SYNTHETIC_USERNAME, role: 'clinician',
+                    authChannel: 'web', createdAt: 0, expiresAt: Date.now() + 60_000,
+                })]);
+            }
+            return Reflect.apply(originalValues, this, []);
+        };
+        delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
+        const staged = isolated.stageWebServerSession({ id: 'collision-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+        assert.ok(staged); const prepared = isolated.prepareStagedWebServerSession(staged); assert.ok(prepared);
+        sessionId = isolated.getPreparedWebServerSessionId(prepared) ?? ''; const port = isolated.armPreparedWebServerSession(prepared); assert.ok(port);
+        const control = authControlApi().create('bulk-collision'); control.begin('login', 'op', 'key', 'fp', 0);
+        const ticket = control.prepareTicket('bulk-collision', 'op', BigInt(0), 'fp', sessionId, 1); assert.ok(ticket);
+        assert.equal(isolated.activateArmedWebServerSession(port, ticket), true);
+        assert.ok(isolated.resolveActiveWebServerSession(sessionId));
+        collide = true;
+        assert.equal(isolated.retireServerSessionsForUser('collision-user').outcome, 'completed');
+        assert.equal(isolated.resolveActiveWebServerSession(sessionId), null);
+        assert.ok(isolated.peekSession(sessionId), 'P3 retirement must not fall back to the colliding Map entry');
+    } finally {
+        collide = false; Map.prototype.values = originalValues; isolated?.clearAllSessions();
+        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
+    }
+});
+
+test('user-scoped retirement attempts every target and aggregates the worst outcome', () => {
+    const failed = activeResourceFixture('bulk-failure');
+    const healthy = activeResourceFixture('bulk-failure');
+    assert.equal(failed.control.retireTicket(failed.ticket, 'delete'), 1);
+    const receipt = retireServerSessionsForUser('bulk-failure');
+    assert.equal(receipt.outcome, 'failed');
+    assert.equal(resolveActiveWebServerSession(healthy.sessionId), null, 'later target was attempted');
+    assert.equal(resolveActiveWebServerSession(failed.sessionId), null);
+
+    const throwing = createSession({ id: 'bulk-failure', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    const later = createSession({ id: 'bulk-failure', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    registerServerSessionResource(throwing.id, () => { throw new Error('synthetic cleanup failure'); });
+    const second = retireServerSessionsForUser('bulk-failure');
+    assert.equal(second.outcome, 'failed');
+    assert.equal(getSession(throwing.id), null); assert.equal(getSession(later.id), null);
+});
+
+test('user-scoped retirement resists hostile IDs and legacy list mutation', async (t) => {
+    const active = activeResourceFixture('hostile-user'); let observed = 0;
+    const proxy = new Proxy(Object.create(null), { get() { observed += 1; throw new Error('get'); }, ownKeys() { observed += 1; throw new Error('keys'); } });
+    const accessor = Object.create(null);
+    Object.defineProperty(accessor, 'then', { get() { observed += 1; throw new Error('then'); } });
+    const rejected = Promise.reject(new Error('synthetic rejected bulk input')); rejected.catch(() => undefined);
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    for (const value of [null, undefined, '', {}, Object.create(null), proxy, accessor, Promise.resolve(), rejected]) {
+        assert.equal(retireServerSessionsForUser(value).outcome, 'denied');
+    }
+    assert.equal(retireServerSessionsForUser('__proto__').outcome, 'completed');
+    const first = createSession({ id: 'mutation-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    const second = createSession({ id: 'mutation-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    let nestedOutcome: WebServerSessionRetirementCleanupReceipt['outcome'] | null = null;
+    registerServerSessionResource(first.id, () => { nestedOutcome = retireServerSessionsForUser('mutation-user').outcome; });
+    const outer = retireServerSessionsForUser('mutation-user');
+    assert.equal(outer.outcome, 'completed'); assert.equal(nestedOutcome, 'completed');
+    assert.equal(getSession(first.id), null); assert.equal(getSession(second.id), null);
+    assert.ok(resolveActiveWebServerSession(active.sessionId));
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { observed += 1; throw new Error('ambient then'); } });
+    try { assert.equal(retireServerSessionsForUser('missing-user').outcome, 'completed'); }
+    finally { delete (Object.prototype as { then?: unknown }).then; }
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(observed, 0); assert.deepEqual(unhandled, []);
 });
 
 test('dispatch reports failed after an uncommitted P2 retirement and scrubs B1/B2 state', () => {
