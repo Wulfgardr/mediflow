@@ -29,6 +29,7 @@ const ObjectFreeze = Object.freeze;
 const applyIntrinsic = Reflect.apply;
 const functionToString = Function.prototype.toString;
 const mapGet = Map.prototype.get;
+const mapHas = Map.prototype.has;
 const mapSet = Map.prototype.set;
 const mapDelete = Map.prototype.delete;
 const mapClear = Map.prototype.clear;
@@ -50,6 +51,10 @@ const isProxy = types.isProxy;
 
 function getMapValue<K, V>(registry: Map<K, V>, key: K): V | undefined {
     return applyIntrinsic(mapGet, registry, [key]);
+}
+
+function hasMapValue<K, V>(registry: Map<K, V>, key: K): boolean {
+    return applyIntrinsic(mapHas, registry, [key]);
 }
 
 function setMapValue<K, V>(registry: Map<K, V>, key: K, value: V): void {
@@ -1001,12 +1006,14 @@ export function activateArmedWebServerSession(port: unknown, ticket: unknown): b
     return false;
 }
 
-/** Retires one exact ACTIVE Web cell through its privately retained P2 ticket. */
-/* @Codex */
-export function retireActiveWebServerSession(sessionId: unknown, reason: unknown): boolean {
-    if (typeof sessionId !== 'string' || !sessionId || !isWebServerSessionRetirementReason(reason)) return false;
-    const cell = armedWebSessionCellsById[sessionId];
-    if (!cell || cell.state !== 'ACTIVE' || cell.session.id !== sessionId || !cell.activationTicket) return false;
+function retireActiveWebServerSessionCell(
+    cell: ArmedWebSessionCellRecord,
+    reason: WebServerSessionRetirementReason,
+    observation: Readonly<{ expiresAt: number; now: number }> | null = null,
+): boolean {
+    const sessionId = cell.sessionId;
+    if (armedWebSessionCellsById[sessionId] !== cell || cell.state !== 'ACTIVE'
+        || cell.session.id !== sessionId || !cell.activationTicket) return false;
     const session = cell.session;
     const ticket = cell.activationTicket;
     cell.retirementReason = reason;
@@ -1025,10 +1032,11 @@ export function retireActiveWebServerSession(sessionId: unknown, reason: unknown
         return false;
     }
     try {
-        const now = DateNow();
+        const now = observation ? observation.now : DateNow();
         const exact = armedWebSessionCellsById[sessionId] === cell && cell.state === 'ACTIVE'
             && cell.session === session && cell.activationTicket === ticket && session.id === sessionId
             && session.authChannel === 'web'
+            && (!observation || (reason === 'expired' && session.expiresAt === observation.expiresAt))
             && (reason === 'expired' ? session.expiresAt <= now : session.expiresAt > now);
         if (webSessionCellLifecyclePoisoned || !exact) {
             retireArmedWebSessionCellRecord(cell);
@@ -1068,6 +1076,14 @@ export function retireActiveWebServerSession(sessionId: unknown, reason: unknown
     webSessionCellLifecyclePoisoned = false;
     webSessionCellLifecycle = 'idle';
     return false;
+}
+
+/** Retires one exact ACTIVE Web cell through its privately retained P2 ticket. */
+/* @Codex */
+export function retireActiveWebServerSession(sessionId: unknown, reason: unknown): boolean {
+    if (typeof sessionId !== 'string' || !sessionId || !isWebServerSessionRetirementReason(reason)) return false;
+    const cell = armedWebSessionCellsById[sessionId];
+    return cell ? retireActiveWebServerSessionCell(cell, reason) : false;
 }
 
 /** Canonically publishes a prepared session only for server-local compatibility callers. */
@@ -1131,21 +1147,36 @@ export function abortStagedWebServerSession(capsule: unknown): boolean {
 /* @Codex */
 export function resolveActiveWebServerSession(sessionId: unknown): ServerSession | null {
     if (!beginWebSessionCellLifecycle(sessionId)) return null;
+    let expired: Readonly<{ cell: ArmedWebSessionCellRecord; expiresAt: number; now: number }> | null = null;
     try {
         if (typeof sessionId !== 'string' || !sessionId) return null;
         const cell = armedWebSessionCellsById[sessionId];
-        const visibleSession = getMapValue(sessions, sessionId);
-        if (webSessionCellLifecyclePoisoned || visibleSession || !cell || cell.state !== 'ACTIVE') return null;
+        if (webSessionCellLifecyclePoisoned || !cell || cell.state !== 'ACTIVE') return null;
         const session = cell.session;
         const expiry = session.expiresAt;
         const now = DateNow();
         if (webSessionCellLifecyclePoisoned || armedWebSessionCellsById[sessionId] !== cell
             || cell.state !== 'ACTIVE' || cell.session !== session || session.id !== sessionId
-            || session.authChannel !== 'web' || session.expiresAt !== expiry || expiry <= now
-            || getMapValue(sessions, sessionId)) return null;
+            || session.authChannel !== 'web' || session.expiresAt !== expiry) return null;
+        if (expiry <= now) {
+            expired = { cell, expiresAt: expiry, now };
+            return null;
+        }
+        const finalVisibleSession = getMapValue(sessions, sessionId);
+        const finalVisibleSessionPresent = hasMapValue(sessions, sessionId);
+        if (webSessionCellLifecyclePoisoned || finalVisibleSession || finalVisibleSessionPresent
+            || armedWebSessionCellsById[sessionId] !== cell
+            || cell.state !== 'ACTIVE' || cell.session !== session || session.id !== sessionId
+            || session.authChannel !== 'web' || session.expiresAt !== expiry) return null;
         return session;
     } catch { return null; }
-    finally { endWebSessionCellLifecycle(); }
+    finally {
+        endWebSessionCellLifecycle();
+        if (expired) {
+            try { dispatchActiveWebServerSessionCellRetirement(expired.cell, 'expired', expired); }
+            catch { /* expiry denial remains fail-closed */ }
+        }
+    }
 }
 
 /** Mints one opaque resource identity for the exact process-local ACTIVE Web session. */
@@ -1635,17 +1666,9 @@ export function retireWebP3SessionsForUser(userId: unknown): WebServerSessionRet
     }
 }
 
-/** Compacts one exact RETIRED Web cell into its terminal owner-private tombstone. */
-/* @Codex */
-export function cleanupRetiredWebServerSession(
-    sessionId: unknown,
-    reason: unknown,
-): WebServerSessionRetirementCleanupReceipt {
-    if (typeof sessionId !== 'string' || !sessionId || !isWebServerSessionRetirementReason(reason)) {
-        return deniedWebSessionRetirementCleanupReceipt;
-    }
-    const cell = armedWebSessionCellsById[sessionId];
-    if (!cell) return deniedWebSessionRetirementCleanupReceipt;
+function cleanupRetiredWebServerSessionCell(cell: ArmedWebSessionCellRecord, reason: WebServerSessionRetirementReason): WebServerSessionRetirementCleanupReceipt {
+    const sessionId = cell.sessionId;
+    if (armedWebSessionCellsById[sessionId] !== cell) return deniedWebSessionRetirementCleanupReceipt;
     if (cell.state === 'RETIRED_CLEANUP') {
         beginWebSessionCellLifecycle(sessionId);
         return deniedWebSessionRetirementCleanupReceipt;
@@ -1673,6 +1696,28 @@ export function cleanupRetiredWebServerSession(
         cell.state = 'RETIRED_TOMBSTONE';
         return failedWebSessionRetirementCleanupReceipt;
     } finally { endWebSessionCellLifecycle(); }
+}
+
+/** Compacts one exact RETIRED Web cell into its terminal owner-private tombstone. */
+/* @Codex */
+export function cleanupRetiredWebServerSession(
+    sessionId: unknown,
+    reason: unknown,
+): WebServerSessionRetirementCleanupReceipt {
+    if (typeof sessionId !== 'string' || !sessionId || !isWebServerSessionRetirementReason(reason)) {
+        return deniedWebSessionRetirementCleanupReceipt;
+    }
+    const cell = armedWebSessionCellsById[sessionId];
+    return cell ? cleanupRetiredWebServerSessionCell(cell, reason) : deniedWebSessionRetirementCleanupReceipt;
+}
+
+function dispatchActiveWebServerSessionCellRetirement(
+    cell: ArmedWebSessionCellRecord,
+    reason: WebServerSessionRetirementReason,
+    observation: Readonly<{ expiresAt: number; now: number }>,
+): WebServerSessionRetirementCleanupReceipt {
+    retireActiveWebServerSessionCell(cell, reason, observation);
+    return cleanupRetiredWebServerSessionCell(cell, reason);
 }
 
 /** Retires and terminally compacts one exact ACTIVE Web session by controlled reason. */
