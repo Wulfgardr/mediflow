@@ -430,18 +430,24 @@ function anyNamedImport(sourceFile, exportName) {
             !element.isTypeOnly && (element.propertyName?.text ?? element.name.text) === exportName));
 }
 
-function directPropertyCalls(owner, objectName, propertyName) {
-    const calls = [];
+function exactDirectObjectCalls(owner, objectName, allowedNames) {
+    const calls = new Map(allowedNames.map((name) => [name, []]));
+    let exact = true;
     const visit = (node) => {
-        if (node !== owner && ts.isFunctionLike(node)) return;
-        if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(unwrap(node.expression))
-            && ts.isIdentifier(unwrap(node.expression).expression)
-            && unwrap(node.expression).expression.text === objectName
-            && unwrap(node.expression).name.text === propertyName) calls.push(node);
+        if (ts.isIdentifier(node) && node.text === objectName) {
+            const property = node.parent;
+            const call = property && ts.isPropertyAccessExpression(property)
+                && property.expression === node && !property.questionDotToken
+                && allowedNames.includes(property.name.text)
+                && property.parent && ts.isCallExpression(property.parent)
+                && unwrap(property.parent.expression) === property ? property.parent : null;
+            if (!call) exact = false;
+            else calls.get(property.name.text).push(call);
+        }
         ts.forEachChild(node, visit);
     };
     if (owner.body) visit(owner.body);
-    return calls;
+    return { calls, exact };
 }
 
 function isAwaited(call) {
@@ -476,6 +482,132 @@ function hasDeferredWork(root) {
     return found;
 }
 
+function directStatement(owner, node) {
+    let current = node;
+    while (current.parent && current.parent !== owner.body) current = current.parent;
+    return current.parent === owner.body && ts.isStatement(current) ? current : null;
+}
+
+function exactPropertyAssignments(literal, allowedNames) {
+    if (!literal || literal.properties.some((item) => !ts.isPropertyAssignment(item)
+        || ts.isComputedPropertyName(item.name)
+        || !(ts.isIdentifier(item.name) || ts.isStringLiteral(item.name)))) return null;
+    const names = literal.properties.map((item) => item.name.text);
+    if (new Set(names).size !== names.length || names.some((name) => !allowedNames.includes(name))) return null;
+    return new Map(literal.properties.map((item) => [item.name.text, item]));
+}
+
+function responseStatus(statement, sourceFile) {
+    const value = statement.expression && unwrap(statement.expression);
+    if (!value || !ts.isNewExpression(value) || !ts.isIdentifier(value.expression)
+        || value.expression.text !== 'Response' || value.arguments?.length !== 2
+        || unwrap(value.arguments[0]).kind !== ts.SyntaxKind.NullKeyword) return null;
+    const options = objectLiteral(value.arguments[1]);
+    const properties = exactPropertyAssignments(options, ['status', 'headers']);
+    const status = properties?.get('status')?.initializer;
+    return status && ts.isNumericLiteral(status) ? Number(status.text) : null;
+}
+
+function directAwaitedExpressionStatement(owner, call) {
+    let current = call;
+    while (ts.isParenthesizedExpression(current.parent)) current = current.parent;
+    if (!ts.isAwaitExpression(current.parent)) return null;
+    current = current.parent;
+    while (ts.isParenthesizedExpression(current.parent)) current = current.parent;
+    return ts.isExpressionStatement(current.parent) && directStatement(owner, current.parent) === current.parent
+        ? current.parent : null;
+}
+
+function exactCompletedGuard(statement, binding, sourceFile) {
+    if (!ts.isIfStatement(statement) || statement.elseStatement) return false;
+    const condition = unwrap(statement.expression);
+    const operand = ts.isPrefixUnaryExpression(condition)
+        && condition.operator === ts.SyntaxKind.ExclamationToken ? unwrap(condition.operand) : null;
+    if (!operand || !ts.isPropertyAccessExpression(operand) || !ts.isIdentifier(operand.expression)
+        || operand.expression.text !== binding || operand.name.text !== 'completed') return false;
+    const denied = ts.isReturnStatement(statement.thenStatement) ? statement.thenStatement
+        : ts.isBlock(statement.thenStatement) && statement.thenStatement.statements.length === 1
+            && ts.isReturnStatement(statement.thenStatement.statements[0]) ? statement.thenStatement.statements[0] : null;
+    const status = denied && responseStatus(denied, sourceFile);
+    return typeof status === 'number' && status >= 400 && status <= 599;
+}
+
+function directReturnStatements(owner) {
+    const returns = [];
+    const visit = (node) => {
+        if (node !== owner && ts.isFunctionLike(node)) return;
+        if (ts.isReturnStatement(node)) returns.push(node);
+        ts.forEachChild(node, visit);
+    };
+    if (owner.body) visit(owner.body);
+    return returns;
+}
+
+function auditLiteralSyntaxIsExactAndSafe(root) {
+    let safe = true;
+    const forbidden = /^(?:authorization|bearer|cookie|token|raw)$/iu;
+    const visit = (node) => {
+        if (!safe) return;
+        if (ts.isObjectLiteralExpression(node)) {
+            const names = [];
+            for (const property of node.properties) {
+                if (!ts.isPropertyAssignment(property) || ts.isComputedPropertyName(property.name)
+                    || !(ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))) {
+                    safe = false;
+                    return;
+                }
+                names.push(property.name.text);
+                if (forbidden.test(property.name.text)) {
+                    safe = false;
+                    return;
+                }
+            }
+            if (new Set(names).size !== names.length) {
+                safe = false;
+                return;
+            }
+        } else if (ts.isArrayLiteralExpression(node)
+            && node.elements.some((item) => ts.isSpreadElement(item))) {
+            safe = false;
+            return;
+        } else if (ts.isPropertyAccessExpression(node) && forbidden.test(node.name.text)) {
+            safe = false;
+            return;
+        } else if (ts.isElementAccessExpression(node)) {
+            const argument = node.argumentExpression && unwrap(node.argumentExpression);
+            if (argument && ts.isStringLiteral(argument) && forbidden.test(argument.text)) {
+                safe = false;
+                return;
+            }
+        } else if (ts.isStringLiteral(node) && forbidden.test(node.text)) {
+            safe = false;
+            return;
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(root);
+    return safe;
+}
+
+function metadataIsExactAndSafe(initializer) {
+    const value = initializer && unwrap(initializer);
+    if (value?.kind === ts.SyntaxKind.NullKeyword) return true;
+    const literal = objectLiteral(initializer);
+    const properties = exactPropertyAssignments(literal, METADATA_KEYS);
+    if (!properties) return false;
+    for (const [name, property] of properties) {
+        const value = unwrap(property.initializer);
+        if (name === 'resourceVersion' || name === 'counts') {
+            if (!ts.isNumericLiteral(value)) return false;
+        } else if (name === 'reasonCode') {
+            if (!ts.isStringLiteral(value) || /authorization|bearer|cookie|token|session|patient|clinical|raw/iu.test(value.text)) return false;
+        } else if (!ts.isArrayLiteralExpression(value) || value.elements.some((item) =>
+            ts.isSpreadElement(item) || !ts.isStringLiteral(unwrap(item))
+            || /authorization|bearer|cookie|token|session|patient|clinical|raw/iu.test(unwrap(item).text))) return false;
+    }
+    return true;
+}
+
 /* @Codex */
 export function validateLogoutAuditModes({ spec, routeSource, serviceSource = null }) {
     const problems = [];
@@ -498,10 +630,35 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
     const handler = namedFunction(route.sourceFile, delegated.handler, true);
     const delegate = importedBinding(route.sourceFile, route.checker, delegated.serviceModule, delegated.serviceExport);
     const routeCalls = handler && delegate ? bindingCalls(handler, route.checker, delegate.symbol) : [];
-    const response204 = handler?.body && [...handler.body.statements].find((statement) => ts.isReturnStatement(statement)
-        && statement.getText(route.sourceFile).match(/\bstatus\s*:\s*204\b/u));
-    if (routeCalls.length !== 1 || !isAwaited(routeCalls[0])) problems.push('delegated logout call must be awaited exactly once');
-    if (!response204 || (routeCalls[0] && routeCalls[0].getStart() > response204.getStart())) problems.push('delegated audit must complete before the 204 response');
+    const routeCall = routeCalls[0];
+    const directDelegate = routeCall && ts.isIdentifier(unwrap(routeCall.expression))
+        && unwrap(routeCall.expression).text === importedName(route.sourceFile, delegated.serviceModule, delegated.serviceExport);
+    const callDeclaration = routeCall?.parent && ts.isAwaitExpression(routeCall.parent)
+        && routeCall.parent.parent && ts.isVariableDeclaration(routeCall.parent.parent)
+        ? routeCall.parent.parent : null;
+    const receipt = callDeclaration && ts.isIdentifier(callDeclaration.name) ? callDeclaration.name.text : null;
+    const callStatement = callDeclaration && directStatement(handler, callDeclaration);
+    const routeStatements = handler?.body ? [...handler.body.statements] : [];
+    const callIndex = callStatement ? routeStatements.indexOf(callStatement) : -1;
+    const guard = callIndex >= 0 ? routeStatements[callIndex + 1] : null;
+    const response204 = guard ? routeStatements[callIndex + 2] : null;
+    const routeReturns = handler ? directReturnStatements(handler) : [];
+    const all204 = [];
+    const find204 = (node) => {
+        if (node !== handler && ts.isFunctionLike(node)) return;
+        if (ts.isReturnStatement(node) && responseStatus(node, route.sourceFile) === 204) all204.push(node);
+        ts.forEachChild(node, find204);
+    };
+    if (handler) find204(handler);
+    if (routeCalls.length !== 1 || !directDelegate || !callDeclaration || !receipt
+        || !ts.isVariableDeclarationList(callDeclaration.parent)
+        || !(callDeclaration.parent.flags & ts.NodeFlags.Const)) problems.push('delegated logout call must be awaited directly into one exact receipt');
+    if (!guard || !receipt || !exactCompletedGuard(guard, receipt, route.sourceFile)
+        || !response204 || !ts.isReturnStatement(response204) || responseStatus(response204, route.sourceFile) !== 204
+        || routeStatements.at(-1) !== response204 || routeReturns.length !== 2
+        || !routeReturns.includes(response204) || all204.length !== 1 || all204[0] !== response204) {
+        problems.push('the exact completed receipt must dominate the single terminal 204 response');
+    }
     if (handler && hasDeferredWork(handler)) problems.push('logout route must not defer audit work');
 
     const service = checkedSource('service.ts', serviceSource);
@@ -513,12 +670,12 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
         ? [...statement.declarationList.declarations] : []).find((declaration) =>
         ts.isIdentifier(declaration.name) && declaration.name.text === delegated.sourcesName);
     const sources = objectLiteral(sourcesDeclaration?.initializer);
-    const auditProperty = sources?.properties.find((property) => ts.isPropertyAssignment(property)
-        && property.name.getText(service.sourceFile).replaceAll(/['"]/gu, '') === 'audit');
+    const sourceProperties = exactPropertyAssignments(sources, ['resolve', 'retire', 'audit']);
+    const auditProperty = sourceProperties?.get('audit');
     const auditOwner = auditProperty && ts.isFunctionLike(auditProperty.initializer) ? auditProperty.initializer : null;
     const sourcesAreConst = sourcesDeclaration && ts.isVariableDeclarationList(sourcesDeclaration.parent)
         && Boolean(sourcesDeclaration.parent.flags & ts.NodeFlags.Const);
-    if (!owner || !writer || !hash || !writerBinding || !sourcesAreConst || !auditOwner) problems.push('delegated service writer is missing, shadowed, or unreachable');
+    if (!owner || !writer || !hash || !writerBinding || !sourcesAreConst || !sourceProperties || !auditOwner) problems.push('delegated service writer is missing, shadowed, or unreachable');
     if (!owner || !writer || !hash || !writerBinding || !auditOwner) return problems;
 
     const sourceParameter = owner.parameters.find((parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === 'sources');
@@ -526,10 +683,11 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
         || unwrap(sourceParameter.initializer).text !== delegated.sourcesName || localBindingExists(owner, 'sources', true)) {
         problems.push('owner must use the exact immutable production sources binding');
     }
-    const retireCalls = directPropertyCalls(owner, 'sources', 'retire');
-    const auditCalls = directPropertyCalls(owner, 'sources', 'audit');
+    const sourceCalls = exactDirectObjectCalls(owner, 'sources', ['resolve', 'retire', 'audit']);
+    const retireCalls = sourceCalls.calls.get('retire');
+    const auditCalls = sourceCalls.calls.get('audit');
     const auditCall = auditCalls[0];
-    if (retireCalls.length !== 1 || auditCalls.length !== 1 || !auditCall || !isAwaited(auditCall)
+    if (!sourceCalls.exact || retireCalls.length !== 1 || auditCalls.length !== 1 || !auditCall || !isAwaited(auditCall)
         || auditCall.arguments.map((argument) => argument.getText(service.sourceFile)).join(',') !== 'session,sessionId,request') {
         problems.push('owner must await exactly one sources.audit(session,sessionId,request) call');
     }
@@ -545,19 +703,35 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
         && alwaysTerminates(statement.thenStatement));
     if (!completedGuard || !auditCall || retireCalls[0].getStart() > completedGuard.getStart()
         || completedGuard.getStart() > auditCall.getStart()) problems.push('completed retirement must be checked before audit');
+    const ownerStatements = owner.body ? [...owner.body.statements] : [];
+    const retireStatement = retireCalls[0] && directStatement(owner, retireCalls[0]);
+    const retireIndex = retireStatement ? ownerStatements.indexOf(retireStatement) : -1;
+    const auditStatement = auditCall && directAwaitedExpressionStatement(owner, auditCall);
+    const completedReturn = retireIndex >= 0 ? ownerStatements[retireIndex + 3] : null;
+    const completedProperties = completedReturn && ts.isReturnStatement(completedReturn)
+        ? exactPropertyAssignments(objectLiteral(completedReturn.expression), ['completed']) : null;
+    if (retireIndex < 0 || ownerStatements[retireIndex + 1] !== completedGuard
+        || ownerStatements[retireIndex + 2] !== auditStatement
+        || !completedProperties || completedProperties.get('completed')?.initializer.kind !== ts.SyntaxKind.TrueKeyword
+        || ownerStatements.at(-1) !== completedReturn) {
+        problems.push('retirement, completed guard, awaited audit, and completed publication must be one terminal sequence');
+    }
 
     const writerCalls = directWriterCalls(auditOwner, writer, null);
     const allWriterCalls = bindingCalls(service.sourceFile, service.checker, writerBinding.symbol);
     const input = writerCalls.direct[0]?.arguments[0];
-    const properties = input && ts.isObjectLiteralExpression(input) ? input.properties : [];
-    const property = (name) => properties.find((item) => ts.isPropertyAssignment(item)
-        && (ts.isIdentifier(item.name) || ts.isStringLiteral(item.name)) && item.name.text === name);
-    const event = property('eventType');
-    const subject = property('subjectRef');
+    const auditProperties = exactPropertyAssignments(input && ts.isObjectLiteralExpression(input) ? input : null, [
+        'eventType', 'outcome', 'actorType', 'actorRef', 'subjectType', 'subjectRef',
+        'sourceSurface', 'occurredAt', 'requestId', 'redactedMetadata',
+    ]);
+    const event = auditProperties?.get('eventType');
+    const subject = auditProperties?.get('subjectRef');
     const subjectValue = subject && unwrap(subject.initializer);
     if (localBindingExists(auditOwner, writer) || localBindingExists(auditOwner, hash)
         || allWriterCalls.length !== 1 || writerCalls.all.length !== 1 || writerCalls.direct.length !== 1 || !isAwaited(writerCalls.direct[0])
-        || !event || !ts.isStringLiteral(event.initializer) || event.initializer.text !== delegated.eventType) {
+        || directAwaitedExpressionStatement(auditOwner, writerCalls.direct[0]) === null
+        || !isReachableCall(writerCalls.direct[0], auditOwner)
+        || !auditProperties || !event || !ts.isStringLiteral(event.initializer) || event.initializer.text !== delegated.eventType) {
         problems.push('delegated writer must await exactly one auth.logout event');
     }
     let eventLiteralCount = 0;
@@ -570,8 +744,12 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
     let rawSessionIdUses = 0;
     const countSessionId = (node) => { if (ts.isIdentifier(node) && node.text === 'sessionId') rawSessionIdUses += 1; ts.forEachChild(node, countSessionId); };
     if (input) countSessionId(input);
-    if (properties.some((item) => /bearer|cookie|token|raw/iu.test(item.name?.getText(service.sourceFile) ?? ''))
-        || rawSessionIdUses !== 1 || serviceSource.match(/redactedMetadata\s*:\s*[^\n]*(sessionId|bearer|cookie|token)/u)) problems.push('delegated audit exposes raw bearer material');
+    const metadata = auditProperties?.get('redactedMetadata');
+    if (!auditProperties || [...auditProperties.keys()].some((name) => /authorization|bearer|cookie|token|raw/iu.test(name))
+        || rawSessionIdUses !== 1 || !auditLiteralSyntaxIsExactAndSafe(input)
+        || (metadata && !metadataIsExactAndSafe(metadata.initializer))) {
+        problems.push('delegated audit exposes raw bearer material or unsafe metadata');
+    }
     if (hasDeferredWork(owner) || hasDeferredWork(auditOwner)) problems.push('delegated owner must not defer or float audit work');
     return problems;
 }
