@@ -1646,7 +1646,7 @@ test('the trusted ACTIVE resolver denies tombstones, wrong IDs, hostile values, 
     assert.equal(observed, 0);
 });
 
-test('the trusted ACTIVE resolver denies expiry and lifecycle reentry without mutating or cleaning the cell', async (t) => {
+test('the trusted ACTIVE resolver retires exact expiry after leaving its lifecycle and denies reentry', async (t) => {
     const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
     const cached = nodeRequire.cache[modulePath]; const ttl = process.env.MEDIFLOW_SESSION_TTL_MS; const originalNow = Date.now;
     let isolated: typeof import('./server-session') | undefined; let now = 1_000; let trigger = false; let nested = () => undefined;
@@ -1671,7 +1671,8 @@ test('the trusted ACTIVE resolver denies expiry and lifecycle reentry without mu
         now = exact.expiresAt;
         assert.equal(isolated.resolveActiveWebServerSession(expiredId), null);
         now = exact.createdAt;
-        assert.equal(isolated.resolveActiveWebServerSession(expiredId), exact, 'expiry denial performs no direct mutation or cleanup');
+        assert.equal(isolated.resolveActiveWebServerSession(expiredId), null, 'expiry observation terminally retires the exact P3 cell');
+        assert.equal(isolated.retireExpiredServerSession(expiredId).outcome, 'completed', 'lost cleanup receipt remains replay-stable');
         assert.equal(isolated.getSession(expiredId), null);
 
         for (const operation of ['delete', 'invalidate', 'clear'] as const) {
