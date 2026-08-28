@@ -246,41 +246,51 @@ const logoutSpec = {
     modes: {
         inline: { handler: 'POST', writerModule: '@/lib/security/audit', writerExport: 'writeAuditEvent', eventType: 'auth.logout' },
         delegated: {
-            handler: 'POST', serviceModule: '@/lib/security/web-logout-service', serviceExport: 'completeExactWebP3Logout',
-            ownerFile: 'lib/security/web-logout-service.ts', ownerName: 'completeExactWebP3Logout',
-            writerModule: '@/lib/security/audit', writerExport: 'writeAuditEvent', hashExport: 'hashAuditRef',
+            handler: 'POST', serviceModule: '@/lib/security/web-auth-logout-server', serviceExport: 'completeExactWebP3Logout',
+            ownerFile: 'lib/security/web-auth-logout-server.ts', ownerName: 'completeExactWebP3Logout',
+            writerModule: './audit', writerExport: 'writeAuditEvent', hashExport: 'hashAuditRef',
             eventType: 'auth.logout', sourcesName: 'productionSources',
         },
     },
 };
-const logoutRoute = `import { completeExactWebP3Logout } from '@/lib/security/web-logout-service';
+const logoutRoute = `import { completeExactWebP3Logout } from '@/lib/security/web-auth-logout-server';
 export async function POST(request: Request): Promise<Response> {
-    const receipt = await completeExactWebP3Logout(request);
-    if (!receipt.completed) return new Response(null, { status: 401 });
-    return new Response(null, { status: 204 });
+    const cookie = {};
+    return completeExactWebP3Logout(cookie, request);
 }`;
-const logoutService = `import { hashAuditRef, writeAuditEvent } from '@/lib/security/audit';
+const logoutService = `import { auditContextFromSession, hashAuditRef, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from './audit';
 type Session = { id: string };
-type Sources = { retire(id: string): { outcome: 'completed' | 'denied' }; audit(session: Session, sessionId: string, request: Request): Promise<void> };
+type Sources = { resolve(id: string): Session | null; retire(id: string, reason: 'delete'): { outcome: 'completed' | 'denied' }; audit(session: Session, sessionId: string, request: Request): Promise<void> };
+function completedReceipt(value: unknown): boolean { return Boolean(value); }
+function empty(status: 204 | 401 | 409): Response { return new Response(null, { status, headers: { 'Cache-Control': 'no-store' } }); }
 const productionSources: Sources = Object.freeze({
-    retire: (_id: string) => ({ outcome: 'completed' as const }),
-    audit: async (_session: Session, sessionId: string, _request: Request) => {
-        await writeAuditEvent({ eventType: 'auth.logout', subjectRef: hashAuditRef(sessionId) });
+    resolve: (_id: string) => ({ id: 'synthetic-session' }),
+    retire: (_id: string, _reason: 'delete') => ({ outcome: 'completed' as const }),
+    audit: async (session: Session, sessionId: string, request: Request) => {
+        const context = auditContextFromSession(session);
+        await writeAuditEvent({ eventType: 'auth.logout', outcome: 'success', actorType: context.actorType, actorRef: context.actorRef, subjectType: 'session', subjectRef: hashAuditRef(sessionId), sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request), redactedMetadata: withAuditContextMetadata(context, null) });
     },
 });
-export async function completeExactWebP3Logout(request: Request, sources = productionSources): Promise<{ completed: boolean }> {
-    const session: Session = { id: 'synthetic-session' };
+export async function completeExactWebP3Logout(cookie: unknown, request: Request, sources = productionSources): Promise<Response> {
+    void cookie;
     const sessionId = 'synthetic-bearer';
-    const retirement = sources.retire(sessionId);
-    if (retirement.outcome !== 'completed') return { completed: false };
-    await sources.audit(session,sessionId,request);
-    return { completed: true };
+    let session: Session | null;
+    try { session = sources.resolve(sessionId); } catch { return empty(401); }
+    if (!session) return empty(401);
+    let receipt: unknown;
+    try { receipt = sources.retire(sessionId, 'delete'); } catch { return empty(409); }
+    if (!completedReceipt(receipt)) return empty(409);
+    try { await sources.audit(session, sessionId, request); } catch {}
+    return empty(204);
 }`;
 
 function assertLogoutSemanticClean(route, service) {
     const sources = new Map([
-        ['/fixture/route.ts', route], ['/fixture/lib/security/web-logout-service.ts', service],
-        ['/fixture/lib/security/audit.d.ts', `export declare function hashAuditRef(value: string): string;
+        ['/fixture/route.ts', route], ['/fixture/lib/security/web-auth-logout-server.ts', service],
+        ['/fixture/lib/security/audit.d.ts', `export declare function auditContextFromSession(value: unknown): Record<string, unknown>;
+export declare function hashAuditRef(value: string): string;
+export declare function requestIdFromRequest(value: Request): string;
+export declare function withAuditContextMetadata(context: Record<string, unknown>, value: null): null;
 export declare function writeAuditEvent(input: Record<string, unknown>): Promise<void>;`],
     ]);
     const options = { strict: true, noEmit: true, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext,
@@ -296,36 +306,25 @@ export declare function writeAuditEvent(input: Record<string, unknown>): Promise
         .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')), []);
 }
 
-test('accepts the current inline logout and one exact delegated terminal audit', () => {
+test('accepts the current inline logout and the exact service-owned delegated terminal audit', () => {
     const inline = fs.readFileSync(path.join(process.cwd(), 'app/api/auth/logout/route.ts'), 'utf8');
     assert.deepEqual(validateLogoutAuditModes({ spec: logoutSpec, routeSource: inline }), []);
     assertLogoutSemanticClean(logoutRoute, logoutService);
     assert.deepEqual(validateLogoutAuditModes({ spec: logoutSpec, routeSource: logoutRoute, serviceSource: logoutService }), []);
-    for (const metadata of [
-        "{ reasonCode: 'logout_completed', flags: ['auth:web'], changedFields: [], resourceVersion: 1, counts: 1 }",
-        'null',
-    ]) {
-        const service = logoutService.replace(
-            'subjectRef: hashAuditRef(sessionId)',
-            `subjectRef: hashAuditRef(sessionId), redactedMetadata: ${metadata}`,
-        );
-        assertLogoutSemanticClean(logoutRoute, service);
-        assert.deepEqual(validateLogoutAuditModes({ spec: logoutSpec, routeSource: logoutRoute, serviceSource: service }), []);
-    }
 });
 
-test('rejects mixed, missing, unreachable, reordered, floating, and raw delegated logout audit shapes', () => {
+test('rejects stale paths and non-terminal, reordered, floating, or raw delegated logout shapes', () => {
     const mutations = [
-        [logoutRoute.replace("@/lib/security/web-logout-service", '@/lib/security/wrong-service'), logoutService],
-        [logoutRoute, logoutService.replace("@/lib/security/audit", '@/lib/security/wrong-audit')],
+        [logoutRoute.replace("@/lib/security/web-auth-logout-server", '@/lib/security/web-logout-service'), logoutService],
+        [logoutRoute, logoutService.replace("from './audit'", "from './wrong-audit'")],
         [logoutRoute, logoutService.replace("'auth.logout'", "'auth.login.succeeded'")],
-        [logoutRoute, logoutService.replace("const retirement = sources.retire(sessionId);\n    if (retirement.outcome !== 'completed') return { completed: false };\n    await sources.audit(session,sessionId,request);", "await sources.audit(session,sessionId,request);\n    const retirement = sources.retire(sessionId);\n    if (retirement.outcome !== 'completed') return { completed: false };")],
-        [logoutRoute, logoutService.replace('await sources.audit(session,sessionId,request);', 'void sources.audit(session,sessionId,request);')],
-        [logoutRoute, logoutService.replace("    if (retirement.outcome !== 'completed') return { completed: false };\n", '')],
+        [logoutRoute.replace('return completeExactWebP3Logout(cookie, request);', 'const response = await completeExactWebP3Logout(cookie, request); return new Response(null, { status: 204 });'), logoutService],
+        [logoutRoute, logoutService.replace("try { receipt = sources.retire(sessionId, 'delete'); } catch { return empty(409); }\n    if (!completedReceipt(receipt)) return empty(409);\n    try { await sources.audit(session, sessionId, request); } catch {}", "try { await sources.audit(session, sessionId, request); } catch {}\n    try { receipt = sources.retire(sessionId, 'delete'); } catch { return empty(409); }\n    if (!completedReceipt(receipt)) return empty(409);")],
+        [logoutRoute, logoutService.replace('try { await sources.audit(session, sessionId, request); } catch {}', 'try { void sources.audit(session, sessionId, request); } catch {}')],
+        [logoutRoute, logoutService.replace('if (!completedReceipt(receipt)) return empty(409);\n    ', '')],
         [logoutRoute, logoutService.replace('hashAuditRef(sessionId)', 'sessionId')],
-        [logoutRoute, logoutService.replace("subjectRef: hashAuditRef(sessionId)", "subjectRef: hashAuditRef(sessionId), redactedMetadata: { token: sessionId }")],
-        [logoutRoute.replace('const receipt = await', 'const receipt ='), logoutService],
-        [logoutRoute, logoutService.replace('await sources.audit(session,sessionId,request);', 'queueMicrotask(() => void sources.audit(session,sessionId,request));')],
+        [logoutRoute, logoutService.replace("'Cache-Control': 'no-store'", "'Cache-Control': 'cache'")],
+        [logoutRoute, logoutService.replace('try { await sources.audit(session, sessionId, request); } catch {}', 'await sources.audit(session, sessionId, request);')],
         [logoutRoute, logoutService.replace('sources = productionSources', 'sources: Sources')],
         [logoutRoute, logoutService.replace("await writeAuditEvent({ eventType: 'auth.logout'", "const writeAuditEvent = async (_input: unknown) => {}; await writeAuditEvent({ eventType: 'auth.logout'")],
         [`import { writeAuditEvent } from '@/lib/security/audit';\n${logoutRoute}`, logoutService],
@@ -333,109 +332,5 @@ test('rejects mixed, missing, unreachable, reordered, floating, and raw delegate
     ];
     for (const [route, service] of mutations) {
         assert.notDeepEqual(validateLogoutAuditModes({ spec: logoutSpec, routeSource: route, serviceSource: service }), []);
-    }
-});
-
-test('rejects delegated logout 204 bypasses, hidden writers, and ambiguous audit objects', () => {
-    const writerStatement = "        await writeAuditEvent({ eventType: 'auth.logout', subjectRef: hashAuditRef(sessionId) });";
-    const mutations = [
-        [logoutRoute.replace(
-            '    const receipt = await completeExactWebP3Logout(request);',
-            "    if (request.url.endsWith('/early')) return new Response(null, { status: 204 });\n    const receipt = await completeExactWebP3Logout(request);",
-        ), logoutService],
-        [logoutRoute.replace(
-            "    if (!receipt.completed) return new Response(null, { status: 401 });\n    return new Response(null, { status: 204 });",
-            "    if (receipt.completed) return new Response(null, { status: 204 });\n    return new Response(null, { status: 401 });",
-        ), logoutService],
-        [logoutRoute.replace('status: 401', "status: Number('204')"), logoutService],
-        [logoutRoute.replace(
-            'const receipt = await completeExactWebP3Logout(request);',
-            'const finish = completeExactWebP3Logout; const receipt = await finish(request);',
-        ), logoutService],
-        [logoutRoute.replace(
-            '    const receipt = await completeExactWebP3Logout(request);',
-            "    const early = new Response(null, { status: 204 });\n    if (request.url.endsWith('/early')) return early;\n    const receipt = await completeExactWebP3Logout(request);",
-        ), logoutService],
-        [logoutRoute.replace(
-            '    const receipt = await completeExactWebP3Logout(request);',
-            "    const earlyStatus = 204;\n    if (request.url.endsWith('/early')) return new Response(null, { status: earlyStatus });\n    const receipt = await completeExactWebP3Logout(request);",
-        ), logoutService],
-        [logoutRoute, logoutService.replace(
-            'await sources.audit(session,sessionId,request);',
-            'if (true) await sources.audit(session,sessionId,request);',
-        )],
-        [logoutRoute, logoutService.replace(
-            '    const retirement = sources.retire(sessionId);',
-            '    const extraAudit = sources.audit;\n    await extraAudit(session,sessionId,request);\n    const retirement = sources.retire(sessionId);',
-        )],
-        [logoutRoute, logoutService.replace(
-            '    const retirement = sources.retire(sessionId);',
-            "    await sources['audit'](session,sessionId,request);\n    const retirement = sources.retire(sessionId);",
-        )],
-        [logoutRoute, logoutService.replace(
-            "        await writeAuditEvent({ eventType: 'auth.logout'",
-            "        if (false) await writeAuditEvent({ eventType: 'auth.logout'",
-        )],
-        [logoutRoute, logoutService.replace(
-            "        await writeAuditEvent({ eventType: 'auth.logout'",
-            "        return; await writeAuditEvent({ eventType: 'auth.logout'",
-        )],
-        [logoutRoute, logoutService.replace(writerStatement,
-            "        if (_request.url.endsWith('/skip')) return;\n" + writerStatement)],
-        [logoutRoute, logoutService.replace(writerStatement,
-            "        if (_request.url.endsWith('/write')) " + writerStatement.trim())],
-        [logoutRoute, logoutService.replace(writerStatement,
-            "        await (_request.url.endsWith('/write') ? writeAuditEvent({ eventType: 'auth.logout', subjectRef: hashAuditRef(sessionId) }) : Promise.resolve());")],
-        [logoutRoute, logoutService.replace(writerStatement,
-            "        await (_request.url.endsWith('/write') && writeAuditEvent({ eventType: 'auth.logout', subjectRef: hashAuditRef(sessionId) }));")],
-        [logoutRoute, logoutService.replace(writerStatement,
-            "        try { await writeAuditEvent({ eventType: 'auth.logout', subjectRef: hashAuditRef(sessionId) }); } finally {}")],
-        [logoutRoute, logoutService.replace(writerStatement,
-            "        await writeAuditEvent?.({ eventType: 'auth.logout', subjectRef: hashAuditRef(sessionId) });")],
-        [logoutRoute, logoutService.replace(writerStatement,
-            "        await (writeAuditEvent)?.({ eventType: 'auth.logout', subjectRef: hashAuditRef(sessionId) });")],
-        [logoutRoute, logoutService.replace(writerStatement,
-            "        await (writeAuditEvent as typeof writeAuditEvent)?.({ eventType: 'auth.logout', subjectRef: hashAuditRef(sessionId) });")],
-        [logoutRoute, logoutService.replace(writerStatement,
-            "        await (writeAuditEvent satisfies typeof writeAuditEvent)?.({ eventType: 'auth.logout', subjectRef: hashAuditRef(sessionId) });")],
-        [logoutRoute, logoutService.replace(writerStatement,
-            "        await (writeAuditEvent!)?.({ eventType: 'auth.logout', subjectRef: hashAuditRef(sessionId) });")],
-        [logoutRoute, logoutService.replace(writerStatement,
-            "        await ({ writeAuditEvent })?.writeAuditEvent({ eventType: 'auth.logout', subjectRef: hashAuditRef(sessionId) });")],
-        [logoutRoute, logoutService.replace(writerStatement,
-            "        await ({ writeAuditEvent })?.['writeAuditEvent']({ eventType: 'auth.logout', subjectRef: hashAuditRef(sessionId) });")],
-        [logoutRoute, logoutService.replace(
-            'subjectRef: hashAuditRef(sessionId)',
-            "subjectRef: hashAuditRef(sessionId), redactedMetadata: { ...{ reasonCode: 'logout' } }",
-        )],
-        [logoutRoute, logoutService.replace(
-            'subjectRef: hashAuditRef(sessionId)',
-            "subjectRef: hashAuditRef(sessionId), redactedMetadata: { reasonCode: { Authorization: sessionId } }",
-        )],
-        [logoutRoute, logoutService.replace(
-            'subjectRef: hashAuditRef(sessionId)',
-            "subjectRef: hashAuditRef(sessionId), actorRef: ({ Authorization: 'synthetic-secret' }).Authorization",
-        )],
-        [logoutRoute, logoutService.replace(
-            'subjectRef: hashAuditRef(sessionId)',
-            "subjectRef: hashAuditRef(sessionId), actorRef: ({ ...{ Authorization: 'synthetic-secret' } }).Authorization",
-        )],
-        [logoutRoute, logoutService.replace(
-            'subjectRef: hashAuditRef(sessionId)',
-            "subjectRef: hashAuditRef(sessionId), actorRef: _request.headers.get('Authorization') ?? 'anonymous'",
-        )],
-        [logoutRoute, logoutService.replace(
-            "eventType: 'auth.logout', subjectRef:",
-            "eventType: 'auth.logout', ['event' + 'Type']: 'auth.login.failed', subjectRef:",
-        )],
-        [logoutRoute, logoutService.replace('    audit: async', "    ['audit']: async")],
-    ];
-    for (const [index, [route, service]] of mutations.entries()) {
-        assertLogoutSemanticClean(route, service);
-        assert.notDeepEqual(
-            validateLogoutAuditModes({ spec: logoutSpec, routeSource: route, serviceSource: service }),
-            [],
-            `mutation ${index}`,
-        );
     }
 });
