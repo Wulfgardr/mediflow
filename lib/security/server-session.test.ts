@@ -67,8 +67,16 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
     const errors: string[] = []; const uses = Object.entries(sources).flatMap(([file, source]) => inventoryModuleImports({
         file, source, target: 'lib/security/server-session', repositoryRoot: REPOSITORY_ROOT, allowUnresolvedExpressions: allowedGenericLoaderExpressions,
     }));
-    const logout = new Set(['lib/security/web-auth-logout-server.ts', 'lib/security/web-auth-logout-server.test.ts']);
-    const exact = new Set(['resolveActiveWebServerSession', 'dispatchActiveWebServerSessionRetirement']);
+    const logout = new Map([
+        ['lib/security/web-auth-logout-server.ts', new Set([
+            'dispatchActiveWebServerSessionRetirement', 'resolveActiveWebServerSession', 'SESSION_COOKIE_NAME',
+        ])],
+        ['lib/security/web-auth-logout-server.test.ts', new Set([
+            'activateArmedWebServerSession', 'armPreparedWebServerSession', 'clearAllSessions',
+            'dispatchActiveWebServerSessionRetirement', 'getPreparedWebServerSessionId',
+            'prepareStagedWebServerSession', 'resolveActiveWebServerSession', 'stageWebServerSession',
+        ])],
+    ]);
     for (const use of uses) {
         if (use.form === 'import-type' && use.typeOnly && use.file === 'lib/security/server-session.test.ts') continue;
         const provenDynamic = use.form === 'dynamic' && use.file === 'lib/security/web-auth-channel-cutover.test.ts'
@@ -78,7 +86,7 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
         if (!use.typeOnly && use.symbol === 'dispatchActiveWebServerSessionRetirement'
             && use.file !== 'lib/security/server-session.test.ts' && !logout.has(use.file)) errors.push(`${use.file}:dispatch`);
     }
-    for (const file of logout) {
+    for (const [file, exact] of logout) {
         if (!(file in sources)) continue;
         const runtime = uses.filter((use) => use.file === file && !use.typeOnly);
         if (runtime.some((use) => use.form !== 'named') || runtime.length !== exact.size
@@ -608,13 +616,21 @@ test('ACTIVE resource port has no callback surface or production importer before
 test('inventories exact session imports by AST and closes the logout authority boundary', () => {
     assert.deepEqual(validateSessionImports(typescriptSources()).errors, []);
     const valid = {
-        'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession as resolve, dispatchActiveWebServerSessionRetirement } from '@/lib/security/server-session';",
-        'lib/security/web-auth-logout-server.test.ts': "import { dispatchActiveWebServerSessionRetirement as dispatch, resolveActiveWebServerSession } from './server-session.ts';",
+        'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession as resolve, dispatchActiveWebServerSessionRetirement, SESSION_COOKIE_NAME } from '@/lib/security/server-session';",
+        'lib/security/web-auth-logout-server.test.ts': "import { activateArmedWebServerSession, armPreparedWebServerSession, clearAllSessions, dispatchActiveWebServerSessionRetirement as dispatch, getPreparedWebServerSessionId, prepareStagedWebServerSession, resolveActiveWebServerSession, stageWebServerSession } from './server-session.ts';",
         'lib/security/literal.ts': "// import deleteSession from './server-session'; const text = 'clearAllSessions'; const regex = /retireWebP3SessionsForUser/u; test('createNativeServerSession', () => undefined);",
         'lib/security/types.ts': "import type { ServerSession as Session } from './server-session';",
     };
     const accepted = validateSessionImports(valid);
     assert.deepEqual(accepted.errors, []); assert.equal(accepted.uses.find((use) => use.symbol === 'ServerSession')?.typeOnly, true);
+    assert.ok(validateSessionImports({
+        ...valid,
+        'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession, dispatchActiveWebServerSessionRetirement } from './server-session';",
+    }).errors.includes('lib/security/web-auth-logout-server.ts:authority'));
+    assert.ok(validateSessionImports({
+        ...valid,
+        'lib/security/web-auth-logout-server.test.ts': `${valid['lib/security/web-auth-logout-server.test.ts']}\nimport { createSession } from './server-session';`,
+    }).errors.includes('lib/security/web-auth-logout-server.test.ts:authority'));
     const rejected: Array<Record<string, string>> = [
         { 'lib/security/web-auth-logout-server.ts': "import { deleteSession as dispatch } from './server-session';" },
         { 'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession, dispatchActiveWebServerSessionRetirement, createSession, createNativeServerSession, deleteSession, invalidateSessionsForUser, retireWebP3SessionsForUser, clearAllSessions } from '../../lib/security/server-session';" },
