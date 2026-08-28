@@ -49,6 +49,7 @@ import {
     allowedGenericLoaderExpressions,
     createRequireBypassFixtures,
     createRequireShadowFixtures,
+    createRequireUnresolvedFixtures,
     inventoryModuleImports,
     moduleImportBypassFixtures,
     reservedLoaderBindingFixtures,
@@ -668,6 +669,10 @@ test('inventories exact session imports by AST and closes the logout authority b
         const shadowErrors = validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
         assert.equal(shadowErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:reserved-loader-identity').length, 1, fixture);
     }
+    for (const fixture of createRequireUnresolvedFixtures('../lib/security/server-session')) {
+        const unresolvedErrors = validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
+        assert.equal(unresolvedErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:protected-loader-unsupported').length, 1, fixture);
+    }
     const sessionSource = typescriptSources()['lib/security/server-session.test.ts']; assert.ok(sessionSource);
     const indexedReload = ['nodeRequire', '(paths[0])'].join('');
     const createRequireDrift = validateSessionImports({
@@ -695,6 +700,19 @@ test('inventories exact session imports by AST and closes the logout authority b
         'lib/security/server-session.test.ts': sessionSource.replace('const cached = nodeRequire.cache[modulePath]', 'const duplicateCached = nodeRequire.cache[modulePath]; const cached = nodeRequire.cache[modulePath]'),
     }).errors;
     assert.ok(protectedCacheDuplicate.includes('lib/security/server-session.test.ts:protected-loader-allowlist-duplicate'));
+    const dynamicResolve = ['nodeRequire', '.resolve(`./${name}`)'].join('');
+    const newDynamicResolve = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace(dynamicResolve, `(nodeRequire.resolve(pick()), ${dynamicResolve})`),
+    }).errors;
+    assert.ok(newDynamicResolve.includes('lib/security/server-session.test.ts:protected-loader-unsupported'));
+    const duplicateDynamicResolve = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace(dynamicResolve, `(${dynamicResolve}, ${dynamicResolve})`),
+    }).errors;
+    assert.ok(duplicateDynamicResolve.includes('lib/security/server-session.test.ts:protected-loader-unresolved-allowlist-duplicate'));
+    const driftDynamicResolve = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace(dynamicResolve, 'nodeRequire.resolve(name)'),
+    }).errors;
+    assert.ok(driftDynamicResolve.includes('lib/security/server-session.test.ts:protected-loader-unresolved-allowlist-drift'));
     const pm2 = typescriptSources()['lib/pm2-manager.ts']; assert.ok(pm2);
     assert.deepEqual(validateSessionImports({ 'lib/pm2-manager.ts': pm2 }).errors, []);
     assert.ok(validateSessionImports({ 'lib/pm2-manager.ts': pm2.replace("require('pm2')", "require('pm2-drift')") }).errors.includes('lib/pm2-manager.ts:reserved-loader-allowlist-drift'));
@@ -728,6 +746,7 @@ test('Node runtime resolves every inventory alias that the AST gate denies', () 
             const load=(specifier)=>import(specifier);if((await load(${JSON.stringify(canonical)})).marker!==expected)throw Error('loader');
             const nodeRequire=createRequire?.(${metaUrl});const required=nodeRequire(${JSON.stringify(commonjs)});if(required.marker!==expected)throw Error('optional-createRequire');
             const resolved=nodeRequire.resolve(${JSON.stringify(commonjs)});if(nodeRequire.cache[resolved]?.exports.marker!==expected)throw Error('require-cache');
+            const pick=()=>${JSON.stringify(commonjs)};const dynamicResolved=nodeRequire.resolve(pick());if(nodeRequire.cache[dynamicResolved]?.exports.marker!==expected)throw Error('dynamic-require-cache');
         `;
         execFileSync(process.execPath, ['--input-type=module', '--eval', script], { stdio: 'pipe' });
     } finally { rmSync(directory, { recursive: true, force: true }); }
