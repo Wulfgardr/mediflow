@@ -46,6 +46,7 @@ import {
     type WebServerSessionRetirementCleanupReceipt,
 } from './server-session';
 import {
+    allowedGenericLoaderExpressions,
     inventoryModuleImports,
     moduleImportBypassFixtures,
     repositoryTypeScriptSources,
@@ -58,14 +59,8 @@ const AUTH_CONTROL_MODULE_PATH = ['./web-auth-control', '-record.ts'].join('');
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
-    const allowedUnresolved = new Set([
-        'lib/ai-providers/fabric/document-synthesis-provider-binding.test.ts', 'lib/ai-providers/fabric/document-synthesis-provider-envelope.test.ts',
-        'lib/ai-providers/fabric/document-synthesis-source-set-currentness-owner.test.ts', 'lib/pm2-manager.test.ts',
-        'lib/security/web-auth-control-owner.test.ts', 'lib/security/web-auth-control-record.test.ts', 'lib/security/web-auth-session-issuer.test.ts',
-        'scripts/benchmark-clinical-entities.ts', 'scripts/benchmark-redaction.ts',
-    ]);
     const errors: string[] = []; const uses = Object.entries(sources).flatMap(([file, source]) => inventoryModuleImports({
-        file, source, target: 'lib/security/server-session', repositoryRoot: REPOSITORY_ROOT, allowUnresolvedFiles: allowedUnresolved,
+        file, source, target: 'lib/security/server-session', repositoryRoot: REPOSITORY_ROOT, allowUnresolvedExpressions: allowedGenericLoaderExpressions,
     }));
     const logout = new Set(['lib/security/web-auth-logout-server.ts', 'lib/security/web-auth-logout-server.test.ts']);
     const exact = new Set(['resolveActiveWebServerSession', 'dispatchActiveWebServerSessionRetirement']);
@@ -637,6 +632,19 @@ test('inventories exact session imports by AST and closes the logout authority b
         assert.notDeepEqual(result.errors, [], source);
     }
     assert.ok(validateSessionImports({ 'lib/security/extra.ts': 'import(pick());' }).errors.includes('lib/security/extra.ts:unsupported-expression'));
+    const benchmark = typescriptSources()['scripts/benchmark-redaction.ts']; assert.ok(benchmark);
+    const errors = validateSessionImports({
+        'scripts/benchmark-redaction.ts': `${benchmark}\nconst suffix=pick();import('./server-session'+suffix);`,
+    }).errors;
+    for (const form of ['unsupported-expression', 'module-path', 'dynamic']) assert.ok(errors.includes(`scripts/benchmark-redaction.ts:${form}`), form);
+    const duplicate = validateSessionImports({
+        'scripts/benchmark-redaction.ts': `${benchmark}\nconst duplicate=await import(pathToFileURL(adapterModule).href);`,
+    }).errors;
+    assert.ok(duplicate.includes('scripts/benchmark-redaction.ts:allowlist-duplicate'));
+    const drift = validateSessionImports({
+        'scripts/benchmark-redaction.ts': benchmark.replace('pathToFileURL(adapterModule).href', 'pathToFileURL(adapterModule).toString()'),
+    }).errors;
+    assert.ok(drift.includes('scripts/benchmark-redaction.ts:allowlist-drift'));
 });
 
 test('Node runtime resolves every inventory alias that the AST gate denies', () => {
