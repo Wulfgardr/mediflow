@@ -45,6 +45,87 @@ test('holds one pending, commits an exact auth CAS, and permits only one active 
     assert.deepEqual(record.disposeBoundSession('f1', 'web-1', 'f2', 4), { ok: true, fence: 'f2', generation: BigInt(2) });
 });
 
+test('cancels only the exact live pre-ticket pending tuple and preserves replay receipts', () => {
+    const { record } = control();
+    const receipt = record.begin('login', 'op-1', 'key-1', 'fp-1', 0);
+    const pending = record.snapshot();
+    const mismatches: [unknown, unknown, unknown, unknown, unknown][] = [
+        ['other', 'op-1', pending.generation, 'fp-1', 200_000],
+        ['f0', 'other', pending.generation, 'fp-1', 1],
+        ['f0', 'op-1', BigInt(1), 'fp-1', 1],
+        ['f0', 'op-1', pending.generation, 'other', 1],
+        ['f0', 'op-1', pending.generation, 'fp-1', -1],
+    ];
+    for (const values of mismatches) {
+        assert.equal(record.cancelPendingAuth(...values), 0);
+        assert.deepEqual(record.snapshot(), pending, 'a mismatch cannot advance time or clear another attempt');
+    }
+    assert.equal(record.cancelPendingAuth('f0', 'op-1', pending.generation, 'fp-1', 1), 1);
+    assert.deepEqual(record.snapshot(), { fence: 'f0', generation: BigInt(0), pending: false, active: false });
+    assert.equal(record.finalizeAuth('f0', 'op-1', pending.generation, 'fp-1', 'web', 'f1', 2).ok, false);
+    assert.deepEqual(record.begin('login', 'op-1', 'key-1', 'fp-1', 2), receipt, 'a begin replay is receipt-only');
+    assert.equal(record.snapshot().pending, false);
+    assert.equal(record.begin('login', 'op-1', 'key-2', 'fp-2', 3).ok, true, 'a new key may retry');
+    assert.equal(record.cancelPendingAuth('f0', 'op-1', BigInt(0), 'fp-1', 4), 0, 'the stale fingerprint cannot cancel the retry');
+    assert.equal(record.snapshot().pending, true);
+    assert.equal(record.cancelPendingAuth('f0', 'op-1', BigInt(0), 'fp-2', 4), 1);
+    assert.equal(record.cancelPendingAuth('f0', 'op-1', BigInt(0), 'fp-2', 4), 0);
+});
+
+test('expires exact cancellation monotonically and excludes prepared tickets and ACTIVE state', () => {
+    const expired = control().record;
+    expired.begin('login', 'op', 'key', 'fp', 0);
+    assert.equal(expired.cancelPendingAuth('f0', 'op', BigInt(0), 'fp', 120_000), 0);
+    assert.equal(expired.snapshot().pending, false);
+
+    const ticketed = control().record;
+    ticketed.begin('login', 'op', 'key', 'fp', 0);
+    const ticket = ticketed.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 1); assert.ok(ticket);
+    const before = ticketed.snapshot();
+    assert.equal(ticketed.cancelPendingAuth('f0', 'op', BigInt(0), 'fp', 2), 0, 'prepared-ticket cleanup belongs to P2c0b');
+    assert.deepEqual(ticketed.snapshot(), before);
+    assert.equal(commitAuthControlTicket(ticket), true);
+    const active = ticketed.snapshot();
+    assert.equal(ticketed.cancelPendingAuth(active.fence, 'op', active.generation, 'fp', 3), 0);
+    assert.deepEqual(ticketed.snapshot(), active);
+});
+
+test('cancellation denies hostile values and intrinsic reentry without residue', async (t) => {
+    let traps = 0;
+    const proxy = new Proxy({}, { get: () => { traps += 1; throw new Error('get'); }, ownKeys: () => { traps += 1; throw new Error('keys'); } });
+    const rejected = Promise.reject(new Error('hostile')); rejected.catch(() => undefined);
+    const record = control().record; record.begin('login', 'op', 'key', 'fp', 0);
+    const before = record.snapshot();
+    for (const value of [proxy, rejected, { then: proxy }, Symbol('x')]) {
+        assert.equal(record.cancelPendingAuth(value, 'op', BigInt(0), 'fp', 1), 0);
+        assert.equal(record.cancelPendingAuth('f0', value, BigInt(0), 'fp', 1), 0);
+        assert.equal(record.cancelPendingAuth('f0', 'op', value, 'fp', 1), 0);
+        assert.equal(record.cancelPendingAuth('f0', 'op', BigInt(0), value, 1), 0);
+        assert.equal(record.cancelPendingAuth('f0', 'op', BigInt(0), 'fp', value), 0);
+    }
+    assert.equal(traps, 0); assert.deepEqual(record.snapshot(), before);
+    const ambientThen = Object.getOwnPropertyDescriptor(Object.prototype, 'then'); let ambientReads = 0;
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get: () => { ambientReads += 1; throw new Error('ambient then'); } });
+    try { assert.equal(record.cancelPendingAuth('wrong', 'op', BigInt(0), 'fp', 1), 0); }
+    finally { if (ambientThen) Object.defineProperty(Object.prototype, 'then', ambientThen); else delete (Object.prototype as { then?: unknown }).then; }
+    assert.equal(ambientReads, 0); assert.deepEqual(record.snapshot(), before);
+
+    const original = Number.isSafeInteger; let isolated: Awaited<ReturnType<typeof freshModule>>; let nested = -1; let armed = false; let failAfterApply = false;
+    Number.isSafeInteger = ((value: unknown) => {
+        const accepted = original(value);
+        if (armed) { armed = false; nested = reentrant.cancelPendingAuth('f0', 'op', BigInt(0), 'fp', 1); if (failAfterApply) throw new Error('apply then throw'); }
+        return accepted;
+    }) as typeof Number.isSafeInteger;
+    try { isolated = await freshModule('cancel-pending-reentry'); } finally { Number.isSafeInteger = original; }
+    const reentrant = isolated.createWebAuthControlRecord('f0'); reentrant.begin('login', 'op', 'key', 'fp', 0);
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    armed = true; assert.equal(reentrant.cancelPendingAuth('f0', 'op', BigInt(0), 'fp', 1), 0); assert.equal(nested, 0); assert.equal(reentrant.snapshot().pending, true);
+    armed = true; failAfterApply = true; assert.equal(reentrant.cancelPendingAuth('f0', 'op', BigInt(0), 'fp', 1), 0); assert.equal(reentrant.snapshot().pending, true);
+    failAfterApply = false; assert.equal(reentrant.cancelPendingAuth('f0', 'op', BigInt(0), 'fp', 1), 1);
+    await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
+});
+
 test('lock preempts pending, binds its successor fence, and detaches only once on exact replay', () => {
     const { record, issued } = control();
     record.begin('setup', 'op', 'key', 'fp', 0);
