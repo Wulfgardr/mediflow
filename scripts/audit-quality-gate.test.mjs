@@ -249,7 +249,8 @@ const logoutSpec = {
             handler: 'POST', serviceModule: '@/lib/security/web-auth-logout-server', serviceExport: 'completeExactWebP3Logout',
             ownerFile: 'lib/security/web-auth-logout-server.ts', ownerName: 'completeExactWebP3Logout',
             writerModule: './audit', writerExport: 'writeAuditEvent', hashExport: 'hashAuditRef',
-            eventType: 'auth.logout', sourcesName: 'productionSources',
+            retireModule: './server-session', retireExport: 'dispatchActiveWebServerSessionRetirement',
+            eventType: 'auth.logout', sourcesName: 'productionSources', receiptValidator: 'completedReceipt',
         },
     },
 };
@@ -265,13 +266,20 @@ export async function POST(request: Request): Promise<Response> {
     return completeExactWebP3Logout(cookie, request);
 }`;
 const logoutService = `import { auditContextFromSession, hashAuditRef, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from './audit';
+import { dispatchActiveWebServerSessionRetirement } from './server-session';
 type Session = { id: string };
 type Sources = { resolve(id: string): Session | null; retire(id: string, reason: 'delete'): { outcome: 'completed' | 'denied' }; audit(session: Session, sessionId: string, request: Request): Promise<void> };
-function completedReceipt(value: unknown): boolean { return Boolean(value); }
+function exactRecord(value: unknown, keys: readonly string[], prototype: object | null, frozen: boolean): Record<string, unknown> | null {
+    void keys; void prototype; void frozen; return value as Record<string, unknown> | null;
+}
+function completedReceipt(value: unknown): boolean {
+    const record = exactRecord(value, ['outcome'], null, true);
+    return record?.outcome === 'completed';
+}
 function empty(status: 204 | 401 | 409): Response { return new Response(null, { status, headers: { 'Cache-Control': 'no-store' } }); }
 const productionSources: Sources = Object.freeze({
     resolve: (_id: string) => ({ id: 'synthetic-session' }),
-    retire: (_id: string, _reason: 'delete') => ({ outcome: 'completed' as const }),
+    retire: dispatchActiveWebServerSessionRetirement,
     audit: async (session: Session, sessionId: string, request: Request) => {
         const context = auditContextFromSession(session);
         await writeAuditEvent({ eventType: 'auth.logout', outcome: 'success', actorType: context.actorType, actorRef: context.actorRef, subjectType: 'session', subjectRef: hashAuditRef(sessionId), sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request), redactedMetadata: withAuditContextMetadata(context, null) });
@@ -294,7 +302,8 @@ function assertLogoutSemanticClean(route, service) {
     const sources = new Map([
         ['/fixture/route.ts', route], ['/fixture/lib/security/web-auth-logout-server.ts', service],
         ['/fixture/node_modules/next/headers.d.ts', `export declare function cookies(): Promise<{ get(name: string): unknown }>;`],
-        ['/fixture/lib/security/server-session.d.ts', `export declare const SESSION_COOKIE_NAME: string;`],
+        ['/fixture/lib/security/server-session.d.ts', `export declare const SESSION_COOKIE_NAME: string;
+export declare function dispatchActiveWebServerSessionRetirement(id: string, reason: 'delete'): { outcome: 'completed' | 'denied' };`],
         ['/fixture/lib/security/audit.d.ts', `export declare function auditContextFromSession(value: unknown): Record<string, unknown>;
 export declare function hashAuditRef(value: string): string;
 export declare function requestIdFromRequest(value: Request): string;
@@ -407,4 +416,88 @@ test('V5A rejects shadowed bindings, freeze drift, and a false terminal before e
         if (findings.length === 0) accepted.push(name);
     }
     assert.deepEqual(accepted, []);
+});
+
+test('V5B rejects conditional retirement, forged authority, alternate writers, and raw audit material', () => {
+    const mutations = [
+        ['unreachable retirement', logoutService.replace(
+            "try { receipt = sources.retire(sessionId, 'delete'); } catch { return empty(409); }",
+            "if (false) { try { receipt = sources.retire(sessionId, 'delete'); } catch { return empty(409); } }",
+        )],
+        ['conditional retirement', logoutService.replace(
+            "try { receipt = sources.retire(sessionId, 'delete'); } catch { return empty(409); }",
+            "if (cookie) { try { receipt = sources.retire(sessionId, 'delete'); } catch { return empty(409); } }",
+        )],
+        ['deferred retirement', logoutService.replace(
+            "try { receipt = sources.retire(sessionId, 'delete'); } catch { return empty(409); }",
+            "queueMicrotask(() => { receipt = sources.retire(sessionId, 'delete'); });",
+        )],
+        ['forged completedReceipt binding', logoutService.replace(
+            'void cookie;', 'void cookie; const completedReceipt = (_value: unknown): boolean => true;',
+        )],
+        ['forged completedReceipt body', logoutService.replace(
+            "const record = exactRecord(value, ['outcome'], null, true);\n    return record?.outcome === 'completed';",
+            "void value; return true;",
+        )],
+        ['forged production retire', logoutService.replace(
+            'retire: dispatchActiveWebServerSessionRetirement,',
+            "retire: (_id: string, _reason: 'delete') => ({ outcome: 'completed' as const }),",
+        )],
+        ['conditional audit', logoutService.replace(
+            'try { await sources.audit(session, sessionId, request); } catch {}',
+            'if (cookie) { try { await sources.audit(session, sessionId, request); } catch {} }',
+        )],
+        ['deferred audit', logoutService.replace(
+            'try { await sources.audit(session, sessionId, request); } catch {}',
+            'queueMicrotask(async () => { try { await sources.audit(session, sessionId, request); } catch {} });',
+        )],
+        ['alternate writer', logoutService.replace('await writeAuditEvent({', 'await alternateWriter({')
+            .replace("import { auditContextFromSession,", "import { writeAuditEvent as alternateWriter } from './alternate-audit';\nimport { auditContextFromSession,")],
+        ['nested writer', logoutService.replace('await writeAuditEvent({', 'await (async () => { await writeAuditEvent({')
+            .replace('redactedMetadata: withAuditContextMetadata(context, null) });', 'redactedMetadata: withAuditContextMetadata(context, null) }); })();')],
+        ['multiple writer binding', logoutService.replace(
+            'writeAuditEvent }', 'writeAuditEvent, writeAuditEvent as secondWriter }',
+        )],
+        ['raw session.id', logoutService.replace('actorRef: context.actorRef', 'actorRef: session.id')],
+        ...['bearer', 'cookie', 'token', 'authorization'].map((name) => [
+            `raw ${name} metadata`, logoutService.replace('actorRef: context.actorRef', `actorRef: ${name}`),
+        ]),
+    ];
+    const accepted = [];
+    for (const [name, service] of mutations) {
+        assert.equal(ts.createSourceFile('service.ts', service, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS).parseDiagnostics.length, 0, name);
+        let findings;
+        assert.doesNotThrow(() => {
+            findings = validateLogoutAuditModes({ spec: logoutSpec, routeSource: logoutRoute, serviceSource: service });
+        }, name);
+        if (findings.length === 0) accepted.push(name);
+    }
+    assert.deepEqual(accepted, []);
+
+    const root = process.cwd();
+    const gatePath = path.join(root, 'scripts/audit-quality-gate.mjs');
+    const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-audit-v5b-'));
+    try {
+        const gateSource = fs.readFileSync(gatePath, 'utf8');
+        const files = [...gateSource.matchAll(/\broute:\s*'([^']+)'/g).map((match) => match[1]),
+            'lib/security/audit-db.ts', 'lib/security/audit.ts', 'lib/siss-audit.ts',
+            'lib/security/pin-change-service.ts', 'lib/prosthetic-prescription-write.ts'];
+        for (const relativePath of new Set(files)) {
+            if (!fs.existsSync(path.join(root, relativePath))) continue;
+            fs.mkdirSync(path.dirname(path.join(fixtureRoot, relativePath)), { recursive: true });
+            fs.copyFileSync(path.join(root, relativePath), path.join(fixtureRoot, relativePath));
+        }
+        fs.writeFileSync(path.join(fixtureRoot, 'app/api/auth/logout/route.ts'), logoutRoute);
+        const ownerPath = path.join(fixtureRoot, 'lib/security/web-auth-logout-server.ts');
+        fs.mkdirSync(path.dirname(ownerPath), { recursive: true });
+        fs.writeFileSync(ownerPath, logoutService.replace('actorRef: context.actorRef', 'actorRef: session.id'));
+        const result = spawnSync(process.execPath, [gatePath, '--out', 'tmp/v5b.json'], { cwd: fixtureRoot });
+        const report = JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'tmp/v5b.json'), 'utf8'));
+        assert.equal(result.status, 1);
+        assert.deepEqual(report.findings.filter(({ code }) => code === 'AUDIT_ROUTE_DELEGATION'), [{
+            code: 'AUDIT_ROUTE_DELEGATION',
+            message: 'app/api/auth/logout/route.ts: delegated audit exposes raw bearer material or unsafe metadata',
+            route: 'app/api/auth/logout/route.ts', target: 'auth.logout', eventType: 'auth.logout',
+        }]);
+    } finally { fs.rmSync(fixtureRoot, { recursive: true, force: true }); }
 });
