@@ -1,0 +1,126 @@
+# ADR 0105: assunzione di integrita del processo per l'auth web
+
+Date: 2026-08-28
+Status: Accepted
+
+Issue: WUL-522
+Program line: candidato `0.8.5`
+Exact evidence: H1a `7c98474a13ce03c14b46f66d963dcb0ea2d780af`
+
+Related: [ADR 0096](./0096-owner-sessione-selezione-e-lifetime-broker.md),
+[ADR 0102](./0102-document-synthesis-source-authority.md) e
+[SECURITY.md](../../SECURITY.md).
+
+## Problema
+
+H1a acquisisce una sessione web autenticata e il relativo projection owner
+attraverso un boundary privato e fail-closed. La primitive Next `cookies()`
+restituisce pero una Promise nativa. Il suo settlement avviene nel runtime
+JavaScript condiviso e non puo essere reso indipendente da una mutazione
+process-global persistente di `Object.prototype.then` senza cambiare anche il
+boundary framework.
+
+Serve rendere esplicito quale integrita del processo assume il candidato
+0.8.5, quale minaccia resta fuori dal contratto e quali prove bloccano H1b e la
+promozione.
+
+## Decisione
+
+### Assunzione accettata per H1a
+
+Il core H1a opera sotto un'assunzione di integrita process-global:
+
+- dati controllati dalla richiesta non possono modificare prototype globali;
+- codice non fidato non viene eseguito nello stesso processo con facolta di
+  monkeypatch globale;
+- dipendenze, bootstrap e moduli server trusted non modificano
+  `Object.prototype.then` durante una richiesta autenticata.
+
+Una mutazione gia presente all'ingresso o introdotta da un callout sincrono
+osservato da H1a deve negare senza pubblicare sessione o owner. Il boundary
+non trasforma cookie, body, route, adapter o provider in authority.
+
+Questa e un'assunzione tecnica limitata, non una proprieta dimostrata contro
+un host compromesso o contro codice arbitrario gia in esecuzione nel processo.
+
+### Evidenza e limite osservato
+
+Alla SHA H1a esatta, `lib/security/server-auth.ts`:
+
+- controlla l'assenza di un `then` ambient prima dell'ingresso e attorno ai
+  callout sincroni;
+- richiede una Promise cookie nativa dello stesso realm;
+- costruisce il contesto finale come record `null`-prototype, frozen e con i
+  soli riferimenti `session` e `owner`;
+- restituisce `null` su errore, forma ostile o perdita dell'assunzione rilevata
+  prima dell'ingresso o durante callout applicativi sincroni.
+
+I test H1a provano il diniego pre-entry, la Promise cookie nativa, gli stati
+sessione/database negati e l'uso degli intrinsic catturati. Non provano
+l'integrita generale del processo.
+
+Una mutazione persistente e concorrente di `Object.prototype.then` durante il
+settlement della Promise nativa di `cookies()` puo invece impedire il settlement
+e negare disponibilita. Nel perimetro osservato non pubblica un contesto
+autenticato, non concede authority e non avvia callout applicativi di stadi
+successivi. Questo residuo resta un rischio di disponibilita, non una garanzia
+contro ogni forma futura di reentry o modifica del framework.
+
+### Alternative escluse dalla 0.8.5
+
+Non introduciamo in questa release:
+
+- timeout o policy di race non misurati;
+- freeze globale dei prototype o monkeypatch del runtime;
+- riscrittura ampia di `requireSession` o del framework auth;
+- capability pre-acquisite o redesign delle route;
+- un nuovo boundary pubblico per aggirare la Promise cookie di Next.
+
+Queste opzioni aumentano il perimetro o spostano il rischio senza una prova
+proporzionata. Una loro futura adozione richiede un packet e una decisione
+separati.
+
+## Threat actor e confine
+
+Il boundary copre input di richiesta, oggetti ostili presentati alle funzioni
+H1a e drift sincrono nei callout osservati. Non copre malware, host OS
+compromesso, dipendenza server malevola, plugin in-process non fidato o codice
+trusted che mantenga una mutazione globale concorrente.
+
+Se una di queste capacita entra nel threat model operativo, l'assunzione non e
+piu valida e H1a torna in `HOLD_SECURITY`.
+
+## Gate H1b e release
+
+H1b puo procedere solo se conserva la SHA H1a esatta nella propria ancestry,
+consuma esclusivamente il contesto canonico H1a e ripete i falsificatori sul
+tree integrato. H1b non puo ampliare `requireSession`, accettare un contesto
+ricostruito o trattare una denial come sessione valida.
+
+Prima della release, la review di sicurezza sull'exact release candidate deve:
+
+1. verificare che nessun input di richiesta raggiunga mutation di prototype;
+2. ripetere poison pre-entry e durante ogni callout sincrono;
+3. verificare che il poison persistente durante la Promise cookie produca al
+   massimo denial/disponibilita e mai pubblicazione di sessione o owner;
+4. verificare assenza di `unhandledRejection`, lavoro differito e authority
+   recuperabile dopo la denial;
+5. riesaminare bootstrap, dipendenze server e nuovi plugin in-process.
+
+Un esito diverso, una mutazione globale raggiungibile da input, una modifica
+della semantica `cookies()`, un nuovo runtime multi-tenant o un plugin
+in-process non fidato sono trigger obbligatori di revisione.
+
+## Claim ceiling e stop rule
+
+Il claim massimo e: **H1a e un candidato locale fail-closed sotto
+l'assunzione documentata di integrita process-global; il residuo noto e una
+possibile perdita di disponibilita senza pubblicazione osservata di authority.**
+
+Fermare H1b o la promozione se il poison pubblica un contesto, resta lavoro
+post-denial, produce una rejection non gestita, l'assunzione non e verificabile
+sul tree integrato o la review di sicurezza non copre questo confine.
+
+Questo ADR non dimostra la catena auth completa, sicurezza generale,
+compliance, disponibilita, integrazione, release readiness o release. Non
+modifica runtime, test, route, cookie, database, provider, persistenza o apply.

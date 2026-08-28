@@ -159,6 +159,24 @@ La policy canonica è definita in [docs/adr/0017-auth-lockout-policy.md](./docs/
   - `423 AUTH_LOCKED` quando il lockout è attivo, con header `Retry-After`
 - Il bearer token `/api/v1` già bootstrapato non introduce una policy separata: il controllo avviene sul PIN condiviso prima dell'emissione della sessione web o dell'unlock native.
 
+### Integrita del processo per l'acquisizione auth web H1a
+
+[ADR 0105](./docs/adr/0105-web-auth-process-integrity-assumption.md) limita
+l'acquisizione privata H1a a un processo server trusted: input di richiesta e
+adapter non possono modificare prototype globali o eseguire monkeypatch nello
+stesso processo. Poison presente all'ingresso o introdotto da un callout
+sincrono osservato deve negare senza pubblicare sessione o projection owner.
+
+Resta un rischio di disponibilita: una mutazione persistente e concorrente di
+`Object.prototype.then` durante il settlement della Promise nativa di
+`cookies()` puo negare l'acquisizione. Non deve produrre un contesto autenticato,
+authority recuperabile o lavoro post-denial. Il rischio va riprovato sul tree
+integrato H1b e nell'audit di sicurezza dell'exact release candidate.
+
+Questa assunzione non copre host compromesso, dipendenze malevole o plugin
+in-process non fidati e non dimostra la catena auth completa o la sicurezza
+generale del prodotto.
+
 ---
 
 ## 🧱 Proxy verso servizi locali (sicurezza SSRF)

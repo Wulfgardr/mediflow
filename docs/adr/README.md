@@ -6,6 +6,7 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
+- [0105-web-auth-process-integrity-assumption.md](./0105-web-auth-process-integrity-assumption.md): accetta per H1a l'assunzione di integrita process-global e registra il residuo di disponibilita e i gate H1b/security.
 - [0104-web-lock-revocation-fence-and-credential-transport.md](./0104-web-lock-revocation-fence-and-credential-transport.md): accetta fence process-local per lock Web e binding control/session; runtime e native restano non implementati.
 - [0102-document-synthesis-source-authority.md](./0102-document-synthesis-source-authority.md): fissa il source-set host-owned, le citazioni validate e la receipt review-only per Document Synthesis.
 - [0103-headless-clinician-authorized-soap-entry-write.md](./0103-headless-clinician-authorized-soap-entry-write.md): accetta una sola scrittura SOAP locale a conferma clinica monouso; runtime, Fabric e apply generale restano non implementati.
