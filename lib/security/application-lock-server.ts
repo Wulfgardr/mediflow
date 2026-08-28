@@ -3,9 +3,7 @@ import 'server-only';
 
 import { NextResponse } from 'next/server';
 
-import { sessionCookieOptionsForRequest } from './request-transport';
 import {
-    SESSION_COOKIE_NAME,
     type ServerSession,
     type ServerSessionCleanupOutcome,
 } from './server-session';
@@ -72,13 +70,21 @@ export function applicationLockHttpStatus(receipt: ApplicationLockReceipt): 200 
     return receipt.state === 'server_invalidation_confirmed' ? 200 : 409;
 }
 
-export function createApplicationLockResponse(request: Request, receipt: ApplicationLockReceipt): NextResponse {
-    const response = NextResponse.json(receipt, { status: applicationLockHttpStatus(receipt) });
-    if (receipt.state === 'server_invalidation_confirmed') {
-        response.cookies.set(SESSION_COOKIE_NAME, '', {
-            ...sessionCookieOptionsForRequest(request),
-            maxAge: 0,
-        });
+/** Audit is ancillary evidence and cannot retrograde a completed invalidation. */
+/* @Codex */
+export async function preserveApplicationLockReceipt(
+    receipt: ApplicationLockReceipt,
+    audit: () => PromiseLike<unknown> | unknown,
+): Promise<ApplicationLockReceipt> {
+    if (receipt.state !== 'server_invalidation_confirmed') return receipt;
+    try {
+        await audit();
+    } catch {
+        // The server-side invalidation receipt remains authoritative if audit fails.
     }
-    return response;
+    return receipt;
+}
+
+export function createApplicationLockResponse(receipt: ApplicationLockReceipt): NextResponse {
+    return NextResponse.json(receipt, { status: applicationLockHttpStatus(receipt) });
 }
