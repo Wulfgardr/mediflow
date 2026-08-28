@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import Module, { createRequire } from 'node:module';
-import test from 'node:test';
+import { runInNewContext } from 'node:vm';
+import test, { describe } from 'node:test';
 
 type AuthContext = Readonly<{ session: object; owner: object }>;
 type Hook = (() => void) | undefined;
@@ -11,7 +12,7 @@ type State = {
     user: Record<string, unknown>; userResult: unknown; owner: Record<string, unknown>; ownerResult: unknown;
     cookiesCalls: number; cookieGetCalls: number; getSessionCalls: number; getCalls: number;
     deleteSessionCalls: number; acquireCalls: number; onCookies: Hook; onCookieGet: Hook; onGetSession: Hook;
-    onGet: Hook; onDeleteSession: Hook; onAcquire: Hook;
+    onEq: Hook; onSelect: Hook; onFrom: Hook; onWhere: Hook; onGet: Hook; onDeleteSession: Hook; onAcquire: Hook;
 };
 
 const session = { id: 'session.synthetic.auth', userId: 'user.synthetic.auth', username: ['synthetic', '-user'].join(''), role: 'doctor', authChannel: 'web', createdAt: 1, expiresAt: 9_999_999_999_999 };
@@ -24,7 +25,8 @@ const state = {
     session, sessionResult: session as unknown, cookieResult: undefined, cookieRecord: { name: 'mediflow_session', value: session.id },
     user: { id: session.userId, username: session.username, role: session.role }, userResult: undefined, owner, ownerResult: owner,
     cookiesCalls: 0, cookieGetCalls: 0, getSessionCalls: 0, getCalls: 0, deleteSessionCalls: 0, acquireCalls: 0,
-    onCookies: undefined, onCookieGet: undefined, onGetSession: undefined, onGet: undefined, onDeleteSession: undefined, onAcquire: undefined,
+    onCookies: undefined, onCookieGet: undefined, onGetSession: undefined, onEq: undefined, onSelect: undefined, onFrom: undefined,
+    onWhere: undefined, onGet: undefined, onDeleteSession: undefined, onAcquire: undefined,
 } as State;
 const cookieStore = { get: () => { state.cookieGetCalls += 1; state.onCookieGet?.(); return state.cookieRecord; } };
 
@@ -35,8 +37,27 @@ moduleApi._load = function (request, parent, isMain) {
     if (request === 'server-only') return {};
     if (request === 'next/headers') return { cookies: () => { state.cookiesCalls += 1; state.onCookies?.(); return state.cookieResult; } };
     if (request === 'next/server') return { NextResponse: { json: () => null } };
-    if (request === 'drizzle-orm') return { eq: () => ({}) };
-    if (request === '@/lib/db-server') return { dbServer: { select: () => ({ from: () => ({ where: () => ({ get: () => { state.getCalls += 1; state.onGet?.(); return state.userResult; } }) }) }) } };
+    if (request === 'drizzle-orm') return { eq: () => { state.onEq?.(); return {}; } };
+    if (request === '@/lib/db-server') {
+        return {
+            dbServer: {
+                select() {
+                    state.onSelect?.();
+                    return {
+                        from() {
+                            state.onFrom?.();
+                            return {
+                                where() {
+                                    state.onWhere?.();
+                                    return { get() { state.getCalls += 1; state.onGet?.(); return state.userResult; } };
+                                },
+                            };
+                        },
+                    };
+                },
+            },
+        };
+    }
     if (request === '@/lib/schema') return { users: { id: 'id', username: ['user', 'name'].join(''), role: 'role' } };
     if (request === '@/lib/security/server-session') return {
         SESSION_COOKIE_NAME: 'mediflow_session', getSession: () => { state.getSessionCalls += 1; state.onGetSession?.(); return state.sessionResult; },
@@ -46,14 +67,18 @@ moduleApi._load = function (request, parent, isMain) {
     if (request === '@/lib/security/local-api-auth') return { requireLocalApiToken: () => null };
     return originalLoad.call(this, request, parent, isMain);
 };
-try { acquire = (createRequire(import.meta.url)('./server-auth') as { acquireAuthenticatedWebSessionProjectionOwnerContext: typeof acquire }).acquireAuthenticatedWebSessionProjectionOwnerContext; }
+try {
+    const loaded = createRequire(import.meta.url)('./server-auth.ts') as { acquireAuthenticatedWebSessionProjectionOwnerContext: () => Promise<AuthContext | null> };
+    acquire = loaded.acquireAuthenticatedWebSessionProjectionOwnerContext;
+}
 finally { moduleApi._load = originalLoad; }
 
 function reset(): void {
     state.sessionResult = session; state.cookieResult = Promise.resolve(cookieStore); state.cookieRecord = { name: 'mediflow_session', value: session.id };
     state.userResult = state.user; state.ownerResult = owner;
     state.cookiesCalls = 0; state.cookieGetCalls = 0; state.getSessionCalls = 0; state.getCalls = 0; state.deleteSessionCalls = 0; state.acquireCalls = 0;
-    state.onCookies = undefined; state.onCookieGet = undefined; state.onGetSession = undefined; state.onGet = undefined; state.onDeleteSession = undefined; state.onAcquire = undefined;
+    state.onCookies = undefined; state.onCookieGet = undefined; state.onGetSession = undefined; state.onEq = undefined; state.onSelect = undefined;
+    state.onFrom = undefined; state.onWhere = undefined; state.onGet = undefined; state.onDeleteSession = undefined; state.onAcquire = undefined;
 }
 
 const initialThen = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
@@ -71,12 +96,23 @@ function assertContext(value: unknown): asserts value is AuthContext {
     assert.deepEqual(Object.getOwnPropertyDescriptor(value, 'owner'), { value: owner, writable: false, enumerable: true, configurable: false });
 }
 
-test('fenced private acquisition preserves ordinary identities with synchronous DB', { concurrency: false }, async () => {
+let testTail = Promise.resolve();
+function serialTest(name: string, options: { concurrency?: boolean }, action: () => Promise<void>): void {
+    test(name, options, async () => {
+        const prior = testTail; let release!: () => void;
+        testTail = new Promise<void>((resolve) => { release = resolve; });
+        await prior;
+        try { await action(); } finally { release(); }
+    });
+}
+
+describe('H1b auth-context adversarial matrix', { concurrency: 1 }, () => {
+serialTest('fenced private acquisition preserves ordinary identities with synchronous DB', { concurrency: false }, async () => {
     reset(); const result = await acquire(); assertContext(result); assert.equal(result.session, session); assert.equal(result.owner, owner);
     assert.deepEqual([state.cookiesCalls, state.cookieGetCalls, state.getSessionCalls, state.getCalls, state.acquireCalls], [1, 1, 1, 1, 1]);
 });
 
-test('unsafe pre-entry Object.prototype.then denies before cookies without reads or unhandled rejection', { concurrency: false }, async () => {
+serialTest('unsafe pre-entry Object.prototype.then denies before cookies without reads or unhandled rejection', { concurrency: false }, async () => {
     const descriptors: PropertyDescriptor[] = [
         { configurable: true, get: () => { throw new Error('ambient then'); } },
         { configurable: true, value: () => 'ambient', writable: true },
@@ -88,7 +124,7 @@ test('unsafe pre-entry Object.prototype.then denies before cookies without reads
     }
 });
 
-test('requires a same-realm native cookie Promise and consumes native rejection', { concurrency: false }, async () => {
+serialTest('requires a same-realm native cookie Promise and consumes native rejection', { concurrency: false }, async () => {
     class CookiePromise<T> extends Promise<T> {}
     const invalid: unknown[] = [new CookiePromise((resolve) => resolve(cookieStore)), new Proxy(Promise.resolve(cookieStore), {}), Object.create(Promise.prototype), { get then() { throw new Error('thenable read'); } }];
     for (const value of invalid) {
@@ -98,7 +134,7 @@ test('requires a same-realm native cookie Promise and consumes native rejection'
     assert.equal(rejected.value, null); assert.deepEqual(rejected.unhandled, []); assert.equal(state.cookieGetCalls, 0);
 });
 
-test('fails closed for missing, expired, user-missing and database failure states', { concurrency: false }, async () => {
+serialTest('fails closed for missing, expired, user-missing and database failure states', { concurrency: false }, async () => {
     reset(); state.cookieRecord = undefined; assert.equal(await acquire(), null); assert.equal(state.getSessionCalls, 0);
     reset(); state.sessionResult = { ...session, expiresAt: 0 }; assert.equal(await acquire(), null); assert.equal(state.getCalls, 0);
     reset(); state.userResult = undefined; assert.equal(await acquire(), null); assert.equal(state.deleteSessionCalls, 1);
@@ -106,7 +142,7 @@ test('fails closed for missing, expired, user-missing and database failure state
     reset(); state.ownerResult = null; assert.equal(await acquire(), null); assert.equal(state.acquireCalls, 1);
 });
 
-test('uses captured construction intrinsics and keeps public requireSession separate', { concurrency: false }, async () => {
+serialTest('uses captured construction intrinsics and keeps public requireSession separate', { concurrency: false }, async () => {
     reset(); const originals = { create: Object.create, define: Object.defineProperty, freeze: Object.freeze }; let result: AuthContext | null = null;
     try {
         Object.create = (() => { throw new Error('poisoned create'); }) as typeof Object.create;
@@ -117,4 +153,87 @@ test('uses captured construction intrinsics and keeps public requireSession sepa
     assertContext(result);
     const source = readFileSync(new URL('./server-auth.ts', import.meta.url), 'utf8'); const start = source.indexOf('export async function acquireAuthenticatedWebSessionProjectionOwnerContext'); const end = source.indexOf('export async function acquireAuthenticatedWebSessionProjectionOwner()', start);
     assert.ok(start >= 0 && end > start); assert.doesNotMatch(source.slice(start, end), /requireSession/u); assert.match(source, /export async function requireSession\(\): Promise<ServerSession \| null>/u);
+    const poisonAmbientThen = (): void => {
+        Object.defineProperty(Object.prototype, 'then', { configurable: true, value: () => undefined, writable: true });
+    };
+    const stages = ['onCookies', 'onCookieGet', 'onGetSession', 'onEq', 'onSelect', 'onFrom', 'onWhere', 'onGet', 'onDeleteSession', 'onAcquire'] as const;
+    for (const stage of stages) {
+        reset();
+        if (stage === 'onDeleteSession') state.userResult = undefined;
+        state[stage] = poisonAmbientThen;
+        const observed = await noUnhandled(async () => { try { return await acquire(); } finally { restoreThen(); } });
+        assert.equal(observed.value, null); assert.deepEqual(observed.unhandled, []);
+        if (stage !== 'onAcquire') assert.equal(state.acquireCalls, 0);
+        if (stage !== 'onCookies') assert.equal(state.cookiesCalls, 1);
+        if (stage === 'onCookieGet') assert.equal(state.cookieGetCalls, 1);
+        if (stage === 'onGetSession') assert.equal(state.getSessionCalls, 1);
+        if (stage === 'onDeleteSession') assert.equal(state.deleteSessionCalls, 1);
+        if (stage === 'onAcquire') assert.equal(state.acquireCalls, 1);
+    }
+
+    reset();
+    const settledCookieStore = { then: undefined, get: cookieStore.get };
+    state.cookieResult = new Promise((resolve) => queueMicrotask(() => { poisonAmbientThen(); resolve(settledCookieStore); }));
+    const observed = await noUnhandled(async () => { try { return await acquire(); } finally { restoreThen(); } });
+    assert.equal(observed.value, null); assert.deepEqual(observed.unhandled, []);
+    assert.equal(state.cookiesCalls, 1); assert.equal(state.cookieGetCalls, 0); assert.equal(state.getSessionCalls, 0); assert.equal(state.acquireCalls, 0);
+
+    class CookiePromise<T> extends Promise<T> {}
+    let thenReads = 0;
+    const factories: Array<() => unknown> = [
+        () => runInNewContext('Promise.resolve({})'),
+        () => runInNewContext('Promise.reject(new Error("synthetic rejection"))'),
+        () => new CookiePromise((resolve) => resolve(cookieStore)),
+        () => new CookiePromise((_, reject) => reject(new Error('synthetic subclass rejection'))),
+        () => new Proxy(Promise.resolve(cookieStore), {}),
+        () => new Proxy(Promise.resolve(cookieStore), { get() { throw new Error('proxy read'); } }),
+        () => Object.create(Promise.prototype),
+        () => ({ get then() { thenReads += 1; throw new Error('thenable read'); } }),
+    ];
+    for (const factory of factories) {
+        reset();
+        const observed = await noUnhandled(() => { state.cookieResult = factory(); return acquire(); });
+        assert.equal(observed.value, null); assert.deepEqual(observed.unhandled, []);
+        assert.equal(state.cookieGetCalls, 0); assert.equal(state.getSessionCalls, 0); assert.equal(state.acquireCalls, 0);
+    }
+    assert.equal(thenReads, 0);
+
+    let proxyTraps = 0; let accessorReads = 0;
+    const proxy = new Proxy({ name: 'mediflow_session', value: session.id }, {
+        get() { proxyTraps += 1; throw new Error('proxy read'); }, ownKeys() { proxyTraps += 1; return []; },
+    });
+    const accessor = { name: 'mediflow_session', value: session.id };
+    Object.defineProperty(accessor, 'value', { configurable: true, enumerable: true, get() { accessorReads += 1; return session.id; } });
+    const nonEnumerable = { name: 'mediflow_session', value: session.id };
+    Object.defineProperty(nonEnumerable, 'value', { configurable: true, enumerable: false, writable: true, value: session.id });
+    const customPrototype = Object.assign(Object.create({ inherited: true }), { name: 'mediflow_session', value: session.id });
+    const extra = { name: 'mediflow_session', value: session.id, extra: true };
+    const symbolic = { name: 'mediflow_session', value: session.id, [Symbol('synthetic')]: true };
+    for (const record of [proxy, accessor, nonEnumerable, customPrototype, extra, symbolic]) {
+        reset(); state.cookieRecord = record;
+        const observed = await noUnhandled(acquire);
+        assert.equal(observed.value, null); assert.deepEqual(observed.unhandled, []); assert.equal(state.getSessionCalls, 0); assert.equal(state.acquireCalls, 0);
+    }
+    assert.equal(proxyTraps, 0); assert.equal(accessorReads, 0);
+
+    reset();
+    const intrinsicOriginals = {
+        own: Object.getOwnPropertyDescriptor, proto: Object.getPrototypeOf, apply: Reflect.apply, keys: Reflect.ownKeys,
+        now: Date.now, finite: Number.isFinite,
+    };
+    let intrinsicResult: AuthContext | null = null;
+    try {
+        Object.getOwnPropertyDescriptor = (() => { throw new Error('poisoned descriptor'); }) as typeof Object.getOwnPropertyDescriptor;
+        Object.getPrototypeOf = (() => { throw new Error('poisoned prototype'); }) as typeof Object.getPrototypeOf;
+        Reflect.apply = (() => { throw new Error('poisoned apply'); }) as typeof Reflect.apply;
+        Reflect.ownKeys = (() => { throw new Error('poisoned keys'); }) as typeof Reflect.ownKeys;
+        Date.now = (() => { throw new Error('poisoned clock'); }) as typeof Date.now;
+        Number.isFinite = (() => { throw new Error('poisoned finite'); }) as typeof Number.isFinite;
+        intrinsicResult = await acquire();
+    } finally {
+        Object.getOwnPropertyDescriptor = intrinsicOriginals.own; Object.getPrototypeOf = intrinsicOriginals.proto; Reflect.apply = intrinsicOriginals.apply; Reflect.ownKeys = intrinsicOriginals.keys;
+        Date.now = intrinsicOriginals.now; Number.isFinite = intrinsicOriginals.finite; restoreThen();
+    }
+    assertContext(intrinsicResult); const snapshot = intrinsicResult; await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(intrinsicResult, snapshot); assertContext(intrinsicResult);
+});
 });
