@@ -8,7 +8,14 @@ import {
 /* @Codex */
 import { verifyHostCredentials } from '@/lib/security/host-credential-verification';
 /* @Codex */
-import { createSession, SESSION_COOKIE_NAME } from '@/lib/security/server-session';
+import { SESSION_COOKIE_NAME } from '@/lib/security/server-session';
+/* @Codex */
+import {
+    abort as abortWebAuthSession,
+    begin as beginWebAuthSession,
+    issue as issueWebAuthSession,
+    type WebAuthSessionAttempt,
+} from '@/lib/security/web-auth-session-issuer';
 /* @Codex */
 import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
 
@@ -24,6 +31,7 @@ function authFailureResponse(payload: Record<string, unknown>, status: number) {
 }
 
 export async function POST(request: Request) {
+    let attempt: WebAuthSessionAttempt | null = null;
     try {
         const body = await request.json();
         const requestedUsername = typeof body?.username === 'string' ? body.username.trim() : '';
@@ -33,22 +41,28 @@ export async function POST(request: Request) {
             return authFailureResponse({ error: 'Missing credentials', code: 'AUTH_MISSING_CREDENTIALS' }, 400);
         }
 
+        attempt = beginWebAuthSession('login');
+        if (!attempt) {
+            return authFailureResponse({ error: 'Login unavailable', code: 'AUTH_LOGIN_UNAVAILABLE' }, 503);
+        }
+
         // The shared verifier records 'auth.login.failed' with Web-only context.
         const verification = await verifyHostCredentials({ username: requestedUsername, pin: password });
-        if (verification.kind === 'denied') return authFailureResponse(verification.body, verification.status);
+        if (verification.kind === 'denied') {
+            abortWebAuthSession(attempt);
+            attempt = null;
+            return authFailureResponse(verification.body, verification.status);
+        }
         const user = verification.account;
-
-        // Return the encrypted key blob. 
-        // NOTE: We do NOT set a session cookie here yet because this is a local app 
-        // and we rely on the client holding the decrypted MasterKey in memory as the "Session".
-        // If they reload, they must login again to decrypt the key. 
-        // This is arguably more secure than a persistent cookie for a medical app.
-
-        /* @Codex */
-        const session = createSession(
-            { id: user.id, username: user.username, role: user.role || 'user' },
-            'web',
-        );
+        const session = issueWebAuthSession(attempt, {
+            id: user.id,
+            username: user.username,
+            role: user.role || 'user',
+        });
+        attempt = null;
+        if (!session) {
+            return authFailureResponse({ error: 'Login unavailable', code: 'AUTH_LOGIN_UNAVAILABLE' }, 503);
+        }
         try {
             await writeAuditEvent({
                 eventType: 'auth.login.succeeded',
@@ -56,7 +70,7 @@ export async function POST(request: Request) {
                 actorType: 'user',
                 actorRef: user.id,
                 subjectType: 'session',
-                subjectRef: session.id,
+                subjectRef: session.sessionId,
                 sourceSurface: 'web',
                 requestId: requestIdFromRequest(request),
                 redactedMetadata: withAuditContextMetadata({
@@ -79,10 +93,11 @@ export async function POST(request: Request) {
             encryptedMasterKey: user.encryptedMasterKey,
             salt: user.salt
         });
-        response.cookies.set(SESSION_COOKIE_NAME, session.id, sessionCookieOptionsForRequest(request));
+        response.cookies.set(SESSION_COOKIE_NAME, session.sessionId, sessionCookieOptionsForRequest(request));
         response.headers.set('Cache-Control', 'no-store');
         return response;
     } catch (error) {
+        if (attempt) abortWebAuthSession(attempt);
         console.error("Login error:", error);
         return authFailureResponse({ error: "Login failed", code: "AUTH_LOGIN_FAILED" }, 500);
     }

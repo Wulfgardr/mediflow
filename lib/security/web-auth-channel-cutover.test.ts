@@ -80,7 +80,7 @@ test('login delegates credentials, preserves its Web contract, and records Web a
     assert.equal(body.encryptedMasterKey, WRAPPED_KEY);
     assert.equal(body.salt, SALT);
     const id = sessionId(response);
-    assert.equal(getSession(id)?.authChannel, 'web');
+    assert.equal(getSession(id), null);
     const audit = (await listAuditEvents({ eventType: 'auth.login.succeeded' }))
         .find((event) => event.subjectRef === id);
     assert.equal(audit?.sourceSurface, 'web');
@@ -92,9 +92,11 @@ test('routes make Web authority literal, do not read source-surface, and retain 
     assert.match(loginSource, /from '@\/lib\/security\/host-credential-verification'/u);
     assert.match(loginSource, /verifyHostCredentials\(\{ username: requestedUsername, pin: password \}\)/u);
     assert.match(loginSource, /authFailureResponse\(verification\.body, verification\.status\)/u);
-    assert.match(loginSource, /createSession\([\s\S]*?'web',\s*\)/u);
+    assert.match(loginSource, /beginWebAuthSession\('login'\)/u);
+    assert.match(loginSource, /issueWebAuthSession\(attempt,\s*\{[\s\S]*?id:\s*user\.id[\s\S]*?\}\);/u);
+    assert.doesNotMatch(loginSource, /createSession\(/u);
     assert.match(setupSource, /createSession\([\s\S]*?'web',\s*\)/u);
     assert.doesNotMatch(loginSource, /auditSourceSurfaceFromRequest|sourceSurface === 'native'/u);
     assert.doesNotMatch(setupSource, /auditSourceSurfaceFromRequest|sourceSurface === 'native'/u);
-    assert.match(loginSource, /const session = createSession[\s\S]*?try\s*\{\s*await writeAuditEvent[\s\S]*?catch/u);
+    assert.match(loginSource, /const session = issueWebAuthSession[\s\S]*?try\s*\{\s*await writeAuditEvent[\s\S]*?catch/u);
 });
