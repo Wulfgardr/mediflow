@@ -66,6 +66,40 @@ autenticato, non concede authority e non avvia callout applicativi di stadi
 successivi. Questo residuo resta un rischio di disponibilita, non una garanzia
 contro ogni forma futura di reentry o modifica del framework.
 
+### Responsabilita delle rejection e diniego dei Proxy
+
+Il gate distingue tre casi. Questa distinzione non amplia gli input accettati:
+
+1. **Promise nativa accettata dal boundary.** Se il producer canonico
+   `cookies()` consegna una Promise nativa dello stesso realm e H1a la accetta,
+   H1a possiede il settlement. Ogni rejection deve diventare denial osservata,
+   senza `unhandledRejection`, lavoro post-denial o pubblicazione di authority.
+2. **Rejection osservabile dal producer.** Se un adapter, un caller o una
+   fixture crea una Promise che H1a non accetta, il producer conserva
+   l'identita della Promise e deve consumarne la rejection prima di presentare
+   il valore al boundary. Il diniego di H1a non trasferisce questa
+   responsabilita.
+3. **Target nascosto dietro un Proxy.** H1a deve negare il `Proxy` prima di
+   riflessione o assimilazione, con zero trap. Il boundary non puo recuperare
+   in modo sicuro una Promise target nascosta dal producer. Non deve chiamare
+   `then`, `Promise.resolve`, `await` o un trap per tentare di consumarne la
+   rejection. Una rejection non gestita del target resta un difetto del
+   producer fuori contratto, non una rejection accettata dal boundary.
+
+Il terzo caso non e un'eccezione runtime. E ammesso soltanto come falsificatore
+sintetico isolato quando la fixture dimostra insieme che:
+
+- la fixture possiede il target e ne consuma la rejection prima del wrapping;
+- H1a nega il `Proxy` con zero trap e senza assimilazione;
+- non vengono pubblicati sessione, owner, contesto o altra authority;
+- non restano lavoro differito, mutation o stato recuperabile dal boundary;
+- nessun listener o handler process-global sopprime rejection in produzione.
+
+Una rejection non gestita di una Promise ordinaria, di una Promise accettata o
+del producer canonico resta sempre un blocco di promozione. La classificazione
+non autorizza Proxy, thenable arbitrari, monkeypatch globali o una riduzione del
+threat model.
+
 ### Alternative escluse dalla 0.8.5
 
 Non introduciamo in questa release:
@@ -103,9 +137,15 @@ Prima della release, la review di sicurezza sull'exact release candidate deve:
 2. ripetere poison pre-entry e durante ogni callout sincrono;
 3. verificare che il poison persistente durante la Promise cookie produca al
    massimo denial/disponibilita e mai pubblicazione di sessione o owner;
-4. verificare assenza di `unhandledRejection`, lavoro differito e authority
-   recuperabile dopo la denial;
-5. riesaminare bootstrap, dipendenze server e nuovi plugin in-process.
+4. provare su Node.js 24.19 e Next.js 16.2.11 che il producer canonico
+   `cookies()` consegni una Promise nativa dello stesso realm, non un `Proxy` o
+   un thenable arbitrario;
+5. verificare che ogni rejection ordinaria, accettata o del producer canonico
+   sia gestita e non lasci lavoro differito o authority recuperabile;
+6. verificare il falsificatore sintetico del target nascosto con ownership
+   della fixture, zero trap, zero authority e nessuna assimilazione o
+   soppressione globale;
+7. riesaminare bootstrap, dipendenze server e nuovi plugin in-process.
 
 Un esito diverso, una mutazione globale raggiungibile da input, una modifica
 della semantica `cookies()`, un nuovo runtime multi-tenant o un plugin
@@ -118,8 +158,11 @@ l'assunzione documentata di integrita process-global; il residuo noto e una
 possibile perdita di disponibilita senza pubblicazione osservata di authority.**
 
 Fermare H1b o la promozione se il poison pubblica un contesto, resta lavoro
-post-denial, produce una rejection non gestita, l'assunzione non e verificabile
-sul tree integrato o la review di sicurezza non copre questo confine.
+post-denial, una rejection ordinaria o canonica non e gestita, `cookies()` non
+rispetta il contratto verificato, l'assunzione non e verificabile sul tree
+integrato o la review di sicurezza non copre questo confine. Fermare anche se
+il falsificatore del target nascosto esegue trap, assimila il valore, pubblica
+authority o usa soppressione globale.
 
 Questo ADR non dimostra la catena auth completa, sicurezza generale,
 compliance, disponibilita, integrazione, release readiness o release. Non
