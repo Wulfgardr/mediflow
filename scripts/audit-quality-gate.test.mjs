@@ -621,6 +621,12 @@ test('V5D rejects for-in and for-of targets bound to the owner session id', () =
         ['for-in target', 'for (sessionId in { forged: true }) {}'],
         ['destructured for-of target', "for ([sessionId] of [['forged']]) {}"],
         ['destructured for-in target', 'for ([sessionId] in { forged: true }) {}'],
+        ['shorthand assignment target', "({ sessionId } = { sessionId: 'forged' });"],
+        ['shorthand for-of target', "for ({ sessionId } of [{ sessionId: 'forged' }]) {}"],
+        ['default shorthand target', "({ sessionId = 'fallback' } = { sessionId: 'forged' });"],
+        ['nested shorthand target', "([{ sessionId }] = [{ sessionId: 'forged' }]);"],
+        ['shorthand for-in target', 'for ({ sessionId } in { forged: true }) {}'],
+        ['shorthand for-await target', "for await ({ sessionId } of [{ sessionId: 'forged' }]) {}"],
     ];
     const observed = mutations.map(([name, write]) => {
         const service = logoutService.replace('const sessionId = exactBearer(cookie);', `const sessionId = exactBearer(cookie); ${write}`);
@@ -630,4 +636,6 @@ test('V5D rejects for-in and for-of targets bound to the owner session id', () =
         return [name, findings];
     });
     assert.deepEqual(observed, mutations.map(([name]) => [name, ['owner session id must be the exact const bearer binding']]));
+    const unrelated = logoutService.replace('const sessionId = exactBearer(cookie);', "const sessionId = exactBearer(cookie); { let sessionId = 'unrelated'; sessionId = 'changed'; }");
+    assert.deepEqual(validateLogoutAuditModes({ spec: logoutSpec, routeSource: logoutRoute, serviceSource: unrelated }), []);
 });

@@ -612,6 +612,7 @@ function exactIdentifierBinding(checker, node, binding) {
 function bindingIsWritten(root, checker, binding) {
     let found = false;
     const containsBinding = (node) => exactIdentifierBinding(checker, node, binding)
+        || ts.isShorthandPropertyAssignment(node) && checker.getShorthandAssignmentValueSymbol(node) === binding
         || node.getChildren().some(containsBinding);
     const visit = (node) => {
         const assignment = ts.isBinaryExpression(node)
