@@ -1,12 +1,13 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, test } from 'node:test';
-import ts from 'typescript';
 
 import {
     abortActiveWebSessionResourceUse,
@@ -44,6 +45,11 @@ import {
     tombstoneArmedWebServerSession,
     type WebServerSessionRetirementCleanupReceipt,
 } from './server-session';
+import {
+    inventoryModuleImports,
+    moduleImportBypassFixtures,
+    repositoryTypeScriptSources,
+} from './module-import-inventory.test-support.ts';
 
 const SYNTHETIC_USERNAME = `synthetic-${randomUUID()}`;
 const TARGET_USERNAME = ['synthetic', 'target'].join('-');
@@ -51,112 +57,16 @@ const OTHER_USERNAME = ['synthetic', 'other'].join('-');
 const AUTH_CONTROL_MODULE_PATH = ['./web-auth-control', '-record.ts'].join('');
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
-type ImportUse = Readonly<{ file: string; form: string; symbol: string; typeOnly: boolean }>;
-type ModuleValue = Readonly<{ value: string | null; escaped: boolean }>;
-const importUses = (file: string, source: string, target: string): ImportUse[] => {
-    const uses: ImportUse[] = []; const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
-    const add = (form: string, symbol: string, typeOnly = false) => uses.push({ file, form, symbol, typeOnly });
-    const constants = new Map<string, ts.Expression>();
-    const collect = (node: ts.Node): void => {
-        if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer
-            && ts.isVariableDeclarationList(node.parent) && (node.parent.flags & ts.NodeFlags.Const) !== 0) constants.set(node.name.text, node.initializer);
-        ts.forEachChild(node, collect);
-    };
-    collect(ast);
-    const unwrap = (input: ts.Expression): ts.Expression => {
-        let node = input;
-        while (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)
-            || ts.isSatisfiesExpression(node) || ts.isNonNullExpression(node)) node = node.expression;
-        return node;
-    };
-    const evaluate = (input: ts.Expression, seen = new Set<string>()): ModuleValue => {
-        const node = unwrap(input);
-        if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-            const raw = node.getText(ast); return { value: node.text, escaped: raw.slice(1, -1) !== node.text };
-        }
-        if (ts.isTemplateExpression(node)) {
-            let value = node.head.text; let escaped = node.head.getText(ast).slice(1) !== node.head.text;
-            for (const span of node.templateSpans) {
-                const part = evaluate(span.expression, seen); if (part.value === null) return { value: null, escaped };
-                value += part.value + span.literal.text; escaped ||= part.escaped;
-            }
-            return { value, escaped };
-        }
-        if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
-            const left = evaluate(node.left, seen); const right = evaluate(node.right, seen);
-            return { value: left.value === null || right.value === null ? null : left.value + right.value, escaped: left.escaped || right.escaped };
-        }
-        if (ts.isIdentifier(node) && constants.has(node.text) && !seen.has(node.text)) {
-            const next = new Set(seen); next.add(node.text); const value = evaluate(constants.get(node.text)!, next);
-            return value;
-        }
-        return { value: null, escaped: false };
-    };
-    const targetPath = path.join(REPOSITORY_ROOT, target); const filePath = path.join(REPOSITORY_ROOT, file);
-    const expectedRelative = path.relative(path.dirname(filePath), targetPath).replaceAll(path.sep, '/');
-    const canonicalRelative = expectedRelative.startsWith('.') ? expectedRelative : `./${expectedRelative}`;
-    const relation = (expression: ts.Expression) => {
-        const evaluated = evaluate(expression); const value = evaluated.value;
-        if (value === null) {
-            const root = unwrap(expression); const text = `${expression.getText(ast)} ${ts.isIdentifier(root) ? constants.get(root.text)?.getText(ast) ?? '' : ''}`;
-            const copiedFixture = ['lib/security/web-auth-control-owner.test.ts', 'lib/security/web-auth-session-issuer.test.ts'].includes(file)
-                && text.startsWith('pathToFileURL(join(directory,');
-            return { target: false, invalid: text.includes(path.basename(target)) && !copiedFixture, unresolved: true };
-        }
-        const resolved = value.startsWith('@/') ? path.join(REPOSITORY_ROOT, value.slice(2)) : path.resolve(path.dirname(filePath), value);
-        const targetMatch = resolved === targetPath || ['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs'].some((extension) => resolved === targetPath + extension);
-        const allowed = value === `@/${target}` || value === canonicalRelative || (file.endsWith('.test.ts') && value === `${canonicalRelative}.ts`);
-        return { target: targetMatch, invalid: targetMatch && (!allowed || evaluated.escaped), unresolved: false };
-    };
-    const namedFromBinding = (node: ts.CallExpression) => {
-        let parent: ts.Node = node.parent; if (ts.isAwaitExpression(parent)) parent = parent.parent;
-        if (!ts.isVariableDeclaration(parent) || !ts.isObjectBindingPattern(parent.name)) return ['*'];
-        return parent.name.elements.map((element) => element.propertyName?.getText(ast) ?? element.name.getText(ast));
-    };
-    const loader = (input: ts.Expression, seen = new Set<string>()): 'dynamic' | 'require' | null => {
-        const node = unwrap(input); if (node.kind === ts.SyntaxKind.ImportKeyword) return 'dynamic';
-        if (ts.isIdentifier(node)) {
-            if (node.text === 'require') return 'require';
-            if (constants.has(node.text) && !seen.has(node.text)) { const next = new Set(seen); next.add(node.text); return loader(constants.get(node.text)!, next); }
-        }
-        if ((ts.isPropertyAccessExpression(node) && node.name.text === 'require')
-            || (ts.isElementAccessExpression(node) && ts.isStringLiteral(node.argumentExpression) && node.argumentExpression.text === 'require')) return 'require';
-        return null;
-    };
-    const recordModule = (expression: ts.Expression, form: string, symbols: readonly string[] = ['*'], typeOnly = false) => {
-        const found = relation(expression); if (!found.target && !found.invalid) return;
-        if (found.invalid) add('module-path', '*', typeOnly);
-        for (const symbol of symbols) add(form, symbol, typeOnly);
-    };
-    const visit = (node: ts.Node): void => {
-        if (ts.isImportDeclaration(node)) {
-            const clause = node.importClause;
-            const imported: ImportUse[] = [];
-            if (!clause) imported.push({ file, form: 'side-effect', symbol: '*', typeOnly: false });
-            else {
-                if (clause.name) imported.push({ file, form: 'default', symbol: 'default', typeOnly: clause.isTypeOnly });
-                if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings)) imported.push({ file, form: 'namespace', symbol: '*', typeOnly: clause.isTypeOnly });
-                if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) for (const item of clause.namedBindings.elements) imported.push({ file, form: 'named', symbol: item.propertyName?.text ?? item.name.text, typeOnly: clause.isTypeOnly || item.isTypeOnly });
-            }
-            const found = relation(node.moduleSpecifier); if (found.target || found.invalid) {
-                if (found.invalid) add('module-path', '*'); uses.push(...imported);
-            }
-        } else if (ts.isExportDeclaration(node) && node.moduleSpecifier) recordModule(node.moduleSpecifier, 're-export', ['*'], node.isTypeOnly);
-        else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference) && node.moduleReference.expression) recordModule(node.moduleReference.expression, 'require', [node.name.text], node.isTypeOnly);
-        else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument) && ts.isStringLiteral(node.argument.literal)) recordModule(node.argument.literal, 'import-type', ['*'], true);
-        else if (ts.isCallExpression(node)) {
-            const callee = unwrap(node.expression); const memberCall = ts.isPropertyAccessExpression(callee) && callee.name.text === 'call' && loader(callee.expression) === 'require';
-            const kind = memberCall ? 'require' : loader(node.expression); const argument = node.arguments[memberCall ? 1 : 0]; if (kind && argument) {
-                const symbols = kind === 'dynamic' ? namedFromBinding(node) : ['*'];
-                recordModule(argument, node.arguments.length === (memberCall ? 2 : 1) ? kind : `${kind}-options`, symbols);
-            }
-        }
-        ts.forEachChild(node, visit);
-    };
-    visit(ast); return uses;
-};
 const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
-    const errors: string[] = []; const uses = Object.entries(sources).flatMap(([file, source]) => importUses(file, source, 'lib/security/server-session'));
+    const allowedUnresolved = new Set([
+        'lib/ai-providers/fabric/document-synthesis-provider-binding.test.ts', 'lib/ai-providers/fabric/document-synthesis-provider-envelope.test.ts',
+        'lib/ai-providers/fabric/document-synthesis-source-set-currentness-owner.test.ts', 'lib/pm2-manager.test.ts',
+        'lib/security/web-auth-control-owner.test.ts', 'lib/security/web-auth-control-record.test.ts', 'lib/security/web-auth-session-issuer.test.ts',
+        'scripts/benchmark-clinical-entities.ts', 'scripts/benchmark-redaction.ts',
+    ]);
+    const errors: string[] = []; const uses = Object.entries(sources).flatMap(([file, source]) => inventoryModuleImports({
+        file, source, target: 'lib/security/server-session', repositoryRoot: REPOSITORY_ROOT, allowUnresolvedFiles: allowedUnresolved,
+    }));
     const logout = new Set(['lib/security/web-auth-logout-server.ts', 'lib/security/web-auth-logout-server.test.ts']);
     const exact = new Set(['resolveActiveWebServerSession', 'dispatchActiveWebServerSessionRetirement']);
     for (const use of uses) {
@@ -175,13 +85,7 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
     }
     return { errors, uses };
 };
-const sourceFiles = (directory: string): string[] => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const absolute = path.join(directory, entry.name);
-    if (entry.isDirectory() && !['.git', '.next', 'node_modules'].includes(entry.name)) return sourceFiles(absolute);
-    return entry.isFile() && /\.[cm]?tsx?$/u.test(entry.name) ? [absolute] : [];
-});
-const typescriptSources = () => Object.fromEntries(sourceFiles(REPOSITORY_ROOT)
-    .map((absolute) => [path.relative(REPOSITORY_ROOT, absolute), readFileSync(absolute, 'utf8')]));
+const typescriptSources = () => repositoryTypeScriptSources(REPOSITORY_ROOT);
 
 function authControlApi() {
     const api = createRequire(import.meta.url)(AUTH_CONTROL_MODULE_PATH) as {
@@ -727,6 +631,34 @@ test('inventories exact session imports by AST and closes the logout authority b
         { 'lib/security/extra.ts': "import { dispatchActiveWebServerSessionRetirement as dispatch } from './server-session';" },
     ];
     for (const source of rejected) assert.notDeepEqual(validateSessionImports(source).errors, []);
+    const target = path.join(REPOSITORY_ROOT, 'lib/security/server-session');
+    for (const source of moduleImportBypassFixtures('./server-session', target)) {
+        const result = validateSessionImports({ 'lib/security/web-auth-logout-server.ts': source });
+        assert.notDeepEqual(result.errors, [], source);
+    }
+    assert.ok(validateSessionImports({ 'lib/security/extra.ts': 'import(pick());' }).errors.includes('lib/security/extra.ts:unsupported-expression'));
+});
+
+test('Node runtime resolves every inventory alias that the AST gate denies', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'mediflow-session-inventory-runtime-'));
+    const target = path.join(directory, 'server-session.mjs'); const upper = path.join(directory, 'SERVER-SESSION.mjs'); const extension = path.join(directory, 'server-session.js');
+    try {
+        writeFileSync(target, "export const marker='session-inventory-runtime';\n");
+        if (process.platform !== 'darwin') symlinkSync(target, upper);
+        symlinkSync(target, extension);
+        const canonical = pathToFileURL(target).href; const encoded = canonical.replace('server-session', '%73erver-session');
+        const script = `
+            const expected='session-inventory-runtime';
+            const verify=async(specifier)=>{const loaded=await import(specifier);if(loaded.marker!==expected)throw Error(specifier)};
+            await verify(${JSON.stringify(`${canonical}?query=1`)});await verify(${JSON.stringify(`${canonical}#hash`)});
+            await verify(${JSON.stringify(encoded)});await verify(${JSON.stringify(pathToFileURL(upper).href)});await verify(${JSON.stringify(pathToFileURL(extension).href)});
+            const object={target:${JSON.stringify(canonical)}};const array=[${JSON.stringify(canonical)}];await verify(object.target);await verify(array[0]);
+            await eval(${JSON.stringify(`import(${JSON.stringify(canonical)})`)}).then((loaded)=>{if(loaded.marker!==expected)throw Error('eval')});
+            const generated=new Function(${JSON.stringify(`return import(${JSON.stringify(canonical)})`)});if((await generated()).marker!==expected)throw Error('Function');
+            const load=(specifier)=>import(specifier);if((await load(${JSON.stringify(canonical)})).marker!==expected)throw Error('loader');
+        `;
+        execFileSync(process.execPath, ['--input-type=module', '--eval', script], { stdio: 'pipe' });
+    } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
 test('compacts one exact RETIRED Web cell into a replay-stable PHI-safe tombstone receipt', () => {

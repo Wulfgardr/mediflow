@@ -2,12 +2,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import path, { join } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
-import ts from 'typescript';
 
 import {
     abortPreparedAuthControlTicket,
@@ -22,95 +21,23 @@ import {
     prepareAuthControlRetirement,
     retireAuthControlTicket,
 } from './web-auth-control-record.ts';
+import {
+    inventoryModuleImports,
+    moduleImportBypassFixtures,
+    repositoryTypeScriptSources,
+} from './module-import-inventory.test-support.ts';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-type ControlImport = Readonly<{ file: string; form: string; symbol: string; typeOnly: boolean }>;
-const controlImports = (file: string, source: string): ControlImport[] => {
-    const result: ControlImport[] = []; const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
-    const add = (form: string, symbol: string, typeOnly = false) => result.push({ file, form, symbol, typeOnly });
-    const constants = new Map<string, ts.Expression>();
-    const collect = (node: ts.Node): void => {
-        if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer
-            && ts.isVariableDeclarationList(node.parent) && (node.parent.flags & ts.NodeFlags.Const) !== 0) constants.set(node.name.text, node.initializer);
-        ts.forEachChild(node, collect);
-    };
-    collect(ast);
-    const unwrap = (input: ts.Expression): ts.Expression => {
-        let node = input;
-        while (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)
-            || ts.isSatisfiesExpression(node) || ts.isNonNullExpression(node)) node = node.expression;
-        return node;
-    };
-    const evaluate = (input: ts.Expression, seen = new Set<string>()): { value: string | null; escaped: boolean } => {
-        const node = unwrap(input);
-        if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-            const raw = node.getText(ast); return { value: node.text, escaped: raw.slice(1, -1) !== node.text };
-        }
-        if (ts.isTemplateExpression(node)) {
-            let value = node.head.text; let escaped = false;
-            for (const span of node.templateSpans) { const part = evaluate(span.expression, seen); if (part.value === null) return { value: null, escaped };
-                value += part.value + span.literal.text; escaped ||= part.escaped; }
-            return { value, escaped };
-        }
-        if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
-            const left = evaluate(node.left, seen); const right = evaluate(node.right, seen);
-            return { value: left.value === null || right.value === null ? null : left.value + right.value, escaped: left.escaped || right.escaped };
-        }
-        if (ts.isIdentifier(node) && constants.has(node.text) && !seen.has(node.text)) {
-            const next = new Set(seen); next.add(node.text); return evaluate(constants.get(node.text)!, next);
-        }
-        return { value: null, escaped: false };
-    };
-    const targetName = 'lib/security/web-auth-control-record'; const target = path.join(ROOT, targetName); const filePath = path.join(ROOT, file);
-    const expected = path.relative(path.dirname(filePath), target).replaceAll(path.sep, '/'); const relative = expected.startsWith('.') ? expected : `./${expected}`;
-    const relation = (expression: ts.Expression) => {
-        const evaluated = evaluate(expression); if (evaluated.value === null) {
-            const root = unwrap(expression); const text = `${expression.getText(ast)} ${ts.isIdentifier(root) ? constants.get(root.text)?.getText(ast) ?? '' : ''}`;
-            return { target: false, invalid: text.includes(path.basename(target)) };
-        }
-        const resolved = evaluated.value.startsWith('@/') ? path.join(ROOT, evaluated.value.slice(2)) : path.resolve(path.dirname(filePath), evaluated.value);
-        const targetMatch = resolved === target || ['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs'].some((extension) => resolved === target + extension);
-        const allowed = evaluated.value === `@/${targetName}` || evaluated.value === relative || (file.endsWith('.test.ts') && evaluated.value === `${relative}.ts`);
-        return { target: targetMatch, invalid: targetMatch && (!allowed || evaluated.escaped) };
-    };
-    const loader = (input: ts.Expression, seen = new Set<string>()): 'dynamic' | 'require' | null => {
-        const node = unwrap(input); if (node.kind === ts.SyntaxKind.ImportKeyword) return 'dynamic';
-        if (ts.isIdentifier(node)) {
-            if (node.text === 'require') return 'require';
-            if (constants.has(node.text) && !seen.has(node.text)) { const next = new Set(seen); next.add(node.text); return loader(constants.get(node.text)!, next); }
-        }
-        if ((ts.isPropertyAccessExpression(node) && node.name.text === 'require')
-            || (ts.isElementAccessExpression(node) && ts.isStringLiteral(node.argumentExpression) && node.argumentExpression.text === 'require')) return 'require';
-        return null;
-    };
-    const record = (expression: ts.Expression, form: string, symbols: readonly string[] = ['*'], typeOnly = false) => {
-        const found = relation(expression); if (!found.target && !found.invalid) return;
-        if (found.invalid) add('module-path', '*', typeOnly); for (const symbol of symbols) add(form, symbol, typeOnly);
-    };
-    const visit = (node: ts.Node): void => {
-        if (ts.isImportDeclaration(node)) {
-            const clause = node.importClause;
-            const imported: ControlImport[] = [];
-            if (!clause) imported.push({ file, form: 'side-effect', symbol: '*', typeOnly: false });
-            else {
-                if (clause.name) imported.push({ file, form: 'default', symbol: 'default', typeOnly: clause.isTypeOnly });
-                if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings)) imported.push({ file, form: 'namespace', symbol: '*', typeOnly: clause.isTypeOnly });
-                if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) for (const item of clause.namedBindings.elements) imported.push({ file, form: 'named', symbol: item.propertyName?.text ?? item.name.text, typeOnly: clause.isTypeOnly || item.isTypeOnly });
-            }
-            const found = relation(node.moduleSpecifier); if (found.target || found.invalid) { if (found.invalid) add('module-path', '*'); result.push(...imported); }
-        } else if (ts.isExportDeclaration(node) && node.moduleSpecifier) record(node.moduleSpecifier, 're-export', ['*'], node.isTypeOnly);
-        else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference) && node.moduleReference.expression) record(node.moduleReference.expression, 'require', [node.name.text], node.isTypeOnly);
-        else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument) && ts.isStringLiteral(node.argument.literal)) record(node.argument.literal, 'import-type', ['*'], true);
-        else if (ts.isCallExpression(node)) {
-            const callee = unwrap(node.expression); const memberCall = ts.isPropertyAccessExpression(callee) && callee.name.text === 'call' && loader(callee.expression) === 'require';
-            const kind = memberCall ? 'require' : loader(node.expression); const argument = node.arguments[memberCall ? 1 : 0]; if (kind && argument) record(argument, node.arguments.length === (memberCall ? 2 : 1) ? kind : `${kind}-options`);
-        }
-        ts.forEachChild(node, visit);
-    };
-    visit(ast); return result;
-};
 const validateControlImports = (sources: Readonly<Record<string, string>>) => {
-    const uses = Object.entries(sources).flatMap(([file, source]) => controlImports(file, source)); const errors: string[] = [];
+    const allowedUnresolved = new Set([
+        'lib/ai-providers/fabric/document-synthesis-provider-binding.test.ts', 'lib/ai-providers/fabric/document-synthesis-provider-envelope.test.ts',
+        'lib/ai-providers/fabric/document-synthesis-source-set-currentness-owner.test.ts', 'lib/pm2-manager.test.ts',
+        'lib/security/web-auth-control-owner.test.ts', 'lib/security/web-auth-control-record.test.ts', 'lib/security/web-auth-session-issuer.test.ts',
+        'scripts/benchmark-clinical-entities.ts', 'scripts/benchmark-redaction.ts',
+    ]);
+    const uses = Object.entries(sources).flatMap(([file, source]) => inventoryModuleImports({
+        file, source, target: 'lib/security/web-auth-control-record', repositoryRoot: ROOT, allowUnresolvedFiles: allowedUnresolved,
+    })); const errors: string[] = [];
     const production = new Map([
         ['lib/security/server-session.ts', { runtime: new Set(['abortPreparedAuthControlActivation', 'abortPreparedAuthControlRetirement', 'commitPreparedAuthControlActivation', 'commitPreparedAuthControlRetirement', 'prepareAuthControlActivation', 'prepareAuthControlRetirement']), types: new Set<string>() }],
         ['lib/security/web-auth-control-owner.ts', { runtime: new Set(['abortPreparedAuthControlTicket', 'createWebAuthControlRecord']), types: new Set(['AuthControlTicket']) }],
@@ -134,13 +61,7 @@ const validateControlImports = (sources: Readonly<Record<string, string>>) => {
     return { errors, uses };
 };
 let repositorySourceCache: Record<string, string> | undefined;
-const controlSourceFiles = (directory: string): string[] => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const absolute = path.join(directory, entry.name);
-    if (entry.isDirectory() && !['.git', '.next', 'node_modules'].includes(entry.name)) return controlSourceFiles(absolute);
-    return entry.isFile() && /\.[cm]?tsx?$/u.test(entry.name) ? [absolute] : [];
-});
-const repositoryTypeScript = () => repositorySourceCache ??= Object.fromEntries(controlSourceFiles(ROOT)
-    .map((absolute) => [path.relative(ROOT, absolute), readFileSync(absolute, 'utf8')]));
+const repositoryTypeScript = () => repositorySourceCache ??= repositoryTypeScriptSources(ROOT);
 
 const MAX = BigInt('18446744073709551615');
 function control(fence = 'f0', generation = BigInt(0)) {
@@ -775,6 +696,12 @@ test('keeps the current-binding predicate private until the server-session retai
         "import type { createWebAuthControlRecord } from './web-auth-control-record';",
     ];
     for (const source of rejected) assert.notDeepEqual(validateControlImports({ 'lib/security/web-auth-logout-server.test.ts': source }).errors, []);
+    const target = join(ROOT, 'lib/security/web-auth-control-record');
+    for (const source of moduleImportBypassFixtures('./web-auth-control-record', target)) {
+        assert.notDeepEqual(validateControlImports({ 'lib/security/web-auth-logout-server.test.ts': source }).errors, [], source);
+    }
+    const unresolvedRequire = ['req', 'uire(pick());'].join('');
+    assert.ok(validateControlImports({ 'lib/security/extra.ts': unresolvedRequire }).errors.includes('lib/security/extra.ts:unsupported-expression:*'));
     assert.notDeepEqual(validateControlImports({ 'lib/security/web-auth-logout-server.ts': "import { createWebAuthControlRecord } from '../../lib/security/web-auth-control-record.ts';" }).errors, []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/extra.ts': "import { createWebAuthControlRecord } from './web-auth-control-record';" }).errors, []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/extra.test.ts': "import { createWebAuthControlRecord } from './web-auth-control-record.ts';" }).errors, []);
