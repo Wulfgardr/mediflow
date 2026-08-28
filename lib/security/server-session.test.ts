@@ -825,7 +825,7 @@ test('user-scoped retirement resists hostile IDs and legacy list mutation', asyn
     let nestedOutcome: WebServerSessionRetirementCleanupReceipt['outcome'] | null = null;
     registerServerSessionResource(first.id, () => { nestedOutcome = retireServerSessionsForUser('mutation-user').outcome; });
     const outer = retireServerSessionsForUser('mutation-user');
-    assert.equal(outer.outcome, 'completed'); assert.equal(nestedOutcome, 'completed');
+    assert.equal(outer.outcome, 'denied'); assert.equal(nestedOutcome, 'denied');
     assert.equal(getSession(first.id), null); assert.equal(getSession(second.id), null);
     assert.ok(resolveActiveWebServerSession(active.sessionId));
     Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { observed += 1; throw new Error('ambient then'); } });
@@ -833,6 +833,62 @@ test('user-scoped retirement resists hostile IDs and legacy list mutation', asyn
     finally { delete (Object.prototype as { then?: unknown }).then; }
     await new Promise<void>((resolve) => setImmediate(resolve));
     assert.equal(observed, 0); assert.deepEqual(unhandled, []);
+});
+
+test('user retirement turn fences same-user issuance while preserving system and cross-user authority', async (t) => {
+    const userId = 'retirement-turn-user';
+    const victim = createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' });
+    const staged = stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(staged);
+    const prepared = prepareStagedWebServerSession(stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' })); assert.ok(prepared);
+    const armed = armedControlActivation(userId); assert.ok(armed.port);
+    let nestedOutcome: WebServerSessionRetirementCleanupReceipt['outcome'] | null = null;
+    let webDenied = false; let nativeDenied = false; let stagedDenied = false; let preparedDenied = false; let armedDenied = false;
+    let otherSessionId: string | null = null; let systemSessionId: string | null = null;
+    let hostileReads = 0; let hostileDenied = false; let hostileStageDenied = false;
+    const hostileUser = Object.create(null);
+    Object.defineProperty(hostileUser, 'id', { enumerable: true, get() { hostileReads += 1; return userId; } });
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    registerServerSessionResource(victim.id, () => {
+        hostileStageDenied = stageWebServerSession(hostileUser as { id: string; username: string; role: string }) === null;
+        try { createSession(hostileUser as { id: string; username: string; role: string }); } catch { hostileDenied = true; }
+        try { createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }); } catch { webDenied = true; }
+        try { createNativeServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }, { clientId: 'turn-client', clientPlatform: 'ios' }); } catch { nativeDenied = true; }
+        nestedOutcome = retireServerSessionsForUser(userId).outcome;
+        stagedDenied = stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }) === null;
+        preparedDenied = prepareStagedWebServerSession(staged) === null && commitPreparedWebServerSession(prepared) === false;
+        armedDenied = activateArmedWebServerSession(armed.port, armed.ticket) === false;
+        otherSessionId = createSession({ id: 'retirement-turn-other', username: SYNTHETIC_USERNAME, role: 'clinician' }).id;
+        systemSessionId = createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'system' }, 'system').id;
+    });
+
+    const originalThen = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { throw new Error('ambient then'); } });
+    try {
+        const receipt = retireServerSessionsForUser(userId);
+        assert.equal(receipt.outcome, 'denied');
+        assert.equal(nestedOutcome, 'denied'); assert.equal(webDenied, true); assert.equal(nativeDenied, true);
+        assert.equal(hostileDenied, true); assert.equal(hostileStageDenied, true); assert.equal(hostileReads, 0);
+        assert.equal(stagedDenied, true); assert.equal(preparedDenied, true); assert.equal(armedDenied, true);
+        assert.equal(getSession(victim.id), null);
+        assert.ok(otherSessionId);
+        assert.equal(getSession(otherSessionId)?.userId, 'retirement-turn-other');
+        assert.ok(systemSessionId); assert.equal(getSession(systemSessionId)?.authChannel, 'system');
+        const retry = createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' });
+        assert.equal(getSession(retry.id), retry); deleteSession(retry.id);
+        const throwing = createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }); let throwingDenied = false;
+        registerServerSessionResource(throwing.id, () => {
+            try { createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }); } catch { throwingDenied = true; }
+            throw new Error('synthetic apply-then-throw');
+        });
+        assert.equal(retireServerSessionsForUser(userId).outcome, 'failed'); assert.equal(throwingDenied, true); assert.equal(getSession(throwing.id), null);
+        const retryAfterThrow = createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }); deleteSession(retryAfterThrow.id);
+    } finally {
+        if (originalThen) Object.defineProperty(Object.prototype, 'then', originalThen);
+        else delete (Object.prototype as { then?: unknown }).then;
+    }
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.deepEqual(unhandled, []);
 });
 
 test('dispatch reports failed after an uncommitted P2 retirement and scrubs B1/B2 state', () => {

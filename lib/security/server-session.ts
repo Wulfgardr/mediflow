@@ -222,12 +222,59 @@ const armedWebSessionPortRecords = new WeakMapConstructor<object, ArmedWebSessio
 const activeWebSessionCellsBySession = new WeakMapConstructor<ServerSession, ArmedWebSessionCellRecord>();
 const activeWebSessionResourcePortRecords = new WeakMapConstructor<object, ActiveWebSessionResourcePortRecord>();
 const activeWebSessionResourceUseRecords = new WeakMapConstructor<object, ActiveWebSessionResourceUseRecord>();
+/* @Codex */
+interface UserRetirementTurnRecord { poisoned: boolean; }
+const invalidRetirementTurnUser = Symbol('invalid_retirement_turn_user');
+const userRetirementTurns = new MapConstructor<string, UserRetirementTurnRecord>();
 const armedWebSessionCellsById = ObjectCreate(null) as Record<string, ArmedWebSessionCellRecord | undefined>;
 let armedWebSessionCellHead: ArmedWebSessionCellRecord | null = null;
 let webSessionPrepareInProgress = false;
 let webSessionPreparePoisoned = false;
 let webSessionCellLifecycle: 'idle' | 'active' | 'cleanup' = 'idle';
 let webSessionCellLifecyclePoisoned = false;
+
+function sessionUserIdForRetirementTurn(value: unknown): string | typeof invalidRetirementTurnUser {
+    try {
+        if (!value || typeof value !== 'object' || isProxy(value)) return invalidRetirementTurnUser;
+        const descriptor = ObjectGetOwnPropertyDescriptor(value, 'id');
+        return descriptor && 'value' in descriptor && typeof descriptor.value === 'string'
+            ? descriptor.value
+            : invalidRetirementTurnUser;
+    } catch { return invalidRetirementTurnUser; }
+}
+
+function beginUserRetirementTurn(userId: string): UserRetirementTurnRecord | null {
+    const active = getMapValue(userRetirementTurns, userId);
+    if (active) {
+        active.poisoned = true;
+        return null;
+    }
+    const turn = { poisoned: false };
+    setMapValue(userRetirementTurns, userId, turn);
+    return turn;
+}
+
+function endUserRetirementTurn(userId: string, turn: UserRetirementTurnRecord): void {
+    if (getMapValue(userRetirementTurns, userId) === turn) deleteMapValue(userRetirementTurns, userId);
+}
+
+function denyUserRetirementTurn(userId: string): boolean {
+    const active = getMapValue(userRetirementTurns, userId);
+    if (!active) return false;
+    active.poisoned = true;
+    return true;
+}
+
+function poisonUserRetirementTurns(): boolean {
+    let poisoned = false;
+    const iterator = mapValuesOf(userRetirementTurns);
+    for (let next = nextMapIterator<UserRetirementTurnRecord>(iterator); !next.done;
+        next = nextMapIterator<UserRetirementTurnRecord>(iterator)) {
+        next.value.poisoned = true;
+        poisoned = true;
+    }
+    return poisoned;
+}
 
 function isSupportedSynchronousDisposer(candidate: unknown): candidate is ServerSessionResourceDisposer {
     if (typeof candidate !== 'function' || isProxy(candidate)) return false;
@@ -322,6 +369,12 @@ export function createSession(
     user: { id: string; username: string; role: string },
     authChannel: ServerSession['authChannel'] = 'web'
 ): ServerSession {
+    if (authChannel !== 'system') {
+        const userId = sessionUserIdForRetirementTurn(user);
+        if (userId === invalidRetirementTurnUser) {
+            if (poisonUserRetirementTurns()) throw new Error('session_retirement_in_progress');
+        } else if (denyUserRetirementTurn(userId)) throw new Error('session_retirement_in_progress');
+    }
     const now = DateNow();
     const session: ServerSession = {
         id: crypto.randomBytes(32).toString('hex'),
@@ -668,7 +721,11 @@ function revokePreparedWebSessionForId(sessionId: string): void {
 /** Stages only exact host-owned Web user data; the capsule has no observable session fields. */
 /* @Codex */
 export function stageWebServerSession(user: unknown): StagedWebServerSession | null {
-    if (!isStrictWebSessionUser(user)) return null;
+    if (!isStrictWebSessionUser(user)) {
+        poisonUserRetirementTurns();
+        return null;
+    }
+    if (denyUserRetirementTurn(user.id)) return null;
     try {
         const now = DateNow();
         const capsule = ObjectFreeze(ObjectCreate(null)) as StagedWebServerSession;
@@ -689,15 +746,15 @@ export function stageWebServerSession(user: unknown): StagedWebServerSession | n
 /** Consumes a staged Web capsule into one private, unpublishable Web-session reservation. */
 /* @Codex */
 export function prepareStagedWebServerSession(capsule: unknown): PreparedWebServerSession | null {
+    const record = stagedWebSessionRecord(capsule);
+    if (record && denyUserRetirementTurn(record.userId)) return null;
     if (webSessionPrepareInProgress) {
         webSessionPreparePoisoned = true;
-        const nestedRecord = stagedWebSessionRecord(capsule);
-        if (nestedRecord) revokeStagedWebSession(nestedRecord);
+        if (record) revokeStagedWebSession(record);
         return null;
     }
     webSessionPrepareInProgress = true;
     try {
-    const record = stagedWebSessionRecord(capsule);
     if (!record || !record.active) return null;
     if (record.expiresAt <= DateNow()) {
         revokeStagedWebSession(record);
@@ -764,10 +821,11 @@ export function getPreparedWebServerSessionId(capability: unknown): string | nul
 /** Burns one prepared capability into its final inert, non-resolvable session cell. */
 /* @Codex */
 export function armPreparedWebServerSession(capability: unknown): ArmedWebServerSessionPort | null {
+    const prepared = preparedWebSessionRecord(capability);
+    if (prepared && denyUserRetirementTurn(prepared.session.userId)) return null;
     if (!beginWebSessionCellLifecycle(capability)) return null;
     let cell: ArmedWebSessionCellRecord | null = null;
     try {
-        const prepared = preparedWebSessionRecord(capability);
         if (webSessionCellLifecyclePoisoned || !prepared || !prepared.active) return null;
         const session = prepared.session;
         if (session.expiresAt <= DateNow() || getMapValue(preparedWebSessionReservations, session.id) !== prepared
@@ -837,6 +895,8 @@ export function tombstoneArmedWebServerSession(port: unknown): boolean {
 /* @Codex */
 export function activateArmedWebServerSession(port: unknown, ticket: unknown): boolean {
     const sessionId = getArmedWebServerSessionId(port);
+    const activationCell = armedWebSessionCellRecord(port);
+    if (activationCell && denyUserRetirementTurn(activationCell.session.userId)) return false;
     const preparedActivation = prepareAuthControlActivation(ticket, sessionId);
     if (!sessionId || !preparedActivation) {
         tombstoneArmedWebServerSession(port);
@@ -960,6 +1020,7 @@ function commitPreparedWebServerSessionInternally(capability: unknown, returnSes
 function commitPreparedWebServerSessionInternally(capability: unknown, returnSession: boolean): ServerSession | boolean | null {
     const deniedResult = returnSession ? null : false;
     const record = preparedWebSessionRecord(capability);
+    if (record && denyUserRetirementTurn(record.session.userId)) return deniedResult;
     if (!record || !record.active) return deniedResult;
     try {
         const session = record.session;
@@ -1317,6 +1378,8 @@ function retireLegacyServerSessionForUser(
 /* @Codex */
 export function retireServerSessionsForUser(userId: unknown): WebServerSessionRetirementCleanupReceipt {
     if (typeof userId !== 'string' || !userId) return deniedWebSessionRetirementCleanupReceipt;
+    const turn = beginUserRetirementTurn(userId);
+    if (!turn) return deniedWebSessionRetirementCleanupReceipt;
 
     const p3Targets: Array<{
         cell: ArmedWebSessionCellRecord;
@@ -1326,87 +1389,94 @@ export function retireServerSessionsForUser(userId: unknown): WebServerSessionRe
     }> = [];
     const legacySessionIds: string[] = [];
 
-    // Snapshot both registries before any retirement, cleanup, revocation, or unlink mutation.
-    for (let record = armedWebSessionCellHead; record;) {
-        const next = record.next;
-        const isTarget = (record.state === 'ARMED_ACTIVATE' || record.state === 'ACTIVE' || record.state === 'RETIRED')
-            && armedWebSessionCellsById[record.sessionId] === record
-            && record.session.id === record.sessionId
-            && record.session.userId === userId
-            && record.session.authChannel === 'web';
-        if (isTarget) {
+    try {
+        // Snapshot both registries before any retirement, cleanup, revocation, or unlink mutation.
+        for (let record = armedWebSessionCellHead; record;) {
+            const next = record.next;
+            const isTarget = (record.state === 'ARMED_ACTIVATE' || record.state === 'ACTIVE' || record.state === 'RETIRED')
+                && armedWebSessionCellsById[record.sessionId] === record
+                && record.session.id === record.sessionId
+                && record.session.userId === userId
+                && record.session.authChannel === 'web';
+            if (isTarget) {
+                let duplicate = false;
+                for (let index = 0; index < p3Targets.length; index += 1) {
+                    if (p3Targets[index].sessionId === record.sessionId) { duplicate = true; break; }
+                }
+                if (!duplicate) {
+                    const reason = record.state === 'RETIRED' && record.retirementReason
+                        ? record.retirementReason
+                        : 'delete';
+                    appendArrayValue(p3Targets, { cell: record, sessionId: record.sessionId, state: record.state, reason });
+                }
+            }
+            record = next;
+        }
+
+        const legacyIterator = mapValuesOf(sessions);
+        for (let next = nextMapIterator<ServerSession>(legacyIterator); !next.done; next = nextMapIterator<ServerSession>(legacyIterator)) {
+            if (next.value.userId !== userId || (next.value.authChannel !== 'web' && next.value.authChannel !== 'native')) continue;
+            // P3 identity is authoritative even when a legacy Map entry collides with it.
+            if (armedWebSessionCellsById[next.value.id]) continue;
             let duplicate = false;
-            for (let index = 0; index < p3Targets.length; index += 1) {
-                if (p3Targets[index].sessionId === record.sessionId) { duplicate = true; break; }
+            for (let index = 0; index < legacySessionIds.length; index += 1) {
+                if (legacySessionIds[index] === next.value.id) { duplicate = true; break; }
             }
-            if (!duplicate) {
-                const reason = record.state === 'RETIRED' && record.retirementReason
-                    ? record.retirementReason
-                    : 'delete';
-                appendArrayValue(p3Targets, { cell: record, sessionId: record.sessionId, state: record.state, reason });
-            }
+            if (!duplicate) appendArrayValue(legacySessionIds, next.value.id);
         }
-        record = next;
-    }
 
-    const legacyIterator = mapValuesOf(sessions);
-    for (let next = nextMapIterator<ServerSession>(legacyIterator); !next.done; next = nextMapIterator<ServerSession>(legacyIterator)) {
-        if (next.value.userId !== userId || (next.value.authChannel !== 'web' && next.value.authChannel !== 'native')) continue;
-        // P3 identity is authoritative even when a legacy Map entry collides with it.
-        if (armedWebSessionCellsById[next.value.id]) continue;
-        let duplicate = false;
+        let outcome: WebServerSessionRetirementCleanupOutcome = 'completed';
+        for (let index = 0; index < p3Targets.length; index += 1) {
+            const target = p3Targets[index];
+            let receipt: WebServerSessionRetirementCleanupReceipt;
+            try {
+                const current = armedWebSessionCellsById[target.sessionId];
+                if (current !== target.cell || current.state !== target.state) {
+                    receipt = deniedWebSessionRetirementCleanupReceipt;
+                } else if (target.state === 'ARMED_ACTIVATE') {
+                    receipt = tombstoneArmedWebSessionCellRecord(current)
+                        ? completedWebSessionRetirementCleanupReceipt
+                        : deniedWebSessionRetirementCleanupReceipt;
+                } else {
+                    receipt = target.reason === 'delete'
+                        ? retireServerSessionForLogout(target.sessionId)
+                        : dispatchActiveWebServerSessionRetirement(target.sessionId, target.reason);
+                }
+            } catch {
+                receipt = failedWebSessionRetirementCleanupReceipt;
+            }
+            outcome = worseWebServerSessionRetirementOutcome(outcome, receipt.outcome);
+        }
+
+        try { revokeStagedWebSessionsForUser(userId); } catch { outcome = 'failed'; }
+        try { revokePreparedWebSessionsForUser(userId); } catch { outcome = 'failed'; }
+
         for (let index = 0; index < legacySessionIds.length; index += 1) {
-            if (legacySessionIds[index] === next.value.id) { duplicate = true; break; }
+            const receipt = retireLegacyServerSessionForUser(legacySessionIds[index], userId);
+            outcome = worseWebServerSessionRetirementOutcome(outcome, receipt.outcome);
         }
-        if (!duplicate) appendArrayValue(legacySessionIds, next.value.id);
-    }
 
-    let outcome: WebServerSessionRetirementCleanupOutcome = 'completed';
-    for (let index = 0; index < p3Targets.length; index += 1) {
-        const target = p3Targets[index];
-        let receipt: WebServerSessionRetirementCleanupReceipt;
-        try {
-            const current = armedWebSessionCellsById[target.sessionId];
-            if (current !== target.cell || current.state !== target.state) {
-                receipt = deniedWebSessionRetirementCleanupReceipt;
-            } else if (target.state === 'ARMED_ACTIVATE') {
-                receipt = tombstoneArmedWebSessionCellRecord(current)
-                    ? completedWebSessionRetirementCleanupReceipt
-                    : deniedWebSessionRetirementCleanupReceipt;
-            } else {
-                receipt = target.reason === 'delete'
-                    ? retireServerSessionForLogout(target.sessionId)
-                    : dispatchActiveWebServerSessionRetirement(target.sessionId, target.reason);
+        // Do not report completion if reentrant cleanup introduced a matching armed authority.
+        for (let record = armedWebSessionCellHead; record; record = record.next) {
+            if (record.state === 'ARMED_ACTIVATE' && armedWebSessionCellsById[record.sessionId] === record
+                && record.session.id === record.sessionId && record.session.userId === userId
+                && record.session.authChannel === 'web') {
+                outcome = worseWebServerSessionRetirementOutcome(outcome, 'denied');
+                break;
             }
-        } catch {
-            receipt = failedWebSessionRetirementCleanupReceipt;
         }
-        outcome = worseWebServerSessionRetirementOutcome(outcome, receipt.outcome);
+
+        const finalOutcome = turn.poisoned
+            ? worseWebServerSessionRetirementOutcome(outcome, 'denied')
+            : outcome;
+        return finalOutcome === 'failed'
+            ? failedWebSessionRetirementCleanupReceipt
+            : finalOutcome === 'denied'
+                ? deniedWebSessionRetirementCleanupReceipt
+                : completedWebSessionRetirementCleanupReceipt;
+    } finally {
+        endUserRetirementTurn(userId, turn);
     }
-
-    try { revokeStagedWebSessionsForUser(userId); } catch { outcome = 'failed'; }
-    try { revokePreparedWebSessionsForUser(userId); } catch { outcome = 'failed'; }
-
-    for (let index = 0; index < legacySessionIds.length; index += 1) {
-        const receipt = retireLegacyServerSessionForUser(legacySessionIds[index], userId);
-        outcome = worseWebServerSessionRetirementOutcome(outcome, receipt.outcome);
-    }
-
-    // Do not report completion if reentrant cleanup introduced a matching armed authority.
-    for (let record = armedWebSessionCellHead; record; record = record.next) {
-        if (record.state === 'ARMED_ACTIVATE' && armedWebSessionCellsById[record.sessionId] === record
-            && record.session.id === record.sessionId && record.session.userId === userId
-            && record.session.authChannel === 'web') {
-            outcome = worseWebServerSessionRetirementOutcome(outcome, 'denied');
-            break;
-        }
-    }
-
-    return outcome === 'failed'
-        ? failedWebSessionRetirementCleanupReceipt
-        : outcome === 'denied'
-            ? deniedWebSessionRetirementCleanupReceipt
-            : completedWebSessionRetirementCleanupReceipt;
 }
 
 /** Compacts one exact RETIRED Web cell into its terminal owner-private tombstone. */
