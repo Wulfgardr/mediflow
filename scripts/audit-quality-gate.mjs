@@ -609,6 +609,24 @@ function exactIdentifierBinding(checker, node, binding) {
     return Boolean(node && binding && ts.isIdentifier(node) && checker.getSymbolAtLocation(node) === binding);
 }
 
+function bindingIsWritten(root, checker, binding) {
+    let found = false;
+    const containsBinding = (node) => exactIdentifierBinding(checker, node, binding)
+        || node.getChildren().some(containsBinding);
+    const visit = (node) => {
+        const assignment = ts.isBinaryExpression(node)
+            && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+            && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment && containsBinding(node.left);
+        const update = (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
+            && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(node.operator)
+            && containsBinding(node.operand);
+        if (assignment || update) found = true;
+        else if (!found) ts.forEachChild(node, visit);
+    };
+    visit(root);
+    return found;
+}
+
 function exactCookieLookup(expression, checker, cookieStore, sessionCookieName) {
     const value = unwrap(expression);
     return ts.isCallExpression(value) && !value.questionDotToken && ts.isPropertyAccessExpression(value.expression)
@@ -902,7 +920,8 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
         || !ts.isCallExpression(sessionIdInitializer) || sessionIdInitializer.questionDotToken
         || !exactIdentifierBinding(service.checker, unwrap(sessionIdInitializer.expression), exactBearerSymbol)
         || sessionIdInitializer.arguments.length !== 1
-        || !exactIdentifierBinding(service.checker, unwrap(sessionIdInitializer.arguments[0]), cookieSymbol)) {
+        || !exactIdentifierBinding(service.checker, unwrap(sessionIdInitializer.arguments[0]), cookieSymbol)
+        || bindingIsWritten(owner.body, service.checker, sessionIdSymbol)) {
         problems.push('owner session id must be the exact const bearer binding');
     }
     const resolveCall = resolveCalls.length === 1 ? resolveCalls[0] : null;
