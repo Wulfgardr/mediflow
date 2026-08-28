@@ -21,6 +21,50 @@ import {
     prepareAuthControlRetirement,
     retireAuthControlTicket,
 } from './web-auth-control-record.ts';
+import {
+    allowedGenericLoaderExpressions,
+    createRequireBypassFixtures,
+    createRequireShadowFixtures,
+    createRequireUnresolvedFixtures,
+    inventoryModuleImports,
+    moduleImportBypassFixtures,
+    reservedLoaderBindingFixtures,
+    repositoryTypeScriptSources,
+    unsafeLoaderIdentityFixtures,
+} from './module-import-inventory.test-support.ts';
+
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+const validateControlImports = (sources: Readonly<Record<string, string>>) => {
+    const uses = Object.entries(sources).flatMap(([file, source]) => inventoryModuleImports({
+        file, source, target: 'lib/security/web-auth-control-record', repositoryRoot: ROOT, allowUnresolvedExpressions: allowedGenericLoaderExpressions,
+    })); const errors: string[] = [];
+    const production = new Map([
+        ['lib/security/server-session.ts', { runtime: new Set(['abortPreparedAuthControlActivation', 'abortPreparedAuthControlRetirement', 'commitPreparedAuthControlActivation', 'commitPreparedAuthControlRetirement', 'prepareAuthControlActivation', 'prepareAuthControlRetirement']), types: new Set<string>() }],
+        ['lib/security/web-auth-control-owner.ts', { runtime: new Set(['abortPreparedAuthControlTicket', 'createWebAuthControlRecord']), types: new Set(['AuthControlTicket']) }],
+    ]);
+    const ownTest = new Set(['abortPreparedAuthControlTicket', 'abortPreparedAuthControlActivation', 'abortPreparedAuthControlRetirement', 'commitAuthControlTicket', 'commitPreparedAuthControlActivation', 'commitPreparedAuthControlRetirement', 'createWebAuthControlRecord', 'isCurrentAuthControlSessionBinding', 'prepareAuthControlActivation', 'prepareAuthControlRetirement', 'retireAuthControlTicket']);
+    for (const use of uses) {
+        if (use.file === 'lib/security/server-session.test.ts' && use.form === 'require' && !use.typeOnly) continue;
+        if (use.file === 'lib/security/web-auth-control-record.test.ts') {
+            if (!((use.form === 'named' && !use.typeOnly && ownTest.has(use.symbol)) || (use.form === 'import-type' && use.typeOnly))) errors.push(`${use.file}:${use.form}:${use.symbol}`);
+            continue;
+        }
+        if (use.file === 'lib/security/web-auth-logout-server.test.ts') {
+            if (use.form !== 'named' || use.typeOnly || use.symbol !== 'createWebAuthControlRecord') errors.push(`${use.file}:${use.form}:${use.symbol}`);
+            continue;
+        }
+        const allowed = production.get(use.file); const symbols = use.typeOnly ? allowed?.types : allowed?.runtime;
+        if (!allowed || use.form !== 'named' || !symbols?.has(use.symbol)) errors.push(`${use.file}:${use.form}:${use.symbol}`);
+    }
+    const logout = uses.filter((use) => use.file === 'lib/security/web-auth-logout-server.test.ts' && !use.typeOnly);
+    if ('lib/security/web-auth-logout-server.test.ts' in sources
+        && (logout.length !== 1 || logout[0]?.form !== 'named' || logout[0]?.symbol !== 'createWebAuthControlRecord')) errors.push('logout-test:fixture');
+    const sessionTestBridge = uses.filter((use) => use.file === 'lib/security/server-session.test.ts' && use.form === 'require' && !use.typeOnly);
+    if ('lib/security/server-session.test.ts' in sources && sessionTestBridge.length !== 1) errors.push('server-session-test:fixture');
+    return { errors, uses };
+};
+let repositorySourceCache: Record<string, string> | undefined;
+const repositoryTypeScript = () => repositorySourceCache ??= repositoryTypeScriptSources(ROOT);
 
 const MAX = BigInt('18446744073709551615');
 function control(fence = 'f0', generation = BigInt(0)) {
@@ -632,8 +676,76 @@ test('keeps current-binding lookup read-only through captured intrinsic poison a
 });
 
 test('keeps the current-binding predicate private until the server-session retained-ticket packet', () => {
-    const paths = execFileSync('rg', ['-l', 'isCurrentAuthControlSessionBinding', '-g', '*.ts', '.'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map((path) => path.replace(/^\.\//u, ''));
-    assert.deepEqual(paths.sort(), ['lib/security/web-auth-control-record.test.ts', 'lib/security/web-auth-control-record.ts']);
+    assert.deepEqual(validateControlImports(repositoryTypeScript()).errors, []);
+    const positive = validateControlImports({
+        'lib/security/web-auth-logout-server.test.ts': "import { createWebAuthControlRecord as fixture } from '@/lib/security/web-auth-control-record';",
+        'lib/security/literal.ts': "// import control from './web-auth-control-record'; const value = 'createWebAuthControlRecord'; const regex = /commitAuthControlTicket/u;",
+    });
+    assert.deepEqual(positive.errors, []); assert.equal(positive.uses[0]?.symbol, 'createWebAuthControlRecord');
+    const rejected = [
+        "import { commitAuthControlTicket as createWebAuthControlRecord } from './web-auth-control-record';",
+        "import control from './web-auth-control-record';",
+        "import * as control from './web-auth-control-record';",
+        "export { createWebAuthControlRecord } from './web-auth-control-record';",
+        ['const control = req', "uire('./web-auth-control-record');"].join(''),
+        "const control = await import('./web-auth-control-record');",
+        "const target = './web-auth-' + 'control-record'; const control = import((target as const), { with: { type: 'json' } });",
+        "const suffix = pick(); const target = './web-auth-control-record' + suffix; import(target);",
+        "const target = `./web-auth-control-record`; const load = require; load(target);",
+        ['module.req', "uire('./web-auth-control-record'); req", "uire.call(null, './web-auth-control-record');"].join(''),
+        "import { createWebAuthControlRecord } from './web-auth-control\\x2drecord';",
+        "import { createWebAuthControlRecord } from './web-auth-control-record.js';",
+        "import { createWebAuthControlRecord } from './nested/../web-auth-control-record';",
+        "import type { createWebAuthControlRecord } from './web-auth-control-record';",
+    ];
+    for (const source of rejected) assert.notDeepEqual(validateControlImports({ 'lib/security/web-auth-logout-server.test.ts': source }).errors, []);
+    const target = join(ROOT, 'lib/security/web-auth-control-record');
+    for (const source of moduleImportBypassFixtures('./web-auth-control-record', target)) {
+        assert.notDeepEqual(validateControlImports({ 'lib/security/web-auth-logout-server.test.ts': source }).errors, [], source);
+    }
+    const unresolvedRequire = ['req', 'uire(pick());'].join('');
+    assert.ok(validateControlImports({ 'lib/security/extra.ts': unresolvedRequire }).errors.includes('lib/security/extra.ts:unsupported-expression:*'));
+    const benchmark = repositoryTypeScript()['scripts/benchmark-redaction.ts']; assert.ok(benchmark);
+    const errors = validateControlImports({
+        'scripts/benchmark-redaction.ts': `${benchmark}\nconst suffix=pick();import('./web-auth-control-record'+suffix);`,
+    }).errors;
+    for (const form of ['unsupported-expression', 'module-path', 'dynamic']) assert.ok(errors.includes(`scripts/benchmark-redaction.ts:${form}:*`), form);
+    assert.deepEqual(validateControlImports({ 'scripts/benchmark-redaction.ts': benchmark }).errors, []);
+    for (const fixture of unsafeLoaderIdentityFixtures('../lib/security/web-auth-control-record')) {
+        const aliasErrors = validateControlImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
+        assert.ok(aliasErrors.includes('scripts/benchmark-redaction.ts:reserved-loader-identity:*'), fixture);
+    }
+    for (const fixture of reservedLoaderBindingFixtures) {
+        const bindingErrors = validateControlImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
+        assert.equal(bindingErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:reserved-loader-identity:*').length, 1, fixture);
+    }
+    for (const fixture of createRequireBypassFixtures('../lib/security/web-auth-control-record')) {
+        assert.notDeepEqual(validateControlImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors, [], fixture);
+    }
+    for (const fixture of createRequireShadowFixtures('../lib/security/web-auth-control-record')) {
+        const shadowErrors = validateControlImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
+        assert.equal(shadowErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:reserved-loader-identity:*').length, 1, fixture);
+    }
+    for (const fixture of createRequireUnresolvedFixtures('../lib/security/web-auth-control-record')) {
+        const unresolvedErrors = validateControlImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
+        assert.equal(unresolvedErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:protected-loader-unsupported:*').length, 1, fixture);
+    }
+    const sessionSource = repositoryTypeScript()['lib/security/server-session.test.ts']; assert.ok(sessionSource);
+    const authResolve = ['nodeRequire', '.resolve(AUTH_CONTROL_MODULE_PATH)'].join('');
+    const authResolveDuplicate = validateControlImports({
+        'lib/security/server-session.test.ts': sessionSource.replace(`const authPath = ${authResolve}`, `const duplicateAuthPath = ${authResolve}; const authPath = ${authResolve}`),
+    }).errors;
+    assert.ok(authResolveDuplicate.includes('lib/security/server-session.test.ts:protected-loader-allowlist-duplicate:*'));
+    const dynamicResolve = ['nodeRequire', '.resolve(`./${name}`)'].join('');
+    const newDynamicResolve = validateControlImports({
+        'lib/security/server-session.test.ts': sessionSource.replace(dynamicResolve, `(nodeRequire.resolve(pick()), ${dynamicResolve})`),
+    }).errors;
+    assert.ok(newDynamicResolve.includes('lib/security/server-session.test.ts:protected-loader-unsupported:*'));
+    assert.notDeepEqual(validateControlImports({ 'lib/security/web-auth-logout-server.ts': "import { createWebAuthControlRecord } from '../../lib/security/web-auth-control-record.ts';" }).errors, []);
+    assert.notDeepEqual(validateControlImports({ 'lib/security/extra.ts': "import { createWebAuthControlRecord } from './web-auth-control-record';" }).errors, []);
+    assert.notDeepEqual(validateControlImports({ 'lib/security/extra.test.ts': "import { createWebAuthControlRecord } from './web-auth-control-record.ts';" }).errors, []);
+    assert.notDeepEqual(validateControlImports({ 'lib/security/server-session.ts': "import type { prepareAuthControlActivation } from './web-auth-control-record';" }).errors, []);
+    assert.notDeepEqual(validateControlImports({ 'lib/security/web-auth-control-owner.ts': "import { AuthControlTicket } from './web-auth-control-record';" }).errors, []);
     const source = readFileSync(fileURLToPath(new URL('./web-auth-control-record.ts', import.meta.url)), 'utf8');
     const start = source.indexOf('export function isCurrentAuthControlSessionBinding');
     const body = source.slice(start, source.indexOf('/** Resolves one active ticket', start));
@@ -798,10 +910,7 @@ test('denies stale, expired, wrapped, restarted, and hostile tickets without obs
 });
 
 test('keeps the ticket module private to its canonical future server-session importer', () => {
-    const paths = execFileSync('rg', ['-l', 'web-auth-control-record|prepareAuthControlTicket|commitAuthControlTicket|retireAuthControlTicket', '-g', '*.ts', '.'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map((path) => path.replace(/^\.\//u, ''));
-    assert.equal(paths.includes('lib/security/web-auth-control-record.test.ts'), true);
-    assert.equal(paths.includes('lib/security/web-auth-control-record.ts'), true);
-    assert.equal(paths.every((path) => path === 'lib/security/server-session.ts' || path === 'lib/security/web-auth-control-owner.ts' || path === 'lib/security/web-auth-control-owner.test.ts' || path.endsWith('web-auth-control-record.ts') || path.endsWith('web-auth-control-record.test.ts')), true);
+    assert.deepEqual(validateControlImports(repositoryTypeScript()).errors, []);
 });
 
 test('entropy collision and same-record reentry deny before ticket publication and permit a clean retry', async () => {
