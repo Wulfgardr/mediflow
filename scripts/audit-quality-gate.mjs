@@ -465,6 +465,17 @@ function objectLiteral(initializer) {
         && ts.isObjectLiteralExpression(unwrap(value.arguments[0])) ? unwrap(value.arguments[0]) : null;
 }
 
+function exactFrozenObjectLiteral(initializer, sourceFile) {
+    const value = initializer && unwrap(initializer);
+    if (!value || !ts.isCallExpression(value) || value.questionDotToken
+        || value.typeArguments?.length || value.arguments.length !== 1
+        || !ts.isPropertyAccessExpression(value.expression) || value.expression.questionDotToken
+        || !ts.isIdentifier(value.expression.expression) || value.expression.expression.text !== 'Object'
+        || value.expression.name.text !== 'freeze' || moduleScopeBindingExists(sourceFile, 'Object')) return null;
+    const literal = unwrap(value.arguments[0]);
+    return ts.isObjectLiteralExpression(literal) ? literal : null;
+}
+
 function hasDeferredWork(root) {
     let found = false;
     const visit = (node) => {
@@ -521,18 +532,27 @@ function exactNamedImport(statement, moduleName, exportName) {
         && (element.propertyName?.text ?? element.name.text) === exportName && element.name.text === exportName;
 }
 
-function exactCookieLookup(expression, cookieStore, sessionCookieName) {
-    const value = unwrap(expression);
-    return ts.isCallExpression(value) && !value.questionDotToken && ts.isPropertyAccessExpression(value.expression)
-        && !value.expression.questionDotToken && ts.isIdentifier(value.expression.expression)
-        && value.expression.expression.text === cookieStore && value.expression.name.text === 'get'
-        && exactArguments(value, [{ identifier: sessionCookieName }]);
+function exactIdentifierBinding(checker, node, binding) {
+    return Boolean(node && binding && ts.isIdentifier(node) && checker.getSymbolAtLocation(node) === binding);
 }
 
-function validateExactServiceOwnedLogoutRoute(sourceFile, spec) {
+function exactCookieLookup(expression, checker, cookieStore, sessionCookieName) {
+    const value = unwrap(expression);
+    return ts.isCallExpression(value) && !value.questionDotToken && ts.isPropertyAccessExpression(value.expression)
+        && !value.expression.questionDotToken
+        && exactIdentifierBinding(checker, value.expression.expression, cookieStore)
+        && value.expression.name.text === 'get' && value.arguments.length === 1
+        && exactIdentifierBinding(checker, unwrap(value.arguments[0]), sessionCookieName);
+}
+
+function validateExactServiceOwnedLogoutRoute(sourceFile, checker, spec) {
     const delegated = spec.modes.delegated;
     const [cookiesImport, serviceImport, sessionImport, handler] = sourceFile.statements;
     const problems = [];
+    const cookiesBinding = importedBinding(sourceFile, checker, 'next/headers', 'cookies')?.symbol;
+    const sessionCookieBinding = importedBinding(
+        sourceFile, checker, '@/lib/security/server-session', 'SESSION_COOKIE_NAME',
+    )?.symbol;
     if (sourceFile.statements.length !== 4
         || !exactNamedImport(cookiesImport, 'next/headers', 'cookies')
         || !exactNamedImport(serviceImport, delegated.serviceModule, delegated.serviceExport)
@@ -547,6 +567,7 @@ function validateExactServiceOwnedLogoutRoute(sourceFile, spec) {
     const cookieDeclaration = statements[0] && ts.isVariableStatement(statements[0]) ? statements[0] : null;
     const [cookie] = cookieDeclaration?.declarationList.declarations ?? [];
     const cookieBinding = cookie && ts.isIdentifier(cookie.name) ? cookie.name.text : null;
+    const cookieSymbol = cookie && ts.isIdentifier(cookie.name) ? checker.getSymbolAtLocation(cookie.name) : null;
     const cookieInitialized = Boolean(cookie?.initializer && isNullOrUndefined(cookie.initializer));
     const cookieIsLet = Boolean(cookieDeclaration?.declarationList.flags & ts.NodeFlags.Let);
     const acquisition = statements[1] && ts.isTryStatement(statements[1]) ? statements[1] : null;
@@ -555,6 +576,8 @@ function validateExactServiceOwnedLogoutRoute(sourceFile, spec) {
         ? acquisitionStatements[0] : null;
     const [cookieStore] = cookieStoreDeclaration?.declarationList.declarations ?? [];
     const cookieStoreBinding = cookieStore && ts.isIdentifier(cookieStore.name) ? cookieStore.name.text : null;
+    const cookieStoreSymbol = cookieStore && ts.isIdentifier(cookieStore.name)
+        ? checker.getSymbolAtLocation(cookieStore.name) : null;
     const cookieStoreInitializer = cookieStore?.initializer && unwrap(cookieStore.initializer);
     const cookiesCall = cookieStoreInitializer && ts.isAwaitExpression(cookieStoreInitializer)
         ? unwrap(cookieStoreInitializer.expression) : null;
@@ -566,15 +589,18 @@ function validateExactServiceOwnedLogoutRoute(sourceFile, spec) {
         && ts.isIdentifier(delegateCall.expression) && delegateCall.expression.text === delegated.serviceExport
         && exactArguments(delegateCall, [{ identifier: cookieBinding ?? '' }, { identifier: request?.name && ts.isIdentifier(request.name) ? request.name.text : '' }]));
     const exactRead = Boolean(read && ts.isBinaryExpression(read) && read.operatorToken.kind === ts.SyntaxKind.EqualsToken
-        && ts.isIdentifier(read.left) && read.left.text === cookieBinding
-        && exactCookieLookup(read.right, cookieStoreBinding ?? '', 'SESSION_COOKIE_NAME'));
+        && exactIdentifierBinding(checker, read.left, cookieSymbol)
+        && exactCookieLookup(read.right, checker, cookieStoreSymbol, sessionCookieBinding));
     if (handler.parameters.length !== 1 || !request || !ts.isIdentifier(request.name) || request.name.text !== 'request'
         || statements.length !== 3 || !cookieBinding || !cookieInitialized || !cookieIsLet
+        || cookieDeclaration.declarationList.declarations.length !== 1
         || !acquisition || acquisition.finallyBlock || !acquisition.catchClause || acquisition.catchClause.variableDeclaration
         || acquisition.catchClause.block.statements.length !== 0 || acquisitionStatements.length !== 2
         || !cookieStoreBinding || !cookieStoreDeclaration || !(cookieStoreDeclaration.declarationList.flags & ts.NodeFlags.Const)
+        || cookieStoreDeclaration.declarationList.declarations.length !== 1
         || !cookiesCall || !ts.isCallExpression(cookiesCall) || cookiesCall.questionDotToken || !ts.isIdentifier(cookiesCall.expression)
-        || cookiesCall.expression.text !== 'cookies' || cookiesCall.arguments.length !== 0 || !exactRead || !exactDelegate) {
+        || !exactIdentifierBinding(checker, cookiesCall.expression, cookiesBinding)
+        || cookiesCall.arguments.length !== 0 || !exactRead || !exactDelegate) {
         problems.push('POST must deny cookie acquisition failure and directly return the exact service-owned response');
     }
     return problems;
@@ -585,13 +611,22 @@ function moduleScopeBindingExists(sourceFile, name) {
         if (ts.isImportDeclaration(statement) && statement.importClause) {
             if (statement.importClause.name?.text === name) return true;
             const bindings = statement.importClause.namedBindings;
+            if (bindings && ts.isNamespaceImport(bindings) && bindings.name.text === name) return true;
             return bindings && ts.isNamedImports(bindings) && bindings.elements.some((element) => element.name.text === name);
         }
+        if (ts.isImportEqualsDeclaration(statement)) return statement.name.text === name;
         if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement) || ts.isEnumDeclaration(statement)
-            || ts.isModuleDeclaration(statement)) && statement.name.getText(sourceFile) === name) return true;
+            || ts.isModuleDeclaration(statement)) && statement.name?.getText(sourceFile) === name) return true;
         return ts.isVariableStatement(statement) && statement.declarationList.declarations.some((declaration) =>
-            ts.isIdentifier(declaration.name) && declaration.name.text === name);
+            bindingNameContains(declaration.name, name));
     });
+}
+
+function hasPriorUnconditionalTermination(owner, node) {
+    const statement = directStatement(owner, node);
+    if (!statement || !owner.body) return true;
+    const index = owner.body.statements.indexOf(statement);
+    return index < 0 || owner.body.statements.slice(0, index).some(alwaysTerminates);
 }
 
 function exactNoStoreResponseFactory(sourceFile) {
@@ -716,7 +751,7 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
         });
     }
     if (!serviceSource) return ['delegated logout owner source is missing'];
-    problems.push(...validateExactServiceOwnedLogoutRoute(route.sourceFile, spec));
+    problems.push(...validateExactServiceOwnedLogoutRoute(route.sourceFile, route.checker, spec));
     const handler = namedFunction(route.sourceFile, delegated.handler, true);
     const delegate = importedBinding(route.sourceFile, route.checker, delegated.serviceModule, delegated.serviceExport);
     const routeCalls = handler && delegate ? bindingCalls(handler, route.checker, delegate.symbol) : [];
@@ -739,7 +774,7 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
     const sourcesDeclaration = service.sourceFile.statements.flatMap((statement) => ts.isVariableStatement(statement)
         ? [...statement.declarationList.declarations] : []).find((declaration) =>
         ts.isIdentifier(declaration.name) && declaration.name.text === delegated.sourcesName);
-    const sources = objectLiteral(sourcesDeclaration?.initializer);
+    const sources = exactFrozenObjectLiteral(sourcesDeclaration?.initializer, service.sourceFile);
     const sourceProperties = exactPropertyAssignments(sources, ['resolve', 'retire', 'audit']);
     const auditProperty = sourceProperties?.get('audit');
     const auditOwner = auditProperty && ts.isFunctionLike(auditProperty.initializer) ? auditProperty.initializer : null;
@@ -753,9 +788,16 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
         problems.push('all delegated service terminal statuses must return through the exact no-store response factory');
     }
 
-    const sourceParameter = owner.parameters.find((parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === 'sources');
-    if (!sourceParameter?.initializer || !ts.isIdentifier(unwrap(sourceParameter.initializer))
-        || unwrap(sourceParameter.initializer).text !== delegated.sourcesName || localBindingExists(owner, 'sources', true)) {
+    const [cookieParameter, requestParameter, sourceParameter] = owner.parameters;
+    const sourceInitializer = sourceParameter?.initializer && unwrap(sourceParameter.initializer);
+    const sourcesSymbol = sourcesDeclaration && ts.isIdentifier(sourcesDeclaration.name)
+        ? service.checker.getSymbolAtLocation(sourcesDeclaration.name) : null;
+    if (owner.parameters.length !== 3
+        || !cookieParameter || !ts.isIdentifier(cookieParameter.name) || cookieParameter.name.text !== 'cookie'
+        || !requestParameter || !ts.isIdentifier(requestParameter.name) || requestParameter.name.text !== 'request'
+        || !sourceParameter || !ts.isIdentifier(sourceParameter.name) || sourceParameter.name.text !== 'sources'
+        || !exactIdentifierBinding(service.checker, sourceInitializer, sourcesSymbol)
+        || localBindingExists(owner, 'sources', true)) {
         problems.push('owner must use the exact immutable production sources binding');
     }
     const sourceCalls = exactDirectObjectCalls(owner, 'sources', ['resolve', 'retire', 'audit']);
@@ -768,6 +810,10 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
         || !exactArguments(retireCalls[0], [{ identifier: 'sessionId' }, { literal: 'delete' }])
         || !exactArguments(auditCall, [{ identifier: 'session' }, { identifier: 'sessionId' }, { identifier: 'request' }])) {
         problems.push('owner must resolve and retire the exact session before one awaited audit');
+    }
+    if ([resolveCalls[0], retireCalls[0], auditCalls[0]].some((call) =>
+        !call || hasPriorUnconditionalTermination(owner, call))) {
+        problems.push('owner must not terminate before the exact resolution, retirement, and audit flow');
     }
     const retirement = retireCalls[0]?.parent && ts.isVariableDeclaration(retireCalls[0].parent)
         && ts.isIdentifier(retireCalls[0].parent.name) ? retireCalls[0].parent.name.text

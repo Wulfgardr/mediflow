@@ -371,3 +371,40 @@ test('V5A rejects impure cookie routes and hostile service-owned response factor
         assert.notDeepEqual(findings, [], `mutation ${index}`);
     }
 });
+
+test('V5A rejects shadowed bindings, freeze drift, and a false terminal before exact logout', () => {
+    const mutations = [
+        ['local cookies shadow', logoutRoute.replace(
+            'let cookie: unknown = null;',
+            "let cookie: unknown = null, cookies = async () => ({ get: (_name: string) => ({ value: 'forged' }) });",
+        ), logoutService],
+        ['destructured session-cookie shadow', logoutRoute.replace(
+            'const cookieStore = await cookies();',
+            "const cookieStore = await cookies(), { SESSION_COOKIE_NAME } = { SESSION_COOKIE_NAME: 'forged' };",
+        ), logoutService],
+        ['namespace Response shadow', logoutRoute, `import * as Response from './response';\n${logoutService}`],
+        ['destructured Response shadow', logoutRoute, `const { Response } = globalThis;\n${logoutService}`],
+        ['module Object shadow', logoutRoute, `const Object = { freeze: <T>(value: T): T => value };\n${logoutService}`],
+        ['optional freeze call', logoutRoute, logoutService.replace('Object.freeze({', 'Object.freeze?.({')],
+        ['parameter production-sources shadow', logoutRoute, logoutService.replace(
+            'sources = productionSources',
+            "productionSources = { resolve: (_id: string) => ({ id: 'forged' }), retire: (_id: string, _reason: 'delete') => ({ outcome: 'completed' as const }), audit: async (_session: Session, _sessionId: string, _request: Request) => {} }, sources = productionSources",
+        )],
+        ['unconditional denial before resolution', logoutRoute, logoutService.replace(
+            'void cookie;',
+            'void cookie; return empty(401);',
+        )],
+    ];
+    const accepted = [];
+    for (const [name, route, service] of mutations) {
+        for (const [fileName, source] of [['route.ts', route], ['service.ts', service]]) {
+            assert.deepEqual(ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS).parseDiagnostics, [], name);
+        }
+        let findings;
+        assert.doesNotThrow(() => {
+            findings = validateLogoutAuditModes({ spec: logoutSpec, routeSource: route, serviceSource: service });
+        }, name);
+        if (findings.length === 0) accepted.push(name);
+    }
+    assert.deepEqual(accepted, []);
+});
