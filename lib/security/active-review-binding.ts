@@ -10,6 +10,11 @@ import { sessionPhysicianReviewAuthority, type SessionPhysicianReviewAuthorityV1
 
 const SCHEMA_VERSION = 'mediflow.active-review-binding.v1' as const;
 const AUTHORITY_SCHEMA_VERSION = 'mediflow.session-physician-review-authority.v1' as const;
+const ArrayIsArray = Array.isArray;
+const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const ObjectGetPrototypeOf = Object.getPrototypeOf;
+const ObjectIsFrozen = Object.isFrozen;
+const ReflectOwnKeys = Reflect.ownKeys;
 
 type Owner = Pick<ServerSessionProjectionOwner, 'snapshotReviewContextEpoch' | 'snapshotSelectionEpoch' | 'withLeaseCriticalSection'>;
 type Context = Readonly<{ owner: Owner; session: ServerSession }>;
@@ -71,14 +76,24 @@ function exactSources(value: unknown): ActiveReviewBindingSources {
 
 function context(value: unknown): Context {
     try {
-        if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype
-            || Reflect.ownKeys(value).length !== 2) return fail('context_unavailable');
-        const session = Object.getOwnPropertyDescriptor(value, 'session')?.value;
-        const owner = Object.getOwnPropertyDescriptor(value, 'owner')?.value;
-        const ownerDescriptors = owner && typeof owner === 'object' && !types.isProxy(owner) ? Object.getOwnPropertyDescriptors(owner) : null;
-        if (!session || typeof session !== 'object' || types.isProxy(session) || !ownerDescriptors
-            || !['withLeaseCriticalSection', 'snapshotSelectionEpoch', 'snapshotReviewContextEpoch'].every((key) => 'value' in (ownerDescriptors[key] ?? {}) && typeof ownerDescriptors[key]?.value === 'function')) return fail('context_unavailable');
-        return Object.freeze({ owner: owner as Owner, session: session as ServerSession });
+        if (!value || typeof value !== 'object' || types.isProxy(value) || ArrayIsArray(value)
+            || ObjectGetPrototypeOf(value) !== null || !ObjectIsFrozen(value)) return fail('context_unavailable');
+        const keys = ReflectOwnKeys(value);
+        if (keys.length !== 2 || keys[0] !== 'session' || keys[1] !== 'owner') return fail('context_unavailable');
+        const sessionDescriptor = ObjectGetOwnPropertyDescriptor(value, 'session');
+        const ownerDescriptor = ObjectGetOwnPropertyDescriptor(value, 'owner');
+        const exactData = (descriptor: PropertyDescriptor | undefined): descriptor is PropertyDescriptor & { value: unknown } => Boolean(descriptor && 'value' in descriptor
+            && descriptor.enumerable === true && descriptor.writable === false && descriptor.configurable === false);
+        if (!exactData(sessionDescriptor) || !exactData(ownerDescriptor)) return fail('context_unavailable');
+        const session = sessionDescriptor.value as unknown;
+        const owner = ownerDescriptor.value as unknown;
+        if (!session || typeof session !== 'object' || types.isProxy(session)
+            || !owner || typeof owner !== 'object' || types.isProxy(owner)) return fail('context_unavailable');
+        for (const key of ['withLeaseCriticalSection', 'snapshotSelectionEpoch', 'snapshotReviewContextEpoch'] as const) {
+            const descriptor = ObjectGetOwnPropertyDescriptor(owner, key);
+            if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'function') return fail('context_unavailable');
+        }
+        return value as Context;
     } catch (error) {
         if (error instanceof ActiveReviewBindingError) throw error;
         return fail('context_unavailable');
