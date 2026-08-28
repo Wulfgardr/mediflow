@@ -886,6 +886,18 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
     const resolveCalls = sourceCalls.calls.get('resolve');
     const retireCalls = sourceCalls.calls.get('retire');
     const auditCalls = sourceCalls.calls.get('audit');
+    const sessionIdDeclarations = owner.body.statements.flatMap((statement) => ts.isVariableStatement(statement)
+        ? [...statement.declarationList.declarations].filter((declaration) =>
+            ts.isIdentifier(declaration.name) && declaration.name.text === 'sessionId') : []);
+    const sessionIdDeclaration = sessionIdDeclarations.length === 1 ? sessionIdDeclarations[0] : null;
+    const sessionIdSymbol = sessionIdDeclaration
+        ? service.checker.getSymbolAtLocation(sessionIdDeclaration.name) : null;
+    const resolveCall = resolveCalls.length === 1 ? resolveCalls[0] : null;
+    const resolveArgument = resolveCall?.arguments.length === 1 ? unwrap(resolveCall.arguments[0]) : null;
+    if (!resolveCall || !isUnconditionalOwnerCall(owner, resolveCall)
+        || !exactIdentifierBinding(service.checker, resolveArgument, sessionIdSymbol)) {
+        problems.push('owner must resolve exactly once with the bound session id');
+    }
     const auditCall = auditCalls[0];
     if (!sourceCalls.exact || resolveCalls.length !== 1 || retireCalls.length !== 1 || auditCalls.length !== 1
         || !auditCall || !isAwaited(auditCall)
