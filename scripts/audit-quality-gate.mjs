@@ -933,6 +933,8 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
         && owner.body.statements[guardIndex + 1] === auditTry
         && owner.body.statements[guardIndex + 2] === terminal204[0];
     if (!completedGuard || !auditCall || !auditTry?.catchClause || auditTry.catchClause.block.statements.length !== 0
+        || auditTry.tryBlock.statements.length !== 1 || auditTry.tryBlock.statements[0] !== auditCall.parent.parent
+        || auditTry.finallyBlock
         || !terminal204[0] || terminal204.length !== 1 || ownerReturns.at(-1) !== terminal204[0]
         || completedGuard.getStart() > auditCall.getStart() || auditCall.getStart() > terminal204[0].getStart()
         || !exactTerminalSequence) {
