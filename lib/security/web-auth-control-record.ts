@@ -221,6 +221,23 @@ export function createWebAuthControlRecord(initialFence: unknown, initialGenerat
     });
 }
 
+/** Burns one exact prepared ticket and clears only its still-current pending attempt. */
+/* @Codex */
+export function abortPreparedAuthControlTicket(ticket: unknown): boolean {
+    if (!enterTicketOperation()) return false;
+    try {
+        const binding = weakMapGet(ticketBindings, ticket);
+        if (ticketOperationPoisoned || !binding || binding.lifecycle !== 'prepared') return false;
+        const state = binding.owner;
+        const clearsPending = state.pending === binding.pending && state.ticketedPending === binding.pending
+            && state.activeSessionId === null && state.fence === binding.fence && state.generation === binding.generation;
+        denyTicket(binding);
+        if (clearsPending) { state.pending = null; state.ticketedPending = null; }
+        return true;
+    } catch { return false; }
+    finally { leaveTicketOperation(); }
+}
+
 function denyTicket(binding: TicketBinding): void {
     binding.lifecycle = 'denied';
     tableDelete(binding.owner.reserved, binding.activateFence); tableDelete(binding.owner.reserved, binding.retireFence);
