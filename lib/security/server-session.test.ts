@@ -37,6 +37,7 @@ import {
     retireServerSessionForApplicationLock,
     retireServerSessionForLogout,
     retireServerSessionsForUser,
+    retireWebP3SessionsForUser,
     resolveActiveWebServerSession,
     stageWebServerSession,
     tombstoneArmedWebServerSession,
@@ -756,6 +757,143 @@ test('user-scoped retirement snapshots P3 targets before mutation and preserves 
     assert.ok(resolveActiveWebServerSession(other.sessionId));
     assert.equal(Object.getPrototypeOf(receipt), null); assert.equal(Object.isFrozen(receipt), true);
     assert.deepEqual(Reflect.ownKeys(receipt), ['outcome']);
+});
+
+test('P3-only user retirement compacts exact Web P3 work without touching legacy, native, or system state', () => {
+    const userId = 'p3-only-user';
+    const active = activeResourceFixture(userId);
+    const retired = activeResourceFixture(userId);
+    assert.equal(retireActiveWebServerSession(retired.sessionId, 'dispose'), true);
+    const armed = armedControlActivation(userId);
+    const staged = stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(staged);
+    const prepared = prepareStagedWebServerSession(stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' })); assert.ok(prepared);
+
+    const otherActive = activeResourceFixture('p3-only-other');
+    const otherStaged = stageWebServerSession({ id: 'p3-only-other', username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(otherStaged);
+    const otherPrepared = prepareStagedWebServerSession(otherStaged); assert.ok(otherPrepared);
+    const otherPreparedId = getPreparedWebServerSessionId(otherPrepared); assert.ok(otherPreparedId);
+
+    const legacy = createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' });
+    const native = createNativeServerSession(
+        { id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' },
+        { clientId: 'p3-only-client', clientPlatform: 'macos' },
+    );
+    const system = createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'system' }, 'system');
+    const legacyBytes = JSON.stringify(legacy); const nativeBytes = JSON.stringify(native); const systemBytes = JSON.stringify(system);
+    const events: string[] = [];
+    registerServerSessionResource(legacy.id, (reason) => { events.push(`legacy:${reason}`); });
+    registerServerSessionResource(native.id, (reason) => { events.push(`native:${reason}`); });
+    registerServerSessionResource(system.id, (reason) => { events.push(`system:${reason}`); });
+
+    const receipt = retireWebP3SessionsForUser(userId);
+
+    assert.equal(receipt.outcome, 'completed');
+    assert.equal(resolveActiveWebServerSession(active.sessionId), null);
+    assert.equal(resolveActiveWebServerSession(retired.sessionId), null);
+    assert.equal(activateArmedWebServerSession(armed.port, armed.ticket), false);
+    assert.equal(abortStagedWebServerSession(staged), false);
+    assert.equal(getPreparedWebServerSessionId(prepared), null);
+    assert.ok(resolveActiveWebServerSession(otherActive.sessionId));
+    assert.equal(getPreparedWebServerSessionId(otherPrepared), otherPreparedId);
+
+    assert.strictEqual(peekSession(legacy.id), legacy); assert.equal(JSON.stringify(legacy), legacyBytes);
+    assert.strictEqual(peekSession(native.id), native); assert.equal(JSON.stringify(native), nativeBytes);
+    assert.strictEqual(peekSession(system.id), system); assert.equal(JSON.stringify(system), systemBytes);
+    assert.deepEqual(events, []);
+    assert.strictEqual(retireWebP3SessionsForUser(userId), receipt, 'terminal P3 work has a stable empty replay');
+
+    const source = readFileSync(fileURLToPath(new URL('./server-session.ts', import.meta.url)), 'utf8');
+    const body = source.slice(source.indexOf('export function retireWebP3SessionsForUser'), source.indexOf('/** Compacts one exact RETIRED Web cell'));
+    assert.doesNotMatch(body, /\b(?:sessions|deleteSession|terminateSession|retireLegacyServerSessionForUser|retireServerSessionForLogout|resolveActiveWebServerSession)\b/u);
+});
+
+test('P3-only user retirement fails closed for stale P2 cleanup and hostile input without later work', async (t) => {
+    const userId = 'p3-only-failure';
+    const failed = activeResourceFixture(userId);
+    const unaffected = activeResourceFixture('p3-only-unaffected');
+    assert.equal(failed.control.retireTicket(failed.ticket, 'delete'), 1);
+    let observed = 0;
+    const proxy = new Proxy(Object.create(null), { get() { observed += 1; throw new Error('get'); }, ownKeys() { observed += 1; throw new Error('keys'); } });
+    const accessor = Object.create(null);
+    Object.defineProperty(accessor, 'then', { get() { observed += 1; throw new Error('then'); } });
+    const rejected = Promise.reject(new Error('synthetic rejected P3-only input')); rejected.catch(() => undefined);
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+
+    for (const value of [null, undefined, '', {}, Object.create(null), proxy, accessor, Promise.resolve(), rejected]) {
+        assert.equal(retireWebP3SessionsForUser(value).outcome, 'denied');
+    }
+    const receipt = retireWebP3SessionsForUser(userId);
+    assert.equal(receipt.outcome, 'failed');
+    assert.equal(resolveActiveWebServerSession(failed.sessionId), null);
+    assert.ok(resolveActiveWebServerSession(unaffected.sessionId));
+
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(observed, 0); assert.deepEqual(unhandled, []);
+});
+
+test('P3-only user retirement fences same-user P3 and issuer issuance through nested cleanup reentry', async (t) => {
+    const nodeRequire = createRequire(import.meta.url);
+    const paths = ['server-session.ts', 'web-auth-session-issuer.ts', 'web-auth-control-owner.ts']
+        .map((name) => nodeRequire.resolve(`./${name}`));
+    const cached = paths.map((path) => nodeRequire.cache[path]);
+    const originalValues = Map.prototype.values;
+    let isolated: typeof import('./server-session') | undefined;
+    let issuer: typeof import('./web-auth-session-issuer') | undefined;
+    let trigger = false;
+    let nested: WebServerSessionRetirementCleanupReceipt['outcome'] | null = null;
+    let stagedDenied = false; let preparedDenied = false; let armedDenied = false; let activationDenied = false; let issuerDenied = false;
+    const userId = 'p3-only-fence';
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    Map.prototype.values = function (...args: Parameters<typeof originalValues>) {
+        const iterator = Reflect.apply(originalValues, this, args);
+        if (trigger) {
+            trigger = false;
+            nested = isolated!.retireWebP3SessionsForUser(userId).outcome;
+            stagedDenied = isolated!.stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }) === null;
+            preparedDenied = isolated!.prepareStagedWebServerSession(staged) === null;
+            armedDenied = isolated!.armPreparedWebServerSession(prepared) === null;
+            activationDenied = isolated!.activateArmedWebServerSession(armed, null) === false;
+            issuerDenied = issuer!.issue(attempt, { id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }) === null;
+            throw new Error('synthetic apply-then-throw');
+        }
+        return iterator;
+    };
+    let staged: ReturnType<typeof stageWebServerSession> = null;
+    let prepared: ReturnType<typeof prepareStagedWebServerSession> = null;
+    let armed: ReturnType<typeof armPreparedWebServerSession> = null;
+    let activeId = '';
+    let attempt: ReturnType<typeof import('./web-auth-session-issuer').begin> = null;
+    try {
+        for (const path of paths) delete nodeRequire.cache[path];
+        isolated = nodeRequire(paths[0]) as typeof import('./server-session');
+        issuer = nodeRequire(paths[1]) as typeof import('./web-auth-session-issuer');
+        const activeStaged = isolated.stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(activeStaged);
+        const activePrepared = isolated.prepareStagedWebServerSession(activeStaged); assert.ok(activePrepared);
+        activeId = isolated.getPreparedWebServerSessionId(activePrepared) ?? ''; assert.ok(activeId);
+        const activePort = isolated.armPreparedWebServerSession(activePrepared); assert.ok(activePort);
+        const control = authControlApi().create('p3-only-fence-control'); control.begin('login', 'op', 'key', 'fp', 0);
+        const ticket = control.prepareTicket('p3-only-fence-control', 'op', BigInt(0), 'fp', activeId, 1); assert.ok(ticket);
+        assert.equal(isolated.activateArmedWebServerSession(activePort, ticket), true);
+        staged = isolated.stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(staged);
+        prepared = isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' })); assert.ok(prepared);
+        armed = isolated.armPreparedWebServerSession(isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }))); assert.ok(armed);
+        attempt = issuer.begin('login'); assert.ok(attempt);
+
+        trigger = true;
+        assert.equal(isolated.retireWebP3SessionsForUser(userId).outcome, 'failed');
+        assert.equal(nested, 'denied'); assert.equal(stagedDenied, true); assert.equal(preparedDenied, true);
+        assert.equal(armedDenied, true); assert.equal(activationDenied, true); assert.equal(issuerDenied, true);
+        assert.equal(isolated.resolveActiveWebServerSession(activeId), null);
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        assert.equal(isolated.resolveActiveWebServerSession(activeId), null); assert.deepEqual(unhandled, []);
+    } finally {
+        trigger = false; Map.prototype.values = originalValues; isolated?.clearAllSessions();
+        for (let index = 0; index < paths.length; index += 1) {
+            if (cached[index]) nodeRequire.cache[paths[index]] = cached[index]; else delete nodeRequire.cache[paths[index]];
+        }
+    }
 });
 
 test('user-scoped retirement preserves P3 ownership over a colliding legacy Map entry', () => {
