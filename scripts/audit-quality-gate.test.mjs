@@ -295,6 +295,7 @@ type ExactRecord = Readonly<Record<string, unknown>>;
 type Session = { id: string };
 type Sources = { resolve(id: string): Session | null; retire(id: string, reason: 'delete'): { outcome: 'completed' | 'denied' }; audit(session: Session, sessionId: string, request: Request): Promise<void> };
 function exactRecord(value: unknown, keys: readonly string[], prototype: object | null, frozen: boolean): ExactRecord | null ${exactRecordBody}
+function exactBearer(_cookie: unknown): string { return 'synthetic-bearer'; }
 function completedReceipt(value: unknown): boolean {
     const record = exactRecord(value, ['outcome'], null, true);
     return record?.outcome === 'completed';
@@ -310,7 +311,7 @@ const productionSources: Sources = Object.freeze({
 });
 export async function completeExactWebP3Logout(cookie: unknown, request: Request, sources = productionSources): Promise<Response> {
     void cookie;
-    const sessionId = 'synthetic-bearer';
+    const sessionId = exactBearer(cookie);
     let session: Session | null;
     try { session = sources.resolve(sessionId); } catch { return empty(401); }
     if (!session) return empty(401);
@@ -590,4 +591,23 @@ test('V5C rejects wrong arity, value, and binding for session resolution without
         observed.push([name, findings]);
     }
     assert.deepEqual(observed, mutations.map(([name]) => [name, ['owner must resolve exactly once with the bound session id']]));
+});
+
+test('V5C requires the owner session id to be the exact const bearer binding', () => {
+    const mutations = [
+        ['mutable session id', logoutService.replace('const sessionId = exactBearer(cookie);', "let sessionId = exactBearer(cookie); sessionId = 'forged';")],
+        ['module session id', `const sessionId = 'forged';\n${logoutService}`],
+        ['shadowed exactBearer', logoutService.replace('void cookie;', "void cookie; const exactBearer = (_cookie: unknown) => 'forged';")],
+        ['wrong bearer argument', logoutService.replace('exactBearer(cookie)', 'exactBearer(request)')],
+        ['zero bearer arguments', logoutService.replace('exactBearer(cookie)', 'exactBearer()')],
+        ['extra bearer argument', logoutService.replace('exactBearer(cookie)', 'exactBearer(cookie, request)')],
+    ];
+    const observed = [];
+    for (const [name, service] of mutations) {
+        assert.equal(ts.createSourceFile('service.ts', service, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS).parseDiagnostics.length, 0, name);
+        let findings;
+        assert.doesNotThrow(() => { findings = validateLogoutAuditModes({ spec: logoutSpec, routeSource: logoutRoute, serviceSource: service }); }, name);
+        observed.push([name, findings]);
+    }
+    assert.deepEqual(observed, mutations.map(([name]) => [name, ['owner session id must be the exact const bearer binding']]));
 });
