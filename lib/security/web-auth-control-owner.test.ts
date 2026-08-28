@@ -66,6 +66,31 @@ test('serializes entropy reentry and recovers after WeakMap apply-then-throw', a
     try { const isolated = await fresh('owner-weakmap-set'); throwAfter = true; assert.equal(isolated.beginWebAuth('login'), null); throwAfter = false; assert.ok(isolated.beginWebAuth('login')); } finally { WeakMap.prototype.set = set; }
 });
 
+test('cancels record begin publication when captured Map hooks poison the owner turn', async (t) => {
+    const originalGet = Map.prototype.get; const originalSet = Map.prototype.set;
+    let owner: Awaited<ReturnType<typeof fresh>>; let armed: 'get' | 'set' | '' = ''; let nested: unknown;
+    const reenter = (): void => { const mode = armed; if (!mode) return; armed = ''; nested = owner.beginWebAuth('setup'); };
+    Map.prototype.get = function (...args: Parameters<typeof originalGet>) {
+        const result = Reflect.apply(originalGet, this, args); if (armed === 'get') reenter(); return result;
+    };
+    Map.prototype.set = function (...args: Parameters<typeof originalSet>) {
+        const result = Reflect.apply(originalSet, this, args); if (armed === 'set') reenter(); return result;
+    };
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    try {
+        owner = await fresh('owner-map-reentry');
+        const baseline = owner.beginWebAuth('login'); assert.ok(baseline); assert.equal(owner.cancelWebAuth(baseline), true);
+        for (let index = 0; index < 64; index += 1) {
+            armed = index % 2 === 0 ? 'get' : 'set'; nested = undefined;
+            assert.equal(owner.beginWebAuth('login'), null); assert.equal(nested, null, `nested denial missing at iteration ${index}`);
+        }
+        const clean = owner.beginWebAuth('login'); assert.ok(clean, 'failed owner turns cannot strand pending or idempotency capacity');
+        assert.equal(owner.cancelWebAuth(clean), true);
+    } finally { Map.prototype.get = originalGet; Map.prototype.set = originalSet; }
+    await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
+});
+
 test('retries owner WeakMap get after reentry or apply-then-throw without residue', async () => {
     const get = WeakMap.prototype.get; let mode: 'reenter' | 'throw' | '' = ''; let owner: Awaited<ReturnType<typeof fresh>>; let attempt: unknown; let nested: unknown;
     WeakMap.prototype.get = function (...args: Parameters<typeof get>) { const result = Reflect.apply(get, this, args); if (mode === 'reenter') { mode = ''; nested = owner.prepareWebAuthActivation(attempt, 'nested'); } else if (mode === 'throw') throw new Error('apply then throw'); return result; };
