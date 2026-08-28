@@ -3,6 +3,7 @@
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 export const ANYDOC_VERSION = '0.2.4';
 export const ANYDOC_WORKER_PATH = 'scripts/anydoc-local-extraction-worker.mjs';
@@ -52,26 +53,128 @@ export function validateAnyDocSupplyChain(packageJson, packageLock) {
     return issues;
 }
 
-function packageReferences(source) {
-    return [...source.matchAll(/['"](@firecrawl\/anydoc(?:\/[^'"]*)?)['"]/gu)].map((match) => match[1]);
+function parseSource(source, worker) {
+    return ts.createSourceFile(worker ? 'anydoc-worker.mjs' : 'anydoc-guard-input.tsx', source, ts.ScriptTarget.Latest, true, worker ? ts.ScriptKind.JS : ts.ScriptKind.TSX);
+}
+
+function constantBindings(sourceFile) {
+    const bindings = new Map();
+    const visit = (node) => {
+        if (
+            ts.isVariableDeclaration(node)
+            && ts.isIdentifier(node.name)
+            && node.initializer
+            && (node.parent.flags & ts.NodeFlags.Const) !== 0
+        ) bindings.set(node.name.text, bindings.has(node.name.text) ? undefined : node.initializer);
+        ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+    return bindings;
+}
+
+function constantString(node, bindings, seen = new Set()) {
+    if (!node) return undefined;
+    if (ts.isStringLiteralLike(node)) return node.text;
+    if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isNonNullExpression(node)) return constantString(node.expression, bindings, seen);
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+        const left = constantString(node.left, bindings, seen);
+        const right = constantString(node.right, bindings, seen);
+        return left === undefined || right === undefined ? undefined : left + right;
+    }
+    if (ts.isTemplateExpression(node)) {
+        let value = node.head.text;
+        for (const span of node.templateSpans) {
+            const expression = constantString(span.expression, bindings, seen);
+            if (expression === undefined) return undefined;
+            value += expression + span.literal.text;
+        }
+        return value;
+    }
+    if (ts.isIdentifier(node) && !seen.has(node.text)) {
+        const initializer = bindings.get(node.text);
+        if (!initializer) return undefined;
+        return constantString(initializer, bindings, new Set([...seen, node.text]));
+    }
+    return undefined;
+}
+
+function propertyName(node, bindings) {
+    if (ts.isIdentifier(node)) return node.text;
+    if (ts.isComputedPropertyName(node)) return constantString(node.expression, bindings);
+    return constantString(node, bindings);
+}
+
+const NETWORK_MODULES = new Set(['http', 'https', 'net', 'tls', 'node:http', 'node:https', 'node:net', 'node:tls']);
+const FORBIDDEN_IDENTIFIERS = new Set([
+    'fetch', 'WebSocket', 'XMLHttpRequest', 'require', 'eval', 'Function', 'env',
+    'FIRECRAWL_API_KEY', 'FIRECRAWL_API_URL', 'NAPI_RS_NATIVE_LIBRARY_PATH',
+]);
+const FORBIDDEN_CONSTANTS = new Set([...FORBIDDEN_IDENTIFIERS, 'http', 'https', 'net', 'tls']);
+
+function analyzeSource(source, worker) {
+    const sourceFile = parseSource(source, worker);
+    const bindings = constantBindings(sourceFile);
+    const issues = new Set();
+    let nativeImports = 0;
+    let staticImports = 0;
+    if (worker && sourceFile.parseDiagnostics.length > 0) issues.add('worker source has syntax errors');
+
+    const visit = (node) => {
+        if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+            staticImports += 1;
+            const specifier = node.moduleSpecifier.text;
+            const namedImports = node.importClause?.namedBindings;
+            const hasTypeSyntax = node.importClause?.isTypeOnly === true
+                || (namedImports && ts.isNamedImports(namedImports) && namedImports.elements.some((element) => element.isTypeOnly));
+            if (worker && hasTypeSyntax) issues.add('type-only import syntax is forbidden in the worker');
+            if (specifier === ANYDOC_NATIVE_SUBPATH) nativeImports += 1;
+            else if (specifier.startsWith('@firecrawl/anydoc')) issues.add('package root or CLI import is forbidden');
+            if (worker && NETWORK_MODULES.has(specifier)) issues.add('network module import is forbidden');
+        }
+        if (ts.isExportDeclaration(node) && node.moduleSpecifier) {
+            const specifier = constantString(node.moduleSpecifier, bindings);
+            if (specifier?.startsWith('@firecrawl/anydoc')) issues.add('AnyDoc re-export is forbidden');
+        }
+        if (ts.isCallExpression(node)) {
+            const dynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
+            const requireCall = ts.isIdentifier(node.expression) && node.expression.text === 'require';
+            if (worker && dynamicImport) issues.add('dynamic import is forbidden');
+            if (worker && requireCall) issues.add('require is forbidden');
+            if (dynamicImport || requireCall) {
+                const specifier = constantString(node.arguments[0], bindings);
+                if (specifier?.startsWith('@firecrawl/anydoc')) issues.add('computed AnyDoc package loading is forbidden');
+            }
+        }
+        if (worker && ts.isIdentifier(node) && FORBIDDEN_IDENTIFIERS.has(node.text)) issues.add(`${node.text} is forbidden`);
+        if (worker && (ts.isElementAccessExpression(node) || ts.isComputedPropertyName(node))) issues.add('computed property access is forbidden');
+        if (worker && ts.isPropertyAssignment(node)) {
+            const name = propertyName(node.name, bindings);
+            const value = constantString(node.initializer, bindings);
+            if (name === 'ocr' && value === 'hosted') issues.add('hosted OCR option is forbidden');
+        }
+        const constant = constantString(node, bindings);
+        const isAcceptedImport = worker
+            && ts.isStringLiteral(node)
+            && ts.isImportDeclaration(node.parent)
+            && node.parent.moduleSpecifier === node
+            && node.text === ANYDOC_NATIVE_SUBPATH;
+        if (!isAcceptedImport && constant?.startsWith('@firecrawl/anydoc')) issues.add('AnyDoc package reference is forbidden outside the exact static import');
+        if (worker && constant && NETWORK_MODULES.has(constant)) issues.add('network module reference is forbidden');
+        if (worker && constant && FORBIDDEN_CONSTANTS.has(constant)) issues.add(`${constant} constant is forbidden`);
+        if (worker && constant && /^(?:https?|wss?):/u.test(constant)) issues.add('network URL is forbidden');
+        ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+    if (worker && (nativeImports !== 1 || staticImports !== 1)) issues.add(`worker must have exactly one static import declaration from ${ANYDOC_NATIVE_SUBPATH}`);
+    return [...issues];
 }
 
 export function validateAnyDocWorkerSource(source) {
-    const issues = [];
-    const references = packageReferences(source);
-    if (references.length !== 1 || references[0] !== ANYDOC_NATIVE_SUBPATH) issues.push(`worker must import exactly ${ANYDOC_NATIVE_SUBPATH}`);
-    const forbidden = [
-        [/\bocr\s*:\s*['"]hosted['"]/u, 'hosted OCR option'],
-        [/FIRECRAWL_API_KEY/u, 'FIRECRAWL_API_KEY'],
-        [/FIRECRAWL_API_URL/u, 'FIRECRAWL_API_URL'],
-        [/NAPI_RS_NATIVE_LIBRARY_PATH/u, 'NAPI_RS_NATIVE_LIBRARY_PATH'],
-        [/\bfetch\s*\(/u, 'fetch'],
-        [/(?:['"](?:node:)?https?['"]|https?:\/\/)/u, 'HTTP module or URL'],
-        [/(?:node:)?(?:net|tls)['"]/u, 'network socket module'],
-        [/\b(?:WebSocket|XMLHttpRequest)\b/u, 'browser network API'],
-    ];
-    for (const [pattern, label] of forbidden) if (pattern.test(source)) issues.push(`${label} is forbidden`);
-    return issues;
+    return analyzeSource(source, true);
+}
+
+export function validateAnyDocNonWorkerSource(source) {
+    return analyzeSource(source, false);
 }
 
 async function sourceFiles(root) {
@@ -99,12 +202,11 @@ export async function runAnyDocLocalOnlyGuard(root) {
         const relative = path.relative(root, absolute).split(path.sep).join('/');
         if (SELF_FILES.has(relative)) continue;
         const source = await readFile(absolute, 'utf8');
-        const references = packageReferences(source);
         if (relative === ANYDOC_WORKER_PATH) {
             workerSeen = true;
             issues.push(...validateAnyDocWorkerSource(source).map((issue) => `${relative}: ${issue}`));
-        } else if (references.length > 0) {
-            issues.push(`${relative}: AnyDoc package use is allowed only in ${ANYDOC_WORKER_PATH}`);
+        } else {
+            issues.push(...validateAnyDocNonWorkerSource(source).map((issue) => `${relative}: ${issue}`));
         }
     }
     if (issues.length > 0) throw new Error(`AnyDoc local-only guard failed:\n- ${issues.join('\n- ')}`);

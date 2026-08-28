@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
     ANYDOC_NATIVE_SUBPATH,
+    validateAnyDocNonWorkerSource,
     validateAnyDocSupplyChain,
     validateAnyDocWorkerSource,
 } from './check-anydoc-local-only.mjs';
@@ -19,8 +20,27 @@ test('accepted supply chain and native-only worker source pass', () => {
 
 test('package root and CLI imports fail', () => {
     for (const specifier of ['@firecrawl/anydoc', '@firecrawl/anydoc/cli.js']) {
-        assert.match(validateAnyDocWorkerSource(`import '${specifier}';`).join('\n'), /must import exactly/u);
+        assert.match(validateAnyDocWorkerSource(`import '${specifier}';`).join('\n'), /package root or CLI import/u);
     }
+});
+
+test('comments and strings do not satisfy the exact static import requirement', () => {
+    assert.match(validateAnyDocWorkerSource(`// import '${ANYDOC_NATIVE_SUBPATH}';`).join('\n'), /exactly one static import/u);
+    assert.match(validateAnyDocWorkerSource(`const note = '${ANYDOC_NATIVE_SUBPATH}';`).join('\n'), /exactly one static import/u);
+    assert.deepEqual(validateAnyDocWorkerSource(`${validWorker}\n// import '@firecrawl/anydoc';`), []);
+    assert.notDeepEqual(validateAnyDocWorkerSource(`${validWorker}\nimport 'node:fs';`), []);
+    assert.notDeepEqual(validateAnyDocWorkerSource(`import type { Result } from '${ANYDOC_NATIVE_SUBPATH}';`), []);
+});
+
+test('dynamic, require, computed and template package loading fail', () => {
+    const sources = [
+        `${validWorker}\nimport('@firecrawl/' + 'anydoc');`,
+        `${validWorker}\nconst scope = '@firecrawl/'; const name = 'anydoc'; import(scope + name);`,
+        `${validWorker}\nrequire(\`@firecrawl/${'${'}'anydoc'}\`);`,
+        `${validWorker}\nconst load = require; load('@firecrawl/' + 'anydoc');`,
+        `${validWorker}\nglobalThis['require']('@firecrawl/anydoc/cli.js');`,
+    ];
+    for (const source of sources) assert.notDeepEqual(validateAnyDocWorkerSource(source), []);
 });
 
 test('hosted OCR, Firecrawl variables, native override and network use fail', () => {
@@ -30,12 +50,28 @@ test('hosted OCR, Firecrawl variables, native override and network use fail', ()
         `${validWorker}\nprocess.env.FIRECRAWL_API_URL;`,
         `${validWorker}\nprocess.env.NAPI_RS_NATIVE_LIBRARY_PATH;`,
         `${validWorker}\nfetch('/extract');`,
+        `${validWorker}\nconst request = fetch; request('/extract');`,
+        `${validWorker}\nglobalThis['fe' + 'tch']('/extract');`,
+        `${validWorker}\nReflect.get(globalThis, 'fe' + 'tch')('/extract');`,
         `${validWorker}\nimport 'node:http';`,
         `${validWorker}\nimport 'node:https';`,
         `${validWorker}\nimport 'node:net';`,
+        `${validWorker}\nconst prefix = 'node:'; import(prefix + 'http');`,
+        `${validWorker}\nprocess.env['FIRECRAWL_' + 'API_KEY'];`,
+        `${validWorker}\nReflect.get(process, 'e' + 'nv');`,
         `${validWorker}\nnew WebSocket('ws://local');`,
     ];
     for (const source of forbiddenSources) assert.notDeepEqual(validateAnyDocWorkerSource(source), []);
+});
+
+test('AnyDoc direct and composed references fail outside the worker', () => {
+    const sources = [
+        `import '${ANYDOC_NATIVE_SUBPATH}';`,
+        `import('@firecrawl/' + 'anydoc');`,
+        `const scope = '@firecrawl/'; const name = 'anydoc'; require(scope + name + '/cli.js');`,
+    ];
+    for (const source of sources) assert.notDeepEqual(validateAnyDocNonWorkerSource(source), []);
+    assert.deepEqual(validateAnyDocNonWorkerSource(`// import '@firecrawl/anydoc';\nconst parser = 'anydoc-local';`), []);
 });
 
 test('version, integrity and native package drift fail', () => {
