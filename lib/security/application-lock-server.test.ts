@@ -1,8 +1,10 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { afterEach, test } from 'node:test';
+import { pathToFileURL } from 'node:url';
 
 import { createApplicationLockResponse, evaluateApplicationLockAttempt, preserveApplicationLockReceipt } from './application-lock-server';
 import { clearAllSessions, createSession, deleteSession, invalidateServerSessionForApplicationLock, peekSession, registerServerSessionResource } from './server-session';
@@ -89,13 +91,41 @@ test('production registrations remain declared synchronous void callbacks', () =
     assert.doesNotMatch(`${broker}\n${owner}\n${capture}`, /registerServerSessionResource\([^\n]*async/u);
 });
 
-test('route receives the primitive capture rather than pre-invalidation peek state', () => {
+test('route delegates the exact cookie to the P3 application-lock service', () => {
     const route = readFileSync(new URL('../../app/api/auth/lock/route.ts', import.meta.url), 'utf8');
-    assert.match(route, /attempt\.sessionBeforeDeletion/u); assert.doesNotMatch(route, /peekSession/u);
-    assert.match(route, /invalidateServerSessionForApplicationLock/u);
-    assert.match(route, /preserveApplicationLockReceipt/u);
-    assert.doesNotMatch(route, /receipt\s*=\s*\{/u);
+    assert.match(route, /let cookie: unknown = null/u);
+    assert.match(route, /completeExactWebP3ApplicationLock\(cookie, request\)/u);
+    assert.doesNotMatch(route, /invalidateServerSessionForApplicationLock|evaluateApplicationLockAttempt|preserveApplicationLockReceipt/u);
+    assert.doesNotMatch(route, /serverSessionProjectionOwnerRegistry|writeAuditEvent|peekSession/u);
     assert.doesNotMatch(route, /cookies\.(set|delete)|maxAge\s*:\s*0/u);
+});
+
+test('route turns a rejected cookie lookup into one inert P3 lock delegation', () => {
+    const routeUrl = pathToFileURL(new URL('../../app/api/auth/lock/route.ts', import.meta.url).pathname).href;
+    const toDataModule = (source: string) => `data:text/javascript,${encodeURIComponent(source)}`;
+    const program = `
+        import { registerHooks } from 'node:module';
+        const routeUrl = ${JSON.stringify(pathToFileURL(new URL('../../app/api/auth/lock/route.ts', import.meta.url).pathname).href)};
+        const modules = new Map([
+            ['next/headers', ${JSON.stringify(toDataModule("export const cookies = () => Promise.reject(new Error('synthetic rejection'));"))}],
+            ['@/lib/security/server-session', ${JSON.stringify(toDataModule("export const SESSION_COOKIE_NAME = 'mediflow_session';"))}],
+            ['@/lib/security/web-auth-application-lock-server', ${JSON.stringify(toDataModule("export async function completeExactWebP3ApplicationLock(cookie) { globalThis.calls = (globalThis.calls ?? 0) + 1; globalThis.cookie = cookie; return new Response(JSON.stringify({ schemaVersion: 'mediflow.application-lock-receipt.v1', state: 'server_invalidation_unconfirmed' }), { status: 409, headers: { 'Content-Type': 'application/json' } }); }"))}],
+        ]);
+        registerHooks({ resolve(specifier, context, nextResolve) {
+            if (context.parentURL === routeUrl && modules.has(specifier)) return { shortCircuit: true, url: modules.get(specifier), format: 'module' };
+            return nextResolve(specifier, context);
+        } });
+        let unhandled = 0;
+        process.on('unhandledRejection', () => { unhandled += 1; });
+        const { POST } = await import(routeUrl);
+        const response = await POST(new Request('http://127.0.0.1/api/auth/lock', { method: 'POST' }));
+        await new Promise((resolve) => setImmediate(resolve));
+        const observed = { status: response.status, body: await response.json(), calls: globalThis.calls, cookie: globalThis.cookie, unhandled };
+        const expected = { status: 409, body: { schemaVersion: 'mediflow.application-lock-receipt.v1', state: 'server_invalidation_unconfirmed' }, calls: 1, cookie: null, unhandled: 0 };
+        if (JSON.stringify(observed) !== JSON.stringify(expected)) process.exitCode = 1;
+    `;
+    const child = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '--eval', program], { encoding: 'utf8' });
+    assert.equal(child.status, 0, child.stderr || child.stdout || routeUrl);
 });
 
 test('audit failure cannot retrograde a confirmed invalidation receipt', async () => {

@@ -1,40 +1,14 @@
 /* @Codex */
 import { cookies } from 'next/headers';
 
-import {
-    evaluateApplicationLockAttempt,
-    preserveApplicationLockReceipt,
-    type ApplicationLockSources,
-    createApplicationLockResponse,
-} from '@/lib/security/application-lock-server';
-import { hashAuditRef, auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
-import { invalidateServerSessionForApplicationLock, SESSION_COOKIE_NAME } from '@/lib/security/server-session';
-import { serverSessionProjectionOwnerRegistry } from '@/lib/security/server-session-projection-owner-production';
-
-const productionSources: ApplicationLockSources = Object.freeze({
-    invalidateSession: invalidateServerSessionForApplicationLock,
-    lookupProjectionOwner: (sessionId) => serverSessionProjectionOwnerRegistry.lookup(sessionId),
-});
+import { completeExactWebP3ApplicationLock } from '@/lib/security/web-auth-application-lock-server';
+import { SESSION_COOKIE_NAME } from '@/lib/security/server-session';
 
 export async function POST(request: Request) {
-    const cookieStore = await cookies();
-    const cookieSessionId = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-    const attempt = evaluateApplicationLockAttempt(cookieSessionId, productionSources);
-    const receipt = await preserveApplicationLockReceipt(attempt.receipt, async () => {
-        if (typeof cookieSessionId !== 'string') throw new Error('invalid lock receipt input');
-        const context = auditContextFromSession(attempt.sessionBeforeDeletion);
-        await writeAuditEvent({
-            eventType: 'auth.lock',
-            outcome: 'success',
-            actorType: context.actorType,
-            actorRef: context.actorRef,
-            subjectType: 'session',
-            subjectRef: hashAuditRef(cookieSessionId),
-            sourceSurface: context.sourceSurface,
-            requestId: requestIdFromRequest(request),
-            redactedMetadata: withAuditContextMetadata(context, null),
-        });
-    });
-
-    return createApplicationLockResponse(receipt);
+    let cookie: unknown = null;
+    try {
+        const cookieStore = await cookies();
+        cookie = cookieStore.get(SESSION_COOKIE_NAME);
+    } catch { /* The terminal service receives only the inert denial input. */ }
+    return completeExactWebP3ApplicationLock(cookie, request);
 }
