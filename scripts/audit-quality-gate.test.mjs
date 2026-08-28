@@ -571,3 +571,23 @@ test('V5B rejects conditional retirement, forged authority, alternate writers, a
         }]);
     } finally { fs.rmSync(fixtureRoot, { recursive: true, force: true }); }
 });
+
+test('V5C rejects wrong arity, value, and binding for session resolution without throwing', () => {
+    const mutations = [
+        ['wrong literal', logoutService.replace('sources.resolve(sessionId)', "sources.resolve('forged')")],
+        ['zero arguments', logoutService.replace('sources.resolve(sessionId)', 'sources.resolve()')],
+        ['extra argument', logoutService.replace('sources.resolve(sessionId)', "sources.resolve(sessionId, 'forged')")],
+        ['shadowed session id', logoutService.replace(
+            'try { session = sources.resolve(sessionId); }',
+            "try { { const sessionId = 'forged'; session = sources.resolve(sessionId); } }",
+        )],
+    ];
+    const observed = [];
+    for (const [name, service] of mutations) {
+        assert.equal(ts.createSourceFile('service.ts', service, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS).parseDiagnostics.length, 0, name);
+        let findings;
+        assert.doesNotThrow(() => { findings = validateLogoutAuditModes({ spec: logoutSpec, routeSource: logoutRoute, serviceSource: service }); }, name);
+        observed.push([name, findings]);
+    }
+    assert.deepEqual(observed, mutations.map(([name]) => [name, ['owner must resolve exactly once with the bound session id']]));
+});
