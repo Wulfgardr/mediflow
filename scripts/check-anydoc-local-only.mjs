@@ -205,9 +205,24 @@ function analyzeSource(source, worker) {
             if (name === 'ocr' && value === 'hosted') issues.add('hosted OCR option is forbidden');
         }
         if (worker && ts.isShorthandPropertyAssignment(node)) {
-            const value = constantString(node.name, declarations);
-            if (node.name.text === 'ocr' && value === 'hosted') issues.add('hosted OCR shorthand is forbidden');
+            if (node.name.text === 'ocr') issues.add('ocr shorthand is forbidden');
         }
+        if (worker && ts.isVariableDeclaration(node)
+            && (ts.isObjectBindingPattern(node.name) || ts.isArrayBindingPattern(node.name))) {
+            issues.add('destructuring bindings are forbidden in the worker');
+        }
+        if (worker && ts.isParameter(node)) {
+            if (ts.isObjectBindingPattern(node.name) || ts.isArrayBindingPattern(node.name)) {
+                issues.add('destructuring parameters are forbidden in the worker');
+            }
+            if (ts.isIdentifier(node.name) && node.name.text === 'ocr') issues.add('ocr parameters are forbidden in the worker');
+        }
+        if (worker && ts.isBinaryExpression(node)
+            && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
+            && (ts.isObjectLiteralExpression(node.left) || ts.isArrayLiteralExpression(node.left))) {
+            issues.add('destructuring assignments are forbidden in the worker');
+        }
+        if (worker && ts.isSpreadAssignment(node)) issues.add('property spread is forbidden in the worker');
         if (worker && (ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node) || ts.isMethodDeclaration(node))) {
             issues.add('accessor and method declarations are forbidden in the worker');
         }
