@@ -70,6 +70,7 @@ cp -R "$STANDALONE_DIR/." "$WEB/"
 cp -R "$ROOT_DIR/$NEXT_DIST_DIR/static" "$WEB/.next/static"
 [[ -d "$ROOT_DIR/public" ]] && cp -R "$ROOT_DIR/public" "$WEB/public"
 cp "$ROOT_DIR/scripts/local-api-tls-proxy.mjs" "$RES/local-api-tls-proxy.mjs"
+"$ROOT_DIR/scripts/check-macos-web-runtime-native-payload.sh" --normalize --web-runtime "$WEB"
 
 # 4. Optional codesign (so the injected runtime is covered for distribution)
 if [[ -n "${MEDIFLOW_CODESIGN_IDENTITY:-}" ]]; then
