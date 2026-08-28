@@ -253,9 +253,15 @@ const logoutSpec = {
         },
     },
 };
-const logoutRoute = `import { completeExactWebP3Logout } from '@/lib/security/web-auth-logout-server';
+const logoutRoute = `import { cookies } from 'next/headers';
+import { completeExactWebP3Logout } from '@/lib/security/web-auth-logout-server';
+import { SESSION_COOKIE_NAME } from '@/lib/security/server-session';
 export async function POST(request: Request): Promise<Response> {
-    const cookie = {};
+    let cookie: unknown = null;
+    try {
+        const cookieStore = await cookies();
+        cookie = cookieStore.get(SESSION_COOKIE_NAME);
+    } catch {}
     return completeExactWebP3Logout(cookie, request);
 }`;
 const logoutService = `import { auditContextFromSession, hashAuditRef, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from './audit';
@@ -287,6 +293,8 @@ export async function completeExactWebP3Logout(cookie: unknown, request: Request
 function assertLogoutSemanticClean(route, service) {
     const sources = new Map([
         ['/fixture/route.ts', route], ['/fixture/lib/security/web-auth-logout-server.ts', service],
+        ['/fixture/node_modules/next/headers.d.ts', `export declare function cookies(): Promise<{ get(name: string): unknown }>;`],
+        ['/fixture/lib/security/server-session.d.ts', `export declare const SESSION_COOKIE_NAME: string;`],
         ['/fixture/lib/security/audit.d.ts', `export declare function auditContextFromSession(value: unknown): Record<string, unknown>;
 export declare function hashAuditRef(value: string): string;
 export declare function requestIdFromRequest(value: Request): string;
@@ -332,5 +340,34 @@ test('rejects stale paths and non-terminal, reordered, floating, or raw delegate
     ];
     for (const [route, service] of mutations) {
         assert.notDeepEqual(validateLogoutAuditModes({ spec: logoutSpec, routeSource: route, serviceSource: service }), []);
+    }
+});
+
+test('V5A rejects impure cookie routes and hostile service-owned response factories without throwing', () => {
+    const mutations = [
+        [logoutRoute.replace('} catch {}', "} catch { throw new Error('cookie rejection'); }"), logoutService],
+        [logoutRoute.replace('cookie = cookieStore.get(SESSION_COOKIE_NAME);', 'cookieStore.delete(SESSION_COOKIE_NAME); cookie = cookieStore.get(SESSION_COOKIE_NAME);'), logoutService],
+        [logoutRoute.replace('return completeExactWebP3Logout(cookie, request);', 'return completeExactWebP3Logout.call(null, cookie, request);'), logoutService],
+        [logoutRoute.replace('return completeExactWebP3Logout(cookie, request);', 'return completeExactWebP3Logout?.(cookie, request);'), logoutService],
+        [logoutRoute.replace('return completeExactWebP3Logout(cookie, request);', 'return completeExactWebP3Logout.apply(null, [cookie, request]);'), logoutService],
+        [logoutRoute.replace('return completeExactWebP3Logout(cookie, request);', 'return completeExactWebP3Logout.bind(null)(cookie, request);'), logoutService],
+        [logoutRoute.replace('return completeExactWebP3Logout(cookie, request);', 'return Reflect.apply(completeExactWebP3Logout, null, [cookie, request]);'), logoutService],
+        [logoutRoute.replace('return completeExactWebP3Logout(cookie, request);', "return (await import('./logout')).completeExactWebP3Logout(cookie, request);"), logoutService],
+        [logoutRoute.replace('return completeExactWebP3Logout(cookie, request);', 'void completeExactWebP3Logout(cookie, request); return completeExactWebP3Logout(cookie, request);'), logoutService],
+        [logoutRoute.replace('} catch {}', '    return new Response(null, { status: 204 });\n    } catch {}'), logoutService],
+        [logoutRoute.replace('return completeExactWebP3Logout(cookie, request);', 'return new Response(null, { status: 204 });'), logoutService],
+        [logoutRoute, logoutService.replace("headers: { 'Cache-Control': 'no-store' }", "headers: { ...{ 'Cache-Control': 'no-store' } }")],
+        [logoutRoute, logoutService.replace("'Cache-Control': 'no-store'", "['Cache-Control']: 'no-store'")],
+        [logoutRoute, logoutService.replace("'Cache-Control': 'no-store'", "'cache-control': 'no-store'")],
+        [logoutRoute, logoutService.replace("headers: { 'Cache-Control': 'no-store' }", 'headers: {}')],
+        [logoutRoute, logoutService.replace('{ status, headers:', '{ status: status, headers:')],
+        [logoutRoute, `import { Response } from './response';\n${logoutService}`],
+        [logoutRoute, logoutService.replace('return empty(204);', "return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });")],
+        [logoutRoute, logoutService.replace('return empty(204);', 'return empty?.(204);')],
+    ];
+    for (const [index, [route, service]] of mutations.entries()) {
+        let findings;
+        assert.doesNotThrow(() => { findings = validateLogoutAuditModes({ spec: logoutSpec, routeSource: route, serviceSource: service }); }, `mutation ${index}`);
+        assert.notDeepEqual(findings, [], `mutation ${index}`);
     }
 });
