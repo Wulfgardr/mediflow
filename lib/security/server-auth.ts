@@ -12,6 +12,10 @@ import { serverSessionProjectionOwnerRegistry } from '@/lib/security/server-sess
 /* @Codex */
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 
+const ObjectCreate = Object.create;
+const ObjectDefineProperty = Object.defineProperty;
+const ObjectFreeze = Object.freeze;
+
 export async function requireSession(): Promise<ServerSession | null> {
     const cookieStore = await cookies();
     const sessionId = cookieStore.get(SESSION_COOKIE_NAME)?.value;
@@ -66,12 +70,22 @@ export type AuthenticatedWebSessionProjectionOwnerContext = Readonly<{
     session: ServerSession; owner: ServerSessionProjectionOwner;
 }>;
 
+function authenticatedProjectionOwnerContext(
+    session: ServerSession,
+    owner: ServerSessionProjectionOwner,
+): AuthenticatedWebSessionProjectionOwnerContext {
+    const context = ObjectCreate(null) as AuthenticatedWebSessionProjectionOwnerContext;
+    ObjectDefineProperty(context, 'session', { value: session, writable: false, enumerable: true, configurable: false });
+    ObjectDefineProperty(context, 'owner', { value: owner, writable: false, enumerable: true, configurable: false });
+    return ObjectFreeze(context);
+}
+
 /* @Codex */
 export async function acquireAuthenticatedWebSessionProjectionOwnerContext(): Promise<AuthenticatedWebSessionProjectionOwnerContext | null> {
     const session = await requireSession();
     if (!session) return null;
     const owner = serverSessionProjectionOwnerRegistry.acquire(session);
-    return Object.freeze({ session, owner });
+    return authenticatedProjectionOwnerContext(session, owner);
 }
 
 /* @Codex */
