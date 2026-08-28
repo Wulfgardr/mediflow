@@ -48,6 +48,7 @@ import {
 import {
     allowedGenericLoaderExpressions,
     inventoryModuleImports,
+    moduleCalleeAliasFixtures,
     moduleImportBypassFixtures,
     repositoryTypeScriptSources,
 } from './module-import-inventory.test-support.ts';
@@ -645,6 +646,11 @@ test('inventories exact session imports by AST and closes the logout authority b
         'scripts/benchmark-redaction.ts': benchmark.replace('pathToFileURL(adapterModule).href', 'pathToFileURL(adapterModule).toString()'),
     }).errors;
     assert.ok(drift.includes('scripts/benchmark-redaction.ts:allowlist-drift'));
+    assert.deepEqual(validateSessionImports({ 'scripts/benchmark-redaction.ts': benchmark }).errors, []);
+    for (const fixture of moduleCalleeAliasFixtures('../lib/security/server-session')) {
+        const aliasErrors = validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture.source}` }).errors;
+        assert.ok(aliasErrors.includes(`scripts/benchmark-redaction.ts:${fixture.form}`), fixture.source);
+    }
 });
 
 test('Node runtime resolves every inventory alias that the AST gate denies', () => {

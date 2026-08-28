@@ -61,7 +61,6 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
         typeOnly: boolean;
     }>> = [];
     const declarations = new Map<string, ts.VariableDeclaration[]>();
-    const loaderWrappers = new Map<string, Readonly<{ kind: 'dynamic' | 'require'; parameter: number }>>();
     const collect = (node: ts.Node): void => {
         if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer
             && ts.isVariableDeclarationList(node.parent) && (node.parent.flags & ts.NodeFlags.Const) !== 0) {
@@ -154,34 +153,88 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
             && (raw === `@/${target}` || raw === relative || (file.endsWith('.test.ts') && raw === `${relative}.ts`));
         return { target: targetMatch, invalid: targetMatch && (!allowed || evaluated.escaped), unresolved: false };
     };
-    const loader = (input: ts.Expression, seen = new Set<string>()): 'dynamic' | 'require' | null => {
-        const node = unwrap(input); if (node.kind === ts.SyntaxKind.ImportKeyword) return 'dynamic';
-        if (ts.isIdentifier(node)) {
-            if (node.text === 'require') return 'require';
-            if (!seen.has(node.text)) { const initializer = declaration(node.text, node.pos); if (initializer) { const next = new Set(seen); next.add(node.text); return loader(initializer, next); } }
-        }
-        if ((ts.isPropertyAccessExpression(node) && node.name.text === 'require')
-            || (ts.isElementAccessExpression(node) && ts.isStringLiteral(node.argumentExpression) && node.argumentExpression.text === 'require')) return 'require';
-        return null;
+    const memberKey = (node: ts.PropertyAccessExpression | ts.ElementAccessExpression): string | null => {
+        if (ts.isPropertyAccessExpression(node)) return node.name.text;
+        if (!node.argumentExpression) return null;
+        const key = evaluate(node.argumentExpression); return key.known && ['string', 'number'].includes(typeof key.value) ? String(key.value) : null;
     };
-    const codeLoaderKind = (input: ts.Expression, seen = new Set<string>()): boolean => {
+    const propertyKey = (node: ts.ObjectLiteralElementLike): string | null => {
+        if (!node.name) return null;
+        if (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name) || ts.isNumericLiteral(node.name)) return node.name.text;
+        if (!ts.isComputedPropertyName(node.name)) return null;
+        const key = evaluate(node.name.expression); return key.known && ['string', 'number'].includes(typeof key.value) ? String(key.value) : null;
+    };
+    const resolveCallee = (input: ts.Expression, seen = new Set<ts.Expression>(), depth = 0): ts.Expression | null => {
         const node = unwrap(input);
+        if (depth >= 16 || seen.has(node)) return null;
+        const next = new Set(seen); next.add(node);
         if (ts.isIdentifier(node)) {
-            if (['eval', 'Function'].includes(node.text)) return true;
-            if (!seen.has(node.text)) { const initializer = declaration(node.text, node.pos); if (initializer) { const next = new Set(seen); next.add(node.text); return codeLoaderKind(initializer, next); } }
+            if (['eval', 'Function', 'require'].includes(node.text)) return node;
+            const matches = declarations.get(node.text)?.filter((item) => item.pos < node.pos) ?? [];
+            return matches.length === 1 && matches[0]?.initializer ? resolveCallee(matches[0].initializer, next, depth + 1) : null;
         }
-        return (ts.isPropertyAccessExpression(node) && ['eval', 'Function'].includes(node.name.text))
-            || (ts.isElementAccessExpression(node) && ts.isStringLiteral(node.argumentExpression) && ['eval', 'Function'].includes(node.argumentExpression.text));
+        if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+            const key = memberKey(node); if (key === null) return null;
+            const base = resolveCallee(node.expression, next, depth + 1);
+            if (base && ts.isObjectLiteralExpression(base)) {
+                const matches = base.properties.filter((property) => propertyKey(property) === key);
+                if (matches.length !== 1) return null;
+                const property = matches[0]; const value = ts.isPropertyAssignment(property) ? property.initializer : ts.isShorthandPropertyAssignment(property) ? property.name : null;
+                return value ? resolveCallee(value, next, depth + 1) : null;
+            }
+            if (base && ts.isArrayLiteralExpression(base) && /^\d+$/u.test(key)) {
+                const element = base.elements[Number(key)]; return element && !ts.isSpreadElement(element) ? resolveCallee(element, next, depth + 1) : null;
+            }
+            return ['eval', 'Function', 'require'].includes(key) ? node : null;
+        }
+        return ts.isArrowFunction(node) || ts.isFunctionExpression(node) || ts.isObjectLiteralExpression(node)
+            || ts.isArrayLiteralExpression(node) || node.kind === ts.SyntaxKind.ImportKeyword ? node : null;
     };
-    for (const [name, items] of declarations) {
-        const initializer = items.at(-1)?.initializer; if (!initializer || (!ts.isArrowFunction(initializer) && !ts.isFunctionExpression(initializer))) continue;
+    const intrinsic = (input: ts.Expression): string | null => {
+        const node = resolveCallee(input); if (!node) return null;
+        if (node.kind === ts.SyntaxKind.ImportKeyword) return 'dynamic';
+        if (ts.isIdentifier(node)) return node.text;
+        return ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node) ? memberKey(node) : null;
+    };
+    const loader = (input: ts.Expression): 'dynamic' | 'require' | null => {
+        const kind = intrinsic(input); return kind === 'dynamic' || kind === 'require' ? kind : null;
+    };
+    const codeLoaderKind = (input: ts.Expression) => ['eval', 'Function'].includes(intrinsic(input) ?? '');
+    const loaderWrapper = (input: ts.Expression): Readonly<{ kind: 'code' | 'dynamic' | 'require'; parameter: number }> | null => {
+        const initializer = resolveCallee(input); if (!initializer || (!ts.isArrowFunction(initializer) && !ts.isFunctionExpression(initializer))) return null;
         const body = ts.isBlock(initializer.body) && initializer.body.statements.length === 1 && ts.isReturnStatement(initializer.body.statements[0]) ? initializer.body.statements[0].expression : initializer.body;
-        if (!body || !ts.isCallExpression(unwrap(body as ts.Expression))) continue;
-        const call = unwrap(body as ts.Expression) as ts.CallExpression; const kind = loader(call.expression); const argument = call.arguments[0];
-        if (!kind || !argument) continue;
+        if (!body || !ts.isCallExpression(unwrap(body as ts.Expression))) return null;
+        const call = unwrap(body as ts.Expression) as ts.CallExpression; const kind = loader(call.expression) ?? (codeLoaderKind(call.expression) ? 'code' : null); const argument = call.arguments[0];
+        if (!kind || !argument) return null;
         const parameter = initializer.parameters.findIndex((item) => ts.isIdentifier(item.name) && argument.getText(ast).includes(item.name.text));
-        if (parameter >= 0) loaderWrappers.set(name, { kind, parameter });
-    }
+        return parameter < 0 ? null : { kind, parameter };
+    };
+    const sensitiveCallee = (input: ts.Node, seen = new Set<ts.Node>(), depth = 0): boolean => {
+        const node = ts.isParenthesizedExpression(input) || ts.isAsExpression(input) || ts.isTypeAssertionExpression(input)
+            || ts.isSatisfiesExpression(input) || ts.isNonNullExpression(input) ? unwrap(input) : input;
+        if (depth >= 16) return true; if (seen.has(node)) return true;
+        const next = new Set(seen); next.add(node);
+        if (node.kind === ts.SyntaxKind.ImportKeyword) return true;
+        if (ts.isIdentifier(node)) {
+            if (['eval', 'Function', 'require'].includes(node.text)) return true;
+            return (declarations.get(node.text)?.filter((item) => item.pos < node.pos) ?? []).some((item) => item.initializer && sensitiveCallee(item.initializer, next, depth + 1));
+        }
+        if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+            const key = memberKey(node); if (key !== null && ['eval', 'Function', 'require'].includes(key)) return true;
+            return sensitiveCallee(node.expression, next, depth + 1);
+        }
+        if (ts.isObjectLiteralExpression(node)) {
+            return node.properties.some((property) => (ts.isPropertyAssignment(property) ? sensitiveCallee(property.initializer, next, depth + 1)
+                : ts.isShorthandPropertyAssignment(property) && sensitiveCallee(property.name, next, depth + 1)));
+        }
+        if (ts.isArrayLiteralExpression(node)) return node.elements.some((element) => !ts.isSpreadElement(element) && sensitiveCallee(element, next, depth + 1));
+        if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return sensitiveCallee(node.body, next, depth + 1);
+        if (ts.isCallExpression(node) || ts.isNewExpression(node)) return sensitiveCallee(node.expression, next, depth + 1);
+        if (ts.isBlock(node)) return node.statements.some((statement) => sensitiveCallee(statement, next, depth + 1));
+        if (ts.isReturnStatement(node) && node.expression) return sensitiveCallee(node.expression, next, depth + 1);
+        if (ts.isExpressionStatement(node)) return sensitiveCallee(node.expression, next, depth + 1);
+        return false;
+    };
     const namedFromBinding = (node: ts.CallExpression) => {
         let parent: ts.Node = node.parent; if (ts.isAwaitExpression(parent)) parent = parent.parent;
         if (!ts.isVariableDeclaration(parent) || !ts.isObjectBindingPattern(parent.name)) return ['*'];
@@ -220,13 +273,19 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
         } else if (ts.isExportDeclaration(node) && node.moduleSpecifier) record(node.moduleSpecifier, 're-export', ['*'], node.isTypeOnly);
         else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference) && node.moduleReference.expression) record(node.moduleReference.expression, 'require', [node.name.text], node.isTypeOnly);
         else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument) && ts.isStringLiteral(node.argument.literal)) record(node.argument.literal, 'import-type', ['*'], true);
-        else if (ts.isNewExpression(node) && codeLoaderKind(node.expression)) codeLoader(node);
+        else if (ts.isNewExpression(node)) {
+            if (codeLoaderKind(node.expression)) codeLoader(node);
+            else if (sensitiveCallee(node.expression) && (node.arguments ?? []).some(sensitiveText)) add('unsupported-callee');
+        }
         else if (ts.isCallExpression(node)) {
-            const callee = unwrap(node.expression); const wrapper = ts.isIdentifier(callee) ? loaderWrappers.get(callee.text) : undefined;
-            const memberCall = ts.isPropertyAccessExpression(callee) && callee.name.text === 'call' && loader(callee.expression) === 'require';
-            const kind = wrapper?.kind ?? (memberCall ? 'require' : loader(node.expression)); const argument = wrapper ? node.arguments[wrapper.parameter] : node.arguments[memberCall ? 1 : 0];
+            const callee = unwrap(node.expression); const wrapper = loaderWrapper(callee);
+            const memberCall = (ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)) && memberKey(callee) === 'call' && loader(callee.expression) === 'require';
+            const kind = wrapper?.kind === 'code' ? null : wrapper?.kind ?? (memberCall ? 'require' : loader(node.expression));
+            const argument = wrapper ? node.arguments[wrapper.parameter] : node.arguments[memberCall ? 1 : 0];
             if (kind && argument) record(argument, node.arguments.length === (memberCall ? 2 : 1) ? kind : `${kind}-options`, kind === 'dynamic' ? namedFromBinding(node) : ['*']);
-            if (codeLoaderKind(callee)) codeLoader(node);
+            const code = wrapper?.kind === 'code' || codeLoaderKind(callee);
+            if (code) codeLoader(node);
+            else if (!kind && sensitiveCallee(callee) && node.arguments.some(sensitiveText)) add('unsupported-callee');
         }
         ts.forEachChild(node, visit);
     };
@@ -266,4 +325,19 @@ export const moduleImportBypassFixtures = (specifier: string, absoluteTarget: st
     `const run=eval;run(${JSON.stringify(`import(${JSON.stringify(specifier)})`)});`,
     `const load=(value:string)=>import(value);load(${JSON.stringify(specifier)});`, `import(pick());`,
     `import(${JSON.stringify(pathToFileURL(absoluteTarget).href)});`,
+]);
+
+export const moduleCalleeAliasFixtures = (specifier: string): readonly Readonly<{ form: string; source: string }>[] => Object.freeze([
+    { form: 'code-loader', source: `const loaders={run:eval};loaders.run(${JSON.stringify(`import(${JSON.stringify(specifier)})`)});` },
+    { form: 'code-loader', source: `const loaders=[eval];loaders[0](${JSON.stringify(`import(${JSON.stringify(specifier)})`)});` },
+    { form: 'require', source: `const loaders={run:require};loaders.run(${JSON.stringify(specifier)});` },
+    { form: 'require', source: `const loaders=[require];loaders[0](${JSON.stringify(specifier)});` },
+    { form: 'require', source: `const loaders={run:require};(((loaders.run as typeof require) satisfies typeof require)!)(${JSON.stringify(specifier)});` },
+    { form: 'code-loader', source: `globalThis['ev'+'al'](${JSON.stringify(`import(${JSON.stringify(specifier)})`)});` },
+    { form: 'code-loader', source: `new globalThis['Fun'+'ction'](${JSON.stringify(`return import(${JSON.stringify(specifier)})`)})();` },
+    { form: 'dynamic', source: `const load=(value:string)=>import(value);const loaders={['r'+'un']:load};loaders.run(${JSON.stringify(specifier)});` },
+    { form: 'unsupported-callee', source: `const loaders={run:eval};loaders[pick()](${JSON.stringify(`import(${JSON.stringify(specifier)})`)});` },
+    { form: 'unsupported-callee', source: `const loop=loop;loop(${JSON.stringify(`import(${JSON.stringify(specifier)})`)});` },
+    { form: 'unsupported-callee', source: `const run=eval;{const run=String;}run(${JSON.stringify(`import(${JSON.stringify(specifier)})`)});` },
+    { form: 'unsupported-callee', source: `const load17=eval;${Array.from({ length: 17 }, (_, index) => `const load${16 - index}=load${17 - index};`).join('')}load0(${JSON.stringify(`import(${JSON.stringify(specifier)})`)});` },
 ]);

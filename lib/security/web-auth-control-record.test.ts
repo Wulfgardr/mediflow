@@ -24,6 +24,7 @@ import {
 import {
     allowedGenericLoaderExpressions,
     inventoryModuleImports,
+    moduleCalleeAliasFixtures,
     moduleImportBypassFixtures,
     repositoryTypeScriptSources,
 } from './module-import-inventory.test-support.ts';
@@ -702,6 +703,11 @@ test('keeps the current-binding predicate private until the server-session retai
         'scripts/benchmark-redaction.ts': `${benchmark}\nconst suffix=pick();import('./web-auth-control-record'+suffix);`,
     }).errors;
     for (const form of ['unsupported-expression', 'module-path', 'dynamic']) assert.ok(errors.includes(`scripts/benchmark-redaction.ts:${form}:*`), form);
+    assert.deepEqual(validateControlImports({ 'scripts/benchmark-redaction.ts': benchmark }).errors, []);
+    for (const fixture of moduleCalleeAliasFixtures('../lib/security/web-auth-control-record')) {
+        const aliasErrors = validateControlImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture.source}` }).errors;
+        assert.ok(aliasErrors.includes(`scripts/benchmark-redaction.ts:${fixture.form}:*`), fixture.source);
+    }
     assert.notDeepEqual(validateControlImports({ 'lib/security/web-auth-logout-server.ts': "import { createWebAuthControlRecord } from '../../lib/security/web-auth-control-record.ts';" }).errors, []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/extra.ts': "import { createWebAuthControlRecord } from './web-auth-control-record';" }).errors, []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/extra.test.ts': "import { createWebAuthControlRecord } from './web-auth-control-record.ts';" }).errors, []);
