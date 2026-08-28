@@ -1006,7 +1006,11 @@ export function activateArmedWebServerSession(port: unknown, ticket: unknown): b
     return false;
 }
 
-function retireActiveWebServerSessionCell(cell: ArmedWebSessionCellRecord, reason: WebServerSessionRetirementReason): boolean {
+function retireActiveWebServerSessionCell(
+    cell: ArmedWebSessionCellRecord,
+    reason: WebServerSessionRetirementReason,
+    observation: Readonly<{ expiresAt: number; now: number }> | null = null,
+): boolean {
     const sessionId = cell.sessionId;
     if (armedWebSessionCellsById[sessionId] !== cell || cell.state !== 'ACTIVE'
         || cell.session.id !== sessionId || !cell.activationTicket) return false;
@@ -1028,10 +1032,11 @@ function retireActiveWebServerSessionCell(cell: ArmedWebSessionCellRecord, reaso
         return false;
     }
     try {
-        const now = DateNow();
+        const now = observation ? observation.now : DateNow();
         const exact = armedWebSessionCellsById[sessionId] === cell && cell.state === 'ACTIVE'
             && cell.session === session && cell.activationTicket === ticket && session.id === sessionId
             && session.authChannel === 'web'
+            && (!observation || (reason === 'expired' && session.expiresAt === observation.expiresAt))
             && (reason === 'expired' ? session.expiresAt <= now : session.expiresAt > now);
         if (webSessionCellLifecyclePoisoned || !exact) {
             retireArmedWebSessionCellRecord(cell);
@@ -1142,7 +1147,7 @@ export function abortStagedWebServerSession(capsule: unknown): boolean {
 /* @Codex */
 export function resolveActiveWebServerSession(sessionId: unknown): ServerSession | null {
     if (!beginWebSessionCellLifecycle(sessionId)) return null;
-    let expiredCell: ArmedWebSessionCellRecord | null = null;
+    let expired: Readonly<{ cell: ArmedWebSessionCellRecord; expiresAt: number; now: number }> | null = null;
     try {
         if (typeof sessionId !== 'string' || !sessionId) return null;
         const cell = armedWebSessionCellsById[sessionId];
@@ -1154,7 +1159,7 @@ export function resolveActiveWebServerSession(sessionId: unknown): ServerSession
             || cell.state !== 'ACTIVE' || cell.session !== session || session.id !== sessionId
             || session.authChannel !== 'web' || session.expiresAt !== expiry) return null;
         if (expiry <= now) {
-            expiredCell = cell;
+            expired = { cell, expiresAt: expiry, now };
             return null;
         }
         const finalVisibleSession = getMapValue(sessions, sessionId);
@@ -1167,8 +1172,9 @@ export function resolveActiveWebServerSession(sessionId: unknown): ServerSession
     } catch { return null; }
     finally {
         endWebSessionCellLifecycle();
-        if (expiredCell) {
-            try { dispatchActiveWebServerSessionCellRetirement(expiredCell, 'expired'); } catch { /* expiry denial remains fail-closed */ }
+        if (expired) {
+            try { dispatchActiveWebServerSessionCellRetirement(expired.cell, 'expired', expired); }
+            catch { /* expiry denial remains fail-closed */ }
         }
     }
 }
@@ -1705,8 +1711,12 @@ export function cleanupRetiredWebServerSession(
     return cell ? cleanupRetiredWebServerSessionCell(cell, reason) : deniedWebSessionRetirementCleanupReceipt;
 }
 
-function dispatchActiveWebServerSessionCellRetirement(cell: ArmedWebSessionCellRecord, reason: WebServerSessionRetirementReason): WebServerSessionRetirementCleanupReceipt {
-    retireActiveWebServerSessionCell(cell, reason);
+function dispatchActiveWebServerSessionCellRetirement(
+    cell: ArmedWebSessionCellRecord,
+    reason: WebServerSessionRetirementReason,
+    observation: Readonly<{ expiresAt: number; now: number }>,
+): WebServerSessionRetirementCleanupReceipt {
+    retireActiveWebServerSessionCell(cell, reason, observation);
     return cleanupRetiredWebServerSessionCell(cell, reason);
 }
 
