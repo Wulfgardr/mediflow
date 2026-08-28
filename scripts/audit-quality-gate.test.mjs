@@ -601,6 +601,9 @@ test('V5C requires the owner session id to be the exact const bearer binding', (
         ['wrong bearer argument', logoutService.replace('exactBearer(cookie)', 'exactBearer(request)')],
         ['zero bearer arguments', logoutService.replace('exactBearer(cookie)', 'exactBearer()')],
         ['extra bearer argument', logoutService.replace('exactBearer(cookie)', 'exactBearer(cookie, request)')],
+        ['direct session id assignment', logoutService.replace('const sessionId = exactBearer(cookie);', "const sessionId = exactBearer(cookie); sessionId = 'forged';")],
+        ['session id update', logoutService.replace('const sessionId = exactBearer(cookie);', 'const sessionId = exactBearer(cookie); sessionId++;')],
+        ['session id destructuring assignment', logoutService.replace('const sessionId = exactBearer(cookie);', "const sessionId = exactBearer(cookie); ([sessionId] = ['forged']);")],
     ];
     const observed = [];
     for (const [name, service] of mutations) {
