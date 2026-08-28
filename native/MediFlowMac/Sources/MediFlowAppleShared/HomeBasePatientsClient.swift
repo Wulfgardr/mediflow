@@ -90,11 +90,19 @@ public actor HomeBasePatientsClient {
             .appendingPathComponent("api")
             .appendingPathComponent("auth")
             .appendingPathComponent("logout")
-        let (data, _) = try await send(
+        let (data, response) = try await send(
             to: url,
             method: "POST",
             headers: accountHeaders(credentials: credentials, sessionCookie: sessionCookie)
         )
+        // Logout is the only acknowledgement boundary that accepts the HTTP
+        // no-content variant. A body would contradict the 204 contract.
+        if response.statusCode == 204 {
+            guard data.isEmpty else {
+                throw HomeBaseClientError.contract
+            }
+            return HomeBaseMutationAcknowledgement(success: true)
+        }
         return try decode(HomeBaseMutationAcknowledgement.self, from: data)
     }
 

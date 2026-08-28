@@ -128,6 +128,115 @@ final class HomeBasePatientsClientTests: XCTestCase {
     }
 
     /* @Codex */
+    func testLogoutAcceptsExactEmpty204AcknowledgementWithoutRetry() async throws {
+        var requestCount = 0
+        let client = makeClient { request in
+            requestCount += 1
+            self.assertLogoutRequest(request)
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 204, httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data())
+        }
+
+        let acknowledgement = try await client.logout(credentials: creds, sessionCookie: cookie)
+
+        XCTAssertEqual(acknowledgement, HomeBaseMutationAcknowledgement(success: true))
+        XCTAssertEqual(requestCount, 1)
+    }
+
+    /* @Codex */
+    func testLogoutRejectsNonempty204BodyAsContractWithoutRetry() async {
+        var requestCount = 0
+        let client = makeClient { request in
+            requestCount += 1
+            self.assertLogoutRequest(request)
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 204, httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data("unexpected".utf8))
+        }
+
+        do {
+            _ = try await client.logout(credentials: creds, sessionCookie: cookie)
+            XCTFail("A nonempty 204 body must fail the acknowledgement contract")
+        } catch let error as HomeBaseClientError {
+            XCTAssertEqual(error, .contract)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+        XCTAssertEqual(requestCount, 1)
+    }
+
+    /* @Codex */
+    func testLogoutKeepsJson2xxAcknowledgementCompatibility() async throws {
+        var requestCount = 0
+        let client = makeClient { request in
+            requestCount += 1
+            self.assertLogoutRequest(request)
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data(#"{"success":true}"#.utf8))
+        }
+
+        let acknowledgement = try await client.logout(credentials: creds, sessionCookie: cookie)
+
+        XCTAssertEqual(acknowledgement, HomeBaseMutationAcknowledgement(success: true))
+        XCTAssertEqual(requestCount, 1)
+    }
+
+    /* @Codex */
+    func testLogoutRejectsEmpty200AcknowledgementAsContractWithoutRetry() async {
+        var requestCount = 0
+        let client = makeClient { request in
+            requestCount += 1
+            self.assertLogoutRequest(request)
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data())
+        }
+
+        do {
+            _ = try await client.logout(credentials: creds, sessionCookie: cookie)
+            XCTFail("An empty 200 body must fail the acknowledgement contract")
+        } catch let error as HomeBaseClientError {
+            XCTAssertEqual(error, .contract)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+        XCTAssertEqual(requestCount, 1)
+    }
+
+    /* @Codex */
+    func testLogoutPreservesNon2xxTypedFailuresWithoutRetry() async {
+        for (statusCode, message) in [(401, "Sessione non valida"), (409, "Logout in conflitto")] {
+            var requestCount = 0
+            let client = makeClient { request in
+                requestCount += 1
+                self.assertLogoutRequest(request)
+                let response = HTTPURLResponse(
+                    url: try XCTUnwrap(request.url), statusCode: statusCode, httpVersion: nil,
+                    headerFields: ["Content-Type": "application/json"]
+                )!
+                return (response, Data("{\"error\":\"\(message)\"}".utf8))
+            }
+
+            do {
+                _ = try await client.logout(credentials: creds, sessionCookie: cookie)
+                XCTFail("Expected HTTP \(statusCode) failure")
+            } catch let error as HomeBaseClientError {
+                XCTAssertEqual(error, .httpStatus(statusCode, message))
+            } catch {
+                XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertEqual(requestCount, 1)
+        }
+    }
+
+    /* @Codex */
     func testLocalDataSourceForwardsPairedLoginCredentialsUnchanged() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.url?.path, "/api/auth/native/login")
@@ -2351,6 +2460,18 @@ final class HomeBasePatientsClientTests: XCTestCase {
     private var cookie: String { "mediflow_session=session-123" }
 
     private var fixtureDate: Date { Date(timeIntervalSince1970: 1_751_961_600) }
+
+    private func assertLogoutRequest(_ request: URLRequest) {
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.absoluteString, "https://localhost:3443/api/auth/logout")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), cookie)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
+        XCTAssertNil(request.value(forHTTPHeaderField: "Content-Type"))
+        XCTAssertNil(request.httpBody)
+        XCTAssertNil(request.httpBodyStream)
+    }
 
     private func makeClient(
         handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)
