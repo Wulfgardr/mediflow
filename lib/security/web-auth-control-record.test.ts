@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
 
 import {
+    abortPreparedAuthControlTicket,
     abortPreparedAuthControlActivation,
     abortPreparedAuthControlRetirement,
     commitAuthControlTicket,
@@ -88,6 +89,87 @@ test('expires exact cancellation monotonically and excludes prepared tickets and
     const active = ticketed.snapshot();
     assert.equal(ticketed.cancelPendingAuth(active.fence, 'op', active.generation, 'fp', 3), 0);
     assert.deepEqual(ticketed.snapshot(), active);
+});
+
+test('aborts one exact prepared ticket and preserves idempotency for a clean retry', () => {
+    const record = control().record;
+    const receipt = record.begin('login', 'op', 'key', 'fp', 0);
+    const ticket = record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 1); assert.ok(ticket);
+    assert.equal(abortPreparedAuthControlTicket(ticket), true);
+    assert.equal(abortPreparedAuthControlTicket(ticket), false, 'the ticket burn is one-shot');
+    assert.deepEqual(record.snapshot(), { fence: 'f0', generation: BigInt(0), pending: false, active: false });
+    assert.deepEqual(record.begin('login', 'op', 'key', 'fp', 2), receipt, 'the original begin remains receipt-only');
+    assert.equal(record.snapshot().pending, false);
+    assert.equal(record.begin('login', 'op', 'new-key', 'fp', 3).ok, true);
+    const retry = record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 4); assert.ok(retry);
+    assert.equal(abortPreparedAuthControlTicket(retry), true);
+});
+
+test('burns stale prepared tickets without clearing an expired or ABA replacement pending', () => {
+    const record = control().record;
+    record.begin('login', 'op', 'old-key', 'fp', 0);
+    const old = record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web-old', 1); assert.ok(old);
+    assert.equal(record.begin('login', 'op', 'new-key', 'fp', 120_000).ok, true, 'same tuple values may belong to a new pending identity');
+    const replacement = record.snapshot();
+    assert.equal(abortPreparedAuthControlTicket(old), true);
+    assert.deepEqual(record.snapshot(), replacement, 'the old ticket cannot clear the ABA replacement');
+    const next = record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web-new', 120_002); assert.ok(next);
+    assert.equal(abortPreparedAuthControlTicket(next), true);
+
+    const expired = control().record;
+    expired.begin('login', 'op', 'key', 'fp', 0);
+    const stale = expired.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 1); assert.ok(stale);
+    assert.equal(expired.finalizeAuth('wrong', 'op', BigInt(0), 'fp', 'web', 'f1', 120_000).ok, false);
+    assert.equal(expired.snapshot().pending, false);
+    assert.equal(abortPreparedAuthControlTicket(stale), true, 'a stale exact ticket still burns its reservations');
+    assert.equal(expired.snapshot().pending, false);
+});
+
+test('does not steal ticket ownership from prepared activation or retirement lifecycles', () => {
+    const record = control().record; record.begin('login', 'op', 'key', 'fp', 0);
+    const ticket = record.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 1); assert.ok(ticket);
+    const activation = prepareAuthControlActivation(ticket, 'web'); assert.ok(activation);
+    const beforeActivation = record.snapshot();
+    assert.equal(abortPreparedAuthControlTicket(ticket), false);
+    assert.deepEqual(record.snapshot(), beforeActivation);
+    assert.equal(commitPreparedAuthControlActivation(activation), 1);
+    const retirement = prepareAuthControlRetirement(ticket, 'web', 'lock'); assert.ok(retirement);
+    const beforeRetirement = record.snapshot();
+    assert.equal(abortPreparedAuthControlTicket(ticket), false);
+    assert.deepEqual(record.snapshot(), beforeRetirement);
+    assert.equal(commitPreparedAuthControlRetirement(retirement), 2);
+});
+
+test('ticket abort rejects hostile, foreign, reentrant, and throwing lookups without residue', async (t) => {
+    let traps = 0;
+    const proxy = new Proxy({}, { get: () => { traps += 1; throw new Error('get'); }, ownKeys: () => { traps += 1; throw new Error('keys'); } });
+    const rejected = Promise.reject(new Error('hostile')); rejected.catch(() => undefined);
+    for (const value of [proxy, rejected, { then: proxy }, Symbol('x'), null]) assert.equal(abortPreparedAuthControlTicket(value), false);
+    assert.equal(traps, 0);
+    const primary = control().record; primary.begin('login', 'op', 'key', 'fp', 0);
+    const primaryTicket = primary.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 1); assert.ok(primaryTicket);
+    const foreign = await freshModule('abort-ticket-foreign');
+    assert.equal(foreign.abortPreparedAuthControlTicket(primaryTicket), false);
+    assert.equal(abortPreparedAuthControlTicket(primaryTicket), true);
+
+    const original = WeakMap.prototype.get; let isolated: Awaited<ReturnType<typeof freshModule>>; let ticket: object; let armed = false; let reenter = true; let nested = true; let failAfterApply = false;
+    WeakMap.prototype.get = function (...args: Parameters<typeof original>) {
+        const result = Reflect.apply(original, this, args) as unknown;
+        if (armed) { armed = false; if (reenter) nested = isolated.abortPreparedAuthControlTicket(ticket); if (failAfterApply) throw new Error('apply then throw'); }
+        return result;
+    };
+    try { isolated = await freshModule('abort-ticket-reentry'); } finally { WeakMap.prototype.get = original; }
+    const first = isolated.createWebAuthControlRecord('f0'); first.begin('login', 'op', 'key', 'fp', 0);
+    ticket = first.prepareAuthControlTicket('f0', 'op', BigInt(0), 'fp', 'web', 1) as object;
+    armed = true; assert.equal(isolated.abortPreparedAuthControlTicket(ticket), false); assert.equal(nested, false); assert.equal(first.snapshot().pending, true);
+    assert.equal(isolated.abortPreparedAuthControlTicket(ticket), true);
+    const second = isolated.createWebAuthControlRecord('g0'); second.begin('login', 'op', 'key', 'fp', 0);
+    ticket = second.prepareAuthControlTicket('g0', 'op', BigInt(0), 'fp', 'web', 1) as object;
+    armed = true; reenter = false; failAfterApply = true; assert.equal(isolated.abortPreparedAuthControlTicket(ticket), false); assert.equal(second.snapshot().pending, true);
+    failAfterApply = false; assert.equal(isolated.abortPreparedAuthControlTicket(ticket), true);
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
 });
 
 test('cancellation denies hostile values and intrinsic reentry without residue', async (t) => {
