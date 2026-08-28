@@ -2,9 +2,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, test } from 'node:test';
 
 import {
@@ -43,11 +45,50 @@ import {
     tombstoneArmedWebServerSession,
     type WebServerSessionRetirementCleanupReceipt,
 } from './server-session';
+import {
+    allowedGenericLoaderExpressions,
+    createRequireBypassFixtures,
+    createRequireShadowFixtures,
+    createRequireUnresolvedFixtures,
+    inventoryModuleImports,
+    moduleImportBypassFixtures,
+    reservedLoaderBindingFixtures,
+    repositoryTypeScriptSources,
+    unsafeLoaderIdentityFixtures,
+} from './module-import-inventory.test-support.ts';
 
 const SYNTHETIC_USERNAME = `synthetic-${randomUUID()}`;
 const TARGET_USERNAME = ['synthetic', 'target'].join('-');
 const OTHER_USERNAME = ['synthetic', 'other'].join('-');
-const AUTH_CONTROL_MODULE_PATH = ['./web-auth-control', '-record.ts'].join('');
+const AUTH_CONTROL_MODULE_PATH = './web-auth-control-record.ts';
+const REPOSITORY_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+
+const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
+    const errors: string[] = []; const uses = Object.entries(sources).flatMap(([file, source]) => inventoryModuleImports({
+        file, source, target: 'lib/security/server-session', repositoryRoot: REPOSITORY_ROOT, allowUnresolvedExpressions: allowedGenericLoaderExpressions,
+    }));
+    const logout = new Set(['lib/security/web-auth-logout-server.ts', 'lib/security/web-auth-logout-server.test.ts']);
+    const exact = new Set(['resolveActiveWebServerSession', 'dispatchActiveWebServerSessionRetirement']);
+    for (const use of uses) {
+        if (use.form === 'import-type' && use.typeOnly && use.file === 'lib/security/server-session.test.ts') continue;
+        const provenDynamic = use.form === 'dynamic' && use.file === 'lib/security/web-auth-channel-cutover.test.ts'
+            && ['clearAllSessions', 'getSession'].includes(use.symbol);
+        const ownReload = use.form === 'require' && use.file === 'lib/security/server-session.test.ts';
+        if (use.form !== 'named' && !provenDynamic && !ownReload) errors.push(`${use.file}:${use.form}`);
+        if (!use.typeOnly && use.symbol === 'dispatchActiveWebServerSessionRetirement'
+            && use.file !== 'lib/security/server-session.test.ts' && !logout.has(use.file)) errors.push(`${use.file}:dispatch`);
+    }
+    for (const file of logout) {
+        if (!(file in sources)) continue;
+        const runtime = uses.filter((use) => use.file === file && !use.typeOnly);
+        if (runtime.some((use) => use.form !== 'named') || runtime.length !== exact.size
+            || runtime.some((use) => !exact.has(use.symbol)) || [...exact].some((symbol) => !runtime.some((use) => use.symbol === symbol))) errors.push(`${file}:authority`);
+    }
+    const ownReloads = uses.filter((use) => use.file === 'lib/security/server-session.test.ts' && use.form === 'require' && !use.typeOnly);
+    if ('lib/security/server-session.test.ts' in sources && ownReloads.length !== 30) errors.push('lib/security/server-session.test.ts:reload-count');
+    return { errors, uses };
+};
+const typescriptSources = () => repositoryTypeScriptSources(REPOSITORY_ROOT);
 
 function authControlApi() {
     const api = createRequire(import.meta.url)(AUTH_CONTROL_MODULE_PATH) as {
@@ -562,8 +603,153 @@ test('ACTIVE resource port has no callback surface or production importer before
     assert.doesNotMatch(cleanup, /\b(?:DateNow|Promise|async|then|setTimeout|setImmediate|queueMicrotask|nextTick)\b/u);
     assert.match(dispatch, /retireActiveWebServerSession\(sessionId, reason\);\s*return cleanupRetiredWebServerSession\(sessionId, reason\);/u);
     assert.doesNotMatch(dispatch, /\b(?:callback|ticket|owner|session:|Promise|async|then|setTimeout|setImmediate|queueMicrotask|nextTick)\b/u);
-    const paths = execFileSync('rg', ['-l', 'mintActiveWebSessionResourcePort|releaseActiveWebSessionResourcePort|beginActiveWebSessionResourceUse|commitActiveWebSessionResourceUse|abortActiveWebSessionResourceUse|cleanupRetiredWebServerSession|dispatchActiveWebServerSessionRetirement', '-g', '*.ts', '.'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map((value) => value.replace(/^\.\//u, ''));
-    assert.deepEqual(paths.sort(), ['lib/security/server-session.test.ts', 'lib/security/server-session.ts']);
+});
+
+test('inventories exact session imports by AST and closes the logout authority boundary', () => {
+    assert.deepEqual(validateSessionImports(typescriptSources()).errors, []);
+    const valid = {
+        'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession as resolve, dispatchActiveWebServerSessionRetirement } from '@/lib/security/server-session';",
+        'lib/security/web-auth-logout-server.test.ts': "import { dispatchActiveWebServerSessionRetirement as dispatch, resolveActiveWebServerSession } from './server-session.ts';",
+        'lib/security/literal.ts': "// import deleteSession from './server-session'; const text = 'clearAllSessions'; const regex = /retireWebP3SessionsForUser/u; test('createNativeServerSession', () => undefined);",
+        'lib/security/types.ts': "import type { ServerSession as Session } from './server-session';",
+    };
+    const accepted = validateSessionImports(valid);
+    assert.deepEqual(accepted.errors, []); assert.equal(accepted.uses.find((use) => use.symbol === 'ServerSession')?.typeOnly, true);
+    const rejected: Array<Record<string, string>> = [
+        { 'lib/security/web-auth-logout-server.ts': "import { deleteSession as dispatch } from './server-session';" },
+        { 'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession, dispatchActiveWebServerSessionRetirement, createSession, createNativeServerSession, deleteSession, invalidateSessionsForUser, retireWebP3SessionsForUser, clearAllSessions } from '../../lib/security/server-session';" },
+        { 'lib/security/web-auth-logout-server.ts': "import session from './server-session';" },
+        { 'lib/security/web-auth-logout-server.ts': "import * as session from './server-session';" },
+        { 'lib/security/web-auth-logout-server.ts': "export { resolveActiveWebServerSession } from './server-session';" },
+        { 'lib/security/web-auth-logout-server.ts': ['const session = req', "uire('./server-session');"].join('') },
+        { 'lib/security/web-auth-logout-server.ts': "const session = await import('./server-session');" },
+        { 'lib/security/web-auth-logout-server.ts': "const target = './server-' + 'session'; const session = await import((target as const), { with: { type: 'json' } });" },
+        { 'lib/security/web-auth-logout-server.ts': "const suffix = pick(); const target = './server-session' + suffix; import(target);" },
+        { 'lib/security/web-auth-logout-server.ts': "const target = `./server-session`; const load = require; load(target);" },
+        { 'lib/security/web-auth-logout-server.ts': ['module.req', "uire('./server-session'); req", "uire.call(null, './server-session');"].join('') },
+        { 'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession, dispatchActiveWebServerSessionRetirement } from './server\\x2dsession';" },
+        { 'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession, dispatchActiveWebServerSessionRetirement } from './server-session.js';" },
+        { 'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession, dispatchActiveWebServerSessionRetirement } from './nested/../server-session';" },
+        { 'lib/security/web-auth-logout-server.ts': "import type { resolveActiveWebServerSession, dispatchActiveWebServerSessionRetirement } from './server-session';" },
+        { 'lib/security/extra.ts': "import { dispatchActiveWebServerSessionRetirement as dispatch } from './server-session';" },
+    ];
+    for (const source of rejected) assert.notDeepEqual(validateSessionImports(source).errors, []);
+    const target = path.join(REPOSITORY_ROOT, 'lib/security/server-session');
+    for (const source of moduleImportBypassFixtures('./server-session', target)) {
+        const result = validateSessionImports({ 'lib/security/web-auth-logout-server.ts': source });
+        assert.notDeepEqual(result.errors, [], source);
+    }
+    assert.ok(validateSessionImports({ 'lib/security/extra.ts': 'import(pick());' }).errors.includes('lib/security/extra.ts:unsupported-expression'));
+    const benchmark = typescriptSources()['scripts/benchmark-redaction.ts']; assert.ok(benchmark);
+    const errors = validateSessionImports({
+        'scripts/benchmark-redaction.ts': `${benchmark}\nconst suffix=pick();import('./server-session'+suffix);`,
+    }).errors;
+    for (const form of ['unsupported-expression', 'module-path', 'dynamic']) assert.ok(errors.includes(`scripts/benchmark-redaction.ts:${form}`), form);
+    const duplicate = validateSessionImports({
+        'scripts/benchmark-redaction.ts': `${benchmark}\nconst duplicate=await import(pathToFileURL(adapterModule).href);`,
+    }).errors;
+    assert.ok(duplicate.includes('scripts/benchmark-redaction.ts:allowlist-duplicate'));
+    const drift = validateSessionImports({
+        'scripts/benchmark-redaction.ts': benchmark.replace('pathToFileURL(adapterModule).href', 'pathToFileURL(adapterModule).toString()'),
+    }).errors;
+    assert.ok(drift.includes('scripts/benchmark-redaction.ts:allowlist-drift'));
+    assert.deepEqual(validateSessionImports({ 'scripts/benchmark-redaction.ts': benchmark }).errors, []);
+    for (const fixture of unsafeLoaderIdentityFixtures('../lib/security/server-session')) {
+        const aliasErrors = validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
+        assert.ok(aliasErrors.includes('scripts/benchmark-redaction.ts:reserved-loader-identity'), fixture);
+    }
+    for (const fixture of reservedLoaderBindingFixtures) {
+        const bindingErrors = validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
+        assert.equal(bindingErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:reserved-loader-identity').length, 1, fixture);
+    }
+    for (const fixture of createRequireBypassFixtures('../lib/security/server-session')) {
+        assert.notDeepEqual(validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors, [], fixture);
+    }
+    for (const fixture of createRequireShadowFixtures('../lib/security/server-session')) {
+        const shadowErrors = validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
+        assert.equal(shadowErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:reserved-loader-identity').length, 1, fixture);
+    }
+    for (const fixture of createRequireUnresolvedFixtures('../lib/security/server-session')) {
+        const unresolvedErrors = validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
+        assert.equal(unresolvedErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:protected-loader-unsupported').length, 1, fixture);
+    }
+    const sessionSource = typescriptSources()['lib/security/server-session.test.ts']; assert.ok(sessionSource);
+    const indexedReload = ['nodeRequire', '(paths[0])'].join('');
+    const createRequireDrift = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace(indexedReload, 'nodeRequire(paths.at(0)!)'),
+    }).errors;
+    assert.ok(createRequireDrift.includes('lib/security/server-session.test.ts:allowlist-drift'));
+    const createRequireDuplicate = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace(`isolated = ${indexedReload}`, `${indexedReload}; isolated = ${indexedReload}`),
+    }).errors;
+    assert.ok(createRequireDuplicate.includes('lib/security/server-session.test.ts:allowlist-duplicate'));
+    const extraOwnReload = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace('const cryptoModule = nodeRequire', "nodeRequire('./server-session.ts'); const cryptoModule = nodeRequire"),
+    }).errors;
+    assert.ok(extraOwnReload.includes('lib/security/server-session.test.ts:reload-count'));
+    const protectedResolve = "nodeRequire.resolve('./server-session.ts')";
+    const protectedResolveDrift = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace(protectedResolve, `(nodeRequire.resolve)('./server-session.ts')`),
+    }).errors;
+    assert.ok(protectedResolveDrift.includes('lib/security/server-session.test.ts:protected-loader-allowlist-drift'));
+    const protectedResolveDuplicate = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace(`const modulePath = ${protectedResolve}`, `const duplicatePath = ${protectedResolve}; const modulePath = ${protectedResolve}`),
+    }).errors;
+    assert.ok(protectedResolveDuplicate.includes('lib/security/server-session.test.ts:protected-loader-allowlist-duplicate'));
+    const protectedCacheDuplicate = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace('const cached = nodeRequire.cache[modulePath]', 'const duplicateCached = nodeRequire.cache[modulePath]; const cached = nodeRequire.cache[modulePath]'),
+    }).errors;
+    assert.ok(protectedCacheDuplicate.includes('lib/security/server-session.test.ts:protected-loader-allowlist-duplicate'));
+    const dynamicResolve = ['nodeRequire', '.resolve(`./${name}`)'].join('');
+    const newDynamicResolve = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace(dynamicResolve, `(nodeRequire.resolve(pick()), ${dynamicResolve})`),
+    }).errors;
+    assert.ok(newDynamicResolve.includes('lib/security/server-session.test.ts:protected-loader-unsupported'));
+    const duplicateDynamicResolve = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace(dynamicResolve, `(${dynamicResolve}, ${dynamicResolve})`),
+    }).errors;
+    assert.ok(duplicateDynamicResolve.includes('lib/security/server-session.test.ts:protected-loader-unresolved-allowlist-duplicate'));
+    const driftDynamicResolve = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace(dynamicResolve, 'nodeRequire.resolve(name)'),
+    }).errors;
+    assert.ok(driftDynamicResolve.includes('lib/security/server-session.test.ts:protected-loader-unresolved-allowlist-drift'));
+    const pm2 = typescriptSources()['lib/pm2-manager.ts']; assert.ok(pm2);
+    assert.deepEqual(validateSessionImports({ 'lib/pm2-manager.ts': pm2 }).errors, []);
+    assert.ok(validateSessionImports({ 'lib/pm2-manager.ts': pm2.replace("require('pm2')", "require('pm2-drift')") }).errors.includes('lib/pm2-manager.ts:reserved-loader-allowlist-drift'));
+    assert.ok(validateSessionImports({ 'lib/pm2-manager.ts': `${pm2}\nconst duplicate=require('pm2');` }).errors.includes('lib/pm2-manager.ts:reserved-loader-allowlist-duplicate'));
+    const pdfjs = typescriptSources()['lib/pdfjs-server.ts']; assert.ok(pdfjs);
+    assert.deepEqual(validateSessionImports({ 'lib/pdfjs-server.ts': pdfjs }).errors, []);
+    assert.ok(validateSessionImports({ 'lib/pdfjs-server.ts': pdfjs.replace('return import(specifier);', 'return import(specifier); ') }).errors.includes('lib/pdfjs-server.ts:reserved-loader-allowlist-drift'));
+    assert.ok(validateSessionImports({ 'lib/pdfjs-server.ts': `${pdfjs}\nconst duplicate=new Function('specifier','return import(specifier);');` }).errors.includes('lib/pdfjs-server.ts:reserved-loader-allowlist-duplicate'));
+});
+
+test('Node runtime resolves every inventory alias that the AST gate denies', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'mediflow-session-inventory-runtime-'));
+    const target = path.join(directory, 'server-session.mjs'); const commonjs = path.join(directory, 'server-session.cjs');
+    const upper = path.join(directory, 'SERVER-SESSION.mjs'); const extension = path.join(directory, 'server-session.js');
+    try {
+        writeFileSync(target, "export const marker='session-inventory-runtime';\n");
+        writeFileSync(commonjs, "module.exports={marker:'session-inventory-runtime'};\n");
+        if (process.platform !== 'darwin') symlinkSync(target, upper);
+        symlinkSync(target, extension);
+        const canonical = pathToFileURL(target).href; const encoded = canonical.replace('server-session', '%73erver-session');
+        const metaUrl = ['import', 'meta', 'url'].join('.');
+        const script = `
+            import {createRequire} from 'node:module';
+            const expected='session-inventory-runtime';
+            const verify=async(specifier)=>{const loaded=await import(specifier);if(loaded.marker!==expected)throw Error(specifier)};
+            await verify(${JSON.stringify(`${canonical}?query=1`)});await verify(${JSON.stringify(`${canonical}#hash`)});
+            await verify(${JSON.stringify(encoded)});await verify(${JSON.stringify(pathToFileURL(upper).href)});await verify(${JSON.stringify(pathToFileURL(extension).href)});
+            const object={target:${JSON.stringify(canonical)}};const array=[${JSON.stringify(canonical)}];await verify(object.target);await verify(array[0]);
+            await eval(${JSON.stringify(`import(${JSON.stringify(canonical)})`)}).then((loaded)=>{if(loaded.marker!==expected)throw Error('eval')});
+            const generated=new Function(${JSON.stringify(`return import(${JSON.stringify(canonical)})`)});if((await generated()).marker!==expected)throw Error('Function');
+            const load=(specifier)=>import(specifier);if((await load(${JSON.stringify(canonical)})).marker!==expected)throw Error('loader');
+            const nodeRequire=createRequire?.(${metaUrl});const required=nodeRequire(${JSON.stringify(commonjs)});if(required.marker!==expected)throw Error('optional-createRequire');
+            const resolved=nodeRequire.resolve(${JSON.stringify(commonjs)});if(nodeRequire.cache[resolved]?.exports.marker!==expected)throw Error('require-cache');
+            const pick=()=>${JSON.stringify(commonjs)};const dynamicResolved=nodeRequire.resolve(pick());if(nodeRequire.cache[dynamicResolved]?.exports.marker!==expected)throw Error('dynamic-require-cache');
+        `;
+        execFileSync(process.execPath, ['--input-type=module', '--eval', script], { stdio: 'pipe' });
+    } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
 test('compacts one exact RETIRED Web cell into a replay-stable PHI-safe tombstone receipt', () => {
@@ -675,9 +861,6 @@ test('fixed-cause adapters deny hostile and cross-module IDs without observation
     }
     await new Promise<void>((resolve) => setImmediate(resolve));
     assert.equal(observed, 0); assert.deepEqual(unhandled, []);
-    const paths = execFileSync('rg', ['-l', 'retireServerSessionForLogout|retireServerSessionForApplicationLock|retireExpiredServerSession', '-g', '*.ts', '.'], { encoding: 'utf8' })
-        .trim().split('\n').filter(Boolean).map((value) => value.replace(/^\.\//u, '')).sort();
-    assert.deepEqual(paths, ['lib/security/server-session.test.ts', 'lib/security/server-session.ts']);
 });
 
 test('fixed-cause P3 ownership wins over a colliding legacy Map entry and CAS drift stays terminal', async (t) => {
