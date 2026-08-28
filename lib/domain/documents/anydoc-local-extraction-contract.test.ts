@@ -16,6 +16,16 @@ function assertDenied(result: ReturnType<typeof buildAnyDocLocalExtraction>, fie
     assert.equal(result.writes, 0);
     assert.equal(result.apply, 'none');
 }
+function assertFrozenExactRecord(value: object, expectedKeys: string[]) {
+    assert.equal(Object.isFrozen(value), true);
+    assert.deepEqual(Reflect.ownKeys(value).map(String).sort(), [...expectedKeys].sort());
+    for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(value))) {
+        assert.equal('value' in descriptor, true);
+        assert.equal(descriptor.enumerable, true);
+        assert.equal(descriptor.configurable, false);
+        assert.equal(descriptor.writable, false);
+    }
+}
 
 test('success binds minimized Markdown to validated metadata and an outcome receipt', () => {
     const result = buildAnyDocLocalExtraction(source, '\r\n# Lettera sintetica   \r\n\r\n\r\nTerapia da verificare.\0\r\n');
@@ -94,4 +104,42 @@ test('empty canonical Markdown fails closed with a distinct failure receipt', ()
     assert.equal(result.markdown, '');
     assert.equal(result.candidateUse, 'blocked');
     assert.equal(result.receipt.outcome, 'review_required:empty_extraction');
+});
+
+test('success returns frozen exact records and has no alias to caller source', () => {
+    const callerSource = { ...source };
+    const result = buildAnyDocLocalExtraction(callerSource, 'Contenuto sintetico.');
+    assert.equal(result.status, 'extracted');
+    if (result.status !== 'extracted') return;
+    assertFrozenExactRecord(result, ['schemaVersion', 'provenance', 'receipt', 'review', 'writes', 'apply', 'status', 'markdown', 'candidateUse']);
+    assertFrozenExactRecord(result.provenance, ['attachmentId', 'sourceSha256', 'byteLength']);
+    assertFrozenExactRecord(result.receipt, ['receiptId', 'parser', 'outcome', 'sourceSha256', 'sourceByteLength', 'markdownSha256', 'markdownByteLength']);
+    const sourceDigest = result.provenance.sourceSha256;
+    const receiptId = result.receipt.receiptId;
+    const markdown = result.markdown;
+    callerSource.sourceSha256 = 'b'.repeat(64);
+    assert.notEqual(result.provenance, callerSource);
+    assert.throws(() => { (result.provenance as { sourceSha256: string }).sourceSha256 = 'c'.repeat(64); }, TypeError);
+    assert.throws(() => { (result.receipt as { receiptId: string }).receiptId = 'changed'; }, TypeError);
+    assert.throws(() => { (result as { markdown: string }).markdown = 'changed'; }, TypeError);
+    assert.equal(result.provenance.sourceSha256, sourceDigest);
+    assert.equal(result.receipt.receiptId, receiptId);
+    assert.equal(result.markdown, markdown);
+});
+
+test('failure and denial return frozen exact records that reject mutation', () => {
+    const failure = mapAnyDocLocalFailure(source, 'needsOcr');
+    assert.equal(failure.status, 'review_required');
+    if (failure.status !== 'review_required') return;
+    assertFrozenExactRecord(failure, ['schemaVersion', 'provenance', 'receipt', 'review', 'writes', 'apply', 'status', 'reason', 'detail', 'markdown', 'candidateUse']);
+    assertFrozenExactRecord(failure.provenance, ['attachmentId', 'sourceSha256', 'byteLength']);
+    assertFrozenExactRecord(failure.receipt, ['receiptId', 'parser', 'outcome', 'sourceSha256', 'sourceByteLength', 'markdownByteLength']);
+    assert.throws(() => { (failure as { detail: string }).detail = 'changed'; }, TypeError);
+    assert.throws(() => { (failure.receipt as { receiptId: string }).receiptId = 'changed'; }, TypeError);
+
+    const denial = buildAnyDocLocalExtraction(source, 42);
+    assert.equal(denial.status, 'denied');
+    if (denial.status !== 'denied') return;
+    assertFrozenExactRecord(denial, ['schemaVersion', 'status', 'reason', 'field', 'review', 'writes', 'apply', 'candidateUse']);
+    assert.throws(() => { (denial as { field: string }).field = 'changed'; }, TypeError);
 });
