@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { afterEach, test } from 'node:test';
 
-import { createApplicationLockResponse, evaluateApplicationLockAttempt } from './application-lock-server';
+import { createApplicationLockResponse, evaluateApplicationLockAttempt, preserveApplicationLockReceipt } from './application-lock-server';
 import { clearAllSessions, createSession, deleteSession, invalidateServerSessionForApplicationLock, peekSession, registerServerSessionResource } from './server-session';
 
 afterEach(() => clearAllSessions());
@@ -92,13 +92,32 @@ test('production registrations remain declared synchronous void callbacks', () =
 test('route receives the primitive capture rather than pre-invalidation peek state', () => {
     const route = readFileSync(new URL('../../app/api/auth/lock/route.ts', import.meta.url), 'utf8');
     assert.match(route, /attempt\.sessionBeforeDeletion/u); assert.doesNotMatch(route, /peekSession/u);
+    assert.match(route, /invalidateServerSessionForApplicationLock/u);
+    assert.match(route, /preserveApplicationLockReceipt/u);
+    assert.doesNotMatch(route, /receipt\s*=\s*\{/u);
+    assert.doesNotMatch(route, /cookies\.(set|delete)|maxAge\s*:\s*0/u);
 });
 
-test('HTTP responses expose only the exact receipt and expire cookie only on confirmation', async () => {
-    const confirmed = createApplicationLockResponse(new Request('https://127.0.0.1/api/auth/lock'), { schemaVersion: 'mediflow.application-lock-receipt.v1', state: 'server_invalidation_confirmed' });
-    const unconfirmed = createApplicationLockResponse(new Request('http://127.0.0.1/api/auth/lock'), { schemaVersion: 'mediflow.application-lock-receipt.v1', state: 'server_invalidation_unconfirmed' });
+test('audit failure cannot retrograde a confirmed invalidation receipt', async () => {
+    const receipt = { schemaVersion: 'mediflow.application-lock-receipt.v1', state: 'server_invalidation_confirmed' } as const;
+    const preserved = await preserveApplicationLockReceipt(receipt, async () => { throw new Error('synthetic audit failure'); });
+    assert.strictEqual(preserved, receipt);
+    assert.equal(preserved.state, 'server_invalidation_confirmed');
+});
+
+test('unconfirmed invalidation never starts ancillary audit work', async () => {
+    const receipt = { schemaVersion: 'mediflow.application-lock-receipt.v1', state: 'server_invalidation_unconfirmed' } as const;
+    let called = false;
+    const preserved = await preserveApplicationLockReceipt(receipt, () => { called = true; });
+    assert.strictEqual(preserved, receipt);
+    assert.equal(called, false);
+});
+
+test('HTTP responses expose only the exact receipt and never clear the fixed bearer cookie', async () => {
+    const confirmed = createApplicationLockResponse({ schemaVersion: 'mediflow.application-lock-receipt.v1', state: 'server_invalidation_confirmed' });
+    const unconfirmed = createApplicationLockResponse({ schemaVersion: 'mediflow.application-lock-receipt.v1', state: 'server_invalidation_unconfirmed' });
     assert.equal(confirmed.status, 200); assert.deepEqual(await confirmed.json(), { schemaVersion: 'mediflow.application-lock-receipt.v1', state: 'server_invalidation_confirmed' });
-    assert.match(confirmed.headers.get('set-cookie') ?? '', /mediflow_session=; Path=\/; Max-Age=0; Secure; HttpOnly; SameSite=lax/u);
+    assert.equal(confirmed.headers.get('set-cookie'), null);
     assert.equal(unconfirmed.status, 409); assert.deepEqual(await unconfirmed.json(), { schemaVersion: 'mediflow.application-lock-receipt.v1', state: 'server_invalidation_unconfirmed' });
     assert.equal(unconfirmed.headers.get('set-cookie'), null);
 });
