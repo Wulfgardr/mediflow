@@ -19,6 +19,8 @@ type Options = Readonly<{
 const EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs'] as const;
 const fingerprint = (file: string, form: string, expressionKind: string, statementKind: string, expression: string) =>
     [file, form, expressionKind, statementKind, expression].join('|');
+const protectedFingerprint = (target: string, file: string, form: string, expressionKind: string, statementKind: string, expression: string) =>
+    [target, fingerprint(file, form, expressionKind, statementKind, expression)].join('|');
 export const allowedGenericLoaderExpressions: ReadonlySet<string> = new Set([
     fingerprint('lib/ai-providers/fabric/document-synthesis-provider-binding.test.ts', 'dynamic', 'TemplateExpression', 'VariableStatement', "`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`"),
     fingerprint('lib/ai-providers/fabric/document-synthesis-provider-envelope.test.ts', 'dynamic', 'TemplateExpression', 'VariableStatement', "`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`"),
@@ -43,6 +45,19 @@ const allowedUnsafeLoaderExpressions: ReadonlySet<string> = new Set([
     fingerprint('lib/pm2-manager.test.ts', 'unsafe:require', 'CallExpression', 'ExpressionStatement', 'require(managerPath)'),
     fingerprint('lib/backup-restore-preflight.ts', 'unsafe:require', 'CallExpression', 'ReturnStatement', "require('./data-dir')"),
     fingerprint('lib/pdfjs-server.ts', 'unsafe:Function', 'NewExpression', 'VariableStatement', "new Function('specifier', 'return import(specifier);')"),
+]);
+const allowedProtectedLoaderExpressions: ReadonlyMap<string, number> = new Map([
+    [protectedFingerprint('lib/security/server-session', 'lib/security/server-session.test.ts', 'loader-resolve', 'CallExpression', 'VariableStatement', "nodeRequire.resolve('./server-session.ts')"), 30],
+    [protectedFingerprint('lib/security/server-session', 'lib/security/server-session.test.ts', 'loader-cache-read', 'ElementAccessExpression', 'VariableStatement', 'nodeRequire.cache[modulePath]'), 28],
+    [protectedFingerprint('lib/security/server-session', 'lib/security/server-session.test.ts', 'loader-cache-delete', 'ElementAccessExpression', 'ExpressionStatement', 'nodeRequire.cache[modulePath]'), 56],
+    [protectedFingerprint('lib/security/server-session', 'lib/security/server-session.test.ts', 'loader-cache-write', 'ElementAccessExpression', 'ExpressionStatement', 'nodeRequire.cache[modulePath]'), 28],
+    [protectedFingerprint('lib/security/server-session', 'lib/security/server-session.test.ts', 'loader-cache-read', 'ElementAccessExpression', 'VariableStatement', 'nodeRequire.cache[sessionPath]'), 2],
+    [protectedFingerprint('lib/security/server-session', 'lib/security/server-session.test.ts', 'loader-cache-delete', 'ElementAccessExpression', 'ExpressionStatement', 'nodeRequire.cache[sessionPath]'), 4],
+    [protectedFingerprint('lib/security/server-session', 'lib/security/server-session.test.ts', 'loader-cache-write', 'ElementAccessExpression', 'ExpressionStatement', 'nodeRequire.cache[sessionPath]'), 2],
+    [protectedFingerprint('lib/security/web-auth-control-record', 'lib/security/server-session.test.ts', 'loader-resolve', 'CallExpression', 'VariableStatement', 'nodeRequire.resolve(AUTH_CONTROL_MODULE_PATH)'), 2],
+    [protectedFingerprint('lib/security/web-auth-control-record', 'lib/security/server-session.test.ts', 'loader-cache-read', 'ElementAccessExpression', 'VariableStatement', 'nodeRequire.cache[authPath]'), 2],
+    [protectedFingerprint('lib/security/web-auth-control-record', 'lib/security/server-session.test.ts', 'loader-cache-delete', 'ElementAccessExpression', 'ExpressionStatement', 'nodeRequire.cache[authPath]'), 4],
+    [protectedFingerprint('lib/security/web-auth-control-record', 'lib/security/server-session.test.ts', 'loader-cache-write', 'ElementAccessExpression', 'ExpressionStatement', 'nodeRequire.cache[authPath]'), 2],
 ]);
 // Controller policy: these spellings are reserved loader identities even when a local binding shadows the global.
 const RESERVED_LOADER_IDENTITIES: ReadonlySet<string> = new Set(['eval', 'Function', 'require', 'createRequire']);
@@ -303,10 +318,16 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
         }
     };
     const unsafeLoaderCandidates: string[] = [];
+    const protectedLoaderCandidates: Array<Readonly<{ fingerprint: string; invalid: boolean }>> = [];
     const unsafeLoaderFingerprint = (identity: string, expression: ts.CallExpression | ts.NewExpression) => {
         let statement: ts.Node = expression;
         while (statement.parent && !ts.isStatement(statement)) statement = statement.parent;
         return fingerprint(file, `unsafe:${identity}`, stableKind(expression), stableKind(statement), printer.printNode(ts.EmitHint.Expression, expression, ast));
+    };
+    const protectedLoaderFingerprint = (form: string, expression: ts.Expression) => {
+        let statement: ts.Node = expression;
+        while (statement.parent && !ts.isStatement(statement)) statement = statement.parent;
+        return protectedFingerprint(target, file, form, stableKind(expression), stableKind(statement), printer.printNode(ts.EmitHint.Expression, expression, ast));
     };
     const inTypePosition = (node: ts.Node) => {
         let parent: ts.Node | undefined = node.parent;
@@ -376,13 +397,21 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
         }
         if (ts.isIdentifier(node) && createRequireFactories.has(node.text) && !shadowed(node.text, node) && !declarationName(node)) {
             const parent = node.parent;
-            if (!(ts.isCallExpression(parent) && parent.expression === node)) add('reserved-loader-identity');
+            if (!(ts.isCallExpression(parent) && parent.expression === node && !parent.questionDotToken)) add('reserved-loader-identity');
         }
         if (ts.isIdentifier(node) && createRequireLoader(node) && !declarationName(node)) {
             const parent = node.parent; const directCall = ts.isCallExpression(parent) && parent.expression === node && !parent.questionDotToken;
             const fixedMember = ts.isPropertyAccessExpression(parent) && parent.expression === node && !parent.questionDotToken
                 && ['cache', 'resolve'].includes(parent.name.text);
             if (!directCall && !fixedMember) add('reserved-loader-identity');
+        }
+        if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))
+            && ts.isIdentifier(unwrap(node.expression)) && createRequireLoader(unwrap(node.expression) as ts.Identifier)) {
+            const key = memberKey(node); const parent = node.parent;
+            const directResolve = key === 'resolve' && ts.isCallExpression(parent) && unwrap(parent.expression) === node && !parent.questionDotToken;
+            const directCacheIndex = key === 'cache' && (ts.isElementAccessExpression(parent) || ts.isPropertyAccessExpression(parent))
+                && unwrap(parent.expression) === node && !parent.questionDotToken;
+            if (['resolve', 'cache'].includes(key ?? '') && !directResolve && !directCacheIndex) add('reserved-loader-identity');
         }
         if (ts.isIdentifier(node) && node.text !== 'createRequire' && RESERVED_LOADER_IDENTITIES.has(node.text) && !inTypePosition(node) && !declarationName(node)) {
             const parent = node.parent; const directCall = ts.isCallExpression(parent) && parent.expression === node && !parent.questionDotToken;
@@ -425,6 +454,32 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
         ts.forEachChild(node, visit);
     };
     visit(ast); unsafeIdentityVisit(ast);
+    const protectedVisit = (node: ts.Node): void => {
+        if (ts.isCallExpression(node)) {
+            const callee = unwrap(node.expression);
+            if ((ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee))
+                && memberKey(callee) === 'resolve' && ts.isIdentifier(unwrap(callee.expression))
+                && createRequireLoader(unwrap(callee.expression) as ts.Identifier) && node.arguments[0]) {
+                const found = relation(node.arguments[0]);
+                if (found.target || found.invalid) protectedLoaderCandidates.push({ fingerprint: protectedLoaderFingerprint('loader-resolve', node), invalid: found.invalid });
+            }
+        }
+        if (ts.isElementAccessExpression(node) && node.argumentExpression
+            && (ts.isPropertyAccessExpression(unwrap(node.expression)) || ts.isElementAccessExpression(unwrap(node.expression)))) {
+            const cache = unwrap(node.expression) as ts.PropertyAccessExpression | ts.ElementAccessExpression;
+            const base = unwrap(cache.expression);
+            if (memberKey(cache) === 'cache' && ts.isIdentifier(base) && createRequireLoader(base)) {
+                const found = relation(node.argumentExpression);
+                if (found.target || found.invalid) {
+                    const parent = node.parent; const form = ts.isDeleteExpression(parent) ? 'loader-cache-delete'
+                        : ts.isBinaryExpression(parent) && parent.left === node ? 'loader-cache-write' : 'loader-cache-read';
+                    protectedLoaderCandidates.push({ fingerprint: protectedLoaderFingerprint(form, node), invalid: found.invalid });
+                }
+            }
+        }
+        ts.forEachChild(node, protectedVisit);
+    };
+    protectedVisit(ast);
     const unsafeLoaderCounts = new Map<string, number>();
     for (const item of unsafeLoaderCandidates) unsafeLoaderCounts.set(item, (unsafeLoaderCounts.get(item) ?? 0) + 1);
     for (const item of unsafeLoaderCandidates) {
@@ -432,6 +487,18 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
     }
     for (const allowed of allowedUnsafeLoaderExpressions) {
         if (allowed.startsWith(`${file}|`) && unsafeLoaderCounts.get(allowed) !== 1) add(unsafeLoaderCounts.has(allowed) ? 'reserved-loader-allowlist-duplicate' : 'reserved-loader-allowlist-drift');
+    }
+    const protectedCounts = new Map<string, number>();
+    for (const item of protectedLoaderCandidates) protectedCounts.set(item.fingerprint, (protectedCounts.get(item.fingerprint) ?? 0) + 1);
+    for (const item of protectedLoaderCandidates) {
+        const expectedCount = allowedProtectedLoaderExpressions.get(item.fingerprint);
+        if (expectedCount === protectedCounts.get(item.fingerprint)) continue;
+        if (expectedCount !== undefined) continue;
+        add('protected-loader-access'); if (item.invalid) add('module-path');
+    }
+    for (const [allowed, expectedCount] of allowedProtectedLoaderExpressions) {
+        if (!allowed.startsWith(`${target}|${file}|`) || protectedCounts.get(allowed) === expectedCount) continue;
+        add((protectedCounts.get(allowed) ?? 0) > expectedCount ? 'protected-loader-allowlist-duplicate' : 'protected-loader-allowlist-drift');
     }
     const counts = new Map<string, number>();
     for (const item of unresolved) counts.set(item.fingerprint, (counts.get(item.fingerprint) ?? 0) + 1);
@@ -505,6 +572,22 @@ export const createRequireBypassFixtures = (specifier: string): readonly string[
         `import * as Module from 'node:module';const {createRequire:make}=Module;make(${metaUrl})(${JSON.stringify(specifier)});`,
         `const {createRequire}=await import('node:module');createRequire(${metaUrl})(${JSON.stringify(specifier)});`,
         `createRequire(${metaUrl})(${JSON.stringify(specifier)});`,
+        `import {createRequire} from 'node:module';createRequire?.(${metaUrl})(${JSON.stringify(specifier)});`,
+        `import {createRequire as makeRequire} from 'module';makeRequire?.(${metaUrl})(${JSON.stringify(specifier)});`,
+        `import * as Module from 'node:module';Module.createRequire?.(${metaUrl})(${JSON.stringify(specifier)});`,
+        `import {createRequire} from 'node:module';const loader=createRequire(${metaUrl});const resolved=loader.resolve(${JSON.stringify(specifier)});loader.cache[resolved]?.exports;`,
+        `import {createRequire} from 'node:module';const loader=createRequire(${metaUrl});loader['resolve'](${JSON.stringify(specifier)});`,
+        `import {createRequire} from 'node:module';const loader=createRequire(${metaUrl});loader.resolve?.(${JSON.stringify(specifier)});`,
+        `import {createRequire} from 'node:module';const loader=createRequire(${metaUrl});(loader.resolve)(${JSON.stringify(specifier)});`,
+        `import {createRequire} from 'node:module';const loader=createRequire(${metaUrl});loader.resolve.call(null,${JSON.stringify(specifier)});`,
+        `import {createRequire} from 'node:module';const loader=createRequire(${metaUrl});loader.resolve.apply(null,[${JSON.stringify(specifier)}]);`,
+        `import {createRequire} from 'node:module';const loader=createRequire(${metaUrl});loader.resolve.bind(loader)(${JSON.stringify(specifier)});`,
+        `import {createRequire} from 'node:module';const loader=createRequire(${metaUrl});const resolve=loader.resolve;resolve(${JSON.stringify(specifier)});`,
+        `import {createRequire} from 'node:module';const loader=createRequire(${metaUrl});loader.cache[loader.resolve(${JSON.stringify(specifier)})]?.['exports'];`,
+        `import {createRequire} from 'node:module';const loader=createRequire(${metaUrl});const resolved=loader.resolve(${JSON.stringify(specifier)});loader.cache[resolved]={exports:{}};`,
+        `import {createRequire} from 'node:module';const loader=createRequire(${metaUrl});const resolved=loader.resolve(${JSON.stringify(specifier)});delete loader.cache[resolved];`,
+        `import {createRequire} from 'node:module';const loader=createRequire(${metaUrl});const resolved=loader.resolve(${JSON.stringify(specifier)});loader.cache?.[resolved]?.exports;`,
+        `import {createRequire} from 'node:module';const loader=createRequire(${metaUrl});const resolved=loader.resolve(${JSON.stringify(specifier)});const cache=loader.cache;cache[resolved]?.exports;`,
     ]);
 };
 

@@ -725,6 +725,12 @@ test('keeps the current-binding predicate private until the server-session retai
         const shadowErrors = validateControlImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
         assert.equal(shadowErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:reserved-loader-identity:*').length, 1, fixture);
     }
+    const sessionSource = repositoryTypeScript()['lib/security/server-session.test.ts']; assert.ok(sessionSource);
+    const authResolve = ['nodeRequire', '.resolve(AUTH_CONTROL_MODULE_PATH)'].join('');
+    const authResolveDuplicate = validateControlImports({
+        'lib/security/server-session.test.ts': sessionSource.replace(`const authPath = ${authResolve}`, `const duplicateAuthPath = ${authResolve}; const authPath = ${authResolve}`),
+    }).errors;
+    assert.ok(authResolveDuplicate.includes('lib/security/server-session.test.ts:protected-loader-allowlist-duplicate:*'));
     assert.notDeepEqual(validateControlImports({ 'lib/security/web-auth-logout-server.ts': "import { createWebAuthControlRecord } from '../../lib/security/web-auth-control-record.ts';" }).errors, []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/extra.ts': "import { createWebAuthControlRecord } from './web-auth-control-record';" }).errors, []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/extra.test.ts': "import { createWebAuthControlRecord } from './web-auth-control-record.ts';" }).errors, []);
