@@ -1482,10 +1482,10 @@ test('retires one exact ACTIVE cell through its retained control ticket', () => 
     assert.equal(active.control.retireTicket(active.ticket, 'dispose'), 0);
 
     const source = readFileSync(fileURLToPath(new URL('./server-session.ts', import.meta.url)), 'utf8');
-    const body = source.slice(source.indexOf('export function retireActiveWebServerSession'), source.indexOf('/** Canonically publishes a prepared session'));
+    const body = source.slice(source.indexOf('function retireActiveWebServerSessionCell'), source.indexOf('/** Canonically publishes a prepared session'));
     const finalCas = 'const retirementResult = commitPreparedAuthControlRetirement(preparedRetirement);';
     const finalCasOffset = body.indexOf(finalCas);
-    const postCas = body.slice(finalCasOffset + finalCas.length);
+    const postCas = body.slice(finalCasOffset + finalCas.length, body.indexOf('/** Retires one exact ACTIVE', finalCasOffset));
     const retiredFlip = postCas.indexOf("cell.state = 'RETIRED';");
     assert.ok(finalCasOffset >= 0 && retiredFlip >= 0);
     assert.doesNotMatch(postCas, /\b(?:try|catch|finally)\b/u);
@@ -1646,15 +1646,22 @@ test('the trusted ACTIVE resolver denies tombstones, wrong IDs, hostile values, 
     assert.equal(observed, 0);
 });
 
-test('the trusted ACTIVE resolver denies expiry and lifecycle reentry without mutating or cleaning the cell', async (t) => {
+test('the trusted ACTIVE resolver retires exact expiry after leaving its lifecycle and denies reentry', async (t) => {
     const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
     const cached = nodeRequire.cache[modulePath]; const ttl = process.env.MEDIFLOW_SESSION_TTL_MS; const originalNow = Date.now;
     let isolated: typeof import('./server-session') | undefined; let now = 1_000; let trigger = false; let nested = () => undefined;
+    let expiryClock: 'stable' | 'rollback' | 'throw' = 'stable'; let expiryClockReads = 0;
     const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
     process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
     try {
         process.env.MEDIFLOW_SESSION_TTL_MS = '10';
-        Date.now = () => { if (trigger) { trigger = false; nested(); } return now; };
+        Date.now = () => {
+            if (expiryClock !== 'stable' && ++expiryClockReads === 2) {
+                if (expiryClock === 'throw') throw new Error('synthetic expiry clock reread');
+                return 0;
+            }
+            if (trigger) { trigger = false; nested(); } return now;
+        };
         delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
         const activate = () => {
             const staged = isolated!.stageWebServerSession({ id: 'active-isolated', username: SYNTHETIC_USERNAME, role: 'clinician' });
@@ -1664,18 +1671,24 @@ test('the trusted ACTIVE resolver denies expiry and lifecycle reentry without mu
             const control = authControlApi().create(`f-${sessionId}`); control.begin('login', 'op', 'key', 'fp', 0);
             const ticket = control.prepareTicket(`f-${sessionId}`, 'op', BigInt(0), 'fp', sessionId, now); assert.ok(ticket);
             assert.equal(isolated!.activateArmedWebServerSession(port, ticket), true);
-            return sessionId;
+            return { sessionId, control };
         };
 
-        const expiredId = activate(); const exact = isolated.resolveActiveWebServerSession(expiredId); assert.ok(exact);
-        now = exact.expiresAt;
-        assert.equal(isolated.resolveActiveWebServerSession(expiredId), null);
-        now = exact.createdAt;
-        assert.equal(isolated.resolveActiveWebServerSession(expiredId), exact, 'expiry denial performs no direct mutation or cleanup');
-        assert.equal(isolated.getSession(expiredId), null);
+        for (const clock of ['rollback', 'throw'] as const) {
+            const expired = activate(); const exact = isolated.resolveActiveWebServerSession(expired.sessionId); assert.ok(exact);
+            const resource = isolated.mintActiveWebSessionResourcePort(exact); assert.ok(resource);
+            const use = isolated.beginActiveWebSessionResourceUse(resource); assert.ok(use);
+            now = exact.expiresAt; expiryClock = clock; expiryClockReads = 0;
+            assert.equal(isolated.resolveActiveWebServerSession(expired.sessionId), null); expiryClock = 'stable';
+            assert.equal(expiryClockReads, 1); assert.equal(expired.control.snapshot().active, false);
+            assert.equal(isolated.commitActiveWebSessionResourceUse(use), false);
+            assert.equal(isolated.releaseActiveWebSessionResourcePort(resource), false);
+            const receipt = isolated.retireExpiredServerSession(expired.sessionId); assert.equal(receipt.outcome, 'completed');
+            assert.equal(isolated.retireExpiredServerSession(expired.sessionId), receipt);
+        }
 
         for (const operation of ['delete', 'invalidate', 'clear'] as const) {
-            const sessionId = activate();
+            const { sessionId } = activate();
             nested = () => {
                 if (operation === 'delete') isolated!.deleteSession(sessionId);
                 else if (operation === 'invalidate') isolated!.invalidateSessionsForUser('active-isolated');
@@ -1688,29 +1701,65 @@ test('the trusted ACTIVE resolver denies expiry and lifecycle reentry without mu
         }
         await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
     } finally {
-        Date.now = originalNow; isolated?.clearAllSessions();
+        expiryClock = 'stable'; Date.now = originalNow; isolated?.clearAllSessions();
         if (ttl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = ttl;
         if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
     }
 });
 
-test('the trusted ACTIVE resolver denies lookup reentry and legacy Map collision with captured intrinsics', async (t) => {
+test('the trusted ACTIVE resolver revalidates final-get collision, reentry, and throw before expiry retirement', async (t) => {
     const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
-    const cached = nodeRequire.cache[modulePath]; const originalGet = Map.prototype.get; const originalSet = Map.prototype.set;
-    let isolated: typeof import('./server-session') | undefined; let sessionId = ''; let mode: 'idle' | 'nested' | 'collision' = 'idle';
-    let nestedResult: unknown; let poisonedCalls = 0;
+    const cached = nodeRequire.cache[modulePath]; const originalGet = Map.prototype.get; const originalHas = Map.prototype.has; const originalSet = Map.prototype.set;
+    const originalDelete = Map.prototype.delete; const originalNow = Date.now; const ttl = process.env.MEDIFLOW_SESSION_TTL_MS;
+    let isolated: typeof import('./server-session') | undefined; let sessionId = ''; let now = 1_000; let targetReads = 0;
+    let mode: 'idle' | 'nested' | 'collision' | 'final-collision' | 'final-reentry' | 'final-throw' = 'idle';
+    let nestedResult: unknown; let poisonedCalls = 0; let registry: Map<unknown, unknown> | null = null;
+    let replacementCollision: unknown = null; let expiryCollision: object | null = null; let installExpiryCollision = false;
+    let expiryAttack = false; let expiryGetCalls = 0; let expiryHasCalls = 0;
     const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
     process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
     Map.prototype.get = function (key: unknown) {
         const prior = Reflect.apply(originalGet, this, [key]);
         if (key === sessionId && mode === 'nested') { mode = 'idle'; nestedResult = isolated?.resolveActiveWebServerSession(sessionId); }
         if (key === sessionId && mode === 'collision') {
-            mode = 'idle'; Reflect.apply(originalSet, this, [key, Object.freeze({ id: sessionId })]);
+            mode = 'idle'; registry = this as Map<unknown, unknown>;
+            Reflect.apply(originalSet, this, [key, Object.freeze({ id: sessionId })]);
+        }
+        if (key === sessionId && mode.startsWith('final-') && ++targetReads === 1) {
+            const action = mode; mode = 'idle';
+            if (action === 'final-collision') {
+                registry = this as Map<unknown, unknown>;
+                Reflect.apply(originalSet, this, [key, Object.freeze({ id: sessionId })]);
+                replacementCollision = Object.freeze({ id: sessionId, replacement: true });
+                Reflect.apply(originalSet, this, [key, replacementCollision]);
+            } else if (action === 'final-reentry') {
+                nestedResult = isolated?.resolveActiveWebServerSession(sessionId);
+            } else {
+                throw new Error('synthetic final-get apply-then-throw');
+            }
+        }
+        if (key === sessionId && expiryAttack) {
+            expiryGetCalls += 1; if (registry && expiryCollision) Reflect.apply(originalSet, registry, [sessionId, expiryCollision]);
+        }
+        return prior;
+    };
+    Map.prototype.has = function (key: unknown) {
+        const prior = Reflect.apply(originalHas, this, [key]);
+        if (key === sessionId && expiryAttack) {
+            expiryHasCalls += 1; if (registry && expiryCollision) Reflect.apply(originalSet, registry, [sessionId, expiryCollision]);
+            throw new Error('synthetic final-has apply-then-throw');
         }
         return prior;
     };
     try {
+        process.env.MEDIFLOW_SESSION_TTL_MS = '10'; Date.now = () => {
+            if (installExpiryCollision && registry && expiryCollision) {
+                installExpiryCollision = false; Reflect.apply(originalSet, registry, [sessionId, expiryCollision]);
+            }
+            return now;
+        };
         delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
+        Map.prototype.get = originalGet; Map.prototype.has = originalHas;
         const staged = isolated.stageWebServerSession({ id: 'lookup-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
         const prepared = isolated.prepareStagedWebServerSession(staged); assert.ok(prepared);
         sessionId = isolated.getPreparedWebServerSessionId(prepared) ?? ''; assert.ok(sessionId);
@@ -1721,6 +1770,22 @@ test('the trusted ACTIVE resolver denies lookup reentry and legacy Map collision
 
         mode = 'nested'; assert.equal(isolated.resolveActiveWebServerSession(sessionId), null); assert.equal(nestedResult, null);
         const session = isolated.resolveActiveWebServerSession(sessionId); assert.ok(session);
+        now = session.createdAt; targetReads = 0; mode = 'final-collision';
+        assert.equal(isolated.resolveActiveWebServerSession(sessionId), null); assert.equal(targetReads, 1); assert.ok(registry);
+        assert.equal(Reflect.apply(originalGet, registry, [sessionId]), replacementCollision);
+        Reflect.apply(originalDelete, registry, [sessionId]); now = session.createdAt;
+        assert.equal(isolated.resolveActiveWebServerSession(sessionId), session, 'a replaced final-get collision cannot retire P3');
+
+        now = session.createdAt; targetReads = 0; mode = 'final-reentry';
+        assert.equal(isolated.resolveActiveWebServerSession(sessionId), null); assert.equal(nestedResult, null);
+        now = session.createdAt; assert.equal(isolated.resolveActiveWebServerSession(sessionId), session);
+
+        now = session.createdAt; targetReads = 0; mode = 'final-throw'; let thrownResult: unknown = 'unset';
+        assert.doesNotThrow(() => { thrownResult = isolated!.resolveActiveWebServerSession(sessionId); });
+        assert.equal(thrownResult, null); now = session.createdAt;
+        assert.equal(isolated.resolveActiveWebServerSession(sessionId), session);
+        assert.equal(control.snapshot().active, true, 'denied observations preserve exact P2/P3 retry authority');
+
         const resource = isolated.mintActiveWebSessionResourcePort(session); assert.ok(resource);
         mode = 'collision'; assert.equal(isolated.mintActiveWebSessionResourcePort(session), null);
 
@@ -1736,9 +1801,22 @@ test('the trusted ACTIVE resolver denies lookup reentry and legacy Map collision
             Map.prototype.get = originals.mapGet; Date.now = originals.dateNow;
             if (originals.then) Object.defineProperty(Object.prototype, 'then', originals.then); else delete (Object.prototype as { then?: unknown }).then;
         }
+        assert.ok(registry); Reflect.apply(originalDelete, registry, [sessionId]);
+        const expiryResource = isolated.mintActiveWebSessionResourcePort(session); assert.ok(expiryResource);
+        const expiryUse = isolated.beginActiveWebSessionResourceUse(expiryResource); assert.ok(expiryUse);
+        expiryCollision = { id: sessionId, userId: 'legacy-synthetic', username: SYNTHETIC_USERNAME, role: 'clinician', authChannel: 'web', createdAt: 1_000, expiresAt: 100_000 }; Reflect.apply(originalSet, registry, [sessionId, Object.freeze({ id: sessionId, beforeExpiry: true })]);
+        installExpiryCollision = true; expiryAttack = true; now = session.expiresAt;
+        assert.equal(isolated.resolveActiveWebServerSession(sessionId), null, 'exact expiry does not consult legacy Map'); expiryAttack = false;
+        assert.deepEqual([expiryGetCalls, expiryHasCalls], [0, 0]); assert.equal(isolated.peekSession(sessionId), expiryCollision);
+        assert.equal(control.snapshot().active, false); assert.equal(isolated.commitActiveWebSessionResourceUse(expiryUse), false);
+        assert.equal(isolated.releaseActiveWebSessionResourcePort(expiryResource), false);
+        const receipt = isolated.retireExpiredServerSession(sessionId); assert.equal(receipt.outcome, 'completed');
+        assert.equal(isolated.retireExpiredServerSession(sessionId), receipt); Reflect.apply(originalDelete, registry, [sessionId]);
+        now = session.createdAt; assert.equal(isolated.resolveActiveWebServerSession(sessionId), null);
         await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(poisonedCalls, 0); assert.deepEqual(unhandled, []);
     } finally {
-        Map.prototype.get = originalGet; isolated?.clearAllSessions();
+        mode = 'idle'; expiryAttack = false; Map.prototype.get = originalGet; Map.prototype.has = originalHas; Date.now = originalNow; isolated?.clearAllSessions();
+        if (ttl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = ttl;
         if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
     }
 });
