@@ -890,8 +890,21 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
         ? [...statement.declarationList.declarations].filter((declaration) =>
             ts.isIdentifier(declaration.name) && declaration.name.text === 'sessionId') : []);
     const sessionIdDeclaration = sessionIdDeclarations.length === 1 ? sessionIdDeclarations[0] : null;
+    const sessionIdInitializer = sessionIdDeclaration?.initializer && unwrap(sessionIdDeclaration.initializer);
     const sessionIdSymbol = sessionIdDeclaration
         ? service.checker.getSymbolAtLocation(sessionIdDeclaration.name) : null;
+    const cookieSymbol = cookieParameter && ts.isIdentifier(cookieParameter.name)
+        ? service.checker.getSymbolAtLocation(cookieParameter.name) : null;
+    const exactBearer = namedFunction(service.sourceFile, 'exactBearer');
+    const exactBearerSymbol = exactBearer?.name && service.checker.getSymbolAtLocation(exactBearer.name);
+    if (!sessionIdDeclaration || !ts.isVariableDeclarationList(sessionIdDeclaration.parent)
+        || !(sessionIdDeclaration.parent.flags & ts.NodeFlags.Const) || moduleScopeBindingExists(service.sourceFile, 'sessionId')
+        || !ts.isCallExpression(sessionIdInitializer) || sessionIdInitializer.questionDotToken
+        || !exactIdentifierBinding(service.checker, unwrap(sessionIdInitializer.expression), exactBearerSymbol)
+        || sessionIdInitializer.arguments.length !== 1
+        || !exactIdentifierBinding(service.checker, unwrap(sessionIdInitializer.arguments[0]), cookieSymbol)) {
+        problems.push('owner session id must be the exact const bearer binding');
+    }
     const resolveCall = resolveCalls.length === 1 ? resolveCalls[0] : null;
     const resolveArgument = resolveCall?.arguments.length === 1 ? unwrap(resolveCall.arguments[0]) : null;
     if (!resolveCall || !isUnconditionalOwnerCall(owner, resolveCall)
