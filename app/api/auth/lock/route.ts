@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 
 import {
     evaluateApplicationLockAttempt,
+    preserveApplicationLockReceipt,
     type ApplicationLockSources,
     createApplicationLockResponse,
 } from '@/lib/security/application-lock-server';
@@ -19,30 +20,21 @@ export async function POST(request: Request) {
     const cookieStore = await cookies();
     const cookieSessionId = cookieStore.get(SESSION_COOKIE_NAME)?.value;
     const attempt = evaluateApplicationLockAttempt(cookieSessionId, productionSources);
-    let receipt = attempt.receipt;
+    const receipt = await preserveApplicationLockReceipt(attempt.receipt, async () => {
+        if (typeof cookieSessionId !== 'string') throw new Error('invalid lock receipt input');
+        const context = auditContextFromSession(attempt.sessionBeforeDeletion);
+        await writeAuditEvent({
+            eventType: 'auth.lock',
+            outcome: 'success',
+            actorType: context.actorType,
+            actorRef: context.actorRef,
+            subjectType: 'session',
+            subjectRef: hashAuditRef(cookieSessionId),
+            sourceSurface: context.sourceSurface,
+            requestId: requestIdFromRequest(request),
+            redactedMetadata: withAuditContextMetadata(context, null),
+        });
+    });
 
-    if (receipt.state === 'server_invalidation_confirmed') {
-        try {
-            if (typeof cookieSessionId !== 'string') throw new Error('invalid lock receipt input');
-            const context = auditContextFromSession(attempt.sessionBeforeDeletion);
-            await writeAuditEvent({
-                eventType: 'auth.lock',
-                outcome: 'success',
-                actorType: context.actorType,
-                actorRef: context.actorRef,
-                subjectType: 'session',
-                subjectRef: hashAuditRef(cookieSessionId),
-                sourceSurface: context.sourceSurface,
-                requestId: requestIdFromRequest(request),
-                redactedMetadata: withAuditContextMetadata(context, null),
-            });
-        } catch {
-            receipt = {
-                schemaVersion: 'mediflow.application-lock-receipt.v1',
-                state: 'server_invalidation_unconfirmed',
-            };
-        }
-    }
-
-    return createApplicationLockResponse(request, receipt);
+    return createApplicationLockResponse(receipt);
 }
