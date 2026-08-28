@@ -7,7 +7,12 @@ import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { users } from '@/lib/schema';
-import { deleteSession, getSession, peekSession, SESSION_COOKIE_NAME, type ServerSession } from '@/lib/security/server-session';
+import {
+    resolveActiveWebServerSession,
+    retireWebP3SessionsForUser,
+    SESSION_COOKIE_NAME,
+    type ServerSession,
+} from '@/lib/security/server-session';
 import type { ServerSessionProjectionOwner } from '@/lib/security/server-session-projection-owner';
 import { serverSessionProjectionOwnerRegistry } from '@/lib/security/server-session-projection-owner-production';
 /* @Codex */
@@ -116,13 +121,42 @@ function isProjectionOwner(value: unknown): value is ServerSessionProjectionOwne
     }
 }
 
-export async function requireSession(): Promise<ServerSession | null> {
-    const cookieStore = await cookies();
-    const sessionId = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-    const session = getSession(sessionId);
-    if (!session || !sessionId) return null;
+function validatedUserAgreesWithActiveWebSession(
+    user: unknown,
+    sessionRecord: Record<string, unknown>,
+): boolean {
+    const userRecord = exactDataRecord(user, AUTH_USER_KEYS);
+    if (!userRecord || userRecord.id !== sessionRecord.userId
+        || userRecord.username !== sessionRecord.username
+        || (userRecord.role !== null && userRecord.role !== undefined && typeof userRecord.role !== 'string')) return false;
+    const effectiveRole = (userRecord.role as string | null | undefined) ?? sessionRecord.role;
+    return effectiveRole === sessionRecord.role;
+}
 
+function retireActiveWebSessionsForUser(userId: unknown): void {
     try {
+        retireWebP3SessionsForUser(userId);
+    } catch {
+        // Retirement is fail-closed: a denial or failure cannot preserve this request's authority.
+    }
+}
+
+async function resolveValidatedActiveWebSession(): Promise<ServerSession | null> {
+    try {
+        const cookieStore = await cookies();
+        const sessionId = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+        const session = resolveActiveWebServerSession(sessionId);
+        if (!session || !sessionId) return null;
+        const sessionRecord = exactDataRecord(session, AUTH_SESSION_KEYS);
+        if (!sessionRecord || sessionRecord.id !== sessionId
+            || typeof sessionRecord.userId !== 'string' || sessionRecord.userId.length === 0
+            || typeof sessionRecord.username !== 'string' || sessionRecord.username.length === 0
+            || typeof sessionRecord.role !== 'string' || sessionRecord.role.length === 0
+            || sessionRecord.authChannel !== 'web'
+            || typeof sessionRecord.createdAt !== 'number' || !NumberIsFinite(sessionRecord.createdAt)
+            || typeof sessionRecord.expiresAt !== 'number' || !NumberIsFinite(sessionRecord.expiresAt)
+            || sessionRecord.expiresAt <= DateNow()) return null;
+
         const user = await dbServer
             .select({
                 id: users.id,
@@ -130,40 +164,25 @@ export async function requireSession(): Promise<ServerSession | null> {
                 role: users.role,
             })
             .from(users)
-            .where(eq(users.id, session.userId))
+            .where(eq(users.id, sessionRecord.userId))
             .get();
-
-        if (!user) {
-            deleteSession(sessionId);
+        if (!validatedUserAgreesWithActiveWebSession(user, sessionRecord)) {
+            retireActiveWebSessionsForUser(sessionRecord.userId);
             return null;
         }
-
-        session.username = user.username;
-        session.role = user.role ?? session.role;
-    } catch (error) {
-        console.error('[MediFlow] Session validation against users table failed:', error);
+        return session;
+    } catch {
+        return null;
     }
+}
 
-    return session;
+export async function requireSession(): Promise<ServerSession | null> {
+    return resolveValidatedActiveWebSession();
 }
 
 /* @Codex */
 export async function readAuthenticatedWebSession(): Promise<ServerSession | null> {
-    const cookieStore = await cookies();
-    const sessionId = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-    const session = peekSession(sessionId);
-    if (!session || !sessionId) return null;
-
-    const user = await dbServer
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.id, session.userId))
-        .get();
-    if (!user) {
-        deleteSession(sessionId);
-        return null;
-    }
-    return session;
+    return resolveValidatedActiveWebSession();
 }
 
 export type AuthenticatedWebSessionProjectionOwnerContext = Readonly<{
@@ -202,7 +221,7 @@ export async function acquireAuthenticatedWebSessionProjectionOwnerContext(): Pr
             || typeof cookieRecord.value !== 'string' || cookieRecord.value.length === 0) return null;
         const sessionId = cookieRecord.value;
 
-        const session = getSession(sessionId);
+        const session = resolveActiveWebServerSession(sessionId);
         if (!ambientThenSafe() || !session) return null;
         const sessionRecord = exactDataRecord(session, AUTH_SESSION_KEYS);
         if (!sessionRecord || sessionRecord.id !== sessionId
@@ -228,20 +247,13 @@ export async function acquireAuthenticatedWebSessionProjectionOwnerContext(): Pr
         if (!ambientThenSafe()) return null;
         const user = filtered.get();
         if (!ambientThenSafe()) return null;
-        if (!user) {
-            deleteSession(sessionId);
+        if (!validatedUserAgreesWithActiveWebSession(user, sessionRecord)) {
+            retireActiveWebSessionsForUser(sessionRecord.userId);
             if (!ambientThenSafe()) return null;
             return null;
         }
-        const userRecord = exactDataRecord(user, AUTH_USER_KEYS);
-        if (!userRecord || userRecord.id !== sessionRecord.userId
-            || typeof userRecord.username !== 'string' || userRecord.username.length === 0
-            || (userRecord.role !== null && userRecord.role !== undefined && typeof userRecord.role !== 'string')) return null;
 
         const sessionValue = session as ServerSession;
-        sessionValue.username = userRecord.username;
-        sessionValue.role = (userRecord.role as string | null | undefined) ?? sessionValue.role;
-
         const owner = serverSessionProjectionOwnerRegistry.acquire(sessionValue);
         if (!ambientThenSafe() || !isProjectionOwner(owner)) return null;
         return authenticatedProjectionOwnerContext(sessionValue, owner);
