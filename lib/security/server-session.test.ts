@@ -49,6 +49,7 @@ import {
     allowedGenericLoaderExpressions,
     inventoryModuleImports,
     moduleImportBypassFixtures,
+    reservedLoaderBindingFixtures,
     repositoryTypeScriptSources,
     unsafeLoaderIdentityFixtures,
 } from './module-import-inventory.test-support.ts';
@@ -649,16 +650,20 @@ test('inventories exact session imports by AST and closes the logout authority b
     assert.deepEqual(validateSessionImports({ 'scripts/benchmark-redaction.ts': benchmark }).errors, []);
     for (const fixture of unsafeLoaderIdentityFixtures('../lib/security/server-session')) {
         const aliasErrors = validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
-        assert.ok(aliasErrors.includes('scripts/benchmark-redaction.ts:unsafe-loader'), fixture);
+        assert.ok(aliasErrors.includes('scripts/benchmark-redaction.ts:reserved-loader-identity'), fixture);
+    }
+    for (const fixture of reservedLoaderBindingFixtures) {
+        const bindingErrors = validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
+        assert.equal(bindingErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:reserved-loader-identity').length, 1, fixture);
     }
     const pm2 = typescriptSources()['lib/pm2-manager.ts']; assert.ok(pm2);
     assert.deepEqual(validateSessionImports({ 'lib/pm2-manager.ts': pm2 }).errors, []);
-    assert.ok(validateSessionImports({ 'lib/pm2-manager.ts': pm2.replace("require('pm2')", "require('pm2-drift')") }).errors.includes('lib/pm2-manager.ts:unsafe-loader-drift'));
-    assert.ok(validateSessionImports({ 'lib/pm2-manager.ts': `${pm2}\nconst duplicate=require('pm2');` }).errors.includes('lib/pm2-manager.ts:unsafe-loader-duplicate'));
+    assert.ok(validateSessionImports({ 'lib/pm2-manager.ts': pm2.replace("require('pm2')", "require('pm2-drift')") }).errors.includes('lib/pm2-manager.ts:reserved-loader-allowlist-drift'));
+    assert.ok(validateSessionImports({ 'lib/pm2-manager.ts': `${pm2}\nconst duplicate=require('pm2');` }).errors.includes('lib/pm2-manager.ts:reserved-loader-allowlist-duplicate'));
     const pdfjs = typescriptSources()['lib/pdfjs-server.ts']; assert.ok(pdfjs);
     assert.deepEqual(validateSessionImports({ 'lib/pdfjs-server.ts': pdfjs }).errors, []);
-    assert.ok(validateSessionImports({ 'lib/pdfjs-server.ts': pdfjs.replace('return import(specifier);', 'return import(specifier); ') }).errors.includes('lib/pdfjs-server.ts:unsafe-loader-drift'));
-    assert.ok(validateSessionImports({ 'lib/pdfjs-server.ts': `${pdfjs}\nconst duplicate=new Function('specifier','return import(specifier);');` }).errors.includes('lib/pdfjs-server.ts:unsafe-loader-duplicate'));
+    assert.ok(validateSessionImports({ 'lib/pdfjs-server.ts': pdfjs.replace('return import(specifier);', 'return import(specifier); ') }).errors.includes('lib/pdfjs-server.ts:reserved-loader-allowlist-drift'));
+    assert.ok(validateSessionImports({ 'lib/pdfjs-server.ts': `${pdfjs}\nconst duplicate=new Function('specifier','return import(specifier);');` }).errors.includes('lib/pdfjs-server.ts:reserved-loader-allowlist-duplicate'));
 });
 
 test('Node runtime resolves every inventory alias that the AST gate denies', () => {
