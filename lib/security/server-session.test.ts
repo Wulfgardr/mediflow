@@ -721,6 +721,12 @@ test('user-scoped retirement snapshots P3 targets before mutation and preserves 
     const retired = activeResourceFixture('bulk-user');
     assert.equal(retireActiveWebServerSession(retired.sessionId, 'dispose'), true);
     const other = activeResourceFixture('other-user');
+    const armedStaged = stageWebServerSession({ id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
+    assert.ok(armedStaged); const armedPrepared = prepareStagedWebServerSession(armedStaged); assert.ok(armedPrepared);
+    const armedSessionId = getPreparedWebServerSessionId(armedPrepared); assert.ok(armedSessionId);
+    const armedPort = armPreparedWebServerSession(armedPrepared); assert.ok(armedPort);
+    const armedControl = authControlApi().create('bulk-armed'); armedControl.begin('login', 'op', 'key', 'fp', 0);
+    const armedTicket = armedControl.prepareTicket('bulk-armed', 'op', BigInt(0), 'fp', armedSessionId, 1); assert.ok(armedTicket);
     const staged = stageWebServerSession({ id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
     assert.ok(staged);
     const prepared = prepareStagedWebServerSession(stageWebServerSession({ id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' }));
@@ -730,6 +736,7 @@ test('user-scoped retirement snapshots P3 targets before mutation and preserves 
         { id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' },
         { clientId: 'bulk-client', clientPlatform: 'macos' },
     );
+    const system = createSession({ id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'system' }, 'system');
     const events: string[] = [];
     registerServerSessionResource(legacy.id, (reason) => { events.push(`web:${reason}`); });
     registerServerSessionResource(native.id, (reason) => { events.push(`native:${reason}`); });
@@ -739,7 +746,10 @@ test('user-scoped retirement snapshots P3 targets before mutation and preserves 
     assert.strictEqual(retireServerSessionsForUser('bulk-user'), receipt, 'lost response replay is stable');
     assert.equal(resolveActiveWebServerSession(active.sessionId), null);
     assert.equal(resolveActiveWebServerSession(retired.sessionId), null);
+    assert.equal(activateArmedWebServerSession(armedPort, armedTicket), false, 'retained ticket cannot resurrect armed authority');
+    assert.equal(getArmedWebServerSessionId(armedPort), null);
     assert.equal(getSession(legacy.id), null); assert.equal(getSession(native.id), null);
+    assert.strictEqual(peekSession(system.id), system, 'system authority is outside the Web/native bulk');
     assert.equal(abortStagedWebServerSession(staged), false);
     assert.equal(getPreparedWebServerSessionId(prepared), null);
     assert.deepEqual(events, ['web:session_deleted', 'native:session_deleted']);
