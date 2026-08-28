@@ -201,8 +201,7 @@ function analyzeSource(source, worker) {
         if (worker && ts.isMetaProperty(node)) issues.add('import.meta is forbidden');
         if (worker && ts.isPropertyAssignment(node)) {
             const name = propertyName(node.name, declarations);
-            const value = constantString(node.initializer, declarations);
-            if (name === 'ocr' && value === 'hosted') issues.add('hosted OCR option is forbidden');
+            if (name === 'ocr') issues.add('ocr option is forbidden');
         }
         if (worker && ts.isShorthandPropertyAssignment(node)) {
             if (node.name.text === 'ocr') issues.add('ocr shorthand is forbidden');
