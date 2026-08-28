@@ -1131,6 +1131,7 @@ export function abortStagedWebServerSession(capsule: unknown): boolean {
 /* @Codex */
 export function resolveActiveWebServerSession(sessionId: unknown): ServerSession | null {
     if (!beginWebSessionCellLifecycle(sessionId)) return null;
+    let retireObservedExpiry = false;
     try {
         if (typeof sessionId !== 'string' || !sessionId) return null;
         const cell = armedWebSessionCellsById[sessionId];
@@ -1141,11 +1142,20 @@ export function resolveActiveWebServerSession(sessionId: unknown): ServerSession
         const now = DateNow();
         if (webSessionCellLifecyclePoisoned || armedWebSessionCellsById[sessionId] !== cell
             || cell.state !== 'ACTIVE' || cell.session !== session || session.id !== sessionId
-            || session.authChannel !== 'web' || session.expiresAt !== expiry || expiry <= now
+            || session.authChannel !== 'web' || session.expiresAt !== expiry
             || getMapValue(sessions, sessionId)) return null;
+        if (expiry <= now) {
+            retireObservedExpiry = true;
+            return null;
+        }
         return session;
     } catch { return null; }
-    finally { endWebSessionCellLifecycle(); }
+    finally {
+        endWebSessionCellLifecycle();
+        if (retireObservedExpiry) {
+            try { retireExpiredServerSession(sessionId); } catch { /* expiry denial remains fail-closed */ }
+        }
+    }
 }
 
 /** Mints one opaque resource identity for the exact process-local ACTIVE Web session. */
