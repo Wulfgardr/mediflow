@@ -22,6 +22,7 @@ import {
 const request = new Request('http://127.0.0.1/api/auth/lock', { method: 'POST' });
 const SYNTHETIC_USERNAME = `synthetic-${randomUUID()}`;
 const cookie = (value: unknown) => ({ name: 'mediflow_session', value });
+const nextCookie = (value: unknown, path: unknown = '/') => ({ name: 'mediflow_session', value, path });
 const completed = Object.freeze(Object.assign(Object.create(null), { outcome: 'completed' as const }));
 const denied = Object.freeze(Object.assign(Object.create(null), { outcome: 'denied' as const }));
 
@@ -66,7 +67,7 @@ test('application lock retires only the exact ACTIVE Web P3 before confirming', 
         },
     });
 
-    const response = await completeExactWebP3ApplicationLock(cookie(target.sessionId), request, sources);
+    const response = await completeExactWebP3ApplicationLock(nextCookie(target.sessionId), request, sources);
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), {
@@ -102,7 +103,8 @@ test('application lock denies hostile bearer, session and retirement receipts wi
     });
 
     for (const value of [undefined, null, {}, proxy, accessor, Promise.resolve(),
-        { ...cookie(target.sessionId), extra: true }, cookie('A'.repeat(64)), cookie('a'.repeat(63))]) {
+        { ...cookie(target.sessionId), extra: true }, nextCookie(target.sessionId, '/wrong'),
+        { ...nextCookie(target.sessionId), extra: true }, cookie('A'.repeat(64)), cookie('a'.repeat(63))]) {
         const response = await completeExactWebP3ApplicationLock(value, request, inertSources);
         assert.equal(response.status, 409);
     }
