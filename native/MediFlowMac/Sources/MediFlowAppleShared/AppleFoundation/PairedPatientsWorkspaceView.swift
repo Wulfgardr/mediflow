@@ -4,6 +4,7 @@ import PhotosUI
 struct PairedPatientsWorkspaceView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var model: PairedPatientsWorkspaceModel
     // S6 (D7-bis): gates the new document surfaces on the effective capability
     // matrix returned for this pairing. The server downgrades host-supported but
@@ -75,7 +76,7 @@ struct PairedPatientsWorkspaceView: View {
         )
         .modifier(MinimizedSearchToolbarBehavior())
         #else
-        .background(PlatformColors.groupedBackground)
+        .background(mobileCanvasColor)
         // Creating a patient is the home's primary action, so it belongs in the
         // navigation bar. Inline it consumed the first viewport at accessibility
         // text sizes and pushed the first patient off screen.
@@ -341,7 +342,7 @@ struct PairedPatientsWorkspaceView: View {
             HStack(spacing: 0) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
-                        connectionSetupBanner
+                        mobilePairedStatus
                         workspaceFeedbackLine
                         patientsListContent
                             .padding(16)
@@ -401,12 +402,12 @@ struct PairedPatientsWorkspaceView: View {
                         selectedPatientSections(detail)
                             .compactContainerWidth(inset: 40)
                     } else {
-                        connectionSetupBanner
+                        mobilePairedStatus
                         workspaceFeedbackLine
                         patientsCard
                     }
                     #else
-                    connectionSetupBanner
+                    mobilePairedStatus
                     workspaceFeedbackLine
                     patientsCard
                     #endif
@@ -418,6 +419,45 @@ struct PairedPatientsWorkspaceView: View {
                 if let detail = model.selectedPatient {
                     compactPatientHeader(detail)
                 }
+            }
+        }
+    }
+
+    /* @Codex */
+    private var mobileCanvasColor: Color {
+        colorScheme == .dark
+            ? LumePalette.guardia.canvas
+            : PlatformColors.groupedBackground
+    }
+
+    /* @Codex */
+    @ViewBuilder
+    private var mobilePairedStatus: some View {
+        #if DEBUG
+        if let override = MobilePairedStatusUITestOverride.load() {
+            MobilePairedStatusView(presentation: override.presentation, onPrimaryAction: {})
+        } else {
+            liveMobilePairedStatus
+        }
+        #else
+        liveMobilePairedStatus
+        #endif
+    }
+
+    private var liveMobilePairedStatus: some View {
+        MobilePairedStatusView(
+            presentation: .make(
+                connectionState: model.connectionState,
+                isWorking: model.isWorking,
+                errorMessage: model.errorMessage,
+                reconciliationLine: model.reconciliationLine
+            )
+        ) {
+            switch model.connectionState {
+            case .notLoaded, .sessionExpired:
+                showsConnectionSetup = true
+            case .cached, .pairedOnline, .pairedOfflineDegraded:
+                Task { await model.loadPatients() }
             }
         }
     }
