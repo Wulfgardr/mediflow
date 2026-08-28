@@ -6,6 +6,7 @@ Questa cartella contiene le decisioni di MediFlow (web + native).
 
 ## ADR piu recente
 
+- [0106-web-auth-logout-pin-setup-lifecycle.md](./0106-web-auth-logout-pin-setup-lifecycle.md): completa il lifecycle Web P3 per logout esatto, retirement dopo CAS PIN e setup commit-last; non prova runtime o reset PIN.
 - [0105-web-auth-process-integrity-assumption.md](./0105-web-auth-process-integrity-assumption.md): accetta per H1a l'assunzione di integrita process-global e registra il residuo di disponibilita e i gate H1b/security.
 - [0104-web-lock-revocation-fence-and-credential-transport.md](./0104-web-lock-revocation-fence-and-credential-transport.md): accetta fence process-local per lock Web e binding control/session; runtime e native restano non implementati.
 - [0102-document-synthesis-source-authority.md](./0102-document-synthesis-source-authority.md): fissa il source-set host-owned, le citazioni validate e la receipt review-only per Document Synthesis.
