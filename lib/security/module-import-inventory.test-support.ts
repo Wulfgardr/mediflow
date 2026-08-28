@@ -30,6 +30,8 @@ export const allowedGenericLoaderExpressions: ReadonlySet<string> = new Set([
     fingerprint('lib/security/web-auth-control-record.test.ts', 'dynamic', 'PropertyAccessExpression', 'ReturnStatement', 'pathToFileURL(target).href'),
     fingerprint('lib/security/web-auth-session-issuer.test.ts', 'dynamic', 'PropertyAccessExpression', 'VariableStatement', "pathToFileURL(join(directory, 'web-auth-session-issuer.ts')).href"),
     fingerprint('lib/security/web-auth-session-issuer.test.ts', 'dynamic', 'PropertyAccessExpression', 'VariableStatement', "pathToFileURL(join(directory, 'server-session.ts')).href"),
+    fingerprint('lib/security/server-session.test.ts', 'require', 'ElementAccessExpression', 'ExpressionStatement', 'paths[0]'),
+    fingerprint('lib/security/server-session.test.ts', 'require', 'ElementAccessExpression', 'ExpressionStatement', 'paths[1]'),
     fingerprint('scripts/benchmark-clinical-entities.ts', 'dynamic', 'PropertyAccessExpression', 'VariableStatement', 'pathToFileURL(adapterModule).href'),
     fingerprint('scripts/benchmark-redaction.ts', 'dynamic', 'PropertyAccessExpression', 'VariableStatement', 'pathToFileURL(adapterModule).href'),
 ]);
@@ -43,7 +45,7 @@ const allowedUnsafeLoaderExpressions: ReadonlySet<string> = new Set([
     fingerprint('lib/pdfjs-server.ts', 'unsafe:Function', 'NewExpression', 'VariableStatement', "new Function('specifier', 'return import(specifier);')"),
 ]);
 // Controller policy: these spellings are reserved loader identities even when a local binding shadows the global.
-const RESERVED_LOADER_IDENTITIES: ReadonlySet<string> = new Set(['eval', 'Function', 'require']);
+const RESERVED_LOADER_IDENTITIES: ReadonlySet<string> = new Set(['eval', 'Function', 'require', 'createRequire']);
 const normalizeIdentity = (value: string) => path.normalize(value).normalize('NFC').toLocaleLowerCase('en-US');
 const safeRealpath = (value: string) => {
     try { return realpathSync.native(value); } catch { return null; }
@@ -72,12 +74,27 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
         typeOnly: boolean;
     }>> = [];
     const declarations = new Map<string, ts.VariableDeclaration[]>();
+    const localBindings = new Map<string, ts.Node[]>();
     const loaderWrappers = new Map<string, Readonly<{ kind: 'dynamic' | 'require'; parameter: number }>>();
+    const createRequireFactories = new Set<string>(); const moduleNamespaces = new Set<string>();
     const collect = (node: ts.Node): void => {
+        if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)
+            && ['module', 'node:module'].includes(node.moduleSpecifier.text) && node.importClause) {
+            const bindings = node.importClause.namedBindings;
+            if (!node.importClause.isTypeOnly && node.importClause.name) moduleNamespaces.add(node.importClause.name.text);
+            if (!node.importClause.isTypeOnly && bindings && ts.isNamespaceImport(bindings)) moduleNamespaces.add(bindings.name.text);
+            if (bindings && ts.isNamedImports(bindings)) for (const item of bindings.elements) {
+                if (!node.importClause.isTypeOnly && !item.isTypeOnly
+                    && (item.propertyName?.text ?? item.name.text) === 'createRequire') createRequireFactories.add(item.name.text);
+            }
+        }
         if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer
             && ts.isVariableDeclarationList(node.parent) && (node.parent.flags & ts.NodeFlags.Const) !== 0) {
             const list = declarations.get(node.name.text) ?? []; list.push(node); declarations.set(node.name.text, list);
         }
+        const binding = (ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isFunctionDeclaration(node)
+            || ts.isFunctionExpression(node) || ts.isBindingElement(node)) && node.name && ts.isIdentifier(node.name) ? node.name.text : null;
+        if (binding) { const list = localBindings.get(binding) ?? []; list.push(node); localBindings.set(binding, list); }
         ts.forEachChild(node, collect);
     };
     collect(ast);
@@ -87,7 +104,51 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
             || ts.isSatisfiesExpression(node) || ts.isNonNullExpression(node)) node = node.expression;
         return node;
     };
-    const declaration = (name: string, position: number) => declarations.get(name)?.filter((item) => item.pos < position).at(-1)?.initializer;
+    const syntacticMemberKey = (node: ts.PropertyAccessExpression | ts.ElementAccessExpression): string | null => {
+        if (ts.isPropertyAccessExpression(node)) return node.name.text;
+        const argument = node.argumentExpression && unwrap(node.argumentExpression);
+        return argument && (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument)) ? argument.text : null;
+    };
+    const bindingOwner = (binding: ts.Node) => {
+        let owner = binding;
+        if (ts.isParameter(binding)) while (owner.parent && !ts.isFunctionLike(owner.parent)) owner = owner.parent;
+        else while (owner.parent && !ts.isBlock(owner.parent) && !ts.isSourceFile(owner.parent)) owner = owner.parent;
+        return owner.parent ?? owner;
+    };
+    const shadowed = (name: string, reference: ts.Node, except?: ts.Node) => (localBindings.get(name) ?? [])
+        .some((binding) => binding !== except && bindingOwner(binding).pos <= reference.pos && reference.pos < bindingOwner(binding).end);
+    const importMetaUrl = (input: ts.Expression) => {
+        const node = unwrap(input);
+        if (!ts.isPropertyAccessExpression(node) || node.name.text !== 'url') return false;
+        const base = unwrap(node.expression);
+        return ts.isMetaProperty(base) && base.keywordToken === ts.SyntaxKind.ImportKeyword;
+    };
+    const createRequireFactory = (input: ts.Expression) => {
+        const node = unwrap(input);
+        if (ts.isIdentifier(node)) return createRequireFactories.has(node.text) && !shadowed(node.text, node);
+        if (!ts.isPropertyAccessExpression(node) && !ts.isElementAccessExpression(node)) return false;
+        if (node.questionDotToken) return false;
+        const base = unwrap(node.expression);
+        return ts.isIdentifier(base) && moduleNamespaces.has(base.text) && !shadowed(base.text, base)
+            && syntacticMemberKey(node) === 'createRequire';
+    };
+    const canonicalCreateRequire = (input: ts.Expression): input is ts.CallExpression => {
+        const node = unwrap(input);
+        return ts.isCallExpression(node) && !node.questionDotToken && createRequireFactory(node.expression)
+            && node.arguments.length === 1 && importMetaUrl(node.arguments[0]!);
+    };
+    const declarationNode = (name: string, position: number) => declarations.get(name)?.filter((item) => {
+        let scope: ts.Node = item;
+        while (scope.parent && !ts.isBlock(scope.parent) && !ts.isSourceFile(scope.parent)) scope = scope.parent;
+        const owner = scope.parent ?? scope;
+        return item.pos < position && owner.pos <= position && position < owner.end;
+    }).at(-1);
+    const declaration = (name: string, position: number) => declarationNode(name, position)?.initializer;
+    const createRequireLoader = (node: ts.Identifier) => {
+        const selected = declarationNode(node.text, node.pos); const initializer = selected?.initializer;
+        return selected !== undefined && !shadowed(node.text, node, selected)
+            && initializer !== undefined && canonicalCreateRequire(initializer);
+    };
     const evaluate = (input: ts.Expression, seen = new Set<ts.Expression>()): StaticResult => {
         const node = unwrap(input); if (seen.has(node)) return { known: false, escaped: false };
         const nextSeen = new Set(seen); nextSeen.add(node);
@@ -138,6 +199,18 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
             const value = (base.value as Readonly<Record<string, StaticValue>>)[String(key.value)];
             return value === undefined ? { known: false, escaped: base.escaped || key.escaped } : { known: true, value, escaped: base.escaped || key.escaped };
         }
+        if (ts.isCallExpression(node) && node.arguments.length === 1) {
+            const callee = unwrap(node.expression);
+            if (ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)) {
+                const base = unwrap(callee.expression);
+                if (syntacticMemberKey(callee) !== 'resolve' || !ts.isIdentifier(base) || !createRequireLoader(base)) return { known: false, escaped: false };
+                const value = evaluate(node.arguments[0]!, nextSeen);
+                if (value.known && typeof value.value === 'string') {
+                    return { known: true, value: path.resolve(path.dirname(path.resolve(repositoryRoot, file)), value.value), escaped: value.escaped };
+                }
+                return { known: false, escaped: value.escaped };
+            }
+        }
         return { known: false, escaped: false };
     };
     const targetPath = path.resolve(repositoryRoot, target); const targetReal = safeRealpath(targetPath); const filePath = path.resolve(repositoryRoot, file);
@@ -145,6 +218,18 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
     const sensitiveText = (input: ts.Expression) => {
         const evaluated = evaluate(input); const text = evaluated.known && typeof evaluated.value === 'string' ? evaluated.value : input.getText(ast);
         const decoded = decode(text).decoded.toLocaleLowerCase('en-US'); return decoded.includes(path.basename(target).toLocaleLowerCase('en-US'));
+    };
+    const canonicalResolvedSpecifier = (input: ts.Expression, seen = new Set<ts.Expression>()): boolean => {
+        const node = unwrap(input); if (seen.has(node)) return false;
+        if (ts.isIdentifier(node)) {
+            const initializer = declaration(node.text, node.pos);
+            return initializer !== undefined && canonicalResolvedSpecifier(initializer, new Set(seen).add(node));
+        }
+        if (!ts.isCallExpression(node) || node.arguments.length !== 1) return false;
+        const callee = unwrap(node.expression);
+        if (!ts.isPropertyAccessExpression(callee) && !ts.isElementAccessExpression(callee)) return false;
+        const base = unwrap(callee.expression);
+        return syntacticMemberKey(callee) === 'resolve' && ts.isIdentifier(base) && createRequireLoader(base);
     };
     const relation = (expression: ts.Expression) => {
         const evaluated = evaluate(expression);
@@ -161,8 +246,9 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
         const candidates = [resolved, ...EXTENSIONS.filter((extension) => resolved.endsWith(extension)).map((extension) => resolved.slice(0, -extension.length))];
         const targetMatch = candidates.some((candidate) => normalizeIdentity(candidate) === normalizeIdentity(targetPath)
             || (targetReal !== null && safeRealpath(candidate) !== null && normalizeIdentity(safeRealpath(candidate)!) === normalizeIdentity(targetReal)));
+        const resolvedOwnTestReload = file === `${target}.test.ts` && canonicalResolvedSpecifier(expression);
         const allowed = !decoded.encoded && !decoded.malformed && !hasSuffix
-            && (raw === `@/${target}` || raw === relative || (file.endsWith('.test.ts') && raw === `${relative}.ts`));
+            && (raw === `@/${target}` || raw === relative || (file.endsWith('.test.ts') && raw === `${relative}.ts`) || resolvedOwnTestReload);
         return { target: targetMatch, invalid: targetMatch && (!allowed || evaluated.escaped), unresolved: false };
     };
     const memberKey = (node: ts.PropertyAccessExpression | ts.ElementAccessExpression): string | null => {
@@ -172,7 +258,8 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
     };
     const loader = (input: ts.Expression): 'dynamic' | 'require' | null => {
         const node = unwrap(input); if (node.kind === ts.SyntaxKind.ImportKeyword) return 'dynamic';
-        if (ts.isIdentifier(node) && node.text === 'require') return 'require';
+        if (ts.isIdentifier(node) && (node.text === 'require' || createRequireLoader(node))) return 'require';
+        if (canonicalCreateRequire(node)) return 'require';
         if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) && memberKey(node) === 'require') return 'require';
         return null;
     };
@@ -233,7 +320,8 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
         const parent = node.parent;
         return ((ts.isVariableDeclaration(parent) || ts.isParameter(parent) || ts.isFunctionDeclaration(parent)
             || ts.isFunctionExpression(parent) || ts.isClassDeclaration(parent) || ts.isBindingElement(parent)
-            || ts.isImportClause(parent) || ts.isImportSpecifier(parent) || ts.isNamespaceImport(parent)) && parent.name === node)
+            || ts.isImportClause(parent) || ts.isNamespaceImport(parent)) && parent.name === node)
+            || (ts.isImportSpecifier(parent) && (parent.name === node || parent.propertyName === node))
             || ((ts.isPropertyAssignment(parent) || ts.isMethodDeclaration(parent) || ts.isGetAccessorDeclaration(parent)
                 || ts.isSetAccessorDeclaration(parent)) && parent.name === node);
     };
@@ -244,28 +332,71 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
             : node.text === 'require' && ['cache', 'resolve'].includes(parent.name.text);
     };
     const globalObject = (input: ts.Expression) => ts.isIdentifier(input) && ['global', 'globalThis', 'self', 'window'].includes(input.text);
+    const canonicalFactoryContext = (call: ts.CallExpression) => {
+        let parent: ts.Node = call.parent;
+        while (ts.isParenthesizedExpression(parent) || ts.isAsExpression(parent) || ts.isTypeAssertionExpression(parent)
+            || ts.isSatisfiesExpression(parent) || ts.isNonNullExpression(parent)) parent = parent.parent;
+        if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) return parent.initializer !== undefined
+            && unwrap(parent.initializer) === call && ts.isVariableDeclarationList(parent.parent)
+            && (parent.parent.flags & ts.NodeFlags.Const) !== 0;
+        return ts.isCallExpression(parent) && unwrap(parent.expression) === call;
+    };
     const unsafeIdentityVisit = (node: ts.Node): void => {
         if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && !node.questionDotToken
-            && RESERVED_LOADER_IDENTITIES.has(node.expression.text)) {
+            && RESERVED_LOADER_IDENTITIES.has(node.expression.text)
+            && (node.expression.text !== 'createRequire' || createRequireFactory(node.expression))
+            && !(canonicalCreateRequire(node) && canonicalFactoryContext(node))) {
             unsafeLoaderCandidates.push(unsafeLoaderFingerprint(node.expression.text, node));
         } else if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'Function') {
             unsafeLoaderCandidates.push(unsafeLoaderFingerprint('Function', node));
         }
+        if (ts.isImportDeclaration(node) && node.importClause) {
+            const validModule = ts.isStringLiteral(node.moduleSpecifier) && ['module', 'node:module'].includes(node.moduleSpecifier.text);
+            const bindings = node.importClause.namedBindings;
+            const importedCreateRequire = bindings && ts.isNamedImports(bindings)
+                ? bindings.elements.filter((item) => (item.propertyName?.text ?? item.name.text) === 'createRequire') : [];
+            if (!validModule && (node.importClause.name?.text === 'createRequire' || importedCreateRequire.length > 0)) add('reserved-loader-identity');
+        }
+        if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) && memberKey(node) === 'createRequire') {
+            const parent = node.parent;
+            const validFactory = ts.isCallExpression(parent) && unwrap(parent.expression) === node
+                && canonicalCreateRequire(parent) && canonicalFactoryContext(parent);
+            if (!validFactory) add('reserved-loader-identity');
+        }
         if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) && globalObject(node.expression)
-            && RESERVED_LOADER_IDENTITIES.has(memberKey(node) ?? '')) add('reserved-loader-identity');
-        if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer && globalObject(unwrap(node.initializer))) {
+            && memberKey(node) !== 'createRequire' && RESERVED_LOADER_IDENTITIES.has(memberKey(node) ?? '')) add('reserved-loader-identity');
+        if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer) {
             for (const element of node.name.elements) {
                 const name = element.propertyName ?? element.name;
-                if (ts.isIdentifier(name) && RESERVED_LOADER_IDENTITIES.has(name.text)) add('reserved-loader-identity');
+                const key = ts.isIdentifier(name) || ts.isStringLiteral(name) ? name.text
+                    : ts.isComputedPropertyName(name) ? evaluate(name.expression).value : null;
+                if (key === 'createRequire' || (typeof key === 'string' && globalObject(unwrap(node.initializer))
+                    && RESERVED_LOADER_IDENTITIES.has(key))) add('reserved-loader-identity');
             }
         }
-        if (ts.isIdentifier(node) && RESERVED_LOADER_IDENTITIES.has(node.text) && !inTypePosition(node) && !declarationName(node)) {
+        if (ts.isIdentifier(node) && createRequireFactories.has(node.text) && !shadowed(node.text, node) && !declarationName(node)) {
+            const parent = node.parent;
+            if (!(ts.isCallExpression(parent) && parent.expression === node)) add('reserved-loader-identity');
+        }
+        if (ts.isIdentifier(node) && createRequireLoader(node) && !declarationName(node)) {
+            const parent = node.parent; const directCall = ts.isCallExpression(parent) && parent.expression === node && !parent.questionDotToken;
+            const fixedMember = ts.isPropertyAccessExpression(parent) && parent.expression === node && !parent.questionDotToken
+                && ['cache', 'resolve'].includes(parent.name.text);
+            if (!directCall && !fixedMember) add('reserved-loader-identity');
+        }
+        if (ts.isIdentifier(node) && node.text !== 'createRequire' && RESERVED_LOADER_IDENTITIES.has(node.text) && !inTypePosition(node) && !declarationName(node)) {
             const parent = node.parent; const directCall = ts.isCallExpression(parent) && parent.expression === node && !parent.questionDotToken;
             const directFunctionNew = node.text === 'Function' && ts.isNewExpression(parent) && parent.expression === node;
             const propertyName = (ts.isPropertyAccessExpression(parent) && parent.name === node)
                 || ((ts.isPropertyAssignment(parent) || ts.isMethodDeclaration(parent) || ts.isGetAccessorDeclaration(parent)
                     || ts.isSetAccessorDeclaration(parent)) && parent.name === node);
             if (!directCall && !directFunctionNew && !propertyName && !safeFixedMember(node)) add('reserved-loader-identity');
+        }
+        if (ts.isIdentifier(node) && node.text === 'createRequire' && !createRequireFactory(node)
+            && !inTypePosition(node) && !declarationName(node)) {
+            const parent = node.parent;
+            const propertyName = ts.isPropertyAccessExpression(parent) && parent.name === node;
+            if (!propertyName) add('reserved-loader-identity');
         }
         ts.forEachChild(node, unsafeIdentityVisit);
     };
@@ -354,3 +485,33 @@ export const reservedLoaderBindingFixtures: readonly string[] = Object.freeze([
     "import require from './synthetic-safe';require();",
     "import {synthetic as eval} from './synthetic-safe';eval();",
 ]);
+
+export const createRequireBypassFixtures = (specifier: string): readonly string[] => {
+    const metaUrl = ['import', 'meta', 'url'].join('.');
+    return Object.freeze([
+        `import {createRequire} from 'node:module';createRequire(${metaUrl})(${JSON.stringify(specifier)});`,
+        `import {createRequire as makeRequire} from 'module';makeRequire(${metaUrl})(${JSON.stringify(specifier)});`,
+        `import * as Module from 'node:module';Module.createRequire(${metaUrl})(${JSON.stringify(specifier)});`,
+        `import {createRequire} from 'node:module';const make=createRequire;make(${metaUrl})(${JSON.stringify(specifier)});`,
+        `import {createRequire} from 'node:module';const make=()=>createRequire(${metaUrl});make()(${JSON.stringify(specifier)});`,
+        `import {createRequire} from 'node:module';const nodeRequire=createRequire(${metaUrl});const load=nodeRequire;load(${JSON.stringify(specifier)});`,
+        `import {createRequire} from 'node:module';const nodeRequire=createRequire(${metaUrl});nodeRequire(${JSON.stringify(specifier)},{});`,
+        `import {createRequire} from 'node:module';const nodeRequire=createRequire(${metaUrl});nodeRequire(${JSON.stringify(`${specifier}?inventory=1`)});`,
+        `import {createRequire} from 'node:module';const nodeRequire=createRequire(${metaUrl});nodeRequire(${JSON.stringify(`${specifier}#inventory`)});`,
+        `import {createRequire} from 'node:module';const nodeRequire=createRequire(${metaUrl});nodeRequire(${JSON.stringify(specifier.replace('server', '%73erver').replace('web-auth', 'web-%61uth'))});`,
+        `import {createRequire} from 'node:module';const nodeRequire=createRequire(${metaUrl});nodeRequire(pick());`,
+        `import * as Module from 'node:module';Module['create'+'Require'](${metaUrl})(${JSON.stringify(specifier)});`,
+        `process.getBuiltinModule('node:module').createRequire(${metaUrl})(${JSON.stringify(specifier)});`,
+        `import * as Module from 'node:module';const {createRequire:make}=Module;make(${metaUrl})(${JSON.stringify(specifier)});`,
+        `const {createRequire}=await import('node:module');createRequire(${metaUrl})(${JSON.stringify(specifier)});`,
+        `createRequire(${metaUrl})(${JSON.stringify(specifier)});`,
+    ]);
+};
+
+export const createRequireShadowFixtures = (specifier: string): readonly string[] => {
+    const metaUrl = ['import', 'meta', 'url'].join('.');
+    return Object.freeze([
+        `import {createRequire} from 'node:module';function f(createRequire:Function){createRequire(${metaUrl})(${JSON.stringify(specifier)});}`,
+        `import * as Module from 'node:module';function f(Module:object){Module.createRequire(${metaUrl})(${JSON.stringify(specifier)});}`,
+    ]);
+};

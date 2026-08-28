@@ -23,6 +23,8 @@ import {
 } from './web-auth-control-record.ts';
 import {
     allowedGenericLoaderExpressions,
+    createRequireBypassFixtures,
+    createRequireShadowFixtures,
     inventoryModuleImports,
     moduleImportBypassFixtures,
     reservedLoaderBindingFixtures,
@@ -41,6 +43,7 @@ const validateControlImports = (sources: Readonly<Record<string, string>>) => {
     ]);
     const ownTest = new Set(['abortPreparedAuthControlTicket', 'abortPreparedAuthControlActivation', 'abortPreparedAuthControlRetirement', 'commitAuthControlTicket', 'commitPreparedAuthControlActivation', 'commitPreparedAuthControlRetirement', 'createWebAuthControlRecord', 'isCurrentAuthControlSessionBinding', 'prepareAuthControlActivation', 'prepareAuthControlRetirement', 'retireAuthControlTicket']);
     for (const use of uses) {
+        if (use.file === 'lib/security/server-session.test.ts' && use.form === 'require' && !use.typeOnly) continue;
         if (use.file === 'lib/security/web-auth-control-record.test.ts') {
             if (!((use.form === 'named' && !use.typeOnly && ownTest.has(use.symbol)) || (use.form === 'import-type' && use.typeOnly))) errors.push(`${use.file}:${use.form}:${use.symbol}`);
             continue;
@@ -55,6 +58,8 @@ const validateControlImports = (sources: Readonly<Record<string, string>>) => {
     const logout = uses.filter((use) => use.file === 'lib/security/web-auth-logout-server.test.ts' && !use.typeOnly);
     if ('lib/security/web-auth-logout-server.test.ts' in sources
         && (logout.length !== 1 || logout[0]?.form !== 'named' || logout[0]?.symbol !== 'createWebAuthControlRecord')) errors.push('logout-test:fixture');
+    const sessionTestBridge = uses.filter((use) => use.file === 'lib/security/server-session.test.ts' && use.form === 'require' && !use.typeOnly);
+    if ('lib/security/server-session.test.ts' in sources && sessionTestBridge.length !== 1) errors.push('server-session-test:fixture');
     return { errors, uses };
 };
 let repositorySourceCache: Record<string, string> | undefined;
@@ -712,6 +717,13 @@ test('keeps the current-binding predicate private until the server-session retai
     for (const fixture of reservedLoaderBindingFixtures) {
         const bindingErrors = validateControlImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
         assert.equal(bindingErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:reserved-loader-identity:*').length, 1, fixture);
+    }
+    for (const fixture of createRequireBypassFixtures('../lib/security/web-auth-control-record')) {
+        assert.notDeepEqual(validateControlImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors, [], fixture);
+    }
+    for (const fixture of createRequireShadowFixtures('../lib/security/web-auth-control-record')) {
+        const shadowErrors = validateControlImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
+        assert.equal(shadowErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:reserved-loader-identity:*').length, 1, fixture);
     }
     assert.notDeepEqual(validateControlImports({ 'lib/security/web-auth-logout-server.ts': "import { createWebAuthControlRecord } from '../../lib/security/web-auth-control-record.ts';" }).errors, []);
     assert.notDeepEqual(validateControlImports({ 'lib/security/extra.ts': "import { createWebAuthControlRecord } from './web-auth-control-record';" }).errors, []);
