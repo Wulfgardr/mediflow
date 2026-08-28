@@ -47,6 +47,8 @@ import {
 } from './server-session';
 import {
     allowedGenericLoaderExpressions,
+    createRequireBypassFixtures,
+    createRequireShadowFixtures,
     inventoryModuleImports,
     moduleImportBypassFixtures,
     reservedLoaderBindingFixtures,
@@ -57,7 +59,7 @@ import {
 const SYNTHETIC_USERNAME = `synthetic-${randomUUID()}`;
 const TARGET_USERNAME = ['synthetic', 'target'].join('-');
 const OTHER_USERNAME = ['synthetic', 'other'].join('-');
-const AUTH_CONTROL_MODULE_PATH = ['./web-auth-control', '-record.ts'].join('');
+const AUTH_CONTROL_MODULE_PATH = './web-auth-control-record.ts';
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
@@ -70,7 +72,8 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
         if (use.form === 'import-type' && use.typeOnly && use.file === 'lib/security/server-session.test.ts') continue;
         const provenDynamic = use.form === 'dynamic' && use.file === 'lib/security/web-auth-channel-cutover.test.ts'
             && ['clearAllSessions', 'getSession'].includes(use.symbol);
-        if (use.form !== 'named' && !provenDynamic) errors.push(`${use.file}:${use.form}`);
+        const ownReload = use.form === 'require' && use.file === 'lib/security/server-session.test.ts';
+        if (use.form !== 'named' && !provenDynamic && !ownReload) errors.push(`${use.file}:${use.form}`);
         if (!use.typeOnly && use.symbol === 'dispatchActiveWebServerSessionRetirement'
             && use.file !== 'lib/security/server-session.test.ts' && !logout.has(use.file)) errors.push(`${use.file}:dispatch`);
     }
@@ -80,6 +83,8 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
         if (runtime.some((use) => use.form !== 'named') || runtime.length !== exact.size
             || runtime.some((use) => !exact.has(use.symbol)) || [...exact].some((symbol) => !runtime.some((use) => use.symbol === symbol))) errors.push(`${file}:authority`);
     }
+    const ownReloads = uses.filter((use) => use.file === 'lib/security/server-session.test.ts' && use.form === 'require' && !use.typeOnly);
+    if ('lib/security/server-session.test.ts' in sources && ownReloads.length !== 30) errors.push('lib/security/server-session.test.ts:reload-count');
     return { errors, uses };
 };
 const typescriptSources = () => repositoryTypeScriptSources(REPOSITORY_ROOT);
@@ -656,6 +661,27 @@ test('inventories exact session imports by AST and closes the logout authority b
         const bindingErrors = validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
         assert.equal(bindingErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:reserved-loader-identity').length, 1, fixture);
     }
+    for (const fixture of createRequireBypassFixtures('../lib/security/server-session')) {
+        assert.notDeepEqual(validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors, [], fixture);
+    }
+    for (const fixture of createRequireShadowFixtures('../lib/security/server-session')) {
+        const shadowErrors = validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
+        assert.equal(shadowErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:reserved-loader-identity').length, 1, fixture);
+    }
+    const sessionSource = typescriptSources()['lib/security/server-session.test.ts']; assert.ok(sessionSource);
+    const indexedReload = ['nodeRequire', '(paths[0])'].join('');
+    const createRequireDrift = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace(indexedReload, 'nodeRequire(paths.at(0)!)'),
+    }).errors;
+    assert.ok(createRequireDrift.includes('lib/security/server-session.test.ts:allowlist-drift'));
+    const createRequireDuplicate = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace(`isolated = ${indexedReload}`, `${indexedReload}; isolated = ${indexedReload}`),
+    }).errors;
+    assert.ok(createRequireDuplicate.includes('lib/security/server-session.test.ts:allowlist-duplicate'));
+    const extraOwnReload = validateSessionImports({
+        'lib/security/server-session.test.ts': sessionSource.replace('const cryptoModule = nodeRequire', "nodeRequire('./server-session.ts'); const cryptoModule = nodeRequire"),
+    }).errors;
+    assert.ok(extraOwnReload.includes('lib/security/server-session.test.ts:reload-count'));
     const pm2 = typescriptSources()['lib/pm2-manager.ts']; assert.ok(pm2);
     assert.deepEqual(validateSessionImports({ 'lib/pm2-manager.ts': pm2 }).errors, []);
     assert.ok(validateSessionImports({ 'lib/pm2-manager.ts': pm2.replace("require('pm2')", "require('pm2-drift')") }).errors.includes('lib/pm2-manager.ts:reserved-loader-allowlist-drift'));
