@@ -46,6 +46,39 @@ test('holds one pending, commits an exact auth CAS, and permits only one active 
     assert.deepEqual(record.disposeBoundSession('f1', 'web-1', 'f2', 4), { ok: true, fence: 'f2', generation: BigInt(2) });
 });
 
+test('begin rolls back captured Map reentry and apply-then-throw without consuming capacity', async (t) => {
+    const originalGet = Map.prototype.get; const originalSet = Map.prototype.set;
+    let isolated: Awaited<ReturnType<typeof freshModule>>; let activeRecord: ReturnType<typeof createWebAuthControlRecord> | null = null;
+    let armedGet = false; let armedSet = false; let throwGet = false; let throwSet = false; let nested = true;
+    Map.prototype.get = function (...args: Parameters<typeof originalGet>) {
+        const result = Reflect.apply(originalGet, this, args) as unknown;
+        if (armedGet) { armedGet = false; if (throwGet) throw new Error('get after apply'); nested = activeRecord!.begin('login', 'nested', 'nested-key', 'nested-fp', 1).ok; }
+        return result;
+    };
+    Map.prototype.set = function (...args: Parameters<typeof originalSet>) {
+        const result = Reflect.apply(originalSet, this, args) as Map<unknown, unknown>;
+        if (armedSet) { armedSet = false; if (throwSet) throw new Error('set after apply'); nested = activeRecord!.begin('login', 'nested', 'nested-key', 'nested-fp', 1).ok; }
+        return result;
+    };
+    try { isolated = await freshModule('begin-rollback'); } finally { Map.prototype.get = originalGet; Map.prototype.set = originalSet; }
+    const record = isolated.createWebAuthControlRecord('f0'); activeRecord = record;
+    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+
+    armedGet = true; assert.equal(record.begin('login', 'outer', 'get-reentry', 'fp', 0).ok, false); assert.equal(nested, false); assert.equal(record.snapshot().pending, false);
+    armedGet = true; throwGet = true; assert.equal(record.begin('login', 'outer', 'get-throw', 'fp', 2).ok, false); assert.equal(record.snapshot().pending, false); throwGet = false;
+    armedSet = true; assert.equal(record.begin('login', 'outer', 'set-reentry', 'fp', 3).ok, false); assert.equal(nested, false); assert.equal(record.snapshot().pending, false);
+    for (let index = 0; index < 64; index += 1) {
+        armedSet = true; throwSet = true;
+        assert.equal(record.begin('login', 'outer', `failed-${index}`, 'fp', 4 + index).ok, false);
+        assert.equal(record.snapshot().pending, false);
+    }
+    throwSet = false;
+    assert.equal(record.begin('login', 'outer', 'clean-retry', 'fp', 100).ok, true, 'failed publication cannot consume idempotency capacity');
+    assert.equal(record.snapshot().pending, true);
+    await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
+});
+
 test('cancels only the exact live pre-ticket pending tuple and preserves replay receipts', () => {
     const { record } = control();
     const receipt = record.begin('login', 'op-1', 'key-1', 'fp-1', 0);

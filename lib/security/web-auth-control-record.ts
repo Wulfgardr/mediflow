@@ -16,6 +16,7 @@ const isProxyIntrinsic = types.isProxy;
 const byteLengthIntrinsic = ObjectConstructor.getOwnPropertyDescriptor(ObjectConstructor.getPrototypeOf(Uint8Array.prototype), 'byteLength')?.get;
 const mapGetIntrinsic = Map.prototype.get;
 const mapSetIntrinsic = Map.prototype.set;
+const mapDeleteIntrinsic = Map.prototype.delete;
 const mapSizeIntrinsic = ObjectConstructor.getOwnPropertyDescriptor(Map.prototype, 'size')?.get;
 const weakMapGetIntrinsic = WeakMap.prototype.get;
 const weakMapSetIntrinsic = WeakMap.prototype.set;
@@ -63,6 +64,7 @@ const denied = freeze({ ok: false } as const);
 const frozen = <Value>(value: Value): Readonly<Value> => apply(freeze, ObjectConstructor, [value]) as Readonly<Value>;
 const mapGet = <Value>(map: Map<string, Value>, key: string): Value | undefined => apply(mapGetIntrinsic, map, [key]) as Value | undefined;
 const mapSet = <Value>(map: Map<string, Value>, key: string, value: Value): void => { apply(mapSetIntrinsic, map, [key, value]); };
+const mapDelete = (map: Map<string, unknown>, key: string): boolean => apply(mapDeleteIntrinsic, map, [key]) as boolean;
 const mapSize = (map: Map<string, unknown>): number => apply(mapSizeIntrinsic!, map, []) as number;
 const tableHas = (table: FenceTable, value: string): boolean => table[value] === true;
 const tableAdd = (table: FenceTable, value: string): void => { table[value] = true; };
@@ -120,18 +122,30 @@ export function createWebAuthControlRecord(initialFence: unknown, initialGenerat
     const next = (value: string, expectedFence: string, expectedGeneration: bigint, expectedPending: Pending | null): string | null =>
         expectedGeneration === MAX_U64 || tableHas(state.used, value) || state.fence !== expectedFence || state.generation !== expectedGeneration || state.pending !== expectedPending ? null : value;
     const advance = (value: string, output: Readonly<{ ok: true; fence: string; generation: bigint }>): Result => { state.fence = value; tableAdd(state.used, value); state.generation += ONE; return output; };
+    let beginOperationActive = false; let beginOperationPoisoned = false;
     let pendingCancellationActive = false; let pendingCancellationPoisoned = false;
     return frozen({
         begin(kind: unknown, operation: unknown, key: unknown, fingerprint: unknown, at: unknown): Result {
-            const current = tick(at); if (current === null || (kind !== 'login' && kind !== 'setup') || !text(operation) || !text(key) || !text(fingerprint)) return denied;
-            const prior = replay(key, fingerprint, state.fence, current);
-            if (prior) return prior.kind === 'begin' ? frozen({ ok: true, fence: prior.fence, generation: prior.generation }) : denied;
-            if (prior === false || mapSize(state.entries) >= IDEMPOTENCY_CAP || state.pending || state.activeSessionId) return denied;
-            const preparedPending = frozen({ operation, fingerprint, generation: state.generation, createdAt: current });
-            const preparedEntry = frozen({ kind: 'begin' as const, requestFence: state.fence, fence: state.fence, fingerprint, generation: state.generation, createdAt: current });
-            const output = frozen({ ok: true as const, fence: state.fence, generation: state.generation });
-            mapSet(state.entries, key, preparedEntry); state.pending = preparedPending;
-            return output;
+            if (beginOperationActive) { beginOperationPoisoned = true; return denied; }
+            beginOperationActive = true; beginOperationPoisoned = false;
+            let preparedKey: string | null = null; let preparedPending: Pending | null = null;
+            const rollback = (): void => {
+                if (state.pending === preparedPending) state.pending = null;
+                if (preparedKey) { try { mapDelete(state.entries, preparedKey); } catch { /* deny */ } }
+            };
+            try {
+                const current = tick(at); if (current === null || (kind !== 'login' && kind !== 'setup') || !text(operation) || !text(key) || !text(fingerprint)) return denied;
+                const prior = replay(key, fingerprint, state.fence, current); if (beginOperationPoisoned) return denied;
+                if (prior) return prior.kind === 'begin' ? frozen({ ok: true, fence: prior.fence, generation: prior.generation }) : denied;
+                const size = mapSize(state.entries); if (beginOperationPoisoned || prior === false || size >= IDEMPOTENCY_CAP || state.pending || state.activeSessionId) return denied;
+                preparedPending = frozen({ operation, fingerprint, generation: state.generation, createdAt: current });
+                const preparedEntry = frozen({ kind: 'begin' as const, requestFence: state.fence, fence: state.fence, fingerprint, generation: state.generation, createdAt: current });
+                const output = frozen({ ok: true as const, fence: state.fence, generation: state.generation });
+                if (beginOperationPoisoned) return denied; preparedKey = key; mapSet(state.entries, key, preparedEntry);
+                if (beginOperationPoisoned) { rollback(); return denied; }
+                state.pending = preparedPending; return output;
+            } catch { rollback(); return denied; }
+            finally { beginOperationActive = false; beginOperationPoisoned = false; }
         },
         cancelPendingAuth(expectedFence: unknown, operation: unknown, expectedGeneration: unknown, fingerprint: unknown, at: unknown): 0 | 1 {
             if (pendingCancellationActive) { pendingCancellationPoisoned = true; return 0; }
