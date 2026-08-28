@@ -33,6 +33,15 @@ export const allowedGenericLoaderExpressions: ReadonlySet<string> = new Set([
     fingerprint('scripts/benchmark-clinical-entities.ts', 'dynamic', 'PropertyAccessExpression', 'VariableStatement', 'pathToFileURL(adapterModule).href'),
     fingerprint('scripts/benchmark-redaction.ts', 'dynamic', 'PropertyAccessExpression', 'VariableStatement', 'pathToFileURL(adapterModule).href'),
 ]);
+const allowedUnsafeLoaderExpressions: ReadonlySet<string> = new Set([
+    fingerprint('scripts/document-evidence-backfill-live-db.ts', 'unsafe:require', 'CallExpression', 'VariableStatement', "require('better-sqlite3')"),
+    fingerprint('scripts/treatment-reasoning-live-db-smoke.ts', 'unsafe:require', 'CallExpression', 'VariableStatement', "require('better-sqlite3')"),
+    fingerprint('lib/pm2-manager.ts', 'unsafe:require', 'CallExpression', 'VariableStatement', "require('pm2')"),
+    fingerprint('lib/pm2-manager.test.ts', 'unsafe:require', 'CallExpression', 'VariableStatement', 'require(managerPath)'),
+    fingerprint('lib/pm2-manager.test.ts', 'unsafe:require', 'CallExpression', 'ExpressionStatement', 'require(managerPath)'),
+    fingerprint('lib/backup-restore-preflight.ts', 'unsafe:require', 'CallExpression', 'ReturnStatement', "require('./data-dir')"),
+    fingerprint('lib/pdfjs-server.ts', 'unsafe:Function', 'NewExpression', 'VariableStatement', "new Function('specifier', 'return import(specifier);')"),
+]);
 const normalizeIdentity = (value: string) => path.normalize(value).normalize('NFC').toLocaleLowerCase('en-US');
 const safeRealpath = (value: string) => {
     try { return realpathSync.native(value); } catch { return null; }
@@ -61,6 +70,7 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
         typeOnly: boolean;
     }>> = [];
     const declarations = new Map<string, ts.VariableDeclaration[]>();
+    const loaderWrappers = new Map<string, Readonly<{ kind: 'dynamic' | 'require'; parameter: number }>>();
     const collect = (node: ts.Node): void => {
         if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer
             && ts.isVariableDeclarationList(node.parent) && (node.parent.flags & ts.NodeFlags.Const) !== 0) {
@@ -156,85 +166,28 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
     const memberKey = (node: ts.PropertyAccessExpression | ts.ElementAccessExpression): string | null => {
         if (ts.isPropertyAccessExpression(node)) return node.name.text;
         if (!node.argumentExpression) return null;
-        const key = evaluate(node.argumentExpression); return key.known && ['string', 'number'].includes(typeof key.value) ? String(key.value) : null;
-    };
-    const propertyKey = (node: ts.ObjectLiteralElementLike): string | null => {
-        if (!node.name) return null;
-        if (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name) || ts.isNumericLiteral(node.name)) return node.name.text;
-        if (!ts.isComputedPropertyName(node.name)) return null;
-        const key = evaluate(node.name.expression); return key.known && ['string', 'number'].includes(typeof key.value) ? String(key.value) : null;
-    };
-    const resolveCallee = (input: ts.Expression, seen = new Set<ts.Expression>(), depth = 0): ts.Expression | null => {
-        const node = unwrap(input);
-        if (depth >= 16 || seen.has(node)) return null;
-        const next = new Set(seen); next.add(node);
-        if (ts.isIdentifier(node)) {
-            if (['eval', 'Function', 'require'].includes(node.text)) return node;
-            const matches = declarations.get(node.text)?.filter((item) => item.pos < node.pos) ?? [];
-            return matches.length === 1 && matches[0]?.initializer ? resolveCallee(matches[0].initializer, next, depth + 1) : null;
-        }
-        if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
-            const key = memberKey(node); if (key === null) return null;
-            const base = resolveCallee(node.expression, next, depth + 1);
-            if (base && ts.isObjectLiteralExpression(base)) {
-                const matches = base.properties.filter((property) => propertyKey(property) === key);
-                if (matches.length !== 1) return null;
-                const property = matches[0]; const value = ts.isPropertyAssignment(property) ? property.initializer : ts.isShorthandPropertyAssignment(property) ? property.name : null;
-                return value ? resolveCallee(value, next, depth + 1) : null;
-            }
-            if (base && ts.isArrayLiteralExpression(base) && /^\d+$/u.test(key)) {
-                const element = base.elements[Number(key)]; return element && !ts.isSpreadElement(element) ? resolveCallee(element, next, depth + 1) : null;
-            }
-            return ['eval', 'Function', 'require'].includes(key) ? node : null;
-        }
-        return ts.isArrowFunction(node) || ts.isFunctionExpression(node) || ts.isObjectLiteralExpression(node)
-            || ts.isArrayLiteralExpression(node) || node.kind === ts.SyntaxKind.ImportKeyword ? node : null;
-    };
-    const intrinsic = (input: ts.Expression): string | null => {
-        const node = resolveCallee(input); if (!node) return null;
-        if (node.kind === ts.SyntaxKind.ImportKeyword) return 'dynamic';
-        if (ts.isIdentifier(node)) return node.text;
-        return ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node) ? memberKey(node) : null;
+        const key = evaluate(node.argumentExpression); return key.known && typeof key.value === 'string' ? key.value : null;
     };
     const loader = (input: ts.Expression): 'dynamic' | 'require' | null => {
-        const kind = intrinsic(input); return kind === 'dynamic' || kind === 'require' ? kind : null;
+        const node = unwrap(input); if (node.kind === ts.SyntaxKind.ImportKeyword) return 'dynamic';
+        if (ts.isIdentifier(node) && node.text === 'require') return 'require';
+        if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) && memberKey(node) === 'require') return 'require';
+        return null;
     };
-    const codeLoaderKind = (input: ts.Expression) => ['eval', 'Function'].includes(intrinsic(input) ?? '');
-    const loaderWrapper = (input: ts.Expression): Readonly<{ kind: 'code' | 'dynamic' | 'require'; parameter: number }> | null => {
-        const initializer = resolveCallee(input); if (!initializer || (!ts.isArrowFunction(initializer) && !ts.isFunctionExpression(initializer))) return null;
+    const codeLoaderKind = (input: ts.Expression): boolean => {
+        const node = unwrap(input);
+        if (ts.isIdentifier(node)) return ['eval', 'Function'].includes(node.text);
+        return (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) && ['eval', 'Function'].includes(memberKey(node) ?? '');
+    };
+    for (const [name, items] of declarations) {
+        const initializer = items.at(-1)?.initializer; if (!initializer || (!ts.isArrowFunction(initializer) && !ts.isFunctionExpression(initializer))) continue;
         const body = ts.isBlock(initializer.body) && initializer.body.statements.length === 1 && ts.isReturnStatement(initializer.body.statements[0]) ? initializer.body.statements[0].expression : initializer.body;
-        if (!body || !ts.isCallExpression(unwrap(body as ts.Expression))) return null;
-        const call = unwrap(body as ts.Expression) as ts.CallExpression; const kind = loader(call.expression) ?? (codeLoaderKind(call.expression) ? 'code' : null); const argument = call.arguments[0];
-        if (!kind || !argument) return null;
+        if (!body || !ts.isCallExpression(unwrap(body as ts.Expression))) continue;
+        const call = unwrap(body as ts.Expression) as ts.CallExpression; const kind = loader(call.expression); const argument = call.arguments[0];
+        if (!kind || !argument) continue;
         const parameter = initializer.parameters.findIndex((item) => ts.isIdentifier(item.name) && argument.getText(ast).includes(item.name.text));
-        return parameter < 0 ? null : { kind, parameter };
-    };
-    const sensitiveCallee = (input: ts.Node, seen = new Set<ts.Node>(), depth = 0): boolean => {
-        const node = ts.isParenthesizedExpression(input) || ts.isAsExpression(input) || ts.isTypeAssertionExpression(input)
-            || ts.isSatisfiesExpression(input) || ts.isNonNullExpression(input) ? unwrap(input) : input;
-        if (depth >= 16) return true; if (seen.has(node)) return true;
-        const next = new Set(seen); next.add(node);
-        if (node.kind === ts.SyntaxKind.ImportKeyword) return true;
-        if (ts.isIdentifier(node)) {
-            if (['eval', 'Function', 'require'].includes(node.text)) return true;
-            return (declarations.get(node.text)?.filter((item) => item.pos < node.pos) ?? []).some((item) => item.initializer && sensitiveCallee(item.initializer, next, depth + 1));
-        }
-        if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
-            const key = memberKey(node); if (key !== null && ['eval', 'Function', 'require'].includes(key)) return true;
-            return sensitiveCallee(node.expression, next, depth + 1);
-        }
-        if (ts.isObjectLiteralExpression(node)) {
-            return node.properties.some((property) => (ts.isPropertyAssignment(property) ? sensitiveCallee(property.initializer, next, depth + 1)
-                : ts.isShorthandPropertyAssignment(property) && sensitiveCallee(property.name, next, depth + 1)));
-        }
-        if (ts.isArrayLiteralExpression(node)) return node.elements.some((element) => !ts.isSpreadElement(element) && sensitiveCallee(element, next, depth + 1));
-        if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return sensitiveCallee(node.body, next, depth + 1);
-        if (ts.isCallExpression(node) || ts.isNewExpression(node)) return sensitiveCallee(node.expression, next, depth + 1);
-        if (ts.isBlock(node)) return node.statements.some((statement) => sensitiveCallee(statement, next, depth + 1));
-        if (ts.isReturnStatement(node) && node.expression) return sensitiveCallee(node.expression, next, depth + 1);
-        if (ts.isExpressionStatement(node)) return sensitiveCallee(node.expression, next, depth + 1);
-        return false;
-    };
+        if (parameter >= 0) loaderWrappers.set(name, { kind, parameter });
+    }
     const namedFromBinding = (node: ts.CallExpression) => {
         let parent: ts.Node = node.parent; if (ts.isAwaitExpression(parent)) parent = parent.parent;
         if (!ts.isVariableDeclaration(parent) || !ts.isObjectBindingPattern(parent.name)) return ['*'];
@@ -260,6 +213,59 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
             const value = evaluate(argument); if ((value.known && typeof value.value === 'string' && sensitiveText(argument)) || (!value.known && sensitiveText(argument))) add('code-loader');
         }
     };
+    const unsafeLoaderCandidates: string[] = [];
+    const unsafeLoaderFingerprint = (identity: string, expression: ts.CallExpression | ts.NewExpression) => {
+        let statement: ts.Node = expression;
+        while (statement.parent && !ts.isStatement(statement)) statement = statement.parent;
+        return fingerprint(file, `unsafe:${identity}`, stableKind(expression), stableKind(statement), printer.printNode(ts.EmitHint.Expression, expression, ast));
+    };
+    const inTypePosition = (node: ts.Node) => {
+        let parent: ts.Node | undefined = node.parent;
+        while (parent && !ts.isStatement(parent) && !ts.isSourceFile(parent)) {
+            if (ts.isTypeNode(parent)) return true;
+            parent = parent.parent;
+        }
+        return false;
+    };
+    const declarationName = (node: ts.Identifier) => {
+        const parent = node.parent;
+        return ((ts.isVariableDeclaration(parent) || ts.isParameter(parent) || ts.isFunctionDeclaration(parent)
+            || ts.isFunctionExpression(parent) || ts.isClassDeclaration(parent) || ts.isBindingElement(parent)) && parent.name === node)
+            || ((ts.isPropertyAssignment(parent) || ts.isMethodDeclaration(parent) || ts.isGetAccessorDeclaration(parent)
+                || ts.isSetAccessorDeclaration(parent)) && parent.name === node);
+    };
+    const safeFixedMember = (node: ts.Identifier) => {
+        const parent = node.parent;
+        if (!ts.isPropertyAccessExpression(parent) || parent.expression !== node || parent.questionDotToken) return false;
+        return node.text === 'Function' ? ['call', 'prototype'].includes(parent.name.text)
+            : node.text === 'require' && ['cache', 'resolve'].includes(parent.name.text);
+    };
+    const globalObject = (input: ts.Expression) => ts.isIdentifier(input) && ['global', 'globalThis', 'self', 'window'].includes(input.text);
+    const unsafeIdentityVisit = (node: ts.Node): void => {
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && !node.questionDotToken
+            && ['eval', 'Function', 'require'].includes(node.expression.text)) {
+            unsafeLoaderCandidates.push(unsafeLoaderFingerprint(node.expression.text, node));
+        } else if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'Function') {
+            unsafeLoaderCandidates.push(unsafeLoaderFingerprint('Function', node));
+        }
+        if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) && globalObject(node.expression)
+            && ['eval', 'Function', 'require'].includes(memberKey(node) ?? '')) add('unsafe-loader');
+        if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer && globalObject(unwrap(node.initializer))) {
+            for (const element of node.name.elements) {
+                const name = element.propertyName ?? element.name;
+                if (ts.isIdentifier(name) && ['eval', 'Function', 'require'].includes(name.text)) add('unsafe-loader');
+            }
+        }
+        if (ts.isIdentifier(node) && ['eval', 'Function', 'require'].includes(node.text) && !inTypePosition(node) && !declarationName(node)) {
+            const parent = node.parent; const directCall = ts.isCallExpression(parent) && parent.expression === node && !parent.questionDotToken;
+            const directFunctionNew = node.text === 'Function' && ts.isNewExpression(parent) && parent.expression === node;
+            const propertyName = (ts.isPropertyAccessExpression(parent) && parent.name === node)
+                || ((ts.isPropertyAssignment(parent) || ts.isMethodDeclaration(parent) || ts.isGetAccessorDeclaration(parent)
+                    || ts.isSetAccessorDeclaration(parent)) && parent.name === node);
+            if (!directCall && !directFunctionNew && !propertyName && !safeFixedMember(node)) add('unsafe-loader');
+        }
+        ts.forEachChild(node, unsafeIdentityVisit);
+    };
     const visit = (node: ts.Node): void => {
         if (ts.isImportDeclaration(node)) {
             const clause = node.importClause; const imported: ModuleImportUse[] = [];
@@ -273,23 +279,26 @@ export function inventoryModuleImports(options: Options): ModuleImportUse[] {
         } else if (ts.isExportDeclaration(node) && node.moduleSpecifier) record(node.moduleSpecifier, 're-export', ['*'], node.isTypeOnly);
         else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference) && node.moduleReference.expression) record(node.moduleReference.expression, 'require', [node.name.text], node.isTypeOnly);
         else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument) && ts.isStringLiteral(node.argument.literal)) record(node.argument.literal, 'import-type', ['*'], true);
-        else if (ts.isNewExpression(node)) {
-            if (codeLoaderKind(node.expression)) codeLoader(node);
-            else if (sensitiveCallee(node.expression) && (node.arguments ?? []).some(sensitiveText)) add('unsupported-callee');
-        }
+        else if (ts.isNewExpression(node) && codeLoaderKind(node.expression)) codeLoader(node);
         else if (ts.isCallExpression(node)) {
-            const callee = unwrap(node.expression); const wrapper = loaderWrapper(callee);
+            const callee = unwrap(node.expression); const wrapper = ts.isIdentifier(callee) ? loaderWrappers.get(callee.text) : undefined;
             const memberCall = (ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)) && memberKey(callee) === 'call' && loader(callee.expression) === 'require';
-            const kind = wrapper?.kind === 'code' ? null : wrapper?.kind ?? (memberCall ? 'require' : loader(node.expression));
+            const kind = wrapper?.kind ?? (memberCall ? 'require' : loader(node.expression));
             const argument = wrapper ? node.arguments[wrapper.parameter] : node.arguments[memberCall ? 1 : 0];
             if (kind && argument) record(argument, node.arguments.length === (memberCall ? 2 : 1) ? kind : `${kind}-options`, kind === 'dynamic' ? namedFromBinding(node) : ['*']);
-            const code = wrapper?.kind === 'code' || codeLoaderKind(callee);
-            if (code) codeLoader(node);
-            else if (!kind && sensitiveCallee(callee) && node.arguments.some(sensitiveText)) add('unsupported-callee');
+            if (codeLoaderKind(callee)) codeLoader(node);
         }
         ts.forEachChild(node, visit);
     };
-    visit(ast);
+    visit(ast); unsafeIdentityVisit(ast);
+    const unsafeLoaderCounts = new Map<string, number>();
+    for (const item of unsafeLoaderCandidates) unsafeLoaderCounts.set(item, (unsafeLoaderCounts.get(item) ?? 0) + 1);
+    for (const item of unsafeLoaderCandidates) {
+        if (!allowedUnsafeLoaderExpressions.has(item) || unsafeLoaderCounts.get(item) !== 1) add('unsafe-loader');
+    }
+    for (const allowed of allowedUnsafeLoaderExpressions) {
+        if (allowed.startsWith(`${file}|`) && unsafeLoaderCounts.get(allowed) !== 1) add(unsafeLoaderCounts.has(allowed) ? 'unsafe-loader-duplicate' : 'unsafe-loader-drift');
+    }
     const counts = new Map<string, number>();
     for (const item of unresolved) counts.set(item.fingerprint, (counts.get(item.fingerprint) ?? 0) + 1);
     for (const item of unresolved) {
@@ -327,17 +336,11 @@ export const moduleImportBypassFixtures = (specifier: string, absoluteTarget: st
     `import(${JSON.stringify(pathToFileURL(absoluteTarget).href)});`,
 ]);
 
-export const moduleCalleeAliasFixtures = (specifier: string): readonly Readonly<{ form: string; source: string }>[] => Object.freeze([
-    { form: 'code-loader', source: `const loaders={run:eval};loaders.run(${JSON.stringify(`import(${JSON.stringify(specifier)})`)});` },
-    { form: 'code-loader', source: `const loaders=[eval];loaders[0](${JSON.stringify(`import(${JSON.stringify(specifier)})`)});` },
-    { form: 'require', source: `const loaders={run:require};loaders.run(${JSON.stringify(specifier)});` },
-    { form: 'require', source: `const loaders=[require];loaders[0](${JSON.stringify(specifier)});` },
-    { form: 'require', source: `const loaders={run:require};(((loaders.run as typeof require) satisfies typeof require)!)(${JSON.stringify(specifier)});` },
-    { form: 'code-loader', source: `globalThis['ev'+'al'](${JSON.stringify(`import(${JSON.stringify(specifier)})`)});` },
-    { form: 'code-loader', source: `new globalThis['Fun'+'ction'](${JSON.stringify(`return import(${JSON.stringify(specifier)})`)})();` },
-    { form: 'dynamic', source: `const load=(value:string)=>import(value);const loaders={['r'+'un']:load};loaders.run(${JSON.stringify(specifier)});` },
-    { form: 'unsupported-callee', source: `const loaders={run:eval};loaders[pick()](${JSON.stringify(`import(${JSON.stringify(specifier)})`)});` },
-    { form: 'unsupported-callee', source: `const loop=loop;loop(${JSON.stringify(`import(${JSON.stringify(specifier)})`)});` },
-    { form: 'unsupported-callee', source: `const run=eval;{const run=String;}run(${JSON.stringify(`import(${JSON.stringify(specifier)})`)});` },
-    { form: 'unsupported-callee', source: `const load17=eval;${Array.from({ length: 17 }, (_, index) => `const load${16 - index}=load${17 - index};`).join('')}load0(${JSON.stringify(`import(${JSON.stringify(specifier)})`)});` },
+export const unsafeLoaderIdentityFixtures = (specifier: string): readonly string[] => Object.freeze([
+    'const loaders={run:eval};', 'const loaders=[eval];', 'const {eval:run}=globalThis;', 'const [run]=[eval];',
+    "const loaders={run(){return eval('1')}};", 'const loaders={get run(){return eval}};', 'const loaders=[...eval];',
+    'let run;run=eval;', 'consume(eval);', 'function loader(){return eval;}', 'const run=eval;',
+    "globalThis['ev'+'al']('1');", "const make=globalThis['Fun'+'ction'];", `globalThis['req'+'uire'](${JSON.stringify(specifier)});`,
+    "eval?.('1');", `require?.(${JSON.stringify(specifier)});`, 'const run=require;', "eval('1');",
+    "new Function('return 1');", `require(${JSON.stringify(`${specifier}-not-allowlisted`)});`,
 ]);
