@@ -768,7 +768,7 @@ test('keeps the ticket module private to its canonical future server-session imp
     const paths = execFileSync('rg', ['-l', 'web-auth-control-record|prepareAuthControlTicket|commitAuthControlTicket|retireAuthControlTicket', '-g', '*.ts', '.'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map((path) => path.replace(/^\.\//u, ''));
     assert.equal(paths.includes('lib/security/web-auth-control-record.test.ts'), true);
     assert.equal(paths.includes('lib/security/web-auth-control-record.ts'), true);
-    assert.equal(paths.every((path) => path === 'lib/security/server-session.ts' || path.endsWith('web-auth-control-record.ts') || path.endsWith('web-auth-control-record.test.ts')), true);
+    assert.equal(paths.every((path) => path === 'lib/security/server-session.ts' || path === 'lib/security/web-auth-control-owner.ts' || path === 'lib/security/web-auth-control-owner.test.ts' || path.endsWith('web-auth-control-record.ts') || path.endsWith('web-auth-control-record.test.ts')), true);
 });
 
 test('entropy collision and same-record reentry deny before ticket publication and permit a clean retry', async () => {
