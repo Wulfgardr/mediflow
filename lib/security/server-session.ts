@@ -223,9 +223,14 @@ const activeWebSessionCellsBySession = new WeakMapConstructor<ServerSession, Arm
 const activeWebSessionResourcePortRecords = new WeakMapConstructor<object, ActiveWebSessionResourcePortRecord>();
 const activeWebSessionResourceUseRecords = new WeakMapConstructor<object, ActiveWebSessionResourceUseRecord>();
 /* @Codex */
-interface UserRetirementTurnRecord { poisoned: boolean; }
+interface UserRetirementTurnRecord {
+    active: boolean;
+    poisoned: boolean;
+    userId: string;
+    next: UserRetirementTurnRecord | null;
+}
 const invalidRetirementTurnUser = Symbol('invalid_retirement_turn_user');
-const userRetirementTurns = new MapConstructor<string, UserRetirementTurnRecord>();
+let userRetirementTurnHead: UserRetirementTurnRecord | null = null;
 const armedWebSessionCellsById = ObjectCreate(null) as Record<string, ArmedWebSessionCellRecord | undefined>;
 let armedWebSessionCellHead: ArmedWebSessionCellRecord | null = null;
 let webSessionPrepareInProgress = false;
@@ -244,36 +249,53 @@ function sessionUserIdForRetirementTurn(value: unknown): string | typeof invalid
 }
 
 function beginUserRetirementTurn(userId: string): UserRetirementTurnRecord | null {
-    const active = getMapValue(userRetirementTurns, userId);
-    if (active) {
-        active.poisoned = true;
-        return null;
+    for (let active = userRetirementTurnHead; active; active = active.next) {
+        if (active.active && active.userId === userId) {
+            active.poisoned = true;
+            return null;
+        }
     }
-    const turn = { poisoned: false };
-    setMapValue(userRetirementTurns, userId, turn);
+    const turn = { active: true, poisoned: false, userId, next: userRetirementTurnHead };
+    userRetirementTurnHead = turn;
     return turn;
 }
 
 function endUserRetirementTurn(userId: string, turn: UserRetirementTurnRecord): void {
-    if (getMapValue(userRetirementTurns, userId) === turn) deleteMapValue(userRetirementTurns, userId);
+    if (!turn.active || turn.userId !== userId) return;
+    turn.active = false;
+    if (userRetirementTurnHead === turn) userRetirementTurnHead = turn.next;
+    else {
+        for (let prior = userRetirementTurnHead; prior; prior = prior.next) {
+            if (prior.next === turn) { prior.next = turn.next; break; }
+        }
+    }
+    turn.next = null;
 }
 
 function denyUserRetirementTurn(userId: string): boolean {
-    const active = getMapValue(userRetirementTurns, userId);
-    if (!active) return false;
-    active.poisoned = true;
-    return true;
+    for (let active = userRetirementTurnHead; active; active = active.next) {
+        if (active.active && active.userId === userId) {
+            active.poisoned = true;
+            return true;
+        }
+    }
+    return false;
 }
 
 function poisonUserRetirementTurns(): boolean {
     let poisoned = false;
-    const iterator = mapValuesOf(userRetirementTurns);
-    for (let next = nextMapIterator<UserRetirementTurnRecord>(iterator); !next.done;
-        next = nextMapIterator<UserRetirementTurnRecord>(iterator)) {
-        next.value.poisoned = true;
-        poisoned = true;
+    for (let active = userRetirementTurnHead; active; active = active.next) {
+        if (active.active) {
+            active.poisoned = true;
+            poisoned = true;
+        }
     }
     return poisoned;
+}
+
+function rollbackSessionPublication(session: ServerSession): void {
+    try { deleteWeakMapValue(nativeSessionBindings, session); } catch { /* authority rollback continues */ }
+    try { deleteMapValue(sessions, session.id); } catch { /* the exact publication remains denied */ }
 }
 
 function isSupportedSynchronousDisposer(candidate: unknown): candidate is ServerSessionResourceDisposer {
@@ -389,8 +411,16 @@ export function createSession(
         || armedWebSessionCellsById[session.id]) {
         throw new Error('server session id unavailable');
     }
-    setMapValue(sessions, session.id, session);
-    return session;
+    try {
+        setMapValue(sessions, session.id, session);
+        if (authChannel !== 'system' && denyUserRetirementTurn(session.userId)) {
+            throw new Error('session_retirement_in_progress');
+        }
+        return session;
+    } catch (error) {
+        rollbackSessionPublication(session);
+        throw error;
+    }
 }
 
 /* @Codex: native authority is server-tagged and bound to the admitted paired client. */
@@ -399,8 +429,14 @@ export function createNativeServerSession(
 ): ServerSession {
     if (!isNativeBinding(binding)) throw new Error('invalid native session binding');
     const session = createSession(user, 'native');
-    nativeSessionBindings.set(session, ObjectFreeze({ clientId: binding.clientId, clientPlatform: binding.clientPlatform }));
-    return session;
+    try {
+        setWeakMapValue(nativeSessionBindings, session, ObjectFreeze({ clientId: binding.clientId, clientPlatform: binding.clientPlatform }));
+        if (denyUserRetirementTurn(session.userId)) throw new Error('session_retirement_in_progress');
+        return session;
+    } catch (error) {
+        rollbackSessionPublication(session);
+        throw error;
+    }
 }
 
 /** Compatibility accepts only the exact process-local native session and its admitted pair. */
@@ -726,10 +762,12 @@ export function stageWebServerSession(user: unknown): StagedWebServerSession | n
         return null;
     }
     if (denyUserRetirementTurn(user.id)) return null;
+    let capsule: StagedWebServerSession | null = null;
+    let record: StagedWebSessionRecord | null = null;
     try {
         const now = DateNow();
-        const capsule = ObjectFreeze(ObjectCreate(null)) as StagedWebServerSession;
-        const record: StagedWebSessionRecord = {
+        capsule = ObjectFreeze(ObjectCreate(null)) as StagedWebServerSession;
+        record = {
             active: true,
             userId: user.id,
             username: user.username,
@@ -739,8 +777,18 @@ export function stageWebServerSession(user: unknown): StagedWebServerSession | n
         };
         setWeakMapValue(stagedWebSessionRecords, capsule, record);
         addSetValue(stagedWebSessions, record);
+        if (denyUserRetirementTurn(record.userId)) throw new Error('session_retirement_in_progress');
         return capsule;
-    } catch { return null; }
+    } catch {
+        if (record) {
+            record.active = false;
+            try { deleteSetValue(stagedWebSessions, record); } catch { /* terminal record remains inactive */ }
+        }
+        if (capsule) {
+            try { deleteWeakMapValue(stagedWebSessionRecords, capsule); } catch { /* inactive record cannot recover */ }
+        }
+        return null;
+    }
 }
 
 /** Consumes a staged Web capsule into one private, unpublishable Web-session reservation. */
@@ -924,6 +972,14 @@ export function activateArmedWebServerSession(port: unknown, ticket: unknown): b
             return false;
         }
         cell.activationTicket = ticket;
+        if (denyUserRetirementTurn(session.userId)) {
+            cell.state = 'TOMBSTONE';
+            cell.activationTicket = null;
+            abortPreparedAuthControlActivation(preparedActivation);
+            webSessionCellLifecyclePoisoned = false;
+            webSessionCellLifecycle = 'idle';
+            return false;
+        }
     } catch {
         if (cell) tombstoneArmedWebSessionCellRecord(cell);
         try { abortPreparedAuthControlActivation(preparedActivation); } catch { /* prepared P2 denial stays terminal */ }
@@ -1022,6 +1078,7 @@ function commitPreparedWebServerSessionInternally(capability: unknown, returnSes
     const record = preparedWebSessionRecord(capability);
     if (record && denyUserRetirementTurn(record.session.userId)) return deniedResult;
     if (!record || !record.active) return deniedResult;
+    let publicationAttempted = false;
     try {
         const session = record.session;
         if (record.session.expiresAt <= DateNow() || getMapValue(preparedWebSessionReservations, record.session.id) !== record
@@ -1032,9 +1089,12 @@ function commitPreparedWebServerSessionInternally(capability: unknown, returnSes
         const terminalResult = returnSession ? session : true;
         record.active = false;
         deleteMapValue(preparedWebSessionReservations, record.session.id);
+        publicationAttempted = true;
         setMapValue(sessions, session.id, session);
+        if (denyUserRetirementTurn(session.userId)) throw new Error('session_retirement_in_progress');
         return terminalResult;
     } catch {
+        if (publicationAttempted) rollbackSessionPublication(record.session);
         revokePreparedWebSession(record);
         return deniedResult;
     }
