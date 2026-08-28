@@ -12,7 +12,21 @@ const DEFAULT_OUT = 'tmp-audit-quality-gate-report.json';
 
 const REQUIRED_ROUTE_AUDIT = [
     { route: 'app/api/auth/login/route.ts', events: ['auth.login.failed', 'auth.login.succeeded'], reason: 'auth login success/failure must stay auditable' },
-    { route: 'app/api/auth/logout/route.ts', events: ['auth.logout'], reason: 'auth logout must stay auditable' },
+    {
+        route: 'app/api/auth/logout/route.ts', events: ['auth.logout'], reason: 'auth logout must stay auditable',
+        writerContracts: [{
+            target: 'auth.logout',
+            modes: {
+                inline: { handler: 'POST', writerModule: '@/lib/security/audit', writerExport: 'writeAuditEvent', eventType: 'auth.logout' },
+                delegated: {
+                    handler: 'POST', serviceModule: '@/lib/security/web-logout-service', serviceExport: 'completeExactWebP3Logout',
+                    ownerFile: 'lib/security/web-logout-service.ts', ownerName: 'completeExactWebP3Logout',
+                    writerModule: '@/lib/security/audit', writerExport: 'writeAuditEvent', hashExport: 'hashAuditRef',
+                    eventType: 'auth.logout', sourcesName: 'productionSources',
+                },
+            },
+        }],
+    },
     {
         route: 'app/api/auth/change-pin/route.ts', events: ['settings.updated'], reason: 'PIN rotation is an administrative settings mutation',
         writerContracts: [{
@@ -409,9 +423,162 @@ export function validateDelegatedRouteAudit({ spec, routeSource, serviceSource }
     return problems;
 }
 
+function anyNamedImport(sourceFile, exportName) {
+    return sourceFile.statements.some((statement) => ts.isImportDeclaration(statement)
+        && statement.importClause?.namedBindings && ts.isNamedImports(statement.importClause.namedBindings)
+        && statement.importClause.namedBindings.elements.some((element) =>
+            !element.isTypeOnly && (element.propertyName?.text ?? element.name.text) === exportName));
+}
+
+function directPropertyCalls(owner, objectName, propertyName) {
+    const calls = [];
+    const visit = (node) => {
+        if (node !== owner && ts.isFunctionLike(node)) return;
+        if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(unwrap(node.expression))
+            && ts.isIdentifier(unwrap(node.expression).expression)
+            && unwrap(node.expression).expression.text === objectName
+            && unwrap(node.expression).name.text === propertyName) calls.push(node);
+        ts.forEachChild(node, visit);
+    };
+    if (owner.body) visit(owner.body);
+    return calls;
+}
+
+function isAwaited(call) {
+    let current = call;
+    while (ts.isParenthesizedExpression(current.parent)) current = current.parent;
+    return ts.isAwaitExpression(current.parent);
+}
+
+function objectLiteral(initializer) {
+    const value = initializer && unwrap(initializer);
+    if (value && ts.isObjectLiteralExpression(value)) return value;
+    return value && ts.isCallExpression(value) && ts.isPropertyAccessExpression(value.expression)
+        && ts.isIdentifier(value.expression.expression) && value.expression.expression.text === 'Object'
+        && value.expression.name.text === 'freeze' && value.arguments.length === 1
+        && ts.isObjectLiteralExpression(unwrap(value.arguments[0])) ? unwrap(value.arguments[0]) : null;
+}
+
+function hasDeferredWork(root) {
+    let found = false;
+    const visit = (node) => {
+        if (found) return;
+        if (ts.isIdentifier(node) && ['setTimeout', 'setInterval', 'setImmediate', 'queueMicrotask'].includes(node.text)) found = true;
+        if (ts.isPropertyAccessExpression(node) && ['then', 'catch', 'finally'].includes(node.name.text)) found = true;
+        if ((ts.isCallExpression(node) || ts.isNewExpression(node))) {
+            const callee = unwrap(node.expression);
+            if ((ts.isIdentifier(callee) && ['setTimeout', 'setInterval', 'setImmediate', 'queueMicrotask', 'Promise'].includes(callee.text))
+                || (ts.isPropertyAccessExpression(callee) && ['then', 'catch', 'finally'].includes(callee.name.text))) found = true;
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(root);
+    return found;
+}
+
+/* @Codex */
+export function validateLogoutAuditModes({ spec, routeSource, serviceSource = null }) {
+    const problems = [];
+    const route = checkedSource('route.ts', routeSource);
+    const inline = spec.modes.inline;
+    const delegated = spec.modes.delegated;
+    const inlinePresent = anyNamedImport(route.sourceFile, inline.writerExport)
+        || routeSource.includes(`'${inline.eventType}'`);
+    const delegatedPresent = anyNamedImport(route.sourceFile, delegated.serviceExport)
+        || routeSource.includes(delegated.serviceExport);
+    if (inlinePresent === delegatedPresent) return ['logout must use exactly one inline or delegated audit mode'];
+    if (inlinePresent) {
+        return validateAuditWriterControlFlow({
+            source: routeSource, fileName: 'route.ts', ownerName: inline.handler,
+            writerModule: inline.writerModule, writerExport: inline.writerExport, eventType: inline.eventType,
+        });
+    }
+    if (!serviceSource) return ['delegated logout owner source is missing'];
+    problems.push(...validateDelegatedRouteAudit({ spec: delegated, routeSource, serviceSource }));
+    const handler = namedFunction(route.sourceFile, delegated.handler, true);
+    const delegate = importedBinding(route.sourceFile, route.checker, delegated.serviceModule, delegated.serviceExport);
+    const routeCalls = handler && delegate ? bindingCalls(handler, route.checker, delegate.symbol) : [];
+    const response204 = handler?.body && [...handler.body.statements].find((statement) => ts.isReturnStatement(statement)
+        && statement.getText(route.sourceFile).match(/\bstatus\s*:\s*204\b/u));
+    if (routeCalls.length !== 1 || !isAwaited(routeCalls[0])) problems.push('delegated logout call must be awaited exactly once');
+    if (!response204 || (routeCalls[0] && routeCalls[0].getStart() > response204.getStart())) problems.push('delegated audit must complete before the 204 response');
+    if (handler && hasDeferredWork(handler)) problems.push('logout route must not defer audit work');
+
+    const service = checkedSource('service.ts', serviceSource);
+    const owner = namedFunction(service.sourceFile, delegated.ownerName, true);
+    const writer = importedName(service.sourceFile, delegated.writerModule, delegated.writerExport);
+    const hash = importedName(service.sourceFile, delegated.writerModule, delegated.hashExport);
+    const writerBinding = importedBinding(service.sourceFile, service.checker, delegated.writerModule, delegated.writerExport);
+    const sourcesDeclaration = service.sourceFile.statements.flatMap((statement) => ts.isVariableStatement(statement)
+        ? [...statement.declarationList.declarations] : []).find((declaration) =>
+        ts.isIdentifier(declaration.name) && declaration.name.text === delegated.sourcesName);
+    const sources = objectLiteral(sourcesDeclaration?.initializer);
+    const auditProperty = sources?.properties.find((property) => ts.isPropertyAssignment(property)
+        && property.name.getText(service.sourceFile).replaceAll(/['"]/gu, '') === 'audit');
+    const auditOwner = auditProperty && ts.isFunctionLike(auditProperty.initializer) ? auditProperty.initializer : null;
+    const sourcesAreConst = sourcesDeclaration && ts.isVariableDeclarationList(sourcesDeclaration.parent)
+        && Boolean(sourcesDeclaration.parent.flags & ts.NodeFlags.Const);
+    if (!owner || !writer || !hash || !writerBinding || !sourcesAreConst || !auditOwner) problems.push('delegated service writer is missing, shadowed, or unreachable');
+    if (!owner || !writer || !hash || !writerBinding || !auditOwner) return problems;
+
+    const sourceParameter = owner.parameters.find((parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === 'sources');
+    if (!sourceParameter?.initializer || !ts.isIdentifier(unwrap(sourceParameter.initializer))
+        || unwrap(sourceParameter.initializer).text !== delegated.sourcesName || localBindingExists(owner, 'sources', true)) {
+        problems.push('owner must use the exact immutable production sources binding');
+    }
+    const retireCalls = directPropertyCalls(owner, 'sources', 'retire');
+    const auditCalls = directPropertyCalls(owner, 'sources', 'audit');
+    const auditCall = auditCalls[0];
+    if (retireCalls.length !== 1 || auditCalls.length !== 1 || !auditCall || !isAwaited(auditCall)
+        || auditCall.arguments.map((argument) => argument.getText(service.sourceFile)).join(',') !== 'session,sessionId,request') {
+        problems.push('owner must await exactly one sources.audit(session,sessionId,request) call');
+    }
+    const retirement = retireCalls[0]?.parent && ts.isVariableDeclaration(retireCalls[0].parent)
+        && ts.isIdentifier(retireCalls[0].parent.name) ? retireCalls[0].parent.name.text : null;
+    const completedGuard = owner.body?.statements.find((statement) => ts.isIfStatement(statement)
+        && ts.isBinaryExpression(statement.expression)
+        && statement.expression.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken
+        && ts.isPropertyAccessExpression(statement.expression.left)
+        && ts.isIdentifier(statement.expression.left.expression)
+        && statement.expression.left.expression.text === retirement && statement.expression.left.name.text === 'outcome'
+        && ts.isStringLiteral(statement.expression.right) && statement.expression.right.text === 'completed'
+        && alwaysTerminates(statement.thenStatement));
+    if (!completedGuard || !auditCall || retireCalls[0].getStart() > completedGuard.getStart()
+        || completedGuard.getStart() > auditCall.getStart()) problems.push('completed retirement must be checked before audit');
+
+    const writerCalls = directWriterCalls(auditOwner, writer, null);
+    const allWriterCalls = bindingCalls(service.sourceFile, service.checker, writerBinding.symbol);
+    const input = writerCalls.direct[0]?.arguments[0];
+    const properties = input && ts.isObjectLiteralExpression(input) ? input.properties : [];
+    const property = (name) => properties.find((item) => ts.isPropertyAssignment(item)
+        && (ts.isIdentifier(item.name) || ts.isStringLiteral(item.name)) && item.name.text === name);
+    const event = property('eventType');
+    const subject = property('subjectRef');
+    const subjectValue = subject && unwrap(subject.initializer);
+    if (localBindingExists(auditOwner, writer) || localBindingExists(auditOwner, hash)
+        || allWriterCalls.length !== 1 || writerCalls.all.length !== 1 || writerCalls.direct.length !== 1 || !isAwaited(writerCalls.direct[0])
+        || !event || !ts.isStringLiteral(event.initializer) || event.initializer.text !== delegated.eventType) {
+        problems.push('delegated writer must await exactly one auth.logout event');
+    }
+    let eventLiteralCount = 0;
+    const countEvent = (node) => { if (ts.isStringLiteral(node) && node.text === delegated.eventType) eventLiteralCount += 1; ts.forEachChild(node, countEvent); };
+    countEvent(service.sourceFile);
+    if (eventLiteralCount !== 1) problems.push('delegated service must contain exactly one auth.logout literal');
+    if (!subjectValue || !ts.isCallExpression(subjectValue) || !ts.isIdentifier(subjectValue.expression)
+        || subjectValue.expression.text !== hash || subjectValue.arguments.length !== 1
+        || subjectValue.arguments[0].getText(service.sourceFile) !== 'sessionId') problems.push('logout subject must be the approved hash of the exact session id');
+    let rawSessionIdUses = 0;
+    const countSessionId = (node) => { if (ts.isIdentifier(node) && node.text === 'sessionId') rawSessionIdUses += 1; ts.forEachChild(node, countSessionId); };
+    if (input) countSessionId(input);
+    if (properties.some((item) => /bearer|cookie|token|raw/iu.test(item.name?.getText(service.sourceFile) ?? ''))
+        || rawSessionIdUses !== 1 || serviceSource.match(/redactedMetadata\s*:\s*[^\n]*(sessionId|bearer|cookie|token)/u)) problems.push('delegated audit exposes raw bearer material');
+    if (hasDeferredWork(owner) || hasDeferredWork(auditOwner)) problems.push('delegated owner must not defer or float audit work');
+    return problems;
+}
+
 function checkAuditWriterControlFlow(findings) {
     const contracts = REQUIRED_ROUTE_AUDIT.flatMap((entry) =>
-        (entry.writerContracts ?? []).map((contract) => ({ ...contract, route: entry.route })));
+        (entry.writerContracts ?? []).filter((contract) => !contract.modes).map((contract) => ({ ...contract, route: entry.route })));
     const parsedFiles = new Map();
     for (const contract of contracts) {
         if (!parsedFiles.has(contract.ownerFile)) {
@@ -477,15 +644,23 @@ function checkRouteCoverage(findings) {
         const source = read(entry.route);
         if (entry.writerContracts) {
             for (const contract of entry.writerContracts) {
-                for (const problem of validateDelegatedRouteAudit({
-                    spec: contract,
-                    routeSource: source,
-                    serviceSource: read(contract.ownerFile),
-                })) {
+                const problems = contract.modes
+                    ? validateLogoutAuditModes({
+                        spec: contract,
+                        routeSource: source,
+                        serviceSource: exists(contract.modes.delegated.ownerFile)
+                            ? read(contract.modes.delegated.ownerFile) : null,
+                    })
+                    : validateDelegatedRouteAudit({
+                        spec: contract,
+                        routeSource: source,
+                        serviceSource: read(contract.ownerFile),
+                    });
+                for (const problem of problems) {
                     addFinding(findings, 'AUDIT_ROUTE_DELEGATION', `${entry.route}: ${problem}`, {
                         route: entry.route,
                         target: contract.target,
-                        eventType: contract.eventType,
+                        eventType: contract.eventType ?? entry.events[0],
                     });
                 }
             }
