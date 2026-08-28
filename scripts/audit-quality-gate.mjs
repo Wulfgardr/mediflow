@@ -19,9 +19,9 @@ const REQUIRED_ROUTE_AUDIT = [
             modes: {
                 inline: { handler: 'POST', writerModule: '@/lib/security/audit', writerExport: 'writeAuditEvent', eventType: 'auth.logout' },
                 delegated: {
-                    handler: 'POST', serviceModule: '@/lib/security/web-logout-service', serviceExport: 'completeExactWebP3Logout',
-                    ownerFile: 'lib/security/web-logout-service.ts', ownerName: 'completeExactWebP3Logout',
-                    writerModule: '@/lib/security/audit', writerExport: 'writeAuditEvent', hashExport: 'hashAuditRef',
+                    handler: 'POST', serviceModule: '@/lib/security/web-auth-logout-server', serviceExport: 'completeExactWebP3Logout',
+                    ownerFile: 'lib/security/web-auth-logout-server.ts', ownerName: 'completeExactWebP3Logout',
+                    writerModule: './audit', writerExport: 'writeAuditEvent', hashExport: 'hashAuditRef',
                     eventType: 'auth.logout', sourcesName: 'productionSources',
                 },
             },
@@ -497,15 +497,35 @@ function exactPropertyAssignments(literal, allowedNames) {
     return new Map(literal.properties.map((item) => [item.name.text, item]));
 }
 
-function responseStatus(statement, sourceFile) {
-    const value = statement.expression && unwrap(statement.expression);
-    if (!value || !ts.isNewExpression(value) || !ts.isIdentifier(value.expression)
-        || value.expression.text !== 'Response' || value.arguments?.length !== 2
-        || unwrap(value.arguments[0]).kind !== ts.SyntaxKind.NullKeyword) return null;
-    const options = objectLiteral(value.arguments[1]);
-    const properties = exactPropertyAssignments(options, ['status', 'headers']);
-    const status = properties?.get('status')?.initializer;
-    return status && ts.isNumericLiteral(status) ? Number(status.text) : null;
+function exactArguments(call, expected) {
+    return call.arguments.length === expected.length && expected.every((item, index) => {
+        const value = unwrap(call.arguments[index]);
+        return 'identifier' in item ? ts.isIdentifier(value) && value.text === item.identifier
+            : ts.isStringLiteral(value) && value.text === item.literal
+            || item.null && value.kind === ts.SyntaxKind.NullKeyword;
+    });
+}
+
+function exactNoStoreResponseFactory(sourceFile) {
+    const factory = namedFunction(sourceFile, 'empty');
+    const parameter = factory?.parameters.length === 1 && ts.isIdentifier(factory.parameters[0].name)
+        ? factory.parameters[0].name.text : null;
+    const statement = factory?.body?.statements.length === 1 ? factory.body.statements[0] : null;
+    const response = statement && ts.isReturnStatement(statement) && statement.expression && unwrap(statement.expression);
+    if (!parameter || !response || !ts.isNewExpression(response) || !ts.isIdentifier(response.expression)
+        || response.expression.text !== 'Response' || response.arguments?.length !== 2
+        || unwrap(response.arguments[0]).kind !== ts.SyntaxKind.NullKeyword) return false;
+    const options = objectLiteral(response.arguments[1]);
+    const statusProperty = options?.properties.find((property) => ts.isShorthandPropertyAssignment(property)
+        && property.name.text === 'status');
+    const headersProperty = options?.properties.find((property) => ts.isPropertyAssignment(property)
+        && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) && property.name.text === 'headers');
+    const headers = headersProperty?.initializer && objectLiteral(headersProperty.initializer);
+    const headerProperties = exactPropertyAssignments(headers, ['Cache-Control']);
+    const cacheControl = headerProperties?.get('Cache-Control')?.initializer && unwrap(headerProperties.get('Cache-Control').initializer);
+    return Boolean(options && options.properties.length === 2 && statusProperty && headersProperty)
+        && statusProperty.name.text === parameter
+        && ts.isStringLiteral(cacheControl) && cacheControl.text === 'no-store';
 }
 
 function directAwaitedExpressionStatement(owner, call) {
@@ -516,20 +536,6 @@ function directAwaitedExpressionStatement(owner, call) {
     while (ts.isParenthesizedExpression(current.parent)) current = current.parent;
     return ts.isExpressionStatement(current.parent) && directStatement(owner, current.parent) === current.parent
         ? current.parent : null;
-}
-
-function exactCompletedGuard(statement, binding, sourceFile) {
-    if (!ts.isIfStatement(statement) || statement.elseStatement) return false;
-    const condition = unwrap(statement.expression);
-    const operand = ts.isPrefixUnaryExpression(condition)
-        && condition.operator === ts.SyntaxKind.ExclamationToken ? unwrap(condition.operand) : null;
-    if (!operand || !ts.isPropertyAccessExpression(operand) || !ts.isIdentifier(operand.expression)
-        || operand.expression.text !== binding || operand.name.text !== 'completed') return false;
-    const denied = ts.isReturnStatement(statement.thenStatement) ? statement.thenStatement
-        : ts.isBlock(statement.thenStatement) && statement.thenStatement.statements.length === 1
-            && ts.isReturnStatement(statement.thenStatement.statements[0]) ? statement.thenStatement.statements[0] : null;
-    const status = denied && responseStatus(denied, sourceFile);
-    return typeof status === 'number' && status >= 400 && status <= 599;
 }
 
 function directReturnStatements(owner) {
@@ -589,25 +595,6 @@ function auditLiteralSyntaxIsExactAndSafe(root) {
     return safe;
 }
 
-function metadataIsExactAndSafe(initializer) {
-    const value = initializer && unwrap(initializer);
-    if (value?.kind === ts.SyntaxKind.NullKeyword) return true;
-    const literal = objectLiteral(initializer);
-    const properties = exactPropertyAssignments(literal, METADATA_KEYS);
-    if (!properties) return false;
-    for (const [name, property] of properties) {
-        const value = unwrap(property.initializer);
-        if (name === 'resourceVersion' || name === 'counts') {
-            if (!ts.isNumericLiteral(value)) return false;
-        } else if (name === 'reasonCode') {
-            if (!ts.isStringLiteral(value) || /authorization|bearer|cookie|token|session|patient|clinical|raw/iu.test(value.text)) return false;
-        } else if (!ts.isArrayLiteralExpression(value) || value.elements.some((item) =>
-            ts.isSpreadElement(item) || !ts.isStringLiteral(unwrap(item))
-            || /authorization|bearer|cookie|token|session|patient|clinical|raw/iu.test(unwrap(item).text))) return false;
-    }
-    return true;
-}
-
 /* @Codex */
 export function validateLogoutAuditModes({ spec, routeSource, serviceSource = null }) {
     const problems = [];
@@ -633,31 +620,11 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
     const routeCall = routeCalls[0];
     const directDelegate = routeCall && ts.isIdentifier(unwrap(routeCall.expression))
         && unwrap(routeCall.expression).text === importedName(route.sourceFile, delegated.serviceModule, delegated.serviceExport);
-    const callDeclaration = routeCall?.parent && ts.isAwaitExpression(routeCall.parent)
-        && routeCall.parent.parent && ts.isVariableDeclaration(routeCall.parent.parent)
-        ? routeCall.parent.parent : null;
-    const receipt = callDeclaration && ts.isIdentifier(callDeclaration.name) ? callDeclaration.name.text : null;
-    const callStatement = callDeclaration && directStatement(handler, callDeclaration);
-    const routeStatements = handler?.body ? [...handler.body.statements] : [];
-    const callIndex = callStatement ? routeStatements.indexOf(callStatement) : -1;
-    const guard = callIndex >= 0 ? routeStatements[callIndex + 1] : null;
-    const response204 = guard ? routeStatements[callIndex + 2] : null;
+    const serviceReturn = routeCall?.parent && ts.isReturnStatement(routeCall.parent) ? routeCall.parent : null;
     const routeReturns = handler ? directReturnStatements(handler) : [];
-    const all204 = [];
-    const find204 = (node) => {
-        if (node !== handler && ts.isFunctionLike(node)) return;
-        if (ts.isReturnStatement(node) && responseStatus(node, route.sourceFile) === 204) all204.push(node);
-        ts.forEachChild(node, find204);
-    };
-    if (handler) find204(handler);
-    if (routeCalls.length !== 1 || !directDelegate || !callDeclaration || !receipt
-        || !ts.isVariableDeclarationList(callDeclaration.parent)
-        || !(callDeclaration.parent.flags & ts.NodeFlags.Const)) problems.push('delegated logout call must be awaited directly into one exact receipt');
-    if (!guard || !receipt || !exactCompletedGuard(guard, receipt, route.sourceFile)
-        || !response204 || !ts.isReturnStatement(response204) || responseStatus(response204, route.sourceFile) !== 204
-        || routeStatements.at(-1) !== response204 || routeReturns.length !== 2
-        || !routeReturns.includes(response204) || all204.length !== 1 || all204[0] !== response204) {
-        problems.push('the exact completed receipt must dominate the single terminal 204 response');
+    if (routeCalls.length !== 1 || !directDelegate || !serviceReturn
+        || routeReturns.length !== 1 || routeReturns[0] !== serviceReturn) {
+        problems.push('delegated logout route must return exactly one direct service-owned terminal response');
     }
     if (handler && hasDeferredWork(handler)) problems.push('logout route must not defer audit work');
 
@@ -675,7 +642,8 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
     const auditOwner = auditProperty && ts.isFunctionLike(auditProperty.initializer) ? auditProperty.initializer : null;
     const sourcesAreConst = sourcesDeclaration && ts.isVariableDeclarationList(sourcesDeclaration.parent)
         && Boolean(sourcesDeclaration.parent.flags & ts.NodeFlags.Const);
-    if (!owner || !writer || !hash || !writerBinding || !sourcesAreConst || !sourceProperties || !auditOwner) problems.push('delegated service writer is missing, shadowed, or unreachable');
+    if (!owner || !writer || !hash || !writerBinding || !sourcesAreConst || !sourceProperties || !auditOwner
+        || !exactNoStoreResponseFactory(service.sourceFile)) problems.push('delegated service writer or no-store response factory is missing, shadowed, or unreachable');
     if (!owner || !writer || !hash || !writerBinding || !auditOwner) return problems;
 
     const sourceParameter = owner.parameters.find((parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === 'sources');
@@ -684,39 +652,52 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
         problems.push('owner must use the exact immutable production sources binding');
     }
     const sourceCalls = exactDirectObjectCalls(owner, 'sources', ['resolve', 'retire', 'audit']);
+    const resolveCalls = sourceCalls.calls.get('resolve');
     const retireCalls = sourceCalls.calls.get('retire');
     const auditCalls = sourceCalls.calls.get('audit');
     const auditCall = auditCalls[0];
-    if (!sourceCalls.exact || retireCalls.length !== 1 || auditCalls.length !== 1 || !auditCall || !isAwaited(auditCall)
-        || auditCall.arguments.map((argument) => argument.getText(service.sourceFile)).join(',') !== 'session,sessionId,request') {
-        problems.push('owner must await exactly one sources.audit(session,sessionId,request) call');
+    if (!sourceCalls.exact || resolveCalls.length !== 1 || retireCalls.length !== 1 || auditCalls.length !== 1
+        || !auditCall || !isAwaited(auditCall)
+        || !exactArguments(retireCalls[0], [{ identifier: 'sessionId' }, { literal: 'delete' }])
+        || !exactArguments(auditCall, [{ identifier: 'session' }, { identifier: 'sessionId' }, { identifier: 'request' }])) {
+        problems.push('owner must resolve and retire the exact session before one awaited audit');
     }
     const retirement = retireCalls[0]?.parent && ts.isVariableDeclaration(retireCalls[0].parent)
-        && ts.isIdentifier(retireCalls[0].parent.name) ? retireCalls[0].parent.name.text : null;
+        && ts.isIdentifier(retireCalls[0].parent.name) ? retireCalls[0].parent.name.text
+        : retireCalls[0]?.parent && ts.isBinaryExpression(retireCalls[0].parent)
+            && retireCalls[0].parent.operatorToken.kind === ts.SyntaxKind.EqualsToken
+            && ts.isIdentifier(retireCalls[0].parent.left) ? retireCalls[0].parent.left.text : null;
     const completedGuard = owner.body?.statements.find((statement) => ts.isIfStatement(statement)
-        && ts.isBinaryExpression(statement.expression)
-        && statement.expression.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken
-        && ts.isPropertyAccessExpression(statement.expression.left)
-        && ts.isIdentifier(statement.expression.left.expression)
-        && statement.expression.left.expression.text === retirement && statement.expression.left.name.text === 'outcome'
-        && ts.isStringLiteral(statement.expression.right) && statement.expression.right.text === 'completed'
+        && ts.isPrefixUnaryExpression(unwrap(statement.expression))
+        && unwrap(statement.expression).operator === ts.SyntaxKind.ExclamationToken
+        && ts.isCallExpression(unwrap(statement.expression).operand)
+        && ts.isIdentifier(unwrap(statement.expression).operand.expression)
+        && unwrap(statement.expression).operand.expression.text === 'completedReceipt'
+        && exactArguments(unwrap(statement.expression).operand, [{ identifier: retirement ?? '' }])
         && alwaysTerminates(statement.thenStatement));
     if (!completedGuard || !auditCall || retireCalls[0].getStart() > completedGuard.getStart()
         || completedGuard.getStart() > auditCall.getStart()) problems.push('completed retirement must be checked before audit');
-    const ownerStatements = owner.body ? [...owner.body.statements] : [];
-    const retireStatement = retireCalls[0] && directStatement(owner, retireCalls[0]);
-    const retireIndex = retireStatement ? ownerStatements.indexOf(retireStatement) : -1;
-    const auditStatement = auditCall && directAwaitedExpressionStatement(owner, auditCall);
-    const completedReturn = retireIndex >= 0 ? ownerStatements[retireIndex + 3] : null;
-    const completedProperties = completedReturn && ts.isReturnStatement(completedReturn)
-        ? exactPropertyAssignments(objectLiteral(completedReturn.expression), ['completed']) : null;
-    if (retireIndex < 0 || ownerStatements[retireIndex + 1] !== completedGuard
-        || ownerStatements[retireIndex + 2] !== auditStatement
-        || !completedProperties || completedProperties.get('completed')?.initializer.kind !== ts.SyntaxKind.TrueKeyword
-        || ownerStatements.at(-1) !== completedReturn) {
-        problems.push('retirement, completed guard, awaited audit, and completed publication must be one terminal sequence');
+    const ownerReturns = directReturnStatements(owner);
+    const terminal204 = ownerReturns.filter((statement) => {
+        const expression = statement.expression && unwrap(statement.expression);
+        return ts.isCallExpression(expression) && ts.isIdentifier(expression.expression)
+            && expression.expression.text === 'empty' && expression.arguments.length === 1
+            && ts.isNumericLiteral(unwrap(expression.arguments[0])) && Number(unwrap(expression.arguments[0]).text) === 204;
+    });
+    const auditTry = auditCall?.parent && ts.isAwaitExpression(auditCall.parent)
+        && auditCall.parent.parent && ts.isExpressionStatement(auditCall.parent.parent)
+        && auditCall.parent.parent.parent && ts.isBlock(auditCall.parent.parent.parent)
+        && auditCall.parent.parent.parent.parent && ts.isTryStatement(auditCall.parent.parent.parent.parent)
+        ? auditCall.parent.parent.parent.parent : null;
+    if (!completedGuard || !auditCall || !auditTry?.catchClause || auditTry.catchClause.block.statements.length !== 0
+        || !terminal204[0] || terminal204.length !== 1 || ownerReturns.at(-1) !== terminal204[0]
+        || completedGuard.getStart() > auditCall.getStart() || auditCall.getStart() > terminal204[0].getStart()) {
+        problems.push('completed retirement must contain the awaited audit before one service-owned terminal 204');
     }
 
+    const context = importedName(service.sourceFile, delegated.writerModule, 'auditContextFromSession');
+    const requestId = importedName(service.sourceFile, delegated.writerModule, 'requestIdFromRequest');
+    const metadataBuilder = importedName(service.sourceFile, delegated.writerModule, 'withAuditContextMetadata');
     const writerCalls = directWriterCalls(auditOwner, writer, null);
     const allWriterCalls = bindingCalls(service.sourceFile, service.checker, writerBinding.symbol);
     const input = writerCalls.direct[0]?.arguments[0];
@@ -732,9 +713,23 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
     const exactWriterCallee = writerCall && !writerCall.questionDotToken
         && ts.isIdentifier(writerCall.expression) && writerCall.expression.text === writer;
     const auditStatements = ts.isBlock(auditOwner.body) ? [...auditOwner.body.statements] : [];
+    const contextDeclaration = auditStatements[0] && ts.isVariableStatement(auditStatements[0])
+        ? auditStatements[0].declarationList.declarations[0] : null;
+    const contextInitializer = contextDeclaration?.initializer && unwrap(contextDeclaration.initializer);
+    const requestIdValue = auditProperties?.get('requestId')?.initializer && unwrap(auditProperties.get('requestId').initializer);
+    const metadataValue = auditProperties?.get('redactedMetadata')?.initializer && unwrap(auditProperties.get('redactedMetadata').initializer);
     if (localBindingExists(auditOwner, writer) || localBindingExists(auditOwner, hash)
+        || !context || !requestId || !metadataBuilder || localBindingExists(auditOwner, context)
+        || localBindingExists(auditOwner, requestId) || localBindingExists(auditOwner, metadataBuilder)
         || allWriterCalls.length !== 1 || writerCalls.all.length !== 1 || writerCalls.direct.length !== 1 || !isAwaited(writerCall)
-        || !exactWriterCallee || !writerStatement || auditStatements.length !== 1 || auditStatements[0] !== writerStatement
+        || !exactWriterCallee || !writerStatement || auditStatements.length !== 2 || auditStatements[1] !== writerStatement
+        || !contextDeclaration || !ts.isIdentifier(contextDeclaration.name) || contextDeclaration.name.text !== 'context'
+        || !ts.isCallExpression(contextInitializer) || !ts.isIdentifier(contextInitializer.expression) || contextInitializer.expression.text !== context
+        || !exactArguments(contextInitializer, [{ identifier: 'session' }])
+        || !ts.isCallExpression(requestIdValue) || !ts.isIdentifier(requestIdValue.expression) || requestIdValue.expression.text !== requestId
+        || !exactArguments(requestIdValue, [{ identifier: 'request' }])
+        || !ts.isCallExpression(metadataValue) || !ts.isIdentifier(metadataValue.expression) || metadataValue.expression.text !== metadataBuilder
+        || !exactArguments(metadataValue, [{ identifier: 'context' }, { null: true }])
         || !auditProperties || !event || !ts.isStringLiteral(event.initializer) || event.initializer.text !== delegated.eventType) {
         problems.push('delegated writer must await exactly one auth.logout event');
     }
@@ -750,8 +745,7 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
     if (input) countSessionId(input);
     const metadata = auditProperties?.get('redactedMetadata');
     if (!auditProperties || [...auditProperties.keys()].some((name) => /authorization|bearer|cookie|token|raw/iu.test(name))
-        || rawSessionIdUses !== 1 || !auditLiteralSyntaxIsExactAndSafe(input)
-        || (metadata && !metadataIsExactAndSafe(metadata.initializer))) {
+        || rawSessionIdUses !== 1 || !auditLiteralSyntaxIsExactAndSafe(input)) {
         problems.push('delegated audit exposes raw bearer material or unsafe metadata');
     }
     if (hasDeferredWork(owner) || hasDeferredWork(auditOwner)) problems.push('delegated owner must not defer or float audit work');
