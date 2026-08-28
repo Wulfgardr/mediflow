@@ -48,12 +48,17 @@ const usedKeys = new Set<string>(); // Entropy tombstones only; this is not an a
 let control: ControlRecord | null = null;
 let operationActive = false;
 let operationPoisoned = false;
+let recordBeginTurn: ControlRecord | null = null;
 
 function enter(): boolean {
-    if (operationActive) { operationPoisoned = true; return false; }
+    if (operationActive) {
+        operationPoisoned = true;
+        try { recordBeginTurn?.begin(null, null, null, null, null); } catch { /* outer turn remains poisoned */ }
+        return false;
+    }
     operationActive = true; operationPoisoned = false; return true;
 }
-function leave(): void { operationActive = false; operationPoisoned = false; }
+function leave(): void { recordBeginTurn = null; operationActive = false; operationPoisoned = false; }
 function text(value: unknown): value is string { return typeof value === 'string' && value.length > 0 && value.length <= 256; }
 function now(): number | null {
     try { const value = apply(dateNow, Date, []); return safeInteger(value) && value >= 0 ? value : null; } catch { return null; }
@@ -83,9 +88,12 @@ function ensureControl(): ControlRecord | null {
     if (!fence || operationPoisoned) return null;
     try { control = createWebAuthControlRecord(fence); return control; } catch { return null; }
 }
+function cancelAt(binding: AttemptBinding, at: number): void {
+    binding.control.cancelPendingAuth(binding.fence, binding.operation, binding.generation, binding.fingerprint, at);
+}
 function cancelExact(binding: AttemptBinding): void {
     const current = now();
-    if (current !== null) binding.control.cancelPendingAuth(binding.fence, binding.operation, binding.generation, binding.fingerprint, current);
+    if (current !== null) cancelAt(binding, current);
 }
 
 /** Starts one owner-generated login/setup operation; no caller metadata enters P2. */
@@ -97,14 +105,17 @@ export function beginWebAuth(kind: unknown): WebAuthAttempt | null {
         if (kind !== 'login' && kind !== 'setup') return null;
         const owner = ensureControl(); const operation = mint('wac_operation_'); const key = mint('wac_key_'); const fingerprint = mint('wac_fingerprint_'); const at = now();
         if (!owner || !operation || !key || !fingerprint || at === null || operationPoisoned || !rememberKey(key)) return null;
+        recordBeginTurn = owner;
         const result = owner.begin(kind, operation, key, fingerprint, at);
-        if (!result.ok || operationPoisoned) return null;
-        attempt = opaque<WebAuthAttempt>();
+        recordBeginTurn = null;
+        if (!result.ok) return null;
         binding = { lifecycle: 'pending', control: owner, operation, key, fingerprint, fence: result.fence, generation: result.generation, at, activation: null };
+        if (operationPoisoned) { cancelAt(binding, at); return null; }
+        attempt = opaque<WebAuthAttempt>();
         set(attempts, attempt, binding);
         if (operationPoisoned) { try { drop(attempts, attempt); } catch { /* no caller capability was returned */ } cancelExact(binding); return null; }
         return attempt;
-    } catch { if (binding) cancelExact(binding); return null; }
+    } catch { if (attempt) { try { drop(attempts, attempt); } catch { /* no caller capability was returned */ } } if (binding) cancelExact(binding); return null; }
     finally { leave(); }
 }
 
