@@ -199,6 +199,46 @@ VoiceOver nel simulatore mobile; il limite e la deroga della sola candidata
 sorgente 0.8 sono registrati in
 [docs/known-limitations.md](./known-limitations.md).
 
+### 4. Temperamento mobile candidato e stato paired
+
+`WUL-556` usa **Guardia** come temperamento esplorativo su iPhone/iPadOS e
+**Carta** come substrato delle superfici cliniche. La scelta resta
+`PROPOSED_FOR_OWNER_REVIEW`: un rifiuto o un cambio del product owner blocca
+la promozione della candidata. Il client non forza il tema scuro; usa il canvas
+Guardia solo quando l'aspetto di sistema è scuro e mantiene componenti,
+materiali e navigazione di sistema.
+
+La decisione owner per questa slice è vincolante: **Carta descrive la grammatica
+del contenuto, non una palette**. Le superfici mobili non introducono crema,
+beige, avorio o parchment. Il giorno usa i colori neutrali adattivi già
+canonici (`canvas #eef0f2`, `field #f4f6f8`, `focal #fbfcfe`); il buio usa il
+canvas Guardia neutro `#0c0e12`. I colori success/warning/critical restano
+segnali funzionali e non derivano dalla metafora Carta. Le preview sintetiche
+coprono esplicitamente iPhone light e iPad dark.
+
+Il pannello `mobile-paired-status` rende distinguibili caricamento, errore,
+online, cache locale, offline in sola lettura e sessione scaduta. La resa stale
+ha preview e test sintetici, ma non è ancora cablata a metadata live: la cache
+oltre il TTL viene scartata. L'azione primaria misura almeno 48 pt, espone label
+VoiceOver e supporta `⌘R` e pointer su iPad.
+
+Questa superficie non concede capability. Il gate di consumo `WUL-557` usa il
+contratto machine-readable canonico
+`packages/mini/contracts/mini-parity.json`, verificato byte-identico nei head
+`3fd988bafe71a058fdd7d3c25ea569793dcba903` (PR #184) e
+`1e35733c0218eae67a1d6e158085aab7340bc26b` (PR #190). Il contratto dichiara
+4 righe `available` su 66 (`6.060606%`), 61 `manual_only`, 1 `proposal_only` e
+0 `unavailable`; le ragioni restano 23 `HOST_AUTHORITY_ONLY`, 38
+`NOT_IN_MINI_PILOT` e 1 `SYNTHETIC_PREVIEW_ONLY`.
+
+Per la slice `WUL-556`, `patient search/show` (riga 1), `whoami` (riga 39) e
+`capabilities` (riga 63) sono disponibili in Mini, ma non colmano i residui
+nativi e non diventano grant. La cache offline (riga 45) resta `manual_only`
+con ragione `NOT_IN_MINI_PILOT`, mentre iPhone/iPadOS restano `partial` per
+metadata stale live, dettaglio offline e write queue assenti. Manifest, receipt,
+stato paired e token locale non conferiscono autorità agentica. La parity resta
+incompleta fino alla verifica manager e a `WUL-564`.
+
 ---
 
 ## Architettura client-server

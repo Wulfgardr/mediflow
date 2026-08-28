@@ -272,6 +272,88 @@ final class MediFlowMobileAppUITests: XCTestCase {
         )
     }
 
+    /* @Codex */
+    func testPairedStatusIsVisibleAndReachableWithSyntheticPatients() throws {
+        launch(seedPatients: true)
+
+        let status = sectionView("mobile-paired-status")
+        XCTAssertTrue(status.waitForExistence(timeout: 20))
+        XCTAssertGreaterThanOrEqual(status.frame.height, 44)
+        XCTAssertFalse(status.value as? String == "")
+
+        let configure = app.buttons["Configura"]
+        XCTAssertTrue(configure.waitForExistence(timeout: 10))
+        XCTAssertGreaterThanOrEqual(configure.frame.height, 44)
+        attachScreenshot(named: UIDevice.current.userInterfaceIdiom == .pad
+            ? "WUL-556-iPad-Guardia-Carta"
+            : "WUL-556-iPhone-Guardia-Carta")
+    }
+
+    /// The paired state must not displace the first worklist row when the
+    /// compact iPhone workspace recomposes for landscape.
+    /* @Codex */
+    func testPairedStatusKeepsFirstPatientReachableAcrossIPhoneRotation() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "iPhone-only first-viewport contract")
+        launch(seedPatients: true, section: "modules")
+        XCUIDevice.shared.orientation = .portrait
+
+        let workspace = sectionView("clinical-workspace-patients-view")
+        XCTAssertTrue(workspace.waitForExistence(timeout: 20))
+        let window = app.windows.firstMatch
+        let tabBar = app.tabBars.firstMatch
+        let firstRow = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(firstRow.waitForExistence(timeout: 15))
+        XCTAssertTrue(firstRow.isHittable, "the first patient must start reachable in portrait")
+        attachScreenshot(named: "WUL-556-F01-iPhone-portrait-before")
+
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let landscapeCompleted = XCTNSPredicateExpectation(
+            predicate: NSPredicate { object, _ in
+                guard let element = object as? XCUIElement else { return false }
+                return element.frame.width > element.frame.height
+            },
+            object: window
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [landscapeCompleted], timeout: 10),
+            .completed,
+            "the iPhone must complete the landscape transition"
+        )
+
+        XCTAssertTrue(firstRow.waitForExistence(timeout: 10))
+        attachScreenshot(named: "WUL-556-F01-iPhone-landscape-before")
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 10))
+        let landscapeGeometry = """
+        viewport:  \(window.frame)
+        first row: \(firstRow.frame)
+        tab bar:   \(tabBar.frame)
+        """
+        let landscapeGeometryEvidence = XCTAttachment(string: landscapeGeometry)
+        landscapeGeometryEvidence.name = "WUL-556-F01-iPhone-landscape-geometry"
+        landscapeGeometryEvidence.lifetime = .keepAlways
+        add(landscapeGeometryEvidence)
+        XCTAssertTrue(firstRow.isHittable, "the first patient must remain reachable in landscape")
+        XCTAssertLessThanOrEqual(
+            firstRow.frame.maxY,
+            window.frame.maxY,
+            "the first patient row must not extend below the landscape viewport"
+        )
+        XCTAssertLessThanOrEqual(
+            firstRow.frame.maxY,
+            tabBar.frame.minY,
+            "the first patient row must clear the landscape tab bar. \(landscapeGeometry)"
+        )
+
+        firstRow.tap()
+        XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 15))
+        XCUIDevice.shared.orientation = .portrait
+        XCTAssertTrue(
+            sectionView("patient-detail-name").waitForExistence(timeout: 15),
+            "selecting a patient must survive the return to portrait"
+        )
+        attachScreenshot(named: "WUL-556-F01-iPhone-portrait-selection")
+    }
+
     // @Codex #142: AX Dynamic Type must select the existing single-column path.
     func testAccessibilityDynamicTypeUsesSinglePatientColumnOnIPad() throws {
         // Not applicable on iPhone: skipping keeps the iPhone suite meaningful
