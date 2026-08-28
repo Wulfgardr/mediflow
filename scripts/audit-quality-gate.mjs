@@ -255,6 +255,17 @@ function alwaysTerminates(statement) {
         && alwaysTerminates(statement.elseStatement));
 }
 
+function containsTermination(statement) {
+    let found = false;
+    const visit = (node) => {
+        if (found || (node !== statement && ts.isFunctionLike(node))) return;
+        if (ts.isReturnStatement(node) || ts.isThrowStatement(node)) found = true;
+        else ts.forEachChild(node, visit);
+    };
+    visit(statement);
+    return found;
+}
+
 function isReachableCall(call, owner) {
     let child = call;
     for (let parent = child.parent; parent && parent !== owner; child = parent, parent = parent.parent) {
@@ -928,9 +939,14 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
         && auditCall.parent.parent.parent && ts.isBlock(auditCall.parent.parent.parent)
         && auditCall.parent.parent.parent.parent && ts.isTryStatement(auditCall.parent.parent.parent.parent)
         ? auditCall.parent.parent.parent.parent : null;
+    const guardIndex = owner.body?.statements.indexOf(completedGuard) ?? -1;
+    const auditIndex = owner.body?.statements.indexOf(auditTry) ?? -1;
+    const auditBypass = guardIndex < 0 || auditIndex < 0
+        || owner.body.statements.slice(guardIndex + 1, auditIndex).some(containsTermination);
     if (!completedGuard || !auditCall || !auditTry?.catchClause || auditTry.catchClause.block.statements.length !== 0
         || !terminal204[0] || terminal204.length !== 1 || ownerReturns.at(-1) !== terminal204[0]
-        || completedGuard.getStart() > auditCall.getStart() || auditCall.getStart() > terminal204[0].getStart()) {
+        || completedGuard.getStart() > auditCall.getStart() || auditCall.getStart() > terminal204[0].getStart()
+        || auditBypass) {
         problems.push('completed retirement must contain the awaited audit before one service-owned terminal 204');
     }
 

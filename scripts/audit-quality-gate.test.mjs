@@ -479,6 +479,10 @@ test('V5B rejects conditional retirement, forged authority, alternate writers, a
             'try { await sources.audit(session, sessionId, request); } catch {}',
             'if (cookie) { try { await sources.audit(session, sessionId, request); } catch {} }',
         )],
+        ['terminal branch between retirement and audit', logoutService.replace(
+            'try { await sources.audit(session, sessionId, request); } catch {}',
+            'if (session.id) return empty(409);\n    try { await sources.audit(session, sessionId, request); } catch {}',
+        )],
         ['deferred audit', logoutService.replace(
             'try { await sources.audit(session, sessionId, request); } catch {}',
             'queueMicrotask(async () => { try { await sources.audit(session, sessionId, request); } catch {} });',
