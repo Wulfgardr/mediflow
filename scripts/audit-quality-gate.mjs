@@ -514,11 +514,40 @@ function isUnconditionalOwnerCall(owner, call) {
     return false;
 }
 
+const EXACT_LOGOUT_RECORD_VALIDATOR_BODY = `{ if (!value || typeof value !== 'object' || isProxy(value)) return null; try { if (ObjectGetPrototypeOf(value) !== prototype || (frozen && !ObjectIsFrozen(value)) || ObjectGetOwnPropertySymbols(value).length !== 0) return null; const names = ObjectGetOwnPropertyNames(value); if (names.length !== keys.length) return null; for (let index = 0; index < keys.length; index += 1) { const key = keys[index]; if (names[index] !== key) return null; const descriptor = ObjectGetOwnPropertyDescriptor(value, key); if (!descriptor || !('value' in descriptor) || !descriptor.enumerable) return null; if (frozen && (descriptor.configurable || descriptor.writable)) return null; } return value as ExactRecord; } catch { return null; } }`;
+
+function exactModuleConstProperty(sourceFile, checker, name, object, property, objectSymbol = null) {
+    const matches = sourceFile.statements.flatMap((statement) => ts.isVariableStatement(statement)
+        ? [...statement.declarationList.declarations].filter((declaration) =>
+            ts.isIdentifier(declaration.name) && declaration.name.text === name) : []);
+    const declaration = matches.length === 1 ? matches[0] : null;
+    const initializer = declaration?.initializer && unwrap(declaration.initializer);
+    return Boolean(declaration && ts.isVariableDeclarationList(declaration.parent)
+        && (declaration.parent.flags & ts.NodeFlags.Const)
+        && initializer && ts.isPropertyAccessExpression(initializer) && !initializer.questionDotToken
+        && ts.isIdentifier(initializer.expression) && initializer.expression.text === object
+        && (!objectSymbol || checker.getSymbolAtLocation(initializer.expression) === objectSymbol)
+        && initializer.name.text === property);
+}
+
 function isExactCompletedReceiptValidator(sourceFile, checker, name) {
     const validator = namedFunction(sourceFile, name);
     const exactRecord = namedFunction(sourceFile, 'exactRecord');
-    if (!validator || !exactRecord || validator.parameters.length !== 1
+    const exactObjectCaptures = [
+        ['ObjectGetPrototypeOf', 'getPrototypeOf'],
+        ['ObjectGetOwnPropertyDescriptor', 'getOwnPropertyDescriptor'],
+        ['ObjectGetOwnPropertyNames', 'getOwnPropertyNames'],
+        ['ObjectGetOwnPropertySymbols', 'getOwnPropertySymbols'],
+        ['ObjectIsFrozen', 'isFrozen'],
+    ].every(([binding, property]) => exactModuleConstProperty(sourceFile, checker, binding, 'Object', property));
+    const typesBinding = importedBinding(sourceFile, checker, 'node:util', 'types');
+    if (!validator || !exactRecord || !exactObjectCaptures || moduleScopeBindingExists(sourceFile, 'Object')
+        || importedName(sourceFile, 'node:util', 'types') !== 'types' || !typesBinding
+        || !exactModuleConstProperty(sourceFile, checker, 'isProxy', 'types', 'isProxy', typesBinding.symbol)
+        || validator.parameters.length !== 1
         || !ts.isIdentifier(validator.parameters[0].name) || validator.parameters[0].name.text !== 'value'
+        || exactRecord.parameters.map((parameter) => parameter.name.getText(sourceFile)).join(',') !== 'value,keys,prototype,frozen'
+        || exactRecord.body?.getText(sourceFile).replace(/\s+/gu, ' ') !== EXACT_LOGOUT_RECORD_VALIDATOR_BODY
         || validator.body?.statements.length !== 2) return null;
     const [declarationStatement, returnStatement] = validator.body.statements;
     const declaration = ts.isVariableStatement(declarationStatement)
@@ -928,6 +957,21 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
     const contextInitializer = contextDeclaration?.initializer && unwrap(contextDeclaration.initializer);
     const requestIdValue = auditProperties?.get('requestId')?.initializer && unwrap(auditProperties.get('requestId').initializer);
     const metadataValue = auditProperties?.get('redactedMetadata')?.initializer && unwrap(auditProperties.get('redactedMetadata').initializer);
+    const exactContextValue = (name, property) => {
+        const value = auditProperties?.get(name)?.initializer && unwrap(auditProperties.get(name).initializer);
+        return Boolean(value && ts.isPropertyAccessExpression(value) && !value.questionDotToken
+            && ts.isIdentifier(value.expression) && value.expression.text === 'context' && value.name.text === property);
+    };
+    const exactStringValue = (name, expected) => {
+        const value = auditProperties?.get(name)?.initializer;
+        return Boolean(value && ts.isStringLiteral(value) && value.text === expected);
+    };
+    const safeAuditInput = Boolean(auditProperties && auditLiteralSyntaxIsExactAndSafe(input));
+    const exactAuditIdentity = Boolean(auditProperties
+        && exactStringValue('outcome', 'success')
+        && exactContextValue('actorType', 'actorType') && exactContextValue('actorRef', 'actorRef')
+        && exactStringValue('subjectType', 'session')
+        && exactContextValue('sourceSurface', 'sourceSurface'));
     if (localBindingExists(auditOwner, writer) || localBindingExists(auditOwner, hash)
         || !context || !requestId || !metadataBuilder || localBindingExists(auditOwner, context)
         || localBindingExists(auditOwner, requestId) || localBindingExists(auditOwner, metadataBuilder)
@@ -943,6 +987,7 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
         || !auditProperties || !event || !ts.isStringLiteral(event.initializer) || event.initializer.text !== delegated.eventType) {
         problems.push('delegated writer must await exactly one auth.logout event');
     }
+    if (safeAuditInput && !exactAuditIdentity) problems.push('delegated writer must bind the exact success identity and session subject');
     let eventLiteralCount = 0;
     const countEvent = (node) => { if (ts.isStringLiteral(node) && node.text === delegated.eventType) eventLiteralCount += 1; ts.forEachChild(node, countEvent); };
     countEvent(service.sourceFile);
@@ -955,7 +1000,7 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
     if (input) countSessionId(input);
     const metadata = auditProperties?.get('redactedMetadata');
     if (!auditProperties || [...auditProperties.keys()].some((name) => /authorization|bearer|cookie|token|raw/iu.test(name))
-        || rawSessionIdUses !== 1 || !auditLiteralSyntaxIsExactAndSafe(input)) {
+        || rawSessionIdUses !== 1 || !safeAuditInput) {
         problems.push('delegated audit exposes raw bearer material or unsafe metadata');
     }
     if (hasDeferredWork(owner) || hasDeferredWork(auditOwner)) problems.push('delegated owner must not defer or float audit work');

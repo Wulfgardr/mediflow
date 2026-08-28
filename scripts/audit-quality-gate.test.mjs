@@ -265,13 +265,36 @@ export async function POST(request: Request): Promise<Response> {
     } catch {}
     return completeExactWebP3Logout(cookie, request);
 }`;
+const exactRecordBody = `{
+    if (!value || typeof value !== 'object' || isProxy(value)) return null;
+    try {
+        if (ObjectGetPrototypeOf(value) !== prototype || (frozen && !ObjectIsFrozen(value))
+            || ObjectGetOwnPropertySymbols(value).length !== 0) return null;
+        const names = ObjectGetOwnPropertyNames(value);
+        if (names.length !== keys.length) return null;
+        for (let index = 0; index < keys.length; index += 1) {
+            const key = keys[index];
+            if (names[index] !== key) return null;
+            const descriptor = ObjectGetOwnPropertyDescriptor(value, key);
+            if (!descriptor || !('value' in descriptor) || !descriptor.enumerable) return null;
+            if (frozen && (descriptor.configurable || descriptor.writable)) return null;
+        }
+        return value as ExactRecord;
+    } catch { return null; }
+}`;
 const logoutService = `import { auditContextFromSession, hashAuditRef, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from './audit';
 import { dispatchActiveWebServerSessionRetirement } from './server-session';
+import { types } from 'node:util';
+const ObjectGetPrototypeOf = Object.getPrototypeOf;
+const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
+const ObjectGetOwnPropertySymbols = Object.getOwnPropertySymbols;
+const ObjectIsFrozen = Object.isFrozen;
+const isProxy = types.isProxy;
+type ExactRecord = Readonly<Record<string, unknown>>;
 type Session = { id: string };
 type Sources = { resolve(id: string): Session | null; retire(id: string, reason: 'delete'): { outcome: 'completed' | 'denied' }; audit(session: Session, sessionId: string, request: Request): Promise<void> };
-function exactRecord(value: unknown, keys: readonly string[], prototype: object | null, frozen: boolean): Record<string, unknown> | null {
-    void keys; void prototype; void frozen; return value as Record<string, unknown> | null;
-}
+function exactRecord(value: unknown, keys: readonly string[], prototype: object | null, frozen: boolean): ExactRecord | null ${exactRecordBody}
 function completedReceipt(value: unknown): boolean {
     const record = exactRecord(value, ['outcome'], null, true);
     return record?.outcome === 'completed';
@@ -439,6 +462,15 @@ test('V5B rejects conditional retirement, forged authority, alternate writers, a
             "const record = exactRecord(value, ['outcome'], null, true);\n    return record?.outcome === 'completed';",
             "void value; return true;",
         )],
+        ['forged exactRecord body', logoutService.replace(
+            exactRecordBody,
+            "{ void value; void keys; void prototype; void frozen; return Object.freeze(Object.assign(Object.create(null), { outcome: 'completed' })); }",
+        )],
+        ['forged descriptor capture', logoutService.replace(
+            'const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;',
+            'const ObjectGetOwnPropertyDescriptor = () => ({ value: null, enumerable: true, configurable: false, writable: false });',
+        )],
+        ['forged proxy capture', logoutService.replace('const isProxy = types.isProxy;', 'const isProxy = () => false;')],
         ['forged production retire', logoutService.replace(
             'retire: dispatchActiveWebServerSessionRetirement,',
             "retire: (_id: string, _reason: 'delete') => ({ outcome: 'completed' as const }),",
@@ -459,6 +491,16 @@ test('V5B rejects conditional retirement, forged authority, alternate writers, a
             'writeAuditEvent }', 'writeAuditEvent, writeAuditEvent as secondWriter }',
         )],
         ['raw session.id', logoutService.replace('actorRef: context.actorRef', 'actorRef: session.id')],
+        ['missing outcome', logoutService.replace("outcome: 'success', ", '')],
+        ['missing actorType', logoutService.replace('actorType: context.actorType, ', '')],
+        ['missing actorRef', logoutService.replace('actorRef: context.actorRef, ', '')],
+        ['missing subjectType', logoutService.replace("subjectType: 'session', ", '')],
+        ['missing sourceSurface', logoutService.replace('sourceSurface: context.sourceSurface, ', '')],
+        ['forged outcome', logoutService.replace("outcome: 'success'", "outcome: 'failure'")],
+        ['forged actorType', logoutService.replace('actorType: context.actorType', "actorType: 'admin'")],
+        ['forged actorRef', logoutService.replace('actorRef: context.actorRef', "actorRef: hashAuditRef('forged')")],
+        ['forged subjectType', logoutService.replace("subjectType: 'session'", "subjectType: 'patient'")],
+        ['forged sourceSurface', logoutService.replace('sourceSurface: context.sourceSurface', "sourceSurface: 'network'")],
         ...['bearer', 'cookie', 'token', 'authorization'].map((name) => [
             `raw ${name} metadata`, logoutService.replace('actorRef: context.actorRef', `actorRef: ${name}`),
         ]),
