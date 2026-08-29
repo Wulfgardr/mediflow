@@ -150,10 +150,11 @@ test('port factory keeps every lease commit port on exact P3 authority', () => {
 test('port lease currentness rechecks exact authority after hostile clock retirement', () => {
     const value = activeP3Session();
     let retire = false; let retireCalls = 0;
-    const owner = createPortProjectionOwnerFactory({ resolve: (_session, pair) => pair, clock: () => {
+    const registry = createPortProjectionOwnerFactory({ resolve: (_session, pair) => pair, clock: () => {
         if (retire && retireCalls === 0) { retireCalls += 1; retireActiveWebServerSession(value.id, 'dispose'); }
         return Date.now();
-    } }).acquire(value);
+    } });
+    const owner = registry.acquire(value);
     owner.issueSelection({ expectedEpoch: 0, ...PAIR });
     const port = owner.mintPatientInsightLeaseCommitPort(value);
     retire = true;
@@ -161,6 +162,116 @@ test('port lease currentness rechecks exact authority after hostile clock retire
     assert.equal(retireCalls, 1);
     assert.throws(() => owner.snapshotSelectionEpoch(value),
         (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
+    assert.equal(registry.lookup(value.id), null);
+    assert.equal(registry.isAuthenticOwner(owner), false);
+});
+
+test('P3 retirement terminally removes its facade and every commit port from the registry', () => {
+    const value = activeP3Session();
+    const registry = createPortProjectionOwnerFactory({ resolve: (_session, pair) => pair });
+    const owner = registry.acquire(value);
+    owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const ports = [owner.mintPatientInsightLeaseCommitPort(value), owner.mintOcrLeaseCommitPort(value),
+        owner.mintDocumentSynthesisLeaseCommitPort(value), owner.mintTreatmentReasoningLeaseCommitPort(value)];
+    const durable = owner.mintDurableReviewCommitPort(value);
+
+    assert.equal(retireActiveWebServerSession(value.id, 'dispose'), true);
+    assert.equal(registry.lookup(value.id), null);
+    assert.equal(registry.isAuthenticOwner(owner), false);
+    for (const port of ports) assert.equal(port.snapshot(), null);
+    assert.equal(spendDurableReviewCommitPort(durable), false);
+    assert.throws(() => owner.issueSelection({ expectedEpoch: 1, ...PAIR }),
+        (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
+    assert.equal(registry.lookup(value.id), null);
+    assert.equal(registry.isAuthenticOwner(owner), false);
+});
+
+test('P3 deletion removes every registry facade without cross-registry resurrection', () => {
+    const value = activeP3Session();
+    const first = createPortProjectionOwnerFactory({ resolve: (_session, pair) => pair });
+    const second = createPortProjectionOwnerFactory({ resolve: (_session, pair) => pair });
+    const firstOwner = first.acquire(value); const secondOwner = second.acquire(value);
+    firstOwner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    secondOwner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const firstPort = firstOwner.mintPatientInsightLeaseCommitPort(value);
+    const secondPort = secondOwner.mintOcrLeaseCommitPort(value);
+
+    deleteSession(value.id);
+    assert.equal(first.lookup(value.id), null, 'first registry lookup');
+    assert.equal(second.lookup(value.id), null, 'second registry lookup');
+    assert.equal(first.isAuthenticOwner(firstOwner), false);
+    assert.equal(second.isAuthenticOwner(secondOwner), false);
+    assert.equal(firstPort.snapshot(), null, 'first registry commit port');
+    assert.equal(secondPort.snapshot(), null, 'second registry commit port');
+    firstOwner.dispose(); secondOwner.dispose();
+    assert.equal(first.lookup(value.id), null);
+    assert.equal(second.lookup(value.id), null);
+    assert.equal(retireActiveWebServerSession(value.id, 'dispose'), true);
+});
+
+test('P3 global clear removes the facade and releases its commit ports', () => {
+    const value = activeP3Session();
+    const registry = createPortProjectionOwnerFactory({ resolve: (_session, pair) => pair });
+    const owner = registry.acquire(value);
+    owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const port = owner.mintTreatmentReasoningLeaseCommitPort(value);
+    clearAllSessions();
+    assert.equal(registry.lookup(value.id), null);
+    assert.equal(registry.isAuthenticOwner(owner), false);
+    assert.equal(port.snapshot(), null);
+    assert.equal(retireActiveWebServerSession(value.id, 'dispose'), true);
+});
+
+test('P3 port currentness expiry terminally cleans the facade before returning', () => {
+    const value = activeP3Session();
+    let now = value.createdAt;
+    const registry = createPortProjectionOwnerFactory({ resolve: (_session, pair) => pair, clock: () => now });
+    const owner = registry.acquire(value);
+    owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const port = owner.mintDocumentSynthesisLeaseCommitPort(value);
+    const durable = owner.mintDurableReviewCommitPort(value);
+
+    now = value.expiresAt;
+    assert.equal(port.snapshot(), null);
+    assert.equal(registry.lookup(value.id), null);
+    assert.equal(registry.isAuthenticOwner(owner), false);
+    assert.equal(spendDurableReviewCommitPort(durable), false);
+    owner.dispose(); owner.dispose();
+    assert.equal(registry.lookup(value.id), null);
+    assert.equal(retireActiveWebServerSession(value.id, 'dispose'), true);
+});
+
+test('every callback-free facade operation terminally cleans failed P3 currentness', () => {
+    const value = activeP3Session();
+    type PortOwner = ReturnType<ReturnType<typeof createPortProjectionOwnerFactory>['acquire']>;
+    type Lease = ReturnType<PortOwner['issueSelection']>;
+    const operations = [
+        (owner: PortOwner) => owner.snapshotSelectionEpoch(value),
+        (owner: PortOwner) => owner.snapshotReviewContextEpoch(value),
+        (owner: PortOwner) => owner.issueSelection({ expectedEpoch: 1, ...PAIR }),
+        (owner: PortOwner, lease: Lease) => owner.dereferenceSelection(value, {
+            sessionRef: lease.sessionRef, selectionEpoch: lease.selectionEpoch, patientRef: lease.patientRef,
+            ambulatoryRef: lease.ambulatoryRef, leaseRef: lease.leaseRef,
+        }),
+        (owner: PortOwner) => owner.mintPatientInsightLeaseCommitPort(value),
+        (owner: PortOwner) => owner.mintOcrLeaseCommitPort(value),
+        (owner: PortOwner) => owner.mintDocumentSynthesisLeaseCommitPort(value),
+        (owner: PortOwner) => owner.mintTreatmentReasoningLeaseCommitPort(value),
+        (owner: PortOwner) => owner.mintDurableReviewCommitPort(value),
+    ];
+    const records = operations.map((operation) => {
+        const registry = createPortProjectionOwnerFactory({ resolve: (_session, pair) => pair });
+        const owner = registry.acquire(value);
+        const lease = owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+        return { operation, registry, owner, lease };
+    });
+    assert.equal(retireActiveWebServerSession(value.id, 'dispose'), true);
+    for (const { operation, registry, owner, lease } of records) {
+        assert.throws(() => operation(owner, lease),
+            (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
+        assert.equal(registry.lookup(value.id), null);
+        assert.equal(registry.isAuthenticOwner(owner), false);
+    }
 });
 
 test('legacy factory remains the default and port publication has a lexical-only reveal tail', () => {
