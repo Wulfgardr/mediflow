@@ -6,7 +6,7 @@ import { types } from 'node:util';
 import { sql } from 'drizzle-orm';
 import { dbServer } from '../../db-server';
 import { peekSession, registerServerSessionResource, type ServerSession } from '../../security/server-session';
-import type { ServerSessionProjectionOwner } from '../../security/server-session-projection-owner';
+import { serverSessionProjectionOwnerRegistry } from '../../security/server-session-projection-owner-production';
 import { ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES } from './anydoc-local-extraction-contract';
 
 type Current = Readonly<{ sourceRef: string; revision: number; freshnessEpoch: number }>;
@@ -15,8 +15,6 @@ type Begun = Readonly<{ status: 'begun'; operation: object; bytes: Uint8Array; e
 type Final = Readonly<{ status: 'spent' | 'aborted' | 'denied'; evidenceAdmissible: boolean; applyPolicy: 'none'; writesPerformed: 0 }>;
 type Row = Readonly<{ id: string; patientId: string; data: string; current: Current }>;
 const REF = /^[0-9a-f]{64}$/u; const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/u; const DATA_URL = /^data:[^,]*;base64,/iu;
-const OWNER_KEYS = ['snapshotSelectionEpoch', 'snapshotReviewContextEpoch', 'acquireProjectionIngest', 'resolveProjectionService',
-    'issueSelection', 'dereferenceSelection', 'withLeaseCriticalSection', 'dispose'];
 const ROW_KEYS = ['id', 'patientId', 'data', 'sourceRef', 'revision', 'freshnessEpoch'];
 const meta = Object.freeze({ applyPolicy: 'none' as const, writesPerformed: 0 as const });
 const denied: Final = Object.freeze({ status: 'denied', evidenceAdmissible: false, ...meta });
@@ -42,15 +40,6 @@ function exact(value: unknown, keys: readonly string[]): Record<string, unknown>
 function validSession(value: unknown): value is ServerSession {
     const fields = exact(value, ['id', 'userId', 'username', 'role', 'authChannel', 'createdAt', 'expiresAt']);
     return !!fields && typeof fields.id === 'string' && fields.authChannel === 'web' && peekSession(fields.id) === value;
-}
-function validOwner(value: unknown): value is ServerSessionProjectionOwner {
-    if (!value || typeof value !== 'object' || isProxy(value) || !Object.isFrozen(value) || getPrototype(value) !== Object.prototype) return false;
-    const keys = ownKeys(value); if (keys.length !== OWNER_KEYS.length) return false;
-    for (let index = 0; index < OWNER_KEYS.length; index += 1) {
-        if (keys[index] !== OWNER_KEYS[index]) return false;
-        const descriptor = getDescriptor(value, OWNER_KEYS[index]!); if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'function') return false;
-    }
-    return true;
 }
 function selector(value: unknown): string | null {
     const fields = exact(value, ['attachmentId']); const id = fields?.attachmentId;
@@ -91,9 +80,13 @@ function ledger<T>() {
 }
 
 /** Owns host-readable attachment bytes without accepting caller currentness, patient authority, or parser options. */
-export function createAttachmentExtractionSourceAuthority(sessionValue: ServerSession, ownerValue: ServerSessionProjectionOwner) {
-    if (!validSession(sessionValue) || !validOwner(ownerValue)) throw new TypeError('Attachment extraction source authority unavailable');
-    const session = sessionValue, owner = ownerValue; const [addLocator, takeLocator, clearLocators] = ledger<Bound>();
+export function createAttachmentExtractionSourceAuthority(sessionValue: ServerSession) {
+    if (!validSession(sessionValue)) throw new TypeError('Attachment extraction source authority unavailable');
+    const session = sessionValue;
+    let owner;
+    try { owner = serverSessionProjectionOwnerRegistry.acquire(session); }
+    catch { throw new TypeError('Attachment extraction source authority unavailable'); }
+    const [addLocator, takeLocator, clearLocators] = ledger<Bound>();
     const [addOperation, takeOperation, clearOperations] = ledger<Bound>(); let active = true;
     const revoke = () => { active = false; clearLocators(); clearOperations(); };
     const unregister = registerServerSessionResource(session.id, revoke); if (!unregister) throw new TypeError('Attachment extraction source authority unavailable');
