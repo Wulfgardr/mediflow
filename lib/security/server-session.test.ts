@@ -70,6 +70,8 @@ const RESOURCE_PORT_PRIMITIVES = new Set([
 const PROJECTION_OWNER_FILES = [
     'lib/security/server-session-projection-owner.ts', 'lib/security/server-session-projection-owner.test.ts',
 ] as const;
+const PROJECTION_OWNER_FACTORY = 'createPortProjectionOwnerFactory';
+const PROJECTION_OWNER_MODULE = 'lib/security/server-session-projection-owner';
 
 const hasExactProjectionOwnerResourceImport = (source: string) => {
     const ast = ts.createSourceFile(PROJECTION_OWNER_FILES[0], source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -92,9 +94,31 @@ const hasExactProjectionOwnerResourceImport = (source: string) => {
     return matchingDeclarations === 1 && exact;
 };
 
+const hasExactProjectionOwnerFactoryImport = (source: string) => {
+    const ast = ts.createSourceFile(PROJECTION_OWNER_FILES[1], source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    let matchingDeclarations = 0; let exact = true;
+    for (const statement of ast.statements) {
+        if (!ts.isImportDeclaration(statement) || !statement.importClause) continue;
+        const bindings = statement.importClause.namedBindings;
+        if (!bindings || !ts.isNamedImports(bindings)) continue;
+        const markers = bindings.elements.filter((item) => (item.propertyName?.text ?? item.name.text) === PROJECTION_OWNER_FACTORY);
+        if (markers.length === 0) continue;
+        matchingDeclarations += 1;
+        exact &&= ts.isStringLiteral(statement.moduleSpecifier)
+            && statement.moduleSpecifier.text === './server-session-projection-owner.ts'
+            && !statement.attributes && !statement.assertClause && !statement.importClause.name
+            && !statement.importClause.isTypeOnly && markers.length === 1
+            && !markers[0]!.propertyName && !markers[0]!.isTypeOnly;
+    }
+    return matchingDeclarations === 1 && exact;
+};
+
 const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
     const errors: string[] = []; const uses = Object.entries(sources).flatMap(([file, source]) => inventoryModuleImports({
         file, source, target: 'lib/security/server-session', repositoryRoot: REPOSITORY_ROOT, allowUnresolvedExpressions: allowedGenericLoaderExpressions,
+    }));
+    const ownerUses = Object.entries(sources).flatMap(([file, source]) => inventoryModuleImports({
+        file, source, target: PROJECTION_OWNER_MODULE, repositoryRoot: REPOSITORY_ROOT, allowUnresolvedExpressions: allowedGenericLoaderExpressions,
     }));
     const logout = new Map([
         ['lib/security/web-auth-logout-server.ts', new Set([
@@ -135,10 +159,21 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
         if (!PROJECTION_OWNER_FILES.includes(use.file as typeof PROJECTION_OWNER_FILES[number])) errors.push(`${use.file}:resource-owner`);
         if (use.form !== 'named' || use.typeOnly) errors.push(`${use.file}:resource-form`);
     }
-    const ownerAdopters = PROJECTION_OWNER_FILES.filter((file) => resourceUses.some((use) => use.file === file));
-    if (ownerAdopters.length !== 0 && ownerAdopters.length !== PROJECTION_OWNER_FILES.length) errors.push('projection-owner:resource-pair');
-    if (ownerAdopters.includes(PROJECTION_OWNER_FILES[0])
+    const adoptionResourceUses = resourceUses.filter((use) => use.file !== 'lib/security/server-session.test.ts');
+    const ownerAdopters = new Set(adoptionResourceUses.map((use) => use.file));
+    const factorySignals = ownerUses.filter((use) => use.symbol === PROJECTION_OWNER_FACTORY
+        || ['module-path', 'dynamic', 'dynamic-options', 'require', 'require-options', 're-export', 'namespace',
+            'default', 'side-effect', 'code-loader'].includes(use.form)
+        || (use.file === PROJECTION_OWNER_FILES[1] && use.form === 'unsupported-expression'));
+    if (ownerAdopters.has(PROJECTION_OWNER_FILES[0])
         && !hasExactProjectionOwnerResourceImport(sources[PROJECTION_OWNER_FILES[0]] ?? '')) errors.push(`${PROJECTION_OWNER_FILES[0]}:resource-shape`);
+    const absent = adoptionResourceUses.length === 0 && factorySignals.length === 0;
+    const paired = adoptionResourceUses.length === RESOURCE_PORT_PRIMITIVES.size && ownerAdopters.size === 1
+        && ownerAdopters.has(PROJECTION_OWNER_FILES[0]) && hasExactProjectionOwnerResourceImport(sources[PROJECTION_OWNER_FILES[0]] ?? '')
+        && factorySignals.length === 1 && factorySignals[0]!.file === PROJECTION_OWNER_FILES[1]
+        && factorySignals[0]!.form === 'named' && !factorySignals[0]!.typeOnly
+        && hasExactProjectionOwnerFactoryImport(sources[PROJECTION_OWNER_FILES[1]] ?? '');
+    if (!absent && !paired) errors.push('projection-owner:resource-pair');
     const ownReloads = uses.filter((use) => use.file === 'lib/security/server-session.test.ts' && use.form === 'require' && !use.typeOnly);
     if ('lib/security/server-session.test.ts' in sources && ownReloads.length !== 30) errors.push('lib/security/server-session.test.ts:reload-count');
     return { errors, uses };
@@ -795,7 +830,7 @@ test('observes no owner resource import now and permits only the exact future ow
     assert.deepEqual(current.uses.filter((use) => PROJECTION_OWNER_FILES.includes(use.file as typeof PROJECTION_OWNER_FILES[number])
         && RESOURCE_PORT_PRIMITIVES.has(use.symbol)), []);
     const exact = "import { getSession, abortActiveWebSessionResourceUse, beginActiveWebSessionResourceUse, commitActiveWebSessionResourceUse, mintActiveWebSessionResourcePort, releaseActiveWebSessionResourcePort, type ServerSession } from './server-session';";
-    const paired = { [production]: exact, [ownerTest]: "import { commitActiveWebSessionResourceUse } from './server-session';" };
+    const paired = { [production]: exact, [ownerTest]: "import { createPortProjectionOwnerFactory } from './server-session-projection-owner.ts';" };
     assert.deepEqual(validateSessionImports(paired).errors, []);
     assert.notDeepEqual(validateSessionImports({ [production]: exact }).errors, []);
     assert.notDeepEqual(validateSessionImports({ [ownerTest]: paired[ownerTest] }).errors, []);
@@ -830,6 +865,37 @@ test('observes no owner resource import now and permits only the exact future ow
     for (const bypass of mixed) {
         assert.notDeepEqual(validateSessionImports({ ...paired, [production]: `${exact}\n${bypass}` }).errors, [], bypass);
     }
+});
+
+test('permits only absent or exact paired projection owner adoption state', () => {
+    const production = PROJECTION_OWNER_FILES[0]; const ownerTest = PROJECTION_OWNER_FILES[1];
+    const resources = "import { abortActiveWebSessionResourceUse, beginActiveWebSessionResourceUse, commitActiveWebSessionResourceUse, mintActiveWebSessionResourcePort, releaseActiveWebSessionResourcePort } from './server-session';";
+    const marker = "import { createPortProjectionOwnerFactory } from './server-session-projection-owner.ts';";
+    assert.deepEqual(validateSessionImports({ [production]: '', [ownerTest]: '' }).errors, []);
+    const accepted = validateSessionImports({ [production]: resources, [ownerTest]: marker });
+    assert.deepEqual(accepted.errors, []); assert.equal(accepted.uses.length, RESOURCE_PORT_PRIMITIVES.size);
+    assert.notDeepEqual(validateSessionImports({ [production]: resources, [ownerTest]: '' }).errors, []);
+    assert.notDeepEqual(validateSessionImports({ [production]: '', [ownerTest]: marker }).errors, []);
+    const invalidMarkers = [
+        `${marker}\n${marker}`,
+        marker.replace(PROJECTION_OWNER_FACTORY, `${PROJECTION_OWNER_FACTORY} as factory`),
+        marker.replace('import {', 'import type {'),
+        marker.replace(';', " with { type: 'json' };"), marker.replace(';', " assert { type: 'json' };"),
+        "const { createPortProjectionOwnerFactory } = await import('./server-session-projection-owner');",
+        "export { createPortProjectionOwnerFactory } from './server-session-projection-owner';",
+        marker.replace('./server-session-projection-owner.ts', './nested/../server-session-projection-owner'),
+        marker.replace('server-session-projection-owner.ts', '%73erver-session-projection-owner'),
+        marker.replace('.ts', '?copy=1'), marker.replace('.ts', '#copy'),
+        "const owner=await import('./server-session-projection-owner');const key=['createPort','ProjectionOwnerFactory'].join('');owner[key];",
+        'const target=pick();const {createPortProjectionOwnerFactory}=await import(target);',
+    ];
+    for (const source of invalidMarkers) {
+        assert.notDeepEqual(validateSessionImports({ [production]: resources, [ownerTest]: source }).errors, [], source);
+    }
+    assert.notDeepEqual(validateSessionImports({ [production]: resources,
+        [ownerTest]: `${marker}\nimport { commitActiveWebSessionResourceUse } from './server-session';` }).errors, []);
+    assert.notDeepEqual(validateSessionImports({ [production]: resources, [ownerTest]: marker,
+        'lib/security/third.test.ts': marker }).errors, []);
 });
 
 test('Node runtime resolves every inventory alias that the AST gate denies', () => {
