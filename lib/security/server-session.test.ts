@@ -82,7 +82,11 @@ const hasExactProjectionOwnerResourceImport = (source: string, countAllCanonical
         const clause = statement.importClause; const bindings = clause?.namedBindings;
         const resources = bindings && ts.isNamedImports(bindings)
             ? bindings.elements.filter((item) => RESOURCE_PORT_PRIMITIVES.has(item.propertyName?.text ?? item.name.text)) : [];
-        if (resources.length === 0 && !(countAllCanonicalDeclarations && canonical)) continue;
+        const resolvedSelfDeclaration = countAllCanonicalDeclarations && resources.length === 0
+            && inventoryModuleImports({ file: 'lib/security/server-session.test.ts', source: statement.getText(ast),
+                target: 'lib/security/server-session', repositoryRoot: REPOSITORY_ROOT })
+                .some((use) => ['named', 'default', 'namespace', 'side-effect'].includes(use.form));
+        if (resources.length === 0 && !resolvedSelfDeclaration) continue;
         const resourceNames = resources.map((item) => item.name.text);
         const distinctResourceNames = new Set(resourceNames);
         matchingDeclarations += 1;
@@ -909,6 +913,8 @@ test('permits only absent or exact paired projection owner adoption state', () =
         `${selfResources}\nimport type { abortActiveWebSessionResourceUse } from './server-session';`,
         `${selfResources}\nimport { getSession } from './server-session';`,
         `${selfResources}\nimport type { ServerSession } from './server-session';`,
+        `${selfResources}\nimport { getSession } from './server-session.ts';`,
+        `${selfResources}\nimport type { ServerSession } from './server-session.ts';`,
         `${selfResources}\nimport session from './server-session';`,
         `${selfResources}\nimport * as session from './server-session';`,
         `${selfResources}\nimport './server-session';`,
