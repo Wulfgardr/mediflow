@@ -67,6 +67,7 @@ test('discards completed worker output when attachment currentness changes in fl
     db.close();
     const result = await pending;
     assert.equal(result.status, 'denied');
+    assert.equal(Object.getPrototypeOf(result), null);
     assert.deepEqual(Reflect.ownKeys(result), ['schemaVersion', 'status', 'reason', 'field', 'review', 'writes', 'apply', 'candidateUse']);
     assert.equal('markdown' in result, false); assert.equal('provenance' in result, false); assert.equal('receipt' in result, false);
 });
@@ -86,6 +87,8 @@ test('returns only finalized review-required evidence for unsupported local extr
     if (result.status !== 'review_required') return;
     assert.equal(result.reason, 'unsupported_local_extraction'); assert.equal(result.detail, 'unsupported_format');
     assert.equal(result.markdown, ''); assert.equal(result.candidateUse, 'blocked'); assert.equal(Object.isFrozen(result), true);
+    assert.equal(Object.getPrototypeOf(result), null);
+    assert.equal(Object.getPrototypeOf(result.provenance), null); assert.equal(Object.getPrototypeOf(result.receipt), null);
 });
 
 test('finalizes a real worker resource-limit outcome without candidate content', async () => {
@@ -118,6 +121,43 @@ test('denies hostile selectors before reflection or worker execution', async () 
     assert.equal(reads, 0);
 });
 
+test('publishes an exact null-prototype result without ambient then assimilation', async () => {
+    seed();
+    const result = await composeAnyDocCurrentSourceExtraction(session(), { attachmentId: ATTACHMENT });
+    let reads = 0; const unhandled: unknown[] = [];
+    const priorThen = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled);
+    try {
+        Object.defineProperty(Object.prototype, 'then', {
+            configurable: true,
+            get() { reads += 1; throw new Error('ambient then'); },
+        });
+        await Promise.resolve(result);
+        assert.equal(result.status, 'extracted');
+        assert.equal(Object.getPrototypeOf(result), null);
+        assert.equal(Object.isFrozen(result), true);
+        assert.deepEqual(Reflect.ownKeys(result), [
+            'schemaVersion', 'provenance', 'receipt', 'review', 'writes', 'apply', 'status', 'markdown', 'candidateUse',
+        ]);
+        if (result.status !== 'extracted') return;
+        assert.equal(Object.getPrototypeOf(result.provenance), null);
+        assert.equal(Object.getPrototypeOf(result.receipt), null);
+        for (const value of [result, result.provenance, result.receipt]) {
+            for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(value))) {
+                assert.equal('value' in descriptor, true); assert.equal(descriptor.enumerable, true);
+                assert.equal(descriptor.configurable, false); assert.equal(descriptor.writable, false);
+            }
+        }
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        assert.equal(reads, 0); assert.deepEqual(unhandled, []);
+    } finally {
+        process.off('unhandledRejection', onUnhandled);
+        if (priorThen) Object.defineProperty(Object.prototype, 'then', priorThen);
+        else delete (Object.prototype as { then?: unknown }).then;
+    }
+});
+
 test('keeps the composition callback-free and outside P4, routes, storage, and logging', () => {
     const source = fs.readFileSync(new URL('./anydoc-current-source-composition.ts', import.meta.url), 'utf8');
     assert.match(source, /createAttachmentExtractionSourceAuthority\(session\)/u);
@@ -125,4 +165,7 @@ test('keeps the composition callback-free and outside P4, routes, storage, and l
     assert.match(source, /authority\.finalize\(operation\)/u);
     assert.doesNotMatch(source, /withLeaseCriticalSection|callback|runnerValue|sourceValue|provider|config|console|app\/api|insert\(|update\(|delete\(/iu);
     assert.doesNotMatch(source, /export async function composeAnyDocCurrentSourceExtraction\([^)]*=>/u);
+    const finalizeAt = source.indexOf('const final = authority.finalize(operation)');
+    const publishAt = source.indexOf('? publishFinalizedResult(result)');
+    assert.ok(finalizeAt >= 0); assert.ok(publishAt > finalizeAt);
 });
