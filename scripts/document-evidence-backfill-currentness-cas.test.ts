@@ -78,6 +78,32 @@ test('skips stale and wrong-patient candidates without changing evidence', () =>
     }
 });
 
+test('rejects currentness overflow before opening a transaction or writing evidence', () => {
+    const db = database();
+    try {
+        db.prepare(`update attachments set document_revision = ?, document_freshness_epoch = ?
+            where id = 'attachment-1'`).run(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
+        const overflow = {
+            ...candidate,
+            revision: Number.MAX_SAFE_INTEGER,
+            freshnessEpoch: Number.MAX_SAFE_INTEGER,
+        };
+        assert.throws(
+            () => applyDocumentEvidenceArtifactsWithCurrentness(db, [overflow]),
+            /cannot be advanced safely/u,
+        );
+        assert.deepEqual(db.prepare(`select parse_evidence_artifact_snapshot as artifact,
+            document_revision as revision, document_freshness_epoch as freshnessEpoch
+            from attachments where id = 'attachment-1'`).get(), {
+            artifact: null,
+            revision: Number.MAX_SAFE_INTEGER,
+            freshnessEpoch: Number.MAX_SAFE_INTEGER,
+        });
+    } finally {
+        db.close();
+    }
+});
+
 test('rolls back the complete batch when one update fails', () => {
     const db = database();
     try {

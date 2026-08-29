@@ -19,6 +19,15 @@ export function applyDocumentEvidenceArtifactsWithCurrentness(
     db: SqliteDatabase,
     candidates: readonly BackfillCurrentnessCandidate[],
 ): Readonly<{ attempted: number; written: number; skipped: number }> {
+    for (const candidate of candidates) {
+        if (!Number.isSafeInteger(candidate.revision) || candidate.revision < 1
+            || candidate.revision >= Number.MAX_SAFE_INTEGER
+            || !Number.isSafeInteger(candidate.freshnessEpoch) || candidate.freshnessEpoch < 1
+            || candidate.freshnessEpoch >= Number.MAX_SAFE_INTEGER) {
+            throw new RangeError('Attachment currentness cannot be advanced safely.');
+        }
+    }
+
     let written = 0;
     let skipped = 0;
     const update = db.prepare(`
