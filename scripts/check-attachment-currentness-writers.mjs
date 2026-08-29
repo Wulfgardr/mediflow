@@ -18,8 +18,7 @@ const record = (path, kind, fingerprint, count, disposition = 'current', code) =
 export const CONTRACT = [
     record('app/api/attachments/[id]/ocr-replay/route.ts', 'orm-update', '735f2e1f2df28f47', 1, 'finding', 'OCR_REPLAY_CURRENTNESS_GAP'),
     record('app/api/attachments/[id]/ocr-replay/route.ts', 'orm-update', 'd3592d74c71de56c', 1, 'finding', 'OCR_REPLAY_CURRENTNESS_GAP'),
-    record('app/api/attachments/[id]/route.ts', 'orm-delete', '0d3d2253c30c0278', 1),
-    record('app/api/attachments/[id]/route.ts', 'orm-update', '98ea3632d457577f', 1, 'finding', 'AUTHENTICATED_METADATA_PUT_CURRENTNESS_GAP'),
+    record('app/api/attachments/[id]/route.ts', 'orm-delete', '46227366b7b8c814', 1),
     record('app/patients/[id]/entries/new/page.tsx', 'facade-add', '42039a36fd2030de', 1, 'delegated'),
     record('components/document-upload.tsx', 'facade-add', 'eb93ed4c22637733', 1, 'delegated'),
     record('components/document-upload.tsx', 'facade-delete', 'ea20bffd502bf35b', 1, 'delegated'),
@@ -28,6 +27,7 @@ export const CONTRACT = [
     record('components/document-upload.tsx', 'facade-update', 'b09c961d357ca147', 1, 'delegated'),
     record('components/document-upload.tsx', 'facade-update', 'cfe926ff66787d75', 2, 'delegated'),
     record('components/document-upload.tsx', 'facade-update', 'e3a5b86baa23e4d4', 1, 'delegated'),
+    record('lib/attachment-currentness-host.ts', 'raw-update', '9c1cca84075cc579', 1),
     record('lib/attachment-currentness-host.ts', 'raw-update', 'f7b9893a376ee118', 1),
     record('lib/attachment-web-create.ts', 'orm-insert', '58b77ec84cbf40a6', 1),
     record('lib/backup-restore-executor.ts', 'restore-clear-binding', 'a6330adedc96f3b5', 1),
@@ -210,7 +210,6 @@ export function policyFindings() {
     const checks = [
         ['BACKUP_LEGACY_CURRENTNESS_GAP', 'lib/backup-artifact.ts', /BACKUP_DOCUMENT_CURRENTNESS_UNSUPPORTED/u, false],
         ['RESTORE_PREFLIGHT_CURRENTNESS_GAP', 'lib/backup-restore-preflight.ts', /BACKUP_DOCUMENT_CURRENTNESS_UNSUPPORTED/u, false],
-        ['DELETE_LOCATOR_REVOCATION_GAP', 'app/api/attachments/[id]/route.ts', /revoke\w*Attachment\w*Locator/iu, true],
         ['PURGE_LOCATOR_REVOCATION_GAP', 'lib/patient-cascade.ts', /revoke\w*Attachment\w*Locator/iu, true],
         ['RESTORE_LOCATOR_REVOCATION_GAP', 'lib/backup-restore-executor.ts', /revoke\w*Attachment\w*Locator/iu, true],
     ];
