@@ -80,10 +80,14 @@ const hasExactProjectionOwnerResourceImport = (source: string) => {
         if (!bindings || !ts.isNamedImports(bindings)) continue;
         const resources = bindings.elements.filter((item) => RESOURCE_PORT_PRIMITIVES.has(item.propertyName?.text ?? item.name.text));
         if (resources.length === 0) continue;
+        const resourceNames = resources.map((item) => item.name.text);
+        const distinctResourceNames = new Set(resourceNames);
         matchingDeclarations += 1;
         exact &&= ts.isStringLiteral(statement.moduleSpecifier) && statement.moduleSpecifier.text === './server-session'
-            && !statement.importClause.isTypeOnly && resources.length === RESOURCE_PORT_PRIMITIVES.size
-            && resources.every((item) => !item.propertyName && !item.isTypeOnly && RESOURCE_PORT_PRIMITIVES.has(item.name.text));
+            && !statement.attributes && !statement.assertClause && !statement.importClause.isTypeOnly
+            && resources.length === RESOURCE_PORT_PRIMITIVES.size && distinctResourceNames.size === RESOURCE_PORT_PRIMITIVES.size
+            && [...RESOURCE_PORT_PRIMITIVES].every((name) => distinctResourceNames.has(name))
+            && resources.every((item) => !item.propertyName && !item.isTypeOnly);
     }
     return matchingDeclarations === 1 && exact;
 };
@@ -800,6 +804,18 @@ test('observes no owner resource import now and permits only the exact future ow
         [production]: exact.replace('mintActiveWebSessionResourcePort', 'mintActiveWebSessionResourcePort as mint') }).errors, []);
     assert.notDeepEqual(validateSessionImports({ ...paired,
         [ownerTest]: "import type { commitActiveWebSessionResourceUse } from './server-session';" }).errors, []);
+    const attributed = [
+        exact.replace(" from './server-session';", " from './server-session' with { type: 'json' };"),
+        exact.replace(" from './server-session';", " from './server-session' assert { type: 'json' };"),
+    ];
+    for (const source of attributed) assert.notDeepEqual(validateSessionImports({ ...paired, [production]: source }).errors, [], source);
+    for (const omitted of RESOURCE_PORT_PRIMITIVES) {
+        for (const duplicate of RESOURCE_PORT_PRIMITIVES) {
+            if (duplicate === omitted) continue;
+            const source = exact.replace(omitted, duplicate);
+            assert.notDeepEqual(validateSessionImports({ ...paired, [production]: source }).errors, [], `${omitted}->${duplicate}`);
+        }
+    }
     const mixed = [
         "await import('./server-session?shadow#copy');", "await import('./server-session#copy');",
         "await import('./%73erver-session');", "await import('./SERVER-SESSION');",
