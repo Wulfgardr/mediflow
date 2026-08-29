@@ -186,10 +186,11 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
         && factorySignals.length === 1 && factorySignals[0]!.file === PROJECTION_OWNER_FILES[1]
         && factorySignals[0]!.form === 'named' && !factorySignals[0]!.typeOnly
         && hasExactProjectionOwnerFactoryImport(sources[PROJECTION_OWNER_FILES[1]] ?? '');
-    if (!absent && !paired) errors.push('projection-owner:resource-pair');
+    const adoptionState = absent ? 'ABSENT' : paired ? 'PAIRED' : 'INVALID';
+    if (adoptionState === 'INVALID') errors.push('projection-owner:resource-pair');
     const ownReloads = uses.filter((use) => use.file === 'lib/security/server-session.test.ts' && use.form === 'require' && !use.typeOnly);
     if ('lib/security/server-session.test.ts' in sources && ownReloads.length !== 30) errors.push('lib/security/server-session.test.ts:reload-count');
-    return { errors, uses };
+    return { adoptionState, errors, uses };
 };
 const typescriptSources = () => repositoryTypeScriptSources(REPOSITORY_ROOT);
 
@@ -836,18 +837,20 @@ test('inventories exact session imports by AST and closes the logout authority b
     assert.ok(validateSessionImports({ 'lib/pdfjs-server.ts': `${pdfjs}\nconst duplicate=new Function('specifier','return import(specifier);');` }).errors.includes('lib/pdfjs-server.ts:reserved-loader-allowlist-duplicate'));
 });
 
-test('observes no owner resource import now and permits only the exact future owner pair', () => {
+test('observes only absent or exact paired projection owner adoption', () => {
     const production = 'lib/security/server-session-projection-owner.ts';
     const ownerTest = 'lib/security/server-session-projection-owner.test.ts';
     const current = validateSessionImports(typescriptSources());
-    assert.deepEqual(current.uses.filter((use) => PROJECTION_OWNER_FILES.includes(use.file as typeof PROJECTION_OWNER_FILES[number])
-        && RESOURCE_PORT_PRIMITIVES.has(use.symbol)), []);
+    assert.ok(current.adoptionState === 'ABSENT' || current.adoptionState === 'PAIRED');
     const exact = "import { getSession, abortActiveWebSessionResourceUse, beginActiveWebSessionResourceUse, commitActiveWebSessionResourceUse, mintActiveWebSessionResourcePort, releaseActiveWebSessionResourcePort, type ServerSession } from './server-session';";
     const paired = { [production]: exact, [ownerTest]: "import { createPortProjectionOwnerFactory } from './server-session-projection-owner.ts';" };
-    assert.deepEqual(validateSessionImports(paired).errors, []);
-    assert.notDeepEqual(validateSessionImports({ [production]: exact }).errors, []);
+    const accepted = validateSessionImports(paired);
+    assert.equal(accepted.adoptionState, 'PAIRED'); assert.deepEqual(accepted.errors, []);
+    const partial = validateSessionImports({ [production]: exact });
+    assert.equal(partial.adoptionState, 'INVALID'); assert.notDeepEqual(partial.errors, []);
     assert.notDeepEqual(validateSessionImports({ [ownerTest]: paired[ownerTest] }).errors, []);
-    assert.notDeepEqual(validateSessionImports({ ...paired, 'lib/security/third.ts': "import { commitActiveWebSessionResourceUse } from './server-session';" }).errors, []);
+    const third = validateSessionImports({ ...paired, 'lib/security/third.ts': "import { commitActiveWebSessionResourceUse } from './server-session';" });
+    assert.equal(third.adoptionState, 'INVALID'); assert.notDeepEqual(third.errors, []);
     assert.notDeepEqual(validateSessionImports({ ...paired,
         [production]: exact.replace('mintActiveWebSessionResourcePort', 'mintActiveWebSessionResourcePort as mint') }).errors, []);
     assert.notDeepEqual(validateSessionImports({ ...paired,
