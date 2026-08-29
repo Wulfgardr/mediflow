@@ -16,8 +16,6 @@ const SELF = new Set(['scripts/check-attachment-currentness-writers.mjs', 'scrip
 // occurrence count all match. `finding` records keep the production gate red.
 const record = (path, kind, fingerprint, count, disposition = 'current', code) => ({ path, kind, fingerprint, count, disposition, code });
 export const CONTRACT = [
-    record('app/api/attachments/[id]/ocr-replay/route.ts', 'orm-update', '735f2e1f2df28f47', 1, 'finding', 'OCR_REPLAY_CURRENTNESS_GAP'),
-    record('app/api/attachments/[id]/ocr-replay/route.ts', 'orm-update', 'd3592d74c71de56c', 1, 'finding', 'OCR_REPLAY_CURRENTNESS_GAP'),
     record('app/api/attachments/[id]/route.ts', 'orm-delete', '46227366b7b8c814', 1),
     record('app/patients/[id]/entries/new/page.tsx', 'facade-add', '42039a36fd2030de', 1, 'delegated'),
     record('components/document-upload.tsx', 'facade-add', 'eb93ed4c22637733', 1, 'delegated'),

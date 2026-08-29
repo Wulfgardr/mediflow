@@ -26,18 +26,15 @@ test('fails closed on duplicate, missing, fingerprint, count, and undeclared dri
 
 test('exact repository inventory is classified and keeps known gaps red', () => {
     const findings = compareInventory(inventory(), CONTRACT);
-    assert.equal(CONTRACT.length, 28);
-    assert.equal(inventory().length, 28);
+    assert.equal(CONTRACT.length, 26);
+    assert.equal(inventory().length, 26);
     assert.deepEqual(findings.filter((item) => ['DUPLICATE_CONTRACT', 'MISSING_OR_DRIFTED_WRITER', 'WRITER_COUNT_DRIFT', 'UNDECLARED_WRITER'].includes(item.code)), []);
     assert.deepEqual([...new Set(findings.map((item) => item.code))].sort(), [
         'LIVE_EVIDENCE_BACKFILL_CURRENTNESS_GAP',
-        'OCR_REPLAY_CURRENTNESS_GAP',
         'SYNTHETIC_SEED_CURRENTNESS_GAP',
     ]);
     assert.equal(CONTRACT.find((item) => item.path === 'lib/seeder.ts' && item.kind === 'facade-add')?.disposition, 'delegated');
     assert.deepEqual([...findings, ...policyFindings()], [
-        { code: 'OCR_REPLAY_CURRENTNESS_GAP', path: 'app/api/attachments/[id]/ocr-replay/route.ts', kind: 'orm-update', fingerprint: '735f2e1f2df28f47', count: 1 },
-        { code: 'OCR_REPLAY_CURRENTNESS_GAP', path: 'app/api/attachments/[id]/ocr-replay/route.ts', kind: 'orm-update', fingerprint: 'd3592d74c71de56c', count: 1 },
         { code: 'LIVE_EVIDENCE_BACKFILL_CURRENTNESS_GAP', path: 'scripts/document-evidence-backfill-live-db.ts', kind: 'raw-update', fingerprint: 'e2b01f457d7d8b56', count: 1 },
         { code: 'SYNTHETIC_SEED_CURRENTNESS_GAP', path: 'scripts/seed-performance-baseline.mjs', kind: 'raw-insert-into', fingerprint: 'd60b484518a09e8b', count: 1 },
         { code: 'BACKUP_LEGACY_CURRENTNESS_GAP', path: 'lib/backup-artifact.ts' },
