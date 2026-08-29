@@ -704,7 +704,9 @@ async function applyCandidateArtifacts(
         if (!row || row.patient_id !== item.patientId
             || !/^[0-9a-f]{64}$/u.test(row.document_source_ref)
             || !Number.isSafeInteger(row.document_revision) || row.document_revision < 1
-            || !Number.isSafeInteger(row.document_freshness_epoch) || row.document_freshness_epoch < 1) {
+            || row.document_revision >= Number.MAX_SAFE_INTEGER
+            || !Number.isSafeInteger(row.document_freshness_epoch) || row.document_freshness_epoch < 1
+            || row.document_freshness_epoch >= Number.MAX_SAFE_INTEGER) {
             throw new Error('Attachment currentness snapshot is unavailable for a candidate artifact.');
         }
         const serialized = serializeDocumentParseEvidenceArtifact(item.candidateArtifact);
