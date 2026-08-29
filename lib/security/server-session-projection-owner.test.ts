@@ -41,14 +41,80 @@ test('port factory reveals one owner only after exact P3 authority commits', () 
     assert.equal(registry.isAuthenticOwner(owner), true);
     const lease = owner.issueSelection({ expectedEpoch: 0, ...PAIR });
     assert.equal(lease.selectionEpoch, 1);
-    const tuple = { sessionRef: lease.sessionRef, selectionEpoch: lease.selectionEpoch, patientRef: lease.patientRef,
-        ambulatoryRef: lease.ambulatoryRef, leaseRef: lease.leaseRef };
-    assert.throws(() => owner.acquireProjectionIngest(value, tuple),
-        (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'broker_unavailable');
+    assert.equal(Reflect.get(owner, 'acquireProjectionIngest'), undefined);
+    assert.equal(Reflect.get(owner, 'resolveProjectionService'), undefined);
+    assert.equal(Reflect.get(owner, 'withLeaseCriticalSection'), undefined);
     assert.equal(brokerCalls, 0);
     assert.equal(retireActiveWebServerSession(value.id, 'dispose'), true);
     assert.throws(() => owner.snapshotSelectionEpoch(value),
         (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
+});
+
+test('port owner surface cannot recover legacy callback or broker authority', () => {
+    const value = activeP3Session();
+    const registry = createPortProjectionOwnerFactory({ resolve: (_session, pair) => pair });
+    const owner = registry.acquire(value);
+    owner.issueSelection({ expectedEpoch: 0, ...PAIR });
+    const forbidden = ['acquireProjectionIngest', 'resolveProjectionService', 'withLeaseCriticalSection'] as const;
+    let effects = 0;
+
+    assert.equal(Object.getPrototypeOf(owner), null);
+    assert.equal(Object.isFrozen(owner), true);
+    assert.equal(isServerSessionProjectionOwner(owner), false);
+    assert.deepEqual(Reflect.ownKeys(owner), [
+        'snapshotSelectionEpoch', 'snapshotReviewContextEpoch', 'issueSelection', 'dereferenceSelection',
+        'mintPatientInsightLeaseCommitPort', 'mintOcrLeaseCommitPort', 'mintDocumentSynthesisLeaseCommitPort',
+        'mintTreatmentReasoningLeaseCommitPort', 'mintDurableReviewCommitPort', 'dispose',
+    ]);
+    for (const key of forbidden) {
+        assert.equal(Reflect.has(owner, key), false);
+        assert.equal(Reflect.get(owner, key), undefined);
+        assert.equal(Object.getOwnPropertyDescriptor(owner, key), undefined);
+    }
+    const cast = owner as unknown as { withLeaseCriticalSection(session: ServerSession, callback: () => void): void };
+    assert.throws(() => cast.withLeaseCriticalSection(value, () => { effects += 1; }), TypeError);
+    assert.equal(effects, 0);
+    const issueAlias = owner.issueSelection;
+    assert.throws(() => issueAlias({ expectedEpoch: 1, ...PAIR }),
+        (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
+    assert.throws(() => Object.defineProperty(owner, 'withLeaseCriticalSection', {
+        get() { effects += 1; return () => undefined; },
+    }), TypeError);
+    assert.equal(effects, 0);
+
+    const inherited = Object.getOwnPropertyDescriptor(Object.prototype, 'withLeaseCriticalSection');
+    try {
+        Object.defineProperty(Object.prototype, 'withLeaseCriticalSection', {
+            configurable: true, get() { effects += 1; return () => undefined; },
+        });
+        assert.equal(Reflect.get(owner, 'withLeaseCriticalSection'), undefined);
+        assert.equal(effects, 0);
+    } finally {
+        if (inherited) Object.defineProperty(Object.prototype, 'withLeaseCriticalSection', inherited);
+        else delete (Object.prototype as { withLeaseCriticalSection?: unknown }).withLeaseCriticalSection;
+    }
+
+    let traps = 0;
+    const hostile = new Proxy(owner, { get() { traps += 1; throw new Error('synthetic trap'); } });
+    assert.equal(registry.isAuthenticOwner(hostile), false);
+    assert.equal(traps, 0);
+    assert.equal(retireActiveWebServerSession(value.id, 'dispose'), true);
+});
+
+test('port owner surface stays registry-private and the adoption gate denies module-copy imports', () => {
+    const value = activeP3Session();
+    const registry = createPortProjectionOwnerFactory({ resolve: (_session, pair) => pair });
+    const owner = registry.acquire(value);
+    const foreignRegistry = createPortProjectionOwnerFactory({ resolve: (_session, pair) => pair });
+    const foreignOwner = foreignRegistry.acquire(value);
+    assert.equal(registry.isAuthenticOwner(foreignOwner), false);
+    assert.equal(foreignRegistry.isAuthenticOwner(owner), false);
+    assert.equal(Reflect.get(foreignOwner, 'withLeaseCriticalSection'), undefined);
+    assert.equal(Reflect.get(foreignOwner, 'acquireProjectionIngest'), undefined);
+    const inventory = readFileSync(new URL('./server-session.test.ts', import.meta.url), 'utf8');
+    assert.match(inventory, /marker\.replace\('\.ts', '\?copy=1'\)/u);
+    foreignOwner.dispose(); owner.dispose();
+    assert.equal(retireActiveWebServerSession(value.id, 'dispose'), true);
 });
 
 test('port factory rejects legacy, forged, hostile, wrong-channel, expired, and retired sessions', () => {
@@ -104,7 +170,7 @@ test('legacy factory remains the default and port publication has a lexical-only
     assert.equal(compatible.acquire(second).snapshotSelectionEpoch(second), 0);
 
     const source = readFileSync(new URL('./server-session-projection-owner.ts', import.meta.url), 'utf8');
-    assert.match(source, /if \(!commitActiveWebSessionResourceUse\(acquisitionUse\)\) return fail\('session_ineligible'\);\s+portRevealActive = false;\s+revealed = true;\s+return completedOwner;/u);
+    assert.match(source, /if \(!commitActiveWebSessionResourceUse\(acquisitionUse\)\) return fail\('session_ineligible'\);\s+portRevealActive = false;\s+revealed = true;\s+return completedPortOwner as Owner;/u);
     assert.match(source, /export function createServerSessionProjectionOwnerRegistry[\s\S]*return createLegacyProjectionOwnerFactory\(sourceOverrides\);/u);
 });
 

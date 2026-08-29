@@ -194,6 +194,29 @@ export type TreatmentReasoningLeaseCommitPort = Readonly<{
     dispose(): void;
 }>;
 
+export type PortServerSessionProjectionOwner = Readonly<{
+    snapshotSelectionEpoch(session: ServerSession): number;
+    snapshotReviewContextEpoch(session: ServerSession): number;
+    issueSelection(input: Readonly<{ expectedEpoch: number; patientId: string; ambulatoryId: string }>): SelectionLease;
+    dereferenceSelection(session: ServerSession, input: SelectionLeaseTuple): CanonicalPair;
+    mintPatientInsightLeaseCommitPort(session: ServerSession): PatientInsightLeaseCommitPort;
+    mintOcrLeaseCommitPort(session: ServerSession): OcrLeaseCommitPort;
+    mintDocumentSynthesisLeaseCommitPort(session: ServerSession): DocumentSynthesisLeaseCommitPort;
+    mintTreatmentReasoningLeaseCommitPort(session: ServerSession): TreatmentReasoningLeaseCommitPort;
+    mintDurableReviewCommitPort(session: ServerSession): DurableReviewCommitPort;
+    dispose(): void;
+}>;
+
+type ProjectionOwnerSurface = ServerSessionProjectionOwner | PortServerSessionProjectionOwner;
+type ProjectionOwnerRegistry<Owner extends ProjectionOwnerSurface> = Readonly<{
+    isAuthenticOwner(candidate: unknown): candidate is Owner;
+    lookup(sessionId: string): Owner | null;
+    snapshotSelectionEpoch(session: ServerSession): number;
+    snapshotReviewContextEpoch(session: ServerSession): number;
+    acquire(session: ServerSession): Owner;
+    create(session: ServerSession): Owner;
+}>;
+
 export function isServerSessionProjectionOwner(candidate: unknown): candidate is ServerSessionProjectionOwner {
     if (typeof candidate !== 'object' || candidate === null || isProxy(candidate)) return false;
     return hasOwnerIdentity(authenticOwners, candidate);
@@ -252,10 +275,10 @@ function frozenExact(input: unknown, keys: readonly string[]): Record<string, un
 
 type ProjectionOwnerAuthorityKind = 'legacy' | 'port';
 
-function createProjectionOwnerFactory(authorityKind: ProjectionOwnerAuthorityKind,
-    sourceOverrides: Partial<SelectionSources> = {}) {
+function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(authorityKind: ProjectionOwnerAuthorityKind,
+    sourceOverrides: Partial<SelectionSources> = {}): ProjectionOwnerRegistry<Owner> {
     const sources = ObjectFreeze({ ...defaultSources, ...sourceOverrides });
-    const owners = new MapConstructor<string, ServerSessionProjectionOwner>();
+    const owners = new MapConstructor<string, ProjectionOwnerSurface>();
     const ownerSessions = new MapConstructor<string, ServerSession>();
     const registryOwners = new WeakSetConstructor<object>();
     const retired = new SetConstructor<string>();
@@ -273,14 +296,14 @@ function createProjectionOwnerFactory(authorityKind: ProjectionOwnerAuthorityKin
         } catch { return false; }
     };
 
-    const registry = {
-        isAuthenticOwner(candidate: unknown): candidate is ServerSessionProjectionOwner {
-            if (!isServerSessionProjectionOwner(candidate)) return false;
+    const registry: ProjectionOwnerRegistry<Owner> = {
+        isAuthenticOwner(candidate: unknown): candidate is Owner {
+            if (typeof candidate !== 'object' || candidate === null || isProxy(candidate)) return false;
             return hasOwnerIdentity(registryOwners, candidate);
         },
-        lookup(sessionId: string): ServerSessionProjectionOwner | null {
+        lookup(sessionId: string): Owner | null {
             if (portRevealActive) return null;
-            return getMapValue(owners, sessionId) ?? null;
+            return (getMapValue(owners, sessionId) as Owner | undefined) ?? null;
         },
         snapshotSelectionEpoch(session: ServerSession): number {
             if (portRevealActive || !eligible(session, false)) return fail('session_ineligible');
@@ -290,14 +313,14 @@ function createProjectionOwnerFactory(authorityKind: ProjectionOwnerAuthorityKin
             if (portRevealActive || !eligible(session, false)) return fail('session_ineligible');
             return getMapValue(owners, session.id)?.snapshotReviewContextEpoch(session) ?? 0;
         },
-        acquire(session: ServerSession): ServerSessionProjectionOwner {
+        acquire(session: ServerSession): Owner {
             if (portRevealActive || !eligible(session, true)) return fail('session_ineligible');
             const existing = getMapValue(owners, session.id);
-            if (existing && (authorityKind === 'legacy' || getMapValue(ownerSessions, session.id) === session)) return existing;
+            if (existing && (authorityKind === 'legacy' || getMapValue(ownerSessions, session.id) === session)) return existing as Owner;
             if (existing) return fail('session_ineligible');
             return registry.create(session);
         },
-        create(session: ServerSession): ServerSessionProjectionOwner {
+        create(session: ServerSession): Owner {
             if (portRevealActive || !eligible(session, true)) return fail('session_ineligible');
             if (hasMapValue(owners, session.id)) return fail('owner_exists');
             if (hasSetValue(retired, session.id)) return fail('owner_disposed');
@@ -321,6 +344,7 @@ function createProjectionOwnerFactory(authorityKind: ProjectionOwnerAuthorityKin
             let terminal = false;
             let unregisterOwner: (() => void) | null = null;
             let authorityPort: ActiveWebSessionResourcePort | null = null;
+            let publishedOwner: ProjectionOwnerSurface | null = null;
             const currentSession = (renew: boolean) => {
                 if (authorityKind === 'legacy') return (renew ? getSession(session.id) : peekSession(session.id)) === session ? session : null;
                 if (!authorityPort) return null;
@@ -668,7 +692,8 @@ function createProjectionOwnerFactory(authorityKind: ProjectionOwnerAuthorityKin
                         catch { return fail('selection_unavailable'); }
                         const assertCurrent = () => {
                             const current = currentSession(true);
-                            if (terminal || current !== session || session.authChannel !== 'web' || getMapValue(owners, session.id) !== owner) {
+                            if (terminal || current !== session || session.authChannel !== 'web'
+                                || getMapValue(owners, session.id) !== publishedOwner) {
                                 return fail('session_unavailable');
                             }
                             if (value.expectedEpoch !== epoch) return fail('epoch_conflict');
@@ -767,13 +792,57 @@ function createProjectionOwnerFactory(authorityKind: ProjectionOwnerAuthorityKin
             } });
             const completedOwner = ObjectFreeze(owner) as unknown as ServerSessionProjectionOwner;
 
+            const portOwner = ObjectCreate(null) as PortServerSessionProjectionOwner;
+            ObjectDefineProperty(portOwner, 'snapshotSelectionEpoch', { value: function(presentedSession: ServerSession) {
+                if (this !== portOwner) return fail('session_unavailable');
+                return completedOwner.snapshotSelectionEpoch(presentedSession);
+            } });
+            ObjectDefineProperty(portOwner, 'snapshotReviewContextEpoch', { value: function(presentedSession: ServerSession) {
+                if (this !== portOwner) return fail('session_unavailable');
+                return completedOwner.snapshotReviewContextEpoch(presentedSession);
+            } });
+            ObjectDefineProperty(portOwner, 'issueSelection', { value: function(input: Parameters<PortServerSessionProjectionOwner['issueSelection']>[0]) {
+                if (this !== portOwner) return fail('session_unavailable');
+                return completedOwner.issueSelection(input);
+            } });
+            ObjectDefineProperty(portOwner, 'dereferenceSelection', { value: function(presentedSession: ServerSession, input: SelectionLeaseTuple) {
+                if (this !== portOwner) return fail('session_unavailable');
+                return completedOwner.dereferenceSelection(presentedSession, input);
+            } });
+            ObjectDefineProperty(portOwner, 'mintPatientInsightLeaseCommitPort', { value: function(presentedSession: ServerSession) {
+                if (this !== portOwner) return fail('session_unavailable');
+                return completedOwner.mintPatientInsightLeaseCommitPort(presentedSession);
+            } });
+            ObjectDefineProperty(portOwner, 'mintOcrLeaseCommitPort', { value: function(presentedSession: ServerSession) {
+                if (this !== portOwner) return fail('session_unavailable');
+                return completedOwner.mintOcrLeaseCommitPort(presentedSession);
+            } });
+            ObjectDefineProperty(portOwner, 'mintDocumentSynthesisLeaseCommitPort', { value: function(presentedSession: ServerSession) {
+                if (this !== portOwner) return fail('session_unavailable');
+                return completedOwner.mintDocumentSynthesisLeaseCommitPort(presentedSession);
+            } });
+            ObjectDefineProperty(portOwner, 'mintTreatmentReasoningLeaseCommitPort', { value: function(presentedSession: ServerSession) {
+                if (this !== portOwner) return fail('session_unavailable');
+                return completedOwner.mintTreatmentReasoningLeaseCommitPort(presentedSession);
+            } });
+            ObjectDefineProperty(portOwner, 'mintDurableReviewCommitPort', { value: function(presentedSession: ServerSession) {
+                if (this !== portOwner) return fail('session_unavailable');
+                return completedOwner.mintDurableReviewCommitPort(presentedSession);
+            } });
+            ObjectDefineProperty(portOwner, 'dispose', { value: function() {
+                if (this !== portOwner) return fail('session_unavailable');
+                return completedOwner.dispose();
+            } });
+            const completedPortOwner = ObjectFreeze(portOwner);
+
             if (authorityKind === 'legacy') {
                 unregisterOwner = registerServerSessionResource(session.id, () => finish(false));
                 if (!unregisterOwner) return fail('session_ineligible');
-                setMapValue(owners, session.id, completedOwner);
+                publishedOwner = completedOwner;
+                setMapValue(owners, session.id, publishedOwner);
                 addOwnerIdentity(registryOwners, completedOwner);
                 addOwnerIdentity(authenticOwners, completedOwner);
-                return completedOwner;
+                return completedOwner as Owner;
             }
             authorityPort = mintActiveWebSessionResourcePort(session);
             if (!authorityPort) return fail('session_ineligible');
@@ -782,22 +851,22 @@ function createProjectionOwnerFactory(authorityKind: ProjectionOwnerAuthorityKin
             let revealed = false;
             try {
                 unregisterOwner = () => { if (authorityPort) releaseActiveWebSessionResourcePort(authorityPort); };
-                setMapValue(owners, session.id, completedOwner);
+                publishedOwner = completedPortOwner;
+                setMapValue(owners, session.id, publishedOwner);
                 setMapValue(ownerSessions, session.id, session);
-                addOwnerIdentity(registryOwners, completedOwner);
-                addOwnerIdentity(authenticOwners, completedOwner);
+                addOwnerIdentity(registryOwners, publishedOwner);
                 deleteSetValue(acquiring, session.id);
                 acquisitionCleared = true;
                 portRevealActive = true;
                 if (!commitActiveWebSessionResourceUse(acquisitionUse)) return fail('session_ineligible');
                 portRevealActive = false;
                 revealed = true;
-                return completedOwner;
+                return completedPortOwner as Owner;
             } finally {
                 if (!revealed) {
                     portRevealActive = false;
                     abortActiveWebSessionResourceUse(acquisitionUse);
-                    if (getMapValue(owners, session.id) === completedOwner) deleteMapValue(owners, session.id);
+                    if (getMapValue(owners, session.id) === completedPortOwner) deleteMapValue(owners, session.id);
                     if (getMapValue(ownerSessions, session.id) === session) deleteMapValue(ownerSessions, session.id);
                     releaseActiveWebSessionResourcePort(authorityPort);
                     authorityPort = null;
@@ -814,11 +883,11 @@ function createProjectionOwnerFactory(authorityKind: ProjectionOwnerAuthorityKin
 }
 
 export function createLegacyProjectionOwnerFactory(sourceOverrides: Partial<SelectionSources> = {}) {
-    return createProjectionOwnerFactory('legacy', sourceOverrides);
+    return createProjectionOwnerFactory<ServerSessionProjectionOwner>('legacy', sourceOverrides);
 }
 
 export function createPortProjectionOwnerFactory(sourceOverrides: Partial<SelectionSources> = {}) {
-    return createProjectionOwnerFactory('port', sourceOverrides);
+    return createProjectionOwnerFactory<PortServerSessionProjectionOwner>('port', sourceOverrides);
 }
 
 export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Partial<SelectionSources> = {}) {
