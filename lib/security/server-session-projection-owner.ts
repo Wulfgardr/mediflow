@@ -749,7 +749,7 @@ function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(auth
                         assertCurrent();
                         const patientRef = reference('ptr'); const ambulatoryRef = reference('abr'); const leaseRef = reference('lsr');
                         const now = readClock(); const finalSession = assertCurrent(); const expiresAt = finalSession.expiresAt;
-                        if (now >= expiresAt) fail('lease_expired');
+                        if (now >= expiresAt) { if (authorityKind === 'port') expire(); fail('lease_expired'); }
                         const next: SelectionState = ObjectFreeze({ ...pair, sessionRef, selectionEpoch: epoch + 1,
                             patientRef, ambulatoryRef, leaseRef,
                             expiresAt });

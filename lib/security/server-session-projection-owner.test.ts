@@ -241,6 +241,29 @@ test('P3 port currentness expiry terminally cleans the facade before returning',
     assert.equal(retireActiveWebServerSession(value.id, 'dispose'), true);
 });
 
+test('first P3 selection at or after finite expiry cleans before typed denial', async () => {
+    const value = activeP3Session(); let unhandled = 0;
+    const onUnhandled = () => { unhandled += 1; };
+    process.on('unhandledRejection', onUnhandled);
+    try {
+        for (const now of [value.expiresAt, value.expiresAt + 1]) {
+            const registry = createPortProjectionOwnerFactory({ resolve: (_session, pair) => pair, clock: () => now });
+            const owner = registry.acquire(value);
+            assert.throws(() => owner.issueSelection({ expectedEpoch: 0, ...PAIR }),
+                (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'lease_expired');
+            assert.equal(registry.lookup(value.id), null);
+            assert.equal(registry.isAuthenticOwner(owner), false);
+            assert.throws(() => owner.issueSelection({ expectedEpoch: 0, ...PAIR }),
+                (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
+            assert.throws(() => owner.mintOcrLeaseCommitPort(value),
+                (error: unknown) => error instanceof ServerSessionProjectionOwnerError && error.code === 'session_unavailable');
+        }
+        await new Promise<void>((resolve) => setImmediate(resolve));
+    } finally { process.off('unhandledRejection', onUnhandled); }
+    assert.equal(unhandled, 0);
+    assert.equal(retireActiveWebServerSession(value.id, 'dispose'), true);
+});
+
 test('every callback-free facade operation terminally cleans failed P3 currentness', () => {
     const value = activeP3Session();
     type PortOwner = ReturnType<ReturnType<typeof createPortProjectionOwnerFactory>['acquire']>;
