@@ -159,7 +159,9 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
         if (!PROJECTION_OWNER_FILES.includes(use.file as typeof PROJECTION_OWNER_FILES[number])) errors.push(`${use.file}:resource-owner`);
         if (use.form !== 'named' || use.typeOnly) errors.push(`${use.file}:resource-form`);
     }
-    const adoptionResourceUses = resourceUses.filter((use) => use.file !== 'lib/security/server-session.test.ts');
+    const selfFile = 'lib/security/server-session.test.ts';
+    if (selfFile in sources && !hasExactProjectionOwnerResourceImport(sources[selfFile] ?? '')) errors.push(`${selfFile}:resource-shape`);
+    const adoptionResourceUses = resourceUses.filter((use) => use.file !== selfFile);
     const ownerAdopters = new Set(adoptionResourceUses.map((use) => use.file));
     const factorySignals = ownerUses.filter((use) => use.symbol === PROJECTION_OWNER_FACTORY
         || ['module-path', 'dynamic', 'dynamic-options', 'require', 'require-options', 're-export', 'namespace',
@@ -896,6 +898,16 @@ test('permits only absent or exact paired projection owner adoption state', () =
         [ownerTest]: `${marker}\nimport { commitActiveWebSessionResourceUse } from './server-session';` }).errors, []);
     assert.notDeepEqual(validateSessionImports({ [production]: resources, [ownerTest]: marker,
         'lib/security/third.test.ts': marker }).errors, []);
+    const self = 'lib/security/server-session.test.ts'; const selfError = `${self}:resource-shape`;
+    const selfResources = `import { ${[...RESOURCE_PORT_PRIMITIVES].join(', ')} } from './server-session';`;
+    assert.equal(validateSessionImports({ [self]: selfResources }).errors.includes(selfError), false);
+    const invalidSelf = [
+        selfResources.replace(' }', ', abortActiveWebSessionResourceUse as duplicateAbort }'),
+        `${selfResources}\nimport { abortActiveWebSessionResourceUse } from './server-session';`,
+        `${selfResources}\nimport type { abortActiveWebSessionResourceUse } from './server-session';`,
+        selfResources.replace(';', " with { type: 'json' };"), selfResources.replace(';', " assert { type: 'json' };"),
+    ];
+    for (const source of invalidSelf) assert.ok(validateSessionImports({ [self]: source }).errors.includes(selfError), source);
 });
 
 test('Node runtime resolves every inventory alias that the AST gate denies', () => {
