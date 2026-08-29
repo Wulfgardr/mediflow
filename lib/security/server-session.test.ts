@@ -73,23 +73,25 @@ const PROJECTION_OWNER_FILES = [
 const PROJECTION_OWNER_FACTORY = 'createPortProjectionOwnerFactory';
 const PROJECTION_OWNER_MODULE = 'lib/security/server-session-projection-owner';
 
-const hasExactProjectionOwnerResourceImport = (source: string) => {
+const hasExactProjectionOwnerResourceImport = (source: string, countAllCanonicalDeclarations = false) => {
     const ast = ts.createSourceFile(PROJECTION_OWNER_FILES[0], source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
     let matchingDeclarations = 0; let exact = true;
     for (const statement of ast.statements) {
-        if (!ts.isImportDeclaration(statement) || !statement.importClause) continue;
-        const bindings = statement.importClause.namedBindings;
-        if (!bindings || !ts.isNamedImports(bindings)) continue;
-        const resources = bindings.elements.filter((item) => RESOURCE_PORT_PRIMITIVES.has(item.propertyName?.text ?? item.name.text));
-        if (resources.length === 0) continue;
+        if (!ts.isImportDeclaration(statement)) continue;
+        const canonical = ts.isStringLiteral(statement.moduleSpecifier) && statement.moduleSpecifier.text === './server-session';
+        const clause = statement.importClause; const bindings = clause?.namedBindings;
+        const resources = bindings && ts.isNamedImports(bindings)
+            ? bindings.elements.filter((item) => RESOURCE_PORT_PRIMITIVES.has(item.propertyName?.text ?? item.name.text)) : [];
+        if (resources.length === 0 && !(countAllCanonicalDeclarations && canonical)) continue;
         const resourceNames = resources.map((item) => item.name.text);
         const distinctResourceNames = new Set(resourceNames);
         matchingDeclarations += 1;
-        exact &&= ts.isStringLiteral(statement.moduleSpecifier) && statement.moduleSpecifier.text === './server-session'
-            && !statement.attributes && !statement.assertClause && !statement.importClause.isTypeOnly
+        exact &&= canonical && !!clause && !!bindings && ts.isNamedImports(bindings)
+            && !statement.attributes && !statement.assertClause && !clause.isTypeOnly
             && resources.length === RESOURCE_PORT_PRIMITIVES.size && distinctResourceNames.size === RESOURCE_PORT_PRIMITIVES.size
             && [...RESOURCE_PORT_PRIMITIVES].every((name) => distinctResourceNames.has(name))
-            && resources.every((item) => !item.propertyName && !item.isTypeOnly);
+            && resources.every((item) => !item.propertyName && !item.isTypeOnly)
+            && (!countAllCanonicalDeclarations || !clause.name);
     }
     return matchingDeclarations === 1 && exact;
 };
@@ -160,7 +162,7 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
         if (use.form !== 'named' || use.typeOnly) errors.push(`${use.file}:resource-form`);
     }
     const selfFile = 'lib/security/server-session.test.ts';
-    if (selfFile in sources && !hasExactProjectionOwnerResourceImport(sources[selfFile] ?? '')) errors.push(`${selfFile}:resource-shape`);
+    if (selfFile in sources && !hasExactProjectionOwnerResourceImport(sources[selfFile] ?? '', true)) errors.push(`${selfFile}:resource-shape`);
     const adoptionResourceUses = resourceUses.filter((use) => use.file !== selfFile);
     const ownerAdopters = new Set(adoptionResourceUses.map((use) => use.file));
     const factorySignals = ownerUses.filter((use) => use.symbol === PROJECTION_OWNER_FACTORY
@@ -905,6 +907,11 @@ test('permits only absent or exact paired projection owner adoption state', () =
         selfResources.replace(' }', ', abortActiveWebSessionResourceUse as duplicateAbort }'),
         `${selfResources}\nimport { abortActiveWebSessionResourceUse } from './server-session';`,
         `${selfResources}\nimport type { abortActiveWebSessionResourceUse } from './server-session';`,
+        `${selfResources}\nimport { getSession } from './server-session';`,
+        `${selfResources}\nimport type { ServerSession } from './server-session';`,
+        `${selfResources}\nimport session from './server-session';`,
+        `${selfResources}\nimport * as session from './server-session';`,
+        `${selfResources}\nimport './server-session';`,
         selfResources.replace(';', " with { type: 'json' };"), selfResources.replace(';', " assert { type: 'json' };"),
     ];
     for (const source of invalidSelf) assert.ok(validateSessionImports({ [self]: source }).errors.includes(selfError), source);
