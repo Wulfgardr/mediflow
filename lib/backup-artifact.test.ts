@@ -93,6 +93,14 @@ const basePayload = {
     therapies: [],
 };
 
+function attachmentCurrentness(overrides: Record<string, unknown> = {}) {
+    return {
+        id: 'attachment-currentness-1', patientId: 'pat-1',
+        documentSourceRef: 'a'.repeat(64), documentRevision: 1, documentFreshnessEpoch: 1,
+        ...overrides,
+    };
+}
+
 test('creates a stable backup artifact with checksum and manifest', async () => {
     const artifact = await createBackupArtifact(basePayload);
 
@@ -108,6 +116,34 @@ test('creates a stable backup artifact with checksum and manifest', async () => 
 
     assert.equal(parsed.manifest.checksum, artifact.manifest.checksum);
     assert.equal(stableStringify(parsed.payload), stableStringify(basePayload));
+});
+
+test('requires an exact host-minted attachment currentness tuple on export and parse', async () => {
+    const valid = { ...basePayload, attachments: [attachmentCurrentness()] };
+    const parsed = await parseBackupArtifact(JSON.parse(await serializeBackupArtifact(valid)));
+    assert.deepEqual(parsed.payload.attachments[0], attachmentCurrentness());
+
+    for (const overrides of [
+        { documentSourceRef: 'A'.repeat(64) }, { documentSourceRef: 'a'.repeat(63) },
+        { documentRevision: 0 }, { documentFreshnessEpoch: 0 }, { documentRevision: Number.MAX_SAFE_INTEGER + 1 },
+    ]) {
+        await assert.rejects(() => createBackupArtifact({ ...basePayload, attachments: [attachmentCurrentness(overrides)] }),
+            (error: unknown) => error instanceof BackupArtifactError && error.code === 'backup-document-currentness-unsupported' && error.message === 'BACKUP_DOCUMENT_CURRENTNESS_UNSUPPORTED');
+    }
+    await assert.rejects(() => createBackupArtifact({ ...basePayload, attachments: [attachmentCurrentness(), attachmentCurrentness({ id: 'attachment-currentness-2' })] }),
+        (error: unknown) => error instanceof BackupArtifactError && error.code === 'backup-document-currentness-unsupported');
+});
+
+test('rejects proxy and accessor attachment tuples without reading them', async () => {
+    let reads = 0; let traps = 0;
+    const accessor = attachmentCurrentness();
+    Object.defineProperty(accessor, 'documentSourceRef', { enumerable: true, get() { reads += 1; return 'a'.repeat(64); } });
+    const proxy = new Proxy(attachmentCurrentness(), { get() { traps += 1; throw new Error('synthetic trap'); } });
+    for (const attachment of [accessor, proxy]) {
+        await assert.rejects(() => createBackupArtifact({ ...basePayload, attachments: [attachment] }),
+            (error: unknown) => error instanceof BackupArtifactError && error.code === 'backup-document-currentness-unsupported' && error.message === 'BACKUP_DOCUMENT_CURRENTNESS_UNSUPPORTED');
+    }
+    assert.equal(reads, 0); assert.equal(traps, 0);
 });
 
 /* @Codex */
