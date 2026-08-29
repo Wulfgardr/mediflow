@@ -40,7 +40,7 @@ export const CONTRACT = [
     record('lib/patient-cascade.ts', 'purge-table-binding', 'dbe094bf7fa0c482', 1),
     record('lib/seeder.ts', 'facade-add', '57e674ca12a06a80', 1, 'delegated'),
     record('lib/seeder.ts', 'facade-clear', 'b673d24443e4a92d', 1, 'delegated'),
-    record('scripts/document-evidence-backfill-live-db.ts', 'raw-update', 'e2b01f457d7d8b56', 1, 'finding', 'LIVE_EVIDENCE_BACKFILL_CURRENTNESS_GAP'),
+    record('scripts/document-evidence-backfill-currentness-cas.ts', 'raw-update', 'cc1a0df941d5c333', 1),
     record('scripts/seed-performance-baseline.mjs', 'raw-insert-into', 'd60b484518a09e8b', 1, 'finding', 'SYNTHETIC_SEED_CURRENTNESS_GAP'),
 ];
 

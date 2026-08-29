@@ -30,12 +30,10 @@ test('exact repository inventory is classified and keeps known gaps red', () => 
     assert.equal(inventory().length, 26);
     assert.deepEqual(findings.filter((item) => ['DUPLICATE_CONTRACT', 'MISSING_OR_DRIFTED_WRITER', 'WRITER_COUNT_DRIFT', 'UNDECLARED_WRITER'].includes(item.code)), []);
     assert.deepEqual([...new Set(findings.map((item) => item.code))].sort(), [
-        'LIVE_EVIDENCE_BACKFILL_CURRENTNESS_GAP',
         'SYNTHETIC_SEED_CURRENTNESS_GAP',
     ]);
     assert.equal(CONTRACT.find((item) => item.path === 'lib/seeder.ts' && item.kind === 'facade-add')?.disposition, 'delegated');
     assert.deepEqual([...findings, ...policyFindings()], [
-        { code: 'LIVE_EVIDENCE_BACKFILL_CURRENTNESS_GAP', path: 'scripts/document-evidence-backfill-live-db.ts', kind: 'raw-update', fingerprint: 'e2b01f457d7d8b56', count: 1 },
         { code: 'SYNTHETIC_SEED_CURRENTNESS_GAP', path: 'scripts/seed-performance-baseline.mjs', kind: 'raw-insert-into', fingerprint: 'd60b484518a09e8b', count: 1 },
         { code: 'BACKUP_LEGACY_CURRENTNESS_GAP', path: 'lib/backup-artifact.ts' },
         { code: 'RESTORE_PREFLIGHT_CURRENTNESS_GAP', path: 'lib/backup-restore-preflight.ts' },
