@@ -72,6 +72,13 @@ const PROJECTION_OWNER_FILES = [
 ] as const;
 const PROJECTION_OWNER_FACTORY = 'createPortProjectionOwnerFactory';
 const PROJECTION_OWNER_MODULE = 'lib/security/server-session-projection-owner';
+const SESSION_MODULE_IDENTITY = path.resolve(REPOSITORY_ROOT, 'lib/security/server-session');
+
+const resolvesSelfSessionModule = (specifier: string) => {
+    const relative = specifier.startsWith('@/') ? specifier.slice(2)
+        : specifier.startsWith('.') ? path.join('lib/security', specifier) : null;
+    return relative !== null && path.resolve(REPOSITORY_ROOT, relative).replace(/\.[cm]?[jt]sx?$/u, '') === SESSION_MODULE_IDENTITY;
+};
 
 const hasExactProjectionOwnerResourceImport = (source: string, countAllCanonicalDeclarations = false) => {
     const ast = ts.createSourceFile(PROJECTION_OWNER_FILES[0], source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -82,10 +89,8 @@ const hasExactProjectionOwnerResourceImport = (source: string, countAllCanonical
         const clause = statement.importClause; const bindings = clause?.namedBindings;
         const resources = bindings && ts.isNamedImports(bindings)
             ? bindings.elements.filter((item) => RESOURCE_PORT_PRIMITIVES.has(item.propertyName?.text ?? item.name.text)) : [];
-        const resolvedSelfDeclaration = countAllCanonicalDeclarations && resources.length === 0
-            && inventoryModuleImports({ file: 'lib/security/server-session.test.ts', source: statement.getText(ast),
-                target: 'lib/security/server-session', repositoryRoot: REPOSITORY_ROOT })
-                .some((use) => ['named', 'default', 'namespace', 'side-effect'].includes(use.form));
+        const resolvedSelfDeclaration = countAllCanonicalDeclarations && ts.isStringLiteral(statement.moduleSpecifier)
+            && resolvesSelfSessionModule(statement.moduleSpecifier.text);
         if (resources.length === 0 && !resolvedSelfDeclaration) continue;
         const resourceNames = resources.map((item) => item.name.text);
         const distinctResourceNames = new Set(resourceNames);
@@ -915,6 +920,9 @@ test('permits only absent or exact paired projection owner adoption state', () =
         `${selfResources}\nimport type { ServerSession } from './server-session';`,
         `${selfResources}\nimport { getSession } from './server-session.ts';`,
         `${selfResources}\nimport type { ServerSession } from './server-session.ts';`,
+        `${selfResources}\nimport {} from './server-session';`,
+        `${selfResources}\nimport type {} from './server-session';`,
+        `${selfResources}\nimport {} from './server-session.ts';`,
         `${selfResources}\nimport session from './server-session';`,
         `${selfResources}\nimport * as session from './server-session';`,
         `${selfResources}\nimport './server-session';`,
