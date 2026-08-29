@@ -13,6 +13,10 @@ import {
 } from '../lib/domain/documents/document-evidence-backfill';
 import { serializeDocumentParseEvidenceArtifact } from '../lib/domain/documents/document-parse-evidence-artifact';
 import { decryptData, encryptData, unwrapMasterKeyVersioned } from '../lib/security/security';
+import {
+    applyDocumentEvidenceArtifactsWithCurrentness,
+    type BackfillCurrentnessCandidate,
+} from './document-evidence-backfill-currentness-cas';
 
 type SqliteDatabase = {
     prepare(sql: string): {
@@ -67,6 +71,9 @@ type AttachmentRow = {
     created_at: number | string | null;
     summary_snapshot: string | null;
     parse_evidence_artifact_snapshot: string | null;
+    document_source_ref: string;
+    document_revision: number;
+    document_freshness_epoch: number;
     quality_status?: string | null;
     quality_reason?: string | null;
 };
@@ -416,6 +423,9 @@ function readAttachmentRows(db: SqliteDatabase): AttachmentRow[] {
             created_at,
             summary_snapshot,
             parse_evidence_artifact_snapshot,
+            document_source_ref,
+            document_revision,
+            document_freshness_epoch,
             ${qualityStatus},
             ${qualityReason}
         from attachments
@@ -683,39 +693,31 @@ async function applyCandidateArtifacts(
     db: SqliteDatabase,
     plan: DocumentEvidenceBackfillPlan,
     masterKey: CryptoKey,
+    rows: readonly AttachmentRow[],
 ): Promise<Pick<RedactedLiveDbPlan['apply'], 'attempted' | 'written' | 'skipped'>> {
     const candidates = plan.items.filter((item) => item.candidateArtifact);
-    let attempted = 0;
-    let written = 0;
-    let skipped = 0;
-
-    const update = db.prepare(`
-        update attachments
-        set parse_evidence_artifact_snapshot = ?
-        where id = ? and patient_id = ?
-    `);
-
-    db.prepare('begin immediate').run();
-    try {
-        for (const item of candidates) {
-            if (!item.candidateArtifact) continue;
-            attempted += 1;
-            const serialized = serializeDocumentParseEvidenceArtifact(item.candidateArtifact);
-            const encrypted = encryptedPayload(await encryptData(serialized, masterKey));
-            const result = update.run(encrypted, item.attachmentId, item.patientId);
-            if (result.changes === 1) {
-                written += 1;
-            } else {
-                skipped += 1;
-            }
+    const sourceRows = new Map(rows.map((row) => [row.id, row]));
+    const prepared: BackfillCurrentnessCandidate[] = [];
+    for (const item of candidates) {
+        if (!item.candidateArtifact) continue;
+        const row = sourceRows.get(item.attachmentId);
+        if (!row || row.patient_id !== item.patientId
+            || !/^[0-9a-f]{64}$/u.test(row.document_source_ref)
+            || !Number.isSafeInteger(row.document_revision) || row.document_revision < 1
+            || !Number.isSafeInteger(row.document_freshness_epoch) || row.document_freshness_epoch < 1) {
+            throw new Error('Attachment currentness snapshot is unavailable for a candidate artifact.');
         }
-        db.prepare('commit').run();
-    } catch (error) {
-        db.prepare('rollback').run();
-        throw error;
+        const serialized = serializeDocumentParseEvidenceArtifact(item.candidateArtifact);
+        prepared.push(Object.freeze({
+            attachmentId: item.attachmentId,
+            patientId: item.patientId,
+            sourceRef: row.document_source_ref,
+            revision: row.document_revision,
+            freshnessEpoch: row.document_freshness_epoch,
+            encryptedArtifact: encryptedPayload(await encryptData(serialized, masterKey)),
+        }));
     }
-
-    return { attempted, written, skipped };
+    return applyDocumentEvidenceArtifactsWithCurrentness(db, prepared);
 }
 
 function renderMarkdown(report: RedactedLiveDbPlan): string {
@@ -808,6 +810,7 @@ async function main(): Promise<void> {
         const archiveIndex = args.recoverArchivePdfText && args.archiveRoot
             ? buildArchivePdfIndex(args.archiveRoot, new Set(patientTaxCodes.values()))
             : undefined;
+        const attachmentRows = readAttachmentRows(db);
         const {
             attachments,
             decryptFailures,
@@ -822,7 +825,7 @@ async function main(): Promise<void> {
             archivePdfTextRecovered,
             archivePdfTextRecoveryFailures,
             archivePdfTextRecoveredChars,
-        } = await toPlannerInputs(readAttachmentRows(db), masterKey, {
+        } = await toPlannerInputs(attachmentRows, masterKey, {
             recoverPdfText: args.recoverPdfText,
             recoverArchivePdfText: args.recoverArchivePdfText,
             maxPdfPages: args.maxPdfPages,
@@ -835,7 +838,7 @@ async function main(): Promise<void> {
         const salt = args.redactSalt || randomBytes(32).toString('hex');
         const eligibleCandidates = plan.items.filter((item) => item.candidateArtifact).length;
         const applyResult = args.apply
-            ? await applyCandidateArtifacts(db, plan, masterKey)
+            ? await applyCandidateArtifacts(db, plan, masterKey, attachmentRows)
             : { attempted: 0, written: 0, skipped: 0 };
         const applyStats: RedactedLiveDbPlan['apply'] = {
             mode: args.apply ? 'applied' : 'dry-run',
