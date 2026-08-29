@@ -5,7 +5,12 @@ import { randomBytes } from 'node:crypto';
 import { types } from 'node:util';
 import { createTypedProjectionBroker, ProjectionBrokerError, type TypedProjectionBrokerConfig } from '../typed-projection-broker';
 import { bindProjectionBrokerToServerSession } from './server-session-projection-broker';
-import { getSession, peekSession, registerServerSessionResource, type ServerSession } from './server-session';
+import {
+    abortActiveWebSessionResourceUse, beginActiveWebSessionResourceUse, commitActiveWebSessionResourceUse,
+    getSession, mintActiveWebSessionResourcePort, peekSession, registerServerSessionResource,
+    releaseActiveWebSessionResourcePort, resolveActiveWebServerSession,
+    type ActiveWebSessionResourcePort, type ServerSession,
+} from './server-session';
 
 type TypedBroker = ReturnType<typeof createTypedProjectionBroker>;
 type ActiveBinding = {
@@ -245,12 +250,28 @@ function frozenExact(input: unknown, keys: readonly string[]): Record<string, un
     } catch { return null; }
 }
 
-export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Partial<SelectionSources> = {}) {
+type ProjectionOwnerAuthorityKind = 'legacy' | 'port';
+
+function createProjectionOwnerFactory(authorityKind: ProjectionOwnerAuthorityKind,
+    sourceOverrides: Partial<SelectionSources> = {}) {
     const sources = ObjectFreeze({ ...defaultSources, ...sourceOverrides });
     const owners = new MapConstructor<string, ServerSessionProjectionOwner>();
+    const ownerSessions = new MapConstructor<string, ServerSession>();
     const registryOwners = new WeakSetConstructor<object>();
     const retired = new SetConstructor<string>();
     const acquiring = new SetConstructor<string>();
+    let portRevealActive = false;
+
+    const eligible = (session: ServerSession, renew: boolean) => {
+        if (authorityKind === 'legacy') {
+            return session.authChannel === 'web' && session.id !== 'local-api'
+                && (renew ? getSession(session.id) : peekSession(session.id)) === session;
+        }
+        try {
+            return !isProxy(session) && session.authChannel === 'web' && session.id !== 'local-api'
+                && resolveActiveWebServerSession(session.id) === session;
+        } catch { return false; }
+    };
 
     const registry = {
         isAuthenticOwner(candidate: unknown): candidate is ServerSessionProjectionOwner {
@@ -258,34 +279,31 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             return hasOwnerIdentity(registryOwners, candidate);
         },
         lookup(sessionId: string): ServerSessionProjectionOwner | null {
+            if (portRevealActive) return null;
             return getMapValue(owners, sessionId) ?? null;
         },
         snapshotSelectionEpoch(session: ServerSession): number {
-            if (session.authChannel !== 'web' || session.id === 'local-api' || peekSession(session.id) !== session) {
-                return fail('session_ineligible');
-            }
+            if (portRevealActive || !eligible(session, false)) return fail('session_ineligible');
             return getMapValue(owners, session.id)?.snapshotSelectionEpoch(session) ?? 0;
         },
         snapshotReviewContextEpoch(session: ServerSession): number {
-            if (session.authChannel !== 'web' || session.id === 'local-api' || peekSession(session.id) !== session) {
-                return fail('session_ineligible');
-            }
+            if (portRevealActive || !eligible(session, false)) return fail('session_ineligible');
             return getMapValue(owners, session.id)?.snapshotReviewContextEpoch(session) ?? 0;
         },
         acquire(session: ServerSession): ServerSessionProjectionOwner {
-            if (session.authChannel !== 'web' || session.id === 'local-api' || getSession(session.id) !== session) {
-                return fail('session_ineligible');
-            }
-            return getMapValue(owners, session.id) ?? registry.create(session);
+            if (portRevealActive || !eligible(session, true)) return fail('session_ineligible');
+            const existing = getMapValue(owners, session.id);
+            if (existing && (authorityKind === 'legacy' || getMapValue(ownerSessions, session.id) === session)) return existing;
+            if (existing) return fail('session_ineligible');
+            return registry.create(session);
         },
         create(session: ServerSession): ServerSessionProjectionOwner {
-            if (session.authChannel !== 'web' || session.id === 'local-api' || getSession(session.id) !== session) {
-                return fail('session_ineligible');
-            }
+            if (portRevealActive || !eligible(session, true)) return fail('session_ineligible');
             if (hasMapValue(owners, session.id)) return fail('owner_exists');
             if (hasSetValue(retired, session.id)) return fail('owner_disposed');
             if (hasSetValue(acquiring, session.id)) return fail('owner_acquiring');
             addSetValue(acquiring, session.id);
+            let acquisitionCleared = false;
             try {
 
             let active: ActiveBinding | null = null;
@@ -302,11 +320,22 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             let creating: SelectionState | null = null;
             let terminal = false;
             let unregisterOwner: (() => void) | null = null;
+            let authorityPort: ActiveWebSessionResourcePort | null = null;
+            const currentSession = (renew: boolean) => {
+                if (authorityKind === 'legacy') return (renew ? getSession(session.id) : peekSession(session.id)) === session ? session : null;
+                if (!authorityPort) return null;
+                const use = beginActiveWebSessionResourceUse(authorityPort);
+                if (!use) return null;
+                return commitActiveWebSessionResourceUse(use) ? session : null;
+            };
             const finish = (revokeActive: boolean) => {
                 if (terminal) return;
                 terminal = true;
                 addSetValue(retired, session.id);
                 deleteMapValue(owners, session.id);
+                if (authorityKind === 'port' && getMapValue(ownerSessions, session.id) === session) {
+                    deleteMapValue(ownerSessions, session.id);
+                }
                 unregisterOwner?.();
                 unregisterOwner = null;
                 const previous = active;
@@ -343,7 +372,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 return fail('selection_unavailable');
             };
             const requireCurrentSession = (presented: ServerSession) => {
-                if (terminal || presented !== session || session.authChannel !== 'web' || getSession(session.id) !== session) fail('session_unavailable');
+                if (terminal || presented !== session || session.authChannel !== 'web' || currentSession(true) !== session) fail('session_unavailable');
             };
             const readTuple = (input: unknown) => exact(input, ['sessionRef', 'selectionEpoch', 'patientRef', 'ambulatoryRef', 'leaseRef']) as SelectionLeaseTuple;
             const tupleMatches = (value: SelectionLeaseTuple, current: SelectionState) =>
@@ -397,11 +426,11 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         || selection !== boundSelection || epoch !== boundSelectionEpoch || reviewContextEpoch !== boundReviewContextEpoch) return false;
                     let now: number;
                     try {
-                        if (getSession(session.id) !== session) return false;
+                        if (currentSession(true) !== session) return false;
                         now = sources.clock();
                     } catch { return false; }
                     return NumberIsFinite(now) && now < boundSelection.expiresAt && !terminal
-                        && presentedSession === session && session.authChannel === 'web' && getSession(session.id) === session
+                        && presentedSession === session && session.authChannel === 'web' && currentSession(true) === session
                         && selection === boundSelection && epoch === boundSelectionEpoch && reviewContextEpoch === boundReviewContextEpoch;
                 };
                 const owns = (candidate: unknown): candidate is Ref =>
@@ -515,7 +544,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         try { now = sources.clock(); } catch { return false; }
                         return !leasePortOperationPoisoned && !durableReviewOperationPoisoned && NumberIsFinite(now) && now < boundSelection.expiresAt
                             && !terminal && presentedSession === session && session.authChannel === 'web'
-                            && getSession(session.id) === session && selection === boundSelection && epoch === boundSelectionEpoch
+                            && currentSession(true) === session && selection === boundSelection && epoch === boundSelectionEpoch
                             && reviewContextEpoch === boundReviewContextEpoch && durableReviewCommitInFlight === token;
                     };
                     const record: DurableReviewCommitRecord = ObjectFreeze({
@@ -560,13 +589,13 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             };
             const owner: Omit<ServerSessionProjectionOwner, 'mintPatientInsightLeaseCommitPort' | 'mintOcrLeaseCommitPort' | 'mintDocumentSynthesisLeaseCommitPort' | 'mintTreatmentReasoningLeaseCommitPort' | 'mintDurableReviewCommitPort'> = {
                 snapshotSelectionEpoch(presentedSession) {
-                    if (terminal || presentedSession !== session || session.authChannel !== 'web' || peekSession(session.id) !== session) {
+                    if (terminal || presentedSession !== session || session.authChannel !== 'web' || currentSession(false) !== session) {
                         return fail('session_unavailable');
                     }
                     return epoch;
                 },
                 snapshotReviewContextEpoch(presentedSession) {
-                    if (terminal || presentedSession !== session || session.authChannel !== 'web' || peekSession(session.id) !== session) {
+                    if (terminal || presentedSession !== session || session.authChannel !== 'web' || currentSession(false) !== session) {
                         return fail('session_unavailable');
                     }
                     return reviewContextEpoch;
@@ -574,6 +603,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                 acquireProjectionIngest(presentedSession, input) {
                     rejectLeaseCriticalSectionReentry();
                     requireCurrentSession(presentedSession);
+                    if (authorityKind === 'port') return fail('broker_unavailable');
                     const value = readTuple(input); const current = selection;
                     if (!current || !tupleMatches(value, current)) return fail('stale_selection');
                     if (readClock() >= current.expiresAt) { expire(); return fail('lease_expired'); }
@@ -631,18 +661,18 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                         const value = exact(input, ['expectedEpoch', 'patientId', 'ambulatoryId']);
                         if (!NumberIsSafeInteger(value.expectedEpoch) || (value.expectedEpoch as number) < 0
                             || typeof value.patientId !== 'string' || typeof value.ambulatoryId !== 'string') fail('input_invalid');
-                        const live = getSession(session.id);
+                        const live = currentSession(true);
                         if (session.authChannel !== 'web' || live !== session) fail('session_unavailable');
                         let pair: CanonicalPair;
                         try { pair = sources.resolve(session, { patientId: value.patientId, ambulatoryId: value.ambulatoryId }); }
                         catch { return fail('selection_unavailable'); }
                         const assertCurrent = () => {
-                            const currentSession = getSession(session.id);
-                            if (terminal || currentSession !== session || session.authChannel !== 'web' || getMapValue(owners, session.id) !== owner) {
+                            const current = currentSession(true);
+                            if (terminal || current !== session || session.authChannel !== 'web' || getMapValue(owners, session.id) !== owner) {
                                 return fail('session_unavailable');
                             }
                             if (value.expectedEpoch !== epoch) return fail('epoch_conflict');
-                            return currentSession;
+                            return current;
                         };
                         assertCurrent();
                         const patientRef = reference('ptr'); const ambulatoryRef = reference('abr'); const leaseRef = reference('lsr');
@@ -666,7 +696,7 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
                     if (readClock() >= selection.expiresAt) {
                         expire(); return fail('lease_expired');
                     }
-                    if (presentedSession !== session || getSession(session.id) !== session) fail('session_unavailable');
+                    if (presentedSession !== session || currentSession(true) !== session) fail('session_unavailable');
                     if (value.sessionRef !== sessionRef || value.selectionEpoch !== selection.selectionEpoch
                         || value.patientRef !== selection.patientRef || value.ambulatoryRef !== selection.ambulatoryRef
                         || value.leaseRef !== selection.leaseRef) fail('stale_selection');
@@ -737,16 +767,60 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
             } });
             const completedOwner = ObjectFreeze(owner) as unknown as ServerSessionProjectionOwner;
 
-            unregisterOwner = registerServerSessionResource(session.id, () => finish(false));
-            if (!unregisterOwner) return fail('session_ineligible');
-            setMapValue(owners, session.id, completedOwner);
-            addOwnerIdentity(registryOwners, completedOwner);
-            addOwnerIdentity(authenticOwners, completedOwner);
-            return completedOwner;
-            } finally {
+            if (authorityKind === 'legacy') {
+                unregisterOwner = registerServerSessionResource(session.id, () => finish(false));
+                if (!unregisterOwner) return fail('session_ineligible');
+                setMapValue(owners, session.id, completedOwner);
+                addOwnerIdentity(registryOwners, completedOwner);
+                addOwnerIdentity(authenticOwners, completedOwner);
+                return completedOwner;
+            }
+            authorityPort = mintActiveWebSessionResourcePort(session);
+            if (!authorityPort) return fail('session_ineligible');
+            const acquisitionUse = beginActiveWebSessionResourceUse(authorityPort);
+            if (!acquisitionUse) { releaseActiveWebSessionResourcePort(authorityPort); return fail('session_ineligible'); }
+            let revealed = false;
+            try {
+                unregisterOwner = () => { if (authorityPort) releaseActiveWebSessionResourcePort(authorityPort); };
+                setMapValue(owners, session.id, completedOwner);
+                setMapValue(ownerSessions, session.id, session);
+                addOwnerIdentity(registryOwners, completedOwner);
+                addOwnerIdentity(authenticOwners, completedOwner);
                 deleteSetValue(acquiring, session.id);
+                acquisitionCleared = true;
+                portRevealActive = true;
+                if (!commitActiveWebSessionResourceUse(acquisitionUse)) return fail('session_ineligible');
+                portRevealActive = false;
+                revealed = true;
+                return completedOwner;
+            } finally {
+                if (!revealed) {
+                    portRevealActive = false;
+                    abortActiveWebSessionResourceUse(acquisitionUse);
+                    if (getMapValue(owners, session.id) === completedOwner) deleteMapValue(owners, session.id);
+                    if (getMapValue(ownerSessions, session.id) === session) deleteMapValue(ownerSessions, session.id);
+                    releaseActiveWebSessionResourcePort(authorityPort);
+                    authorityPort = null;
+                    terminal = true;
+                }
+                if (!acquisitionCleared) deleteSetValue(acquiring, session.id);
+            }
+            } finally {
+                if (!acquisitionCleared) deleteSetValue(acquiring, session.id);
             }
         },
     };
     return ObjectFreeze(registry);
+}
+
+export function createLegacyProjectionOwnerFactory(sourceOverrides: Partial<SelectionSources> = {}) {
+    return createProjectionOwnerFactory('legacy', sourceOverrides);
+}
+
+export function createPortProjectionOwnerFactory(sourceOverrides: Partial<SelectionSources> = {}) {
+    return createProjectionOwnerFactory('port', sourceOverrides);
+}
+
+export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Partial<SelectionSources> = {}) {
+    return createLegacyProjectionOwnerFactory(sourceOverrides);
 }
