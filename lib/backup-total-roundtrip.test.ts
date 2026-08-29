@@ -254,6 +254,7 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
         id: 'w7-attachment', patient_id: 'w7-patient', type: 'application/pdf', size: 128,
         ...(await sealed('attachments', ['name', 'path', 'data', 'summary_snapshot', 'parse_evidence_artifact_snapshot', 'ocr_replay_artifact_snapshot'])),
         ocr_queue_state: 'ocr_done', ocr_queue_reason: 'synthetic', ocr_queue_updated_at: now + 22, created_at: now + 22,
+        document_source_ref: 'a'.repeat(64), document_revision: 7, document_freshness_epoch: 11,
     });
     insertRow(db, 'conversations', { id: 'w7-conversation', title: await seal('conversations.title'), updated_at: now + 23, is_archived: 1, is_deleted: 1, created_at: now + 23 });
     insertRow(db, 'messages', {
@@ -359,11 +360,13 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
     const sourceDataDir = path.join(workDir, 'source');
     const targetDataDir = path.join(workDir, 'target');
     const backupDir = path.join(workDir, 'backups');
+    const restoredBackupDir = path.join(workDir, 'restored-backups');
 
     try {
         prepareDatabase(sourceDataDir);
         prepareDatabase(targetDataDir);
         fs.mkdirSync(backupDir, { recursive: true });
+        fs.mkdirSync(restoredBackupDir, { recursive: true });
 
         const sourceDb = new Database(path.join(sourceDataDir, 'medical.db'));
         const targetDb = new Database(path.join(targetDataDir, 'medical.db'));
@@ -436,6 +439,15 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
                     }
                 }
             }
+            const reexport = JSON.parse(runNode(['scripts/run-scheduled-backup.mjs'], {
+                MEDIFLOW_DATA_DIR: targetDataDir,
+                MEDIFLOW_BACKUP_DEST_DIR: restoredBackupDir,
+                MEDIFLOW_BACKUP_FORCE: '1',
+            })) as { ok: boolean; artifactPath?: string; message?: string };
+            assert.equal(reexport.ok, true, reexport.message); assert.ok(reexport.artifactPath);
+            const restoredArtifact = await parseBackupArtifact(JSON.parse(fs.readFileSync(reexport.artifactPath, 'utf8')));
+            assert.deepEqual(restoredArtifact.payload.attachments.map(({ documentSourceRef, documentRevision, documentFreshnessEpoch }) => ({ documentSourceRef, documentRevision, documentFreshnessEpoch })),
+                artifact.payload.attachments.map(({ documentSourceRef, documentRevision, documentFreshnessEpoch }) => ({ documentSourceRef, documentRevision, documentFreshnessEpoch })));
             assert.ok(encryptedFieldCount >= 50, 'fixture must exercise the complete encrypted clinical surface');
         } finally {
             sourceDb.close();
