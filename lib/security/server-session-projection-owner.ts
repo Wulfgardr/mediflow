@@ -284,6 +284,35 @@ function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(auth
     const retired = new SetConstructor<string>();
     const acquiring = new SetConstructor<string>();
     let portRevealActive = false;
+    type PortRegistryNode = { owner: PortServerSessionProjectionOwner; session: ServerSession; authority: ActiveWebSessionResourcePort;
+        previous: PortRegistryNode | null; next: PortRegistryNode | null; active: boolean };
+    let portRegistryHead: PortRegistryNode | null = null;
+    const findPortNode = (candidate: object): PortRegistryNode | null => {
+        let node = portRegistryHead;
+        while (node) { if (node.active && node.owner === candidate) return node; node = node.next; }
+        return null;
+    };
+    const unlinkPortNode = (node: PortRegistryNode | null) => {
+        if (!node?.active) return;
+        node.active = false;
+        if (node.previous) node.previous.next = node.next;
+        else if (portRegistryHead === node) portRegistryHead = node.next;
+        if (node.next) node.next.previous = node.previous;
+        node.previous = null; node.next = null;
+    };
+    const currentPortNode = (node: PortRegistryNode): boolean => {
+        let current = false;
+        let use: ReturnType<typeof beginActiveWebSessionResourceUse> = null;
+        try {
+            use = beginActiveWebSessionResourceUse(node.authority);
+            current = use !== null && commitActiveWebSessionResourceUse(use);
+        } catch { /* fail closed below */ }
+        if (!current && use) { try { abortActiveWebSessionResourceUse(use); } catch { /* cleanup continues */ } }
+        if (current) return true;
+        try { node.owner.dispose(); } catch { /* Public authority remains denied. */ }
+        unlinkPortNode(node);
+        return false;
+    };
 
     const eligible = (session: ServerSession, renew: boolean) => {
         if (authorityKind === 'legacy') {
@@ -299,11 +328,18 @@ function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(auth
     const registry: ProjectionOwnerRegistry<Owner> = {
         isAuthenticOwner(candidate: unknown): candidate is Owner {
             if (typeof candidate !== 'object' || candidate === null || isProxy(candidate)) return false;
+            if (authorityKind === 'port') {
+                const node = findPortNode(candidate);
+                return node ? currentPortNode(node) : false;
+            }
             return hasOwnerIdentity(registryOwners, candidate);
         },
         lookup(sessionId: string): Owner | null {
             if (portRevealActive) return null;
-            return (getMapValue(owners, sessionId) as Owner | undefined) ?? null;
+            const value = (getMapValue(owners, sessionId) as Owner | undefined) ?? null;
+            if (authorityKind !== 'port' || !value) return value;
+            const node = findPortNode(value);
+            return node && currentPortNode(node) ? value : null;
         },
         snapshotSelectionEpoch(session: ServerSession): number {
             if (portRevealActive || !eligible(session, false)) return fail('session_ineligible');
@@ -345,23 +381,30 @@ function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(auth
             let unregisterOwner: (() => void) | null = null;
             let authorityPort: ActiveWebSessionResourcePort | null = null;
             let publishedOwner: ProjectionOwnerSurface | null = null;
+            let registryNode: PortRegistryNode | null = null;
             const currentSession = (renew: boolean) => {
                 if (authorityKind === 'legacy') return (renew ? getSession(session.id) : peekSession(session.id)) === session ? session : null;
-                if (!authorityPort) return null;
-                const use = beginActiveWebSessionResourceUse(authorityPort);
-                if (!use) return null;
-                return commitActiveWebSessionResourceUse(use) ? session : null;
+                try {
+                    if (!authorityPort) { finish(true); return null; }
+                    const use = beginActiveWebSessionResourceUse(authorityPort);
+                    if (!use) { finish(true); return null; }
+                    if (commitActiveWebSessionResourceUse(use)) return session;
+                } catch { /* terminal cleanup below */ }
+                finish(true); return null;
             };
             const finish = (revokeActive: boolean) => {
                 if (terminal) return;
                 terminal = true;
-                addSetValue(retired, session.id);
-                deleteMapValue(owners, session.id);
-                if (authorityKind === 'port' && getMapValue(ownerSessions, session.id) === session) {
-                    deleteMapValue(ownerSessions, session.id);
+                try { addSetValue(retired, session.id); } catch { /* Terminal state remains authoritative. */ }
+                unlinkPortNode(registryNode); registryNode = null;
+                try { deleteMapValue(owners, session.id); } catch { /* Applied deletion stays authoritative. */ }
+                if (authorityKind === 'port') {
+                    try { deleteMapValue(ownerSessions, session.id); } catch { /* Applied deletion stays authoritative. */ }
                 }
-                unregisterOwner?.();
+                try { unregisterOwner?.(); } catch { /* Terminal state remains authoritative. */ }
                 unregisterOwner = null;
+                authorityPort = null;
+                publishedOwner = null;
                 const previous = active;
                 active = null;
                 selection = null;
@@ -393,6 +436,7 @@ function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(auth
             const sessionRef = reference('ssr');
             const readClock = () => {
                 try { const now = sources.clock(); if (NumberIsFinite(now)) return now; } catch { /* fixed error below */ }
+                if (authorityKind === 'port') finish(true);
                 return fail('selection_unavailable');
             };
             const requireCurrentSession = (presented: ServerSession) => {
@@ -404,6 +448,7 @@ function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(auth
                 && value.patientRef === current.patientRef && value.ambulatoryRef === current.ambulatoryRef
                 && value.leaseRef === current.leaseRef;
             const expire = () => {
+                if (authorityKind === 'port') { finish(true); return; }
                 const previous = active; const hadSelection = selection !== null;
                 active = null; selection = null;
                 if (hadSelection) reviewContextEpoch += 1;
@@ -452,7 +497,8 @@ function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(auth
                     try {
                         if (currentSession(true) !== session) return false;
                         now = sources.clock();
-                    } catch { return false; }
+                    } catch { if (authorityKind === 'port') finish(true); return false; }
+                    if (!NumberIsFinite(now) || now >= boundSelection.expiresAt) { expire(); return false; }
                     return NumberIsFinite(now) && now < boundSelection.expiresAt && !terminal
                         && presentedSession === session && session.authChannel === 'web' && currentSession(true) === session
                         && selection === boundSelection && epoch === boundSelectionEpoch && reviewContextEpoch === boundReviewContextEpoch;
@@ -565,7 +611,8 @@ function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(auth
                             || presentedSession !== session || session.authChannel !== 'web' || selection !== boundSelection
                             || epoch !== boundSelectionEpoch || reviewContextEpoch !== boundReviewContextEpoch) return false;
                         let now: number;
-                        try { now = sources.clock(); } catch { return false; }
+                        try { now = sources.clock(); } catch { if (authorityKind === 'port') finish(true); return false; }
+                        if (!NumberIsFinite(now) || now >= boundSelection.expiresAt) { expire(); return false; }
                         return !leasePortOperationPoisoned && !durableReviewOperationPoisoned && NumberIsFinite(now) && now < boundSelection.expiresAt
                             && !terminal && presentedSession === session && session.authChannel === 'web'
                             && currentSession(true) === session && selection === boundSelection && epoch === boundSelectionEpoch
@@ -854,7 +901,10 @@ function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(auth
                 publishedOwner = completedPortOwner;
                 setMapValue(owners, session.id, publishedOwner);
                 setMapValue(ownerSessions, session.id, session);
-                addOwnerIdentity(registryOwners, publishedOwner);
+                registryNode = { owner: completedPortOwner, session, authority: authorityPort,
+                    previous: null, next: portRegistryHead, active: true };
+                if (portRegistryHead) portRegistryHead.previous = registryNode;
+                portRegistryHead = registryNode;
                 deleteSetValue(acquiring, session.id);
                 acquisitionCleared = true;
                 portRevealActive = true;
@@ -866,6 +916,7 @@ function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(auth
                 if (!revealed) {
                     portRevealActive = false;
                     abortActiveWebSessionResourceUse(acquisitionUse);
+                    unlinkPortNode(registryNode); registryNode = null;
                     if (getMapValue(owners, session.id) === completedPortOwner) deleteMapValue(owners, session.id);
                     if (getMapValue(ownerSessions, session.id) === session) deleteMapValue(ownerSessions, session.id);
                     releaseActiveWebSessionResourcePort(authorityPort);
