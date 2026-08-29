@@ -35,9 +35,6 @@ test('exact repository inventory is classified and keeps known gaps red', () => 
     assert.equal(CONTRACT.find((item) => item.path === 'lib/seeder.ts' && item.kind === 'facade-add')?.disposition, 'delegated');
     assert.deepEqual([...findings, ...policyFindings()], [
         { code: 'SYNTHETIC_SEED_CURRENTNESS_GAP', path: 'scripts/seed-performance-baseline.mjs', kind: 'raw-insert-into', fingerprint: 'd60b484518a09e8b', count: 1 },
-        { code: 'BACKUP_LEGACY_CURRENTNESS_GAP', path: 'lib/backup-artifact.ts' },
-        { code: 'RESTORE_PREFLIGHT_CURRENTNESS_GAP', path: 'lib/backup-restore-preflight.ts' },
         { code: 'PURGE_LOCATOR_REVOCATION_GAP', path: 'lib/patient-cascade.ts' },
-        { code: 'RESTORE_LOCATOR_REVOCATION_GAP', path: 'lib/backup-restore-executor.ts' },
     ]);
 });
