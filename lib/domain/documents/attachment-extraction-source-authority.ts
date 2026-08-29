@@ -8,9 +8,13 @@ import { dbServer } from '../../db-server';
 import { peekSession, registerServerSessionResource, type ServerSession } from '../../security/server-session';
 import { serverSessionProjectionOwnerRegistry } from '../../security/server-session-projection-owner-production';
 import { ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES } from './anydoc-local-extraction-contract';
+import {
+    captureAttachmentExtractionLocatorGeneration,
+    isCurrentAttachmentExtractionLocatorGeneration,
+} from './attachment-extraction-locator-revocation';
 
 type Current = Readonly<{ sourceRef: string; revision: number; freshnessEpoch: number }>;
-type Bound = Readonly<{ id: string; patientId: string; current: Current; selectionEpoch: number; reviewContextEpoch: number }>;
+type Bound = Readonly<{ id: string; patientId: string; current: Current; selectionEpoch: number; reviewContextEpoch: number; locatorGeneration: object }>;
 type Begun = Readonly<{ status: 'begun'; operation: object; bytes: Uint8Array; evidenceAdmissible: false; applyPolicy: 'none'; writesPerformed: 0 }>;
 type Final = Readonly<{ status: 'spent' | 'aborted' | 'denied'; evidenceAdmissible: boolean; applyPolicy: 'none'; writesPerformed: 0 }>;
 type Row = Readonly<{ id: string; patientId: string; data: string; current: Current }>;
@@ -97,16 +101,22 @@ export function createAttachmentExtractionSourceAuthority(sessionValue: ServerSe
         && bound.reviewContextEpoch === owner.snapshotReviewContextEpoch(session);
     return Object.freeze({
         issue(value: unknown): object | null { const id = selector(value); if (!id) return null; let bound: Bound | null = null;
-            if (lease((patientId) => { const row = read(id, patientId); if (!row) return 0; bound = Object.freeze({ id: row.id,
-                patientId: row.patientId, current: row.current, ...epochs() }); return 1; }) !== 1 || !bound) return null;
-            return addLocator(bound); },
+            if (lease((patientId) => { const row = read(id, patientId); if (!row) return 0; const locatorGeneration = captureAttachmentExtractionLocatorGeneration();
+                bound = Object.freeze({ id: row.id, patientId: row.patientId, current: row.current, ...epochs(), locatorGeneration });
+                return isCurrentAttachmentExtractionLocatorGeneration(locatorGeneration) ? 1 : 0; }) !== 1) return null;
+            const published = bound as Bound | null;
+            if (!published || !isCurrentAttachmentExtractionLocatorGeneration(published.locatorGeneration)) return null;
+            return addLocator(published); },
         consume(value: unknown): Begun | Final { const bound = takeLocator(value); if (!bound || !active) return denied; let bytes: Uint8Array | null = null;
-            if (lease((patientId) => { const row = read(bound.id, patientId); if (!row || !fresh(bound, row)) return 0; bytes = decode(row.data); return bytes ? 1 : 0; }) !== 1 || !bytes) return denied;
+            if (lease((patientId) => { if (!isCurrentAttachmentExtractionLocatorGeneration(bound.locatorGeneration)) return 0;
+                const row = read(bound.id, patientId); if (!row || !fresh(bound, row)) return 0; bytes = decode(row.data); return bytes ? 1 : 0; }) !== 1 || !bytes) return denied;
             return Object.freeze({ status: 'begun' as const, operation: addOperation(bound), bytes, evidenceAdmissible: false as const, ...meta }); },
         finalize(value: unknown): Final { const bound = takeOperation(value); if (!bound || !active) return denied;
-            return lease((patientId) => { const row = read(bound.id, patientId); return row && fresh(bound, row) ? 1 : 0; }) === 1 ? spent : denied; },
+            return lease((patientId) => { if (!isCurrentAttachmentExtractionLocatorGeneration(bound.locatorGeneration)) return 0;
+                const row = read(bound.id, patientId); return row && fresh(bound, row) ? 1 : 0; }) === 1 ? spent : denied; },
         abort(value: unknown): Final { const bound = takeOperation(value); if (!bound || !active) return denied;
-            return lease((patientId) => { const row = read(bound.id, patientId); return row && fresh(bound, row) ? 1 : 0; }) === 1 ? aborted : denied; },
+            return lease((patientId) => { if (!isCurrentAttachmentExtractionLocatorGeneration(bound.locatorGeneration)) return 0;
+                const row = read(bound.id, patientId); return row && fresh(bound, row) ? 1 : 0; }) === 1 ? aborted : denied; },
         dispose(): void { if (active) { revoke(); unregister(); } },
     });
 }
