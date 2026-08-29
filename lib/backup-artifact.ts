@@ -74,6 +74,7 @@ const DURABLE_PATIENT = /^ptr_[0-9a-f]{32}$/;
 const DURABLE_RECEIPT = /^receipt_[0-9a-f]{32}$/;
 const DURABLE_PROVENANCE = /^provenance_[0-9a-f]{32}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
+const DOCUMENT_SOURCE_REF = /^[0-9a-f]{64}$/;
 const SEALED_CIPHERTEXT = /^ENC:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}$/;
 const IDEMPOTENCY_KEY = /^idem_[a-z0-9]{16,160}$/;
 const DURABLE_RECORD_KEYS = ['patientRef', 'reviewId', 'reviewRevision', 'receiptRef', 'provenanceRef', 'receiptBinding', 'provenanceBinding', 'presentationVersion', 'sealedCiphertext', 'sealedDigest'] as const;
@@ -103,6 +104,7 @@ export interface BackupArtifact {
 }
 
 export type BackupArtifactErrorCode =
+    | 'backup-document-currentness-unsupported'
     | 'invalid-json'
     | 'invalid-format'
     | 'unsupported-version'
@@ -376,6 +378,26 @@ function parseAssignedAmbulatoryMemberships(value: unknown): Array<{ ambulatoryI
     });
 }
 
+/* @Codex Backups carry only already-host-minted attachment currentness; they never mint, default, or rebase it. */
+function assertAttachmentCurrentnessRows(rows: readonly BackupRecord[]): void {
+    const sourceRefs = new Set<string>();
+    for (const row of rows) {
+        try {
+            if (!row || typeof row !== 'object' || Array.isArray(row) || types.isProxy(row) || Object.getPrototypeOf(row) !== Object.prototype) throw new Error();
+            const descriptors = Object.getOwnPropertyDescriptors(row);
+            const tuple = ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch'].map((key) => descriptors[key]);
+            if (tuple.some((descriptor) => !descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value'))) throw new Error();
+            const [sourceRef, revision, freshnessEpoch] = tuple.map((descriptor) => descriptor!.value);
+            if (typeof sourceRef !== 'string' || !DOCUMENT_SOURCE_REF.test(sourceRef) || sourceRefs.has(sourceRef)
+                || typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 1
+                || typeof freshnessEpoch !== 'number' || !Number.isSafeInteger(freshnessEpoch) || freshnessEpoch < 1) throw new Error();
+            sourceRefs.add(sourceRef);
+        } catch {
+            throw new BackupArtifactError('backup-document-currentness-unsupported', 'BACKUP_DOCUMENT_CURRENTNESS_UNSUPPORTED');
+        }
+    }
+}
+
 async function assertCollectionReferences(
     payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
     patientDependentCollections: readonly BackupCollectionName[] = PATIENT_DEPENDENT_COLLECTIONS,
@@ -395,6 +417,8 @@ async function assertCollectionReferences(
             .map((item) => item.id)
             .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
     );
+
+    assertAttachmentCurrentnessRows(payload.attachments ?? []);
 
     for (const patient of payload.patients ?? []) {
         if (typeof patient.ambulatoryId === 'string' && patient.ambulatoryId.trim().length > 0 && !ambulatoryIds.has(patient.ambulatoryId)) {
