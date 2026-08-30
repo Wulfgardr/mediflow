@@ -26,8 +26,12 @@ const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
 const ObjectGetOwnPropertySymbols = Object.getOwnPropertySymbols;
 const ObjectFreeze = Object.freeze;
+const NumberIsFinite = Number.isFinite;
+const NumberIsSafeInteger = Number.isSafeInteger;
 const applyIntrinsic = Reflect.apply;
 const functionToString = Function.prototype.toString;
+const synchronousFunctionPrototype = ObjectGetPrototypeOf(function () {});
+const promiseThen = Promise.prototype.then;
 const mapGet = Map.prototype.get;
 const mapHas = Map.prototype.has;
 const mapSet = Map.prototype.set;
@@ -167,6 +171,11 @@ declare const activeWebSessionResourcePort: unique symbol;
 export type ActiveWebSessionResourcePort = { readonly [activeWebSessionResourcePort]: never };
 declare const activeWebSessionResourceUse: unique symbol;
 export type ActiveWebSessionResourceUse = { readonly [activeWebSessionResourceUse]: never };
+declare const activeWebSessionPrivateResourceRegistration: unique symbol;
+export type ActiveWebSessionPrivateResourceRegistration = {
+    readonly [activeWebSessionPrivateResourceRegistration]: never;
+};
+export type ActiveWebSessionPrivateResourceDisposer = (reason: WebServerSessionRetirementReason) => unknown;
 
 interface StagedWebSessionRecord {
     active: boolean;
@@ -215,6 +224,13 @@ interface ActiveWebSessionResourceUseRecord {
     next: ActiveWebSessionResourceUseRecord | null;
 }
 
+interface ActiveWebSessionPrivateResourceRegistrationRecord {
+    registration: ActiveWebSessionPrivateResourceRegistration;
+    resource: ActiveWebSessionResourcePortRecord | null;
+    dispose: ActiveWebSessionPrivateResourceDisposer | null;
+    next: ActiveWebSessionPrivateResourceRegistrationRecord | null;
+}
+
 const sessions = new MapConstructor<string, ServerSession>();
 const nativeSessionBindings = new WeakMap<ServerSession, NativeServerSessionBinding>();
 const sessionResources = new MapConstructor<string, Set<ServerSessionResourceRegistration>>();
@@ -227,6 +243,7 @@ const armedWebSessionPortRecords = new WeakMapConstructor<object, ArmedWebSessio
 const activeWebSessionCellsBySession = new WeakMapConstructor<ServerSession, ArmedWebSessionCellRecord>();
 const activeWebSessionResourcePortRecords = new WeakMapConstructor<object, ActiveWebSessionResourcePortRecord>();
 const activeWebSessionResourceUseRecords = new WeakMapConstructor<object, ActiveWebSessionResourceUseRecord>();
+let activeWebSessionPrivateResourceRegistrationHead: ActiveWebSessionPrivateResourceRegistrationRecord | null = null;
 /* @Codex */
 interface UserRetirementTurnRecord {
     active: boolean;
@@ -311,6 +328,23 @@ function isSupportedSynchronousDisposer(candidate: unknown): candidate is Server
     } catch {
         return false;
     }
+}
+
+function isSupportedPrivateResourceDisposer(candidate: unknown): candidate is ActiveWebSessionPrivateResourceDisposer {
+    if (typeof candidate !== 'function' || isProxy(candidate)) return false;
+    try {
+        const source = applyIntrinsic(functionToString, candidate, []) as string;
+        return ObjectGetPrototypeOf(candidate) === synchronousFunctionPrototype
+            && !/^\s*(?:async(?:\s|\()|class(?:\s|\{))/u.test(source)
+            && !source.includes('[native code]');
+    } catch { return false; }
+}
+
+function readPrivateResourceClock(): number | null {
+    try {
+        const now = DateNow();
+        return NumberIsFinite(now) && NumberIsSafeInteger(now) && now >= 0 ? now : null;
+    } catch { return null; }
 }
 
 function recordCleanupOutcome(sessionId: string, failed: boolean): ServerSessionCleanupOutcome {
@@ -549,6 +583,47 @@ function activeWebSessionResourceUseRecord(use: unknown): ActiveWebSessionResour
     } catch { return null; }
 }
 
+function takeActiveWebSessionPrivateResourceRegistration(
+    registration: unknown,
+): ActiveWebSessionPrivateResourceRegistrationRecord | null {
+    let previous: ActiveWebSessionPrivateResourceRegistrationRecord | null = null;
+    let current = activeWebSessionPrivateResourceRegistrationHead;
+    while (current) {
+        if (current.registration === registration) {
+            if (previous) previous.next = current.next;
+            else activeWebSessionPrivateResourceRegistrationHead = current.next;
+            current.next = null;
+            return current;
+        }
+        previous = current;
+        current = current.next;
+    }
+    return null;
+}
+
+function burnActiveWebSessionPrivateResourceRegistration(
+    record: ActiveWebSessionPrivateResourceRegistrationRecord,
+): void {
+    const detached = takeActiveWebSessionPrivateResourceRegistration(record.registration) ?? record;
+    detached.resource = null;
+    detached.dispose = null;
+    detached.next = null;
+}
+
+function activeWebSessionPrivateResourceIsCurrent(record: ActiveWebSessionResourcePortRecord): boolean {
+    if (!record.active || record.revoked || !record.cell || !record.session) return false;
+    const cell = record.cell; const session = record.session; const sessionId = session.id;
+    return !webSessionCellLifecyclePoisoned && !cell.resourcePortsRevoked
+        && cell.state === 'ACTIVE' && cell.session === session
+        && armedWebSessionCellsById[sessionId] === cell && session.id === sessionId && session.authChannel === 'web'
+        && getMapValue(sessions, sessionId) === undefined && !hasMapValue(sessions, sessionId)
+        && !webSessionCellLifecyclePoisoned;
+}
+
+function activeWebSessionPrivateResourceIsLiveAt(record: ActiveWebSessionResourcePortRecord, now: number): boolean {
+    return activeWebSessionPrivateResourceIsCurrent(record) && record.session!.expiresAt > now;
+}
+
 function activeWebSessionResourceUseIsLive(record: ActiveWebSessionResourceUseRecord): boolean {
     const owner = record.owner;
     const port = record.port;
@@ -628,6 +703,52 @@ function unlinkArmedWebSessionCellRecord(record: ArmedWebSessionCellRecord): boo
     return true;
 }
 
+function detachActiveWebSessionPrivateResourcesForCell(
+    cell: ArmedWebSessionCellRecord,
+): ActiveWebSessionPrivateResourceRegistrationRecord | null {
+    let detached: ActiveWebSessionPrivateResourceRegistrationRecord | null = null;
+    let previous: ActiveWebSessionPrivateResourceRegistrationRecord | null = null;
+    let current = activeWebSessionPrivateResourceRegistrationHead;
+    while (current) {
+        const next = current.next;
+        if (current.resource?.cell === cell) {
+            if (previous) previous.next = next;
+            else activeWebSessionPrivateResourceRegistrationHead = next;
+            current.next = detached;
+            detached = current;
+        } else previous = current;
+        current = next;
+    }
+    return detached;
+}
+
+function ignorePrivateResourceCleanupRejection(): void {}
+
+function disposeDetachedActiveWebSessionPrivateResources(
+    detached: ActiveWebSessionPrivateResourceRegistrationRecord | null,
+    reason: WebServerSessionRetirementReason | null,
+): boolean {
+    let failed = false;
+    while (detached) {
+        const current = detached;
+        detached = current.next;
+        const dispose = current.dispose;
+        current.next = null;
+        current.resource = null;
+        current.dispose = null;
+        if (!dispose || !reason) { failed = true; continue; }
+        try {
+            const outcome = dispose(reason);
+            if (outcome !== undefined) {
+                failed = true;
+                try { applyIntrinsic(promiseThen, outcome, [undefined, ignorePrivateResourceCleanupRejection]); }
+                catch { /* non-Promise and hostile outcomes stay opaque */ }
+            }
+        } catch { failed = true; }
+    }
+    return failed;
+}
+
 function compactRetiredWebSessionCellRecord(
     record: ArmedWebSessionCellRecord,
     session: ServerSession,
@@ -635,6 +756,7 @@ function compactRetiredWebSessionCellRecord(
     let failed = !record.retirementCommitted;
     record.state = 'RETIRED_CLEANUP';
     record.cleanupReceipt = failedWebSessionRetirementCleanupReceipt;
+    const detachedPrivateResources = detachActiveWebSessionPrivateResourcesForCell(record);
     record.resourcePortsRevoked = true;
     let resource = record.resourcePortHead;
     record.resourcePortHead = null;
@@ -667,6 +789,8 @@ function compactRetiredWebSessionCellRecord(
     record.activationTicket = null;
     record.retirement = null;
     record.next = null;
+    if (disposeDetachedActiveWebSessionPrivateResources(detachedPrivateResources, record.retirementReason)) failed = true;
+    if (webSessionCellLifecyclePoisoned) failed = true;
     record.cleanupReceipt = failed
         ? failedWebSessionRetirementCleanupReceipt
         : completedWebSessionRetirementCleanupReceipt;
@@ -679,6 +803,8 @@ function denyNestedWebSessionCellInput(value: unknown): void {
     if (prepared) revokePreparedWebSession(prepared);
     const cell = armedWebSessionCellRecord(value);
     if (cell) tombstoneArmedWebSessionCellRecord(cell);
+    const registration = takeActiveWebSessionPrivateResourceRegistration(value);
+    if (registration) burnActiveWebSessionPrivateResourceRegistration(registration);
 }
 
 function beginWebSessionCellLifecycle(value: unknown): boolean {
@@ -1280,6 +1406,63 @@ export function commitActiveWebSessionResourceUse(use: unknown): boolean {
 /* @Codex */
 export function abortActiveWebSessionResourceUse(use: unknown): boolean {
     return finishActiveWebSessionResourceUse(use);
+}
+
+/** Registers one opaque, one-use cleanup against an exact ACTIVE Web resource port. */
+/* @Codex */
+export function registerActiveWebSessionPrivateResource(
+    port: unknown,
+    dispose: ActiveWebSessionPrivateResourceDisposer,
+): ActiveWebSessionPrivateResourceRegistration | null {
+    if (!beginWebSessionCellLifecycle(port)) return null;
+    let record: ActiveWebSessionPrivateResourceRegistrationRecord | null = null;
+    let expired: Readonly<{ cell: ArmedWebSessionCellRecord; expiresAt: number; now: number }> | null = null;
+    try {
+        if (webSessionCellLifecyclePoisoned || !isSupportedPrivateResourceDisposer(dispose)) return null;
+        const resource = activeWebSessionResourceRecord(port);
+        const now = readPrivateResourceClock();
+        if (!resource || now === null || !activeWebSessionPrivateResourceIsCurrent(resource)) return null;
+        const cell = resource.cell!; const session = resource.session!; const expiry = session.expiresAt;
+        if (expiry <= now) { expired = { cell, expiresAt: expiry, now }; return null; }
+
+        const registration = ObjectFreeze(ObjectCreate(null)) as ActiveWebSessionPrivateResourceRegistration;
+        record = { registration, resource, dispose, next: activeWebSessionPrivateResourceRegistrationHead };
+        activeWebSessionPrivateResourceRegistrationHead = record;
+
+        const finalNow = readPrivateResourceClock();
+        if (finalNow === null || webSessionCellLifecyclePoisoned || record.resource !== resource
+            || record.dispose !== dispose || !activeWebSessionPrivateResourceIsLiveAt(resource, finalNow)) {
+            if (finalNow !== null && !webSessionCellLifecyclePoisoned && activeWebSessionPrivateResourceIsCurrent(resource)
+                && expiry <= finalNow) expired = { cell, expiresAt: expiry, now: finalNow };
+            burnActiveWebSessionPrivateResourceRegistration(record);
+            return null;
+        }
+        return registration;
+    } catch {
+        if (record) burnActiveWebSessionPrivateResourceRegistration(record);
+        return null;
+    } finally {
+        endWebSessionCellLifecycle();
+        if (expired) {
+            try { dispatchActiveWebServerSessionCellRetirement(expired.cell, 'expired', expired); }
+            catch { /* expiry denial remains fail-closed */ }
+        }
+    }
+}
+
+/** Burns one exact cleanup registration without invoking consumer code. */
+/* @Codex */
+export function unregisterActiveWebSessionPrivateResource(port: unknown, registration: unknown): boolean {
+    if (!beginWebSessionCellLifecycle(registration)) return false;
+    const record = takeActiveWebSessionPrivateResourceRegistration(registration);
+    const resource = record?.resource ?? null;
+    if (record) { record.resource = null; record.dispose = null; record.next = null; }
+    try {
+        return !!(record && resource && !webSessionCellLifecyclePoisoned
+            && activeWebSessionResourceRecord(port) === resource && activeWebSessionPrivateResourceIsCurrent(resource)
+            && !webSessionCellLifecyclePoisoned);
+    } catch { return false; }
+    finally { endWebSessionCellLifecycle(); }
 }
 
 export function getSession(sessionId: string | null | undefined): ServerSession | null {

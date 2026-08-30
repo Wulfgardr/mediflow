@@ -33,6 +33,7 @@ import {
     commitActiveWebSessionResourceUse,
     prepareStagedWebServerSession,
     peekSession,
+    registerActiveWebSessionPrivateResource,
     registerServerSessionResource,
     releaseActiveWebSessionResourcePort,
     retireExpiredServerSession,
@@ -44,6 +45,7 @@ import {
     resolveActiveWebServerSession,
     stageWebServerSession,
     tombstoneArmedWebServerSession,
+    unregisterActiveWebSessionPrivateResource,
     type WebServerSessionRetirementCleanupReceipt,
 } from './server-session';
 import {
@@ -597,6 +599,73 @@ function activeResourceFixture(userId = 'atomic-user') {
     return { ...active, session, port };
 }
 
+test('private ACTIVE resource registrations are opaque, exact, and one-use', () => {
+    const first = activeResourceFixture('private-first');
+    const second = activeResourceFixture('private-second');
+    let calls = 0; let reason = '';
+    const registration = registerActiveWebSessionPrivateResource(first.port, (value) => {
+        calls += 1; reason = value;
+    });
+    assert.ok(registration);
+    assert.deepEqual([
+        Object.getPrototypeOf(registration), Object.isFrozen(registration), Reflect.ownKeys(registration),
+    ], [null, true, []]);
+
+    assert.equal(unregisterActiveWebSessionPrivateResource(second.port, registration), false);
+    assert.equal(unregisterActiveWebSessionPrivateResource(first.port, registration), false);
+    assert.equal(dispatchActiveWebServerSessionRetirement(first.sessionId, 'delete').outcome, 'completed');
+    assert.deepEqual([calls, reason], [0, '']);
+
+    const removed = registerActiveWebSessionPrivateResource(second.port, () => { calls += 1; });
+    assert.ok(removed);
+    assert.equal(unregisterActiveWebSessionPrivateResource(second.port, removed), true);
+    const live = registerActiveWebSessionPrivateResource(second.port, (value) => {
+        calls += 1; reason = value;
+    });
+    assert.ok(live);
+    const receipt = dispatchActiveWebServerSessionRetirement(second.sessionId, 'dispose');
+    assert.equal(receipt.outcome, 'completed');
+    assert.equal(dispatchActiveWebServerSessionRetirement(second.sessionId, 'dispose'), receipt);
+    assert.deepEqual([calls, reason], [1, 'dispose']);
+    assert.equal(unregisterActiveWebSessionPrivateResource(second.port, live), false);
+    assert.equal(releaseActiveWebSessionResourcePort(second.port), false);
+});
+
+test('terminal retirement detaches cleanup before containing throws, promises, and hostile returns', async (t) => {
+    const active = activeResourceFixture('private-hostile');
+    let calls = 0; let reads = 0; let nestedUnregister = true; let nestedRegister: unknown = true;
+    const unhandled: unknown[] = []; const onUnhandled = (value: unknown) => unhandled.push(value);
+    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
+    const thenable = Object.create(null); Object.defineProperty(thenable, 'then', { get() { reads += 1; throw new Error('then'); } });
+    const proxy = new Proxy(Object.create(null), { get() { reads += 1; throw new Error('get'); } });
+    let promiseRegistration: ReturnType<typeof registerActiveWebSessionPrivateResource> = null;
+    const throwingRegistration = registerActiveWebSessionPrivateResource(active.port, () => {
+        calls += 1;
+        nestedUnregister = unregisterActiveWebSessionPrivateResource(active.port, promiseRegistration);
+        nestedRegister = registerActiveWebSessionPrivateResource(active.port, () => undefined);
+        assert.equal(resolveActiveWebServerSession(active.sessionId), null);
+        throw new Error('synthetic cleanup');
+    });
+    promiseRegistration = registerActiveWebSessionPrivateResource(active.port, () => {
+        calls += 1; return Promise.reject(new Error('synthetic rejection'));
+    });
+    const hostileRegistration = registerActiveWebSessionPrivateResource(active.port, () => {
+        calls += 1; return calls % 2 ? proxy : thenable;
+    });
+    const otherHostileRegistration = registerActiveWebSessionPrivateResource(active.port, () => {
+        calls += 1; return calls % 2 ? proxy : thenable;
+    });
+    assert.ok(throwingRegistration && promiseRegistration && hostileRegistration && otherHostileRegistration);
+
+    assert.equal(dispatchActiveWebServerSessionRetirement(active.sessionId, 'dispose').outcome, 'failed');
+    assert.deepEqual([calls, nestedUnregister, nestedRegister, reads], [4, false, null, 0]);
+    for (const registration of [throwingRegistration, promiseRegistration, hostileRegistration, otherHostileRegistration]) {
+        assert.equal(unregisterActiveWebSessionPrivateResource(active.port, registration), false);
+    }
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.deepEqual(unhandled, []);
+});
+
 test('ACTIVE resource uses are opaque, one-use, and commit-last without consumer effects', async () => {
     const active = activeResourceFixture();
     const first = beginActiveWebSessionResourceUse(active.port); assert.ok(first);
@@ -695,8 +764,9 @@ test('resource cleanup and expiry burn uses and deny new use without changing re
 test('ACTIVE resource port has no callback surface or production importer before adoption', () => {
     const source = readFileSync(fileURLToPath(new URL('./server-session.ts', import.meta.url)), 'utf8');
     const mint = source.slice(source.indexOf('export function mintActiveWebSessionResourcePort'), source.indexOf('export function releaseActiveWebSessionResourcePort'));
-    const release = source.slice(source.indexOf('export function releaseActiveWebSessionResourcePort'), source.indexOf('export function getSession'));
-    const use = source.slice(source.indexOf('export function beginActiveWebSessionResourceUse'), source.indexOf('export function getSession'));
+    const release = source.slice(source.indexOf('export function releaseActiveWebSessionResourcePort'), source.indexOf('export function beginActiveWebSessionResourceUse'));
+    const use = source.slice(source.indexOf('export function beginActiveWebSessionResourceUse'), source.indexOf('export function registerActiveWebSessionPrivateResource'));
+    const privateResource = source.slice(source.indexOf('export function registerActiveWebSessionPrivateResource'), source.indexOf('export function getSession'));
     const cleanup = source.slice(source.indexOf('export function cleanupRetiredWebServerSession'));
     const dispatch = source.slice(source.indexOf('export function dispatchActiveWebServerSessionRetirement'));
     assert.match(mint, /\(session: unknown\): ActiveWebSessionResourcePort \| null/u); assert.match(release, /\(port: unknown\): boolean/u);
@@ -704,6 +774,8 @@ test('ACTIVE resource port has no callback surface or production importer before
     assert.match(use, /export function commitActiveWebSessionResourceUse\(use: unknown\): boolean/u);
     assert.match(use, /export function abortActiveWebSessionResourceUse\(use: unknown\): boolean/u);
     assert.doesNotMatch(`${mint}\n${release}\n${use}`, /\b(?:callback|dispose|Promise|async|then|setTimeout|setImmediate|queueMicrotask|nextTick|payload|effect|method)\b/u);
+    assert.match(privateResource, /registerActiveWebSessionPrivateResource\([\s\S]*\): ActiveWebSessionPrivateResourceRegistration \| null/u);
+    assert.match(privateResource, /unregisterActiveWebSessionPrivateResource\(port: unknown, registration: unknown\): boolean/u);
     assert.doesNotMatch(cleanup, /\b(?:DateNow|Promise|async|then|setTimeout|setImmediate|queueMicrotask|nextTick)\b/u);
     assert.match(dispatch, /retireActiveWebServerSession\(sessionId, reason\);\s*return cleanupRetiredWebServerSession\(sessionId, reason\);/u);
     assert.doesNotMatch(dispatch, /\b(?:callback|ticket|owner|session:|Promise|async|then|setTimeout|setImmediate|queueMicrotask|nextTick)\b/u);
