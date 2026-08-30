@@ -384,7 +384,7 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                             )}
                         </div>
 
-                        <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                             {file.ocrQueueState && file.ocrQueueState !== 'ocr_done' && (
                                 <button
                                     onClick={() => handleLocalExtractionPreview(file)}
