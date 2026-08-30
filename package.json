@@ -40,7 +40,7 @@
     "workflow-monitor": "node scripts/codex-workflow-monitor.mjs",
     "rehearse:api-v1-compatibility": "node scripts/api-v1-compatibility-rehearsal.mjs",
     "check:never-regress": "node scripts/check-never-regress.mjs",
-    "check:web-auth-lifecycle-owner-boundary": "node scripts/run-strip-types.mjs --test lib/security/web-auth-lifecycle-owner-boundary.test.ts",
+    "check:web-auth-lifecycle-owner-boundary": "node scripts/run-strip-types.mjs --test lib/security/web-auth-lifecycle-owner-boundary.test.ts lib/security/web-auth-lifecycle-owner-resolver-boundary.test.ts",
     "check:lume-tokens": "node scripts/check-lume-tokens.mjs",
     "test:lume-tokens": "node --test scripts/check-lume-tokens.test.mjs",
     "check:motion-budget": "node scripts/check-motion-budget.mjs",
