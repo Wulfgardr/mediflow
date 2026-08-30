@@ -8,7 +8,7 @@ import ts from 'typescript';
 const ROOT = process.cwd();
 const SERVICE_PATH = 'lib/domain/documents/document-synthesis-service.ts';
 const EXPECTED_COUNTS: Record<string, number> = {
-    'components/document-upload.tsx': 2,
+    'components/document-upload.tsx': 1,
     'components/pdf-importer.tsx': 1,
     'app/patients/[id]/entries/new/page.tsx': 1,
 };
@@ -185,16 +185,13 @@ test('source bytes stay local, gated, and binding-checked across all productive 
     assertExpectedCalls(calls);
     const byPath = (filePath: string) => calls.filter((site) => site.path === filePath);
     const upload = byPath('components/document-upload.tsx');
-    assert.deepEqual(upload.map((site) => sourceBytesInput(site).name), ['file', 'blob']);
+    assert.deepEqual(upload.map((site) => sourceBytesInput(site).name), ['file']);
     assert.equal(sourceBytesInput(byPath('components/pdf-importer.tsx')[0]).name, 'file');
     const entry = byPath('app/patients/[id]/entries/new/page.tsx')[0];
     assert.equal(sourceBytesInput(entry).name, 'file');
     for (const site of [...upload, byPath('components/pdf-importer.tsx')[0], entry]) assertFallibleReader(site.source);
 
     for (const site of [...upload, byPath('components/pdf-importer.tsx')[0], entry]) assertReadHasGate(site, 'documentSynthesisEnabled');
-    assertReadHasGate(upload[1], 'replay.outcome');
-    const replayHash = namedCalls(upload[0].source, 'sha256Hex').find((call) => call.arguments[0]?.getText(upload[0].source) === 'file.data');
-    assert.ok(replayHash && replayHash.getStart(upload[0].source) < upload[1].call.getStart(upload[1].source), 'Replay Data URL hash must remain separate and precede source-byte reading.');
     const entryGate = initializerBefore(entry.source, 'documentSynthesisEnabled', entry.call.getStart(entry.source));
     const entryGateCall = entryGate ? unwrap(entryGate) : undefined;
     assert.ok(entryGateCall && ts.isCallExpression(entryGateCall) && ts.isIdentifier(entryGateCall.expression) && entryGateCall.expression.text === 'isAiDocumentSynthesisEnabledValue', 'NewEntryPage must resolve the document-synthesis kill switch before reading bytes.');

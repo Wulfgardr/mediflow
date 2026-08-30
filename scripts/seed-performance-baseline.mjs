@@ -122,6 +122,12 @@ function patientId(index) {
   return `perf-patient-${String(index).padStart(6, '0')}`;
 }
 
+function documentSourceRef(attachmentId) {
+  return createHash('sha256')
+    .update(`mediflow-performance-document-source:v1:${attachmentId}`, 'utf8')
+    .digest('hex');
+}
+
 function seedRows(db, counts, wrappedMasterKey) {
   const insertPatient = db.prepare(`
     INSERT INTO patients (
@@ -164,10 +170,12 @@ function seedRows(db, counts, wrappedMasterKey) {
   const insertDocument = db.prepare(`
     INSERT INTO attachments (
       id, patient_id, name, type, size, path, data, summary_snapshot,
-      parse_evidence_artifact_snapshot, ocr_queue_state, ocr_queue_updated_at, created_at
+      parse_evidence_artifact_snapshot, ocr_queue_state, ocr_queue_updated_at,
+      document_source_ref, document_revision, document_freshness_epoch, created_at
     ) VALUES (
       @id, @patientId, @name, 'application/pdf', 4096, @path, @data, @summary,
-      @evidence, 'ocr_done', @createdAt, @createdAt
+      @evidence, 'ocr_done', @createdAt,
+      @documentSourceRef, @documentRevision, @documentFreshnessEpoch, @createdAt
     )
   `);
 
@@ -255,14 +263,18 @@ function seedRows(db, counts, wrappedMasterKey) {
 
       for (let index = 0; index < counts.documents; index += 1) {
         const rowIdentity = `${identity}:document:${index}`;
+        const attachmentId = `${id}-document-${String(index).padStart(2, '0')}`;
         insertDocument.run({
-          id: `${id}-document-${String(index).padStart(2, '0')}`,
+          id: attachmentId,
           patientId: id,
           name: encryptedFixture(`referto-sintetico-${index + 1}.pdf`, `${rowIdentity}:name`),
           path: encryptedFixture(`fixture/referto-sintetico-${index + 1}.pdf`, `${rowIdentity}:path`),
           data: encryptedFixture('JVBERi0xLjQKJSBmaXh0dXJlIHNpbnRldGljYQo=', `${rowIdentity}:data`),
           summary: encryptedFixture('Sintesi documentale sintetica, sempre soggetta a revisione.', `${rowIdentity}:summary`),
           evidence: encryptedFixture({ schemaVersion: 1, facts: [], source: 'synthetic' }, `${rowIdentity}:evidence`),
+          documentSourceRef: documentSourceRef(attachmentId),
+          documentRevision: 1,
+          documentFreshnessEpoch: 1,
           createdAt: createdAt - index * 7 * 86400,
         });
       }

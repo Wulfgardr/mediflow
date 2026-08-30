@@ -6,14 +6,13 @@ import { eq } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { buildAttachmentPath } from '@/lib/attachment-path';
 import {
-    canTransitionDocumentOcrQueueState,
-    isDocumentOcrQueueState,
     type DocumentOcrQueueState,
 } from '@/lib/domain/documents/document-ocr-queue';
 /* @Codex */
 import { attachmentUpdateSchema } from '@/lib/api-schemas/attachments';
 /* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
+import { isAttachmentCurrentnessHostError, isAttachmentMetadataCurrentnessHostError, transitionAttachmentMetadataCurrentness } from '@/lib/attachment-currentness-host';
 
 const ATTACHMENT_DETAIL_RESPONSE_COLUMNS = {
     id: attachments.id,
@@ -74,20 +73,10 @@ export async function PUT(
         if (!parsedBody.ok) return parsedBody.response;
         const payload = parsedBody.data;
 
-        const existing = await dbServer
-            .select({ id: attachments.id, ocrQueueState: attachments.ocrQueueState })
-            .from(attachments)
-            .where(eq(attachments.id, id))
-            .get();
-        if (!existing) {
-            return NextResponse.json({ error: 'Not found' }, { status: 404 });
-        }
-
         const updateData: {
             summarySnapshot?: string | null;
             parseEvidenceArtifactSnapshot?: string | null;
             ocrQueueState?: DocumentOcrQueueState;
-            ocrQueueUpdatedAt?: Date;
         } = {};
 
         if (Object.prototype.hasOwnProperty.call(payload, 'summarySnapshot')) {
@@ -107,26 +96,30 @@ export async function PUT(
         }
 
         if (payload.ocrQueueState !== undefined) {
-            if (!isDocumentOcrQueueState(payload.ocrQueueState)) {
-                return NextResponse.json({ error: 'Invalid OCR queue state' }, { status: 400 });
-            }
-            if (!isDocumentOcrQueueState(existing.ocrQueueState)) {
-                return NextResponse.json({ error: 'Attachment is not in the OCR queue' }, { status: 409 });
-            }
-            if (!canTransitionDocumentOcrQueueState(existing.ocrQueueState, payload.ocrQueueState)) {
-                return NextResponse.json({ error: 'Invalid OCR queue state transition' }, { status: 409 });
-            }
             updateData.ocrQueueState = payload.ocrQueueState;
-            updateData.ocrQueueUpdatedAt = new Date();
         }
 
         if (Object.keys(updateData).length === 0) {
             return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
         }
 
-        await dbServer.update(attachments).set(updateData).where(eq(attachments.id, id));
+        transitionAttachmentMetadataCurrentness(id, {
+            summarySnapshot: updateData.summarySnapshot,
+            parseEvidenceArtifactSnapshot: updateData.parseEvidenceArtifactSnapshot,
+            ocrQueueState: updateData.ocrQueueState,
+        });
         return NextResponse.json({ success: true });
     } catch (error) {
+        if (isAttachmentMetadataCurrentnessHostError(error)) {
+            if (error.code === 'ocr_queue_unavailable') return NextResponse.json({ error: 'Attachment is not in the OCR queue' }, { status: 409 });
+            return NextResponse.json({ error: 'Invalid OCR queue state transition' }, { status: 409 });
+        }
+        if (isAttachmentCurrentnessHostError(error)) {
+            if (error.code === 'attachment_missing') return NextResponse.json({ error: 'Not found' }, { status: 404 });
+            if (error.code === 'currentness_overflow') return NextResponse.json({ error: 'Attachment currentness cannot advance' }, { status: 409 });
+            if (error.code === 'currentness_conflict') return NextResponse.json({ error: 'Attachment changed; reload and retry' }, { status: 409 });
+            if (error.code === 'input_invalid') return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+        }
         return NextResponse.json({ error: "Update Failed" }, { status: 500 });
     }
 }
@@ -141,7 +134,8 @@ export async function DELETE(
 
     try {
         const { id } = await params;
-        await dbServer.delete(attachments).where(eq(attachments.id, id));
+        const deleted = await dbServer.delete(attachments).where(eq(attachments.id, id));
+        if (deleted.changes !== 1) return NextResponse.json({ error: 'Not found' }, { status: 404 });
         return NextResponse.json({ success: true });
     } catch (error) {
         return NextResponse.json({ error: "Delete Failed" }, { status: 500 });
