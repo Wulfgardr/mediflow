@@ -10,6 +10,7 @@ import ts from 'typescript';
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const OWNER_STEM = ['web-auth-life', 'cycle-owner'].join('');
 const PACKAGE = `@mediflow/${OWNER_STEM}`;
+const PACKAGE_SOURCE_MANIFEST = `packages/${OWNER_STEM}/package.json`;
 const D1A = `lib/security/${OWNER_STEM}-boundary.test.ts`;
 const D1B = `lib/security/${OWNER_STEM}-resolver-boundary.test.ts`;
 const GUARD_SCRIPT = `check:${OWNER_STEM}-boundary`;
@@ -86,7 +87,8 @@ const inventoryErrors = (files: readonly string[]): string[] => {
         || /^babel\.config\./u.test(path.basename(file)) || /^\.babelrc(?:\.|$)/u.test(path.basename(file)));
     const errors: string[] = [];
     if (canonical(nextConfigs) !== canonical(['next.config.ts'])) errors.push('inventory:next-config');
-    if (canonical(packages) !== canonical(['package.json'])) errors.push('inventory:package');
+    if (![canonical(['package.json']), canonical(['package.json', PACKAGE_SOURCE_MANIFEST])].includes(canonical(packages)))
+        errors.push('inventory:package');
     if (alternates.length > 0) errors.push('inventory:alternate-resolver');
     return errors;
 };
@@ -141,6 +143,7 @@ test('freezes canonical TypeScript and package resolver projections', () => {
 test('denies alternate resolver files, nested packages, and loss of the combined guard', () => {
     assert.deepEqual(inventoryErrors(liveFiles), []);
     const baseline = ['next.config.ts', 'package.json'];
+    assert.deepEqual(inventoryErrors([...baseline, PACKAGE_SOURCE_MANIFEST]), []);
     for (const file of ['next.config.js', 'next.config.mjs', 'jsconfig.json', '.babelrc', 'babel.config.cjs',
         'lib/security/package.json']) assert.notDeepEqual(inventoryErrors([...baseline, file]), [], file);
     assert.deepEqual(inventoryErrors([...baseline, 'node_modules/dep/package.json', '.next/cache/package.json']), []);

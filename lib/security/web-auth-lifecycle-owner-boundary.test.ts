@@ -1,7 +1,8 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync,
+    symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,6 +20,10 @@ import {
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const PACKAGE = '@mediflow/web-auth-lifecycle-owner';
+const PACKAGE_ROOT = 'packages/web-auth-lifecycle-owner';
+const PACKAGE_MANIFEST_FILE = `${PACKAGE_ROOT}/package.json`;
+const PACKAGE_ENTRY_FILE = `${PACKAGE_ROOT}/index.js`;
+const PREPARED_PACKAGE_TARBALL = `${PACKAGE_ROOT}/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5-prepared.0.tgz`;
 const ADAPTER = 'lib/security/web-auth-lifecycle-owner-adapter';
 const ADAPTER_FILE = `${ADAPTER}.ts`;
 const ADAPTER_TEST = `${ADAPTER}.test`;
@@ -48,6 +53,11 @@ const AUTHORITY_ROSTER_SHA256 = '8cef18fd9f1e29f5f48a285092c9cd159e0be707a27d497
 const PRE_CUTOVER_GLOBAL_OWNER_SHA256 = 'ae959c2ba88cb768b106aa52d7fec1ea2f6acc7407db194ad9765799ec2fa854';
 const PRE_CUTOVER_GLOBAL_OWNER = 'lib/security/server-session-projection-owner-production.ts';
 const DORMANT_ADAPTER_SOURCE = "import 'server-only';\nexport const lifecycleOwnerAdapterState = 'dormant_prepared' as const;\nexport type LifecycleOwnerAdapterState = typeof lifecycleOwnerAdapterState;";
+const PREPARED_PACKAGE_MANIFEST = JSON.stringify({
+    name: PACKAGE, version: '0.8.5-prepared.0', private: true, type: 'commonjs', main: './index.js',
+    exports: './index.js', files: ['index.js', 'internal/'], engines: { node: '>=24 <25' },
+}, null, 2);
+const PREPARED_PACKAGE_ENTRY = "'use strict';\nmodule.exports = Object.freeze(Object.create(null));";
 const STATEFUL_AUTHORITY_MODULES = new Set([
     'active-review-binding', 'audit', 'in-process-preview-job-control', 'module-import-inventory.test-support', 'pin-change',
     'server-session-projection-owner-production', 'server-session', 'session-physician-review-authority',
@@ -57,6 +67,11 @@ const STATEFUL_AUTHORITY_MODULES = new Set([
 ].map((name) => `lib/security/${name}.ts`));
 type Sources = Readonly<Record<string, string>>;
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
+const decodedIdentity = (value: string): string | null => { let decoded = value; try { for (let index = 0; index < 4; index += 1) { const next = decodeURIComponent(decoded); if (next === decoded) break; decoded = next; } return decoded; } catch { return null; } };
+const canonical = (value: unknown): string => JSON.stringify(value && typeof value === 'object' && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, JSON.parse(canonical(item))]))
+    : Array.isArray(value) ? value.map((item) => JSON.parse(canonical(item))) : value);
 const sourceFiles = (root: string): Record<string, string> => {
     const walk = (directory: string): string[] => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
         const absolute = path.join(directory, entry.name);
@@ -71,26 +86,47 @@ const DORMANT_ADAPTER_CONTRACT = printed(ADAPTER_FILE, DORMANT_ADAPTER_SOURCE);
 const parseErrors = (file: string, source: string) =>
     (ast(file, source) as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length;
 type ScanOps = Readonly<{ exists(value: string): boolean; realpath(value: string): string;
+    read(value: string): string;
     readdir(value: string): ReadonlyArray<{ name: string; isDirectory(): boolean; isSymbolicLink(): boolean }> }>;
 const SCAN_OPS: ScanOps = { exists: existsSync, realpath: realpathSync.native,
+    read: (value) => readFileSync(value, 'utf8'),
     readdir: (value) => readdirSync(value, { withFileTypes: true }) };
 const ownerPackageCopies = (root: string, ops = SCAN_OPS) => {
-    const pending = [path.join(root, 'node_modules')]; const seen = new Set<string>(); const found: string[] = [];
+    const sourceRoot = path.join(root, PACKAGE_ROOT); let sourceReal: string | null = null;
+    try { if (ops.exists(sourceRoot)) sourceReal = ops.realpath(sourceRoot); } catch { return ['<unscannable>']; }
+    const pending = [path.join(root, 'node_modules')]; const seen = new Set<string>();
+    const seenPackages = new Set<string>(); const found: string[] = [];
+    const inspectPackage = (packageRoot: string, logicalName: string): void => {
+        let real: string;
+        try { real = ops.realpath(packageRoot); } catch { found.push('<unscannable>'); return; }
+        if (seenPackages.has(real)) return; seenPackages.add(real);
+        const manifestFile = path.join(packageRoot, 'package.json'); let manifestName: unknown;
+        try { if (ops.exists(manifestFile)) manifestName = (JSON.parse(ops.read(manifestFile)) as { name?: unknown }).name; }
+        catch { found.push('<unscannable>'); return; }
+        if (logicalName === PACKAGE || manifestName === PACKAGE || (sourceReal !== null && real === sourceReal))
+            found.push(packageRoot);
+        pending.push(path.join(packageRoot, 'node_modules'));
+    };
     while (pending.length > 0) {
         const directory = pending.pop()!; if (!ops.exists(directory)) continue;
         let real: string; try { real = ops.realpath(directory); } catch { return [...found, '<unscannable>']; }
         if (seen.has(real)) continue; seen.add(real); if (seen.size > 4_096) return [...found, '<scan-limit>'];
-        const owner = path.join(directory, PACKAGE); if (ops.exists(owner)) found.push(owner);
         try { for (const entry of ops.readdir(directory)) {
-            const candidate = path.join(directory, entry.name); const packages = entry.name.startsWith('@') && entry.isDirectory()
-                ? ops.readdir(candidate).filter((item) => item.isDirectory() || item.isSymbolicLink()).map((item) => path.join(candidate, item.name))
-                : entry.isDirectory() || entry.isSymbolicLink() ? [candidate] : [];
-            for (const packageRoot of packages) pending.push(entry.name === '.pnpm' ? packageRoot : path.join(packageRoot, 'node_modules'));
+            if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+            const candidate = path.join(directory, entry.name);
+            if (entry.name === '.pnpm') {
+                for (const item of ops.readdir(candidate)) if (item.isDirectory() || item.isSymbolicLink())
+                    pending.push(path.join(candidate, item.name, 'node_modules'));
+            } else if (entry.name.startsWith('@')) {
+                for (const item of ops.readdir(candidate)) if (item.isDirectory() || item.isSymbolicLink())
+                    inspectPackage(path.join(candidate, item.name), `${entry.name}/${item.name}`);
+            } else inspectPackage(candidate, entry.name);
         } } catch { return [...found, '<unscannable>']; }
     }
     return found;
 };
-const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false): string[] => {
+const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false,
+    packageAliases: ReadonlySet<string> = new Set()): string[] => {
     const errors: string[] = [];
     for (const [file, source] of Object.entries(sources)) {
         if (file === THIS_FILE) continue;
@@ -99,9 +135,21 @@ const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false): s
         const packageUses = inventoryModuleImports({ file, source, target: packageTarget, repositoryRoot: ROOT,
             allowUnresolvedExpressions: allowedGenericLoaderExpressions });
         const packageRelevant = packageUses.filter((use) => IMPORT_FORMS.has(use.form) || use.form === 'module-path'
-            || (UNRESOLVED_LOADER_FORMS.has(use.form) && !unresolvedLoaderIsKnown)
-            || source.includes('web-auth-lifecycle-owner'));
-        if (packageRelevant.length > 0) errors.push(`${file}:package-load`);
+            || (UNRESOLVED_LOADER_FORMS.has(use.form) && !unresolvedLoaderIsKnown));
+        const packageSourceUses = inventoryModuleImports({ file, source, target: PACKAGE_ENTRY_FILE, repositoryRoot: ROOT,
+            allowUnresolvedExpressions: allowedGenericLoaderExpressions });
+        const packageSourceRelevant = packageSourceUses.filter((use) => IMPORT_FORMS.has(use.form) || use.form === 'module-path'
+            || (UNRESOLVED_LOADER_FORMS.has(use.form) && !unresolvedLoaderIsKnown));
+        if (packageRelevant.length > 0 || packageSourceRelevant.length > 0)
+            errors.push(`${file}:package-load`);
+        for (const alias of packageAliases) {
+            if (alias.startsWith('<')) continue;
+            const aliasUses = inventoryModuleImports({ file, source, target: path.join(path.dirname(file), alias),
+                repositoryRoot: ROOT, allowUnresolvedExpressions: allowedGenericLoaderExpressions });
+            if (aliasUses.some((use) => IMPORT_FORMS.has(use.form) || use.form === 'module-path'
+                || (UNRESOLVED_LOADER_FORMS.has(use.form) && !unresolvedLoaderIsKnown)))
+                errors.push(`${file}:package-alias-load`);
+        }
         const packageAst = ast(file, source); let deepPackage = false; const constants = new Map<string, ts.Expression>();
         const collectConstants = (node: ts.Node): void => {
             if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) constants.set(node.name.text, node.initializer);
@@ -124,7 +172,12 @@ const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false): s
         };
         const visitPackage = (node: ts.Node): void => {
             if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateExpression(node) || ts.isBinaryExpression(node) || ts.isIdentifier(node)) {
-                const value = staticString(node); if (value === PACKAGE || value?.startsWith(`${PACKAGE}/`)) deepPackage = true;
+                const value = staticString(node); const sourcePath = value === null ? null
+                    : path.resolve(path.dirname(path.join(ROOT, file)), value);
+                const decoded = value === null ? null : decodedIdentity(value);
+                if (value === PACKAGE || value?.startsWith(`${PACKAGE}/`)
+                    || sourcePath === path.join(ROOT, PACKAGE_ENTRY_FILE)
+                    || [...packageAliases].some((alias) => decoded === alias || decoded?.startsWith(`${alias}/`))) deepPackage = true;
             }
             ts.forEachChild(node, visitPackage);
         };
@@ -196,43 +249,159 @@ const dormantAdapterErrors = (source: string): string[] => {
     return [...new Set(errors)];
 };
 
+type PackageSourceOps = Readonly<{
+    exists(value: string): boolean;
+    read(value: string): string;
+    realpath(value: string): string;
+    readdir(value: string): ReadonlyArray<{
+        name: string; isFile(): boolean; isSymbolicLink(): boolean;
+    }>;
+}>;
+const PACKAGE_SOURCE_OPS: PackageSourceOps = {
+    exists: (value) => { try { lstatSync(value); return true; } catch { return false; } },
+    read: (value) => readFileSync(value, 'utf8'), realpath: realpathSync.native,
+    readdir: (value) => readdirSync(value, { withFileTypes: true }),
+};
+const packageSourceArtifacts = (root: string, ops = PACKAGE_SOURCE_OPS): Sources => {
+    const directory = path.join(root, PACKAGE_ROOT);
+    if (!ops.exists(directory)) return {};
+    try {
+        if (ops.realpath(directory) !== path.join(ops.realpath(root), PACKAGE_ROOT))
+            return { '<package-source-symlink>': '' };
+        const entries = ops.readdir(directory);
+        if (entries.some((entry) => !entry.isFile() || entry.isSymbolicLink()))
+            return { '<package-source-invalid>': '' };
+        return Object.fromEntries(entries.map((entry) => {
+            const file = path.join(PACKAGE_ROOT, entry.name);
+            return [file, ops.read(path.join(root, file))];
+        }));
+    } catch { return { '<package-source-unscannable>': '' }; }
+};
+const duplicateJsonKeys = (source: string): boolean => {
+    const tree = ts.parseJsonText(PACKAGE_MANIFEST_FILE, source); let duplicate = false;
+    const visit = (node: ts.Node): void => {
+        if (ts.isObjectLiteralExpression(node)) {
+            const names = new Set<string>();
+            for (const property of node.properties) if (ts.isPropertyAssignment(property)) {
+                const name = ts.isStringLiteral(property.name) || ts.isNumericLiteral(property.name)
+                    ? property.name.text : property.name.getText(tree);
+                if (names.has(name)) duplicate = true; names.add(name);
+            }
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(tree); return duplicate;
+};
+const packageSourceErrors = (artifacts: Sources): string[] => {
+    if (canonical(Object.keys(artifacts).sort()) !== canonical([PACKAGE_ENTRY_FILE, PACKAGE_MANIFEST_FILE].sort()))
+        return ['package-source:inventory'];
+    let manifest: unknown;
+    try { manifest = JSON.parse(artifacts[PACKAGE_MANIFEST_FILE]!); } catch { return ['package-source:manifest-parse']; }
+    const expectedManifest = JSON.parse(PREPARED_PACKAGE_MANIFEST) as unknown;
+    const errors: string[] = [];
+    if (duplicateJsonKeys(artifacts[PACKAGE_MANIFEST_FILE]!) || !manifest || typeof manifest !== 'object'
+        || JSON.stringify(Object.keys(manifest)) !== JSON.stringify(Object.keys(expectedManifest as object))
+        || canonical(manifest) !== canonical(expectedManifest)) errors.push('package-source:manifest');
+    if (parseErrors(PACKAGE_ENTRY_FILE, artifacts[PACKAGE_ENTRY_FILE]!) > 0
+        || printed(PACKAGE_ENTRY_FILE, artifacts[PACKAGE_ENTRY_FILE]!) !== printed(PACKAGE_ENTRY_FILE, PREPARED_PACKAGE_ENTRY))
+        errors.push('package-source:entry');
+    return errors;
+};
+
+const ownerPackageReference = (value: unknown): boolean => {
+    if (typeof value !== 'string') return false;
+    const decoded = decodedIdentity(value); if (decoded === null) return true;
+    if (decoded === PACKAGE || decoded.startsWith(`${PACKAGE}/`) || decoded.startsWith(`${PACKAGE}@`)
+        || decoded.startsWith(`npm:${PACKAGE}@`) || decoded.includes(`/${PACKAGE}/`)) return true;
+    const local = decoded.replace(/^(?:file|link):/u, '').split(/[?#]/u, 1)[0]!;
+    const resolved = path.resolve(ROOT, local); const sourceRoot = path.join(ROOT, PACKAGE_ROOT);
+    return resolved === sourceRoot || resolved === path.join(ROOT, PREPARED_PACKAGE_TARBALL);
+};
+const lockPackageAlias = (key: string): string | null => {
+    const marker = 'node_modules/'; const index = key.lastIndexOf(marker);
+    if (index < 0) return null;
+    const remainder = key.slice(index + marker.length); const segments = remainder.split('/');
+    return segments[0]?.startsWith('@') ? segments.slice(0, 2).join('/') : segments[0] ?? null;
+};
+const ownerLockAliases = (source: string): Set<string> => {
+    const aliases = new Set<string>(); if (source.trim() === '') return aliases;
+    let lock: unknown;
+    try { lock = JSON.parse(source); } catch { aliases.add('<invalid-lock>'); return aliases; }
+    const visit = (value: unknown, key = ''): void => {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+        const record = value as Record<string, unknown>; const alias = lockPackageAlias(key);
+        if (record.name === PACKAGE || ownerPackageReference(record.resolved) || ownerPackageReference(record.version))
+            aliases.add(alias ?? PACKAGE);
+        for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
+            const dependencies = record[section];
+            if (dependencies && typeof dependencies === 'object' && !Array.isArray(dependencies)) {
+                for (const [name, spec] of Object.entries(dependencies))
+                    if (name === PACKAGE || ownerPackageReference(spec)) aliases.add(name);
+            }
+        }
+        for (const [childKey, child] of Object.entries(record)) visit(child, childKey);
+    };
+    visit(lock); return aliases;
+};
+const ownerDependencyAliases = (packageJson: Record<string, unknown>, lock: string): Set<string> => {
+    const aliases = ownerLockAliases(lock);
+    for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
+        const dependencies = (packageJson[section] as Record<string, unknown> | undefined) ?? {};
+        for (const [name, spec] of Object.entries(dependencies))
+            if (name === PACKAGE || ownerPackageReference(spec)) aliases.add(name);
+    }
+    return aliases;
+};
+
 const packageBoundaryErrors = (packageJson: Record<string, unknown>, lock: string, nextConfig: string,
     ownerInNodeModules: boolean): string[] => {
     const errors: string[] = [];
     for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
-        if (PACKAGE in ((packageJson[section] as Record<string, unknown> | undefined) ?? {})) errors.push(`package:${section}`);
+        const dependencies = (packageJson[section] as Record<string, unknown> | undefined) ?? {};
+        if (Object.entries(dependencies).some(([name, spec]) => name === PACKAGE || ownerPackageReference(spec)))
+            errors.push(`package:${section}`);
     }
-    if (lock.includes(PACKAGE)) errors.push('package:lock');
+    if (lock.includes(PACKAGE) || ownerLockAliases(lock).size > 0) errors.push('package:lock');
     if (ownerInNodeModules) errors.push('package:node_modules');
     if (/serverExternalPackages\s*:[\s\S]*?@mediflow\/web-auth-lifecycle-owner/u.test(nextConfig)) errors.push('package:next-external');
     return errors;
 };
-const preCutoverSourceState = (sources: Sources): 'BASELINE' | 'DORMANT_PREPARED' | 'INVALID' => {
+const preCutoverSourceState = (sources: Sources, packageArtifacts: Sources = {}):
+    'BASELINE' | 'DORMANT_PREPARED' | 'PACKAGE_SOURCE_PREPARED' | 'INVALID' => {
     const adapter = sources[ADAPTER_FILE];
     if (importInventoryErrors(sources, adapter !== undefined).length > 0) return 'INVALID';
-    if (adapter === undefined) return 'BASELINE';
-    return dormantAdapterErrors(adapter).length === 0 ? 'DORMANT_PREPARED' : 'INVALID';
+    if (adapter === undefined) return Object.keys(packageArtifacts).length === 0 ? 'BASELINE' : 'INVALID';
+    if (dormantAdapterErrors(adapter).length > 0) return 'INVALID';
+    if (Object.keys(packageArtifacts).length === 0) return 'DORMANT_PREPARED';
+    return sources[PACKAGE_ENTRY_FILE] === packageArtifacts[PACKAGE_ENTRY_FILE]
+        && packageSourceErrors(packageArtifacts).length === 0 ? 'PACKAGE_SOURCE_PREPARED' : 'INVALID';
 };
 
 const liveSources = sourceFiles(ROOT);
 const livePackage = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as Record<string, unknown>;
 const liveLock = readFileSync(path.join(ROOT, 'package-lock.json'), 'utf8');
 const liveNext = readFileSync(path.join(ROOT, 'next.config.ts'), 'utf8');
+const livePackageSource = packageSourceArtifacts(ROOT);
 
-test('accepts only the exact BASELINE or DORMANT_PREPARED pre-cutover repository state', () => {
+test('accepts only the three exact closed pre-cutover repository states', () => {
     assert.deepEqual(packageBoundaryErrors(livePackage, liveLock, liveNext,
         ownerPackageCopies(ROOT).length > 0), []);
-    assert.equal(preCutoverSourceState(liveSources), liveSources[ADAPTER_FILE] === undefined ? 'BASELINE' : 'DORMANT_PREPARED');
+    assert.equal(preCutoverSourceState(liveSources, livePackageSource), liveSources[ADAPTER_FILE] === undefined
+        ? 'BASELINE' : Object.keys(livePackageSource).length === 0 ? 'DORMANT_PREPARED' : 'PACKAGE_SOURCE_PREPARED');
     assert.equal(authorityRosterDigest(liveSources), AUTHORITY_ROSTER_SHA256);
     assert.deepEqual(statefulAuthorityModules(liveSources), STATEFUL_AUTHORITY_MODULES);
     assert.equal(digest(liveSources[PRE_CUTOVER_GLOBAL_OWNER]!), PRE_CUTOVER_GLOBAL_OWNER_SHA256,
         'the historical globalThis projection owner is permitted only while state=pre_cutover');
 });
 
-test('accepts both closed states and denies an early or consumed adapter', () => {
+test('accepts all closed states and denies an early or consumed adapter', () => {
     const dormant = DORMANT_ADAPTER_SOURCE;
     assert.equal(preCutoverSourceState({}), 'BASELINE');
     assert.equal(preCutoverSourceState({ [ADAPTER_FILE]: dormant }), 'DORMANT_PREPARED');
+    assert.equal(preCutoverSourceState({ [ADAPTER_FILE]: dormant, [PACKAGE_ENTRY_FILE]: PREPARED_PACKAGE_ENTRY }, {
+        [PACKAGE_MANIFEST_FILE]: PREPARED_PACKAGE_MANIFEST,
+        [PACKAGE_ENTRY_FILE]: PREPARED_PACKAGE_ENTRY,
+    }), 'PACKAGE_SOURCE_PREPARED');
     for (const source of ["export const owner = new Map();", "import 'server-only';export const owner=globalThis.owner;",
         "import 'server-only';import {serverSessionProjectionOwnerRegistry} from './server-session-projection-owner-production';",
         "import 'server-only';export function selectOwner(){return process.cache;}",
@@ -249,9 +418,52 @@ test('accepts both closed states and denies an early or consumed adapter', () =>
         "import { lifecycleOwnerAdapterState } from './web-auth-lifecycle-owner-adapter';" }), 'INVALID');
 });
 
+test('recognizes only the exact physical package source scaffold', () => {
+    assert.equal(PACKAGE_ENTRY_FILE, 'packages/web-auth-lifecycle-owner/index.js');
+    assert.deepEqual(JSON.parse(PREPARED_PACKAGE_MANIFEST), { name: PACKAGE, version: '0.8.5-prepared.0', private: true,
+        type: 'commonjs', main: './index.js', exports: './index.js', files: ['index.js', 'internal/'],
+        engines: { node: '>=24 <25' } });
+    assert.equal(PREPARED_PACKAGE_ENTRY, "'use strict';\nmodule.exports = Object.freeze(Object.create(null));");
+    const prepared: Sources = { [PACKAGE_MANIFEST_FILE]: PREPARED_PACKAGE_MANIFEST,
+        [PACKAGE_ENTRY_FILE]: PREPARED_PACKAGE_ENTRY };
+    const syntheticRoot = '/synthetic';
+    const ops = {
+        exists: () => true, realpath: (value: string) => value,
+        readdir: () => ['package.json', 'index.js'].map((name) => ({
+            name, isFile: () => true, isSymbolicLink: () => false,
+        })),
+        read: (value: string) => prepared[path.relative(syntheticRoot, value)]!,
+    };
+    assert.deepEqual(packageSourceArtifacts(syntheticRoot, ops), prepared);
+    assert.deepEqual(packageSourceErrors(prepared), []);
+    assert.deepEqual(importInventoryErrors({ [PACKAGE_ENTRY_FILE]: PREPARED_PACKAGE_ENTRY }), []);
+    assert.equal(authorityRosterDigest({ ...liveSources, [PACKAGE_ENTRY_FILE]: PREPARED_PACKAGE_ENTRY }), AUTHORITY_ROSTER_SHA256);
+    assert.deepEqual(statefulAuthorityModules({ ...liveSources, [PACKAGE_ENTRY_FILE]: PREPARED_PACKAGE_ENTRY }), STATEFUL_AUTHORITY_MODULES);
+    const dormant = DORMANT_ADAPTER_SOURCE;
+    for (const invalid of [
+        { [PACKAGE_MANIFEST_FILE]: PREPARED_PACKAGE_MANIFEST },
+        { ...prepared, 'packages/web-auth-lifecycle-owner/extra.cjs': '' },
+        { ...prepared, [PACKAGE_ENTRY_FILE]: "module.exports = {};" },
+        { ...prepared, [PACKAGE_MANIFEST_FILE]: JSON.stringify({ ...JSON.parse(PREPARED_PACKAGE_MANIFEST), main: './index.cjs' }) },
+        { ...prepared, [PACKAGE_MANIFEST_FILE]: PREPARED_PACKAGE_MANIFEST.replace(
+            '"exports": "./index.js"', '"exports": "./index.js",\n  "exports": "./index.js"') },
+    ] as Sources[]) assert.equal(preCutoverSourceState({ [ADAPTER_FILE]: dormant,
+        [PACKAGE_ENTRY_FILE]: invalid[PACKAGE_ENTRY_FILE] ?? '' }, invalid), 'INVALID');
+    assert.equal(preCutoverSourceState({ [PACKAGE_ENTRY_FILE]: PREPARED_PACKAGE_ENTRY }, prepared), 'INVALID');
+    assert.notDeepEqual(packageSourceArtifacts(syntheticRoot, { ...ops,
+        realpath: (value) => value.endsWith(PACKAGE_ROOT) ? '/synthetic-linked-package' : value }), prepared);
+    assert.notDeepEqual(packageSourceArtifacts(syntheticRoot, { ...ops, readdir: () => [{
+        name: 'package.json', isFile: () => false, isSymbolicLink: () => true,
+    }] }), prepared);
+});
+
 test('denies hostile package and adapter loads without changing the shared inventory support', () => {
-    const adapterAbsolute = path.join(ROOT, ADAPTER); const hostile = [
-        `import '${PACKAGE}';`, `import '${PACKAGE}/deep';`, `import './web-auth-lifecycle-owner-adapter';`,
+    const adapterAbsolute = path.join(ROOT, ADAPTER); const packageSourceSpecifier = `../../${PACKAGE_ENTRY_FILE}`;
+    const hostile = [
+        `import '${PACKAGE}';`, `import '${PACKAGE}/deep';`, `import '../../packages/web-auth-lifecycle-owner/index.js';`,
+        `export * from '../../packages/web-auth-lifecycle-owner/index.js';`, `import './web-auth-lifecycle-owner-adapter';`,
+        `const p='../../packages/web-auth-'+'lifecycle-owner/index.js';import(p);`,
+        `const p='../../packages/web-auth-'+'lifecycle-owner/index.js';readFileSync(p);`,
         `export * from './web-auth-lifecycle-owner-adapter';`, `const p='./web-auth-'+'lifecycle-owner-adapter';import(p);`,
         `Reflect.apply(require,null,['./web-auth-lifecycle-owner-adapter']);`,
         "const p='@mediflow/web-auth-'+'lifecycle-owner/deep';import(p);",
@@ -261,27 +473,62 @@ test('denies hostile package and adapter loads without changing the shared inven
         ...createRequireBypassFixtures('./web-auth-lifecycle-owner-adapter'),
         ...createRequireUnresolvedFixtures('./web-auth-lifecycle-owner-adapter'),
         ...unsafeLoaderIdentityFixtures('./web-auth-lifecycle-owner-adapter'),
+        ...moduleImportBypassFixtures(packageSourceSpecifier, path.join(ROOT, PACKAGE_ENTRY_FILE)),
+        ...createRequireBypassFixtures(packageSourceSpecifier), ...createRequireUnresolvedFixtures(packageSourceSpecifier),
+        ...unsafeLoaderIdentityFixtures(packageSourceSpecifier),
     ];
     for (const [index, source] of hostile.entries()) assert.notDeepEqual(
         importInventoryErrors({ [`lib/security/hostile-${index}.ts`]: source }), [], source);
+    for (const source of ["import owner from 'owner-alias';", "require('owner-alias');", "import('owner-alias');",
+        "import 'owner-alias/deep';", "const p='owner-'+'alias/deep';import(p);", "import('owner%2Dalias/deep');"])
+        assert.notDeepEqual(importInventoryErrors({ 'lib/security/alias-consumer.ts': source }, false,
+            ownerDependencyAliases({ dependencies: { 'owner-alias': `file:${PACKAGE_ROOT}` } }, '')), [], source);
 });
 
 test('denies package metadata, early externalization, new authority modules or edges, and ambient-owner drift', () => {
     for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
         assert.notDeepEqual(packageBoundaryErrors({ [section]: { [PACKAGE]: '0.0.0-synthetic' } }, '', '', false), []);
+        assert.notDeepEqual(packageBoundaryErrors({ [section]: { 'owner-alias': `file:${PACKAGE_ROOT}` } }, '', '', false), []);
     }
+    assert.deepEqual(ownerDependencyAliases({ dependencies: { 'owner-alias': `file:${PACKAGE_ROOT}` } }, ''), new Set(['owner-alias']));
+    for (const spec of [`npm:${PACKAGE}@0.8.5-prepared.0`, `file:./packages/../${PACKAGE_ROOT}`, 'file:packages%2Fweb-auth-lifecycle-owner',
+        'file:packages%252Fweb-auth-lifecycle-owner', `file:${PREPARED_PACKAGE_TARBALL}`]) assert.ok(ownerPackageReference(spec), spec);
+    for (const spec of ['@mediflow/web-auth-lifecycle-owner-helper',
+        'npm:@mediflow/web-auth-lifecycle-owner-helper@0.8.5-prepared.0',
+        'file:packages/web-auth-lifecycle-owner-helper', `file:${PACKAGE_ROOT}/artifacts/mediflow-web-auth-lifecycle-owner-helper-0.8.5-prepared.0.tgz`,
+        ['https:', '', 'registry.invalid', '@mediflow/web-auth-lifecycle-owner-helper', '-', 'owner.tgz'].join('/')])
+        assert.equal(ownerPackageReference(spec), false, spec);
+    assert.deepEqual(importInventoryErrors({ 'lib/security/helper-consumer.ts': "import '@mediflow/web-auth-lifecycle-owner-helper';" }), []);
     assert.notDeepEqual(packageBoundaryErrors({}, `{"node_modules/${PACKAGE}":{}}`, '', false), []);
+    assert.notDeepEqual(packageBoundaryErrors({}, JSON.stringify({ packages: {
+        'node_modules/owner-alias': { resolved: `file:${PACKAGE_ROOT}` },
+    } }), '', false), []);
+    assert.deepEqual(ownerLockAliases(JSON.stringify({ packages: { 'node_modules/owner-alias': {
+        resolved: ['https:', '', 'registry.invalid', PACKAGE, '-', `${path.basename(PACKAGE_ROOT)}.tgz`].join('/'),
+    } } })), new Set(['owner-alias']));
     assert.notDeepEqual(packageBoundaryErrors({}, '', `serverExternalPackages:['${PACKAGE}']`, false), []);
     assert.notDeepEqual(packageBoundaryErrors({}, '', '', true), []);
     const nestedRoot = mkdtempSync(path.join(tmpdir(), 'mediflow-owner-boundary-'));
     try {
+        const aliasRoot = path.join(nestedRoot, 'node_modules', 'owner-alias');
+        mkdirSync(aliasRoot, { recursive: true });
+        writeFileSync(path.join(aliasRoot, 'package.json'), JSON.stringify({ name: PACKAGE }));
+        assert.notDeepEqual(ownerPackageCopies(nestedRoot), []);
+        rmSync(aliasRoot, { recursive: true });
+        const sourceRoot = path.join(nestedRoot, PACKAGE_ROOT);
+        mkdirSync(sourceRoot, { recursive: true });
+        writeFileSync(path.join(sourceRoot, 'package.json'), JSON.stringify({ name: 'synthetic-source' }));
+        symlinkSync(sourceRoot, aliasRoot, 'dir');
+        assert.notDeepEqual(ownerPackageCopies(nestedRoot), []);
+        rmSync(aliasRoot);
         mkdirSync(path.join(nestedRoot, 'node_modules', 'synthetic-parent', 'node_modules', PACKAGE), { recursive: true });
         assert.notDeepEqual(ownerPackageCopies(nestedRoot), []);
         rmSync(path.join(nestedRoot, 'node_modules', 'synthetic-parent'), { recursive: true });
         mkdirSync(path.join(nestedRoot, 'node_modules', '.pnpm', 'synthetic@0.0.0', 'node_modules', PACKAGE), { recursive: true });
         assert.notDeepEqual(ownerPackageCopies(nestedRoot), []);
     } finally { rmSync(nestedRoot, { recursive: true, force: true }); }
-    const baseOps: ScanOps = { exists: (value) => value.endsWith('node_modules'), realpath: (value) => value, readdir: () => [] };
+    const baseOps: ScanOps = { exists: (value) => value.endsWith('node_modules'), realpath: (value) => value,
+        read: () => '{}', readdir: () => [] };
     for (const ops of [{ ...baseOps, realpath: () => { throw new Error('synthetic'); } },
         { ...baseOps, readdir: () => { throw new Error('synthetic'); } }]) {
         assert.ok(ownerPackageCopies('/synthetic', ops).includes('<unscannable>'));
