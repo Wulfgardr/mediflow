@@ -229,6 +229,34 @@ provenienza indica quel predecessore esatto. Il commit di cutover sostituisce
 insieme tutti gli elementi correnti secondo il contratto finale gia definito;
 non puo partire da una versione preparata superata o da una serie incompleta.
 
+### Addendum D0d: provenienza senza autoriferimento
+
+Per ogni `N > 0`, `acceptedBase` e lo SHA Git completo dell'immediata base gia
+accettata da cui parte il packet, prima di qualunque suo edit. Non e lo SHA del
+commit che consegna il packet e non identifica un commit sorgente intermedio.
+
+La provenienza di `N > 0` omette la chiave `sourceCommit`. Un riferimento al
+commit che contiene la provenienza sarebbe circolare; un placeholder o uno SHA
+previsto non costituiscono evidenza. I digest degli input e il roster ordinato
+legano invece la provenienza agli esatti byte sorgente. Questa regola non
+modifica la provenienza storica immutabile di `0.8.5-prepared.0`.
+
+Il predecessore resta esattamente
+`{version,tarSha256,provenanceSha256}` e coincide con l'ultimo `N` accettato. La
+provenienza conserva inoltre toolchain, comandi di pack, digest e `integrity`
+dell'artifact, input e roster del tarball.
+
+Per P3a1, due copie temporanee pulite dello stesso candidato eseguono i due pack
+offline e senza script. Solo se i tarball sono byte-identici, i loro valori
+reali di lunghezza, digest, `integrity` e roster possono entrare nella
+provenienza e nel guard.
+
+Lo stesso packet atomico P3a1 congela nel guard questi valori reali e sposta il
+live pin alla nuova versione. Manifest, tarball, provenienza, dipendenza root,
+lockfile e unica copia fisica avanzano insieme allo stesso `N`. Non sono ammessi
+un commit preparatorio fisico, un pin anticipato, valori sintetici, due versioni
+correnti o un elemento ancora riferito al predecessore storico.
+
 ### Sorgente, manifest e root CommonJS
 
 Per la prima versione preparata `0.8.5-prepared.0`, nomi e percorsi sono fissi:
