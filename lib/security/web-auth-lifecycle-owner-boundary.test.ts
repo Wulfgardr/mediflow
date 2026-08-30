@@ -49,16 +49,13 @@ const PRE_CUTOVER_GLOBAL_OWNER_SHA256 = 'ae959c2ba88cb768b106aa52d7fec1ea2f6acc7
 const PRE_CUTOVER_GLOBAL_OWNER = 'lib/security/server-session-projection-owner-production.ts';
 const DORMANT_ADAPTER_SOURCE = "import 'server-only';\nexport const lifecycleOwnerAdapterState = 'dormant_prepared' as const;\nexport type LifecycleOwnerAdapterState = typeof lifecycleOwnerAdapterState;";
 const STATEFUL_AUTHORITY_MODULES = new Set([
-    'lib/security/active-review-binding.ts', 'lib/security/audit.ts', 'lib/security/in-process-preview-job-control.ts',
-    'lib/security/module-import-inventory.test-support.ts', 'lib/security/pin-change.ts', PRE_CUTOVER_GLOBAL_OWNER,
-    'lib/security/server-session.ts', 'lib/security/session-physician-review-authority.ts',
-    'lib/security/smart-import-browser-orchestrator.ts', 'lib/security/smart-import-context-proposal-browser-adapter.ts',
-    'lib/security/smart-import-projection-attachment-browser-normalizer.ts',
-    'lib/security/smart-import-selection-browser-adapter.ts', 'lib/security/web-auth-control-owner.ts',
-    'lib/security/web-auth-session-issuer.ts',
-]);
+    'active-review-binding', 'audit', 'in-process-preview-job-control', 'module-import-inventory.test-support', 'pin-change',
+    'server-session-projection-owner-production', 'server-session', 'session-physician-review-authority',
+    'smart-import-browser-orchestrator', 'smart-import-context-proposal-browser-adapter',
+    'smart-import-projection-attachment-browser-normalizer', 'smart-import-selection-browser-adapter',
+    'web-auth-control-owner', 'web-auth-session-issuer',
+].map((name) => `lib/security/${name}.ts`));
 type Sources = Readonly<Record<string, string>>;
-
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 const sourceFiles = (root: string): Record<string, string> => {
     const walk = (directory: string): string[] => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -73,26 +70,26 @@ const printed = (file: string, source: string) => ts.createPrinter({ removeComme
 const DORMANT_ADAPTER_CONTRACT = printed(ADAPTER_FILE, DORMANT_ADAPTER_SOURCE);
 const parseErrors = (file: string, source: string) =>
     (ast(file, source) as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length;
-const ownerPackageCopies = (root: string) => {
+type ScanOps = Readonly<{ exists(value: string): boolean; realpath(value: string): string;
+    readdir(value: string): ReadonlyArray<{ name: string; isDirectory(): boolean; isSymbolicLink(): boolean }> }>;
+const SCAN_OPS: ScanOps = { exists: existsSync, realpath: realpathSync.native,
+    readdir: (value) => readdirSync(value, { withFileTypes: true }) };
+const ownerPackageCopies = (root: string, ops = SCAN_OPS) => {
     const pending = [path.join(root, 'node_modules')]; const seen = new Set<string>(); const found: string[] = [];
     while (pending.length > 0) {
-        const directory = pending.pop()!; if (!existsSync(directory)) continue;
-        let real: string; try { real = realpathSync.native(directory); } catch { continue; }
+        const directory = pending.pop()!; if (!ops.exists(directory)) continue;
+        let real: string; try { real = ops.realpath(directory); } catch { return [...found, '<unscannable>']; }
         if (seen.has(real)) continue; seen.add(real); if (seen.size > 4_096) return [...found, '<scan-limit>'];
-        const owner = path.join(directory, PACKAGE); if (existsSync(owner)) found.push(owner);
-        let entries; try { entries = readdirSync(directory, { withFileTypes: true }); } catch { continue; }
-        for (const entry of entries) {
-            const candidate = path.join(directory, entry.name);
-            const packages = entry.name.startsWith('@') && entry.isDirectory()
-                ? readdirSync(candidate, { withFileTypes: true }).filter((item) => item.isDirectory() || item.isSymbolicLink())
-                    .map((item) => path.join(candidate, item.name))
+        const owner = path.join(directory, PACKAGE); if (ops.exists(owner)) found.push(owner);
+        try { for (const entry of ops.readdir(directory)) {
+            const candidate = path.join(directory, entry.name); const packages = entry.name.startsWith('@') && entry.isDirectory()
+                ? ops.readdir(candidate).filter((item) => item.isDirectory() || item.isSymbolicLink()).map((item) => path.join(candidate, item.name))
                 : entry.isDirectory() || entry.isSymbolicLink() ? [candidate] : [];
-            for (const packageRoot of packages) pending.push(path.join(packageRoot, 'node_modules'));
-        }
+            for (const packageRoot of packages) pending.push(entry.name === '.pnpm' ? packageRoot : path.join(packageRoot, 'node_modules'));
+        } } catch { return [...found, '<unscannable>']; }
     }
     return found;
 };
-
 const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false): string[] => {
     const errors: string[] = [];
     for (const [file, source] of Object.entries(sources)) {
@@ -117,12 +114,16 @@ const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false): s
                 const left = staticString(node.left, seen); const right = staticString(node.right, seen);
                 return left === null || right === null ? null : left + right;
             }
+            if (ts.isTemplateExpression(node)) {
+                let value = node.head.text; for (const span of node.templateSpans) { const part = staticString(span.expression, seen);
+                    if (part === null) return null; value += part + span.literal.text; } return value;
+            }
             if (ts.isIdentifier(node) && !seen.has(node.text) && constants.has(node.text))
                 return staticString(constants.get(node.text)!, new Set(seen).add(node.text));
             return null;
         };
         const visitPackage = (node: ts.Node): void => {
-            if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isBinaryExpression(node) || ts.isIdentifier(node)) {
+            if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateExpression(node) || ts.isBinaryExpression(node) || ts.isIdentifier(node)) {
                 const value = staticString(node); if (value === PACKAGE || value?.startsWith(`${PACKAGE}/`)) deepPackage = true;
             }
             ts.forEachChild(node, visitPackage);
@@ -146,7 +147,6 @@ const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false): s
     }
     return errors;
 };
-
 const authorityRosterDigest = (sources: Sources) => {
     const roster: Array<readonly [string, string, string, string, boolean]> = [];
     for (const target of OWNER_TARGETS) for (const [file, source] of Object.entries(sources)) {
@@ -255,6 +255,7 @@ test('denies hostile package and adapter loads without changing the shared inven
         `export * from './web-auth-lifecycle-owner-adapter';`, `const p='./web-auth-'+'lifecycle-owner-adapter';import(p);`,
         `Reflect.apply(require,null,['./web-auth-lifecycle-owner-adapter']);`,
         "const p='@mediflow/web-auth-'+'lifecycle-owner/deep';import(p);",
+        "const scope='@mediflow';const name='web-auth-lifecycle-owner';const p=`${scope}/${name}/deep`;import(p);",
         "const p=pick()?'./web-auth-lifecycle-owner-adapter':'./other';import(p);", 'import {',
         ...moduleImportBypassFixtures('./web-auth-lifecycle-owner-adapter', adapterAbsolute),
         ...createRequireBypassFixtures('./web-auth-lifecycle-owner-adapter'),
@@ -276,7 +277,15 @@ test('denies package metadata, early externalization, new authority modules or e
     try {
         mkdirSync(path.join(nestedRoot, 'node_modules', 'synthetic-parent', 'node_modules', PACKAGE), { recursive: true });
         assert.notDeepEqual(ownerPackageCopies(nestedRoot), []);
+        rmSync(path.join(nestedRoot, 'node_modules', 'synthetic-parent'), { recursive: true });
+        mkdirSync(path.join(nestedRoot, 'node_modules', '.pnpm', 'synthetic@0.0.0', 'node_modules', PACKAGE), { recursive: true });
+        assert.notDeepEqual(ownerPackageCopies(nestedRoot), []);
     } finally { rmSync(nestedRoot, { recursive: true, force: true }); }
+    const baseOps: ScanOps = { exists: (value) => value.endsWith('node_modules'), realpath: (value) => value, readdir: () => [] };
+    for (const ops of [{ ...baseOps, realpath: () => { throw new Error('synthetic'); } },
+        { ...baseOps, readdir: () => { throw new Error('synthetic'); } }]) {
+        assert.ok(ownerPackageCopies('/synthetic', ops).includes('<unscannable>'));
+    }
     for (const extension of ['js', 'mjs', 'cjs']) {
         const ownerSource = extension === 'cjs' ? 'module.exports.owner=new Map();' : 'export const owner=new Map();';
         const edgeSource = extension === 'cjs' ? "require('./server-session');" : "import { createSession } from './server-session';";
