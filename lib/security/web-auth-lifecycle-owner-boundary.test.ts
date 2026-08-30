@@ -1,7 +1,8 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
@@ -13,7 +14,6 @@ import {
     createRequireUnresolvedFixtures,
     inventoryModuleImports,
     moduleImportBypassFixtures,
-    repositoryTypeScriptSources,
     unsafeLoaderIdentityFixtures,
 } from './module-import-inventory.test-support.ts';
 
@@ -21,6 +21,8 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const PACKAGE = '@mediflow/web-auth-lifecycle-owner';
 const ADAPTER = 'lib/security/web-auth-lifecycle-owner-adapter';
 const ADAPTER_FILE = `${ADAPTER}.ts`;
+const ADAPTER_TEST = `${ADAPTER}.test`;
+const ADAPTER_TEST_FILE = `${ADAPTER_TEST}.ts`;
 const THIS_FILE = 'lib/security/web-auth-lifecycle-owner-boundary.test.ts';
 const OWNER_TARGETS = [
     'lib/security/web-auth-control-record', 'lib/security/web-auth-control-owner', 'lib/security/server-session',
@@ -45,6 +47,7 @@ const PRE_CUTOVER_UNRESOLVED_LOADERS = new Map([
 const AUTHORITY_ROSTER_SHA256 = '8cef18fd9f1e29f5f48a285092c9cd159e0be707a27d4977cbb43cf4df77b08d';
 const PRE_CUTOVER_GLOBAL_OWNER_SHA256 = 'ae959c2ba88cb768b106aa52d7fec1ea2f6acc7407db194ad9765799ec2fa854';
 const PRE_CUTOVER_GLOBAL_OWNER = 'lib/security/server-session-projection-owner-production.ts';
+const DORMANT_ADAPTER_SOURCE = "import 'server-only';\nexport const lifecycleOwnerAdapterState = 'dormant_prepared' as const;\nexport type LifecycleOwnerAdapterState = typeof lifecycleOwnerAdapterState;";
 const STATEFUL_AUTHORITY_MODULES = new Set([
     'lib/security/active-review-binding.ts', 'lib/security/audit.ts', 'lib/security/in-process-preview-job-control.ts',
     'lib/security/module-import-inventory.test-support.ts', 'lib/security/pin-change.ts', PRE_CUTOVER_GLOBAL_OWNER,
@@ -66,8 +69,29 @@ const sourceFiles = (root: string): Record<string, string> => {
     return Object.fromEntries(walk(root).map((absolute) => [path.relative(root, absolute), readFileSync(absolute, 'utf8')]));
 };
 const ast = (file: string, source: string) => ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+const printed = (file: string, source: string) => ts.createPrinter({ removeComments: true }).printFile(ast(file, source));
+const DORMANT_ADAPTER_CONTRACT = printed(ADAPTER_FILE, DORMANT_ADAPTER_SOURCE);
 const parseErrors = (file: string, source: string) =>
     (ast(file, source) as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length;
+const ownerPackageCopies = (root: string) => {
+    const pending = [path.join(root, 'node_modules')]; const seen = new Set<string>(); const found: string[] = [];
+    while (pending.length > 0) {
+        const directory = pending.pop()!; if (!existsSync(directory)) continue;
+        let real: string; try { real = realpathSync.native(directory); } catch { continue; }
+        if (seen.has(real)) continue; seen.add(real); if (seen.size > 4_096) return [...found, '<scan-limit>'];
+        const owner = path.join(directory, PACKAGE); if (existsSync(owner)) found.push(owner);
+        let entries; try { entries = readdirSync(directory, { withFileTypes: true }); } catch { continue; }
+        for (const entry of entries) {
+            const candidate = path.join(directory, entry.name);
+            const packages = entry.name.startsWith('@') && entry.isDirectory()
+                ? readdirSync(candidate, { withFileTypes: true }).filter((item) => item.isDirectory() || item.isSymbolicLink())
+                    .map((item) => path.join(candidate, item.name))
+                : entry.isDirectory() || entry.isSymbolicLink() ? [candidate] : [];
+            for (const packageRoot of packages) pending.push(path.join(packageRoot, 'node_modules'));
+        }
+    }
+    return found;
+};
 
 const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false): string[] => {
     const errors: string[] = [];
@@ -81,21 +105,43 @@ const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false): s
             || (UNRESOLVED_LOADER_FORMS.has(use.form) && !unresolvedLoaderIsKnown)
             || source.includes('web-auth-lifecycle-owner'));
         if (packageRelevant.length > 0) errors.push(`${file}:package-load`);
-        const packageAst = ast(file, source); let deepPackage = false;
+        const packageAst = ast(file, source); let deepPackage = false; const constants = new Map<string, ts.Expression>();
+        const collectConstants = (node: ts.Node): void => {
+            if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) constants.set(node.name.text, node.initializer);
+            ts.forEachChild(node, collectConstants);
+        };
+        collectConstants(packageAst);
+        const staticString = (node: ts.Expression, seen = new Set<string>()): string | null => {
+            if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+            if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+                const left = staticString(node.left, seen); const right = staticString(node.right, seen);
+                return left === null || right === null ? null : left + right;
+            }
+            if (ts.isIdentifier(node) && !seen.has(node.text) && constants.has(node.text))
+                return staticString(constants.get(node.text)!, new Set(seen).add(node.text));
+            return null;
+        };
         const visitPackage = (node: ts.Node): void => {
-            if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
-                && (node.text === PACKAGE || node.text.startsWith(`${PACKAGE}/`))) deepPackage = true;
+            if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isBinaryExpression(node) || ts.isIdentifier(node)) {
+                const value = staticString(node); if (value === PACKAGE || value?.startsWith(`${PACKAGE}/`)) deepPackage = true;
+            }
             ts.forEachChild(node, visitPackage);
         };
         visitPackage(packageAst); if (deepPackage) errors.push(`${file}:package-literal`);
         const adapterUses = inventoryModuleImports({ file, source, target: ADAPTER, repositoryRoot: ROOT,
             allowUnresolvedExpressions: allowedGenericLoaderExpressions });
-        const allowedTestUse = allowAdapterTestUse && file.endsWith('.test.ts') && adapterUses.every((use) =>
+        const allowedTestUse = allowAdapterTestUse && file === ADAPTER_TEST_FILE && adapterUses.every((use) =>
             (use.form === 'named' && !use.typeOnly) || (use.form === 'import-type' && use.typeOnly));
         const adapterRelevant = adapterUses.filter((use) => IMPORT_FORMS.has(use.form) || use.form === 'module-path'
             || (UNRESOLVED_LOADER_FORMS.has(use.form) && !unresolvedLoaderIsKnown)
             || source.includes('web-auth-lifecycle-owner-adapter'));
         if (adapterRelevant.length > 0 && !allowedTestUse) errors.push(`${file}:adapter-load`);
+        const adapterTestUses = inventoryModuleImports({ file, source, target: ADAPTER_TEST, repositoryRoot: ROOT,
+            allowUnresolvedExpressions: allowedGenericLoaderExpressions });
+        const adapterTestRelevant = adapterTestUses.filter((use) => IMPORT_FORMS.has(use.form) || use.form === 'module-path'
+            || ((UNRESOLVED_LOADER_FORMS.has(use.form) && !unresolvedLoaderIsKnown)
+                && source.includes('web-auth-lifecycle-owner-adapter.test')));
+        if (file !== ADAPTER_TEST_FILE && adapterTestRelevant.length > 0) errors.push(`${file}:adapter-test-reachability`);
         if (parseErrors(file, source) > 0) errors.push(`${file}:parse`);
     }
     return errors;
@@ -146,6 +192,7 @@ const dormantAdapterErrors = (source: string): string[] => {
         errors.push('adapter:stateful-declaration');
     }
     if (serverOnly !== 1) errors.push('adapter:server-only');
+    if (printed(ADAPTER_FILE, source) !== DORMANT_ADAPTER_CONTRACT) errors.push('adapter:exact-contract');
     return [...new Set(errors)];
 };
 
@@ -167,34 +214,37 @@ const preCutoverSourceState = (sources: Sources): 'BASELINE' | 'DORMANT_PREPARED
     return dormantAdapterErrors(adapter).length === 0 ? 'DORMANT_PREPARED' : 'INVALID';
 };
 
-const liveSources = sourceFiles(ROOT); const liveTypeScript = repositoryTypeScriptSources(ROOT);
+const liveSources = sourceFiles(ROOT);
 const livePackage = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as Record<string, unknown>;
 const liveLock = readFileSync(path.join(ROOT, 'package-lock.json'), 'utf8');
 const liveNext = readFileSync(path.join(ROOT, 'next.config.ts'), 'utf8');
 
 test('accepts only the exact BASELINE or DORMANT_PREPARED pre-cutover repository state', () => {
     assert.deepEqual(packageBoundaryErrors(livePackage, liveLock, liveNext,
-        existsSync(path.join(ROOT, 'node_modules', PACKAGE))), []);
+        ownerPackageCopies(ROOT).length > 0), []);
     assert.equal(preCutoverSourceState(liveSources), liveSources[ADAPTER_FILE] === undefined ? 'BASELINE' : 'DORMANT_PREPARED');
-    assert.equal(authorityRosterDigest(liveTypeScript), AUTHORITY_ROSTER_SHA256);
-    assert.deepEqual(statefulAuthorityModules(liveTypeScript), STATEFUL_AUTHORITY_MODULES);
+    assert.equal(authorityRosterDigest(liveSources), AUTHORITY_ROSTER_SHA256);
+    assert.deepEqual(statefulAuthorityModules(liveSources), STATEFUL_AUTHORITY_MODULES);
     assert.equal(digest(liveSources[PRE_CUTOVER_GLOBAL_OWNER]!), PRE_CUTOVER_GLOBAL_OWNER_SHA256,
         'the historical globalThis projection owner is permitted only while state=pre_cutover');
 });
 
 test('accepts both closed states and denies an early or consumed adapter', () => {
-    const dormant = "import 'server-only';\nexport const lifecycleOwnerAdapterState = 'dormant_prepared' as const;\nexport type LifecycleOwnerAdapterState = typeof lifecycleOwnerAdapterState;";
+    const dormant = DORMANT_ADAPTER_SOURCE;
     assert.equal(preCutoverSourceState({}), 'BASELINE');
     assert.equal(preCutoverSourceState({ [ADAPTER_FILE]: dormant }), 'DORMANT_PREPARED');
     for (const source of ["export const owner = new Map();", "import 'server-only';export const owner=globalThis.owner;",
         "import 'server-only';import {serverSessionProjectionOwnerRegistry} from './server-session-projection-owner-production';",
-        "import 'server-only';export function selectOwner(){return process.cache;}"]) {
+        "import 'server-only';export function selectOwner(){return process.cache;}",
+        "import 'server-only';export const arbitrary = 'closed' as const;export type Arbitrary=typeof arbitrary;"]) {
         assert.equal(preCutoverSourceState({ [ADAPTER_FILE]: source }), 'INVALID', source);
     }
     const adapterTest = "import { lifecycleOwnerAdapterState } from './web-auth-lifecycle-owner-adapter.ts';";
-    assert.equal(preCutoverSourceState({ 'lib/security/web-auth-lifecycle-owner-adapter.test.ts': adapterTest }), 'INVALID');
+    assert.equal(preCutoverSourceState({ [ADAPTER_TEST_FILE]: adapterTest }), 'INVALID');
     assert.equal(preCutoverSourceState({ [ADAPTER_FILE]: dormant,
-        'lib/security/web-auth-lifecycle-owner-adapter.test.ts': adapterTest }), 'DORMANT_PREPARED');
+        [ADAPTER_TEST_FILE]: adapterTest }), 'DORMANT_PREPARED');
+    assert.equal(preCutoverSourceState({ [ADAPTER_FILE]: dormant, [ADAPTER_TEST_FILE]: adapterTest,
+        'lib/security/production.ts': "import './web-auth-lifecycle-owner-adapter.test';" }), 'INVALID');
     assert.equal(preCutoverSourceState({ [ADAPTER_FILE]: dormant, 'lib/security/production.ts':
         "import { lifecycleOwnerAdapterState } from './web-auth-lifecycle-owner-adapter';" }), 'INVALID');
 });
@@ -204,6 +254,7 @@ test('denies hostile package and adapter loads without changing the shared inven
         `import '${PACKAGE}';`, `import '${PACKAGE}/deep';`, `import './web-auth-lifecycle-owner-adapter';`,
         `export * from './web-auth-lifecycle-owner-adapter';`, `const p='./web-auth-'+'lifecycle-owner-adapter';import(p);`,
         `Reflect.apply(require,null,['./web-auth-lifecycle-owner-adapter']);`,
+        "const p='@mediflow/web-auth-'+'lifecycle-owner/deep';import(p);",
         "const p=pick()?'./web-auth-lifecycle-owner-adapter':'./other';import(p);", 'import {',
         ...moduleImportBypassFixtures('./web-auth-lifecycle-owner-adapter', adapterAbsolute),
         ...createRequireBypassFixtures('./web-auth-lifecycle-owner-adapter'),
@@ -221,9 +272,18 @@ test('denies package metadata, early externalization, new authority modules or e
     assert.notDeepEqual(packageBoundaryErrors({}, `{"node_modules/${PACKAGE}":{}}`, '', false), []);
     assert.notDeepEqual(packageBoundaryErrors({}, '', `serverExternalPackages:['${PACKAGE}']`, false), []);
     assert.notDeepEqual(packageBoundaryErrors({}, '', '', true), []);
-    const newAuthority = { ...liveTypeScript, 'lib/security/synthetic-lifecycle-authority.ts': 'export const owner=new Map();' };
-    assert.notDeepEqual(statefulAuthorityModules(newAuthority), STATEFUL_AUTHORITY_MODULES);
-    const newEdge = { ...liveTypeScript, 'lib/security/synthetic-edge.ts': "import { createSession } from './server-session';" };
-    assert.notEqual(authorityRosterDigest(newEdge), AUTHORITY_ROSTER_SHA256);
+    const nestedRoot = mkdtempSync(path.join(tmpdir(), 'mediflow-owner-boundary-'));
+    try {
+        mkdirSync(path.join(nestedRoot, 'node_modules', 'synthetic-parent', 'node_modules', PACKAGE), { recursive: true });
+        assert.notDeepEqual(ownerPackageCopies(nestedRoot), []);
+    } finally { rmSync(nestedRoot, { recursive: true, force: true }); }
+    for (const extension of ['js', 'mjs', 'cjs']) {
+        const ownerSource = extension === 'cjs' ? 'module.exports.owner=new Map();' : 'export const owner=new Map();';
+        const edgeSource = extension === 'cjs' ? "require('./server-session');" : "import { createSession } from './server-session';";
+        const newAuthority = { ...liveSources, [`lib/security/synthetic-lifecycle-authority.${extension}`]: ownerSource };
+        assert.notDeepEqual(statefulAuthorityModules(newAuthority), STATEFUL_AUTHORITY_MODULES);
+        const newEdge = { ...liveSources, [`lib/security/synthetic-edge.${extension}`]: edgeSource };
+        assert.notEqual(authorityRosterDigest(newEdge), AUTHORITY_ROSTER_SHA256);
+    }
     assert.notEqual(digest(`${liveSources[PRE_CUTOVER_GLOBAL_OWNER]}\nglobalThis.syntheticOwner={};`), PRE_CUTOVER_GLOBAL_OWNER_SHA256);
 });
