@@ -72,6 +72,26 @@ const RESOURCE_PORT_PRIMITIVES = new Set([
 const PROJECTION_OWNER_FILES = [
     'lib/security/server-session-projection-owner.ts', 'lib/security/server-session-projection-owner.test.ts',
 ] as const;
+const PROJECTION_BROKER_FILES = [
+    'lib/security/server-session-projection-broker.ts', 'lib/security/server-session-projection-broker.test.ts',
+] as const;
+const PROJECTION_BROKER_IMPORTS = new Map<string, ReadonlyMap<string, boolean>>([
+    [PROJECTION_BROKER_FILES[0], new Map([
+        ['ActiveWebSessionResourcePort', true], ['registerActiveWebSessionPrivateResource', false],
+        ['registerServerSessionResource', false], ['releaseActiveWebSessionResourcePort', false],
+        ['unregisterActiveWebSessionPrivateResource', false],
+    ])],
+    [PROJECTION_BROKER_FILES[1], new Map([
+        ['clearAllSessions', false], ['deleteSession', false], ['invalidateSessionsForUser', false],
+        ['mintActiveWebSessionResourcePort', false], ['releaseActiveWebSessionResourcePort', false],
+        ['resolveActiveWebServerSession', false],
+    ])],
+]);
+const PROJECTION_BROKER_ADOPTION_SYMBOLS = new Set([
+    'ActiveWebSessionResourcePort', 'registerActiveWebSessionPrivateResource',
+    'releaseActiveWebSessionResourcePort', 'unregisterActiveWebSessionPrivateResource',
+    'mintActiveWebSessionResourcePort', 'resolveActiveWebServerSession',
+]);
 const PROJECTION_OWNER_FACTORY = 'createPortProjectionOwnerFactory';
 const PROJECTION_OWNER_MODULE = 'lib/security/server-session-projection-owner';
 const SESSION_MODULE_IDENTITY = path.resolve(REPOSITORY_ROOT, 'lib/security/server-session');
@@ -126,6 +146,29 @@ const hasExactProjectionOwnerFactoryImport = (source: string) => {
     return matchingDeclarations === 1 && exact;
 };
 
+const hasExactProjectionBrokerSessionImport = (file: string, source: string) => {
+    const expected = PROJECTION_BROKER_IMPORTS.get(file); if (!expected) return false;
+    const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    let declarations = 0; let exact = true;
+    for (const statement of ast.statements) {
+        if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)
+            || !resolvesSelfSessionModule(statement.moduleSpecifier.text)) continue;
+        declarations += 1;
+        const clause = statement.importClause; const bindings = clause?.namedBindings;
+        if (statement.moduleSpecifier.text !== './server-session' || !clause || clause.name || clause.isTypeOnly
+            || !bindings || !ts.isNamedImports(bindings) || statement.attributes || statement.assertClause
+            || bindings.elements.length !== expected.size) { exact = false; continue; }
+        const seen = new Set<string>();
+        for (const element of bindings.elements) {
+            const imported = element.propertyName?.text ?? element.name.text;
+            if (element.propertyName || seen.has(imported) || expected.get(imported) !== element.isTypeOnly) exact = false;
+            seen.add(imported);
+        }
+        if ([...expected.keys()].some((symbol) => !seen.has(symbol))) exact = false;
+    }
+    return declarations === 1 && exact;
+};
+
 const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
     const errors: string[] = []; const uses = Object.entries(sources).flatMap(([file, source]) => inventoryModuleImports({
         file, source, target: 'lib/security/server-session', repositoryRoot: REPOSITORY_ROOT, allowUnresolvedExpressions: allowedGenericLoaderExpressions,
@@ -167,14 +210,23 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
             || runtime.some((use) => !exact.has(use.symbol)) || [...exact].some((symbol) => !runtime.some((use) => use.symbol === symbol))) errors.push(`${file}:authority`);
     }
     const resourceUses = uses.filter((use) => RESOURCE_PORT_PRIMITIVES.has(use.symbol));
+    const brokerAdoptionUses = uses.filter((use) => PROJECTION_BROKER_FILES.includes(use.file as typeof PROJECTION_BROKER_FILES[number])
+        && PROJECTION_BROKER_ADOPTION_SYMBOLS.has(use.symbol));
+    const brokerFilesPresent = new Set(brokerAdoptionUses.map((use) => use.file));
+    const brokerPaired = brokerFilesPresent.size === PROJECTION_BROKER_FILES.length
+        && PROJECTION_BROKER_FILES.every((file) => hasExactProjectionBrokerSessionImport(file, sources[file] ?? ''));
+    if (brokerFilesPresent.size !== 0 && !brokerPaired) errors.push('projection-broker:resource-pair');
     for (const use of resourceUses) {
         if (use.file === 'lib/security/server-session.test.ts') continue;
-        if (!PROJECTION_OWNER_FILES.includes(use.file as typeof PROJECTION_OWNER_FILES[number])) errors.push(`${use.file}:resource-owner`);
+        const projectionOwner = PROJECTION_OWNER_FILES.includes(use.file as typeof PROJECTION_OWNER_FILES[number]);
+        const projectionBroker = brokerPaired && PROJECTION_BROKER_FILES.includes(use.file as typeof PROJECTION_BROKER_FILES[number]);
+        if (!projectionOwner && !projectionBroker) errors.push(`${use.file}:resource-owner`);
         if (use.form !== 'named' || use.typeOnly) errors.push(`${use.file}:resource-form`);
     }
     const selfFile = 'lib/security/server-session.test.ts';
     if (selfFile in sources && !hasExactProjectionOwnerResourceImport(sources[selfFile] ?? '', true)) errors.push(`${selfFile}:resource-shape`);
-    const adoptionResourceUses = resourceUses.filter((use) => use.file !== selfFile);
+    const adoptionResourceUses = resourceUses.filter((use) => use.file !== selfFile
+        && !PROJECTION_BROKER_FILES.includes(use.file as typeof PROJECTION_BROKER_FILES[number]));
     const ownerAdopters = new Set(adoptionResourceUses.map((use) => use.file));
     const factorySignals = ownerUses.filter((use) => use.symbol === PROJECTION_OWNER_FACTORY
         || ['module-path', 'dynamic', 'dynamic-options', 'require', 'require-options', 're-export', 'namespace',
@@ -192,7 +244,7 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
     if (adoptionState === 'INVALID') errors.push('projection-owner:resource-pair');
     const ownReloads = uses.filter((use) => use.file === 'lib/security/server-session.test.ts' && use.form === 'require' && !use.typeOnly);
     if ('lib/security/server-session.test.ts' in sources && ownReloads.length !== 30) errors.push('lib/security/server-session.test.ts:reload-count');
-    return { adoptionState, errors, uses };
+    return { adoptionState, brokerAdoptionState: brokerFilesPresent.size === 0 ? 'ABSENT' : brokerPaired ? 'PAIRED' : 'INVALID', errors, uses };
 };
 const typescriptSources = () => repositoryTypeScriptSources(REPOSITORY_ROOT);
 
@@ -1004,6 +1056,28 @@ test('permits only absent or exact paired projection owner adoption state', () =
         selfResources.replace(';', " with { type: 'json' };"), selfResources.replace(';', " assert { type: 'json' };"),
     ];
     for (const source of invalidSelf) assert.ok(validateSessionImports({ [self]: source }).errors.includes(selfError), source);
+});
+
+test('permits only the exact paired projection broker resource adoption', () => {
+    const production = PROJECTION_BROKER_FILES[0]; const brokerTest = PROJECTION_BROKER_FILES[1];
+    const sourceImport = "import { type ActiveWebSessionResourcePort, registerActiveWebSessionPrivateResource, registerServerSessionResource, releaseActiveWebSessionResourcePort, unregisterActiveWebSessionPrivateResource } from './server-session';";
+    const testImport = "import { clearAllSessions, deleteSession, invalidateSessionsForUser, mintActiveWebSessionResourcePort, releaseActiveWebSessionResourcePort, resolveActiveWebServerSession } from './server-session';";
+    const paired = { [production]: sourceImport, [brokerTest]: testImport };
+    const accepted = validateSessionImports(paired);
+    assert.equal(accepted.brokerAdoptionState, 'PAIRED'); assert.deepEqual(accepted.errors, []);
+    assert.equal(validateSessionImports({ [production]: '', [brokerTest]: '' }).brokerAdoptionState, 'ABSENT');
+    const rejected: Array<Readonly<Record<string, string>>> = [
+        { [production]: sourceImport }, { [brokerTest]: testImport },
+        { ...paired, [production]: sourceImport.replace('type ActiveWebSessionResourcePort', 'ActiveWebSessionResourcePort') },
+        { ...paired, [production]: sourceImport.replace('registerActiveWebSessionPrivateResource', 'registerActiveWebSessionPrivateResource as register') },
+        { ...paired, [production]: sourceImport.replace("'./server-session'", "'./server-session.ts'") },
+        { ...paired, [production]: `${sourceImport}\n${sourceImport}` },
+        { ...paired, [brokerTest]: testImport.replace('deleteSession, ', '') },
+        { ...paired, [brokerTest]: testImport.replace('clearAllSessions', 'clearAllSessions as clear') },
+        { ...paired, [brokerTest]: testImport.replace(';', " with { type: 'json' };") },
+        { ...paired, 'lib/security/third.ts': "import { releaseActiveWebSessionResourcePort } from './server-session';" },
+    ];
+    for (const source of rejected) assert.notDeepEqual(validateSessionImports(source).errors, [], JSON.stringify(source));
 });
 
 test('Node runtime resolves every inventory alias that the AST gate denies', () => {
