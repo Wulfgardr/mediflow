@@ -1,0 +1,95 @@
+{
+  "schemaVersion": "mediflow.web-auth-lifecycle-owner.package-provenance.v1",
+  "acceptedBase": "83983a3b8e6b4d9d15be7f5c69dcce84fdc0f5aa",
+  "predecessor": {
+    "version": "0.8.5-prepared.1",
+    "tarSha256": "d24e919fb1709cdfd4a78cdb618a565e647922d63e28c15ff79b4a6e46bab1f2",
+    "provenanceSha256": "ec24b7bd7d99b245209c15421de34bcee0db0b34136c7c5e4884ecf008f46424"
+  },
+  "package": {
+    "name": "@mediflow/web-auth-lifecycle-owner",
+    "version": "0.8.5-prepared.2"
+  },
+  "toolchain": {
+    "node": "v24.19.0",
+    "npm": "11.17.0"
+  },
+  "pack": {
+    "command": "npm pack --ignore-scripts --pack-destination ./artifacts",
+    "runs": 2,
+    "network": "offline",
+    "scripts": "ignored",
+    "cache": "empty_temporary",
+    "byteIdentical": true
+  },
+  "artifact": {
+    "path": "packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5-prepared.2.tgz",
+    "bytes": 881,
+    "sha256": "a3539c0a52631172691d8088b2897b8b292dea9e755474ef4962572a5fecf869",
+    "integrity": "sha512-ypTB9E26lsqnFyZRHGcjMGjIrfYrjfhiKFpcTyU1spGIapwWWgI/YDHGVw2wmX3BAyykuiA5BuyZG+yeAipDuQ=="
+  },
+  "inputs": [
+    {
+      "path": "index.js",
+      "bytes": 80,
+      "sha256": "7bc72383ad0639480702aadb8bad2cacf135c2c1b1cb7013a68ed5eef6d26a4f"
+    },
+    {
+      "path": "internal/owner.cjs",
+      "bytes": 94,
+      "sha256": "70a65a0cea7dd3ba4e29799d1f899d3df0a0d9e832499841e2de7d67ab403add"
+    },
+    {
+      "path": "internal/support/successor-fence.cjs",
+      "bytes": 1172,
+      "sha256": "7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff"
+    },
+    {
+      "path": "internal/support/value.cjs",
+      "bytes": 47,
+      "sha256": "9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1"
+    },
+    {
+      "path": "package.json",
+      "bytes": 251,
+      "sha256": "cb410b7d61a160b6bb0adf352a464496c5183ae1546cdf0b9ffa58edf3b3c2c0"
+    }
+  ],
+  "roster": [
+    {
+      "path": "package/internal/owner.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 94,
+      "sha256": "70a65a0cea7dd3ba4e29799d1f899d3df0a0d9e832499841e2de7d67ab403add"
+    },
+    {
+      "path": "package/internal/support/successor-fence.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 1172,
+      "sha256": "7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff"
+    },
+    {
+      "path": "package/internal/support/value.cjs",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 47,
+      "sha256": "9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1"
+    },
+    {
+      "path": "package/index.js",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 80,
+      "sha256": "7bc72383ad0639480702aadb8bad2cacf135c2c1b1cb7013a68ed5eef6d26a4f"
+    },
+    {
+      "path": "package/package.json",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 251,
+      "sha256": "cb410b7d61a160b6bb0adf352a464496c5183ae1546cdf0b9ffa58edf3b3c2c0"
+    }
+  ]
+}
