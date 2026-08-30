@@ -145,6 +145,8 @@ const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false,
     const errors: string[] = [];
     for (const [file, source] of Object.entries(sources)) {
         const dormantPackageFile = file === PACKAGE_ENTRY_FILE || file.startsWith(`${PACKAGE_ROOT}/internal/`);
+        const futureSuccessorFence = file === `${PACKAGE_ROOT}/internal/support/successor-fence.cjs`
+            && source === PREPARED_2_SUCCESSOR_FENCE;
         const unresolvedLoaderIsKnown = PRE_CUTOVER_UNRESOLVED_LOADERS.get(file) === digest(source);
         const packageTarget = path.join(path.dirname(file), PACKAGE);
         const packageUses = inventoryModuleImports({ file, source, target: packageTarget, repositoryRoot: ROOT,
@@ -215,7 +217,7 @@ const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false,
         const adapterRelevant = adapterUses.filter((use) => IMPORT_FORMS.has(use.form) || use.form === 'module-path'
             || (UNRESOLVED_LOADER_FORMS.has(use.form) && !unresolvedLoaderIsKnown)
             || source.includes('web-auth-lifecycle-owner-adapter'));
-        if (adapterRelevant.length > 0 && !allowedTestUse) errors.push(`${file}:adapter-load`);
+        if (adapterRelevant.length > 0 && !allowedTestUse && !futureSuccessorFence) errors.push(`${file}:adapter-load`);
         const adapterTestUses = inventoryModuleImports({ file, source, target: ADAPTER_TEST, repositoryRoot: ROOT,
             allowUnresolvedExpressions: allowedGenericLoaderExpressions });
         const adapterTestRelevant = adapterTestUses.filter((use) => IMPORT_FORMS.has(use.form) || use.form === 'module-path'
@@ -460,6 +462,7 @@ const PREPARED_1_VERSION = '0.8.5-prepared.1';
 const PREPARED_1_TARBALL = `${PACKAGE_ROOT}/artifacts/mediflow-web-auth-lifecycle-owner-${PREPARED_1_VERSION}.tgz`;
 const PREPARED_1_PROVENANCE_PATH = PREPARED_1_TARBALL.replace(/\.tgz$/u, '.provenance.json');
 const PREPARED_1_TAR_SHA256 = 'd24e919fb1709cdfd4a78cdb618a565e647922d63e28c15ff79b4a6e46bab1f2';
+const PREPARED_1_PROVENANCE_SHA256 = 'ec24b7bd7d99b245209c15421de34bcee0db0b34136c7c5e4884ecf008f46424';
 const PREPARED_1_INTEGRITY = 'sha512-LuOI8iBDJzt2D3JW4n8r1UIzCwn5dI/5vkcgEbw+l8Br4nKbSpVIeB3rDOX+7SsoeYF5OlCxGVEqmTH2UvmtrA==';
 const PREDECESSOR = { version: PREPARED_PACKAGE_VERSION, tarSha256: PREPARED_PACKAGE_SHA256,
     provenanceSha256: PREPARED_PROVENANCE_SHA256 } as const;
@@ -484,14 +487,84 @@ const PREPARED_1: PreparedContract = {
     provenance: prepared1Provenance(), predecessor: PREDECESSOR, inputs: PREPARED_1_INPUTS,
     roster: prepared1Provenance().roster, artifacts: [...PREPARED_0.artifacts,
         { path: PREPARED_1_TARBALL, bytes: 433, sha256: PREPARED_1_TAR_SHA256 },
-        { path: PREPARED_1_PROVENANCE_PATH, bytes: 2554, sha256: 'ec24b7bd7d99b245209c15421de34bcee0db0b34136c7c5e4884ecf008f46424' }],
+        { path: PREPARED_1_PROVENANCE_PATH, bytes: 2554, sha256: PREPARED_1_PROVENANCE_SHA256 }],
+};
+const PREPARED_2_VERSION = '0.8.5-prepared.2';
+const PREPARED_2_MANIFEST = PREPARED_1_MANIFEST.replace(PREPARED_1_VERSION, PREPARED_2_VERSION);
+const PREPARED_2_SUCCESSOR_FENCE = `/* @Codex */
+'use strict';
+const { randomBytes } = require('node:crypto');
+const { types: { isProxy } } = require('node:util');
+const { Buffer } = require('node:buffer');
+const bufferIsBuffer = Buffer.isBuffer;
+const bufferPrototype = Buffer.prototype;
+const bufferToString = bufferPrototype.toString;
+const objectFreeze = Object.freeze;
+const objectGetPrototypeOf = Object.getPrototypeOf;
+const reflectApply = Reflect.apply;
+const stringCharCodeAt = String.prototype.charCodeAt;
+function successorFence() {
+    try {
+        const bytes = randomBytes(32);
+        if (isProxy(bytes) || !bufferIsBuffer(bytes) || objectGetPrototypeOf(bytes) !== bufferPrototype) return null;
+        const value = reflectApply(bufferToString, bytes, ['hex']);
+        if (typeof value !== 'string' || value.length !== 64) return null;
+        for (let index = 0; index < value.length; index += 1) {
+            const code = reflectApply(stringCharCodeAt, value, [index]);
+            if (!((code >= 48 && code <= 57) || (code >= 97 && code <= 102))) return null;
+        }
+        return value;
+    } catch {
+        return null;
+    }
+}
+module.exports = objectFreeze({ successorFence });
+`;
+const PREPARED_2_INPUTS = [
+    { path: 'index.js', bytes: 80, sha256: PREPARED_INDEX_SHA256 },
+    { path: 'internal/owner.cjs', bytes: 94, sha256: '70a65a0cea7dd3ba4e29799d1f899d3df0a0d9e832499841e2de7d67ab403add' },
+    { path: 'internal/support/successor-fence.cjs', bytes: 1172,
+        sha256: '7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff' },
+    { path: 'internal/support/value.cjs', bytes: 47, sha256: '9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1' },
+    { path: 'package.json', bytes: 251, sha256: 'cb410b7d61a160b6bb0adf352a464496c5183ae1546cdf0b9ffa58edf3b3c2c0' },
+] as const;
+const PREPARED_2_TARBALL = `${PACKAGE_ROOT}/artifacts/mediflow-web-auth-lifecycle-owner-${PREPARED_2_VERSION}.tgz`;
+const PREPARED_2_PROVENANCE_PATH = PREPARED_2_TARBALL.replace(/\.tgz$/u, '.provenance.json');
+const PREPARED_2_TAR_SHA256 = '2222222222222222222222222222222222222222222222222222222222222222';
+const PREPARED_2_INTEGRITY = 'sha512-AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg==';
+const PREPARED_2_PREDECESSOR = { version: PREPARED_1_VERSION, tarSha256: PREPARED_1_TAR_SHA256,
+    provenanceSha256: PREPARED_1_PROVENANCE_SHA256 } as const;
+const prepared2Provenance = () => ({
+    schemaVersion: 'mediflow.web-auth-lifecycle-owner.package-provenance.v1',
+    acceptedBase: '<synthetic-p4a1-accepted-base>', predecessor: PREPARED_2_PREDECESSOR,
+    package: { name: PACKAGE, version: PREPARED_2_VERSION }, toolchain: { node: 'v24.19.0', npm: '11.17.0' },
+    pack: { command: 'npm pack --ignore-scripts --pack-destination ./artifacts', runs: 2,
+        network: 'offline', scripts: 'ignored', cache: 'empty_temporary', byteIdentical: true },
+    artifact: { path: PREPARED_2_TARBALL, bytes: 2_222, sha256: PREPARED_2_TAR_SHA256,
+        integrity: PREPARED_2_INTEGRITY }, inputs: PREPARED_2_INPUTS,
+    roster: ['internal/owner.cjs', 'internal/support/successor-fence.cjs', 'internal/support/value.cjs',
+        'index.js', 'package.json'].map((path) => { const file = PREPARED_2_INPUTS.find((entry) => entry.path === path)!;
+        return { path: `package/${file.path}`, type: 'file' as const, mode: '0644' as const,
+            bytes: file.bytes, sha256: file.sha256 }; }),
+});
+const PREPARED_2: PreparedContract = {
+    version: PREPARED_2_VERSION, sequence: 2, manifest: PREPARED_2_MANIFEST,
+    tarball: PREPARED_2_TARBALL, provenancePath: PREPARED_2_PROVENANCE_PATH, dependency: `file:${PREPARED_2_TARBALL}`,
+    tar: { path: PREPARED_2_TARBALL, bytes: 2_222, sha256: PREPARED_2_TAR_SHA256, integrity: PREPARED_2_INTEGRITY },
+    provenance: prepared2Provenance(), predecessor: PREPARED_2_PREDECESSOR, inputs: PREPARED_2_INPUTS,
+    roster: prepared2Provenance().roster, artifacts: [...PREPARED_1.artifacts,
+        { path: PREPARED_2_TARBALL, bytes: 2_222, sha256: PREPARED_2_TAR_SHA256 },
+        { path: PREPARED_2_PROVENANCE_PATH, bytes: 3_333,
+            sha256: '3333333333333333333333333333333333333333333333333333333333333333' }],
 };
 const LIVE_PREPARED_CONTRACT = PREPARED_1;
 const preparedContractErrors = (contract: PreparedContract): string[] => {
-    const match = /^0\.8\.5-prepared\.(0|1)$/u.exec(contract.version);
+    const match = /^0\.8\.5-prepared\.(0|1|2)$/u.exec(contract.version);
     if (!match || Number(match[1]) !== contract.sequence) return ['physical:version-sequence'];
     if (contract.sequence === 0) return contract === PREPARED_0 && contract.predecessor === undefined ? [] : ['physical:version-reuse'];
-    return contract === PREPARED_1 && canonical(contract.predecessor) === canonical(PREDECESSOR)
+    if (contract.sequence === 1) return contract === PREPARED_1 && canonical(contract.predecessor) === canonical(PREDECESSOR)
+        ? [] : ['physical:predecessor'];
+    return contract === PREPARED_2 && canonical(contract.predecessor) === canonical(PREPARED_2_PREDECESSOR)
         ? [] : ['physical:predecessor'];
 };
 const ownerReferenceCount = (value: unknown): number => {
@@ -902,5 +975,110 @@ test('enforces the monotonic prepared.1 package and recursive inert internal ros
         const nestedFile = path.join(temporary, PACKAGE_ROOT, 'internal/support/value.cjs'); rmSync(nestedFile);
         symlinkSync(path.join(temporary, PACKAGE_ENTRY_FILE), nestedFile);
         assert.notDeepEqual(packageSourceArtifacts(temporary), source);
+    } finally { rmSync(temporary, { recursive: true, force: true }); }
+});
+
+test('freezes the synthetic prepared.2 successor fence without advancing the live package', () => {
+    assert.equal(LIVE_PREPARED_CONTRACT, PREPARED_1);
+    assert.deepEqual(preparedContractErrors(PREPARED_2), []);
+    assert.equal(Buffer.byteLength(PREPARED_2_SUCCESSOR_FENCE), 1172);
+    assert.equal(digest(PREPARED_2_SUCCESSOR_FENCE), '7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff');
+    assert.equal(PREPARED_2_SUCCESSOR_FENCE.match(/randomBytes\(32\)/gu)?.length, 1);
+    assert.doesNotMatch(PREPARED_2_SUCCESSOR_FENCE, /\b(?:Map|Set|WeakMap|globalThis|process|session|authority|cell)\b/iu);
+    const source: Sources = { [PACKAGE_MANIFEST_FILE]: PREPARED_2_MANIFEST, [PACKAGE_ENTRY_FILE]: PREPARED_PACKAGE_ENTRY,
+        [`${PACKAGE_ROOT}/internal/owner.cjs`]: PREPARED_1_INTERNAL,
+        [`${PACKAGE_ROOT}/internal/support/successor-fence.cjs`]: PREPARED_2_SUCCESSOR_FENCE,
+        [`${PACKAGE_ROOT}/internal/support/value.cjs`]: PREPARED_1_NESTED };
+    const temporary = realpathSync.native(mkdtempSync(path.join(tmpdir(), 'mediflow-owner-prepared2-')));
+    try {
+        for (const [file, contents] of Object.entries(source)) { const absolute = path.join(temporary, file);
+            mkdirSync(path.dirname(absolute), { recursive: true }); writeFileSync(absolute, contents); }
+        assert.deepEqual(packageSourceArtifacts(temporary), source);
+        const installedRoot = path.join(temporary, 'node_modules', PACKAGE);
+        for (const input of PREPARED_2.inputs) { const absolute = path.join(installedRoot, input.path);
+            mkdirSync(path.dirname(absolute), { recursive: true }); writeFileSync(absolute, source[`${PACKAGE_ROOT}/${input.path}`]!); }
+        const file = (expected: ExpectedFile): PhysicalFileSnapshot => ({ ...expected, regular: true,
+            symbolicLink: false, links: 1 });
+        const physical: PhysicalPackageSnapshot = {
+            packageJson: { dependencies: { [PACKAGE]: PREPARED_2.dependency } },
+            lock: { lockfileVersion: 3, packages: { '': { dependencies: { [PACKAGE]: PREPARED_2.dependency } },
+                [`node_modules/${PACKAGE}`]: { version: PREPARED_2_VERSION, resolved: PREPARED_2.dependency,
+                    integrity: PREPARED_2_INTEGRITY, engines: { node: '>=24 <25' } } } },
+            tarball: file(PREPARED_2.tar), tarRoster: PREPARED_2.roster,
+            provenance: { ...file(PREPARED_2.artifacts.at(-1)!), value: prepared2Provenance() },
+            artifacts: PREPARED_2.artifacts.map(file), installed: [installedSnapshot(installedRoot)],
+        };
+        const modules = Object.fromEntries(Object.entries(source).filter(([name]) => name !== PACKAGE_MANIFEST_FILE));
+        assert.deepEqual({ source: packageSourceErrors(source, PREPARED_2),
+            imports: importInventoryErrors({ [ADAPTER_FILE]: DORMANT_ADAPTER_SOURCE, ...modules }, true),
+            physical: physicalPackageErrors(physical, PREPARED_2) }, { source: [], imports: [], physical: [] });
+        const mutatedFence = `${PREPARED_2_SUCCESSOR_FENCE}\nrequire('../../../../lib/security/web-auth-lifecycle-owner-adapter');`;
+        assert.notDeepEqual(packageSourceErrors({ ...source,
+            [`${PACKAGE_ROOT}/internal/support/successor-fence.cjs`]: mutatedFence }, PREPARED_2), []);
+        assert.notDeepEqual(importInventoryErrors({
+            [`${PACKAGE_ROOT}/internal/support/successor-fence.cjs`]: mutatedFence }, true), []);
+        assert.equal(preCutoverSourceState({ [ADAPTER_FILE]: DORMANT_ADAPTER_SOURCE, ...modules }, source, physical,
+            PREPARED_2), 'PHYSICAL_PACKAGE_PREPARED');
+        for (const invalid of [
+            { ...PREPARED_2, version: '0.8.5-prepared.3', sequence: 3 },
+            { ...PREPARED_2, predecessor: PREDECESSOR },
+            { ...PREPARED_1, version: PREPARED_2_VERSION, sequence: 2 },
+        ]) assert.notDeepEqual(preparedContractErrors(invalid), []);
+        for (const invalid of [
+            { ...physical, packageJson: { dependencies: { [PACKAGE]: PREPARED_1.dependency } } },
+            { ...physical, provenance: { ...physical.provenance,
+                value: { ...prepared2Provenance(), sourceCommit: '0'.repeat(40) } } },
+            { ...physical, installed: [{ ...physical.installed[0]!, files: physical.installed[0]!.files.slice(1) }] },
+        ]) assert.notDeepEqual(physicalPackageErrors(invalid, PREPARED_2), []);
+        assert.equal(authorityRosterDigest({ ...liveSources,
+            [`${PACKAGE_ROOT}/internal/support/successor-fence.cjs`]: PREPARED_2_SUCCESSOR_FENCE }), AUTHORITY_ROSTER_SHA256);
+        assert.deepEqual(statefulAuthorityModules({ ...liveSources,
+            [`${PACKAGE_ROOT}/internal/support/successor-fence.cjs`]: PREPARED_2_SUCCESSOR_FENCE }), STATEFUL_AUTHORITY_MODULES);
+        for (const consumer of ['lib/security/production.ts', 'lib/security/production.test.ts', THIS_FILE])
+            assert.notDeepEqual(importInventoryErrors({ [consumer]:
+                "import '../../packages/web-auth-lifecycle-owner/internal/support/successor-fence.cjs';" }), [], consumer);
+        const child = String.raw`
+const Module = require('node:module');
+const originalLoad = Module._load;
+const mode = process.argv[2];
+let calls = 0;
+const crypto = { randomBytes(size) {
+    calls += 1;
+    if (size !== 32 || mode === 'error') throw new Error('synthetic');
+    if (mode === 'short') return Buffer.alloc(31, 0xab);
+    if (mode === 'typed') return new Uint8Array(32);
+    if (mode === 'prototype') { const value = Buffer.alloc(32, 0xab); Object.setPrototypeOf(value, null); return value; }
+    if (mode === 'proxy') return new Proxy(Buffer.alloc(32, 0xab), {});
+    return Buffer.alloc(32, 0xab);
+} };
+Module._load = function(request, parent, isMain) {
+    return request === 'node:crypto' ? crypto : originalLoad.call(this, request, parent, isMain);
+};
+if (mode === 'pre-is-proxy') {
+    const util = require('node:util');
+    const originalIsProxy = util.types.isProxy;
+    util.types.isProxy = (value) => { originalIsProxy(value); throw new Error('synthetic post-isProxy'); };
+}
+const ownKeys = Reflect.ownKeys;
+const isFrozen = Object.isFrozen;
+const api = require(process.argv[1]);
+if (mode === 'captured') {
+    crypto.randomBytes = () => { throw new Error('late mutation'); };
+    Buffer.isBuffer = () => false;
+    Object.getPrototypeOf = () => null;
+    Reflect.apply = () => { throw new Error('late mutation'); };
+    require('node:util').types.isProxy = () => true;
+    Buffer.prototype.toString = () => 'INVALID';
+}
+const result = api.successorFence();
+process.stdout.write(JSON.stringify({ calls, result, keys: ownKeys(api), frozen: isFrozen(api) }));`;
+        for (const [mode, expected] of [['valid', 'ab'.repeat(32)], ['captured', 'ab'.repeat(32)], ['error', null],
+            ['short', null], ['typed', null], ['prototype', null], ['proxy', null], ['pre-is-proxy', null]] as const) {
+            const result = spawnSync(process.execPath, ['-e', child,
+                path.join(temporary, PACKAGE_ROOT, 'internal/support/successor-fence.cjs'), mode],
+            { cwd: temporary, env: { NODE_ENV: 'test' }, encoding: 'utf8' });
+            assert.equal(result.status, 0, result.stderr);
+            assert.deepEqual(JSON.parse(result.stdout), { calls: 1, result: expected, keys: ['successorFence'], frozen: true });
+        }
     } finally { rmSync(temporary, { recursive: true, force: true }); }
 });
