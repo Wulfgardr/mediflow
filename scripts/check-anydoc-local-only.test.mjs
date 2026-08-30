@@ -155,6 +155,14 @@ test('retired PDF inspector cannot be reintroduced through project inputs', asyn
     try {
         await reset();
         assert.deepEqual(await runAnyDocLocalOnlyGuard(root), { workerSeen: true, checkedPackages: 8 });
+        await reset();
+        const aliasPackage = structuredClone(packageJson);
+        aliasPackage.dependencies['retired-parser'] = 'npm:@firecrawl/pdf-inspector@1.12.0';
+        await writeFile(path.join(root, 'package.json'), JSON.stringify(aliasPackage));
+        await writeFile(path.join(root, 'scripts', 'legacy.ts'), "import 'retired-parser/internal.js';\n");
+        await assert.rejects(runAnyDocLocalOnlyGuard(root), (error) => error instanceof Error
+            && /dependency is forbidden/u.test(error.message)
+            && /legacy\.ts: retired PDF inspector alias import is forbidden/u.test(error.message));
         await expectFailure(async () => {
             const value = structuredClone(packageJson);
             value.dependencies['@firecrawl/pdf-inspector'] = '1.12.0';
@@ -163,6 +171,31 @@ test('retired PDF inspector cannot be reintroduced through project inputs', asyn
         await expectFailure(async () => {
             const value = structuredClone(packageLock);
             value.packages['node_modules/@firecrawl/pdf-inspector-linux-x64-gnu'] = { version: '1.12.0' };
+            await writeFile(path.join(root, 'package-lock.json'), JSON.stringify(value));
+        });
+        await expectFailure(async () => {
+            const value = structuredClone(packageLock);
+            value.packages[''].dependencies['retired-parser'] = 'file:vendor/retired-parser';
+            value.packages['node_modules/retired-parser'] = {
+                name: '@firecrawl/pdf-inspector',
+                resolved: 'file:vendor/retired-parser',
+            };
+            await writeFile(path.join(root, 'package-lock.json'), JSON.stringify(value));
+        });
+        await expectFailure(async () => {
+            const value = structuredClone(packageLock);
+            value.packages['node_modules/renamed-parser'] = {
+                name: 'renamed-parser',
+                resolved: 'https://registry.npmjs.org/@firecrawl/pdf-inspector/-/pdf-inspector-1.12.0.tgz',
+            };
+            await writeFile(path.join(root, 'package-lock.json'), JSON.stringify(value));
+        });
+        await expectFailure(async () => {
+            const value = structuredClone(packageLock);
+            value.packages['node_modules/renamed-parser'] = {
+                name: 'renamed-parser',
+                version: 'npm:@firecrawl/pdf-inspector@1.12.0',
+            };
             await writeFile(path.join(root, 'package-lock.json'), JSON.stringify(value));
         });
         await expectFailure(() => writeFile(path.join(root, 'next.config.ts'), "const traced = '@firecrawl/' + 'pdf-inspector';\n"));

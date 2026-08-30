@@ -41,15 +41,32 @@ function bundledWorkerFailure(standaloneDir) {
 
 function retiredPdfRuntimeFailure(standaloneDir) {
   const pending = [standaloneDir];
+  const visited = new Set();
   while (pending.length > 0) {
     const directory = pending.pop();
+    const realDirectory = fs.realpathSync(directory);
+    if (visited.has(realDirectory)) continue;
+    visited.add(realDirectory);
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       const absolute = path.join(directory, entry.name);
       const relative = path.relative(standaloneDir, absolute);
       if (PDF_RUNTIME_REFERENCE.test(relative)) {
         return 'Standalone runtime contains retired PDF inspector code.';
       }
-      if (entry.isDirectory()) pending.push(absolute);
+      if (entry.name === 'package.json' && (entry.isFile() || entry.isSymbolicLink())) {
+        try {
+          const manifest = JSON.parse(fs.readFileSync(absolute, 'utf8'));
+          if (typeof manifest?.name === 'string' && /^@firecrawl\/pdf-inspector(?:-|$)/iu.test(manifest.name)) {
+            return 'Standalone runtime contains a renamed retired PDF inspector package.';
+          }
+          if (typeof manifest?.resolved === 'string' && PDF_RUNTIME_REFERENCE.test(manifest.resolved)) {
+            return 'Standalone runtime contains retired PDF inspector package provenance.';
+          }
+        } catch {
+          // Other package validation remains owned by its runtime gate.
+        }
+      }
+      if (entry.isDirectory() || (entry.isSymbolicLink() && fs.statSync(absolute).isDirectory())) pending.push(absolute);
     }
   }
 
@@ -139,6 +156,25 @@ function runPdfRetirementSelfTest() {
     });
     expectFailure('retired PDF package', () => fs.mkdirSync(path.join(packageRoot, 'pdf-inspector'), { recursive: true }));
     expectFailure('retired PDF native package', () => fs.mkdirSync(path.join(packageRoot, 'pdf-inspector-darwin-arm64'), { recursive: true }));
+    expectFailure('renamed retired PDF package', () => {
+      const renamed = path.join(standaloneDir, 'node_modules', 'renamed-parser');
+      fs.mkdirSync(renamed, { recursive: true });
+      fs.writeFileSync(path.join(renamed, 'package.json'), '{"name":"@firecrawl/pdf-inspector"}');
+    });
+    expectFailure('renamed retired PDF native package', () => {
+      const renamed = path.join(standaloneDir, 'node_modules', 'renamed-native');
+      fs.mkdirSync(renamed, { recursive: true });
+      fs.writeFileSync(path.join(renamed, 'package.json'), '{"name":"@firecrawl/pdf-inspector-darwin-arm64"}');
+      fs.writeFileSync(path.join(renamed, 'renamed.node'), 'synthetic native');
+    });
+    expectFailure('symlinked renamed retired PDF package', () => {
+      const target = path.join(root, 'renamed-package-target');
+      fs.mkdirSync(target, { recursive: true });
+      fs.writeFileSync(path.join(target, 'package.json'), '{"name":"@firecrawl/pdf-inspector"}');
+      const renamed = path.join(standaloneDir, 'node_modules', 'renamed-parser');
+      fs.mkdirSync(path.dirname(renamed), { recursive: true });
+      fs.symlinkSync(target, renamed, process.platform === 'win32' ? 'junction' : 'dir');
+    });
     expectFailure('retired PDF router', () => {
       const router = path.join(standaloneDir, 'server', 'chunks', 'pdf-inspector-router.js');
       fs.mkdirSync(path.dirname(router), { recursive: true });
