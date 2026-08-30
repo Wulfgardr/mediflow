@@ -142,6 +142,173 @@ supervisore standalone. Multiprocesso, worker, Edge, serverless o routing senza
 affinity richiedono una nuova decisione: non possono ereditare il claim
 process-local di questa ADR.
 
+### Addendum D0b: preparazione dormiente del package
+
+Questo addendum precisa le preparazioni ammesse prima del cutover atomico. La
+parola `stateless` alla riga di confine precedente qualifica il grafo che la
+produzione puo valutare, non la sola presenza di file nel tree. Un file interno
+puo contenere l'implementazione P2 solo se resta irraggiungibile dal root del
+package, dall'adapter e da ogni consumer di produzione.
+
+La sola presenza dei byte non costituisce authority. Costituiscono invece
+authority, e rendono lo stato `INVALID`, qualunque import, `require`, export,
+deep import, loader dinamico o calcolato, side effect, cache, registrazione su
+`globalThis` o `process` e qualunque stato condiviso valutato dalla produzione.
+I test possono valutare il file interno solo in processi sintetici isolati;
+questa prova non e evidenza di attivazione runtime.
+
+Gli stati pre-cutover ammessi sono ordinati e chiusi:
+
+1. `DORMANT_PREPARED`: esiste solo l'adapter canonico dormiente; non esistono
+   package, dipendenza, lock entry, copia installata o consumer.
+2. `PACKAGE_SOURCE_PREPARED`: esiste la sorgente esatta sotto
+   `packages/web-auth-lifecycle-owner/`. Il root e inerte e non carica
+   `internal/`; l'implementazione P2 interna puo essere presente, ma il package
+   resta assente da dipendenze, lockfile, `node_modules`, configurazione Next,
+   adapter e grafi di import di produzione.
+3. `PHYSICAL_PACKAGE_PREPARED`: alla sorgente si aggiungono tarball e
+   provenienza tracciati, dipendenza e lock entry esatti e una sola copia
+   fisica installata. Il root resta inerte, non carica `internal/` e non ha
+   consumer o externalization di produzione.
+
+La sola transizione ammessa e
+`DORMANT_PREPARED -> PACKAGE_SOURCE_PREPARED -> PHYSICAL_PACKAGE_PREPARED ->`
+cutover atomico. D1 deve riconoscere il nome esatto dello stato prima che il
+relativo packet sia accettato. Combinazioni parziali, ritorni a uno stato
+precedente e due authority parallele sono `INVALID` e fermano il programma.
+In tutti e tre gli stati l'owner storico locale resta la sola authority runtime.
+
+### Sorgente, manifest e root CommonJS
+
+Per `0.8.5` nomi e percorsi sono fissi:
+
+- sorgente: `packages/web-auth-lifecycle-owner/`;
+- nome package: `@mediflow/web-auth-lifecycle-owner`;
+- root: `packages/web-auth-lifecycle-owner/index.js`;
+- tarball:
+  `packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5.tgz`;
+- provenienza:
+  `packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5.provenance.json`;
+- dipendenza root:
+  `file:packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5.tgz`.
+
+Il `package.json` del package contiene, nello stesso ordine, soltanto:
+
+```json
+{
+  "name": "@mediflow/web-auth-lifecycle-owner",
+  "version": "0.8.5",
+  "private": true,
+  "type": "commonjs",
+  "main": "./index.js",
+  "exports": "./index.js",
+  "files": ["index.js", "internal/"],
+  "engines": { "node": ">=24 <25" }
+}
+```
+
+Non sono ammessi `module`, `browser`, `imports`, `bin`, `scripts`, dipendenze,
+peer o optional dependency, export condizionali o subpath. Il tar contiene
+soltanto `package/package.json`, `package/index.js` e file regolari sotto
+`package/internal/`; test, mappe, documenti, provenance e altri artifact
+restano fuori dal roster.
+
+Prima del cutover il root ha l'unico contenuto eseguibile seguente, oltre a
+spaziatura e commenti:
+
+```js
+'use strict';
+module.exports = Object.freeze(Object.create(null));
+```
+
+Il root non espone API, owner o stato e non carica il file P2 interno. Qualunque
+altra dichiarazione, chiamata, export, import, `require` o lettura ambientale
+porta lo stato a `INVALID`.
+
+Il marker `server-only` resta responsabilita esclusiva dell'adapter canonico,
+che importa `server-only` a livello di modulo. Il CommonJS non aggiunge
+`require('server-only')`, dipendenze o condizioni di export. Prima del cutover
+nessun modulo di produzione carica il package; al cutover solo l'adapter puo
+caricarne il root. Route, client, deep import e accesso diretto a `internal/`
+restano vietati.
+
+### Provenienza, pack e installazione fisica
+
+La provenienza JSON registra almeno: base Git accettata
+`a9a81a4fe4c3551be1b9676019579a7bcdd6a611`, nome e versione, versioni esatte
+Node e npm, comando di pack, lunghezza e SHA-256 del tarball, roster ordinato
+del tar e SHA-256 di ogni input e membro. Il file non contiene percorsi
+assoluti, cache, credenziali o dati runtime. Una modifica di un solo byte
+richiede una nuova versione; la stessa versione non puo identificare due
+digest diversi.
+
+Il pack viene eseguito due volte da due copie temporanee pulite della sorgente,
+con la stessa toolchain registrata e con:
+
+```text
+npm pack --ignore-scripts --pack-destination ./artifacts
+```
+
+I due tarball devono essere byte-identici e avere lo stesso roster e gli stessi
+digest dei membri. Il pack non usa rete, registry, Git URL, lifecycle script o
+cache ambientale. Un risultato non riproducibile e `HOLD_SUPPLY_CHAIN`.
+
+La prova di installazione usa un package scratch vuoto la cui unica dipendenza
+e il tarball tracciato. Usa una cache temporanea vuota e:
+
+```text
+npm install --offline --ignore-scripts --no-audit --no-fund <tarball>
+```
+
+La dipendenza dell'applicazione punta allo stesso `file:` esatto. Il lockfile
+v3 contiene una sola risoluzione locale con `integrity`, senza `link: true`,
+workspace, directory package, registry, Git o URL. Nessun comando puo ricadere
+su rete o cache per completare il package owner.
+
+Le prove `lstat`, `stat` e `realpath` devono mostrare una sola directory package
+fisica e un solo root sotto il `node_modules` dell'applicazione. Manifest, root
+e file interni sono file regolari, non symlink o hardlink, e hanno link count
+uno. Roster e digest devono coincidere con la provenienza. Le stesse prove si
+ripetono sulla copia inclusa nello standalone di produzione.
+
+### Significato dei due standalone di produzione
+
+I "due standalone di produzione" della prova minima sono due avvii sequenziali,
+A e B, dello stesso output immutabile `.next/standalone`. A viene terminato
+completamente prima di avviare B; ogni avvio crea un nuovo processo Node e un
+nuovo realm.
+
+In A e in B almeno due bundle route compilati separatamente devono attraversare
+la stessa unica copia fisica del package e lo stesso lifecycle process-local.
+B deve negare ogni cookie, ticket, locator e operation emesso da A e deve
+osservare una nuova identita process-local. Il digest dell'output e il roster
+del package non cambiano fra i due avvii.
+
+Questa prova non descrive due build, due supervisori concorrenti, replica, alta
+disponibilita o coordinamento multiprocesso. Avvii sovrapposti o authority
+condivisa tra A e B richiedono una nuova decisione e restano `HOLD`.
+
+### Falsificatori e claim del packet D0b
+
+Fermare la preparazione se il root raggiunge P2, un consumer di produzione
+carica package o adapter prima del cutover, l'owner storico smette di essere la
+sola authority, o D1 non restituisce lo stato atteso esatto. Fermare anche per
+tar non riproducibile, versione riusata con byte diversi, drift di manifest,
+roster, digest, provenienza, lock o integrity, installazione con rete, cache o
+script, link o copia duplicata, import diretto/client/deep e inferenze
+multiprocesso dalla prova sequenziale.
+
+Registry remoto, Git o URL, dual CJS/ESM, condizioni di export, un marker
+`server-only` interno al package, un secondo owner, un servizio separato,
+worker, Edge, serverless, replica o multiprocesso cambiano il confine e
+richiedono una nuova decisione. Route, cookie, API e semantica P2/P3 restano
+fuori da D0b.
+
+Claim massimo D0b: **contratto documentale per preparare sorgente e copia fisica
+di un package CommonJS dormiente, locale e riproducibile; nessun package,
+lockfile, configurazione, consumer, runtime o authority esterna e consegnato da
+questo addendum.**
+
 ### Addendum: commit finale di attivazione e ritiro
 
 Questo addendum raffina i confini P2, P3 e P4. Non modifica P1, P5, P6 o P7.
