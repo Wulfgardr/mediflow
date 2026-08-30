@@ -1,6 +1,8 @@
 /* @Codex */
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { types } from 'node:util';
 
@@ -13,8 +15,11 @@ import {
     type LocalExtractionResult,
 } from './anydoc-local-extraction-contract';
 
-const WORKER_DIRECTORY = fileURLToPath(new URL('../../../scripts/', import.meta.url));
-const WORKER_PATH = fileURLToPath(new URL('../../../scripts/anydoc-local-extraction-worker.mjs', import.meta.url));
+const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
+const MEDIFLOW_PACKAGE_NAME = 'medical-record-app';
+const WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
+const WORKER_SHA256 = '34f2db3d788585dab175b284bc8f1f39395fb66a21780e1782a5d5067073e370';
+const MAX_ROOT_STEPS = 8;
 const WORKER_TIMEOUT_MS = 15_000;
 const MAX_DIAGNOSTIC_BYTES = 16 * 1024;
 const EXIT_SIGNAL = new Map<number, AnyDocLocalFailureSignal>([
@@ -38,10 +43,49 @@ function sourceEvidence(attachmentId: string, bytes: Buffer) {
     };
 }
 
+function inside(root: string, candidate: string): boolean {
+    const relative = path.relative(root, candidate);
+    return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+function resolveOwnedWorker(): { path: string; directory: string } | null {
+    let directory: string;
+    try { directory = realpathSync(MODULE_DIRECTORY); } catch { return null; }
+
+    for (let step = 0; step < MAX_ROOT_STEPS; step += 1) {
+        let packageValue: unknown;
+        try {
+            const packagePath = path.join(directory, 'package.json');
+            packageValue = JSON.parse(readFileSync(packagePath, 'utf8'));
+        } catch { packageValue = null; }
+        if (typeof packageValue === 'object' && packageValue !== null
+            && Object.getPrototypeOf(packageValue) === Object.prototype
+            && Reflect.ownKeys(packageValue).length > 0
+            && (packageValue as { name?: unknown }).name === MEDIFLOW_PACKAGE_NAME) {
+            try {
+                const workerPath = path.join(directory, 'scripts', WORKER_FILE);
+                if (!lstatSync(workerPath).isFile()) return null;
+                const root = realpathSync(directory);
+                const worker = realpathSync(workerPath);
+                if (!inside(root, worker) || !statSync(worker).isFile()) return null;
+                const digest = createHash('sha256').update(readFileSync(worker)).digest('hex');
+                return digest === WORKER_SHA256 ? { path: worker, directory: path.dirname(worker) } : null;
+            } catch { return null; }
+        }
+        const parent = path.dirname(directory);
+        if (parent === directory) return null;
+        directory = parent;
+    }
+
+    return null;
+}
+
 async function runWorker(bytes: Buffer): Promise<{ signal?: AnyDocLocalFailureSignal; markdown?: string }> {
     return await new Promise((resolve) => {
-        const child = spawn(process.execPath, [WORKER_PATH], {
-            cwd: WORKER_DIRECTORY,
+        const worker = resolveOwnedWorker();
+        if (!worker) return resolve({ signal: 'io' });
+        const child = spawn(process.execPath, [worker.path], {
+            cwd: worker.directory,
             env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
             stdio: ['pipe', 'pipe', 'pipe'],
             windowsHide: true,
