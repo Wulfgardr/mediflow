@@ -1,7 +1,8 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync,
+    symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -64,6 +65,13 @@ const STATEFUL_AUTHORITY_MODULES = new Set([
 ].map((name) => `lib/security/${name}.ts`));
 type Sources = Readonly<Record<string, string>>;
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
+const decodedIdentity = (value: string): string | null => {
+    let decoded = value;
+    try { for (let index = 0; index < 4; index += 1) {
+        const next = decodeURIComponent(decoded); if (next === decoded) break; decoded = next;
+    } } catch { return null; }
+    return decoded;
+};
 const canonical = (value: unknown): string => JSON.stringify(value && typeof value === 'object' && !Array.isArray(value)
     ? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
         .map(([key, item]) => [key, JSON.parse(canonical(item))]))
@@ -82,26 +90,47 @@ const DORMANT_ADAPTER_CONTRACT = printed(ADAPTER_FILE, DORMANT_ADAPTER_SOURCE);
 const parseErrors = (file: string, source: string) =>
     (ast(file, source) as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics.length;
 type ScanOps = Readonly<{ exists(value: string): boolean; realpath(value: string): string;
+    read(value: string): string;
     readdir(value: string): ReadonlyArray<{ name: string; isDirectory(): boolean; isSymbolicLink(): boolean }> }>;
 const SCAN_OPS: ScanOps = { exists: existsSync, realpath: realpathSync.native,
+    read: (value) => readFileSync(value, 'utf8'),
     readdir: (value) => readdirSync(value, { withFileTypes: true }) };
 const ownerPackageCopies = (root: string, ops = SCAN_OPS) => {
-    const pending = [path.join(root, 'node_modules')]; const seen = new Set<string>(); const found: string[] = [];
+    const sourceRoot = path.join(root, PACKAGE_ROOT); let sourceReal: string | null = null;
+    try { if (ops.exists(sourceRoot)) sourceReal = ops.realpath(sourceRoot); } catch { return ['<unscannable>']; }
+    const pending = [path.join(root, 'node_modules')]; const seen = new Set<string>();
+    const seenPackages = new Set<string>(); const found: string[] = [];
+    const inspectPackage = (packageRoot: string, logicalName: string): void => {
+        let real: string;
+        try { real = ops.realpath(packageRoot); } catch { found.push('<unscannable>'); return; }
+        if (seenPackages.has(real)) return; seenPackages.add(real);
+        const manifestFile = path.join(packageRoot, 'package.json'); let manifestName: unknown;
+        try { if (ops.exists(manifestFile)) manifestName = (JSON.parse(ops.read(manifestFile)) as { name?: unknown }).name; }
+        catch { found.push('<unscannable>'); return; }
+        if (logicalName === PACKAGE || manifestName === PACKAGE || (sourceReal !== null && real === sourceReal))
+            found.push(packageRoot);
+        pending.push(path.join(packageRoot, 'node_modules'));
+    };
     while (pending.length > 0) {
         const directory = pending.pop()!; if (!ops.exists(directory)) continue;
         let real: string; try { real = ops.realpath(directory); } catch { return [...found, '<unscannable>']; }
         if (seen.has(real)) continue; seen.add(real); if (seen.size > 4_096) return [...found, '<scan-limit>'];
-        const owner = path.join(directory, PACKAGE); if (ops.exists(owner)) found.push(owner);
         try { for (const entry of ops.readdir(directory)) {
-            const candidate = path.join(directory, entry.name); const packages = entry.name.startsWith('@') && entry.isDirectory()
-                ? ops.readdir(candidate).filter((item) => item.isDirectory() || item.isSymbolicLink()).map((item) => path.join(candidate, item.name))
-                : entry.isDirectory() || entry.isSymbolicLink() ? [candidate] : [];
-            for (const packageRoot of packages) pending.push(entry.name === '.pnpm' ? packageRoot : path.join(packageRoot, 'node_modules'));
+            if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+            const candidate = path.join(directory, entry.name);
+            if (entry.name === '.pnpm') {
+                for (const item of ops.readdir(candidate)) if (item.isDirectory() || item.isSymbolicLink())
+                    pending.push(path.join(candidate, item.name, 'node_modules'));
+            } else if (entry.name.startsWith('@')) {
+                for (const item of ops.readdir(candidate)) if (item.isDirectory() || item.isSymbolicLink())
+                    inspectPackage(path.join(candidate, item.name), `${entry.name}/${item.name}`);
+            } else inspectPackage(candidate, entry.name);
         } } catch { return [...found, '<unscannable>']; }
     }
     return found;
 };
-const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false): string[] => {
+const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false,
+    packageAliases: ReadonlySet<string> = new Set()): string[] => {
     const errors: string[] = [];
     for (const [file, source] of Object.entries(sources)) {
         if (file === THIS_FILE) continue;
@@ -119,6 +148,14 @@ const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false): s
         if (packageRelevant.length > 0 || packageSourceRelevant.length > 0
             || source.includes(PACKAGE) || source.includes(PACKAGE_ROOT))
             errors.push(`${file}:package-load`);
+        for (const alias of packageAliases) {
+            if (alias.startsWith('<')) continue;
+            const aliasUses = inventoryModuleImports({ file, source, target: path.join(path.dirname(file), alias),
+                repositoryRoot: ROOT, allowUnresolvedExpressions: allowedGenericLoaderExpressions });
+            if (aliasUses.some((use) => IMPORT_FORMS.has(use.form) || use.form === 'module-path'
+                || (UNRESOLVED_LOADER_FORMS.has(use.form) && !unresolvedLoaderIsKnown)))
+                errors.push(`${file}:package-alias-load`);
+        }
         const packageAst = ast(file, source); let deepPackage = false; const constants = new Map<string, ts.Expression>();
         const collectConstants = (node: ts.Node): void => {
             if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) constants.set(node.name.text, node.initializer);
@@ -143,8 +180,10 @@ const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false): s
             if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateExpression(node) || ts.isBinaryExpression(node) || ts.isIdentifier(node)) {
                 const value = staticString(node); const sourcePath = value === null ? null
                     : path.resolve(path.dirname(path.join(ROOT, file)), value);
+                const decoded = value === null ? null : decodedIdentity(value);
                 if (value === PACKAGE || value?.startsWith(`${PACKAGE}/`)
-                    || sourcePath === path.join(ROOT, PACKAGE_ENTRY_FILE)) deepPackage = true;
+                    || sourcePath === path.join(ROOT, PACKAGE_ENTRY_FILE)
+                    || [...packageAliases].some((alias) => decoded === alias || decoded?.startsWith(`${alias}/`))) deepPackage = true;
             }
             ts.forEachChild(node, visitPackage);
         };
@@ -274,13 +313,61 @@ const packageSourceErrors = (artifacts: Sources): string[] => {
     return errors;
 };
 
+const ownerPackageReference = (value: unknown): boolean => {
+    if (typeof value !== 'string') return false;
+    const decoded = decodedIdentity(value); if (decoded === null) return true;
+    if (decoded.includes(PACKAGE) || decoded.startsWith(`npm:${PACKAGE}@`)) return true;
+    const local = decoded.replace(/^(?:file|link):/u, '').split(/[?#]/u, 1)[0]!;
+    const resolved = path.resolve(ROOT, local); const sourceRoot = path.join(ROOT, PACKAGE_ROOT);
+    const tarball = path.basename(resolved);
+    return resolved === sourceRoot || resolved.startsWith(`${sourceRoot}${path.sep}`)
+        || (tarball.startsWith(path.basename(PACKAGE_ROOT)) && tarball.endsWith('.tgz'));
+};
+const lockPackageAlias = (key: string): string | null => {
+    const marker = 'node_modules/'; const index = key.lastIndexOf(marker);
+    if (index < 0) return null;
+    const remainder = key.slice(index + marker.length); const segments = remainder.split('/');
+    return segments[0]?.startsWith('@') ? segments.slice(0, 2).join('/') : segments[0] ?? null;
+};
+const ownerLockAliases = (source: string): Set<string> => {
+    const aliases = new Set<string>(); if (source.trim() === '') return aliases;
+    let lock: unknown;
+    try { lock = JSON.parse(source); } catch { aliases.add('<invalid-lock>'); return aliases; }
+    const visit = (value: unknown, key = ''): void => {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+        const record = value as Record<string, unknown>; const alias = lockPackageAlias(key);
+        if (record.name === PACKAGE || ownerPackageReference(record.resolved) || ownerPackageReference(record.version))
+            aliases.add(alias ?? PACKAGE);
+        for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
+            const dependencies = record[section];
+            if (dependencies && typeof dependencies === 'object' && !Array.isArray(dependencies)) {
+                for (const [name, spec] of Object.entries(dependencies))
+                    if (name === PACKAGE || ownerPackageReference(spec)) aliases.add(name);
+            }
+        }
+        for (const [childKey, child] of Object.entries(record)) visit(child, childKey);
+    };
+    visit(lock); return aliases;
+};
+const ownerDependencyAliases = (packageJson: Record<string, unknown>, lock: string): Set<string> => {
+    const aliases = ownerLockAliases(lock);
+    for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
+        const dependencies = (packageJson[section] as Record<string, unknown> | undefined) ?? {};
+        for (const [name, spec] of Object.entries(dependencies))
+            if (name === PACKAGE || ownerPackageReference(spec)) aliases.add(name);
+    }
+    return aliases;
+};
+
 const packageBoundaryErrors = (packageJson: Record<string, unknown>, lock: string, nextConfig: string,
     ownerInNodeModules: boolean): string[] => {
     const errors: string[] = [];
     for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
-        if (PACKAGE in ((packageJson[section] as Record<string, unknown> | undefined) ?? {})) errors.push(`package:${section}`);
+        const dependencies = (packageJson[section] as Record<string, unknown> | undefined) ?? {};
+        if (Object.entries(dependencies).some(([name, spec]) => name === PACKAGE || ownerPackageReference(spec)))
+            errors.push(`package:${section}`);
     }
-    if (lock.includes(PACKAGE)) errors.push('package:lock');
+    if (lock.includes(PACKAGE) || ownerLockAliases(lock).size > 0) errors.push('package:lock');
     if (ownerInNodeModules) errors.push('package:node_modules');
     if (/serverExternalPackages\s*:[\s\S]*?@mediflow\/web-auth-lifecycle-owner/u.test(nextConfig)) errors.push('package:next-external');
     return errors;
@@ -393,24 +480,57 @@ test('denies hostile package and adapter loads without changing the shared inven
     ];
     for (const [index, source] of hostile.entries()) assert.notDeepEqual(
         importInventoryErrors({ [`lib/security/hostile-${index}.ts`]: source }), [], source);
+    for (const source of ["import owner from 'owner-alias';", "require('owner-alias');", "import('owner-alias');",
+        "import 'owner-alias/deep';", "const p='owner-'+'alias/deep';import(p);", "import('owner%2Dalias/deep');"])
+        assert.notDeepEqual(importInventoryErrors({ 'lib/security/alias-consumer.ts': source }, false,
+            ownerDependencyAliases({ dependencies: { 'owner-alias': `file:${PACKAGE_ROOT}` } }, '')), [], source);
 });
 
 test('denies package metadata, early externalization, new authority modules or edges, and ambient-owner drift', () => {
     for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
         assert.notDeepEqual(packageBoundaryErrors({ [section]: { [PACKAGE]: '0.0.0-synthetic' } }, '', '', false), []);
+        assert.notDeepEqual(packageBoundaryErrors({ [section]: { 'owner-alias': `file:${PACKAGE_ROOT}` } }, '', '', false), []);
+    }
+    assert.notDeepEqual(packageBoundaryErrors({ dependencies: {
+        'owner-alias': `file:${PACKAGE_ROOT}`,
+    } }, '', '', false), []);
+    assert.deepEqual(ownerDependencyAliases({ dependencies: {
+        'owner-alias': `file:${PACKAGE_ROOT}`,
+    } }, ''), new Set(['owner-alias']));
+    for (const spec of [`file:./packages/../${PACKAGE_ROOT}`, 'file:packages%2Fweb-auth-lifecycle-owner',
+        'file:packages%252Fweb-auth-lifecycle-owner', 'file:artifacts/web-auth-lifecycle-owner.tgz']) {
+        assert.ok(ownerPackageReference(spec), spec);
     }
     assert.notDeepEqual(packageBoundaryErrors({}, `{"node_modules/${PACKAGE}":{}}`, '', false), []);
+    assert.notDeepEqual(packageBoundaryErrors({}, JSON.stringify({ packages: {
+        'node_modules/owner-alias': { resolved: `file:${PACKAGE_ROOT}` },
+    } }), '', false), []);
+    assert.deepEqual(ownerLockAliases(JSON.stringify({ packages: { 'node_modules/owner-alias': {
+        resolved: ['https:', '', 'registry.invalid', PACKAGE, '-', `${path.basename(PACKAGE_ROOT)}.tgz`].join('/'),
+    } } })), new Set(['owner-alias']));
     assert.notDeepEqual(packageBoundaryErrors({}, '', `serverExternalPackages:['${PACKAGE}']`, false), []);
     assert.notDeepEqual(packageBoundaryErrors({}, '', '', true), []);
     const nestedRoot = mkdtempSync(path.join(tmpdir(), 'mediflow-owner-boundary-'));
     try {
+        const aliasRoot = path.join(nestedRoot, 'node_modules', 'owner-alias');
+        mkdirSync(aliasRoot, { recursive: true });
+        writeFileSync(path.join(aliasRoot, 'package.json'), JSON.stringify({ name: PACKAGE }));
+        assert.notDeepEqual(ownerPackageCopies(nestedRoot), []);
+        rmSync(aliasRoot, { recursive: true });
+        const sourceRoot = path.join(nestedRoot, PACKAGE_ROOT);
+        mkdirSync(sourceRoot, { recursive: true });
+        writeFileSync(path.join(sourceRoot, 'package.json'), JSON.stringify({ name: 'synthetic-source' }));
+        symlinkSync(sourceRoot, aliasRoot, 'dir');
+        assert.notDeepEqual(ownerPackageCopies(nestedRoot), []);
+        rmSync(aliasRoot);
         mkdirSync(path.join(nestedRoot, 'node_modules', 'synthetic-parent', 'node_modules', PACKAGE), { recursive: true });
         assert.notDeepEqual(ownerPackageCopies(nestedRoot), []);
         rmSync(path.join(nestedRoot, 'node_modules', 'synthetic-parent'), { recursive: true });
         mkdirSync(path.join(nestedRoot, 'node_modules', '.pnpm', 'synthetic@0.0.0', 'node_modules', PACKAGE), { recursive: true });
         assert.notDeepEqual(ownerPackageCopies(nestedRoot), []);
     } finally { rmSync(nestedRoot, { recursive: true, force: true }); }
-    const baseOps: ScanOps = { exists: (value) => value.endsWith('node_modules'), realpath: (value) => value, readdir: () => [] };
+    const baseOps: ScanOps = { exists: (value) => value.endsWith('node_modules'), realpath: (value) => value,
+        read: () => '{}', readdir: () => [] };
     for (const ops of [{ ...baseOps, realpath: () => { throw new Error('synthetic'); } },
         { ...baseOps, readdir: () => { throw new Error('synthetic'); } }]) {
         assert.ok(ownerPackageCopies('/synthetic', ops).includes('<unscannable>'));
