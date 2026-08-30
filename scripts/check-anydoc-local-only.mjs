@@ -26,22 +26,60 @@ const SOURCE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx']);
 const SCAN_ROOTS = ['app', 'components', 'lib', 'scripts'];
 const SELF_FILES = new Set(['scripts/check-anydoc-local-only.mjs', 'scripts/check-anydoc-local-only.test.mjs']);
 
+function retiredPdfIdentity(value) {
+    return typeof value === 'string' && (value.includes(RETIRED_PDF_INSPECTOR)
+        || /(?:^|[/:])pdf-inspector(?:[-/@]|$)/iu.test(value));
+}
+
+function dependencyEntries(manifest) {
+    return ['dependencies', 'devDependencies', 'optionalDependencies']
+        .flatMap((field) => Object.entries(manifest?.[field] ?? {}));
+}
+
+function lockPackageName(key) {
+    const tail = key.slice(key.lastIndexOf('node_modules/') + 'node_modules/'.length);
+    const parts = tail.split('/');
+    return parts[0]?.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+}
+
+function retiredLockIdentity(key, value) {
+    return [key, value?.name, value?.version, value?.resolved].some(retiredPdfIdentity);
+}
+
+function retiredAliasReference(value, aliases) {
+    return [...aliases].some((alias) => value === alias || value.startsWith(`${alias}/`));
+}
+
+function retiredPdfAliases(packageJson, packageLock) {
+    const aliases = new Set(dependencyEntries(packageJson)
+        .filter(([name, value]) => retiredPdfIdentity(name) || retiredPdfIdentity(value))
+        .map(([name]) => name));
+    for (const [name, value] of dependencyEntries(packageLock?.packages?.[''])) {
+        if (retiredPdfIdentity(name) || retiredPdfIdentity(value)) aliases.add(name);
+    }
+    for (const [key, value] of Object.entries(packageLock?.packages ?? {})) {
+        if (retiredLockIdentity(key, value)) {
+            const name = lockPackageName(key);
+            if (name) aliases.add(name);
+        }
+    }
+    return aliases;
+}
+
 function sameMembers(left, right) {
     return left.length === right.length && [...left].sort().every((value, index) => value === [...right].sort()[index]);
 }
 
 export function validateAnyDocSupplyChain(packageJson, packageLock) {
     const issues = [];
-    const retired = (name) => name === RETIRED_PDF_INSPECTOR || name.startsWith(`${RETIRED_PDF_INSPECTOR}-`);
-    for (const field of ['dependencies', 'devDependencies', 'optionalDependencies']) {
-        if (Object.keys(packageJson?.[field] ?? {}).some(retired)) issues.push('retired PDF inspector dependency is forbidden');
+    if (dependencyEntries(packageJson).some(([name, value]) => retiredPdfIdentity(name) || retiredPdfIdentity(value))) {
+        issues.push('retired PDF inspector dependency is forbidden');
     }
     if (packageJson?.dependencies?.['@firecrawl/anydoc'] !== ANYDOC_VERSION) issues.push('package dependency must pin @firecrawl/anydoc 0.2.4 exactly');
     const packages = packageLock?.packages;
     if (!packages || typeof packages !== 'object') return [...issues, 'package-lock packages map is missing'];
-    if (['dependencies', 'devDependencies', 'optionalDependencies']
-        .some((field) => Object.keys(packages['']?.[field] ?? {}).some(retired))
-        || Object.keys(packages).some((key) => key.startsWith('node_modules/') && retired(key.slice('node_modules/'.length)))) {
+    if (dependencyEntries(packages['']).some(([name, value]) => retiredPdfIdentity(name) || retiredPdfIdentity(value))
+        || Object.entries(packages).some(([key, value]) => retiredLockIdentity(key, value))) {
         issues.push('retired PDF inspector package-lock entry is forbidden');
     }
     if (packages['']?.dependencies?.['@firecrawl/anydoc'] !== ANYDOC_VERSION) issues.push('package-lock root dependency drift');
@@ -167,7 +205,7 @@ function hasValueImportBinding(node) {
         && clause.namedBindings.elements.some((element) => !element.isTypeOnly));
 }
 
-function analyzeSource(source, worker) {
+function analyzeSource(source, worker, retiredAliases = new Set()) {
     const sourceFile = parseSource(source, worker);
     const declarations = declarationIndex(sourceFile);
     const issues = new Set();
@@ -240,6 +278,15 @@ function analyzeSource(source, worker) {
             issues.add('ocr class property is forbidden');
         }
         const constant = constantString(node, declarations);
+        const parent = node.parent;
+        let moduleReference = false;
+        if (parent) {
+            moduleReference = (ts.isImportDeclaration(parent) || ts.isExportDeclaration(parent))
+                ? parent.moduleSpecifier === node
+                : ts.isCallExpression(parent) && parent.arguments[0] === node
+                    && (parent.expression.kind === ts.SyntaxKind.ImportKeyword
+                        || (ts.isIdentifier(parent.expression) && parent.expression.text === 'require'));
+        }
         const isAcceptedImport = worker
             && ts.isStringLiteral(node)
             && ts.isImportDeclaration(node.parent)
@@ -247,6 +294,7 @@ function analyzeSource(source, worker) {
             && node.text === ANYDOC_NATIVE_SUBPATH;
         if (!isAcceptedImport && constant?.startsWith('@firecrawl/anydoc')) issues.add('AnyDoc package reference is forbidden outside the exact static import');
         if (constant?.startsWith(RETIRED_PDF_INSPECTOR)) issues.add('retired PDF inspector source reference is forbidden');
+        if (moduleReference && constant && retiredAliasReference(constant, retiredAliases)) issues.add('retired PDF inspector alias import is forbidden');
         if (worker && constant && FORBIDDEN_CONSTANTS.has(constant)) issues.add(`${constant} constant is forbidden`);
         if (worker && constant && /^(?:https?|wss?):/u.test(constant)) issues.add('network URL is forbidden');
         ts.forEachChild(node, visit);
@@ -260,8 +308,8 @@ export function validateAnyDocWorkerSource(source) {
     return analyzeSource(source, true);
 }
 
-export function validateAnyDocNonWorkerSource(source) {
-    return analyzeSource(source, false);
+export function validateAnyDocNonWorkerSource(source, retiredAliases) {
+    return analyzeSource(source, false, new Set(retiredAliases));
 }
 
 async function sourceFiles(root) {
@@ -284,8 +332,9 @@ export async function runAnyDocLocalOnlyGuard(root) {
     const packageJson = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
     const packageLock = JSON.parse(await readFile(path.join(root, 'package-lock.json'), 'utf8'));
     const issues = validateAnyDocSupplyChain(packageJson, packageLock);
+    const retiredAliases = retiredPdfAliases(packageJson, packageLock);
     const configSource = await readFile(path.join(root, 'next.config.ts'), 'utf8');
-    issues.push(...validateAnyDocNonWorkerSource(configSource).map((issue) => `next.config.ts: ${issue}`));
+    issues.push(...validateAnyDocNonWorkerSource(configSource, retiredAliases).map((issue) => `next.config.ts: ${issue}`));
     for (const relative of RETIRED_PDF_PATHS) {
         try {
             await lstat(path.join(root, relative));
@@ -303,7 +352,7 @@ export async function runAnyDocLocalOnlyGuard(root) {
             workerSeen = true;
             issues.push(...validateAnyDocWorkerSource(source).map((issue) => `${relative}: ${issue}`));
         } else {
-            issues.push(...validateAnyDocNonWorkerSource(source).map((issue) => `${relative}: ${issue}`));
+            issues.push(...validateAnyDocNonWorkerSource(source, retiredAliases).map((issue) => `${relative}: ${issue}`));
         }
     }
     if (issues.length > 0) throw new Error(`AnyDoc local-only guard failed:\n- ${issues.join('\n- ')}`);
