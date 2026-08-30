@@ -237,61 +237,20 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/ocr/extract
- * 
- * Check if OCR model is available
+ *
+ * Legacy OCR diagnostic route retirement boundary.
  */
 export async function GET(request: NextRequest) {
     /* @Codex */
     const session = await requireSessionOrLocalToken(request);
-    if (!session) return unauthorizedResponse();
-
-    try {
-        const { configuredModel, baseUrl } = await loadOcrRuntimeSettings();
-        const validation = validateLocalTarget(baseUrl);
-        if (!validation.ok) {
-            return NextResponse.json({
-                available: false,
-                model: configuredModel,
-                message: `Configured OCR endpoint not allowed: ${validation.reason}`
-            });
-        }
-
-        const res = await fetch(`${validation.url.toString().replace(/\/$/, '')}/api/tags`);
-        if (!res.ok) {
-            return NextResponse.json({
-                available: false,
-                model: configuredModel,
-                message: 'Ollama not reachable'
-            });
-        }
-
-        const data = await res.json();
-        const models = data.models || [];
-
-        const normalizedConfigured = configuredModel.toLowerCase();
-        const isConfiguredPresent = models.some((m: { name: string }) => {
-            const name = m.name.toLowerCase();
-            return name === normalizedConfigured || name.startsWith(`${normalizedConfigured}:`);
-        });
-
-        const ocrPatterns = ['deepseek-ocr', 'deepseek', 'minicpm', 'llava'];
-        const found = isConfiguredPresent || models.some((m: { name: string }) =>
-            ocrPatterns.some(pattern => m.name.toLowerCase().includes(pattern))
-        );
-
+    if (!session) {
         return NextResponse.json({
-            available: found,
-            model: configuredModel,
-            message: found
-                ? 'DeepSeek OCR 2 ready'
-                : `OCR model not available. Run: ollama pull ${configuredModel}`
-        });
-    } catch (err) {
-        console.error('[OCR Check] Error:', err);
-        return NextResponse.json({
-            available: false,
-            model: 'deepseek-ocr',
-            message: 'Check failed'
-        });
+            error: 'Unauthorized',
+        }, { status: 401, headers: { 'cache-control': 'no-store' } });
     }
+
+    return NextResponse.json({
+        error: 'OCR extraction endpoint retired',
+        code: 'OCR_EXTRACTION_RETIRED',
+    }, { status: 410, headers: { 'cache-control': 'no-store' } });
 }
