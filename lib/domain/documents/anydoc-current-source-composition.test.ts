@@ -25,6 +25,7 @@ const { serverSessionProjectionOwnerRegistry } = productionOwnerModule;
 const PATIENT = 'patient.synthetic.p1d';
 const ATTACHMENT = 'attachment.synthetic.p1d';
 const AMBULATORY = 'ambulatory.synthetic.p1d';
+const OTHER_AMBULATORY = 'ambulatory.synthetic.other.p1d';
 const REF = 'c'.repeat(64);
 const RTF = Buffer.from('{\\rtf1\\ansi Synthetic current source note.}', 'utf8');
 const MAX_MARKDOWN_BYTES = 8 * 1024 * 1024;
@@ -33,7 +34,8 @@ function seed(data = RTF.toString('base64')) {
     const db = new Database(dbPath); db.pragma('foreign_keys = ON');
     try {
         db.exec('DELETE FROM attachments; DELETE FROM patients_to_ambulatories; DELETE FROM patients; DELETE FROM ambulatories;');
-        db.prepare('INSERT INTO ambulatories (id, name, type) VALUES (?, ?, ?)').run(AMBULATORY, 'Ambulatorio sintetico', 'test');
+        db.prepare('INSERT INTO ambulatories (id, name, type) VALUES (?, ?, ?), (?, ?, ?)')
+            .run(AMBULATORY, 'Ambulatorio sintetico', 'test', OTHER_AMBULATORY, 'Altro sintetico', 'test');
         db.prepare('INSERT INTO patients (id, first_name, last_name, tax_code) VALUES (?, ?, ?, ?)')
             .run(PATIENT, 'Ada', 'Synthetic', 'SYNTHETIC00000002');
         db.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, ?)').run(PATIENT, AMBULATORY);
@@ -42,22 +44,48 @@ function seed(data = RTF.toString('base64')) {
     } finally { db.close(); }
 }
 function session() {
-    const value = createSession({ id: 'user.synthetic.p1d', username: ['clinician', 'synthetic', 'p1d'].join('.'), role: 'clinician' });
-    serverSessionProjectionOwnerRegistry.acquire(value).issueSelection({ expectedEpoch: 0, patientId: PATIENT, ambulatoryId: AMBULATORY });
-    return value;
+    return createSession({ id: 'user.synthetic.p1d', username: ['clinician', 'synthetic', 'p1d'].join('.'), role: 'clinician' });
 }
 afterEach(() => clearAllSessions());
 after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
 test('reveals real AnyDoc Markdown and evidence only after a current host source finalizes', async () => {
-    seed();
-    const result = await composeAnyDocCurrentSourceExtraction(session(), { attachmentId: ATTACHMENT });
+    seed(); const activeSession = session();
+    assert.equal(serverSessionProjectionOwnerRegistry.lookup(activeSession.id), null);
+    const result = await composeAnyDocCurrentSourceExtraction(activeSession, { attachmentId: ATTACHMENT });
     assert.equal(result.status, 'extracted');
     if (result.status !== 'extracted') return;
     assert.equal(result.markdown, 'Synthetic current source note.');
     assert.equal(result.provenance.attachmentId, ATTACHMENT);
     assert.equal(result.receipt.outcome, 'extracted');
     assert.equal(result.writes, 0); assert.equal(result.apply, 'none'); assert.equal(Object.isFrozen(result), true);
+    const owner = serverSessionProjectionOwnerRegistry.lookup(activeSession.id); assert.ok(owner);
+    assert.deepEqual(owner.withLeaseCriticalSection(activeSession, (selection) => selection), { patientId: PATIENT, ambulatoryId: AMBULATORY });
+});
+
+test('denies zero or multiple host memberships without publishing candidate evidence', async () => {
+    seed();
+    const db = new Database(dbPath);
+    db.prepare('DELETE FROM patients_to_ambulatories WHERE patient_id = ?').run(PATIENT);
+    db.close();
+    let result = await composeAnyDocCurrentSourceExtraction(session(), { attachmentId: ATTACHMENT });
+    assert.equal(result.status, 'denied'); assert.equal('markdown' in result, false); assert.equal('provenance' in result, false);
+
+    seed();
+    const multi = new Database(dbPath);
+    multi.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, ?)').run(PATIENT, OTHER_AMBULATORY);
+    multi.close();
+    result = await composeAnyDocCurrentSourceExtraction(session(), { attachmentId: ATTACHMENT });
+    assert.equal(result.status, 'denied'); assert.equal('markdown' in result, false); assert.equal('receipt' in result, false);
+});
+
+test('denies expired and logged-out authenticated sessions before source authority publication', async () => {
+    seed(); const expired = session(); expired.expiresAt = 0;
+    let result = await composeAnyDocCurrentSourceExtraction(expired, { attachmentId: ATTACHMENT });
+    assert.equal(result.status, 'denied'); assert.equal('provenance' in result, false);
+    const loggedOut = session(); deleteSession(loggedOut.id);
+    result = await composeAnyDocCurrentSourceExtraction(loggedOut, { attachmentId: ATTACHMENT });
+    assert.equal(result.status, 'denied'); assert.equal('provenance' in result, false);
 });
 
 test('discards completed worker output when attachment currentness changes in flight', async () => {
@@ -160,12 +188,16 @@ test('publishes an exact null-prototype result without ambient then assimilation
 
 test('keeps the composition callback-free and outside P4, routes, storage, and logging', () => {
     const source = fs.readFileSync(new URL('./anydoc-current-source-composition.ts', import.meta.url), 'utf8');
+    assert.match(source, /bindAttachmentExtractionSelection\(session, id\)/u);
     assert.match(source, /createAttachmentExtractionSourceAuthority\(session\)/u);
     assert.match(source, /await extractAnyDocLocalBytes\(id, begun\.bytes\)/u);
     assert.match(source, /authority\.finalize\(operation\)/u);
     assert.doesNotMatch(source, /withLeaseCriticalSection|callback|runnerValue|sourceValue|provider|config|console|app\/api|insert\(|update\(|delete\(/iu);
     assert.doesNotMatch(source, /export async function composeAnyDocCurrentSourceExtraction\([^)]*=>/u);
+    const bindingAt = source.indexOf('bindAttachmentExtractionSelection(session, id)');
+    const authorityAt = source.indexOf('createAttachmentExtractionSourceAuthority(session)');
     const finalizeAt = source.indexOf('const final = authority.finalize(operation)');
     const publishAt = source.indexOf('? publishFinalizedResult(result)');
-    assert.ok(finalizeAt >= 0); assert.ok(publishAt > finalizeAt);
+    assert.ok(bindingAt >= 0); assert.ok(authorityAt > bindingAt);
+    assert.ok(finalizeAt > authorityAt); assert.ok(publishAt > finalizeAt);
 });
