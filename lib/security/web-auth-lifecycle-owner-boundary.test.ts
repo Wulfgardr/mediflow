@@ -39,6 +39,10 @@ const ADAPTER_FILE = `${ADAPTER}.ts`;
 const ADAPTER_TEST = `${ADAPTER}.test`;
 const ADAPTER_TEST_FILE = `${ADAPTER_TEST}.ts`;
 const THIS_FILE = 'lib/security/web-auth-lifecycle-owner-boundary.test.ts';
+// @Codex: this exact selector is tooling metadata, not a package load or ownership edge.
+const ESLINT_CONFIG_FILE = 'eslint.config.mjs';
+const OWNER_COMMONJS_LINT_GLOB = `${PACKAGE_ROOT}/**/*.cjs`;
+const OWNER_COMMONJS_LINT_CONFIG_SHA256 = '57d021a63d44c33c891d514daac17a58e4409fd7b7b639583c97e74e92a1a1ae';
 const OWNER_TARGETS = [
     'lib/security/web-auth-control-record', 'lib/security/web-auth-control-owner', 'lib/security/server-session',
     'lib/security/server-session-projection-owner', 'lib/security/server-session-projection-owner-production',
@@ -167,7 +171,7 @@ const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false,
                 || (UNRESOLVED_LOADER_FORMS.has(use.form) && !unresolvedLoaderIsKnown)))
                 errors.push(`${file}:package-alias-load`);
         }
-        const packageAst = ast(file, source); let deepPackage = false; let directPackageLoad = false;
+        const packageAst = ast(file, source); let deniedPackageLiteral = false; let directPackageLoad = false;
         const constants = new Map<string, ts.Expression>();
         const collectConstants = (node: ts.Node): void => {
             if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) constants.set(node.name.text, node.initializer);
@@ -198,16 +202,26 @@ const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false,
                     || (packageRelative !== null && packageRelative !== '' && !packageRelative.startsWith('..')
                         && !path.isAbsolute(packageRelative)) || sourcePath === path.join(ROOT, PACKAGE_ROOT)
                     || [...packageAliases].some((alias) => decoded === alias || decoded?.startsWith(`${alias}/`));
-                if (ownerIdentity) { deepPackage = true; const parent = node.parent;
-                    if ((ts.isImportDeclaration(parent) || ts.isExportDeclaration(parent)) && parent.moduleSpecifier === node
+                if (ownerIdentity) { const parent = node.parent;
+                    const isDirectPackageLoad = (ts.isImportDeclaration(parent) || ts.isExportDeclaration(parent))
+                        && parent.moduleSpecifier === node
                         || (ts.isCallExpression(parent) && parent.arguments[0] === node
                             && (parent.expression.kind === ts.SyntaxKind.ImportKeyword
-                                || ts.isIdentifier(parent.expression) && parent.expression.text === 'require')))
-                        directPackageLoad = true; }
+                                || ts.isIdentifier(parent.expression) && parent.expression.text === 'require'));
+                    const lintFilesProperty = ts.isArrayLiteralExpression(parent) ? parent.parent : undefined;
+                    const allowedLintSelector = file === ESLINT_CONFIG_FILE && value === OWNER_COMMONJS_LINT_GLOB
+                        && digest(source) === OWNER_COMMONJS_LINT_CONFIG_SHA256
+                        && ts.isArrayLiteralExpression(parent) && lintFilesProperty !== undefined
+                        && ts.isPropertyAssignment(lintFilesProperty)
+                        && lintFilesProperty.initializer === parent
+                        && (ts.isIdentifier(lintFilesProperty.name) || ts.isStringLiteral(lintFilesProperty.name))
+                        && lintFilesProperty.name.text === 'files';
+                    if (!allowedLintSelector) deniedPackageLiteral = true;
+                    if (isDirectPackageLoad) directPackageLoad = true; }
             }
             ts.forEachChild(node, visitPackage);
         };
-        visitPackage(packageAst); if ((deepPackage && file !== THIS_FILE && !dormantPackageFile)
+        visitPackage(packageAst); if ((deniedPackageLiteral && file !== THIS_FILE && !dormantPackageFile)
             || (directPackageLoad && !dormantPackageFile))
             errors.push(`${file}:package-literal`);
         const adapterUses = inventoryModuleImports({ file, source, target: ADAPTER, repositoryRoot: ROOT,
@@ -850,6 +864,26 @@ test('denies hostile package and adapter loads without changing the shared inven
         "import 'owner-alias/deep';", "const p='owner-'+'alias/deep';import(p);", "import('owner%2Dalias/deep');"])
         assert.notDeepEqual(importInventoryErrors({ 'lib/security/alias-consumer.ts': source }, false,
             ownerDependencyAliases({ dependencies: { 'owner-alias': `file:${PACKAGE_ROOT}` } }, '')), [], source);
+});
+
+test('allows only the exact owner CommonJS lint selector as non-runtime tooling metadata', () => {
+    const lintConfig = liveSources[ESLINT_CONFIG_FILE]!;
+    assert.equal(digest(lintConfig), OWNER_COMMONJS_LINT_CONFIG_SHA256);
+    assert.deepEqual(importInventoryErrors({ [ESLINT_CONFIG_FILE]: lintConfig }), []);
+    const rejected: ReadonlyArray<readonly [string, string]> = [
+        ['eslint.other.config.mjs', lintConfig],
+        [ESLINT_CONFIG_FILE, `${lintConfig}\n// synthetic config drift\n`],
+        [ESLINT_CONFIG_FILE, `${lintConfig}\nreadFileSync(packageCommonJsConfig.files[0]);\n`],
+        [ESLINT_CONFIG_FILE, `${lintConfig}\nconst duplicateOwnerLintGlob = '${OWNER_COMMONJS_LINT_GLOB}';\n`],
+        [ESLINT_CONFIG_FILE, `export default [{ files: ['${PACKAGE_ROOT}/internal/owner.cjs'] }];`],
+        [ESLINT_CONFIG_FILE, `import '${OWNER_COMMONJS_LINT_GLOB}';`],
+        [ESLINT_CONFIG_FILE, `export * from '${OWNER_COMMONJS_LINT_GLOB}';`],
+        [ESLINT_CONFIG_FILE, `require('${OWNER_COMMONJS_LINT_GLOB}');`],
+        [ESLINT_CONFIG_FILE, `import('${OWNER_COMMONJS_LINT_GLOB}');`],
+        [ESLINT_CONFIG_FILE, `readFileSync('${OWNER_COMMONJS_LINT_GLOB}');`],
+    ];
+    for (const [file, source] of rejected)
+        assert.notDeepEqual(importInventoryErrors({ [file]: source }), [], `${file}: ${source}`);
 });
 
 test('denies package metadata, early externalization, new authority modules or edges, and ambient-owner drift', () => {
