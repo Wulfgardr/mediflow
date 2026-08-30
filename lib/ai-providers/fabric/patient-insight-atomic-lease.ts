@@ -145,7 +145,7 @@ export function createPatientInsightAtomicLease(input: unknown): PatientInsightA
                     || final.generation !== before.generation || final.terminal || poisoned) fail('stale_selection');
                 active = false;
                 poisoned = false;
-                if (!port.commit(freeze({ expected: before.currentRef, replacement }))) fail('stale_selection');
+                if (port.commit(freeze({ expected: before.currentRef, replacement })) !== true) fail('stale_selection');
                 return handle;
             } catch (error) {
                 close(staged, replacement, published);

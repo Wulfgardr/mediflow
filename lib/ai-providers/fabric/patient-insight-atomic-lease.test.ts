@@ -134,6 +134,20 @@ test('aborts both real stages after review drift and releases broker entropy wit
     assert.throws(() => denied.broker.consume(Object.freeze({ handle: expectedHandle })), PatientInsightBrokerError);
 });
 
+test('rejects sync commit methods returning Promise booleans without publication or residue', () => {
+    for (const outcome of [false, true]) {
+        const value = fixture();
+        const port = Object.freeze({ ...value.port, commit: () => Promise.resolve(outcome) });
+        const lease = createPatientInsightAtomicLease(Object.freeze({ port, broker: value.broker }));
+        assert.throws(() => lease.commit(), rejects('stale_selection'));
+        assert.throws(() => value.broker.consume(Object.freeze({ handle: expectedHandle })), PatientInsightBrokerError);
+        const terminal = value.port.snapshot()!;
+        assert.equal(terminal.stagedRef, null);
+        assert.equal(terminal.generation, 0);
+        assert.equal(terminal.terminal, true);
+    }
+});
+
 test('makes swallowed lease reentry sticky and aborts the broker reservation', () => {
     const value = fixture(); value.reenterDuringStage();
     assert.throws(() => value.lease.commit(), rejects('operation_reentered'));
