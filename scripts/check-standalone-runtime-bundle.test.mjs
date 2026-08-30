@@ -21,6 +21,10 @@ function runSelfTest(argument) {
 test('standalone checker rejects retired PDF runtime reintroduction', () => {
   const result = runSelfTest('--self-test=pdf-retirement');
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+
+  const source = fs.readFileSync(checker, 'utf8');
+  assert.match(source, /node_modules.*@firecrawl.*pdf-inspector/s);
+  assert.match(source, /pdf-inspector-router/);
 });
 
 test('standalone checker preserves AnyDoc worker and native binding guards', () => {

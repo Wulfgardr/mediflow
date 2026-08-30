@@ -1,9 +1,12 @@
 /* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import {
     ANYDOC_NATIVE_SUBPATH,
+    runAnyDocLocalOnlyGuard,
     validateAnyDocNonWorkerSource,
     validateAnyDocSupplyChain,
     validateAnyDocWorkerSource,
@@ -129,4 +132,47 @@ test('version, integrity and native package drift fail', () => {
     optionalDrift.packages['node_modules/@firecrawl/anydoc-linux-x64-gnu'].optional = false;
     cases.push([packageJson, optionalDrift]);
     for (const [candidatePackage, candidateLock] of cases) assert.notDeepEqual(validateAnyDocSupplyChain(candidatePackage, candidateLock), []);
+});
+
+test('retired PDF inspector cannot be reintroduced through project inputs', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'mediflow-pdf-retirement-source-'));
+
+    async function reset() {
+        await rm(root, { recursive: true, force: true });
+        await mkdir(path.join(root, 'scripts'), { recursive: true });
+        await writeFile(path.join(root, 'package.json'), JSON.stringify(packageJson));
+        await writeFile(path.join(root, 'package-lock.json'), JSON.stringify(packageLock));
+        await writeFile(path.join(root, 'next.config.ts'), 'export default {};\n');
+        await writeFile(path.join(root, 'scripts', 'anydoc-local-extraction-worker.mjs'), validWorker);
+    }
+
+    async function expectFailure(mutate) {
+        await reset();
+        await mutate();
+        await assert.rejects(runAnyDocLocalOnlyGuard(root), /retired PDF inspector/u);
+    }
+
+    try {
+        await reset();
+        assert.deepEqual(await runAnyDocLocalOnlyGuard(root), { workerSeen: true, checkedPackages: 8 });
+        await expectFailure(async () => {
+            const value = structuredClone(packageJson);
+            value.dependencies['@firecrawl/pdf-inspector'] = '1.12.0';
+            await writeFile(path.join(root, 'package.json'), JSON.stringify(value));
+        });
+        await expectFailure(async () => {
+            const value = structuredClone(packageLock);
+            value.packages['node_modules/@firecrawl/pdf-inspector-linux-x64-gnu'] = { version: '1.12.0' };
+            await writeFile(path.join(root, 'package-lock.json'), JSON.stringify(value));
+        });
+        await expectFailure(() => writeFile(path.join(root, 'next.config.ts'), "const traced = '@firecrawl/' + 'pdf-inspector';\n"));
+        await expectFailure(() => writeFile(path.join(root, 'scripts', 'legacy.ts'), "import '@firecrawl/pdf-inspector';\n"));
+        await expectFailure(async () => {
+            const target = path.join(root, 'retired-worker-target.mjs');
+            await writeFile(target, 'export {};\n');
+            await symlink(target, path.join(root, 'scripts', 'pdf-inspector-worker.mjs'));
+        });
+    } finally {
+        await rm(root, { recursive: true, force: true });
+    }
 });

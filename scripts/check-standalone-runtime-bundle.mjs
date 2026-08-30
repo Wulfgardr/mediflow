@@ -11,7 +11,7 @@ const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
 const ANYDOC_WORKER_SHA256 = '34f2db3d788585dab175b284bc8f1f39395fb66a21780e1782a5d5067073e370';
 const PDF_INSPECTOR_WORKER_FILE = 'pdf-inspector-worker.mjs';
 const PDF_ROUTE_DIRECTORY = path.join('server', 'app', 'api', 'pdf-extract');
-const PDF_ROUTE_REFERENCE = /(?:pdf-inspector-worker\.mjs|@firecrawl\/pdf-inspector(?:[-/]|$))/i;
+const PDF_RUNTIME_REFERENCE = /(?:pdf-inspector-worker\.mjs|pdf-inspector-router|(?:node_modules[\\/])?@firecrawl[\\/]pdf-inspector(?:[-/]|$))/i;
 const SYNTHETIC_RTF = Buffer.from('{\\rtf1\\ansi Synthetic standalone note.}', 'utf8');
 
 function bundledWorkerFailure(standaloneDir) {
@@ -44,10 +44,12 @@ function retiredPdfRuntimeFailure(standaloneDir) {
   while (pending.length > 0) {
     const directory = pending.pop();
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-      if (entry.name === PDF_INSPECTOR_WORKER_FILE) {
-        return 'Standalone runtime contains the retired PDF inspector worker.';
+      const absolute = path.join(directory, entry.name);
+      const relative = path.relative(standaloneDir, absolute);
+      if (PDF_RUNTIME_REFERENCE.test(relative)) {
+        return 'Standalone runtime contains retired PDF inspector code.';
       }
-      if (entry.isDirectory()) pending.push(path.join(directory, entry.name));
+      if (entry.isDirectory()) pending.push(absolute);
     }
   }
 
@@ -77,7 +79,7 @@ function retiredPdfRuntimeFailure(standaloneDir) {
       || trace.files.some((entry) => typeof entry !== 'string')) {
     return 'Standalone runtime retired PDF route trace has an invalid shape.';
   }
-  if (PDF_ROUTE_REFERENCE.test(routeSource) || trace.files.some((entry) => PDF_ROUTE_REFERENCE.test(entry))) {
+  if (PDF_RUNTIME_REFERENCE.test(routeSource) || trace.files.some((entry) => PDF_RUNTIME_REFERENCE.test(entry))) {
     return 'Standalone runtime retired PDF route still references executable PDF inspector code.';
   }
   return null;
@@ -107,6 +109,7 @@ function runPdfRetirementSelfTest() {
   const standaloneDir = path.join(root, '.next-self-test', 'standalone');
   const routeDirectory = path.join(standaloneDir, '.next-self-test', PDF_ROUTE_DIRECTORY);
   const workerPath = path.join(standaloneDir, 'scripts', PDF_INSPECTOR_WORKER_FILE);
+  const packageRoot = path.join(standaloneDir, 'node_modules', '@firecrawl');
 
   function reset() {
     fs.rmSync(root, { recursive: true, force: true });
@@ -133,6 +136,13 @@ function runPdfRetirementSelfTest() {
       fs.mkdirSync(target);
       fs.mkdirSync(path.dirname(workerPath), { recursive: true });
       fs.symlinkSync(target, workerPath, process.platform === 'win32' ? 'junction' : 'dir');
+    });
+    expectFailure('retired PDF package', () => fs.mkdirSync(path.join(packageRoot, 'pdf-inspector'), { recursive: true }));
+    expectFailure('retired PDF native package', () => fs.mkdirSync(path.join(packageRoot, 'pdf-inspector-darwin-arm64'), { recursive: true }));
+    expectFailure('retired PDF router', () => {
+      const router = path.join(standaloneDir, 'server', 'chunks', 'pdf-inspector-router.js');
+      fs.mkdirSync(path.dirname(router), { recursive: true });
+      fs.writeFileSync(router, 'export {};\n');
     });
     expectFailure('missing retired route trace', () => fs.rmSync(path.join(routeDirectory, 'route.js.nft.json')));
     expectFailure('invalid retired route trace', () => fs.writeFileSync(path.join(routeDirectory, 'route.js.nft.json'), '{'));
