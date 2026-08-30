@@ -11,36 +11,62 @@ const COMMAND_FIRST = new RegExp(
 const ARGS_FIRST = new RegExp(
   `^[ \\t\\r\\n]*\\{[ \\t\\r\\n]*"args"[ \\t\\r\\n]*:[ \\t\\r\\n]*\\{[ \\t\\r\\n]*\\}[ \\t\\r\\n]*,[ \\t\\r\\n]*"command"[ \\t\\r\\n]*:[ \\t\\r\\n]*(${JSON_STRING})[ \\t\\r\\n]*\\}[ \\t\\r\\n]*$`,
 );
+const CREATE = Object.create;
+const DEFINE = Object.defineProperty;
+const STRINGIFY = JSON.stringify;
 
 type OutputFormat = 'json' | 'ndjson';
 type ErrorCode = 'INVALID_REQUEST' | 'TRANSPORT_UNBOUND';
+type DataRecord = Record<string, unknown>;
+
+function record(): DataRecord {
+  return CREATE(null) as DataRecord;
+}
+
+function field(target: DataRecord | unknown[], key: string, value: unknown, enumerable = true): void {
+  DEFINE(target, key, { value, enumerable, configurable: false, writable: false });
+}
+
+function encoded(value: DataRecord | unknown[]): string {
+  return STRINGIFY(value)!;
+}
 
 function finish(code: number, output: string): void {
   stdout.write(output, () => exit(code));
 }
 
 function fail(code: ErrorCode, exitCode: number): void {
-  finish(exitCode, `${JSON.stringify({
-    schemaVersion: SCHEMA_VERSION,
-    ok: false,
-    error: { code },
-  })}\n`);
+  const error = record();
+  field(error, 'code', code);
+  const output = record();
+  field(output, 'schemaVersion', SCHEMA_VERSION);
+  field(output, 'ok', false);
+  field(output, 'error', error);
+  finish(exitCode, `${encoded(output)}\n`);
 }
 
 function serialize(format: OutputFormat): string {
   if (format === 'ndjson') {
     let output = '';
     for (let index = 0; index < MINI_HEADLESS_REFERENTIAL_STATUSES.length; index += 1) {
-      output += `${JSON.stringify({ index, item: MINI_HEADLESS_REFERENTIAL_STATUSES[index]! })}\n`;
+      const line = record();
+      field(line, 'index', index);
+      field(line, 'item', MINI_HEADLESS_REFERENTIAL_STATUSES[index]!);
+      output += `${encoded(line)}\n`;
     }
     return output;
   }
 
   const items = [] as (typeof MINI_HEADLESS_REFERENTIAL_STATUSES)[number][];
+  field(items, 'toJSON', undefined, false);
   for (let index = 0; index < MINI_HEADLESS_REFERENTIAL_STATUSES.length; index += 1) {
     items[index] = MINI_HEADLESS_REFERENTIAL_STATUSES[index]!;
   }
-  return `${JSON.stringify({ schemaVersion: SCHEMA_VERSION, ok: true, items })}\n`;
+  const output = record();
+  field(output, 'schemaVersion', SCHEMA_VERSION);
+  field(output, 'ok', true);
+  field(output, 'items', items);
+  return `${encoded(output)}\n`;
 }
 
 let format: OutputFormat;

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { MINI_HEADLESS_REFERENTIAL_STATUSES } from './headless-referential-status';
 
 /* @Codex */
 const COMMANDS = ['patient search', 'patient show', 'draft preview', 'open-loops', 'whoami', 'capabilities'] as const;
@@ -22,6 +23,14 @@ function run(input: string | Buffer, args: string[] = []) {
   });
   assert.equal(result.stderr, '');
   return result;
+}
+
+function runDirect(input: string, args: string[], poison: string) {
+  return spawnSync(process.execPath, [
+    '--experimental-strip-types', '--import', new URL('../../../scripts/register-strip-types-loader.mjs', import.meta.url).pathname,
+    '--import', `data:text/javascript,${encodeURIComponent(poison)}`, new URL('./cli.ts', import.meta.url).pathname,
+    ...args,
+  ], { input, encoding: 'utf8', timeout: 5000 });
 }
 
 test('serializes the exact six deny-only rows as JSON through the npm entrypoint', () => {
@@ -93,12 +102,29 @@ test('rejects oversized open stdin without waiting for EOF', async () => {
 
 test('serializes without ambient array iteration or inherited then access', () => {
   const poison = 'setImmediate(()=>{Object.defineProperty(Object.prototype,"then",{configurable:true,get(){throw Error("then")}});Object.defineProperty(Array.prototype,Symbol.iterator,{configurable:true,value(){throw Error("iterator")}})})';
-  const result = spawnSync(process.execPath, [
-    '--experimental-strip-types', '--import', new URL('../../../scripts/register-strip-types-loader.mjs', import.meta.url).pathname,
-    '--import', `data:text/javascript,${encodeURIComponent(poison)}`, new URL('./cli.ts', import.meta.url).pathname,
-  ], { input: '{"command":"capabilities","args":{}}', encoding: 'utf8', timeout: 5000 });
+  const result = runDirect('{"command":"capabilities","args":{}}', [], poison);
   assert.equal(result.status, 0); assert.equal(result.stderr, '');
   assert.equal(result.stdout, `${JSON.stringify(success)}\n`);
+});
+
+test('never reads inherited toJSON for success or denial serialization', () => {
+  const poison = 'setImmediate(()=>{const d={configurable:true,get(){throw Error("toJSON read")}};Object.defineProperty(Object.prototype,"toJSON",d);Object.defineProperty(Array.prototype,"toJSON",d)})';
+  const cases: readonly [string, string[], number, string][] = [
+    ['{"command":"capabilities","args":{}}', [], 0, `${JSON.stringify(success)}\n`],
+    ['{"command":"capabilities","args":{}}', ['--format', 'ndjson'], 0, `${items.map((item, index) => JSON.stringify({ index, item })).join('\n')}\n`],
+    ['not-json', [], 2, failure('INVALID_REQUEST')],
+    ['{"command":"patient search","args":{}}', [], 69, failure('TRANSPORT_UNBOUND')],
+  ];
+  const first = MINI_HEADLESS_REFERENTIAL_STATUSES[0]!;
+  for (let index = 0; index < cases.length; index += 1) {
+    const item = cases[index]!;
+    const result = runDirect(item[0], item[1], poison);
+    assert.equal(result.status, item[2]); assert.equal(result.stderr, ''); assert.equal(result.stdout, item[3]);
+  }
+  assert.equal(MINI_HEADLESS_REFERENTIAL_STATUSES[0], first);
+  for (let index = 0; index < MINI_HEADLESS_REFERENTIAL_STATUSES.length; index += 1) {
+    assert.equal(Object.hasOwn(MINI_HEADLESS_REFERENTIAL_STATUSES[index]!, 'toJSON'), false);
+  }
 });
 
 test('keeps the CLI pipe-only, indexed, and free of executable bindings', () => {
