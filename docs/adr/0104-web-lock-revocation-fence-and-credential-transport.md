@@ -99,6 +99,49 @@ Non puo scegliere la fiducia da header, cookie, source surface o convenienza.
 Un restart globale revoca control, sessioni e idempotenza process-locali.
 Nessun record viene ricostruito, replicato o accettato da un altro processo.
 
+### Addendum: owner fisico unico tra bundle Web
+
+Il cutover di produzione deve collocare P2, P3, lifecycle guard, control store,
+session store, risorse e revoca in un solo modulo `server-only` caricato una
+volta dal processo Node host. Il modulo e esterno ai bundle delle route: due
+route compilate non possono incorporarne due copie o mantenere un proprio
+registro autoritativo.
+
+Per `0.8.5` il modulo e un package CommonJS fisico, con un solo export root e
+una sola copia installata e tracciata dal lockfile. Sono vietati dual entry
+CommonJS/ESM, deep import, seconda copia, symlink di directory, import relativo
+della sorgente e fallback a un owner locale. Il package non esporta
+costruttori, registri, celle, Map, Set, WeakMap o primitive che consentano al
+chiamante di creare o sostituire authority.
+
+`globalThis`, `process`, `Symbol.for`, cache Next, cache manuali, injection di
+puntatori e un servizio locale separato non sono owner ammessi. Sono ambienti
+mutabili o cambiano il confine di deployment; non provano identita fisica,
+lifetime o revoca condivisi.
+
+Tutti i consumer P2 e P3 devono passare dallo stesso adapter canonico e
+consegnare l'identita di sessione host-owned esatta. Un `sessionId`, cookie,
+header, receipt o altro valore data-only non seleziona l'owner e non conferisce
+authority. Il chiamante non sceglie tra owner storico ed esterno.
+
+Il cutover e atomico: adapter, issuer, control, replay, expiry, resource
+cleanup, revoca e tutti i resolver P2/P3 passano insieme al package esterno.
+Nello stesso commit gli export storici che potrebbero conservare una seconda
+authority diventano fail-closed. Preparazioni stateless e migrazioni dei
+caller possono precedere il cutover, ma non possono attivare un owner ibrido.
+
+La prova minima richiede una sola identita fisica in Webpack dev, Turbopack
+dev e nei due standalone di produzione; login, richiesta protetta, logout,
+lock, expiry e replay devono attraversare bundle distinti mantenendo un unico
+lifecycle. Un restart dello standalone deve negare cookie, ticket, locator e
+operation precedenti. Manifest, lockfile, digest, roster del package e assenza
+di sorgente owner nei chunk sono evidenze separate e obbligatorie.
+
+Questa decisione resta limitata a un solo processo Node, un solo realm e un
+supervisore standalone. Multiprocesso, worker, Edge, serverless o routing senza
+affinity richiedono una nuova decisione: non possono ereditare il claim
+process-local di questa ADR.
+
 ### Addendum: commit finale di attivazione e ritiro
 
 Questo addendum raffina i confini P2, P3 e P4. Non modifica P1, P5, P6 o P7.
