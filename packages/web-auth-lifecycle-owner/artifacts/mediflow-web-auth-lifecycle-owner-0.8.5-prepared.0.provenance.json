@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "mediflow.web-auth-lifecycle-owner.package-provenance.v1",
+  "acceptedBase": "a9a81a4fe4c3551be1b9676019579a7bcdd6a611",
+  "sourceCommit": "7bb687e2ba31c83854646b52bd799d807bb02348",
+  "package": {
+    "name": "@mediflow/web-auth-lifecycle-owner",
+    "version": "0.8.5-prepared.0"
+  },
+  "toolchain": {
+    "node": "v24.19.0",
+    "npm": "11.17.0"
+  },
+  "pack": {
+    "command": "npm pack --ignore-scripts --pack-destination ./artifacts",
+    "runs": 2,
+    "network": "offline",
+    "scripts": "ignored",
+    "cache": "empty_temporary",
+    "byteIdentical": true
+  },
+  "artifact": {
+    "path": "packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5-prepared.0.tgz",
+    "bytes": 347,
+    "sha256": "4f03a28891ff1dbe4539e2a297334d7bbeee23dfc42c7cf4793fb38c3fde5d5a",
+    "integrity": "sha512-m0ZCMZQ8Mgothnd/Dig5o6pgpkd8YJRB24cTMcXrTJUKr4qO0GEYwcgbgprRkM0aRiLTAOCcXDMHHih3KIvM6A=="
+  },
+  "inputs": [
+    {
+      "path": "index.js",
+      "bytes": 80,
+      "sha256": "7bc72383ad0639480702aadb8bad2cacf135c2c1b1cb7013a68ed5eef6d26a4f"
+    },
+    {
+      "path": "package.json",
+      "bytes": 251,
+      "sha256": "ee606c50ba3a13d072143aa3149afe39f1a8ceee9ce4982f9a99ceacb53b0db7"
+    }
+  ],
+  "roster": [
+    {
+      "path": "package/index.js",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 80,
+      "sha256": "7bc72383ad0639480702aadb8bad2cacf135c2c1b1cb7013a68ed5eef6d26a4f"
+    },
+    {
+      "path": "package/package.json",
+      "type": "file",
+      "mode": "0644",
+      "bytes": 251,
+      "sha256": "ee606c50ba3a13d072143aa3149afe39f1a8ceee9ce4982f9a99ceacb53b0db7"
+    }
+  ]
+}
