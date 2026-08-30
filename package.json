@@ -17,6 +17,8 @@
     "postbuild": "node scripts/node-runtime-contract.mjs write-standalone-manifest && node scripts/check-standalone-runtime-bundle.mjs",
     "prestart": "node scripts/node-runtime-contract.mjs verify",
     "start": "next start --hostname 127.0.0.1 --port 3000",
+    "mini": "node scripts/run-strip-types.mjs packages/mini/src/cli.ts",
+    "test:mini-cli": "node scripts/run-strip-types.mjs --test packages/mini/src/cli.test.ts",
     "local:tls-proxy": "node scripts/local-api-tls-proxy.mjs",
     "docs:siss-corpus:validate": "node scripts/siss-docs-corpus.mjs validate",
     "docs:siss-corpus:fetch": "node scripts/siss-docs-corpus.mjs fetch",
