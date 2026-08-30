@@ -1,5 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync,
     symlinkSync, writeFileSync } from 'node:fs';
@@ -8,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import ts from 'typescript';
+import { gunzipSync } from 'node:zlib';
 
 import {
     allowedGenericLoaderExpressions,
@@ -28,6 +30,7 @@ const PREPARED_PACKAGE_PROVENANCE = `${PACKAGE_ROOT}/artifacts/mediflow-web-auth
 const PREPARED_PACKAGE_DEPENDENCY = `file:${PREPARED_PACKAGE_TARBALL}`;
 const PREPARED_PACKAGE_VERSION = '0.8.5-prepared.0';
 const PREPARED_PACKAGE_SHA256 = '4f03a28891ff1dbe4539e2a297334d7bbeee23dfc42c7cf4793fb38c3fde5d5a';
+const PREPARED_PROVENANCE_SHA256 = '9c7dfeb27b9cfc7fbfb1d08a71478912cb9d51e31b662b4bc587b4bb1b61b96a';
 const PREPARED_PACKAGE_INTEGRITY = 'sha512-m0ZCMZQ8Mgothnd/Dig5o6pgpkd8YJRB24cTMcXrTJUKr4qO0GEYwcgbgprRkM0aRiLTAOCcXDMHHih3KIvM6A==';
 const PREPARED_INDEX_SHA256 = '7bc72383ad0639480702aadb8bad2cacf135c2c1b1cb7013a68ed5eef6d26a4f';
 const PREPARED_MANIFEST_SHA256 = 'ee606c50ba3a13d072143aa3149afe39f1a8ceee9ce4982f9a99ceacb53b0db7';
@@ -60,11 +63,8 @@ const AUTHORITY_ROSTER_SHA256 = '8cef18fd9f1e29f5f48a285092c9cd159e0be707a27d497
 const PRE_CUTOVER_GLOBAL_OWNER_SHA256 = 'ae959c2ba88cb768b106aa52d7fec1ea2f6acc7407db194ad9765799ec2fa854';
 const PRE_CUTOVER_GLOBAL_OWNER = 'lib/security/server-session-projection-owner-production.ts';
 const DORMANT_ADAPTER_SOURCE = "import 'server-only';\nexport const lifecycleOwnerAdapterState = 'dormant_prepared' as const;\nexport type LifecycleOwnerAdapterState = typeof lifecycleOwnerAdapterState;";
-const PREPARED_PACKAGE_MANIFEST = JSON.stringify({
-    name: PACKAGE, version: '0.8.5-prepared.0', private: true, type: 'commonjs', main: './index.js',
-    exports: './index.js', files: ['index.js', 'internal/'], engines: { node: '>=24 <25' },
-}, null, 2);
-const PREPARED_PACKAGE_ENTRY = "'use strict';\nmodule.exports = Object.freeze(Object.create(null));";
+const PREPARED_PACKAGE_MANIFEST = `{\n  "name": "${PACKAGE}",\n  "version": "0.8.5-prepared.0",\n  "private": true,\n  "type": "commonjs",\n  "main": "./index.js",\n  "exports": "./index.js",\n  "files": ["index.js", "internal/"],\n  "engines": { "node": ">=24 <25" }\n}\n`;
+const PREPARED_PACKAGE_ENTRY = "/* @Codex */\n'use strict';\nmodule.exports = Object.freeze(Object.create(null));\n";
 const STATEFUL_AUTHORITY_MODULES = new Set([
     'active-review-binding', 'audit', 'in-process-preview-job-control', 'module-import-inventory.test-support', 'pin-change',
     'server-session-projection-owner-production', 'server-session', 'session-physician-review-authority',
@@ -73,6 +73,14 @@ const STATEFUL_AUTHORITY_MODULES = new Set([
     'web-auth-control-owner', 'web-auth-session-issuer',
 ].map((name) => `lib/security/${name}.ts`));
 type Sources = Readonly<Record<string, string>>;
+type ExpectedFile = Readonly<{ path: string; bytes: number; sha256: string }>;
+type PreparedContract = Readonly<{
+    version: string; sequence: number; manifest: string; tarball: string; provenancePath: string; dependency: string;
+    tar: ExpectedFile & Readonly<{ integrity: string }>; provenance: unknown; predecessor?: Readonly<{
+        version: string; tarSha256: string; provenanceSha256: string }>;
+    inputs: readonly ExpectedFile[]; roster: readonly (ExpectedFile & Readonly<{ type: 'file'; mode: '0644' }>)[];
+    artifacts: readonly ExpectedFile[];
+}>;
 const digest = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex');
 const decodedIdentity = (value: string): string | null => { let decoded = value; try { for (let index = 0; index < 4; index += 1) { const next = decodeURIComponent(decoded); if (next === decoded) break; decoded = next; } return decoded; } catch { return null; } };
 const canonical = (value: unknown): string => JSON.stringify(value && typeof value === 'object' && !Array.isArray(value)
@@ -136,7 +144,7 @@ const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false,
     packageAliases: ReadonlySet<string> = new Set()): string[] => {
     const errors: string[] = [];
     for (const [file, source] of Object.entries(sources)) {
-        if (file === THIS_FILE) continue;
+        const dormantPackageFile = file === PACKAGE_ENTRY_FILE || file.startsWith(`${PACKAGE_ROOT}/internal/`);
         const unresolvedLoaderIsKnown = PRE_CUTOVER_UNRESOLVED_LOADERS.get(file) === digest(source);
         const packageTarget = path.join(path.dirname(file), PACKAGE);
         const packageUses = inventoryModuleImports({ file, source, target: packageTarget, repositoryRoot: ROOT,
@@ -147,7 +155,7 @@ const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false,
             allowUnresolvedExpressions: allowedGenericLoaderExpressions });
         const packageSourceRelevant = packageSourceUses.filter((use) => IMPORT_FORMS.has(use.form) || use.form === 'module-path'
             || (UNRESOLVED_LOADER_FORMS.has(use.form) && !unresolvedLoaderIsKnown));
-        if (packageRelevant.length > 0 || packageSourceRelevant.length > 0)
+        if (!dormantPackageFile && (packageRelevant.length > 0 || packageSourceRelevant.length > 0))
             errors.push(`${file}:package-load`);
         for (const alias of packageAliases) {
             if (alias.startsWith('<')) continue;
@@ -157,7 +165,8 @@ const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false,
                 || (UNRESOLVED_LOADER_FORMS.has(use.form) && !unresolvedLoaderIsKnown)))
                 errors.push(`${file}:package-alias-load`);
         }
-        const packageAst = ast(file, source); let deepPackage = false; const constants = new Map<string, ts.Expression>();
+        const packageAst = ast(file, source); let deepPackage = false; let directPackageLoad = false;
+        const constants = new Map<string, ts.Expression>();
         const collectConstants = (node: ts.Node): void => {
             if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) constants.set(node.name.text, node.initializer);
             ts.forEachChild(node, collectConstants);
@@ -182,13 +191,23 @@ const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false,
                 const value = staticString(node); const sourcePath = value === null ? null
                     : path.resolve(path.dirname(path.join(ROOT, file)), value);
                 const decoded = value === null ? null : decodedIdentity(value);
-                if (value === PACKAGE || value?.startsWith(`${PACKAGE}/`)
-                    || sourcePath === path.join(ROOT, PACKAGE_ENTRY_FILE)
-                    || [...packageAliases].some((alias) => decoded === alias || decoded?.startsWith(`${alias}/`))) deepPackage = true;
+                const packageRelative = sourcePath === null ? null : path.relative(path.join(ROOT, PACKAGE_ROOT), sourcePath);
+                const ownerIdentity = value === PACKAGE || value?.startsWith(`${PACKAGE}/`)
+                    || (packageRelative !== null && packageRelative !== '' && !packageRelative.startsWith('..')
+                        && !path.isAbsolute(packageRelative)) || sourcePath === path.join(ROOT, PACKAGE_ROOT)
+                    || [...packageAliases].some((alias) => decoded === alias || decoded?.startsWith(`${alias}/`));
+                if (ownerIdentity) { deepPackage = true; const parent = node.parent;
+                    if ((ts.isImportDeclaration(parent) || ts.isExportDeclaration(parent)) && parent.moduleSpecifier === node
+                        || (ts.isCallExpression(parent) && parent.arguments[0] === node
+                            && (parent.expression.kind === ts.SyntaxKind.ImportKeyword
+                                || ts.isIdentifier(parent.expression) && parent.expression.text === 'require')))
+                        directPackageLoad = true; }
             }
             ts.forEachChild(node, visitPackage);
         };
-        visitPackage(packageAst); if (deepPackage) errors.push(`${file}:package-literal`);
+        visitPackage(packageAst); if ((deepPackage && file !== THIS_FILE && !dormantPackageFile)
+            || (directPackageLoad && !dormantPackageFile))
+            errors.push(`${file}:package-literal`);
         const adapterUses = inventoryModuleImports({ file, source, target: ADAPTER, repositoryRoot: ROOT,
             allowUnresolvedExpressions: allowedGenericLoaderExpressions });
         const allowedTestUse = allowAdapterTestUse && file === ADAPTER_TEST_FILE && adapterUses.every((use) =>
@@ -275,14 +294,18 @@ const packageSourceArtifacts = (root: string, ops = PACKAGE_SOURCE_OPS): Sources
     try {
         if (ops.realpath(directory) !== path.join(ops.realpath(root), PACKAGE_ROOT))
             return { '<package-source-symlink>': '' };
-        const entries = ops.readdir(directory);
-        if (entries.some((entry) => entry.isSymbolicLink() || (!entry.isFile()
-            && !(entry.name === 'artifacts' && entry.isDirectory?.()))))
-            return { '<package-source-invalid>': '' };
-        return Object.fromEntries(entries.filter((entry) => entry.isFile()).map((entry) => {
-            const file = path.join(PACKAGE_ROOT, entry.name);
-            return [file, ops.read(path.join(root, file))];
-        }));
+        const walk = (relative = ''): Array<readonly [string, string]> => ops.readdir(path.join(directory, relative))
+            .flatMap((entry) => {
+                const nested = path.join(relative, entry.name); const file = path.join(PACKAGE_ROOT, nested);
+                if (entry.isSymbolicLink()) return [[`<package-source-link:${nested}>`, '']];
+                if (entry.isFile()) return [[file, ops.read(path.join(root, file))]];
+                if (entry.isDirectory?.() && relative === '' && entry.name === 'artifacts') return [];
+                if (entry.isDirectory?.() && (nested === 'internal' || nested.startsWith(`internal${path.sep}`))) {
+                    const children = walk(nested); return children.length > 0 ? children : [[`<package-source-empty:${nested}>`, '']];
+                }
+                return [[`<package-source-invalid:${nested}>`, '']];
+            });
+        return Object.fromEntries(walk());
     } catch { return { '<package-source-unscannable>': '' }; }
 };
 const duplicateJsonKeys = (source: string): boolean => {
@@ -300,12 +323,13 @@ const duplicateJsonKeys = (source: string): boolean => {
     };
     visit(tree); return duplicate;
 };
-const packageSourceErrors = (artifacts: Sources): string[] => {
-    if (canonical(Object.keys(artifacts).sort()) !== canonical([PACKAGE_ENTRY_FILE, PACKAGE_MANIFEST_FILE].sort()))
+const packageSourceErrors = (artifacts: Sources, contract: PreparedContract = LIVE_PREPARED_CONTRACT): string[] => {
+    const expectedFiles = contract.inputs.map((file) => `${PACKAGE_ROOT}/${file.path}`);
+    if (canonical(Object.keys(artifacts).sort()) !== canonical(expectedFiles.sort()))
         return ['package-source:inventory'];
     let manifest: unknown;
     try { manifest = JSON.parse(artifacts[PACKAGE_MANIFEST_FILE]!); } catch { return ['package-source:manifest-parse']; }
-    const expectedManifest = JSON.parse(PREPARED_PACKAGE_MANIFEST) as unknown;
+    const expectedManifest = JSON.parse(contract.manifest) as unknown;
     const errors: string[] = [];
     if (duplicateJsonKeys(artifacts[PACKAGE_MANIFEST_FILE]!) || !manifest || typeof manifest !== 'object'
         || JSON.stringify(Object.keys(manifest)) !== JSON.stringify(Object.keys(expectedManifest as object))
@@ -313,6 +337,9 @@ const packageSourceErrors = (artifacts: Sources): string[] => {
     if (parseErrors(PACKAGE_ENTRY_FILE, artifacts[PACKAGE_ENTRY_FILE]!) > 0
         || printed(PACKAGE_ENTRY_FILE, artifacts[PACKAGE_ENTRY_FILE]!) !== printed(PACKAGE_ENTRY_FILE, PREPARED_PACKAGE_ENTRY))
         errors.push('package-source:entry');
+    for (const expected of contract.inputs) { const source = artifacts[`${PACKAGE_ROOT}/${expected.path}`]!;
+        if (Buffer.byteLength(source) !== expected.bytes || digest(source) !== expected.sha256)
+            errors.push(`package-source:${expected.path}`); }
     return errors;
 };
 
@@ -323,7 +350,10 @@ const ownerPackageReference = (value: unknown): boolean => {
         || decoded.startsWith(`npm:${PACKAGE}@`) || decoded.includes(`/${PACKAGE}/`)) return true;
     const local = decoded.replace(/^(?:file|link):/u, '').split(/[?#]/u, 1)[0]!;
     const resolved = path.resolve(ROOT, local); const sourceRoot = path.join(ROOT, PACKAGE_ROOT);
-    return resolved === sourceRoot || resolved === path.join(ROOT, PREPARED_PACKAGE_TARBALL);
+    const relative = path.relative(sourceRoot, resolved);
+    return resolved === sourceRoot || (relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative)
+        && (relative.startsWith(`internal${path.sep}`)
+            || /^artifacts[/\\]mediflow-web-auth-lifecycle-owner-0\.8\.5-prepared\.\d+\.(?:tgz|provenance\.json)$/u.test(relative)));
 };
 const lockPackageAlias = (key: string): string | null => {
     const marker = 'node_modules/'; const index = key.lastIndexOf(marker);
@@ -381,7 +411,9 @@ type InstalledPackageSnapshot = Readonly<{ path: string; realpath: string; direc
     files: readonly PhysicalFileSnapshot[] }>;
 type PhysicalPackageSnapshot = Readonly<{
     packageJson: Record<string, unknown>; lock: Record<string, unknown>; tarball: PhysicalFileSnapshot;
-    provenance: PhysicalFileSnapshot & Readonly<{ value: unknown }>; installed: readonly InstalledPackageSnapshot[];
+    tarRoster: readonly (ExpectedFile & Readonly<{ type: string; mode: string }>)[];
+    provenance: PhysicalFileSnapshot & Readonly<{ value: unknown }>; artifacts: readonly PhysicalFileSnapshot[];
+    installed: readonly InstalledPackageSnapshot[];
 }>;
 const asRecord = (value: unknown): Record<string, unknown> | null => value && typeof value === 'object'
     && !Array.isArray(value) ? value as Record<string, unknown> : null;
@@ -404,7 +436,60 @@ const preparedProvenance = () => ({
         { path: 'package/package.json', type: 'file', mode: '0644', bytes: 251,
             sha256: PREPARED_MANIFEST_SHA256 },
     ],
+} as const);
+const PREPARED_0: PreparedContract = {
+    version: PREPARED_PACKAGE_VERSION, sequence: 0, manifest: PREPARED_PACKAGE_MANIFEST,
+    tarball: PREPARED_PACKAGE_TARBALL, provenancePath: PREPARED_PACKAGE_PROVENANCE,
+    dependency: PREPARED_PACKAGE_DEPENDENCY, tar: { path: PREPARED_PACKAGE_TARBALL, bytes: 347,
+        sha256: PREPARED_PACKAGE_SHA256, integrity: PREPARED_PACKAGE_INTEGRITY }, provenance: preparedProvenance(),
+    inputs: preparedProvenance().inputs, roster: preparedProvenance().roster,
+    artifacts: [{ path: PREPARED_PACKAGE_TARBALL, bytes: 347, sha256: PREPARED_PACKAGE_SHA256 },
+        { path: PREPARED_PACKAGE_PROVENANCE, bytes: Buffer.byteLength(`${JSON.stringify(preparedProvenance(), null, 2)}\n`),
+            sha256: PREPARED_PROVENANCE_SHA256 }],
+};
+const LIVE_PREPARED_CONTRACT = PREPARED_0;
+const SYNTHETIC_MANIFEST = PREPARED_PACKAGE_MANIFEST.replace('0.8.5-prepared.0', '0.8.5-prepared.1');
+const SYNTHETIC_INTERNAL = "'use strict';\nmodule.exports = Object.freeze({ state: 'synthetic_prepared_1' });\n";
+const SYNTHETIC_NESTED = "'use strict';\nmodule.exports = 1;\n";
+const SYNTHETIC_INPUTS = [
+    { path: 'index.js', bytes: 80, sha256: PREPARED_INDEX_SHA256 },
+    { path: 'internal/owner.cjs', bytes: 81, sha256: '25b2131daa569b58b8b38d49e26e19ccb80c6a8052868cb8621483156bb60101' },
+    { path: 'internal/support/value.cjs', bytes: 34, sha256: 'eddf9352dc5f5d7d8b204def390c4ae5892c934be596a3c92258e7e334fc68cf' },
+    { path: 'package.json', bytes: 251, sha256: '80ceecdb6d109dfd860769220883a6a78797e24677c09e9479e5994a5595fd81' },
+] as const;
+const SYNTHETIC_VERSION = '0.8.5-prepared.1';
+const SYNTHETIC_TARBALL = `${PACKAGE_ROOT}/artifacts/mediflow-web-auth-lifecycle-owner-${SYNTHETIC_VERSION}.tgz`;
+const SYNTHETIC_PROVENANCE_PATH = SYNTHETIC_TARBALL.replace(/\.tgz$/u, '.provenance.json');
+const SYNTHETIC_TAR_SHA256 = '1'.repeat(64);
+const SYNTHETIC_INTEGRITY = 'sha512-AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ==';
+const PREDECESSOR = { version: PREPARED_PACKAGE_VERSION, tarSha256: PREPARED_PACKAGE_SHA256,
+    provenanceSha256: PREPARED_PROVENANCE_SHA256 } as const;
+const syntheticProvenance = () => ({
+    schemaVersion: 'mediflow.web-auth-lifecycle-owner.package-provenance.v1',
+    acceptedBase: '7386adb528c15cf7855cc8460a7c0f923bd5694d', sourceCommit: '1'.repeat(40), predecessor: PREDECESSOR,
+    package: { name: PACKAGE, version: SYNTHETIC_VERSION }, toolchain: { node: 'v24.19.0', npm: '11.17.0' },
+    pack: { command: 'npm pack --ignore-scripts --pack-destination ./artifacts', runs: 2,
+        network: 'offline', scripts: 'ignored', cache: 'empty_temporary', byteIdentical: true },
+    artifact: { path: SYNTHETIC_TARBALL, bytes: 777, sha256: SYNTHETIC_TAR_SHA256, integrity: SYNTHETIC_INTEGRITY },
+    inputs: SYNTHETIC_INPUTS, roster: SYNTHETIC_INPUTS.map((file) => ({ path: `package/${file.path}`,
+        type: 'file' as const, mode: '0644' as const, bytes: file.bytes, sha256: file.sha256 })),
 });
+const SYNTHETIC_PREPARED_1: PreparedContract = {
+    version: SYNTHETIC_VERSION, sequence: 1, manifest: SYNTHETIC_MANIFEST,
+    tarball: SYNTHETIC_TARBALL, provenancePath: SYNTHETIC_PROVENANCE_PATH, dependency: `file:${SYNTHETIC_TARBALL}`,
+    tar: { path: SYNTHETIC_TARBALL, bytes: 777, sha256: SYNTHETIC_TAR_SHA256, integrity: SYNTHETIC_INTEGRITY },
+    provenance: syntheticProvenance(), predecessor: PREDECESSOR, inputs: SYNTHETIC_INPUTS,
+    roster: syntheticProvenance().roster, artifacts: [...PREPARED_0.artifacts,
+        { path: SYNTHETIC_TARBALL, bytes: 777, sha256: SYNTHETIC_TAR_SHA256 },
+        { path: SYNTHETIC_PROVENANCE_PATH, bytes: 2616, sha256: 'ab9ef4578ba2670eb5c0d1726e1100ee327bfe2eebe157fbc852bed2db4c5385' }],
+};
+const preparedContractErrors = (contract: PreparedContract): string[] => {
+    const match = /^0\.8\.5-prepared\.(0|1)$/u.exec(contract.version);
+    if (!match || Number(match[1]) !== contract.sequence) return ['physical:version-sequence'];
+    if (contract.sequence === 0) return contract === PREPARED_0 && contract.predecessor === undefined ? [] : ['physical:version-reuse'];
+    return contract === SYNTHETIC_PREPARED_1 && canonical(contract.predecessor) === canonical(PREDECESSOR)
+        ? [] : ['physical:predecessor'];
+};
 const ownerReferenceCount = (value: unknown): number => {
     if (Array.isArray(value)) return value.reduce((total, item) => total + ownerReferenceCount(item), 0);
     const record = asRecord(value); if (!record) return ownerPackageReference(value) ? 1 : 0;
@@ -414,31 +499,31 @@ const ownerReferenceCount = (value: unknown): number => {
 const physicalFileErrors = (value: PhysicalFileSnapshot, expected: Readonly<{ path: string; bytes: number;
     sha256: string }>): string[] => value.path === expected.path && value.regular && !value.symbolicLink
     && value.links === 1 && value.bytes === expected.bytes && value.sha256 === expected.sha256 ? [] : [expected.path];
-const physicalPackageErrors = (value: PhysicalPackageSnapshot): string[] => {
-    const errors: string[] = []; const dependencies = asRecord(value.packageJson.dependencies) ?? {};
-    if (dependencies[PACKAGE] !== PREPARED_PACKAGE_DEPENDENCY || ownerReferenceCount(value.packageJson) !== 2)
+const physicalPackageErrors = (value: PhysicalPackageSnapshot, contract: PreparedContract = LIVE_PREPARED_CONTRACT): string[] => {
+    const errors = preparedContractErrors(contract); const dependencies = asRecord(value.packageJson.dependencies) ?? {};
+    if (dependencies[PACKAGE] !== contract.dependency || ownerReferenceCount(value.packageJson) !== 2)
         errors.push('physical:dependency');
     const packages = asRecord(value.lock.packages); const root = asRecord(packages?.['']);
     const rootDependencies = asRecord(root?.dependencies); const installed = asRecord(packages?.[`node_modules/${PACKAGE}`]);
-    const expectedInstalled = { version: PREPARED_PACKAGE_VERSION, resolved: PREPARED_PACKAGE_DEPENDENCY,
-        integrity: PREPARED_PACKAGE_INTEGRITY, engines: { node: '>=24 <25' } };
-    if (value.lock.lockfileVersion !== 3 || rootDependencies?.[PACKAGE] !== PREPARED_PACKAGE_DEPENDENCY
+    const expectedInstalled = { version: contract.version, resolved: contract.dependency,
+        integrity: contract.tar.integrity, engines: { node: '>=24 <25' } };
+    if (value.lock.lockfileVersion !== 3 || rootDependencies?.[PACKAGE] !== contract.dependency
         || canonical(installed) !== canonical(expectedInstalled) || ownerReferenceCount(value.lock) !== 4
         || canonical([...ownerLockAliases(JSON.stringify(value.lock))]) !== canonical([PACKAGE])) errors.push('physical:lock');
-    errors.push(...physicalFileErrors(value.tarball, { path: PREPARED_PACKAGE_TARBALL, bytes: 347,
-        sha256: PREPARED_PACKAGE_SHA256 }));
-    errors.push(...physicalFileErrors(value.provenance, { path: PREPARED_PACKAGE_PROVENANCE,
-        bytes: Buffer.byteLength(`${JSON.stringify(preparedProvenance(), null, 2)}\n`),
-        sha256: digest(`${JSON.stringify(preparedProvenance(), null, 2)}\n`) }));
-    if (canonical(value.provenance.value) !== canonical(preparedProvenance())) errors.push('physical:provenance');
+    errors.push(...physicalFileErrors(value.tarball, contract.tar));
+    const provenanceFile = contract.artifacts.find((file) => file.path === contract.provenancePath)!;
+    errors.push(...physicalFileErrors(value.provenance, provenanceFile));
+    if (canonical(value.provenance.value) !== canonical(contract.provenance)) errors.push('physical:provenance');
+    if (canonical(value.tarRoster) !== canonical(contract.roster)) errors.push('physical:tar-roster');
+    if (canonical(value.artifacts.map((file) => file.path).sort()) !== canonical(contract.artifacts.map((file) => file.path).sort()))
+        errors.push('physical:artifact-roster');
+    else for (const expected of contract.artifacts) errors.push(...physicalFileErrors(
+        value.artifacts.find((file) => file.path === expected.path)!, expected));
     if (value.installed.length !== 1) errors.push('physical:copy-count');
     const copy = value.installed[0]; const marker = `${path.sep}node_modules${path.sep}`;
     if (!copy || !copy.directory || copy.symbolicLink || copy.realpath !== copy.path
         || copy.path.split(marker).length !== 2 || !copy.path.endsWith(`${marker}${PACKAGE}`)) errors.push('physical:copy');
-    const expectedFiles = [
-        { path: 'index.js', bytes: 80, sha256: PREPARED_INDEX_SHA256 },
-        { path: 'package.json', bytes: 251, sha256: PREPARED_MANIFEST_SHA256 },
-    ];
+    const expectedFiles = contract.inputs;
     if (!copy || canonical(copy.files.map((file) => file.path).sort()) !== canonical(expectedFiles.map((file) => file.path)))
         errors.push('physical:installed-roster');
     else for (const expected of expectedFiles) errors.push(...physicalFileErrors(
@@ -452,25 +537,46 @@ const fileSnapshot = (root: string, relative: string): PhysicalFileSnapshot => {
             links: metadata.nlink, bytes: metadata.size, sha256: digest(bytes) }; }
     catch { return { path: relative, regular: false, symbolicLink: false, links: 0, bytes: 0, sha256: '' }; }
 };
+const tarRoster = (root: string, relative: string): PhysicalPackageSnapshot['tarRoster'] => {
+    try { const archive = gunzipSync(readFileSync(path.join(root, relative))); const roster: Array<ExpectedFile & { type: string; mode: string }> = [];
+        for (let offset = 0; offset + 512 <= archive.length;) { const header = archive.subarray(offset, offset + 512);
+            if (header.every((byte) => byte === 0)) break;
+            const field = (start: number, end: number) => header.subarray(start, end).toString('utf8').replace(/\0.*$/u, '').trim();
+            const name = field(0, 100); const size = Number.parseInt(field(124, 136) || '0', 8);
+            const mode = Number.parseInt(field(100, 108) || '0', 8).toString(8).padStart(4, '0');
+            const type = field(156, 157) || '0'; const contents = archive.subarray(offset + 512, offset + 512 + size);
+            if (type !== '0' || !name || !Number.isSafeInteger(size) || contents.length !== size) return [{ path: '<invalid-tar>', type, mode, bytes: 0, sha256: '' }];
+            roster.push({ path: name, type: 'file', mode, bytes: size, sha256: digest(contents) });
+            offset += 512 + Math.ceil(size / 512) * 512;
+        } return roster;
+    } catch { return [{ path: '<invalid-tar>', type: 'invalid', mode: '', bytes: 0, sha256: '' }]; }
+};
 const installedSnapshot = (logicalPath: string): InstalledPackageSnapshot => {
-    try { const metadata = lstatSync(logicalPath); const files = readdirSync(logicalPath, { withFileTypes: true })
-        .map((entry) => fileSnapshot(logicalPath, entry.name));
+    try { const metadata = lstatSync(logicalPath); const walk = (directory: string): PhysicalFileSnapshot[] =>
+        readdirSync(path.join(logicalPath, directory), { withFileTypes: true }).flatMap((entry) => {
+            const relative = path.join(directory, entry.name); const details = lstatSync(path.join(logicalPath, relative));
+            return details.isDirectory() && !details.isSymbolicLink() ? walk(relative) : [fileSnapshot(logicalPath, relative)];
+        }); const files = walk('');
         return { path: logicalPath, realpath: realpathSync.native(logicalPath), directory: metadata.isDirectory(),
             symbolicLink: metadata.isSymbolicLink(), files }; }
     catch { return { path: logicalPath, realpath: '', directory: false, symbolicLink: false, files: [] }; }
 };
 const physicalPackageSnapshot = (root: string, packageJson: Record<string, unknown>, lockSource: string,
-    copies: readonly string[]): PhysicalPackageSnapshot | undefined => {
+    copies: readonly string[], contract: PreparedContract = LIVE_PREPARED_CONTRACT): PhysicalPackageSnapshot | undefined => {
     const artifactsDirectory = path.join(root, PACKAGE_ROOT, 'artifacts');
     const aliases = ownerDependencyAliases(packageJson, lockSource);
     if (!existsSync(artifactsDirectory) && aliases.size === 0 && copies.length === 0) return undefined;
     let lock: Record<string, unknown> = {}; try { lock = JSON.parse(lockSource) as Record<string, unknown>; } catch { /* invalid */ }
-    const provenanceFile = fileSnapshot(root, PREPARED_PACKAGE_PROVENANCE); let provenanceValue: unknown = null;
-    try { provenanceValue = JSON.parse(readFileSync(path.join(root, PREPARED_PACKAGE_PROVENANCE), 'utf8')); } catch { /* invalid */ }
-    return { packageJson, lock, tarball: fileSnapshot(root, PREPARED_PACKAGE_TARBALL),
-        provenance: { ...provenanceFile, value: provenanceValue }, installed: copies.map(installedSnapshot) };
+    const provenanceFile = fileSnapshot(root, contract.provenancePath); let provenanceValue: unknown = null;
+    try { provenanceValue = JSON.parse(readFileSync(path.join(root, contract.provenancePath), 'utf8')); } catch { /* invalid */ }
+    let artifacts: PhysicalFileSnapshot[] = [];
+    try { artifacts = readdirSync(artifactsDirectory).map((name) => fileSnapshot(root, `${PACKAGE_ROOT}/artifacts/${name}`)); }
+    catch { artifacts = [{ path: '<unscannable-artifacts>', regular: false, symbolicLink: false, links: 0, bytes: 0, sha256: '' }]; }
+    return { packageJson, lock, tarball: fileSnapshot(root, contract.tarball), tarRoster: tarRoster(root, contract.tarball),
+        provenance: { ...provenanceFile, value: provenanceValue }, artifacts, installed: copies.map(installedSnapshot) };
 };
-const preCutoverSourceState = (sources: Sources, packageArtifacts: Sources = {}, physical?: PhysicalPackageSnapshot):
+const preCutoverSourceState = (sources: Sources, packageArtifacts: Sources = {}, physical?: PhysicalPackageSnapshot,
+    contract: PreparedContract = LIVE_PREPARED_CONTRACT):
     'BASELINE' | 'DORMANT_PREPARED' | 'PACKAGE_SOURCE_PREPARED' | 'PHYSICAL_PACKAGE_PREPARED' | 'INVALID' => {
     const adapter = sources[ADAPTER_FILE];
     if (importInventoryErrors(sources, adapter !== undefined).length > 0) return 'INVALID';
@@ -478,9 +584,9 @@ const preCutoverSourceState = (sources: Sources, packageArtifacts: Sources = {},
     if (dormantAdapterErrors(adapter).length > 0) return 'INVALID';
     if (Object.keys(packageArtifacts).length === 0) return 'DORMANT_PREPARED';
     if (sources[PACKAGE_ENTRY_FILE] !== packageArtifacts[PACKAGE_ENTRY_FILE]
-        || packageSourceErrors(packageArtifacts).length > 0) return 'INVALID';
+        || packageSourceErrors(packageArtifacts, contract).length > 0) return 'INVALID';
     if (physical === undefined) return 'PACKAGE_SOURCE_PREPARED';
-    return physicalPackageErrors(physical).length === 0 ? 'PHYSICAL_PACKAGE_PREPARED' : 'INVALID';
+    return physicalPackageErrors(physical, contract).length === 0 ? 'PHYSICAL_PACKAGE_PREPARED' : 'INVALID';
 };
 
 const liveSources = sourceFiles(ROOT);
@@ -533,7 +639,8 @@ test('recognizes only the exact physical package source scaffold', () => {
     assert.deepEqual(JSON.parse(PREPARED_PACKAGE_MANIFEST), { name: PACKAGE, version: '0.8.5-prepared.0', private: true,
         type: 'commonjs', main: './index.js', exports: './index.js', files: ['index.js', 'internal/'],
         engines: { node: '>=24 <25' } });
-    assert.equal(PREPARED_PACKAGE_ENTRY, "'use strict';\nmodule.exports = Object.freeze(Object.create(null));");
+    assert.equal(printed(PACKAGE_ENTRY_FILE, PREPARED_PACKAGE_ENTRY),
+        printed(PACKAGE_ENTRY_FILE, "'use strict';\nmodule.exports = Object.freeze(Object.create(null));"));
     const prepared: Sources = { [PACKAGE_MANIFEST_FILE]: PREPARED_PACKAGE_MANIFEST,
         [PACKAGE_ENTRY_FILE]: PREPARED_PACKAGE_ENTRY };
     const syntheticRoot = '/synthetic';
@@ -602,9 +709,16 @@ test('recognizes only the exact synthetic physical prepared package state', () =
         } },
         tarball: { path: PREPARED_PACKAGE_TARBALL, regular: true, symbolicLink: false, links: 1,
             bytes: 347, sha256: tarballSha256 },
+        tarRoster: provenanceValue.roster,
         provenance: { path: `${PACKAGE_ROOT}/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5-prepared.0.provenance.json`,
             regular: true, symbolicLink: false, links: 1, bytes: Buffer.byteLength(provenanceSource),
             sha256: digest(provenanceSource), value: provenanceValue },
+        artifacts: [
+            { path: PREPARED_PACKAGE_TARBALL, regular: true, symbolicLink: false, links: 1,
+                bytes: 347, sha256: tarballSha256 },
+            { path: PREPARED_PACKAGE_PROVENANCE, regular: true, symbolicLink: false, links: 1,
+                bytes: Buffer.byteLength(provenanceSource), sha256: digest(provenanceSource) },
+        ],
         installed: [{ path: installedRoot, realpath: installedRoot, directory: true, symbolicLink: false,
             files: [
                 { path: 'index.js', regular: true, symbolicLink: false, links: 1, bytes: 80, sha256: indexSha256 },
@@ -666,7 +780,7 @@ test('denies package metadata, early externalization, new authority modules or e
         assert.notDeepEqual(packageBoundaryErrors({ [section]: { 'owner-alias': `file:${PACKAGE_ROOT}` } }, '', '', false), []);
     }
     assert.deepEqual(ownerDependencyAliases({ dependencies: { 'owner-alias': `file:${PACKAGE_ROOT}` } }, ''), new Set(['owner-alias']));
-    for (const spec of [`npm:${PACKAGE}@0.8.5-prepared.0`, `file:./packages/../${PACKAGE_ROOT}`, 'file:packages%2Fweb-auth-lifecycle-owner',
+    for (const spec of [`npm:${PACKAGE}@0.8.5-prepared.0`, `file:./packages/../${PACKAGE_ROOT}`, `file:${PACKAGE_ROOT}/internal/owner.cjs`, 'file:packages%2Fweb-auth-lifecycle-owner',
         'file:packages%252Fweb-auth-lifecycle-owner', `file:${PREPARED_PACKAGE_TARBALL}`]) assert.ok(ownerPackageReference(spec), spec);
     for (const spec of ['@mediflow/web-auth-lifecycle-owner-helper',
         'npm:@mediflow/web-auth-lifecycle-owner-helper@0.8.5-prepared.0',
@@ -717,4 +831,67 @@ test('denies package metadata, early externalization, new authority modules or e
         assert.notEqual(authorityRosterDigest(newEdge), AUTHORITY_ROSTER_SHA256);
     }
     assert.notEqual(digest(`${liveSources[PRE_CUTOVER_GLOBAL_OWNER]}\nglobalThis.syntheticOwner={};`), PRE_CUTOVER_GLOBAL_OWNER_SHA256);
+});
+
+test('enforces the monotonic prepared.1 package and recursive inert internal roster', () => {
+    const source: Sources = { [PACKAGE_MANIFEST_FILE]: SYNTHETIC_MANIFEST, [PACKAGE_ENTRY_FILE]: PREPARED_PACKAGE_ENTRY,
+        [`${PACKAGE_ROOT}/internal/owner.cjs`]: SYNTHETIC_INTERNAL,
+        [`${PACKAGE_ROOT}/internal/support/value.cjs`]: SYNTHETIC_NESTED };
+    const provenanceSource = `${JSON.stringify(syntheticProvenance(), null, 2)}\n`;
+    assert.equal(Buffer.byteLength(provenanceSource), 2616);
+    assert.equal(digest(provenanceSource), 'ab9ef4578ba2670eb5c0d1726e1100ee327bfe2eebe157fbc852bed2db4c5385');
+    const temporary = realpathSync.native(mkdtempSync(path.join(tmpdir(), 'mediflow-owner-prepared1-')));
+    try {
+        for (const [file, contents] of Object.entries(source)) { const absolute = path.join(temporary, file);
+            mkdirSync(path.dirname(absolute), { recursive: true }); writeFileSync(absolute, contents); }
+        assert.deepEqual(packageSourceArtifacts(temporary), source);
+        const installedRoot = path.join(temporary, 'node_modules', PACKAGE);
+        for (const input of SYNTHETIC_PREPARED_1.inputs) { const absolute = path.join(installedRoot, input.path);
+            mkdirSync(path.dirname(absolute), { recursive: true });
+            writeFileSync(absolute, source[`${PACKAGE_ROOT}/${input.path}`]!); }
+        const file = (expected: ExpectedFile): PhysicalFileSnapshot => ({ ...expected, regular: true,
+            symbolicLink: false, links: 1 });
+        const physical: PhysicalPackageSnapshot = {
+            packageJson: { dependencies: { [PACKAGE]: SYNTHETIC_PREPARED_1.dependency } },
+            lock: { lockfileVersion: 3, packages: { '': { dependencies: { [PACKAGE]: SYNTHETIC_PREPARED_1.dependency } },
+                [`node_modules/${PACKAGE}`]: { version: SYNTHETIC_VERSION, resolved: SYNTHETIC_PREPARED_1.dependency,
+                    integrity: SYNTHETIC_INTEGRITY, engines: { node: '>=24 <25' } } } },
+            tarball: file(SYNTHETIC_PREPARED_1.tar), tarRoster: SYNTHETIC_PREPARED_1.roster,
+            provenance: { ...file(SYNTHETIC_PREPARED_1.artifacts.at(-1)!), value: syntheticProvenance() },
+            artifacts: SYNTHETIC_PREPARED_1.artifacts.map(file), installed: [installedSnapshot(installedRoot)],
+        };
+        const modules = Object.fromEntries(Object.entries(source).filter(([name]) => name !== PACKAGE_MANIFEST_FILE));
+        assert.deepEqual({ source: packageSourceErrors(source, SYNTHETIC_PREPARED_1),
+            imports: importInventoryErrors({ [ADAPTER_FILE]: DORMANT_ADAPTER_SOURCE, ...modules }, true),
+            physical: physicalPackageErrors(physical, SYNTHETIC_PREPARED_1) }, { source: [], imports: [], physical: [] });
+        assert.equal(preCutoverSourceState({ [ADAPTER_FILE]: DORMANT_ADAPTER_SOURCE, ...modules }, source, physical,
+            SYNTHETIC_PREPARED_1), 'PHYSICAL_PACKAGE_PREPARED');
+        for (let run = 0; run < 2; run += 1) { const result = spawnSync(process.execPath,
+            ['-e', "process.stdout.write(require(process.argv[1]).state)", path.join(installedRoot, 'internal/owner.cjs')],
+            { cwd: temporary, env: { NODE_ENV: 'test' }, encoding: 'utf8' });
+            assert.deepEqual({ status: result.status, stdout: result.stdout }, { status: 0, stdout: 'synthetic_prepared_1' }); }
+        const invalidPhysical = [
+            { ...physical, packageJson: { dependencies: { [PACKAGE]: PREPARED_PACKAGE_DEPENDENCY } } },
+            { ...physical, tarball: { ...physical.tarball, sha256: '0'.repeat(64) } },
+            { ...physical, lock: { ...physical.lock, packages: { ...(physical.lock.packages as object),
+                [`node_modules/${PACKAGE}`]: { version: PREPARED_PACKAGE_VERSION } } } },
+            { ...physical, tarRoster: physical.tarRoster.slice(1) },
+            { ...physical, artifacts: physical.artifacts.slice(2) },
+            { ...physical, provenance: { ...physical.provenance, value: { ...syntheticProvenance(),
+                predecessor: { ...PREDECESSOR, version: '0.8.5-prepared.2' } } } },
+            { ...physical, installed: [{ ...physical.installed[0]!, files: physical.installed[0]!.files.map((entry) =>
+                entry.path.includes('support') ? { ...entry, links: 2 } : entry) }] },
+        ];
+        for (const invalid of invalidPhysical) assert.notDeepEqual(physicalPackageErrors(invalid, SYNTHETIC_PREPARED_1), []);
+        assert.notDeepEqual(packageSourceErrors({ ...source, [`${PACKAGE_ROOT}/internal/extra.cjs`]: '' }, SYNTHETIC_PREPARED_1), []);
+        for (const invalid of [{ ...SYNTHETIC_PREPARED_1, version: '0.8.5-prepared.2', sequence: 2 },
+            { ...PREPARED_0, tar: { ...PREPARED_0.tar, sha256: '0'.repeat(64) } }])
+            assert.notDeepEqual(preparedContractErrors(invalid), []);
+        for (const consumer of ['lib/security/production.ts', 'lib/security/production.test.ts', THIS_FILE])
+            assert.notDeepEqual(importInventoryErrors({ [consumer]:
+                "import '../../packages/web-auth-lifecycle-owner/internal/owner.cjs';" }), [], consumer);
+        const nestedFile = path.join(temporary, PACKAGE_ROOT, 'internal/support/value.cjs'); rmSync(nestedFile);
+        symlinkSync(path.join(temporary, PACKAGE_ENTRY_FILE), nestedFile);
+        assert.notDeepEqual(packageSourceArtifacts(temporary), source);
+    } finally { rmSync(temporary, { recursive: true, force: true }); }
 });
