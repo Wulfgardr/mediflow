@@ -17,6 +17,7 @@ migrationDb.close();
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 const route = await import('../app/api/ocr/extract/route.ts');
 const get = route.GET as (request: NextRequest) => Promise<Response>;
+const post = route.POST as (request: NextRequest) => Promise<Response>;
 const requireCurrent = createRequire(import.meta.url);
 const serverAuth = requireCurrent('./security/server-auth') as {
     requireSessionOrLocalToken: (request: Request) => Promise<unknown>;
@@ -106,4 +107,12 @@ test('keeps GET as the authenticated retirement boundary with no diagnostics or 
     assert.match(getSource, /OCR_EXTRACTION_RETIRED/u);
     assert.doesNotMatch(getSource, /request\.(?:json|text|arrayBuffer|formData|body|url|nextUrl|searchParams)/u);
     assert.doesNotMatch(getSource, /\bparams\b|loadOcrRuntimeSettings|validateLocalTarget|fetch\(|dbServer|settings|provider|readiness|fs\.|execFile|extractDocumentWithAI|AIService/iu);
+});
+
+test('POST is an authenticated, no-store retirement boundary without request observation', async () => {
+    for (const session of [null, webSession, localTokenSession]) {
+        const reads = { count: 0 }; const response = await withAuth(session, () => post(hostileRequest(reads)));
+        assert.equal(response.status, session ? 410 : 401); assert.equal(response.headers.get('cache-control'), 'no-store');
+        assert.deepEqual(await response.json(), session ? retiredBody : { error: 'Unauthorized' }); assert.equal(reads.count, 0);
+    }
 });
