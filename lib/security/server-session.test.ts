@@ -82,7 +82,8 @@ const PROJECTION_BROKER_IMPORTS = new Map<string, ReadonlyMap<string, boolean>>(
         ['unregisterActiveWebSessionPrivateResource', false],
     ])],
     [PROJECTION_BROKER_FILES[1], new Map([
-        ['clearAllSessions', false], ['deleteSession', false], ['invalidateSessionsForUser', false],
+        ['clearAllSessions', false], ['createSession', false], ['deleteSession', false], ['getSession', false],
+        ['invalidateSessionsForUser', false],
         ['mintActiveWebSessionResourcePort', false], ['releaseActiveWebSessionResourcePort', false],
         ['resolveActiveWebServerSession', false],
     ])],
@@ -1061,7 +1062,7 @@ test('permits only absent or exact paired projection owner adoption state', () =
 test('permits only the exact paired projection broker resource adoption', () => {
     const production = PROJECTION_BROKER_FILES[0]; const brokerTest = PROJECTION_BROKER_FILES[1];
     const sourceImport = "import { type ActiveWebSessionResourcePort, registerActiveWebSessionPrivateResource, registerServerSessionResource, releaseActiveWebSessionResourcePort, unregisterActiveWebSessionPrivateResource } from './server-session';";
-    const testImport = "import { clearAllSessions, deleteSession, invalidateSessionsForUser, mintActiveWebSessionResourcePort, releaseActiveWebSessionResourcePort, resolveActiveWebServerSession } from './server-session';";
+    const testImport = "import { clearAllSessions, createSession, deleteSession, getSession, invalidateSessionsForUser, mintActiveWebSessionResourcePort, releaseActiveWebSessionResourcePort, resolveActiveWebServerSession } from './server-session';";
     const paired = { [production]: sourceImport, [brokerTest]: testImport };
     const accepted = validateSessionImports(paired);
     assert.equal(accepted.brokerAdoptionState, 'PAIRED'); assert.deepEqual(accepted.errors, []);
