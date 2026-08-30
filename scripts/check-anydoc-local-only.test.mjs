@@ -160,6 +160,9 @@ test('retired PDF inspector cannot be reintroduced through project inputs', asyn
             ['tar-parser', 'https://downloads.example/firecrawl/pdf-inspector.tgz?download=1#sha256'],
             ['query-parser', 'https://downloads.example/firecrawl/pdf-inspector?raw=1#v1'],
             ['encoded-parser', 'https://registry.example/%40firecrawl%2Fpdf%2Dinspector%2F-%2Fartifact.tgz'],
+            ['malformed-parser', 'https://registry.example/%25ZZ/%2540firecrawl%252Fpdf%252Dinspector.tgz'],
+            ['unicode-parser', 'https://registry.example/%25E0%25A4%25A/%2540firecrawl%252Fpdf%252Dinspector.tgz'],
+            ['deep-parser', 'https://registry.example/%2525252540firecrawl%252525252Fpdf-inspector'],
         ];
         const escapedIdentities = [];
         for (const [alias, specifier] of encodedRetiredSpecs) {
@@ -177,7 +180,7 @@ test('retired PDF inspector cannot be reintroduced through project inputs', asyn
             }
         }
         assert.deepEqual(escapedIdentities, []);
-        for (const specifier of ['https://example/pdf-inspectorx.tgz', 'https://example/my-pdf-inspector.tgz']) {
+        for (const specifier of ['https://example/pdf-inspectorx.tgz', 'https://example/my-pdf-inspector.tgz', 'https://example/%25ZZ/pdf-inspectorx.tgz']) {
             await reset();
             const value = structuredClone(packageJson);
             value.dependencies['benign-parser'] = specifier;
