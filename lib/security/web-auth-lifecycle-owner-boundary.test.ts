@@ -530,17 +530,17 @@ const PREPARED_2_INPUTS = [
 ] as const;
 const PREPARED_2_TARBALL = `${PACKAGE_ROOT}/artifacts/mediflow-web-auth-lifecycle-owner-${PREPARED_2_VERSION}.tgz`;
 const PREPARED_2_PROVENANCE_PATH = PREPARED_2_TARBALL.replace(/\.tgz$/u, '.provenance.json');
-const PREPARED_2_TAR_SHA256 = '2222222222222222222222222222222222222222222222222222222222222222';
-const PREPARED_2_INTEGRITY = 'sha512-AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg==';
+const PREPARED_2_TAR_SHA256 = 'a3539c0a52631172691d8088b2897b8b292dea9e755474ef4962572a5fecf869';
+const PREPARED_2_INTEGRITY = 'sha512-ypTB9E26lsqnFyZRHGcjMGjIrfYrjfhiKFpcTyU1spGIapwWWgI/YDHGVw2wmX3BAyykuiA5BuyZG+yeAipDuQ==';
 const PREPARED_2_PREDECESSOR = { version: PREPARED_1_VERSION, tarSha256: PREPARED_1_TAR_SHA256,
     provenanceSha256: PREPARED_1_PROVENANCE_SHA256 } as const;
 const prepared2Provenance = () => ({
     schemaVersion: 'mediflow.web-auth-lifecycle-owner.package-provenance.v1',
-    acceptedBase: '<synthetic-p4a1-accepted-base>', predecessor: PREPARED_2_PREDECESSOR,
+    acceptedBase: '83983a3b8e6b4d9d15be7f5c69dcce84fdc0f5aa', predecessor: PREPARED_2_PREDECESSOR,
     package: { name: PACKAGE, version: PREPARED_2_VERSION }, toolchain: { node: 'v24.19.0', npm: '11.17.0' },
     pack: { command: 'npm pack --ignore-scripts --pack-destination ./artifacts', runs: 2,
         network: 'offline', scripts: 'ignored', cache: 'empty_temporary', byteIdentical: true },
-    artifact: { path: PREPARED_2_TARBALL, bytes: 2_222, sha256: PREPARED_2_TAR_SHA256,
+    artifact: { path: PREPARED_2_TARBALL, bytes: 881, sha256: PREPARED_2_TAR_SHA256,
         integrity: PREPARED_2_INTEGRITY }, inputs: PREPARED_2_INPUTS,
     roster: ['internal/owner.cjs', 'internal/support/successor-fence.cjs', 'internal/support/value.cjs',
         'index.js', 'package.json'].map((path) => { const file = PREPARED_2_INPUTS.find((entry) => entry.path === path)!;
@@ -550,14 +550,14 @@ const prepared2Provenance = () => ({
 const PREPARED_2: PreparedContract = {
     version: PREPARED_2_VERSION, sequence: 2, manifest: PREPARED_2_MANIFEST,
     tarball: PREPARED_2_TARBALL, provenancePath: PREPARED_2_PROVENANCE_PATH, dependency: `file:${PREPARED_2_TARBALL}`,
-    tar: { path: PREPARED_2_TARBALL, bytes: 2_222, sha256: PREPARED_2_TAR_SHA256, integrity: PREPARED_2_INTEGRITY },
+    tar: { path: PREPARED_2_TARBALL, bytes: 881, sha256: PREPARED_2_TAR_SHA256, integrity: PREPARED_2_INTEGRITY },
     provenance: prepared2Provenance(), predecessor: PREPARED_2_PREDECESSOR, inputs: PREPARED_2_INPUTS,
     roster: prepared2Provenance().roster, artifacts: [...PREPARED_1.artifacts,
-        { path: PREPARED_2_TARBALL, bytes: 2_222, sha256: PREPARED_2_TAR_SHA256 },
-        { path: PREPARED_2_PROVENANCE_PATH, bytes: 3_333,
-            sha256: '3333333333333333333333333333333333333333333333333333333333333333' }],
+        { path: PREPARED_2_TARBALL, bytes: 881, sha256: PREPARED_2_TAR_SHA256 },
+        { path: PREPARED_2_PROVENANCE_PATH, bytes: 2948,
+            sha256: 'f7899346886df74f818a3e2e05daf6b8a2b8ce225ed98f29af16173221cd8291' }],
 };
-const LIVE_PREPARED_CONTRACT = PREPARED_1;
+const LIVE_PREPARED_CONTRACT = PREPARED_2;
 const preparedContractErrors = (contract: PreparedContract): string[] => {
     const match = /^0\.8\.5-prepared\.(0|1|2)$/u.exec(contract.version);
     if (!match || Number(match[1]) !== contract.sequence) return ['physical:version-sequence'];
@@ -978,8 +978,8 @@ test('enforces the monotonic prepared.1 package and recursive inert internal ros
     } finally { rmSync(temporary, { recursive: true, force: true }); }
 });
 
-test('freezes the synthetic prepared.2 successor fence without advancing the live package', () => {
-    assert.equal(LIVE_PREPARED_CONTRACT, PREPARED_1);
+test('materializes the prepared.2 successor fence as the sole live physical package', () => {
+    assert.equal(LIVE_PREPARED_CONTRACT, PREPARED_2);
     assert.deepEqual(preparedContractErrors(PREPARED_2), []);
     assert.equal(Buffer.byteLength(PREPARED_2_SUCCESSOR_FENCE), 1172);
     assert.equal(digest(PREPARED_2_SUCCESSOR_FENCE), '7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff');
@@ -1048,6 +1048,8 @@ const crypto = { randomBytes(size) {
     if (mode === 'short') return Buffer.alloc(31, 0xab);
     if (mode === 'typed') return new Uint8Array(32);
     if (mode === 'prototype') { const value = Buffer.alloc(32, 0xab); Object.setPrototypeOf(value, null); return value; }
+    if (mode === 'subclass') { const value = Buffer.alloc(32, 0xab);
+        Object.setPrototypeOf(value, Object.create(Buffer.prototype)); return value; }
     if (mode === 'proxy') return new Proxy(Buffer.alloc(32, 0xab), {});
     return Buffer.alloc(32, 0xab);
 } };
@@ -1073,7 +1075,8 @@ if (mode === 'captured') {
 const result = api.successorFence();
 process.stdout.write(JSON.stringify({ calls, result, keys: ownKeys(api), frozen: isFrozen(api) }));`;
         for (const [mode, expected] of [['valid', 'ab'.repeat(32)], ['captured', 'ab'.repeat(32)], ['error', null],
-            ['short', null], ['typed', null], ['prototype', null], ['proxy', null], ['pre-is-proxy', null]] as const) {
+            ['short', null], ['typed', null], ['prototype', null], ['subclass', null], ['proxy', null],
+            ['pre-is-proxy', null]] as const) {
             const result = spawnSync(process.execPath, ['-e', child,
                 path.join(temporary, PACKAGE_ROOT, 'internal/support/successor-fence.cjs'), mode],
             { cwd: temporary, env: { NODE_ENV: 'test' }, encoding: 'utf8' });
