@@ -50,6 +50,7 @@ function main() {
     runTelemetryChecks(runtimeFiles);
     runZeroKnowledgeChecks(runtimeFiles);
     runLegacyOcrRetirementCheck();
+    runLegacyPdfRetirementCheck();
     reportAndExit();
 }
 
@@ -87,6 +88,61 @@ export function validateLegacyOcrRetirementSource(source) {
         else validateRetirementHandler(handler, name, issues);
     }
     return [...issues];
+}
+
+/* @Codex */
+export function validateLegacyPdfRetirementSource(source) {
+    const issues = new Set();
+    const sourceFile = ts.createSourceFile('app/api/pdf-extract/route.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    if (sourceFile.parseDiagnostics.length > 0) issues.add('route source has syntax errors');
+    const imports = sourceFile.statements.filter(ts.isImportDeclaration);
+    if (imports.length !== 2) issues.add('route must have exactly two static imports');
+    if (!imports.some((node) => isCanonicalNamedImport(node, 'next/server', ['NextResponse']))) issues.add('Next server import must remain canonical and unaliased');
+    if (!imports.some((node) => isCanonicalNamedImport(node, '@/lib/security/server-auth', ['requireSession']))) issues.add('web authentication import must remain canonical and unaliased');
+
+    let runtimeSeen = false;
+    let post;
+    for (const statement of sourceFile.statements) {
+        if (ts.isImportDeclaration(statement) || isInertStringStatement(statement)) continue;
+        if (isCanonicalPdfRuntimeStatement(statement) && !runtimeSeen) { runtimeSeen = true; continue; }
+        if (ts.isFunctionDeclaration(statement) && statement.name?.text === 'POST' && !post) { post = statement; continue; }
+        issues.add('route may contain only canonical imports, runtime, inert strings and POST');
+    }
+    if (!runtimeSeen) issues.add('nodejs runtime declaration is missing');
+    if (!post) issues.add('POST retirement handler is missing');
+    else validatePdfRetirementHandler(post, issues);
+    return [...issues];
+}
+
+function isCanonicalPdfRuntimeStatement(node) {
+    if (!ts.isVariableStatement(node) || !hasModifier(node, ts.SyntaxKind.ExportKeyword)) return false;
+    if ((node.declarationList.flags & ts.NodeFlags.Const) === 0 || node.declarationList.declarations.length !== 1) return false;
+    const declaration = node.declarationList.declarations[0];
+    return ts.isIdentifier(declaration.name) && declaration.name.text === 'runtime'
+        && !declaration.type && !declaration.exclamationToken
+        && ts.isStringLiteral(declaration.initializer) && declaration.initializer.text === 'nodejs';
+}
+
+function validatePdfRetirementHandler(handler, issues) {
+    if (ts.getDecorators(handler)?.length || handler.parameters.some((parameter) => ts.getDecorators(parameter)?.length)) issues.add('POST declaration and parameter decorators are forbidden');
+    if (!hasModifier(handler, ts.SyntaxKind.ExportKeyword) || !hasModifier(handler, ts.SyntaxKind.AsyncKeyword)
+        || hasModifier(handler, ts.SyntaxKind.DefaultKeyword) || handler.asteriskToken || handler.typeParameters?.length
+        || handler.parameters.length !== 0 || !handler.body) { issues.add('POST must keep the exact exported async handler shape'); return; }
+    const statements = handler.body.statements;
+    if (statements.length !== 3) { issues.add('POST must contain only authentication, unauthorized denial and retirement denial'); return; }
+    if (!isCanonicalWebAuthStatement(statements[0])) issues.add('POST must await canonical web authentication as its first statement');
+    if (!isCanonicalUnauthorizedIf(statements[1])) issues.add('POST must keep the exact no-store 401 Unauthorized denial');
+    if (!isCanonicalResponseReturn(statements[2], 410, [['error', 'PDF extraction endpoint retired'], ['code', 'PDF_EXTRACTION_RETIRED']])) issues.add('POST must keep the exact no-store 410 PDF_EXTRACTION_RETIRED denial');
+}
+
+function isCanonicalWebAuthStatement(node) {
+    if (!ts.isVariableStatement(node) || (node.declarationList.flags & ts.NodeFlags.Const) === 0) return false;
+    const declarations = node.declarationList.declarations;
+    if (declarations.length !== 1 || !ts.isIdentifier(declarations[0].name) || declarations[0].name.text !== 'session') return false;
+    const awaited = declarations[0].initializer;
+    return Boolean(awaited && ts.isAwaitExpression(awaited) && ts.isCallExpression(awaited.expression)
+        && ts.isIdentifier(awaited.expression.expression) && awaited.expression.expression.text === 'requireSession'
+        && !awaited.expression.questionDotToken && !awaited.expression.typeArguments?.length && awaited.expression.arguments.length === 0);
 }
 
 function isCanonicalNamedImport(node, moduleName, expectedNames) {
@@ -228,6 +284,14 @@ function runLegacyOcrRetirementCheck() {
             snippet: 'legacy OCR route retirement boundary',
         });
     }
+}
+
+function runLegacyPdfRetirementCheck() {
+    const relativePath = 'app/api/pdf-extract/route.ts';
+    const source = fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
+    for (const issue of validateLegacyPdfRetirementSource(source)) addFinding({
+        code: 'NR-PDF-RETIRED', file: relativePath, line: 1, message: issue, snippet: 'legacy PDF route retirement boundary',
+    });
 }
 
 function collectRuntimeFiles() {
