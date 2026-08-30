@@ -167,9 +167,10 @@ Gli stati pre-cutover ammessi sono ordinati e chiusi:
    resta assente da dipendenze, lockfile, `node_modules`, configurazione Next,
    adapter e grafi di import di produzione.
 3. `PHYSICAL_PACKAGE_PREPARED`: alla sorgente si aggiungono tarball e
-   provenienza `0.8.5-prepared.0` tracciati, dipendenza e lock entry esatti e
-   una sola copia fisica installata. Il root resta inerte, non carica
-   `internal/` e non ha consumer o externalization di produzione.
+   provenienza della versione corrente `0.8.5-prepared.N`, dipendenza e lock
+   entry esatti e una sola copia fisica installata. Il root resta inerte, non
+   carica `internal/` e non ha consumer o externalization di produzione. La
+   prima versione accettata di questo stato e `0.8.5-prepared.0`.
 
 La sola transizione ammessa e
 `DORMANT_PREPARED -> PACKAGE_SOURCE_PREPARED -> PHYSICAL_PACKAGE_PREPARED ->`
@@ -178,9 +179,59 @@ relativo packet sia accettato. Combinazioni parziali, ritorni a uno stato
 precedente e due authority parallele sono `INVALID` e fermano il programma.
 In tutti e tre gli stati l'owner storico locale resta la sola authority runtime.
 
+### Addendum D0c: serie monotona delle versioni preparate
+
+`0.8.5-prepared.N` e una serie monotona, dove `N` e un intero non negativo.
+Ogni packet preparato parte dall'ultimo `N` accettato e usa `N + 1`. Non puo
+saltare, riusare o diminuire `N`.
+
+Ogni modifica di un solo byte agli input del package, ai membri o ai metadati
+del tarball oppure alla provenienza richiede un nuovo `N`. Dopo l'accettazione,
+la coppia formata dalla versione e dai relativi digest e immutabile. Una
+versione non puo quindi identificare byte, roster, digest o integrity diversi.
+
+Per ogni `N`, questi elementi avanzano insieme e identificano la stessa
+versione corrente:
+
+- `packages/web-auth-lifecycle-owner/package.json`;
+- il tarball
+  `packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5-prepared.N.tgz`;
+- la provenienza
+  `packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5-prepared.N.provenance.json`;
+- la dipendenza root
+  `file:packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5-prepared.N.tgz`;
+- versione, `resolved` e `integrity` dell'unica entry del lockfile;
+- l'unica copia fisica corrente installata nell'applicazione.
+
+La provenienza di `N > 0` registra il predecessore esatto come
+`{version,tarSha256,provenanceSha256}`. Registra inoltre la base Git
+accettata del packet, la toolchain, i comandi, i roster e i digest della nuova
+versione. Il predecessore deve coincidere con l'ultimo `N` accettato.
+
+Un packet preparato e indivisibile. D1 riconosce
+`PHYSICAL_PACKAGE_PREPARED` soltanto quando manifest, tarball, provenienza,
+dipendenza, lockfile e copia fisica coincidono sullo stesso `N`. Deve esistere
+esattamente un solo `N` corrente. Qualunque combinazione parziale o mista e
+`INVALID`, anche se ogni elemento e valido separatamente.
+
+La copia sotto `node_modules` e ignorata da Git e non viene mai tracciata. La
+verifica la rimaterializza dal tarball corrente e riconosce il nuovo stato solo
+quando anche questa copia e avanzata allo stesso `N`, con identita fisica,
+roster e digest esatti. Fino a quel momento il packet non e accettabile.
+
+Tarball e provenienze di versioni precedenti possono restare tracciati soltanto
+come evidenza storica inerte. Nessuna dipendenza, lock entry, copia installata,
+adapter, test runtime o consumer puo referenziarli, installarli o caricarli.
+Non costituiscono la versione corrente e non acquisiscono authority.
+
+Il cutover finale `0.8.5` parte dall'ultimo `0.8.5-prepared.N` accettato. La sua
+provenienza indica quel predecessore esatto. Il commit di cutover sostituisce
+insieme tutti gli elementi correnti secondo il contratto finale gia definito;
+non puo partire da una versione preparata superata o da una serie incompleta.
+
 ### Sorgente, manifest e root CommonJS
 
-Per gli stati preparati di `0.8.5` nomi e percorsi sono fissi:
+Per la prima versione preparata `0.8.5-prepared.0`, nomi e percorsi sono fissi:
 
 - sorgente: `packages/web-auth-lifecycle-owner/`;
 - nome package: `@mediflow/web-auth-lifecycle-owner`;
@@ -234,7 +285,8 @@ Il commit atomico di cutover crea invece il nuovo tarball finale
 `packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5.tgz` e la provenienza
 `packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5.provenance.json`.
 Il manifest finale usa la versione `0.8.5`; il root espone la nuova API attiva
-e deve avere byte e digest diversi dal root inerte `0.8.5-prepared.0`. Nello
+e deve avere byte e digest diversi dal root inerte dell'ultima versione
+`0.8.5-prepared.N` accettata. Nello
 stesso commit indivisibile dipendenza root, lockfile, `resolved`, `integrity`,
 copia installata, adapter e consumer passano insieme al tarball finale. Prima
 di quel commit i byte del root/API attivo `0.8.5` non possono esistere in
@@ -244,14 +296,15 @@ anche dopo il cutover.
 
 ### Provenienza, pack e installazione fisica
 
-La provenienza preparata registra almeno: base Git accettata
-`a9a81a4fe4c3551be1b9676019579a7bcdd6a611`, nome e versione, versioni esatte
-Node e npm, comando di pack, lunghezza e SHA-256 del tarball, roster ordinato
-del tar e SHA-256 di ogni input e membro. Il file non contiene percorsi
-assoluti, cache, credenziali o dati runtime. Una modifica di un solo byte
-richiede una nuova versione; la stessa versione non puo identificare due
-digest diversi. La provenienza finale registra separatamente il predecessore del
-cutover e i nuovi roster e digest `0.8.5`.
+La provenienza preparata registra almeno: base Git accettata, nome e versione,
+versioni esatte Node e npm, comando di pack, lunghezza e SHA-256 del tarball,
+roster ordinato del tar e SHA-256 di ogni input e membro. Per
+`0.8.5-prepared.0` la base Git accettata e
+`a9a81a4fe4c3551be1b9676019579a7bcdd6a611`; ogni `N > 0` registra la base Git
+accettata del proprio packet e il predecessore imposto da D0c. Il file non
+contiene percorsi assoluti, cache, credenziali o dati runtime. La provenienza
+finale registra separatamente l'ultimo predecessore preparato e i nuovi roster
+e digest `0.8.5`.
 
 Il pack viene eseguito due volte da due copie temporanee pulite della sorgente,
 con la stessa toolchain registrata e con:
@@ -309,7 +362,9 @@ roster, digest, provenienza, lock o integrity, installazione con rete, cache o
 script, link o copia duplicata, import diretto/client/deep e inferenze
 multiprocesso dalla prova sequenziale. Sono falsificatori anche i byte del
 root/API attivo `0.8.5` presenti prima del cutover e un commit finale che non sostituisce
-insieme tarball, provenienza, dipendenza, lock, `integrity` e root inerte.
+insieme tarball, provenienza, dipendenza, lock, `integrity` e root inerte. D0c
+aggiunge come falsificatori un salto o riuso di `N`, un predecessore errato,
+piu versioni correnti e qualunque mix tra elementi di versioni preparate diverse.
 
 Registry remoto, Git o URL, dual CJS/ESM, condizioni di export, un marker
 `server-only` interno al package, un secondo owner, un servizio separato,
