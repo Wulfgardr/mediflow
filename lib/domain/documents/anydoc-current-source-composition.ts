@@ -3,6 +3,7 @@ import 'server-only';
 
 import { types } from 'node:util';
 import type { ServerSession } from '../../security/server-session';
+import { bindAttachmentExtractionSelection } from './attachment-extraction-selection-binding';
 import { createAttachmentExtractionSourceAuthority } from './attachment-extraction-source-authority';
 import {
     buildAnyDocLocalExtraction,
@@ -78,6 +79,7 @@ function denied(): LocalExtractionResult { return publishFinalizedResult(buildAn
 /** Runs one current host-owned attachment through the fixed local parser and publishes only after final currentness. */
 export async function composeAnyDocCurrentSourceExtraction(session: ServerSession, selector: unknown): Promise<LocalExtractionResult> {
     const id = attachmentId(selector); if (!id) return denied();
+    if (!bindAttachmentExtractionSelection(session, id)) return denied();
     let authority: ReturnType<typeof createAttachmentExtractionSourceAuthority>;
     try { authority = createAttachmentExtractionSourceAuthority(session); }
     catch { return denied(); }
