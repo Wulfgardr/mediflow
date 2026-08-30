@@ -71,7 +71,6 @@ const nextConfig: NextConfig = {
       "./node_modules/sharp/**/*",
       "./node_modules/@img/**/*",
       "./node_modules/@firecrawl/anydoc*/**/*",
-      "./node_modules/@firecrawl/pdf-inspector*/**/*",
     ],
   },
   /* @Codex */
