@@ -29,15 +29,16 @@ const SELF_FILES = new Set(['scripts/check-anydoc-local-only.mjs', 'scripts/chec
 function retiredPdfIdentity(value) {
     if (typeof value !== 'string') return false;
     let canonical = value;
-    for (let depth = 0; depth < 4; depth += 1) {
-        try {
-            const decoded = decodeURIComponent(canonical);
-            if (decoded === canonical) break;
-            canonical = decoded;
-        } catch { break; }
+    for (let depth = 0; depth < 8; depth += 1) {
+        const decoded = canonical.replace(/%([0-7][0-9a-f])/giu, (_match, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
+        if (decoded === canonical) break;
+        canonical = decoded;
     }
-    return canonical.includes(RETIRED_PDF_INSPECTOR)
-        || /(?:^|[/:\\])pdf-inspector(?=$|[-/@.?#])/iu.test(canonical);
+    const residual = canonical.replace(/%(?:25)+/giu, '%')
+        .replace(/%([0-7][0-9a-f])/giu, (_match, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
+    const matches = (candidate) => candidate.includes(RETIRED_PDF_INSPECTOR)
+        || /(?:^|[/:\\])pdf-inspector(?=$|[-/@.?#])/iu.test(candidate);
+    return matches(canonical) || matches(residual);
 }
 
 function dependencyEntries(manifest) {
