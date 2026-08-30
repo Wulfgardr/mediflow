@@ -4,6 +4,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import ts from 'typescript';
 import { NEVER_REGRESS_ALLOWLIST } from './never-regress-allowlist.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -40,7 +41,7 @@ const TELEMETRY_PACKAGES = [
 
 const findings = [];
 
-main();
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) main();
 
 function main() {
     const runtimeFiles = collectRuntimeFiles();
@@ -48,7 +49,183 @@ function main() {
     runExternalUrlChecks(runtimeFiles);
     runTelemetryChecks(runtimeFiles);
     runZeroKnowledgeChecks(runtimeFiles);
+    runLegacyOcrRetirementCheck();
     reportAndExit();
+}
+
+/* @Codex */
+export function validateLegacyOcrRetirementSource(source) {
+    const issues = new Set();
+    const sourceFile = ts.createSourceFile(
+        'app/api/ocr/extract/route.ts',
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+    );
+    if (sourceFile.parseDiagnostics.length > 0) issues.add('route source has syntax errors');
+
+    const imports = sourceFile.statements.filter(ts.isImportDeclaration);
+    if (imports.length !== 2) issues.add('route must have exactly two static imports');
+    if (!imports.some(isCanonicalNextServerImport)) issues.add('Next server import must remain canonical and unaliased');
+    if (!imports.some(isCanonicalAuthImport)) issues.add('authentication import must remain canonical and unaliased');
+
+    const handlers = new Map();
+    for (const [index, statement] of sourceFile.statements.entries()) {
+        if (ts.isImportDeclaration(statement) || (index >= 2 && isInertStringStatement(statement))) continue;
+        if (!ts.isFunctionDeclaration(statement) || !statement.name || !['GET', 'POST'].includes(statement.name.text)) {
+            issues.add('route may contain only canonical imports, inert strings, GET and POST');
+            continue;
+        }
+        if (handlers.has(statement.name.text)) issues.add(`${statement.name.text} must be declared exactly once`);
+        handlers.set(statement.name.text, statement);
+    }
+
+    for (const name of ['GET', 'POST']) {
+        const handler = handlers.get(name);
+        if (!handler) issues.add(`${name} retirement handler is missing`);
+        else validateRetirementHandler(handler, name, issues);
+    }
+    return [...issues];
+}
+
+function isCanonicalNamedImport(node, moduleName, expectedNames) {
+    if (!ts.isStringLiteral(node.moduleSpecifier) || node.moduleSpecifier.text !== moduleName) return false;
+    if (node.attributes || node.assertClause) return false;
+    const clause = node.importClause;
+    if (!clause || clause.isTypeOnly || clause.name || !clause.namedBindings || !ts.isNamedImports(clause.namedBindings)) return false;
+    const names = clause.namedBindings.elements;
+    if (names.length !== expectedNames.length) return false;
+    return expectedNames.every((expected) => names.some((element) => (
+        !element.isTypeOnly && !element.propertyName && element.name.text === expected
+    )));
+}
+
+function isCanonicalNextServerImport(node) {
+    return isCanonicalNamedImport(node, 'next/server', ['NextRequest', 'NextResponse']);
+}
+
+function isCanonicalAuthImport(node) {
+    return isCanonicalNamedImport(node, '@/lib/security/server-auth', ['requireSessionOrLocalToken']);
+}
+
+function isInertStringStatement(node) {
+    return ts.isExpressionStatement(node) && ts.isStringLiteral(node.expression);
+}
+
+function hasModifier(node, kind) {
+    return Boolean(ts.canHaveModifiers(node) && ts.getModifiers(node)?.some((modifier) => modifier.kind === kind));
+}
+
+function validateRetirementHandler(handler, name, issues) {
+    if (!hasModifier(handler, ts.SyntaxKind.ExportKeyword) || !hasModifier(handler, ts.SyntaxKind.AsyncKeyword)) {
+        issues.add(`${name} must remain an exported async function`);
+    }
+    if (hasModifier(handler, ts.SyntaxKind.DefaultKeyword) || handler.asteriskToken
+        || handler.typeParameters?.length || handler.parameters.length !== 1 || !handler.body) {
+        issues.add(`${name} must keep the exact request handler shape`);
+        return;
+    }
+    const parameter = handler.parameters[0];
+    const validParameter = ts.isIdentifier(parameter.name)
+        && parameter.name.text === 'request'
+        && !parameter.initializer
+        && !parameter.dotDotDotToken
+        && ts.isTypeReferenceNode(parameter.type)
+        && ts.isIdentifier(parameter.type.typeName)
+        && parameter.type.typeName.text === 'NextRequest';
+    if (!validParameter) issues.add(`${name} request parameter must remain canonical`);
+
+    const statements = handler.body.statements;
+    if (statements.length !== 3) {
+        issues.add(`${name} must contain only authentication, unauthorized denial and retirement denial`);
+        return;
+    }
+    if (!isCanonicalAuthStatement(statements[0])) issues.add(`${name} must await canonical authentication as its first statement`);
+    if (!isCanonicalUnauthorizedIf(statements[1])) issues.add(`${name} must keep the exact no-store 401 Unauthorized denial`);
+    if (!isCanonicalResponseReturn(statements[2], 410, [
+        ['error', 'OCR extraction endpoint retired'],
+        ['code', 'OCR_EXTRACTION_RETIRED'],
+    ])) issues.add(`${name} must keep the exact no-store 410 OCR_EXTRACTION_RETIRED denial`);
+}
+
+function isCanonicalAuthStatement(node) {
+    if (!ts.isVariableStatement(node) || (node.declarationList.flags & ts.NodeFlags.Const) === 0) return false;
+    const declarations = node.declarationList.declarations;
+    if (declarations.length !== 1 || !ts.isIdentifier(declarations[0].name) || declarations[0].name.text !== 'session') return false;
+    const awaited = declarations[0].initializer;
+    if (!awaited || !ts.isAwaitExpression(awaited) || !ts.isCallExpression(awaited.expression)) return false;
+    const call = awaited.expression;
+    return ts.isIdentifier(call.expression)
+        && call.expression.text === 'requireSessionOrLocalToken'
+        && !call.questionDotToken
+        && !call.typeArguments?.length
+        && call.arguments.length === 1
+        && ts.isIdentifier(call.arguments[0])
+        && call.arguments[0].text === 'request';
+}
+
+function isCanonicalUnauthorizedIf(node) {
+    if (!ts.isIfStatement(node) || node.elseStatement) return false;
+    const condition = node.expression;
+    if (!ts.isPrefixUnaryExpression(condition)
+        || condition.operator !== ts.SyntaxKind.ExclamationToken
+        || !ts.isIdentifier(condition.operand)
+        || condition.operand.text !== 'session') return false;
+    return ts.isBlock(node.thenStatement)
+        && node.thenStatement.statements.length === 1
+        && isCanonicalResponseReturn(node.thenStatement.statements[0], 401, [['error', 'Unauthorized']]);
+}
+
+function isCanonicalResponseReturn(node, status, bodyEntries) {
+    if (!ts.isReturnStatement(node) || !node.expression || !ts.isCallExpression(node.expression)) return false;
+    const call = node.expression;
+    if (!ts.isPropertyAccessExpression(call.expression)
+        || !ts.isIdentifier(call.expression.expression)
+        || call.expression.expression.text !== 'NextResponse'
+        || call.expression.name.text !== 'json'
+        || call.arguments.length !== 2) return false;
+    return isExactStringObject(call.arguments[0], bodyEntries)
+        && isExactResponseOptions(call.arguments[1], status);
+}
+
+function isExactStringObject(node, entries) {
+    if (!ts.isObjectLiteralExpression(node) || node.properties.length !== entries.length) return false;
+    return entries.every(([name, value], index) => {
+        const property = node.properties[index];
+        return ts.isPropertyAssignment(property)
+            && ((ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) && property.name.text === name)
+            && ts.isStringLiteral(property.initializer)
+            && property.initializer.text === value;
+    });
+}
+
+function isExactResponseOptions(node, status) {
+    if (!ts.isObjectLiteralExpression(node) || node.properties.length !== 2) return false;
+    const [statusProperty, headersProperty] = node.properties;
+    return ts.isPropertyAssignment(statusProperty)
+        && ts.isIdentifier(statusProperty.name)
+        && statusProperty.name.text === 'status'
+        && ts.isNumericLiteral(statusProperty.initializer)
+        && Number(statusProperty.initializer.text) === status
+        && ts.isPropertyAssignment(headersProperty)
+        && ts.isIdentifier(headersProperty.name)
+        && headersProperty.name.text === 'headers'
+        && isExactStringObject(headersProperty.initializer, [['cache-control', 'no-store']]);
+}
+
+function runLegacyOcrRetirementCheck() {
+    const relativePath = 'app/api/ocr/extract/route.ts';
+    const source = fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
+    for (const issue of validateLegacyOcrRetirementSource(source)) {
+        addFinding({
+            code: 'NR-OCR-RETIRED',
+            file: relativePath,
+            line: 1,
+            message: issue,
+            snippet: 'legacy OCR route retirement boundary',
+        });
+    }
 }
 
 function collectRuntimeFiles() {
@@ -307,11 +484,6 @@ function runZeroKnowledgeChecks(runtimeFiles) {
             file: 'app/api/icd/proxy/route.ts',
             token: 'validateLocalTarget(ICD_LOCAL_URL)',
             message: 'ICD proxy must validate configured local endpoint before fetching',
-        },
-        {
-            file: 'app/api/ocr/extract/route.ts',
-            token: 'validateLocalTarget(baseUrl)',
-            message: 'OCR availability probe must validate configured local endpoint before fetching',
         },
         {
             file: 'app/api/proxy/ollama/chat/route.ts',
