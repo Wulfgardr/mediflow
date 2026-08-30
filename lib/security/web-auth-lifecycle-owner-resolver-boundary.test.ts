@@ -20,9 +20,16 @@ const EXPECTED_TSCONFIG_RESOLVER = {
     moduleSuffixes: null, customConditions: null,
 };
 const EXPECTED_SCRIPTS = {
+    [`pre${GUARD_SCRIPT}`]: null,
     [GUARD_SCRIPT]: GUARD_COMMAND,
-    dev: 'next dev --turbopack --hostname 127.0.0.1 --port 3000', build: 'next build',
+    [`post${GUARD_SCRIPT}`]: null,
+    predev: 'node scripts/node-runtime-contract.mjs verify',
+    dev: 'next dev --turbopack --hostname 127.0.0.1 --port 3000', postdev: null,
+    prebuild: 'node scripts/node-runtime-contract.mjs verify', build: 'next build',
+    postbuild: 'node scripts/node-runtime-contract.mjs write-standalone-manifest && node scripts/check-standalone-runtime-bundle.mjs',
+    prestart: 'node scripts/node-runtime-contract.mjs verify',
     start: 'next start --hostname 127.0.0.1 --port 3000',
+    poststart: null,
 };
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 type PackageJson = Record<string, unknown>;
@@ -122,6 +129,9 @@ test('freezes canonical TypeScript and package resolver projections', () => {
         assert.notDeepEqual(tsconfigErrors(JSON.stringify(parsed)), []);
     }
     assert.notDeepEqual(tsconfigErrors(JSON.stringify({ ...JSON.parse(liveTsconfig), extends: './owner-tsconfig.json' })), []);
+    assert.deepEqual(packageErrors(livePackage), []);
+    for (const [key, expected] of Object.entries(EXPECTED_SCRIPTS)) assert.notDeepEqual(packageErrors({ ...livePackage,
+        scripts: { ...(livePackage.scripts as object), [key]: expected === null ? 'node synthetic-hook.mjs' : `${expected} && node synthetic-hook.mjs` } }), []);
     const reorderedScripts = Object.fromEntries(Object.entries(EXPECTED_SCRIPTS).reverse());
     assert.deepEqual(packageErrors(JSON.parse(JSON.stringify({ scripts: reorderedScripts, name: 'synthetic' }, null, 4))), []);
     for (const key of ['imports', 'exports', 'browser']) assert.notDeepEqual(packageErrors({ scripts: EXPECTED_SCRIPTS,
@@ -134,6 +144,9 @@ test('denies alternate resolver files, nested packages, and loss of the combined
     for (const file of ['next.config.js', 'next.config.mjs', 'jsconfig.json', '.babelrc', 'babel.config.cjs',
         'lib/security/package.json']) assert.notDeepEqual(inventoryErrors([...baseline, file]), [], file);
     assert.deepEqual(inventoryErrors([...baseline, 'node_modules/dep/package.json', '.next/cache/package.json']), []);
+    assert.notDeepEqual(packageErrors({ ...livePackage, scripts: { ...(livePackage.scripts as object),
+        [`pre${GUARD_SCRIPT}`]: `node synthetic-replace.mjs ${D1B} noop`,
+        [`post${GUARD_SCRIPT}`]: `node synthetic-restore.mjs ${D1B}` } }), []);
     assert.notDeepEqual(packageErrors({ ...livePackage, scripts: { ...(livePackage.scripts as object),
         [GUARD_SCRIPT]: `node scripts/run-strip-types.mjs --test ${D1A}` } }), []);
 });
