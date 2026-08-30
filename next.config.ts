@@ -66,8 +66,11 @@ const nextConfig: NextConfig = {
   /* @Codex */
   outputFileTracingIncludes: {
     "/*": [
+      "./package.json",
+      "./scripts/anydoc-local-extraction-worker.mjs",
       "./node_modules/sharp/**/*",
       "./node_modules/@img/**/*",
+      "./node_modules/@firecrawl/anydoc*/**/*",
       "./node_modules/@firecrawl/pdf-inspector*/**/*",
     ],
   },

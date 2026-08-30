@@ -1,13 +1,28 @@
 /* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import os from 'node:os';
+import path from 'node:path';
 
 import { extractAnyDocLocalBytes } from './anydoc-local-extraction-runner';
 import { ANYDOC_LOCAL_EXTRACTION_MAX_MARKDOWN_BYTES, ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES } from './anydoc-local-extraction-contract';
 
 const SYNTHETIC_RTF = Buffer.from('{\\rtf1\\ansi Synthetic discharge note.}', 'utf8');
 const RUNNER_SOURCE = readFileSync(new URL('./anydoc-local-extraction-runner.ts', import.meta.url), 'utf8');
+const NEXT_CONFIG_SOURCE = readFileSync(new URL('../../../next.config.ts', import.meta.url), 'utf8');
+const WORKER_PATH = path.resolve(path.dirname(new URL('./anydoc-local-extraction-runner.ts', import.meta.url).pathname), '../../../scripts/anydoc-local-extraction-worker.mjs');
+const CHECKER_PATH = path.resolve(path.dirname(WORKER_PATH), 'check-standalone-runtime-bundle.mjs');
+
+function assertIoFailure(result: Awaited<ReturnType<typeof extractAnyDocLocalBytes>>) {
+    assert.equal(result.status, 'review_required');
+    if (result.status !== 'review_required') return;
+    assert.equal(result.reason, 'unsupported_local_extraction');
+    assert.equal(result.detail, 'io_failure');
+    assert.equal(result.markdown, '');
+    assert.equal(result.candidateUse, 'blocked');
+}
 
 test('binds successful extraction evidence to the exact copied source bytes', async () => {
     const result = await extractAnyDocLocalBytes('synthetic-attachment-rtf', SYNTHETIC_RTF);
@@ -54,10 +69,57 @@ test('does not inherit provider, native override or Node option variables', asyn
     }
 });
 
-test('pins child cwd to the owned worker directory without ambient input', () => {
-    assert.match(RUNNER_SOURCE, /const WORKER_DIRECTORY = fileURLToPath\(new URL\('\.\.\/\.\.\/\.\.\/scripts\/', import\.meta\.url\)\);/u);
-    assert.match(RUNNER_SOURCE, /cwd: WORKER_DIRECTORY,/u);
-    assert.doesNotMatch(RUNNER_SOURCE, /cwd:\s*(?:process\.cwd|process\.env)/u);
+test('derives the exact digest-bound worker from the physical module directory', () => {
+    assert.match(RUNNER_SOURCE, /anydoc-local-extraction-worker\.mjs/u);
+    assert.match(RUNNER_SOURCE, /34f2db3d788585dab175b284bc8f1f39395fb66a21780e1782a5d5067073e370/u);
+    assert.match(RUNNER_SOURCE, /medical-record-app/u);
+    assert.match(RUNNER_SOURCE, /cwd: worker\.directory,/u);
+    assert.doesNotMatch(RUNNER_SOURCE, /new URL\([^\n]*scripts\//u);
+    assert.doesNotMatch(RUNNER_SOURCE, /process\.(?:cwd|argv|env)/u);
+    assert.match(NEXT_CONFIG_SOURCE, /"\.\/package\.json"/u);
+    assert.match(NEXT_CONFIG_SOURCE, /"\.\/scripts\/anydoc-local-extraction-worker\.mjs"/u);
+    assert.match(NEXT_CONFIG_SOURCE, /"\.\/node_modules\/@firecrawl\/anydoc\*\/\*\*\/\*"/u);
+});
+
+test('ignores hostile caller cwd when locating the owned worker', async () => {
+    const originalCwd = process.cwd();
+    const hostileCwd = mkdtempSync(path.join(os.tmpdir(), 'mediflow-anydoc-hostile-cwd-'));
+    try {
+        process.chdir(hostileCwd);
+        const result = await extractAnyDocLocalBytes('synthetic-attachment-hostile-cwd', SYNTHETIC_RTF);
+        assert.equal(result.status, 'extracted');
+    } finally {
+        process.chdir(originalCwd);
+        rmSync(hostileCwd, { recursive: true, force: true });
+    }
+});
+
+test('fails closed with sanitized io_failure for missing, symlinked, and tampered workers', async () => {
+    const backupPath = `${WORKER_PATH}.runner-test-backup`;
+    const original = readFileSync(WORKER_PATH);
+    const outsideDir = mkdtempSync(path.join(os.tmpdir(), 'mediflow-anydoc-worker-outside-'));
+    const outsideWorker = path.join(outsideDir, 'worker.mjs');
+    try {
+        renameSync(WORKER_PATH, backupPath);
+        assertIoFailure(await extractAnyDocLocalBytes('synthetic-attachment-worker-missing', SYNTHETIC_RTF));
+
+        writeFileSync(outsideWorker, original);
+        symlinkSync(outsideWorker, WORKER_PATH);
+        assertIoFailure(await extractAnyDocLocalBytes('synthetic-attachment-worker-symlink', SYNTHETIC_RTF));
+        rmSync(WORKER_PATH);
+
+        writeFileSync(WORKER_PATH, Buffer.concat([original, Buffer.from('\n// synthetic tamper\n')]));
+        assertIoFailure(await extractAnyDocLocalBytes('synthetic-attachment-worker-tamper', SYNTHETIC_RTF));
+    } finally {
+        rmSync(WORKER_PATH, { force: true });
+        renameSync(backupPath, WORKER_PATH);
+        rmSync(outsideDir, { recursive: true, force: true });
+    }
+});
+
+test('exercises standalone AnyDoc bundle checks through their public CLI seam', () => {
+    const result = spawnSync(process.execPath, [CHECKER_PATH, '--self-test'], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
 });
 
 test('maps an unsupported byte snapshot to review-required without candidate output', async () => {

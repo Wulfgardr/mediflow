@@ -1,8 +1,64 @@
 // Codex: created 2026-05-02
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node-runtime-contract.mjs';
+
+const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
+const ANYDOC_WORKER_SHA256 = '34f2db3d788585dab175b284bc8f1f39395fb66a21780e1782a5d5067073e370';
+const SYNTHETIC_RTF = Buffer.from('{\\rtf1\\ansi Synthetic standalone note.}', 'utf8');
+
+function bundledWorkerFailure(standaloneDir) {
+  const workerPath = path.join(standaloneDir, 'scripts', ANYDOC_WORKER_FILE);
+  let workerStat;
+  try {
+    workerStat = fs.lstatSync(workerPath);
+  } catch {
+    return 'Standalone runtime does not contain the AnyDoc worker.';
+  }
+  if (!workerStat.isFile()) return 'Standalone runtime AnyDoc worker is not a regular file.';
+
+  try {
+    const root = fs.realpathSync(standaloneDir);
+    const worker = fs.realpathSync(workerPath);
+    const relative = path.relative(root, worker);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) return 'Standalone runtime resolves the AnyDoc worker outside the bundle.';
+    if (!fs.statSync(worker).isFile()) return 'Standalone runtime AnyDoc worker is not a regular file.';
+    if (createHash('sha256').update(fs.readFileSync(worker)).digest('hex') !== ANYDOC_WORKER_SHA256) {
+      return 'Standalone runtime AnyDoc worker digest does not match the packaged worker.';
+    }
+  } catch {
+    return 'Standalone runtime cannot verify the AnyDoc worker.';
+  }
+  return null;
+}
+
+function runSelfTest() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-anydoc-checker-self-test-'));
+  const scriptsDir = path.join(root, 'scripts');
+  const workerPath = path.join(scriptsDir, ANYDOC_WORKER_FILE);
+  const sourceWorker = path.join(process.cwd(), 'scripts', ANYDOC_WORKER_FILE);
+  try {
+    fs.mkdirSync(scriptsDir);
+    fs.copyFileSync(sourceWorker, workerPath);
+    if (bundledWorkerFailure(root) !== null) throw new Error('expected bundled AnyDoc worker to pass');
+    fs.rmSync(workerPath);
+    if (bundledWorkerFailure(root) === null) throw new Error('missing bundled AnyDoc worker passed');
+    fs.copyFileSync(sourceWorker, workerPath);
+    fs.appendFileSync(workerPath, '\n// self-test tamper\n');
+    if (bundledWorkerFailure(root) === null) throw new Error('tampered bundled AnyDoc worker passed');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+if (process.argv[2] === '--self-test') {
+  runSelfTest();
+  process.exit(0);
+}
 
 const root = process.cwd();
 const standaloneDir = standaloneDirectory(root);
@@ -104,6 +160,44 @@ function nativeArtifacts(packageDir, label, matcher) {
   for (const artifact of artifacts) {
     assertRealpathInsideStandalone(artifact, label);
   }
+}
+
+// @Codex: The child-process parser must be fully self-contained and byte-identical.
+const anyDocWorkerFailure = bundledWorkerFailure(standaloneDir);
+if (anyDocWorkerFailure) fail(anyDocWorkerFailure);
+const anyDocWorkerPath = path.join(standaloneDir, 'scripts', ANYDOC_WORKER_FILE);
+const packageScopes = fs.readdirSync(path.join(standaloneDir, 'node_modules'), { withFileTypes: true });
+const firecrawlScope = packageScopes.find((entry) => entry.isDirectory() && entry.name === '@firecrawl')?.name;
+const anyDocName = firecrawlScope
+  ? fs.readdirSync(path.join(standaloneDir, 'node_modules', firecrawlScope), { withFileTypes: true })
+    .find((entry) => entry.isDirectory() && entry.name === 'anydoc')?.name
+  : undefined;
+if (!firecrawlScope || !anyDocName) fail('Standalone runtime does not contain the AnyDoc package directory.');
+const anyDocRequest = [firecrawlScope, anyDocName].join('/');
+const anyDocEntry = requireFromStandalone.resolve(`${anyDocRequest}/index.js`);
+assertRealpathInsideStandalone(anyDocEntry, 'AnyDoc entrypoint');
+const anyDocPackageDir = path.dirname(requireFromStandalone.resolve(`${anyDocRequest}/package`));
+assertRealpathInsideStandalone(anyDocPackageDir, 'AnyDoc package');
+const anyDocManifest = JSON.parse(fs.readFileSync(path.join(anyDocPackageDir, 'package.json'), 'utf8'));
+const anyDocNativePackage = Object.keys(anyDocManifest.optionalDependencies ?? {}).find((name) => {
+  if (!name.startsWith(`${anyDocRequest}-`) || !name.includes(`-${process.platform}-${process.arch}`)) return false;
+  return process.platform !== 'linux' || (process.report?.getReport().header.glibcVersionRuntime ? name.endsWith('-gnu') : name.endsWith('-musl'));
+});
+if (!anyDocNativePackage) fail('AnyDoc does not declare a native package for the current platform.');
+const anyDocNativeManifest = requireFromStandalone.resolve(`${anyDocNativePackage}/package`);
+const anyDocNativeDir = path.dirname(assertRealpathInsideStandalone(anyDocNativeManifest, `${anyDocNativePackage} package`));
+nativeArtifacts(anyDocNativeDir, `${anyDocNativePackage} native binding`, (name) => name.endsWith('.node'));
+const anyDocRun = spawnSync(process.execPath, [anyDocWorkerPath], {
+  cwd: path.dirname(anyDocWorkerPath),
+  env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
+  input: SYNTHETIC_RTF,
+  encoding: 'buffer',
+  timeout: 15_000,
+  windowsHide: true,
+});
+if (anyDocRun.error || anyDocRun.status !== 0 || !Buffer.isBuffer(anyDocRun.stdout)
+    || anyDocRun.stdout.toString('utf8') !== 'Synthetic standalone note.\n') {
+  fail('Standalone runtime AnyDoc worker did not extract the synthetic RTF with its allowlisted environment.');
 }
 
 let databaseEntry;
