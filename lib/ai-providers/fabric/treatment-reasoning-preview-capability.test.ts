@@ -102,6 +102,16 @@ test('rejects malformed configuration before it can invoke its lifecycle callabl
     assert.equal(reads, 0);
 });
 
+test('rejects equal-count source-set mismatch before reading provider lifecycle', () => {
+    let reads = 0;
+    const mismatchedAdmission = admissionHost();
+    mismatchedAdmission.evidenceRefs = ['evidence.synthetic.beta'];
+    assert.throws(() => createTreatmentReasoningPreviewCapability({
+        proposalHost: proposal(), admissionHost: mismatchedAdmission, lifecycle: { read: () => { reads += 1; return lifecycle(); } },
+    }), TreatmentReasoningPreviewCapabilityConfigurationError);
+    assert.equal(reads, 0);
+});
+
 test('does not accept caller input, prompts, authority, provider invocation, or apply policy', () => {
     const preview = service().preview as unknown as (...args: unknown[]) => unknown;
     assert.deepEqual(preview(proposal(), 'invoke'), service().preview());

@@ -32,6 +32,31 @@ function record(value: unknown, expected: readonly string[]): Record<string, unk
     } catch { return null; }
 }
 
+function refs(value: unknown): readonly string[] | null {
+    try {
+        if (types.isProxy(value) || !Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return null;
+        const descriptors = Object.getOwnPropertyDescriptors(value); const lengthDescriptor = descriptors['length'] as PropertyDescriptor | undefined; const length = lengthDescriptor?.value;
+        if (!Number.isInteger(length) || length < 1 || length > 16) return null;
+        const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+        if (Reflect.ownKeys(value).length !== expected.size || !Reflect.ownKeys(value).every((key) => expected.has(String(key)))) return null;
+        const snapshot = new Array<string>(length);
+        for (let index = 0; index < length; index += 1) {
+            const descriptor = descriptors[String(index)];
+            if (!descriptor?.enumerable || !('value' in descriptor) || typeof descriptor.value !== 'string') return null;
+            snapshot[index] = descriptor.value;
+        }
+        return Object.freeze(snapshot);
+    } catch { return null; }
+}
+
+function sourceSetsMatch(proposalHost: unknown, admissionHost: unknown): boolean {
+    const proposal = record(proposalHost, ['projection', 'provenanceRef', 'receiptRef']);
+    const projection = proposal && record(proposal.projection, ['schema', 'capability', 'stage', 'sourceRevision', 'therapyRefs', 'evidenceRefs']);
+    const admission = record(admissionHost, ['readiness', 'receipt', 'provenance', 'evidenceRefs']);
+    const proposed = projection && refs(projection.evidenceRefs); const admitted = admission && refs(admission.evidenceRefs);
+    return proposed !== null && admitted !== null && proposed.length === admitted.length && proposed.every((ref, index) => ref === admitted[index]);
+}
+
 function lifecycleGate(value: unknown): LifecycleGate {
     const response = record(value, ['status', 'record']) ?? record(value, ['status', 'reason']);
     if (!response) return 'invalid';
@@ -65,7 +90,7 @@ export function createTreatmentReasoningPreviewCapability(configuration: unknown
     const input = record(configuration, ['proposalHost', 'admissionHost', 'lifecycle']);
     const lifecycle = input && record(input.lifecycle, ['read']);
     const read = lifecycle && Object.getOwnPropertyDescriptor(lifecycle, 'read')?.value;
-    if (!input || !lifecycle || typeof read !== 'function' || types.isProxy(read)) throw new TreatmentReasoningPreviewCapabilityConfigurationError();
+    if (!input || !lifecycle || typeof read !== 'function' || types.isProxy(read) || !sourceSetsMatch(input.proposalHost, input.admissionHost)) throw new TreatmentReasoningPreviewCapabilityConfigurationError();
     let proposal: ReturnType<typeof buildTreatmentReasoningReviewProposal>; let admission: Admission;
     try { proposal = buildTreatmentReasoningReviewProposal(input.proposalHost); admission = createTreatmentReasoningAthenaAdmission(input.admissionHost); } catch { throw new TreatmentReasoningPreviewCapabilityConfigurationError(); }
     const host = Object.freeze({ read: read as () => unknown });
