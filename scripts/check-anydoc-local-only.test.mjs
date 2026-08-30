@@ -155,6 +155,35 @@ test('retired PDF inspector cannot be reintroduced through project inputs', asyn
     try {
         await reset();
         assert.deepEqual(await runAnyDocLocalOnlyGuard(root), { workerSeen: true, checkedPackages: 8 });
+        const encodedRetiredSpecs = [
+            ['git-parser', 'git+https://github.com/firecrawl/pdf-inspector.git#v1.12.0'],
+            ['tar-parser', 'https://downloads.example/firecrawl/pdf-inspector.tgz?download=1#sha256'],
+            ['query-parser', 'https://downloads.example/firecrawl/pdf-inspector?raw=1#v1'],
+            ['encoded-parser', 'https://registry.example/%40firecrawl%2Fpdf%2Dinspector%2F-%2Fartifact.tgz'],
+        ];
+        const escapedIdentities = [];
+        for (const [alias, specifier] of encodedRetiredSpecs) {
+            await reset();
+            const value = structuredClone(packageJson);
+            value.dependencies[alias] = specifier;
+            await writeFile(path.join(root, 'package.json'), JSON.stringify(value));
+            await writeFile(path.join(root, 'scripts', 'legacy.ts'), `import '${alias}/internal.js';\n`);
+            try {
+                await runAnyDocLocalOnlyGuard(root);
+                escapedIdentities.push(alias);
+            } catch (error) {
+                assert.match(error.message, /dependency is forbidden/u);
+                assert.match(error.message, /legacy\.ts: retired PDF inspector alias import is forbidden/u);
+            }
+        }
+        assert.deepEqual(escapedIdentities, []);
+        for (const specifier of ['https://example/pdf-inspectorx.tgz', 'https://example/my-pdf-inspector.tgz']) {
+            await reset();
+            const value = structuredClone(packageJson);
+            value.dependencies['benign-parser'] = specifier;
+            await writeFile(path.join(root, 'package.json'), JSON.stringify(value));
+            assert.deepEqual(await runAnyDocLocalOnlyGuard(root), { workerSeen: true, checkedPackages: 8 });
+        }
         await reset();
         const aliasPackage = structuredClone(packageJson);
         aliasPackage.dependencies['retired-parser'] = 'npm:@firecrawl/pdf-inspector@1.12.0';
