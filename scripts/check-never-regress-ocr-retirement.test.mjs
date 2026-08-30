@@ -99,3 +99,13 @@ test('ignores inert comments and string literals that mention forbidden code', (
     const inert = canonicalRoute.replace("export async function POST", "// request.body fetch provider fallback\n'createRequire process.env OCR storage';\nexport async function POST");
     assert.deepEqual(validateLegacyOcrRetirementSource(inert), []);
 });
+
+test('denies executable decorators on GET or POST declarations and request parameters', () => {
+    const probes = [
+        canonicalRoute.replace('export async function GET', "@(import('@firecrawl/anydoc'))\nexport async function GET"),
+        canonicalRoute.replace('export async function POST', "@(fetch('https://synthetic.invalid'))\nexport async function POST"),
+        canonicalRoute.replace('POST(request: NextRequest)', 'POST(@(AIService.invoke()) request: NextRequest)'),
+        canonicalRoute.replace('GET(request: NextRequest)', 'GET(@(provider.invoke()) request: NextRequest)'),
+    ];
+    for (const source of probes) assert.notDeepEqual(validateLegacyOcrRetirementSource(source), []);
+});

@@ -118,6 +118,8 @@ function hasModifier(node, kind) {
 }
 
 function validateRetirementHandler(handler, name, issues) {
+    if (ts.getDecorators(handler)?.length || handler.parameters.some((parameter) => ts.getDecorators(parameter)?.length))
+        issues.add(`${name} declaration and parameter decorators are forbidden`);
     if (!hasModifier(handler, ts.SyntaxKind.ExportKeyword) || !hasModifier(handler, ts.SyntaxKind.AsyncKeyword)) {
         issues.add(`${name} must remain an exported async function`);
     }
