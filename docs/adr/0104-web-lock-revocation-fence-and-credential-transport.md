@@ -167,9 +167,9 @@ Gli stati pre-cutover ammessi sono ordinati e chiusi:
    resta assente da dipendenze, lockfile, `node_modules`, configurazione Next,
    adapter e grafi di import di produzione.
 3. `PHYSICAL_PACKAGE_PREPARED`: alla sorgente si aggiungono tarball e
-   provenienza tracciati, dipendenza e lock entry esatti e una sola copia
-   fisica installata. Il root resta inerte, non carica `internal/` e non ha
-   consumer o externalization di produzione.
+   provenienza `0.8.5-prepared.0` tracciati, dipendenza e lock entry esatti e
+   una sola copia fisica installata. Il root resta inerte, non carica
+   `internal/` e non ha consumer o externalization di produzione.
 
 La sola transizione ammessa e
 `DORMANT_PREPARED -> PACKAGE_SOURCE_PREPARED -> PHYSICAL_PACKAGE_PREPARED ->`
@@ -180,24 +180,22 @@ In tutti e tre gli stati l'owner storico locale resta la sola authority runtime.
 
 ### Sorgente, manifest e root CommonJS
 
-Per `0.8.5` nomi e percorsi sono fissi:
+Per gli stati preparati di `0.8.5` nomi e percorsi sono fissi:
 
 - sorgente: `packages/web-auth-lifecycle-owner/`;
 - nome package: `@mediflow/web-auth-lifecycle-owner`;
 - root: `packages/web-auth-lifecycle-owner/index.js`;
-- tarball:
-  `packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5.tgz`;
-- provenienza:
-  `packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5.provenance.json`;
+- tarball: `packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5-prepared.0.tgz`;
+- provenienza: `packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5-prepared.0.provenance.json`;
 - dipendenza root:
-  `file:packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5.tgz`.
+  `file:packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5-prepared.0.tgz`.
 
 Il `package.json` del package contiene, nello stesso ordine, soltanto:
 
 ```json
 {
   "name": "@mediflow/web-auth-lifecycle-owner",
-  "version": "0.8.5",
+  "version": "0.8.5-prepared.0",
   "private": true,
   "type": "commonjs",
   "main": "./index.js",
@@ -232,15 +230,28 @@ nessun modulo di produzione carica il package; al cutover solo l'adapter puo
 caricarne il root. Route, client, deep import e accesso diretto a `internal/`
 restano vietati.
 
+Il commit atomico di cutover crea invece il nuovo tarball finale
+`packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5.tgz` e la provenienza
+`packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.5.provenance.json`.
+Il manifest finale usa la versione `0.8.5`; il root espone la nuova API attiva
+e deve avere byte e digest diversi dal root inerte `0.8.5-prepared.0`. Nello
+stesso commit indivisibile dipendenza root, lockfile, `resolved`, `integrity`,
+copia installata, adapter e consumer passano insieme al tarball finale. Prima
+di quel commit i byte del root/API attivo `0.8.5` non possono esistere in
+sorgente, artifact, lockfile o `node_modules`, ne essere installati o caricati. Solo l'adapter puo
+caricarne il root; deep import e accesso diretto a `internal/` restano vietati
+anche dopo il cutover.
+
 ### Provenienza, pack e installazione fisica
 
-La provenienza JSON registra almeno: base Git accettata
+La provenienza preparata registra almeno: base Git accettata
 `a9a81a4fe4c3551be1b9676019579a7bcdd6a611`, nome e versione, versioni esatte
 Node e npm, comando di pack, lunghezza e SHA-256 del tarball, roster ordinato
 del tar e SHA-256 di ogni input e membro. Il file non contiene percorsi
 assoluti, cache, credenziali o dati runtime. Una modifica di un solo byte
 richiede una nuova versione; la stessa versione non puo identificare due
-digest diversi.
+digest diversi. La provenienza finale registra separatamente il predecessore del
+cutover e i nuovi roster e digest `0.8.5`.
 
 Il pack viene eseguito due volte da due copie temporanee pulite della sorgente,
 con la stessa toolchain registrata e con:
@@ -269,7 +280,7 @@ Le prove `lstat`, `stat` e `realpath` devono mostrare una sola directory package
 fisica e un solo root sotto il `node_modules` dell'applicazione. Manifest, root
 e file interni sono file regolari, non symlink o hardlink, e hanno link count
 uno. Roster e digest devono coincidere con la provenienza. Le stesse prove si
-ripetono sulla copia inclusa nello standalone di produzione.
+ripetono sulla copia finale `0.8.5` inclusa nello standalone di produzione.
 
 ### Significato dei due standalone di produzione
 
@@ -279,7 +290,7 @@ completamente prima di avviare B; ogni avvio crea un nuovo processo Node e un
 nuovo realm.
 
 In A e in B almeno due bundle route compilati separatamente devono attraversare
-la stessa unica copia fisica del package e lo stesso lifecycle process-local.
+la stessa unica copia fisica finale `0.8.5` e lo stesso lifecycle process-local.
 B deve negare ogni cookie, ticket, locator e operation emesso da A e deve
 osservare una nuova identita process-local. Il digest dell'output e il roster
 del package non cambiano fra i due avvii.
@@ -296,7 +307,9 @@ sola authority, o D1 non restituisce lo stato atteso esatto. Fermare anche per
 tar non riproducibile, versione riusata con byte diversi, drift di manifest,
 roster, digest, provenienza, lock o integrity, installazione con rete, cache o
 script, link o copia duplicata, import diretto/client/deep e inferenze
-multiprocesso dalla prova sequenziale.
+multiprocesso dalla prova sequenziale. Sono falsificatori anche i byte del
+root/API attivo `0.8.5` presenti prima del cutover e un commit finale che non sostituisce
+insieme tarball, provenienza, dipendenza, lock, `integrity` e root inerte.
 
 Registry remoto, Git o URL, dual CJS/ESM, condizioni di export, un marker
 `server-only` interno al package, un secondo owner, un servizio separato,
