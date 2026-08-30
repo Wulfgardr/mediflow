@@ -34,6 +34,10 @@ export const allowedGenericLoaderExpressions: ReadonlySet<string> = new Set([
     fingerprint('lib/security/web-auth-session-issuer.test.ts', 'dynamic', 'PropertyAccessExpression', 'VariableStatement', "pathToFileURL(join(directory, 'server-session.ts')).href"),
     fingerprint('lib/security/server-session.test.ts', 'require', 'ElementAccessExpression', 'ExpressionStatement', 'paths[0]'),
     fingerprint('lib/security/server-session.test.ts', 'require', 'ElementAccessExpression', 'ExpressionStatement', 'paths[1]'),
+    fingerprint('lib/domain/documents/attachment-extraction-source-authority.test.ts', 'dynamic', 'TemplateExpression', 'VariableStatement',
+        ["`${new URL('./attachment-extraction-source-authority.ts', import.meta", ".url).href}?copy=synthetic`"].join('')),
+    fingerprint('lib/domain/documents/attachment-extraction-source-authority.test.ts', 'dynamic', 'TemplateExpression', 'VariableStatement',
+        ["`${new URL('./attachment-extraction-source-authority.ts', import.meta", ".url).href}?restore-copy=synthetic`"].join('')),
     fingerprint('scripts/benchmark-clinical-entities.ts', 'dynamic', 'PropertyAccessExpression', 'VariableStatement', 'pathToFileURL(adapterModule).href'),
     fingerprint('scripts/benchmark-redaction.ts', 'dynamic', 'PropertyAccessExpression', 'VariableStatement', 'pathToFileURL(adapterModule).href'),
 ]);

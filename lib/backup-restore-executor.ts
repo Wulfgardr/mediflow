@@ -29,6 +29,7 @@ import {
 } from './schema';
 import type { BackupArtifact, BackupCollectionName } from './backup-artifact';
 import { derivePatientAmbulatoryLinks } from './backup-patient-ambulatory-links';
+import { revokeAttachmentExtractionLocatorGeneration } from './domain/documents/attachment-extraction-locator-revocation';
 
 const CLEAR_ORDER: BackupCollectionName[] = [
     'messages',
@@ -197,6 +198,7 @@ function insertRows<T extends Record<string, unknown>>(
 }
 
 export function restoreBackupArtifact(artifact: BackupArtifact): void {
+    revokeAttachmentExtractionLocatorGeneration();
     dbServer.transaction((tx) => {
         assertCommandRecoveryIsRepresentable();
         for (const collection of CLEAR_ORDER) {

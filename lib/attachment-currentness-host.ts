@@ -6,11 +6,14 @@ import { types } from 'node:util';
 import { sql } from 'drizzle-orm';
 
 import { dbServer, runDbServerImmediateTransaction } from './db-server';
+import { canTransitionDocumentOcrQueueState, isDocumentOcrQueueState, type DocumentOcrQueueState } from './domain/documents/document-ocr-queue';
 
 const REF = /^[0-9a-f]{64}$/u;
 const MAX = Number.MAX_SAFE_INTEGER;
 const KEYS = ['sourceRef', 'revision', 'freshnessEpoch'] as const;
 const STORED_KEYS = ['id', 'patientId', 'sourceRef', 'revision', 'freshnessEpoch'] as const;
+const METADATA_KEYS = ['summarySnapshot', 'parseEvidenceArtifactSnapshot', 'ocrQueueState'] as const;
+const METADATA_STORED_KEYS = [...STORED_KEYS, 'ocrQueueState'] as const;
 const RUN_RESULT_KEYS = ['changes', 'lastInsertRowid'] as const;
 const OBJECT_PROTOTYPE = Object.prototype;
 const objectCreate = Object.create;
@@ -33,19 +36,38 @@ const ErrorConstructor = Error;
 const dbServerGet = dbServer.get.bind(dbServer) as typeof dbServer.get;
 const dbServerRun = dbServer.run.bind(dbServer) as typeof dbServer.run;
 const mintedHostErrors = new WeakSet<object>();
+const mintedMetadataErrors = new WeakSet<object>();
 
 export type AttachmentCurrentness = Readonly<{ sourceRef: string; revision: number; freshnessEpoch: number }>;
 export type AttachmentCurrentnessHostErrorCode = 'input_invalid' | 'attachment_missing' | 'currentness_conflict' | 'currentness_overflow' | 'stored_state_invalid' | 'storage_unavailable';
+export type AttachmentMetadataCurrentnessHostErrorCode = 'ocr_queue_unavailable' | 'ocr_queue_transition_invalid';
+export type AttachmentMetadataMutation = Readonly<{
+    summarySnapshot: string | null | undefined;
+    parseEvidenceArtifactSnapshot: string | null | undefined;
+    ocrQueueState: DocumentOcrQueueState | undefined;
+}>;
 
 /** Identifies only errors minted by this host boundary. */
 export function isAttachmentCurrentnessHostError(error: unknown): error is Error & Readonly<{ code: AttachmentCurrentnessHostErrorCode }> {
     return typeof error === 'object' && error !== null && !isProxy(error) && weakSetHas(mintedHostErrors, error);
 }
 
+/** Identifies only metadata errors minted by this host boundary. */
+export function isAttachmentMetadataCurrentnessHostError(error: unknown): error is Error & Readonly<{ code: AttachmentMetadataCurrentnessHostErrorCode }> {
+    return typeof error === 'object' && error !== null && !isProxy(error) && weakSetHas(mintedMetadataErrors, error);
+}
+
 function fail(code: AttachmentCurrentnessHostErrorCode): never {
     const error = new ErrorConstructor(`Attachment currentness host rejected: ${code}`) as Error & { code: AttachmentCurrentnessHostErrorCode };
     objectDefineProperties(error, { name: { value: 'AttachmentCurrentnessHostError' }, code: { value: code, enumerable: true } });
     weakSetAdd(mintedHostErrors, error);
+    throw objectFreeze(error);
+}
+
+function failMetadata(code: AttachmentMetadataCurrentnessHostErrorCode): never {
+    const error = new ErrorConstructor(`Attachment metadata currentness host rejected: ${code}`) as Error & { code: AttachmentMetadataCurrentnessHostErrorCode };
+    objectDefineProperties(error, { name: { value: 'AttachmentMetadataCurrentnessHostError' }, code: { value: code, enumerable: true } });
+    weakSetAdd(mintedMetadataErrors, error);
     throw objectFreeze(error);
 }
 
@@ -94,6 +116,19 @@ function replacement(value: unknown): string | null {
     return fail('input_invalid');
 }
 
+function metadataMutation(value: unknown): AttachmentMetadataMutation {
+    const fields = exactOwnDataFields(value, METADATA_KEYS);
+    if (!fields) fail('input_invalid');
+    const summarySnapshot = fields.summarySnapshot!.value;
+    const parseEvidenceArtifactSnapshot = fields.parseEvidenceArtifactSnapshot!.value;
+    const ocrQueueState = fields.ocrQueueState!.value;
+    if ((summarySnapshot !== undefined && summarySnapshot !== null && typeof summarySnapshot !== 'string')
+        || (parseEvidenceArtifactSnapshot !== undefined && parseEvidenceArtifactSnapshot !== null && typeof parseEvidenceArtifactSnapshot !== 'string')
+        || (ocrQueueState !== undefined && !isDocumentOcrQueueState(ocrQueueState))
+        || (summarySnapshot === undefined && parseEvidenceArtifactSnapshot === undefined && ocrQueueState === undefined)) fail('input_invalid');
+    return objectFreeze({ summarySnapshot, parseEvidenceArtifactSnapshot, ocrQueueState });
+}
+
 function stored(row: unknown, id: string): AttachmentCurrentness & { patientId: string } {
     try {
         const fields = exactOwnDataFields(row, STORED_KEYS);
@@ -113,6 +148,16 @@ function observed(row: unknown): AttachmentCurrentness {
     }
 }
 
+function metadataStored(row: unknown, id: string): ReturnType<typeof stored> & { ocrQueueState: unknown } {
+    try {
+        const fields = exactOwnDataFields(row, METADATA_STORED_KEYS);
+        if (!fields) fail('stored_state_invalid');
+        const base = stored({ id: fields.id!.value, patientId: fields.patientId!.value, sourceRef: fields.sourceRef!.value,
+            revision: fields.revision!.value, freshnessEpoch: fields.freshnessEpoch!.value }, id);
+        return objectFreeze({ ...base, ocrQueueState: fields.ocrQueueState!.value });
+    } catch { return fail('stored_state_invalid'); }
+}
+
 function runResult(value: unknown): Readonly<{ changes: number; lastInsertRowid: number | bigint }> {
     const fields = exactOwnDataFields(value, RUN_RESULT_KEYS);
     if (!fields) fail('storage_unavailable');
@@ -124,7 +169,7 @@ function runResult(value: unknown): Readonly<{ changes: number; lastInsertRowid:
 }
 
 function storage(error: unknown): never {
-    if (isAttachmentCurrentnessHostError(error)) throw error;
+    if (isAttachmentCurrentnessHostError(error) || isAttachmentMetadataCurrentnessHostError(error)) throw error;
     return fail('storage_unavailable');
 }
 
@@ -172,6 +217,38 @@ export function transitionAttachmentContentCurrentness(idValue: unknown, expecte
                 WHERE id = ${id} AND patient_id = ${storedValue.patientId} AND document_source_ref = ${expected.sourceRef} AND document_revision = ${expected.revision} AND document_freshness_epoch = ${expected.freshnessEpoch}`));
             if (result.changes !== 1) fail('currentness_conflict');
             return objectFreeze({ sourceRef: expected.sourceRef, revision: expected.revision + 1, freshnessEpoch: expected.freshnessEpoch + 1 });
+        });
+    } catch (error) { return storage(error); }
+}
+
+/** Atomically applies one host-validated metadata mutation and advances currentness once. */
+export function transitionAttachmentMetadataCurrentness(idValue: unknown, mutationValue: unknown): AttachmentCurrentness {
+    const id = attachmentId(idValue);
+    const mutation = metadataMutation(mutationValue);
+    try {
+        return runDbServerImmediateTransaction(() => {
+            const row = dbServerGet(sql`SELECT id, patient_id AS patientId, document_source_ref AS sourceRef, document_revision AS revision,
+                document_freshness_epoch AS freshnessEpoch, ocr_queue_state AS ocrQueueState FROM attachments WHERE id = ${id}`);
+            if (!row) fail('attachment_missing');
+            const storedValue = metadataStored(row, id);
+            if (storedValue.revision >= MAX || storedValue.freshnessEpoch >= MAX) fail('currentness_overflow');
+            if (mutation.ocrQueueState !== undefined) {
+                if (!isDocumentOcrQueueState(storedValue.ocrQueueState)) failMetadata('ocr_queue_unavailable');
+                if (!canTransitionDocumentOcrQueueState(storedValue.ocrQueueState, mutation.ocrQueueState)) failMetadata('ocr_queue_transition_invalid');
+            }
+            const updateSummary = mutation.summarySnapshot !== undefined ? 1 : 0;
+            const updateEvidence = mutation.parseEvidenceArtifactSnapshot !== undefined ? 1 : 0;
+            const updateQueue = mutation.ocrQueueState !== undefined ? 1 : 0;
+            const result = runResult(dbServerRun(sql`UPDATE attachments SET
+                summary_snapshot = CASE WHEN ${updateSummary} = 1 THEN ${mutation.summarySnapshot ?? null} ELSE summary_snapshot END,
+                parse_evidence_artifact_snapshot = CASE WHEN ${updateEvidence} = 1 THEN ${mutation.parseEvidenceArtifactSnapshot ?? null} ELSE parse_evidence_artifact_snapshot END,
+                ocr_queue_state = CASE WHEN ${updateQueue} = 1 THEN ${mutation.ocrQueueState ?? null} ELSE ocr_queue_state END,
+                ocr_queue_updated_at = CASE WHEN ${updateQueue} = 1 THEN unixepoch() ELSE ocr_queue_updated_at END,
+                document_revision = document_revision + 1, document_freshness_epoch = document_freshness_epoch + 1
+                WHERE id = ${id} AND patient_id = ${storedValue.patientId} AND document_source_ref = ${storedValue.sourceRef}
+                    AND document_revision = ${storedValue.revision} AND document_freshness_epoch = ${storedValue.freshnessEpoch}`));
+            if (result.changes !== 1) fail('currentness_conflict');
+            return objectFreeze({ sourceRef: storedValue.sourceRef, revision: storedValue.revision + 1, freshnessEpoch: storedValue.freshnessEpoch + 1 });
         });
     } catch (error) { return storage(error); }
 }

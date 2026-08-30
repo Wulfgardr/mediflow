@@ -29,6 +29,8 @@
     "check:schema-drift": "node scripts/check-schema-drift.mjs",
     "check:schema-writers": "node scripts/check-schema-writers.mjs",
     "check:ai-clinical-writes": "node scripts/check-ai-clinical-write-gate.mjs",
+    "check:attachment-currentness-writers": "node scripts/check-attachment-currentness-writers.mjs",
+    "test:attachment-currentness-writers": "node --test scripts/check-attachment-currentness-writers.test.mjs",
     "check:node-runtime": "node scripts/node-runtime-contract.mjs verify",
     "check:standalone-runtime-bundle": "node scripts/check-standalone-runtime-bundle.mjs",
     "check:mlx-operational-parity": "node scripts/check-mlx-operational-parity.mjs",
@@ -192,11 +194,13 @@
     "e2e:ai-rollout-governance": "E2E_SPECS='e2e/ai-rollout-readiness-panel.spec.ts e2e/ai-rollout-guard-settings.spec.ts e2e/patient-insight-kill-switch.spec.ts e2e/smart-import-kill-switch.spec.ts e2e/document-synthesis-kill-switch.spec.ts e2e/treatment-reasoning-kill-switch.spec.ts' bash scripts/e2e-smoke.sh",
     "e2e:fabric-settings": "E2E_SPECS='e2e/settings-fabric.spec.ts' E2E_BASE_URL='http://127.0.0.1:3189' bash scripts/e2e-smoke.sh",
     "e2e:smoke": "bash scripts/e2e-smoke.sh",
+    "check:anydoc-local-only": "node scripts/check-anydoc-local-only.mjs",
+    "test:anydoc-local-only": "node --test scripts/check-anydoc-local-only.test.mjs",
     "check:api-error-leak": "node scripts/check-api-error-leak.mjs",
     "test:api-error-leak": "node scripts/check-api-error-leak.mjs --self-test"
   },
   "dependencies": {
-    "@firecrawl/pdf-inspector": "1.12.0",
+    "@firecrawl/anydoc": "0.2.4",
     "@hookform/resolvers": "^5.2.2",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-virtual": "^3.14.5",

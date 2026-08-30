@@ -1,14 +1,214 @@
 // Codex: created 2026-05-02
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node-runtime-contract.mjs';
+
+const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
+const ANYDOC_WORKER_SHA256 = '34f2db3d788585dab175b284bc8f1f39395fb66a21780e1782a5d5067073e370';
+const PDF_INSPECTOR_WORKER_FILE = 'pdf-inspector-worker.mjs';
+const PDF_ROUTE_DIRECTORY = path.join('server', 'app', 'api', 'pdf-extract');
+const PDF_RUNTIME_REFERENCE = /(?:pdf-inspector-worker\.mjs|pdf-inspector-router|(?:node_modules[\\/])?@firecrawl[\\/]pdf-inspector(?:[-/]|$))/i;
+const SYNTHETIC_RTF = Buffer.from('{\\rtf1\\ansi Synthetic standalone note.}', 'utf8');
+
+function bundledWorkerFailure(standaloneDir) {
+  const workerPath = path.join(standaloneDir, 'scripts', ANYDOC_WORKER_FILE);
+  let workerStat;
+  try {
+    workerStat = fs.lstatSync(workerPath);
+  } catch {
+    return 'Standalone runtime does not contain the AnyDoc worker.';
+  }
+  if (!workerStat.isFile()) return 'Standalone runtime AnyDoc worker is not a regular file.';
+
+  try {
+    const root = fs.realpathSync(standaloneDir);
+    const worker = fs.realpathSync(workerPath);
+    const relative = path.relative(root, worker);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) return 'Standalone runtime resolves the AnyDoc worker outside the bundle.';
+    if (!fs.statSync(worker).isFile()) return 'Standalone runtime AnyDoc worker is not a regular file.';
+    if (createHash('sha256').update(fs.readFileSync(worker)).digest('hex') !== ANYDOC_WORKER_SHA256) {
+      return 'Standalone runtime AnyDoc worker digest does not match the packaged worker.';
+    }
+  } catch {
+    return 'Standalone runtime cannot verify the AnyDoc worker.';
+  }
+  return null;
+}
+
+function retiredPdfRuntimeFailure(standaloneDir) {
+  const pending = [standaloneDir];
+  const visited = new Set();
+  while (pending.length > 0) {
+    const directory = pending.pop();
+    const realDirectory = fs.realpathSync(directory);
+    if (visited.has(realDirectory)) continue;
+    visited.add(realDirectory);
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const absolute = path.join(directory, entry.name);
+      const relative = path.relative(standaloneDir, absolute);
+      if (PDF_RUNTIME_REFERENCE.test(relative)) {
+        return 'Standalone runtime contains retired PDF inspector code.';
+      }
+      if (entry.name === 'package.json' && (entry.isFile() || entry.isSymbolicLink())) {
+        try {
+          const manifest = JSON.parse(fs.readFileSync(absolute, 'utf8'));
+          if (typeof manifest?.name === 'string' && /^@firecrawl\/pdf-inspector(?:-|$)/iu.test(manifest.name)) {
+            return 'Standalone runtime contains a renamed retired PDF inspector package.';
+          }
+          if (typeof manifest?.resolved === 'string' && PDF_RUNTIME_REFERENCE.test(manifest.resolved)) {
+            return 'Standalone runtime contains retired PDF inspector package provenance.';
+          }
+        } catch {
+          // Other package validation remains owned by its runtime gate.
+        }
+      }
+      if (entry.isDirectory() || (entry.isSymbolicLink() && fs.statSync(absolute).isDirectory())) pending.push(absolute);
+    }
+  }
+
+  const distDirectoryName = path.basename(path.dirname(standaloneDir));
+  const routeDirectory = path.join(standaloneDir, distDirectoryName, PDF_ROUTE_DIRECTORY);
+  const routePath = path.join(routeDirectory, 'route.js');
+  const tracePath = path.join(routeDirectory, 'route.js.nft.json');
+  let routeSource;
+  let traceSource;
+  try {
+    if (!fs.lstatSync(routePath).isFile() || !fs.lstatSync(tracePath).isFile()) {
+      return 'Standalone runtime retired PDF route or trace is not a regular file.';
+    }
+    routeSource = fs.readFileSync(routePath, 'utf8');
+    traceSource = fs.readFileSync(tracePath, 'utf8');
+  } catch {
+    return 'Standalone runtime does not contain the retired PDF route and trace.';
+  }
+
+  let trace;
+  try {
+    trace = JSON.parse(traceSource);
+  } catch {
+    return 'Standalone runtime retired PDF route trace is invalid JSON.';
+  }
+  if (trace?.version !== 1 || !Array.isArray(trace.files)
+      || trace.files.some((entry) => typeof entry !== 'string')) {
+    return 'Standalone runtime retired PDF route trace has an invalid shape.';
+  }
+  if (PDF_RUNTIME_REFERENCE.test(routeSource) || trace.files.some((entry) => PDF_RUNTIME_REFERENCE.test(entry))) {
+    return 'Standalone runtime retired PDF route still references executable PDF inspector code.';
+  }
+  return null;
+}
+
+function runSelfTest() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-anydoc-checker-self-test-'));
+  const scriptsDir = path.join(root, 'scripts');
+  const workerPath = path.join(scriptsDir, ANYDOC_WORKER_FILE);
+  const sourceWorker = path.join(process.cwd(), 'scripts', ANYDOC_WORKER_FILE);
+  try {
+    fs.mkdirSync(scriptsDir);
+    fs.copyFileSync(sourceWorker, workerPath);
+    if (bundledWorkerFailure(root) !== null) throw new Error('expected bundled AnyDoc worker to pass');
+    fs.rmSync(workerPath);
+    if (bundledWorkerFailure(root) === null) throw new Error('missing bundled AnyDoc worker passed');
+    fs.copyFileSync(sourceWorker, workerPath);
+    fs.appendFileSync(workerPath, '\n// self-test tamper\n');
+    if (bundledWorkerFailure(root) === null) throw new Error('tampered bundled AnyDoc worker passed');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+function runPdfRetirementSelfTest() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-pdf-retirement-checker-'));
+  const standaloneDir = path.join(root, '.next-self-test', 'standalone');
+  const routeDirectory = path.join(standaloneDir, '.next-self-test', PDF_ROUTE_DIRECTORY);
+  const workerPath = path.join(standaloneDir, 'scripts', PDF_INSPECTOR_WORKER_FILE);
+  const packageRoot = path.join(standaloneDir, 'node_modules', '@firecrawl');
+
+  function reset() {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.mkdirSync(routeDirectory, { recursive: true });
+    fs.writeFileSync(path.join(routeDirectory, 'route.js'), 'export {};\n');
+    fs.writeFileSync(path.join(routeDirectory, 'route.js.nft.json'), '{"version":1,"files":["./route_client-reference-manifest.js"]}\n');
+  }
+
+  function expectFailure(label, mutate) {
+    reset();
+    mutate();
+    if (retiredPdfRuntimeFailure(standaloneDir) === null) throw new Error(`${label} passed`);
+  }
+
+  try {
+    reset();
+    if (retiredPdfRuntimeFailure(standaloneDir) !== null) throw new Error('valid retired PDF bundle failed');
+    expectFailure('retired PDF worker file', () => {
+      fs.mkdirSync(path.dirname(workerPath), { recursive: true });
+      fs.writeFileSync(workerPath, 'retired worker');
+    });
+    expectFailure('retired PDF worker symlink', () => {
+      const target = path.join(root, 'retired-worker-target');
+      fs.mkdirSync(target);
+      fs.mkdirSync(path.dirname(workerPath), { recursive: true });
+      fs.symlinkSync(target, workerPath, process.platform === 'win32' ? 'junction' : 'dir');
+    });
+    expectFailure('retired PDF package', () => fs.mkdirSync(path.join(packageRoot, 'pdf-inspector'), { recursive: true }));
+    expectFailure('retired PDF native package', () => fs.mkdirSync(path.join(packageRoot, 'pdf-inspector-darwin-arm64'), { recursive: true }));
+    expectFailure('renamed retired PDF package', () => {
+      const renamed = path.join(standaloneDir, 'node_modules', 'renamed-parser');
+      fs.mkdirSync(renamed, { recursive: true });
+      fs.writeFileSync(path.join(renamed, 'package.json'), '{"name":"@firecrawl/pdf-inspector"}');
+    });
+    expectFailure('renamed retired PDF native package', () => {
+      const renamed = path.join(standaloneDir, 'node_modules', 'renamed-native');
+      fs.mkdirSync(renamed, { recursive: true });
+      fs.writeFileSync(path.join(renamed, 'package.json'), '{"name":"@firecrawl/pdf-inspector-darwin-arm64"}');
+      fs.writeFileSync(path.join(renamed, 'renamed.node'), 'synthetic native');
+    });
+    expectFailure('symlinked renamed retired PDF package', () => {
+      const target = path.join(root, 'renamed-package-target');
+      fs.mkdirSync(target, { recursive: true });
+      fs.writeFileSync(path.join(target, 'package.json'), '{"name":"@firecrawl/pdf-inspector"}');
+      const renamed = path.join(standaloneDir, 'node_modules', 'renamed-parser');
+      fs.mkdirSync(path.dirname(renamed), { recursive: true });
+      fs.symlinkSync(target, renamed, process.platform === 'win32' ? 'junction' : 'dir');
+    });
+    expectFailure('retired PDF router', () => {
+      const router = path.join(standaloneDir, 'server', 'chunks', 'pdf-inspector-router.js');
+      fs.mkdirSync(path.dirname(router), { recursive: true });
+      fs.writeFileSync(router, 'export {};\n');
+    });
+    expectFailure('missing retired route trace', () => fs.rmSync(path.join(routeDirectory, 'route.js.nft.json')));
+    expectFailure('invalid retired route trace', () => fs.writeFileSync(path.join(routeDirectory, 'route.js.nft.json'), '{'));
+    expectFailure('invalid retired route trace shape', () => fs.writeFileSync(path.join(routeDirectory, 'route.js.nft.json'), '{"version":2,"files":[]}'));
+    expectFailure('PDF inspector trace reference', () => fs.writeFileSync(
+      path.join(routeDirectory, 'route.js.nft.json'),
+      '{"version":1,"files":["../../node_modules/@firecrawl/pdf-inspector/index.js"]}',
+    ));
+    expectFailure('PDF worker compiled reference', () => fs.appendFileSync(
+      path.join(routeDirectory, 'route.js'),
+      'import("../../../../../scripts/pdf-inspector-worker.mjs");\n',
+    ));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+if (process.argv[2] === '--self-test') {
+  runSelfTest();
+  process.exit(0);
+}
+if (process.argv[2] === '--self-test=pdf-retirement') {
+  runPdfRetirementSelfTest();
+  process.exit(0);
+}
 
 const root = process.cwd();
 const standaloneDir = standaloneDirectory(root);
 const serverPath = path.join(standaloneDir, 'server.js');
 const runtimeContractPath = path.join(standaloneDir, 'mediflow-runtime-contract.json');
-const pdfInspectorWorkerPath = path.join(standaloneDir, 'scripts', 'pdf-inspector-worker.mjs');
 
 const forbiddenMatchers = [
   (relativePath) => /^medical\.db$/i.test(relativePath),
@@ -42,6 +242,9 @@ function fail(message) {
   console.error(message);
   process.exit(1);
 }
+
+const retiredPdfFailure = retiredPdfRuntimeFailure(standaloneDir);
+if (retiredPdfFailure) fail(retiredPdfFailure);
 
 function assertRealpathInsideStandalone(candidatePath, label) {
   let resolvedPath;
@@ -106,6 +309,44 @@ function nativeArtifacts(packageDir, label, matcher) {
   }
 }
 
+// @Codex: The child-process parser must be fully self-contained and byte-identical.
+const anyDocWorkerFailure = bundledWorkerFailure(standaloneDir);
+if (anyDocWorkerFailure) fail(anyDocWorkerFailure);
+const anyDocWorkerPath = path.join(standaloneDir, 'scripts', ANYDOC_WORKER_FILE);
+const packageScopes = fs.readdirSync(path.join(standaloneDir, 'node_modules'), { withFileTypes: true });
+const firecrawlScope = packageScopes.find((entry) => entry.isDirectory() && entry.name === '@firecrawl')?.name;
+const anyDocName = firecrawlScope
+  ? fs.readdirSync(path.join(standaloneDir, 'node_modules', firecrawlScope), { withFileTypes: true })
+    .find((entry) => entry.isDirectory() && entry.name === 'anydoc')?.name
+  : undefined;
+if (!firecrawlScope || !anyDocName) fail('Standalone runtime does not contain the AnyDoc package directory.');
+const anyDocRequest = [firecrawlScope, anyDocName].join('/');
+const anyDocEntry = requireFromStandalone.resolve(`${anyDocRequest}/index.js`);
+assertRealpathInsideStandalone(anyDocEntry, 'AnyDoc entrypoint');
+const anyDocPackageDir = path.dirname(requireFromStandalone.resolve(`${anyDocRequest}/package`));
+assertRealpathInsideStandalone(anyDocPackageDir, 'AnyDoc package');
+const anyDocManifest = JSON.parse(fs.readFileSync(path.join(anyDocPackageDir, 'package.json'), 'utf8'));
+const anyDocNativePackage = Object.keys(anyDocManifest.optionalDependencies ?? {}).find((name) => {
+  if (!name.startsWith(`${anyDocRequest}-`) || !name.includes(`-${process.platform}-${process.arch}`)) return false;
+  return process.platform !== 'linux' || (process.report?.getReport().header.glibcVersionRuntime ? name.endsWith('-gnu') : name.endsWith('-musl'));
+});
+if (!anyDocNativePackage) fail('AnyDoc does not declare a native package for the current platform.');
+const anyDocNativeManifest = requireFromStandalone.resolve(`${anyDocNativePackage}/package`);
+const anyDocNativeDir = path.dirname(assertRealpathInsideStandalone(anyDocNativeManifest, `${anyDocNativePackage} package`));
+nativeArtifacts(anyDocNativeDir, `${anyDocNativePackage} native binding`, (name) => name.endsWith('.node'));
+const anyDocRun = spawnSync(process.execPath, [anyDocWorkerPath], {
+  cwd: path.dirname(anyDocWorkerPath),
+  env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
+  input: SYNTHETIC_RTF,
+  encoding: 'buffer',
+  timeout: 15_000,
+  windowsHide: true,
+});
+if (anyDocRun.error || anyDocRun.status !== 0 || !Buffer.isBuffer(anyDocRun.stdout)
+    || anyDocRun.stdout.toString('utf8') !== 'Synthetic standalone note.\n') {
+  fail('Standalone runtime AnyDoc worker did not extract the synthetic RTF with its allowlisted environment.');
+}
+
 let databaseEntry;
 try {
   databaseEntry = requireFromStandalone.resolve('better-sqlite3');
@@ -117,47 +358,6 @@ const Database = requireFromStandalone(databaseEntry);
 const probe = new Database(':memory:');
 probe.prepare('select 1').get();
 probe.close();
-
-// @Codex: The isolated PDF worker must resolve its native binding inside the bundle.
-if (!fs.existsSync(pdfInspectorWorkerPath)) {
-  fail('Standalone runtime does not contain the PDF inspector worker.');
-}
-assertRealpathInsideStandalone(pdfInspectorWorkerPath, 'PDF inspector worker');
-let pdfInspectorEntry;
-const usesIntelMacFallback = process.platform === 'darwin' && process.arch === 'x64';
-try {
-  pdfInspectorEntry = requireFromStandalone.resolve('@firecrawl/pdf-inspector');
-} catch {
-  fail('Standalone runtime does not contain @firecrawl/pdf-inspector.');
-}
-const pdfInspectorPath = assertRealpathInsideStandalone(pdfInspectorEntry, 'PDF inspector entrypoint');
-if (!usesIntelMacFallback) {
-  const pdfInspector = requireFromStandalone(pdfInspectorPath);
-  if (typeof pdfInspector.extractPagesMarkdown !== 'function') {
-    fail('Standalone runtime PDF inspector API is incomplete.');
-  }
-}
-const pdfInspectorPackageDir = path.dirname(requireFromStandalone.resolve('@firecrawl/pdf-inspector/package'));
-const pdfInspectorManifest = JSON.parse(fs.readFileSync(path.join(pdfInspectorPackageDir, 'package.json'), 'utf8'));
-const pdfInspectorBinding = Object.keys(pdfInspectorManifest.optionalDependencies ?? {}).find((name) => {
-  if (!name.startsWith('@firecrawl/pdf-inspector-')) return false;
-  const platform = name.includes(`-${process.platform}-`);
-  const arch = name.includes(`-${process.arch}`);
-  const libc = process.platform !== 'linux'
-    || (process.report?.getReport().header.glibcVersionRuntime ? name.endsWith('-gnu') : name.endsWith('-musl'));
-  return platform && arch && libc;
-});
-if (!pdfInspectorBinding && !usesIntelMacFallback) {
-  fail('PDF inspector does not declare a binding for the current platform.');
-}
-if (pdfInspectorBinding) {
-  const pdfInspectorBindingManifest = requireFromStandalone.resolve(`${pdfInspectorBinding}/package`);
-  const pdfInspectorBindingDir = path.dirname(assertRealpathInsideStandalone(pdfInspectorBindingManifest, `${pdfInspectorBinding} package`));
-  nativeArtifacts(pdfInspectorBindingDir, `${pdfInspectorBinding} native binding`, (name) => name.endsWith('.node'));
-} else {
-  const pdfJsEntry = requireFromStandalone.resolve('pdfjs-dist/legacy/build/pdf.mjs');
-  assertRealpathInsideStandalone(pdfJsEntry, 'Intel macOS PDF.js fallback');
-}
 
 // @Codex: Native image optimization must not resolve through source node_modules.
 let sharpEntry;

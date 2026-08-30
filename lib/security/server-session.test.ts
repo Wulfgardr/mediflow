@@ -93,6 +93,21 @@ const PROJECTION_BROKER_ADOPTION_SYMBOLS = new Set([
     'releaseActiveWebSessionResourcePort', 'unregisterActiveWebSessionPrivateResource',
     'mintActiveWebSessionResourcePort', 'resolveActiveWebServerSession',
 ]);
+const SESSION_TEST_DYNAMIC_IMPORTS = new Map<string, ReadonlyMap<string, number>>([
+    ['lib/attachment-metadata-currentness.test.ts', new Map([['*', 1]])],
+    ['lib/domain/documents/anydoc-current-source-composition.test.ts', new Map([['*', 1]])],
+    ['lib/domain/documents/attachment-extraction-selection-binding.test.ts', new Map([['*', 1]])],
+    ['lib/domain/documents/attachment-extraction-source-authority.test.ts', new Map([['*', 1]])],
+    ['lib/patient-cascade.test.ts', new Map([['clearAllSessions', 1], ['createSession', 1]])],
+]);
+const SESSION_TEST_DYNAMIC_SPECIFIERS = new Map<string, string>([
+    ['lib/attachment-metadata-currentness.test.ts', './security/server-session.ts'],
+    ['lib/domain/documents/anydoc-current-source-composition.test.ts', '../../security/server-session.ts'],
+    ['lib/domain/documents/attachment-extraction-selection-binding.test.ts', '../../security/server-session.ts'],
+    ['lib/domain/documents/attachment-extraction-source-authority.test.ts', '../../security/server-session.ts'],
+    ['lib/patient-cascade.test.ts', './security/server-session.ts'],
+]);
+const PROJECTION_OWNER_DYNAMIC_TEST = 'lib/domain/documents/attachment-extraction-source-authority.test.ts';
 const PROJECTION_OWNER_FACTORY = 'createPortProjectionOwnerFactory';
 const PROJECTION_OWNER_MODULE = 'lib/security/server-session-projection-owner';
 const SESSION_MODULE_IDENTITY = path.resolve(REPOSITORY_ROOT, 'lib/security/server-session');
@@ -197,8 +212,8 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
     ]);
     for (const use of uses) {
         if (use.form === 'import-type' && use.typeOnly && use.file === 'lib/security/server-session.test.ts') continue;
-        const provenDynamic = use.form === 'dynamic' && use.file === 'lib/security/web-auth-channel-cutover.test.ts'
-            && ['clearAllSessions', 'getSession'].includes(use.symbol);
+        const provenDynamic = use.form === 'dynamic' && ((use.file === 'lib/security/web-auth-channel-cutover.test.ts'
+            && ['clearAllSessions', 'getSession'].includes(use.symbol)) || SESSION_TEST_DYNAMIC_IMPORTS.get(use.file)?.has(use.symbol));
         const ownReload = use.form === 'require' && use.file === 'lib/security/server-session.test.ts';
         if (use.form !== 'named' && !provenDynamic && !ownReload) errors.push(`${use.file}:${use.form}`);
         if (!use.typeOnly && use.symbol === 'dispatchActiveWebServerSessionRetirement'
@@ -209,6 +224,14 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
         const runtime = uses.filter((use) => use.file === file && !use.typeOnly);
         if (runtime.some((use) => use.form !== 'named') || runtime.length !== exact.size
             || runtime.some((use) => !exact.has(use.symbol)) || [...exact].some((symbol) => !runtime.some((use) => use.symbol === symbol))) errors.push(`${file}:authority`);
+    }
+    for (const [file, expected] of SESSION_TEST_DYNAMIC_IMPORTS) {
+        if (!(file in sources)) continue;
+        const actual = uses.filter((use) => use.file === file && use.form === 'dynamic' && !use.typeOnly);
+        for (const [symbol, count] of expected) {
+            if (actual.filter((use) => use.symbol === symbol).length !== count) errors.push(`${file}:dynamic-allowlist`);
+        }
+        if (actual.length !== [...expected.values()].reduce((sum, count) => sum + count, 0)) errors.push(`${file}:dynamic-allowlist`);
     }
     const resourceUses = uses.filter((use) => RESOURCE_PORT_PRIMITIVES.has(use.symbol));
     const brokerAdoptionUses = uses.filter((use) => PROJECTION_BROKER_FILES.includes(use.file as typeof PROJECTION_BROKER_FILES[number])
@@ -229,10 +252,16 @@ const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
     const adoptionResourceUses = resourceUses.filter((use) => use.file !== selfFile
         && !PROJECTION_BROKER_FILES.includes(use.file as typeof PROJECTION_BROKER_FILES[number]));
     const ownerAdopters = new Set(adoptionResourceUses.map((use) => use.file));
-    const factorySignals = ownerUses.filter((use) => use.symbol === PROJECTION_OWNER_FACTORY
+    const ownerTestDynamic = ownerUses.filter((use) => use.file === PROJECTION_OWNER_DYNAMIC_TEST
+        && use.form === 'dynamic' && use.symbol === '*' && !use.typeOnly);
+    if (PROJECTION_OWNER_DYNAMIC_TEST in sources && ownerTestDynamic.length !== 1) {
+        errors.push(`${PROJECTION_OWNER_DYNAMIC_TEST}:dynamic-owner-allowlist`);
+    }
+    const factorySignals = ownerUses.filter((use) => !(use.file === PROJECTION_OWNER_DYNAMIC_TEST
+        && use.form === 'dynamic' && use.symbol === '*' && !use.typeOnly) && (use.symbol === PROJECTION_OWNER_FACTORY
         || ['module-path', 'dynamic', 'dynamic-options', 'require', 'require-options', 're-export', 'namespace',
             'default', 'side-effect', 'code-loader'].includes(use.form)
-        || (use.file === PROJECTION_OWNER_FILES[1] && use.form === 'unsupported-expression'));
+        || (use.file === PROJECTION_OWNER_FILES[1] && use.form === 'unsupported-expression')));
     if (ownerAdopters.has(PROJECTION_OWNER_FILES[0])
         && !hasExactProjectionOwnerResourceImport(sources[PROJECTION_OWNER_FILES[0]] ?? '')) errors.push(`${PROJECTION_OWNER_FILES[0]}:resource-shape`);
     const absent = adoptionResourceUses.length === 0 && factorySignals.length === 0;
@@ -836,6 +865,13 @@ test('ACTIVE resource port has no callback surface or production importer before
 
 test('inventories exact session imports by AST and closes the logout authority boundary', () => {
     assert.deepEqual(validateSessionImports(typescriptSources()).errors, []);
+    for (const [file, specifier] of SESSION_TEST_DYNAMIC_SPECIFIERS) {
+        const source = typescriptSources()[file]; assert.ok(source?.includes(`import('${specifier}')`));
+        const drift = validateSessionImports({ [file]: source.replace(`import('${specifier}')`, `import('${specifier}?copy=1')`) });
+        assert.notDeepEqual(drift.errors, [], file);
+        const duplicate = validateSessionImports({ [file]: `${source}\nconst duplicateSession = await import('${specifier}');` });
+        assert.ok(duplicate.errors.includes(`${file}:dynamic-allowlist`), file);
+    }
     const valid = {
         'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession as resolve, dispatchActiveWebServerSessionRetirement, SESSION_COOKIE_NAME } from '@/lib/security/server-session';",
         'lib/security/web-auth-logout-server.test.ts': "import { activateArmedWebServerSession, armPreparedWebServerSession, clearAllSessions, dispatchActiveWebServerSessionRetirement as dispatch, getPreparedWebServerSessionId, prepareStagedWebServerSession, resolveActiveWebServerSession, stageWebServerSession } from './server-session.ts';",

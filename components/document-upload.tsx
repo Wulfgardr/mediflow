@@ -6,7 +6,7 @@ import { Upload, FileText, X, Eye, Loader2, RefreshCw, AlertTriangle } from 'luc
 import { db, Attachment } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
-import { useLiveQuery, notifyDbChange } from '@/lib/live-query';
+import { useLiveQuery } from '@/lib/live-query';
 import {
     AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
     AiDocumentSynthesisDisabledError,
@@ -33,14 +33,10 @@ import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { semanticSignalSurfaceClass } from '@/components/ui/semantic-signal';
 import { sharedKillSwitchSignal } from '@/lib/ui-semantic-signal';
+import { requestAnyDocLocalExtractionPreview } from '@/lib/domain/documents/anydoc-local-extraction-client';
 
 interface DocumentUploadProps {
     patientId: string;
-}
-
-async function sha256Hex(value: string): Promise<string> {
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-    return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 /* @Codex */
@@ -59,7 +55,8 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
     const confirm = useConfirm();
     const [isProcessing, setIsProcessing] = useState(false);
     const [viewingFile, setViewingFile] = useState<Attachment | null>(null);
-    const [replayingId, setReplayingId] = useState<string | null>(null);
+    const [extractingId, setExtractingId] = useState<string | null>(null);
+    const [localExtractionPreview, setLocalExtractionPreview] = useState<{ attachmentId: string; markdown: string } | null>(null);
     /* @Codex */
     const [aiStage, setAiStage] = useState<string>("");
     /* @Codex */
@@ -252,69 +249,17 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
         }
     };
 
-    // Replay documentale post-OCR: aggiorna l'allegato in-place (mai duplicato),
-    // idempotente per hash documento lato server.
-    const handleOcrReplay = async (file: Attachment) => {
-        if (!file.data || replayingId) return;
-        setReplayingId(file.id);
+    /* @Codex: preview transitoria; nessuna persistenza o sintesi downstream. */
+    const handleLocalExtractionPreview = async (file: Attachment) => {
+        if (extractingId) return;
+        setExtractingId(file.id);
+        setLocalExtractionPreview(null);
         try {
-            await db.attachments.update(file.id, { ocrQueueState: 'processing' });
-            let ocrText = '';
-            let blob: Blob | undefined;
-            try {
-                blob = await (await fetch(file.data)).blob();
-                const replayFile = new File([blob], file.name, { type: file.type || blob.type });
-                ocrText = await extractDocumentTextForSummary(replayFile);
-            } catch (ocrError) {
-                console.warn('[DocumentUpload] Replay OCR: estrazione fallita', ocrError);
-            }
-
-            const documentSha256 = await sha256Hex(file.data);
-            const response = await fetch(`/api/attachments/${file.id}/ocr-replay`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ocrText, documentSha256 }),
-            });
-            if (!response.ok) {
-                const err = await response.json().catch(() => ({}));
-                throw new Error(err?.error || 'Replay OCR fallito');
-            }
-            const replay = await response.json();
-            console.info('[DocumentUpload] Replay OCR', {
-                attachmentId: file.id,
-                outcome: replay.outcome,
-                state: replay.state,
-                reason: replay.reason,
-            });
-
-            // Niente proposta clinica finché il testo non è sufficiente.
-            if (replay.outcome === 'applied' && replay.state === 'ocr_done' && replay.sufficientText) {
-                if (documentSynthesisEnabled) {
-                    try {
-                        const sourceBytes = await readSourceBytes(blob);
-                        const result = await synthesizeDocument(ocrText, file.name, patientId, { attachmentId: file.id, sourceBytes });
-                        await db.attachments.update(file.id, {
-                            summarySnapshot: result.insight.summary,
-                            parseEvidenceArtifactSnapshot: serializeDocumentParseEvidenceArtifact(result.parseEvidenceArtifact),
-                        });
-                        await refreshPatientSummaryIfEnabled(patientId);
-                    } catch (synthesisError) {
-                        if (synthesisError instanceof AiDocumentSynthesisDisabledError) {
-                            await db.attachments.update(file.id, { summarySnapshot: 'Sintesi clinica documento disabilitata localmente.' });
-                        } else {
-                            console.warn('[DocumentUpload] Replay OCR: sintesi fallita', synthesisError);
-                        }
-                    }
-                } else {
-                    await db.attachments.update(file.id, { summarySnapshot: 'Sintesi clinica documento disabilitata localmente.' });
-                }
-            }
-        } catch (err) {
-            console.warn('[DocumentUpload] Replay OCR fallito', err);
-            await db.attachments.update(file.id, { ocrQueueState: 'ocr_failed' }).catch(() => undefined);
+            const preview = await requestAnyDocLocalExtractionPreview(file.id);
+            if (preview) setLocalExtractionPreview({ attachmentId: file.id, markdown: preview.markdown });
+            else showToast({ tone: 'warning', title: 'Estrazione locale non disponibile', description: 'Il documento richiede revisione manuale.' });
         } finally {
-            setReplayingId(null);
-            notifyDbChange('attachments');
+            setExtractingId(null);
         }
     };
 
@@ -431,24 +376,30 @@ export default function DocumentUpload({ patientId }: DocumentUploadProps) {
                                     OCR: {describeDocumentOcrQueueEntry(file.ocrQueueState as string, file.ocrQueueReason)}
                                 </p>
                             )}
+                            {localExtractionPreview?.attachmentId === file.id && (
+                                <div className="mt-2 rounded-lg border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-2" role="status" data-testid="anydoc-local-extraction-preview">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Anteprima estrazione locale (sola lettura)</p>
+                                    <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap text-xs text-[color:var(--lume-ink)]">{localExtractionPreview.markdown}</pre>
+                                </div>
+                            )}
                         </div>
 
-                        <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                             {file.ocrQueueState && file.ocrQueueState !== 'ocr_done' && (
                                 <button
-                                    onClick={() => handleOcrReplay(file)}
-                                    disabled={replayingId !== null}
+                                    onClick={() => handleLocalExtractionPreview(file)}
+                                    disabled={extractingId !== null}
                                     className="rounded-lg p-2 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] disabled:opacity-50"
-                                    title="Riprova OCR"
-                                    aria-label={`Riprova OCR su ${file.name}`}
+                                    title="Estrai testo localmente"
+                                    aria-label={`Estrai testo localmente da ${file.name}`}
                                 >
-                                    <RefreshCw className={cn("w-4 h-4", replayingId === file.id && "animate-spin")} />
+                                    <RefreshCw className={cn("w-4 h-4", extractingId === file.id && "animate-spin")} />
                                 </button>
                             )}
                             {file.ocrQueueState && canTransitionDocumentOcrQueueState(file.ocrQueueState, 'manual_review') && file.ocrQueueState !== 'manual_review' && (
                                 <button
                                     onClick={() => handleOcrManualReview(file)}
-                                    disabled={replayingId !== null}
+                                    disabled={extractingId !== null}
                                     className="rounded-lg p-2 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] disabled:opacity-50"
                                     title="Segna per revisione manuale"
                                     aria-label={`Segna ${file.name} per revisione manuale`}
