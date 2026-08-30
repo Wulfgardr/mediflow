@@ -27,8 +27,17 @@ const SCAN_ROOTS = ['app', 'components', 'lib', 'scripts'];
 const SELF_FILES = new Set(['scripts/check-anydoc-local-only.mjs', 'scripts/check-anydoc-local-only.test.mjs']);
 
 function retiredPdfIdentity(value) {
-    return typeof value === 'string' && (value.includes(RETIRED_PDF_INSPECTOR)
-        || /(?:^|[/:])pdf-inspector(?:[-/@]|$)/iu.test(value));
+    if (typeof value !== 'string') return false;
+    let canonical = value;
+    for (let depth = 0; depth < 4; depth += 1) {
+        try {
+            const decoded = decodeURIComponent(canonical);
+            if (decoded === canonical) break;
+            canonical = decoded;
+        } catch { break; }
+    }
+    return canonical.includes(RETIRED_PDF_INSPECTOR)
+        || /(?:^|[/:\\])pdf-inspector(?=$|[-/@.?#])/iu.test(canonical);
 }
 
 function dependencyEntries(manifest) {
