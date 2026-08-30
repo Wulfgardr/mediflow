@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* @Codex */
-import { readFile, readdir } from 'node:fs/promises';
+import { lstat, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
@@ -8,6 +8,8 @@ import ts from 'typescript';
 export const ANYDOC_VERSION = '0.2.4';
 export const ANYDOC_WORKER_PATH = 'scripts/anydoc-local-extraction-worker.mjs';
 export const ANYDOC_NATIVE_SUBPATH = '@firecrawl/anydoc/index.js';
+const RETIRED_PDF_INSPECTOR = '@firecrawl/pdf-inspector';
+const RETIRED_PDF_PATHS = ['scripts/pdf-inspector-worker.mjs', 'lib/pdf-inspector-router.ts'];
 
 const EXPECTED_INTEGRITY = Object.freeze({
     '@firecrawl/anydoc': 'sha512-rfJxa5L+nhoqR5yodcRZoGDLaSfxMTpBuhVj1gSacfW4ZGjBt4cjfErXwaKjPYrpWRTPIBye2sh36UhqgOP1Og==',
@@ -30,9 +32,18 @@ function sameMembers(left, right) {
 
 export function validateAnyDocSupplyChain(packageJson, packageLock) {
     const issues = [];
+    const retired = (name) => name === RETIRED_PDF_INSPECTOR || name.startsWith(`${RETIRED_PDF_INSPECTOR}-`);
+    for (const field of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+        if (Object.keys(packageJson?.[field] ?? {}).some(retired)) issues.push('retired PDF inspector dependency is forbidden');
+    }
     if (packageJson?.dependencies?.['@firecrawl/anydoc'] !== ANYDOC_VERSION) issues.push('package dependency must pin @firecrawl/anydoc 0.2.4 exactly');
     const packages = packageLock?.packages;
     if (!packages || typeof packages !== 'object') return [...issues, 'package-lock packages map is missing'];
+    if (['dependencies', 'devDependencies', 'optionalDependencies']
+        .some((field) => Object.keys(packages['']?.[field] ?? {}).some(retired))
+        || Object.keys(packages).some((key) => key.startsWith('node_modules/') && retired(key.slice('node_modules/'.length)))) {
+        issues.push('retired PDF inspector package-lock entry is forbidden');
+    }
     if (packages['']?.dependencies?.['@firecrawl/anydoc'] !== ANYDOC_VERSION) issues.push('package-lock root dependency drift');
     const root = packages['node_modules/@firecrawl/anydoc'];
     if (root?.engines?.node !== '>= 20') issues.push('AnyDoc Node engine drift');
@@ -235,6 +246,7 @@ function analyzeSource(source, worker) {
             && node.parent.moduleSpecifier === node
             && node.text === ANYDOC_NATIVE_SUBPATH;
         if (!isAcceptedImport && constant?.startsWith('@firecrawl/anydoc')) issues.add('AnyDoc package reference is forbidden outside the exact static import');
+        if (constant?.startsWith(RETIRED_PDF_INSPECTOR)) issues.add('retired PDF inspector source reference is forbidden');
         if (worker && constant && FORBIDDEN_CONSTANTS.has(constant)) issues.add(`${constant} constant is forbidden`);
         if (worker && constant && /^(?:https?|wss?):/u.test(constant)) issues.add('network URL is forbidden');
         ts.forEachChild(node, visit);
@@ -272,6 +284,16 @@ export async function runAnyDocLocalOnlyGuard(root) {
     const packageJson = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
     const packageLock = JSON.parse(await readFile(path.join(root, 'package-lock.json'), 'utf8'));
     const issues = validateAnyDocSupplyChain(packageJson, packageLock);
+    const configSource = await readFile(path.join(root, 'next.config.ts'), 'utf8');
+    issues.push(...validateAnyDocNonWorkerSource(configSource).map((issue) => `next.config.ts: ${issue}`));
+    for (const relative of RETIRED_PDF_PATHS) {
+        try {
+            await lstat(path.join(root, relative));
+            issues.push(`${relative}: retired PDF inspector path is forbidden`);
+        } catch (error) {
+            if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error;
+        }
+    }
     let workerSeen = false;
     for (const absolute of await sourceFiles(root)) {
         const relative = path.relative(root, absolute).split(path.sep).join('/');
