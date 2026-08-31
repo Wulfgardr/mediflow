@@ -1,9 +1,6 @@
 /* @Codex */
 import 'server-only';
 
-import { resolveCanonicalServerSessionClinicalContext } from './server-session-clinical-context-production';
-import { createFullPortProjectionOwnerFactory } from './server-session-projection-owner';
+import { serverSessionProjectionOwnerProductionOwner } from './server-session-projection-owner-production-internal';
 
-export const serverSessionProjectionOwnerRegistry = createFullPortProjectionOwnerFactory({
-    resolve: resolveCanonicalServerSessionClinicalContext,
-});
+export const serverSessionProjectionOwnerRegistry = serverSessionProjectionOwnerProductionOwner.registry;
