@@ -22,17 +22,15 @@ test('exposes one frozen process singleton with only issue, recheck, and dispose
     assert.equal(service.dispose(Object.freeze(Object.create(null))), false);
 });
 
-test('wires only canonical Web auth, SOAP attestation store, and the dedicated grant core', () => {
+test('exposes only the service from the shared private production owner', () => {
     const source = fs.readFileSync(new URL('./headless-soap-active-role-session-grant-production.ts', import.meta.url), 'utf8');
     const imports = [...source.matchAll(/^import\s+(?:['"]([^'"]+)['"]|[\s\S]*?\s+from\s+['"]([^'"]+)['"])\s*;/gmu)].map((match) => match[1] ?? match[2]).sort();
-    assert.deepEqual(imports, ['server-only', './headless-soap-active-role-attestation-store', './headless-soap-active-role-session-grant', './server-auth'].sort());
-    for (const required of ['readAuthenticatedWebSession', 'createHeadlessSoapActiveRoleAttestationStore', 'createHeadlessSoapActiveRoleSessionGrantService']) assert.match(source, new RegExp(required, 'u'));
-    assert.match(source, /readCurrentSession:\s*readAuthenticatedWebSession/u);
+    assert.deepEqual(imports, ['server-only', './headless-soap-active-role-session-grant-production-internal'].sort());
+    assert.match(source, /headlessSoapActiveRoleSessionGrantProductionOwner\.service/u);
     assert.equal(source.match(/^export\s+(?:const|function|class)\s/gmu)?.length, 1);
-    assert.equal(source.match(/\bcreateHeadlessSoapActiveRoleAttestationStore\(\)/gu)?.length, 1);
-    assert.equal(source.match(/\bcreateHeadlessSoapActiveRoleSessionGrantService\s*\(/gu)?.length, 1);
+    assert.doesNotMatch(source, /^export\s+(?:const|function|class)\s+\w*(?:Owner|Controller)\b/gmu);
+    assert.doesNotMatch(source, /readAuthenticatedWebSession|createHeadlessSoapActiveRoleAttestationStore|createHeadlessSoapActiveRoleSessionGrant(?:Owner|Service)/u);
     assert.doesNotMatch(source, /enrollment|credential|physician-review|fresh-review|authenticated-review|fabric|route|db-server|schema|patient|proposal|proof|writer/iu);
-    assert.doesNotMatch(source, /attestationStore\.(?:activate|createInactive|revoke)\b/u);
     assert.doesNotMatch(source, /\b(?:import\s*\(|require\s*\()|^\s*export\s+(?:default|\{|\*)|['"]use client['"]|\b(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|NextResponse|NextRequest|JSX|React)\b/gmu);
 });
 
