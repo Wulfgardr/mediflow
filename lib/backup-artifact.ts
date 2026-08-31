@@ -99,6 +99,7 @@ const HEADLESS_SOAP_ACTIVE_ROLE_ROLE = 'physician';
 const HEADLESS_SOAP_ACTIVE_ROLE_OPERATION = 'mediflow.clinical_diary.append_soap.v1';
 const HEADLESS_SOAP_ACTIVE_ROLE_POLICY = 'clinician_confirmed_single_use.v1';
 const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_REF = /^hsar_[0-9a-f]{32}$/;
+const HEADLESS_SOAP_ACTIVE_ROLE_ISSUER_REF = /^hsari_[0-9a-f]{32}$/;
 const BACKUP_ARTIFACT_ROOT_KEYS = ['format', 'version', 'manifest', 'payload'] as const;
 
 export interface BackupArtifactManifest {
@@ -279,19 +280,20 @@ function assertHeadlessSoapActiveRoleAttestationRows(
         const activatedAt = attestation.activatedAt === null ? null : headlessSoapTimestampMilliseconds(attestation.activatedAt, serialized);
         const revokedAt = attestation.revokedAt === null ? null : headlessSoapTimestampMilliseconds(attestation.revokedAt, serialized);
         const hasValidIssuer = typeof attestation.issuerRef === 'string'
-            && attestation.issuerRef.trim() === attestation.issuerRef
-            && attestation.issuerRef.length >= 1 && attestation.issuerRef.length <= 256;
+            && HEADLESS_SOAP_ACTIVE_ROLE_ISSUER_REF.test(attestation.issuerRef);
+        const hasFixedActivationWindow = expiresAt !== null && activatedAt !== null
+            && expiresAt - activatedAt === 8 * 60 * 60 * 1000;
         const inactive = attestation.status === 'inactive'
             && attestation.issuerRef === null && expiresAt === null && activatedAt === null && revokedAt === null
             && attestation.revocationGeneration === 0;
         const active = attestation.status === 'active'
-            && hasValidIssuer && expiresAt !== null && activatedAt !== null && revokedAt === null
+            && hasValidIssuer && hasFixedActivationWindow && revokedAt === null
             && attestation.revocationGeneration === 0;
         const revoked = attestation.status === 'revoked'
             && revokedAt !== null && typeof attestation.revocationGeneration === 'number'
             && Number.isSafeInteger(attestation.revocationGeneration) && attestation.revocationGeneration >= 1
             && ((attestation.issuerRef === null && expiresAt === null && activatedAt === null)
-                || (hasValidIssuer && expiresAt !== null && activatedAt !== null));
+                || (hasValidIssuer && hasFixedActivationWindow));
         if (typeof attestation.attestationRef !== 'string' || !HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_REF.test(attestation.attestationRef) || attestationRefs.has(attestation.attestationRef)
             || typeof attestation.actorRef !== 'string' || attestation.actorRef.trim() !== attestation.actorRef || attestation.actorRef.length < 1 || attestation.actorRef.length > 256 || actorRefs.has(attestation.actorRef)
             || attestation.schemaVersion !== HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_SCHEMA

@@ -255,7 +255,7 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
         attestation_ref: `hsar_${'7'.repeat(32)}`, actor_ref: actorRef,
         schema_version: 'mediflow.headless-soap-active-role-attestation.v1', role: 'physician',
         operation_id: 'mediflow.clinical_diary.append_soap.v1', policy_version: 'clinician_confirmed_single_use.v1',
-        status: 'active', attestation_version: 1, issuer_ref: 'w7-soap-issuer', expires_at: now + 60,
+        status: 'active', attestation_version: 1, issuer_ref: `hsari_${'7'.repeat(32)}`, expires_at: now + 26 + (8 * 60 * 60),
         activated_at: now + 26, revocation_generation: 0, revoked_at: null, created_at: now + 26, updated_at: now + 26,
     });
     insertRow(db, 'attachments', {

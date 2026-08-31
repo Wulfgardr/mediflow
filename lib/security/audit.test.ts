@@ -56,6 +56,7 @@ test('sanitizeAuditMetadata keeps only the PHI-safe whitelist', () => {
 
 test('audit catalog includes the PHI-safe application lock vocabulary', () => {
     assert.equal(AUDIT_EVENT_TYPES.includes('auth.lock'), true);
+    assert.equal(AUDIT_EVENT_TYPES.includes('auth.soap_active_role.enrolled'), true);
 });
 
 test('audit schema blocks update and delete to preserve append-only semantics', () => {
@@ -347,6 +348,7 @@ test('summarizeAuditEvents groups PHI-safe operational KPIs', () => {
     });
     assert.deepEqual(summary.subjectTypes, {
         session: 1,
+        active_role_attestation: 0,
         patient: 2,
         ambulatory: 0,
         checkup: 0,
