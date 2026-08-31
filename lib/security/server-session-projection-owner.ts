@@ -13,6 +13,7 @@ import {
 } from './server-session';
 import {
     abortResourceUse, beginResourceUse, commitResourceUse, mintResourcePort, releaseResourcePort,
+    registerPrivateResource, unregisterPrivateResource,
     type WebResourcePort,
 } from './web-auth-lifecycle-owner-adapter';
 
@@ -33,6 +34,23 @@ type SelectionLease = Readonly<{
     leaseRef: string; expiresAt: number;
 }>;
 type SelectionState = CanonicalPair & SelectionLease;
+
+declare const selectionScopeIdentity: unique symbol;
+declare const selectionRegistrationIdentity: unique symbol;
+export type ServerSessionSelectionScopeV1 = Readonly<{ readonly [selectionScopeIdentity]?: never }>;
+export type ServerSessionSelectionDependentRegistrationV1 = Readonly<{ readonly [selectionRegistrationIdentity]?: never }>;
+export type ServerSessionSelectionLifecycleControllerV1 = Readonly<{
+    withCurrentSelection(session: ServerSession, operation: (scope: ServerSessionSelectionScopeV1) => void): boolean;
+    registerDependent(scope: unknown, dispose: () => void): ServerSessionSelectionDependentRegistrationV1 | null;
+    confirmDependent(scope: unknown, registration: unknown): boolean;
+    unregisterDependent(scope: unknown, registration: unknown): boolean;
+    withCurrentDependent(scope: unknown, registration: unknown, operation: () => void): boolean;
+}>;
+type SelectionScopeRecord = { scope: ServerSessionSelectionScopeV1; session: ServerSession; selection: SelectionState;
+    active: boolean; dependents: SelectionDependentRecord | null; current(): boolean };
+type SelectionDependentRecord = { registration: ServerSessionSelectionDependentRegistrationV1; scope: SelectionScopeRecord;
+    dispose: () => void; active: boolean; next: SelectionDependentRecord | null; drainNext: SelectionDependentRecord | null;
+    port: WebResourcePort | null; resourceRegistration: object | null };
 
 const ObjectCreate = Object.create;
 const ObjectFreeze = Object.freeze;
@@ -70,7 +88,13 @@ const isProxy = types.isProxy;
 const getOwnPropertyDescriptor = ObjectGetOwnPropertyDescriptor;
 const weakMapGet = WeakMap.prototype.get;
 const weakMapSet = WeakMap.prototype.set;
+const weakMapDelete = WeakMap.prototype.delete;
 const getPrototypeOf = ObjectGetPrototypeOf;
+const FunctionPrototype = Function.prototype;
+const PromiseThen = Promise.prototype.then;
+const isAsyncFunction = types.isAsyncFunction;
+const isGeneratorFunction = types.isGeneratorFunction;
+const isPromise = types.isPromise;
 
 function addOwnerIdentity(registry: WeakSet<object>, owner: object): void {
     applyIntrinsic(weakSetAdd, registry, [owner]);
@@ -86,6 +110,26 @@ function getMapValue<K, V>(registry: Map<K, V>, key: K): V | undefined {
 
 function setMapValue<K, V>(registry: Map<K, V>, key: K, value: V): void {
     applyIntrinsic(mapSet, registry, [key, value]);
+}
+
+function deleteWeakMapValue<K extends object, V>(registry: WeakMap<K, V>, key: K): void {
+    applyIntrinsic(weakMapDelete, registry, [key]);
+}
+
+function supportedSelectionCallback(value: unknown): value is (...args: never[]) => void {
+    return typeof value === 'function' && !isProxy(value) && !isAsyncFunction(value)
+        && !isGeneratorFunction(value) && getPrototypeOf(value) === FunctionPrototype;
+}
+
+function selectionCallbackSucceeded(operation: (...args: never[]) => void, args: unknown[]): boolean {
+    try {
+        const result = applyIntrinsic(operation, undefined, args);
+        if (result === undefined) return true;
+        if (isPromise(result)) {
+            try { applyIntrinsic(PromiseThen, result, [undefined, () => undefined]); } catch { /* denial remains local */ }
+        }
+    } catch { /* fixed false below */ }
+    return false;
 }
 
 function hasMapValue<K, V>(registry: Map<K, V>, key: K): boolean {
@@ -279,8 +323,10 @@ function frozenExact(input: unknown, keys: readonly string[]): Record<string, un
 
 type ProjectionOwnerAuthorityKind = 'legacy' | 'port' | 'port-full';
 
-function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(authorityKind: ProjectionOwnerAuthorityKind,
-    sourceOverrides: Partial<SelectionSources> = {}): ProjectionOwnerRegistry<Owner> {
+function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>(authorityKind: ProjectionOwnerAuthorityKind,
+    sourceOverrides: Partial<SelectionSources> = {}): Readonly<{
+        registry: ProjectionOwnerRegistry<Owner>; selectionLifecycleController: ServerSessionSelectionLifecycleControllerV1;
+    }> {
     const sources = ObjectFreeze({ ...defaultSources, ...sourceOverrides });
     const owners = new MapConstructor<string, ProjectionOwnerSurface>();
     const registryOwners = new WeakSetConstructor<object>();
@@ -288,6 +334,117 @@ function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(auth
     const acquiring = new SetConstructor<string>();
     let portRevealActive = false;
     const portBacked = authorityKind !== 'legacy';
+    const selectionScopes = new WeakMapConstructor<object, SelectionScopeRecord>();
+    const sessionScopes = new WeakMapConstructor<object, SelectionScopeRecord>();
+    const selectionRegistrations = new WeakMapConstructor<object, SelectionDependentRecord>();
+    let selectionOperation: { scope: SelectionScopeRecord; dependent: SelectionDependentRecord | null;
+        created: SelectionDependentRecord | null; poisoned: boolean } | null = null;
+    const scopeRecord = (candidate: unknown): SelectionScopeRecord | null => typeof candidate === 'object' && candidate !== null
+        && !isProxy(candidate) ? applyIntrinsic(weakMapGet, selectionScopes, [candidate]) ?? null : null;
+    const dependentRecord = (candidate: unknown): SelectionDependentRecord | null => typeof candidate === 'object' && candidate !== null
+        && !isProxy(candidate) ? applyIntrinsic(weakMapGet, selectionRegistrations, [candidate]) ?? null : null;
+    const unlinkSelectionDependent = (record: SelectionDependentRecord) => {
+        const scope = record.scope;
+        if (scope.dependents === record) scope.dependents = record.next;
+        else { let previous = scope.dependents; while (previous && previous.next !== record) previous = previous.next;
+            if (previous) previous.next = record.next; }
+        record.next = null;
+    };
+    const finishSelectionDependent = (record: SelectionDependentRecord, invoke: boolean, retirement: boolean) => {
+        if (!record.active) return;
+        record.active = false; deleteWeakMapValue(selectionRegistrations, record.registration); unlinkSelectionDependent(record);
+        const port = record.port; const resourceRegistration = record.resourceRegistration;
+        record.port = null; record.resourceRegistration = null;
+        if (!retirement) {
+            if (port && resourceRegistration) { try { unregisterPrivateResource(port, resourceRegistration); } catch { /* local denial remains */ } }
+            if (port) { try { releaseResourcePort(port); } catch { /* local denial remains */ } }
+        }
+        if (invoke) { try { applyIntrinsic(record.dispose, undefined, []); } catch { /* sibling cleanup continues */ } }
+    };
+    const drainSelectionScope = (scope: SelectionScopeRecord, retirement = false) => {
+        if (!scope.active) return;
+        scope.active = false; deleteWeakMapValue(selectionScopes, scope.scope);
+        if (applyIntrinsic(weakMapGet, sessionScopes, [scope.session]) === scope) deleteWeakMapValue(sessionScopes, scope.session);
+        let record = scope.dependents; let pending: SelectionDependentRecord | null = null; scope.dependents = null;
+        while (record) { const next = record.next; record.next = null; record.drainNext = pending; pending = record;
+            record.active = false; deleteWeakMapValue(selectionRegistrations, record.registration); record = next; }
+        while (pending) { const next = pending.drainNext; pending.drainNext = null;
+            const port = pending.port; const resourceRegistration = pending.resourceRegistration;
+            pending.port = null; pending.resourceRegistration = null;
+            if (!retirement) {
+                if (port && resourceRegistration) { try { unregisterPrivateResource(port, resourceRegistration); } catch { /* drain continues */ } }
+                if (port) { try { releaseResourcePort(port); } catch { /* drain continues */ } }
+            }
+            try { applyIntrinsic(pending.dispose, undefined, []); } catch { /* drain continues */ }
+            pending = next; }
+    };
+    const beginSelectionOperation = (scope: SelectionScopeRecord, dependent: SelectionDependentRecord | null) => {
+        if (selectionOperation) { selectionOperation.poisoned = true; return null; }
+        selectionOperation = { scope, dependent, created: null, poisoned: false }; return selectionOperation;
+    };
+    const endSelectionOperation = (operation: NonNullable<typeof selectionOperation>, success: boolean) => {
+        const accepted = success && !operation.poisoned; selectionOperation = null;
+        if (!accepted) {
+            if (operation.dependent) finishSelectionDependent(operation.dependent, true, false);
+            else if (operation.created) finishSelectionDependent(operation.created, true, false);
+        }
+        return accepted;
+    };
+    const selectionLifecycleController: ServerSessionSelectionLifecycleControllerV1 = ObjectFreeze({
+        withCurrentSelection(presented: ServerSession, operation: (scope: ServerSessionSelectionScopeV1) => void): boolean {
+            if (selectionOperation) { selectionOperation.poisoned = true; return false; }
+            if (!supportedSelectionCallback(operation)) return false;
+            const scope = typeof presented === 'object' && presented !== null && !isProxy(presented)
+                ? applyIntrinsic(weakMapGet, sessionScopes, [presented]) ?? null : null;
+            if (!scope || !scope.active || !scope.current()) return false;
+            const activeOperation = beginSelectionOperation(scope, null); if (!activeOperation) return false;
+            const succeeded = selectionCallbackSucceeded(operation, [scope.scope]) && scope.active && scope.current()
+                && (!activeOperation.created || activeOperation.created.active);
+            return endSelectionOperation(activeOperation, succeeded);
+        },
+        registerDependent(candidate: unknown, dispose: () => void): ServerSessionSelectionDependentRegistrationV1 | null {
+            const scope = scopeRecord(candidate);
+            if (!scope || !scope.active || !supportedSelectionCallback(dispose)
+                || (selectionOperation && selectionOperation.scope !== scope)) {
+                if (selectionOperation) selectionOperation.poisoned = true; return null;
+            }
+            if (selectionOperation?.dependent || selectionOperation?.created || !scope.current()) {
+                if (selectionOperation) selectionOperation.poisoned = true; return null;
+            }
+            const port = mintResourcePort(scope.session); if (!port) return null;
+            const registration = ObjectFreeze(ObjectCreate(null)) as ServerSessionSelectionDependentRegistrationV1;
+            const record: SelectionDependentRecord = { registration, scope, dispose, active: true, next: scope.dependents,
+                drainNext: null, port, resourceRegistration: null };
+            const resourceRegistration = registerPrivateResource(port, () => drainSelectionScope(scope, true));
+            if (!resourceRegistration) { releaseResourcePort(port); return null; }
+            record.resourceRegistration = resourceRegistration; scope.dependents = record;
+            applyIntrinsic(weakMapSet, selectionRegistrations, [registration, record]);
+            if (!scope.active || !scope.current()) { finishSelectionDependent(record, false, false); return null; }
+            if (selectionOperation) selectionOperation.created = record;
+            return registration;
+        },
+        confirmDependent(candidate: unknown, registration: unknown): boolean {
+            const scope = scopeRecord(candidate); const record = dependentRecord(registration);
+            return !!scope && !!record && scope.active && record.active && record.scope === scope
+                && record.registration === registration && scope.current();
+        },
+        unregisterDependent(candidate: unknown, registration: unknown): boolean {
+            const scope = scopeRecord(candidate); const record = dependentRecord(registration);
+            if (!scope || !record || !record.active || record.scope !== scope || record.registration !== registration) return false;
+            finishSelectionDependent(record, false, false); return true;
+        },
+        withCurrentDependent(candidate: unknown, registration: unknown, operation: () => void): boolean {
+            if (selectionOperation) { selectionOperation.poisoned = true; return false; }
+            if (!supportedSelectionCallback(operation)) return false;
+            const scope = scopeRecord(candidate); const record = dependentRecord(registration);
+            if (!scope || !record || !scope.active || !record.active || record.scope !== scope
+                || record.registration !== registration || !scope.current()) return false;
+            const activeOperation = beginSelectionOperation(scope, record); if (!activeOperation) return false;
+            const succeeded = selectionCallbackSucceeded(operation, []) && scope.active && record.active
+                && dependentRecord(registration) === record && scope.current();
+            return endSelectionOperation(activeOperation, succeeded);
+        },
+    });
     type PortRegistryNode = { owner: ProjectionOwnerSurface; authority: WebResourcePort;
         previous: PortRegistryNode | null; next: PortRegistryNode | null; active: boolean };
     let portRegistryHead: PortRegistryNode | null = null;
@@ -381,6 +538,7 @@ function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(auth
             let epoch = 0;
             let reviewContextEpoch = 0;
             let selection: SelectionState | null = null;
+            let selectionLifecycleScope: SelectionScopeRecord | null = null;
             let selecting = false;
             let leaseCriticalSectionActive = false;
             let leasePortOperationActive = false;
@@ -426,6 +584,8 @@ function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(auth
             const finish = (revokeActive: boolean) => {
                 if (terminal) return;
                 terminal = true;
+                const previousSelectionScope = selectionLifecycleScope; selectionLifecycleScope = null;
+                if (previousSelectionScope) drainSelectionScope(previousSelectionScope);
                 try { addSetValue(retired, session.id); } catch { /* Terminal state remains authoritative. */ }
                 unlinkPortNode(registryNode); registryNode = null;
                 try { deleteMapValue(owners, session.id); } catch { /* Applied deletion stays authoritative. */ }
@@ -477,6 +637,8 @@ function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(auth
                 && value.leaseRef === current.leaseRef;
             const expire = () => {
                 if (portBacked) { finish(true); return; }
+                const previousSelectionScope = selectionLifecycleScope; selectionLifecycleScope = null;
+                if (previousSelectionScope) drainSelectionScope(previousSelectionScope);
                 const previous = active; const hadSelection = selection !== null;
                 active = null; selection = null;
                 if (hadSelection) reviewContextEpoch += 1;
@@ -784,9 +946,26 @@ function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(auth
                         const next: SelectionState = ObjectFreeze({ ...pair, sessionRef, selectionEpoch: epoch + 1,
                             patientRef, ambulatoryRef, leaseRef,
                             expiresAt });
+                        const previousSelectionScope = selectionLifecycleScope; selectionLifecycleScope = null;
+                        if (previousSelectionScope) drainSelectionScope(previousSelectionScope);
+                        assertCurrent();
                         const previous = active; active = null; revoke(previous);
                         reviewContextEpoch += 1;
                         epoch = next.selectionEpoch; selection = next;
+                        const scopeIdentity = ObjectFreeze(ObjectCreate(null)) as ServerSessionSelectionScopeV1;
+                        const scope: SelectionScopeRecord = { scope: scopeIdentity, session, selection: next, active: true, dependents: null,
+                            current: () => {
+                                if (!scope.active || terminal || selectionLifecycleScope !== scope || selection !== next || epoch !== next.selectionEpoch) return false;
+                                try {
+                                    const observedAt = readClock();
+                                    if (observedAt >= next.expiresAt) { expire(); return false; }
+                                    return scope.active && !terminal && currentSession(true) === session
+                                        && selectionLifecycleScope === scope && selection === next && epoch === next.selectionEpoch;
+                                } catch { return false; }
+                            } };
+                        selectionLifecycleScope = scope;
+                        applyIntrinsic(weakMapSet, selectionScopes, [scopeIdentity, scope]);
+                        applyIntrinsic(weakMapSet, sessionScopes, [session, scope]);
                         return ObjectFreeze({ sessionRef, selectionEpoch: next.selectionEpoch, patientRef: next.patientRef,
                             ambulatoryRef: next.ambulatoryRef, leaseRef: next.leaseRef, expiresAt });
                     } finally { selecting = false; }
@@ -961,21 +1140,27 @@ function createProjectionOwnerFactory<Owner extends ProjectionOwnerSurface>(auth
             }
         },
     };
-    return ObjectFreeze(registry);
+    return ObjectFreeze({ registry: ObjectFreeze(registry), selectionLifecycleController });
 }
 
 export function createLegacyProjectionOwnerFactory(sourceOverrides: Partial<SelectionSources> = {}) {
-    return createProjectionOwnerFactory<ServerSessionProjectionOwner>('legacy', sourceOverrides);
+    return createProjectionOwnerProcessOwner<ServerSessionProjectionOwner>('legacy', sourceOverrides).registry;
 }
 
 export function createPortProjectionOwnerFactory(sourceOverrides: Partial<SelectionSources> = {}) {
-    return createProjectionOwnerFactory<PortServerSessionProjectionOwner>('port', sourceOverrides);
+    return createProjectionOwnerProcessOwner<PortServerSessionProjectionOwner>('port', sourceOverrides).registry;
 }
 
 /** Creates the full projection surface while external-owner ports govern Web currentness and cleanup. */
 /* @Codex */
 export function createFullPortProjectionOwnerFactory(sourceOverrides: Partial<SelectionSources> = {}) {
-    return createProjectionOwnerFactory<ServerSessionProjectionOwner>('port-full', sourceOverrides);
+    return createFullPortProjectionOwnerProcessOwner(sourceOverrides).registry;
+}
+
+/** Shares one final-owner registry with its private selection lifecycle controller. */
+/* @Codex */
+export function createFullPortProjectionOwnerProcessOwner(sourceOverrides: Partial<SelectionSources> = {}) {
+    return createProjectionOwnerProcessOwner<ServerSessionProjectionOwner>('port-full', sourceOverrides);
 }
 
 export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Partial<SelectionSources> = {}) {
