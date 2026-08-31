@@ -471,6 +471,35 @@ non legge o scrive SQLite, non conia approval o proof e non implementa H5.
 Il gate H4 richiede field set host, codec/golden tri-OS e seal/reopen client
 verificati; il loro handoff runtime e parte di H5 e non viene anticipato.
 
+### Costanti H5a per 0.8.5
+
+H5a e composto da due owner senza authority: il lifecycle host della
+presentazione e la review client dedicata. L'handoff canonico ha schema
+`mediflow.headless.soap-entry-presentation.v1` ed esattamente le own data key
+enumerabili `schema`, `correlationToken`, `fieldSet`, in questo ordine. Il
+`fieldSet` e una copia canonica H4; il token e il base64url senza padding di 32
+byte CSPRNG host-owned, quindi ha esattamente 43 caratteri ASCII canonici. Il
+token correla soltanto la presentazione: non e authority, approval, gesture,
+proof, lease o idempotency key e non contiene proposal ref, scope,
+registration, identita cliniche o testo SOAP.
+
+Un entry ref H4 puo produrre una sola presentazione. Il lifecycle H5a si
+registra e si conferma come dipendente H4 prima di pubblicare handoff o token;
+eredita integralmente currentness e scadenza H4/H3 e non introduce un TTL
+indipendente. Drain H4, cancel, failure di attach o perdita di currentness
+terminalizzano H5a, cancellano registro e copia host; token foreign, stale,
+duplicato o non canonico resta inerte. Il controller privato per H5b espone
+solo currentness e lifecycle dipendente, mai il field set al caller.
+
+Sul client, l'apertura sigilla il field set una sola volta senza emettere
+alcun segnale. Il solo CTA della UI dedicata consuma il gesto; immediatamente
+prima di restituire il risultato riapre seal e field set e applica il
+confronto byte-esatto H4. Il risultato positivo H5a e esattamente il record
+null-prototype e frozen `{ status: 'pin_required' }`, senza token o payload.
+Click concorrenti o ripetuti, cancel, close e denial terminalizzano l'owner.
+I denial restano quelli H4 piu `gesture_unavailable`, tutti PHI-safe. Mount,
+trasporto e adapter applicativi restano H8; H5a non apre route o fetch.
+
 Chat, voce/audio trascritti, planner text, Mini e utterance dell'agente possono
 solo raccogliere la bozza o richiedere preview. Non possono mai approvare,
 coniare un gesto, confermare un PIN o consumare una proof.
