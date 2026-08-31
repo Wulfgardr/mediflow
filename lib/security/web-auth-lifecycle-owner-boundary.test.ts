@@ -36,6 +36,7 @@ const PREPARED_INDEX_SHA256 = '7bc72383ad0639480702aadb8bad2cacf135c2c1b1cb7013a
 const PREPARED_MANIFEST_SHA256 = 'ee606c50ba3a13d072143aa3149afe39f1a8ceee9ce4982f9a99ceacb53b0db7';
 const ADAPTER = 'lib/security/web-auth-lifecycle-owner-adapter';
 const ADAPTER_FILE = `${ADAPTER}.ts`;
+const LEGACY_BRIDGE_FILE = 'lib/security/web-auth-lifecycle-owner-legacy.ts';
 const ADAPTER_TEST = `${ADAPTER}.test`;
 const ADAPTER_TEST_FILE = `${ADAPTER_TEST}.ts`;
 const THIS_FILE = 'lib/security/web-auth-lifecycle-owner-boundary.test.ts';
@@ -55,7 +56,8 @@ const UNRESOLVED_LOADER_FORMS = new Set([
     'unsupported-expression', 'protected-loader-unsupported', 'reserved-loader-identity', 'code-loader',
 ]);
 const PRE_CUTOVER_UNRESOLVED_LOADERS = new Map([
-    ['lib/security/server-session.test.ts', 'e32f86d5ede4060e3d55ed776832aefd3a92d88a2b197e7aedc0aa08bdc71e13'],
+    ['lib/security/web-auth-lifecycle-owner-process.test.ts', '8ca440fd0b292c0d7adb31e687f4dd4c57d2876dc2174e4c08834a8c3be3679f'],
+    ['lib/security/server-session.test.ts', 'e79aa927017e9304f21f107dea4aa698834bd8585e1a5abf76cef5d6c73a9c76'],
     ['native/MediFlowMac/Tests/MediFlowCoreTests/Fixtures/generate-fixture.mjs', '9e3019e28cc78f170dfffe8ab82fc2c744be8b9a6e0875f4116e20bd9ad45897'],
     ['scripts/backup-restore-drill.mjs', 'b9ab5380c602d87971fe67b27db756e3cb1d57bff51d4154b322ae13150ad711'],
     ['scripts/backup-restore-date-fields.test.mjs', 'fb3879de5c0518074b2983c24930fbc0913be8a800e29f923cf205879b19f531'],
@@ -63,10 +65,12 @@ const PRE_CUTOVER_UNRESOLVED_LOADERS = new Map([
     ['scripts/durable-review-record-store-worker.mjs', '4302cd00c488a2edb7039dfe3acf32ee083944942afc63db015cf0cd9f728fa4'],
     ['scripts/node-runtime-contract.mjs', '55638610b2445124751f1bb4381ce84afac3bf4be405e5e5ee07474b0a96488b'],
 ]);
-const AUTHORITY_ROSTER_SHA256 = '8cef18fd9f1e29f5f48a285092c9cd159e0be707a27d4977cbb43cf4df77b08d';
+const AUTHORITY_ROSTER_SHA256 = '0e3bfcf190e1e8205d558850b2e1c89bb815a8d0c5359711df3798e61b9addf2';
 const PRE_CUTOVER_GLOBAL_OWNER_SHA256 = 'ae959c2ba88cb768b106aa52d7fec1ea2f6acc7407db194ad9765799ec2fa854';
 const PRE_CUTOVER_GLOBAL_OWNER = 'lib/security/server-session-projection-owner-production.ts';
 const DORMANT_ADAPTER_SOURCE = "import 'server-only';\nexport const lifecycleOwnerAdapterState = 'dormant_prepared' as const;\nexport type LifecycleOwnerAdapterState = typeof lifecycleOwnerAdapterState;";
+const LEGACY_ADAPTER_SHA256 = '34681575ce1e40e70835644d2df7a4da4593007a5bc39e19f2b52191436f836f';
+const LEGACY_BRIDGE_SHA256 = '05f5f0b290a1e00b3c9a32a9a681627a63f80cde37b1a1f4e59a6de2710c4ae8';
 const PREPARED_PACKAGE_MANIFEST = `{\n  "name": "${PACKAGE}",\n  "version": "0.8.5-prepared.0",\n  "private": true,\n  "type": "commonjs",\n  "main": "./index.js",\n  "exports": "./index.js",\n  "files": ["index.js", "internal/"],\n  "engines": { "node": ">=24 <25" }\n}\n`;
 const PREPARED_PACKAGE_ENTRY = "/* @Codex */\n'use strict';\nmodule.exports = Object.freeze(Object.create(null));\n";
 const STATEFUL_AUTHORITY_MODULES = new Set([
@@ -148,7 +152,12 @@ const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false,
     packageAliases: ReadonlySet<string> = new Set()): string[] => {
     const errors: string[] = [];
     for (const [file, source] of Object.entries(sources)) {
-        const dormantPackageFile = file === PACKAGE_ENTRY_FILE || file.startsWith(`${PACKAGE_ROOT}/internal/`);
+        const packageFileRelative = path.relative(PACKAGE_ROOT, file);
+        const expectedPackageFile = [PREPARED_0, PREPARED_1, PREPARED_2, PREPARED_3, PREPARED_4]
+            .flatMap((contract) => contract.inputs)
+            .find((entry) => entry.path === packageFileRelative && entry.bytes === Buffer.byteLength(source)
+                && entry.sha256 === digest(source));
+        const dormantPackageFile = expectedPackageFile !== undefined;
         const futureSuccessorFence = file === `${PACKAGE_ROOT}/internal/support/successor-fence.cjs`
             && source === PREPARED_2_SUCCESSOR_FENCE;
         const unresolvedLoaderIsKnown = PRE_CUTOVER_UNRESOLVED_LOADERS.get(file) === digest(source);
@@ -231,7 +240,8 @@ const importInventoryErrors = (sources: Sources, allowAdapterTestUse = false,
         const adapterRelevant = adapterUses.filter((use) => IMPORT_FORMS.has(use.form) || use.form === 'module-path'
             || (UNRESOLVED_LOADER_FORMS.has(use.form) && !unresolvedLoaderIsKnown)
             || source.includes('web-auth-lifecycle-owner-adapter'));
-        if (adapterRelevant.length > 0 && !allowedTestUse && !futureSuccessorFence) errors.push(`${file}:adapter-load`);
+        if (adapterRelevant.length > 0 && !allowedTestUse && !futureSuccessorFence && !dormantPackageFile)
+            errors.push(`${file}:adapter-load`);
         const adapterTestUses = inventoryModuleImports({ file, source, target: ADAPTER_TEST, repositoryRoot: ROOT,
             allowUnresolvedExpressions: allowedGenericLoaderExpressions });
         const adapterTestRelevant = adapterTestUses.filter((use) => IMPORT_FORMS.has(use.form) || use.form === 'module-path'
@@ -289,6 +299,22 @@ const dormantAdapterErrors = (source: string): string[] => {
     if (serverOnly !== 1) errors.push('adapter:server-only');
     if (printed(ADAPTER_FILE, source) !== DORMANT_ADAPTER_CONTRACT) errors.push('adapter:exact-contract');
     return [...new Set(errors)];
+};
+
+const preCutoverAdapterErrors = (sources: Sources, source: string): string[] => {
+    if (dormantAdapterErrors(source).length === 0) return [];
+    const bridge = sources[LEGACY_BRIDGE_FILE];
+    const errors: string[] = [];
+    if (digest(source) !== LEGACY_ADAPTER_SHA256) errors.push('adapter:legacy-contract');
+    if (bridge === undefined || digest(bridge) !== LEGACY_BRIDGE_SHA256) errors.push('adapter:legacy-bridge');
+    if (!source.includes("import 'server-only';")
+        || !source.includes("import * as legacy from './web-auth-lifecycle-owner-legacy';"))
+        errors.push('adapter:legacy-imports');
+    if (/(?:@mediflow\/web-auth-lifecycle-owner|ownerSelector|selectOwner|globalThis|process\.)/u.test(source))
+        errors.push('adapter:legacy-bypass');
+    if (bridge && /(?:@mediflow\/web-auth-lifecycle-owner|createNativeServerSession|isPairedNativeServerSession|globalThis)/u.test(bridge))
+        errors.push('adapter:legacy-bridge-bypass');
+    return errors;
 };
 
 type PackageSourceOps = Readonly<{
@@ -571,14 +597,134 @@ const PREPARED_2: PreparedContract = {
         { path: PREPARED_2_PROVENANCE_PATH, bytes: 2948,
             sha256: 'f7899346886df74f818a3e2e05daf6b8a2b8ce225ed98f29af16173221cd8291' }],
 };
-const LIVE_PREPARED_CONTRACT = PREPARED_2;
+const PREPARED_3_VERSION = '0.8.5-prepared.3';
+const PREPARED_3_MANIFEST = PREPARED_2_MANIFEST.replace(PREPARED_2_VERSION, PREPARED_3_VERSION);
+const PREPARED_3_INPUTS = [
+    { path: 'index.js', bytes: 80, sha256: PREPARED_INDEX_SHA256 },
+    { path: 'internal/control-record.cjs', bytes: 17533,
+        sha256: 'ed41f7f713309e02d5353f27785d1333eb96e844ccd94fdfcbbb9a7e35c3c6eb' },
+    { path: 'internal/owner.cjs', bytes: 15755,
+        sha256: '88a4874a10f3fd8fb8b6a23972788dca62cbd02ffdc073670ac1742b5b9e8ea3' },
+    { path: 'internal/session-activation.cjs', bytes: 6046,
+        sha256: 'ae65e88807fe8b33fbf7d14c7cce3651a456e53a915143c26b89d7c800e96b94' },
+    { path: 'internal/session-cell.cjs', bytes: 19298,
+        sha256: 'd8a7880912134ba1e6c130bd57f49114f507b79e44835a8af2ebb05be26eb6b6' },
+    { path: 'internal/session-resolver.cjs', bytes: 2684,
+        sha256: '2a3f9da89b7cf3d23cb551fc73fb7c239cdec60665f6fa1edaeea3dc1ee61266' },
+    { path: 'internal/session-resource.cjs', bytes: 12008,
+        sha256: 'dcdc06fcd35068d42537b9233bc8f2f1ddec276488e3898c6b3e9409c59eb921' },
+    { path: 'internal/session-retirement.cjs', bytes: 5584,
+        sha256: '11fc70ca81bfa5a12cb6a872461319fb93c4f3cd4128089f478f1250189749a9' },
+    { path: 'internal/support/successor-fence.cjs', bytes: 1172,
+        sha256: '7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff' },
+    { path: 'internal/support/value.cjs', bytes: 47,
+        sha256: '9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1' },
+    { path: 'package.json', bytes: 251,
+        sha256: '1cc49c01e8733c8acbe6d435c006122eeb69de155a43593a49266dabd9c3667c' },
+] as const;
+const PREPARED_3_TARBALL = `${PACKAGE_ROOT}/artifacts/mediflow-web-auth-lifecycle-owner-${PREPARED_3_VERSION}.tgz`;
+const PREPARED_3_PROVENANCE_PATH = PREPARED_3_TARBALL.replace(/\.tgz$/u, '.provenance.json');
+const PREPARED_3_TAR_SHA256 = 'b770719d80a33a3ebe8dd7fd810f101fa73f1f32861e43765ca9779d4f1e53f6';
+const PREPARED_3_INTEGRITY = 'sha512-DFUi/H6ZE2CimmVLPpJDCUbEW6L+B4TxbcOmC8M5vv2m2yUKeen65LsV+dn4ezw/fRC7wFtwg0D6sj99WHM7VQ==';
+const PREPARED_3_PREDECESSOR = { version: PREPARED_2_VERSION, tarSha256: PREPARED_2_TAR_SHA256,
+    provenanceSha256: 'f7899346886df74f818a3e2e05daf6b8a2b8ce225ed98f29af16173221cd8291' } as const;
+const prepared3Provenance = () => ({
+    schemaVersion: 'mediflow.web-auth-lifecycle-owner.package-provenance.v1',
+    acceptedBase: '53f3d6be10799aaf982917561d246feef496095f', predecessor: PREPARED_3_PREDECESSOR,
+    package: { name: PACKAGE, version: PREPARED_3_VERSION }, toolchain: { node: 'v24.19.0', npm: '11.17.0' },
+    pack: { command: 'npm pack --ignore-scripts --pack-destination ./artifacts', runs: 2,
+        network: 'offline', scripts: 'ignored', cache: 'empty_temporary', byteIdentical: true },
+    artifact: { path: PREPARED_3_TARBALL, bytes: 13937, sha256: PREPARED_3_TAR_SHA256,
+        integrity: PREPARED_3_INTEGRITY }, inputs: PREPARED_3_INPUTS,
+    roster: [
+        'internal/control-record.cjs', 'internal/owner.cjs', 'internal/session-activation.cjs',
+        'internal/session-cell.cjs', 'internal/session-resolver.cjs', 'internal/session-resource.cjs',
+        'internal/session-retirement.cjs', 'internal/support/successor-fence.cjs',
+        'internal/support/value.cjs', 'index.js', 'package.json',
+    ].map((path) => { const file = PREPARED_3_INPUTS.find((entry) => entry.path === path)!;
+        return { path: `package/${file.path}`, type: 'file' as const, mode: '0644' as const,
+            bytes: file.bytes, sha256: file.sha256 }; }),
+});
+const PREPARED_3: PreparedContract = {
+    version: PREPARED_3_VERSION, sequence: 3, manifest: PREPARED_3_MANIFEST,
+    tarball: PREPARED_3_TARBALL, provenancePath: PREPARED_3_PROVENANCE_PATH, dependency: `file:${PREPARED_3_TARBALL}`,
+    tar: { path: PREPARED_3_TARBALL, bytes: 13937, sha256: PREPARED_3_TAR_SHA256, integrity: PREPARED_3_INTEGRITY },
+    provenance: prepared3Provenance(), predecessor: PREPARED_3_PREDECESSOR, inputs: PREPARED_3_INPUTS,
+    roster: prepared3Provenance().roster, artifacts: [...PREPARED_2.artifacts,
+        { path: PREPARED_3_TARBALL, bytes: 13937, sha256: PREPARED_3_TAR_SHA256 },
+        { path: PREPARED_3_PROVENANCE_PATH, bytes: 5238,
+            sha256: '38173d5c6b463f1c1564507c08d6cebd21f58926385fce38e168e4562ba6fa53' }],
+};
+const PREPARED_4_VERSION = '0.8.5-prepared.4';
+const PREPARED_4_MANIFEST = PREPARED_3_MANIFEST.replace(PREPARED_3_VERSION, PREPARED_4_VERSION);
+const PREPARED_4_INPUTS = [
+    { path: 'index.js', bytes: 80, sha256: PREPARED_INDEX_SHA256 },
+    { path: 'internal/control-record.cjs', bytes: 18237,
+        sha256: 'a15689f13f2af33a5451bd05c5c3dace735dcf3aeca2883f1be3f465fff79adb' },
+    { path: 'internal/owner.cjs', bytes: 18727,
+        sha256: 'ea7bf775c6c4e25bc4ab6914932fe33e366d04457ad68e335955326bef087792' },
+    { path: 'internal/session-activation.cjs', bytes: 6143,
+        sha256: '5ed4c9543f8bc15903c0915a8565b997d697d004e9ccfaaa54a3da6236a2aa96' },
+    { path: 'internal/session-cell.cjs', bytes: 23897,
+        sha256: '4cd0c2e9f8b40b346d43a93de561e20e85c5662fc8a2f9a0a170403fc80c2e31' },
+    { path: 'internal/session-resolver.cjs', bytes: 2965,
+        sha256: '75409d670b8411dbadcc95e4bd9bfebeff47d2f687bde0d638809bb9114b5fa0' },
+    { path: 'internal/session-resource.cjs', bytes: 12008,
+        sha256: 'dcdc06fcd35068d42537b9233bc8f2f1ddec276488e3898c6b3e9409c59eb921' },
+    { path: 'internal/session-retirement.cjs', bytes: 5664,
+        sha256: '8848c92cb88635c6c09baf685839e7c6f1aca40d667ea6580e84e275349f1516' },
+    { path: 'internal/support/successor-fence.cjs', bytes: 1172,
+        sha256: '7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff' },
+    { path: 'internal/support/value.cjs', bytes: 47,
+        sha256: '9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1' },
+    { path: 'package.json', bytes: 251,
+        sha256: 'b946aad1961beca4b8dbd8ad938c10852dc4674b5fb2e3dcac0b0534d9a0430c' },
+] as const;
+const PREPARED_4_TARBALL = `${PACKAGE_ROOT}/artifacts/mediflow-web-auth-lifecycle-owner-${PREPARED_4_VERSION}.tgz`;
+const PREPARED_4_PROVENANCE_PATH = PREPARED_4_TARBALL.replace(/\.tgz$/u, '.provenance.json');
+const PREPARED_4_TAR_SHA256 = 'c8652cdee4d61a5742b3eff6aea57f949eafd917b551c556854b0b458d90d76c';
+const PREPARED_4_INTEGRITY = 'sha512-WK3TnWAH3mGi/3IJ1eg8Dpj9qlizq3BK+28Uk946eJ9I/MGAZ6+f2xTvX6rjlTLWoiBTgA7wJcNcCGkKPkuRAw==';
+const PREPARED_4_PREDECESSOR = { version: PREPARED_3_VERSION, tarSha256: PREPARED_3_TAR_SHA256,
+    provenanceSha256: '38173d5c6b463f1c1564507c08d6cebd21f58926385fce38e168e4562ba6fa53' } as const;
+const prepared4Provenance = () => ({
+    schemaVersion: 'mediflow.web-auth-lifecycle-owner.package-provenance.v1',
+    acceptedBase: '53f3d6be10799aaf982917561d246feef496095f', predecessor: PREPARED_4_PREDECESSOR,
+    package: { name: PACKAGE, version: PREPARED_4_VERSION }, toolchain: { node: 'v24.19.0', npm: '11.17.0' },
+    pack: { command: 'npm pack --ignore-scripts --pack-destination ./artifacts', runs: 2,
+        network: 'offline', scripts: 'ignored', cache: 'empty_temporary', byteIdentical: true },
+    artifact: { path: PREPARED_4_TARBALL, bytes: 15291, sha256: PREPARED_4_TAR_SHA256,
+        integrity: PREPARED_4_INTEGRITY }, inputs: PREPARED_4_INPUTS,
+    roster: [
+        'internal/control-record.cjs', 'internal/owner.cjs', 'internal/session-activation.cjs',
+        'internal/session-cell.cjs', 'internal/session-resolver.cjs', 'internal/session-resource.cjs',
+        'internal/session-retirement.cjs', 'internal/support/successor-fence.cjs',
+        'internal/support/value.cjs', 'index.js', 'package.json',
+    ].map((path) => { const file = PREPARED_4_INPUTS.find((entry) => entry.path === path)!;
+        return { path: `package/${file.path}`, type: 'file' as const, mode: '0644' as const,
+            bytes: file.bytes, sha256: file.sha256 }; }),
+});
+const PREPARED_4: PreparedContract = {
+    version: PREPARED_4_VERSION, sequence: 4, manifest: PREPARED_4_MANIFEST,
+    tarball: PREPARED_4_TARBALL, provenancePath: PREPARED_4_PROVENANCE_PATH, dependency: `file:${PREPARED_4_TARBALL}`,
+    tar: { path: PREPARED_4_TARBALL, bytes: 15291, sha256: PREPARED_4_TAR_SHA256, integrity: PREPARED_4_INTEGRITY },
+    provenance: prepared4Provenance(), predecessor: PREPARED_4_PREDECESSOR, inputs: PREPARED_4_INPUTS,
+    roster: prepared4Provenance().roster, artifacts: [...PREPARED_3.artifacts,
+        { path: PREPARED_4_TARBALL, bytes: 15291, sha256: PREPARED_4_TAR_SHA256 },
+        { path: PREPARED_4_PROVENANCE_PATH, bytes: 5238,
+            sha256: '7acf1f55961908cc6fa39dce31bc99d6d99ac88ce2f9cdad78a0b04180b65b04' }],
+};
+const LIVE_PREPARED_CONTRACT = PREPARED_4;
 const preparedContractErrors = (contract: PreparedContract): string[] => {
-    const match = /^0\.8\.5-prepared\.(0|1|2)$/u.exec(contract.version);
+    const match = /^0\.8\.5-prepared\.(0|1|2|3|4)$/u.exec(contract.version);
     if (!match || Number(match[1]) !== contract.sequence) return ['physical:version-sequence'];
     if (contract.sequence === 0) return contract === PREPARED_0 && contract.predecessor === undefined ? [] : ['physical:version-reuse'];
     if (contract.sequence === 1) return contract === PREPARED_1 && canonical(contract.predecessor) === canonical(PREDECESSOR)
         ? [] : ['physical:predecessor'];
-    return contract === PREPARED_2 && canonical(contract.predecessor) === canonical(PREPARED_2_PREDECESSOR)
+    if (contract.sequence === 2) return contract === PREPARED_2
+        && canonical(contract.predecessor) === canonical(PREPARED_2_PREDECESSOR) ? [] : ['physical:predecessor'];
+    if (contract.sequence === 3) return contract === PREPARED_3
+        && canonical(contract.predecessor) === canonical(PREPARED_3_PREDECESSOR) ? [] : ['physical:predecessor'];
+    return contract === PREPARED_4 && canonical(contract.predecessor) === canonical(PREPARED_4_PREDECESSOR)
         ? [] : ['physical:predecessor'];
 };
 const ownerReferenceCount = (value: unknown): number => {
@@ -672,7 +818,7 @@ const preCutoverSourceState = (sources: Sources, packageArtifacts: Sources = {},
     const adapter = sources[ADAPTER_FILE];
     if (importInventoryErrors(sources, adapter !== undefined).length > 0) return 'INVALID';
     if (adapter === undefined) return Object.keys(packageArtifacts).length === 0 ? 'BASELINE' : 'INVALID';
-    if (dormantAdapterErrors(adapter).length > 0) return 'INVALID';
+    if (preCutoverAdapterErrors(sources, adapter).length > 0) return 'INVALID';
     if (Object.keys(packageArtifacts).length === 0) return 'DORMANT_PREPARED';
     if (sources[PACKAGE_ENTRY_FILE] !== packageArtifacts[PACKAGE_ENTRY_FILE]
         || packageSourceErrors(packageArtifacts, contract).length > 0) return 'INVALID';
@@ -694,7 +840,11 @@ test('accepts only the three exact closed pre-cutover repository states', () => 
     else assert.deepEqual(physicalPackageErrors(livePhysicalPackage), []);
     assert.equal(preCutoverSourceState(liveSources, livePackageSource, livePhysicalPackage),
         liveSources[ADAPTER_FILE] === undefined ? 'BASELINE' : Object.keys(livePackageSource).length === 0
-            ? 'DORMANT_PREPARED' : livePhysicalPackage ? 'PHYSICAL_PACKAGE_PREPARED' : 'PACKAGE_SOURCE_PREPARED');
+            ? 'DORMANT_PREPARED' : livePhysicalPackage ? 'PHYSICAL_PACKAGE_PREPARED' : 'PACKAGE_SOURCE_PREPARED',
+        JSON.stringify({ imports: importInventoryErrors(liveSources, true),
+            adapter: preCutoverAdapterErrors(liveSources, liveSources[ADAPTER_FILE] ?? ''),
+            source: packageSourceErrors(livePackageSource),
+            physical: livePhysicalPackage ? physicalPackageErrors(livePhysicalPackage) : [] }));
     assert.equal(authorityRosterDigest(liveSources), AUTHORITY_ROSTER_SHA256);
     assert.deepEqual(statefulAuthorityModules(liveSources), STATEFUL_AUTHORITY_MODULES);
     assert.equal(digest(liveSources[PRE_CUTOVER_GLOBAL_OWNER]!), PRE_CUTOVER_GLOBAL_OWNER_SHA256,
@@ -1012,8 +1162,7 @@ test('enforces the monotonic prepared.1 package and recursive inert internal ros
     } finally { rmSync(temporary, { recursive: true, force: true }); }
 });
 
-test('materializes the prepared.2 successor fence as the sole live physical package', () => {
-    assert.equal(LIVE_PREPARED_CONTRACT, PREPARED_2);
+test('preserves the accepted prepared.2 successor-fence evidence', () => {
     assert.deepEqual(preparedContractErrors(PREPARED_2), []);
     assert.equal(Buffer.byteLength(PREPARED_2_SUCCESSOR_FENCE), 1172);
     assert.equal(digest(PREPARED_2_SUCCESSOR_FENCE), '7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff');
