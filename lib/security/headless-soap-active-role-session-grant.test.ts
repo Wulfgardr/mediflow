@@ -75,7 +75,7 @@ test('explicit disposal is idempotent and removes authority before any next use'
 test('private owner controller atomically attaches, fences, unregisters, and drains dependents', async () => {
     const current = fixture(); const owner = createHeadlessSoapActiveRoleSessionGrantOwner(current.sources); const grant = await owner.service.issue();
     assert.deepEqual(Reflect.ownKeys(owner.service).sort(), ['dispose', 'issue', 'recheck']);
-    assert.deepEqual(Reflect.ownKeys(owner.lifecycleController).sort(), ['confirmDependent', 'registerDependent', 'unregisterDependent']);
+    assert.deepEqual(Reflect.ownKeys(owner.lifecycleController).sort(), ['confirmDependent', 'registerDependent', 'unregisterDependent', 'withCurrentDependent', 'withCurrentGrant']);
     let calls = 0;
     const first = owner.lifecycleController.registerDependent(grant, () => { calls += 1; assert.equal(owner.lifecycleController.confirmDependent(grant, first), false); assert.equal(owner.lifecycleController.registerDependent(grant, () => undefined), null); });
     const throwing = owner.lifecycleController.registerDependent(grant, () => { calls += 1; throw new Error('synthetic dependent failure'); });
@@ -99,6 +99,47 @@ test('private owner rejects an async disposer whose public prototype is spoofed'
 });
 test('private owner rolls back and terminalizes an apply-then-throw dependent attach', () => {
     const result = spawnSync(process.execPath, ['scripts/run-strip-types.mjs', 'lib/security/headless-soap-active-role-session-grant-attach-failure-fixture.ts'], { cwd: process.cwd(), encoding: 'utf8' });
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+test('private continuations linearize attach and use before queued revocation', async () => {
+    const attaching = fixture((state, readNumber) => { if (readNumber === 2) queueMicrotask(() => queueMicrotask(() => { state.attestation = activeAttestation(state.now, { status: 'revoked', revocationGeneration: 1, revokedAt: new Date(state.now) }); })); });
+    const attachOwner = createHeadlessSoapActiveRoleSessionGrantOwner(attaching.sources); let attachedGrant: unknown, attachedRegistration: unknown, attachDisposals = 0, attachStatus = '';
+    assert.equal(await attachOwner.lifecycleController.withCurrentGrant((grant) => {
+        const registration = attachOwner.lifecycleController.registerDependent(grant, () => { attachDisposals += 1; }); assert.ok(registration);
+        attachedGrant = grant; attachedRegistration = registration; attachStatus = (attaching.state.attestation as { status: string }).status;
+    }), true);
+    assert.equal(attachStatus, 'active'); assert.equal((attaching.state.attestation as { status: string }).status, 'revoked');
+    assert.equal(attachOwner.lifecycleController.confirmDependent(attachedGrant, attachedRegistration), true);
+    await assert.rejects(attachOwner.service.recheck(attachedGrant), denied('attestation_revoked')); assert.equal(attachDisposals, 1);
+
+    const checking = fixture((state, readNumber) => { if (readNumber === 4) queueMicrotask(() => queueMicrotask(() => { state.attestation = activeAttestation(state.now, { status: 'revoked', revocationGeneration: 1, revokedAt: new Date(state.now) }); })); });
+    const checkOwner = createHeadlessSoapActiveRoleSessionGrantOwner(checking.sources); const grant = await checkOwner.service.issue(); let useStatus = '', useDisposals = 0;
+    const registration = checkOwner.lifecycleController.registerDependent(grant, () => { useDisposals += 1; }); assert.ok(registration);
+    assert.equal(await checkOwner.lifecycleController.withCurrentDependent(grant, registration, () => { useStatus = (checking.state.attestation as { status: string }).status; }), true);
+    assert.equal(useStatus, 'active'); assert.equal((checking.state.attestation as { status: string }).status, 'revoked');
+    await assert.rejects(checkOwner.service.recheck(grant), denied('attestation_revoked')); assert.equal(useDisposals, 1);
+});
+test('private continuations fail closed on reentry and asynchronous results', async () => {
+    const reentrant = fixture(); const reentrantOwner = createHeadlessSoapActiveRoleSessionGrantOwner(reentrant.sources); let reentrantDisposals = 0;
+    assert.equal(await reentrantOwner.lifecycleController.withCurrentGrant(grant => {
+        assert.ok(reentrantOwner.lifecycleController.registerDependent(grant, () => { reentrantDisposals += 1; })); reentrantOwner.service.dispose(grant);
+    }), false);
+    assert.equal(reentrantDisposals, 1);
+    const asynchronous = fixture(); const asyncOwner = createHeadlessSoapActiveRoleSessionGrantOwner(asynchronous.sources); const grant = await asyncOwner.service.issue(); let asyncDisposals = 0;
+    const registration = asyncOwner.lifecycleController.registerDependent(grant, () => { asyncDisposals += 1; }); assert.ok(registration);
+    assert.equal(await asyncOwner.lifecycleController.withCurrentDependent(grant, registration, () => Promise.resolve()), false);
+    assert.equal(asyncDisposals, 1); assert.equal(asyncOwner.service.dispose(grant), false);
+});
+test('private continuations poison nested asynchronous grant work', async () => {
+    const current = fixture(); const owner = createHeadlessSoapActiveRoleSessionGrantOwner(current.sources); let nested: Promise<unknown> | null = null, attachedGrant: unknown, publications = 0, disposals = 0;
+    assert.equal(await owner.lifecycleController.withCurrentGrant(grant => {
+        attachedGrant = grant; assert.ok(owner.lifecycleController.registerDependent(grant, () => { disposals += 1; })); publications += 1;
+        nested = owner.lifecycleController.withCurrentGrant(() => { publications += 1; }).then(value => value, error => error);
+    }), false);
+    assert.ok(nested); assert.equal(denied('lifecycle_unavailable')(await nested), true); assert.equal(publications, 1); assert.equal(disposals, 1); assert.equal(owner.service.dispose(attachedGrant), false);
+});
+test('private continuations observe rejected native Promise results', () => {
+    const result = spawnSync(process.execPath, ['scripts/run-strip-types.mjs', 'lib/security/headless-soap-active-role-session-grant-rejection-fixture.ts'], { cwd: process.cwd(), encoding: 'utf8' });
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 });
 test('private dependent drain follows Web owner retirement before the next use', async () => {
