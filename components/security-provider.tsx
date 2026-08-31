@@ -45,6 +45,15 @@ import {
 } from '@/lib/security/client-auth-api';
 /* @Codex */
 import { MEDIFLOW_API_AUTH_UNAVAILABLE_EVENT } from '@/lib/api-table-response';
+/* @Codex */
+import {
+    createClinicianSoapEntrySealOwner,
+    type ClinicianSoapEntryReopenResult,
+    type ClinicianSoapEntrySealOwner,
+    type ClinicianSoapEntrySealResult,
+    type ClinicianSoapEntrySealV1,
+} from '@/lib/headless/clinician-soap-entry-seal';
+import type { ClinicianSoapEntryFieldSetV1 } from '@/lib/headless/clinician-soap-entry-field-set';
 
 export interface User {
     id: string;
@@ -63,6 +72,11 @@ interface SecurityContextType {
     login: (pin: string) => Promise<boolean>;
     setupPin: (pin: string) => Promise<void>;
     changePin: (currentPin: string, newPin: string) => Promise<{ ok: true } | { ok: false; message: string }>;
+    sealClinicianSoapEntry: (fieldSet: ClinicianSoapEntryFieldSetV1) => Promise<ClinicianSoapEntrySealResult>;
+    reopenClinicianSoapEntry: (
+        bundle: ClinicianSoapEntrySealV1,
+        expectedFieldSet: ClinicianSoapEntryFieldSetV1,
+    ) => Promise<ClinicianSoapEntryReopenResult>;
     lock: () => void;
     updateUser: (data: Partial<User>) => void;
 }
@@ -124,6 +138,21 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     /* @Codex */
     const authorityAttemptGenerationRef = useRef(0);
     /* @Codex */
+    const clinicianSoapEntrySealOwnerRef = useRef<ClinicianSoapEntrySealOwner | null>(null);
+    if (clinicianSoapEntrySealOwnerRef.current === null) {
+        const browserCrypto = globalThis.crypto;
+        clinicianSoapEntrySealOwnerRef.current = createClinicianSoapEntrySealOwner({
+            readAuthority: () => {
+                const key = masterKeyRef.current;
+                return key ? { key, generation: authorityAttemptGenerationRef.current } : null;
+            },
+            crypto: {
+                subtle: browserCrypto.subtle,
+                getRandomValues: (target) => browserCrypto.getRandomValues(target),
+            },
+        });
+    }
+    /* @Codex */
     const authorityNetworkBarrierRef = useRef<ReturnType<typeof createClientAuthorityNetworkBarrier> | null>(null);
     if (authorityNetworkBarrierRef.current === null) {
         authorityNetworkBarrierRef.current = createClientAuthorityNetworkBarrier();
@@ -157,6 +186,16 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         const barrier = authorityNetworkBarrierRef.current;
         return barrier ? barrier.run(request) : request();
     };
+
+    /* @Codex */
+    const sealClinicianSoapEntry = (fieldSet: ClinicianSoapEntryFieldSetV1) =>
+        clinicianSoapEntrySealOwnerRef.current!.seal(fieldSet);
+
+    /* @Codex */
+    const reopenClinicianSoapEntry = (
+        bundle: ClinicianSoapEntrySealV1,
+        expectedFieldSet: ClinicianSoapEntryFieldSetV1,
+    ) => clinicianSoapEntrySealOwnerRef.current!.reopen(bundle, expectedFieldSet);
 
     /* @Codex */
     const lock = () => {
@@ -639,6 +678,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 login,
                 setupPin,
                 changePin,
+                sealClinicianSoapEntry,
+                reopenClinicianSoapEntry,
                 lock,
                 updateUser: (data) => setUser(prev => prev ? { ...prev, ...data } : null)
             }}>
@@ -658,6 +699,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             login,
             setupPin,
             changePin,
+            sealClinicianSoapEntry,
+            reopenClinicianSoapEntry,
             lock,
             updateUser: (data) => setUser(prev => prev ? { ...prev, ...data } : null)
         }}>
