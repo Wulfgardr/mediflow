@@ -245,6 +245,21 @@ describe('external Web owner server-auth boundary', { concurrency: 1 }, () => {
         }
     });
 
+    test('accepts framework-normalized root-path cookies at the public Web session gates', async () => {
+        for (const reader of [requireSession, readAuthenticatedWebSession]) {
+            reset();
+            state.bearerCookie = { name: 'mediflow_session', value: SESSION_ID, path: '/' };
+            state.controlCookie = { name: 'mediflow_auth_control', value: CONTROL_ID, path: '/' };
+            assert.equal(await reader(), projection);
+            assert.deepEqual(state.resolveArgs, [[SESSION_ID, CONTROL_ID]]);
+            assert.equal(state.getCalls, 1);
+        }
+        reset();
+        state.bearerCookie = { name: 'mediflow_session', value: SESSION_ID, path: '/' };
+        state.controlCookie = { name: 'mediflow_auth_control', value: CONTROL_ID, path: '/' };
+        assertContext(await acquire());
+    });
+
     test('tri-state denial and either missing cookie stop before the database', async () => {
         for (const resolution of [sealed({ status: 'absent' }), sealed({ status: 'owned_denied' })]) {
             reset(); state.resolution = resolution;
@@ -299,7 +314,16 @@ describe('external Web owner server-auth boundary', { concurrency: 1 }, () => {
         });
         const accessor = { name: 'mediflow_session', value: SESSION_ID };
         Object.defineProperty(accessor, 'value', { enumerable: true, get() { reads += 1; return SESSION_ID; } });
-        for (const cookie of [proxy, accessor, { name: 'mediflow_session', value: SESSION_ID, extra: true }]) {
+        const pathAccessor = { name: 'mediflow_session', value: SESSION_ID };
+        Object.defineProperty(pathAccessor, 'path', { enumerable: true, get() { reads += 1; return '/'; } });
+        for (const cookie of [
+            proxy,
+            accessor,
+            pathAccessor,
+            { name: 'mediflow_session', value: SESSION_ID, extra: true },
+            { name: 'mediflow_session', value: SESSION_ID, path: '/restricted' },
+            { name: 'mediflow_session', value: SESSION_ID, path: '/', extra: true },
+        ]) {
             reset(); state.bearerCookie = cookie;
             assert.equal(await acquire(), null);
             assert.deepEqual(state.resolveArgs, []);

@@ -61,8 +61,8 @@ test('paired and local-token discovery, public revision, identity scope, and FSE
 
         const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
-        const sessionCookie = extractSessionCookie(login.response);
-        const scopedSessionCookie = `${sessionCookie}; ambulatory_id=${ambulatoryId}`;
+        const cookieHeader = login.cookieHeader;
+        const scopedCookieHeader = `${cookieHeader}; ambulatory_id=${ambulatoryId}`;
 
         const localCapabilities = await request('GET', '/api/v1/network/capabilities', {
             headers: localApiHeaders(),
@@ -103,7 +103,7 @@ test('paired and local-token discovery, public revision, identity scope, and FSE
         const pairedIdentity = await request('GET', '/api/v1/network/identity', {
             headers: {
                 ...pairedHeaders(discoveryClient),
-                Cookie: scopedSessionCookie,
+                Cookie: scopedCookieHeader,
             },
         });
         assert.equal(pairedIdentity.response.status, 200);
@@ -120,7 +120,7 @@ test('paired and local-token discovery, public revision, identity scope, and FSE
         const fseValidation = await request('GET', `/api/v1/network/fse/validate-patient?patientId=${encodeURIComponent(patientId)}`, {
             headers: {
                 ...pairedHeaders(discoveryClient),
-                Cookie: scopedSessionCookie,
+                Cookie: scopedCookieHeader,
             },
         });
         assert.equal(fseValidation.response.status, 200);
@@ -129,7 +129,7 @@ test('paired and local-token discovery, public revision, identity scope, and FSE
         const fseOutsideScope = await request('GET', `/api/v1/network/fse/validate-patient?patientId=${encodeURIComponent(outsideScopePatientId)}`, {
             headers: {
                 ...pairedHeaders(discoveryClient),
-                Cookie: scopedSessionCookie,
+                Cookie: scopedCookieHeader,
             },
         });
         assert.equal(fseOutsideScope.response.status, 404);
@@ -137,7 +137,7 @@ test('paired and local-token discovery, public revision, identity scope, and FSE
         const fseMissingCapability = await request('GET', `/api/v1/network/fse/validate-patient?patientId=${encodeURIComponent(patientId)}`, {
             headers: {
                 ...pairedHeaders(noFseClient),
-                Cookie: scopedSessionCookie,
+                Cookie: scopedCookieHeader,
             },
         });
         assert.equal(fseMissingCapability.response.status, 403);
@@ -355,19 +355,6 @@ function pairedHeaders(client) {
         'x-mediflow-paired-client-id': client.pairedClientId,
         'x-mediflow-paired-client-token': client.pairedClientToken,
     };
-}
-
-function extractSessionCookie(response) {
-    const setCookies = typeof response.headers.getSetCookie === 'function'
-        ? response.headers.getSetCookie()
-        : [];
-    const cookieSource = setCookies.find((cookie) => cookie.startsWith('mediflow_session='))
-        ?? response.headers.get('set-cookie');
-    if (!cookieSource) {
-        throw new Error('mediflow_session cookie was not returned by /api/auth/login');
-    }
-
-    return cookieSource.split(';')[0];
 }
 
 async function request(method, pathname, { headers = {}, body } = {}) {

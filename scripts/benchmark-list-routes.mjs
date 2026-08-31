@@ -140,8 +140,8 @@ async function stopServer(server) {
 async function login(baseUrl) {
   const result = await loginWithWebAuthControl(baseUrl, LOGIN);
   if (!result.response.ok) throw new Error(`Login benchmark fallito: ${result.response.status}`);
-  if (!result.sessionCookie) throw new Error('Il login benchmark non ha restituito il cookie di sessione');
-  return result.sessionCookie;
+  if (!result.cookieHeader) throw new Error('Il login benchmark non ha restituito il cookie di sessione');
+  return result.cookieHeader;
 }
 
 function decryptFixture(value) {

@@ -88,8 +88,19 @@ test('home-base read-only pairing flow works end-to-end', async () => {
 
         const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
-        const sessionCookie = extractSessionCookie(login.response);
-        assert.ok(sessionCookie);
+        const cookieHeader = login.cookieHeader;
+        assert.ok(cookieHeader);
+
+        const activeAuthCheck = await request('GET', '/api/auth/check', {
+            headers: { Cookie: cookieHeader },
+        });
+        assert.equal(activeAuthCheck.response.status, 200);
+        assert.equal(activeAuthCheck.json?.hasSession, true);
+
+        const activeContext = await request('GET', '/api/context', {
+            headers: { Cookie: cookieHeader },
+        });
+        assert.equal(activeContext.response.status, 200);
 
         const pairedHeaders = {
             'x-mediflow-paired-client-id': pairedClientId,
@@ -103,7 +114,7 @@ test('home-base read-only pairing flow works end-to-end', async () => {
 
         const missingPairedClient = await request('GET', '/api/v1/network/patients', {
             headers: {
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(missingPairedClient.response.status, 401);
@@ -111,7 +122,7 @@ test('home-base read-only pairing flow works end-to-end', async () => {
         const patientList = await request('GET', '/api/v1/network/patients', {
             headers: {
                 ...pairedHeaders,
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(patientList.response.status, 200);
@@ -122,7 +133,7 @@ test('home-base read-only pairing flow works end-to-end', async () => {
         const patientDetail = await request('GET', `/api/v1/network/patients/${seededPatientId}`, {
             headers: {
                 ...pairedHeaders,
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(patientDetail.response.status, 200);
@@ -131,14 +142,14 @@ test('home-base read-only pairing flow works end-to-end', async () => {
 
         // A18: the paired ambulatory scope list rides on the same read capability.
         const ambulatoriesMissingClient = await request('GET', '/api/v1/network/ambulatories', {
-            headers: { Cookie: sessionCookie },
+            headers: { Cookie: cookieHeader },
         });
         assert.equal(ambulatoriesMissingClient.response.status, 401);
 
         const ambulatories = await request('GET', '/api/v1/network/ambulatories', {
             headers: {
                 ...pairedHeaders,
-                Cookie: sessionCookie,
+                Cookie: cookieHeader,
             },
         });
         assert.equal(ambulatories.response.status, 200);
@@ -235,19 +246,6 @@ function localApiHeaders() {
         Authorization: `Bearer ${LOCAL_API_TOKEN}`,
         'Cache-Control': 'no-store',
     };
-}
-
-function extractSessionCookie(response) {
-    const setCookies = typeof response.headers.getSetCookie === 'function'
-        ? response.headers.getSetCookie()
-        : [];
-    const cookieSource = setCookies.find((cookie) => cookie.startsWith('mediflow_session='))
-        ?? response.headers.get('set-cookie');
-    if (!cookieSource) {
-        throw new Error('mediflow_session cookie was not returned by /api/auth/login');
-    }
-
-    return cookieSource.split(';')[0];
 }
 
 async function request(method, pathname, { headers = {}, body } = {}) {
