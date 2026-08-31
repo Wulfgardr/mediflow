@@ -156,7 +156,9 @@ H2b espone al codice production due superfici separate. Il facade pubblico
 resta esattamente il service a quattro metodi gia fissato; un owner interno
 condivide per closure lo stesso stato e consegna al solo controller host H3 una
 porta lifecycle privata. Il lifecycle H3 resta un modulo autonomo e dipende
-solo da questa porta minima, non dal facade production concreto H2b.
+strutturalmente da questa porta minima per attach e continuation e dal solo
+`terminate` del service H2b per la terminalita; non dipende dal facade
+production concreto H2b.
 
 La porta privata espone esattamente `withCurrentLease(lease, operation)`,
 `registerDependent(lease, dispose)`, `confirmDependent(lease, registration)`,
@@ -198,6 +200,111 @@ denial, logout, restart, cambio selezione, ruolo o policy. SOAP non entra in
 log, persistenza o backup. Solo dopo H3, se necessario e dimostrato, puo
 persistere un record minimizzato di digest e contesto di approvazione;
 non contiene SOAP e non e un grant.
+
+### Costanti H3 per 0.8.5
+
+H3 possiede un solo record memory-only per lease H2b e applica la macchina a
+stati irreversibile `inspect_current -> preview_current -> proposal_current ->
+terminal`. Il service pubblico espone esattamente `inspect(lease, h1Snapshot)`,
+`preview(inspectRef)`, `proposal(previewRef)` e `wipe(stageRef)`. I tre ref di
+stadio sono identita distinte, opache, frozen e senza campi. Una transizione
+invalida il ref precedente per ulteriori transizioni; un ref autentico di uno
+stadio precedente puo ancora essere usato solo per `wipe`. Ref foreign,
+riavviati o terminali non modificano un lifecycle corrente.
+
+`inspect` accetta soltanto l'esatto snapshot `accepted` prodotto da H1. H3 ne
+rivalida forma, normalizzazione e digest attraverso il contratto H1, ne crea
+una copia closure-owned e non trattiene il DTO caller. Non accetta SOAP,
+digest, paziente, selezione, lease binding o authority come campi separati.
+La copia H1 non attraversa il facade H3: resta raggiungibile soltanto dalle
+continuation private degli stadi downstream.
+
+La deadline H3 e unica e vale esattamente `120000 ms` dal campione clock finale
+dell'attach riuscito. L'intervallo e half-open: corrente per `now < expiresAt`
+e scaduto per `now >= expiresAt`. Preview e proposal non rinnovano o
+rischedulano la deadline. Il clock deve restituire un safe integer non negativo
+e consentire la somma esatta; valore invalido, overflow o rollback rendono il
+record terminale.
+
+Un scheduler host-owned e cancellabile elimina il record anche senza un uso
+successivo. Il core riceve clock e scheduler per dependency injection e non
+usa timer ambientali. Il failure del primo scheduling nega prima della
+pubblicazione. Una callback anticipata ricampiona il clock e schedula soltanto
+il residuo; una callback puntuale o tardiva esegue il wipe. Ogni metodo
+ricontrolla comunque clock e deadline: il timer e cleanup, non authority.
+
+La validita H3 e sempre la congiunzione di H2b, selezione host corrente e
+tempo H3. `inspect` usa un attach a due fasi: prima verifica il lease, poi
+registra il dipendente sulla selezione corrente, infine registra il dipendente
+H2b e ricontrolla la stessa selezione nella continuation H2b. Nessun ref H3 e
+pubblicato prima che entrambe le registration e i relativi final fence siano
+correnti. Un attach parziale viene ritirato interamente.
+
+`preview` transiziona soltanto un `inspectRef` corrente. `proposal` transiziona
+soltanto un `previewRef` corrente e usa
+`withCurrentProposalBudget`: il budget H2b passa da `1` a `0` immediatamente
+prima della callback di transizione. Il `proposalRef` viene pubblicato solo
+dopo i final fence H2b, selezione e tempo. Due transizioni concorrenti hanno al
+massimo un vincitore; il loser osserva uno stadio non piu corrente e non
+terminalizza il vincitore.
+
+I denial H3 PHI-safe sono esattamente `snapshot_unavailable`,
+`lease_unavailable`, `selection_unavailable`, `stage_unavailable`,
+`proposal_expired`, `proposal_budget_exhausted` e `lifecycle_unavailable`.
+`inspect` applica la precedenza snapshot H1, lease H2b, selezione, clock e
+scheduler, attach e final fence. Preview e proposal applicano identita ref,
+H2b, selezione, tempo H3, stadio atteso, budget quando richiesto e final fence.
+Un failure dopo l'ingresso in una transizione sullo stadio corrente rende H3
+terminale; un ref foreign o un ref autentico gia superato non danneggiano il
+record corrente. Cause, SOAP e identita upstream non attraversano gli errori.
+
+`wipe` e idempotente come esito booleano: `true` solo per la prima transizione
+terminale, poi `false`. Marca il record terminale prima del cleanup, cancella
+il timer, rimuove i ref dalle registry, rilascia la copia SOAP e digest,
+unregistera H2b e selezione e drena sincronicamente i dipendenti H4 contenendo
+throw e reentry. E cancellazione logica delle referenze JavaScript, non una
+garanzia di zeroization della RAM. Expiry, denial, cambio selezione, logout,
+ruolo o policy, commit e wipe H3 invocano inoltre il gia esistente
+`H2b.service.terminate(lease)`: non aggiungono un settimo metodo alla porta
+lifecycle H2b e non lasciano riutilizzabile la sessione figlia.
+
+### Porta selection lifecycle per H3
+
+Il projection owner production resta un singleton process-local, ma viene
+composto come owner interno con due superfici closure-bound: il registry
+pubblico invariato e un controller selection privato. Il facade pubblico non
+espone controller, scope o registration e non viene creato un secondo
+registry.
+
+La porta privata espone esattamente `withCurrentSelection(session, operation)`,
+`registerDependent(scope, dispose)`, `confirmDependent(scope, registration)`,
+`unregisterDependent(scope, registration)` e
+`withCurrentDependent(scope, registration, operation)`. Scope e registration
+sono identita opache, frozen e senza campi. Le callback sono sincrone e
+host-owned; risultato asincrono, throw, reentry o final fence fallito ritirano
+e drenano il solo dipendente coinvolto, senza revocare la selezione o i
+sibling.
+
+Ogni registration pubblicata e legata anche alla private-resource authority
+della stessa sessione Web. Reselection, expiry, lock, logout, reset, retirement
+o disposal dell'owner fanno prima snapshot e drain sincrono di tutti i
+dipendenti della selezione precedente, quindi rimuovono o pubblicano lo stato
+successivo. La callback di retirement rimuove la registration locale senza
+tentare un secondo unregister sulla risorsa gia drenata.
+
+### Porta lifecycle H3 per H4
+
+L'owner H3 condivide per closure service e controller privato. La porta H4
+espone esattamente `withCurrentProposal(proposalRef, operation)`,
+`registerDependent(proposalRef, dispose)`,
+`confirmDependent(proposalRef, registration)`,
+`unregisterDependent(proposalRef, registration)` e
+`withCurrentDependent(proposalRef, registration, operation)`. Le callback
+ricevono soltanto una copia H1 closure-owned; non ricevono patient ID,
+selezione serializzabile, lease, sessione, approval, proof o write authority.
+Throw, risultato asincrono, reentry o perdita di currentness terminalizzano H3
+e drenano i dipendenti, mentre un ref o una registration foreign restano
+inermi.
 
 Chat, voce/audio trascritti, planner text, Mini e utterance dell'agente possono
 solo raccogliere la bozza o richiedere preview. Non possono mai approvare,
