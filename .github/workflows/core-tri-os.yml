@@ -113,6 +113,8 @@ jobs:
             case "$f" in
               native/MediFlowMac/Sources/MediFlowCore/*) core=true; continue ;;
               native/contracts/*)                        core=true; continue ;;
+              # @Codex
+              scripts/generate-headless-soap-entry-h4-golden.mjs) core=true; continue ;;
             esac
             if [ "$EVENT" != push ]; then
               case "$f" in
@@ -139,6 +141,21 @@ jobs:
         run: swift build --package-path native/MediFlowMac --target MediFlowCore
       - name: Golden-vector gate (MediFlowCoreTests)
         run: swift test --package-path native/MediFlowMac --filter CryptoGoldenVectorsTests
+      - name: H4 SOAP field-set and seal golden gate
+        run: swift test --package-path native/MediFlowMac --filter HeadlessSoapEntryH4GoldenTests
+
+  # @Codex
+  h4-golden:
+    needs: changes
+    if: ${{ needs.changes.outputs.core == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: H4 golden fixture drift check
+        run: node scripts/generate-headless-soap-entry-h4-golden.mjs --check
 
   windows:
     needs: changes
@@ -164,11 +181,14 @@ jobs:
       - name: Golden-vector gate (MediFlowCoreTests)
         run: swift test --package-path native/MediFlowMac --filter CryptoGoldenVectorsTests
         shell: pwsh
+      - name: H4 SOAP field-set and seal golden gate
+        run: swift test --package-path native/MediFlowMac --filter HeadlessSoapEntryH4GoldenTests
+        shell: pwsh
 
   # Contesto da rendere required: `core-tri-os`.
   gate:
     name: core-tri-os
-    needs: [changes, linux, windows]
+    needs: [changes, h4-golden, linux, windows]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:

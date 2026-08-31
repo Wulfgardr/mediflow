@@ -35,3 +35,21 @@ Windows-MSVC e Linux. Vedi [ADR 0071](../../docs/adr/0071-tri-os-reversed-flow-s
 I vettori `v1` sono CONGELATI: cambiarli significa rompere il contratto crypto e
 potenzialmente corrompere PHII a riposo. Per nuovi casi si AGGIUNGONO vettori
 (o un file `v2`), non si mutano quelli esistenti.
+
+## Field set e seal SOAP H4
+
+- `headless-soap-entry-h4-golden.v1.json` congela il field set host-owned, il
+  framing SHA-256 length-prefixed, i tre plaintext JSON e il bundle
+  AES-256-GCM di ADR 0103. La fixture usa soltanto contenuto clinico sintetico.
+- `../../scripts/generate-headless-soap-entry-h4-golden.mjs` genera il vettore
+  deterministico con tre IV distinti e si auto-verifica anche tramite decrypt.
+  `--check` confronta il file tracciato senza riscriverlo:
+  `node scripts/generate-headless-soap-entry-h4-golden.mjs --check`.
+- `HeadlessSoapEntryH4GoldenTests` verifica materializzazione, decoder
+  grammaticale, ciphertext, digest del seal, reopen e tamper mediante un
+  oracolo codec module-internal Swift. Lo stesso test e obbligatorio su Linux e
+  Windows nel gate tri-OS.
+
+Il vettore dimostra parita byte-esatta dell'oracolo shared-core. Non dimostra un
+owner H4 runtime, fence key/generation, handoff H5, approvazione clinica,
+persistenza o write consegnato.
