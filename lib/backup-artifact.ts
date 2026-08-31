@@ -291,7 +291,7 @@ function assertHeadlessSoapActiveRoleAttestationRows(
             && attestation.revocationGeneration === 0;
         const revoked = attestation.status === 'revoked'
             && revokedAt !== null && typeof attestation.revocationGeneration === 'number'
-            && Number.isSafeInteger(attestation.revocationGeneration) && attestation.revocationGeneration >= 1
+            && Number.isSafeInteger(attestation.revocationGeneration) && attestation.revocationGeneration === 1
             && ((attestation.issuerRef === null && expiresAt === null && activatedAt === null)
                 || (hasValidIssuer && hasFixedActivationWindow));
         if (typeof attestation.attestationRef !== 'string' || !HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_REF.test(attestation.attestationRef) || attestationRefs.has(attestation.attestationRef)

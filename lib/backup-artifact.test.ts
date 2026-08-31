@@ -400,6 +400,7 @@ test('rejects malformed, duplicated, and lifecycle-invalid headless SOAP active-
         (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].activatedAt = '2026-03-17T09:11:00.000Z'; },
         (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].revokedAt = '2026-03-17T08:10:00.000Z'; },
         (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].status = 'revoked'; artifact.payload.headlessSoapActiveRoleAttestations[0].revokedAt = '2026-03-17T08:09:00.000Z'; artifact.payload.headlessSoapActiveRoleAttestations[0].revocationGeneration = 1; },
+        (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].status = 'revoked'; artifact.payload.headlessSoapActiveRoleAttestations[0].revokedAt = '2026-03-17T08:11:00.000Z'; artifact.payload.headlessSoapActiveRoleAttestations[0].revocationGeneration = 2; },
         (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations.push({ ...artifact.payload.headlessSoapActiveRoleAttestations[0] }); },
     ];
     for (const mutate of mutations) {
