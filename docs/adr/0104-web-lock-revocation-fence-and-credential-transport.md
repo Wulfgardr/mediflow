@@ -505,6 +505,114 @@ come commit-last, in un solo processo e un solo realm, per l'esatto binding
 control-generation-session**. Lost response route/cookie, multiprocesso,
 replica, crash recovery e cleanup delle risorse restano `HOLD` separati.
 
+### Addendum O1: receipt di sessione e packet O1-P5-O1-P12
+
+Il package esterno non restituisce la cella P3 o il `ServerSession` conservato
+dall'owner. Il resolver root riceve il solo `sessionId` come locator dati non
+autorizzante, risolve internamente l'esatta identita della cella e restituisce
+una receipt congelata con uno dei tre esiti chiusi:
+
+- `active`, con la proiezione dati esatta `id`, `userId`, `username`, `role`,
+  `authChannel`, `createdAt`, `expiresAt`;
+- `owned_denied`, quando l'identita appartiene a una cella non `ACTIVE`;
+- `absent`, quando l'identita non appartiene all'owner Web.
+
+La proiezione `active` e un nuovo oggetto dati, non la cella o la sessione
+interna. Il package lega l'esatta identita della proiezione alla cella `ACTIVE`
+in una `WeakMap` privata. Quella stessa identita e l'unica authority che le API
+successive possono ricevere. Ogni API ripete il controllo di identita, stato,
+`sessionId` ed expiry. Il ritiro esatto richiede la proiezione autentica e una
+causa controllata; il solo `sessionId` non basta. Un ritiro o un restart rende
+inutilizzabile ogni proiezione gia emessa.
+
+L'adapter canonico resta Web-only: non conserva Map, WeakMap, cache, generation
+o puntatori all'owner e non importa l'owner native/system. Passa la receipt e
+la proiezione senza copiarle. Il facade stateless `server-session.ts` consulta
+prima l'adapter Web. Soltanto `absent` permette il lookup nell'owner
+native/system gia server-marked; `owned_denied` termina la risoluzione. Questa
+precedenza non e configurabile dal caller e l'owner native/system rifiuta
+sempre `authChannel: web`.
+
+Il root finale espone soltanto funzioni congelate per:
+
+- `begin`, `issue` e `abort` del tentativo login/setup;
+- risoluzione tri-state della sessione Web;
+- ritiro esatto per proiezione, utente e causa controllata;
+- prepare/commit/abort dell'operazione fissa di reset amministrativo;
+- port, use e registrazione delle risorse private della proiezione autentica.
+
+Non espone costruttori, celle, registri, stato, primitive CAS, ticket P2,
+prepared capability o API per scegliere l'owner. Il cleanup puo richiamare un
+disposer gia validato soltanto dopo `RETIRED`; nessuna callback entra tra CAS e
+flip terminale. Un eventuale esito Promise/thenable nativo viene contenuto dopo
+il ritiro e non puo modificare o ripristinare authority.
+
+Il reset amministrativo prepara prima della mutazione DB una capability opaca,
+esatta e monouso dall'esatta proiezione `ACTIVE` di un admin autenticato. La
+preparazione non ritira sessioni e non riceve dal caller causa o selettore
+owner. Se la cancellazione degli utenti fallisce, l'abort brucia la capability
+senza cambiare le sessioni. Se riesce, il commit non rilegge la proiezione:
+autentica la capability gia preparata e ritira tutte le authority Web correnti
+attraverso `ACTIVE -> ARMED_RETIRE -> RETIRED` con la causa interna `clear`,
+revoca il lavoro Web non attivo e compatta le risorse.
+
+Il facade `server-session.ts` prepara prima del DB anche l'operazione separata
+dell'owner native/system e conserva soltanto le due capability opache in una
+receipt congelata. Dopo il DB esegue i due commit gia validati senza altro
+lavoro fallibile; su errore DB li abortisce entrambi. In questo modo il reset
+non dipende da una proiezione che potrebbe cambiare dopo la cancellazione e non
+fonde i due owner. La cancellazione del cookie resta ammessa soltanto in questa
+operazione distruttiva di onboarding; non cambia logout/lock di ADR 0106.
+
+La modifica autenticata del PIN resta distinta. Dopo il CAS credenziali
+riuscito ritira tutte le sessioni Web P3 dello stesso utente e, con una seconda
+chiamata esplicita, invalida anche le sessioni native/legacy dello stesso
+utente. Questa scelta preserva il comportamento attuale senza fondere i due
+owner. Un vero reset del PIN senza il PIN corrente resta fuori da O1.
+
+O1-P5-O1-P9 contengono helper senza Map, WeakMap, celle o registri mutabili a livello
+di modulo. Tutte le strutture mutabili, inclusa la WeakMap delle proiezioni,
+sono allocate una sola volta dalla factory interna di `owner.cjs`. La factory
+e invocata dal root soltanto in O1-C; prima del cutover puo essere invocata
+esclusivamente da un child process sintetico.
+
+La costruzione esterna segue questo ordine. Circa 300 LOC attivano una review
+di confine, non una divisione automatica. Si divide soltanto quando entrambe le
+parti restano verificabili con un solo owner; una modifica atomica resta unita
+se separarla creerebbe due authority o uno stato intermedio pericoloso:
+
+| Packet | File interni e API preparate | Dipendenze e claim |
+| --- | --- | --- |
+| O1-P5 | `internal/control-record.cjs`: ticket P2, prepare/commit/abort activation e retirement. | Solo supporti puri e `successor-fence`; root inerte. |
+| O1-P6 | `internal/session-cell.cjs`: staging, reservation, cella, port e lifecycle guard. | O1-P5; nessun resolver o consumer. |
+| O1-P7 | `internal/session-activation.cjs`: prepare e commit-last `ARMED_ACTIVATE -> ACTIVE`. | O1-P5/P6; nessun `issue`, ritiro o route. |
+| O1-P8a | `internal/session-retirement.cjs`: `ACTIVE -> ARMED_RETIRE -> RETIRED`. | O1-P5/P7; nessun cleanup prima di `RETIRED`. |
+| O1-P8b | `internal/session-resource.cjs`: port, use, revoca e cleanup post-retirement. | O1-P6/P8a; nessun registro esterno. |
+| O1-P9 | `internal/session-resolver.cjs`: receipt tri-state, proiezione autenticata e currentness delle risorse. | O1-P7/P8b; nessuna importazione native. |
+| O1-P10 | `internal/owner.cjs`: unica factory, stato e composizione `begin`/`issue`/`abort`. | O1-P5/P9; root ancora inerte. |
+| O1-P11 | Ultimo `0.8.5-prepared.N`, tar, provenance, lock e unica copia fisica. | Tutti gli helper accettati; nessun consumer. |
+| O1-P12 | Test esterno con probe interno exact-roster in app sintetica Webpack, Turbopack e standalone A-B. | Il root preparato resta inerte; prova solo identita/topologia. |
+
+La matrice processuale vive in un test esterno al tar, per esempio
+`lib/security/web-auth-lifecycle-owner-process.test.ts`. Il probe O1-P12 puo
+caricare l'internal soltanto nella copia exact-roster dell'app sintetica e non
+introduce route diagnostiche o deep import nell'applicazione reale.
+
+Ogni modifica ai byte del package incrementa `prepared.N` di una sola unita e
+aggiorna nello stesso packet manifest, tar, provenance, dipendenza, lock,
+installazione fisica e guard. Il test puo caricare un internal solo in una
+fixture sintetica exact-roster; nessun file di produzione o test applicativo
+puo usare deep import.
+
+Prima del cutover i consumer possono migrare verso l'adapter soltanto mentre
+questo contiene una sola importazione diretta dell'owner Web storico, zero
+import del package, zero branch configurabili e zero alternativa locale. O1-C
+rimuove quell'import nello stesso diff che carica il root `0.8.5`, externalizza
+il package, commuta i consumer residui e rende gli owner Web storici
+fail-closed. La prova finale ripete O1-P12 sull'app reale e aggiunge due avvii
+standalone sequenziali: ogni artefatto emesso dal processo A deve essere negato
+dal processo B.
+
 ## Alternative scartate
 
 - Slot cookie univoci per generation: scartati per `0.8.5`. Risposte
