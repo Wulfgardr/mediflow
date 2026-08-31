@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { test } from 'node:test';
-import { createHeadlessSoapChildSessionLeaseService, HeadlessSoapChildSessionLeaseError } from './headless-soap-child-session-lease.ts';
+import { createHeadlessSoapChildSessionLeaseOwner, createHeadlessSoapChildSessionLeaseService, HeadlessSoapChildSessionLeaseError } from './headless-soap-child-session-lease.ts';
 import type { HeadlessSoapActiveRoleDependentRegistrationV1, HeadlessSoapActiveRoleSessionGrantV1 } from './headless-soap-active-role-session-grant.ts';
 
 function fixture() {
@@ -25,6 +25,97 @@ test('opens one zero-field process-local child lease and rechecks the same ident
     assert.deepEqual(Reflect.ownKeys(service).sort(), ['consumeProposalBudget', 'open', 'recheck', 'terminate']); assert.equal(service.open.length, 0);
     const lease = await service.open(); assert.equal(await service.recheck(lease), lease);
     assert.equal(Object.getPrototypeOf(lease), null); assert.equal(Object.isFrozen(lease), true); assert.deepEqual(Reflect.ownKeys(lease), []); assert.equal(JSON.stringify(lease), '{}');
+});
+test('private owner attaches, fences, unregisters, and synchronously drains child dependents', async () => {
+    const current = fixture(); const owner = createHeadlessSoapChildSessionLeaseOwner({ ...current.lifecycle, clock: current.clock });
+    assert.deepEqual(Reflect.ownKeys(owner).sort(), ['lifecycleController', 'service']);
+    assert.deepEqual(Reflect.ownKeys(owner.lifecycleController).sort(), ['confirmDependent', 'registerDependent', 'unregisterDependent', 'withCurrentDependent', 'withCurrentLease', 'withCurrentProposalBudget']);
+    const lease = await owner.service.open(); let registration: unknown = null, removed: unknown = null, disposals = 0, removedDisposals = 0;
+    assert.equal(await owner.lifecycleController.withCurrentLease(lease, (candidate) => {
+        registration = owner.lifecycleController.registerDependent(candidate, () => { disposals += 1; });
+        removed = owner.lifecycleController.registerDependent(candidate, () => { removedDisposals += 1; });
+        assert.ok(registration); assert.ok(removed);
+    }), true);
+    assert.equal(owner.lifecycleController.confirmDependent(lease, registration), true);
+    assert.equal(owner.lifecycleController.unregisterDependent(lease, removed), true); assert.equal(owner.lifecycleController.unregisterDependent(lease, removed), false);
+    current.retire(); assert.equal(disposals, 1); assert.equal(removedDisposals, 0); assert.equal(owner.lifecycleController.confirmDependent(lease, registration), false);
+    await assert.rejects(owner.service.recheck(lease), denied('lease_unavailable'));
+});
+test('private continuations consume one proposal budget and isolate callback failure to one child', async () => {
+    const current = fixture(); const owner = createHeadlessSoapChildSessionLeaseOwner({ ...current.lifecycle, clock: current.clock }); const sibling = await owner.service.open();
+    const lease = await owner.service.open(); let registration: unknown = null, calls = 0, disposals = 0;
+    assert.equal(await owner.lifecycleController.withCurrentLease(lease, (candidate) => { registration = owner.lifecycleController.registerDependent(candidate, () => { disposals += 1; }); assert.ok(registration); }), true);
+    assert.equal(await owner.lifecycleController.withCurrentDependent(lease, registration, () => { calls += 1; }), true);
+    assert.equal(await owner.lifecycleController.withCurrentProposalBudget(lease, registration, () => { calls += 1; }), true);
+    await assert.rejects(owner.lifecycleController.withCurrentProposalBudget(lease, registration, () => { calls += 100; }), denied('proposal_budget_exhausted'));
+    assert.equal(await owner.service.recheck(lease), lease); assert.equal(calls, 2);
+    assert.equal(await owner.lifecycleController.withCurrentDependent(lease, registration, () => { throw new Error('synthetic child failure'); }), false);
+    assert.equal(disposals, 1); await assert.rejects(owner.service.recheck(lease), denied('lease_unavailable')); assert.equal(await owner.service.recheck(sibling), sibling);
+});
+test('private continuations reject async callbacks and poison nested child work', async () => {
+    const current = fixture(); const owner = createHeadlessSoapChildSessionLeaseOwner({ ...current.lifecycle, clock: current.clock });
+    const lease = await owner.service.open(); let registration: unknown = null, disposals = 0, nested: Promise<boolean> | null = null;
+    assert.equal(await owner.lifecycleController.withCurrentLease(lease, (candidate) => { registration = owner.lifecycleController.registerDependent(candidate, () => { disposals += 1; }); assert.ok(registration); }), true);
+    assert.equal(await owner.lifecycleController.withCurrentDependent(lease, registration, () => { nested = owner.lifecycleController.withCurrentDependent(lease, registration, () => undefined); }), false);
+    assert.equal(await nested, false); assert.equal(disposals, 1);
+    const asyncLease = await owner.service.open(); let asyncRegistration: unknown = null, asyncDisposals = 0;
+    assert.equal(await owner.lifecycleController.withCurrentLease(asyncLease, (candidate) => { asyncRegistration = owner.lifecycleController.registerDependent(candidate, () => { asyncDisposals += 1; }); assert.ok(asyncRegistration); }), true);
+    assert.equal(await owner.lifecycleController.withCurrentDependent(asyncLease, asyncRegistration, async () => undefined), false); assert.equal(asyncDisposals, 0);
+    assert.equal(await owner.service.recheck(asyncLease), asyncLease);
+    assert.equal(await owner.lifecycleController.withCurrentDependent(asyncLease, asyncRegistration, () => Promise.reject(new Error('synthetic rejected child result'))), false); assert.equal(asyncDisposals, 1);
+    const nestedAsyncLease = await owner.service.open(); let nestedAsyncRegistration: unknown = null, nestedAsync: Promise<boolean> | null = null, nestedAsyncDisposals = 0;
+    assert.equal(await owner.lifecycleController.withCurrentLease(nestedAsyncLease, (candidate) => { nestedAsyncRegistration = owner.lifecycleController.registerDependent(candidate, () => { nestedAsyncDisposals += 1; }); assert.ok(nestedAsyncRegistration); }), true);
+    assert.equal(await owner.lifecycleController.withCurrentDependent(nestedAsyncLease, nestedAsyncRegistration, () => {
+        nestedAsync = owner.lifecycleController.withCurrentDependent(nestedAsyncLease, nestedAsyncRegistration, async () => undefined);
+    }), false);
+    assert.equal(await nestedAsync, false); assert.equal(nestedAsyncDisposals, 1); await assert.rejects(owner.service.recheck(nestedAsyncLease), denied('lease_unavailable'));
+});
+test('private child drain contains a throwing wipe and preserves its sibling', async () => {
+    const current = fixture(); const owner = createHeadlessSoapChildSessionLeaseOwner({ ...current.lifecycle, clock: current.clock });
+    const lease = await owner.service.open(), sibling = await owner.service.open(); let continued = 0, throwing = 0, first: unknown = null, second: unknown = null;
+    assert.equal(await owner.lifecycleController.withCurrentLease(lease, (candidate) => {
+        first = owner.lifecycleController.registerDependent(candidate, () => { continued += 1; });
+        second = owner.lifecycleController.registerDependent(candidate, () => { throwing += 1; throw new Error('synthetic wipe failure'); }); assert.ok(first); assert.ok(second);
+    }), true);
+    assert.equal(owner.service.terminate(lease), true); assert.deepEqual({ continued, throwing }, { continued: 1, throwing: 1 });
+    assert.equal(owner.lifecycleController.confirmDependent(lease, first), false); assert.equal(owner.lifecycleController.confirmDependent(lease, second), false); assert.equal(await owner.service.recheck(sibling), sibling);
+});
+test('parent drain snapshots every child before a reentrant disposer can mutate siblings', async () => {
+    const current = fixture(); const owner = createHeadlessSoapChildSessionLeaseOwner({ ...current.lifecycle, clock: current.clock });
+    const first = await owner.service.open(), second = await owner.service.open(), third = await owner.service.open(); const calls = [0, 0, 0]; const registrations: unknown[] = [];
+    for (const [index, lease] of [first, second, third].entries()) {
+        assert.equal(await owner.lifecycleController.withCurrentLease(lease, (candidate) => {
+            registrations[index] = owner.lifecycleController.registerDependent(candidate, () => { calls[index] += 1; if (lease === third) owner.service.terminate(second); }); assert.ok(registrations[index]);
+        }), true);
+    }
+    current.retire(); assert.deepEqual(calls, [1, 1, 1]);
+    for (const [index, lease] of [first, second, third].entries()) assert.equal(owner.lifecycleController.confirmDependent(lease, registrations[index]), false);
+});
+test('private proposal continuation has one concurrent winner and never republishes after unregister', async () => {
+    const current = fixture(); const owner = createHeadlessSoapChildSessionLeaseOwner({ ...current.lifecycle, clock: current.clock });
+    const lease = await owner.service.open(); let registration: unknown = null, proposals = 0;
+    assert.equal(await owner.lifecycleController.withCurrentLease(lease, (candidate) => { registration = owner.lifecycleController.registerDependent(candidate, () => undefined); assert.ok(registration); }), true);
+    const outcomes = await Promise.allSettled([
+        owner.lifecycleController.withCurrentProposalBudget(lease, registration, () => { proposals += 1; }),
+        owner.lifecycleController.withCurrentProposalBudget(lease, registration, () => { proposals += 1; }),
+    ]);
+    assert.equal(outcomes.filter(outcome => outcome.status === 'fulfilled' && outcome.value).length, 1);
+    assert.equal(outcomes.filter(outcome => outcome.status === 'rejected' && denied('proposal_budget_exhausted')(outcome.reason)).length, 1); assert.equal(proposals, 1);
+    assert.equal(await owner.service.recheck(lease), lease);
+    assert.equal(await owner.lifecycleController.withCurrentDependent(lease, registration, () => { assert.equal(owner.lifecycleController.unregisterDependent(lease, registration), true); }), false);
+    await assert.rejects(owner.service.recheck(lease), denied('lease_unavailable'));
+});
+test('private continuation preserves time and parent-denial precedence over a foreign registration', async () => {
+    const expired = fixture(); const expiredOwner = createHeadlessSoapChildSessionLeaseOwner({ ...expired.lifecycle, clock: expired.clock }); const expiredLease = await expiredOwner.service.open(); expired.setNow(301_000);
+    await assert.rejects(expiredOwner.lifecycleController.withCurrentProposalBudget(expiredLease, Object.freeze(Object.create(null)), () => undefined), denied('lease_expired'));
+    const deniedParent = fixture(); const deniedOwner = createHeadlessSoapChildSessionLeaseOwner({ ...deniedParent.lifecycle, clock: deniedParent.clock }); const deniedLease = await deniedOwner.service.open(); deniedParent.denyUse();
+    await assert.rejects(deniedOwner.lifecycleController.withCurrentDependent(deniedLease, Object.freeze(Object.create(null)), () => undefined), denied('active_role_unavailable'));
+    const current = fixture(); const currentOwner = createHeadlessSoapChildSessionLeaseOwner({ ...current.lifecycle, clock: current.clock }); const currentLease = await currentOwner.service.open(); let registration: unknown = null, proposals = 0;
+    assert.equal(await currentOwner.lifecycleController.withCurrentLease(currentLease, (candidate) => { registration = currentOwner.lifecycleController.registerDependent(candidate, () => undefined); assert.ok(registration); }), true);
+    assert.equal(await currentOwner.lifecycleController.withCurrentProposalBudget(currentLease, Object.freeze(Object.create(null)), () => { proposals += 100; }), false);
+    assert.equal(await currentOwner.lifecycleController.withCurrentProposalBudget(currentLease, undefined, () => { proposals += 100; }), false);
+    assert.equal(await currentOwner.lifecycleController.withCurrentProposalBudget(currentLease, registration, () => { proposals += 1; }), true);
+    assert.equal(proposals, 1); assert.equal(await currentOwner.service.recheck(currentLease), currentLease);
 });
 test('consumes exactly one proposal budget and keeps the lease recheckable', async () => {
     const current = fixture(); const service = createHeadlessSoapChildSessionLeaseService({ ...current.lifecycle, clock: current.clock }); const lease = await service.open();
@@ -76,6 +167,13 @@ test('does not publish a lease terminalized by the final clock sample', async ()
     } });
     const lease = await service.open(); leaseHolder.value = lease; armed = true;
     await assert.rejects(service.recheck(lease), denied('child_unavailable')); await assert.rejects(service.recheck(lease), denied('lease_unavailable'));
+});
+test('does not resolve public recheck or budget consumption after post-await child loss', async () => {
+    for (const operation of ['recheck', 'consumeProposalBudget'] as const) {
+        const current = fixture(); const service = createHeadlessSoapChildSessionLeaseService({ ...current.lifecycle, clock: current.clock }); const lease = await service.open();
+        const pending = service[operation](lease); assert.equal(service.terminate(lease), true);
+        await assert.rejects(pending, denied('child_unavailable')); await assert.rejects(service.recheck(lease), denied('lease_unavailable'));
+    }
 });
 test('serializes concurrent proposal-budget consumption to one winner', async () => {
     const current = fixture(); const service = createHeadlessSoapChildSessionLeaseService({ ...current.lifecycle, clock: current.clock }); const lease = await service.open();
