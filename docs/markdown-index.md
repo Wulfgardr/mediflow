@@ -11,7 +11,7 @@ read_when:
 > GitHub mostra in alto solo alcuni file speciali (`README`, `CONTRIBUTING`, `SECURITY`, ecc.).
 > Questo file elenca invece **tutti** i `.md` tracciati nella repository con una sintesi rapida d'uso.
 
-Ultimo aggiornamento: 2026-08-28
+Ultimo aggiornamento: 2026-08-31
 
 ## 📚 Come usare questo indice
 
@@ -180,6 +180,7 @@ Ultimo aggiornamento: 2026-08-28
 | [docs/adr/0102-document-synthesis-source-authority.md](./adr/0102-document-synthesis-source-authority.md) | ADR accettata per source-set host-owned, citazioni validate, digest distinti e receipt Document Synthesis review-only. |
 | [docs/adr/0099-ocr-document-locator-and-source-currentness.md](./adr/0099-ocr-document-locator-and-source-currentness.md) | ADR accettato per currentness della sorgente OCR e locator monouso volatile; separa schema O1a-O1c, writer O2a-O2e, revoca, deny backup/restore, bridge P4 e route/client senza autorizzare runtime o apply. |
 | [docs/adr/0107-anydoc-local-attachment-extraction.md](./adr/0107-anydoc-local-attachment-extraction.md) | ADR proposto per AnyDoc come unica estrazione automatica locale degli allegati, senza DeepSeek/Ollama, Apple Vision o fallback hosted. |
+| [docs/adr/0108-piano-canonico-headless-read-only-085.md](./adr/0108-piano-canonico-headless-read-only-085.md) | ADR accettato: `66/66` indica 66 esiti Headless terminali; i GET network restano evidence read candidate e non operation grant. |
 | [docs/adr/0012-operator-reviewed-smart-import-from-patient-context.md](./adr/0012-operator-reviewed-smart-import-from-patient-context.md) | Smart import reviewable da note, diario e documenti verso diagnosi ICD-11 e terapie nel profilo paziente. |
 | [docs/adr/0013-qwen35-default-text-only-medgemma-specialist.md](./adr/0013-qwen35-default-text-only-medgemma-specialist.md) | Aggiorna il default text-only a `qwen3.5:35b-a3b` e mantiene MedGemma come opzione specialistica non-default. |
 | [docs/adr/0014-native-token-bootstrap-secure-first.md](./adr/0014-native-token-bootstrap-secure-first.md) | Precedenza secure-first del token native (`Keychain -> config -> legacy`) e failure mode espliciti. |
