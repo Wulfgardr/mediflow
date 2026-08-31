@@ -78,6 +78,48 @@ proposta, TTL breve e stato terminale dopo denial, commit o restart. Non puo
 approvare o autorizzare un'altra proposta, operazione, paziente, field set,
 payload o sessione successiva.
 
+### Costanti H2b per 0.8.5
+
+L'owner H2b e process-local e apre una sessione figlia solo dopo avere emesso
+e verificato il grant H2a-A corrente. Registra inoltre il parent attraverso un
+seam lifecycle privato, legato per closure allo stesso record H2a-A: il
+facade production pubblico non espone quel controller. La terminalizzazione
+H2a-A drena in modo sincrono i parent dipendenti e tutti i relativi figli.
+L'attach e linearizzato sul record H2a-A: o fallisce se il record e gia
+terminale, oppure entra nel set che il disposer deve drenare. Nessun lease e
+pubblicato prima dell'attach riuscito e non esiste un altro `await` tra attach
+e pubblicazione.
+L'API di apertura non accetta grant, actor, sessione, riferimenti, generation,
+TTL o altri campi authority dal chiamante. Restituisce un solo lease opaco,
+frozen, senza campi e legato per identita al parent e alla sessione figlia.
+
+Il lease scade esattamente dopo cinque minuti, senza rinnovo. La validita e
+half-open: e corrente per `now < expiresAt` e scaduto per `now >= expiresAt`.
+La sua validita effettiva e sempre la congiunzione con il grant H2a-A: open
+emette e verifica il parent corrente, mentre consumo e recheck lo rivalidano.
+Il disposer privato garantisce la cascata immediata anche senza un uso
+successivo del lease.
+
+I record H2b di parent, child e lease nascono ciascuno con contract version
+`1`, generation `1` e revocation generation `0`; il figlio nasce inoltre con
+budget astratto `1`. Il consumo atomico porta il budget a `0`; il figlio resta
+solo recheckable per il futuro lifecycle della stessa proposta e non ottiene
+un secondo budget. Expiry, denial host-provato, commit host-provato o
+terminazione esplicita rendono terminali nello stesso processo i record
+coinvolti e portano la relativa revocation generation a `1`. Un clock rollback
+non riattiva lo stato. Il denial del parent drena tutti i figli; expiry,
+denial host-provato, commit o terminazione di un figlio revocano soltanto quel
+child e il relativo lease, senza revocare parent o sibling. Il restart
+distrugge invece record e controller: una
+nuova istanza nega il vecchio lease per identita assente, senza ricostruire o
+simulare una transizione persistita.
+
+In H2b parent, child e lease restano identita object process-local host-owned;
+non esiste ancora una proiezione serializzabile dei relativi binding. Il
+digest H1, SOAP, paziente, selezione, proposal, approval, proof e write non
+entrano nell'owner H2b: il digest viene legato solo quando H3 materializza la
+proposta memory-only.
+
 ### Sessione di medico e lifecycle della proposta
 
 H2a e H2b richiedono una sessione active-role del medico autenticato accettata
