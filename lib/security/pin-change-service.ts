@@ -24,17 +24,39 @@ import { users } from '@/lib/schema';
 /* @Codex */
 import type { dbServer as dbServerType } from '@/lib/db-server';
 /* @Codex */
-import { invalidateSessionsForUser, type ServerSession } from '@/lib/security/server-session';
+import {
+    abortNativeLegacyUserRetirement,
+    commitNativeLegacyUserRetirement,
+    prepareNativeLegacyUserRetirement,
+} from '@/lib/security/server-session';
+/* @Codex */
+import {
+    abortUserRetirement,
+    commitUserRetirement,
+    prepareUserRetirement,
+    type WebSessionProjection,
+} from '@/lib/security/web-auth-lifecycle-owner-adapter';
 
 type PinChangeDatabase = typeof dbServerType;
 
+/* @Codex */
+export const PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED_CODE = 'PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED';
+
+/* @Codex */
 export type PinChangeServiceDependencies = {
     db?: PinChangeDatabase;
     writeAuditEvent?: typeof writeAuditEvent;
+    prepareWebSessionsForUserRetirement?: typeof prepareUserRetirement;
+    commitWebSessionsForUserRetirement?: typeof commitUserRetirement;
+    abortWebSessionsForUserRetirement?: typeof abortUserRetirement;
+    prepareNativeSessionsForUserRetirement?: typeof prepareNativeLegacyUserRetirement;
+    commitNativeSessionsForUserRetirement?: typeof commitNativeLegacyUserRetirement;
+    abortNativeSessionsForUserRetirement?: typeof abortNativeLegacyUserRetirement;
 };
 
+/* @Codex */
 export type PinChangeServiceInput = {
-    session: ServerSession;
+    session: WebSessionProjection;
     request: Request;
     currentPin: string;
     newPin: string;
@@ -97,21 +119,72 @@ export async function changePin(
         };
     }
 
-    const nextPasswordHash = await bcrypt.hash(input.newPin, 10);
-    const updateResult = db.transaction((tx) => tx
-        .update(users)
-        .set({
-            passwordHash: nextPasswordHash,
-            encryptedMasterKey: input.encryptedMasterKey,
-            salt: input.salt,
-            failedLoginAttempts: 0,
-            firstFailedLoginAt: null,
-            lockedUntil: null,
-        })
-        .where(and(eq(users.id, user.id), eq(users.passwordHash, user.passwordHash)))
-        .run());
+    const prepareNativeRetirement = dependencies.prepareNativeSessionsForUserRetirement
+        ?? prepareNativeLegacyUserRetirement;
+    const commitNativeRetirement = dependencies.commitNativeSessionsForUserRetirement
+        ?? commitNativeLegacyUserRetirement;
+    const abortNativeRetirement = dependencies.abortNativeSessionsForUserRetirement
+        ?? abortNativeLegacyUserRetirement;
+    const prepareWebRetirement = dependencies.prepareWebSessionsForUserRetirement
+        ?? prepareUserRetirement;
+    const commitWebRetirement = dependencies.commitWebSessionsForUserRetirement
+        ?? commitUserRetirement;
+    const abortWebRetirement = dependencies.abortWebSessionsForUserRetirement
+        ?? abortUserRetirement;
+    const nativeRetirement = prepareNativeRetirement(user.id);
+    if (!nativeRetirement) {
+        return {
+            kind: 'failure',
+            status: 409,
+            code: PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED_CODE,
+            message: 'La rotazione delle credenziali non può essere confermata. Riprova dopo un nuovo accesso.',
+        };
+    }
+    const webRetirement = prepareWebRetirement(input.session);
+    if (!webRetirement) {
+        try { abortNativeRetirement(nativeRetirement); } catch { /* the credential mutation has not started */ }
+        return {
+            kind: 'failure',
+            status: 409,
+            code: PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED_CODE,
+            message: 'La rotazione delle credenziali non può essere confermata. Riprova dopo un nuovo accesso.',
+        };
+    }
+
+    const abortPreparedRetirements = (): void => {
+        try { abortWebRetirement(webRetirement); } catch { /* the uncommitted capability remains non-authorizing */ }
+        try { abortNativeRetirement(nativeRetirement); } catch { /* the uncommitted capability remains non-authorizing */ }
+    };
+
+    let nextPasswordHash: string;
+    try {
+        nextPasswordHash = await bcrypt.hash(input.newPin, 10);
+    } catch (error) {
+        abortPreparedRetirements();
+        throw error;
+    }
+
+    let updateResult: { changes: number };
+    try {
+        updateResult = db.transaction((tx) => tx
+            .update(users)
+            .set({
+                passwordHash: nextPasswordHash,
+                encryptedMasterKey: input.encryptedMasterKey,
+                salt: input.salt,
+                failedLoginAttempts: 0,
+                firstFailedLoginAt: null,
+                lockedUntil: null,
+            })
+            .where(and(eq(users.id, user.id), eq(users.passwordHash, user.passwordHash)))
+            .run());
+    } catch (error) {
+        abortPreparedRetirements();
+        throw error;
+    }
 
     if (updateResult.changes !== 1) {
+        abortPreparedRetirements();
         return {
             kind: 'failure',
             status: 409,
@@ -120,8 +193,28 @@ export async function changePin(
         };
     }
 
-    /* @Codex: the successful credential CAS invalidates every prior server session synchronously. */
-    invalidateSessionsForUser(user.id);
+    /* @Codex: after the credential CAS, retire Web and native authority through separate exact owners. */
+    let webRetirementOutcome: 'completed' | 'failed' | 'denied' = 'failed';
+    try {
+        webRetirementOutcome = commitWebRetirement(webRetirement).outcome;
+    } catch {
+        webRetirementOutcome = 'failed';
+    }
+    let nativeRetirementOutcome: 'completed' | 'failed' | 'denied' = 'failed';
+    try {
+        nativeRetirementOutcome = commitNativeRetirement(nativeRetirement).outcome;
+    } catch {
+        try { abortNativeRetirement(nativeRetirement); } catch { /* fail-closed response below */ }
+        nativeRetirementOutcome = 'failed';
+    }
+    if (webRetirementOutcome !== 'completed' || nativeRetirementOutcome !== 'completed') {
+        return {
+            kind: 'failure',
+            status: 409,
+            code: PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED_CODE,
+            message: 'La rotazione delle credenziali non può essere confermata. Accedi di nuovo.',
+        };
+    }
 
     try {
         const context = auditContextFromSession(input.session);

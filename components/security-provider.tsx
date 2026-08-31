@@ -164,7 +164,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         setAuthErrorMessage(null);
         clearClientAuthority();
 
-        void runAuthorityNetworkRequest(requestApplicationLockConfirmation)
+        // The revocation fence must overtake any in-flight or queued login/setup request.
+        void requestApplicationLockConfirmation()
             .then((confirmed) => {
                 if (!confirmed && authorityAttemptGenerationRef.current === attemptGeneration) {
                     setAuthErrorMessage('Server lock not confirmed.');
@@ -207,7 +208,19 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     const checkAuthStatus = async (isSessionRestored?: boolean) => {
         try {
-            const { response: res, payload: data } = await checkAuthHealthRequest();
+            const { response: res, payload: data, controlState } = await checkAuthHealthRequest();
+            /* @Codex */
+            if (controlState === 'stale') return;
+            /* @Codex */
+            if (controlState === 'invalid') {
+                setAuthHealth({
+                    status: 'error',
+                    error: { code: 'AUTH_CONTROL_INVALID', message: 'Controllo autenticazione non verificabile.' }
+                });
+                setRequiresSetup(false);
+                clearClientAuthority();
+                return;
+            }
             /* @Codex */
             if (!data) {
                 setAuthHealth({
@@ -309,10 +322,24 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     const login = async (pin: string): Promise<boolean> => {
         const attemptGeneration = ++authorityAttemptGenerationRef.current;
+        /* @Codex */
+        let unacceptedServerAuthority = false;
         try {
             setAuthErrorMessage(null);
-            const { response: res, payload } = await runAuthorityNetworkRequest(() => loginWithPinRequest(pin));
+            const result = await runAuthorityNetworkRequest(async () => {
+                if (authorityAttemptGenerationRef.current !== attemptGeneration) return null;
+                return loginWithPinRequest(pin);
+            });
+            if (!result) return false;
+            const { response: res, payload, controlState } = result;
             if (authorityAttemptGenerationRef.current !== attemptGeneration) return false;
+
+            /* @Codex */
+            if (res.ok && controlState !== 'accepted') {
+                lock();
+                setAuthErrorMessage('Risposta di login non verificabile. Sessione bloccata.');
+                return false;
+            }
 
             if (!res.ok) {
                 if (authorityAttemptGenerationRef.current === attemptGeneration) {
@@ -320,6 +347,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 }
                 return false;
             }
+
+            /* @Codex */
+            unacceptedServerAuthority = true;
 
             const data = payload as {
                 encryptedMasterKey: string;
@@ -330,13 +360,29 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 ambulatoryName?: string;
                 role: string;
             } | null;
-            if (!data) {
-                if (authorityAttemptGenerationRef.current === attemptGeneration) {
-                    setAuthErrorMessage('Errore durante il login.');
-                }
+            /* @Codex */
+            if (!data
+                || typeof data.id !== 'string' || !data.id
+                || typeof data.username !== 'string' || !data.username
+                || typeof data.role !== 'string' || !data.role
+                || typeof data.encryptedMasterKey !== 'string' || !data.encryptedMasterKey
+                || !(typeof data.salt === 'string'
+                    || (Array.isArray(data.salt) && data.salt.every((value) => Number.isInteger(value) && value >= 0 && value <= 255)))
+                || (data.displayName !== undefined && data.displayName !== null && typeof data.displayName !== 'string')
+                || (data.ambulatoryName !== undefined && data.ambulatoryName !== null && typeof data.ambulatoryName !== 'string')) {
+                lock();
+                setAuthErrorMessage('Errore durante il login.');
                 return false;
             }
-            const { encryptedMasterKey, salt, ...userData } = data;
+            const { encryptedMasterKey, salt } = data;
+            /* @Codex */
+            const userData: User = {
+                id: data.id,
+                username: data.username,
+                role: data.role,
+                ...(typeof data.displayName === 'string' ? { displayName: data.displayName } : {}),
+                ...(typeof data.ambulatoryName === 'string' ? { ambulatoryName: data.ambulatoryName } : {}),
+            };
 
             // Convert salt from B64 string
             let saltBytes: Uint8Array;
@@ -349,7 +395,12 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             }
 
             const masterKey = await unwrapMasterKeyVersioned(encryptedMasterKey, pin, saltBytes);
-            if (authorityAttemptGenerationRef.current !== attemptGeneration) return false;
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) {
+                lock();
+                return false;
+            }
+            /* @Codex */
+            unacceptedServerAuthority = false;
 
             setActiveMasterKey(masterKey);
             setUser(userData);
@@ -388,7 +439,11 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
         } catch (e) {
             console.error("Login failed", e);
-            if (authorityAttemptGenerationRef.current === attemptGeneration) {
+            /* @Codex */
+            if (unacceptedServerAuthority) {
+                lock();
+                setAuthErrorMessage('Errore durante il login.');
+            } else if (authorityAttemptGenerationRef.current === attemptGeneration) {
                 setAuthErrorMessage('Errore durante il login.');
             }
             return false;
@@ -411,8 +466,11 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             return { ok: false, message: validationError };
         }
 
+        /* @Codex */
+        let pinMutationDispatched = false;
         try {
             const rotation = await createPinRotationBundle(masterKey, newPin);
+            pinMutationDispatched = true;
             const { response: res, payload } = await changePinRequest({
                 currentPin,
                 newPin,
@@ -424,9 +482,15 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 return { ok: false, message: formatPinChangeFailure((payload as PinChangeFailurePayload | null) ?? null, res.status) };
             }
 
+            /* @Codex - a successful credential CAS terminally retires this Web session. */
+            ++authorityAttemptGenerationRef.current;
+            clearClientAuthority();
+            setAuthErrorMessage('PIN aggiornato. Accedi con il nuovo PIN.');
             return { ok: true };
         } catch (e) {
             console.error('Change PIN failed', e);
+            /* @Codex - after dispatch the server outcome may be terminal even if the response is lost. */
+            if (pinMutationDispatched) lock();
             return { ok: false, message: 'Errore durante il cambio PIN.' };
         }
     };
@@ -451,31 +515,46 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             if (authorityAttemptGenerationRef.current !== attemptGeneration) return;
 
             // Send to Server
-            const { response: res, payload } = await runAuthorityNetworkRequest(() => setupSecurityRequest({
-                username: 'admin',
-                password: pin,
-                encryptedMasterKey,
-                salt: saltB64,
-                displayName,
-                ambulatoryName
-            }));
+            const result = await runAuthorityNetworkRequest(async () => {
+                if (authorityAttemptGenerationRef.current !== attemptGeneration) return null;
+                return setupSecurityRequest({
+                    username: 'admin',
+                    password: pin,
+                    encryptedMasterKey,
+                    salt: saltB64,
+                    displayName,
+                    ambulatoryName
+                });
+            });
+            if (!result) return;
+            const { response: res, payload, controlState } = result;
             if (authorityAttemptGenerationRef.current !== attemptGeneration) return;
 
             /* @Codex */
+            if (res.ok && controlState !== 'accepted') {
+                lock();
+                setFlowError('Risposta di configurazione non verificabile. Sessione bloccata.');
+                return;
+            }
+
+            /* @Codex */
             if (!res.ok) {
-                if ((res.status === 403 || res.status === 409) && payload?.code === 'SETUP_ALREADY_COMPLETED') {
+                if (res.status === 409 && payload?.code === 'SETUP_ALREADY_COMPLETED') {
+                    clearClientAuthority();
                     setRequiresSetup(false);
-                    const success = await login(pin);
-                    if (!success && authorityAttemptGenerationRef.current === attemptGeneration + 1) {
-                        setIsAuthenticated(false);
-                        setIsLocked(true);
-                        // Messaggio mostrato inline dalla LockScreen tramite authErrorMessage.
-                        setAuthErrorMessage("Accesso già configurato.");
-                    }
+                    // Il recupero richiede un nuovo gesto esplicito sulla LockScreen.
+                    setAuthErrorMessage("Accesso già configurato. Accedi con il PIN.");
                     return;
                 }
 
                 throw new Error(payload?.error || "Setup failed server-side");
+            }
+
+            /* @Codex */
+            if (payload?.success !== true) {
+                lock();
+                setFlowError('Risposta di configurazione non valida. Sessione bloccata.');
+                return;
             }
 
             // Set Active

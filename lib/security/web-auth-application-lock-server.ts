@@ -16,12 +16,16 @@ import {
     writeAuditEvent,
 } from './audit';
 import {
-    dispatchActiveWebServerSessionRetirement,
-    resolveActiveWebServerSession,
     SESSION_COOKIE_NAME,
     type ServerSession,
-    type WebServerSessionRetirementCleanupReceipt,
 } from './server-session';
+import {
+    isWebAuthControlMutation,
+    resolveWebAuthControlSession,
+    retireWebAuthControlForLock,
+    setWebAuthControlEtag,
+    type WebAuthControlMutation,
+} from './web-auth-control-transport';
 
 const ObjectPrototype = Object.prototype;
 const ObjectGetPrototypeOf = Object.getPrototypeOf;
@@ -36,8 +40,8 @@ const SESSION_ID = /^[a-f0-9]{64}$/u;
 type ExactRecord = Readonly<Record<string, unknown>>;
 
 export type WebAuthApplicationLockSources = Readonly<{
-    resolve(sessionId: unknown): ServerSession | null;
-    retire(sessionId: unknown, reason: 'lock'): WebServerSessionRetirementCleanupReceipt;
+    resolve(sessionId: unknown, controlId: unknown): unknown;
+    retire(projection: unknown, reason: 'lock', mutation: WebAuthControlMutation): unknown;
     audit(session: ServerSession, sessionId: string, request: Request): unknown;
 }>;
 
@@ -79,7 +83,8 @@ function exactBearer(cookie: unknown): string | null {
 }
 
 function exactActiveWebSession(value: unknown, sessionId: string): ServerSession | null {
-    const record = exactRecord(value, SESSION_KEYS, ObjectPrototype, true);
+    const record = exactRecord(value, SESSION_KEYS, ObjectPrototype, true)
+        ?? exactRecord(value, SESSION_KEYS, null, true);
     if (!record || record.id !== sessionId || record.authChannel !== 'web'
         || typeof record.userId !== 'string' || !record.userId
         || typeof record.username !== 'string' || !record.username
@@ -89,14 +94,24 @@ function exactActiveWebSession(value: unknown, sessionId: string): ServerSession
     return value as ServerSession;
 }
 
-function completedReceipt(value: unknown): boolean {
-    const record = exactRecord(value, ['outcome'], null, true);
-    return record?.outcome === 'completed';
+function exactActiveResolution(value: unknown, sessionId: string): ServerSession | null {
+    const record = exactRecord(value, ['status', 'projection'], null, true)
+        ?? exactRecord(value, ['status', 'projection'], ObjectPrototype, true);
+    return record?.status === 'active' ? exactActiveWebSession(record.projection, sessionId) : null;
+}
+
+function exactRetirementReceipt(value: unknown): { outcome: string; etag: string } | null {
+    const record = exactRecord(value, ['outcome', 'etag'], null, true)
+        ?? exactRecord(value, ['outcome', 'etag'], ObjectPrototype, true);
+    if (!record || (record.outcome !== 'completed' && record.outcome !== 'denied' && record.outcome !== 'failed')
+        || typeof record.etag !== 'string') return null;
+    return { outcome: record.outcome, etag: record.etag };
 }
 
 const productionSources: WebAuthApplicationLockSources = Object.freeze({
-    resolve: resolveActiveWebServerSession,
-    retire: dispatchActiveWebServerSessionRetirement,
+    resolve: resolveWebAuthControlSession,
+    retire: (projection: unknown, _reason: 'lock', mutation: WebAuthControlMutation) =>
+        retireWebAuthControlForLock(projection, mutation),
     audit: async (session: ServerSession, sessionId: string, request: Request) => {
         const context = auditContextFromSession(session);
         await writeAuditEvent({
@@ -107,23 +122,35 @@ const productionSources: WebAuthApplicationLockSources = Object.freeze({
     },
 });
 
-/** Retires only the exact ACTIVE Web P3 named by the fixed bearer. */
+/** Advances the exact control fence and retires its ACTIVE projection when one is present. */
 /* @Codex */
 export async function completeExactWebP3ApplicationLock(
     cookie: unknown,
+    mutation: unknown,
     request: Request,
     sources: WebAuthApplicationLockSources = productionSources,
 ): Promise<Response> {
     const sessionId = exactBearer(cookie);
-    if (!sessionId) return createApplicationLockResponse(unconfirmedReceipt);
-    let session: ServerSession | null;
-    try { session = exactActiveWebSession(sources.resolve(sessionId), sessionId); }
+    if (!isWebAuthControlMutation(mutation)) return createApplicationLockResponse(unconfirmedReceipt);
+    let session: ServerSession | null = null;
+    if (sessionId) {
+        try { session = exactActiveResolution(sources.resolve(sessionId, mutation.controlId), sessionId); }
+        catch { /* A valid control mutation still advances the revocation fence below. */ }
+    }
+    let ownerReceipt: unknown;
+    try { ownerReceipt = sources.retire(session, 'lock', mutation); }
     catch { return createApplicationLockResponse(unconfirmedReceipt); }
-    if (!session) return createApplicationLockResponse(unconfirmedReceipt);
-    let receipt: unknown;
-    try { receipt = sources.retire(sessionId, 'lock'); }
-    catch { return createApplicationLockResponse(unconfirmedReceipt); }
-    if (!completedReceipt(receipt)) return createApplicationLockResponse(unconfirmedReceipt);
-    try { await sources.audit(session, sessionId, request); } catch { /* Terminal retirement is authoritative. */ }
-    return createApplicationLockResponse(confirmedReceipt);
+    const receipt = exactRetirementReceipt(ownerReceipt);
+    if (!receipt) return createApplicationLockResponse(unconfirmedReceipt);
+    if (receipt.outcome !== 'completed') {
+        const response = createApplicationLockResponse(unconfirmedReceipt);
+        setWebAuthControlEtag(response, receipt.etag);
+        return response;
+    }
+    if (session && sessionId) {
+        try { await sources.audit(session, sessionId, request); } catch { /* Terminal retirement is authoritative. */ }
+    }
+    const response = createApplicationLockResponse(confirmedReceipt);
+    setWebAuthControlEtag(response, receipt.etag);
+    return response;
 }

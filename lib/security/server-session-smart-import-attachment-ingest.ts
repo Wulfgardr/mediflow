@@ -2,8 +2,17 @@
 import 'server-only';
 
 import { createHostSmartImportProjectionAttacher } from '../smart-import-projection-attachment-host';
-import { getSession, type ServerSession } from './server-session';
+import type { ServerSession } from './server-session';
 import { createServerSessionProjectionOwnerRegistry, type ServerSessionProjectionOwner } from './server-session-projection-owner';
+import {
+    abortResourceUse,
+    beginResourceUse,
+    commitResourceUse,
+    mintResourcePort,
+    releaseResourcePort,
+    type WebResourcePort,
+    type WebResourceUse,
+} from './web-auth-lifecycle-owner-adapter';
 
 type ProjectionOwnerRegistry = Pick<ReturnType<typeof createServerSessionProjectionOwnerRegistry>, 'lookup'>;
 type ProjectionOwner = Pick<ServerSessionProjectionOwner, 'acquireProjectionIngest'>;
@@ -44,8 +53,7 @@ function tuple(value: unknown): Tuple {
     return Object.freeze({ sessionRef: opaque(input.sessionRef), selectionEpoch: input.selectionEpoch as number,
         patientRef: opaque(input.patientRef), ambulatoryRef: opaque(input.ambulatoryRef), leaseRef: opaque(input.leaseRef) });
 }
-function prepared(session: ServerSession, inputValue: unknown) {
-    if (session.authChannel !== 'web' || session.id === 'local-api' || getSession(session.id) !== session) fail('session_unavailable');
+function prepared(inputValue: unknown) {
     const input = safeExact(inputValue, ['tuple', 'attachment', 'requestId']);
     return Object.freeze({ currentTuple: tuple(input.tuple), attachment: input.attachment, requestId: opaque(input.requestId) });
 }
@@ -56,12 +64,31 @@ function ingestPrepared(session: ServerSession, owner: ProjectionOwner, input: R
     return ingest.ingest({ projection, requestId: input.requestId });
 }
 
+function withCurrentWebSession<T>(session: ServerSession, operation: () => T): T {
+    let port: WebResourcePort | null = null;
+    let use: WebResourceUse | null = null;
+    let committed = false;
+    try {
+        port = mintResourcePort(session);
+        if (!port) return fail('session_unavailable');
+        use = beginResourceUse(port);
+        if (!use || session.authChannel !== 'web' || session.id === 'local-api') return fail('session_unavailable');
+        const result = operation();
+        committed = commitResourceUse(use);
+        if (!committed) return fail('session_unavailable');
+        return result;
+    } finally {
+        if (use && !committed) abortResourceUse(use);
+        if (port) releaseResourcePort(port);
+    }
+}
+
 export function ingestServerSessionSmartImportAttachmentWithOwner(
     session: ServerSession,
     owner: ProjectionOwner,
     inputValue: unknown,
 ): string {
-    return ingestPrepared(session, owner, prepared(session, inputValue));
+    return withCurrentWebSession(session, () => ingestPrepared(session, owner, prepared(inputValue)));
 }
 
 export function ingestServerSessionSmartImportAttachment(
@@ -69,8 +96,10 @@ export function ingestServerSessionSmartImportAttachment(
     registry: ProjectionOwnerRegistry,
     inputValue: unknown,
 ): string {
-    const input = prepared(session, inputValue);
-    const owner = registry.lookup(session.id);
-    if (!owner) fail('owner_unavailable');
-    return ingestPrepared(session, owner, input);
+    return withCurrentWebSession(session, () => {
+        const input = prepared(inputValue);
+        const owner = registry.lookup(session.id);
+        if (!owner) return fail('owner_unavailable');
+        return ingestPrepared(session, owner, input);
+    });
 }

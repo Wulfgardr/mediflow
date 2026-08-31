@@ -15,7 +15,8 @@ const D1A = `lib/security/${OWNER_STEM}-boundary.test.ts`;
 const D1B = `lib/security/${OWNER_STEM}-resolver-boundary.test.ts`;
 const GUARD_SCRIPT = `check:${OWNER_STEM}-boundary`;
 const GUARD_COMMAND = `node scripts/run-strip-types.mjs --test ${D1A} ${D1B}`;
-const NEXT_AST_SHA256 = '6ce42676490da267f3fa21dbc6bee69dafb81900cede602710a53db7db09154d';
+const NEXT_RESOLVER_AST_SHA256 = 'b187421b3b715a0c94ef3f978ff0285c01a186ad04984b9e259dbad0dd38e214';
+const OWNER_DELIVERY_GLOB = `./node_modules/${PACKAGE}/**/*`;
 const EXPECTED_TSCONFIG_RESOLVER = {
     extends: null, moduleResolution: 'bundler', baseUrl: null, paths: { '@/*': ['./*'] }, rootDirs: null,
     moduleSuffixes: null, customConditions: null,
@@ -41,12 +42,66 @@ const canonical = (value: Json): string => JSON.stringify(value && typeof value 
     : Array.isArray(value) ? value.map((item) => JSON.parse(canonical(item))) : value);
 const parsedTypeScript = (file: string, source: string) =>
     ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-const nextConfigErrors = (source: string): string[] => {
+const propertyName = (node: ts.PropertyName): string | null =>
+    ts.isIdentifier(node) || ts.isStringLiteral(node) ? node.text : null;
+const nextConfigObject = (tree: ts.SourceFile): ts.ObjectLiteralExpression | null => {
+    for (const statement of tree.statements) {
+        if (!ts.isVariableStatement(statement)) continue;
+        for (const declaration of statement.declarationList.declarations) {
+            if (ts.isIdentifier(declaration.name) && declaration.name.text === 'nextConfig'
+                && declaration.initializer && ts.isObjectLiteralExpression(declaration.initializer)) {
+                return declaration.initializer;
+            }
+        }
+    }
+    return null;
+};
+const resolverProjection = (tree: ts.SourceFile): string => {
+    const transformed = ts.transform(tree, [(context) => (root) => {
+        const visit: ts.Visitor = (node) => {
+            if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === 'nextConfig'
+                && node.initializer && ts.isObjectLiteralExpression(node.initializer)) {
+                const initializer = ts.factory.updateObjectLiteralExpression(node.initializer,
+                    node.initializer.properties.filter((property) => !(ts.isPropertyAssignment(property)
+                        && propertyName(property.name) === 'outputFileTracingIncludes')));
+                return ts.factory.updateVariableDeclaration(
+                    node, node.name, node.exclamationToken, node.type, initializer,
+                );
+            }
+            return ts.visitEachChild(node, visit, context);
+        };
+        return ts.visitNode(root, visit) as ts.SourceFile;
+    }]);
+    try {
+        return ts.createPrinter({ removeComments: true }).printFile(transformed.transformed[0] as ts.SourceFile);
+    } finally {
+        transformed.dispose();
+    }
+};
+const nextResolverErrors = (source: string): string[] => {
     const tree = parsedTypeScript('next.config.ts', source) as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] };
     if (tree.parseDiagnostics.length > 0) return ['next:parse'];
-    const printed = ts.createPrinter({ removeComments: true }).printFile(tree);
-    return digest(printed) === NEXT_AST_SHA256 ? [] : ['next:ast'];
+    return digest(resolverProjection(tree)) === NEXT_RESOLVER_AST_SHA256 ? [] : ['next:ast'];
 };
+const nextDeliveryErrors = (source: string): string[] => {
+    const tree = parsedTypeScript('next.config.ts', source) as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] };
+    if (tree.parseDiagnostics.length > 0) return ['next:parse'];
+    const config = nextConfigObject(tree);
+    const tracing = config?.properties.filter((property): property is ts.PropertyAssignment =>
+        ts.isPropertyAssignment(property) && propertyName(property.name) === 'outputFileTracingIncludes') ?? [];
+    if (tracing.length !== 1 || !ts.isObjectLiteralExpression(tracing[0]!.initializer)) return ['next:delivery'];
+    const routes = tracing[0]!.initializer.properties.filter((property): property is ts.PropertyAssignment =>
+        ts.isPropertyAssignment(property) && propertyName(property.name) === '/*');
+    if (routes.length !== 1 || !ts.isArrayLiteralExpression(routes[0]!.initializer)) return ['next:delivery'];
+    const ownerEntries = routes[0]!.initializer.elements.filter((element) =>
+        ts.isStringLiteral(element) && element.text.includes(PACKAGE));
+    return ownerEntries.length === 1 && ts.isStringLiteral(ownerEntries[0]!)
+        && ownerEntries[0]!.text === OWNER_DELIVERY_GLOB ? [] : ['next:delivery'];
+};
+const nextConfigErrors = (source: string): string[] => [
+    ...nextResolverErrors(source),
+    ...nextDeliveryErrors(source),
+];
 const tsconfigErrors = (source: string): string[] => {
     const parsed = ts.parseConfigFileTextToJson('tsconfig.json', source);
     if (parsed.error || !parsed.config || typeof parsed.config !== 'object') return ['tsconfig:parse'];
@@ -116,6 +171,8 @@ test('freezes the sole comment-insensitive Next resolver surface', () => {
         webpackMarker, hostile.at(-1)!)}`), []);
     assert.notDeepEqual(nextConfigErrors(liveNext.replace('turbopack: {},',
         `turbopack:{resolveAlias:{'${PACKAGE}':'./owner-shim'}},`)), []);
+    assert.notDeepEqual(nextConfigErrors(liveNext.replace(OWNER_DELIVERY_GLOB,
+        `./node_modules/${PACKAGE}/index.js`)), []);
 });
 
 test('freezes canonical TypeScript and package resolver projections', () => {

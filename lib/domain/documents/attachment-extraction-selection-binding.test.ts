@@ -6,6 +6,7 @@ import path from 'node:path';
 import { after, afterEach, test } from 'node:test';
 import { types } from 'node:util';
 import Database from 'better-sqlite3';
+import type { ServerSession } from '../../security/server-session.ts';
 
 const root = process.cwd();
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-anydoc-l1d-s1-'));
@@ -16,8 +17,8 @@ for (const name of fs.readdirSync(path.join(root, 'drizzle')).filter((file) => f
 migrationDb.close(); process.env.MEDIFLOW_DATA_DIR = dataDir;
 
 const dbModule = await import('../../db-server.ts');
-const sessionModule = await import('../../security/server-session.ts');
 const ownerModule = await import('../../security/server-session-projection-owner-production.ts');
+const webFixtureModule = await import('../../security/web-auth-lifecycle-owner-test-fixture.ts');
 const { dbServer } = dbModule;
 const originalAll = dbServer.all; let allHook = () => {}; let allReplacement: unknown = undefined;
 (dbServer as unknown as { all: typeof dbServer.all }).all = (function (query) {
@@ -25,11 +26,13 @@ const originalAll = dbServer.all; let allHook = () => {}; let allReplacement: un
 }) as typeof dbServer.all;
 const bindingModule = await import('./attachment-extraction-selection-binding.ts');
 (dbServer as unknown as { all: typeof dbServer.all }).all = originalAll;
-const { clearAllSessions, createSession, deleteSession } = sessionModule;
 const { serverSessionProjectionOwnerRegistry } = ownerModule;
+const { issueSyntheticWebSession, retireSyntheticWebSession } = webFixtureModule;
 const { bindAttachmentExtractionSelection } = bindingModule;
 const PATIENT = 'patient.synthetic.selection'; const ATTACHMENT = 'attachment.synthetic.selection';
 const AMBULATORY = 'ambulatory.synthetic.selection'; const OTHER = 'ambulatory.synthetic.other';
+const sessions: ServerSession[] = [];
+let sequence = 0;
 
 function seed(memberships = [AMBULATORY]) {
     const db = new Database(dbPath); db.pragma('foreign_keys = ON');
@@ -44,9 +47,14 @@ function seed(memberships = [AMBULATORY]) {
     db.close();
 }
 function session(channel: 'web' | 'native' | 'system' = 'web') {
-    return createSession({ id: `user.synthetic.${channel}`, username: ['clinician', 'synthetic', channel].join('.'), role: 'clinician' }, channel);
+    const web = issueSyntheticWebSession({ id: `user.synthetic.${channel}`, username: ['clinician', 'synthetic', channel].join('.'), role: 'clinician' },
+        `selection-binding-${sequence += 1}`);
+    sessions.push(web);
+    return channel === 'web' ? web : { ...web, id: `${channel}.synthetic.selection`, authChannel: channel };
 }
-afterEach(() => clearAllSessions());
+afterEach(() => {
+    while (sessions.length > 0) retireSyntheticWebSession(sessions.pop()!);
+});
 after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
 test('derives the unique active host membership and publishes only an opaque selection result', () => {
@@ -76,8 +84,8 @@ test('denies ineligible, stale, hostile, cross-session, and replay-shaped inputs
     const thenable = Object.defineProperty({}, 'then', { enumerable: true, get() { traps += 1; throw new Error('raw then'); } });
     for (const value of [session('native'), session('system'), { ...web, id: 'local-api' }, proxy, accessor, thenable, Promise.resolve(web)])
         assert.doesNotThrow(() => assert.equal(bindAttachmentExtractionSelection(value, ATTACHMENT), null));
-    assert.equal(traps, 0); web.expiresAt = 0; assert.equal(bindAttachmentExtractionSelection(web, ATTACHMENT), null);
-    const loggedOut = session(); deleteSession(loggedOut.id); assert.equal(bindAttachmentExtractionSelection(loggedOut, ATTACHMENT), null);
+    assert.equal(traps, 0); retireSyntheticWebSession(web); assert.equal(bindAttachmentExtractionSelection(web, ATTACHMENT), null);
+    const loggedOut = session(); retireSyntheticWebSession(loggedOut); assert.equal(bindAttachmentExtractionSelection(loggedOut, ATTACHMENT), null);
     const current = session(); const token = bindAttachmentExtractionSelection(current, ATTACHMENT); assert.ok(token);
     const foreign = session(); assert.equal(bindAttachmentExtractionSelection(foreign, token), null);
     for (const target of ['', ` ${ATTACHMENT}`, { attachmentId: ATTACHMENT }, Promise.resolve(ATTACHMENT), new Proxy({}, {})])

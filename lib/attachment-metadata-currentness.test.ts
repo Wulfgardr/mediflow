@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import Database from 'better-sqlite3';
+import type { ServerSession } from './security/server-session.ts';
 
 const root = process.cwd();
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-w0b-'));
@@ -16,14 +17,24 @@ for (const file of fs.readdirSync(path.join(root, 'drizzle')).filter((name) => n
 migrationDb.close(); process.env.MEDIFLOW_DATA_DIR = dataDir;
 
 const route = await import('../app/api/attachments/[id]/route.ts');
-const sessions = await import('./security/server-session.ts');
 const owners = await import('./security/server-session-projection-owner-production.ts');
 const authorityModule = await import('./domain/documents/attachment-extraction-source-authority.ts');
+const webFixtureModule = await import('./security/web-auth-lifecycle-owner-test-fixture.ts');
 const requireCurrent = createRequire(import.meta.url);
 const serverAuth = requireCurrent('./security/server-auth') as { requireSession: () => Promise<unknown> };
+const { issueSyntheticWebSession, retireSyntheticWebSession } = webFixtureModule;
 const REF = 'b'.repeat(64); const PATIENT = 'patient.synthetic.w0b'; const OTHER = 'patient.synthetic.other';
 const ATTACHMENT = 'attachment.synthetic.w0b'; const AMBULATORY = 'ambulatory.synthetic.w0b';
 const auth = { id: 'session.synthetic', userId: 'user.synthetic', username: ['synthetic', 'auth'].join('.'), role: 'admin', authChannel: 'web', createdAt: 1, expiresAt: Number.MAX_SAFE_INTEGER };
+const finalSessions: ServerSession[] = [];
+let sessionSequence = 0;
+
+function finalSession(userId: string, username: string): ServerSession {
+    const session = issueSyntheticWebSession({ id: userId, username, role: 'clinician' },
+        `attachment-metadata-${sessionSequence += 1}`);
+    finalSessions.push(session);
+    return session;
+}
 
 function reset(values: { revision?: number; epoch?: number } = {}) {
     const db = new Database(dbPath); db.pragma('foreign_keys = ON');
@@ -49,7 +60,9 @@ async function invoke(method: 'PUT' | 'DELETE', body?: unknown, id = ATTACHMENT,
     try { return route[method](request(method, body), { params: Promise.resolve({ id }) }); }
     finally { serverAuth.requireSession = original; }
 }
-test.afterEach(() => sessions.clearAllSessions());
+test.afterEach(() => {
+    while (finalSessions.length > 0) retireSyntheticWebSession(finalSessions.pop()!);
+});
 test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
 test('authenticated metadata mutations advance the host tuple exactly once, including concurrent accepted updates', async () => {
@@ -79,12 +92,12 @@ test('no-op, auth, missing, overflow, transition, stale-CAS, and storage failure
 });
 
 test('wrong-patient source authority stays denied and DELETE makes an in-flight finalization fail closed', async () => {
-    reset(); const selectedOther = sessions.createSession({ id: 'user.synthetic.other', username: ['synthetic', 'other'].join('.'), role: 'clinician' });
+    reset(); const selectedOther = finalSession('user.synthetic.other', ['synthetic', 'other'].join('.'));
     owners.serverSessionProjectionOwnerRegistry.acquire(selectedOther).issueSelection({ expectedEpoch: 0, patientId: OTHER, ambulatoryId: AMBULATORY });
     const wrong = authorityModule.createAttachmentExtractionSourceAuthority(selectedOther);
     assert.equal(wrong.issue({ attachmentId: ATTACHMENT }), null); wrong.dispose(); assert.ok(snapshot());
 
-    const selected = sessions.createSession({ id: 'user.synthetic.w0b', username: ['synthetic', 'w0b'].join('.'), role: 'clinician' });
+    const selected = finalSession('user.synthetic.w0b', ['synthetic', 'w0b'].join('.'));
     owners.serverSessionProjectionOwnerRegistry.acquire(selected).issueSelection({ expectedEpoch: 0, patientId: PATIENT, ambulatoryId: AMBULATORY });
     const authority = authorityModule.createAttachmentExtractionSourceAuthority(selected); const locator = authority.issue({ attachmentId: ATTACHMENT }); assert.ok(locator);
     const begun = authority.consume(locator); assert.equal(begun.status, 'begun'); if (begun.status !== 'begun') return;

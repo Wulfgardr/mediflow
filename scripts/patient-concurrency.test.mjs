@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
+import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3100';
 const LOCAL_API_TOKEN = process.env.MEDIFLOW_LOCAL_API_TOKEN || 'mediflow-e2e-local-token';
@@ -332,20 +333,10 @@ async function createAuthContext() {
 }
 
 async function login() {
-    const response = await fetch(new URL('/api/auth/login', BASE_URL), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: USERNAME, password: PIN }),
-    });
-    assert.equal(response.status, 200, 'web concurrency lane should authenticate');
-
-    const setCookies = typeof response.headers.getSetCookie === 'function'
-        ? response.headers.getSetCookie()
-        : [];
-    const cookieSource = setCookies.find((cookie) => cookie.startsWith('mediflow_session='))
-        ?? response.headers.get('set-cookie');
-    assert.ok(cookieSource, 'login should return the mediflow_session cookie');
-    return cookieSource.split(';')[0];
+    const result = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
+    assert.equal(result.response.status, 200, 'web concurrency lane should authenticate');
+    assert.ok(result.sessionCookie, 'login should return the mediflow_session cookie');
+    return result.sessionCookie;
 }
 
 async function cleanupPatient(nativeLane, patientId) {

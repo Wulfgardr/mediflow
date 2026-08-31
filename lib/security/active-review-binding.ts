@@ -6,7 +6,8 @@ import { createDurableCurrentReviewLocator, type DurableCurrentReviewIdentity } 
 import { acquireAuthenticatedWebSessionProjectionOwnerContext } from './server-auth';
 import { registerServerSessionResource, type ServerSession } from './server-session';
 import { type ServerSessionProjectionOwner } from './server-session-projection-owner';
-import { sessionPhysicianReviewAuthority, type SessionPhysicianReviewAuthorityV1 } from './session-physician-review-authority';
+import type { SessionPhysicianReviewAuthorityV1 } from './session-physician-review-authority';
+import { sessionPhysicianReviewAuthority } from './session-physician-review-authority-production';
 
 const SCHEMA_VERSION = 'mediflow.active-review-binding.v1' as const;
 const AUTHORITY_SCHEMA_VERSION = 'mediflow.session-physician-review-authority.v1' as const;

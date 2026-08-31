@@ -2,14 +2,21 @@
 import 'server-only';
 
 import crypto from 'crypto';
-import { eq } from 'drizzle-orm';
 
-import { dbServer } from '../db-server';
-import { users } from '../schema';
-import { resolveAuthenticatedReviewPrincipal, type AuthenticatedReviewPrincipalV1 } from './authenticated-review-principal';
-import { createPhysicianReviewAttestationStore } from './physician-review-attestation-store';
-import { readAuthenticatedWebSession } from './server-auth';
-import { peekSession, registerServerSessionResource, type ServerSession } from './server-session';
+import type { AuthenticatedReviewPrincipalV1 } from './authenticated-review-principal';
+import type { ServerSession } from './server-session';
+import {
+    abortResourceUse,
+    beginResourceUse,
+    commitResourceUse,
+    mintResourcePort,
+    registerPrivateResource,
+    releaseResourcePort,
+    unregisterPrivateResource,
+    type WebResourcePort,
+    type WebResourceRegistration,
+    type WebResourceUse,
+} from './web-auth-lifecycle-owner-adapter';
 
 const SCHEMA_VERSION = 'mediflow.session-physician-review-authority.v1' as const;
 const ATTESTATION_SCHEMA_VERSION = 'mediflow.physician-review-attestation.v1' as const;
@@ -27,8 +34,10 @@ type AuthoritySnapshot = Readonly<{
 type AuthorityRecord = {
     authority: SessionPhysicianReviewAuthorityV1;
     snapshot: AuthoritySnapshot;
-    unregister: (() => void) | null;
+    port: WebResourcePort | null;
+    registration: WebResourceRegistration | null;
 };
+type SnapshotRead = Readonly<{ session: ServerSession; snapshot: AuthoritySnapshot }>;
 
 export type SessionPhysicianReviewAuthorityV1 = Readonly<{
     actorRef: string;
@@ -66,7 +75,6 @@ export type SessionPhysicianReviewAuthoritySources = Readonly<{
     readCurrentSession(): Awaitable<ServerSession | null>;
     readAttestation(actorRef: string): Awaitable<unknown>;
     readAccount(actorRef: string): Awaitable<unknown>;
-    registerSessionResource: typeof registerServerSessionResource;
     clock?: () => number;
 }>;
 
@@ -129,11 +137,9 @@ function verifySession(
     if (!session) return fail('session_unavailable');
     if (session.authChannel !== 'web' || session.id === 'local-api') return fail('session_ineligible');
     if (!Number.isFinite(session.createdAt) || !Number.isFinite(session.expiresAt) || session.expiresAt <= now) {
-        peekSession(session.id);
         return fail('session_unavailable');
     }
     if (principal.actorRef !== session.userId || principal.sessionRef !== session.id) return fail('principal_mismatch');
-    if (peekSession(session.id) !== session) return fail('session_unavailable');
     return session;
 }
 
@@ -143,7 +149,7 @@ export function createSessionPhysicianReviewAuthorityService(sources: SessionPhy
     const markerKey = crypto.randomBytes(32);
     const clock = sources.clock ?? Date.now;
 
-    const readSnapshot = async (): Promise<AuthoritySnapshot> => {
+    const readSnapshot = async (): Promise<SnapshotRead> => {
         let principal: AuthenticatedReviewPrincipalV1;
         let session: ServerSession | null;
         try {
@@ -152,49 +158,71 @@ export function createSessionPhysicianReviewAuthorityService(sources: SessionPhy
             return fail('storage_unavailable');
         }
         const current = verifySession(principal, session, clock());
-
-        let attestation: unknown;
-        let account: unknown;
+        let port: WebResourcePort | null = null;
+        let use: WebResourceUse | null = null;
+        let committed = false;
         try {
-            [attestation, account] = await Promise.all([
-                sources.readAttestation(principal.actorRef),
-                sources.readAccount(principal.actorRef),
-            ]);
-        } catch {
-            return fail('storage_unavailable');
+            port = mintResourcePort(current);
+            if (!port) return fail('session_unavailable');
+            use = beginResourceUse(port);
+            if (!use) return fail('session_unavailable');
+
+            let attestation: unknown;
+            let account: unknown;
+            try {
+                [attestation, account] = await Promise.all([
+                    sources.readAttestation(principal.actorRef),
+                    sources.readAccount(principal.actorRef),
+                ]);
+            } catch (error) {
+                if (error instanceof SessionPhysicianReviewAuthorityError) throw error;
+                return fail('storage_unavailable');
+            }
+            const verifiedAttestation = verifyAttestation(attestation, principal.actorRef);
+            const verifiedAccount = verifyAccount(account, principal.actorRef, clock());
+            const snapshot = Object.freeze({
+                actorRef: principal.actorRef,
+                expiresAt: current.expiresAt,
+                sessionId: current.id,
+                sessionGeneration: marker(markerKey, 'session', [current.id, current.userId, current.createdAt]),
+                revocationGeneration: marker(markerKey, 'revocation', [
+                    principal.actorRef,
+                    verifiedAttestation.updatedAt.getTime(),
+                    verifiedAccount.lockedUntil?.getTime() ?? null,
+                ]),
+            });
+            committed = commitResourceUse(use);
+            if (!committed) return fail('session_unavailable');
+            return Object.freeze({ session: current, snapshot });
+        } finally {
+            if (use && !committed) abortResourceUse(use);
+            if (port) releaseResourcePort(port);
         }
-        const verifiedAttestation = verifyAttestation(attestation, principal.actorRef);
-        const verifiedAccount = verifyAccount(account, principal.actorRef, clock());
-        return Object.freeze({
-            actorRef: principal.actorRef,
-            expiresAt: current.expiresAt,
-            sessionId: current.id,
-            sessionGeneration: marker(markerKey, 'session', [current.id, current.userId, current.createdAt]),
-            revocationGeneration: marker(markerKey, 'revocation', [
-                principal.actorRef,
-                verifiedAttestation.updatedAt.getTime(),
-                verifiedAccount.lockedUntil?.getTime() ?? null,
-            ]),
-        });
     };
 
-    const readStableSnapshot = async (): Promise<AuthoritySnapshot> => {
+    const readStableSnapshot = async (): Promise<SnapshotRead> => {
         const before = await readSnapshot();
         const after = await readSnapshot();
-        if (!snapshotEqual(before, after)) return fail('projection_stale');
+        if (!snapshotEqual(before.snapshot, after.snapshot)) return fail('projection_stale');
         return after;
     };
 
-    const discard = (record: AuthorityRecord): void => {
+    const discard = (record: AuthorityRecord, ownerCleanup = false): void => {
         if (records.get(record.snapshot.sessionId) === record) records.delete(record.snapshot.sessionId);
         issued.delete(record.authority);
-        record.unregister?.();
-        record.unregister = null;
+        const port = record.port;
+        const registration = record.registration;
+        record.port = null;
+        record.registration = null;
+        if (ownerCleanup) return;
+        if (port && registration) unregisterPrivateResource(port, registration);
+        if (port) releaseResourcePort(port);
     };
 
     return Object.freeze({
         async derive(): Promise<SessionPhysicianReviewAuthorityV1> {
-            const snapshot = await readStableSnapshot();
+            const read = await readStableSnapshot();
+            const { snapshot } = read;
             const existing = records.get(snapshot.sessionId);
             if (existing && snapshotEqual(existing.snapshot, snapshot)) return existing.authority;
             if (existing) discard(existing);
@@ -209,15 +237,32 @@ export function createSessionPhysicianReviewAuthorityService(sources: SessionPhy
                 sessionGeneration: snapshot.sessionGeneration,
                 revocationGeneration: snapshot.revocationGeneration,
             });
-            const record: AuthorityRecord = { authority, snapshot, unregister: null };
-            let unregister: (() => void) | null;
+            const record: AuthorityRecord = { authority, snapshot, port: null, registration: null };
+            let port: WebResourcePort | null = null;
+            let use: WebResourceUse | null = null;
+            let registration: WebResourceRegistration | null = null;
+            let committed = false;
             try {
-                unregister = sources.registerSessionResource(snapshot.sessionId, () => discard(record));
-            } catch {
+                port = mintResourcePort(read.session);
+                if (!port) return fail('session_unavailable');
+                use = beginResourceUse(port);
+                if (!use) return fail('session_unavailable');
+                registration = registerPrivateResource(port, () => { discard(record, true); });
+                if (!registration) return fail('session_unavailable');
+                committed = commitResourceUse(use);
+                if (!committed) return fail('session_unavailable');
+            } catch (error) {
+                if (error instanceof SessionPhysicianReviewAuthorityError) throw error;
                 return fail('storage_unavailable');
+            } finally {
+                if (use && !committed) abortResourceUse(use);
+                if (!committed) {
+                    if (port && registration) unregisterPrivateResource(port, registration);
+                    if (port) releaseResourcePort(port);
+                }
             }
-            if (!unregister) return fail('session_unavailable');
-            record.unregister = unregister;
+            record.port = port;
+            record.registration = registration;
             records.set(snapshot.sessionId, record);
             issued.set(authority, record);
             return authority;
@@ -230,7 +275,7 @@ export function createSessionPhysicianReviewAuthorityService(sources: SessionPhy
 
             let snapshot: AuthoritySnapshot;
             try {
-                snapshot = await readStableSnapshot();
+                snapshot = (await readStableSnapshot()).snapshot;
             } catch (error) {
                 discard(record);
                 throw error;
@@ -243,21 +288,3 @@ export function createSessionPhysicianReviewAuthorityService(sources: SessionPhy
         },
     });
 }
-
-const physicianReviewAttestationStore = createPhysicianReviewAttestationStore();
-
-function readCanonicalAccount(actorRef: string): unknown {
-    return dbServer
-        .select({ id: users.id, lockedUntil: users.lockedUntil })
-        .from(users)
-        .where(eq(users.id, actorRef))
-        .get();
-}
-
-export const sessionPhysicianReviewAuthority = createSessionPhysicianReviewAuthorityService({
-    resolvePrincipal: resolveAuthenticatedReviewPrincipal,
-    readCurrentSession: readAuthenticatedWebSession,
-    readAttestation: (actorRef) => physicianReviewAttestationStore.read(actorRef),
-    readAccount: readCanonicalAccount,
-    registerSessionResource: registerServerSessionResource,
-});

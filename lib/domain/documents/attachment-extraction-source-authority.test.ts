@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, afterEach, test } from 'node:test';
 import Database from 'better-sqlite3';
+import type { ServerSession } from '../../security/server-session.ts';
 
 const root = process.cwd();
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-anydoc-p1c-'));
@@ -20,21 +21,23 @@ const authorityModule = await import('./attachment-extraction-source-authority.t
 const revocationModule = await import('./attachment-extraction-locator-revocation.ts');
 const backupModule = await import('../../backup-artifact.ts');
 const restoreModule = await import('../../backup-restore-executor.ts');
-const sessionModule = await import('../../security/server-session.ts');
-const ownerModule = await import('../../security/server-session-projection-owner.ts');
 const productionOwnerModule = await import('../../security/server-session-projection-owner-production.ts');
+const webFixtureModule = await import('../../security/web-auth-lifecycle-owner-test-fixture.ts');
+const lifecycleOwnerModule = await import('../../security/web-auth-lifecycle-owner-adapter.ts');
 const { createAttachmentExtractionSourceAuthority } = authorityModule;
 const { captureAttachmentExtractionLocatorGeneration, isCurrentAttachmentExtractionLocatorGeneration,
     revokeAttachmentExtractionLocatorGeneration } = revocationModule;
 const { createBackupArtifact, createEmptyDataset } = backupModule;
 const { restoreBackupArtifact } = restoreModule;
-const { clearAllSessions, createSession, deleteSession, peekSession } = sessionModule;
-const { createServerSessionProjectionOwnerRegistry } = ownerModule;
 const { serverSessionProjectionOwnerRegistry } = productionOwnerModule;
+const { issueSyntheticWebSession, retireSyntheticWebSession } = webFixtureModule;
+const { beginResourceUse, commitResourceUse, mintResourcePort, releaseResourcePort } = lifecycleOwnerModule;
 const REF = 'a'.repeat(64);
 const PATIENT = 'patient.synthetic.01';
 const ATTACHMENT = 'attachment.synthetic.01';
 const AMBULATORY = 'ambulatory.synthetic.01';
+const sessions: ServerSession[] = [];
+let sequence = 0;
 
 function seed(data = 'data:text/rtf;base64,VGVzdA==', sourceRef = REF, revision = 1, freshnessEpoch = 1) {
     const db = new Database(dbPath); db.pragma('foreign_keys = ON');
@@ -49,7 +52,9 @@ function seed(data = 'data:text/rtf;base64,VGVzdA==', sourceRef = REF, revision 
     } finally { db.close(); }
 }
 function fixture() {
-    const session = createSession({ id: 'user.synthetic.01', username: ['clinician', 'synthetic', '01'].join('.'), role: 'clinician' });
+    const session = issueSyntheticWebSession({ id: 'user.synthetic.01', username: ['clinician', 'synthetic', '01'].join('.'), role: 'clinician' },
+        `attachment-source-${sequence += 1}`);
+    sessions.push(session);
     const projectionOwner = serverSessionProjectionOwnerRegistry.acquire(session);
     projectionOwner.issueSelection({ expectedEpoch: 0, patientId: PATIENT, ambulatoryId: AMBULATORY });
     return { authority: createAttachmentExtractionSourceAuthority(session), projectionOwner, session };
@@ -63,7 +68,14 @@ async function sameTupleArtifact() {
         path: 'synthetic.rtf', data: 'data:text/rtf;base64,VGVzdA==', documentSourceRef: REF, documentRevision: 1, documentFreshnessEpoch: 1 }];
     return createBackupArtifact(payload);
 }
-afterEach(() => clearAllSessions());
+function isCurrentSession(session: ServerSession): boolean {
+    const port = mintResourcePort(session); if (!port) return false;
+    const use = beginResourceUse(port); const result = !!use && commitResourceUse(use);
+    releaseResourcePort(port); return result;
+}
+afterEach(() => {
+    while (sessions.length > 0) retireSyntheticWebSession(sessions.pop()!);
+});
 after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
 test('binds one host source, snapshots bytes, and admits evidence only after fresh finalize', () => {
@@ -82,8 +94,7 @@ test('binds one host source, snapshots bytes, and admits evidence only after fre
     assert.ok(extraArgument(session, fakeOwner).issue({ attachmentId: ATTACHMENT })); assert.equal(fakeCalls, 0);
 
     let foreignResolveCalls = 0;
-    const foreignRegistry = createServerSessionProjectionOwnerRegistry({ resolve() { foreignResolveCalls += 1; throw new Error('foreign registry'); } });
-    const foreignOwner = foreignRegistry.acquire(session);
+    const foreignOwner = Object.freeze({ resolve() { foreignResolveCalls += 1; throw new Error('foreign registry'); } });
     assert.ok(extraArgument(session, foreignOwner).issue({ attachmentId: ATTACHMENT }));
     assert.equal(foreignResolveCalls, 0);
 });
@@ -99,9 +110,9 @@ test('burns stale, wrong-patient, reselected, revoked, and cross-owner capabilit
     const own = second.authority.consume(foreign); assert.equal(own.status, 'begun'); if (own.status !== 'begun') return;
     second.projectionOwner.issueSelection({ expectedEpoch: 1, patientId: PATIENT, ambulatoryId: AMBULATORY });
     assert.equal(second.authority.finalize(own.operation).status, 'denied');
-    const revoked = first.authority.issue({ attachmentId: ATTACHMENT }); assert.ok(revoked); deleteSession(first.session.id);
+    const revoked = first.authority.issue({ attachmentId: ATTACHMENT }); assert.ok(revoked); retireSyntheticWebSession(first.session);
     assert.equal(first.authority.consume(revoked).status, 'denied');
-    seed(); const expired = fixture(); expired.session.expiresAt = 0; assert.equal(expired.authority.issue({ attachmentId: ATTACHMENT }), null);
+    seed(); const expired = fixture(); retireSyntheticWebSession(expired.session); assert.equal(expired.authority.issue({ attachmentId: ATTACHMENT }), null);
     seed(); const wrong = fixture(); const moved = new Database(dbPath); moved.prepare('INSERT INTO patients (id, first_name, last_name, tax_code) VALUES (?, ?, ?, ?)').run('patient.synthetic.02', 'Grace', 'Synthetic', 'SYNTHETIC00000001');
     moved.prepare('UPDATE attachments SET patient_id = ? WHERE id = ?').run('patient.synthetic.02', ATTACHMENT); moved.close();
     assert.equal(wrong.authority.issue({ attachmentId: ATTACHMENT }), null); assert.equal(wrong.authority.issue({ attachmentId: 'missing.synthetic' }), null);
@@ -134,7 +145,7 @@ test('revokes same-tuple locators and operations before restore while preserving
     assert.equal(current.authority.finalize(finalizeOperation.operation).status, 'denied'); assert.equal(current.authority.finalize(finalizeOperation.operation).status, 'denied');
     assert.equal(current.authority.abort(abortOperation.operation).status, 'denied'); assert.equal(current.authority.abort(abortOperation.operation).status, 'denied');
     assert.equal(copyAuthority.consume(copyLocator).status, 'denied');
-    assert.equal(peekSession(current.session.id), current.session);
+    assert.equal(isCurrentSession(current.session), true);
     assert.equal(current.projectionOwner.snapshotSelectionEpoch(current.session), selectionEpoch);
     const freshLocator = current.authority.issue({ attachmentId: ATTACHMENT }); assert.ok(freshLocator);
     const fresh = current.authority.consume(freshLocator); assert.equal(fresh.status, 'begun');
@@ -197,7 +208,8 @@ test('denies hostile selectors and unreadable sources without getters, traps, it
 test('keeps callbacks, AnyDoc, routes, logging, and persistence outside the authority packet', () => {
     const source = fs.readFileSync(new URL('./attachment-extraction-source-authority.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(source, /extractAnyDoc|toMarkdownBytes|fetch|spawn|console|app\/api|insert\(|update\(|delete\(/iu);
-    assert.doesNotMatch(source, /sourcePort|hook|caller.*function|Promise\.|async\s|await\s/iu);
+    assert.doesNotMatch(source, /\bsourcePort\b|hook|caller.*function|Promise\.|async\s|await\s/iu);
+    assert.match(source, /mintResourcePort[\s\S]*beginResourceUse[\s\S]*commitResourceUse/iu);
     assert.doesNotMatch(source, /ownerValue|registryValue|sourceRegistry|createServerSessionProjectionOwnerRegistry/iu);
     assert.match(source, /createAttachmentExtractionSourceAuthority\(sessionValue: ServerSession\)/u);
     assert.match(source, /serverSessionProjectionOwnerRegistry\.acquire\(session\)/u);

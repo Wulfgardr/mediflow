@@ -9,13 +9,13 @@ import {
     type SessionPhysicianReviewAuthorityErrorCode,
 } from './session-physician-review-authority.ts';
 import {
-    clearAllSessions,
-    createSession,
-    deleteSession,
-    invalidateSessionsForUser,
-    registerServerSessionResource,
     type ServerSession,
 } from './server-session.ts';
+import {
+    issueSyntheticWebSession,
+    retireSyntheticWebSession,
+    retireSyntheticWebSessionsForUser,
+} from './web-auth-lifecycle-owner-test-fixture.ts';
 
 const USER = Object.freeze({
     id: 'synthetic-review-authority-user',
@@ -42,43 +42,48 @@ type FixtureOptions = Readonly<{
     attestation?: unknown;
     account?: unknown;
     principal?: Readonly<{ actorRef: string; sessionRef: string }>;
+    retireDuringAttestation?: boolean;
     throwFrom?: 'account' | 'attestation';
 }>;
+const sessions: ServerSession[] = [];
+let sequence = 0;
 
-afterEach(() => clearAllSessions());
+afterEach(() => {
+    while (sessions.length > 0) retireSyntheticWebSession(sessions.pop()!);
+});
 
 function fixture(options: FixtureOptions = {}) {
-    const session = createSession(USER, 'web');
+    const session = issueSyntheticWebSession(USER, `review-authority-${sequence += 1}`);
+    sessions.push(session);
     const state: {
         account: unknown;
         attestation: unknown;
+        now: number;
         principal: Readonly<{ actorRef: string; sessionRef: string }>;
         session: ServerSession | null;
     } = {
         account: options.account === undefined ? { id: USER.id, lockedUntil: null } : options.account,
         attestation: options.attestation === undefined ? activeAttestation() : options.attestation,
+        now: Date.now(),
         principal: options.principal ?? { actorRef: USER.id, sessionRef: session.id },
         session,
     };
-    let registrations = 0;
     const service = createSessionPhysicianReviewAuthorityService({
         resolvePrincipal: async () => state.principal,
         readCurrentSession: async () => state.session,
         readAttestation: async () => {
             if (options.throwFrom === 'attestation') throw new Error('synthetic attestation storage detail');
+            if (options.retireDuringAttestation) retireSyntheticWebSession(session);
             return state.attestation;
         },
         readAccount: async () => {
             if (options.throwFrom === 'account') throw new Error('synthetic account storage detail');
             return state.account;
         },
-        registerSessionResource: (sessionId, dispose) => {
-            registrations += 1;
-            return registerServerSessionResource(sessionId, dispose);
-        },
+        clock: () => state.now,
     });
 
-    return { registrations: () => registrations, service, session, state };
+    return { service, session, state };
 }
 
 async function assertDenied(value: Promise<unknown>, code: SessionPhysicianReviewAuthorityErrorCode) {
@@ -134,6 +139,7 @@ test('denies principal discontinuity, active account locks, and storage uncertai
     );
     await assertDenied(fixture({ throwFrom: 'attestation' }).service.derive(), 'storage_unavailable');
     await assertDenied(fixture({ throwFrom: 'account' }).service.derive(), 'storage_unavailable');
+    await assertDenied(fixture({ retireDuringAttestation: true }).service.derive(), 'session_unavailable');
 });
 
 test('recheck fails closed when the attestation lifecycle or version changes', async () => {
@@ -155,17 +161,18 @@ test('recheck fails closed when the attestation lifecycle or version changes', a
 test('invalidates prior authority for deletion, expiry, principal drift, lock drift, and restart', async () => {
     const deleted = fixture();
     const deletedAuthority = await deleted.service.derive();
-    deleteSession(deleted.session.id);
+    retireSyntheticWebSession(deleted.session);
     await assertDenied(deleted.service.recheck(deletedAuthority), 'projection_unavailable');
 
     const expired = fixture();
     const expiredAuthority = await expired.service.derive();
-    expired.session.expiresAt = Date.now();
+    expired.state.now = expired.session.expiresAt;
     await assertDenied(expired.service.recheck(expiredAuthority), 'session_unavailable');
 
     const changedPrincipal = fixture();
     const changedAuthority = await changedPrincipal.service.derive();
-    const replacement = createSession(USER, 'web');
+    const replacement = issueSyntheticWebSession(USER, `review-authority-replacement-${sequence += 1}`);
+    sessions.push(replacement);
     changedPrincipal.state.session = replacement;
     changedPrincipal.state.principal = { actorRef: USER.id, sessionRef: replacement.id };
     await assertDenied(changedPrincipal.service.recheck(changedAuthority), 'projection_stale');
@@ -181,12 +188,11 @@ test('invalidates prior authority for deletion, expiry, principal drift, lock dr
 });
 
 test('deduplicates concurrent derivation and revokes the authority through canonical user invalidation', async () => {
-    const { registrations, service } = fixture();
+    const { service, session } = fixture();
     const [first, second] = await Promise.all([service.derive(), service.derive()]);
 
     assert.equal(first, second);
-    assert.equal(registrations(), 1);
-    invalidateSessionsForUser(USER.id);
+    retireSyntheticWebSessionsForUser(session);
     await assertDenied(service.recheck(first), 'projection_unavailable');
 });
 

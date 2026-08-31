@@ -10,30 +10,34 @@ import {
     withAuditContextMetadata,
     writeAuditEvent,
 } from './audit';
+import { strongWebAuthControlEtag } from './web-auth-control-transport';
 import {
-    dispatchActiveWebServerSessionRetirement,
-    resolveActiveWebServerSession,
-    SESSION_COOKIE_NAME,
-    type ServerSession,
-    type WebServerSessionRetirementCleanupReceipt,
-} from './server-session';
+    resolve as resolveWebSession,
+    retire as retireWebSession,
+    type WebRetirementReceipt,
+    type WebSessionProjection,
+    type WebSessionResolution,
+} from './web-auth-lifecycle-owner-adapter';
 
-const ObjectPrototype = Object.prototype;
 const ObjectGetPrototypeOf = Object.getPrototypeOf;
 const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
 const ObjectGetOwnPropertySymbols = Object.getOwnPropertySymbols;
 const ObjectIsFrozen = Object.isFrozen;
 const isProxy = types.isProxy;
+const DateNow = Date.now;
+const SESSION_COOKIE_NAME = 'mediflow_session';
+const CONTROL_COOKIE_NAME = 'mediflow_auth_control';
 const SESSION_KEYS = Object.freeze(['id', 'userId', 'username', 'role', 'authChannel', 'createdAt', 'expiresAt']);
 const SESSION_ID = /^[a-f0-9]{64}$/u;
+const CONTROL_ID = /^[A-Za-z0-9_-]{32,256}$/u;
 
 type ExactRecord = Readonly<Record<string, unknown>>;
 
 export type WebAuthLogoutSources = Readonly<{
-    resolve(sessionId: unknown): ServerSession | null;
-    retire(sessionId: unknown, reason: 'delete'): WebServerSessionRetirementCleanupReceipt;
-    audit(session: ServerSession, sessionId: string, request: Request): unknown;
+    resolve(sessionId: unknown, controlId: unknown): WebSessionResolution;
+    retire(projection: unknown, reason: 'delete'): WebRetirementReceipt;
+    audit(session: WebSessionProjection, sessionId: string, request: Request): unknown;
 }>;
 
 function exactRecord(value: unknown, keys: readonly string[], prototype: object | null, frozen: boolean): ExactRecord | null {
@@ -43,9 +47,8 @@ function exactRecord(value: unknown, keys: readonly string[], prototype: object 
             || ObjectGetOwnPropertySymbols(value).length !== 0) return null;
         const names = ObjectGetOwnPropertyNames(value);
         if (names.length !== keys.length) return null;
-        for (let index = 0; index < keys.length; index += 1) {
-            const key = keys[index];
-            if (names[index] !== key) return null;
+        for (const key of keys) {
+            if (!names.includes(key)) return null;
             const descriptor = ObjectGetOwnPropertyDescriptor(value, key);
             if (!descriptor || !('value' in descriptor) || !descriptor.enumerable) return null;
             if (frozen && (descriptor.configurable || descriptor.writable)) return null;
@@ -54,37 +57,47 @@ function exactRecord(value: unknown, keys: readonly string[], prototype: object 
     } catch { return null; }
 }
 
-function exactBearer(cookie: unknown): string | null {
-    const record = exactRecord(cookie, ['name', 'value'], ObjectPrototype, false);
-    if (!record || record.name !== SESSION_COOKIE_NAME || typeof record.value !== 'string'
-        || !SESSION_ID.test(record.value)) return null;
-    return record.value;
+function exactCookie(value: unknown, name: string, pattern: RegExp): string | null {
+    const record = exactRecord(value, ['name', 'value'], Object.prototype, false);
+    return record?.name === name && typeof record.value === 'string' && pattern.test(record.value)
+        ? record.value
+        : null;
 }
 
-function exactActiveWebSession(value: unknown, sessionId: string): ServerSession | null {
-    const record = exactRecord(value, SESSION_KEYS, ObjectPrototype, true);
-    if (!record || record.id !== sessionId || record.authChannel !== 'web'
-        || typeof record.userId !== 'string' || !record.userId
-        || typeof record.username !== 'string' || !record.username
-        || typeof record.role !== 'string' || !record.role
-        || typeof record.createdAt !== 'number' || !Number.isSafeInteger(record.createdAt)
-        || typeof record.expiresAt !== 'number' || !Number.isSafeInteger(record.expiresAt)) return null;
-    return value as ServerSession;
+function exactActiveWebProjection(value: unknown, sessionId: string): WebSessionProjection | null {
+    const resolution = exactRecord(value, ['status', 'projection'], null, true);
+    if (!resolution || resolution.status !== 'active') return null;
+    const projection = exactRecord(resolution.projection, SESSION_KEYS, null, true);
+    if (!projection || projection.id !== sessionId || projection.authChannel !== 'web'
+        || typeof projection.userId !== 'string' || !projection.userId
+        || typeof projection.username !== 'string' || !projection.username
+        || typeof projection.role !== 'string' || !projection.role
+        || typeof projection.createdAt !== 'number' || !Number.isSafeInteger(projection.createdAt)
+        || typeof projection.expiresAt !== 'number' || !Number.isSafeInteger(projection.expiresAt)
+        || projection.expiresAt <= DateNow()) return null;
+    return resolution.projection as WebSessionProjection;
 }
 
-function completedReceipt(value: unknown): boolean {
-    const record = exactRecord(value, ['outcome'], null, true);
-    return record?.outcome === 'completed';
+function retirementReceipt(value: unknown): { outcome: 'completed' | 'denied' | 'failed'; etag: string | null } | null {
+    const oneField = exactRecord(value, ['outcome'], null, true);
+    const twoFields = oneField ? null : exactRecord(value, ['outcome', 'etag'], null, true);
+    const record = oneField ?? twoFields;
+    if (!record || (record.outcome !== 'completed' && record.outcome !== 'denied' && record.outcome !== 'failed')) return null;
+    if (!twoFields) return { outcome: record.outcome, etag: null };
+    const etag = strongWebAuthControlEtag(twoFields.etag);
+    return etag ? { outcome: record.outcome, etag } : null;
 }
 
-function empty(status: 204 | 401 | 409): Response {
-    return new Response(null, { status, headers: { 'Cache-Control': 'no-store' } });
+function empty(status: 204 | 401 | 409, etag: string | null = null): Response {
+    const headers = new Headers({ 'Cache-Control': 'no-store' });
+    if (etag) headers.set('ETag', etag);
+    return new Response(null, { status, headers });
 }
 
 const productionSources: WebAuthLogoutSources = Object.freeze({
-    resolve: resolveActiveWebServerSession,
-    retire: dispatchActiveWebServerSessionRetirement,
-    audit: async (session: ServerSession, sessionId: string, request: Request) => {
+    resolve: resolveWebSession,
+    retire: retireWebSession,
+    audit: async (session: WebSessionProjection, sessionId: string, request: Request) => {
         const context = auditContextFromSession(session);
         await writeAuditEvent({
             eventType: 'auth.logout', outcome: 'success', actorType: context.actorType, actorRef: context.actorRef,
@@ -94,23 +107,25 @@ const productionSources: WebAuthLogoutSources = Object.freeze({
     },
 });
 
-/** Retires only the exact ACTIVE Web P3 named by the fixed bearer. */
-/* @Codex */
+/** Retires only the exact ACTIVE Web projection bound to both fixed cookies. */
 export async function completeExactWebP3Logout(
-    cookie: unknown,
+    bearerCookie: unknown,
+    controlCookie: unknown,
     request: Request,
     sources: WebAuthLogoutSources = productionSources,
 ): Promise<Response> {
-    const sessionId = exactBearer(cookie);
-    if (!sessionId) return empty(401);
-    let session: ServerSession | null;
-    try { session = exactActiveWebSession(sources.resolve(sessionId), sessionId); }
+    const sessionId = exactCookie(bearerCookie, SESSION_COOKIE_NAME, SESSION_ID);
+    const controlId = exactCookie(controlCookie, CONTROL_COOKIE_NAME, CONTROL_ID);
+    if (!sessionId || !controlId) return empty(401);
+    let projection: WebSessionProjection | null;
+    try { projection = exactActiveWebProjection(sources.resolve(sessionId, controlId), sessionId); }
     catch { return empty(401); }
-    if (!session) return empty(401);
-    let receipt: unknown;
-    try { receipt = sources.retire(sessionId, 'delete'); }
+    if (!projection) return empty(401);
+    let receipt: ReturnType<typeof retirementReceipt>;
+    try { receipt = retirementReceipt(sources.retire(projection, 'delete')); }
     catch { return empty(409); }
-    if (!completedReceipt(receipt)) return empty(409);
-    try { await sources.audit(session, sessionId, request); } catch { /* Terminal retirement is authoritative. */ }
-    return empty(204);
+    if (!receipt) return empty(409);
+    if (receipt.outcome !== 'completed') return empty(409, receipt.etag);
+    try { await sources.audit(projection, sessionId, request); } catch { /* Terminal retirement is authoritative. */ }
+    return empty(204, receipt.etag);
 }

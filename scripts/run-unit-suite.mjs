@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 
 const root = path.resolve(import.meta.dirname, '..');
 const node = process.execPath;
-const unitArgs = ['scripts/run-strip-types.mjs', '--test', '--glob', 'lib/**/*.test.ts', '--glob', 'components/**/*.test.ts', 'scripts/check-schema-drift.test.ts', 'scripts/run-native-probe.test.mjs', 'scripts/audit-quality-gate.test.mjs'];
+const unitArgs = ['scripts/run-strip-types.mjs', '--test', '--glob', 'lib/**/*.test.ts', '--glob', 'components/**/*.test.ts', 'scripts/check-schema-drift.test.ts', 'scripts/run-native-probe.test.mjs', 'scripts/audit-quality-gate.test.mjs', 'scripts/prepare-e2e-db.test.mjs'];
 
 function syntheticDataDir(value) {
   if (typeof value !== 'string' || value.length === 0) return null;

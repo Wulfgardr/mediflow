@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, afterEach, test } from 'node:test';
 import Database from 'better-sqlite3';
+import type { ServerSession } from '../../security/server-session.ts';
 
 const root = process.cwd();
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-anydoc-p1d-'));
@@ -17,11 +18,11 @@ migrationDb.close();
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 
 const compositionModule = await import('./anydoc-current-source-composition.ts');
-const sessionModule = await import('../../security/server-session.ts');
 const productionOwnerModule = await import('../../security/server-session-projection-owner-production.ts');
+const webFixtureModule = await import('../../security/web-auth-lifecycle-owner-test-fixture.ts');
 const { composeAnyDocCurrentSourceExtraction } = compositionModule;
-const { clearAllSessions, createSession, deleteSession } = sessionModule;
 const { serverSessionProjectionOwnerRegistry } = productionOwnerModule;
+const { issueSyntheticWebSession, retireSyntheticWebSession } = webFixtureModule;
 const PATIENT = 'patient.synthetic.p1d';
 const ATTACHMENT = 'attachment.synthetic.p1d';
 const AMBULATORY = 'ambulatory.synthetic.p1d';
@@ -29,6 +30,8 @@ const OTHER_AMBULATORY = 'ambulatory.synthetic.other.p1d';
 const REF = 'c'.repeat(64);
 const RTF = Buffer.from('{\\rtf1\\ansi Synthetic current source note.}', 'utf8');
 const MAX_MARKDOWN_BYTES = 8 * 1024 * 1024;
+const finalSessions: ServerSession[] = [];
+let sessionSequence = 0;
 
 function seed(data = RTF.toString('base64')) {
     const db = new Database(dbPath); db.pragma('foreign_keys = ON');
@@ -44,9 +47,14 @@ function seed(data = RTF.toString('base64')) {
     } finally { db.close(); }
 }
 function session() {
-    return createSession({ id: 'user.synthetic.p1d', username: ['clinician', 'synthetic', 'p1d'].join('.'), role: 'clinician' });
+    const value = issueSyntheticWebSession({ id: 'user.synthetic.p1d', username: ['clinician', 'synthetic', 'p1d'].join('.'), role: 'clinician' },
+        `anydoc-current-source-${sessionSequence += 1}`);
+    finalSessions.push(value);
+    return value;
 }
-afterEach(() => clearAllSessions());
+afterEach(() => {
+    while (finalSessions.length > 0) retireSyntheticWebSession(finalSessions.pop()!);
+});
 after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
 test('reveals real AnyDoc Markdown and evidence only after a current host source finalizes', async () => {
@@ -80,10 +88,11 @@ test('denies zero or multiple host memberships without publishing candidate evid
 });
 
 test('denies expired and logged-out authenticated sessions before source authority publication', async () => {
-    seed(); const expired = session(); expired.expiresAt = 0;
+    seed(); const active = session();
+    const expired = Object.freeze({ ...active, expiresAt: 0 }) as ServerSession;
     let result = await composeAnyDocCurrentSourceExtraction(expired, { attachmentId: ATTACHMENT });
     assert.equal(result.status, 'denied'); assert.equal('provenance' in result, false);
-    const loggedOut = session(); deleteSession(loggedOut.id);
+    const loggedOut = session(); retireSyntheticWebSession(loggedOut);
     result = await composeAnyDocCurrentSourceExtraction(loggedOut, { attachmentId: ATTACHMENT });
     assert.equal(result.status, 'denied'); assert.equal('provenance' in result, false);
 });
@@ -103,7 +112,7 @@ test('discards completed worker output when attachment currentness changes in fl
 test('discards completed worker output when the authenticated session is revoked in flight', async () => {
     seed(); const activeSession = session();
     const pending = composeAnyDocCurrentSourceExtraction(activeSession, { attachmentId: ATTACHMENT });
-    deleteSession(activeSession.id);
+    retireSyntheticWebSession(activeSession);
     const result = await pending;
     assert.equal(result.status, 'denied'); assert.equal('markdown' in result, false); assert.equal('provenance' in result, false);
 });

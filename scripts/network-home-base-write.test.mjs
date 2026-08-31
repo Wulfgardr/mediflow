@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
+import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3400';
 const LOCAL_API_TOKEN = process.env.MEDIFLOW_LOCAL_API_TOKEN || 'mediflow-network-write-smoke-local-token';
@@ -40,12 +41,7 @@ test('paired patient profile write requires write capability, session, scope, an
         const readOnlyClient = await pairClient(['network.replica.readonly-patients'], 'Desk iPad readonly');
         const writeClient = await pairClient([READ_CAPABILITY, WRITE_CAPABILITY], 'Desk iPad writer');
 
-        const login = await request('POST', '/api/auth/login', {
-            body: {
-                username: USERNAME,
-                password: PIN,
-            },
-        });
+        const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
         const sessionCookie = extractSessionCookie(login.response);
 
@@ -163,12 +159,7 @@ test('disabling home-base mode makes paired-client tokens inert until re-enabled
     try {
         const writeClient = await pairClient([READ_CAPABILITY, WRITE_CAPABILITY], 'Desk iPad mode gate');
 
-        const login = await request('POST', '/api/auth/login', {
-            body: {
-                username: USERNAME,
-                password: PIN,
-            },
-        });
+        const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
         const sessionCookie = extractSessionCookie(login.response);
 

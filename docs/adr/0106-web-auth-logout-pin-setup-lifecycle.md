@@ -64,16 +64,44 @@ un'altra sessione.
 
 ### Modifica riuscita delle credenziali PIN
 
-Un CAS credenziali PIN riuscito avvia il retirement fail-closed di tutte le
-sessioni Web P3 dello stesso utente, inclusa la sessione che ha iniziato la
-richiesta. Ogni retirement usa il proprio binding P2/P3; nessun `clear`,
-`delete` o expiry diretto puo rimuovere una cella `ACTIVE`.
+Dopo aver verificato il PIN corrente e prima di calcolare il nuovo hash o
+avviare il CAS, l'host prepara sia il retirement native sia una capability Web
+opaca, esatta e monouso. La capability Web lega l'owner e l'utente alla
+projection ancora autentica, ma non ritira sessioni. Un abort brucia la
+capability e lascia invariata l'authority, salvo transizioni concorrenti
+esterne.
+
+Il prepare Web incrementa un'epoch dei tentativi login e apre una quiescenza
+conservativamente globale: `begin` non conosce ancora l'utente che verra
+validato, quindi nessun nuovo attempt puo iniziare finche una capability resta
+preparata. Gli attempt anteriori all'epoch restano bruciati anche dopo abort;
+solo un nuovo `begin` successivo alla terminalita di commit o abort puo emettere
+una sessione.
+
+Il canale native usa un fence separato, opaco e monouso, catturato prima della
+verifica delle credenziali. Il commit native del retirement PIN avanza il
+watermark dello stesso utente; il commit del reset amministrativo avanza il
+watermark globale. Gli abort non li avanzano. La pubblicazione native consuma e
+ricontrolla il fence in una sezione sincrona: un tentativo verificato prima del
+commit non puo creare una sessione dopo il commit, mentre un retirement di un
+altro utente non lo invalida.
+
+Un CAS credenziali PIN riuscito consuma la capability e ritira fail-closed tutte
+le sessioni Web P3 dello stesso utente, inclusa la sessione che ha iniziato la
+richiesta. L'intero roster diventa terminale prima di qualunque cleanup o
+disposer. Reentry, throw o failure di cleanup non possono interrompere la
+terminalizzazione e lasciare una sibling `ACTIVE`. Ogni retirement usa il
+proprio binding P2/P3; nessun `clear`, `delete` o expiry diretto puo rimuovere
+una cella `ACTIVE`.
 
 La route non conferma il successo finche ogni retirement richiesto non e
 terminale e il relativo fence e terminale. Se il CAS PIN fallisce, non modifica
 sessioni, control, fence, cookie o stato di retirement. Se un retirement non
 puo diventare terminale, la route nega fail-closed e non dichiara il successo
-PIN.
+PIN. L'ordine terminale e: prepare native, prepare Web, confronto e CAS oppure
+abort di entrambe, commit Web, commit native, guard completato e audit. Il
+client elimina l'authority locale dopo un successo; se perde la risposta dopo
+il dispatch, si blocca e richiede un nuovo login esplicito.
 
 Questa decisione non definisce il formato PIN, KDF, key re-wrap o reset PIN.
 Un reset e un packet separato. Non puo cancellare silenziosamente il cookie
@@ -105,8 +133,9 @@ L'implementazione futura segue questo ordine, con sole fixture sintetiche:
    resolver che accetta soltanto `ACTIVE`.
 2. Logout route: legare bearer, control e P3 esatti; ritirare una sola sessione;
    restituire `204` e `no-store` senza mutare cookie.
-3. Modifica PIN: applicare CAS, enumerare lo scope utente e completare tutti i
-   retirement prima del successo osservabile.
+3. Modifica PIN: preparare native e Web, chiudere i tentativi login concorrenti,
+   applicare il CAS e terminalizzare l'intero scope utente prima di cleanup,
+   audit e successo osservabile.
 4. Setup route: separare commit DB, CAS/auth e risposta; applicare entrambi i
    `409` terminali senza retry automatico.
 5. Reset PIN: valutare e decidere un packet separato, senza usare il cookie
@@ -128,6 +157,15 @@ Le prove sintetiche devono negare almeno questi casi:
   o reservation;
 - CAS PIN riuscito che conferma prima del retirement di una sessione P3 dello
   stesso utente, dell'iniziatore o di un fence terminale;
+- attempt login iniziato prima o durante il prepare che emette una sessione
+  dopo commit, o che torna valido dopo abort;
+- login native verificato prima di un commit PIN o reset che, riprendendo dopo
+  il commit, emette cookie o sessione; abort e retirement di un altro utente
+  devono invece preservare un tentativo altrimenti valido;
+- cleanup o disposer che tramite throw o reentry interrompe il roster e lascia
+  una sessione sibling `ACTIVE` dopo il CAS;
+- client che conserva authority locale dopo successo PIN o dopo un esito
+  post-dispatch non osservabile;
 - delete, clear, expiry, reactivation o riuso diretto di una cella `ACTIVE`;
 - setup che emette cookie prima di `ACTIVE`, restituisce un UUID non persistito
   o espone oggetti/capability interni;

@@ -9,15 +9,29 @@ import {
     createCanonicalClinicalContextResolver,
     ServerSessionClinicalContextError,
 } from './server-session-clinical-context.ts';
-import { clearAllSessions, createSession, deleteSession } from './server-session.ts';
+import type { ServerSession } from './server-session.ts';
+import {
+    issueSyntheticWebSession,
+    retireSyntheticWebSession,
+} from './web-auth-lifecycle-owner-test-fixture.ts';
 
 const USER = {
     id: ['synthetic', 'context-user'].join('-'),
     username: ['synthetic', 'context-clinician'].join('-'),
     role: 'clinician',
 };
+const sessions: ServerSession[] = [];
+let sequence = 0;
 
-afterEach(() => clearAllSessions());
+afterEach(() => {
+    while (sessions.length > 0) retireSyntheticWebSession(sessions.pop()!);
+});
+
+function webSession(): ServerSession {
+    const session = issueSyntheticWebSession(USER, `clinical-context-${sequence += 1}`);
+    sessions.push(session);
+    return session;
+}
 
 function fixture() {
     const sqlite = new Database(':memory:');
@@ -46,7 +60,7 @@ function rejects(code: string) {
 test('resolves only the requested canonical M2M pair across multiple memberships', (context) => {
     const { sqlite, resolve } = fixture();
     context.after(() => sqlite.close());
-    const session = createSession(USER);
+    const session = webSession();
 
     assert.deepEqual(resolve(session, {
         patientId: 'patient.synthetic.01',
@@ -65,7 +79,7 @@ test('resolves only the requested canonical M2M pair across multiple memberships
 test('rejects missing canonical patient and ambulatory rows distinctly', (context) => {
     const { sqlite, resolve } = fixture();
     context.after(() => sqlite.close());
-    const session = createSession(USER);
+    const session = webSession();
 
     assert.throws(() => resolve(session, {
         patientId: 'patient.synthetic.missing',
@@ -80,23 +94,23 @@ test('rejects missing canonical patient and ambulatory rows distinctly', (contex
 test('rejects native, system, local-api, and unavailable sessions', (context) => {
     const { sqlite, resolve } = fixture();
     context.after(() => sqlite.close());
-    const web = createSession(USER);
+    const web = webSession();
     const request = { patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' };
 
     for (const session of [
-        createSession(USER, 'native'),
-        createSession(USER, 'system'),
+        { ...web, id: 'native.synthetic.clinical-context', authChannel: 'native' as const },
+        { ...web, id: 'system.synthetic.clinical-context', authChannel: 'system' as const },
         { ...web, id: 'local-api' },
     ]) assert.throws(() => resolve(session, request), rejects('session_ineligible'));
 
-    deleteSession(web.id);
+    retireSyntheticWebSession(web);
     assert.throws(() => resolve(web, request), rejects('session_ineligible'));
 });
 
 test('rejects extra keys, custom prototypes, accessors, and malformed identifiers', (context) => {
     const { sqlite, resolve } = fixture();
     context.after(() => sqlite.close());
-    const session = createSession(USER);
+    const session = webSession();
     const valid = { patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' };
     let accessorReads = 0;
     const accessor = Object.defineProperty({ patientId: valid.patientId }, 'ambulatoryId', {

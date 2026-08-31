@@ -1,6 +1,7 @@
 /* @Codex */
 'use strict';
 
+const { types: { isProxy } } = require('node:util');
 const control = require('./control-record.cjs');
 const activation = require('./session-activation.cjs');
 const cells = require('./session-cell.cjs');
@@ -12,19 +13,50 @@ const { successorFence } = require('./support/successor-fence.cjs');
 const objectCreate = Object.create;
 const objectEntries = Object.entries;
 const objectFreeze = Object.freeze;
+const objectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const objectGetOwnPropertyNames = Object.getOwnPropertyNames;
+const objectGetOwnPropertySymbols = Object.getOwnPropertySymbols;
+const objectGetPrototypeOf = Object.getPrototypeOf;
+const objectPrototype = Object.prototype;
 const reflectApply = Reflect.apply;
 const dateNow = Date.now;
 const numberIsSafeInteger = Number.isSafeInteger;
+const numberConstructor = Number;
+const stringCharCodeAt = String.prototype.charCodeAt;
+const mapClear = Map.prototype.clear;
+const mapDelete = Map.prototype.delete;
+const mapEntries = Map.prototype.entries;
+const mapGet = Map.prototype.get;
+const mapSize = Object.getOwnPropertyDescriptor(Map.prototype, 'size').get;
 const mapSet = Map.prototype.set;
 const mapValues = Map.prototype.values;
 const setAdd = Set.prototype.add;
 const setDelete = Set.prototype.delete;
+const setHas = Set.prototype.has;
+const setSize = Object.getOwnPropertyDescriptor(Set.prototype, 'size').get;
 const setValues = Set.prototype.values;
 const weakMapDelete = WeakMap.prototype.delete;
 const weakMapGet = WeakMap.prototype.get;
 const weakMapSet = WeakMap.prototype.set;
 
-const SESSION_TTL_MS = 8 * 60 * 60 * 1_000;
+const DEFAULT_SESSION_TTL_MS = 8 * 60 * 60 * 1_000;
+const IDEMPOTENCY_TTL_MS = 300_000;
+const IDEMPOTENCY_CAP = 64;
+
+function readSessionTtl() {
+    let raw;
+    try { raw = process.env.MEDIFLOW_SESSION_TTL_MS; } catch { return null; }
+    if (raw === undefined) return DEFAULT_SESSION_TTL_MS;
+    if (typeof raw !== 'string' || raw.length === 0 || raw.length > 16) return null;
+    for (let index = 0; index < raw.length; index += 1) {
+        const code = reflectApply(stringCharCodeAt, raw, [index]);
+        if (code < 48 || code > 57) return null;
+    }
+    const value = numberConstructor(raw);
+    return numberIsSafeInteger(value) && value > 0 ? value : null;
+}
+
+const SESSION_TTL_MS = readSessionTtl();
 
 function frozenRecord(values) {
     const value = objectCreate(null);
@@ -33,6 +65,32 @@ function frozenRecord(values) {
 }
 
 function opaque() { return objectFreeze(objectCreate(null)); }
+function opaqueToken(value) {
+    if (typeof value !== 'string' || value.length !== 64) return false;
+    for (let index = 0; index < value.length; index += 1) {
+        const code = reflectApply(stringCharCodeAt, value, [index]);
+        if (!((code >= 48 && code <= 57) || (code >= 97 && code <= 102))) return false;
+    }
+    return true;
+}
+function boundedText(value) { return typeof value === 'string' && value.length >= 16 && value.length <= 256; }
+function exactTransport(value) {
+    if (!value || typeof value !== 'object' || isProxy(value)) return null;
+    try {
+        if (objectGetPrototypeOf(value) !== objectPrototype || objectGetOwnPropertySymbols(value).length !== 0) return null;
+        const names = objectGetOwnPropertyNames(value);
+        if (names.length !== 3 || names[0] !== 'controlId' || names[1] !== 'ifMatch'
+            || names[2] !== 'idempotencyKey') return null;
+        const controlId = objectGetOwnPropertyDescriptor(value, 'controlId');
+        const ifMatch = objectGetOwnPropertyDescriptor(value, 'ifMatch');
+        const idempotencyKey = objectGetOwnPropertyDescriptor(value, 'idempotencyKey');
+        if (!controlId || !ifMatch || !idempotencyKey || !('value' in controlId) || !('value' in ifMatch)
+            || !('value' in idempotencyKey) || !controlId.enumerable || !ifMatch.enumerable
+            || !idempotencyKey.enumerable || !opaqueToken(controlId.value) || !opaqueToken(ifMatch.value)
+            || !boundedText(idempotencyKey.value)) return null;
+        return frozenRecord({ controlId: controlId.value, ifMatch: ifMatch.value, idempotencyKey: idempotencyKey.value });
+    } catch { return null; }
+}
 function retirementReason(value) {
     return value === 'lock' || value === 'dispose' || value === 'expired' || value === 'delete' || value === 'clear';
 }
@@ -48,11 +106,15 @@ function createOwner() {
     const retirementState = retirement.createSessionRetirementState();
     const resourceState = resources.createSessionResourceState();
     const sessions = new Map();
+    const controls = new Map();
     const attempts = new WeakMap();
     const attemptRecords = new Set();
     const projections = new WeakMap();
     const cellBindings = new WeakMap();
+    const userRetirementCapabilities = new WeakMap();
+    const userRetirements = new Set();
     const resetCapabilities = new WeakMap();
+    let loginEpoch = 0;
     let operationActive = false;
     let operationPoisoned = false;
     let resetRecord = null;
@@ -65,6 +127,69 @@ function createOwner() {
         poisoned: () => operationPoisoned,
         retireExpired: (cell) => retireCell(cell, 'expired'),
     };
+
+    function mapValue(registry, key) {
+        try { return reflectApply(mapGet, registry, [key]); } catch { return undefined; }
+    }
+
+    function snapshot(entry) {
+        try { return entry ? control.snapshotControlRecord(entry.state) : null; } catch { return null; }
+    }
+
+    function currentControl(controlId) {
+        if (!opaqueToken(controlId)) return null;
+        const entry = mapValue(controls, controlId);
+        const observed = snapshot(entry);
+        return entry && observed?.controlId === controlId ? entry : null;
+    }
+
+    function purgeReplays(entry, at) {
+        try {
+            const iterator = reflectApply(mapEntries, entry.replays, []);
+            for (const [key, replay] of iterator) {
+                if (!replay || !numberIsSafeInteger(replay.createdAt) || replay.createdAt < 0
+                    || at - replay.createdAt >= IDEMPOTENCY_TTL_MS) {
+                    reflectApply(mapDelete, entry.replays, [key]);
+                }
+            }
+        } catch { return false; }
+        return true;
+    }
+
+    function replayFor(entry, key) {
+        try { return reflectApply(mapGet, entry.replays, [key]) ?? null; } catch { return null; }
+    }
+
+    function canAddReplay(entry, at) {
+        return purgeReplays(entry, at)
+            && reflectApply(mapSize, entry.replays, []) < IDEMPOTENCY_CAP;
+    }
+
+    function bootstrapControl(controlId) {
+        if (!enter()) return null;
+        try {
+            if (controlId !== undefined && controlId !== null && !opaqueToken(controlId)) return null;
+            const existing = currentControl(controlId);
+            const existingSnapshot = snapshot(existing);
+            if (existing && existingSnapshot && !operationPoisoned) {
+                return frozenRecord({ controlId: existingSnapshot.controlId, etag: existingSnapshot.fence });
+            }
+            const nextControlId = successorFence();
+            const fence = successorFence();
+            if (!nextControlId || !fence || nextControlId === fence || operationPoisoned
+                || currentControl(nextControlId)) return null;
+            const state = control.createControlRecordState({ controlId: nextControlId, fence });
+            const entry = { controlId: nextControlId, state, replays: new Map(), lockFailure: null };
+            reflectApply(mapSet, controls, [nextControlId, entry]);
+            if (operationPoisoned) {
+                reflectApply(mapDelete, controls, [nextControlId]);
+                control.terminallyResetControlRecord(state);
+                return null;
+            }
+            return frozenRecord({ controlId: nextControlId, etag: fence });
+        } catch { return null; }
+        finally { leave(); }
+    }
 
     function enter(kind = 'normal') {
         if (operationActive) {
@@ -83,7 +208,7 @@ function createOwner() {
     }
 
     function burnAttempt(record) {
-        if (!record || record.state !== 'pending') return;
+        if (!record || (record.state !== 'pending' && record.state !== 'replay')) return;
         record.state = 'burned';
         try { reflectApply(weakMapDelete, attempts, [record.attempt]); } catch { /* terminal record remains burned */ }
         try { reflectApply(setDelete, attemptRecords, [record]); } catch { /* terminal record remains burned */ }
@@ -97,6 +222,7 @@ function createOwner() {
                 record.generation, record.fingerprint, at);
         } catch { /* pending capability is burned below */ }
         burnAttempt(record);
+        if (record.replay?.state === 'pending') record.replay.state = 'aborted';
         return result === 1;
     }
 
@@ -138,23 +264,94 @@ function createOwner() {
         }
     }
 
-    function begin(kind) {
+    function retireUserCells(userId) {
+        const reason = 'delete';
+        const roster = [];
+        for (const cell of [...reflectApply(mapValues, sessions, [])]) {
+            if (cell.state === 'ACTIVE' && cell.session.userId === userId) roster.push(cell);
+        }
+        let at;
+        try { at = now(); } catch { return 'denied'; }
+        if (operationPoisoned || !numberIsSafeInteger(at) || at < 0) return 'denied';
+
+        let outcome = 'completed';
+        const cleanupRoster = [];
+        for (const cell of roster) {
+            const binding = bindingForCell(cell);
+            if (!binding || binding.cell !== cell || binding.sessionId !== cell.session.id) {
+                outcome = 'denied';
+                continue;
+            }
+            let capability = null;
+            let committed = 0;
+            try {
+                capability = retirement.prepareRetirement(retirementState, binding.controlState, cellState,
+                    binding.ticket, binding.port, binding.sessionId, reason, at);
+                if (capability) {
+                    committed = retirement.commitRetirement(retirementState, binding.controlState,
+                        cellState, capability);
+                }
+            } catch { /* inspect and abort this exact capability below */ }
+            const observation = cells.inspectCell(cellState, binding.port);
+            if (observation?.state === 'RETIRED') cleanupRoster.push(binding);
+            if (!capability || committed !== 2 || observation?.state !== 'RETIRED') {
+                outcome = 'denied';
+                if (capability) {
+                    try {
+                        retirement.abortRetirement(retirementState, binding.controlState,
+                            cellState, capability);
+                    } catch { /* terminal denial remains */ }
+                }
+            }
+        }
+
+        // Cleanup is intentionally delayed until every same-user cell has reached
+        // its terminal authority state, so disposer re-entry cannot strand siblings.
+        for (const binding of cleanupRoster) {
+            const cleanup = cleanupRetired(binding, reason);
+            if (cleanup.outcome !== 'completed') outcome = 'failed';
+        }
+        return operationPoisoned ? 'failed' : outcome;
+    }
+
+    function begin(kind, transport) {
         if (!enter()) return null;
         try {
-            if (kind !== 'login' && kind !== 'setup') return null;
+            if ((kind !== 'login' && kind !== 'setup')
+                || reflectApply(setSize, userRetirements, []) !== 0) return null;
+            const request = exactTransport(transport);
             const at = now();
-            if (operationPoisoned) return null;
+            const entry = request && currentControl(request.controlId);
+            const observed = snapshot(entry);
+            if (!request || !entry || !observed || !numberIsSafeInteger(at) || at < 0
+                || entry.lockFailure !== null || !purgeReplays(entry, at)) return null;
+            const prior = replayFor(entry, request.idempotencyKey);
+            if (prior) {
+                if (prior.kind !== kind || prior.requestFence !== request.ifMatch || prior.state !== 'issued') return null;
+                const attempt = opaque();
+                const record = { state: 'replay', attempt, replay: prior, controlEntry: entry, loginEpoch };
+                reflectApply(weakMapSet, attempts, [attempt, record]);
+                reflectApply(setAdd, attemptRecords, [record]);
+                return operationPoisoned ? null : attempt;
+            }
+            if (observed.fence !== request.ifMatch) return null;
+            if (!canAddReplay(entry, at)) return null;
             const operation = successorFence();
             const fingerprint = successorFence();
             if (!numberIsSafeInteger(at) || at < 0 || !operation || !fingerprint || operation === fingerprint) return null;
-            const controlState = control.createControlRecordState();
-            const opened = control.beginControlOperation(controlState, kind, operation, fingerprint, at);
+            const opened = control.beginControlOperation(entry.state, kind, operation, fingerprint, at);
             if (!opened?.ok) return null;
             const attempt = opaque();
-            const record = {
-                state: 'pending', attempt, controlState, operation, fingerprint,
-                fence: opened.fence, generation: opened.generation,
+            const replay = {
+                kind, state: 'pending', requestFence: request.ifMatch,
+                createdAt: at, issue: null,
             };
+            const record = {
+                state: 'pending', attempt, controlState: entry.state, controlEntry: entry,
+                replay, operation, fingerprint, fence: opened.fence, generation: opened.generation,
+                loginEpoch,
+            };
+            reflectApply(mapSet, entry.replays, [request.idempotencyKey, replay]);
             reflectApply(weakMapSet, attempts, [attempt, record]);
             reflectApply(setAdd, attemptRecords, [record]);
             return attempt;
@@ -170,12 +367,29 @@ function createOwner() {
         let preparedActivation = null;
         try {
             record = weakValue(attempts, attempt);
-            if (!record || record.state !== 'pending') return null;
+            if (!record || (record.state !== 'pending' && record.state !== 'replay')) return null;
+            if (record.loginEpoch !== loginEpoch || reflectApply(setSize, userRetirements, []) !== 0) {
+                const at = now();
+                if (record.state === 'pending' && numberIsSafeInteger(at) && at >= 0) cancelAttempt(record, at);
+                else burnAttempt(record);
+                if (record.replay?.state === 'pending') record.replay.state = 'aborted';
+                return null;
+            }
+            if (record.controlEntry?.lockFailure !== null) {
+                burnAttempt(record);
+                if (record.replay?.state === 'pending') record.replay.state = 'aborted';
+                return null;
+            }
+            if (record.state === 'replay') {
+                const replayed = record.replay?.state === 'issued' ? record.replay.issue : null;
+                burnAttempt(record);
+                return operationPoisoned ? null : replayed;
+            }
             burnAttempt(record);
             const at = now();
             if (operationPoisoned) return null;
             const sessionId = successorFence();
-            const expiresAt = at + SESSION_TTL_MS;
+            const expiresAt = SESSION_TTL_MS === null ? null : at + SESSION_TTL_MS;
             if (!numberIsSafeInteger(at) || at < 0 || !numberIsSafeInteger(expiresAt) || !sessionId) return null;
             const staged = cells.stageWebSession(cellState, user, at, expiresAt);
             if (!staged) return null;
@@ -201,11 +415,15 @@ function createOwner() {
                 cells.tombstoneArmedWebSession(cellState, port);
                 return null;
             }
-            const result = frozenRecord({ ok: true, sessionId });
             const binding = frozenRecord({ cell, controlState: record.controlState, ticket, port, sessionId });
             reflectApply(mapSet, sessions, [sessionId, cell]);
             reflectApply(weakMapSet, cellBindings, [cell, binding]);
             if (!activation.commitActivation(activationState, record.controlState, cellState, preparedActivation)) return null;
+            const observed = snapshot(record.controlEntry);
+            if (!observed || observed.active !== true || observed.fence === record.fence) return null;
+            const result = frozenRecord({ ok: true, sessionId, etag: observed.fence });
+            record.replay.state = 'issued';
+            record.replay.issue = result;
             return result;
         } catch {
             if (preparedActivation && record) {
@@ -217,30 +435,109 @@ function createOwner() {
             if (port) {
                 try { cells.tombstoneArmedWebSession(cellState, port); } catch { /* terminal */ }
             }
+            if (record?.replay?.state === 'pending') record.replay.state = 'aborted';
             return null;
-        } finally { leave(); }
+        } finally {
+            if (record?.replay?.state === 'pending') record.replay.state = 'aborted';
+            leave();
+        }
     }
 
     function abort(attempt) {
         if (!enter()) return false;
         try {
             const record = weakValue(attempts, attempt);
+            if (record?.state === 'replay') {
+                burnAttempt(record);
+                return !operationPoisoned;
+            }
             const at = now();
             return !operationPoisoned && numberIsSafeInteger(at) && at >= 0 && cancelAttempt(record, at);
         } catch { return false; }
         finally { leave(); }
     }
 
-    function resolve(sessionId) {
+    function resolve(sessionId, controlId) {
         if (!enter()) return frozenRecord({ status: 'owned_denied' });
-        try { return resolver.resolve(resolverState, sessionId); }
+        try {
+            const resolution = resolver.resolve(resolverState, sessionId);
+            if (resolution.status !== 'active') return resolution;
+            const cell = resolver.authenticProjectionCell(resolverState, resolution.projection);
+            const binding = cell && bindingForCell(cell);
+            const entry = currentControl(controlId);
+            if (!cell || !binding || !entry || binding.controlState !== entry.state
+                || !control.isCurrentAuthControlSessionBinding(entry.state, binding.ticket, binding.sessionId)
+                || operationPoisoned) return frozenRecord({ status: 'owned_denied' });
+            return resolution;
+        }
         catch { return frozenRecord({ status: 'owned_denied' }); }
         finally { leave(); }
     }
 
-    function retire(projection, reason) {
+    function burnAttemptsForControl(controlState) {
+        const roster = [...reflectApply(setValues, attemptRecords, [])];
+        for (const record of roster) {
+            if (record.controlState !== controlState || record.state !== 'pending') continue;
+            record.replay.state = 'aborted';
+            burnAttempt(record);
+        }
+    }
+
+    function retire(projection, reason, transport) {
         if (!enter()) return frozenRecord({ outcome: 'denied' });
         try {
+            if (reason === 'lock') {
+                const request = exactTransport(transport);
+                const at = now();
+                const entry = request && currentControl(request.controlId);
+                const before = snapshot(entry);
+                if (!request || !entry || !before || !numberIsSafeInteger(at) || at < 0) {
+                    return frozenRecord({ outcome: 'denied' });
+                }
+                const deniedWithCurrentFence = () => frozenRecord({ outcome: 'denied', etag: before.fence });
+                if (!purgeReplays(entry, at)) return deniedWithCurrentFence();
+                const prior = replayFor(entry, request.idempotencyKey);
+                if (prior) {
+                    return prior.kind === 'lock' && prior.requestFence === request.ifMatch
+                        && prior.state === 'locked' && prior.receipt
+                        ? prior.receipt : deniedWithCurrentFence();
+                }
+                if (before.fence !== request.ifMatch) return deniedWithCurrentFence();
+                if (entry.lockFailure !== null) return entry.lockFailure;
+                if (!canAddReplay(entry, at)) return deniedWithCurrentFence();
+                const replay = { kind: 'lock', state: 'pending', requestFence: request.ifMatch, createdAt: at, receipt: null };
+                reflectApply(mapSet, entry.replays, [request.idempotencyKey, replay]);
+                if (!before.active) {
+                    const advanced = control.advanceLockControlRecord(entry.state, request.ifMatch, at);
+                    if (!advanced?.ok || operationPoisoned) {
+                        replay.state = 'aborted';
+                        return deniedWithCurrentFence();
+                    }
+                    burnAttemptsForControl(entry.state);
+                    const receipt = frozenRecord({ outcome: 'completed', etag: advanced.fence });
+                    replay.state = 'locked';
+                    replay.receipt = receipt;
+                    return receipt;
+                }
+                const cell = resolver.authenticProjectionCell(resolverState, projection);
+                const binding = cell && bindingForCell(cell);
+                if (!cell || !binding || binding.controlState !== entry.state || operationPoisoned) {
+                    replay.state = 'aborted';
+                    return deniedWithCurrentFence();
+                }
+                const outcome = retireCell(cell, 'lock');
+                const after = snapshot(entry);
+                if (!after || after.fence === before.fence) {
+                    replay.state = 'aborted';
+                    return deniedWithCurrentFence();
+                }
+                const receipt = frozenRecord({ outcome: outcome === 'completed' ? 'completed' : 'failed', etag: after.fence });
+                replay.state = 'locked';
+                replay.receipt = receipt;
+                if (receipt.outcome === 'failed') entry.lockFailure = receipt;
+                return receipt;
+            }
+            if (transport !== undefined) return frozenRecord({ outcome: 'denied' });
             const cell = resolver.authenticProjectionCell(resolverState, projection);
             const outcome = cell && !operationPoisoned ? retireCell(cell, reason) : 'denied';
             return frozenRecord({ outcome: operationPoisoned ? 'denied' : outcome });
@@ -268,16 +565,83 @@ function createOwner() {
         finally { leave(); }
     }
 
+    function prepareUserRetirement(projection) {
+        if (!enter()) return null;
+        try {
+            const authorityCell = resolver.authenticProjectionCell(resolverState, projection);
+            const userId = authorityCell?.session?.userId;
+            const nextEpoch = loginEpoch + 1;
+            if (!authorityCell || typeof userId !== 'string' || userId.length === 0
+                || !numberIsSafeInteger(nextEpoch) || nextEpoch <= loginEpoch || operationPoisoned) return null;
+            loginEpoch = nextEpoch;
+            const capability = opaque();
+            const binding = { state: 'prepared', capability, userId };
+            reflectApply(weakMapSet, userRetirementCapabilities, [capability, binding]);
+            reflectApply(setAdd, userRetirements, [binding]);
+            if (operationPoisoned) {
+                binding.state = 'aborted';
+                reflectApply(weakMapDelete, userRetirementCapabilities, [capability]);
+                reflectApply(setDelete, userRetirements, [binding]);
+                return null;
+            }
+            return capability;
+        } catch { return null; }
+        finally { leave(); }
+    }
+
+    function abortUserRetirement(capability) {
+        if (!enter()) return false;
+        try {
+            const binding = weakValue(userRetirementCapabilities, capability);
+            if (!binding || binding.state !== 'prepared' || binding.capability !== capability
+                || !reflectApply(setHas, userRetirements, [binding])) return false;
+            binding.state = 'aborted';
+            reflectApply(weakMapDelete, userRetirementCapabilities, [capability]);
+            reflectApply(setDelete, userRetirements, [binding]);
+            return !operationPoisoned;
+        } catch { return false; }
+        finally { leave(); }
+    }
+
+    function commitUserRetirement(capability) {
+        if (!enter()) return frozenRecord({ outcome: 'denied' });
+        let binding = null;
+        let commitStarted = false;
+        try {
+            binding = weakValue(userRetirementCapabilities, capability);
+            if (!binding || binding.state !== 'prepared' || binding.capability !== capability
+                || !reflectApply(setHas, userRetirements, [binding]) || operationPoisoned) {
+                return frozenRecord({ outcome: 'denied' });
+            }
+            binding.state = 'committing';
+            commitStarted = true;
+            const outcome = retireUserCells(binding.userId);
+            binding.state = 'committed';
+            return frozenRecord({ outcome });
+        } catch { return frozenRecord({ outcome: commitStarted ? 'failed' : 'denied' }); }
+        finally {
+            if (binding && binding.state !== 'prepared') {
+                try { reflectApply(weakMapDelete, userRetirementCapabilities, [capability]); } catch { /* one-shot */ }
+                try { reflectApply(setDelete, userRetirements, [binding]); } catch { /* one-shot */ }
+            }
+            leave();
+        }
+    }
+
     function prepareAdminReset(projection) {
         if (!enter()) return null;
         try {
             const cell = resolver.authenticProjectionCell(resolverState, projection);
             if (!cell || cell.session.role !== 'admin' || operationPoisoned || resetRecord !== null
+                || reflectApply(setSize, userRetirements, []) !== 0
                 || !cells.canTerminallyResetAllCells(cellState)) return null;
             const attemptRoster = [...reflectApply(setValues, attemptRecords, [])];
             const cellRoster = [...reflectApply(mapValues, sessions, [])];
             const bindingRoster = [];
             const controlStates = new Set();
+            for (const entry of [...reflectApply(mapValues, controls, [])]) {
+                reflectApply(setAdd, controlStates, [entry.state]);
+            }
             for (const record of attemptRoster) reflectApply(setAdd, controlStates, [record.controlState]);
             for (const current of cellRoster) {
                 const binding = bindingForCell(current);
@@ -329,6 +693,7 @@ function createOwner() {
                 control.terminallyResetControlRecord(binding.controlRoster[index]);
             }
             cells.terminallyResetAllCells(cellState);
+            reflectApply(mapClear, controls, []);
             terminal = true;
             binding.state = 'committed';
             resetRecord = null;
@@ -417,7 +782,8 @@ function createOwner() {
     }
 
     return objectFreeze({
-        begin, issue, abort, resolve, retire, retireForUser,
+        bootstrapControl, begin, issue, abort, resolve, retire, retireForUser,
+        prepareUserRetirement, commitUserRetirement, abortUserRetirement,
         prepareAdminReset, commitAdminReset, abortAdminReset,
         mintResourcePort, releaseResourcePort, beginResourceUse, commitResourceUse, abortResourceUse,
         registerPrivateResource, unregisterPrivateResource,

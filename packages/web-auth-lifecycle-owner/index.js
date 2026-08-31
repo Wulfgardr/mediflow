@@ -1,3 +1,4 @@
 /* @Codex */
 'use strict';
-module.exports = Object.freeze(Object.create(null));
+const { createOwner } = require('./internal/owner.cjs');
+module.exports = createOwner();

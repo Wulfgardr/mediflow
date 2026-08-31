@@ -6,29 +6,25 @@ import { type SmartImportProjection } from '../smart-import-projection.ts';
 import { createTypedProjectionBroker, ProjectionBrokerError } from '../typed-projection-broker.ts';
 import {
     bindProjectionBrokerToActiveWebSessionResource,
-    bindProjectionBrokerToServerSession,
     ServerSessionProjectionBrokerBindingError,
 } from './server-session-projection-broker.ts';
 import {
-    clearAllSessions,
-    createSession,
-    deleteSession,
-    getSession,
-    mintActiveWebSessionResourcePort,
-    releaseActiveWebSessionResourcePort,
-    retireServerSessionForApplicationLock,
-    retireServerSessionForLogout,
-    resolveActiveWebServerSession,
-} from './server-session';
-import { begin as beginWebAuthSession, issue as issueWebAuthSession } from './web-auth-session-issuer';
+    issueSyntheticWebSession,
+    retireSyntheticWebSession,
+} from './web-auth-lifecycle-owner-test-fixture.ts';
+import { mintResourcePort, releaseResourcePort, retire as retireWebAuthSession } from './web-auth-lifecycle-owner-adapter';
 
 const NOW = '2026-08-22T12:00:00.000Z';
 const REF = 'synthetic-1234567890abcdef';
 const SYNTHETIC_USER_ID = ['synthetic', 'user'].join('-');
 const SYNTHETIC_USERNAME = ['synthetic', 'clinician'].join('-');
 let sequence = 0;
+const finalSessions = new Set<ReturnType<typeof issueSyntheticWebSession>>();
 
-afterEach(() => clearAllSessions());
+afterEach(() => {
+    for (const session of finalSessions) retireSyntheticWebSession(session);
+    finalSessions.clear();
+});
 
 function createBoundary(sessionRef: string) {
     return createTypedProjectionBroker({
@@ -72,11 +68,11 @@ function ingest(boundary: ReturnType<typeof createBoundary>): string {
 }
 
 function activeResource(id: string) {
-    const attempt = beginWebAuthSession('login'); assert.ok(attempt);
-    const issued = issueWebAuthSession(attempt, { id, username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(issued);
-    const session = resolveActiveWebServerSession(issued.sessionId); assert.ok(session);
-    const resourcePort = mintActiveWebSessionResourcePort(session); assert.ok(resourcePort);
-    return { resourcePort, session, sessionId: issued.sessionId };
+    const session = issueSyntheticWebSession({ id, username: SYNTHETIC_USERNAME, role: 'clinician' },
+        `projection-broker-${sequence += 1}`);
+    finalSessions.add(session);
+    const resourcePort = mintResourcePort(session); assert.ok(resourcePort);
+    return { resourcePort, session };
 }
 
 type BrokerControl = Parameters<typeof bindProjectionBrokerToActiveWebSessionResource>[1];
@@ -103,43 +99,36 @@ function assertRevoked(boundary: ReturnType<typeof createBoundary>, handle: stri
     );
 }
 
-test('server session deletion revokes its bound broker before the next consume', () => {
-    const session = createSession({ id: SYNTHETIC_USER_ID, username: SYNTHETIC_USERNAME, role: 'clinician' });
-    const boundary = createBoundary(`session.${session.id}`);
+test('final-owner retirement revokes its bound broker before the next consume', () => {
+    const active = activeResource(SYNTHETIC_USER_ID);
+    const boundary = createBoundary(`session.${active.session.id}`);
     const handle = ingest(boundary);
-    bindProjectionBrokerToServerSession(session.id, boundary.control);
+    bindProjectionBrokerToActiveWebSessionResource(active.resourcePort, boundary.control);
 
-    deleteSession(session.id);
+    retireSyntheticWebSession(active.session);
 
-    assert.equal(getSession(session.id), null);
     assertRevoked(boundary, handle);
 });
 
-test('missing or expired sessions leave no consumable unowned broker', () => {
-    for (const sessionId of ['missing-session', 'expired-session']) {
-        const boundary = createBoundary(`session.${REF}-${sessionId}`);
+test('released or retired final-owner resources leave no consumable unowned broker', () => {
+    for (const state of ['released', 'retired'] as const) {
+        const active = activeResource(`synthetic-broker-${state}`);
+        const boundary = createBoundary(`session.${REF}-${state}`);
         const handle = ingest(boundary);
-        if (sessionId === 'expired-session') {
-            const session = createSession({ id: SYNTHETIC_USER_ID, username: SYNTHETIC_USERNAME, role: 'clinician' });
-            session.expiresAt = 0;
-            assert.throws(
-                () => bindProjectionBrokerToServerSession(session.id, boundary.control),
-                ServerSessionProjectionBrokerBindingError,
-            );
-        } else {
-            assert.throws(
-                () => bindProjectionBrokerToServerSession(sessionId, boundary.control),
-                ServerSessionProjectionBrokerBindingError,
-            );
-        }
+        if (state === 'released') assert.equal(releaseResourcePort(active.resourcePort), true);
+        else retireSyntheticWebSession(active.session);
+        assert.throws(
+            () => bindProjectionBrokerToActiveWebSessionResource(active.resourcePort, boundary.control),
+            ServerSessionProjectionBrokerBindingError,
+        );
         assertRevoked(boundary, handle);
     }
 });
 
 test('ACTIVE Web retirement revokes the bound broker exactly once', () => {
     const cases = [
-        ['delete', (active: ReturnType<typeof activeResource>) => retireServerSessionForLogout(active.sessionId)],
-        ['lock', (active: ReturnType<typeof activeResource>) => retireServerSessionForApplicationLock(active.sessionId)],
+        ['delete', (active: ReturnType<typeof activeResource>) => retireWebAuthSession(active.session, 'delete')],
+        ['dispose', (active: ReturnType<typeof activeResource>) => retireWebAuthSession(active.session, 'dispose')],
     ] as const;
     for (const [reason, retire] of cases) {
         const active = activeResource(`synthetic-broker-${reason}`);
@@ -147,16 +136,16 @@ test('ACTIVE Web retirement revokes the bound broker exactly once', () => {
         bindProjectionBrokerToActiveWebSessionResource(active.resourcePort, counted.control);
         retire(active); retire(active);
         assert.equal(counted.calls(), 1, reason);
-        assert.equal(releaseActiveWebSessionResourcePort(active.resourcePort), false, reason);
+        assert.equal(releaseResourcePort(active.resourcePort), false, reason);
     }
 });
 
 test('explicit unregister is idempotent and does not revoke the broker', () => {
     const first = activeResource('synthetic-broker-first'); const firstControl = countingControl();
     const unregister = bindProjectionBrokerToActiveWebSessionResource(first.resourcePort, firstControl.control);
-    unregister(); unregister(); retireServerSessionForLogout(first.sessionId);
+    unregister(); unregister(); retireSyntheticWebSession(first.session);
     assert.equal(firstControl.calls(), 0);
-    assert.equal(releaseActiveWebSessionResourcePort(first.resourcePort), false);
+    assert.equal(releaseResourcePort(first.resourcePort), false);
 });
 
 test('registration failure is opaque, revokes once, and leaves the port terminal', async () => {
@@ -169,8 +158,8 @@ test('registration failure is opaque, revokes once, and leaves the port terminal
             assert.throws(() => bindProjectionBrokerToActiveWebSessionResource(hostile as typeof active.resourcePort, counted.control), ServerSessionProjectionBrokerBindingError);
             assert.equal(counted.calls(), 1);
         }
-        assert.equal(releaseActiveWebSessionResourcePort(active.resourcePort), true);
-        retireServerSessionForLogout(active.sessionId);
+        assert.equal(releaseResourcePort(active.resourcePort), true);
+        retireSyntheticWebSession(active.session);
         const outcomes = [
             () => { throw new Error('synthetic'); },
             () => Promise.reject(new Error('synthetic')),
@@ -178,11 +167,11 @@ test('registration failure is opaque, revokes once, and leaves the port terminal
         ];
         for (let index = 0; index < outcomes.length; index += 1) {
             const denied = activeResource(`synthetic-broker-denied-${index}`);
-            assert.equal(releaseActiveWebSessionResourcePort(denied.resourcePort), true);
+            assert.equal(releaseResourcePort(denied.resourcePort), true);
             const counted = countingControl(outcomes[index]);
             assert.throws(() => bindProjectionBrokerToActiveWebSessionResource(denied.resourcePort, counted.control), ServerSessionProjectionBrokerBindingError);
-            assert.equal(counted.calls(), 1); assert.equal(releaseActiveWebSessionResourcePort(denied.resourcePort), false);
-            retireServerSessionForLogout(denied.sessionId);
+            assert.equal(counted.calls(), 1); assert.equal(releaseResourcePort(denied.resourcePort), false);
+            retireSyntheticWebSession(denied.session);
         }
         await new Promise<void>((resolve) => setImmediate(resolve));
         assert.deepEqual([unhandled, reads], [0, 0]);

@@ -4,6 +4,16 @@ import fs from 'fs';
 import path from 'path';
 import { resolveDataPath } from '@/lib/data-dir';
 import { classifyAuthHealthError } from '@/lib/security/auth-health-classifier';
+/* @Codex */
+import {
+    bootstrapWebAuthControl,
+    resolveWebAuthControlSession,
+    setWebAuthControlCookie,
+    setWebAuthControlEtag,
+    webAuthControlIdFromRequest,
+    webAuthSessionIdFromRequest,
+    type WebAuthControlBootstrap,
+} from '@/lib/security/web-auth-control-transport';
 
 /* @Codex */
 export const dynamic = 'force-dynamic';
@@ -30,16 +40,38 @@ function buildPublicDbState(
 }
 
 /* @Codex */
-async function safeRequireSession(): Promise<boolean> {
-    try {
-        const { requireSession } = await import('@/lib/security/server-auth');
-        return !!(await requireSession());
-    } catch {
-        return false;
-    }
+function finalizeControlResponse(
+    response: NextResponse,
+    request: Request,
+    presentedControlId: string | null,
+    control: WebAuthControlBootstrap,
+) {
+    response.headers.set('Cache-Control', 'no-store');
+    setWebAuthControlEtag(response, control.etag);
+    if (presentedControlId !== control.controlId) setWebAuthControlCookie(response, request, control.controlId);
+    return response;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+    const presentedControlId = webAuthControlIdFromRequest(request);
+    const control = bootstrapWebAuthControl(presentedControlId);
+    if (!control) {
+        const response = NextResponse.json({
+            status: 'error',
+            isSetup: false,
+            hasSession: false,
+            error: {
+                code: 'AUTH_CONTROL_UNAVAILABLE',
+                category: 'unknown',
+                message: 'Authentication control unavailable.',
+                nextAction: 'Retry the authentication check.',
+            },
+            db: buildPublicDbState('unavailable'),
+        }, { status: 503 });
+        response.headers.set('Cache-Control', 'no-store');
+        return response;
+    }
+
     /* @Codex */
     let dbHealth: ReturnType<typeof getDbHealth> | null = null;
     /* WUL-547. Qui passava `error.message` grezzo: percorsi del filesystem e
@@ -54,7 +86,9 @@ export async function GET() {
         console.error('[auth-check]', dbHealthClassification.code, dbHealthClassification.message);
     }
     /* @Codex */
-    const hasSession = await safeRequireSession();
+    const sessionId = webAuthSessionIdFromRequest(request);
+    const resolution = sessionId ? resolveWebAuthControlSession(sessionId, control.controlId) : null;
+    const hasSession = resolution?.status === 'active';
     /* @Codex */
     if (!dbHealth) {
         const response = NextResponse.json({
@@ -72,8 +106,7 @@ export async function GET() {
             },
             db: buildPublicDbState('unavailable')
         });
-        response.headers.set('Cache-Control', 'no-store');
-        return response;
+        return finalizeControlResponse(response, request, presentedControlId, control);
     }
 
     /* @Codex */
@@ -90,8 +123,7 @@ export async function GET() {
             },
             db: buildPublicDbState('missing')
         });
-        response.headers.set('Cache-Control', 'no-store');
-        return response;
+        return finalizeControlResponse(response, request, presentedControlId, control);
     }
 
     try {
@@ -111,8 +143,7 @@ export async function GET() {
             /* @Codex */
             db: buildPublicDbState('ready')
         });
-        response.headers.set('Cache-Control', 'no-store');
-        return response;
+        return finalizeControlResponse(response, request, presentedControlId, control);
     } catch (error) {
         /* @Codex */
         const classification = classifyAuthHealthError(error);
@@ -130,7 +161,6 @@ export async function GET() {
             },
             db: buildPublicDbState(classification.dbState)
         });
-        response.headers.set('Cache-Control', 'no-store');
-        return response;
+        return finalizeControlResponse(response, request, presentedControlId, control);
     }
 }

@@ -36,14 +36,16 @@ function arm(session: Awaited<ReturnType<typeof freshStack>>['session'], userId:
     return { port, sessionId };
 }
 
-test('mints one opaque owner attempt and serializes login/setup through one record', async () => {
+test('mints one opaque owner attempt but the historical activation bridge stays fail closed', async () => {
     const { owner, session } = await freshStack('owner-basic'); const attempt = owner.beginWebAuth('login'); opaque(attempt);
     assert.equal(owner.beginWebAuth('setup'), null);
     const armed = arm(session, 'owner-basic'); const activation = owner.prepareWebAuthActivation(attempt, armed.sessionId); opaque(activation);
-    assert.equal(owner.activatePreparedWebAuthSession(attempt, activation, armed.port), true);
+    assert.equal(owner.activatePreparedWebAuthSession(attempt, activation, armed.port), false);
     assert.equal(owner.activatePreparedWebAuthSession(attempt, activation, armed.port), false); assert.equal(owner.cancelWebAuth(attempt), false);
-    assert.equal(session.resolveActiveWebServerSession(armed.sessionId)?.id, armed.sessionId);
-    assert.equal(owner.beginWebAuth('setup'), null, 'ACTIVE control cannot mint a second attempt');
+    assert.equal(session.getArmedWebServerSessionId(armed.port), null);
+    assert.equal(session.resolveActiveWebServerSession(armed.sessionId), null);
+    const retry = owner.beginWebAuth('setup'); assert.ok(retry, 'terminal denial releases only the dormant owner reservation');
+    assert.equal(owner.cancelWebAuth(retry), true);
 });
 
 test('cancels pending and prepared attempts without exposing control metadata', async () => {
@@ -54,7 +56,7 @@ test('cancels pending and prepared attempts without exposing control metadata', 
     assert.ok(owner.beginWebAuth('login'));
 });
 
-test('binds activation to the exact attempt, module, session ticket, and restart realm', async () => {
+test('binds denial to the exact attempt, module, session ticket, and restart realm', async () => {
     const stack = await freshStack('owner-binding'); const attempt = stack.owner.beginWebAuth('login'); assert.ok(attempt); const armed = arm(stack.session, 'owner-binding');
     const ticket = stack.owner.prepareWebAuthActivation(attempt, armed.sessionId); assert.ok(ticket);
     const foreign = await fresh('owner-foreign'); assert.equal(foreign.activatePreparedWebAuthSession(attempt, ticket, armed.port), false); assert.equal(foreign.cancelWebAuth(attempt), false);
@@ -62,9 +64,12 @@ test('binds activation to the exact attempt, module, session ticket, and restart
     assert.equal(stack.owner.activatePreparedWebAuthSession(attempt, ticket, armed.port), false, 'an authentic presented activation is burned by a mismatched attempt');
     assert.equal(stack.session.resolveActiveWebServerSession(armed.sessionId), null);
 
-    const success = await freshStack('owner-binding-success'); const successfulAttempt = success.owner.beginWebAuth('login'); assert.ok(successfulAttempt);
-    const successfulCell = arm(success.session, 'owner-binding-success'); const successfulActivation = success.owner.prepareWebAuthActivation(successfulAttempt, successfulCell.sessionId); assert.ok(successfulActivation);
-    assert.equal(success.owner.activatePreparedWebAuthSession(successfulAttempt, successfulActivation, successfulCell.port), true);
+    const dormant = await freshStack('owner-binding-dormant'); const dormantAttempt = dormant.owner.beginWebAuth('login'); assert.ok(dormantAttempt);
+    const dormantCell = arm(dormant.session, 'owner-binding-dormant'); const dormantActivation = dormant.owner.prepareWebAuthActivation(dormantAttempt, dormantCell.sessionId); assert.ok(dormantActivation);
+    assert.equal(dormant.owner.activatePreparedWebAuthSession(dormantAttempt, dormantActivation, dormantCell.port), false);
+    assert.equal(dormant.session.getArmedWebServerSessionId(dormantCell.port), null);
+    assert.equal(dormant.session.resolveActiveWebServerSession(dormantCell.sessionId), null);
+    const retry = dormant.owner.beginWebAuth('setup'); assert.ok(retry); assert.equal(dormant.owner.cancelWebAuth(retry), true);
 });
 
 test('denies crossed and expired P3 cells without one-sided authority or reusable owner state', async () => {

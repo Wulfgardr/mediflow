@@ -7,15 +7,23 @@ import {
     ingestServerSessionSmartImportAttachment,
     ServerSessionSmartImportAttachmentIngestError,
 } from './server-session-smart-import-attachment-ingest.ts';
-import { clearAllSessions, createSession, deleteSession } from './server-session.ts';
-import { createServerSessionProjectionOwnerRegistry, ServerSessionProjectionOwnerError } from './server-session-projection-owner.ts';
+import type { ServerSession } from './server-session.ts';
+import { createFullPortProjectionOwnerFactory, ServerSessionProjectionOwnerError } from './server-session-projection-owner.ts';
+import {
+    issueSyntheticWebSession,
+    retireSyntheticWebSession,
+} from './web-auth-lifecycle-owner-test-fixture.ts';
 import { ProjectionBrokerError } from '../typed-projection-broker.ts';
 import { SmartImportProjectionError } from '../smart-import-projection.ts';
 
 const USER = { id: ['synthetic', 'user'].join('-'), username: ['synthetic', 'clinician'].join('-'), role: 'clinician' };
 const PAIR = { patientId: 'patient.synthetic.01', ambulatoryId: 'ambulatory.synthetic.01' };
+const sessions: ServerSession[] = [];
+let sequence = 0;
 
-afterEach(() => clearAllSessions());
+afterEach(() => {
+    while (sessions.length > 0) retireSyntheticWebSession(sessions.pop()!);
+});
 
 function attachment() {
     const now = new Date().toISOString();
@@ -25,8 +33,10 @@ function attachment() {
             label: 'Fonte sintetica', date: null, content: 'Contenuto sintetico.' }] };
 }
 function setup() {
-    const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => pair });
-    const session = createSession(USER); const owner = registry.create(session);
+    const registry = createFullPortProjectionOwnerFactory({ resolve: (_session, pair) => pair });
+    const session = issueSyntheticWebSession(USER, `smart-import-ingest-${sequence += 1}`);
+    sessions.push(session);
+    const owner = registry.create(session);
     const lease = owner.issueSelection({ expectedEpoch: 0, ...PAIR });
     return { registry, session, owner, lease };
 }
@@ -65,7 +75,7 @@ test('keeps broker replay, selection replacement, and session revocation fail cl
     assert.throws(() => ingestServerSessionSmartImportAttachment(replaced.session, replaced.registry, stale),
         (error) => error instanceof ServerSessionProjectionOwnerError && error.code === 'stale_selection');
 
-    const revoked = setup(); deleteSession(revoked.session.id);
+    const revoked = setup(); retireSyntheticWebSession(revoked.session);
     assert.throws(() => ingestServerSessionSmartImportAttachment(revoked.session, revoked.registry, input(revoked.lease)),
         (error) => error instanceof ServerSessionSmartImportAttachmentIngestError && error.code === 'session_unavailable');
 });

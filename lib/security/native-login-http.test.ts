@@ -7,10 +7,14 @@ import test from 'node:test';
 import { createNativeLoginHttpHandler } from './native-login-http.ts';
 import {
     clearAllSessions,
+    commitNativeLegacyUserRetirement,
+    commitNativeSystemAdminReset,
     createNativeServerSession,
     createSession,
     getSession,
     isPairedNativeServerSession,
+    prepareNativeLegacyUserRetirement,
+    prepareNativeSystemAdminReset,
 } from './server-session.ts';
 
 const pin = ['2', '4', '6', '8'].join(''); const wrongPin = ['w', 'r', 'o', 'n', 'g'].join('');
@@ -53,6 +57,52 @@ test('rechecks pairing only after the shared verifier and emits no authority aft
     state.admissions.delete(state.admission); paused.resolve({ kind: 'verified', account: user });
     const response = await pending;
     assert.equal(response.status, 401); assert.equal(response.headers.get('set-cookie'), null); assert.equal(state.admissions.has(state.admission), false);
+});
+
+test('denies a native login verified before its user PIN retirement commits', async () => {
+    const consumeStarted = deferred<void>();
+    const resumeConsume = deferred<typeof binding>();
+    const state = fixture({
+        consume: async () => {
+            consumeStarted.resolve();
+            return resumeConsume.promise;
+        },
+    });
+    const pending = state.handler(request(), state.admission, { username: user.username, password: pin });
+    await consumeStarted.promise;
+
+    const retirement = prepareNativeLegacyUserRetirement(user.id);
+    assert.ok(retirement);
+    assert.equal(commitNativeLegacyUserRetirement(retirement).outcome, 'completed');
+    resumeConsume.resolve(binding);
+
+    const response = await pending;
+    assert.equal(response.status, 401);
+    assert.equal(response.headers.get('set-cookie'), null);
+    assert.equal(state.calls().auditCalls, 0);
+});
+
+test('denies a native login verified before an administrative reset commits', async () => {
+    const consumeStarted = deferred<void>();
+    const resumeConsume = deferred<typeof binding>();
+    const state = fixture({
+        consume: async () => {
+            consumeStarted.resolve();
+            return resumeConsume.promise;
+        },
+    });
+    const pending = state.handler(request(), state.admission, { username: user.username, password: pin });
+    await consumeStarted.promise;
+
+    const reset = prepareNativeSystemAdminReset();
+    assert.ok(reset);
+    assert.equal(commitNativeSystemAdminReset(reset).outcome, 'completed');
+    resumeConsume.resolve(binding);
+
+    const response = await pending;
+    assert.equal(response.status, 401);
+    assert.equal(response.headers.get('set-cookie'), null);
+    assert.equal(state.calls().auditCalls, 0);
 });
 
 test('shared credential denial, replay, and handler exceptions cannot leave a cookie or admission', async () => {

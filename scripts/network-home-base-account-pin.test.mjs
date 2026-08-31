@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
+import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3400';
 const LOCAL_API_TOKEN = process.env.MEDIFLOW_LOCAL_API_TOKEN || 'mediflow-network-write-smoke-local-token';
@@ -134,7 +135,7 @@ test('paired account PIN rotation preserves the master key and sealed patient fi
 
 async function assertServerReady() { const result = await request('GET', '/api/v1/ambulatories', { headers: localApiHeaders() }); assert.equal(result.response.status, 200); }
 async function enableHomeBaseMode() { const result = await request('PUT', '/api/settings/network.mode', { headers: localApiHeaders(), body: { value: 'network-home-base' } }); assert.equal(result.response.status, 200); }
-async function login(pin) { const result = await request('POST', '/api/auth/login', { body: { username: USERNAME, password: pin } }); return { ...result, cookie: result.response.status === 200 ? extractSessionCookie(result.response) : null }; }
+async function login(pin) { const result = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: pin }); return { ...result, cookie: result.response.status === 200 ? result.sessionCookie : null }; }
 async function changePin(cookie, currentPin, newPin, blob, salt) { return request('POST', '/api/auth/change-pin', { headers: { Cookie: cookie }, body: { currentPin, newPin, encryptedMasterKey: blob, salt: salt.toString('base64') } }); }
 async function rewrapMasterKey(cookie, body) { return request('POST', '/api/auth/rewrap-master-key', { headers: { Cookie: cookie }, body }); }
 async function rewrapMasterKeyWithRawBody(cookie, body) { const response = await fetch(new URL('/api/auth/rewrap-master-key', BASE_URL), { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body }); const text = await response.text(); let json = null; try { json = text ? JSON.parse(text) : null; } catch { json = text; } return { response, json, text }; }
@@ -151,6 +152,5 @@ async function sealField(value, masterKey) { const iv = crypto.randomBytes(12); 
 async function openField(value, masterKey) { const [, iv, data] = value.split(':'); const plaintext = await crypto.webcrypto.subtle.decrypt({ name: 'AES-GCM', iv: Buffer.from(iv, 'base64') }, masterKey, Buffer.from(data, 'base64')); return JSON.parse(new TextDecoder().decode(plaintext)); }
 function localApiHeaders() { return { Authorization: `Bearer ${LOCAL_API_TOKEN}`, 'Cache-Control': 'no-store' }; }
 function pairedHeaders(client) { return { 'x-mediflow-paired-client-id': client.pairedClientId, 'x-mediflow-paired-client-token': client.pairedClientToken }; }
-function extractSessionCookie(response) { const cookies = typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : []; const raw = cookies.find((entry) => entry.startsWith('mediflow_session=')) ?? response.headers.get('set-cookie'); assert.ok(raw, 'login must set mediflow_session'); return raw.split(';')[0]; }
 async function request(method, pathname, { headers = {}, body } = {}) { const finalHeaders = { ...headers }; if (body !== undefined) finalHeaders['Content-Type'] = 'application/json'; const response = await fetch(new URL(pathname, BASE_URL), { method, headers: finalHeaders, body: body === undefined ? undefined : JSON.stringify(body) }); const text = await response.text(); let json = null; try { json = text ? JSON.parse(text) : null; } catch { json = text; } return { response, json, text }; }
 function resolveReportPath() { const dataDir = process.env.MEDIFLOW_DATA_DIR || process.env.MEDIFLOW_NETWORK_WRITE_DATA_DIR; return dataDir ? path.join(dataDir, 'reports', 'network-home-base-account-pin-report.json') : path.join(process.cwd(), 'tmp-network-home-base-account-pin-report.json'); }

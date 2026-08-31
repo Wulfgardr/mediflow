@@ -47,15 +47,6 @@ async function createSyntheticFixture(page: Page): Promise<string> {
 async function establishSyntheticSession(page: Page): Promise<void> {
   const pin = process.env.E2E_PIN || '1234';
   await bootstrapUnlockedSession(page, pin);
-  const status = await page.evaluate(async (password) => {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: 'admin', password }),
-    });
-    return response.status;
-  }, pin);
-  expect(status).toBe(200);
 }
 
 async function openDocumentArchive(page: Page, patientId: string): Promise<void> {

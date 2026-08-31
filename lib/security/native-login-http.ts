@@ -8,7 +8,11 @@ import { createInvalidCredentialsPayload } from '@/lib/security/auth-lockout';
 import { requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
 import { verifyHostCredentials } from '@/lib/security/host-credential-verification';
 import type { NativeBootstrapRouteBinding } from '@/lib/security/native-bootstrap-admission';
-import { createNativeServerSession, SESSION_COOKIE_NAME } from '@/lib/security/server-session';
+import {
+    captureNativeLoginSessionFence,
+    createNativeServerSession,
+    SESSION_COOKIE_NAME,
+} from '@/lib/security/server-session';
 import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
 
 type Credentials = Readonly<{ username: string; password: string }>;
@@ -74,11 +78,16 @@ export function createNativeLoginHttpHandler(dependencies: NativeLoginHttpDepend
             if (!admission) return nativeLoginDeniedResponse();
             const parsed = credentials(input);
             if (!parsed) return nativeLoginDeniedResponse();
+            const loginFence = captureNativeLoginSessionFence();
             const verification = await verify({ username: parsed.username, pin: parsed.password });
             if (verification.kind === 'denied') return authFailure(verification.body, verification.status);
             const paired = await consume(admission); consumed = true;
             if (!paired) return nativeLoginDeniedResponse();
-            const session = createNativeSession({ id: verification.account.id, username: verification.account.username, role: verification.account.role || 'user' }, paired);
+            const session = createNativeSession(
+                { id: verification.account.id, username: verification.account.username, role: verification.account.role || 'user' },
+                paired,
+                loginFence,
+            );
             const response = NextResponse.json({ success: true, id: verification.account.id, username: verification.account.username, displayName: verification.account.displayName, ambulatoryName: verification.account.ambulatoryName, role: verification.account.role, encryptedMasterKey: verification.account.encryptedMasterKey, salt: verification.account.salt });
             response.cookies.set(SESSION_COOKIE_NAME, session.id, sessionCookieOptionsForRequest(request));
             response.headers.set('Cache-Control', 'no-store');

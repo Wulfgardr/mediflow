@@ -4,8 +4,17 @@ import 'server-only';
 import { sql, type SQL } from 'drizzle-orm';
 import { types } from 'node:util';
 import { dbServer } from '../../db-server';
-import { peekSession, type ServerSession } from '../../security/server-session';
+import type { ServerSession } from '../../security/server-session';
 import { serverSessionProjectionOwnerRegistry } from '../../security/server-session-projection-owner-production';
+import {
+    abortResourceUse,
+    beginResourceUse,
+    commitResourceUse,
+    mintResourcePort,
+    releaseResourcePort,
+    type WebResourcePort,
+    type WebResourceUse,
+} from '../../security/web-auth-lifecycle-owner-adapter';
 
 type Pair = Readonly<{ attachmentId: string; patientId: string; ambulatoryId: string }>;
 const SESSION_KEYS = ['id', 'userId', 'username', 'role', 'authChannel', 'createdAt', 'expiresAt'];
@@ -32,10 +41,27 @@ function exact(value: unknown, keys: readonly string[]): Record<string, unknown>
 }
 
 function validSession(value: unknown): value is ServerSession {
-    const fields = exact(value, SESSION_KEYS);
-    if (!fields || typeof fields.id !== 'string' || fields.id.length < 1 || fields.authChannel !== 'web'
-        || !Number.isFinite(fields.expiresAt)) return false;
-    try { return peekSession(fields.id) === value; } catch { return false; }
+    if (!value || typeof value !== 'object' || isProxy(value) || arrayIsArray(value)) return false;
+    try {
+        const prototype = getPrototype(value);
+        if (prototype !== null && prototype !== Object.prototype) return false;
+        const found = ownKeys(value);
+        if (found.length !== SESSION_KEYS.length) return false;
+        const fields: Record<string, unknown> = objectCreate(null);
+        for (let index = 0; index < SESSION_KEYS.length; index += 1) {
+            const key = SESSION_KEYS[index]!;
+            if (found[index] !== key) return false;
+            const descriptor = getDescriptor(value, key);
+            if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) return false;
+            fields[key] = descriptor.value;
+        }
+        return typeof fields.id === 'string' && fields.id.length > 0
+            && typeof fields.userId === 'string' && fields.userId.length > 0
+            && typeof fields.username === 'string' && fields.username.length > 0
+            && typeof fields.role === 'string' && fields.role.length > 0
+            && fields.authChannel === 'web'
+            && Number.isFinite(fields.createdAt) && Number.isFinite(fields.expiresAt);
+    } catch { return false; }
 }
 
 function target(value: unknown): string | null {
@@ -65,15 +91,28 @@ function readUniquePair(attachmentId: string): Pair | null {
 export function bindAttachmentExtractionSelection(sessionValue: unknown, attachmentIdValue: unknown): object | null {
     if (active) return null;
     active = true;
+    let port: WebResourcePort | null = null;
+    let use: WebResourceUse | null = null;
+    let committed = false;
     try {
         const success = objectFreeze(objectCreate(null)) as object;
         if (!validSession(sessionValue)) return null;
+        port = mintResourcePort(sessionValue);
+        if (!port) return null;
+        use = beginResourceUse(port);
+        if (!use) return null;
         const attachmentId = target(attachmentIdValue); if (!attachmentId) return null;
         const owner = serverSessionProjectionOwnerRegistry.acquire(sessionValue);
         const expectedEpoch = owner.snapshotSelectionEpoch(sessionValue);
         const pair = readUniquePair(attachmentId); if (!pair) return null;
         owner.issueSelection({ expectedEpoch, patientId: pair.patientId, ambulatoryId: pair.ambulatoryId });
+        committed = commitResourceUse(use);
+        if (!committed) return null;
         return success;
     } catch { return null; }
-    finally { active = false; }
+    finally {
+        if (use && !committed) abortResourceUse(use);
+        if (port) releaseResourcePort(port);
+        active = false;
+    }
 }

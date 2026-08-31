@@ -5,7 +5,8 @@ import bcrypt from 'bcryptjs';
 import { users } from '@/lib/schema';
 import { dbServer } from '@/lib/db-server';
 import { SECURITY_CONFIG } from './security';
-import { resolveAuthenticatedReviewPrincipal, type AuthenticatedReviewPrincipalV1 } from './authenticated-review-principal';
+import type { AuthenticatedReviewPrincipalV1 } from './authenticated-review-principal';
+import { resolveAuthenticatedReviewPrincipal } from './authenticated-review-principal-production';
 
 type CanonicalCredential = Readonly<{ id: string; passwordHash: string }>;
 type ResolvePrincipal = () => Promise<AuthenticatedReviewPrincipalV1>;
