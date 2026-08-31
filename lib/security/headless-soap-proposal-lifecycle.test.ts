@@ -53,7 +53,62 @@ function fixture() {
     };
     return { lease, sources, tasks, setNow(value: number) { now = value; }, blockLeaseCheck() { leaseCheckGate = new Promise<void>((resolve) => { releaseLeaseCheck = resolve; }); },
         releaseLeaseCheck() { const release = releaseLeaseCheck; leaseCheckGate = null; releaseLeaseCheck = null; release?.(); },
-        retireLeaseAttachment() { leaseDispose?.(); }, terminationCalls() { return terminationCalls; }, sessionReads() { return sessionReads; } };
+        retireLeaseAttachment() { leaseDispose?.(); }, retireSelectionAttachment() { selectionDispose?.(); },
+        terminationCalls() { return terminationCalls; }, sessionReads() { return sessionReads; } };
+}
+
+async function h4Fixture() {
+    const current = fixture(); const source = h1Snapshot(); const owner = createHeadlessSoapProposalLifecycleOwner(current.sources);
+    const inspectRef = await owner.service.inspect(current.lease, source); const previewRef = await owner.service.preview(inspectRef);
+    const proposalRef = await owner.service.proposal(previewRef); return { current, source, owner, proposalRef };
+}
+
+async function twoProposalFixture() {
+    const records = [0, 1].map(() => ({
+        lease: Object.freeze(Object.create(null)), session: Object.freeze(Object.create(null)), scope: Object.freeze(Object.create(null)),
+        leaseRegistration: Object.freeze(Object.create(null)), selectionRegistration: Object.freeze(Object.create(null)),
+        leaseCurrent: true, selectionCurrent: true, leaseDispose: null as (() => void) | null, selectionDispose: null as (() => void) | null,
+    }));
+    let attaching: (typeof records)[number] | null = null;
+    const byLease = (candidate: unknown) => records.find((record) => record.lease === candidate) ?? null;
+    const byScope = (candidate: unknown) => records.find((record) => record.scope === candidate) ?? null;
+    const sources = {
+        leaseLifecycle: {
+            async withCurrentLease(candidate: unknown, operation: (value: unknown) => void) { const record = byLease(candidate); if (!record?.leaseCurrent) return false;
+                attaching = record; operation(record.lease); return record.leaseCurrent; },
+            registerDependent(candidate: unknown, dispose: () => void) { const record = byLease(candidate); if (!record?.leaseCurrent) return null;
+                record.leaseDispose = dispose; return record.leaseRegistration; },
+            confirmDependent(candidate: unknown, registration: unknown) { const record = byLease(candidate);
+                return !!record?.leaseCurrent && registration === record.leaseRegistration && record.leaseDispose !== null; },
+            unregisterDependent(candidate: unknown, registration: unknown) { const record = byLease(candidate);
+                if (!record || registration !== record.leaseRegistration || !record.leaseDispose) return false; record.leaseDispose = null; return true; },
+            async withCurrentDependent(candidate: unknown, registration: unknown, operation: () => void) { const record = byLease(candidate);
+                if (!record?.leaseCurrent || registration !== record.leaseRegistration || !record.leaseDispose) return false; operation(); return record.leaseCurrent; },
+            async withCurrentProposalBudget(candidate: unknown, registration: unknown, operation: () => void) { const record = byLease(candidate);
+                if (!record?.leaseCurrent || registration !== record.leaseRegistration || !record.leaseDispose) return false; operation(); return record.leaseCurrent; },
+        },
+        leaseService: { terminate(candidate: unknown) { const record = byLease(candidate); if (!record?.leaseCurrent) return false; record.leaseCurrent = false;
+            const dispose = record.leaseDispose; record.leaseDispose = null; dispose?.(); return true; } },
+        selectionLifecycle: {
+            withCurrentSelection(candidate: unknown, operation: (value: unknown) => void) { const record = records.find((value) => value.session === candidate);
+                if (!record?.selectionCurrent) return false; operation(record.scope); return record.selectionCurrent; },
+            registerDependent(candidate: unknown, dispose: () => void) { const record = byScope(candidate); if (!record?.selectionCurrent) return null;
+                record.selectionDispose = dispose; return record.selectionRegistration; },
+            confirmDependent(candidate: unknown, registration: unknown) { const record = byScope(candidate);
+                return !!record?.selectionCurrent && registration === record.selectionRegistration && record.selectionDispose !== null; },
+            unregisterDependent(candidate: unknown, registration: unknown) { const record = byScope(candidate);
+                if (!record || registration !== record.selectionRegistration || !record.selectionDispose) return false; record.selectionDispose = null; return true; },
+            withCurrentDependent(candidate: unknown, registration: unknown, operation: () => void) { const record = byScope(candidate);
+                if (!record?.selectionCurrent || registration !== record.selectionRegistration || !record.selectionDispose) return false; operation(); return record.selectionCurrent; },
+        },
+        async readCurrentSelectionSession() { const session = attaching?.session ?? null; attaching = null; return session; },
+        clock: () => 10_000,
+        scheduler: (_delay: number, _operation: () => void) => () => undefined,
+    };
+    const owner = createHeadlessSoapProposalLifecycleOwner(sources); const proposals: unknown[] = [];
+    for (const record of records) { const inspect = await owner.service.inspect(record.lease, h1Snapshot()); const preview = await owner.service.preview(inspect);
+        proposals.push(await owner.service.proposal(preview)); }
+    return { owner, proposals };
 }
 
 test('inspect revalidates an H1 snapshot and publishes only an opaque current-stage ref', async () => {
@@ -281,6 +336,153 @@ test('foreign and restarted refs stay inert without damaging the authentic owner
     const restarted = createHeadlessSoapProposalLifecycleOwner(current.sources).service;
     await assert.rejects(restarted.preview(inspectRef), hasCode('stage_unavailable')); assert.equal(restarted.wipe(inspectRef), false);
     const previewRef = await first.preview(inspectRef); assert.equal(first.wipe(previewRef), true);
+});
+
+test('H4 lifecycle surface exposes only a closure-owned H1 copy from the current proposal', async () => {
+    const { owner, proposalRef, source } = await h4Fixture(); let captured: ReturnType<typeof h1Snapshot> | null = null;
+    assert.deepEqual(Reflect.ownKeys(owner), ['service', 'lifecycleController']);
+    assert.deepEqual(Reflect.ownKeys(owner.lifecycleController), [
+        'withCurrentProposal', 'registerDependent', 'confirmDependent', 'unregisterDependent', 'withCurrentDependent',
+    ]);
+    assert.equal(Object.isFrozen(owner.lifecycleController), true);
+    assert.equal(await owner.lifecycleController.withCurrentProposal(proposalRef, (snapshot) => { captured = snapshot; }), true);
+    assert.ok(captured); const snapshot = captured as ReturnType<typeof h1Snapshot>;
+    assert.notEqual(snapshot, source); assert.notEqual(snapshot.digest, source.digest);
+    assert.notEqual(snapshot.digest.sha256, source.digest.sha256); assert.notEqual(snapshot.digest.sha256.bytes, source.digest.sha256.bytes);
+    for (const value of [snapshot, snapshot.digest, snapshot.digest.sha256, snapshot.digest.sha256.bytes]) assert.equal(Object.isFrozen(value), true);
+    assert.deepEqual(Reflect.ownKeys(snapshot), ['status', 'schema', 'operationId', 'subjective', 'objective', 'assessment', 'plan', 'digest']);
+    assert.equal(Reflect.get(snapshot, 'lease'), undefined); assert.equal(Reflect.get(snapshot, 'patientId'), undefined);
+});
+
+test('H4 dependent continuation confirms and unregisters one opaque registration without disposing it', async () => {
+    const { owner, proposalRef } = await h4Fixture(); const lifecycle = owner.lifecycleController; let registration: unknown = null, uses = 0, disposals = 0;
+    assert.equal(await lifecycle.withCurrentProposal(proposalRef, () => {
+        registration = lifecycle.registerDependent(proposalRef, () => { disposals += 1; });
+    }), true);
+    assert.ok(registration); assert.equal(Object.getPrototypeOf(registration), null); assert.equal(Object.isFrozen(registration), true); assert.deepEqual(Reflect.ownKeys(registration), []);
+    assert.equal(lifecycle.confirmDependent(proposalRef, registration), true);
+    assert.equal(await lifecycle.withCurrentDependent(proposalRef, registration, (snapshot) => { uses += 1; assert.equal(snapshot.status, 'accepted'); }), true);
+    assert.equal(uses, 1); assert.equal(lifecycle.unregisterDependent(proposalRef, registration), true);
+    assert.equal(lifecycle.unregisterDependent(proposalRef, registration), false); assert.equal(disposals, 0);
+});
+
+test('H4 foreign, restarted, and stale refs or registrations stay inert before a later authentic use', async () => {
+    const { current, owner, proposalRef } = await h4Fixture(); const lifecycle = owner.lifecycleController;
+    const foreignRef = Object.freeze(Object.create(null)), foreignRegistration = Object.freeze(Object.create(null)); let calls = 0, registration: unknown = null;
+    assert.equal(await lifecycle.withCurrentProposal(foreignRef, () => { calls += 100; }), false);
+    assert.equal(lifecycle.registerDependent(foreignRef, () => { calls += 100; }), null);
+    assert.equal(lifecycle.confirmDependent(proposalRef, foreignRegistration), false);
+    assert.equal(lifecycle.unregisterDependent(proposalRef, foreignRegistration), false);
+    assert.equal(await lifecycle.withCurrentDependent(proposalRef, foreignRegistration, () => { calls += 100; }), false);
+    assert.equal(await createHeadlessSoapProposalLifecycleOwner(current.sources).lifecycleController.withCurrentProposal(proposalRef, () => { calls += 100; }), false);
+    assert.equal(await lifecycle.withCurrentProposal(proposalRef, () => { registration = lifecycle.registerDependent(proposalRef, () => undefined); }), true);
+    assert.ok(registration); assert.equal(lifecycle.unregisterDependent(proposalRef, registration), true);
+    assert.equal(await lifecycle.withCurrentDependent(proposalRef, registration, () => { calls += 100; }), false);
+    let next: unknown = null; assert.equal(await lifecycle.withCurrentProposal(proposalRef, () => { next = lifecycle.registerDependent(proposalRef, () => undefined); calls += 1; }), true);
+    assert.ok(next); assert.equal(lifecycle.confirmDependent(proposalRef, next), true); assert.equal(calls, 1);
+});
+
+test('H4 rejects declared async callbacks without invocation but terminalizes Promise results and throws', async () => {
+    const declared = await h4Fixture(); let declaredCalls = 0, declaredRegistration: unknown = null;
+    assert.equal(await declared.owner.lifecycleController.withCurrentProposal(declared.proposalRef, async () => { declaredCalls += 1; }), false);
+    assert.equal(declaredCalls, 0);
+    assert.equal(await declared.owner.lifecycleController.withCurrentProposal(declared.proposalRef, () => {
+        declaredRegistration = declared.owner.lifecycleController.registerDependent(declared.proposalRef, () => undefined);
+    }), true); assert.ok(declaredRegistration);
+
+    const promised = await h4Fixture(); let promisedRegistration: unknown = null, promisedDisposals = 0;
+    assert.equal(await promised.owner.lifecycleController.withCurrentProposal(promised.proposalRef, () => {
+        promisedRegistration = promised.owner.lifecycleController.registerDependent(promised.proposalRef, () => { promisedDisposals += 1; });
+    }), true);
+    assert.equal(await promised.owner.lifecycleController.withCurrentDependent(promised.proposalRef, promisedRegistration,
+        () => Promise.reject(new Error('synthetic async H4 result')) as never), false);
+    assert.equal(promisedDisposals, 1); assert.equal(promised.owner.service.wipe(promised.proposalRef), false);
+
+    const thrown = await h4Fixture(); let thrownRegistration: unknown = null, thrownDisposals = 0;
+    assert.equal(await thrown.owner.lifecycleController.withCurrentProposal(thrown.proposalRef, () => {
+        thrownRegistration = thrown.owner.lifecycleController.registerDependent(thrown.proposalRef, () => { thrownDisposals += 1; });
+    }), true);
+    assert.equal(await thrown.owner.lifecycleController.withCurrentDependent(thrown.proposalRef, thrownRegistration,
+        () => { throw new Error('synthetic H4 throw'); }), false);
+    assert.equal(thrownDisposals, 1); assert.equal(thrown.owner.service.wipe(thrown.proposalRef), false);
+});
+
+test('nested H4 continuation reentry poisons the outer operation and drains every dependent once', async () => {
+    const { owner, proposalRef } = await h4Fixture(); const lifecycle = owner.lifecycleController; const disposals = [0, 0];
+    let first: unknown = null, second: unknown = null, nested: Promise<boolean> | null = null;
+    assert.equal(await lifecycle.withCurrentProposal(proposalRef, () => {
+        first = lifecycle.registerDependent(proposalRef, () => { disposals[0] += 1; });
+        second = lifecycle.registerDependent(proposalRef, () => { disposals[1] += 1; });
+    }), true); assert.ok(first); assert.ok(second);
+    assert.equal(await lifecycle.withCurrentDependent(proposalRef, first, () => {
+        nested = lifecycle.withCurrentDependent(proposalRef, second, () => undefined);
+    }), false);
+    assert.ok(nested); assert.equal(await nested, false); assert.deepEqual(disposals, [1, 1]);
+    assert.equal(lifecycle.confirmDependent(proposalRef, first), false); assert.equal(lifecycle.confirmDependent(proposalRef, second), false);
+});
+
+test('H4 terminal drain snapshots three dependents before unregister, reentry, and throw', async () => {
+    const { owner, proposalRef } = await h4Fixture(); const lifecycle = owner.lifecycleController; const calls: string[] = [], registrations: unknown[] = [];
+    let siblingUnregister: boolean | null = null, nested: Promise<boolean> | null = null;
+    assert.equal(await lifecycle.withCurrentProposal(proposalRef, () => {
+        registrations.push(lifecycle.registerDependent(proposalRef, () => {
+            calls.push('first'); siblingUnregister = lifecycle.unregisterDependent(proposalRef, registrations[1]);
+            nested = lifecycle.withCurrentProposal(proposalRef, () => undefined);
+        }));
+        registrations.push(lifecycle.registerDependent(proposalRef, () => { calls.push('second'); throw new Error('synthetic H4 cleanup'); }));
+        registrations.push(lifecycle.registerDependent(proposalRef, () => { calls.push('third'); }));
+    }), true);
+    assert.equal(owner.service.wipe(proposalRef), true); assert.deepEqual(calls, ['first', 'second', 'third']);
+    assert.equal(siblingUnregister, false); assert.ok(nested); assert.equal(await nested, false);
+    for (const registration of registrations) assert.equal(lifecycle.confirmDependent(proposalRef, registration), false);
+    assert.equal(owner.service.wipe(proposalRef), false); assert.deepEqual(calls, ['first', 'second', 'third']);
+});
+
+test('H4 terminal drain observes a Promise rejection returned by a normal disposer', async () => {
+    const { owner, proposalRef } = await h4Fixture(); const lifecycle = owner.lifecycleController; const unhandled: unknown[] = [];
+    const observeUnhandled = (reason: unknown) => { unhandled.push(reason); }; process.on('unhandledRejection', observeUnhandled);
+    try {
+        let registration: unknown = null; assert.equal(await lifecycle.withCurrentProposal(proposalRef, () => {
+            registration = lifecycle.registerDependent(proposalRef,
+                () => Promise.reject(new Error('synthetic async H4 disposer')) as never);
+        }), true); assert.ok(registration);
+        assert.equal(owner.service.wipe(proposalRef), true); await new Promise<void>((resolve) => setImmediate(resolve));
+        assert.deepEqual(unhandled, []); assert.equal(lifecycle.confirmDependent(proposalRef, registration), false);
+    } finally { process.off('unhandledRejection', observeUnhandled); }
+});
+
+test('H4 drain rejects reentry into a sibling proposal without damaging that proposal', async () => {
+    const { owner, proposals } = await twoProposalFixture(); const lifecycle = owner.lifecycleController;
+    let nested: Promise<boolean> | null = null, siblingUses = 0, registration: unknown = null;
+    assert.equal(await lifecycle.withCurrentProposal(proposals[0], () => {
+        registration = lifecycle.registerDependent(proposals[0], () => {
+            nested = lifecycle.withCurrentProposal(proposals[1], () => { siblingUses += 100; });
+        });
+    }), true); assert.ok(registration);
+    assert.equal(owner.service.wipe(proposals[0]), true); assert.ok(nested); assert.equal(await nested, false); assert.equal(siblingUses, 0);
+    assert.equal(await lifecycle.withCurrentProposal(proposals[1], () => { siblingUses += 1; }), true); assert.equal(siblingUses, 1);
+    assert.equal(owner.service.wipe(proposals[1]), true);
+});
+
+test('H4 final fences deny H2b and selection retirement after callback without stale success', async () => {
+    for (const boundary of ['lease', 'selection'] as const) {
+        const { current, owner, proposalRef } = await h4Fixture(); const lifecycle = owner.lifecycleController;
+        let registration: unknown = null, callbacks = 0, disposals = 0;
+        assert.equal(await lifecycle.withCurrentProposal(proposalRef, () => {
+            registration = lifecycle.registerDependent(proposalRef, () => { disposals += 1; });
+        }), true); assert.ok(registration);
+        if (boundary === 'lease') current.sources.leaseLifecycle.withCurrentDependent = async (_candidate, _registration, operation) => {
+            operation(); current.retireLeaseAttachment(); return true;
+        };
+        else current.sources.selectionLifecycle.withCurrentDependent = (_candidate, _registration, operation) => {
+            operation(); current.retireSelectionAttachment(); return true;
+        };
+        assert.equal(await lifecycle.withCurrentDependent(proposalRef, registration, () => { callbacks += 1; }), false, boundary);
+        assert.equal(callbacks, 1, boundary); assert.equal(disposals, 1, boundary);
+        assert.equal(lifecycle.confirmDependent(proposalRef, registration), false, boundary);
+        assert.equal(await lifecycle.withCurrentDependent(proposalRef, registration, () => { callbacks += 100; }), false, boundary);
+        assert.equal(callbacks, 1, boundary); assert.equal(disposals, 1, boundary);
+    }
 });
 
 test('core remains memory-only and uses only injected clock and scheduler boundaries', () => {
