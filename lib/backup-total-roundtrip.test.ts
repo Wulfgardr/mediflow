@@ -252,7 +252,7 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
         updated_at: now + 22,
     });
     insertRow(db, 'headless_soap_active_role_attestations', {
-        attestation_ref: 'w7-soap-attestation', actor_ref: actorRef,
+        attestation_ref: `hsar_${'7'.repeat(32)}`, actor_ref: actorRef,
         schema_version: 'mediflow.headless-soap-active-role-attestation.v1', role: 'physician',
         operation_id: 'mediflow.clinical_diary.append_soap.v1', policy_version: 'clinician_confirmed_single_use.v1',
         status: 'active', attestation_version: 1, issuer_ref: 'w7-soap-issuer', expires_at: now + 60,
@@ -371,7 +371,7 @@ test('rolls back a SOAP attestation restore when its local actor is absent', asy
         prepareDatabase(targetDataDir);
         const payload = createEmptyDataset();
         payload.headlessSoapActiveRoleAttestations = [{
-            attestationRef: 'soap-attestation-missing-actor', actorRef: 'absent-synthetic-actor',
+            attestationRef: `hsar_${'e'.repeat(32)}`, actorRef: 'absent-synthetic-actor',
             schemaVersion: 'mediflow.headless-soap-active-role-attestation.v1', role: 'physician',
             operationId: 'mediflow.clinical_diary.append_soap.v1', policyVersion: 'clinician_confirmed_single_use.v1',
             status: 'inactive', attestationVersion: 1, issuerRef: null, expiresAt: null, activatedAt: null,
