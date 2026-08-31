@@ -98,6 +98,7 @@ const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_SCHEMA = 'mediflow.headless-soap-act
 const HEADLESS_SOAP_ACTIVE_ROLE_ROLE = 'physician';
 const HEADLESS_SOAP_ACTIVE_ROLE_OPERATION = 'mediflow.clinical_diary.append_soap.v1';
 const HEADLESS_SOAP_ACTIVE_ROLE_POLICY = 'clinician_confirmed_single_use.v1';
+const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_REF = /^hsar_[0-9a-f]{32}$/;
 const BACKUP_ARTIFACT_ROOT_KEYS = ['format', 'version', 'manifest', 'payload'] as const;
 
 export interface BackupArtifactManifest {
@@ -291,7 +292,7 @@ function assertHeadlessSoapActiveRoleAttestationRows(
             && Number.isSafeInteger(attestation.revocationGeneration) && attestation.revocationGeneration >= 1
             && ((attestation.issuerRef === null && expiresAt === null && activatedAt === null)
                 || (hasValidIssuer && expiresAt !== null && activatedAt !== null));
-        if (typeof attestation.attestationRef !== 'string' || attestation.attestationRef.trim() !== attestation.attestationRef || attestation.attestationRef.length < 1 || attestation.attestationRef.length > 256 || attestationRefs.has(attestation.attestationRef)
+        if (typeof attestation.attestationRef !== 'string' || !HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_REF.test(attestation.attestationRef) || attestationRefs.has(attestation.attestationRef)
             || typeof attestation.actorRef !== 'string' || attestation.actorRef.trim() !== attestation.actorRef || attestation.actorRef.length < 1 || attestation.actorRef.length > 256 || actorRefs.has(attestation.actorRef)
             || attestation.schemaVersion !== HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATION_SCHEMA
             || attestation.role !== HEADLESS_SOAP_ACTIVE_ROLE_ROLE
