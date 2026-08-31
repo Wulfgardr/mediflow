@@ -7,6 +7,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
+import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3400';
 const LOCAL_API_TOKEN = process.env.MEDIFLOW_LOCAL_API_TOKEN || 'mediflow-network-write-smoke-local-token';
@@ -152,13 +153,10 @@ async function pairClient(requestedCapabilities, deviceName) {
 }
 
 async function login() {
-    const response = await request('POST', '/api/auth/login', { body: { username: USERNAME, password: PIN } });
+    const response = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
     assert.equal(response.response.status, 200, 'Smoke operator login must succeed');
-    const raw = typeof response.response.headers.getSetCookie === 'function'
-        ? response.response.headers.getSetCookie().find((entry) => entry.startsWith('mediflow_session='))
-        : response.response.headers.get('set-cookie');
-    assert.ok(raw, 'Operator login must set mediflow_session');
-    return raw.split(';')[0];
+    assert.ok(response.sessionCookie, 'Operator login must set mediflow_session');
+    return response.sessionCookie;
 }
 
 async function createSeedPatient(ambulatoryId) {

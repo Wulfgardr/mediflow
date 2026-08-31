@@ -71,6 +71,7 @@ const nextConfig: NextConfig = {
       "./node_modules/sharp/**/*",
       "./node_modules/@img/**/*",
       "./node_modules/@firecrawl/anydoc*/**/*",
+      "./node_modules/@mediflow/web-auth-lifecycle-owner/**/*",
     ],
   },
   /* @Codex */
@@ -115,7 +116,7 @@ const nextConfig: NextConfig = {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
   turbopack: {},
-  serverExternalPackages: ['pdfjs-dist', 'pm2'],
+  serverExternalPackages: ['@mediflow/web-auth-lifecycle-owner', 'pdfjs-dist', 'pm2'],
   webpack: (config) => {
     config.resolve.alias.canvas = false;
     return config;

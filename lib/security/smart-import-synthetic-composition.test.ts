@@ -14,15 +14,22 @@ import { createAuthenticatedSmartImportPreviewService } from './server-session-a
 import { createSmartImportIngestHttpHandler } from './server-session-smart-import-ingest-http.ts';
 import { createSmartImportPreviewHttpHandler } from './server-session-smart-import-preview-http.ts';
 import { createSmartImportSelectionEpochHttpHandler, createSmartImportSelectionHttpHandler } from './server-session-smart-import-selection-http.ts';
-import { createServerSessionProjectionOwnerRegistry } from './server-session-projection-owner.ts';
-import { clearAllSessions, createSession } from './server-session.ts';
+import { createFullPortProjectionOwnerFactory } from './server-session-projection-owner.ts';
+import type { ServerSession } from './server-session.ts';
 import { createSmartImportProjectionAttachmentBrowserNormalizer } from './smart-import-projection-attachment-browser-normalizer.ts';
 import { createSmartImportSelectionBrowserAdapter } from './smart-import-selection-browser-adapter.ts';
 import { createSmartImportBrowserOrchestrator } from './smart-import-browser-orchestrator.ts';
+import { issueSyntheticWebSession, retireSyntheticWebSession } from './web-auth-lifecycle-owner-test-fixture.ts';
 import { parseSmartImportPreviewWireRoot } from '../smart-import-preview-wire.ts';
 
-afterEach(() => clearAllSessions());
 const USER = { id: 'synthetic-e2e-user', username: ['synthetic', 'e2e'].join('-'), role: 'clinician' };
+const sessions: ServerSession[] = [];
+let sessionSequence = 0;
+
+afterEach(() => {
+    while (sessions.length > 0) retireSyntheticWebSession(sessions.pop()!);
+});
+
 const bytes = (value: number) => new Uint8Array(16).fill(value);
 const attachmentInput = () => ({ patient: { version: 3 }, currentDiagnoses: [{ system: 'ICD-11', code: 'SYN-1', description: 'Synthetic diagnosis' }], currentActiveTherapies: [], sources: [{ kind: 'clinical-entry', originKey: 'origin.synthetic.1', label: 'Synthetic source', date: null, content: 'Synthetic content' }], therapyCandidateHints: [] });
 
@@ -35,7 +42,9 @@ function request(path: string, init?: RequestInit): Request { return new Request
 
 function harness(tamper = false) {
     const now = new Date().toISOString(); const noStore: string[] = []; let entropy = 0; let selectionCalls = 0; let ingestCalls = 0; let previewCalls = 0; let killSwitchReads = 0; let consumes = 0; let chats = 0; let routers = 0;
-    const session = createSession(USER); const registry = createServerSessionProjectionOwnerRegistry({ resolve: (_session, pair) => Object.freeze(pair), clock: () => Date.parse(now), entropy: () => bytes(++entropy), brokerFactory: (config) => createTypedProjectionBroker(config, { clock: () => now, entropy: () => bytes(++entropy) }) });
+    const session = issueSyntheticWebSession(USER, `smart-import-composition-${sessionSequence += 1}`);
+    sessions.push(session);
+    const registry = createFullPortProjectionOwnerFactory({ resolve: (_session, pair) => Object.freeze(pair), clock: () => Date.parse(now), entropy: () => bytes(++entropy), brokerFactory: (config) => createTypedProjectionBroker(config, { clock: () => now, entropy: () => bytes(++entropy) }) });
     const acquireContext = async () => Object.freeze({ session, owner: registry.acquire(session) });
     const selection = createAuthenticatedWebSessionSelectionService({ acquireOwner: async () => registry.acquire(session) });
     const selectionHttp = createSmartImportSelectionHttpHandler({ issueSelection: async (input) => { selectionCalls += 1; return selection.issue(input); } });

@@ -27,6 +27,8 @@ ENV_FILE="$ARTIFACT_DIR/launch.env"
 SCREENSHOT_PATH="$ARTIFACT_DIR/mobile-home-base-launch.png"
 SETTINGS_SNAPSHOT_PATH="$ARTIFACT_DIR/network-settings.snapshot"
 BONJOUR_LOG_PATH="$ARTIFACT_DIR/bonjour.log"
+HTTP_AUTH_COOKIE_JAR="$ARTIFACT_DIR/http-auth-control.cookies"
+HTTPS_AUTH_COOKIE_JAR="$ARTIFACT_DIR/https-auth-control.cookies"
 BUNDLE_ID="${MEDIFLOW_IOS_BUNDLE_ID:-com.mediflow.mobile}"
 SIMULATOR_ID="${MEDIFLOW_IOS_SIMULATOR_ID:-}"
 SIMULATOR_NAME="${MEDIFLOW_MOBILE_SMOKE_SIMULATOR_NAME:-}"
@@ -34,6 +36,9 @@ BONJOUR_PID=""
 TLS_PROXY_WAS_RUNNING=0
 
 mkdir -p "$ARTIFACT_DIR"
+: > "$HTTP_AUTH_COOKIE_JAR"
+: > "$HTTPS_AUTH_COOKIE_JAR"
+chmod 600 "$HTTP_AUTH_COOKIE_JAR" "$HTTPS_AUTH_COOKIE_JAR"
 [[ -n "$OPERATOR_PIN" ]] || { echo "Missing MEDIFLOW_MOBILE_SMOKE_OPERATOR_PIN."; exit 1; }
 [[ -f "$DB_PATH" ]] || { echo "Database not found at $DB_PATH"; exit 1; }
 [[ -f "$TOKEN_FILE" ]] || { echo "Local API token not found at $TOKEN_FILE"; exit 1; }
@@ -118,7 +123,7 @@ cleanup() {
       MEDIFLOW_DATA_DIR="$DATA_DIR" MEDIFLOW_TLS_BIND_HOST="$RESTORE_TLS_BIND_HOST" bash scripts/native-setup.sh >/dev/null 2>&1 || true
     fi
   fi
-  rm -f "$ENV_FILE"
+  rm -f "$ENV_FILE" "$HTTP_AUTH_COOKIE_JAR" "$HTTPS_AUTH_COOKIE_JAR"
 }
 
 trap cleanup EXIT
@@ -126,15 +131,17 @@ trap cleanup EXIT
 sqlite3 "$DB_PATH" "select key || char(9) || hex(value) from settings where key in ('network.mode','network.nodeId','network.pairing.state') order by key;" > "$SETTINGS_SNAPSHOT_PATH"
 
 echo "Checking local backend on $HTTP_URL ..."
-curl -fsS "$HTTP_URL/api/auth/check" >/dev/null || { echo "Local backend is not reachable on $HTTP_URL. Start MediFlow first."; exit 1; }
-if curl -kfsS "$HTTPS_URL/api/auth/check" >/dev/null 2>&1; then
+curl -fsS -b "$HTTP_AUTH_COOKIE_JAR" -c "$HTTP_AUTH_COOKIE_JAR" "$HTTP_URL/api/auth/check" >/dev/null \
+  || { echo "Local backend is not reachable on $HTTP_URL. Start MediFlow first."; exit 1; }
+if curl -kfsS -b "$HTTPS_AUTH_COOKIE_JAR" -c "$HTTPS_AUTH_COOKIE_JAR" "$HTTPS_URL/api/auth/check" >/dev/null 2>&1; then
   TLS_PROXY_WAS_RUNNING=1
 fi
 if is_truthy "$RESTART_TLS_PROXY"; then
   stop_tls_proxy
 fi
 
-if ! curl -kfsS "$HTTPS_URL/api/auth/check" >/dev/null 2>&1 || is_truthy "$RESTART_TLS_PROXY"; then
+if ! curl -kfsS -b "$HTTPS_AUTH_COOKIE_JAR" -c "$HTTPS_AUTH_COOKIE_JAR" "$HTTPS_URL/api/auth/check" >/dev/null 2>&1 \
+  || is_truthy "$RESTART_TLS_PROXY"; then
   if ! is_loopback_host "$TLS_BIND_HOST"; then
     local_api_token="$(cat "$TOKEN_FILE")"
     curl -fsS -X PUT "$HTTP_URL/api/settings/network.mode" \
@@ -149,7 +156,7 @@ fi
 
 https_proxy_ready=0
 for _ in {1..10}; do
-  if curl -kfsS "$HTTPS_URL/api/auth/check" >/dev/null 2>&1; then
+  if curl -kfsS -b "$HTTPS_AUTH_COOKIE_JAR" -c "$HTTPS_AUTH_COOKIE_JAR" "$HTTPS_URL/api/auth/check" >/dev/null 2>&1; then
     https_proxy_ready=1
     break
   fi
@@ -180,6 +187,7 @@ MEDIFLOW_MOBILE_SMOKE_CLIENT_PLATFORM="$CLIENT_PLATFORM" \
 MEDIFLOW_MOBILE_SMOKE_SIMULATOR_NAME="$SIMULATOR_NAME" \
 node --input-type=module <<'EOF'
 import fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const envFile = process.env.MEDIFLOW_MOBILE_SMOKE_ENV_FILE;
@@ -194,15 +202,36 @@ const useBonjour = /^(1|true|yes|on)$/i.test(process.env.MEDIFLOW_MOBILE_SMOKE_U
 const clientPlatform = process.env.MEDIFLOW_MOBILE_SMOKE_CLIENT_PLATFORM || 'ios';
 const simulatorName = process.env.MEDIFLOW_MOBILE_SMOKE_SIMULATOR_NAME || 'Booted Simulator';
 const localApiToken = fs.readFileSync(process.env.MEDIFLOW_MOBILE_SMOKE_TOKEN_FILE, 'utf8').trim();
+const strongAuthControlEtag = /^"[A-Za-z0-9_-]{32,256}"$/u;
+const authControlCookieValue = /^[A-Za-z0-9_-]{32,256}$/u;
+const sessionCookieValue = /^[a-f0-9]{64}$/u;
 
 const shellEscape = (value) => `'${String(value).replace(/'/g, `'\\''`)}'`;
 const assertStatus = (result, status, message) => {
   if (result.response.status !== status) throw new Error(`${message}: ${result.response.status} ${result.text}`);
 };
-const extractCookie = (response) => {
-  const match = (response.headers.get('set-cookie') || '').match(/mediflow_session=[^;]+/);
-  if (!match) throw new Error('mediflow_session cookie was not returned by /api/auth/login');
-  return match[0];
+const responseSetCookies = (response) => {
+  if (typeof response.headers.getSetCookie === 'function') return response.headers.getSetCookie();
+  const combined = response.headers.get('set-cookie');
+  return combined ? [combined] : [];
+};
+const extractCookie = (response, name, pattern, source) => {
+  const values = [];
+  for (const field of responseSetCookies(response)) {
+    const match = field.match(new RegExp(`(?:^|,\\s*)${name}=([^;,]+)`, 'u'));
+    if (match) values.push(match[1]);
+  }
+  if (values.length !== 1 || !pattern.test(values[0])) {
+    throw new Error(`${source} did not return one valid ${name} cookie`);
+  }
+  return `${name}=${values[0]}`;
+};
+const extractStrongAuthControlEtag = (response, source) => {
+  const etag = response.headers.get('etag');
+  if (!etag || !strongAuthControlEtag.test(etag)) {
+    throw new Error(`${source} did not return a strong authentication control ETag`);
+  }
+  return etag;
 };
 const request = async (baseUrl, method, pathname, { headers = {}, body } = {}) => {
   const response = await fetch(new URL(pathname, baseUrl), {
@@ -242,18 +271,43 @@ if (typeof pairedClientId !== 'string' || !pairedClientId || typeof pairedClient
   throw new Error('Pairing confirmation did not return client credentials');
 }
 
+/* @Codex Native fetch has no implicit cookie jar. Carry the exact opaque
+   control cookie and strong fence through bootstrap, login and the read. */
+const authBootstrap = await request(httpsUrl, 'GET', '/api/auth/check', {
+  headers: { 'Cache-Control': 'no-store' },
+});
+assertStatus(authBootstrap, 200, 'Authentication control bootstrap failed');
+const controlCookie = extractCookie(
+  authBootstrap.response,
+  'mediflow_auth_control',
+  authControlCookieValue,
+  'Authentication control bootstrap',
+);
+const controlEtag = extractStrongAuthControlEtag(authBootstrap.response, 'Authentication control bootstrap');
 const login = await request(httpsUrl, 'POST', '/api/auth/login', {
+  headers: {
+    Cookie: controlCookie,
+    'If-Match': controlEtag,
+    'Idempotency-Key': randomUUID(),
+  },
   body: { username: username || undefined, password: operatorPin },
 });
 assertStatus(login, 200, 'Operator login failed');
+const successorEtag = extractStrongAuthControlEtag(login.response, 'Operator login');
+if (successorEtag === controlEtag) throw new Error('Operator login did not advance the authentication control ETag');
 const setCookie = login.response.headers.get('set-cookie') || '';
 if (!/;\s*Secure\b/i.test(setCookie)) {
   throw new Error(`HTTPS operator login did not return a Secure session cookie: ${setCookie || '<empty>'}`);
 }
-const cookie = extractCookie(login.response);
+const sessionCookie = extractCookie(
+  login.response,
+  'mediflow_session',
+  sessionCookieValue,
+  'Operator login',
+);
 assertStatus(await request(httpsUrl, 'GET', '/api/v1/network/patients', {
   headers: {
-    Cookie: `${cookie}; ambulatory_id=${ambulatoryId}`,
+    Cookie: `${controlCookie}; ${sessionCookie}; ambulatory_id=${ambulatoryId}`,
     'x-mediflow-paired-client-id': pairedClientId,
     'x-mediflow-paired-client-token': pairedClientToken,
   },

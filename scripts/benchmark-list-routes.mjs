@@ -10,6 +10,7 @@ import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RUN_STRIP_TYPES = path.join(ROOT_DIR, 'scripts/run-strip-types.mjs');
@@ -116,7 +117,7 @@ async function waitForServer(server, baseUrl) {
   while (Date.now() < deadline) {
     if (server.exitCode !== null) throw new Error(`Il server benchmark e terminato con ${server.exitCode}`);
     try {
-      const response = await fetch(`${baseUrl}/api/auth/check`, { cache: 'no-store' });
+      const response = await fetch(`${baseUrl}/api/system/revision`, { cache: 'no-store' });
       if (response.ok) return;
     } catch {
       // Avvio non ancora completato.
@@ -137,15 +138,10 @@ async function stopServer(server) {
 }
 
 async function login(baseUrl) {
-  const response = await fetch(`${baseUrl}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(LOGIN),
-  });
-  if (!response.ok) throw new Error(`Login benchmark fallito: ${response.status} ${await response.text()}`);
-  const setCookie = response.headers.get('set-cookie');
-  if (!setCookie) throw new Error('Il login benchmark non ha restituito il cookie di sessione');
-  return setCookie.split(';', 1)[0];
+  const result = await loginWithWebAuthControl(baseUrl, LOGIN);
+  if (!result.response.ok) throw new Error(`Login benchmark fallito: ${result.response.status}`);
+  if (!result.sessionCookie) throw new Error('Il login benchmark non ha restituito il cookie di sessione');
+  return result.sessionCookie;
 }
 
 function decryptFixture(value) {

@@ -11,57 +11,67 @@ import { verifyHostCredentials } from '@/lib/security/host-credential-verificati
 import { SESSION_COOKIE_NAME } from '@/lib/security/server-session';
 /* @Codex */
 import {
-    abort as abortWebAuthSession,
-    begin as beginWebAuthSession,
-    issue as issueWebAuthSession,
-    type WebAuthSessionAttempt,
-} from '@/lib/security/web-auth-session-issuer';
+    abortWebAuthControl,
+    beginWebAuthControl,
+    issueWebAuthControl,
+    setWebAuthControlEtag,
+    webAuthControlMutationFromRequest,
+    type WebAuthControlMutation,
+} from '@/lib/security/web-auth-control-transport';
 /* @Codex */
 import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
 
 /* @Codex */
-function authFailureResponse(payload: Record<string, unknown>, status: number) {
+function authFailureResponse(payload: Record<string, unknown>, status: number, etag?: string) {
     const response = NextResponse.json(payload, { status });
     const retryAfterSeconds = typeof payload.retryAfterSeconds === 'number' ? payload.retryAfterSeconds : null;
     if (retryAfterSeconds) {
         response.headers.set('Retry-After', String(retryAfterSeconds));
     }
     response.headers.set('Cache-Control', 'no-store');
+    if (etag) setWebAuthControlEtag(response, etag);
     return response;
 }
 
 export async function POST(request: Request) {
-    let attempt: WebAuthSessionAttempt | null = null;
+    let mutation: WebAuthControlMutation | null = null;
+    let attempt: unknown | null = null;
     try {
+        mutation = webAuthControlMutationFromRequest(request);
+        if (!mutation) {
+            return authFailureResponse({ error: 'Login unavailable', code: 'AUTH_LOGIN_UNAVAILABLE' }, 503);
+        }
+        attempt = beginWebAuthControl('login', mutation);
+        if (!attempt) {
+            return authFailureResponse({ error: 'Login unavailable', code: 'AUTH_LOGIN_UNAVAILABLE' }, 503, mutation.ifMatch);
+        }
+
         const body = await request.json();
         const requestedUsername = typeof body?.username === 'string' ? body.username.trim() : '';
         const password = typeof body?.password === 'string' ? body.password : '';
 
         if (!password) {
-            return authFailureResponse({ error: 'Missing credentials', code: 'AUTH_MISSING_CREDENTIALS' }, 400);
-        }
-
-        attempt = beginWebAuthSession('login');
-        if (!attempt) {
-            return authFailureResponse({ error: 'Login unavailable', code: 'AUTH_LOGIN_UNAVAILABLE' }, 503);
+            abortWebAuthControl(attempt);
+            attempt = null;
+            return authFailureResponse({ error: 'Missing credentials', code: 'AUTH_MISSING_CREDENTIALS' }, 400, mutation.ifMatch);
         }
 
         // The shared verifier records 'auth.login.failed' with Web-only context.
         const verification = await verifyHostCredentials({ username: requestedUsername, pin: password });
         if (verification.kind === 'denied') {
-            abortWebAuthSession(attempt);
+            abortWebAuthControl(attempt);
             attempt = null;
-            return authFailureResponse(verification.body, verification.status);
+            return authFailureResponse(verification.body, verification.status, mutation.ifMatch);
         }
         const user = verification.account;
-        const session = issueWebAuthSession(attempt, {
+        const session = issueWebAuthControl(attempt, {
             id: user.id,
             username: user.username,
             role: user.role || 'user',
         });
         attempt = null;
         if (!session) {
-            return authFailureResponse({ error: 'Login unavailable', code: 'AUTH_LOGIN_UNAVAILABLE' }, 503);
+            return authFailureResponse({ error: 'Login unavailable', code: 'AUTH_LOGIN_UNAVAILABLE' }, 503, mutation.ifMatch);
         }
         try {
             await writeAuditEvent({
@@ -94,11 +104,11 @@ export async function POST(request: Request) {
             salt: user.salt
         });
         response.cookies.set(SESSION_COOKIE_NAME, session.sessionId, sessionCookieOptionsForRequest(request));
-        response.headers.set('Cache-Control', 'no-store');
+        setWebAuthControlEtag(response, session.etag);
         return response;
     } catch (error) {
-        if (attempt) abortWebAuthSession(attempt);
+        if (attempt) abortWebAuthControl(attempt);
         console.error("Login error:", error);
-        return authFailureResponse({ error: "Login failed", code: "AUTH_LOGIN_FAILED" }, 500);
+        return authFailureResponse({ error: "Login failed", code: "AUTH_LOGIN_FAILED" }, 500, mutation?.ifMatch);
     }
 }

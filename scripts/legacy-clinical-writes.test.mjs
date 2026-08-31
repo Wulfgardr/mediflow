@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
+import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3310';
 const LOCAL_API_TOKEN = process.env.MEDIFLOW_LOCAL_API_TOKEN || 'mediflow-legacy-clinical-writes-token';
@@ -244,11 +245,10 @@ async function assertServerReady() {
 }
 
 async function login() {
-    const loginResponse = await request('POST', '/api/auth/login', {
-        body: { username: USERNAME, password: PIN },
-    });
-    assert.equal(loginResponse.status, 200);
-    return extractSessionCookie(loginResponse.response);
+    const loginResponse = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
+    assert.equal(loginResponse.response.status, 200);
+    assert.ok(loginResponse.sessionCookie);
+    return loginResponse.sessionCookie;
 }
 
 async function createSeedPatient() {
@@ -320,19 +320,6 @@ async function request(method, pathname, { headers = {}, body } = {}) {
     }
 
     return { response, status: response.status, json, text };
-}
-
-function extractSessionCookie(response) {
-    const setCookies = typeof response.headers.getSetCookie === 'function'
-        ? response.headers.getSetCookie()
-        : [];
-    const cookieSource = setCookies.find((cookie) => cookie.startsWith('mediflow_session='))
-        ?? response.headers.get('set-cookie');
-    if (!cookieSource) {
-        throw new Error('mediflow_session cookie was not returned by /api/auth/login');
-    }
-
-    return cookieSource.split(';')[0];
 }
 
 function resolveReportPath() {

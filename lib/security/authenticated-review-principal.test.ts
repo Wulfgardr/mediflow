@@ -6,7 +6,11 @@ import {
     AuthenticatedReviewPrincipalError,
     createAuthenticatedReviewPrincipalResolver,
 } from './authenticated-review-principal.ts';
-import { clearAllSessions, createSession, type ServerSession } from './server-session.ts';
+import type { ServerSession } from './server-session.ts';
+import {
+    issueSyntheticWebSession,
+    retireSyntheticWebSession,
+} from './web-auth-lifecycle-owner-test-fixture.ts';
 
 const USER = Object.freeze({
     id: ['synthetic', 'review', 'user'].join('-'),
@@ -14,11 +18,17 @@ const USER = Object.freeze({
     role: 'user',
 });
 const MISMATCHED_USERNAME = ['synthetic', 'other', 'principal'].join('-');
+const sessions: ServerSession[] = [];
+let sequence = 0;
 
-afterEach(() => clearAllSessions());
+afterEach(() => {
+    while (sessions.length > 0) retireSyntheticWebSession(sessions.pop()!);
+});
 
 function currentWebSession(): ServerSession {
-    return createSession(USER, 'web');
+    const session = issueSyntheticWebSession(USER, `review-principal-${sequence += 1}`);
+    sessions.push(session);
+    return session;
 }
 
 function resolver(
@@ -41,7 +51,6 @@ test('resolves only the opaque actor and current session binding from the canoni
 
 test('resolving the canonical review principal does not slide session expiry', async () => {
     const session = currentWebSession();
-    session.expiresAt = Date.now() + 60_000;
     const expiry = session.expiresAt;
 
     await resolver(session, async (userId) => [{ id: userId, username: USER.username }]).resolve();
@@ -61,6 +70,17 @@ test('denies a missing canonical user and a username-discontinuous principal', a
     );
 });
 
+test('denies when the owner retires the projection during canonical lookup', async () => {
+    const session = currentWebSession();
+    await assert.rejects(
+        resolver(session, async (userId) => {
+            retireSyntheticWebSession(session);
+            return [{ id: userId, username: USER.username }];
+        }).resolve(),
+        (error) => error instanceof AuthenticatedReviewPrincipalError && error.code === 'session_ineligible',
+    );
+});
+
 test('denies duplicate lookup results, storage failures, and system sessions', async () => {
     const session = currentWebSession();
     const same = { id: USER.id, username: USER.username };
@@ -74,7 +94,7 @@ test('denies duplicate lookup results, storage failures, and system sessions', a
             && !/synthetic storage/u.test(error.message),
     );
 
-    const systemSession = createSession(USER, 'system');
+    const systemSession: ServerSession = { ...session, id: 'system.synthetic.review-principal', authChannel: 'system' };
     await assert.rejects(
         resolver(systemSession, async () => [same]).resolve(),
         (error) => error instanceof AuthenticatedReviewPrincipalError && error.code === 'session_ineligible',

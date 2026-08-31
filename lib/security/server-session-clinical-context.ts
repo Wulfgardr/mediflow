@@ -4,7 +4,16 @@ import 'server-only';
 import { and, eq } from 'drizzle-orm';
 import type { dbServer } from '../db-server';
 import { ambulatories, patients, patientsToAmbulatories } from '../schema';
-import { getSession, type ServerSession } from './server-session';
+import type { ServerSession } from './server-session';
+import {
+    abortResourceUse,
+    beginResourceUse,
+    commitResourceUse,
+    mintResourcePort,
+    releaseResourcePort,
+    type WebResourcePort,
+    type WebResourceUse,
+} from './web-auth-lifecycle-owner-adapter';
 
 type ClinicalContextDatabase = Pick<typeof dbServer, 'select'>;
 
@@ -41,22 +50,33 @@ function parseRequest(input: unknown): Readonly<{ patientId: string; ambulatoryI
 export function createCanonicalClinicalContextResolver(database: ClinicalContextDatabase) {
     return (session: ServerSession, input: unknown) => {
         const request = parseRequest(input);
-        if (session.authChannel !== 'web' || session.id === 'local-api' || getSession(session.id) !== session) {
-            return fail('session_ineligible');
+        let port: WebResourcePort | null = null;
+        let use: WebResourceUse | null = null;
+        let committed = false;
+        try {
+            port = mintResourcePort(session);
+            if (!port) return fail('session_ineligible');
+            use = beginResourceUse(port);
+            if (!use || session.authChannel !== 'web' || session.id === 'local-api') return fail('session_ineligible');
+            const patient = database.select({ id: patients.id })
+                .from(patients).where(eq(patients.id, request.patientId)).get();
+            if (!patient) return fail('patient_missing');
+            const ambulatory = database.select({ id: ambulatories.id })
+                .from(ambulatories).where(eq(ambulatories.id, request.ambulatoryId)).get();
+            if (!ambulatory) return fail('ambulatory_missing');
+            const membership = database.select({ patientId: patientsToAmbulatories.patientId })
+                .from(patientsToAmbulatories)
+                .where(and(
+                    eq(patientsToAmbulatories.patientId, patient.id),
+                    eq(patientsToAmbulatories.ambulatoryId, ambulatory.id),
+                )).get();
+            if (!membership) return fail('membership_missing');
+            committed = commitResourceUse(use);
+            if (!committed) return fail('session_ineligible');
+            return Object.freeze({ patientId: patient.id, ambulatoryId: ambulatory.id });
+        } finally {
+            if (use && !committed) abortResourceUse(use);
+            if (port) releaseResourcePort(port);
         }
-        const patient = database.select({ id: patients.id })
-            .from(patients).where(eq(patients.id, request.patientId)).get();
-        if (!patient) return fail('patient_missing');
-        const ambulatory = database.select({ id: ambulatories.id })
-            .from(ambulatories).where(eq(ambulatories.id, request.ambulatoryId)).get();
-        if (!ambulatory) return fail('ambulatory_missing');
-        const membership = database.select({ patientId: patientsToAmbulatories.patientId })
-            .from(patientsToAmbulatories)
-            .where(and(
-                eq(patientsToAmbulatories.patientId, patient.id),
-                eq(patientsToAmbulatories.ambulatoryId, ambulatory.id),
-            )).get();
-        if (!membership) return fail('membership_missing');
-        return Object.freeze({ patientId: patient.id, ambulatoryId: ambulatory.id });
     };
 }

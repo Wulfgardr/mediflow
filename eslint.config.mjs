@@ -6,7 +6,7 @@ import nextTs from "eslint-config-next/typescript";
 const packageCommonJsConfig = {
   ...nextVitals[0],
   name: "mediflow/web-auth-lifecycle-owner-commonjs",
-  files: ["packages/web-auth-lifecycle-owner/**/*.cjs"],
+  files: ["packages/web-auth-lifecycle-owner/**/*.{cjs,js}"],
   languageOptions: {
     ...nextVitals[0].languageOptions,
     sourceType: "commonjs",

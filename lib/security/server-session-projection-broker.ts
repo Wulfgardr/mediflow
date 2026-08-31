@@ -2,13 +2,13 @@
 import 'server-only';
 
 import type { createTypedProjectionBroker } from '../typed-projection-broker';
+import { registerServerSessionResource } from './server-session';
 import {
-    type ActiveWebSessionResourcePort,
-    registerActiveWebSessionPrivateResource,
-    registerServerSessionResource,
-    releaseActiveWebSessionResourcePort,
-    unregisterActiveWebSessionPrivateResource,
-} from './server-session';
+    registerPrivateResource,
+    releaseResourcePort,
+    unregisterPrivateResource,
+    type WebResourcePort,
+} from './web-auth-lifecycle-owner-adapter';
 
 export class ServerSessionProjectionBrokerBindingError extends Error {
     constructor() {
@@ -49,17 +49,17 @@ export function bindProjectionBrokerToServerSession(
  */
 /* @Codex */
 export function bindProjectionBrokerToActiveWebSessionResource(
-    port: ActiveWebSessionResourcePort,
+    port: WebResourcePort,
     control: ProjectionBrokerControl,
 ): () => void {
-    const registration = registerActiveWebSessionPrivateResource(port, () => control.revoke());
+    const registration = registerPrivateResource(port, () => control.revoke());
     if (!registration) {
         try {
             containNativePromiseRejection(control.revoke() as unknown);
         } catch {
             // Cleanup failures remain opaque at this security boundary.
         } finally {
-            releaseActiveWebSessionResourcePort(port);
+            releaseResourcePort(port);
         }
         throw new ServerSessionProjectionBrokerBindingError();
     }
@@ -68,7 +68,7 @@ export function bindProjectionBrokerToActiveWebSessionResource(
     return () => {
         if (!active) return;
         active = false;
-        unregisterActiveWebSessionPrivateResource(port, registration);
-        releaseActiveWebSessionResourcePort(port);
+        unregisterPrivateResource(port, registration);
+        releaseResourcePort(port);
     };
 }

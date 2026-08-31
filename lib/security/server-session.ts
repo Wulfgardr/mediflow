@@ -4,14 +4,39 @@ import 'server-only';
 import crypto from 'crypto';
 import { types } from 'node:util';
 
-import {
-    abortPreparedAuthControlActivation,
-    abortPreparedAuthControlRetirement,
-    commitPreparedAuthControlActivation,
-    commitPreparedAuthControlRetirement,
-    prepareAuthControlActivation,
-    prepareAuthControlRetirement,
-} from './web-auth-control-record';
+/* @Codex: after O1-C the historical P3 owner cannot acquire P2 authority. */
+function prepareAuthControlActivation(_ticket: unknown, _exactSessionId: unknown): null {
+    return null;
+}
+
+/* @Codex */
+function commitPreparedAuthControlActivation(_prepared: unknown): 0 | 1 {
+    return 0;
+}
+
+/* @Codex */
+function abortPreparedAuthControlActivation(_prepared: unknown): boolean {
+    return false;
+}
+
+/* @Codex */
+function prepareAuthControlRetirement(
+    _ticket: unknown,
+    _exactSessionId: unknown,
+    _exactReason: unknown,
+): null {
+    return null;
+}
+
+/* @Codex */
+function commitPreparedAuthControlRetirement(_prepared: unknown): 0 | 2 {
+    return 0;
+}
+
+/* @Codex */
+function abortPreparedAuthControlRetirement(_prepared: unknown): boolean {
+    return false;
+}
 
 export const SESSION_COOKIE_NAME = 'mediflow_session';
 const SESSION_TTL_MS = Number(process.env.MEDIFLOW_SESSION_TTL_MS || 1000 * 60 * 60 * 8);
@@ -41,7 +66,9 @@ const mapKeys = Map.prototype.keys;
 const mapValues = Map.prototype.values;
 const mapIteratorNext = ObjectGetPrototypeOf(new MapConstructor().keys()).next;
 const setAdd = Set.prototype.add;
+const setClear = Set.prototype.clear;
 const setDelete = Set.prototype.delete;
+const setHas = Set.prototype.has;
 const setValues = Set.prototype.values;
 const setIteratorNext = ObjectGetPrototypeOf(new SetConstructor().values()).next;
 const setSize = ObjectGetOwnPropertyDescriptor(Set.prototype, 'size')!.get!;
@@ -93,6 +120,14 @@ function deleteSetValue<T>(registry: Set<T>, value: T): boolean {
     return applyIntrinsic(setDelete, registry, [value]);
 }
 
+function hasSetValue<T>(registry: Set<T>, value: T): boolean {
+    return applyIntrinsic(setHas, registry, [value]);
+}
+
+function clearSet<T>(registry: Set<T>): void {
+    applyIntrinsic(setClear, registry, []);
+}
+
 function nextSetIterator<T>(iterator: object): IteratorResult<T> {
     return applyIntrinsic(setIteratorNext, iterator, []) as IteratorResult<T>;
 }
@@ -137,6 +172,17 @@ function createWebServerSessionRetirementCleanupReceipt(
 const completedWebSessionRetirementCleanupReceipt = createWebServerSessionRetirementCleanupReceipt('completed');
 const failedWebSessionRetirementCleanupReceipt = createWebServerSessionRetirementCleanupReceipt('failed');
 const deniedWebSessionRetirementCleanupReceipt = createWebServerSessionRetirementCleanupReceipt('denied');
+/* @Codex */
+function createNativeSystemSessionOperationReceipt(
+    outcome: NativeSystemSessionOperationReceipt['outcome'],
+): NativeSystemSessionOperationReceipt {
+    const receipt = ObjectCreate(null) as { outcome: NativeSystemSessionOperationReceipt['outcome'] };
+    receipt.outcome = outcome;
+    return ObjectFreeze(receipt);
+}
+const completedNativeSystemSessionOperationReceipt = createNativeSystemSessionOperationReceipt('completed');
+const failedNativeSystemSessionOperationReceipt = createNativeSystemSessionOperationReceipt('failed');
+const deniedNativeSystemSessionOperationReceipt = createNativeSystemSessionOperationReceipt('denied');
 const retiredWebSessionSentinel = ObjectFreeze({
     id: '', userId: '', username: '', role: '', authChannel: 'web' as const, createdAt: 0, expiresAt: 0,
 });
@@ -159,6 +205,23 @@ export interface ServerSession {
 export type NativeServerSessionBinding = Readonly<{
     clientId: string;
     clientPlatform: 'macos' | 'ios' | 'ipados';
+}>;
+
+/* @Codex */
+declare const nativeSystemAdminResetCapability: unique symbol;
+export type NativeSystemAdminResetCapability = {
+    readonly [nativeSystemAdminResetCapability]: never;
+};
+declare const nativeLegacyUserRetirementCapability: unique symbol;
+export type NativeLegacyUserRetirementCapability = {
+    readonly [nativeLegacyUserRetirementCapability]: never;
+};
+declare const nativeLoginSessionFence: unique symbol;
+export type NativeLoginSessionFence = {
+    readonly [nativeLoginSessionFence]: never;
+};
+export type NativeSystemSessionOperationReceipt = Readonly<{
+    outcome: 'completed' | 'failed' | 'denied';
 }>;
 
 declare const stagedWebSessionCapsule: unique symbol;
@@ -231,6 +294,26 @@ interface ActiveWebSessionPrivateResourceRegistrationRecord {
     next: ActiveWebSessionPrivateResourceRegistrationRecord | null;
 }
 
+/* @Codex */
+type NativeSystemSessionOperationKind = 'admin_reset' | 'user_retirement';
+type NativeSystemSessionOperationTarget = {
+    sessionId: string;
+    session: ServerSession;
+    cleanupOnly: boolean;
+};
+type NativeSystemSessionOperationRecord = {
+    state: 'prepared' | 'committing' | 'committed' | 'aborted';
+    kind: NativeSystemSessionOperationKind;
+    capabilities: Set<object>;
+    userId: string | null;
+    targets: NativeSystemSessionOperationTarget[];
+    poisoned: boolean;
+};
+type NativeLoginSessionFenceRecord = {
+    active: boolean;
+    epoch: number | null;
+};
+
 const sessions = new MapConstructor<string, ServerSession>();
 const nativeSessionBindings = new WeakMap<ServerSession, NativeServerSessionBinding>();
 const sessionResources = new MapConstructor<string, Set<ServerSessionResourceRegistration>>();
@@ -243,6 +326,13 @@ const armedWebSessionPortRecords = new WeakMapConstructor<object, ArmedWebSessio
 const activeWebSessionCellsBySession = new WeakMapConstructor<ServerSession, ArmedWebSessionCellRecord>();
 const activeWebSessionResourcePortRecords = new WeakMapConstructor<object, ActiveWebSessionResourcePortRecord>();
 const activeWebSessionResourceUseRecords = new WeakMapConstructor<object, ActiveWebSessionResourceUseRecord>();
+const nativeSystemSessionOperationRecords = new WeakMapConstructor<object, NativeSystemSessionOperationRecord>();
+const nativeLoginSessionFenceRecords = new WeakMapConstructor<object, NativeLoginSessionFenceRecord>();
+const nativeLoginUserRetirementEpochs = new MapConstructor<string, number>();
+let nativeSystemSessionOperation: NativeSystemSessionOperationRecord | null = null;
+let nativeLoginRetirementEpoch = 0;
+let nativeLoginAdminResetEpoch = 0;
+let nativeLoginFenceStateAvailable = true;
 let activeWebSessionPrivateResourceRegistrationHead: ActiveWebSessionPrivateResourceRegistrationRecord | null = null;
 /* @Codex */
 interface UserRetirementTurnRecord {
@@ -313,6 +403,255 @@ function poisonUserRetirementTurns(): boolean {
         }
     }
     return poisoned;
+}
+
+/* @Codex */
+function advanceNativeLoginRetirementEpoch(userId: string | null): boolean {
+    if (!nativeLoginFenceStateAvailable) return false;
+    try {
+        const nextEpoch = nativeLoginRetirementEpoch + 1;
+        if (!NumberIsSafeInteger(nextEpoch)) throw new Error('native_login_epoch_unavailable');
+        if (userId === null) nativeLoginAdminResetEpoch = nextEpoch;
+        else setMapValue(nativeLoginUserRetirementEpochs, userId, nextEpoch);
+        nativeLoginRetirementEpoch = nextEpoch;
+        return true;
+    } catch {
+        nativeLoginFenceStateAvailable = false;
+        return false;
+    }
+}
+
+/* @Codex */
+function nativeLoginFenceAllowsUser(epoch: number | null, userId: string): boolean {
+    if (!nativeLoginFenceStateAvailable || epoch === null) return false;
+    try {
+        return nativeLoginAdminResetEpoch <= epoch
+            && (getMapValue(nativeLoginUserRetirementEpochs, userId) ?? 0) <= epoch;
+    } catch {
+        nativeLoginFenceStateAvailable = false;
+        return false;
+    }
+}
+
+/* @Codex */
+function consumeNativeLoginSessionFence(fence: unknown, userId: string): number | null {
+    try {
+        if (!fence || typeof fence !== 'object' || isProxy(fence)
+            || ObjectGetPrototypeOf(fence) !== null) return null;
+        const record = getWeakMapValue(nativeLoginSessionFenceRecords, fence);
+        if (!record || !record.active) return null;
+        record.active = false;
+        deleteWeakMapValue(nativeLoginSessionFenceRecords, fence);
+        return nativeLoginFenceAllowsUser(record.epoch, userId) ? record.epoch : null;
+    } catch { return null; }
+}
+
+/* @Codex */
+function nativeSystemOperationBlocksCreation(
+    user: unknown,
+    authChannel: ServerSession['authChannel'],
+): boolean {
+    const operation = nativeSystemSessionOperation;
+    if (!operation || (operation.state !== 'prepared' && operation.state !== 'committing')) return false;
+    if (operation.kind === 'admin_reset') return authChannel === 'native' || authChannel === 'system';
+    if (authChannel !== 'native' || !operation.userId) return false;
+    try {
+        if (!user || typeof user !== 'object' || isProxy(user)) return true;
+        const sessionUserId = ObjectGetOwnPropertyDescriptor(user, 'userId');
+        if (sessionUserId && 'value' in sessionUserId && typeof sessionUserId.value === 'string') {
+            return sessionUserId.value === operation.userId;
+        }
+        return sessionUserIdForRetirementTurn(user) === operation.userId;
+    } catch { return true; }
+}
+
+function prepareNativeSystemSessionOperation(
+    kind: NativeSystemSessionOperationKind,
+    userId: string | null,
+): object | null {
+    const active = nativeSystemSessionOperation;
+    if (active) {
+        if (active.state === 'committing') {
+            active.poisoned = true;
+            return null;
+        }
+        if (active.state === 'prepared' && kind === 'user_retirement'
+            && active.kind === kind && active.userId === userId) {
+            const alias = ObjectFreeze(ObjectCreate(null)) as object;
+            try {
+                addSetValue(active.capabilities, alias);
+                setWeakMapValue(nativeSystemSessionOperationRecords, alias, active);
+                if (active.state !== 'prepared' || nativeSystemSessionOperation !== active
+                    || !hasSetValue(active.capabilities, alias)) throw new Error('native_session_operation_alias_denied');
+                return alias;
+            } catch {
+                try { deleteWeakMapValue(nativeSystemSessionOperationRecords, alias); } catch { /* alias stays inert */ }
+                try { deleteSetValue(active.capabilities, alias); } catch { /* alias stays inert */ }
+                return null;
+            }
+        }
+        return null;
+    }
+    const capability = ObjectFreeze(ObjectCreate(null)) as object;
+    const record: NativeSystemSessionOperationRecord = {
+        state: 'prepared',
+        kind,
+        capabilities: new SetConstructor<object>(),
+        userId,
+        targets: [],
+        poisoned: false,
+    };
+    nativeSystemSessionOperation = record;
+    try {
+        addSetValue(record.capabilities, capability);
+        const iterator = mapValuesOf(sessions);
+        for (let next = nextMapIterator<ServerSession>(iterator); !next.done;
+            next = nextMapIterator<ServerSession>(iterator)) {
+            const session = next.value;
+            const authorityTarget = kind === 'admin_reset'
+                ? session.authChannel === 'native' || session.authChannel === 'system'
+                : session.authChannel === 'native' && session.userId === userId;
+            const cleanupOnly = kind === 'user_retirement'
+                && session.authChannel === 'web'
+                && session.userId === userId
+                && !armedWebSessionCellsById[session.id];
+            if (authorityTarget || cleanupOnly) {
+                appendArrayValue(record.targets, {
+                    sessionId: session.id,
+                    session,
+                    cleanupOnly,
+                });
+            }
+        }
+        if (record.poisoned || nativeSystemSessionOperation !== record) throw new Error('native_session_operation_poisoned');
+        setWeakMapValue(nativeSystemSessionOperationRecords, capability, record);
+        if (record.poisoned || nativeSystemSessionOperation !== record) throw new Error('native_session_operation_poisoned');
+        return capability;
+    } catch {
+        try { deleteWeakMapValue(nativeSystemSessionOperationRecords, capability); } catch { /* unpublished capability stays inert */ }
+        record.state = 'aborted';
+        clearSet(record.capabilities);
+        record.targets.length = 0;
+        record.userId = null;
+        if (nativeSystemSessionOperation === record) nativeSystemSessionOperation = null;
+        return null;
+    }
+}
+
+function nativeSystemSessionOperationRecord(
+    capability: unknown,
+    kind: NativeSystemSessionOperationKind,
+): NativeSystemSessionOperationRecord | null {
+    try {
+        if (!capability || typeof capability !== 'object' || isProxy(capability)
+            || ObjectGetPrototypeOf(capability) !== null) return null;
+        const record = getWeakMapValue(nativeSystemSessionOperationRecords, capability);
+        return record && record.kind === kind && hasSetValue(record.capabilities, capability)
+            && record.state === 'prepared' && nativeSystemSessionOperation === record
+            ? record
+            : null;
+    } catch { return null; }
+}
+
+function revokeNativeSystemSessionOperationCapabilities(record: NativeSystemSessionOperationRecord): boolean {
+    let failed = false;
+    const iterator = applyIntrinsic(setValues, record.capabilities, []) as object;
+    for (let next = nextSetIterator<object>(iterator); !next.done; next = nextSetIterator<object>(iterator)) {
+        try {
+            if (!deleteWeakMapValue(nativeSystemSessionOperationRecords, next.value)) failed = true;
+        } catch { failed = true; }
+    }
+    try { clearSet(record.capabilities); } catch { failed = true; }
+    return !failed;
+}
+
+function sessionMatchesNativeSystemOperation(
+    session: ServerSession,
+    kind: NativeSystemSessionOperationKind,
+    userId: string | null,
+): boolean {
+    return kind === 'admin_reset'
+        ? session.authChannel === 'native' || session.authChannel === 'system'
+        : session.authChannel === 'native' && session.userId === userId;
+}
+
+function commitNativeSystemSessionOperation(
+    capability: unknown,
+    kind: NativeSystemSessionOperationKind,
+): NativeSystemSessionOperationReceipt {
+    const record = nativeSystemSessionOperationRecord(capability, kind);
+    if (!record || typeof capability !== 'object' || capability === null) {
+        return deniedNativeSystemSessionOperationReceipt;
+    }
+    const retirementUserId = kind === 'user_retirement' ? record.userId : null;
+    record.state = 'committing';
+    let failed = record.poisoned || !revokeNativeSystemSessionOperationCapabilities(record);
+    if ((kind === 'user_retirement' && !retirementUserId)
+        || !advanceNativeLoginRetirementEpoch(retirementUserId)) {
+        failed = true;
+    }
+    try {
+        for (let index = 0; index < record.targets.length; index += 1) {
+            const target = record.targets[index]!;
+            const current = getMapValue(sessions, target.sessionId);
+            if (!current) continue;
+            if (current !== target.session) {
+                failed = true;
+                if (!target.cleanupOnly && sessionMatchesNativeSystemOperation(current, kind, record.userId)) {
+                    try { deleteWeakMapValue(nativeSessionBindings, current); } catch { failed = true; }
+                    const replacement = terminateSession(target.sessionId, 'session_deleted');
+                    if (!replacement.authorityAbsent || replacement.cleanupOutcome === 'failed') failed = true;
+                }
+                continue;
+            }
+            if (!target.cleanupOnly) {
+                try { deleteWeakMapValue(nativeSessionBindings, current); } catch { failed = true; }
+            }
+            const result = terminateSession(target.sessionId, 'session_deleted');
+            if (!result.authorityAbsent || result.cleanupOutcome === 'failed') failed = true;
+        }
+
+        const iterator = mapValuesOf(sessions);
+        for (let next = nextMapIterator<ServerSession>(iterator); !next.done;
+            next = nextMapIterator<ServerSession>(iterator)) {
+            if (sessionMatchesNativeSystemOperation(next.value, kind, record.userId)) {
+                failed = true;
+                try { deleteWeakMapValue(nativeSessionBindings, next.value); } catch { /* authority removal continues */ }
+                const result = terminateSession(next.value.id, 'session_deleted');
+                if (!result.authorityAbsent || result.cleanupOutcome === 'failed') failed = true;
+            }
+        }
+        if (record.poisoned) failed = true;
+    } catch {
+        failed = true;
+    } finally {
+        record.state = 'committed';
+        try { clearSet(record.capabilities); } catch { /* terminal record remains inert */ }
+        record.targets.length = 0;
+        record.userId = null;
+        if (nativeSystemSessionOperation === record) nativeSystemSessionOperation = null;
+    }
+    return failed ? failedNativeSystemSessionOperationReceipt : completedNativeSystemSessionOperationReceipt;
+}
+
+function abortNativeSystemSessionOperation(
+    capability: unknown,
+    kind: NativeSystemSessionOperationKind,
+): boolean {
+    const record = nativeSystemSessionOperationRecord(capability, kind);
+    if (!record || typeof capability !== 'object' || capability === null) return false;
+    let removed = false;
+    try {
+        removed = deleteSetValue(record.capabilities, capability);
+        if (!removed) return false;
+        deleteWeakMapValue(nativeSystemSessionOperationRecords, capability);
+    } catch { return false; }
+    if (setSizeOf(record.capabilities) !== 0) return true;
+    record.state = 'aborted';
+    record.targets.length = 0;
+    record.userId = null;
+    if (nativeSystemSessionOperation === record) nativeSystemSessionOperation = null;
+    return true;
 }
 
 function rollbackSessionPublication(session: ServerSession): void {
@@ -430,6 +769,9 @@ export function createSession(
     user: { id: string; username: string; role: string },
     authChannel: ServerSession['authChannel'] = 'web'
 ): ServerSession {
+    if (nativeSystemOperationBlocksCreation(user, authChannel)) {
+        throw new Error('native_session_operation_in_progress');
+    }
     if (authChannel !== 'system') {
         const userId = sessionUserIdForRetirementTurn(user);
         if (userId === invalidRetirementTurnUser) {
@@ -452,6 +794,9 @@ export function createSession(
     }
     try {
         setMapValue(sessions, session.id, session);
+        if (nativeSystemOperationBlocksCreation(session, authChannel)) {
+            throw new Error('native_session_operation_in_progress');
+        }
         if (authChannel !== 'system' && denyUserRetirementTurn(session.userId)) {
             throw new Error('session_retirement_in_progress');
         }
@@ -462,15 +807,41 @@ export function createSession(
     }
 }
 
+/** Captures an opaque one-shot fence before native credential verification. */
+/* @Codex */
+export function captureNativeLoginSessionFence(): NativeLoginSessionFence {
+    const fence = ObjectFreeze(ObjectCreate(null)) as NativeLoginSessionFence;
+    const record: NativeLoginSessionFenceRecord = {
+        active: true,
+        epoch: nativeLoginFenceStateAvailable ? nativeLoginRetirementEpoch : null,
+    };
+    try { setWeakMapValue(nativeLoginSessionFenceRecords, fence, record); }
+    catch { record.active = false; record.epoch = null; nativeLoginFenceStateAvailable = false; }
+    return fence;
+}
+
 /* @Codex: native authority is server-tagged and bound to the admitted paired client. */
 export function createNativeServerSession(
     user: { id: string; username: string; role: string }, binding: NativeServerSessionBinding,
+    loginFence?: NativeLoginSessionFence,
 ): ServerSession {
     if (!isNativeBinding(binding)) throw new Error('invalid native session binding');
-    const session = createSession(user, 'native');
+    let admittedEpoch: number | null = null;
+    let nativeUser = user;
+    if (loginFence !== undefined) {
+        if (!isStrictWebSessionUser(user)) throw new Error('invalid native session user');
+        nativeUser = ObjectFreeze({ id: user.id, username: user.username, role: user.role });
+        admittedEpoch = consumeNativeLoginSessionFence(loginFence, nativeUser.id);
+        if (admittedEpoch === null) throw new Error('native_login_session_fence_stale');
+    }
+    const session = createSession(nativeUser, 'native');
     try {
         setWeakMapValue(nativeSessionBindings, session, ObjectFreeze({ clientId: binding.clientId, clientPlatform: binding.clientPlatform }));
+        if (nativeSystemOperationBlocksCreation(session, 'native')) throw new Error('native_session_operation_in_progress');
         if (denyUserRetirementTurn(session.userId)) throw new Error('session_retirement_in_progress');
+        if (loginFence !== undefined && !nativeLoginFenceAllowsUser(admittedEpoch, session.userId)) {
+            throw new Error('native_login_session_fence_stale');
+        }
         return session;
     } catch (error) {
         rollbackSessionPublication(session);
@@ -1529,6 +1900,50 @@ export function invalidateSessionsForUser(userId: string): void {
     for (let index = 0; index < sessionIds.length; index += 1) {
         deleteSession(sessionIds[index]);
     }
+}
+
+/** Prepares the native/system half of the fixed administrative reset.
+ * The capability owns only server-marked native/system authority. */
+/* @Codex */
+export function prepareNativeSystemAdminReset(): NativeSystemAdminResetCapability | null {
+    return prepareNativeSystemSessionOperation('admin_reset', null) as NativeSystemAdminResetCapability | null;
+}
+
+/** Commits one exact prepared native/system administrative reset. */
+/* @Codex */
+export function commitNativeSystemAdminReset(
+    capability: unknown,
+): NativeSystemSessionOperationReceipt {
+    return commitNativeSystemSessionOperation(capability, 'admin_reset');
+}
+
+/** Burns one exact prepared native/system reset without changing sessions. */
+/* @Codex */
+export function abortNativeSystemAdminReset(capability: unknown): boolean {
+    return abortNativeSystemSessionOperation(capability, 'admin_reset');
+}
+
+/** Prepares native authority retirement for one user and snapshots only inert legacy-Web cleanup. */
+/* @Codex */
+export function prepareNativeLegacyUserRetirement(
+    userId: unknown,
+): NativeLegacyUserRetirementCapability | null {
+    if (typeof userId !== 'string' || !userId) return null;
+    return prepareNativeSystemSessionOperation('user_retirement', userId) as NativeLegacyUserRetirementCapability | null;
+}
+
+/** Commits the exact native authority retirement and inert legacy-Web cleanup prepared for one user. */
+/* @Codex */
+export function commitNativeLegacyUserRetirement(
+    capability: unknown,
+): NativeSystemSessionOperationReceipt {
+    return commitNativeSystemSessionOperation(capability, 'user_retirement');
+}
+
+/** Burns one exact prepared per-user native retirement without changing sessions. */
+/* @Codex */
+export function abortNativeLegacyUserRetirement(capability: unknown): boolean {
+    return abortNativeSystemSessionOperation(capability, 'user_retirement');
 }
 
 /* @Codex */

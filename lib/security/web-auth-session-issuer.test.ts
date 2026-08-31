@@ -51,15 +51,12 @@ test('mints one opaque login/setup attempt, burns it once, and leaves no second 
     assert.equal(typeof (issuer as { issue?: unknown }).issue, 'function');
 });
 
-test('issues an exact data-only user through the P3 activation splice', async () => {
+test('burns an exact data-only issue at the historical fail-closed activation splice', async () => {
     const stack = await fresh('p3b2-issue'); const attempt = stack.begin('login'); assert.ok(attempt);
-    const result = stack.issue(attempt, USER); assert.ok(result);
-    assert.deepEqual(Object.keys(result), ['ok', 'sessionId']); assert.equal(result.ok, true);
-    assert.equal(Object.getPrototypeOf(result), null); assert.equal(Object.isFrozen(result), true);
-    assert.equal(stack.session.resolveActiveWebServerSession(result.sessionId)?.userId, USER.id);
+    const result = stack.issue(attempt, USER); assert.equal(result, null);
     assert.equal(stack.issue(attempt, USER), null);
-    const logout = ['retireServerSession', 'ForLogout'].join(''); assert.equal((stack.session as unknown as Record<string, (id: string) => { outcome: string }>)[logout](result.sessionId).outcome, 'completed');
-    assert.equal(stack.session.resolveActiveWebServerSession(result.sessionId), null);
+    const retry = stack.begin('setup'); assert.ok(retry, 'terminal historical denial leaves the dormant island retryable');
+    assert.equal(stack.abort(retry), true);
 });
 
 test('burns issue before hostile input and leaves owner control retryable', async () => {
@@ -69,7 +66,7 @@ test('burns issue before hostile input and leaves owner control retryable', asyn
     const retry = stack.begin('setup'); assert.ok(retry); assert.equal(stack.abort(retry), true);
 });
 
-test('rejects hostile, cloned, foreign, and cross-module capabilities without traps', async () => {
+test('rejects hostile, cloned, foreign, and cross-module capabilities without publishing authority', async () => {
     const first = await fresh('p3b1-first');
     const second = await fresh('p3b1-second');
     const attempt = first.begin('login');
@@ -82,8 +79,8 @@ test('rejects hostile, cloned, foreign, and cross-module capabilities without tr
     }
     assert.equal(traps.count, 0);
     assert.equal(second.abort(attempt), false);
-    assert.equal(second.issue(attempt, USER), null); const result = first.issue(attempt, USER); assert.ok(result);
-    assert.equal(second.session.resolveActiveWebServerSession(result.sessionId), null);
+    assert.equal(second.issue(attempt, USER), null); assert.equal(first.issue(attempt, USER), null);
+    const retry = first.begin('setup'); assert.ok(retry); assert.equal(first.abort(retry), true);
 });
 
 test('poisons owner reentry and rolls back an issuer WeakMap apply-then-throw', async () => {

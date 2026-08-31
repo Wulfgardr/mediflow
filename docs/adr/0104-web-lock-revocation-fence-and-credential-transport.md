@@ -508,9 +508,10 @@ replica, crash recovery e cleanup delle risorse restano `HOLD` separati.
 ### Addendum O1: receipt di sessione e packet O1-P5-O1-P12
 
 Il package esterno non restituisce la cella P3 o il `ServerSession` conservato
-dall'owner. Il resolver root riceve il solo `sessionId` come locator dati non
-autorizzante, risolve internamente l'esatta identita della cella e restituisce
-una receipt congelata con uno dei tre esiti chiusi:
+dall'owner. Il resolver root riceve `sessionId` e `controlId` soltanto come
+locator dati non autorizzanti, risolve internamente l'esatto binding tra cella
+e control corrente e restituisce una receipt congelata con uno dei tre esiti
+chiusi:
 
 - `active`, con la proiezione dati esatta `id`, `userId`, `username`, `role`,
   `authChannel`, `createdAt`, `expiresAt`;
@@ -535,6 +536,7 @@ sempre `authChannel: web`.
 
 Il root finale espone soltanto funzioni congelate per:
 
+- bootstrap idempotente del control process-local tramite `bootstrapControl`;
 - `begin`, `issue` e `abort` del tentativo login/setup;
 - risoluzione tri-state della sessione Web;
 - ritiro esatto per proiezione, utente e causa controllata;
@@ -546,6 +548,15 @@ prepared capability o API per scegliere l'owner. Il cleanup puo richiamare un
 disposer gia validato soltanto dopo `RETIRED`; nessuna callback entra tra CAS e
 flip terminale. Un eventuale esito Promise/thenable nativo viene contenuto dopo
 il ritiro e non puo modificare o ripristinare authority.
+
+`bootstrapControl` accetta soltanto il locator del cookie gia presentato. Se il
+locator appartiene al processo restituisce lo stesso `controlId` e l'ETag
+corrente; se e assente o sconosciuto crea un nuovo record. `begin` riceve
+`controlId`, `If-Match` e idempotency key; `issue` restituisce il nuovo ETag
+insieme al solo `sessionId`. `resolve` richiede il binding esatto tra i due
+locator. Per la causa fissa `lock`, `retire` riceve anche i tre dati di
+ordinamento, avanza il fence prima del cleanup e conserva la receipt bounded per
+il replay. Questi valori restano dati di ordinamento e non diventano authority.
 
 Il reset amministrativo prepara prima della mutazione DB una capability opaca,
 esatta e monouso dall'esatta proiezione `ACTIVE` di un admin autenticato. La
@@ -563,6 +574,17 @@ lavoro fallibile; su errore DB li abortisce entrambi. In questo modo il reset
 non dipende da una proiezione che potrebbe cambiare dopo la cancellazione e non
 fonde i due owner. La cancellazione del cookie resta ammessa soltanto in questa
 operazione distruttiva di onboarding; non cambia logout/lock di ADR 0106.
+
+Il login native cattura un fence opaco e monouso prima della verifica delle
+credenziali. L'owner native/system conserva un'epoch monotona, un watermark
+globale per il reset amministrativo e l'ultima epoch di retirement per utente.
+Il commit del reset avanza il watermark globale; il commit del retirement PIN
+avanza soltanto quello dell'utente interessato. Gli abort non avanzano alcun
+watermark. La creazione native consuma il fence e lo ricontrolla prima e dopo
+la pubblicazione sincrona, rimuovendo la sessione se nel frattempo e diventato
+stantio. Un login verificato prima di un commit reset o PIN non puo quindi
+pubblicare authority dopo il commit, mentre il retirement di un altro utente
+non invalida il login corrente.
 
 La modifica autenticata del PIN resta distinta. Dopo il CAS credenziali
 riuscito ritira tutte le sessioni Web P3 dello stesso utente e, con una seconda

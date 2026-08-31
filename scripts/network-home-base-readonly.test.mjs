@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
+import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3200';
 const LOCAL_API_TOKEN = process.env.MEDIFLOW_LOCAL_API_TOKEN || 'mediflow-network-smoke-local-token';
@@ -85,12 +86,7 @@ test('home-base read-only pairing flow works end-to-end', async () => {
         assert.equal(pairedSession.json?.pairingState, 'paired');
         assert.equal(pairedSession.json?.trustedSession, true);
 
-        const login = await request('POST', '/api/auth/login', {
-            body: {
-                username: USERNAME,
-                password: PIN,
-            },
-        });
+        const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
         const sessionCookie = extractSessionCookie(login.response);
         assert.ok(sessionCookie);

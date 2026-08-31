@@ -3,6 +3,8 @@
 
 import { useState } from 'react';
 import { CheckCircle, XCircle, AlertTriangle, Loader2, Play, Server, Database, Activity, Globe } from 'lucide-react';
+/* @Codex */
+import { checkAuthHealthRequest } from '@/lib/security/client-auth-api';
 import { cn } from '@/lib/utils'; // Assuming cn exists, else use template literals
 
 interface ServiceCheck {
@@ -26,9 +28,9 @@ export default function DiagnosticHub() {
             checkFn: async () => {
                 const start = performance.now();
                 // We use auth/check as a proxy for DB health since it reads from DB
-                const res = await fetch('/api/auth/check');
+                const { response: res, payload: data, controlState } = await checkAuthHealthRequest();
                 /* @Codex */
-                const data = await res.json().catch(() => null);
+                if (controlState !== 'accepted') throw new Error('Controllo autenticazione non verificabile');
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 if (data?.status === 'error' || data?.error) {
                     throw new Error(data?.error?.message || 'Database non disponibile');

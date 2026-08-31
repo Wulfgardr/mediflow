@@ -13,6 +13,65 @@ const PDF_INSPECTOR_WORKER_FILE = 'pdf-inspector-worker.mjs';
 const PDF_ROUTE_DIRECTORY = path.join('server', 'app', 'api', 'pdf-extract');
 const PDF_RUNTIME_REFERENCE = /(?:pdf-inspector-worker\.mjs|pdf-inspector-router|(?:node_modules[\\/])?@firecrawl[\\/]pdf-inspector(?:[-/]|$))/i;
 const SYNTHETIC_RTF = Buffer.from('{\\rtf1\\ansi Synthetic standalone note.}', 'utf8');
+const WEB_AUTH_OWNER_PACKAGE = '@mediflow/web-auth-lifecycle-owner';
+const WEB_AUTH_OWNER_VERSION = '0.8.5';
+const WEB_AUTH_OWNER_KEYS = Object.freeze([
+  'abort', 'abortAdminReset', 'abortResourceUse', 'abortUserRetirement', 'begin', 'beginResourceUse',
+  'bootstrapControl', 'commitAdminReset', 'commitResourceUse', 'commitUserRetirement', 'issue',
+  'mintResourcePort', 'prepareAdminReset', 'prepareUserRetirement', 'registerPrivateResource',
+  'releaseResourcePort', 'resolve', 'retire', 'retireForUser',
+  'unregisterPrivateResource',
+]);
+const WEB_AUTH_OWNER_FILES = Object.freeze([
+  ['index.d.ts', '00ab94b147ca1d067873aef8046996423a4a5778634878760b4f80536c796c8b'],
+  ['index.js', '1abc52ee8abe9fd25b28046f1f00ecc2f09d699ba220c61e6222730c22ca44c5'],
+  ['internal/control-record.cjs', '3d443096679799ffde96e744060de5be59c9a86ddb383bdd975de75c913b9aa4'],
+  ['internal/owner.cjs', '4bc41e902e6193108d1551055639ffa34e91b59e5881542a549c2eb648ee7778'],
+  ['internal/session-activation.cjs', '5ed4c9543f8bc15903c0915a8565b997d697d004e9ccfaaa54a3da6236a2aa96'],
+  ['internal/session-cell.cjs', '4cd0c2e9f8b40b346d43a93de561e20e85c5662fc8a2f9a0a170403fc80c2e31'],
+  ['internal/session-resolver.cjs', '75409d670b8411dbadcc95e4bd9bfebeff47d2f687bde0d638809bb9114b5fa0'],
+  ['internal/session-resource.cjs', 'dcdc06fcd35068d42537b9233bc8f2f1ddec276488e3898c6b3e9409c59eb921'],
+  ['internal/session-retirement.cjs', '8848c92cb88635c6c09baf685839e7c6f1aca40d667ea6580e84e275349f1516'],
+  ['internal/support/successor-fence.cjs', '7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff'],
+  ['internal/support/value.cjs', '9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1'],
+  ['package.json', '6dee73e802f596cfd44d8b17a4d3e4a14ba4d0e07f3bf7a7b676629c06a42abc'],
+]);
+
+/* @Codex: P12 proves that the externalized final owner is a physical standalone copy
+   and that its process-local authority cannot survive an A-to-B runtime restart. */
+const WEB_AUTH_OWNER_PROCESS_A = String.raw`
+'use strict';
+const owner = require(process.argv[1]);
+const control = owner.bootstrapControl();
+if (!control) throw new Error('control bootstrap denied');
+const attempt = owner.begin('login', {
+  controlId: control.controlId,
+  ifMatch: control.etag,
+  idempotencyKey: 'synthetic-idempotency-standalone-p12-a',
+});
+if (!attempt) throw new Error('synthetic login begin denied');
+const issued = owner.issue(attempt, {
+  id: 'user.synthetic.standalone-p12',
+  username: 'synthetic-standalone-p12',
+  role: 'clinician',
+});
+if (!issued) throw new Error('synthetic session issue denied');
+if (owner.resolve(issued.sessionId, control.controlId).status !== 'active') {
+  throw new Error('synthetic session was not active in process A');
+}
+process.stdout.write(JSON.stringify({ sessionId: issued.sessionId, controlId: control.controlId }));
+`;
+const WEB_AUTH_OWNER_PROCESS_B = String.raw`
+'use strict';
+const fs = require('node:fs');
+const owner = require(process.argv[1]);
+const locators = JSON.parse(fs.readFileSync(0, 'utf8'));
+const resolution = owner.resolve(locators.sessionId, locators.controlId);
+if (!resolution || resolution.status !== 'absent') {
+  throw new Error('process B resolved authority created by process A');
+}
+process.stdout.write(resolution.status);
+`;
 
 function bundledWorkerFailure(standaloneDir) {
   const workerPath = path.join(standaloneDir, 'scripts', ANYDOC_WORKER_FILE);
@@ -100,6 +159,167 @@ function retiredPdfRuntimeFailure(standaloneDir) {
     return 'Standalone runtime retired PDF route still references executable PDF inspector code.';
   }
   return null;
+}
+
+function standaloneWebAuthOwnerInspection(standaloneDir, requireFromStandalone) {
+  const nodeModulesDirectory = path.join(standaloneDir, 'node_modules');
+  const scopeDirectory = path.join(nodeModulesDirectory, '@mediflow');
+  const packageDirectory = path.join(scopeDirectory, 'web-auth-lifecycle-owner');
+  const expectedEntry = path.join(packageDirectory, 'index.js');
+  const manifestPath = path.join(packageDirectory, 'package.json');
+
+  try {
+    for (const [candidate, label] of [
+      [nodeModulesDirectory, 'node_modules directory'],
+      [scopeDirectory, '@mediflow scope directory'],
+      [packageDirectory, `${WEB_AUTH_OWNER_PACKAGE} package directory`],
+    ]) {
+      const stat = fs.lstatSync(candidate);
+      if (!stat.isDirectory() || stat.isSymbolicLink()) {
+        return { failure: `Standalone runtime ${label} is not a physical directory.` };
+      }
+    }
+
+    const realStandalone = fs.realpathSync(standaloneDir);
+    const realPackage = fs.realpathSync(packageDirectory);
+    const expectedRealPackage = path.join(realStandalone, 'node_modules', '@mediflow', 'web-auth-lifecycle-owner');
+    if (realPackage !== expectedRealPackage) {
+      return { failure: `Standalone runtime ${WEB_AUTH_OWNER_PACKAGE} resolves outside its physical package directory.` };
+    }
+
+    const pending = [packageDirectory];
+    const roster = [];
+    while (pending.length > 0) {
+      const directory = pending.pop();
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const candidate = path.join(directory, entry.name);
+        const stat = fs.lstatSync(candidate);
+        if (stat.isSymbolicLink()) {
+          return { failure: `Standalone runtime ${WEB_AUTH_OWNER_PACKAGE} contains a symbolic link.` };
+        }
+        if (stat.isDirectory()) pending.push(candidate);
+        else if (!stat.isFile()) {
+          return { failure: `Standalone runtime ${WEB_AUTH_OWNER_PACKAGE} contains a non-file package entry.` };
+        } else {
+          roster.push([
+            path.relative(packageDirectory, candidate).split(path.sep).join('/'),
+            createHash('sha256').update(fs.readFileSync(candidate)).digest('hex'),
+          ]);
+        }
+      }
+    }
+    roster.sort(([left], [right]) => left.localeCompare(right));
+
+    const manifestStat = fs.lstatSync(manifestPath);
+    const entryStat = fs.lstatSync(expectedEntry);
+    if (!manifestStat.isFile() || manifestStat.isSymbolicLink()
+        || !entryStat.isFile() || entryStat.isSymbolicLink()) {
+      return { failure: `Standalone runtime ${WEB_AUTH_OWNER_PACKAGE} root files are not physical regular files.` };
+    }
+
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    if (manifest?.name !== WEB_AUTH_OWNER_PACKAGE || manifest?.version !== WEB_AUTH_OWNER_VERSION
+        || manifest?.main !== './index.js' || manifest?.exports !== './index.js') {
+      return { failure: `Standalone runtime does not contain the final ${WEB_AUTH_OWNER_PACKAGE} ${WEB_AUTH_OWNER_VERSION} manifest.` };
+    }
+    if (JSON.stringify(roster) !== JSON.stringify(WEB_AUTH_OWNER_FILES)) {
+      return { failure: `Standalone runtime ${WEB_AUTH_OWNER_PACKAGE} does not match the exact final file roster.` };
+    }
+
+    const resolvedEntry = requireFromStandalone.resolve(WEB_AUTH_OWNER_PACKAGE);
+    if (fs.realpathSync(resolvedEntry) !== fs.realpathSync(expectedEntry)) {
+      return { failure: `Standalone runtime did not resolve ${WEB_AUTH_OWNER_PACKAGE} from its physical copy.` };
+    }
+
+    const owner = requireFromStandalone(WEB_AUTH_OWNER_PACKAGE);
+    const keys = Reflect.ownKeys(owner).slice().sort();
+    if (!Object.isFrozen(owner) || keys.length !== WEB_AUTH_OWNER_KEYS.length
+        || keys.some((key, index) => key !== WEB_AUTH_OWNER_KEYS[index])
+        || WEB_AUTH_OWNER_KEYS.some((key) => typeof owner[key] !== 'function')
+        || Reflect.has(owner, 'createOwner')) {
+      return { failure: `Standalone runtime ${WEB_AUTH_OWNER_PACKAGE} root is not the frozen exact 17-function API.` };
+    }
+
+    return { failure: null, entryPath: expectedEntry };
+  } catch (error) {
+    return {
+      failure: `Standalone runtime cannot inspect ${WEB_AUTH_OWNER_PACKAGE}: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+function webAuthOwnerRestartFailure(entryPath) {
+  const childEnvironment = {
+    MEDIFLOW_SESSION_TTL_MS: '60000',
+    NODE_ENV: 'production',
+    NODE_OPTIONS: '',
+    NO_COLOR: '1',
+  };
+  const commonOptions = {
+    cwd: path.dirname(path.dirname(path.dirname(path.dirname(entryPath)))),
+    encoding: 'utf8',
+    env: childEnvironment,
+    timeout: 10_000,
+    windowsHide: true,
+  };
+  const processA = spawnSync(process.execPath, ['-e', WEB_AUTH_OWNER_PROCESS_A, entryPath], commonOptions);
+  if (processA.error || processA.status !== 0 || processA.signal !== null || processA.stderr !== '') {
+    return `Standalone runtime ${WEB_AUTH_OWNER_PACKAGE} process A could not create a synthetic session.`;
+  }
+
+  let locators;
+  try {
+    locators = JSON.parse(processA.stdout);
+  } catch {
+    return `Standalone runtime ${WEB_AUTH_OWNER_PACKAGE} process A emitted invalid locators.`;
+  }
+  if (!locators || Object.getPrototypeOf(locators) !== Object.prototype
+      || Object.keys(locators).join(',') !== 'sessionId,controlId'
+      || !/^[0-9a-f]{64}$/u.test(locators.sessionId)
+      || !/^[0-9a-f]{64}$/u.test(locators.controlId)) {
+    return `Standalone runtime ${WEB_AUTH_OWNER_PACKAGE} process A emitted data other than exact synthetic locators.`;
+  }
+
+  const processB = spawnSync(process.execPath, ['-e', WEB_AUTH_OWNER_PROCESS_B, entryPath], {
+    ...commonOptions,
+    input: processA.stdout,
+  });
+  if (processB.error || processB.status !== 0 || processB.signal !== null
+      || processB.stderr !== '' || processB.stdout !== 'absent') {
+    return `Standalone runtime ${WEB_AUTH_OWNER_PACKAGE} process B did not deny process A authority as absent.`;
+  }
+  return null;
+}
+
+function runWebAuthOwnerSelfTest() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-web-auth-owner-checker-'));
+  const standaloneDir = path.join(root, 'standalone');
+  const serverPath = path.join(standaloneDir, 'server.js');
+  const installedPackage = path.join(process.cwd(), 'node_modules', '@mediflow', 'web-auth-lifecycle-owner');
+  const copiedPackage = path.join(standaloneDir, 'node_modules', '@mediflow', 'web-auth-lifecycle-owner');
+  try {
+    fs.mkdirSync(path.dirname(copiedPackage), { recursive: true });
+    fs.cpSync(installedPackage, copiedPackage, { recursive: true, dereference: false });
+    fs.writeFileSync(serverPath, "'use strict';\n");
+    const requireFromStandalone = createRequire(serverPath);
+    const inspection = standaloneWebAuthOwnerInspection(standaloneDir, requireFromStandalone);
+    if (inspection.failure || !inspection.entryPath) throw new Error(inspection.failure ?? 'missing entry path');
+    const restartFailure = webAuthOwnerRestartFailure(inspection.entryPath);
+    if (restartFailure) throw new Error(restartFailure);
+
+    const manifestPath = path.join(copiedPackage, 'package.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const entryPath = path.join(copiedPackage, 'index.js');
+    fs.appendFileSync(entryPath, '\n// synthetic roster drift\n');
+    const rosterMismatch = standaloneWebAuthOwnerInspection(standaloneDir, requireFromStandalone).failure;
+    if (!rosterMismatch?.includes('exact final file roster')) throw new Error('roster mismatch passed');
+    fs.copyFileSync(path.join(installedPackage, 'index.js'), entryPath);
+    fs.writeFileSync(manifestPath, `${JSON.stringify({ ...manifest, version: '0.8.4' }, null, 2)}\n`);
+    const mismatch = standaloneWebAuthOwnerInspection(standaloneDir, requireFromStandalone).failure;
+    if (!mismatch?.includes(WEB_AUTH_OWNER_VERSION)) throw new Error('version mismatch passed');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 }
 
 function runSelfTest() {
@@ -204,6 +424,10 @@ if (process.argv[2] === '--self-test=pdf-retirement') {
   runPdfRetirementSelfTest();
   process.exit(0);
 }
+if (process.argv[2] === '--self-test=web-auth-owner') {
+  runWebAuthOwnerSelfTest();
+  process.exit(0);
+}
 
 const root = process.cwd();
 const standaloneDir = standaloneDirectory(root);
@@ -245,6 +469,13 @@ function fail(message) {
 
 const retiredPdfFailure = retiredPdfRuntimeFailure(standaloneDir);
 if (retiredPdfFailure) fail(retiredPdfFailure);
+
+const webAuthOwnerInspection = standaloneWebAuthOwnerInspection(standaloneDir, requireFromStandalone);
+if (webAuthOwnerInspection.failure || !webAuthOwnerInspection.entryPath) {
+  fail(webAuthOwnerInspection.failure ?? `Standalone runtime cannot resolve ${WEB_AUTH_OWNER_PACKAGE}.`);
+}
+const webAuthOwnerRestart = webAuthOwnerRestartFailure(webAuthOwnerInspection.entryPath);
+if (webAuthOwnerRestart) fail(webAuthOwnerRestart);
 
 function assertRealpathInsideStandalone(candidatePath, label) {
   let resolvedPath;

@@ -114,7 +114,7 @@ async function waitForServer(server) {
   while (Date.now() < deadline) {
     if (server.exitCode !== null) throw new Error(`Dev server exited with ${server.exitCode}`);
     try {
-      if ((await fetch(`${BASE_URL}/api/auth/check`, { cache: 'no-store' })).ok) return;
+      if ((await fetch(`${BASE_URL}/api/system/revision`, { cache: 'no-store' })).ok) return;
     } catch {
       // The server is still compiling. The next poll observes readiness.
     }

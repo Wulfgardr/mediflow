@@ -1,14 +1,10 @@
 /* @Codex */
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { createHash, randomUUID } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { afterEach, test } from 'node:test';
-import ts from 'typescript';
 
 import {
     abortActiveWebSessionResourceUse,
@@ -50,14 +46,8 @@ import {
 } from './server-session';
 import {
     allowedGenericLoaderExpressions,
-    createRequireBypassFixtures,
-    createRequireShadowFixtures,
-    createRequireUnresolvedFixtures,
     inventoryModuleImports,
-    moduleImportBypassFixtures,
-    reservedLoaderBindingFixtures,
     repositoryTypeScriptSources,
-    unsafeLoaderIdentityFixtures,
 } from './module-import-inventory.test-support.ts';
 
 const SYNTHETIC_USERNAME = `synthetic-${randomUUID()}`;
@@ -65,224 +55,93 @@ const TARGET_USERNAME = ['synthetic', 'target'].join('-');
 const OTHER_USERNAME = ['synthetic', 'other'].join('-');
 const AUTH_CONTROL_MODULE_PATH = './web-auth-control-record.ts';
 const REPOSITORY_ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const RESOURCE_PORT_PRIMITIVES = new Set([
-    'abortActiveWebSessionResourceUse', 'beginActiveWebSessionResourceUse', 'commitActiveWebSessionResourceUse',
-    'mintActiveWebSessionResourcePort', 'releaseActiveWebSessionResourcePort',
-]);
-const LEGACY_OWNER_BRIDGE_FILE = 'lib/security/web-auth-lifecycle-owner-legacy.ts';
-const LEGACY_OWNER_BRIDGE_SHA256 = '05f5f0b290a1e00b3c9a32a9a681627a63f80cde37b1a1f4e59a6de2710c4ae8';
-const PROJECTION_OWNER_FILES = [
-    'lib/security/server-session-projection-owner.ts', 'lib/security/server-session-projection-owner.test.ts',
-] as const;
-const PROJECTION_BROKER_FILES = [
-    'lib/security/server-session-projection-broker.ts', 'lib/security/server-session-projection-broker.test.ts',
-] as const;
-const PROJECTION_BROKER_IMPORTS = new Map<string, ReadonlyMap<string, boolean>>([
-    [PROJECTION_BROKER_FILES[0], new Map([
-        ['ActiveWebSessionResourcePort', true], ['registerActiveWebSessionPrivateResource', false],
-        ['registerServerSessionResource', false], ['releaseActiveWebSessionResourcePort', false],
-        ['unregisterActiveWebSessionPrivateResource', false],
+const HISTORICAL_WEB_RUNTIME_IMPORTS = new Map<string, ReadonlySet<string>>([
+    ['lib/security/web-auth-control-owner.ts', new Set([
+        'activateArmedWebServerSession', 'getArmedWebServerSessionId', 'tombstoneArmedWebServerSession',
     ])],
-    [PROJECTION_BROKER_FILES[1], new Map([
-        ['clearAllSessions', false], ['createSession', false], ['deleteSession', false], ['getSession', false],
-        ['mintActiveWebSessionResourcePort', false], ['releaseActiveWebSessionResourcePort', false],
-        ['retireServerSessionForApplicationLock', false], ['retireServerSessionForLogout', false],
-        ['resolveActiveWebServerSession', false],
+    ['lib/security/web-auth-session-issuer.ts', new Set([
+        'abortPreparedWebServerSession', 'abortStagedWebServerSession', 'armPreparedWebServerSession',
+        'getPreparedWebServerSessionId', 'prepareStagedWebServerSession', 'stageWebServerSession',
+        'tombstoneArmedWebServerSession',
     ])],
 ]);
-const PROJECTION_BROKER_ADOPTION_SYMBOLS = new Set([
-    'ActiveWebSessionResourcePort', 'registerActiveWebSessionPrivateResource',
-    'releaseActiveWebSessionResourcePort', 'unregisterActiveWebSessionPrivateResource',
-    'mintActiveWebSessionResourcePort', 'resolveActiveWebServerSession',
+const HISTORICAL_WEB_RUNTIME_SYMBOLS = new Set([
+    'abortActiveWebSessionResourceUse', 'abortPreparedWebServerSession', 'abortStagedWebServerSession',
+    'activateArmedWebServerSession', 'activateStagedWebServerSession', 'armPreparedWebServerSession',
+    'beginActiveWebSessionResourceUse', 'cleanupRetiredWebServerSession', 'commitActiveWebSessionResourceUse',
+    'commitPreparedWebServerSession', 'dispatchActiveWebServerSessionRetirement', 'getArmedWebServerSessionId',
+    'getPreparedWebServerSessionId', 'mintActiveWebSessionResourcePort', 'prepareStagedWebServerSession',
+    'registerActiveWebSessionPrivateResource', 'releaseActiveWebSessionResourcePort', 'resolveActiveWebServerSession',
+    'retireActiveWebServerSession', 'retireWebP3SessionsForUser', 'stageWebServerSession',
+    'tombstoneArmedWebServerSession', 'unregisterActiveWebSessionPrivateResource',
 ]);
-const SESSION_TEST_DYNAMIC_IMPORTS = new Map<string, ReadonlyMap<string, number>>([
-    ['lib/attachment-metadata-currentness.test.ts', new Map([['*', 1]])],
-    ['lib/domain/documents/anydoc-current-source-composition.test.ts', new Map([['*', 1]])],
-    ['lib/domain/documents/attachment-extraction-selection-binding.test.ts', new Map([['*', 1]])],
-    ['lib/domain/documents/attachment-extraction-source-authority.test.ts', new Map([['*', 1]])],
-    ['lib/patient-cascade.test.ts', new Map([['clearAllSessions', 1], ['createSession', 1]])],
+const NATIVE_CAPABILITY_IMPORTS = new Map<string, ReadonlySet<string>>([
+    ['app/api/auth/reset/route.ts', new Set([
+        'abortNativeSystemAdminReset', 'commitNativeSystemAdminReset', 'prepareNativeSystemAdminReset',
+    ])],
+    ['lib/security/pin-change-service.ts', new Set([
+        'abortNativeLegacyUserRetirement', 'commitNativeLegacyUserRetirement', 'prepareNativeLegacyUserRetirement',
+    ])],
 ]);
-const SESSION_TEST_DYNAMIC_SPECIFIERS = new Map<string, string>([
-    ['lib/attachment-metadata-currentness.test.ts', './security/server-session.ts'],
-    ['lib/domain/documents/anydoc-current-source-composition.test.ts', '../../security/server-session.ts'],
-    ['lib/domain/documents/attachment-extraction-selection-binding.test.ts', '../../security/server-session.ts'],
-    ['lib/domain/documents/attachment-extraction-source-authority.test.ts', '../../security/server-session.ts'],
-    ['lib/patient-cascade.test.ts', './security/server-session.ts'],
+const NATIVE_CAPABILITY_SYMBOLS = new Set([...NATIVE_CAPABILITY_IMPORTS.values()].flatMap((symbols) => [...symbols]));
+const DORMANT_WEB_OWNER_MODULE_IMPORTS = new Map<string, ReadonlyMap<string, ReadonlySet<string>>>([
+    ['lib/security/web-auth-control-owner', new Map([
+        ['lib/security/web-auth-session-issuer.ts', new Set([
+            'activatePreparedWebAuthSession', 'beginWebAuth', 'cancelWebAuth', 'prepareWebAuthActivation',
+        ])],
+    ])],
+    ['lib/security/web-auth-session-issuer', new Map()],
 ]);
-const PROJECTION_OWNER_DYNAMIC_TEST = 'lib/domain/documents/attachment-extraction-source-authority.test.ts';
-const PROJECTION_OWNER_FACTORY = 'createPortProjectionOwnerFactory';
-const PROJECTION_OWNER_MODULE = 'lib/security/server-session-projection-owner';
-const SESSION_MODULE_IDENTITY = path.resolve(REPOSITORY_ROOT, 'lib/security/server-session');
 
-const resolvesSelfSessionModule = (specifier: string) => {
-    const relative = specifier.startsWith('@/') ? specifier.slice(2)
-        : specifier.startsWith('.') ? path.join('lib/security', specifier) : null;
-    return relative !== null && path.resolve(REPOSITORY_ROOT, relative).replace(/\.[cm]?[jt]sx?$/u, '') === SESSION_MODULE_IDENTITY;
-};
-
-const hasExactProjectionOwnerResourceImport = (source: string, countAllCanonicalDeclarations = false) => {
-    const ast = ts.createSourceFile(PROJECTION_OWNER_FILES[0], source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-    let matchingDeclarations = 0; let exact = true;
-    for (const statement of ast.statements) {
-        if (!ts.isImportDeclaration(statement)) continue;
-        const canonical = ts.isStringLiteral(statement.moduleSpecifier) && statement.moduleSpecifier.text === './server-session';
-        const clause = statement.importClause; const bindings = clause?.namedBindings;
-        const resources = bindings && ts.isNamedImports(bindings)
-            ? bindings.elements.filter((item) => RESOURCE_PORT_PRIMITIVES.has(item.propertyName?.text ?? item.name.text)) : [];
-        const resolvedSelfDeclaration = countAllCanonicalDeclarations && ts.isStringLiteral(statement.moduleSpecifier)
-            && resolvesSelfSessionModule(statement.moduleSpecifier.text);
-        if (resources.length === 0 && !resolvedSelfDeclaration) continue;
-        const resourceNames = resources.map((item) => item.name.text);
-        const distinctResourceNames = new Set(resourceNames);
-        matchingDeclarations += 1;
-        exact &&= canonical && !!clause && !!bindings && ts.isNamedImports(bindings)
-            && !statement.attributes && !statement.assertClause && !clause.isTypeOnly
-            && resources.length === RESOURCE_PORT_PRIMITIVES.size && distinctResourceNames.size === RESOURCE_PORT_PRIMITIVES.size
-            && [...RESOURCE_PORT_PRIMITIVES].every((name) => distinctResourceNames.has(name))
-            && resources.every((item) => !item.propertyName && !item.isTypeOnly)
-            && (!countAllCanonicalDeclarations || !clause.name);
-    }
-    return matchingDeclarations === 1 && exact;
-};
-
-const hasExactProjectionOwnerFactoryImport = (source: string) => {
-    const ast = ts.createSourceFile(PROJECTION_OWNER_FILES[1], source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-    let matchingDeclarations = 0; let exact = true;
-    for (const statement of ast.statements) {
-        if (!ts.isImportDeclaration(statement) || !statement.importClause) continue;
-        const bindings = statement.importClause.namedBindings;
-        if (!bindings || !ts.isNamedImports(bindings)) continue;
-        const markers = bindings.elements.filter((item) => (item.propertyName?.text ?? item.name.text) === PROJECTION_OWNER_FACTORY);
-        if (markers.length === 0) continue;
-        matchingDeclarations += 1;
-        exact &&= ts.isStringLiteral(statement.moduleSpecifier)
-            && statement.moduleSpecifier.text === './server-session-projection-owner.ts'
-            && !statement.attributes && !statement.assertClause && !statement.importClause.name
-            && !statement.importClause.isTypeOnly && markers.length === 1
-            && !markers[0]!.propertyName && !markers[0]!.isTypeOnly;
-    }
-    return matchingDeclarations === 1 && exact;
-};
-
-const hasExactProjectionBrokerSessionImport = (file: string, source: string) => {
-    const expected = PROJECTION_BROKER_IMPORTS.get(file); if (!expected) return false;
-    const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-    let declarations = 0; let exact = true;
-    for (const statement of ast.statements) {
-        if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)
-            || !resolvesSelfSessionModule(statement.moduleSpecifier.text)) continue;
-        declarations += 1;
-        const clause = statement.importClause; const bindings = clause?.namedBindings;
-        if (statement.moduleSpecifier.text !== './server-session' || !clause || clause.name || clause.isTypeOnly
-            || !bindings || !ts.isNamedImports(bindings) || statement.attributes || statement.assertClause
-            || bindings.elements.length !== expected.size) { exact = false; continue; }
-        const seen = new Set<string>();
-        for (const element of bindings.elements) {
-            const imported = element.propertyName?.text ?? element.name.text;
-            if (element.propertyName || seen.has(imported) || expected.get(imported) !== element.isTypeOnly) exact = false;
-            seen.add(imported);
-        }
-        if ([...expected.keys()].some((symbol) => !seen.has(symbol))) exact = false;
-    }
-    return declarations === 1 && exact;
-};
-
-const validateSessionImports = (sources: Readonly<Record<string, string>>) => {
-    const errors: string[] = []; const uses = Object.entries(sources).flatMap(([file, source]) => inventoryModuleImports({
-        file, source, target: 'lib/security/server-session', repositoryRoot: REPOSITORY_ROOT, allowUnresolvedExpressions: allowedGenericLoaderExpressions,
+const isTestSource = (file: string) => /(?:^|\/)[^/]+\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(file);
+const inventory = (sources: Readonly<Record<string, string>>, target: string) => Object.entries(sources)
+    .flatMap(([file, source]) => inventoryModuleImports({
+        file, source, target, repositoryRoot: REPOSITORY_ROOT,
+        allowUnresolvedExpressions: allowedGenericLoaderExpressions,
     }));
-    const ownerUses = Object.entries(sources).flatMap(([file, source]) => inventoryModuleImports({
-        file, source, target: PROJECTION_OWNER_MODULE, repositoryRoot: REPOSITORY_ROOT, allowUnresolvedExpressions: allowedGenericLoaderExpressions,
-    }));
-    const legacyOwnerBridgeExact = LEGACY_OWNER_BRIDGE_FILE in sources
-        && createHash('sha256').update(sources[LEGACY_OWNER_BRIDGE_FILE] ?? '').digest('hex') === LEGACY_OWNER_BRIDGE_SHA256;
-    if (LEGACY_OWNER_BRIDGE_FILE in sources && !legacyOwnerBridgeExact) errors.push(`${LEGACY_OWNER_BRIDGE_FILE}:shape`);
-    const logout = new Map([
-        ['lib/security/web-auth-logout-server.ts', new Set([
-            'dispatchActiveWebServerSessionRetirement', 'resolveActiveWebServerSession', 'SESSION_COOKIE_NAME',
-        ])],
-        ['lib/security/web-auth-logout-server.test.ts', new Set([
-            'activateArmedWebServerSession', 'armPreparedWebServerSession', 'clearAllSessions',
-            'dispatchActiveWebServerSessionRetirement', 'getPreparedWebServerSessionId',
-            'prepareStagedWebServerSession', 'resolveActiveWebServerSession', 'stageWebServerSession',
-        ])],
-        ['lib/security/web-auth-application-lock-server.ts', new Set([
-            'dispatchActiveWebServerSessionRetirement', 'resolveActiveWebServerSession', 'SESSION_COOKIE_NAME',
-        ])],
-        ['lib/security/web-auth-application-lock-server.test.ts', new Set([
-            'activateArmedWebServerSession', 'armPreparedWebServerSession', 'clearAllSessions',
-            'dispatchActiveWebServerSessionRetirement', 'getPreparedWebServerSessionId',
-            'prepareStagedWebServerSession', 'resolveActiveWebServerSession', 'stageWebServerSession',
-        ])],
-    ]);
-    for (const use of uses) {
-        if (use.form === 'import-type' && use.typeOnly && use.file === 'lib/security/server-session.test.ts') continue;
-        const provenDynamic = use.form === 'dynamic' && ((use.file === 'lib/security/web-auth-channel-cutover.test.ts'
-            && ['clearAllSessions', 'getSession'].includes(use.symbol)) || SESSION_TEST_DYNAMIC_IMPORTS.get(use.file)?.has(use.symbol));
-        const ownReload = use.form === 'require' && use.file === 'lib/security/server-session.test.ts';
-        if (use.form !== 'named' && !provenDynamic && !ownReload) errors.push(`${use.file}:${use.form}`);
-        if (!use.typeOnly && use.symbol === 'dispatchActiveWebServerSessionRetirement'
-            && use.file !== 'lib/security/server-session.test.ts' && !logout.has(use.file)
-            && !(legacyOwnerBridgeExact && use.file === LEGACY_OWNER_BRIDGE_FILE)) errors.push(`${use.file}:dispatch`);
-    }
-    for (const [file, exact] of logout) {
-        if (!(file in sources)) continue;
-        const runtime = uses.filter((use) => use.file === file && !use.typeOnly);
-        if (runtime.some((use) => use.form !== 'named') || runtime.length !== exact.size
-            || runtime.some((use) => !exact.has(use.symbol)) || [...exact].some((symbol) => !runtime.some((use) => use.symbol === symbol))) errors.push(`${file}:authority`);
-    }
-    for (const [file, expected] of SESSION_TEST_DYNAMIC_IMPORTS) {
-        if (!(file in sources)) continue;
-        const actual = uses.filter((use) => use.file === file && use.form === 'dynamic' && !use.typeOnly);
-        for (const [symbol, count] of expected) {
-            if (actual.filter((use) => use.symbol === symbol).length !== count) errors.push(`${file}:dynamic-allowlist`);
+const exactRuntimeSymbols = (
+    uses: ReturnType<typeof inventory>, file: string, symbols: ReadonlySet<string>,
+) => {
+    const actual = uses.filter((use) => use.file === file && !use.typeOnly && symbols.has(use.symbol));
+    return actual.length === symbols.size && actual.every((use) => use.form === 'named')
+        && [...symbols].every((symbol) => actual.some((use) => use.symbol === symbol));
+};
+
+/* @Codex */
+const validateO1CSessionImports = (sources: Readonly<Record<string, string>>) => {
+    const errors: string[] = [];
+    const sessionUses = inventory(sources, 'lib/security/server-session');
+    for (const use of sessionUses) {
+        if (use.typeOnly || isTestSource(use.file)) continue;
+        if (use.form !== 'named') errors.push(`${use.file}:session-loader`);
+        if (HISTORICAL_WEB_RUNTIME_SYMBOLS.has(use.symbol)
+            && !HISTORICAL_WEB_RUNTIME_IMPORTS.get(use.file)?.has(use.symbol)) {
+            errors.push(`${use.file}:historical-web-authority`);
         }
-        if (actual.length !== [...expected.values()].reduce((sum, count) => sum + count, 0)) errors.push(`${file}:dynamic-allowlist`);
+        if (NATIVE_CAPABILITY_SYMBOLS.has(use.symbol)
+            && !NATIVE_CAPABILITY_IMPORTS.get(use.file)?.has(use.symbol)) {
+            errors.push(`${use.file}:native-capability-owner`);
+        }
     }
-    const resourceUses = uses.filter((use) => RESOURCE_PORT_PRIMITIVES.has(use.symbol));
-    const brokerAdoptionUses = uses.filter((use) => PROJECTION_BROKER_FILES.includes(use.file as typeof PROJECTION_BROKER_FILES[number])
-        && PROJECTION_BROKER_ADOPTION_SYMBOLS.has(use.symbol));
-    const brokerFilesPresent = new Set(brokerAdoptionUses.map((use) => use.file));
-    const brokerPaired = brokerFilesPresent.size === PROJECTION_BROKER_FILES.length
-        && PROJECTION_BROKER_FILES.every((file) => hasExactProjectionBrokerSessionImport(file, sources[file] ?? ''));
-    if (brokerFilesPresent.size !== 0 && !brokerPaired) errors.push('projection-broker:resource-pair');
-    for (const use of resourceUses) {
-        if (use.file === 'lib/security/server-session.test.ts') continue;
-        const projectionOwner = PROJECTION_OWNER_FILES.includes(use.file as typeof PROJECTION_OWNER_FILES[number]);
-        const projectionBroker = brokerPaired && PROJECTION_BROKER_FILES.includes(use.file as typeof PROJECTION_BROKER_FILES[number]);
-        const legacyOwnerBridge = legacyOwnerBridgeExact && use.file === LEGACY_OWNER_BRIDGE_FILE;
-        if (!projectionOwner && !projectionBroker && !legacyOwnerBridge) errors.push(`${use.file}:resource-owner`);
-        if (use.form !== 'named' || use.typeOnly) errors.push(`${use.file}:resource-form`);
+    for (const [file, symbols] of HISTORICAL_WEB_RUNTIME_IMPORTS) {
+        if (file in sources && !exactRuntimeSymbols(sessionUses, file, symbols)) errors.push(`${file}:historical-shape`);
     }
-    const selfFile = 'lib/security/server-session.test.ts';
-    if (selfFile in sources && !hasExactProjectionOwnerResourceImport(sources[selfFile] ?? '', true)) errors.push(`${selfFile}:resource-shape`);
-    const adoptionResourceUses = resourceUses.filter((use) => use.file !== selfFile
-        && !PROJECTION_BROKER_FILES.includes(use.file as typeof PROJECTION_BROKER_FILES[number])
-        && !(legacyOwnerBridgeExact && use.file === LEGACY_OWNER_BRIDGE_FILE));
-    const ownerAdopters = new Set(adoptionResourceUses.map((use) => use.file));
-    const ownerTestDynamic = ownerUses.filter((use) => use.file === PROJECTION_OWNER_DYNAMIC_TEST
-        && use.form === 'dynamic' && use.symbol === '*' && !use.typeOnly);
-    if (PROJECTION_OWNER_DYNAMIC_TEST in sources && ownerTestDynamic.length !== 1) {
-        errors.push(`${PROJECTION_OWNER_DYNAMIC_TEST}:dynamic-owner-allowlist`);
+    for (const [file, symbols] of NATIVE_CAPABILITY_IMPORTS) {
+        if (file in sources && !exactRuntimeSymbols(sessionUses, file, symbols)) errors.push(`${file}:native-capability-shape`);
     }
-    const factorySignals = ownerUses.filter((use) => !(use.file === PROJECTION_OWNER_DYNAMIC_TEST
-        && use.form === 'dynamic' && use.symbol === '*' && !use.typeOnly) && (use.symbol === PROJECTION_OWNER_FACTORY
-        || ['module-path', 'dynamic', 'dynamic-options', 'require', 'require-options', 're-export', 'namespace',
-            'default', 'side-effect', 'code-loader'].includes(use.form)
-        || (use.file === PROJECTION_OWNER_FILES[1] && use.form === 'unsupported-expression')));
-    if (ownerAdopters.has(PROJECTION_OWNER_FILES[0])
-        && !hasExactProjectionOwnerResourceImport(sources[PROJECTION_OWNER_FILES[0]] ?? '')) errors.push(`${PROJECTION_OWNER_FILES[0]}:resource-shape`);
-    const absent = adoptionResourceUses.length === 0 && factorySignals.length === 0;
-    const paired = adoptionResourceUses.length === RESOURCE_PORT_PRIMITIVES.size && ownerAdopters.size === 1
-        && ownerAdopters.has(PROJECTION_OWNER_FILES[0]) && hasExactProjectionOwnerResourceImport(sources[PROJECTION_OWNER_FILES[0]] ?? '')
-        && factorySignals.length === 1 && factorySignals[0]!.file === PROJECTION_OWNER_FILES[1]
-        && factorySignals[0]!.form === 'named' && !factorySignals[0]!.typeOnly
-        && hasExactProjectionOwnerFactoryImport(sources[PROJECTION_OWNER_FILES[1]] ?? '');
-    const adoptionState = absent ? 'ABSENT' : paired ? 'PAIRED' : 'INVALID';
-    if (adoptionState === 'INVALID') errors.push('projection-owner:resource-pair');
-    const ownReloads = uses.filter((use) => use.file === 'lib/security/server-session.test.ts' && use.form === 'require' && !use.typeOnly);
-    if ('lib/security/server-session.test.ts' in sources && ownReloads.length !== 30) errors.push('lib/security/server-session.test.ts:reload-count');
-    return { adoptionState, brokerAdoptionState: brokerFilesPresent.size === 0 ? 'ABSENT' : brokerPaired ? 'PAIRED' : 'INVALID', errors, uses };
+    for (const [target, expectedByFile] of DORMANT_WEB_OWNER_MODULE_IMPORTS) {
+        const uses = inventory(sources, target);
+        for (const use of uses) {
+            if (use.typeOnly || isTestSource(use.file)) continue;
+            if (use.form !== 'named' || !expectedByFile.get(use.file)?.has(use.symbol)) {
+                errors.push(`${use.file}:historical-owner-reachable`);
+            }
+        }
+        for (const [file, symbols] of expectedByFile) {
+            if (file in sources && !exactRuntimeSymbols(uses, file, symbols)) errors.push(`${file}:historical-owner-shape`);
+        }
+    }
+    return errors;
 };
 const typescriptSources = () => repositoryTypeScriptSources(REPOSITORY_ROOT);
 
@@ -568,644 +427,67 @@ function armedControlActivation(userId = 'atomic-user') {
     return { control, port, sessionId, ticket };
 }
 
-test('atomically splices one exact control CAS into an inert Web session cell', () => {
-    const { control, port, sessionId, ticket } = armedControlActivation();
-
-    assert.equal(activateArmedWebServerSession(port, ticket), true);
-    assert.deepEqual(control.snapshot(), { fence: control.snapshot().fence, generation: BigInt(1), pending: false, active: true });
-    assert.equal(getArmedWebServerSessionId(port), null, 'ACTIVE is no longer an armed capability');
-    assert.equal(getSession(sessionId), null, 'P3b2b does not migrate the resolver');
-    assert.equal(peekSession(sessionId), null);
-    assert.equal(activateArmedWebServerSession(port, ticket), false, 'lost-response replay cannot duplicate activation');
+test('O1-C historical P2 prepare commit and abort bridges cannot activate or retire Web authority', () => {
+    const activation = armedControlActivation('cutover-denied');
+    assert.equal(activateArmedWebServerSession(activation.port, activation.ticket), false);
+    assert.equal(resolveActiveWebServerSession(activation.sessionId), null);
+    assert.equal(getSession(activation.sessionId), null);
+    assert.equal(retireActiveWebServerSession(activation.sessionId, 'delete'), false);
+    assert.equal(dispatchActiveWebServerSessionRetirement(activation.sessionId, 'delete').outcome, 'denied');
+    assert.deepEqual(activation.control.snapshot(), {
+        fence: 'f0', generation: BigInt(0), pending: true, active: false,
+    });
 
     const source = readFileSync(fileURLToPath(new URL('./server-session.ts', import.meta.url)), 'utf8');
-    const body = source.slice(source.indexOf('export function activateArmedWebServerSession'), source.indexOf('/** Canonically publishes'));
-    const successfulCas = body.indexOf('if (commitPreparedAuthControlActivation(preparedActivation) === 1) {');
-    const activeFlip = body.indexOf("cell.state = 'ACTIVE';", successfulCas);
-    assert.ok(successfulCas >= 0 && activeFlip > successfulCas);
-    assert.equal(body.slice(successfulCas + 'if (commitPreparedAuthControlActivation(preparedActivation) === 1) {'.length, activeFlip).trim(), '');
-    assert.doesNotMatch(body.slice(activeFlip, body.indexOf('return true;', activeFlip)), /\w+\s*\(/u);
+    assert.doesNotMatch(source, /from ['"]\.\/web-auth-control-record['"]/u);
+    assert.match(source, /function prepareAuthControlActivation[\s\S]*?return null;/u);
+    assert.match(source, /function commitPreparedAuthControlActivation[\s\S]*?return 0;/u);
+    assert.match(source, /function abortPreparedAuthControlActivation[\s\S]*?return false;/u);
+    assert.match(source, /function prepareAuthControlRetirement[\s\S]*?return null;/u);
+    assert.match(source, /function commitPreparedAuthControlRetirement[\s\S]*?return 0;/u);
+    assert.match(source, /function abortPreparedAuthControlRetirement[\s\S]*?return false;/u);
 });
 
-test('the trusted ACTIVE resolver returns only the exact P3 cell without legacy publication or sliding expiry', () => {
-    const armed = armedControlActivation();
-    assert.equal(resolveActiveWebServerSession(armed.sessionId), null);
-    assert.equal(activateArmedWebServerSession(armed.port, armed.ticket), true);
+test('O1-C inventories historical Web authority as a dormant fail-closed island', () => {
+    const sources = typescriptSources();
+    assert.deepEqual(validateO1CSessionImports(sources), []);
 
-    const session = resolveActiveWebServerSession(armed.sessionId);
-    assert.ok(session);
-    const expiry = session.expiresAt;
-    assert.equal(session.id, armed.sessionId);
-    assert.equal(session.authChannel, 'web');
-    assert.equal(resolveActiveWebServerSession(armed.sessionId), session);
-    assert.equal(session.expiresAt, expiry);
-    assert.equal(Object.isFrozen(session), true);
-    assert.equal(Object.getPrototypeOf(session), Object.prototype);
-    const mutations: ReadonlyArray<readonly [keyof typeof session, unknown]> = [
-        ['id', 'other-id'], ['userId', 'other-user'], ['username', 'other-name'], ['role', 'administrator'],
-        ['authChannel', 'native'], ['createdAt', 0], ['expiresAt', expiry + 1],
-    ];
-    for (const [key, value] of mutations) {
-        const descriptor = Object.getOwnPropertyDescriptor(session, key);
-        assert.deepEqual({ enumerable: descriptor?.enumerable, configurable: descriptor?.configurable, writable: descriptor && 'writable' in descriptor ? descriptor.writable : undefined },
-            { enumerable: true, configurable: false, writable: false });
-        assert.throws(() => { (session as unknown as Record<string, unknown>)[key] = value; }, TypeError);
-        assert.throws(() => Object.defineProperty(session, key, { value }), TypeError);
-        assert.throws(() => { delete (session as unknown as Record<string, unknown>)[key]; }, TypeError);
-    }
-    assert.throws(() => Object.setPrototypeOf(session, null), TypeError);
-    assert.equal(resolveActiveWebServerSession(armed.sessionId), session);
-    assert.deepEqual({ id: session.id, userId: session.userId, username: session.username, role: session.role,
-        authChannel: session.authChannel, createdAt: session.createdAt, expiresAt: session.expiresAt },
-    { id: armed.sessionId, userId: 'atomic-user', username: SYNTHETIC_USERNAME, role: 'clinician',
-        authChannel: 'web', createdAt: session.createdAt, expiresAt: expiry });
-    assert.equal(getSession(armed.sessionId), null);
-    assert.equal(peekSession(armed.sessionId), null);
-});
-
-test('mints and releases only a zero-field port for the exact ACTIVE session identity', async () => {
-    const active = armedControlActivation(); assert.equal(activateArmedWebServerSession(active.port, active.ticket), true);
-    const session = resolveActiveWebServerSession(active.sessionId); assert.ok(session);
-    const port = mintActiveWebSessionResourcePort(session); assert.ok(port);
-    assert.equal(Object.getPrototypeOf(port), null); assert.equal(Object.isFrozen(port), true); assert.deepEqual(Reflect.ownKeys(port), []);
-
-    let observed = 0; const proxy = new Proxy(Object.create(null), { get: () => { observed += 1; throw new Error('get'); }, ownKeys: () => { observed += 1; throw new Error('keys'); } });
-    const accessor = Object.create(null); Object.defineProperty(accessor, 'then', { get: () => { observed += 1; throw new Error('then'); } });
-    const rejected = Promise.reject(new Error('synthetic rejected port')); rejected.catch(() => undefined);
-    const legacy = syntheticSession(); const clone = structuredClone(session); const spread = { ...session };
-    const custom = Object.create({ inherited: true }); const armedOnly = armedControlActivation();
-    for (const value of [null, undefined, '', {}, Object.create(null), proxy, accessor, Promise.resolve(), rejected,
-        legacy, clone, spread, custom, armedOnly.port]) {
-        assert.equal(mintActiveWebSessionResourcePort(value), null);
-        assert.equal(releaseActiveWebSessionResourcePort(value), false);
-    }
-    const symbol = Object.create(null); Object.defineProperty(symbol, Symbol('hostile'), { value: true });
-    const hidden = Object.create(null); Object.defineProperty(hidden, 'hidden', { value: true });
-    assert.equal(releaseActiveWebSessionResourcePort(symbol), false); assert.equal(releaseActiveWebSessionResourcePort(hidden), false);
-
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath];
-    try { delete nodeRequire.cache[modulePath]; const restarted = nodeRequire(modulePath) as typeof import('./server-session');
-        assert.equal(restarted.mintActiveWebSessionResourcePort(session), null); assert.equal(restarted.releaseActiveWebSessionResourcePort(port), false); restarted.clearAllSessions();
-    } finally { if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
-
-    assert.equal(retireActiveWebServerSession(active.sessionId, 'dispose'), true);
-    assert.equal(mintActiveWebSessionResourcePort(session), null);
-    assert.equal(releaseActiveWebSessionResourcePort(port), true); assert.equal(releaseActiveWebSessionResourcePort(port), false);
-    await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(observed, 0);
-});
-
-test('ACTIVE resource mint denies expiry and lifecycle reentry without releasing an existing port', async (t) => {
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath];
-    const originalNow = Date.now; const originalTtl = process.env.MEDIFLOW_SESSION_TTL_MS; let isolated: typeof import('./server-session') | undefined;
-    let now = 1_000; let trigger = false; let nested: () => unknown = () => undefined; const unhandled: unknown[] = []; const onUnhandled = (value: unknown) => unhandled.push(value);
-    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
-    try {
-        process.env.MEDIFLOW_SESSION_TTL_MS = '10'; Date.now = () => { if (trigger) { trigger = false; nested(); } return now; };
-        delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
-        const staged = isolated.stageWebServerSession({ id: 'active-resource', username: SYNTHETIC_USERNAME, role: 'clinician' });
-        const prepared = isolated.prepareStagedWebServerSession(staged); assert.ok(prepared); const sessionId = isolated.getPreparedWebServerSessionId(prepared); assert.ok(sessionId);
-        const armed = isolated.armPreparedWebServerSession(prepared); assert.ok(armed); const control = authControlApi().create('resource-fence'); control.begin('login', 'op', 'key', 'fp', 0);
-        const ticket = control.prepareTicket('resource-fence', 'op', BigInt(0), 'fp', sessionId, now); assert.ok(ticket); assert.equal(isolated.activateArmedWebServerSession(armed, ticket), true);
-        const session = isolated.resolveActiveWebServerSession(sessionId); assert.ok(session); const retained = isolated.mintActiveWebSessionResourcePort(session); assert.ok(retained);
-        for (const operation of ['mint', 'release', 'delete', 'clear'] as const) {
-            nested = () => operation === 'release' ? isolated!.releaseActiveWebSessionResourcePort(retained)
-                : operation === 'mint' ? isolated!.mintActiveWebSessionResourcePort(session)
-                : operation === 'delete' ? isolated!.deleteSession(sessionId) : isolated!.clearAllSessions();
-            trigger = true; assert.equal(isolated.mintActiveWebSessionResourcePort(session), null); assert.equal(trigger, false);
-        }
-        assert.equal(isolated.releaseActiveWebSessionResourcePort(retained), true);
-        now = session.expiresAt; assert.equal(isolated.mintActiveWebSessionResourcePort(session), null);
-        await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
-    } finally { trigger = false; Date.now = originalNow; isolated?.clearAllSessions();
-        if (originalTtl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = originalTtl;
-        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
-});
-
-function activeResourceFixture(userId = 'atomic-user') {
-    const active = armedControlActivation(userId);
-    assert.equal(activateArmedWebServerSession(active.port, active.ticket), true);
-    const session = resolveActiveWebServerSession(active.sessionId); assert.ok(session);
-    const port = mintActiveWebSessionResourcePort(session); assert.ok(port);
-    return { ...active, session, port };
-}
-
-test('private ACTIVE resource registrations are opaque, exact, and one-use', () => {
-    const first = activeResourceFixture('private-first');
-    const second = activeResourceFixture('private-second');
-    let calls = 0; let reason = '';
-    const registration = registerActiveWebSessionPrivateResource(first.port, (value) => {
-        calls += 1; reason = value;
+    const unauthorized = validateO1CSessionImports({
+        'lib/security/unauthorized.ts': "import { activateArmedWebServerSession } from './server-session';",
     });
-    assert.ok(registration);
-    assert.deepEqual([
-        Object.getPrototypeOf(registration), Object.isFrozen(registration), Reflect.ownKeys(registration),
-    ], [null, true, []]);
+    assert.ok(unauthorized.includes('lib/security/unauthorized.ts:historical-web-authority'));
 
-    assert.equal(unregisterActiveWebSessionPrivateResource(second.port, registration), false);
-    assert.equal(unregisterActiveWebSessionPrivateResource(first.port, registration), false);
-    assert.equal(dispatchActiveWebServerSessionRetirement(first.sessionId, 'delete').outcome, 'completed');
-    assert.deepEqual([calls, reason], [0, '']);
-
-    const removed = registerActiveWebSessionPrivateResource(second.port, () => { calls += 1; });
-    assert.ok(removed);
-    assert.equal(unregisterActiveWebSessionPrivateResource(second.port, removed), true);
-    const live = registerActiveWebSessionPrivateResource(second.port, (value) => {
-        calls += 1; reason = value;
+    const reachableIssuer = validateO1CSessionImports({
+        'lib/security/unauthorized.ts': "import { issue } from './web-auth-session-issuer';",
     });
-    assert.ok(live);
-    const receipt = dispatchActiveWebServerSessionRetirement(second.sessionId, 'dispose');
-    assert.equal(receipt.outcome, 'completed');
-    assert.equal(dispatchActiveWebServerSessionRetirement(second.sessionId, 'dispose'), receipt);
-    assert.deepEqual([calls, reason], [1, 'dispose']);
-    assert.equal(unregisterActiveWebSessionPrivateResource(second.port, live), false);
-    assert.equal(releaseActiveWebSessionResourcePort(second.port), false);
-});
+    assert.ok(reachableIssuer.includes('lib/security/unauthorized.ts:historical-owner-reachable'));
 
-test('terminal retirement detaches cleanup before containing throws, promises, and hostile returns', async (t) => {
-    const active = activeResourceFixture('private-hostile');
-    let calls = 0; let reads = 0; let nestedUnregister = true; let nestedRegister: unknown = true;
-    const unhandled: unknown[] = []; const onUnhandled = (value: unknown) => unhandled.push(value);
-    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
-    const thenable = Object.create(null); Object.defineProperty(thenable, 'then', { get() { reads += 1; throw new Error('then'); } });
-    const proxy = new Proxy(Object.create(null), { get() { reads += 1; throw new Error('get'); } });
-    let promiseRegistration: ReturnType<typeof registerActiveWebSessionPrivateResource> = null;
-    const throwingRegistration = registerActiveWebSessionPrivateResource(active.port, () => {
-        calls += 1;
-        nestedUnregister = unregisterActiveWebSessionPrivateResource(active.port, promiseRegistration);
-        nestedRegister = registerActiveWebSessionPrivateResource(active.port, () => undefined);
-        assert.equal(resolveActiveWebServerSession(active.sessionId), null);
-        throw new Error('synthetic cleanup');
+    const hiddenLoader = validateO1CSessionImports({
+        'lib/security/unauthorized.ts': "const session = await import('./server-session');",
     });
-    promiseRegistration = registerActiveWebSessionPrivateResource(active.port, () => {
-        calls += 1; return Promise.reject(new Error('synthetic rejection'));
+    assert.ok(hiddenLoader.includes('lib/security/unauthorized.ts:session-loader'));
+});
+
+test('O1-C binds native-system capabilities to reset and PIN change only', () => {
+    const sources = typescriptSources();
+    const reset = sources['app/api/auth/reset/route.ts']; assert.ok(reset);
+    const pin = sources['lib/security/pin-change-service.ts']; assert.ok(pin);
+    assert.deepEqual(validateO1CSessionImports({
+        'app/api/auth/reset/route.ts': reset,
+        'lib/security/pin-change-service.ts': pin,
+    }), []);
+
+    const stolen = validateO1CSessionImports({
+        'lib/security/unauthorized.ts':
+            "import { prepareNativeSystemAdminReset } from './server-session';",
     });
-    const hostileRegistration = registerActiveWebSessionPrivateResource(active.port, () => {
-        calls += 1; return calls % 2 ? proxy : thenable;
+    assert.ok(stolen.includes('lib/security/unauthorized.ts:native-capability-owner'));
+
+    const partialReset = validateO1CSessionImports({
+        'app/api/auth/reset/route.ts':
+            "import { prepareNativeSystemAdminReset, commitNativeSystemAdminReset } from '@/lib/security/server-session';",
     });
-    const otherHostileRegistration = registerActiveWebSessionPrivateResource(active.port, () => {
-        calls += 1; return calls % 2 ? proxy : thenable;
-    });
-    assert.ok(throwingRegistration && promiseRegistration && hostileRegistration && otherHostileRegistration);
-
-    assert.equal(dispatchActiveWebServerSessionRetirement(active.sessionId, 'dispose').outcome, 'failed');
-    assert.deepEqual([calls, nestedUnregister, nestedRegister, reads], [4, false, null, 0]);
-    for (const registration of [throwingRegistration, promiseRegistration, hostileRegistration, otherHostileRegistration]) {
-        assert.equal(unregisterActiveWebSessionPrivateResource(active.port, registration), false);
-    }
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    assert.deepEqual(unhandled, []);
-});
-
-test('ACTIVE resource uses are opaque, one-use, and commit-last without consumer effects', async () => {
-    const active = activeResourceFixture();
-    const first = beginActiveWebSessionResourceUse(active.port); assert.ok(first);
-    assert.equal(Object.getPrototypeOf(first), null); assert.equal(Object.isFrozen(first), true);
-    assert.deepEqual(Reflect.ownKeys(first), []);
-
-    let observed = 0;
-    const proxy = new Proxy(Object.create(null), { get: () => { observed += 1; throw new Error('get'); }, ownKeys: () => { observed += 1; throw new Error('keys'); } });
-    const accessor = Object.create(null); Object.defineProperty(accessor, 'then', { get: () => { observed += 1; throw new Error('then'); } });
-    const rejected = Promise.reject(new Error('synthetic rejected use')); rejected.catch(() => undefined);
-    const clone = structuredClone(first); const spread = { ...first };
-    for (const value of [null, undefined, {}, proxy, accessor, Promise.resolve(), rejected, clone, spread]) {
-        assert.equal(commitActiveWebSessionResourceUse(value), false);
-        assert.equal(abortActiveWebSessionResourceUse(value), false);
-    }
-    assert.equal(observed, 0);
-
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath];
-    try { delete nodeRequire.cache[modulePath]; const secondary = nodeRequire(modulePath) as typeof import('./server-session');
-        assert.equal(secondary.commitActiveWebSessionResourceUse(first), false); assert.equal(secondary.abortActiveWebSessionResourceUse(first), false); secondary.clearAllSessions();
-    } finally { if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
-
-    const originals = { weakGet: WeakMap.prototype.get, setDelete: Set.prototype.delete };
-    const fail = () => { throw new Error('ambient collection poison'); };
-    try { WeakMap.prototype.get = fail as typeof WeakMap.prototype.get; Set.prototype.delete = fail as typeof Set.prototype.delete;
-        assert.equal(commitActiveWebSessionResourceUse(first), true);
-    } finally { WeakMap.prototype.get = originals.weakGet; Set.prototype.delete = originals.setDelete; }
-    assert.equal(commitActiveWebSessionResourceUse(first), false);
-    assert.equal(abortActiveWebSessionResourceUse(first), false);
-
-    const second = beginActiveWebSessionResourceUse(active.port); assert.ok(second);
-    assert.equal(abortActiveWebSessionResourceUse(second), true);
-    assert.equal(commitActiveWebSessionResourceUse(second), false);
-    assert.equal(abortActiveWebSessionResourceUse(second), false);
-
-    const released = activeResourceFixture(); const releasedUse = beginActiveWebSessionResourceUse(released.port); assert.ok(releasedUse);
-    assert.equal(releaseActiveWebSessionResourcePort(released.port), true);
-    assert.equal(commitActiveWebSessionResourceUse(releasedUse), false);
-    assert.equal(beginActiveWebSessionResourceUse(released.port), null);
-
-    const retired = activeResourceFixture(); const retiredUse = beginActiveWebSessionResourceUse(retired.port); assert.ok(retiredUse);
-    assert.equal(retireActiveWebServerSession(retired.sessionId, 'dispose'), true);
-    assert.equal(commitActiveWebSessionResourceUse(retiredUse), false);
-    assert.equal(abortActiveWebSessionResourceUse(retiredUse), false);
-    assert.equal(beginActiveWebSessionResourceUse(retired.port), null);
-    assert.equal(releaseActiveWebSessionResourcePort(retired.port), true);
-    assert.equal(releaseActiveWebSessionResourcePort(retired.port), false);
-});
-
-test('resource cleanup and expiry burn uses and deny new use without changing resolver semantics', async (t) => {
-    for (const cleanup of ['delete', 'invalidate', 'clear'] as const) {
-        const active = activeResourceFixture(); const use = beginActiveWebSessionResourceUse(active.port); assert.ok(use);
-        if (cleanup === 'delete') deleteSession(active.sessionId);
-        else if (cleanup === 'invalidate') invalidateSessionsForUser('atomic-user');
-        else clearAllSessions();
-        assert.equal(commitActiveWebSessionResourceUse(use), false);
-        assert.equal(abortActiveWebSessionResourceUse(use), false);
-        assert.equal(beginActiveWebSessionResourceUse(active.port), null);
-        assert.equal(releaseActiveWebSessionResourcePort(active.port), true);
-    }
-
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
-    const cached = nodeRequire.cache[modulePath]; const originalNow = Date.now; const originalTtl = process.env.MEDIFLOW_SESSION_TTL_MS;
-    let isolated: typeof import('./server-session') | undefined; let now = 1_000; let trigger = false; let nested = () => undefined;
-    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
-    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
-    try {
-        process.env.MEDIFLOW_SESSION_TTL_MS = '10'; Date.now = () => { if (trigger) { trigger = false; nested(); } return now; }; delete nodeRequire.cache[modulePath];
-        isolated = nodeRequire(modulePath) as typeof import('./server-session');
-        const staged = isolated.stageWebServerSession({ id: 'use-expiry', username: SYNTHETIC_USERNAME, role: 'clinician' });
-        const prepared = isolated.prepareStagedWebServerSession(staged); assert.ok(prepared);
-        const id = isolated.getPreparedWebServerSessionId(prepared); assert.ok(id);
-        const armed = isolated.armPreparedWebServerSession(prepared); assert.ok(armed);
-        const control = authControlApi().create('use-expiry-fence'); control.begin('login', 'op', 'key', 'fp', 0);
-        const ticket = control.prepareTicket('use-expiry-fence', 'op', BigInt(0), 'fp', id, now); assert.ok(ticket);
-        assert.equal(isolated.activateArmedWebServerSession(armed, ticket), true);
-        const session = isolated.resolveActiveWebServerSession(id); assert.ok(session);
-        const port = isolated.mintActiveWebSessionResourcePort(session); assert.ok(port);
-        const reentryUse = isolated.beginActiveWebSessionResourceUse(port); assert.ok(reentryUse);
-        nested = () => { isolated?.commitActiveWebSessionResourceUse(reentryUse); }; trigger = true;
-        assert.equal(isolated.commitActiveWebSessionResourceUse(reentryUse), false);
-        const use = isolated.beginActiveWebSessionResourceUse(port); assert.ok(use); now = session.expiresAt;
-        assert.equal(isolated.commitActiveWebSessionResourceUse(use), false);
-        assert.equal(isolated.abortActiveWebSessionResourceUse(use), false);
-        assert.equal(isolated.beginActiveWebSessionResourceUse(port), null);
-        isolated.releaseActiveWebSessionResourcePort(port); isolated.clearAllSessions();
-    } finally {
-        Date.now = originalNow;
-        if (originalTtl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = originalTtl;
-        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
-    }
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    assert.deepEqual(unhandled, []);
-});
-
-test('ACTIVE resource port has no callback surface or production importer before adoption', () => {
-    const source = readFileSync(fileURLToPath(new URL('./server-session.ts', import.meta.url)), 'utf8');
-    const mint = source.slice(source.indexOf('export function mintActiveWebSessionResourcePort'), source.indexOf('export function releaseActiveWebSessionResourcePort'));
-    const release = source.slice(source.indexOf('export function releaseActiveWebSessionResourcePort'), source.indexOf('export function beginActiveWebSessionResourceUse'));
-    const use = source.slice(source.indexOf('export function beginActiveWebSessionResourceUse'), source.indexOf('export function registerActiveWebSessionPrivateResource'));
-    const privateResource = source.slice(source.indexOf('export function registerActiveWebSessionPrivateResource'), source.indexOf('export function getSession'));
-    const cleanup = source.slice(source.indexOf('export function cleanupRetiredWebServerSession'));
-    const dispatch = source.slice(source.indexOf('export function dispatchActiveWebServerSessionRetirement'));
-    assert.match(mint, /\(session: unknown\): ActiveWebSessionResourcePort \| null/u); assert.match(release, /\(port: unknown\): boolean/u);
-    assert.match(use, /export function beginActiveWebSessionResourceUse\(port: unknown\): ActiveWebSessionResourceUse \| null/u);
-    assert.match(use, /export function commitActiveWebSessionResourceUse\(use: unknown\): boolean/u);
-    assert.match(use, /export function abortActiveWebSessionResourceUse\(use: unknown\): boolean/u);
-    assert.doesNotMatch(`${mint}\n${release}\n${use}`, /\b(?:callback|dispose|Promise|async|then|setTimeout|setImmediate|queueMicrotask|nextTick|payload|effect|method)\b/u);
-    assert.match(privateResource, /registerActiveWebSessionPrivateResource\([\s\S]*\): ActiveWebSessionPrivateResourceRegistration \| null/u);
-    assert.match(privateResource, /unregisterActiveWebSessionPrivateResource\(port: unknown, registration: unknown\): boolean/u);
-    assert.doesNotMatch(cleanup, /\b(?:DateNow|Promise|async|then|setTimeout|setImmediate|queueMicrotask|nextTick)\b/u);
-    assert.match(dispatch, /retireActiveWebServerSession\(sessionId, reason\);\s*return cleanupRetiredWebServerSession\(sessionId, reason\);/u);
-    assert.doesNotMatch(dispatch, /\b(?:callback|ticket|owner|session:|Promise|async|then|setTimeout|setImmediate|queueMicrotask|nextTick)\b/u);
-});
-
-test('inventories exact session imports by AST and closes the logout authority boundary', () => {
-    const currentSources = typescriptSources();
-    assert.deepEqual(validateSessionImports(currentSources).errors, []);
-    const legacyBridge = currentSources[LEGACY_OWNER_BRIDGE_FILE]; assert.ok(legacyBridge);
-    assert.deepEqual(validateSessionImports({ [LEGACY_OWNER_BRIDGE_FILE]: legacyBridge }).errors, []);
-    assert.ok(validateSessionImports({
-        [LEGACY_OWNER_BRIDGE_FILE]: legacyBridge.replace('peekSession,', 'peekSession as peekHistoricalSession,'),
-    }).errors.includes(`${LEGACY_OWNER_BRIDGE_FILE}:shape`));
-    for (const [file, specifier] of SESSION_TEST_DYNAMIC_SPECIFIERS) {
-        const source = typescriptSources()[file]; assert.ok(source?.includes(`import('${specifier}')`));
-        const drift = validateSessionImports({ [file]: source.replace(`import('${specifier}')`, `import('${specifier}?copy=1')`) });
-        assert.notDeepEqual(drift.errors, [], file);
-        const duplicate = validateSessionImports({ [file]: `${source}\nconst duplicateSession = await import('${specifier}');` });
-        assert.ok(duplicate.errors.includes(`${file}:dynamic-allowlist`), file);
-    }
-    const valid = {
-        'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession as resolve, dispatchActiveWebServerSessionRetirement, SESSION_COOKIE_NAME } from '@/lib/security/server-session';",
-        'lib/security/web-auth-logout-server.test.ts': "import { activateArmedWebServerSession, armPreparedWebServerSession, clearAllSessions, dispatchActiveWebServerSessionRetirement as dispatch, getPreparedWebServerSessionId, prepareStagedWebServerSession, resolveActiveWebServerSession, stageWebServerSession } from './server-session.ts';",
-        'lib/security/web-auth-application-lock-server.ts': "import { resolveActiveWebServerSession as resolve, dispatchActiveWebServerSessionRetirement, SESSION_COOKIE_NAME } from '@/lib/security/server-session';",
-        'lib/security/web-auth-application-lock-server.test.ts': "import { activateArmedWebServerSession, armPreparedWebServerSession, clearAllSessions, dispatchActiveWebServerSessionRetirement as dispatch, getPreparedWebServerSessionId, prepareStagedWebServerSession, resolveActiveWebServerSession, stageWebServerSession } from './server-session.ts';",
-        'lib/security/literal.ts': "// import deleteSession from './server-session'; const text = 'clearAllSessions'; const regex = /retireWebP3SessionsForUser/u; test('createNativeServerSession', () => undefined);",
-        'lib/security/types.ts': "import type { ServerSession as Session } from './server-session';",
-    };
-    const accepted = validateSessionImports(valid);
-    assert.deepEqual(accepted.errors, []); assert.equal(accepted.uses.find((use) => use.symbol === 'ServerSession')?.typeOnly, true);
-    assert.ok(validateSessionImports({
-        ...valid,
-        'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession, dispatchActiveWebServerSessionRetirement } from './server-session';",
-    }).errors.includes('lib/security/web-auth-logout-server.ts:authority'));
-    assert.ok(validateSessionImports({
-        ...valid,
-        'lib/security/web-auth-logout-server.test.ts': `${valid['lib/security/web-auth-logout-server.test.ts']}\nimport { createSession } from './server-session';`,
-    }).errors.includes('lib/security/web-auth-logout-server.test.ts:authority'));
-    const rejected: Array<Record<string, string>> = [
-        { 'lib/security/web-auth-logout-server.ts': "import { deleteSession as dispatch } from './server-session';" },
-        { 'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession, dispatchActiveWebServerSessionRetirement, createSession, createNativeServerSession, deleteSession, invalidateSessionsForUser, retireWebP3SessionsForUser, clearAllSessions } from '../../lib/security/server-session';" },
-        { 'lib/security/web-auth-logout-server.ts': "import session from './server-session';" },
-        { 'lib/security/web-auth-logout-server.ts': "import * as session from './server-session';" },
-        { 'lib/security/web-auth-logout-server.ts': "export { resolveActiveWebServerSession } from './server-session';" },
-        { 'lib/security/web-auth-logout-server.ts': ['const session = req', "uire('./server-session');"].join('') },
-        { 'lib/security/web-auth-logout-server.ts': "const session = await import('./server-session');" },
-        { 'lib/security/web-auth-logout-server.ts': "const target = './server-' + 'session'; const session = await import((target as const), { with: { type: 'json' } });" },
-        { 'lib/security/web-auth-logout-server.ts': "const suffix = pick(); const target = './server-session' + suffix; import(target);" },
-        { 'lib/security/web-auth-logout-server.ts': "const target = `./server-session`; const load = require; load(target);" },
-        { 'lib/security/web-auth-logout-server.ts': ['module.req', "uire('./server-session'); req", "uire.call(null, './server-session');"].join('') },
-        { 'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession, dispatchActiveWebServerSessionRetirement } from './server\\x2dsession';" },
-        { 'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession, dispatchActiveWebServerSessionRetirement } from './server-session.js';" },
-        { 'lib/security/web-auth-logout-server.ts': "import { resolveActiveWebServerSession, dispatchActiveWebServerSessionRetirement } from './nested/../server-session';" },
-        { 'lib/security/web-auth-logout-server.ts': "import type { resolveActiveWebServerSession, dispatchActiveWebServerSessionRetirement } from './server-session';" },
-        { 'lib/security/extra.ts': "import { dispatchActiveWebServerSessionRetirement as dispatch } from './server-session';" },
-    ];
-    for (const source of rejected) assert.notDeepEqual(validateSessionImports(source).errors, []);
-    const target = path.join(REPOSITORY_ROOT, 'lib/security/server-session');
-    for (const source of moduleImportBypassFixtures('./server-session', target)) {
-        const result = validateSessionImports({ 'lib/security/web-auth-logout-server.ts': source });
-        assert.notDeepEqual(result.errors, [], source);
-    }
-    assert.ok(validateSessionImports({ 'lib/security/extra.ts': 'import(pick());' }).errors.includes('lib/security/extra.ts:unsupported-expression'));
-    const benchmark = typescriptSources()['scripts/benchmark-redaction.ts']; assert.ok(benchmark);
-    const errors = validateSessionImports({
-        'scripts/benchmark-redaction.ts': `${benchmark}\nconst suffix=pick();import('./server-session'+suffix);`,
-    }).errors;
-    for (const form of ['unsupported-expression', 'module-path', 'dynamic']) assert.ok(errors.includes(`scripts/benchmark-redaction.ts:${form}`), form);
-    const duplicate = validateSessionImports({
-        'scripts/benchmark-redaction.ts': `${benchmark}\nconst duplicate=await import(pathToFileURL(adapterModule).href);`,
-    }).errors;
-    assert.ok(duplicate.includes('scripts/benchmark-redaction.ts:allowlist-duplicate'));
-    const drift = validateSessionImports({
-        'scripts/benchmark-redaction.ts': benchmark.replace('pathToFileURL(adapterModule).href', 'pathToFileURL(adapterModule).toString()'),
-    }).errors;
-    assert.ok(drift.includes('scripts/benchmark-redaction.ts:allowlist-drift'));
-    assert.deepEqual(validateSessionImports({ 'scripts/benchmark-redaction.ts': benchmark }).errors, []);
-    for (const fixture of unsafeLoaderIdentityFixtures('../lib/security/server-session')) {
-        const aliasErrors = validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
-        assert.ok(aliasErrors.includes('scripts/benchmark-redaction.ts:reserved-loader-identity'), fixture);
-    }
-    for (const fixture of reservedLoaderBindingFixtures) {
-        const bindingErrors = validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
-        assert.equal(bindingErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:reserved-loader-identity').length, 1, fixture);
-    }
-    for (const fixture of createRequireBypassFixtures('../lib/security/server-session')) {
-        assert.notDeepEqual(validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors, [], fixture);
-    }
-    for (const fixture of createRequireShadowFixtures('../lib/security/server-session')) {
-        const shadowErrors = validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
-        assert.equal(shadowErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:reserved-loader-identity').length, 1, fixture);
-    }
-    for (const fixture of createRequireUnresolvedFixtures('../lib/security/server-session')) {
-        const unresolvedErrors = validateSessionImports({ 'scripts/benchmark-redaction.ts': `${benchmark}\n${fixture}` }).errors;
-        assert.equal(unresolvedErrors.filter((error) => error === 'scripts/benchmark-redaction.ts:protected-loader-unsupported').length, 1, fixture);
-    }
-    const sessionSource = typescriptSources()['lib/security/server-session.test.ts']; assert.ok(sessionSource);
-    const indexedReload = ['nodeRequire', '(paths[0])'].join('');
-    const createRequireDrift = validateSessionImports({
-        'lib/security/server-session.test.ts': sessionSource.replace(indexedReload, 'nodeRequire(paths.at(0)!)'),
-    }).errors;
-    assert.ok(createRequireDrift.includes('lib/security/server-session.test.ts:allowlist-drift'));
-    const createRequireDuplicate = validateSessionImports({
-        'lib/security/server-session.test.ts': sessionSource.replace(`isolated = ${indexedReload}`, `${indexedReload}; isolated = ${indexedReload}`),
-    }).errors;
-    assert.ok(createRequireDuplicate.includes('lib/security/server-session.test.ts:allowlist-duplicate'));
-    const extraOwnReload = validateSessionImports({
-        'lib/security/server-session.test.ts': sessionSource.replace('const cryptoModule = nodeRequire', "nodeRequire('./server-session.ts'); const cryptoModule = nodeRequire"),
-    }).errors;
-    assert.ok(extraOwnReload.includes('lib/security/server-session.test.ts:reload-count'));
-    const protectedResolve = "nodeRequire.resolve('./server-session.ts')";
-    const protectedResolveDrift = validateSessionImports({
-        'lib/security/server-session.test.ts': sessionSource.replace(protectedResolve, `(nodeRequire.resolve)('./server-session.ts')`),
-    }).errors;
-    assert.ok(protectedResolveDrift.includes('lib/security/server-session.test.ts:protected-loader-allowlist-drift'));
-    const protectedResolveDuplicate = validateSessionImports({
-        'lib/security/server-session.test.ts': sessionSource.replace(`const modulePath = ${protectedResolve}`, `const duplicatePath = ${protectedResolve}; const modulePath = ${protectedResolve}`),
-    }).errors;
-    assert.ok(protectedResolveDuplicate.includes('lib/security/server-session.test.ts:protected-loader-allowlist-duplicate'));
-    const protectedCacheDuplicate = validateSessionImports({
-        'lib/security/server-session.test.ts': sessionSource.replace('const cached = nodeRequire.cache[modulePath]', 'const duplicateCached = nodeRequire.cache[modulePath]; const cached = nodeRequire.cache[modulePath]'),
-    }).errors;
-    assert.ok(protectedCacheDuplicate.includes('lib/security/server-session.test.ts:protected-loader-allowlist-duplicate'));
-    const dynamicResolve = ['nodeRequire', '.resolve(`./${name}`)'].join('');
-    const newDynamicResolve = validateSessionImports({
-        'lib/security/server-session.test.ts': sessionSource.replace(dynamicResolve, `(nodeRequire.resolve(pick()), ${dynamicResolve})`),
-    }).errors;
-    assert.ok(newDynamicResolve.includes('lib/security/server-session.test.ts:protected-loader-unsupported'));
-    const duplicateDynamicResolve = validateSessionImports({
-        'lib/security/server-session.test.ts': sessionSource.replace(dynamicResolve, `(${dynamicResolve}, ${dynamicResolve})`),
-    }).errors;
-    assert.ok(duplicateDynamicResolve.includes('lib/security/server-session.test.ts:protected-loader-unresolved-allowlist-duplicate'));
-    const driftDynamicResolve = validateSessionImports({
-        'lib/security/server-session.test.ts': sessionSource.replace(dynamicResolve, 'nodeRequire.resolve(name)'),
-    }).errors;
-    assert.ok(driftDynamicResolve.includes('lib/security/server-session.test.ts:protected-loader-unresolved-allowlist-drift'));
-    const pm2 = typescriptSources()['lib/pm2-manager.ts']; assert.ok(pm2);
-    assert.deepEqual(validateSessionImports({ 'lib/pm2-manager.ts': pm2 }).errors, []);
-    assert.ok(validateSessionImports({ 'lib/pm2-manager.ts': pm2.replace("require('pm2')", "require('pm2-drift')") }).errors.includes('lib/pm2-manager.ts:reserved-loader-allowlist-drift'));
-    assert.ok(validateSessionImports({ 'lib/pm2-manager.ts': `${pm2}\nconst duplicate=require('pm2');` }).errors.includes('lib/pm2-manager.ts:reserved-loader-allowlist-duplicate'));
-    const pdfjs = typescriptSources()['lib/pdfjs-server.ts']; assert.ok(pdfjs);
-    assert.deepEqual(validateSessionImports({ 'lib/pdfjs-server.ts': pdfjs }).errors, []);
-    assert.ok(validateSessionImports({ 'lib/pdfjs-server.ts': pdfjs.replace('return import(specifier);', 'return import(specifier); ') }).errors.includes('lib/pdfjs-server.ts:reserved-loader-allowlist-drift'));
-    assert.ok(validateSessionImports({ 'lib/pdfjs-server.ts': `${pdfjs}\nconst duplicate=new Function('specifier','return import(specifier);');` }).errors.includes('lib/pdfjs-server.ts:reserved-loader-allowlist-duplicate'));
-});
-
-test('observes only absent or exact paired projection owner adoption', () => {
-    const production = 'lib/security/server-session-projection-owner.ts';
-    const ownerTest = 'lib/security/server-session-projection-owner.test.ts';
-    const current = validateSessionImports(typescriptSources());
-    assert.ok(current.adoptionState === 'ABSENT' || current.adoptionState === 'PAIRED');
-    const exact = "import { getSession, abortActiveWebSessionResourceUse, beginActiveWebSessionResourceUse, commitActiveWebSessionResourceUse, mintActiveWebSessionResourcePort, releaseActiveWebSessionResourcePort, type ServerSession } from './server-session';";
-    const paired = { [production]: exact, [ownerTest]: "import { createPortProjectionOwnerFactory } from './server-session-projection-owner.ts';" };
-    const accepted = validateSessionImports(paired);
-    assert.equal(accepted.adoptionState, 'PAIRED'); assert.deepEqual(accepted.errors, []);
-    const partial = validateSessionImports({ [production]: exact });
-    assert.equal(partial.adoptionState, 'INVALID'); assert.notDeepEqual(partial.errors, []);
-    assert.notDeepEqual(validateSessionImports({ [ownerTest]: paired[ownerTest] }).errors, []);
-    const third = validateSessionImports({ ...paired, 'lib/security/third.ts': "import { commitActiveWebSessionResourceUse } from './server-session';" });
-    assert.equal(third.adoptionState, 'INVALID'); assert.notDeepEqual(third.errors, []);
-    assert.notDeepEqual(validateSessionImports({ ...paired,
-        [production]: exact.replace('mintActiveWebSessionResourcePort', 'mintActiveWebSessionResourcePort as mint') }).errors, []);
-    assert.notDeepEqual(validateSessionImports({ ...paired,
-        [ownerTest]: "import type { commitActiveWebSessionResourceUse } from './server-session';" }).errors, []);
-    const attributed = [
-        exact.replace(" from './server-session';", " from './server-session' with { type: 'json' };"),
-        exact.replace(" from './server-session';", " from './server-session' assert { type: 'json' };"),
-    ];
-    for (const source of attributed) assert.notDeepEqual(validateSessionImports({ ...paired, [production]: source }).errors, [], source);
-    for (const omitted of RESOURCE_PORT_PRIMITIVES) {
-        for (const duplicate of RESOURCE_PORT_PRIMITIVES) {
-            if (duplicate === omitted) continue;
-            const source = exact.replace(omitted, duplicate);
-            assert.notDeepEqual(validateSessionImports({ ...paired, [production]: source }).errors, [], `${omitted}->${duplicate}`);
-        }
-    }
-    const mixed = [
-        "await import('./server-session?shadow#copy');", "await import('./server-session#copy');",
-        "await import('./%73erver-session');", "await import('./SERVER-SESSION');",
-        "import * as hidden from './nested/../server-session';", "const load=require;load('./server-session');",
-        "export { commitActiveWebSessionResourceUse } from './server-session';",
-        "await import('./server-session', { with: { type: 'json' } });",
-        "const target='./server-'+'session';await import(target);",
-        "const escaped='./server-'+'\\x73ession';await import(escaped);",
-        "const load=(value:string)=>import(value);load('./server-session');",
-        "const suffix=pick();await import('./server-session'+suffix);",
-    ];
-    for (const bypass of mixed) {
-        assert.notDeepEqual(validateSessionImports({ ...paired, [production]: `${exact}\n${bypass}` }).errors, [], bypass);
-    }
-});
-
-test('permits only absent or exact paired projection owner adoption state', () => {
-    const production = PROJECTION_OWNER_FILES[0]; const ownerTest = PROJECTION_OWNER_FILES[1];
-    const resources = "import { abortActiveWebSessionResourceUse, beginActiveWebSessionResourceUse, commitActiveWebSessionResourceUse, mintActiveWebSessionResourcePort, releaseActiveWebSessionResourcePort } from './server-session';";
-    const marker = "import { createPortProjectionOwnerFactory } from './server-session-projection-owner.ts';";
-    assert.deepEqual(validateSessionImports({ [production]: '', [ownerTest]: '' }).errors, []);
-    const accepted = validateSessionImports({ [production]: resources, [ownerTest]: marker });
-    assert.deepEqual(accepted.errors, []); assert.equal(accepted.uses.length, RESOURCE_PORT_PRIMITIVES.size);
-    assert.notDeepEqual(validateSessionImports({ [production]: resources, [ownerTest]: '' }).errors, []);
-    assert.notDeepEqual(validateSessionImports({ [production]: '', [ownerTest]: marker }).errors, []);
-    const invalidMarkers = [
-        `${marker}\n${marker}`,
-        marker.replace(PROJECTION_OWNER_FACTORY, `${PROJECTION_OWNER_FACTORY} as factory`),
-        marker.replace('import {', 'import type {'),
-        marker.replace(';', " with { type: 'json' };"), marker.replace(';', " assert { type: 'json' };"),
-        "const { createPortProjectionOwnerFactory } = await import('./server-session-projection-owner');",
-        "export { createPortProjectionOwnerFactory } from './server-session-projection-owner';",
-        marker.replace('./server-session-projection-owner.ts', './nested/../server-session-projection-owner'),
-        marker.replace('server-session-projection-owner.ts', '%73erver-session-projection-owner'),
-        marker.replace('.ts', '?copy=1'), marker.replace('.ts', '#copy'),
-        "const owner=await import('./server-session-projection-owner');const key=['createPort','ProjectionOwnerFactory'].join('');owner[key];",
-        'const target=pick();const {createPortProjectionOwnerFactory}=await import(target);',
-    ];
-    for (const source of invalidMarkers) {
-        assert.notDeepEqual(validateSessionImports({ [production]: resources, [ownerTest]: source }).errors, [], source);
-    }
-    assert.notDeepEqual(validateSessionImports({ [production]: resources,
-        [ownerTest]: `${marker}\nimport { commitActiveWebSessionResourceUse } from './server-session';` }).errors, []);
-    assert.notDeepEqual(validateSessionImports({ [production]: resources, [ownerTest]: marker,
-        'lib/security/third.test.ts': marker }).errors, []);
-    const self = 'lib/security/server-session.test.ts'; const selfError = `${self}:resource-shape`;
-    const selfResources = `import { ${[...RESOURCE_PORT_PRIMITIVES].join(', ')} } from './server-session';`;
-    assert.equal(validateSessionImports({ [self]: selfResources }).errors.includes(selfError), false);
-    const invalidSelf = [
-        selfResources.replace(' }', ', abortActiveWebSessionResourceUse as duplicateAbort }'),
-        `${selfResources}\nimport { abortActiveWebSessionResourceUse } from './server-session';`,
-        `${selfResources}\nimport type { abortActiveWebSessionResourceUse } from './server-session';`,
-        `${selfResources}\nimport { getSession } from './server-session';`,
-        `${selfResources}\nimport type { ServerSession } from './server-session';`,
-        `${selfResources}\nimport { getSession } from './server-session.ts';`,
-        `${selfResources}\nimport type { ServerSession } from './server-session.ts';`,
-        `${selfResources}\nimport {} from './server-session';`,
-        `${selfResources}\nimport type {} from './server-session';`,
-        `${selfResources}\nimport {} from './server-session.ts';`,
-        `${selfResources}\nimport session from './server-session';`,
-        `${selfResources}\nimport * as session from './server-session';`,
-        `${selfResources}\nimport './server-session';`,
-        selfResources.replace(';', " with { type: 'json' };"), selfResources.replace(';', " assert { type: 'json' };"),
-    ];
-    for (const source of invalidSelf) assert.ok(validateSessionImports({ [self]: source }).errors.includes(selfError), source);
-});
-
-test('permits only the exact paired projection broker resource adoption', () => {
-    const production = PROJECTION_BROKER_FILES[0]; const brokerTest = PROJECTION_BROKER_FILES[1];
-    const sourceImport = "import { type ActiveWebSessionResourcePort, registerActiveWebSessionPrivateResource, registerServerSessionResource, releaseActiveWebSessionResourcePort, unregisterActiveWebSessionPrivateResource } from './server-session';";
-    const testImport = "import { clearAllSessions, createSession, deleteSession, getSession, mintActiveWebSessionResourcePort, releaseActiveWebSessionResourcePort, retireServerSessionForApplicationLock, retireServerSessionForLogout, resolveActiveWebServerSession } from './server-session';";
-    const paired = { [production]: sourceImport, [brokerTest]: testImport };
-    const accepted = validateSessionImports(paired);
-    assert.equal(accepted.brokerAdoptionState, 'PAIRED'); assert.deepEqual(accepted.errors, []);
-    assert.equal(validateSessionImports({ [production]: '', [brokerTest]: '' }).brokerAdoptionState, 'ABSENT');
-    const rejected: Array<Readonly<Record<string, string>>> = [
-        { [production]: sourceImport }, { [brokerTest]: testImport },
-        { ...paired, [production]: sourceImport.replace('type ActiveWebSessionResourcePort', 'ActiveWebSessionResourcePort') },
-        { ...paired, [production]: sourceImport.replace('registerActiveWebSessionPrivateResource', 'registerActiveWebSessionPrivateResource as register') },
-        { ...paired, [production]: sourceImport.replace("'./server-session'", "'./server-session.ts'") },
-        { ...paired, [production]: `${sourceImport}\n${sourceImport}` },
-        { ...paired, [brokerTest]: testImport.replace('deleteSession, ', '') },
-        { ...paired, [brokerTest]: testImport.replace('clearAllSessions', 'clearAllSessions as clear') },
-        { ...paired, [brokerTest]: testImport.replace(';', " with { type: 'json' };") },
-        { ...paired, 'lib/security/third.ts': "import { releaseActiveWebSessionResourcePort } from './server-session';" },
-    ];
-    for (const source of rejected) assert.notDeepEqual(validateSessionImports(source).errors, [], JSON.stringify(source));
-});
-
-test('Node runtime resolves every inventory alias that the AST gate denies', () => {
-    const directory = mkdtempSync(path.join(tmpdir(), 'mediflow-session-inventory-runtime-'));
-    const target = path.join(directory, 'server-session.mjs'); const commonjs = path.join(directory, 'server-session.cjs');
-    const upper = path.join(directory, 'SERVER-SESSION.mjs'); const extension = path.join(directory, 'server-session.js');
-    try {
-        writeFileSync(target, "export const marker='session-inventory-runtime';\n");
-        writeFileSync(commonjs, "module.exports={marker:'session-inventory-runtime'};\n");
-        if (process.platform !== 'darwin') symlinkSync(target, upper);
-        symlinkSync(target, extension);
-        const canonical = pathToFileURL(target).href; const encoded = canonical.replace('server-session', '%73erver-session');
-        const metaUrl = ['import', 'meta', 'url'].join('.');
-        const script = `
-            import {createRequire} from 'node:module';
-            const expected='session-inventory-runtime';
-            const verify=async(specifier)=>{const loaded=await import(specifier);if(loaded.marker!==expected)throw Error(specifier)};
-            await verify(${JSON.stringify(`${canonical}?query=1`)});await verify(${JSON.stringify(`${canonical}#hash`)});
-            await verify(${JSON.stringify(encoded)});await verify(${JSON.stringify(pathToFileURL(upper).href)});await verify(${JSON.stringify(pathToFileURL(extension).href)});
-            const object={target:${JSON.stringify(canonical)}};const array=[${JSON.stringify(canonical)}];await verify(object.target);await verify(array[0]);
-            await eval(${JSON.stringify(`import(${JSON.stringify(canonical)})`)}).then((loaded)=>{if(loaded.marker!==expected)throw Error('eval')});
-            const generated=new Function(${JSON.stringify(`return import(${JSON.stringify(canonical)})`)});if((await generated()).marker!==expected)throw Error('Function');
-            const load=(specifier)=>import(specifier);if((await load(${JSON.stringify(canonical)})).marker!==expected)throw Error('loader');
-            const nodeRequire=createRequire?.(${metaUrl});const required=nodeRequire(${JSON.stringify(commonjs)});if(required.marker!==expected)throw Error('optional-createRequire');
-            const resolved=nodeRequire.resolve(${JSON.stringify(commonjs)});if(nodeRequire.cache[resolved]?.exports.marker!==expected)throw Error('require-cache');
-            const pick=()=>${JSON.stringify(commonjs)};const dynamicResolved=nodeRequire.resolve(pick());if(nodeRequire.cache[dynamicResolved]?.exports.marker!==expected)throw Error('dynamic-require-cache');
-        `;
-        execFileSync(process.execPath, ['--input-type=module', '--eval', script], { stdio: 'pipe' });
-    } finally { rmSync(directory, { recursive: true, force: true }); }
-});
-
-test('compacts one exact RETIRED Web cell into a replay-stable PHI-safe tombstone receipt', () => {
-    const active = activeResourceFixture();
-    const pendingUse = beginActiveWebSessionResourceUse(active.port); assert.ok(pendingUse);
-    assert.equal(retireActiveWebServerSession(active.sessionId, 'dispose'), true);
-
-    const receipt = cleanupRetiredWebServerSession(active.sessionId, 'dispose');
-    assert.equal(Object.getPrototypeOf(receipt), null);
-    assert.equal(Object.isFrozen(receipt), true);
-    assert.deepEqual(Reflect.ownKeys(receipt), ['outcome']);
-    assert.deepEqual(Object.getOwnPropertyDescriptor(receipt, 'outcome'), {
-        value: 'completed', enumerable: true, configurable: false, writable: false,
-    });
-    assert.equal(cleanupRetiredWebServerSession(active.sessionId, 'dispose'), receipt);
-    assert.equal(cleanupRetiredWebServerSession(active.sessionId, 'lock').outcome, 'denied');
-    assert.equal(commitActiveWebSessionResourceUse(pendingUse), false);
-    assert.equal(abortActiveWebSessionResourceUse(pendingUse), false);
-    assert.equal(releaseActiveWebSessionResourcePort(active.port), false);
-    assert.equal(mintActiveWebSessionResourcePort(active.session), null);
-    assert.equal(resolveActiveWebServerSession(active.sessionId), null);
-});
-
-test('dispatches one reason-bound ACTIVE retirement into a stable cleanup receipt', () => {
-    const active = activeResourceFixture();
-    const pendingUse = beginActiveWebSessionResourceUse(active.port); assert.ok(pendingUse);
-
-    const receipt = dispatchActiveWebServerSessionRetirement(active.sessionId, 'dispose');
-    assert.equal(receipt.outcome, 'completed');
-    assert.equal(dispatchActiveWebServerSessionRetirement(active.sessionId, 'dispose'), receipt);
-    assert.equal(dispatchActiveWebServerSessionRetirement(active.sessionId, 'lock').outcome, 'denied');
-    assert.equal(commitActiveWebSessionResourceUse(pendingUse), false);
-    assert.equal(releaseActiveWebSessionResourcePort(active.port), false);
-    assert.equal(resolveActiveWebServerSession(active.sessionId), null);
-});
-
-test('fixed-cause adapters retire one exact P3 session without accepting caller authority', () => {
-    const logout = activeResourceFixture();
-    const logoutReceipt = retireServerSessionForLogout(logout.sessionId);
-    assert.equal(logoutReceipt.outcome, 'completed');
-    assert.equal(retireServerSessionForLogout(logout.sessionId), logoutReceipt, 'lost response replays one receipt');
-    assert.equal(retireServerSessionForApplicationLock(logout.sessionId).outcome, 'denied');
-
-    const locked = activeResourceFixture();
-    assert.equal(retireServerSessionForApplicationLock(locked.sessionId).outcome, 'completed');
-    const expired = activeResourceFixture();
-    assert.equal(retireExpiredServerSession(expired.sessionId).outcome, 'failed');
-    assert.equal(resolveActiveWebServerSession(expired.sessionId), null, 'wrong expiry timing fails closed');
+    assert.ok(partialReset.includes('app/api/auth/reset/route.ts:native-capability-shape'));
 });
 
 test('fixed-cause adapters preserve legacy Web and native cleanup while leaving system authority untouched', () => {
@@ -1236,332 +518,6 @@ test('fixed-cause adapters preserve legacy Web and native cleanup while leaving 
     assert.deepEqual(events, ['logout:session_deleted', 'lock:application_locked', 'expired:session_expired']);
     assert.equal(Object.getPrototypeOf(logoutReceipt), null); assert.equal(Object.isFrozen(logoutReceipt), true);
     assert.deepEqual(Reflect.ownKeys(logoutReceipt), ['outcome']);
-});
-
-test('fixed-cause adapters deny hostile and cross-module IDs without observation or later work', async (t) => {
-    const active = activeResourceFixture(); let observed = 0;
-    const proxy = new Proxy(Object.create(null), {
-        get: () => { observed += 1; throw new Error('get'); },
-        ownKeys: () => { observed += 1; throw new Error('keys'); },
-    });
-    const accessor = Object.create(null);
-    Object.defineProperty(accessor, 'then', { get() { observed += 1; throw new Error('then'); } });
-    const rejected = Promise.reject(new Error('synthetic adapter input')); rejected.catch(() => undefined);
-    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
-    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
-    for (const value of [null, undefined, '', {}, proxy, accessor, Promise.resolve(), rejected, '__proto__']) {
-        assert.equal(retireServerSessionForLogout(value).outcome, 'denied');
-        assert.equal(retireServerSessionForApplicationLock(value).outcome, 'denied');
-        assert.equal(retireExpiredServerSession(value).outcome, 'denied');
-    }
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
-    const cached = nodeRequire.cache[modulePath]; const originalThen = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
-    try {
-        delete nodeRequire.cache[modulePath]; const restarted = nodeRequire(modulePath) as typeof import('./server-session');
-        assert.equal(restarted.retireServerSessionForLogout(active.sessionId).outcome, 'denied');
-        Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { observed += 1; throw new Error('ambient then'); } });
-        assert.equal(retireServerSessionForLogout(active.sessionId).outcome, 'completed');
-        restarted.clearAllSessions();
-    } finally {
-        if (originalThen) Object.defineProperty(Object.prototype, 'then', originalThen);
-        else delete (Object.prototype as { then?: unknown }).then;
-        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
-    }
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    assert.equal(observed, 0); assert.deepEqual(unhandled, []);
-});
-
-test('fixed-cause P3 ownership wins over a colliding legacy Map entry and CAS drift stays terminal', async (t) => {
-    const drifted = activeResourceFixture();
-    assert.equal(drifted.control.retireTicket(drifted.ticket, 'delete'), 1);
-    const failed = retireServerSessionForLogout(drifted.sessionId);
-    assert.equal(failed.outcome, 'failed'); assert.equal(retireServerSessionForLogout(drifted.sessionId), failed);
-
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
-    const cached = nodeRequire.cache[modulePath]; const originalGet = Map.prototype.get; const originalSet = Map.prototype.set;
-    let isolated: typeof import('./server-session') | undefined; let sessionId = ''; let collide = false;
-    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
-    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
-    Map.prototype.get = function (key: unknown) {
-        const prior = Reflect.apply(originalGet, this, [key]);
-        if (collide && key === sessionId) {
-            collide = false; Reflect.apply(originalSet, this, [key, Object.freeze({ id: sessionId })]);
-        }
-        return prior;
-    };
-    try {
-        delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
-        const staged = isolated.stageWebServerSession({ id: 'collision', username: SYNTHETIC_USERNAME, role: 'clinician' });
-        const prepared = isolated.prepareStagedWebServerSession(staged); assert.ok(prepared);
-        sessionId = isolated.getPreparedWebServerSessionId(prepared) ?? ''; const port = isolated.armPreparedWebServerSession(prepared); assert.ok(port);
-        const control = authControlApi().create('fixed-collision'); control.begin('login', 'op', 'key', 'fp', 0);
-        const ticket = control.prepareTicket('fixed-collision', 'op', BigInt(0), 'fp', sessionId, 1); assert.ok(ticket);
-        assert.equal(isolated.activateArmedWebServerSession(port, ticket), true);
-        const session = isolated.resolveActiveWebServerSession(sessionId); assert.ok(session);
-        collide = true; assert.equal(isolated.mintActiveWebSessionResourcePort(session), null);
-        assert.equal(isolated.retireServerSessionForLogout(sessionId).outcome, 'completed');
-        assert.ok(isolated.peekSession(sessionId), 'P3 dispatch never falls back to deleting the colliding Map entry');
-        await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
-    } finally {
-        collide = false; Map.prototype.get = originalGet; isolated?.clearAllSessions();
-        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
-    }
-});
-
-test('user-scoped retirement snapshots P3 targets before mutation and preserves legacy cleanup', () => {
-    const active = activeResourceFixture('bulk-user');
-    const retired = activeResourceFixture('bulk-user');
-    assert.equal(retireActiveWebServerSession(retired.sessionId, 'dispose'), true);
-    const other = activeResourceFixture('other-user');
-    const armedStaged = stageWebServerSession({ id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
-    assert.ok(armedStaged); const armedPrepared = prepareStagedWebServerSession(armedStaged); assert.ok(armedPrepared);
-    const armedSessionId = getPreparedWebServerSessionId(armedPrepared); assert.ok(armedSessionId);
-    const armedPort = armPreparedWebServerSession(armedPrepared); assert.ok(armedPort);
-    const armedControl = authControlApi().create('bulk-armed'); armedControl.begin('login', 'op', 'key', 'fp', 0);
-    const armedTicket = armedControl.prepareTicket('bulk-armed', 'op', BigInt(0), 'fp', armedSessionId, 1); assert.ok(armedTicket);
-    const staged = stageWebServerSession({ id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
-    assert.ok(staged);
-    const prepared = prepareStagedWebServerSession(stageWebServerSession({ id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' }));
-    assert.ok(prepared);
-    const legacy = createSession({ id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
-    const native = createNativeServerSession(
-        { id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'clinician' },
-        { clientId: 'bulk-client', clientPlatform: 'macos' },
-    );
-    const system = createSession({ id: 'bulk-user', username: SYNTHETIC_USERNAME, role: 'system' }, 'system');
-    const events: string[] = [];
-    registerServerSessionResource(legacy.id, (reason) => { events.push(`web:${reason}`); });
-    registerServerSessionResource(native.id, (reason) => { events.push(`native:${reason}`); });
-
-    const receipt = retireServerSessionsForUser('bulk-user');
-    assert.equal(receipt.outcome, 'completed');
-    assert.strictEqual(retireServerSessionsForUser('bulk-user'), receipt, 'lost response replay is stable');
-    assert.equal(resolveActiveWebServerSession(active.sessionId), null);
-    assert.equal(resolveActiveWebServerSession(retired.sessionId), null);
-    assert.equal(activateArmedWebServerSession(armedPort, armedTicket), false, 'retained ticket cannot resurrect armed authority');
-    assert.equal(getArmedWebServerSessionId(armedPort), null);
-    assert.equal(getSession(legacy.id), null); assert.equal(getSession(native.id), null);
-    assert.strictEqual(peekSession(system.id), system, 'system authority is outside the Web/native bulk');
-    assert.equal(abortStagedWebServerSession(staged), false);
-    assert.equal(getPreparedWebServerSessionId(prepared), null);
-    assert.deepEqual(events, ['web:session_deleted', 'native:session_deleted']);
-    assert.ok(resolveActiveWebServerSession(other.sessionId));
-    assert.equal(Object.getPrototypeOf(receipt), null); assert.equal(Object.isFrozen(receipt), true);
-    assert.deepEqual(Reflect.ownKeys(receipt), ['outcome']);
-});
-
-test('P3-only user retirement compacts exact Web P3 work without touching legacy, native, or system state', () => {
-    const userId = 'p3-only-user';
-    const active = activeResourceFixture(userId);
-    const retired = activeResourceFixture(userId);
-    assert.equal(retireActiveWebServerSession(retired.sessionId, 'dispose'), true);
-    const armed = armedControlActivation(userId);
-    const staged = stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(staged);
-    const prepared = prepareStagedWebServerSession(stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' })); assert.ok(prepared);
-
-    const otherActive = activeResourceFixture('p3-only-other');
-    const otherStaged = stageWebServerSession({ id: 'p3-only-other', username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(otherStaged);
-    const otherPrepared = prepareStagedWebServerSession(otherStaged); assert.ok(otherPrepared);
-    const otherPreparedId = getPreparedWebServerSessionId(otherPrepared); assert.ok(otherPreparedId);
-
-    const legacy = createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' });
-    const native = createNativeServerSession(
-        { id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' },
-        { clientId: 'p3-only-client', clientPlatform: 'macos' },
-    );
-    const system = createSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'system' }, 'system');
-    const legacyBytes = JSON.stringify(legacy); const nativeBytes = JSON.stringify(native); const systemBytes = JSON.stringify(system);
-    const events: string[] = [];
-    registerServerSessionResource(legacy.id, (reason) => { events.push(`legacy:${reason}`); });
-    registerServerSessionResource(native.id, (reason) => { events.push(`native:${reason}`); });
-    registerServerSessionResource(system.id, (reason) => { events.push(`system:${reason}`); });
-
-    const receipt = retireWebP3SessionsForUser(userId);
-
-    assert.equal(receipt.outcome, 'completed');
-    assert.equal(resolveActiveWebServerSession(active.sessionId), null);
-    assert.equal(resolveActiveWebServerSession(retired.sessionId), null);
-    assert.equal(activateArmedWebServerSession(armed.port, armed.ticket), false);
-    assert.equal(abortStagedWebServerSession(staged), false);
-    assert.equal(getPreparedWebServerSessionId(prepared), null);
-    assert.ok(resolveActiveWebServerSession(otherActive.sessionId));
-    assert.equal(getPreparedWebServerSessionId(otherPrepared), otherPreparedId);
-
-    assert.strictEqual(peekSession(legacy.id), legacy); assert.equal(JSON.stringify(legacy), legacyBytes);
-    assert.strictEqual(peekSession(native.id), native); assert.equal(JSON.stringify(native), nativeBytes);
-    assert.strictEqual(peekSession(system.id), system); assert.equal(JSON.stringify(system), systemBytes);
-    assert.deepEqual(events, []);
-    assert.strictEqual(retireWebP3SessionsForUser(userId), receipt, 'terminal P3 work has a stable empty replay');
-
-    const source = readFileSync(fileURLToPath(new URL('./server-session.ts', import.meta.url)), 'utf8');
-    const body = source.slice(source.indexOf('export function retireWebP3SessionsForUser'), source.indexOf('/** Compacts one exact RETIRED Web cell'));
-    assert.doesNotMatch(body, /\b(?:sessions|deleteSession|terminateSession|retireLegacyServerSessionForUser|retireServerSessionForLogout|resolveActiveWebServerSession)\b/u);
-});
-
-test('P3-only user retirement fails closed for stale P2 cleanup and hostile input without later work', async (t) => {
-    const userId = 'p3-only-failure';
-    const failed = activeResourceFixture(userId);
-    const unaffected = activeResourceFixture('p3-only-unaffected');
-    assert.equal(failed.control.retireTicket(failed.ticket, 'delete'), 1);
-    let observed = 0;
-    const proxy = new Proxy(Object.create(null), { get() { observed += 1; throw new Error('get'); }, ownKeys() { observed += 1; throw new Error('keys'); } });
-    const accessor = Object.create(null);
-    Object.defineProperty(accessor, 'then', { get() { observed += 1; throw new Error('then'); } });
-    const rejected = Promise.reject(new Error('synthetic rejected P3-only input')); rejected.catch(() => undefined);
-    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
-    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
-
-    for (const value of [null, undefined, '', {}, Object.create(null), proxy, accessor, Promise.resolve(), rejected]) {
-        assert.equal(retireWebP3SessionsForUser(value).outcome, 'denied');
-    }
-    const receipt = retireWebP3SessionsForUser(userId);
-    assert.equal(receipt.outcome, 'failed');
-    assert.equal(resolveActiveWebServerSession(failed.sessionId), null);
-    assert.ok(resolveActiveWebServerSession(unaffected.sessionId));
-
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    assert.equal(observed, 0); assert.deepEqual(unhandled, []);
-});
-
-test('P3-only user retirement fences same-user P3 and issuer issuance through nested cleanup reentry', async (t) => {
-    const nodeRequire = createRequire(import.meta.url);
-    const paths = ['server-session.ts', 'web-auth-session-issuer.ts', 'web-auth-control-owner.ts']
-        .map((name) => nodeRequire.resolve(`./${name}`));
-    const cached = paths.map((path) => nodeRequire.cache[path]);
-    const originalValues = Map.prototype.values;
-    let isolated: typeof import('./server-session') | undefined;
-    let issuer: typeof import('./web-auth-session-issuer') | undefined;
-    let trigger = false;
-    let nested: WebServerSessionRetirementCleanupReceipt['outcome'] | null = null;
-    let stagedDenied = false; let preparedDenied = false; let armedDenied = false; let activationDenied = false; let issuerDenied = false;
-    const userId = 'p3-only-fence';
-    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
-    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
-    Map.prototype.values = function (...args: Parameters<typeof originalValues>) {
-        const iterator = Reflect.apply(originalValues, this, args);
-        if (trigger) {
-            trigger = false;
-            nested = isolated!.retireWebP3SessionsForUser(userId).outcome;
-            stagedDenied = isolated!.stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }) === null;
-            preparedDenied = isolated!.prepareStagedWebServerSession(staged) === null;
-            armedDenied = isolated!.armPreparedWebServerSession(prepared) === null;
-            activationDenied = isolated!.activateArmedWebServerSession(armed, null) === false;
-            issuerDenied = issuer!.issue(attempt, { id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }) === null;
-            throw new Error('synthetic apply-then-throw');
-        }
-        return iterator;
-    };
-    let staged: ReturnType<typeof stageWebServerSession> = null;
-    let prepared: ReturnType<typeof prepareStagedWebServerSession> = null;
-    let armed: ReturnType<typeof armPreparedWebServerSession> = null;
-    let activeId = '';
-    let attempt: ReturnType<typeof import('./web-auth-session-issuer').begin> = null;
-    try {
-        for (const path of paths) delete nodeRequire.cache[path];
-        isolated = nodeRequire(paths[0]) as typeof import('./server-session');
-        issuer = nodeRequire(paths[1]) as typeof import('./web-auth-session-issuer');
-        const activeStaged = isolated.stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(activeStaged);
-        const activePrepared = isolated.prepareStagedWebServerSession(activeStaged); assert.ok(activePrepared);
-        activeId = isolated.getPreparedWebServerSessionId(activePrepared) ?? ''; assert.ok(activeId);
-        const activePort = isolated.armPreparedWebServerSession(activePrepared); assert.ok(activePort);
-        const control = authControlApi().create('p3-only-fence-control'); control.begin('login', 'op', 'key', 'fp', 0);
-        const ticket = control.prepareTicket('p3-only-fence-control', 'op', BigInt(0), 'fp', activeId, 1); assert.ok(ticket);
-        assert.equal(isolated.activateArmedWebServerSession(activePort, ticket), true);
-        staged = isolated.stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }); assert.ok(staged);
-        prepared = isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' })); assert.ok(prepared);
-        armed = isolated.armPreparedWebServerSession(isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({ id: userId, username: SYNTHETIC_USERNAME, role: 'clinician' }))); assert.ok(armed);
-        attempt = issuer.begin('login'); assert.ok(attempt);
-
-        trigger = true;
-        assert.equal(isolated.retireWebP3SessionsForUser(userId).outcome, 'failed');
-        assert.equal(nested, 'denied'); assert.equal(stagedDenied, true); assert.equal(preparedDenied, true);
-        assert.equal(armedDenied, true); assert.equal(activationDenied, true); assert.equal(issuerDenied, true);
-        assert.equal(isolated.resolveActiveWebServerSession(activeId), null);
-        await new Promise<void>((resolve) => setImmediate(resolve));
-        assert.equal(isolated.resolveActiveWebServerSession(activeId), null); assert.deepEqual(unhandled, []);
-    } finally {
-        trigger = false; Map.prototype.values = originalValues; isolated?.clearAllSessions();
-        for (let index = 0; index < paths.length; index += 1) {
-            if (cached[index]) nodeRequire.cache[paths[index]] = cached[index]; else delete nodeRequire.cache[paths[index]];
-        }
-    }
-});
-
-test('user-scoped retirement preserves P3 ownership over a colliding legacy Map entry', () => {
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
-    const cached = nodeRequire.cache[modulePath]; const originalValues = Map.prototype.values; const originalSet = Map.prototype.set;
-    let isolated: typeof import('./server-session') | undefined; let sessionId = ''; let collide = false; let injected = false;
-    try {
-        Map.prototype.values = function () {
-            if (collide && !injected) {
-                injected = true;
-                Reflect.apply(originalSet, this, [sessionId, Object.freeze({
-                    id: sessionId, userId: 'collision-user', username: SYNTHETIC_USERNAME, role: 'clinician',
-                    authChannel: 'web', createdAt: 0, expiresAt: Date.now() + 60_000,
-                })]);
-            }
-            return Reflect.apply(originalValues, this, []);
-        };
-        delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
-        const staged = isolated.stageWebServerSession({ id: 'collision-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
-        assert.ok(staged); const prepared = isolated.prepareStagedWebServerSession(staged); assert.ok(prepared);
-        sessionId = isolated.getPreparedWebServerSessionId(prepared) ?? ''; const port = isolated.armPreparedWebServerSession(prepared); assert.ok(port);
-        const control = authControlApi().create('bulk-collision'); control.begin('login', 'op', 'key', 'fp', 0);
-        const ticket = control.prepareTicket('bulk-collision', 'op', BigInt(0), 'fp', sessionId, 1); assert.ok(ticket);
-        assert.equal(isolated.activateArmedWebServerSession(port, ticket), true);
-        assert.ok(isolated.resolveActiveWebServerSession(sessionId));
-        collide = true;
-        assert.equal(isolated.retireServerSessionsForUser('collision-user').outcome, 'completed');
-        assert.equal(isolated.resolveActiveWebServerSession(sessionId), null);
-        assert.ok(isolated.peekSession(sessionId), 'P3 retirement must not fall back to the colliding Map entry');
-    } finally {
-        collide = false; Map.prototype.values = originalValues; isolated?.clearAllSessions();
-        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
-    }
-});
-
-test('user-scoped retirement attempts every target and aggregates the worst outcome', () => {
-    const failed = activeResourceFixture('bulk-failure');
-    const healthy = activeResourceFixture('bulk-failure');
-    assert.equal(failed.control.retireTicket(failed.ticket, 'delete'), 1);
-    const receipt = retireServerSessionsForUser('bulk-failure');
-    assert.equal(receipt.outcome, 'failed');
-    assert.equal(resolveActiveWebServerSession(healthy.sessionId), null, 'later target was attempted');
-    assert.equal(resolveActiveWebServerSession(failed.sessionId), null);
-
-    const throwing = createSession({ id: 'bulk-failure', username: SYNTHETIC_USERNAME, role: 'clinician' });
-    const later = createSession({ id: 'bulk-failure', username: SYNTHETIC_USERNAME, role: 'clinician' });
-    registerServerSessionResource(throwing.id, () => { throw new Error('synthetic cleanup failure'); });
-    const second = retireServerSessionsForUser('bulk-failure');
-    assert.equal(second.outcome, 'failed');
-    assert.equal(getSession(throwing.id), null); assert.equal(getSession(later.id), null);
-});
-
-test('user-scoped retirement resists hostile IDs and legacy list mutation', async (t) => {
-    const active = activeResourceFixture('hostile-user'); let observed = 0;
-    const proxy = new Proxy(Object.create(null), { get() { observed += 1; throw new Error('get'); }, ownKeys() { observed += 1; throw new Error('keys'); } });
-    const accessor = Object.create(null);
-    Object.defineProperty(accessor, 'then', { get() { observed += 1; throw new Error('then'); } });
-    const rejected = Promise.reject(new Error('synthetic rejected bulk input')); rejected.catch(() => undefined);
-    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
-    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
-    for (const value of [null, undefined, '', {}, Object.create(null), proxy, accessor, Promise.resolve(), rejected]) {
-        assert.equal(retireServerSessionsForUser(value).outcome, 'denied');
-    }
-    assert.equal(retireServerSessionsForUser('__proto__').outcome, 'completed');
-    const first = createSession({ id: 'mutation-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
-    const second = createSession({ id: 'mutation-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
-    let nestedOutcome: WebServerSessionRetirementCleanupReceipt['outcome'] | null = null;
-    registerServerSessionResource(first.id, () => { nestedOutcome = retireServerSessionsForUser('mutation-user').outcome; });
-    const outer = retireServerSessionsForUser('mutation-user');
-    assert.equal(outer.outcome, 'denied'); assert.equal(nestedOutcome, 'denied');
-    assert.equal(getSession(first.id), null); assert.equal(getSession(second.id), null);
-    assert.ok(resolveActiveWebServerSession(active.sessionId));
-    Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { observed += 1; throw new Error('ambient then'); } });
-    try { assert.equal(retireServerSessionsForUser('missing-user').outcome, 'completed'); }
-    finally { delete (Object.prototype as { then?: unknown }).then; }
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    assert.equal(observed, 0); assert.deepEqual(unhandled, []);
 });
 
 test('user retirement turn fences same-user issuance while preserving system and cross-user authority', async (t) => {
@@ -1744,465 +700,6 @@ test('publication rollback removes apply-then-throw authority and poisons the en
     }
 });
 
-test('dispatch reports failed after an uncommitted P2 retirement and scrubs B1/B2 state', () => {
-    const active = activeResourceFixture();
-    const pendingUse = beginActiveWebSessionResourceUse(active.port); assert.ok(pendingUse);
-    assert.equal(active.control.retireTicket(active.ticket, 'dispose'), 1, 'external P2 drift precedes dispatch');
-
-    const failed = dispatchActiveWebServerSessionRetirement(active.sessionId, 'dispose');
-    assert.equal(failed.outcome, 'failed');
-    assert.equal(dispatchActiveWebServerSessionRetirement(active.sessionId, 'dispose'), failed);
-    assert.equal(dispatchActiveWebServerSessionRetirement(active.sessionId, 'lock').outcome, 'denied');
-    assert.equal(commitActiveWebSessionResourceUse(pendingUse), false);
-    assert.equal(abortActiveWebSessionResourceUse(pendingUse), false);
-    assert.equal(releaseActiveWebSessionResourcePort(active.port), false);
-    assert.equal(mintActiveWebSessionResourcePort(active.session), null);
-    assert.equal(resolveActiveWebServerSession(active.sessionId), null);
-});
-
-test('dispatch denies hostile and cross-module inputs without observation or later work', async (t) => {
-    const active = activeResourceFixture(); let observed = 0;
-    const proxy = new Proxy(Object.create(null), {
-        get() { observed += 1; throw new Error('get'); },
-        ownKeys() { observed += 1; throw new Error('keys'); },
-    });
-    const accessor = Object.create(null);
-    Object.defineProperty(accessor, 'then', { get() { observed += 1; throw new Error('then'); } });
-    const rejected = Promise.reject(new Error('synthetic dispatch input')); rejected.catch(() => undefined);
-    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
-    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
-    for (const value of [null, undefined, '', {}, proxy, accessor, Promise.resolve(), rejected, '__proto__']) {
-        assert.equal(dispatchActiveWebServerSessionRetirement(value, 'dispose').outcome, 'denied');
-        assert.equal(dispatchActiveWebServerSessionRetirement(active.sessionId, value).outcome, 'denied');
-    }
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
-    const cached = nodeRequire.cache[modulePath]; const originalThen = Object.getOwnPropertyDescriptor(Object.prototype, 'then');
-    try {
-        delete nodeRequire.cache[modulePath]; const restarted = nodeRequire(modulePath) as typeof import('./server-session');
-        assert.equal(restarted.dispatchActiveWebServerSessionRetirement(active.sessionId, 'dispose').outcome, 'denied');
-        Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { observed += 1; throw new Error('ambient then'); } });
-        assert.equal(dispatchActiveWebServerSessionRetirement(active.sessionId, 'dispose').outcome, 'completed');
-        restarted.clearAllSessions();
-    } finally {
-        if (originalThen) Object.defineProperty(Object.prototype, 'then', originalThen);
-        else delete (Object.prototype as { then?: unknown }).then;
-        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
-    }
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    assert.equal(observed, 0); assert.deepEqual(unhandled, []);
-});
-
-test('dispatch cleanup fails terminally on captured WeakMap apply-then-throw and reentry', async (t) => {
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
-    const cached = nodeRequire.cache[modulePath]; const originalDelete = WeakMap.prototype.delete;
-    let isolated: typeof import('./server-session') | undefined; let mode: 'idle' | 'throw' | 'reenter' = 'idle';
-    let currentId = ''; let nestedOutcome = ''; const unhandled: unknown[] = [];
-    const onUnhandled = (reason: unknown) => unhandled.push(reason); process.on('unhandledRejection', onUnhandled);
-    t.after(() => process.off('unhandledRejection', onUnhandled));
-    WeakMap.prototype.delete = function (key: object) {
-        const result = Reflect.apply(originalDelete, this, [key]);
-        if (mode === 'throw') { mode = 'idle'; throw new Error('synthetic post-delete failure'); }
-        if (mode === 'reenter') { mode = 'idle'; nestedOutcome = isolated!.dispatchActiveWebServerSessionRetirement(currentId, 'dispose').outcome; }
-        return result;
-    };
-    const make = () => {
-        const staged = isolated!.stageWebServerSession({ id: `cleanup-${currentId || 'first'}`, username: SYNTHETIC_USERNAME, role: 'clinician' });
-        const prepared = isolated!.prepareStagedWebServerSession(staged); assert.ok(prepared);
-        currentId = isolated!.getPreparedWebServerSessionId(prepared) ?? ''; const port = isolated!.armPreparedWebServerSession(prepared); assert.ok(port);
-        const control = authControlApi().create(`cleanup-${currentId}`); control.begin('login', 'op', `key-${currentId}`, `fp-${currentId}`, 0);
-        const ticket = control.prepareTicket(`cleanup-${currentId}`, 'op', BigInt(0), `fp-${currentId}`, currentId, 1); assert.ok(ticket);
-        assert.equal(isolated!.activateArmedWebServerSession(port, ticket), true); const session = isolated!.resolveActiveWebServerSession(currentId); assert.ok(session);
-        const resource = isolated!.mintActiveWebSessionResourcePort(session); assert.ok(resource); const use = isolated!.beginActiveWebSessionResourceUse(resource); assert.ok(use);
-        return { session, resource, use };
-    };
-    try {
-        delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
-        const first = make(); mode = 'throw'; const failed = isolated.dispatchActiveWebServerSessionRetirement(currentId, 'dispose'); assert.equal(failed.outcome, 'failed');
-        assert.equal(isolated.dispatchActiveWebServerSessionRetirement(currentId, 'dispose'), failed);
-        assert.equal(isolated.commitActiveWebSessionResourceUse(first.use), false); assert.equal(isolated.releaseActiveWebSessionResourcePort(first.resource), false);
-        assert.equal(isolated.mintActiveWebSessionResourcePort(first.session), null);
-        currentId = 'second'; make(); mode = 'reenter'; assert.equal(isolated.dispatchActiveWebServerSessionRetirement(currentId, 'dispose').outcome, 'failed');
-        assert.equal(nestedOutcome, 'denied'); await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
-    } finally { mode = 'idle'; WeakMap.prototype.delete = originalDelete; isolated?.clearAllSessions();
-        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
-});
-
-test('RETIRED cleanup denies hostile and cross-module inputs without observation or later work', async (t) => {
-    const active = activeResourceFixture(); let observed = 0;
-    const proxy = new Proxy(Object.create(null), { get: () => { observed += 1; throw new Error('get'); }, ownKeys: () => { observed += 1; throw new Error('keys'); } });
-    const accessor = Object.create(null); Object.defineProperty(accessor, 'then', { get: () => { observed += 1; throw new Error('then'); } });
-    const rejected = Promise.reject(new Error('synthetic cleanup input')); rejected.catch(() => undefined);
-    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
-    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
-    for (const value of [null, undefined, '', {}, proxy, accessor, Promise.resolve(), rejected, '__proto__']) {
-        assert.equal(cleanupRetiredWebServerSession(value, 'dispose').outcome, 'denied');
-    }
-    assert.equal(cleanupRetiredWebServerSession(active.sessionId, 'dispose').outcome, 'denied');
-    assert.equal(retireActiveWebServerSession(active.sessionId, 'dispose'), true);
-    const originalThen = Object.getOwnPropertyDescriptor(Object.prototype, 'then'); const originalWeakDelete = WeakMap.prototype.delete;
-    try { WeakMap.prototype.delete = (() => { observed += 1; throw new Error('ambient delete'); }) as typeof WeakMap.prototype.delete;
-        Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { observed += 1; throw new Error('ambient then'); } });
-        assert.equal(cleanupRetiredWebServerSession(active.sessionId, 'dispose').outcome, 'completed'); }
-    finally { WeakMap.prototype.delete = originalWeakDelete;
-        if (originalThen) Object.defineProperty(Object.prototype, 'then', originalThen); else delete (Object.prototype as { then?: unknown }).then; }
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts'); const cached = nodeRequire.cache[modulePath];
-    try { delete nodeRequire.cache[modulePath]; const restarted = nodeRequire(modulePath) as typeof import('./server-session');
-        assert.equal(restarted.cleanupRetiredWebServerSession(active.sessionId, 'dispose').outcome, 'denied'); restarted.clearAllSessions(); }
-    finally { if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
-    await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(observed, 0); assert.deepEqual(unhandled, []);
-});
-
-test('retires one exact ACTIVE cell through its retained control ticket', () => {
-    const active = armedControlActivation(); assert.equal(activateArmedWebServerSession(active.port, active.ticket), true);
-    assert.equal(retireActiveWebServerSession(active.sessionId, 'unknown'), false);
-    assert.ok(resolveActiveWebServerSession(active.sessionId));
-    assert.equal(retireActiveWebServerSession(active.sessionId, 'lock'), true);
-    assert.equal(resolveActiveWebServerSession(active.sessionId), null);
-    assert.equal(getSession(active.sessionId), null); assert.equal(peekSession(active.sessionId), null);
-    assert.equal(retireActiveWebServerSession(active.sessionId, 'lock'), false);
-    assert.equal(active.control.retireTicket(active.ticket, 'lock'), 2);
-    assert.equal(active.control.retireTicket(active.ticket, 'dispose'), 0);
-
-    const source = readFileSync(fileURLToPath(new URL('./server-session.ts', import.meta.url)), 'utf8');
-    const body = source.slice(source.indexOf('function retireActiveWebServerSessionCell'), source.indexOf('/** Canonically publishes a prepared session'));
-    const finalCas = 'const retirementResult = commitPreparedAuthControlRetirement(preparedRetirement);';
-    const finalCasOffset = body.indexOf(finalCas);
-    const postCas = body.slice(finalCasOffset + finalCas.length, body.indexOf('/** Retires one exact ACTIVE', finalCasOffset));
-    const retiredFlip = postCas.indexOf("cell.state = 'RETIRED';");
-    assert.ok(finalCasOffset >= 0 && retiredFlip >= 0);
-    assert.doesNotMatch(postCas, /\b(?:try|catch|finally)\b/u);
-    assert.doesNotMatch(postCas, /\.retirement\b/u);
-    assert.doesNotMatch(postCas, /\b(?:DateNow|armedWebSessionCellsById|sessions|preparedWebSessionReservations|armedWebSessionPortRecords)\b/u);
-    assert.deepEqual([...postCas.matchAll(/\b(?!if\b)([A-Za-z_$][\w$]*)\s*\(/gu)].map((match) => match[1]), []);
-    assert.match(postCas, /cell\.retirementCommitted = true;\s*cell\.state = 'RETIRED';\s*webSessionCellLifecyclePoisoned = false;\s*webSessionCellLifecycle = 'idle';\s*return true;/u);
-    assert.equal((source.match(/cell\.retirementCommitted = true;/gu) ?? []).length, 1);
-});
-
-test('retirement denies hostile inputs, stale control, and module copies without observation', async () => {
-    const active = armedControlActivation(); assert.equal(activateArmedWebServerSession(active.port, active.ticket), true);
-    let observed = 0;
-    const boxed = new String(active.sessionId);
-    const proxy = new Proxy(boxed, { get: () => { observed += 1; throw new Error('synthetic get'); }, ownKeys: () => { observed += 1; throw new Error('synthetic keys'); } });
-    const thenable = Object.create(null); Object.defineProperty(thenable, 'then', { get: () => { observed += 1; throw new Error('synthetic then'); } });
-    const rejected = Promise.reject(new Error('synthetic retirement input')); rejected.catch(() => undefined);
-    for (const value of [null, undefined, '', 'wrong-session', boxed, proxy, thenable, rejected, { id: active.sessionId }]) {
-        assert.equal(retireActiveWebServerSession(value, 'lock'), false);
-    }
-    assert.ok(resolveActiveWebServerSession(active.sessionId));
-
-    const stale = armedControlActivation(); assert.equal(activateArmedWebServerSession(stale.port, stale.ticket), true);
-    assert.equal(stale.control.retireTicket(stale.ticket, 'lock'), 1);
-    assert.equal(retireActiveWebServerSession(stale.sessionId, 'lock'), false);
-    assert.equal(resolveActiveWebServerSession(stale.sessionId), null);
-
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
-    const cached = nodeRequire.cache[modulePath];
-    try {
-        delete nodeRequire.cache[modulePath];
-        const restarted = nodeRequire(modulePath) as typeof import('./server-session');
-        assert.equal(restarted.retireActiveWebServerSession(active.sessionId, 'lock'), false);
-        restarted.clearAllSessions();
-    } finally { if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
-    const poisoned = armedControlActivation(); assert.equal(activateArmedWebServerSession(poisoned.port, poisoned.ticket), true);
-    const originals = { mapGet: Map.prototype.get, weakGet: WeakMap.prototype.get, apply: Reflect.apply, then: Object.getOwnPropertyDescriptor(Object.prototype, 'then') };
-    const fail = () => { throw new Error('ambient intrinsic'); };
-    try {
-        Map.prototype.get = fail as typeof Map.prototype.get; WeakMap.prototype.get = fail as typeof WeakMap.prototype.get; Reflect.apply = fail;
-        Object.defineProperty(Object.prototype, 'then', { configurable: true, get: fail });
-        assert.equal(retireActiveWebServerSession(poisoned.sessionId, 'lock'), true);
-    } finally {
-        Map.prototype.get = originals.mapGet; WeakMap.prototype.get = originals.weakGet; Reflect.apply = originals.apply;
-        if (originals.then) Object.defineProperty(Object.prototype, 'then', originals.then); else delete (Object.prototype as { then?: unknown }).then;
-    }
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    assert.equal(observed, 0);
-});
-
-test('retirement poisons clock and lifecycle reentry and denies expiry without drift', async (t) => {
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
-    const cached = nodeRequire.cache[modulePath]; const originalNow = Date.now; const originalTtl = process.env.MEDIFLOW_SESSION_TTL_MS;
-    let isolated: typeof import('./server-session') | undefined; let now = 1_000; let trigger = false; let nestedCalls = 0; let clockReads = 0;
-    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
-    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
-    process.env.MEDIFLOW_SESSION_TTL_MS = '10'; Date.now = () => { clockReads += 1; if (trigger) { trigger = false; nestedCalls += 1; nested(); } return now; };
-    let nested: () => void = () => undefined;
-    const make = () => {
-        const staged = isolated!.stageWebServerSession({ id: `retire-${nestedCalls}-${now}`, username: ['synthetic', 'retire'].join('-'), role: 'clinician' });
-        const prepared = isolated!.prepareStagedWebServerSession(staged); assert.ok(prepared);
-        const sessionId = isolated!.getPreparedWebServerSessionId(prepared); assert.ok(sessionId);
-        const port = isolated!.armPreparedWebServerSession(prepared); assert.ok(port);
-        const control = authControlApi().create(`retire-fence-${sessionId}`); control.begin('login', 'op', `key-${sessionId}`, `fp-${sessionId}`, 0);
-        const ticket = control.prepareTicket(`retire-fence-${sessionId}`, 'op', BigInt(0), `fp-${sessionId}`, sessionId, now); assert.ok(ticket);
-        assert.equal(isolated!.activateArmedWebServerSession(port, ticket), true);
-        return { sessionId, port, control, ticket };
-    };
-    try {
-        delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
-        for (const operation of ['lookup', 'retire', 'delete', 'lock', 'clear'] as const) {
-            const current = make();
-            nested = () => operation === 'lookup' ? isolated!.resolveActiveWebServerSession(current.sessionId)
-                : operation === 'retire' ? isolated!.retireActiveWebServerSession(current.sessionId, 'lock')
-                    : operation === 'delete' ? isolated!.deleteSession(current.sessionId)
-                        : operation === 'lock' ? isolated!.invalidateServerSessionForApplicationLock(current.sessionId) : isolated!.clearAllSessions();
-            clockReads = 0; trigger = true;
-            const failed = isolated.dispatchActiveWebServerSessionRetirement(current.sessionId, 'lock');
-            assert.equal(failed.outcome, 'failed');
-            assert.equal(isolated.dispatchActiveWebServerSessionRetirement(current.sessionId, 'lock'), failed);
-            assert.equal(clockReads, 1);
-            assert.equal(isolated.resolveActiveWebServerSession(current.sessionId), null);
-        }
-        const boundary = make(); now += 10; clockReads = 0;
-        assert.equal(isolated.retireActiveWebServerSession(boundary.sessionId, 'expired'), true);
-        assert.equal(clockReads, 1); assert.equal(boundary.control.retireTicket(boundary.ticket, 'expired'), 2);
-        assert.equal(isolated.retireActiveWebServerSession(boundary.sessionId, 'expired'), false);
-        assert.equal(boundary.control.retireTicket(boundary.ticket, 'lock'), 0);
-
-        const live = make(); clockReads = 0;
-        assert.equal(isolated.retireActiveWebServerSession(live.sessionId, 'expired'), false);
-        assert.equal(clockReads, 1); assert.equal(isolated.resolveActiveWebServerSession(live.sessionId), null);
-
-        const expiredWrongReason = make(); now += 10; clockReads = 0;
-        assert.equal(isolated.retireActiveWebServerSession(expiredWrongReason.sessionId, 'lock'), false);
-        assert.equal(clockReads, 1); assert.equal(isolated.resolveActiveWebServerSession(expiredWrongReason.sessionId), null);
-
-        const past = make(); now += 11; clockReads = 0;
-        assert.equal(isolated.retireActiveWebServerSession(past.sessionId, 'expired'), true);
-        assert.equal(clockReads, 1); assert.equal(past.control.retireTicket(past.ticket, 'expired'), 2);
-
-        const expiredReentry = make(); now += 10;
-        nested = () => isolated!.clearAllSessions(); clockReads = 0; trigger = true;
-        assert.equal(isolated.retireActiveWebServerSession(expiredReentry.sessionId, 'expired'), false);
-        assert.equal(clockReads, 1); assert.equal(isolated.resolveActiveWebServerSession(expiredReentry.sessionId), null);
-
-        const dispatchReentry = make();
-        nested = () => { isolated!.dispatchActiveWebServerSessionRetirement(dispatchReentry.sessionId, 'lock'); };
-        clockReads = 0; trigger = true;
-        const dispatchFailed = isolated.dispatchActiveWebServerSessionRetirement(dispatchReentry.sessionId, 'lock');
-        assert.equal(dispatchFailed.outcome, 'failed'); assert.equal(clockReads, 1);
-        assert.equal(isolated.dispatchActiveWebServerSessionRetirement(dispatchReentry.sessionId, 'lock'), dispatchFailed);
-
-        const casZero = make();
-        nested = () => { authControlApi().prepareRetirement(casZero.ticket, casZero.sessionId, 'lock'); };
-        clockReads = 0; trigger = true;
-        const casZeroFailed = isolated.dispatchActiveWebServerSessionRetirement(casZero.sessionId, 'lock');
-        assert.equal(casZeroFailed.outcome, 'failed'); assert.equal(clockReads, 1);
-        assert.equal(isolated.dispatchActiveWebServerSessionRetirement(casZero.sessionId, 'lock'), casZeroFailed);
-        await new Promise<void>((resolve) => setImmediate(resolve));
-        assert.equal(nestedCalls, 8); assert.deepEqual(unhandled, []);
-    } finally {
-        trigger = false; Date.now = originalNow; isolated?.clearAllSessions();
-        if (originalTtl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = originalTtl;
-        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
-    }
-});
-
-test('the trusted ACTIVE resolver denies tombstones, wrong IDs, hostile values, and module copies without observation', async () => {
-    const active = armedControlActivation(); assert.equal(activateArmedWebServerSession(active.port, active.ticket), true);
-    const tombstone = armedControlActivation(); assert.equal(tombstoneArmedWebServerSession(tombstone.port), true);
-    let observed = 0;
-    const boxed = new String(active.sessionId);
-    const proxy = new Proxy(boxed, {
-        get() { observed += 1; throw new Error('synthetic get'); },
-        getOwnPropertyDescriptor() { observed += 1; throw new Error('synthetic descriptor'); },
-        ownKeys() { observed += 1; throw new Error('synthetic keys'); },
-    });
-    const thenable = Object.create(null); Object.defineProperty(thenable, 'then', {
-        enumerable: true, get() { observed += 1; throw new Error('synthetic then'); },
-    });
-    for (const value of [null, undefined, '', 'wrong-session-id', Object.freeze({ id: active.sessionId }),
-        boxed, structuredClone(boxed), proxy, thenable, { ...boxed }]) {
-        assert.equal(resolveActiveWebServerSession(value), null);
-    }
-    assert.equal(resolveActiveWebServerSession(tombstone.sessionId), null);
-    const rejected = Promise.reject(new Error('synthetic rejected input')); rejected.catch(() => undefined);
-    assert.equal(resolveActiveWebServerSession(rejected), null);
-
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
-    const cached = nodeRequire.cache[modulePath]; let restarted: typeof import('./server-session') | undefined;
-    try {
-        delete nodeRequire.cache[modulePath]; restarted = nodeRequire(modulePath) as typeof import('./server-session');
-        assert.equal(restarted.resolveActiveWebServerSession(active.sessionId), null);
-        restarted.clearAllSessions();
-    } finally { if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath]; }
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    assert.equal(observed, 0);
-});
-
-test('the trusted ACTIVE resolver retires exact expiry after leaving its lifecycle and denies reentry', async (t) => {
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
-    const cached = nodeRequire.cache[modulePath]; const ttl = process.env.MEDIFLOW_SESSION_TTL_MS; const originalNow = Date.now;
-    let isolated: typeof import('./server-session') | undefined; let now = 1_000; let trigger = false; let nested = () => undefined;
-    let expiryClock: 'stable' | 'rollback' | 'throw' = 'stable'; let expiryClockReads = 0;
-    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
-    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
-    try {
-        process.env.MEDIFLOW_SESSION_TTL_MS = '10';
-        Date.now = () => {
-            if (expiryClock !== 'stable' && ++expiryClockReads === 2) {
-                if (expiryClock === 'throw') throw new Error('synthetic expiry clock reread');
-                return 0;
-            }
-            if (trigger) { trigger = false; nested(); } return now;
-        };
-        delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
-        const activate = () => {
-            const staged = isolated!.stageWebServerSession({ id: 'active-isolated', username: SYNTHETIC_USERNAME, role: 'clinician' });
-            const prepared = isolated!.prepareStagedWebServerSession(staged); assert.ok(prepared);
-            const sessionId = isolated!.getPreparedWebServerSessionId(prepared); assert.ok(sessionId);
-            const port = isolated!.armPreparedWebServerSession(prepared); assert.ok(port);
-            const control = authControlApi().create(`f-${sessionId}`); control.begin('login', 'op', 'key', 'fp', 0);
-            const ticket = control.prepareTicket(`f-${sessionId}`, 'op', BigInt(0), 'fp', sessionId, now); assert.ok(ticket);
-            assert.equal(isolated!.activateArmedWebServerSession(port, ticket), true);
-            return { sessionId, control };
-        };
-
-        for (const clock of ['rollback', 'throw'] as const) {
-            const expired = activate(); const exact = isolated.resolveActiveWebServerSession(expired.sessionId); assert.ok(exact);
-            const resource = isolated.mintActiveWebSessionResourcePort(exact); assert.ok(resource);
-            const use = isolated.beginActiveWebSessionResourceUse(resource); assert.ok(use);
-            now = exact.expiresAt; expiryClock = clock; expiryClockReads = 0;
-            assert.equal(isolated.resolveActiveWebServerSession(expired.sessionId), null); expiryClock = 'stable';
-            assert.equal(expiryClockReads, 1); assert.equal(expired.control.snapshot().active, false);
-            assert.equal(isolated.commitActiveWebSessionResourceUse(use), false);
-            assert.equal(isolated.releaseActiveWebSessionResourcePort(resource), false);
-            const receipt = isolated.retireExpiredServerSession(expired.sessionId); assert.equal(receipt.outcome, 'completed');
-            assert.equal(isolated.retireExpiredServerSession(expired.sessionId), receipt);
-        }
-
-        for (const operation of ['delete', 'invalidate', 'clear'] as const) {
-            const { sessionId } = activate();
-            nested = () => {
-                if (operation === 'delete') isolated!.deleteSession(sessionId);
-                else if (operation === 'invalidate') isolated!.invalidateSessionsForUser('active-isolated');
-                else isolated!.clearAllSessions();
-            };
-            trigger = true;
-            assert.equal(isolated.resolveActiveWebServerSession(sessionId), null);
-            assert.equal(trigger, false);
-            assert.ok(isolated.resolveActiveWebServerSession(sessionId), 'direct lifecycle calls are denial observations, not ACTIVE cleanup');
-        }
-        await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
-    } finally {
-        expiryClock = 'stable'; Date.now = originalNow; isolated?.clearAllSessions();
-        if (ttl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = ttl;
-        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
-    }
-});
-
-test('the trusted ACTIVE resolver revalidates final-get collision, reentry, and throw before expiry retirement', async (t) => {
-    const nodeRequire = createRequire(import.meta.url); const modulePath = nodeRequire.resolve('./server-session.ts');
-    const cached = nodeRequire.cache[modulePath]; const originalGet = Map.prototype.get; const originalHas = Map.prototype.has; const originalSet = Map.prototype.set;
-    const originalDelete = Map.prototype.delete; const originalNow = Date.now; const ttl = process.env.MEDIFLOW_SESSION_TTL_MS;
-    let isolated: typeof import('./server-session') | undefined; let sessionId = ''; let now = 1_000; let targetReads = 0;
-    let mode: 'idle' | 'nested' | 'collision' | 'final-collision' | 'final-reentry' | 'final-throw' = 'idle';
-    let nestedResult: unknown; let poisonedCalls = 0; let registry: Map<unknown, unknown> | null = null;
-    let replacementCollision: unknown = null; let expiryCollision: object | null = null; let installExpiryCollision = false;
-    let expiryAttack = false; let expiryGetCalls = 0; let expiryHasCalls = 0;
-    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
-    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
-    Map.prototype.get = function (key: unknown) {
-        const prior = Reflect.apply(originalGet, this, [key]);
-        if (key === sessionId && mode === 'nested') { mode = 'idle'; nestedResult = isolated?.resolveActiveWebServerSession(sessionId); }
-        if (key === sessionId && mode === 'collision') {
-            mode = 'idle'; registry = this as Map<unknown, unknown>;
-            Reflect.apply(originalSet, this, [key, Object.freeze({ id: sessionId })]);
-        }
-        if (key === sessionId && mode.startsWith('final-') && ++targetReads === 1) {
-            const action = mode; mode = 'idle';
-            if (action === 'final-collision') {
-                registry = this as Map<unknown, unknown>;
-                Reflect.apply(originalSet, this, [key, Object.freeze({ id: sessionId })]);
-                replacementCollision = Object.freeze({ id: sessionId, replacement: true });
-                Reflect.apply(originalSet, this, [key, replacementCollision]);
-            } else if (action === 'final-reentry') {
-                nestedResult = isolated?.resolveActiveWebServerSession(sessionId);
-            } else {
-                throw new Error('synthetic final-get apply-then-throw');
-            }
-        }
-        if (key === sessionId && expiryAttack) {
-            expiryGetCalls += 1; if (registry && expiryCollision) Reflect.apply(originalSet, registry, [sessionId, expiryCollision]);
-        }
-        return prior;
-    };
-    Map.prototype.has = function (key: unknown) {
-        const prior = Reflect.apply(originalHas, this, [key]);
-        if (key === sessionId && expiryAttack) {
-            expiryHasCalls += 1; if (registry && expiryCollision) Reflect.apply(originalSet, registry, [sessionId, expiryCollision]);
-            throw new Error('synthetic final-has apply-then-throw');
-        }
-        return prior;
-    };
-    try {
-        process.env.MEDIFLOW_SESSION_TTL_MS = '10'; Date.now = () => {
-            if (installExpiryCollision && registry && expiryCollision) {
-                installExpiryCollision = false; Reflect.apply(originalSet, registry, [sessionId, expiryCollision]);
-            }
-            return now;
-        };
-        delete nodeRequire.cache[modulePath]; isolated = nodeRequire(modulePath) as typeof import('./server-session');
-        Map.prototype.get = originalGet; Map.prototype.has = originalHas;
-        const staged = isolated.stageWebServerSession({ id: 'lookup-user', username: SYNTHETIC_USERNAME, role: 'clinician' });
-        const prepared = isolated.prepareStagedWebServerSession(staged); assert.ok(prepared);
-        sessionId = isolated.getPreparedWebServerSessionId(prepared) ?? ''; assert.ok(sessionId);
-        const port = isolated.armPreparedWebServerSession(prepared); assert.ok(port);
-        const control = authControlApi().create('lookup-fence'); control.begin('login', 'op', 'key', 'fp', 0);
-        const ticket = control.prepareTicket('lookup-fence', 'op', BigInt(0), 'fp', sessionId, 1); assert.ok(ticket);
-        assert.equal(isolated.activateArmedWebServerSession(port, ticket), true);
-
-        mode = 'nested'; assert.equal(isolated.resolveActiveWebServerSession(sessionId), null); assert.equal(nestedResult, null);
-        const session = isolated.resolveActiveWebServerSession(sessionId); assert.ok(session);
-        now = session.createdAt; targetReads = 0; mode = 'final-collision';
-        assert.equal(isolated.resolveActiveWebServerSession(sessionId), null); assert.equal(targetReads, 1); assert.ok(registry);
-        assert.equal(Reflect.apply(originalGet, registry, [sessionId]), replacementCollision);
-        Reflect.apply(originalDelete, registry, [sessionId]); now = session.createdAt;
-        assert.equal(isolated.resolveActiveWebServerSession(sessionId), session, 'a replaced final-get collision cannot retire P3');
-
-        now = session.createdAt; targetReads = 0; mode = 'final-reentry';
-        assert.equal(isolated.resolveActiveWebServerSession(sessionId), null); assert.equal(nestedResult, null);
-        now = session.createdAt; assert.equal(isolated.resolveActiveWebServerSession(sessionId), session);
-
-        now = session.createdAt; targetReads = 0; mode = 'final-throw'; let thrownResult: unknown = 'unset';
-        assert.doesNotThrow(() => { thrownResult = isolated!.resolveActiveWebServerSession(sessionId); });
-        assert.equal(thrownResult, null); now = session.createdAt;
-        assert.equal(isolated.resolveActiveWebServerSession(sessionId), session);
-        assert.equal(control.snapshot().active, true, 'denied observations preserve exact P2/P3 retry authority');
-
-        const resource = isolated.mintActiveWebSessionResourcePort(session); assert.ok(resource);
-        mode = 'collision'; assert.equal(isolated.mintActiveWebSessionResourcePort(session), null);
-
-        const originals = { mapGet: Map.prototype.get, dateNow: Date.now, then: Object.getOwnPropertyDescriptor(Object.prototype, 'then') };
-        Map.prototype.get = (() => { poisonedCalls += 1; throw new Error('ambient map get'); }) as typeof Map.prototype.get;
-        Date.now = () => { poisonedCalls += 1; throw new Error('ambient clock'); };
-        Object.defineProperty(Object.prototype, 'then', { configurable: true, get() { poisonedCalls += 1; throw new Error('ambient then'); } });
-        try {
-            assert.equal(isolated.resolveActiveWebServerSession(sessionId), null, 'the legacy collision remains fail-closed');
-            assert.equal(isolated.releaseActiveWebSessionResourcePort(resource), true, 'identity release remains callback-free');
-        }
-        finally {
-            Map.prototype.get = originals.mapGet; Date.now = originals.dateNow;
-            if (originals.then) Object.defineProperty(Object.prototype, 'then', originals.then); else delete (Object.prototype as { then?: unknown }).then;
-        }
-        assert.ok(registry); Reflect.apply(originalDelete, registry, [sessionId]);
-        const expiryResource = isolated.mintActiveWebSessionResourcePort(session); assert.ok(expiryResource);
-        const expiryUse = isolated.beginActiveWebSessionResourceUse(expiryResource); assert.ok(expiryUse);
-        expiryCollision = { id: sessionId, userId: 'legacy-synthetic', username: SYNTHETIC_USERNAME, role: 'clinician', authChannel: 'web', createdAt: 1_000, expiresAt: 100_000 }; Reflect.apply(originalSet, registry, [sessionId, Object.freeze({ id: sessionId, beforeExpiry: true })]);
-        installExpiryCollision = true; expiryAttack = true; now = session.expiresAt;
-        assert.equal(isolated.resolveActiveWebServerSession(sessionId), null, 'exact expiry does not consult legacy Map'); expiryAttack = false;
-        assert.deepEqual([expiryGetCalls, expiryHasCalls], [0, 0]); assert.equal(isolated.peekSession(sessionId), expiryCollision);
-        assert.equal(control.snapshot().active, false); assert.equal(isolated.commitActiveWebSessionResourceUse(expiryUse), false);
-        assert.equal(isolated.releaseActiveWebSessionResourcePort(expiryResource), false);
-        const receipt = isolated.retireExpiredServerSession(sessionId); assert.equal(receipt.outcome, 'completed');
-        assert.equal(isolated.retireExpiredServerSession(sessionId), receipt); Reflect.apply(originalDelete, registry, [sessionId]);
-        now = session.createdAt; assert.equal(isolated.resolveActiveWebServerSession(sessionId), null);
-        await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(poisonedCalls, 0); assert.deepEqual(unhandled, []);
-    } finally {
-        mode = 'idle'; expiryAttack = false; Map.prototype.get = originalGet; Map.prototype.has = originalHas; Date.now = originalNow; isolated?.clearAllSessions();
-        if (ttl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = ttl;
-        if (cached) nodeRequire.cache[modulePath] = cached; else delete nodeRequire.cache[modulePath];
-    }
-});
-
 test('activation burns crossed, hostile, copied, and cross-module inputs without observation', async (t) => {
     const first = armedControlActivation(); const second = armedControlActivation(); let observed = 0;
     const proxy = new Proxy(first.port, { get: () => { observed += 1; throw new Error('get'); }, ownKeys: () => { observed += 1; throw new Error('keys'); } });
@@ -2226,64 +723,6 @@ test('activation burns crossed, hostile, copied, and cross-module inputs without
     assert.equal(observed, 0); assert.deepEqual(unhandled, []);
 });
 
-test('activation denies clock reentry, CAS drift, and ambient collection poison without post-return drift', async (t) => {
-    const nodeRequire = createRequire(import.meta.url); const sessionPath = nodeRequire.resolve('./server-session.ts');
-    const authPath = nodeRequire.resolve(AUTH_CONTROL_MODULE_PATH); const cachedSession = nodeRequire.cache[sessionPath]; const cachedAuth = nodeRequire.cache[authPath];
-    const originalNow = Date.now; const ttl = process.env.MEDIFLOW_SESSION_TTL_MS; let now = 1_000;
-    let armed = false; let clockCalls = 0; let nested = () => undefined;
-    const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
-    process.on('unhandledRejection', onUnhandled); t.after(() => process.off('unhandledRejection', onUnhandled));
-    process.env.MEDIFLOW_SESSION_TTL_MS = '1';
-    Date.now = () => { clockCalls += 1; if (armed && clockCalls === 2) nested(); return now; };
-    delete nodeRequire.cache[sessionPath]; delete nodeRequire.cache[authPath];
-    const isolated = nodeRequire(sessionPath) as typeof import('./server-session');
-    const auth = authControlApi();
-    const fixture = () => {
-        clockCalls = 0; armed = false;
-        const prepared = isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({ id: 'clock-user', username: SYNTHETIC_USERNAME, role: 'clinician' })); assert.ok(prepared);
-        const sessionId = isolated.getPreparedWebServerSessionId(prepared); assert.ok(sessionId);
-        const port = isolated.armPreparedWebServerSession(prepared); assert.ok(port);
-        const control = auth.create('f0'); control.begin('login', 'op', 'key', 'fp', 0);
-        const ticket = control.prepareTicket('f0', 'op', BigInt(0), 'fp', sessionId, 1); assert.ok(ticket);
-        clockCalls = 0; armed = true; return { control, port, sessionId, ticket };
-    };
-    try {
-        for (const operation of ['tombstone', 'delete', 'logout', 'clear', 'arm'] as const) {
-            const current = fixture(); const nestedPrepared = operation === 'arm' ? isolated.prepareStagedWebServerSession(isolated.stageWebServerSession({ id: 'nested', username: SYNTHETIC_USERNAME, role: 'clinician' })) : null;
-            clockCalls = 0; armed = true; nested = () => {
-                if (operation === 'tombstone') isolated.tombstoneArmedWebServerSession(current.port);
-                else if (operation === 'delete') isolated.deleteSession(current.sessionId);
-                else if (operation === 'logout') isolated.invalidateSessionsForUser('clock-user');
-                else if (operation === 'clear') isolated.clearAllSessions();
-                else isolated.armPreparedWebServerSession(nestedPrepared);
-            };
-            assert.equal(isolated.activateArmedWebServerSession(current.port, current.ticket), false);
-            assert.equal(isolated.getArmedWebServerSessionId(current.port), null);
-            await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(isolated.getArmedWebServerSessionId(current.port), null);
-        }
-        const drift = fixture();
-        const other = auth.create('other'); other.begin('login', 'other-op', 'other-key', 'other-fp', 0);
-        const otherTicket = other.prepareTicket('other', 'other-op', BigInt(0), 'other-fp', 'other-session', 1); assert.ok(otherTicket);
-        clockCalls = 0; armed = true; nested = () => { auth.prepareActivation(otherTicket, 'other-session'); };
-        assert.equal(isolated.activateArmedWebServerSession(drift.port, drift.ticket), false);
-        assert.equal(isolated.getArmedWebServerSessionId(drift.port), null);
-        const expired = fixture(); armed = false; now += 1;
-        assert.equal(isolated.activateArmedWebServerSession(expired.port, expired.ticket), false);
-        assert.equal(isolated.getArmedWebServerSessionId(expired.port), null);
-        const fail = () => { throw new Error('ambient collection poison'); };
-        const originals = { get: WeakMap.prototype.get, set: WeakMap.prototype.set, mapGet: Map.prototype.get, apply: Reflect.apply };
-        const clean = fixture(); clockCalls = 0; armed = false;
-        try { WeakMap.prototype.get = fail as typeof WeakMap.prototype.get; WeakMap.prototype.set = fail as typeof WeakMap.prototype.set; Map.prototype.get = fail as typeof Map.prototype.get; Reflect.apply = fail as typeof Reflect.apply; assert.equal(isolated.activateArmedWebServerSession(clean.port, clean.ticket), true); }
-        finally { WeakMap.prototype.get = originals.get; WeakMap.prototype.set = originals.set; Map.prototype.get = originals.mapGet; Reflect.apply = originals.apply; }
-        assert.equal(isolated.getSession(clean.sessionId), null);
-        await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []);
-    } finally {
-        armed = false; Date.now = originalNow; isolated.clearAllSessions();
-        if (ttl === undefined) delete process.env.MEDIFLOW_SESSION_TTL_MS; else process.env.MEDIFLOW_SESSION_TTL_MS = ttl;
-        if (cachedSession) nodeRequire.cache[sessionPath] = cachedSession; else delete nodeRequire.cache[sessionPath];
-        if (cachedAuth) nodeRequire.cache[authPath] = cachedAuth; else delete nodeRequire.cache[authPath];
-    }
-});
 
 test('activation tombstones lookup reentry and a captured WeakMap mutate-then-throw', async () => {
     const nodeRequire = createRequire(import.meta.url); const sessionPath = nodeRequire.resolve('./server-session.ts');

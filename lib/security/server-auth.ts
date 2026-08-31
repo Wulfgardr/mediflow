@@ -7,22 +7,21 @@ import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { users } from '@/lib/schema';
-import {
-    resolveActiveWebServerSession,
-    retireWebP3SessionsForUser,
-    SESSION_COOKIE_NAME,
-    type ServerSession,
-} from '@/lib/security/server-session';
+import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import type { ServerSessionProjectionOwner } from '@/lib/security/server-session-projection-owner';
 import { serverSessionProjectionOwnerRegistry } from '@/lib/security/server-session-projection-owner-production';
-/* @Codex */
-import { requireLocalApiToken } from '@/lib/security/local-api-auth';
+import {
+    resolve as resolveWebSession,
+    retireForUser as retireWebSessionsForProjectionUser,
+    type WebSessionProjection,
+} from '@/lib/security/web-auth-lifecycle-owner-adapter';
 
 const ObjectCreate = Object.create;
 const ObjectDefineProperty = Object.defineProperty;
 const ObjectFreeze = Object.freeze;
 const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const ObjectGetPrototypeOf = Object.getPrototypeOf;
+const ObjectIsFrozen = Object.isFrozen;
 const ObjectPrototype = Object.prototype;
 const ReflectApply = Reflect.apply;
 const ReflectOwnKeys = Reflect.ownKeys;
@@ -31,8 +30,12 @@ const PromiseThen = PromisePrototype.then;
 const TypesIsProxy = types.isProxy;
 const TypesIsPromise = types.isPromise;
 const DateNow = Date.now;
-const NumberIsFinite = Number.isFinite;
+const NumberIsSafeInteger = Number.isSafeInteger;
 
+const SESSION_COOKIE_NAME = 'mediflow_session';
+const CONTROL_COOKIE_NAME = 'mediflow_auth_control';
+const SESSION_ID = /^[a-f0-9]{64}$/u;
+const CONTROL_ID = /^[A-Za-z0-9_-]{32,256}$/u;
 const AUTH_SESSION_KEYS = ['id', 'userId', 'username', 'role', 'authChannel', 'createdAt', 'expiresAt'] as const;
 const AUTH_COOKIE_KEYS = ['name', 'value'] as const;
 const AUTH_USER_KEYS = ['id', 'username', 'role'] as const;
@@ -46,6 +49,16 @@ const OWNER_METHOD_KEYS = [
     'withLeaseCriticalSection',
     'dispose',
 ] as const;
+
+export type ServerSession = Readonly<{
+    id: string;
+    userId: string;
+    username: string;
+    role: string;
+    authChannel: 'web' | 'native' | 'system';
+    createdAt: number;
+    expiresAt: number;
+}>;
 
 function ambientThenSafe(): boolean {
     try {
@@ -80,10 +93,10 @@ function discardNativePromise(value: Promise<unknown>): void {
     }
 }
 
-function exactDataRecord(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
+function exactDataRecord(value: unknown, keys: readonly string[], prototype: object | null): Record<string, unknown> | null {
     if (typeof value !== 'object' || value === null) return null;
     try {
-        if (TypesIsProxy(value) || ObjectGetPrototypeOf(value) !== ObjectPrototype) return null;
+        if (TypesIsProxy(value) || ObjectGetPrototypeOf(value) !== prototype) return null;
         const ownKeys = ReflectOwnKeys(value);
         if (ownKeys.length !== keys.length) return null;
         for (let index = 0; index < keys.length; index += 1) {
@@ -102,6 +115,28 @@ function exactDataRecord(value: unknown, keys: readonly string[]): Record<string
     }
 }
 
+function exactFrozenOwnerRecord(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
+    const record = exactDataRecord(value, keys, null);
+    if (!record) return null;
+    try {
+        if (!ObjectIsFrozen(value)) return null;
+        for (const key of keys) {
+            const descriptor = ObjectGetOwnPropertyDescriptor(value, key);
+            if (!descriptor || descriptor.configurable || descriptor.writable) return null;
+        }
+        return record;
+    } catch {
+        return null;
+    }
+}
+
+function exactCookieValue(value: unknown, name: string, pattern: RegExp): string | null {
+    const record = exactDataRecord(value, AUTH_COOKIE_KEYS, ObjectPrototype);
+    return record?.name === name && typeof record.value === 'string' && pattern.test(record.value)
+        ? record.value
+        : null;
+}
+
 function isProjectionOwner(value: unknown): value is ServerSessionProjectionOwner {
     if (typeof value !== 'object' || value === null) return false;
     try {
@@ -116,72 +151,75 @@ function isProjectionOwner(value: unknown): value is ServerSessionProjectionOwne
     }
 }
 
-function validatedUserAgreesWithActiveWebSession(
-    user: unknown,
-    sessionRecord: Record<string, unknown>,
-): boolean {
-    const userRecord = exactDataRecord(user, AUTH_USER_KEYS);
-    if (!userRecord || userRecord.id !== sessionRecord.userId
-        || userRecord.username !== sessionRecord.username
-        || (userRecord.role !== null && userRecord.role !== undefined && typeof userRecord.role !== 'string')) return false;
-    const effectiveRole = (userRecord.role as string | null | undefined) ?? sessionRecord.role;
-    return effectiveRole === sessionRecord.role;
+function activeWebProjection(sessionId: unknown, controlId: unknown): WebSessionProjection | null {
+    if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId)
+        || typeof controlId !== 'string' || !CONTROL_ID.test(controlId)) return null;
+    let resolution: unknown;
+    try { resolution = resolveWebSession(sessionId, controlId); } catch { return null; }
+    const resolved = exactFrozenOwnerRecord(resolution, ['status', 'projection']);
+    if (!resolved || resolved.status !== 'active') return null;
+    const projection = exactFrozenOwnerRecord(resolved.projection, AUTH_SESSION_KEYS);
+    if (!projection || projection.id !== sessionId
+        || typeof projection.userId !== 'string' || projection.userId.length === 0
+        || typeof projection.username !== 'string' || projection.username.length === 0
+        || typeof projection.role !== 'string' || projection.role.length === 0
+        || projection.authChannel !== 'web'
+        || typeof projection.createdAt !== 'number' || !NumberIsSafeInteger(projection.createdAt)
+        || typeof projection.expiresAt !== 'number' || !NumberIsSafeInteger(projection.expiresAt)
+        || projection.expiresAt <= DateNow()) return null;
+    return resolved.projection as WebSessionProjection;
 }
 
-function retireActiveWebSessionsForUser(userId: unknown): void {
+function validatedUserAgreesWithActiveWebSession(user: unknown, session: WebSessionProjection): boolean {
+    const userRecord = exactDataRecord(user, AUTH_USER_KEYS, ObjectPrototype);
+    if (!userRecord || userRecord.id !== session.userId
+        || userRecord.username !== session.username
+        || (userRecord.role !== null && userRecord.role !== undefined && typeof userRecord.role !== 'string')) return false;
+    return ((userRecord.role as string | null | undefined) ?? session.role) === session.role;
+}
+
+function retireActiveWebSessionsForProjectionUser(projection: WebSessionProjection): void {
     try {
-        retireWebP3SessionsForUser(userId);
+        retireWebSessionsForProjectionUser(projection);
     } catch {
-        // Retirement is fail-closed: a denial or failure cannot preserve this request's authority.
+        // The request remains denied even if terminal cleanup reports a failure.
     }
 }
 
-async function resolveValidatedActiveWebSession(): Promise<ServerSession | null> {
+async function validateProjectionAgainstDatabase(projection: WebSessionProjection): Promise<WebSessionProjection | null> {
+    const user = await dbServer
+        .select({ id: users.id, username: users.username, role: users.role })
+        .from(users)
+        .where(eq(users.id, projection.userId))
+        .get();
+    if (validatedUserAgreesWithActiveWebSession(user, projection)) return projection;
+    retireActiveWebSessionsForProjectionUser(projection);
+    return null;
+}
+
+async function resolveValidatedActiveWebSession(): Promise<WebSessionProjection | null> {
     try {
         const cookieStore = await cookies();
-        const sessionId = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-        const session = resolveActiveWebServerSession(sessionId);
-        if (!session || !sessionId) return null;
-        const sessionRecord = exactDataRecord(session, AUTH_SESSION_KEYS);
-        if (!sessionRecord || sessionRecord.id !== sessionId
-            || typeof sessionRecord.userId !== 'string' || sessionRecord.userId.length === 0
-            || typeof sessionRecord.username !== 'string' || sessionRecord.username.length === 0
-            || typeof sessionRecord.role !== 'string' || sessionRecord.role.length === 0
-            || sessionRecord.authChannel !== 'web'
-            || typeof sessionRecord.createdAt !== 'number' || !NumberIsFinite(sessionRecord.createdAt)
-            || typeof sessionRecord.expiresAt !== 'number' || !NumberIsFinite(sessionRecord.expiresAt)
-            || sessionRecord.expiresAt <= DateNow()) return null;
-
-        const user = await dbServer
-            .select({
-                id: users.id,
-                username: users.username,
-                role: users.role,
-            })
-            .from(users)
-            .where(eq(users.id, sessionRecord.userId))
-            .get();
-        if (!validatedUserAgreesWithActiveWebSession(user, sessionRecord)) {
-            retireActiveWebSessionsForUser(sessionRecord.userId);
-            return null;
-        }
-        return session;
+        const sessionId = exactCookieValue(cookieStore.get(SESSION_COOKIE_NAME), SESSION_COOKIE_NAME, SESSION_ID);
+        const controlId = exactCookieValue(cookieStore.get(CONTROL_COOKIE_NAME), CONTROL_COOKIE_NAME, CONTROL_ID);
+        const projection = activeWebProjection(sessionId, controlId);
+        return projection ? await validateProjectionAgainstDatabase(projection) : null;
     } catch {
         return null;
     }
 }
 
-export async function requireSession(): Promise<ServerSession | null> {
+export async function requireSession(): Promise<WebSessionProjection | null> {
     return resolveValidatedActiveWebSession();
 }
 
-/* @Codex */
-export async function readAuthenticatedWebSession(): Promise<ServerSession | null> {
+export async function readAuthenticatedWebSession(): Promise<WebSessionProjection | null> {
     return resolveValidatedActiveWebSession();
 }
 
 export type AuthenticatedWebSessionProjectionOwnerContext = Readonly<{
-    session: ServerSession; owner: ServerSessionProjectionOwner;
+    session: ServerSession;
+    owner: ServerSessionProjectionOwner;
 }>;
 
 function authenticatedProjectionOwnerContext(
@@ -194,11 +232,9 @@ function authenticatedProjectionOwnerContext(
     return ObjectFreeze(context);
 }
 
-/* @Codex */
 export async function acquireAuthenticatedWebSessionProjectionOwnerContext(): Promise<AuthenticatedWebSessionProjectionOwnerContext | null> {
     try {
         if (!ambientThenSafe()) return null;
-
         const cookiePromise = cookies();
         const nativeCookiePromise = isNativePromise(cookiePromise) ? cookiePromise : null;
         if (!ambientThenSafe()) { if (nativeCookiePromise) discardNativePromise(nativeCookiePromise); return null; }
@@ -206,36 +242,21 @@ export async function acquireAuthenticatedWebSessionProjectionOwnerContext(): Pr
 
         const cookieStore = await nativeCookiePromise;
         if (!ambientThenSafe() || (typeof cookieStore !== 'object' && typeof cookieStore !== 'function') || cookieStore === null) return null;
-
         const cookieGet = (cookieStore as { get?: unknown }).get;
         if (!ambientThenSafe() || typeof cookieGet !== 'function') return null;
-        const cookie = ReflectApply(cookieGet, cookieStore, [SESSION_COOKIE_NAME]);
+        const bearerCookie = ReflectApply(cookieGet, cookieStore, [SESSION_COOKIE_NAME]);
         if (!ambientThenSafe()) return null;
-        if (cookie === undefined) return null;
-        const cookieRecord = exactDataRecord(cookie, AUTH_COOKIE_KEYS);
-        if (!cookieRecord || cookieRecord.name !== SESSION_COOKIE_NAME
-            || typeof cookieRecord.value !== 'string' || cookieRecord.value.length === 0) return null;
-        const sessionId = cookieRecord.value;
-
-        const session = resolveActiveWebServerSession(sessionId);
-        if (!ambientThenSafe() || !session) return null;
-        const sessionRecord = exactDataRecord(session, AUTH_SESSION_KEYS);
-        if (!sessionRecord || sessionRecord.id !== sessionId
-            || typeof sessionRecord.userId !== 'string' || sessionRecord.userId.length === 0
-            || typeof sessionRecord.username !== 'string' || sessionRecord.username.length === 0
-            || typeof sessionRecord.role !== 'string' || sessionRecord.role.length === 0
-            || sessionRecord.authChannel !== 'web'
-            || typeof sessionRecord.createdAt !== 'number' || !NumberIsFinite(sessionRecord.createdAt)
-            || typeof sessionRecord.expiresAt !== 'number' || !NumberIsFinite(sessionRecord.expiresAt)
-            || sessionRecord.expiresAt <= DateNow()) return null;
-
-        const userIdPredicate = eq(users.id, sessionRecord.userId);
+        const controlCookie = ReflectApply(cookieGet, cookieStore, [CONTROL_COOKIE_NAME]);
         if (!ambientThenSafe()) return null;
-        const selected = dbServer.select({
-            id: users.id,
-            username: users.username,
-            role: users.role,
-        });
+        const sessionId = exactCookieValue(bearerCookie, SESSION_COOKIE_NAME, SESSION_ID);
+        const controlId = exactCookieValue(controlCookie, CONTROL_COOKIE_NAME, CONTROL_ID);
+        if (!sessionId || !controlId) return null;
+
+        const projection = activeWebProjection(sessionId, controlId);
+        if (!ambientThenSafe() || !projection) return null;
+        const userIdPredicate = eq(users.id, projection.userId);
+        if (!ambientThenSafe()) return null;
+        const selected = dbServer.select({ id: users.id, username: users.username, role: users.role });
         if (!ambientThenSafe()) return null;
         const fromUsers = selected.from(users);
         if (!ambientThenSafe()) return null;
@@ -243,65 +264,43 @@ export async function acquireAuthenticatedWebSessionProjectionOwnerContext(): Pr
         if (!ambientThenSafe()) return null;
         const user = filtered.get();
         if (!ambientThenSafe()) return null;
-        if (!validatedUserAgreesWithActiveWebSession(user, sessionRecord)) {
-            retireActiveWebSessionsForUser(sessionRecord.userId);
+        if (!validatedUserAgreesWithActiveWebSession(user, projection)) {
+            retireActiveWebSessionsForProjectionUser(projection);
             if (!ambientThenSafe()) return null;
             return null;
         }
 
-        const sessionValue = session as ServerSession;
-        const owner = serverSessionProjectionOwnerRegistry.acquire(sessionValue);
+        const owner = serverSessionProjectionOwnerRegistry.acquire(projection);
         if (!ambientThenSafe() || !isProjectionOwner(owner)) return null;
-        return authenticatedProjectionOwnerContext(sessionValue, owner);
+        return authenticatedProjectionOwnerContext(projection, owner);
     } catch {
         return null;
     }
 }
 
-/* @Codex */
 export async function acquireAuthenticatedWebSessionProjectionOwner() {
     return (await acquireAuthenticatedWebSessionProjectionOwnerContext())?.owner ?? null;
 }
 
-/* @Codex */
 function buildLocalApiSystemSession(): ServerSession {
     const now = Date.now();
     return {
-        id: 'local-api',
-        userId: 'local-api',
-        username: 'local-api',
-        role: 'admin',
-        authChannel: 'system',
-        createdAt: now,
-        expiresAt: now + 1000 * 60 * 60,
+        id: 'local-api', userId: 'local-api', username: 'local-api', role: 'admin', authChannel: 'system',
+        createdAt: now, expiresAt: now + 1000 * 60 * 60,
     };
 }
 
-/* @Codex */
 export async function requireSessionOrLocalToken(request: Request): Promise<ServerSession | null> {
     const session = await requireSession();
     if (session) return session;
-
-    const tokenError = requireLocalApiToken(request);
-    if (tokenError) return null;
-
+    if (requireLocalApiToken(request)) return null;
     return buildLocalApiSystemSession();
 }
 
-/* @Codex */
 export async function requireLocalApiActorSession(request: Request): Promise<ServerSession | null> {
-    const tokenError = requireLocalApiToken(request);
-    if (tokenError) return null;
-
+    if (requireLocalApiToken(request)) return null;
     const session = await requireSession();
-    if (session) {
-        return {
-            ...session,
-            id: `native:${session.userId}`,
-            authChannel: 'native',
-        };
-    }
-
+    if (session) return { ...session, id: `native:${session.userId}`, authChannel: 'native' };
     return buildLocalApiSystemSession();
 }
 

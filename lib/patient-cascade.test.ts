@@ -7,6 +7,7 @@ import path from 'node:path';
 import test, { after, afterEach } from 'node:test';
 import Database from 'better-sqlite3';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import type { ServerSession } from './security/server-session.ts';
 import {
     PATIENT_CHILD_TABLES,
     countOrphanedClinicalRows,
@@ -37,8 +38,13 @@ const AUTHORITY_DB_PATH = path.join(AUTHORITY_DATA_DIR, 'medical.db');
 }
 process.env.MEDIFLOW_DATA_DIR = AUTHORITY_DATA_DIR;
 
+const authoritySessions: ServerSession[] = [];
+let authoritySessionSequence = 0;
+
 afterEach(async () => {
     const { clearAllSessions } = await import('./security/server-session.ts');
+    const { retireSyntheticWebSession } = await import('./security/web-auth-lifecycle-owner-test-fixture.ts');
+    while (authoritySessions.length > 0) retireSyntheticWebSession(authoritySessions.pop()!);
     clearAllSessions();
 });
 after(() => fs.rmSync(AUTHORITY_DATA_DIR, { recursive: true, force: true }));
@@ -173,9 +179,13 @@ function insertAuthorityPatientWithAttachment(sqlite: Database.Database, patient
 
 async function createSelectedAuthority(patientId: string) {
     const { createAttachmentExtractionSourceAuthority } = await import('./domain/documents/attachment-extraction-source-authority.ts');
-    const { createSession } = await import('./security/server-session.ts');
     const { serverSessionProjectionOwnerRegistry } = await import('./security/server-session-projection-owner-production.ts');
-    const session = createSession({ id: `user-${patientId}`, username: ['clinician', 'synthetic', patientId].join('.'), role: 'clinician' });
+    const { issueSyntheticWebSession } = await import('./security/web-auth-lifecycle-owner-test-fixture.ts');
+    const session = issueSyntheticWebSession(
+        { id: `user-${patientId}`, username: ['clinician', 'synthetic', patientId].join('.'), role: 'clinician' },
+        `patient-cascade-${authoritySessionSequence += 1}`,
+    );
+    authoritySessions.push(session);
     const owner = serverSessionProjectionOwnerRegistry.acquire(session);
     owner.issueSelection({ expectedEpoch: 0, patientId, ambulatoryId: 'amb-test' });
     return createAttachmentExtractionSourceAuthority(session);

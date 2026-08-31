@@ -388,6 +388,34 @@ function abortPreparedAuthControlRetirement(state, prepared) {
     return exact;
 }
 
+/** Advances an idle or pending control fence for lock before any cleanup. */
+function advanceLockControlRecord(state, expectedFence, at) {
+    if (!trustedState(state) || state.operationActive) return null;
+    state.operationActive = true;
+    state.operationPoisoned = false;
+    try {
+        const now = tick(state, currentTime(at));
+        const record = state.record;
+        if (now === null || !isText(expectedFence) || record.fence !== expectedFence
+            || record.activeSessionId !== null || state.activationRecord !== null
+            || state.retirementRecord !== null) return null;
+        const nextFence = successorFence();
+        if (!isText(nextFence) || record.generation === MAX_U64
+            || has(state.used, nextFence) || has(state.reserved, nextFence)) return null;
+        record.pending = null;
+        state.ticketedPending = null;
+        reserve(state.used, nextFence);
+        record.fence = nextFence;
+        record.generation += ONE;
+        return objectFreeze({ ok: true, fence: nextFence, generation: record.generation });
+    } catch {
+        return null;
+    } finally {
+        state.operationActive = false;
+        state.operationPoisoned = false;
+    }
+}
+
 /** Returns immutable ordering data only; no internal record escapes. */
 function snapshotControlRecord(state) {
     if (!trustedState(state)) return null;
@@ -431,6 +459,7 @@ module.exports = objectFreeze({
     prepareAuthControlRetirement,
     commitPreparedAuthControlRetirement,
     abortPreparedAuthControlRetirement,
+    advanceLockControlRecord,
     snapshotControlRecord,
     canTerminallyResetControlRecord,
     terminallyResetControlRecord,

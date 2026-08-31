@@ -34,10 +34,11 @@ function applySqlMigrations(db, projectRoot) {
   }
 }
 
-function ensureE2EDatabase(projectRoot, dbPath, legacyDbPath) {
+/* @Codex */
+function ensureE2EDatabase(projectRoot, dbPath, legacyDbPath, allowLegacyCopy = true) {
   if (fs.existsSync(dbPath)) return;
 
-  if (fs.existsSync(legacyDbPath)) {
+  if (allowLegacyCopy && fs.existsSync(legacyDbPath)) {
     fs.copyFileSync(legacyDbPath, dbPath);
     return;
   }
@@ -150,7 +151,9 @@ async function main() {
     if (!hasUsersTable) {
       db.close();
       fs.rmSync(dbPath, { force: true });
-      ensureE2EDatabase(projectRoot, dbPath, legacyDbPath);
+      // A present but non-MediFlow legacy file must not be copied a second time:
+      // rebuild the isolated E2E database from the canonical SQL migrations.
+      ensureE2EDatabase(projectRoot, dbPath, legacyDbPath, false);
       db = new Database(dbPath);
       hasUsersTable = db
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'users'")
