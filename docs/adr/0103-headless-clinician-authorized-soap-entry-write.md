@@ -398,6 +398,9 @@ byte. Il wire format e esattamente quello di ADR 0071:
 bundle usa lo schema `mediflow.headless.soap-entry-seal.v1`, conserva in chiaro
 `type`, `date`, `setting` e `payloadDigest`, contiene i tre `ENC:` nell'ordine
 `title`, `content`, `metadata` e non contiene `attachments`.
+Le own data keys enumerabili del bundle sono esattamente, nello stesso ordine,
+`schema`, `type`, `date`, `setting`, `title`, `content`, `metadata`,
+`payloadDigest`, `sealDigest`.
 
 `sealDigest` usa il codec
 `mediflow.headless.soap-entry-seal-digest.v1`, lo stesso framing length-prefixed
