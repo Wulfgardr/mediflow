@@ -1,5 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
     CLINICIAN_SOAP_DRAFT_SCHEMA, CLINICIAN_SOAP_OPERATION_ID, validateClinicianSoapWriteDraft,
@@ -19,6 +20,21 @@ function acceptedSnapshot(overrides: Partial<Record<'subjective' | 'objective' |
     const result = validateClinicianSoapWriteDraft(input); assert.equal(result.status, 'accepted');
     if (result.status !== 'accepted') throw new Error('synthetic H1 fixture denied'); return result;
 }
+
+test('matches the language-neutral H4 field-set golden fixture byte for byte', () => {
+    const fixture = JSON.parse(readFileSync(new URL('../../native/contracts/headless-soap-entry-h4-golden.v1.json', import.meta.url), 'utf8')) as {
+        inputs: { epochMilliseconds: number; subjective: string; objective: string; assessment: string; plan: string };
+        h1Digest: { sha256: { hex: string } };
+        fieldSet: unknown;
+    };
+    const source = acceptedSnapshot({
+        subjective: fixture.inputs.subjective, objective: fixture.inputs.objective,
+        assessment: fixture.inputs.assessment, plan: fixture.inputs.plan,
+    });
+    assert.equal(source.digest.sha256.hex, fixture.h1Digest.sha256.hex);
+    const result = createClinicianSoapEntryFieldSet(source, fixture.inputs.epochMilliseconds); assert.ok(result);
+    assert.equal(JSON.stringify(result), JSON.stringify(fixture.fieldSet));
+});
 
 test('creates the exact authority-free SOAP entry field set from one accepted H1 snapshot', () => {
     const source = acceptedSnapshot(); const result = createClinicianSoapEntryFieldSet(source, 1_704_067_200_987);
