@@ -306,6 +306,168 @@ Throw, risultato asincrono, reentry o perdita di currentness terminalizzano H3
 e drenano i dipendenti, mentre un ref o una registration foreign restano
 inermi.
 
+### Costanti H4 per 0.8.5
+
+H4 e diviso in due componenti senza authority: il field set host-owned e il
+codec client di seal/reopen. Il primo resta server-side e closure-bound a H3;
+il secondo resta browser-side e closure-bound alla master key della sessione.
+Nessuna identita opaca JavaScript attraversa il confine server/browser. H5
+usera il canale applicativo previsto per trasportare soltanto il DTO canonico
+e un correlation token non-authorizing; `proposalRef`, scope e registration
+non sono serializzabili e non attraversano quel canale.
+
+Il field set plaintext usa lo schema letterale
+`mediflow.headless.soap-entry-field-set.v1` e ha esattamente queste own data
+keys enumerabili, nell'ordine indicato:
+
+```text
+schema, type, title, date, content, setting, metadata, payloadDigest
+```
+
+I literal host-owned sono esattamente:
+
+```text
+type    = visit
+title   = Voce clinica
+setting = ambulatory
+```
+
+`date` deriva da un solo epoch millisecond host-owned, safe integer e non
+negativo, campionato dentro la prima continuation H3 corrente. H4 tronca al
+secondo inferiore e usa esclusivamente la forma ASCII UTC
+`YYYY-MM-DDTHH:mm:ss.000Z`, con anno a quattro cifre. Locale, timezone,
+precisione e data caller-supplied non sono input.
+
+`content` concatena quattro blocchi, in ordine S, O, A, P. Per il label `L` e
+la sezione H1 `v`, il blocco e `<p>L:</p>` quando `v` e vuota e
+`<p>L: {escape(v)}</p>` altrimenti. `escape` procede una volta da sinistra a
+destra: `&`, `<`, `>`, `"`, `'` diventano rispettivamente `&amp;`, `&lt;`,
+`&gt;`, `&quot;`, `&#39;`; ogni LF diventa `<br>`. Non esegue trim,
+sanitization, DOM parsing o ulteriori normalizzazioni. Spazi, tab, slash,
+emoji e LF gia normalizzati da H1 restano byte-significativi. Il decoder
+accetta soltanto questa grammatica e richiede
+`encode(decode(content)) === content`; `<br/>`, tag o whitespace alternativi
+non sono equivalenti.
+
+`metadata` e l'esatta proiezione digest H1, come oggetto JSON e non come
+stringa JSON: own keys `codec, sha256`, poi `bytes, hex`. La serializzazione
+canonica non contiene whitespace e usa esattamente l'ordine
+`codec,sha256` / `bytes,hex`; bytes ed hex devono rappresentare lo stesso
+SHA-256. Non aggiunge schema, operation, autore, paziente o altro contesto.
+
+`attachments` e semanticamente assente: non e una own key nel field set, nel
+bundle sigillato o nello snapshot H5 e corrisponde a SQL `NULL` al commit.
+`null`, `[]`, `"[]"`, stringa vuota o un quarto `ENC:` non sono
+rappresentazioni equivalenti. Nei digest l'assenza e legata dal sentinel
+letterale `mediflow.headless.attachments.absent.v1`.
+
+`payloadDigest` usa il codec
+`mediflow.headless.soap-entry-payload-digest.v1` e SHA-256. Ogni campo e UTF-8
+senza BOM, preceduto dalla propria lunghezza unsigned 32-bit big-endian, nello
+stesso framing H1. L'ordine e esattamente:
+
+```text
+mediflow.headless.soap-entry-payload-digest.v1
+mediflow.headless.soap-entry-field-set.v1
+mediflow.headless.soap-draft-digest.v1
+<h1DigestHex>
+visit
+Voce clinica
+<date>
+<content>
+ambulatory
+<metadataJsonCanonico>
+mediflow.headless.attachments.absent.v1
+```
+
+Il digest ha la forma chiusa e frozen `codec`, `sha256`, quindi `bytes`,
+`hex`; bytes contiene 32 interi e hex 64 caratteri lowercase.
+
+### Seal client H4
+
+Il client sigilla separatamente e una sola volta `title`, `content` e
+`metadata`. Il plaintext e rispettivamente l'UTF-8 senza BOM di
+`JSON.stringify(string)`, `JSON.stringify(string)` e del JSON metadata
+canonico come oggetto raw. Non usa il sanitizer rich-text, l'encoder
+Foundation `.iso8601`, il `JSONEncoder` Swift ambientale o i generic helper che
+trasformano un errore di decrypt in `null`.
+
+Ogni campo usa AES-256-GCM con un IV CSPRNG distinto di 12 byte e tag di 16
+byte. Il wire format e esattamente quello di ADR 0071:
+`ENC:base64(iv12):base64(ciphertext||tag)`, con base64 RFC 4648 canonico. Il
+bundle usa lo schema `mediflow.headless.soap-entry-seal.v1`, conserva in chiaro
+`type`, `date`, `setting` e `payloadDigest`, contiene i tre `ENC:` nell'ordine
+`title`, `content`, `metadata` e non contiene `attachments`.
+
+`sealDigest` usa il codec
+`mediflow.headless.soap-entry-seal-digest.v1`, lo stesso framing length-prefixed
+e questo ordine:
+
+```text
+mediflow.headless.soap-entry-seal-digest.v1
+mediflow.headless.soap-entry-seal.v1
+mediflow.headless.soap-entry-payload-digest.v1
+<payloadDigestHex>
+visit
+<date>
+ambulatory
+<titleEnc>
+<contentEnc>
+<metadataEnc>
+mediflow.headless.attachments.absent.v1
+```
+
+Il client riapre lo stesso bundle, verifica i tipi plaintext
+string/string/object, ricostruisce il field set e confronta byte per byte
+schema, type, title, date, content, setting, metadata, payload digest e assenza
+attachments con il DTO host ricevuto. Verifica inoltre il seal digest; una
+re-encryption non e un confronto valido perche gli IV sono casuali.
+
+Il seal owner e creato dentro `SecurityProvider`: master key e generation di
+authority restano closure-bound e non sono parametri caller. Ogni await
+WebCrypto e seguito da un fence sulla stessa key identity e sulla stessa
+`authorityAttemptGenerationRef`; lock, logout o cambio generation impediscono
+la pubblicazione tardiva e rendono il bundle non corrente.
+
+### Lifecycle host H4 verso H5
+
+L'owner host H4 espone esattamente `{ service, lifecycleController }`. Il
+service espone solo `materialize(proposalRef)` e `wipe(entryRef)`.
+`materialize` accetta esclusivamente un `proposalRef` H3 corrente, reclama una
+sola volta quella proposta, campiona la data, costruisce il field set e
+registra un dipendente H3 prima di pubblicare un `entryRef` opaco, frozen,
+null-prototype e senza campi. Nessun field set attraversa il facade pubblico.
+
+Il controller privato H5 espone esattamente
+`withCurrentEntry(entryRef, operation)`, `registerDependent(entryRef,
+dispose)`, `confirmDependent(entryRef, registration)`,
+`unregisterDependent(entryRef, registration)` e
+`withCurrentDependent(entryRef, registration, operation)`. Le continuation
+ricevono soltanto una copia frozen del field set H4; non ricevono paziente,
+ambulatorio, sessione, lease, proposal ref, approval, proof, command,
+idempotenza o write authority.
+
+La currentness H4 e la congiunzione di entry identity, dipendente H3 e proposta
+H3 correnti; H4 non rinnova ne estende la deadline H3. Callback async,
+generator, Proxy, throw, risultato non-void, Promise, reentry o final fence
+fallito terminalizzano H4 e H3. Ref e registration foreign o stale restano
+inermi. Il drain H5 e bifase e snapshot-safe; unregister esplicito e true una
+sola volta e non invoca il disposer.
+
+`wipe` e idempotente: marca H4 terminale, rimuove ref e registration, rilascia
+le copie plaintext e i digest, unregistera H3, invoca `H3.service.wipe` e poi
+drena H5 contenendo throw, Promise rejection e reentry. Il disposer H3 usa la
+stessa terminalizzazione senza tentare di riusare H3. E cancellazione logica
+delle referenze, non zeroization della RAM.
+
+I denial PHI-safe H4 sono esattamente `proposal_unavailable`,
+`field_set_unavailable`, `seal_unavailable`, `seal_mismatch` e
+`lifecycle_unavailable`. Prima dell'attach un ref foreign e inerte. Dopo il
+primo attach H3 riuscito, ogni denial terminalizza H4 e H3. H4 non apre route,
+non legge o scrive SQLite, non conia approval o proof e non implementa H5.
+Il gate H4 richiede field set host, codec/golden tri-OS e seal/reopen client
+verificati; il loro handoff runtime e parte di H5 e non viene anticipato.
+
 Chat, voce/audio trascritti, planner text, Mini e utterance dell'agente possono
 solo raccogliere la bozza o richiedere preview. Non possono mai approvare,
 coniare un gesto, confermare un PIN o consumare una proof.
