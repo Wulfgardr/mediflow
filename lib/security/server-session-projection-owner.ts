@@ -336,6 +336,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
     const portBacked = authorityKind !== 'legacy';
     const selectionScopes = new WeakMapConstructor<object, SelectionScopeRecord>();
     const sessionScopes = new WeakMapConstructor<object, SelectionScopeRecord>();
+    const sessionIdScopes = new MapConstructor<string, SelectionScopeRecord>();
     const selectionRegistrations = new WeakMapConstructor<object, SelectionDependentRecord>();
     let selectionOperation: { scope: SelectionScopeRecord; dependent: SelectionDependentRecord | null;
         created: SelectionDependentRecord | null; poisoned: boolean } | null = null;
@@ -365,6 +366,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
         if (!scope.active) return;
         scope.active = false; deleteWeakMapValue(selectionScopes, scope.scope);
         if (applyIntrinsic(weakMapGet, sessionScopes, [scope.session]) === scope) deleteWeakMapValue(sessionScopes, scope.session);
+        if (getMapValue(sessionIdScopes, scope.session.id) === scope) deleteMapValue(sessionIdScopes, scope.session.id);
         let record = scope.dependents; let pending: SelectionDependentRecord | null = null; scope.dependents = null;
         while (record) { const next = record.next; record.next = null; record.drainNext = pending; pending = record;
             record.active = false; deleteWeakMapValue(selectionRegistrations, record.registration); record = next; }
@@ -394,8 +396,9 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
         withCurrentSelection(presented: ServerSession, operation: (scope: ServerSessionSelectionScopeV1) => void): boolean {
             if (selectionOperation) { selectionOperation.poisoned = true; return false; }
             if (!supportedSelectionCallback(operation)) return false;
-            const scope = typeof presented === 'object' && presented !== null && !isProxy(presented)
+            let scope = typeof presented === 'object' && presented !== null && !isProxy(presented)
                 ? applyIntrinsic(weakMapGet, sessionScopes, [presented]) ?? null : null;
+            if (!scope) { try { if (eligible(presented, false)) scope = getMapValue(sessionIdScopes, presented.id) ?? null; } catch { scope = null; } }
             if (!scope || !scope.active || !scope.current()) return false;
             const activeOperation = beginSelectionOperation(scope, null); if (!activeOperation) return false;
             const succeeded = selectionCallbackSucceeded(operation, [scope.scope]) && scope.active && scope.current()
@@ -966,6 +969,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                         selectionLifecycleScope = scope;
                         applyIntrinsic(weakMapSet, selectionScopes, [scopeIdentity, scope]);
                         applyIntrinsic(weakMapSet, sessionScopes, [session, scope]);
+                        setMapValue(sessionIdScopes, session.id, scope);
                         return ObjectFreeze({ sessionRef, selectionEpoch: next.selectionEpoch, patientRef: next.patientRef,
                             ambulatoryRef: next.ambulatoryRef, leaseRef: next.leaseRef, expiresAt });
                     } finally { selecting = false; }
