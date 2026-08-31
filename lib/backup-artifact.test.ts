@@ -14,6 +14,9 @@ import {
 const SOAP_ATTESTATION_A = `hsar_${'a'.repeat(32)}`;
 const SOAP_ATTESTATION_C = `hsar_${'c'.repeat(32)}`;
 const SOAP_ATTESTATION_F = `hsar_${'f'.repeat(32)}`;
+const SOAP_ISSUER_A = `hsari_${'a'.repeat(32)}`;
+const SOAP_ISSUER_C = `hsari_${'c'.repeat(32)}`;
+const SOAP_ISSUER_F = `hsari_${'f'.repeat(32)}`;
 
 const basePayload = {
     ambulatories: [
@@ -288,8 +291,8 @@ async function checksumValidHeadlessSoapAttestationArtifact(mutate: (artifact: a
             policyVersion: 'clinician_confirmed_single_use.v1',
             status: 'active',
             attestationVersion: 1,
-            issuerRef: 'issuer-synthetic',
-            expiresAt: '2026-03-17T09:10:00.000Z',
+            issuerRef: SOAP_ISSUER_C,
+            expiresAt: '2026-03-17T16:10:00.000Z',
             activatedAt: '2026-03-17T08:10:00.000Z',
             revocationGeneration: 0,
             revokedAt: null,
@@ -319,11 +322,11 @@ test('uses whole-second non-negative canonical timestamps and a stable H2 attest
         headlessSoapActiveRoleAttestations: [{
             attestationRef: SOAP_ATTESTATION_F, actorRef: 'actor-z', schemaVersion: 'mediflow.headless-soap-active-role-attestation.v1',
             role: 'physician', operationId: 'mediflow.clinical_diary.append_soap.v1', policyVersion: 'clinician_confirmed_single_use.v1',
-            status: 'active', attestationVersion: 1, issuerRef: 'issuer-z', expiresAt: '2026-03-17T09:00:00.000Z', activatedAt: '2026-03-17T08:00:00.000Z', revocationGeneration: 0, revokedAt: null, createdAt: '2026-03-17T08:00:00.000Z', updatedAt: '2026-03-17T08:00:00.000Z',
+            status: 'active', attestationVersion: 1, issuerRef: SOAP_ISSUER_F, expiresAt: '2026-03-17T16:00:00.000Z', activatedAt: '2026-03-17T08:00:00.000Z', revocationGeneration: 0, revokedAt: null, createdAt: '2026-03-17T08:00:00.000Z', updatedAt: '2026-03-17T08:00:00.000Z',
         }, {
             attestationRef: SOAP_ATTESTATION_A, actorRef: 'actor-a', schemaVersion: 'mediflow.headless-soap-active-role-attestation.v1',
             role: 'physician', operationId: 'mediflow.clinical_diary.append_soap.v1', policyVersion: 'clinician_confirmed_single_use.v1',
-            status: 'active', attestationVersion: 1, issuerRef: 'issuer-a', expiresAt: '2026-03-17T09:00:00.000Z', activatedAt: '2026-03-17T08:00:00.000Z', revocationGeneration: 0, revokedAt: null, createdAt: '2026-03-17T08:00:00.000Z', updatedAt: '2026-03-17T08:00:00.000Z',
+            status: 'active', attestationVersion: 1, issuerRef: SOAP_ISSUER_A, expiresAt: '2026-03-17T16:00:00.000Z', activatedAt: '2026-03-17T08:00:00.000Z', revocationGeneration: 0, revokedAt: null, createdAt: '2026-03-17T08:00:00.000Z', updatedAt: '2026-03-17T08:00:00.000Z',
         }],
     }));
     const rows = source.payload.headlessSoapActiveRoleAttestations;
@@ -390,6 +393,8 @@ test('rejects malformed, duplicated, and lifecycle-invalid headless SOAP active-
         (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].role = 'admin'; },
         (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].operationId = 'other'; },
         (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].policyVersion = 'other.v1'; },
+        (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].issuerRef = 'caller-supplied-issuer'; },
+        (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].expiresAt = '2026-03-17T16:09:59.000Z'; },
         (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].issuerRef = null; },
         (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].revocationGeneration = 1; },
         (artifact) => { artifact.payload.headlessSoapActiveRoleAttestations[0].activatedAt = '2026-03-17T09:11:00.000Z'; },

@@ -14,6 +14,7 @@ export const AUDIT_EVENT_TYPES = [
     'auth.login.failed',
     'auth.logout',
     'auth.lock',
+    'auth.soap_active_role.enrolled',
     'patient.created',
     'patient.updated',
     'patient.deleted',
@@ -59,7 +60,7 @@ export const AUDIT_EVENT_TYPES = [
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
 export type AuditOutcome = 'success' | 'failure' | 'denied';
 export type AuditActorType = 'user' | 'system';
-export type AuditSubjectType = 'session' | 'patient' | 'ambulatory' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'attachment' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings' | 'ai_review';
+export type AuditSubjectType = 'session' | 'active_role_attestation' | 'patient' | 'ambulatory' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'attachment' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings' | 'ai_review';
 export type AuditSourceSurface = 'web' | 'native' | 'api' | 'job';
 export type AuditAuthContext = 'session' | 'local-token' | 'anonymous';
 
@@ -380,6 +381,7 @@ export function summarizeAuditEvents(records: AuditRecord[], isTruncated = false
     };
     const subjectTypes: Record<AuditSubjectType, number> = {
         session: 0,
+        active_role_attestation: 0,
         patient: 0,
         ambulatory: 0,
         checkup: 0,
