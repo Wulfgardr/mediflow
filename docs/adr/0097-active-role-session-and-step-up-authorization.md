@@ -120,6 +120,28 @@ and independent verification remain the later H5-H10 sequence in ADR 0103.
 No packet may combine this active-role work with Fabric runtime or reuse the
 ADR 0098 review path as its implementation.
 
+### H2a-E activation constants for 0.8.5
+
+The controlled local setup accepts only the fresh raw PIN. The host resolves
+the current Web administrator, supplies its canonical username to credential
+verification, and requires the exact session and account projection to remain
+unchanged before and after that verification. Actor, username, role, session,
+issuer, expiry and attestation references are never caller fields.
+
+One successful setup activates an inactive attestation, or renews an active but
+expired one, for exactly eight hours. The store mints a fresh opaque
+`hsari_<32 lowercase hex>` issuer reference for every activation generation.
+An unexpired active attestation denies duplicate activation; a revoked
+attestation is terminal. Revocation preserves the last activation facts and
+increments the revocation generation.
+
+Activation and its PHI-safe `auth.soap_active_role.enrolled` audit event commit
+in the same local SQLite transaction. The event is scoped to the opaque actor
+and attestation references and contains no PIN, SOAP, direct identity, grant,
+proposal or authority payload. H2a-E returns only a non-authorizing lifecycle
+projection; it creates no active-role session grant, route, UI or clinical
+write.
+
 ## Consequences and stop rule
 
 The first 0.8.5 write remains a proposed, clinician-confirmed SOAP append
