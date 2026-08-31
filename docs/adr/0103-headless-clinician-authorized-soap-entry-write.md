@@ -150,6 +150,36 @@ digest H1, SOAP, paziente, selezione, proposal, approval, proof e write non
 entrano nell'owner H2b: il digest viene legato solo quando H3 materializza la
 proposta memory-only.
 
+### Porta lifecycle H2b per H3
+
+H2b espone al codice production due superfici separate. Il facade pubblico
+resta esattamente il service a quattro metodi gia fissato; un owner interno
+condivide per closure lo stesso stato e consegna al solo controller host H3 una
+porta lifecycle privata. Il lifecycle H3 resta un modulo autonomo e dipende
+solo da questa porta minima, non dal facade production concreto H2b.
+
+La porta privata espone esattamente `withNewLease(operation)`,
+`registerDependent(lease, dispose)`, `confirmDependent(lease, registration)`,
+`unregisterDependent(lease, registration)`,
+`withCurrentDependent(lease, registration, operation)` e
+`withCurrentProposalBudget(lease, registration, operation)`. Lease e
+registration sono identita opache, frozen, senza campi. `withNewLease`
+materializza il figlio e invoca la callback nella stessa continuation H2a
+prima di risolvere; nessun record H3 puo quindi essere pubblicato prima
+dell'attach. La terminalizzazione del figlio rimuove tutte le registration e
+invoca sincronicamente ogni disposer prima del successivo uso osservabile.
+
+Le tre continuation accettano soltanto callback sincrone host-owned e
+restituiscono `true` solo quando callback e final fence terminano sullo stesso
+figlio corrente. Throw, risultato asincrono, reentry, attach parziale o perdita
+del figlio terminalizzano quel figlio, drenano i suoi dipendenti e non
+revocano parent o sibling. `withCurrentProposalBudget` applica la precedenza
+identita, tempo, H2a, final fence, registration e budget; porta il budget da
+`1` a `0` una sola volta immediatamente prima della callback. Un budget gia
+zero resta `proposal_budget_exhausted` e non rende terminale il figlio. Nessuna
+callback riceve SOAP, digest, selezione, proposal, approval, proof o write
+authority da H2b.
+
 ### Sessione di medico e lifecycle della proposta
 
 H2a e H2b richiedono una sessione active-role del medico autenticato accettata
