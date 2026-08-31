@@ -158,16 +158,17 @@ condivide per closure lo stesso stato e consegna al solo controller host H3 una
 porta lifecycle privata. Il lifecycle H3 resta un modulo autonomo e dipende
 solo da questa porta minima, non dal facade production concreto H2b.
 
-La porta privata espone esattamente `withNewLease(operation)`,
+La porta privata espone esattamente `withCurrentLease(lease, operation)`,
 `registerDependent(lease, dispose)`, `confirmDependent(lease, registration)`,
 `unregisterDependent(lease, registration)`,
 `withCurrentDependent(lease, registration, operation)` e
 `withCurrentProposalBudget(lease, registration, operation)`. Lease e
-registration sono identita opache, frozen, senza campi. `withNewLease`
-materializza il figlio e invoca la callback nella stessa continuation H2a
-prima di risolvere; nessun record H3 puo quindi essere pubblicato prima
-dell'attach. La terminalizzazione del figlio rimuove tutte le registration e
-invoca sincronicamente ogni disposer prima del successivo uso osservabile.
+registration sono identita opache, frozen, senza campi. Dopo `open()`,
+`withCurrentLease` rivalida il figlio e invoca la callback di attach nella
+continuation H2a; nessun record H3 puo essere pubblicato prima che questa
+continuation termini con successo. La terminalizzazione del figlio rimuove
+tutte le registration e invoca sincronicamente ogni disposer prima del
+successivo uso osservabile.
 
 Le tre continuation accettano soltanto callback sincrone host-owned e
 restituiscono `true` solo quando callback e final fence terminano sullo stesso
