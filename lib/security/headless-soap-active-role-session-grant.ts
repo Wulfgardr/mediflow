@@ -13,8 +13,9 @@ const TTL_MS = 8 * 60 * 60 * 1_000, sessionIdPattern = /^[0-9a-f]{64}$/u, attest
 const objectAssign = Object.assign, objectCreate = Object.create, objectFreeze = Object.freeze, objectGetPrototypeOf = Object.getPrototypeOf;
 const objectGetOwnPropertyDescriptors = Object.getOwnPropertyDescriptors, objectIsFrozen = Object.isFrozen, reflectOwnKeys = Reflect.ownKeys;
 const reflectApply = Reflect.apply, regexpExec = RegExp.prototype.exec, stringTrim = String.prototype.trim, numberIsSafeInteger = Number.isSafeInteger;
-const isAsyncFunction = types.isAsyncFunction, isGeneratorFunction = types.isGeneratorFunction, isProxy = types.isProxy;
+const isAsyncFunction = types.isAsyncFunction, isGeneratorFunction = types.isGeneratorFunction, isPromise = types.isPromise, isProxy = types.isProxy;
 const datePrototype = Date.prototype, dateGetTime = Date.prototype.getTime, functionPrototype = Function.prototype, defaultClock = Date.now;
+const promiseThen = Promise.prototype.then;
 const WeakMapConstructor = WeakMap, MapConstructor = Map, weakMapGet = WeakMap.prototype.get, weakMapSet = WeakMap.prototype.set, weakMapDelete = WeakMap.prototype.delete;
 const mapGet = Map.prototype.get, mapSet = Map.prototype.set, mapDelete = Map.prototype.delete;
 declare const grantIdentity: unique symbol;
@@ -34,6 +35,13 @@ type Session = Readonly<{ id: string; userId: string; username: string; role: 'a
 type Snapshot = Readonly<{ session: Session; attestationRef: string; issuerRef: string; activatedAt: number; attestationExpiresAt: number; updatedAt: number; expiresAt: number }>;
 type DependentRecord = { registration: HeadlessSoapActiveRoleDependentRegistrationV1; owner: GrantRecord; dispose: () => void; active: boolean; next: DependentRecord | null };
 type GrantRecord = { grant: HeadlessSoapActiveRoleSessionGrantV1; snapshot: Snapshot; active: boolean; port: WebResourcePort | null; registration: WebResourceRegistration | null; dependents: DependentRecord | null };
+const dependentOperationFailure = objectFreeze(objectCreate(null));
+const ignorePromiseRejection = () => undefined;
+function requireVoidResult(value: unknown): void { if (value === undefined) return;
+    if (isPromise(value)) { try { reflectApply(promiseThen, value, [undefined, ignorePromiseRejection]); } catch { /* the owner is terminalized below */ } }
+    throw dependentOperationFailure; }
+function synchronousCallback(value: unknown): boolean { return typeof value === 'function' && !isProxy(value) && !isAsyncFunction(value)
+    && !isGeneratorFunction(value) && objectGetPrototypeOf(value) === functionPrototype; }
 function fail(code: HeadlessSoapActiveRoleSessionGrantErrorCode): never { throw new HeadlessSoapActiveRoleSessionGrantError(code); }
 function exact(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
     try {
@@ -84,7 +92,7 @@ function currentDelete(registry: Map<string, GrantRecord>, key: string): void { 
 /** Owns the public grant service and its closure-bound dependent lifecycle controller. */
 export function createHeadlessSoapActiveRoleSessionGrantOwner(sources: HeadlessSoapActiveRoleSessionGrantSources) {
     const issued = new WeakMapConstructor<object, GrantRecord>(), dependentRegistrations = new WeakMapConstructor<object, DependentRecord>();
-    const current = new MapConstructor<string, GrantRecord>(), clock = sources.clock ?? defaultClock;
+    const current = new MapConstructor<string, GrantRecord>(), clock = sources.clock ?? defaultClock; let dependentOperationActive = false, dependentOperationPoisoned = false;
     const unlinkDependent = (dependent: DependentRecord): void => { const owner = dependent.owner;
         if (owner.dependents === dependent) owner.dependents = dependent.next;
         else { let previous = owner.dependents; while (previous && previous.next !== dependent) previous = previous.next; if (previous) previous.next = dependent.next; }
@@ -109,11 +117,19 @@ export function createHeadlessSoapActiveRoleSessionGrantOwner(sources: HeadlessS
     const confirmResource = (record: GrantRecord): boolean => { const port = record.port; if (!record.active || !port) return false; let resourceUse: WebResourceUse | null = null, committed = false;
         try { resourceUse = beginResourceUse(port); committed = !!resourceUse && commitResourceUse(resourceUse); return committed; }
         catch { return false; } finally { if (resourceUse && !committed) abortResourceUse(resourceUse); } };
-    const service = objectFreeze({
-        async issue(): Promise<HeadlessSoapActiveRoleSessionGrantV1> {
+    const finishCurrent = (record: GrantRecord, operation?: (record: GrantRecord) => void): GrantRecord => {
+        if (!record.active || currentGet(current, record.snapshot.session.id) !== record || weakGet(issued, record.grant) !== record) { discard(record); return fail('lifecycle_unavailable'); }
+        if (operation) { if (dependentOperationActive) { dependentOperationPoisoned = true; discard(record); throw dependentOperationFailure; }
+            dependentOperationPoisoned = false; dependentOperationActive = true;
+            try { requireVoidResult(reflectApply(operation, undefined, [record])); }
+            catch (error) { discard(record); throw error; } finally { dependentOperationActive = false; }
+            if (dependentOperationPoisoned || !record.active || currentGet(current, record.snapshot.session.id) !== record || weakGet(issued, record.grant) !== record) { discard(record); throw dependentOperationFailure; } }
+        return record; };
+    const issueCurrent = async (operation?: (record: GrantRecord) => void): Promise<HeadlessSoapActiveRoleSessionGrantV1> => {
+            if (dependentOperationActive) { dependentOperationPoisoned = true; return fail('lifecycle_unavailable'); }
             const before = await read(); let value: unknown; try { value = await sources.readCurrentSession(); } catch { return fail('session_unavailable'); }
             const snapshot = capture(value); if (!sameSnapshot(before, snapshot)) return fail('projection_stale'); const existing = currentGet(current, snapshot.session.id);
-            if (existing && sameSnapshot(existing.snapshot, snapshot) && confirmResource(existing)) return existing.grant;
+            if (existing && sameSnapshot(existing.snapshot, snapshot) && confirmResource(existing)) return finishCurrent(existing, operation).grant;
             if (existing) discard(existing);
             const grant = objectFreeze(objectCreate(null)) as HeadlessSoapActiveRoleSessionGrantV1;
             const record: GrantRecord = { grant, snapshot, active: true, port: null, registration: null, dependents: null };
@@ -123,46 +139,66 @@ export function createHeadlessSoapActiveRoleSessionGrantOwner(sources: HeadlessS
                 registration = registerPrivateResource(port, () => { discard(record, true); }); if (!registration) return fail('lifecycle_unavailable');
                 committed = commitResourceUse(resourceUse); if (!committed || !record.active) return fail('lifecycle_unavailable');
                 record.port = port; record.registration = registration; currentSet(current, snapshot.session.id, record); weakSet(issued, grant, record);
-                if (!record.active || currentGet(current, snapshot.session.id) !== record || weakGet(issued, grant) !== record) { discard(record); return fail('lifecycle_unavailable'); }
-                return grant;
+                return finishCurrent(record, operation).grant;
             } finally { if (resourceUse && !committed) abortResourceUse(resourceUse); if (!committed) { if (port && registration) unregisterPrivateResource(port, registration); if (port) releaseResourcePort(port); record.active = false; } }
-        },
-        async recheck(candidate: unknown): Promise<HeadlessSoapActiveRoleSessionGrantV1> {
+        };
+    const recheckCurrent = async (candidate: unknown, operation?: (record: GrantRecord) => void): Promise<HeadlessSoapActiveRoleSessionGrantV1> => {
+            if (dependentOperationActive) { dependentOperationPoisoned = true; return fail('lifecycle_unavailable'); }
             const record = typeof candidate === 'object' && candidate !== null ? weakGet(issued, candidate) : undefined;
             if (!record || !record.active || now(clock) >= record.snapshot.expiresAt) { if (record) discard(record); return fail('grant_unavailable'); }
             let snapshot: Snapshot; try { const before = await read(); let value: unknown;
                 try { value = await sources.readCurrentSession(); } catch { return fail('session_unavailable'); }
                 snapshot = capture(value); if (!sameSnapshot(before, snapshot)) return fail('projection_stale'); } catch (error) { discard(record); throw error; }
             if (!record.active || !sameSnapshot(record.snapshot, snapshot)) { discard(record); return fail('projection_stale'); }
-            if (!confirmResource(record)) { discard(record); return fail('grant_unavailable'); } return record.grant;
-        },
+            if (!confirmResource(record)) { discard(record); return fail('grant_unavailable'); } return finishCurrent(record, operation).grant;
+        };
+    const registerDependentRecord = (owner: GrantRecord, dispose: () => void): HeadlessSoapActiveRoleDependentRegistrationV1 | null => {
+        const registration = objectFreeze(objectCreate(null)) as HeadlessSoapActiveRoleDependentRegistrationV1;
+        const dependent: DependentRecord = { registration, owner, dispose, active: true, next: owner.dependents }; owner.dependents = dependent;
+        try { weakSet(dependentRegistrations, registration, dependent);
+            if (!owner.active || weakGet(issued, owner.grant) !== owner || weakGet(dependentRegistrations, registration) !== dependent) throw dependentOperationFailure;
+        } catch { dependent.active = false; try { weakDelete(dependentRegistrations, registration); } catch { /* an unpublished identity cannot retain authority */ }
+            unlinkDependent(dependent); discard(owner); return null; }
+        return registration; };
+    const dependentCurrent = (owner: GrantRecord, registration: unknown): boolean => {
+        if (typeof registration !== 'object' || registration === null) return false; const dependent = weakGet(dependentRegistrations, registration);
+        return owner.active && !!dependent && dependent.active && dependent.owner === owner && dependent.registration === registration; };
+    const service = objectFreeze({
+        issue(): Promise<HeadlessSoapActiveRoleSessionGrantV1> { return issueCurrent(); },
+        recheck(candidate: unknown): Promise<HeadlessSoapActiveRoleSessionGrantV1> { return recheckCurrent(candidate); },
         dispose(candidate: unknown): boolean { const record = typeof candidate === 'object' && candidate !== null ? weakGet(issued, candidate) : undefined;
             if (!record || !record.active) return false; discard(record); return true; },
     });
     const lifecycleController = objectFreeze({
+        async withCurrentGrant(operation: (grant: HeadlessSoapActiveRoleSessionGrantV1) => void): Promise<boolean> {
+            if (!synchronousCallback(operation)) return false;
+            try { await issueCurrent((owner) => {
+                    try { requireVoidResult(reflectApply(operation, undefined, [owner.grant])); } catch { throw dependentOperationFailure; }
+                }); return true;
+            } catch (error) { if (error === dependentOperationFailure) return false; throw error; }
+        },
         registerDependent(candidate: unknown, dispose: () => void): HeadlessSoapActiveRoleDependentRegistrationV1 | null {
-            if (typeof candidate !== 'object' || candidate === null || typeof dispose !== 'function' || isProxy(dispose)
-                || isAsyncFunction(dispose) || isGeneratorFunction(dispose) || objectGetPrototypeOf(dispose) !== functionPrototype) return null;
+            if (typeof candidate !== 'object' || candidate === null || !synchronousCallback(dispose)) return null;
             const owner = weakGet(issued, candidate); if (!owner || !owner.active) return null;
-            const registration = objectFreeze(objectCreate(null)) as HeadlessSoapActiveRoleDependentRegistrationV1;
-            const dependent: DependentRecord = { registration, owner, dispose, active: true, next: owner.dependents };
-            owner.dependents = dependent;
-            try { weakSet(dependentRegistrations, registration, dependent);
-                if (!owner.active || weakGet(issued, candidate) !== owner || weakGet(dependentRegistrations, registration) !== dependent) throw new Error('dependent_attach_failed');
-            } catch { dependent.active = false; try { weakDelete(dependentRegistrations, registration); } catch { /* an unpublished identity cannot retain authority */ }
-                unlinkDependent(dependent); discard(owner); return null; }
-            return registration;
+            return registerDependentRecord(owner, dispose);
         },
         confirmDependent(candidate: unknown, registration: unknown): boolean {
-            if (typeof candidate !== 'object' || candidate === null || typeof registration !== 'object' || registration === null) return false;
-            const owner = weakGet(issued, candidate), dependent = weakGet(dependentRegistrations, registration);
-            return !!owner && owner.active && !!dependent && dependent.active && dependent.owner === owner && dependent.registration === registration;
+            if (typeof candidate !== 'object' || candidate === null) return false; const owner = weakGet(issued, candidate);
+            return !!owner && dependentCurrent(owner, registration);
         },
         unregisterDependent(candidate: unknown, registration: unknown): boolean {
             if (typeof candidate !== 'object' || candidate === null || typeof registration !== 'object' || registration === null) return false;
             const owner = weakGet(issued, candidate), dependent = weakGet(dependentRegistrations, registration);
             if (!owner || !dependent || !dependent.active || dependent.owner !== owner || dependent.registration !== registration) return false;
             dependent.active = false; weakDelete(dependentRegistrations, registration); unlinkDependent(dependent); return true;
+        },
+        async withCurrentDependent(candidate: unknown, registration: unknown, operation: () => void): Promise<boolean> {
+            if (typeof candidate !== 'object' || candidate === null || !synchronousCallback(operation)) return false;
+            const owner = weakGet(issued, candidate); if (!owner || !dependentCurrent(owner, registration)) return false;
+            try { await recheckCurrent(candidate, (currentOwner) => { if (currentOwner !== owner || !dependentCurrent(owner, registration)) throw dependentOperationFailure;
+                    try { requireVoidResult(reflectApply(operation, undefined, [])); } catch { throw dependentOperationFailure; }
+                    if (!dependentCurrent(owner, registration)) throw dependentOperationFailure; }); return true;
+            } catch (error) { if (error === dependentOperationFailure) return false; throw error; }
         },
     });
     return objectFreeze({ service, lifecycleController });
